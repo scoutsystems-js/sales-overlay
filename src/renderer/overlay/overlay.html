@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Overlay</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: transparent; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; pointer-events: none; }
+    .bar {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 8px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      pointer-events: none;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      max-height: 100vh;
+      overflow-y: auto;
+    }
+
+    /* Drag handle — small bar at top-left you can grab to move the overlay */
+    .drag-handle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 60px;
+      height: 12px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 0 0 4px 0;
+      cursor: grab;
+      pointer-events: auto;
+      -webkit-app-region: drag;
+      z-index: 10;
+      transition: background 0.2s;
+    }
+    .drag-handle:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .drag-handle::after {
+      content: '⠿';
+      font-size: 8px;
+      color: rgba(255,255,255,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+
+    /* Each prompt row */
+    .prompt-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 6px 0;
+      transition: opacity 0.4s ease;
+    }
+    .prompt-row.delivered {
+      opacity: 0.6;
+    }
+    .prompt-row + .prompt-row {
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .stage-badge {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      margin-top: 2px;
+      flex-shrink: 0;
+      background: #3b82f6;
+      color: #fff;
+    }
+    .stage-badge.objection { background: #ef4444; }
+    .stage-badge.close { background: #22c55e; color: #000; }
+    .stage-badge.transition { background: #f59e0b; color: #000; }
+
+    .content {
+      flex: 1;
+      min-width: 0;
+    }
+    .headline {
+      font-size: 11px;
+      font-weight: 600;
+      color: #999;
+      margin-bottom: 2px;
+      letter-spacing: 0.3px;
+    }
+    .suggestion {
+      font-size: 14px;
+      color: #fff;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .prompt-row.delivered .suggestion {
+      color: #aaa;
+    }
+    .follow-up {
+      font-size: 11px;
+      color: #555;
+      margin-top: 3px;
+      line-height: 1.3;
+      display: none;
+    }
+    .follow-up.visible { display: block; }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    .listening-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      flex-shrink: 0;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .status-label {
+      font-size: 10px;
+      color: #444;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="drag-handle" title="Drag to move overlay"></div>
+  <div class="bar" id="bar">
+    <div class="status-row" id="statusRow" style="display:none;">
+      <div class="listening-dot"></div>
+      <span class="status-label">Listening</span>
+    </div>
+    <div id="promptStack"></div>
+  </div>
+  <script>
+    var bar = document.getElementById('bar');
+    var promptStack = document.getElementById('promptStack');
+    var statusRow = document.getElementById('statusRow');
+    var MAX_VISIBLE_PROMPTS = 3; // Show current + 2 previous (faded)
+
+    function getStageClass(stage) {
+      if (stage === 'objection_handling') return 'objection';
+      if (stage === 'close') return 'close';
+      if (stage === 'transition') return 'transition';
+      return '';
+    }
+
+    function getStageLabel(stage) {
+      var labels = {
+        introduction: 'INTRO',
+        set: 'THE SET',
+        discovery: 'DISCOVERY',
+        transition: 'TRANSITION',
+        pitch: 'PITCH',
+        close: 'CLOSE',
+        objection_handling: 'OBJECTION',
+      };
+      return labels[stage] || (stage || '').toUpperCase();
+    }
+
+    function addPrompt(data) {
+      // Mark all existing prompts as delivered (faded)
+      var existing = promptStack.querySelectorAll('.prompt-row');
+      for (var i = 0; i < existing.length; i++) {
+        existing[i].classList.add('delivered');
+      }
+
+      // Create the new prompt row
+      var row = document.createElement('div');
+      row.className = 'prompt-row';
+
+      var badge = document.createElement('span');
+      badge.className = 'stage-badge';
+      var stageClass = getStageClass(data.stage);
+      if (stageClass) badge.classList.add(stageClass);
+      badge.textContent = getStageLabel(data.stage);
+
+      var content = document.createElement('div');
+      content.className = 'content';
+
+      var headline = document.createElement('div');
+      headline.className = 'headline';
+      headline.textContent = data.headline || '';
+
+      var suggestion = document.createElement('div');
+      suggestion.className = 'suggestion';
+      suggestion.textContent = data.suggestion || '';
+
+      content.appendChild(headline);
+      content.appendChild(suggestion);
+
+      if (data.followUp) {
+        var followUp = document.createElement('div');
+        followUp.className = 'follow-up visible';
+        followUp.textContent = data.followUp;
+        content.appendChild(followUp);
+      }
+
+      row.appendChild(badge);
+      row.appendChild(content);
+      promptStack.appendChild(row);
+
+      // Remove old prompts beyond the max
+      var allRows = promptStack.querySelectorAll('.prompt-row');
+      while (allRows.length > MAX_VISIBLE_PROMPTS) {
+        promptStack.removeChild(allRows[0]);
+        allRows = promptStack.querySelectorAll('.prompt-row');
+      }
+
+      // Scroll to bottom so newest prompt is visible
+      bar.scrollTop = bar.scrollHeight;
+    }
+
+    // Session started — show the opening script
+    window.electronAPI.onStatusUpdate(function(data) {
+      if (data.active) {
+        statusRow.style.display = 'flex';
+        promptStack.innerHTML = '';
+        addPrompt({
+          stage: 'introduction',
+          headline: 'INTRODUCTION — Open the call',
+          suggestion: '"Hey [Name], can you hear me okay? Great to meet you. I\'m [Your Name]. Where are you calling in from today?"',
+          followUp: 'Get their name, city, profession, and family in 90 seconds. Each answer becomes a close frame.',
+        });
+      } else {
+        statusRow.style.display = 'none';
+        promptStack.innerHTML = '';
+        addPrompt({
+          stage: '',
+          headline: 'Session ended',
+          suggestion: '',
+        });
+      }
+    });
+
+    // New suggestion from Claude — add below as a new line
+    window.electronAPI.onNewSuggestion(function(data) {
+      addPrompt(data);
+    });
+
+    window.electronAPI.onClearSuggestion(function() {
+      promptStack.innerHTML = '';
+    });
+  </script>
+</body>
+</html>
