@@ -1,6 +1,6 @@
 {
   "name": "sales-overlay",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Scout Systems — Real-time AI sales coaching overlay",
   "main": "src/main/index.js",
   "scripts": {
@@ -38,14 +38,18 @@
     "mac": {
       "target": {
         "target": "dmg",
-        "arch": ["arm64", "x64"]
+        "arch": [
+          "arm64",
+          "x64"
+        ]
       },
       "category": "public.app-category.business",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "entitlements.plist",
       "entitlementsInherit": "entitlements.plist",
-      "notarize": true
+      "notarize": true,
+      "icon": "build/icon.icns"
     },
     "dmg": {
       "title": "Scout by Scout Systems",
