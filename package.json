@@ -1,21 +1,65 @@
 {
   "name": "sales-overlay",
   "version": "1.0.0",
-  "description": "",
+  "description": "Scout Systems — Real-time AI sales coaching overlay",
   "main": "src/main/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
-    "dev": "NODE_ENV=development electron ."
+    "dev": "NODE_ENV=development electron .",
+    "build": "node scripts/prebuild.js && electron-builder --mac",
+    "release": "node scripts/prebuild.js && electron-builder --mac --publish always",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "Scout Systems",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/supabase-js": "^2.101.1",
     "dotenv": "^17.4.1",
+    "electron-audio-loopback": "^1.0.6",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^2.3.0",
     "electron": "^41.1.1",
-    "electron-audio-loopback": "^1.0.6"
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "io.scoutsystems.overlay",
+    "productName": "Scout",
+    "copyright": "Copyright © 2026 Scout Systems",
+    "publish": {
+      "provider": "github",
+      "owner": "scoutsystems-js",
+      "repo": "sales-overlay"
+    },
+    "mac": {
+      "target": {
+        "target": "dmg",
+        "arch": ["arm64", "x64"]
+      },
+      "category": "public.app-category.business",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.plist",
+      "entitlementsInherit": "entitlements.plist",
+      "notarize": true
+    },
+    "dmg": {
+      "title": "Scout by Scout Systems",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/electron-audio-loopback/**/*"
+    ]
   }
 }
