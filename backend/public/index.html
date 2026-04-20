@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scout Systems — AI Sales Coaching for High-Ticket Closers</title>
+  <meta name="description" content="Real-time AI teleprompter that tells you exactly what to say next on every high-ticket sales call. Handle objections, guide discovery, close more deals.">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #080808;
+      --surface: #111;
+      --surface2: #161616;
+      --border: #1e1e1e;
+      --blue: #2563eb;
+      --blue-hover: #1d4ed8;
+      --green: #4ade80;
+      --text: #f0f0f0;
+      --muted: #888;
+      --faint: #444;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 40px;
+      background: rgba(8,8,8,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-logo-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--blue);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+      border: none;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--faint); }
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--blue-hover); }
+    .btn-lg {
+      padding: 13px 28px;
+      font-size: 15px;
+      border-radius: 10px;
+    }
+    .btn-xl {
+      padding: 15px 36px;
+      font-size: 16px;
+      border-radius: 10px;
+    }
+
+    /* HERO */
+    .hero {
+      padding: 160px 40px 100px;
+      text-align: center;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(37,99,235,0.12);
+      border: 1px solid rgba(37,99,235,0.25);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: #93c5fd;
+      margin-bottom: 28px;
+      letter-spacing: 0.3px;
+    }
+    .hero-badge-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    h1 {
+      font-size: clamp(38px, 6vw, 68px);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 22px;
+    }
+    h1 span { color: var(--blue); }
+    .hero-sub {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 40px;
+      line-height: 1.65;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .hero-note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--faint);
+    }
+
+    /* OVERLAY PREVIEW */
+    .preview-section {
+      padding: 0 40px 80px;
+      display: flex;
+      justify-content: center;
+    }
+    .overlay-mock {
+      background: rgba(0,0,0,0.82);
+      border-radius: 0 0 12px 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      width: 100%;
+      max-width: 720px;
+      padding: 0;
+      overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+    }
+    .mock-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .mock-brand {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      opacity: 0.7;
+      letter-spacing: 0.5px;
+    }
+    .mock-controls {
+      display: flex;
+      gap: 6px;
+    }
+    .mock-btn {
+      width: 28px;
+      height: 22px;
+      border-radius: 5px;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mock-btn-start { background: #16a34a; color: #fff; }
+    .mock-btn-stop { background: #dc2626; color: #fff; }
+    .mock-prompt {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .mock-prompt:last-child { border-bottom: none; }
+    .mock-prompt-old { opacity: 0.5; }
+    .mock-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .badge-discovery { background: rgba(37,99,235,0.2); color: #93c5fd; }
+    .badge-objection { background: rgba(220,38,38,0.2); color: #fca5a5; }
+    .badge-close { background: rgba(22,163,74,0.2); color: #86efac; }
+    .mock-text {
+      font-size: 13px;
+      color: #e5e5e5;
+      line-height: 1.55;
+    }
+    .mock-prompt-old .mock-text { color: #aaa; }
+    .mock-question {
+      color: #93c5fd;
+      font-weight: 500;
+    }
+    .mock-prompt-old .mock-question { color: #666; }
+
+    /* SECTION STYLES */
+    section {
+      padding: 80px 40px;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--blue);
+      margin-bottom: 12px;
+    }
+    h2 {
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+    }
+    .section-sub {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.6;
+      margin-bottom: 52px;
+    }
+
+    /* HOW IT WORKS */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+    }
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      background: rgba(37,99,235,0.15);
+      border: 1px solid rgba(37,99,235,0.25);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #93c5fd;
+      margin-bottom: 16px;
+    }
+    .step h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .step p {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* FEATURES */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: var(--faint); }
+    .feature-icon {
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+    .feature-card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* WHO IT'S FOR */
+    .audience {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+    }
+    .audience h2 { margin-bottom: 12px; }
+    .audience p { color: var(--muted); font-size: 15px; line-height: 1.7; margin-bottom: 28px; }
+    .check-list { list-style: none; }
+    .check-list li {
+      font-size: 14px;
+      color: var(--muted);
+      padding: 6px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .check-list li::before {
+      content: '✓';
+      color: var(--green);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .stat-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-box .num {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-box .num.green { color: var(--green); }
+    .stat-box .num.blue { color: #93c5fd; }
+    .stat-box .label { font-size: 12px; color: var(--muted); }
+
+    /* PRICING */
+    .pricing-wrapper {
+      display: flex;
+      justify-content: center;
+    }
+    .pricing-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 48px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .pricing-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--blue), #7c3aed);
+    }
+    .pricing-badge {
+      display: inline-block;
+      background: rgba(74,222,128,0.12);
+      border: 1px solid rgba(74,222,128,0.25);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .pricing-card h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .pricing-card .price {
+      font-size: 52px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+      margin: 20px 0 4px;
+    }
+    .pricing-card .price sub {
+      font-size: 20px;
+      font-weight: 400;
+      color: var(--muted);
+      vertical-align: middle;
+    }
+    .pricing-card .price-note {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+    .pricing-features {
+      text-align: left;
+      list-style: none;
+      margin-bottom: 32px;
+    }
+    .pricing-features li {
+      font-size: 14px;
+      color: var(--muted);
+      padding: 7px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pricing-features li:last-child { border-bottom: none; }
+    .pricing-features li::before {
+      content: '✓';
+      color: var(--green);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* CTA BANNER */
+    .cta-banner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 60px 48px;
+      text-align: center;
+    }
+    .cta-banner h2 { margin-bottom: 12px; }
+    .cta-banner p { color: var(--muted); font-size: 16px; margin-bottom: 32px; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    footer p { font-size: 13px; color: var(--faint); }
+    footer a { color: var(--muted); text-decoration: none; font-size: 13px; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; gap: 24px; }
+
+    @media (max-width: 700px) {
+      nav { padding: 14px 20px; }
+      .nav-links { display: none; }
+      .hero { padding: 120px 20px 60px; }
+      section { padding: 60px 20px; }
+      .audience { grid-template-columns: 1fr; gap: 32px; padding: 28px; }
+      .pricing-card { padding: 32px 24px; }
+      .cta-banner { padding: 40px 24px; }
+      footer { flex-direction: column; gap: 16px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="nav-logo-icon">⚡</div>
+    Scout Systems
+  </a>
+  <ul class="nav-links">
+    <li><a href="#how-it-works">How it works</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+  <div class="nav-cta">
+    <a href="/login" class="btn btn-ghost">Log In</a>
+    <a href="/login#signup" class="btn btn-primary">Get Early Access</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">
+    <span class="hero-badge-dot"></span>
+    Now in early access — free for beta testers
+  </div>
+  <h1>Know Exactly What to Say.<br><span>On Every Call.</span></h1>
+  <p class="hero-sub">
+    Scout is a real-time AI teleprompter for high-ticket closers. It listens to your call, reads the room, and tells you exactly what to say next — live, in a transparent overlay on your screen.
+  </p>
+  <div class="hero-actions">
+    <a href="/login#signup" class="btn btn-primary btn-xl">Get Early Access — Free</a>
+    <a href="#how-it-works" class="btn btn-ghost btn-xl">See How It Works</a>
+  </div>
+  <p class="hero-note">Mac only · No API keys needed · Works on any call platform</p>
+</div>
+
+<!-- OVERLAY PREVIEW (mock UI) -->
+<div class="preview-section">
+  <div class="overlay-mock">
+    <div class="mock-top-row">
+      <span class="mock-brand">⚡ SCOUT</span>
+      <div class="mock-controls">
+        <div class="mock-btn mock-btn-start">▶</div>
+        <div class="mock-btn mock-btn-stop">■</div>
+      </div>
+    </div>
+    <div class="mock-prompt mock-prompt-old">
+      <div class="mock-badge badge-discovery">Discovery</div>
+      <div class="mock-text">
+        Acknowledge what they shared. Then probe deeper on the financial impact.
+        <span class="mock-question"> "If this problem goes unsolved for another 12 months, what does that cost you?"</span>
+      </div>
+    </div>
+    <div class="mock-prompt">
+      <div class="mock-badge badge-objection">Objection — Think About It</div>
+      <div class="mock-text">
+        Validate without agreeing. Surface what's really behind the hesitation.
+        <span class="mock-question"> "Of course — what specifically would you want to think through before moving forward?"</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <div class="section-label">How it works</div>
+  <h2>Set it up in 60 seconds.<br>Coach you in real time.</h2>
+  <p class="section-sub">Scout runs quietly in the background. Open it, click Start, and it takes over — no setup between calls.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Download & Launch</h3>
+      <p>Install the Mac app. Scout appears as a dark bar at the top of your screen — always visible, never in the way.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Start Your Call</h3>
+      <p>Click Start in Scout. It begins listening to both you and your prospect using your mic and system audio — no special setup.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Follow the Prompts</h3>
+      <p>Scout reads the conversation and displays your next line in the overlay. Deliver it, let the prospect respond, and your next prompt appears.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <h3>Handle Every Objection</h3>
+      <p>When Scout detects an objection, it instantly switches to the right framework and gives you the exact response to say.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-label">Features</div>
+  <h2>Built for closers.<br>Not sales managers.</h2>
+  <p class="section-sub">Everything in Scout is designed around one moment — you on a live call, needing to know what to say right now.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <h3>Live AI Teleprompter</h3>
+      <p>Scout follows the conversation in real time and always shows you the ideal next statement and question — matched to where you are in the call.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛡️</div>
+      <h3>Instant Objection Handling</h3>
+      <p>Money, spouse, think about it, no time — Scout detects objections the moment your prospect speaks and immediately shows you the proven framework response.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🗺️</div>
+      <h3>7-Stage Call Framework</h3>
+      <p>Scout tracks where you are across Introduction, Set, Discovery, Transition, Pitch, Close, and Objection Handling — and coaches appropriately for each stage.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">✅</div>
+      <h3>Discovery Tracker</h3>
+      <p>A live checklist that auto-fills as the call progresses. Always know if you've confirmed budget, decision maker, pain, timeline, and more before you pitch.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔇</div>
+      <h3>Zero Interference</h3>
+      <p>Scout never pops up while you're speaking. The overlay stays silent when you're talking and only updates after your prospect responds.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔌</div>
+      <h3>Works on Any Platform</h3>
+      <p>Zoom, Teams, FaceTime, phone calls — if your prospect can hear you, Scout can hear them. No integrations or plugins required.</p>
+    </div>
+  </div>
+</section>
+
+<!-- WHO IT'S FOR -->
+<section>
+  <div class="audience">
+    <div>
+      <div class="section-label">Who it's for</div>
+      <h2>For closers who sell high-ticket offers.</h2>
+      <p>If you're on the phone closing $3k–$50k+ programs, coaching packages, or consulting engagements — Scout was built for your calls.</p>
+      <ul class="check-list">
+        <li>High-ticket coaches and consultants</li>
+        <li>Appointment setters and closers on commission</li>
+        <li>Sales reps selling enterprise or complex deals</li>
+        <li>Agency owners doing their own sales</li>
+        <li>Anyone who lives and dies by the call</li>
+      </ul>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="num green">7</div>
+        <div class="label">Call stages tracked</div>
+      </div>
+      <div class="stat-box">
+        <div class="num blue">4</div>
+        <div class="label">Objection frameworks</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">60s</div>
+        <div class="label">Setup time</div>
+      </div>
+      <div class="stat-box">
+        <div class="num green">0</div>
+        <div class="label">Drivers needed</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div style="text-align:center; margin-bottom: 48px;">
+    <div class="section-label" style="display:inline-block">Pricing</div>
+    <h2>Simple pricing. No surprises.</h2>
+    <p class="section-sub" style="margin: 0 auto;">One plan. Everything included. Cancel anytime.</p>
+  </div>
+  <div class="pricing-wrapper">
+    <div class="pricing-card">
+      <div class="pricing-badge">Free during beta</div>
+      <h3>Scout Pro</h3>
+      <div class="price"><sub>$</sub>197<sub>/mo</sub></div>
+      <p class="price-note">Free while we're in early access. No credit card required.</p>
+      <ul class="pricing-features">
+        <li>Live AI teleprompter on every call</li>
+        <li>Real-time objection handling (4 frameworks)</li>
+        <li>7-stage call framework</li>
+        <li>Discovery tracker auto-checklist</li>
+        <li>Works on Zoom, Teams, FaceTime & more</li>
+        <li>Mac app — no drivers, no setup</li>
+      </ul>
+      <a href="/login#signup" class="btn btn-primary btn-lg" style="width:100%; display:flex;">Get Early Access — Free</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA BANNER -->
+<section>
+  <div class="cta-banner">
+    <h2>Ready to close more deals?</h2>
+    <p>Join closers using Scout to never lose a call to hesitation again.</p>
+    <a href="/login#signup" class="btn btn-primary btn-xl">Get Early Access — Free</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2025 Scout Systems. All rights reserved.</p>
+  <div class="footer-links">
+    <a href="/login">Log In</a>
+    <a href="mailto:hello@scoutsystems.io">Contact</a>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Scout Systems</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-app-region: no-drag;
+    }
+    .container { width: 340px; }
+    .logo { text-align: center; margin-bottom: 28px; }
+    .logo h1 { font-size: 20px; font-weight: 600; color: #fff; letter-spacing: 0.4px; }
+    .logo p { font-size: 12px; color: #666; margin-top: 4px; }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #262626;
+      border-radius: 12px;
+      padding: 28px;
+    }
+    .tab-row {
+      display: flex;
+      margin-bottom: 22px;
+      background: #111;
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .tab {
+      flex: 1;
+      padding: 7px;
+      text-align: center;
+      font-size: 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #555;
+      transition: all 0.15s;
+    }
+    .tab.active { background: #2a2a2a; color: #fff; }
+    .field { margin-bottom: 14px; }
+    label { display: block; font-size: 11px; color: #777; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input {
+      width: 100%;
+      background: #111;
+      border: 1px solid #262626;
+      border-radius: 7px;
+      color: #fff;
+      font-size: 14px;
+      padding: 9px 11px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: #3a3a3a; }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      margin-top: 6px;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+    .btn-subscribe { background: #16a34a; color: #fff; margin-top: 18px; }
+    .btn-subscribe:hover:not(:disabled) { background: #15803d; }
+    .btn-check { background: #1a2a1a; color: #4ade80; border: 1px solid #16a34a; margin-top: 8px; }
+    .btn-check:hover:not(:disabled) { background: #16a34a; color: #fff; }
+    .btn-logout { background: transparent; color: #555; border: 1px solid #262626; margin-top: 8px; }
+    .btn-logout:hover { color: #888; border-color: #3a3a3a; }
+    .error-msg {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 7px;
+      color: #f87171;
+      font-size: 12px;
+      padding: 9px 11px;
+      margin-top: 12px;
+      display: none;
+      line-height: 1.5;
+    }
+    .info-msg {
+      background: rgba(59,130,246,0.08);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 7px;
+      color: #93c5fd;
+      font-size: 12px;
+      padding: 9px 11px;
+      margin-top: 12px;
+      display: none;
+      line-height: 1.5;
+    }
+    #paywallView { display: none; flex-direction: column; text-align: center; }
+    #paywallView h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+    #paywallView > p { font-size: 12px; color: #666; line-height: 1.5; }
+    .price { font-size: 36px; font-weight: 700; color: #fff; margin: 16px 0 2px; }
+    .price span { font-size: 13px; color: #666; font-weight: 400; }
+    .features { text-align: left; margin: 14px 0 4px; }
+    .features li { font-size: 12px; color: #999; padding: 3px 0; list-style: none; }
+    .features li::before { content: '✓ '; color: #4ade80; }
+    #loadingView { text-align: center; color: #555; font-size: 13px; padding: 24px 0; }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid #2a2a2a;
+      border-top-color: #555;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <img src="../../../build/icon.png" alt="Scout" style="width:64px;height:64px;border-radius:14px;margin:0 auto 10px;display:block;">
+    <h1>Scout Systems</h1>
+    <p>Real-time AI sales coaching</p>
+  </div>
+
+  <div class="card">
+
+    <!-- Loading -->
+    <div id="loadingView">
+      <div class="spinner"></div>
+      Checking your account...
+    </div>
+
+    <!-- Auth form -->
+    <div id="authView" style="display:none">
+      <div class="tab-row">
+        <div class="tab active" id="loginTab" onclick="switchTab('login')">Log In</div>
+        <div class="tab" id="signupTab" onclick="switchTab('signup')">Sign Up</div>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="submitBtn" onclick="handleSubmit()">Log In</button>
+      <div class="error-msg" id="authError"></div>
+    </div>
+
+    <!-- Paywall -->
+    <div id="paywallView">
+      <h2>Activate Your Access</h2>
+      <p>You're logged in. Subscribe to launch Sales Overlay.</p>
+      <div class="price">$197 <span>/ month</span></div>
+      <ul class="features">
+        <li>Live AI teleprompter on every call</li>
+        <li>Real-time objection handling</li>
+        <li>Discovery tracker auto-checklist</li>
+        <li>7-stage call framework</li>
+      </ul>
+      <button class="btn btn-subscribe" id="subscribeBtn" onclick="handleSubscribe()">Subscribe at scoutsystems.io</button>
+      <button class="btn btn-check" id="checkBtn" onclick="handleCheckAgain()" style="display:none">I've Subscribed — Launch</button>
+      <button class="btn btn-logout" onclick="handleLogout()">Log out</button>
+      <div class="error-msg" id="paywallError"></div>
+      <div class="info-msg" id="paywallInfo"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var currentTab = 'login';
+  var currentToken = null;
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('loginTab').className = 'tab' + (tab === 'login' ? ' active' : '');
+    document.getElementById('signupTab').className = 'tab' + (tab === 'signup' ? ' active' : '');
+    document.getElementById('submitBtn').textContent = tab === 'login' ? 'Log In' : 'Create Account';
+    hideMsg('authError');
+  }
+
+  function showMsg(id, msg) {
+    var el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideMsg(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  function showView(view) {
+    document.getElementById('loadingView').style.display = view === 'loading' ? 'block' : 'none';
+    document.getElementById('authView').style.display = view === 'auth' ? 'block' : 'none';
+    document.getElementById('paywallView').style.display = view === 'paywall' ? 'flex' : 'none';
+  }
+
+  async function handleSubmit() {
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+    hideMsg('authError');
+
+    if (!email || !password) {
+      showMsg('authError', 'Please enter your email and password.');
+      return;
+    }
+
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Please wait...';
+
+    try {
+      var result;
+      if (currentTab === 'login') {
+        result = await window.electronAPI.authLogin(email, password);
+      } else {
+        result = await window.electronAPI.authSignup(email, password);
+      }
+
+      if (result.error) {
+        showMsg('authError', result.error);
+        btn.disabled = false;
+        btn.textContent = currentTab === 'login' ? 'Log In' : 'Create Account';
+        return;
+      }
+
+      currentToken = result.token;
+      await window.electronAPI.saveToken(result.token);
+      await checkSubscription(result.token);
+
+    } catch (err) {
+      showMsg('authError', 'Something went wrong. Please try again.');
+      btn.disabled = false;
+      btn.textContent = currentTab === 'login' ? 'Log In' : 'Create Account';
+    }
+  }
+
+  async function checkSubscription(token) {
+    showView('loading');
+    document.getElementById('loadingView').querySelector('div').nextSibling.textContent = ' Verifying subscription...';
+    try {
+      var result = await window.electronAPI.checkSubscription(token);
+      if (result.error) {
+        await window.electronAPI.clearToken();
+        showView('auth');
+        showMsg('authError', 'Session expired. Please log in again.');
+        return;
+      }
+      if (result.active) {
+        window.electronAPI.authSuccess();
+      } else {
+        showView('paywall');
+      }
+    } catch (err) {
+      showView('auth');
+      showMsg('authError', 'Could not verify subscription. Check your connection.');
+    }
+  }
+
+  async function handleSubscribe() {
+    var btn = document.getElementById('subscribeBtn');
+    btn.disabled = true;
+    btn.textContent = 'Opening checkout...';
+    hideMsg('paywallError');
+    hideMsg('paywallInfo');
+
+    try {
+      var result = await window.electronAPI.openCheckout(currentToken);
+      if (result.error) {
+        showMsg('paywallError', result.error);
+        btn.disabled = false;
+        btn.textContent = 'Subscribe & Launch';
+      } else {
+        btn.textContent = 'Checkout opened in browser';
+        showMsg('paywallInfo', 'Complete your purchase in the browser, then click the button below.');
+        document.getElementById('checkBtn').style.display = 'block';
+      }
+    } catch (err) {
+      showMsg('paywallError', 'Could not open checkout. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Subscribe & Launch';
+    }
+  }
+
+  async function handleCheckAgain() {
+    if (currentToken) await checkSubscription(currentToken);
+  }
+
+  async function handleLogout() {
+    await window.electronAPI.clearToken();
+    currentToken = null;
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('subscribeBtn').disabled = false;
+    document.getElementById('subscribeBtn').textContent = 'Subscribe & Launch';
+    document.getElementById('checkBtn').style.display = 'none';
+    hideMsg('paywallError');
+    hideMsg('paywallInfo');
+    showView('auth');
+  }
+
+  // On load — check for stored token
+  window.addEventListener('DOMContentLoaded', async function() {
+    showView('loading');
+    try {
+      var token = await window.electronAPI.getToken();
+      if (token) {
+        currentToken = token;
+        await checkSubscription(token);
+      } else {
+        showView('auth');
+      }
+    } catch (err) {
+      showView('auth');
+    }
+  });
+
+  // Enter key submits
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && document.getElementById('authView').style.display !== 'none') {
+      handleSubmit();
+    }
+  });
+</script>
+</body>
+</html>
