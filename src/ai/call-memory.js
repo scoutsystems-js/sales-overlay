@@ -4,7 +4,7 @@ var Anthropic = require('@anthropic-ai/sdk');
 var STAGE_ORDER = ['introduction', 'set', 'discovery', 'transition', 'pitch', 'close', 'objection_handling'];
 
 class CallMemory {
-  constructor(anthropicKey) {
+  constructor(anthropicKey, onUpdate) {
     this.client = new Anthropic({ apiKey: anthropicKey });
     this.fullTranscript = [];       // Every turn of the call
     this.summary = '';               // Rolling compressed summary
@@ -13,6 +13,20 @@ class CallMemory {
     this.isSummarizing = false;
     this.detectedStage = 'introduction';   // Current call stage
     this.keyFacts = [];              // Important facts extracted from the call
+    this.onUpdate = onUpdate || null; // Called after each summary update with discovery state
+    this.discovery = {              // Discovery tracker — once true, never goes back to false
+      finances: false,        // Budget / income / investment ability discussed
+      willingness: false,     // Commitment / readiness to do the work confirmed
+      pain: false,            // Specific challenge or pain point identified
+      goals: false,           // Specific goal or desired outcome stated
+      timeline: false,        // When they want to start or achieve it
+      decisionMaker: false,   // Whether they decide alone or need spouse/partner
+      whyNow: false,          // Why they're looking for a solution now
+      financeDetails: [],     // Array of short strings with specific financial details extracted
+                              // from the prospect (e.g., "Income: $180k/yr", "Savings: ~$20k",
+                              // "AmEx balance: $15k", "Monthly cashflow: $3k"). Accumulates
+                              // during the call, deduped and capped at 8 entries.
+    };
   }
 
   // Returns whether newStage is a valid progression from currentStage
@@ -92,9 +106,32 @@ class CallMemory {
       prompt += '  IMPORTANT: Stages progress sequentially. From "' + this.detectedStage + '" you can ONLY move to the next stage in order, or to objection_handling. Do NOT skip stages.\n';
       prompt += '- Any commitments or next steps mentioned\n';
       prompt += '- Important facts (name, location, profession, family, income, goal, WHY, budget, timeline, pain points)\n';
-      prompt += '- Which discovery techniques have been used (labels, frames, DCQs, fear-based, challenge, consequence)\n\n';
+      prompt += '- Which discovery techniques have been used (labels, frames, DCQs, fear-based, challenge, consequence)\n';
+      prompt += '- Discovery items gathered — set to true ONLY if clearly discussed. Once true it stays true:\n';
+      prompt += '  * finances: budget/income/investment ability has been discussed\n';
+      prompt += '  * willingness: their readiness/commitment to do the work has been confirmed\n';
+      prompt += '  * pain: a specific challenge or pain point has been identified\n';
+      prompt += '  * goals: a specific goal or desired outcome has been stated\n';
+      prompt += '  * timeline: when they want to start or achieve their goal has been discussed\n';
+      prompt += '  * decisionMaker: whether they can decide alone (or need spouse/partner) has been established\n';
+      prompt += '  * whyNow: why they are looking for a solution right now has been uncovered\n';
+      prompt += '- financeDetails: Array of short strings capturing SPECIFIC financial values the prospect has shared.\n';
+      prompt += '  ONLY include items actually stated by the prospect. Keep each item under 40 characters. Examples:\n';
+      prompt += '    "Income: $180k/yr"\n';
+      prompt += '    "Savings: ~$20k"\n';
+      prompt += '    "Monthly cashflow: $3k"\n';
+      prompt += '    "AmEx available: $15k"\n';
+      prompt += '    "Credit score: 760"\n';
+      prompt += '    "Spouse income: $90k"\n';
+      prompt += '    "Budget: under $10k"\n';
+      prompt += '    "Debt: $40k student loans"\n';
+      prompt += '  Rules:\n';
+      prompt += '    - Only include details EXPLICITLY stated by the prospect (not the closer, not inferences).\n';
+      prompt += '    - Prefer numeric values. If the prospect gives a range or approximation, capture it ("Savings: $15-20k").\n';
+      prompt += '    - If no new financial details have been shared in this batch, return an empty array [].\n';
+      prompt += '    - Do NOT repeat details already in previous summary unless the prospect updated the number.\n\n';
       prompt += 'Respond in raw JSON only. No markdown, no code fences, no explanation.\n';
-      prompt += 'Exact format: {"summary": "...", "stage": "introduction|set|discovery|transition|pitch|close|objection_handling", "keyFacts": ["fact1", "fact2"]}';
+      prompt += 'Exact format: {"summary": "...", "stage": "introduction|set|discovery|transition|pitch|close|objection_handling", "keyFacts": ["fact1", "fact2"], "discovery": {"finances": false, "willingness": false, "pain": false, "goals": false, "timeline": false, "decisionMaker": false, "whyNow": false, "financeDetails": ["Income: $180k/yr", "Savings: ~$20k"]}}';
 
       console.log('[memory] Updating call summary...');
 
@@ -136,8 +173,44 @@ class CallMemory {
             this.keyFacts = this.keyFacts.slice(-10);
           }
         }
+        // Merge discovery state — once a boolean is true it never goes back to false
+        // financeDetails is an accumulating array: append new items, dedupe, cap at 8
+        if (parsed.discovery && typeof parsed.discovery === 'object') {
+          var keys = Object.keys(this.discovery);
+          for (var d = 0; d < keys.length; d++) {
+            var key = keys[d];
+            if (key === 'financeDetails') {
+              if (Array.isArray(parsed.discovery.financeDetails)) {
+                for (var f = 0; f < parsed.discovery.financeDetails.length; f++) {
+                  var detail = parsed.discovery.financeDetails[f];
+                  if (typeof detail === 'string') {
+                    var trimmed = detail.trim();
+                    if (trimmed && this.discovery.financeDetails.indexOf(trimmed) === -1) {
+                      this.discovery.financeDetails.push(trimmed);
+                    }
+                  }
+                }
+                // Cap at 8 most recent details so the sidebar never overflows
+                if (this.discovery.financeDetails.length > 8) {
+                  this.discovery.financeDetails = this.discovery.financeDetails.slice(-8);
+                }
+                // If any finance detail was captured, the finances boolean is true too
+                if (this.discovery.financeDetails.length > 0) {
+                  this.discovery.finances = true;
+                }
+              }
+            } else if (parsed.discovery[key] === true) {
+              this.discovery[key] = true;
+            }
+          }
+        }
         console.log('[memory] Summary updated. Stage: ' + this.detectedStage);
         console.log('[memory] Key facts: ' + this.keyFacts.length);
+        console.log('[memory] Discovery: ' + JSON.stringify(this.discovery));
+        // Notify listener (e.g. main process → discovery window)
+        if (this.onUpdate) {
+          this.onUpdate(this.discovery);
+        }
       }
 
       this.turnsSinceLastSummary = 0;
@@ -164,6 +237,11 @@ class CallMemory {
       parts.push('KEY FACTS:\n- ' + this.keyFacts.join('\n- '));
     }
 
+    if (this.discovery.financeDetails && this.discovery.financeDetails.length > 0) {
+      parts.push('PROSPECT FINANCIAL DETAILS (explicitly shared by prospect):\n- ' +
+        this.discovery.financeDetails.join('\n- '));
+    }
+
     return parts.join('\n\n');
   }
 
@@ -178,6 +256,16 @@ class CallMemory {
     this.isSummarizing = false;
     this.detectedStage = 'introduction';
     this.keyFacts = [];
+    this.discovery = {
+      finances: false,
+      willingness: false,
+      pain: false,
+      goals: false,
+      timeline: false,
+      decisionMaker: false,
+      whyNow: false,
+      financeDetails: [],
+    };
   }
 }
 
