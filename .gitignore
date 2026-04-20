@@ -1,0 +1,32 @@
+# Secrets — never commit real values. See backend/.env.example for required vars.
+.env
+.env.*
+!.env.example
+API\ Keys.md
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Build output
+dist/
+dist.nosync/
+out/
+
+# macOS
+.DS_Store
+
+# Backup / temp / stray binaries
+*.zip
+sales-overlay-backup-*
+*.nosync
+ziqdw1Z3
+
+# Old nested copy of the project — ignore entirely.
+sales-overlay/
+
+# Claude memory files — local scratch only, not for version control.
+memory/
