@@ -18,7 +18,10 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static website files
-app.use(express.static(path.join(__dirname, 'public')));
+// Folder is named 'web' (not 'public') because Railpack's Staticfile
+// detector auto-triggers on a 'public/' folder and deploys Caddy instead
+// of Node. Renaming sidesteps that entirely.
+app.use(express.static(path.join(__dirname, 'web')));
 
 // Health check
 app.get('/health', function(req, res) {
