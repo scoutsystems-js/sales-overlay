@@ -31,13 +31,6 @@
       color: #f0f0f0;
       text-decoration: none;
     }
-    .nav-logo-icon {
-      width: 28px; height: 28px;
-      background: #2563eb;
-      border-radius: 7px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px;
-    }
     nav a.back { font-size: 13px; color: #666; text-decoration: none; }
     nav a.back:hover { color: #aaa; }
 
@@ -101,7 +94,7 @@
       transition: border-color 0.15s;
       font-family: inherit;
     }
-    input:focus { border-color: #333; }
+    input:focus { border-color: #22c55e; }
     input::placeholder { color: #444; }
 
     .btn {
@@ -117,8 +110,8 @@
       margin-top: 4px;
     }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-primary { background: #2563eb; color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+    .btn-primary { background: #22c55e; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #16a34a; }
     .btn-launch {
       background: #16a34a;
       color: #fff;
@@ -214,8 +207,15 @@
 <body>
 <nav>
   <a href="/" class="nav-logo">
-    <div class="nav-logo-icon">⚡</div>
-    Scout Systems
+    <svg width="22" height="24" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <circle cx="10" cy="12" r="1.6" fill="#22c55e"/>
+      <circle cx="10" cy="16" r="1.2" fill="#22c55e"/>
+      <circle cx="10" cy="19.5" r="0.8" fill="#22c55e"/>
+    </svg>
+    Scout
   </a>
   <a href="/" class="back">← Back to site</a>
 </nav>
