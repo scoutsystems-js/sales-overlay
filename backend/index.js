@@ -37,6 +37,28 @@ app.use(function(err, req, res, next) {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Log env var presence at startup — helps diagnose Railway deploys.
+// Values are never logged, only whether each key is set.
+function reportEnv() {
+  var required = [
+    'SUPABASE_URL',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'ANTHROPIC_API_KEY',
+    'DEEPGRAM_API_KEY',
+    'DEEPGRAM_PROJECT_ID',
+  ];
+  var optional = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID', 'GITHUB_TOKEN'];
+  console.log('[server] Env check:');
+  required.forEach(function(k) {
+    console.log('  ' + k + ': ' + (process.env[k] ? 'set' : 'MISSING (required)'));
+  });
+  optional.forEach(function(k) {
+    console.log('  ' + k + ': ' + (process.env[k] ? 'set' : 'not set (optional)'));
+  });
+}
+
 app.listen(PORT, '0.0.0.0', function() {
   console.log('[server] Scout backend running on port ' + PORT);
+  reportEnv();
 });

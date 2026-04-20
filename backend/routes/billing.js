@@ -1,21 +1,38 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const { requireAuth } = require('../middleware/auth');
+
+var router = express.Router();
 
 // Lazy Stripe init — only loads when a billing route is actually called.
 // Prevents crash on startup when STRIPE_SECRET_KEY is not yet configured.
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
-    throw new Error('Stripe not configured yet. Add STRIPE_SECRET_KEY to Railway variables.');
+    throw new Error('Stripe not configured — set STRIPE_SECRET_KEY in Railway Variables.');
   }
   return require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
-const { requireAuth } = require('../middleware/auth');
 
-var router = express.Router();
-var supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Lazy Supabase client (service role — can write to subscriptions table).
+var _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase admin not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Railway Variables.');
+  }
+  _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return _supabase;
+}
+
+// Wraps a route handler so a getStripe()/getSupabase() throw turns into 503.
+function handleConfigError(err, res) {
+  if (err.message && err.message.indexOf('not configured') !== -1) {
+    console.error('[billing] Config error:', err.message);
+    res.status(503).json({ error: err.message });
+    return true;
+  }
+  return false;
+}
 
 // Create a Stripe Checkout session — user pays $197/month
 // Electron app opens the returned URL in a browser window
@@ -40,6 +57,7 @@ router.post('/checkout', requireAuth, async function(req, res) {
 
     res.json({ url: session.url });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[billing] Checkout error:', err.message);
     res.status(500).json({ error: 'Failed to create checkout session' });
   }
@@ -49,6 +67,7 @@ router.post('/checkout', requireAuth, async function(req, res) {
 router.post('/portal', requireAuth, async function(req, res) {
   try {
     // Look up the Stripe customer ID from our subscriptions table
+    var supabase = getSupabase();
     var { data, error } = await supabase
       .from('subscriptions')
       .select('stripe_customer_id')
@@ -66,6 +85,7 @@ router.post('/portal', requireAuth, async function(req, res) {
 
     res.json({ url: portalSession.url });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[billing] Portal error:', err.message);
     res.status(500).json({ error: 'Failed to open billing portal' });
   }
@@ -74,6 +94,7 @@ router.post('/portal', requireAuth, async function(req, res) {
 // Check subscription status for the logged-in user
 router.get('/status', requireAuth, async function(req, res) {
   try {
+    var supabase = getSupabase();
     var { data, error } = await supabase
       .from('subscriptions')
       .select('status, current_period_end')
@@ -86,6 +107,7 @@ router.get('/status', requireAuth, async function(req, res) {
 
     res.json({ status: data.status, current_period_end: data.current_period_end });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[billing] Status error:', err.message);
     res.status(500).json({ error: 'Failed to get subscription status' });
   }
@@ -100,11 +122,13 @@ router.post('/webhook', async function(req, res) {
   try {
     event = getStripe().webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[billing] Webhook signature failed:', err.message);
     return res.status(400).json({ error: 'Invalid webhook signature' });
   }
 
   try {
+    var supabase = getSupabase();
     switch (event.type) {
       case 'checkout.session.completed': {
         var session = event.data.object;
@@ -176,6 +200,7 @@ router.post('/webhook', async function(req, res) {
         break;
     }
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[billing] Webhook handler error:', err.message);
   }
 

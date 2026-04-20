@@ -2,10 +2,28 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 
 var router = express.Router();
-var supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+
+// Lazy Supabase client — only created on first request so a missing env var
+// returns a clean 503 from the route instead of crashing `require()` at boot.
+// If Railway forgets to set SUPABASE_URL, /health and /download still work.
+var _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    throw new Error('Supabase not configured — set SUPABASE_URL and SUPABASE_ANON_KEY in Railway Variables.');
+  }
+  _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  return _supabase;
+}
+
+// Wraps a route handler so a getSupabase() throw turns into a 503 response.
+function handleConfigError(err, res) {
+  if (err.message && err.message.indexOf('not configured') !== -1) {
+    console.error('[auth] Config error:', err.message);
+    return res.status(503).json({ error: err.message });
+  }
+  return null;
+}
 
 // Sign up with email + password
 router.post('/signup', async function(req, res) {
@@ -15,6 +33,7 @@ router.post('/signup', async function(req, res) {
   }
 
   try {
+    var supabase = getSupabase();
     var { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return res.status(400).json({ error: error.message });
     // If session is null, Supabase requires email confirmation
@@ -23,6 +42,7 @@ router.post('/signup', async function(req, res) {
     }
     res.json({ token: data.session.access_token, user: data.user });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[auth] Signup error:', err.message);
     res.status(500).json({ error: 'Signup failed' });
   }
@@ -36,10 +56,12 @@ router.post('/login', async function(req, res) {
   }
 
   try {
+    var supabase = getSupabase();
     var { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ token: data.session.access_token, user: data.user });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[auth] Login error:', err.message);
     res.status(500).json({ error: 'Login failed' });
   }
@@ -49,6 +71,7 @@ router.post('/login', async function(req, res) {
 // user logs in, gets redirected back with a session token.
 router.get('/google', async function(req, res) {
   try {
+    var supabase = getSupabase();
     var { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -58,6 +81,7 @@ router.get('/google', async function(req, res) {
     if (error) return res.status(400).json({ error: error.message });
     res.json({ url: data.url });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[auth] Google OAuth error:', err.message);
     res.status(500).json({ error: 'Google OAuth failed' });
   }
@@ -71,10 +95,12 @@ router.post('/refresh', async function(req, res) {
   }
 
   try {
+    var supabase = getSupabase();
     var { data, error } = await supabase.auth.refreshSession({ refresh_token });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ user: data.user, session: data.session });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[auth] Refresh error:', err.message);
     res.status(500).json({ error: 'Token refresh failed' });
   }

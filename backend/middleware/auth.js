@@ -1,9 +1,16 @@
 const { createClient } = require('@supabase/supabase-js');
 
-var supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Lazy Supabase client — only created on first auth check so a missing env
+// var returns 503 from the route instead of crashing `require()` at boot.
+var _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase admin not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Railway Variables.');
+  }
+  _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return _supabase;
+}
 
 // Verifies the Supabase JWT sent by the Electron app.
 // Attaches req.user (with id, email) and req.subscription status.
@@ -16,6 +23,7 @@ async function requireAuth(req, res, next) {
   var token = authHeader.replace('Bearer ', '');
 
   try {
+    var supabase = getSupabase();
     var { data, error } = await supabase.auth.getUser(token);
     if (error || !data.user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
@@ -23,6 +31,10 @@ async function requireAuth(req, res, next) {
     req.user = data.user;
     next();
   } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) {
+      console.error('[auth middleware] Config error:', err.message);
+      return res.status(503).json({ error: err.message });
+    }
     console.error('[auth] Token verification failed:', err.message);
     return res.status(401).json({ error: 'Auth check failed' });
   }
@@ -32,6 +44,7 @@ async function requireAuth(req, res, next) {
 // Run this AFTER requireAuth.
 async function requireSubscription(req, res, next) {
   try {
+    var supabase = getSupabase();
     var { data, error } = await supabase
       .from('subscriptions')
       .select('status')
@@ -48,6 +61,10 @@ async function requireSubscription(req, res, next) {
 
     next();
   } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) {
+      console.error('[auth middleware] Config error:', err.message);
+      return res.status(503).json({ error: err.message });
+    }
     console.error('[auth] Subscription check failed:', err.message);
     return res.status(403).json({ error: 'Subscription check failed' });
   }

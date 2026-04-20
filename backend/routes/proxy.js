@@ -3,7 +3,40 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
 
 var router = express.Router();
-var anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Lazy Anthropic client — only created on first /suggest or /memory request.
+// Prevents crash on startup when ANTHROPIC_API_KEY is not yet set.
+var _anthropic = null;
+function getAnthropic() {
+  if (_anthropic) return _anthropic;
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Anthropic not configured — set ANTHROPIC_API_KEY in Railway Variables.');
+  }
+  _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return _anthropic;
+}
+
+// Validates Deepgram env vars just before use — same lazy pattern but there's
+// no client instance to cache, we just need the env values present.
+function getDeepgramConfig() {
+  if (!process.env.DEEPGRAM_API_KEY || !process.env.DEEPGRAM_PROJECT_ID) {
+    throw new Error('Deepgram not configured — set DEEPGRAM_API_KEY and DEEPGRAM_PROJECT_ID in Railway Variables.');
+  }
+  return {
+    apiKey: process.env.DEEPGRAM_API_KEY,
+    projectId: process.env.DEEPGRAM_PROJECT_ID,
+  };
+}
+
+// Wraps a route handler so a getAnthropic()/getDeepgramConfig() throw becomes 503.
+function handleConfigError(err, res) {
+  if (err.message && err.message.indexOf('not configured') !== -1) {
+    console.error('[proxy] Config error:', err.message);
+    res.status(503).json({ error: err.message });
+    return true;
+  }
+  return false;
+}
 
 // Both routes require a valid login AND an active subscription
 var protect = [requireAuth, requireSubscription];
@@ -20,6 +53,7 @@ router.post('/suggest', protect, async function(req, res) {
   try {
     console.log('[proxy] Claude request for user:', req.user.id);
 
+    var anthropic = getAnthropic();
     var response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: maxTokens || 300,
@@ -34,6 +68,7 @@ router.post('/suggest', protect, async function(req, res) {
 
     res.json({ content: content });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[proxy] Claude error:', err.message);
     res.status(500).json({ error: 'Claude API call failed' });
   }
@@ -48,6 +83,7 @@ router.post('/memory', protect, async function(req, res) {
   }
 
   try {
+    var anthropic = getAnthropic();
     var response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: maxTokens || 500,
@@ -61,6 +97,7 @@ router.post('/memory', protect, async function(req, res) {
 
     res.json({ content: content });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[proxy] Memory error:', err.message);
     res.status(500).json({ error: 'Memory API call failed' });
   }
@@ -72,11 +109,13 @@ router.post('/deepgram-key', protect, async function(req, res) {
   try {
     console.log('[proxy] Deepgram key request for user:', req.user.id);
 
+    var dg = getDeepgramConfig();
+
     // Create a temporary Deepgram API key that expires in 10 minutes
-    var response = await fetch('https://api.deepgram.com/v1/projects/' + process.env.DEEPGRAM_PROJECT_ID + '/keys', {
+    var response = await fetch('https://api.deepgram.com/v1/projects/' + dg.projectId + '/keys', {
       method: 'POST',
       headers: {
-        'Authorization': 'Token ' + process.env.DEEPGRAM_API_KEY,
+        'Authorization': 'Token ' + dg.apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -93,6 +132,7 @@ router.post('/deepgram-key', protect, async function(req, res) {
     var data = await response.json();
     res.json({ key: data.key });
   } catch (err) {
+    if (handleConfigError(err, res)) return;
     console.error('[proxy] Deepgram key error:', err.message);
     res.status(500).json({ error: 'Failed to create Deepgram key' });
   }
