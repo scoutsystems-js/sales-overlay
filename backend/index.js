@@ -28,6 +28,12 @@ app.get('/health', function(req, res) {
   res.json({ status: 'ok', service: 'Scout Systems Backend' });
 });
 
+// Pretty URL for the login page — /login serves web/login.html
+// (express.static only matches exact filenames, so /login needs an explicit route)
+app.get('/login', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'login.html'));
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/billing', billingRoutes);
