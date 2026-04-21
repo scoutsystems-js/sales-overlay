@@ -21,7 +21,13 @@ app.use(express.json());
 // Folder is named 'web' (not 'public') because Railpack's Staticfile
 // detector auto-triggers on a 'public/' folder and deploys Caddy instead
 // of Node. Renaming sidesteps that entirely.
-app.use(express.static(path.join(__dirname, 'web')));
+app.use(express.static(path.join(__dirname, 'web'), {
+  setHeaders: function(res, filePath) {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 
 // Health check
 app.get('/health', function(req, res) {
