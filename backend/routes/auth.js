@@ -40,7 +40,16 @@ router.post('/signup', async function(req, res) {
     if (!data.session) {
       return res.status(400).json({ error: 'Please check your email to confirm your account before logging in.' });
     }
-    res.json({ token: data.session.access_token, user: data.user });
+    // Return full session — includes refresh token and expires_at so the
+    // frontend can persist login across browser restarts and auto-refresh.
+    // `token` kept for backwards compat with existing Electron app code.
+    res.json({
+      token: data.session.access_token,
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_at: data.session.expires_at,
+      user: data.user,
+    });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[auth] Signup error:', err.message);
@@ -59,7 +68,13 @@ router.post('/login', async function(req, res) {
     var supabase = getSupabase();
     var { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return res.status(400).json({ error: error.message });
-    res.json({ token: data.session.access_token, user: data.user });
+    res.json({
+      token: data.session.access_token,
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_at: data.session.expires_at,
+      user: data.user,
+    });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[auth] Login error:', err.message);
