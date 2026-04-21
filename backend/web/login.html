@@ -4,126 +4,110 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In — Scout Systems</title>
+  <link rel="stylesheet" href="/css/style.css"/>
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    /* Login-specific layout on top of the shared brand stylesheet. */
     body {
-      background: #080808;
-      color: #f0f0f0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      -webkit-font-smoothing: antialiased;
     }
-    nav {
+    .login-nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 18px 40px;
-      border-bottom: 1px solid #1e1e1e;
+      border-bottom: 1px solid var(--border);
     }
-    .nav-logo {
+    .login-nav .nav-logo {
       display: flex;
       align-items: center;
       gap: 10px;
       font-size: 15px;
       font-weight: 600;
-      color: #f0f0f0;
-      text-decoration: none;
+      color: var(--text);
     }
-    nav a.back { font-size: 13px; color: #666; text-decoration: none; }
-    nav a.back:hover { color: #aaa; }
+    .login-nav .back {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .login-nav .back:hover { color: var(--text); }
 
-    main {
+    .login-main {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 40px 20px;
     }
-    .card {
-      width: 100%;
-      max-width: 380px;
-    }
-    .card-header {
-      text-align: center;
-      margin-bottom: 28px;
-    }
-    .card-header h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
-    .card-header p { font-size: 14px; color: #666; }
+    .card { width: 100%; max-width: 400px; }
+    .card-header { text-align: center; margin-bottom: 28px; }
+    .card-header h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+    .card-header p { font-size: 14px; color: var(--muted); }
 
     .tab-row {
       display: flex;
-      background: #111;
+      background: var(--bg2);
+      border: 1px solid var(--border);
       border-radius: 9px;
       padding: 3px;
       margin-bottom: 24px;
     }
     .tab {
       flex: 1;
-      padding: 8px;
+      padding: 9px;
       text-align: center;
       font-size: 13px;
+      font-weight: 500;
       border-radius: 7px;
       cursor: pointer;
-      color: #555;
+      color: var(--muted);
       transition: all 0.15s;
       user-select: none;
     }
-    .tab.active { background: #1e1e1e; color: #f0f0f0; }
+    .tab.active { background: var(--bg3); color: var(--text); }
 
     .field { margin-bottom: 14px; }
-    label {
+    .field label {
       display: block;
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: #666;
+      color: var(--muted);
       margin-bottom: 6px;
     }
-    input {
+    .field input {
       width: 100%;
-      background: #111;
-      border: 1px solid #1e1e1e;
+      background: var(--bg2);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      color: #f0f0f0;
+      color: var(--text);
       font-size: 14px;
-      padding: 10px 12px;
+      padding: 11px 13px;
       outline: none;
       transition: border-color 0.15s;
       font-family: inherit;
     }
-    input:focus { border-color: #22c55e; }
-    input::placeholder { color: #444; }
+    .field input:focus { border-color: var(--green); }
+    .field input::placeholder { color: #4a5763; }
 
-    .btn {
+    .submit-btn {
       width: 100%;
-      padding: 11px;
+      padding: 12px;
       border-radius: 8px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 700;
       cursor: pointer;
       border: none;
       font-family: inherit;
-      transition: opacity 0.15s, background 0.15s;
+      background: var(--green);
+      color: #000;
       margin-top: 4px;
+      transition: background 0.15s, opacity 0.15s;
     }
-    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-primary { background: #22c55e; color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: #16a34a; }
-    .btn-launch {
-      background: #16a34a;
-      color: #fff;
-      margin-top: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      font-size: 15px;
-      padding: 13px;
-    }
-    .btn-launch:hover:not(:disabled) { background: #15803d; }
+    .submit-btn:hover:not(:disabled) { background: var(--green-dark); }
+    .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
     .error-msg {
       background: rgba(239,68,68,0.08);
@@ -136,21 +120,29 @@
       display: none;
       line-height: 1.5;
     }
+
     .success-view { display: none; text-align: center; }
     .success-icon {
       width: 56px; height: 56px;
-      background: rgba(74,222,128,0.12);
-      border: 1px solid rgba(74,222,128,0.25);
+      background: var(--green-dim);
+      border: 1px solid var(--green-glow);
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       font-size: 24px;
       margin: 0 auto 20px;
+      color: var(--green);
     }
-    .success-view h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
-    .success-view p { font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.6; }
+    .success-view h2 { font-size: 22px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .signed-in-email {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .signed-in-email strong { color: var(--text); }
+
     .launch-steps {
-      background: #111;
-      border: 1px solid #1e1e1e;
+      background: var(--bg2);
+      border: 1px solid var(--border);
       border-radius: 10px;
       padding: 16px 20px;
       margin-bottom: 20px;
@@ -158,17 +150,18 @@
     }
     .launch-steps p {
       font-size: 12px;
-      color: #555;
+      color: var(--muted);
       margin-bottom: 10px;
     }
     .launch-steps ol {
       list-style: none;
       counter-reset: steps;
+      padding: 0;
     }
     .launch-steps li {
       counter-increment: steps;
       font-size: 13px;
-      color: #888;
+      color: var(--text);
       padding: 5px 0;
       display: flex;
       align-items: center;
@@ -177,35 +170,77 @@
     .launch-steps li::before {
       content: counter(steps);
       width: 20px; height: 20px;
-      background: #1e1e1e;
+      background: var(--bg3);
+      border: 1px solid var(--border);
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       font-size: 11px;
-      color: #555;
+      color: var(--green);
       flex-shrink: 0;
     }
-    .divider { text-align: center; font-size: 12px; color: #333; margin: 20px 0; }
+
+    .launch-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      background: var(--green);
+      color: #000;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .launch-btn:hover { background: var(--green-dark); }
+
+    .divider { text-align: center; font-size: 12px; color: var(--muted); margin: 20px 0; }
+    .download-link {
+      display: block;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .download-link:hover { color: var(--text); }
+
+    .signout-row {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 12px;
+    }
+    .signout-row a {
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .signout-row a:hover { color: var(--text); }
+
     .spinner {
       width: 18px; height: 18px;
-      border: 2px solid rgba(255,255,255,0.2);
-      border-top-color: #fff;
+      border: 2px solid rgba(0,0,0,0.25);
+      border-top-color: #000;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       display: inline-block;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    footer {
+
+    .login-footer {
       text-align: center;
       padding: 20px;
       font-size: 12px;
-      color: #333;
+      color: var(--muted);
     }
-    footer a { color: #555; text-decoration: none; }
-    footer a:hover { color: #888; }
+    .login-footer a { color: var(--muted); }
+    .login-footer a:hover { color: var(--text); }
   </style>
 </head>
 <body>
-<nav>
+
+<nav class="login-nav">
   <a href="/" class="nav-logo">
     <svg width="22" height="24" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
       <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
@@ -215,12 +250,12 @@
       <circle cx="10" cy="16" r="1.2" fill="#22c55e"/>
       <circle cx="10" cy="19.5" r="0.8" fill="#22c55e"/>
     </svg>
-    Scout
+    <span>Scout</span>
   </a>
   <a href="/" class="back">← Back to site</a>
 </nav>
 
-<main>
+<main class="login-main">
   <div class="card">
     <div class="card-header">
       <h1 id="cardTitle">Welcome back</h1>
@@ -243,45 +278,124 @@
         <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
       </div>
 
-      <button class="btn btn-primary" id="submitBtn" onclick="handleSubmit()">Log In</button>
+      <button class="submit-btn" id="submitBtn" onclick="handleSubmit()">Log In</button>
       <div class="error-msg" id="errorMsg"></div>
     </div>
 
     <!-- Success / Launch view -->
     <div class="success-view" id="successView">
       <div class="success-icon">✓</div>
-      <h2>You're in!</h2>
-      <p>Scout is installed on your Mac. Click the button below to open it now.</p>
+      <h2>You're signed in</h2>
+      <p class="signed-in-email">Logged in as <strong id="signedInEmail"></strong></p>
       <div class="launch-steps">
-        <p>If Scout isn't installed yet:</p>
+        <p>Launch Scout on your Mac:</p>
         <ol>
-          <li>Download the Mac app below</li>
-          <li>Open it and log in with this account</li>
-          <li>Click Start on any call</li>
+          <li>Download the Mac app if you haven't yet</li>
+          <li>Open it — it'll use this login automatically</li>
+          <li>Click Start on any sales call</li>
         </ol>
       </div>
-      <button class="btn btn-launch" onclick="launchApp()">
-        ⚡ Open Scout App
-      </button>
+      <button class="launch-btn" onclick="launchApp()">Open Scout App →</button>
       <div class="divider">or</div>
-      <a href="/download" id="downloadLink" style="font-size:13px; color:#666; text-decoration:none;">
-        Download Scout for Mac →
-      </a>
+      <a href="/download" class="download-link">Download Scout for Mac →</a>
+      <div class="signout-row">
+        <a onclick="signOut()">Sign out</a>
+      </div>
     </div>
 
   </div>
 </main>
 
-<footer>
-  <a href="/">scoutsystems.io</a> · <a href="mailto:hello@scoutsystems.io">Support</a>
+<footer class="login-footer">
+  <a href="/">scoutsystems.io</a> · <a href="mailto:support@scoutsystems.io">Support</a>
 </footer>
 
 <script>
+  // ── Persistent login state ───────────────────────────────────────────────
+  // We store the full session (access + refresh + expiry + email) in
+  // localStorage so users stay logged in across browser restarts, not just
+  // within a single tab session. On page load we check if a valid session
+  // exists and auto-show the "signed in" view if so, refreshing the token
+  // if it's within 5 minutes of expiring.
+
+  var STORAGE_KEY = 'scout_session_v1';
   var currentTab = 'login';
 
-  // Check if we're on #signup hash
-  if (window.location.hash === '#signup') switchTab('signup');
+  function getSession() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
+  }
+  function setSession(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+  function clearSession() { localStorage.removeItem(STORAGE_KEY); }
 
+  // Returns true if access token expires more than 60s from now.
+  function isSessionValid(s) {
+    if (!s || !s.access_token || !s.expires_at) return false;
+    var nowSec = Math.floor(Date.now() / 1000);
+    return s.expires_at > nowSec + 60;
+  }
+
+  // Returns true if we should preemptively refresh (within 5 min of expiry).
+  function shouldRefresh(s) {
+    if (!s || !s.expires_at) return false;
+    var nowSec = Math.floor(Date.now() / 1000);
+    return s.expires_at - nowSec < 300;
+  }
+
+  async function refreshSessionIfNeeded() {
+    var s = getSession();
+    if (!s || !s.refresh_token) return null;
+    if (!shouldRefresh(s)) return s;
+    try {
+      var res = await fetch('/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: s.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); return null; }
+      var data = await res.json();
+      if (!data.session) { clearSession(); return null; }
+      var fresh = {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+        email: (data.user && data.user.email) || (s && s.email),
+      };
+      setSession(fresh);
+      return fresh;
+    } catch (err) {
+      // If refresh fails (network or token revoked), force re-login.
+      clearSession();
+      return null;
+    }
+  }
+
+  // On page load: if we have a valid session, show the success view.
+  // If close to expiring, refresh in the background.
+  async function checkExistingSession() {
+    var s = getSession();
+    if (isSessionValid(s)) {
+      showSignedInView(s);
+      if (shouldRefresh(s)) refreshSessionIfNeeded();
+      return;
+    }
+    // Stale but has refresh token — try to refresh silently.
+    if (s && s.refresh_token) {
+      var refreshed = await refreshSessionIfNeeded();
+      if (refreshed) { showSignedInView(refreshed); return; }
+    }
+    // No session or refresh failed — show login form.
+    if (window.location.hash === '#signup') switchTab('signup');
+  }
+
+  function showSignedInView(s) {
+    document.getElementById('authForm').style.display = 'none';
+    document.getElementById('successView').style.display = 'block';
+    document.getElementById('cardTitle').textContent = 'Signed in';
+    document.getElementById('cardSub').textContent = '';
+    document.getElementById('signedInEmail').textContent = s.email || '';
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────
   function switchTab(tab) {
     currentTab = tab;
     document.getElementById('loginTab').className = 'tab' + (tab === 'login' ? ' active' : '');
@@ -302,6 +416,7 @@
     document.getElementById('errorMsg').style.display = 'none';
   }
 
+  // ── Login / signup submit ────────────────────────────────────────────────
   async function handleSubmit() {
     var email = document.getElementById('email').value.trim();
     var password = document.getElementById('password').value;
@@ -332,16 +447,14 @@
         return;
       }
 
-      // Store token for deep link
-      if (data.token) {
-        sessionStorage.setItem('scout_token', data.token);
-      }
-
-      // Show success + launch view
-      document.getElementById('authForm').style.display = 'none';
-      document.getElementById('successView').style.display = 'block';
-      document.getElementById('cardTitle').textContent = currentTab === 'login' ? 'Signed in' : 'Account created';
-      document.getElementById('cardSub').textContent = '';
+      // Persist the full session so the user stays logged in.
+      setSession({
+        access_token: data.access_token || data.token,
+        refresh_token: data.refresh_token,
+        expires_at: data.expires_at,
+        email: (data.user && data.user.email) || email,
+      });
+      showSignedInView(getSession());
 
     } catch (err) {
       showError('Could not reach server. Check your connection.');
@@ -351,17 +464,32 @@
   }
 
   function launchApp() {
-    var token = sessionStorage.getItem('scout_token') || '';
-    // Deep link opens the Scout desktop app
+    var s = getSession();
+    var token = s ? s.access_token : '';
+    // Deep link opens the Scout desktop app and passes the access token.
     window.location.href = 'scout://launch?token=' + encodeURIComponent(token);
   }
 
-  // Enter key submits
+  function signOut() {
+    clearSession();
+    document.getElementById('successView').style.display = 'none';
+    document.getElementById('authForm').style.display = 'block';
+    document.getElementById('cardTitle').textContent = 'Welcome back';
+    document.getElementById('cardSub').textContent = 'Sign in to launch Scout';
+    document.getElementById('email').value = '';
+    document.getElementById('password').value = '';
+    switchTab('login');
+  }
+
+  // Enter key submits when form is visible
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && document.getElementById('authForm').style.display !== 'none') {
       handleSubmit();
     }
   });
+
+  // Kick off session check on page load
+  checkExistingSession();
 </script>
 </body>
 </html>
