@@ -150,8 +150,8 @@
   <div class="nav-links">
     <a href="/#how-it-works">How it works</a>
     <a href="/#pricing">Pricing</a>
-    <a href="/login.html" class="btn-outline">Log in</a>
-    <a href="/signup.html" class="btn-primary">Get started</a>
+    <a href="/login" class="btn-outline">Log in</a>
+    <a href="/login#signup" class="btn-primary">Get started</a>
   </div>
 </nav>
 
@@ -241,6 +241,29 @@
     .catch(function() {
       document.getElementById('download-version').textContent = '';
     });
+</script>
+
+<script>
+  // Mirror of the nav-swap on index.html — if there's a valid saved session,
+  // show "Account" instead of the guest Log in / Get started CTAs. Keeps
+  // signed-in state consistent across every page on the site.
+  (function() {
+    try {
+      var s = JSON.parse(localStorage.getItem('scout_session_v1'));
+      if (!s || !s.expires_at) return;
+      var nowSec = Math.floor(Date.now() / 1000);
+      if (s.expires_at < nowSec + 60) return;
+      var navLinks = document.querySelector('.nav-links');
+      if (!navLinks) return;
+      var loginBtn = navLinks.querySelector('a[href="/login"]');
+      var signupBtn = navLinks.querySelector('a[href="/login#signup"]');
+      if (loginBtn) loginBtn.remove();
+      if (signupBtn) {
+        signupBtn.textContent = 'Account';
+        signupBtn.setAttribute('href', '/login');
+      }
+    } catch (e) {}
+  })();
 </script>
 
 </body>

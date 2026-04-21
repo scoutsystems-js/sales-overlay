@@ -186,5 +186,30 @@
   <p class="footer-copy">© 2026 Scout Systems. All rights reserved.</p>
 </footer>
 
+<script>
+  // If the visitor has a valid saved session, swap the nav buttons so the page
+  // reflects their signed-in state. The session is stored on /login under
+  // scout_session_v1 and persists across pages because localStorage is
+  // domain-wide (not per-page). If there's no session or it's expired, leave
+  // the nav as-is so the guest CTAs still show.
+  (function() {
+    try {
+      var s = JSON.parse(localStorage.getItem('scout_session_v1'));
+      if (!s || !s.expires_at) return;
+      var nowSec = Math.floor(Date.now() / 1000);
+      if (s.expires_at < nowSec + 60) return;
+      var navLinks = document.querySelector('.nav-links');
+      if (!navLinks) return;
+      var loginBtn = navLinks.querySelector('a[href="/login"]');
+      var signupBtn = navLinks.querySelector('a[href="/login#signup"]');
+      if (loginBtn) loginBtn.remove();
+      if (signupBtn) {
+        signupBtn.textContent = 'Account';
+        signupBtn.setAttribute('href', '/login');
+      }
+    } catch (e) {}
+  })();
+</script>
+
 </body>
 </html>
