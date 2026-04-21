@@ -123,6 +123,7 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - Auto-updater (electron-updater) pointed at GitHub Releases — `latest-mac.yml` + DMGs + blockmaps uploaded per release
 - GitHub Release v1.0.0 and v1.0.1 published with signed + notarized DMGs; v1.0.1 adds the macOS app icon
 - Project synced to iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay/`) with node_modules and dist as `.nosync` symlinks
+- Supabase user_profiles table live — stores onboarding wizard data (niche, offer, pricing, payment URLs) with RLS scoped to auth.uid(). Migration at backend/migrations/001_user_profiles.sql.
 
 ## Current Status: What's Being Tuned
 1. **Prompt firing speed** — Target: fires within ~1.5s of prospect finishing. With polling timer + backchannel fix this should now work. Still being tested.
@@ -283,7 +284,7 @@ SKIP_AUTH=true                   # flip to false once auth is tested
 - Releases currently uploaded manually via GitHub web UI (drag DMGs + `.blockmap`s + `latest-mac.yml` from `dist/`). `npm run release` will work once `gh` CLI is installed + `GH_TOKEN` set.
 
 ## Future Plans
-- **Phase 1.5 build order (next up, see BUILD-PLAN.md):** 1) Financial Tracker (DONE — live detail extraction under Finances row), 2) Onboarding Wizard (niche, offer, price, qualifications, payment links — PIF / 2-pay / Affirm), 3) Call Boundary Detection (auto-detect Zoom/FaceTime start & end with confirmation prompt), 4) Post-Call Summary (Win/Loss + stats screen after every call)
+- **Phase 1.5 build order (next up, see BUILD-PLAN.md):** 1) Financial Tracker (DONE — live detail extraction under Finances row), 2) Onboarding Wizard (in progress — data layer done) (niche, offer, price, qualifications, payment links — PIF / 2-pay / Affirm), 3) Call Boundary Detection (auto-detect Zoom/FaceTime start & end with confirmation prompt), 4) Post-Call Summary (Win/Loss + stats screen after every call)
 - Context-aware payment link surfacing: during Close / money objection, overlay shows the right payment option link based on prospect's financial situation (wired up after onboarding stores the links)
 - Stripe billing fully wired (keys pending — see Railway env vars above)
 - Diagnostics dashboard (Phase 3 — see BUILD-PLAN.md)
