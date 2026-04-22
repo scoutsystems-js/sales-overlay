@@ -69,12 +69,12 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - **System prompt rules** — explicit instructions to never revisit answered topics, go deeper on answers or pivot
 
 ### Overlay Display
-- **50% screen width, horizontally centered**, positioned at top of screen (y=0)
-- **Auto-resizing window** — window height syncs to bar content height via `resize-overlay` IPC so the window never extends beyond the visible dark bar. This means clicks below the bar pass through naturally without needing `setIgnoreMouseEvents`. Do NOT use `setIgnoreMouseEvents` for click-through — auto-resize is the correct approach.
-- **Control panel hidden** (`show: false` in createControlWindow) — audio capture runs there invisibly
-- **Overlay controls** — Scout logo + brand name center-left, Start (green) / Stop (red) / X buttons top-right. Start triggers `startSession('generic')`, Stop triggers `stopSession()`, X triggers `quitApp()`
-- **Top row is sticky** (`position: sticky; top: 0`) — buttons always visible even when prompts stack below
-- **Drag handle** — top-left corner, 48px wide
+- **50% screen width, horizontally centered**, positioned at `y: display.workArea.y` (just below macOS menu bar — NOT y:0 which goes behind it)
+- **Auto-resizing window** — `ResizeObserver` on `.bar` sends `resize-overlay` IPC to main on every content change; main calls `setBounds` with `Math.max(44, height)`. This means clicks below the bar pass through naturally without needing `setIgnoreMouseEvents`. Do NOT use `setIgnoreMouseEvents` for click-through — auto-resize is the correct approach.
+- **Control panel hidden** (`show: false` in createControlWindow) — audio capture runs there invisibly; receives `trigger-start-audio` / `trigger-stop-audio` IPC from main when overlay buttons are pressed
+- **Overlay controls** — Scout logo + brand name (drag handle) center-left, Start (green) / Stop (red) / X buttons top-right. Start triggers `startSession('generic')`, Stop triggers `stopSession()`, X triggers `quitApp()`
+- **Button visibility** — managed exclusively via inline `style.display` (`'flex'`/`'none'`). CSS classes carry appearance only, never `display:none`. Initial states set on HTML elements. All transitions go through `setSessionState(active)`.
+- **Drag** — brand area (logo + name) is `-webkit-app-region: drag`; buttons are `-webkit-app-region: no-drag`
 - **Stacking prompts** — new prompts appear below, old ones fade to 60% opacity with #aaa text color
 - **Max 3 visible** — oldest removed when 4th appears
 - **Stage badges** — color-coded (blue default, red objection, green close, amber transition)
@@ -117,7 +117,7 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - Discovery Tracker — side panel top-right, 7 auto-checking items driven by call memory + live financial detail extraction under the Finances row
 - Audio device enumeration and dual-input UI
 - Stage progression allows skipping 2 stages, 3 after 30 turns, any after 50 turns
-- Signed + notarized .dmg via electron-builder using Apple Developer ID (identity `1CD4B87D…`, team `8QN5Y29R27`). v1.0.2 ships arm64 only — x64 failed due to transient Apple notarization 500; rebuild x64 when servers recover and re-release.
+- Signed + notarized .dmg via electron-builder using Apple Developer ID (identity `1CD4B87D…`, team `8QN5Y29R27`). v1.0.2 ships arm64 only — x64 failed due to transient Apple notarization 500; rebuild x64 when servers recover and re-release. v1.0.2 packaged app predates the overlay fixes — next build (v1.0.3) will include them.
 - App bundles ship with the Scout icon (`build/icon.icns` referenced via `build.mac.icon` in `package.json`)
 - GitHub repo at github.com/scoutsystems-js/sales-overlay (PAT lives in `API Keys.md` only — never in committed files)
 - Auto-updater (electron-updater) pointed at GitHub Releases — `latest-mac.yml` + DMGs + blockmaps uploaded per release. electron-updater is lazy-required inside `initAutoUpdater()` with try/catch so a missing module never crashes the app.
@@ -188,6 +188,9 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - Railway provisions a **different** `*.up.railway.app` endpoint for each custom domain (e.g., `ujcd5dfv` for the old bare domain, `vdy3qiy5` for the new `www` domain). Both route to the same underlying service. Make sure to update any CNAME records to the NEW endpoint when Railway asks for it — using an old endpoint will 404.
 - Packaged app login showed "Something went wrong" → two root causes: (1) `BACKEND_URL` fell back to `http://localhost:3000` when no `.env` present in packaged build; (2) all 8 auth methods (`authLogin`, `authSignup`, `getToken`, `saveToken`, `clearToken`, `checkSubscription`, `openCheckout`, `authSuccess`) were missing from `src/preload.js` contextBridge — calling `undefined()` threw TypeError. Fixed both in v1.0.2: BACKEND_URL default changed to Railway URL, all 8 methods added to contextBridge.
 - `Cannot find module 'electron-updater'` crash in packaged app → adding `"node_modules/**/*"` to electron-builder `files` array bypasses smart bundler and produces malformed asar headers (only 2 entries for electron-updater instead of 201). Fix: revert `files` to `["src/**/*", "package.json"]` (smart bundler handles transitive deps automatically) + lazy-require electron-updater inside `initAutoUpdater()` with try/catch so future packaging issues never crash the app. Confirmed fixed: `npx asar list app.asar | grep -c electron-updater` returns 201.
+- Overlay showed as thin black line — three compounding causes: (1) overlay.html was missing the entire top control row (Start/Stop/X/logo) — it was only in the hidden control panel; (2) `y: 0` positioned the window behind the macOS menu bar (~24px), so only a sliver of the bar showed below it — fixed by using `y: display.workArea.y`; (3) `trigger-start-audio` / `trigger-stop-audio` IPC was sent from main to the hidden control window but control.js had no listeners — added them.
+- Stop button never appeared after pressing Start — CSS had `display:none` on `.btn-stop`; JS used `style.display = ''` which clears the inline style and falls back to the CSS rule (still none). Fix: remove `display:none` from CSS class, set initial state as inline `style="display:none"` on the HTML element, use explicit `'flex'`/`'none'` in JS via `setSessionState(active)`.
+- Overlay was rendering but from old packaged app (v1.0.2 DMG) — source changes in the iCloud working directory have no effect on the installed Scout.app. Always test with `npm start` from `~/Library/Mobile\ Documents/com~apple~CloudDocs/sales-overlay/` during dev; only the packaged DMG reflects built changes.
 - Force-push on origin silently wiped 5 commits of backend code (`de4836d`, `8b5bdb3`, `c6b028e`, `d9e2fe6`, `671d3cc`) → Railway kept running an older cached build while the current `main` was missing `backend/routes/auth.js`, `backend/routes/billing.js`, `backend/routes/proxy.js`, `backend/middleware/auth.js`, `backend/package.json`, `Procfile`, `railway.json`. Login endpoints 404'd, nobody noticed for days because `/health` kept working. Fixed by recovering from git reflog (`git checkout 671d3cc -- <paths>`) and committing restore as `0e669f8`. Prevention: branch protection on `main` (no force-push), `.gitignore` covering all secrets on `main`, pre-commit `gitleaks` hook. See README.md.
 
 ## Brand
