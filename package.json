@@ -15,13 +15,6 @@
   "author": "Scout Systems",
   "license": "ISC",
   "type": "commonjs",
-  "bundledDependencies": [
-    "electron-updater",
-    "@anthropic-ai/sdk",
-    "@supabase/supabase-js",
-    "dotenv",
-    "electron-audio-loopback"
-  ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/supabase-js": "^2.101.1",
