@@ -14,7 +14,6 @@ const { initMain } = require('electron-audio-loopback');
 initMain(); // Must be called before app.whenReady()
 
 const { app, BrowserWindow, ipcMain, screen, dialog, session, systemPreferences, shell } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const DeepgramTranscriber = require('../transcription/deepgram');
@@ -609,8 +608,15 @@ ipcMain.on('clear-suggestion', function() {
 });
 
 function initAutoUpdater() {
-  // Only run auto-updates in packaged app, not during development
   if (!app.isPackaged) return;
+
+  var autoUpdater;
+  try {
+    autoUpdater = require('electron-updater').autoUpdater;
+  } catch (err) {
+    console.error('[updater] electron-updater unavailable — auto-update disabled:', err.message);
+    return;
+  }
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -639,7 +645,7 @@ function initAutoUpdater() {
     dialog.showMessageBox({
       type: 'info',
       title: 'Update Ready',
-      message: 'Sales Overlay v' + info.version + ' has been downloaded.',
+      message: 'Scout v' + info.version + ' has been downloaded.',
       detail: 'The update will be installed when you quit the app.',
       buttons: ['Install Now', 'Later'],
     }).then(function(result) {
@@ -653,7 +659,6 @@ function initAutoUpdater() {
     console.error('[updater] Error:', err.message);
   });
 
-  // Check for updates 5 seconds after launch
   setTimeout(function() {
     autoUpdater.checkForUpdates();
   }, 5000);

@@ -6,15 +6,22 @@
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
-    "build": "electron-builder --mac",
-    "build:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
-    "release": "electron-builder --mac --publish always",
+    "build": "npm ci && electron-builder --mac",
+    "build:unsigned": "npm ci && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "release": "npm ci && electron-builder --mac --publish always",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "Scout Systems",
   "license": "ISC",
   "type": "commonjs",
+  "bundledDependencies": [
+    "electron-updater",
+    "@anthropic-ai/sdk",
+    "@supabase/supabase-js",
+    "dotenv",
+    "electron-audio-loopback"
+  ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/supabase-js": "^2.101.1",
@@ -61,8 +68,7 @@
     },
     "files": [
       "src/**/*",
-      "package.json",
-      "node_modules/**/*"
+      "package.json"
     ],
     "asarUnpack": [
       "node_modules/electron-audio-loopback/**/*"
