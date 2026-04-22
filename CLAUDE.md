@@ -117,14 +117,17 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - Discovery Tracker — side panel top-right, 7 auto-checking items driven by call memory + live financial detail extraction under the Finances row
 - Audio device enumeration and dual-input UI
 - Stage progression allows skipping 2 stages, 3 after 30 turns, any after 50 turns
-- Signed + notarized universal .dmg (arm64 + x64) via electron-builder using Apple Developer ID (identity `1CD4B87D…`, team `8QN5Y29R27`)
+- Signed + notarized .dmg via electron-builder using Apple Developer ID (identity `1CD4B87D…`, team `8QN5Y29R27`). v1.0.2 ships arm64 only — x64 failed due to transient Apple notarization 500; rebuild x64 when servers recover and re-release.
 - App bundles ship with the Scout icon (`build/icon.icns` referenced via `build.mac.icon` in `package.json`)
 - GitHub repo at github.com/scoutsystems-js/sales-overlay (PAT lives in `API Keys.md` only — never in committed files)
-- Auto-updater (electron-updater) pointed at GitHub Releases — `latest-mac.yml` + DMGs + blockmaps uploaded per release
-- GitHub Release v1.0.0 and v1.0.1 published with signed + notarized DMGs; v1.0.1 adds the macOS app icon
+- Auto-updater (electron-updater) pointed at GitHub Releases — `latest-mac.yml` + DMGs + blockmaps uploaded per release. electron-updater is lazy-required inside `initAutoUpdater()` with try/catch so a missing module never crashes the app.
+- GitHub Release v1.0.0 and v1.0.1 published with signed + notarized DMGs; v1.0.1 adds the macOS app icon; v1.0.2 fixes packaged app login (arm64 only)
 - Project synced to iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay/`) with node_modules and dist as `.nosync` symlinks
 - Supabase user_profiles table live — stores onboarding wizard data (niche, offer, pricing, payment URLs) with RLS scoped to auth.uid(). Migration at backend/migrations/001_user_profiles.sql.
 - Onboarding Wizard — 5-screen post-login setup (niche, offer, pricing, payment links, qualifications) wired to user_profiles via Supabase. Skip saves partial data, complete sets completed_at to hide wizard on future launches.
+- Web login session persistence — backend/routes/auth.js returns full session (access_token, refresh_token, expires_at); login.html stores to localStorage under `scout_session_v1` key and auto-restores on reload
+- Cache-Control: no-cache on all HTML files served by backend (prevents browser caching stale login/landing pages after deploys)
+- gitleaks pre-commit hook installed via `.pre-commit-config.yaml` — blocks commits containing API keys or secrets before they reach GitHub
 
 ## Current Status: What's Being Tuned
 1. **Prompt firing speed** — Target: fires within ~1.5s of prospect finishing. With polling timer + backchannel fix this should now work. Still being tested.
@@ -134,10 +137,10 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 
 ## Current Status: Not Yet Built
 - Post-call summary
-- Onboarding wizard
-- Backend / auth / billing (Phase 2 — building with Claude, no external dev)
-- Diagnostics dashboard (Phase 2 — see BUILD-PLAN.md for spec)
+- Stripe billing wired end-to-end (auth works; Stripe keys pending; `SKIP_BILLING` currently `true` so all logged-in users get full access)
+- Diagnostics dashboard (Phase 3 — see BUILD-PLAN.md for spec)
 - Automated release via `npm run release` (currently manual — DMGs uploaded to GitHub Releases via web UI since `gh` CLI isn't installed locally)
+- x64 DMG for v1.0.2 (Apple notarization server returned 500 mid-build; arm64 shipped; rebuild x64 separately when Apple servers recover)
 
 ## Resolved Issues (full history)
 - Overlay used to replace prompts mid-read → fixed with delivery detection + stacking
@@ -183,7 +186,8 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - Namecheap "Failed to save record" error when adding SPF TXT `v=spf1 include:_spf.google.com ~all` → the tilde `~` character causes the save to fail in Namecheap's UI. Fix: use `-all` (hard fail) instead of `~all` (soft fail). Functionally stricter but fine for a domain that only sends via Google.
 - Google Workspace MX verification failing on first retry even though MX is correct + globally propagated → normal. Google docs: activation can take up to 72 hours. Just retry every ~30 min.
 - Railway provisions a **different** `*.up.railway.app` endpoint for each custom domain (e.g., `ujcd5dfv` for the old bare domain, `vdy3qiy5` for the new `www` domain). Both route to the same underlying service. Make sure to update any CNAME records to the NEW endpoint when Railway asks for it — using an old endpoint will 404.
-- Packaged app login showed "Something went wrong" → `BACKEND_URL` in `src/main/index.js` fell back to `http://localhost:3000` when no `.env` present (always the case in packaged builds). Fixed by changing the default to `https://sales-overlay-production.up.railway.app` — requires a new build to ship (v1.0.2).
+- Packaged app login showed "Something went wrong" → two root causes: (1) `BACKEND_URL` fell back to `http://localhost:3000` when no `.env` present in packaged build; (2) all 8 auth methods (`authLogin`, `authSignup`, `getToken`, `saveToken`, `clearToken`, `checkSubscription`, `openCheckout`, `authSuccess`) were missing from `src/preload.js` contextBridge — calling `undefined()` threw TypeError. Fixed both in v1.0.2: BACKEND_URL default changed to Railway URL, all 8 methods added to contextBridge.
+- `Cannot find module 'electron-updater'` crash in packaged app → adding `"node_modules/**/*"` to electron-builder `files` array bypasses smart bundler and produces malformed asar headers (only 2 entries for electron-updater instead of 201). Fix: revert `files` to `["src/**/*", "package.json"]` (smart bundler handles transitive deps automatically) + lazy-require electron-updater inside `initAutoUpdater()` with try/catch so future packaging issues never crash the app. Confirmed fixed: `npx asar list app.asar | grep -c electron-updater` returns 201.
 - Force-push on origin silently wiped 5 commits of backend code (`de4836d`, `8b5bdb3`, `c6b028e`, `d9e2fe6`, `671d3cc`) → Railway kept running an older cached build while the current `main` was missing `backend/routes/auth.js`, `backend/routes/billing.js`, `backend/routes/proxy.js`, `backend/middleware/auth.js`, `backend/package.json`, `Procfile`, `railway.json`. Login endpoints 404'd, nobody noticed for days because `/health` kept working. Fixed by recovering from git reflog (`git checkout 671d3cc -- <paths>`) and committing restore as `0e669f8`. Prevention: branch protection on `main` (no force-push), `.gitignore` covering all secrets on `main`, pre-commit `gitleaks` hook. See README.md.
 
 ## Brand
@@ -282,7 +286,7 @@ SKIP_AUTH=true                   # flip to false once auth is tested
 ### Electron app publish target (auto-updater)
 - Publish provider: `github`
 - Owner/repo: `scoutsystems-js/sales-overlay`
-- Current release: v1.0.1 (commit `feba9a9` + version bump), signed + notarized, icon shipping
+- Current release: v1.0.2 — fixes packaged app login (BACKEND_URL + contextBridge), lazy electron-updater. arm64 only (x64 Apple notarization 500 — rebuild pending). Upload: go to GitHub Releases → v1.0.2 → Edit → drag `Scout-1.0.2-arm64.dmg`, `Scout-1.0.2-arm64.dmg.blockmap`, `latest-mac.yml` from `~/sales-overlay/dist/`.
 - Releases currently uploaded manually via GitHub web UI (drag DMGs + `.blockmap`s + `latest-mac.yml` from `dist/`). `npm run release` will work once `gh` CLI is installed + `GH_TOKEN` set.
 
 ## Future Plans
