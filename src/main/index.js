@@ -351,15 +351,15 @@ function createControlWindow() {
 }
 
 function createDiscoveryWindow() {
-  var display = screen.getPrimaryDisplay().workAreaSize;
+  var display = screen.getPrimaryDisplay();
   var winWidth = 190;
-  var winX = display.width - winWidth; // Right edge of screen
+  var winX = display.workArea.x + display.workArea.width - winWidth;
 
   discoveryWindow = new BrowserWindow({
     width: winWidth,
     height: 250,
     x: winX,
-    y: 0,
+    y: display.workArea.y,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -383,15 +383,15 @@ function createDiscoveryWindow() {
 }
 
 function createOverlayWindow() {
-  var display = screen.getPrimaryDisplay().workAreaSize;
-  var overlayWidth = Math.floor(display.width / 2);
-  var overlayX = Math.floor((display.width - overlayWidth) / 2);
+  var display = screen.getPrimaryDisplay();
+  var overlayWidth = Math.floor(display.workArea.width / 2);
+  var overlayX = display.workArea.x + Math.floor((display.workArea.width - overlayWidth) / 2);
 
   overlayWindow = new BrowserWindow({
     width: overlayWidth,
     height: 200,
     x: overlayX,
-    y: 0,
+    y: display.workArea.y,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
