@@ -1,13 +1,14 @@
 {
   "name": "sales-overlay",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Scout Systems — Real-time AI sales coaching overlay",
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
-    "build": "node scripts/prebuild.js && electron-builder --mac",
-    "release": "node scripts/prebuild.js && electron-builder --mac --publish always",
+    "build": "electron-builder --mac",
+    "build:unsigned": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "release": "electron-builder --mac --publish always",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -46,8 +47,8 @@
       "category": "public.app-category.business",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "entitlements": "entitlements.plist",
-      "entitlementsInherit": "entitlements.plist",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "notarize": true,
       "icon": "build/icon.icns"
     },
