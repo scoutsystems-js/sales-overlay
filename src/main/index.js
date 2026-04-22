@@ -31,6 +31,7 @@ let authWindow = null;
 let controlWindow = null;
 let overlayWindow = null;
 let discoveryWindow = null;
+let onboardingWindow = null;
 let deepgram = null;
 let claude = null;
 let kb = null;
@@ -142,13 +143,178 @@ ipcMain.handle('clear-token', async function() {
   } catch (err) { return { error: err.message }; }
 });
 
-ipcMain.on('auth-success', function() {
-  // Create app windows first, then close auth so window-all-closed never fires
+ipcMain.on('auth-success', async function() {
+  // Create app windows first, then close auth so window-all-closed never fires.
+  // If the user hasn't completed onboarding, show the wizard instead of the
+  // main control panel. The wizard is responsible for opening the control/
+  // overlay/discovery trio when it finishes or is skipped.
   initKnowledgeBase();
+  var token = readTokenFromDisk();
+  var needsOnboarding = await needsOnboardingCheck(token);
+  if (needsOnboarding) {
+    createOnboardingWindow();
+  } else {
+    createControlWindow();
+    createOverlayWindow();
+    createDiscoveryWindow();
+  }
+  if (authWindow) { authWindow.close(); authWindow = null; }
+});
+
+// ── Onboarding flow ──────────────────────────────────────────────────────
+// On first login, users land in the onboarding wizard (niche, offer, pricing,
+// payment links, qualifications). "Save & continue" marks the profile
+// completed and boots the main app. "Skip for now" still boots the main app
+// but saves any partial data so the wizard can resume, and triggers a nudge
+// banner on the control panel. Onboarding state lives in Supabase's
+// `user_profiles` table with RLS scoped to auth.uid().
+
+function readTokenFromDisk() {
+  try {
+    if (tokenPath && fs.existsSync(tokenPath)) {
+      var data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+      return data.token || null;
+    }
+  } catch (err) {}
+  return null;
+}
+
+// Build a Supabase client authenticated as the current user. The user's JWT
+// is passed as an Authorization header so RLS policies using auth.uid() work.
+function createSupabaseForUser(token) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !token) return null;
+  var { createClient } = require('@supabase/supabase-js');
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: 'Bearer ' + token } },
+    auth: { persistSession: false },
+  });
+}
+
+// Extract the Supabase user id (`sub` claim) from a JWT without a crypto check —
+// we only need it for upserts; RLS still enforces that users can't write anyone
+// else's row, so a forged id here just makes the insert fail.
+function decodeUserIdFromToken(token) {
+  try {
+    var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+    return payload.sub || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// True if the user has no profile row OR has started but not finished setup.
+// On any failure we return false so errors never block the user from reaching
+// the app — worst case they just don't see the wizard, which matches the
+// "nudge but allow" skip model anyway.
+async function needsOnboardingCheck(token) {
+  if (!token) return false;
+  var supabase = createSupabaseForUser(token);
+  if (!supabase) return false;
+  try {
+    var res = await supabase.from('user_profiles').select('completed_at').maybeSingle();
+    if (res.error) {
+      console.error('[onboarding] Check error:', res.error.message);
+      return false;
+    }
+    return !res.data || !res.data.completed_at;
+  } catch (err) {
+    console.error('[onboarding] Check exception:', err.message);
+    return false;
+  }
+}
+
+function createOnboardingWindow() {
+  onboardingWindow = new BrowserWindow({
+    width: 480,
+    height: 560,
+    center: true,
+    resizable: false,
+    titleBarStyle: 'hiddenInset',
+    backgroundColor: '#0f0f0f',
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  onboardingWindow.loadFile(path.join(__dirname, '..', 'renderer', 'onboarding', 'onboarding.html'));
+  onboardingWindow.on('closed', function() { onboardingWindow = null; });
+}
+
+// Loads the current user's profile — used to pre-populate the wizard when
+// a user resumes an incomplete setup, and (later) by the overlay to feed the
+// closer's offer details into Claude's system prompt on each session.
+ipcMain.handle('get-profile', async function() {
+  var token = readTokenFromDisk();
+  var supabase = createSupabaseForUser(token);
+  if (!supabase) return { error: 'Not authenticated' };
+  try {
+    var res = await supabase.from('user_profiles').select('*').maybeSingle();
+    if (res.error) return { error: res.error.message };
+    return { profile: res.data || null };
+  } catch (err) { return { error: err.message }; }
+});
+
+// Saves the wizard data. When `data.completed === true`, sets completed_at
+// so the wizard stops showing on future launches. On skip, any partial data
+// is saved but completed_at stays null so the wizard reappears next login.
+ipcMain.handle('save-profile', async function(event, data) {
+  var token = readTokenFromDisk();
+  var supabase = createSupabaseForUser(token);
+  if (!supabase) return { error: 'Not authenticated' };
+  var userId = decodeUserIdFromToken(token);
+  if (!userId) return { error: 'Could not decode user id from token' };
+  try {
+    var row = {
+      user_id:        userId,
+      niche:          data.niche || null,
+      offer:          data.offer || null,
+      price_pif:      data.price_pif != null ? data.price_pif : null,
+      price_2pay:     data.price_2pay != null ? data.price_2pay : null,
+      qualifications: data.qualifications || null,
+      pif_url:        data.pif_url || null,
+      twopay_url:     data.twopay_url || null,
+      affirm_url:     data.affirm_url || null,
+    };
+    if (data.completed === true) row.completed_at = new Date().toISOString();
+    var res = await supabase
+      .from('user_profiles')
+      .upsert(row, { onConflict: 'user_id' })
+      .select()
+      .maybeSingle();
+    if (res.error) return { error: res.error.message };
+    return { profile: res.data };
+  } catch (err) { return { error: err.message }; }
+});
+
+// Wizard finished — launch the main app windows.
+ipcMain.on('onboarding-complete', function() {
   createControlWindow();
   createOverlayWindow();
   createDiscoveryWindow();
-  if (authWindow) { authWindow.close(); authWindow = null; }
+  if (onboardingWindow) { onboardingWindow.close(); onboardingWindow = null; }
+});
+
+// Wizard skipped — launch the main windows, then tell the control panel to
+// show the "finish setup" nudge banner once it's done loading.
+ipcMain.on('onboarding-skip', function() {
+  createControlWindow();
+  createOverlayWindow();
+  createDiscoveryWindow();
+  if (controlWindow) {
+    controlWindow.webContents.once('did-finish-load', function() {
+      if (controlWindow) controlWindow.webContents.send('show-setup-nudge');
+    });
+  }
+  if (onboardingWindow) { onboardingWindow.close(); onboardingWindow = null; }
+});
+
+// Reopen the wizard from the control panel (user clicked the nudge banner).
+ipcMain.on('open-onboarding', function() {
+  if (!onboardingWindow) createOnboardingWindow();
+  else onboardingWindow.focus();
 });
 
 // Initialize knowledge base on startup

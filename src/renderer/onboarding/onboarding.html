@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Set up Scout</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      height: 100vh;
+      padding: 32px 28px 24px;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+    }
+
+    /* Header bar with progress + skip link */
+    .wizard-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 26px;
+    }
+    .progress-track {
+      flex: 1;
+      height: 4px;
+      background: #1a1a1a;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #22c55e;
+      width: 20%;
+      transition: width 0.3s ease;
+    }
+    .progress-label {
+      font-size: 11px;
+      color: #666;
+      letter-spacing: 0.4px;
+      min-width: 28px;
+      text-align: right;
+    }
+    .skip-link {
+      font-size: 11px;
+      color: #555;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: color 0.15s;
+      user-select: none;
+    }
+    .skip-link:hover { color: #888; }
+
+    /* Card that holds each screen */
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #262626;
+      border-radius: 12px;
+      padding: 28px;
+      height: calc(100vh - 92px);
+      display: flex;
+      flex-direction: column;
+    }
+    .screen { display: none; flex: 1; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.2px; }
+    h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.2px; }
+    .sub {
+      font-size: 13px;
+      color: #888;
+      line-height: 1.55;
+      margin-bottom: 22px;
+    }
+
+    /* Form fields */
+    .fields { flex: 1; overflow-y: auto; padding-right: 2px; }
+    .field { margin-bottom: 14px; }
+    label {
+      display: block;
+      font-size: 11px;
+      color: #777;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    input, textarea {
+      width: 100%;
+      background: #111;
+      border: 1px solid #262626;
+      border-radius: 7px;
+      color: #fff;
+      font-size: 13px;
+      padding: 9px 11px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus { border-color: #22c55e; }
+    textarea { resize: none; min-height: 80px; line-height: 1.5; }
+    .helper {
+      font-size: 11px;
+      color: #555;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    /* Price inputs — show $ prefix */
+    .price-row { display: flex; align-items: center; }
+    .price-prefix {
+      background: #111;
+      border: 1px solid #262626;
+      border-right: none;
+      border-radius: 7px 0 0 7px;
+      color: #555;
+      padding: 9px 8px 9px 11px;
+      font-size: 13px;
+    }
+    .price-row input {
+      border-radius: 0 7px 7px 0;
+      border-left: none;
+    }
+
+    /* Error banner */
+    .error-msg {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 7px;
+      color: #f87171;
+      font-size: 12px;
+      padding: 9px 11px;
+      margin-bottom: 14px;
+      display: none;
+      line-height: 1.5;
+    }
+
+    /* Bottom action row */
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .btn {
+      padding: 10px 16px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, background 0.15s;
+      font-family: inherit;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: #22c55e;
+      color: #000;
+      flex: 1;
+    }
+    .btn-primary:hover:not(:disabled) { background: #16a34a; }
+    .btn-secondary {
+      background: transparent;
+      color: #888;
+      border: 1px solid #262626;
+      padding: 10px 20px;
+    }
+    .btn-secondary:hover { color: #fff; border-color: #3a3a3a; }
+    .btn-full { width: 100%; }
+
+    /* Welcome screen centering */
+    .welcome-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+    }
+    .welcome-body .sub { margin-bottom: 32px; }
+
+    /* Spinner for save button */
+    .spinner {
+      width: 13px;
+      height: 13px;
+      border: 2px solid rgba(0,0,0,0.25);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div class="wizard-header">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">1 / 5</div>
+    <span class="skip-link" id="skipLink" onclick="handleSkip()">Skip for now</span>
+  </div>
+
+  <div class="card">
+
+    <!-- Screen 1: Welcome -->
+    <div class="screen active" id="screen1">
+      <div class="welcome-body">
+        <h1>Set up Scout</h1>
+        <p class="sub">Tell Scout about your offer so it can coach you on every call. Takes about two minutes. You can edit this anytime.</p>
+        <button class="btn btn-primary btn-full" onclick="next()">Get started</button>
+      </div>
+    </div>
+
+    <!-- Screen 2: Niche + offer -->
+    <div class="screen" id="screen2">
+      <h2>Who you sell to</h2>
+      <p class="sub">Helps Scout speak your prospect's language instead of giving generic coaching.</p>
+      <div class="fields">
+        <div class="field">
+          <label for="niche">Your niche</label>
+          <input type="text" id="niche" placeholder="e.g. High-ticket coaching for consultants"/>
+        </div>
+        <div class="field">
+          <label for="offer">What you sell</label>
+          <textarea id="offer" rows="4" placeholder="e.g. 12-week coaching program with weekly 1:1 calls, group community access, and a client acquisition playbook."></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="prev()">Back</button>
+        <button class="btn btn-primary" onclick="next()">Next</button>
+      </div>
+    </div>
+
+    <!-- Screen 3: Pricing -->
+    <div class="screen" id="screen3">
+      <h2>Pricing</h2>
+      <p class="sub">Scout uses this to frame offers naturally during your pitch and close. Leave blank if you don't offer a tier.</p>
+      <div class="fields">
+        <div class="field">
+          <label for="price_pif">Pay in full</label>
+          <div class="price-row">
+            <span class="price-prefix">$</span>
+            <input type="number" id="price_pif" inputmode="numeric" min="0" placeholder="e.g. 5000"/>
+          </div>
+        </div>
+        <div class="field">
+          <label for="price_2pay">2-payment installment (each)</label>
+          <div class="price-row">
+            <span class="price-prefix">$</span>
+            <input type="number" id="price_2pay" inputmode="numeric" min="0" placeholder="e.g. 2750"/>
+          </div>
+          <div class="helper">Per payment, not total.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="prev()">Back</button>
+        <button class="btn btn-primary" onclick="next()">Next</button>
+      </div>
+    </div>
+
+    <!-- Screen 4: Payment links -->
+    <div class="screen" id="screen4">
+      <h2>Payment links</h2>
+      <p class="sub">Scout will surface the right link the moment your prospect raises a money objection at close.</p>
+      <div class="fields">
+        <div class="field">
+          <label for="pif_url">Pay-in-full checkout URL</label>
+          <input type="url" id="pif_url" placeholder="https://..."/>
+        </div>
+        <div class="field">
+          <label for="twopay_url">2-pay checkout URL</label>
+          <input type="url" id="twopay_url" placeholder="https://..."/>
+        </div>
+        <div class="field">
+          <label for="affirm_url">Affirm financing URL</label>
+          <input type="url" id="affirm_url" placeholder="https://..."/>
+          <div class="helper">Optional. Use this when a prospect can't pay up-front.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="prev()">Back</button>
+        <button class="btn btn-primary" onclick="next()">Next</button>
+      </div>
+    </div>
+
+    <!-- Screen 5: Qualifications -->
+    <div class="screen" id="screen5">
+      <h2>Qualifications</h2>
+      <p class="sub">What makes someone a good fit? Scout uses this during discovery to flag red flags and green lights in real time.</p>
+      <div class="fields">
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="field">
+          <label for="qualifications">Your ideal prospect</label>
+          <textarea id="qualifications" rows="7" placeholder="e.g. Established business doing $10k+/mo. Decision maker (not running it past a partner later). Willing to invest in themselves. Can dedicate 5 hrs/week for 90 days. Growth-minded, not looking for a magic bullet."></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="prev()">Back</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveAndFinish()">Save &amp; continue</button>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+  // ── State ─────────────────────────────────────────────────────────────────
+  var currentScreen = 1;
+  var TOTAL = 5;
+
+  // ── Screen nav ────────────────────────────────────────────────────────────
+  function showScreen(n) {
+    for (var i = 1; i <= TOTAL; i++) {
+      var el = document.getElementById('screen' + i);
+      if (el) el.classList.toggle('active', i === n);
+    }
+    document.getElementById('progressFill').style.width = (n / TOTAL * 100) + '%';
+    document.getElementById('progressLabel').textContent = n + ' / ' + TOTAL;
+    currentScreen = n;
+  }
+
+  function next() {
+    if (currentScreen < TOTAL) showScreen(currentScreen + 1);
+  }
+
+  function prev() {
+    if (currentScreen > 1) showScreen(currentScreen - 1);
+  }
+
+  // ── Form helpers ──────────────────────────────────────────────────────────
+  function getVal(id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var v = el.value.trim();
+    return v === '' ? null : v;
+  }
+
+  function getPrice(id) {
+    var v = getVal(id);
+    if (v === null) return null;
+    var n = parseInt(v, 10);
+    return isNaN(n) ? null : n;
+  }
+
+  function collectFormData() {
+    return {
+      niche:          getVal('niche'),
+      offer:          getVal('offer'),
+      price_pif:      getPrice('price_pif'),
+      price_2pay:     getPrice('price_2pay'),
+      qualifications: getVal('qualifications'),
+      pif_url:        getVal('pif_url'),
+      twopay_url:     getVal('twopay_url'),
+      affirm_url:     getVal('affirm_url'),
+    };
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    var el = document.getElementById('errorMsg');
+    if (el) el.style.display = 'none';
+  }
+
+  // ── Pre-populate on load (if user is resuming an incomplete setup) ────────
+  async function loadExisting() {
+    if (!window.electronAPI || !window.electronAPI.getProfile) return;
+    try {
+      var res = await window.electronAPI.getProfile();
+      if (!res || res.error || !res.profile) return;
+      var p = res.profile;
+      if (p.niche)          document.getElementById('niche').value = p.niche;
+      if (p.offer)          document.getElementById('offer').value = p.offer;
+      if (p.price_pif != null)   document.getElementById('price_pif').value = p.price_pif;
+      if (p.price_2pay != null)  document.getElementById('price_2pay').value = p.price_2pay;
+      if (p.qualifications) document.getElementById('qualifications').value = p.qualifications;
+      if (p.pif_url)        document.getElementById('pif_url').value = p.pif_url;
+      if (p.twopay_url)     document.getElementById('twopay_url').value = p.twopay_url;
+      if (p.affirm_url)     document.getElementById('affirm_url').value = p.affirm_url;
+    } catch (err) {
+      // Silent — wizard still works without pre-populated data
+    }
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+  async function saveAndFinish() {
+    hideError();
+    var btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+
+    var data = collectFormData();
+    data.completed = true; // signals main process to set completed_at = now()
+
+    try {
+      var res = await window.electronAPI.saveProfile(data);
+      if (res && res.error) {
+        showError(res.error);
+        btn.disabled = false;
+        btn.textContent = 'Save & continue';
+        return;
+      }
+      window.electronAPI.onboardingComplete();
+    } catch (err) {
+      showError('Could not save. Check your connection and try again.');
+      btn.disabled = false;
+      btn.textContent = 'Save & continue';
+    }
+  }
+
+  async function handleSkip() {
+    // Save any partial data so the user can resume later, but don't mark completed.
+    var data = collectFormData();
+    data.completed = false;
+    try {
+      if (window.electronAPI && window.electronAPI.saveProfile) {
+        await window.electronAPI.saveProfile(data);
+      }
+    } catch (err) {
+      // Non-blocking — we still want to let them proceed even if the partial save fails.
+    }
+    window.electronAPI.onboardingSkip();
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  showScreen(1);
+  loadExisting();
+</script>
+
+</body>
+</html>

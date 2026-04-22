@@ -10,6 +10,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getClients: function() { return ipcRenderer.invoke('get-clients'); },
   enableLoopbackAudio: function() { return ipcRenderer.invoke('enable-loopback-audio'); },
   disableLoopbackAudio: function() { return ipcRenderer.invoke('disable-loopback-audio'); },
+
+  // Onboarding wizard — load/save profile data + lifecycle signals
+  getProfile: function() { return ipcRenderer.invoke('get-profile'); },
+  saveProfile: function(data) { return ipcRenderer.invoke('save-profile', data); },
+  onboardingComplete: function() { ipcRenderer.send('onboarding-complete'); },
+  onboardingSkip: function() { ipcRenderer.send('onboarding-skip'); },
+  openOnboarding: function() { ipcRenderer.send('open-onboarding'); },
+  onShowSetupNudge: function(callback) {
+    ipcRenderer.on('show-setup-nudge', function() { callback(); });
+  },
+
   onStatusUpdate: function(callback) {
     ipcRenderer.on('status-update', function(event, data) { callback(data); });
   },
