@@ -43,4 +43,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onClearSuggestion: function(callback) {
     ipcRenderer.on('clear-suggestion', function() { callback(); });
   },
+
+  quitApp: function() { ipcRenderer.send('quit-app'); },
+  resizeOverlay: function(height) { ipcRenderer.send('resize-overlay', height); },
+  onTriggerStartAudio: function(callback) { ipcRenderer.on('trigger-start-audio', function() { callback(); }); },
+  onTriggerStopAudio: function(callback) { ipcRenderer.on('trigger-stop-audio', function() { callback(); }); },
 });

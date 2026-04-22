@@ -311,5 +311,14 @@ window.electronAPI.onAppendTranscript(function(data) {
   appendToTranscript(data.speaker, data.text);
 });
 
+// ── Triggered by overlay Start/Stop buttons via main process ──
+window.electronAPI.onTriggerStartAudio(async function() {
+  await startAudioCapture();
+});
+
+window.electronAPI.onTriggerStopAudio(function() {
+  stopAudioCapture();
+});
+
 // ── Init ──
 enumerateAudioDevices();
