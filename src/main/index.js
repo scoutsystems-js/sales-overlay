@@ -23,7 +23,7 @@ const KnowledgeBase = require('../ai/knowledge-base');
 const CallMemory = require('../ai/call-memory');
 const ScriptParser = require('../ai/script-parser');
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://sales-overlay-production.up.railway.app';
 const SKIP_AUTH = process.env.SKIP_AUTH === 'true';
 let tokenPath = null; // Set after app is ready (needs app.getPath)
 
