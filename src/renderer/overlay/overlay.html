@@ -21,7 +21,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 7px 10px 7px 10px;
+      padding: 9px 12px;
       pointer-events: auto;
       -webkit-app-region: no-drag;
     }
@@ -29,7 +29,7 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
       cursor: grab;
       -webkit-app-region: drag;
       padding: 2px 4px;
@@ -56,6 +56,7 @@
       -webkit-app-region: no-drag;
     }
 
+    /* Appearance only — runtime visibility is managed via inline styles */
     .btn-start, .btn-stop, .btn-quit {
       border: none;
       border-radius: 5px;
@@ -66,17 +67,16 @@
       transition: opacity 0.15s;
       -webkit-app-region: no-drag;
     }
-    .btn-start { background: #22c55e; color: #000; padding: 4px 11px; }
+    .btn-start { background: #22c55e; color: #000; padding: 5px 13px; }
     .btn-start:hover { opacity: 0.85; }
-    .btn-stop { background: #ef4444; color: #fff; padding: 4px 11px; display: none; }
-    .btn-stop:hover { opacity: 0.85; }
-    .btn-quit { background: rgba(255,255,255,0.08); color: #777; padding: 4px 9px; font-size: 13px; }
-    .btn-quit:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .btn-stop  { background: #ef4444; color: #fff; padding: 5px 13px; }
+    .btn-stop:hover  { opacity: 0.85; }
+    .btn-quit  { background: rgba(255,255,255,0.08); color: #777; padding: 5px 9px; font-size: 13px; }
+    .btn-quit:hover  { background: rgba(255,255,255,0.18); color: #fff; }
 
     /* ── Prompt area (shown only during active session) ── */
     .prompt-area {
       padding: 0 16px 8px;
-      display: none;
     }
 
     .status-row {
@@ -129,12 +129,12 @@
       background: #3b82f6;
       color: #fff;
     }
-    .stage-badge.objection { background: #ef4444; }
-    .stage-badge.close { background: #22c55e; color: #000; }
+    .stage-badge.objection  { background: #ef4444; }
+    .stage-badge.close      { background: #22c55e; color: #000; }
     .stage-badge.transition { background: #f59e0b; color: #000; }
 
     .content { flex: 1; min-width: 0; }
-    .headline { font-size: 11px; font-weight: 600; color: #999; margin-bottom: 2px; letter-spacing: 0.3px; }
+    .headline  { font-size: 11px; font-weight: 600; color: #999; margin-bottom: 2px; letter-spacing: 0.3px; }
     .suggestion { font-size: 14px; color: #fff; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
     .prompt-row.delivered .suggestion { color: #aaa; }
     .follow-up { font-size: 11px; color: #555; margin-top: 3px; line-height: 1.3; display: none; }
@@ -150,13 +150,13 @@
         <span class="brand-name">Scout</span>
       </div>
       <div class="top-controls">
-        <button class="btn-start" id="btnStart">Start</button>
-        <button class="btn-stop" id="btnStop">Stop</button>
-        <button class="btn-quit" id="btnQuit">✕</button>
+        <button class="btn-start" id="btnStart" style="display:flex">Start</button>
+        <button class="btn-stop"  id="btnStop"  style="display:none">Stop</button>
+        <button class="btn-quit"  id="btnQuit">✕</button>
       </div>
     </div>
 
-    <div class="prompt-area" id="promptArea">
+    <div class="prompt-area" id="promptArea" style="display:none">
       <div class="status-row">
         <div class="listening-dot"></div>
         <span class="status-label">Listening</span>
@@ -167,26 +167,18 @@
   </div>
 
   <script>
-    var bar = document.getElementById('bar');
-    var promptArea = document.getElementById('promptArea');
+    var bar         = document.getElementById('bar');
+    var promptArea  = document.getElementById('promptArea');
     var promptStack = document.getElementById('promptStack');
-    var btnStart = document.getElementById('btnStart');
-    var btnStop = document.getElementById('btnStop');
-    var btnQuit = document.getElementById('btnQuit');
+    var btnStart    = document.getElementById('btnStart');
+    var btnStop     = document.getElementById('btnStop');
+    var btnQuit     = document.getElementById('btnQuit');
     var MAX_VISIBLE_PROMPTS = 3;
 
     // ── Button handlers ──
-    btnStart.addEventListener('click', function() {
-      window.electronAPI.startSession('generic');
-    });
-
-    btnStop.addEventListener('click', function() {
-      window.electronAPI.stopSession();
-    });
-
-    btnQuit.addEventListener('click', function() {
-      window.electronAPI.quitApp();
-    });
+    btnStart.addEventListener('click', function() { window.electronAPI.startSession('generic'); });
+    btnStop.addEventListener('click',  function() { window.electronAPI.stopSession(); });
+    btnQuit.addEventListener('click',  function() { window.electronAPI.quitApp(); });
 
     // ── Auto-resize window to match bar content height ──
     var resizeObserver = new ResizeObserver(function() {
@@ -194,22 +186,30 @@
     });
     resizeObserver.observe(bar);
 
+    // ── Session state — single function owns all UI transitions ──
+    function setSessionState(active) {
+      btnStart.style.display    = active ? 'none'  : 'flex';
+      btnStop.style.display     = active ? 'flex'  : 'none';
+      promptArea.style.display  = active ? 'block' : 'none';
+      if (!active) promptStack.innerHTML = '';
+    }
+
     // ── Prompt helpers ──
     function getStageClass(stage) {
       if (stage === 'objection_handling') return 'objection';
-      if (stage === 'close') return 'close';
-      if (stage === 'transition') return 'transition';
+      if (stage === 'close')             return 'close';
+      if (stage === 'transition')        return 'transition';
       return '';
     }
 
     function getStageLabel(stage) {
       var labels = {
-        introduction: 'INTRO',
-        set: 'THE SET',
-        discovery: 'DISCOVERY',
-        transition: 'TRANSITION',
-        pitch: 'PITCH',
-        close: 'CLOSE',
+        introduction:       'INTRO',
+        set:                'THE SET',
+        discovery:          'DISCOVERY',
+        transition:         'TRANSITION',
+        pitch:              'PITCH',
+        close:              'CLOSE',
         objection_handling: 'OBJECTION',
       };
       return labels[stage] || (stage || '').toUpperCase();
@@ -221,19 +221,19 @@
         existing[i].classList.add('delivered');
       }
 
-      var row = document.createElement('div');
+      var row      = document.createElement('div');
       row.className = 'prompt-row';
 
-      var badge = document.createElement('span');
+      var badge      = document.createElement('span');
       badge.className = 'stage-badge';
-      var stageClass = getStageClass(data.stage);
+      var stageClass  = getStageClass(data.stage);
       if (stageClass) badge.classList.add(stageClass);
       badge.textContent = getStageLabel(data.stage);
 
-      var content = document.createElement('div');
+      var content    = document.createElement('div');
       content.className = 'content';
 
-      var headline = document.createElement('div');
+      var headline   = document.createElement('div');
       headline.className = 'headline';
       headline.textContent = data.headline || '';
 
@@ -264,32 +264,20 @@
 
     // ── IPC event handlers ──
     window.electronAPI.onStatusUpdate(function(data) {
+      setSessionState(data.active);
       if (data.active) {
-        btnStart.style.display = 'none';
-        btnStop.style.display = '';
-        promptArea.style.display = 'block';
-        promptStack.innerHTML = '';
         addPrompt({
-          stage: 'introduction',
-          headline: 'INTRODUCTION — Open the call',
+          stage:     'introduction',
+          headline:  'INTRODUCTION — Open the call',
           suggestion: '"Hey [Name], can you hear me okay? Great to meet you. I\'m [Your Name]. Where are you calling in from today?"',
-          followUp: 'Get their name, city, profession, and family in 90 seconds. Each answer becomes a close frame.',
+          followUp:  'Get their name, city, profession, and family in 90 seconds. Each answer becomes a close frame.',
         });
-      } else {
-        btnStart.style.display = '';
-        btnStop.style.display = 'none';
-        promptArea.style.display = 'none';
-        promptStack.innerHTML = '';
       }
     });
 
-    window.electronAPI.onNewSuggestion(function(data) {
-      addPrompt(data);
-    });
+    window.electronAPI.onNewSuggestion(function(data) { addPrompt(data); });
 
-    window.electronAPI.onClearSuggestion(function() {
-      promptStack.innerHTML = '';
-    });
+    window.electronAPI.onClearSuggestion(function() { promptStack.innerHTML = ''; });
   </script>
 </body>
 </html>
