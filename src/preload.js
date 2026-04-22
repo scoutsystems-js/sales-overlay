@@ -1,6 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Auth
+  authLogin: function(email, password) { return ipcRenderer.invoke('auth-login', email, password); },
+  authSignup: function(email, password) { return ipcRenderer.invoke('auth-signup', email, password); },
+  getToken: function() { return ipcRenderer.invoke('get-token'); },
+  saveToken: function(token) { return ipcRenderer.invoke('save-token', token); },
+  clearToken: function() { return ipcRenderer.invoke('clear-token'); },
+  checkSubscription: function(token) { return ipcRenderer.invoke('check-subscription', token); },
+  openCheckout: function(token) { return ipcRenderer.invoke('open-checkout', token); },
+  authSuccess: function() { ipcRenderer.send('auth-success'); },
+
   startSession: function(clientId) { ipcRenderer.send('start-session', clientId); },
   stopSession: function() { ipcRenderer.send('stop-session'); },
   sendAudioChunk: function(buffer) { ipcRenderer.send('audio-chunk', buffer); },
