@@ -30,3 +30,11 @@ sales-overlay/
 
 # Claude memory files — local scratch only, not for version control.
 memory/
+
+# Claude Code internal files — local only.
+.agents/
+.claude/
+skills-lock.json
+
+# dist symlink (points to dist.nosync — build artifacts, not for git)
+dist
