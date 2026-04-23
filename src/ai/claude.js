@@ -173,6 +173,11 @@ class ClaudeCoach {
 
     // Track when prospect last spoke — prevents next prompt from firing mid-answer
     this.lastProspectSpeechTime = 0;
+    // v1.0.7: "prospect finished speaking" silence window. Must be > Deepgram's
+    // endpointing=500ms so a normal pause doesn't fire a premature prompt.
+    // 800ms total (ours) + Deepgram's ~500ms = ~1300ms effective silence window,
+    // down from v1.0.6's 1500ms-plus-endpointing ~2000ms. Saves ~700ms per cycle.
+    this.prospectSilenceMs = 800;
   }
 
   addTurn(text, speaker) {
@@ -333,7 +338,7 @@ class ClaudeCoach {
     // Prospect-finished-speaking check: wait 1.5s after prospect's last speech before firing.
     // This prevents the next prompt from appearing while the prospect is still mid-sentence.
     // The prospect response gate already confirmed they spoke — this just waits for their pause.
-    if (this.lastProspectSpeechTime > 0 && now - this.lastProspectSpeechTime < 1500) { gateBlocked('prospect_silence'); return; }
+    if (this.lastProspectSpeechTime > 0 && now - this.lastProspectSpeechTime < this.prospectSilenceMs) { gateBlocked('prospect_silence'); return; }
     // v1.0.7-alpha: t1 — prospect-silence gate cleared
     timingLog('[TIMING] cycle=none stage=t1_silence_ok abs_ms=' + (this._lastProspectT0 ? (now - this._lastProspectT0) : -1));
 
