@@ -1,4 +1,3 @@
-var Anthropic = require('@anthropic-ai/sdk');
 var prompts = require('./prompts');
 var objections = require('./objections');
 
@@ -124,8 +123,8 @@ function hasDeliveredLine(spokenText, suggestedText) {
 }
 
 class ClaudeCoach {
-  constructor(apiKey, knowledgeBase, callMemory) {
-    this.client = new Anthropic({ apiKey: apiKey });
+  constructor(proxyClient, knowledgeBase, callMemory) {
+    this.proxy = proxyClient;
     this.kb = knowledgeBase || null;
     this.memory = callMemory || null;
     this.callBuffer = [];
@@ -355,18 +354,23 @@ class ClaudeCoach {
         suggestionHistory += '\nIf you\'ve asked about a topic 2+ times and the prospect answered, MOVE ON. Do not rephrase the same question.';
       }
 
-      // 5. Call Claude with full context
-      console.log('[claude] Calling Claude API...');
+      // 5. Call Claude via backend proxy (keys live server-side)
+      console.log('[claude] Calling Claude via proxy...');
       var userPrompt = prompts.buildSuggestionPrompt(transcript, null, kbContext, memoryContext, suggestionHistory);
 
-      var response = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 300,
-        system: prompts.SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-      });
+      var response;
+      try {
+        response = await this.proxy.suggest({
+          systemPrompt: prompts.SYSTEM_PROMPT,
+          userPrompt: userPrompt,
+          maxTokens: 300,
+        });
+      } catch (err) {
+        console.error('[claude] Proxy suggest failed:', err.message);
+        return;
+      }
 
-      var content = response.content[0] ? response.content[0].text : null;
+      var content = response && response.content ? response.content : null;
       if (!content) return;
 
       // Strip markdown code fences if Claude wraps the JSON

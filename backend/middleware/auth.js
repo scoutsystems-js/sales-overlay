@@ -42,7 +42,17 @@ async function requireAuth(req, res, next) {
 
 // Checks that the user has an active Stripe subscription in the subscriptions table.
 // Run this AFTER requireAuth.
+//
+// Beta behavior: while SKIP_BILLING is not explicitly 'false', this middleware
+// lets any authenticated user through. Matches the desktop app's own
+// check-subscription IPC, which returns { active: true, status: 'beta' } under
+// the same condition. Flip SKIP_BILLING=false in Railway env vars once Stripe
+// is wired and a subscriptions table exists.
 async function requireSubscription(req, res, next) {
+  if (process.env.SKIP_BILLING !== 'false') {
+    return next();
+  }
+
   try {
     var supabase = getSupabase();
     var { data, error } = await supabase

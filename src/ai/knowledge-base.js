@@ -1,10 +1,8 @@
 var { createClient } = require('@supabase/supabase-js');
-var Anthropic = require('@anthropic-ai/sdk');
 
 class KnowledgeBase {
-  constructor(supabaseUrl, supabaseKey, anthropicKey) {
+  constructor(supabaseUrl, supabaseKey) {
     this.supabase = createClient(supabaseUrl, supabaseKey);
-    this.anthropic = new Anthropic({ apiKey: anthropicKey });
     this.embeddingCache = {};
     this.activeClient = 'generic'; // Set by main process on session start
   }

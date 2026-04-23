@@ -232,7 +232,9 @@
       }
 
       currentToken = result.token;
-      await window.electronAPI.saveToken(result.token);
+      // Pass the full result object so main stores refresh_token + expires_at.
+      // Without those the session can't be refreshed once the 1-hour JWT expires.
+      await window.electronAPI.saveToken(result);
       await checkSubscription(result.token);
 
     } catch (err) {

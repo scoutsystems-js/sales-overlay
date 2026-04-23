@@ -1,11 +1,9 @@
-var Anthropic = require('@anthropic-ai/sdk');
-
 // Valid stage progression order — stages can only advance forward (except objection_handling)
 var STAGE_ORDER = ['introduction', 'set', 'discovery', 'transition', 'pitch', 'close', 'objection_handling'];
 
 class CallMemory {
-  constructor(anthropicKey, onUpdate) {
-    this.client = new Anthropic({ apiKey: anthropicKey });
+  constructor(proxyClient, onUpdate) {
+    this.proxy = proxyClient;
     this.fullTranscript = [];       // Every turn of the call
     this.summary = '';               // Rolling compressed summary
     this.turnsSinceLastSummary = 0;
@@ -133,15 +131,21 @@ class CallMemory {
       prompt += 'Respond in raw JSON only. No markdown, no code fences, no explanation.\n';
       prompt += 'Exact format: {"summary": "...", "stage": "introduction|set|discovery|transition|pitch|close|objection_handling", "keyFacts": ["fact1", "fact2"], "discovery": {"finances": false, "willingness": false, "pain": false, "goals": false, "timeline": false, "decisionMaker": false, "whyNow": false, "financeDetails": ["Income: $180k/yr", "Savings: ~$20k"]}}';
 
-      console.log('[memory] Updating call summary...');
+      console.log('[memory] Updating call summary via proxy...');
 
-      var response = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: prompt }],
-      });
+      var response;
+      try {
+        response = await this.proxy.memory({
+          userPrompt: prompt,
+          maxTokens: 500,
+        });
+      } catch (err) {
+        console.error('[memory] Proxy memory failed:', err.message);
+        this.isSummarizing = false;
+        return;
+      }
 
-      var content = response.content[0] ? response.content[0].text : null;
+      var content = response && response.content ? response.content : null;
       if (content) {
         // Strip markdown code fences if Claude wraps the JSON
         var jsonStr = content.trim();

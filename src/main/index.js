@@ -21,8 +21,10 @@ const ClaudeCoach = require('../ai/claude');
 const KnowledgeBase = require('../ai/knowledge-base');
 const CallMemory = require('../ai/call-memory');
 const ScriptParser = require('../ai/script-parser');
+const ProxyClient = require('../lib/proxy-client');
+const config = require('../config');
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://sales-overlay-production.up.railway.app';
+const BACKEND_URL = config.BACKEND_URL;
 const SKIP_AUTH = process.env.SKIP_AUTH === 'true';
 let tokenPath = null; // Set after app is ready (needs app.getPath)
 
@@ -57,7 +59,8 @@ function createAuthWindow() {
   authWindow.on('closed', function() { authWindow = null; });
 }
 
-// Auth IPC handlers
+// Auth IPC handlers — return full session so the renderer persists refresh_token
+// and expires_at. Without those we can't refresh the access token when it expires.
 ipcMain.handle('auth-login', async function(event, email, password) {
   try {
     var res = await fetch(BACKEND_URL + '/auth/login', {
@@ -67,7 +70,13 @@ ipcMain.handle('auth-login', async function(event, email, password) {
     });
     var data = await res.json();
     if (!res.ok) return { error: data.error || 'Login failed. Check your email and password.' };
-    return { token: data.token, user: data.user };
+    return {
+      token: data.access_token || data.token,
+      access_token: data.access_token || data.token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_at,
+      user: data.user,
+    };
   } catch (err) {
     console.error('[auth] Login error:', err.message);
     return { error: 'Could not reach server. Check your internet connection.' };
@@ -83,7 +92,13 @@ ipcMain.handle('auth-signup', async function(event, email, password) {
     });
     var data = await res.json();
     if (!res.ok) return { error: data.error || 'Signup failed. Try a different email.' };
-    return { token: data.token, user: data.user };
+    return {
+      token: data.access_token || data.token,
+      access_token: data.access_token || data.token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_at,
+      user: data.user,
+    };
   } catch (err) {
     console.error('[auth] Signup error:', err.message);
     return { error: 'Could not reach server. Check your internet connection.' };
@@ -118,19 +133,33 @@ ipcMain.handle('open-checkout', async function(event, token) {
   return { success: true };
 });
 
+// get-token auto-refreshes if the stored access_token is expired/expiring. The
+// renderer gets a fresh JWT back without knowing anything about refresh tokens.
+// Returns null if the session is unrecoverable (no refresh_token or refresh
+// call failed) — the renderer should show the login screen in that case.
 ipcMain.handle('get-token', async function() {
   try {
-    if (tokenPath && fs.existsSync(tokenPath)) {
-      var data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
-      return data.token || null;
-    }
-    return null;
+    return await ensureFreshToken();
   } catch (err) { return null; }
 });
 
-ipcMain.handle('save-token', async function(event, token) {
+// save-token accepts either a bare access_token string (legacy) OR a full
+// session object { access_token, refresh_token, expires_at }. The renderer's
+// auth code passes the full login response, so refresh_token is preserved.
+ipcMain.handle('save-token', async function(event, payload) {
   try {
-    if (tokenPath) fs.writeFileSync(tokenPath, JSON.stringify({ token: token }), 'utf8');
+    if (!tokenPath) return { error: 'tokenPath not set' };
+    var session;
+    if (payload && typeof payload === 'object') {
+      session = {
+        access_token: payload.access_token || payload.token,
+        refresh_token: payload.refresh_token || null,
+        expires_at: payload.expires_at || null,
+      };
+    } else {
+      session = { access_token: payload, refresh_token: null, expires_at: null };
+    }
+    saveSessionToDisk(session);
     return { success: true };
   } catch (err) { return { error: err.message }; }
 });
@@ -148,7 +177,17 @@ ipcMain.on('auth-success', async function() {
   // main control panel. The wizard is responsible for opening the control/
   // overlay/discovery trio when it finishes or is skipped.
   initKnowledgeBase();
-  var token = readTokenFromDisk();
+
+  // Refresh the access token up-front so the onboarding check actually reaches
+  // Supabase instead of failing with JWT expired and fail-opening to "no wizard
+  // needed." If the session can't be refreshed, fall back to the login screen.
+  var token = await ensureFreshToken();
+  if (!token) {
+    console.log('[auth] Session could not be refreshed — reopening login.');
+    if (!authWindow) createAuthWindow();
+    return;
+  }
+
   var needsOnboarding = await needsOnboardingCheck(token);
   if (needsOnboarding) {
     createOnboardingWindow();
@@ -168,25 +207,148 @@ ipcMain.on('auth-success', async function() {
 // banner on the control panel. Onboarding state lives in Supabase's
 // `user_profiles` table with RLS scoped to auth.uid().
 
-function readTokenFromDisk() {
+// Returns the full session object stored on disk: { access_token, refresh_token, expires_at }.
+// The legacy `token` key (old installs) is mapped to access_token for compatibility.
+function readSessionFromDisk() {
   try {
     if (tokenPath && fs.existsSync(tokenPath)) {
       var data = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
-      return data.token || null;
+      return {
+        access_token: data.access_token || data.token || null,
+        refresh_token: data.refresh_token || null,
+        expires_at: data.expires_at || null,
+      };
     }
   } catch (err) {}
   return null;
 }
 
+function saveSessionToDisk(session) {
+  if (!tokenPath || !session || !session.access_token) return false;
+  try {
+    // Keep `token` key for backwards compatibility with anything still reading the old shape.
+    fs.writeFileSync(tokenPath, JSON.stringify({
+      token: session.access_token,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token || null,
+      expires_at: session.expires_at || null,
+    }), 'utf8');
+    return true;
+  } catch (err) {
+    console.error('[auth] saveSessionToDisk failed:', err.message);
+    return false;
+  }
+}
+
+function clearSessionFromDisk() {
+  try {
+    if (tokenPath && fs.existsSync(tokenPath)) fs.unlinkSync(tokenPath);
+  } catch (err) {}
+}
+
+// Parse a JWT without verification (we only need the `exp` claim). Treat any
+// unparseable token, or one expiring within 60 seconds, as expired to avoid
+// racing the clock on a request that's in flight when the token hits TTL.
+function isJwtExpired(accessToken) {
+  if (!accessToken || typeof accessToken !== 'string') return true;
+  try {
+    var parts = accessToken.split('.');
+    if (parts.length < 2) return true;
+    var b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+    if (!payload.exp) return true;
+    var nowSec = Math.floor(Date.now() / 1000);
+    return payload.exp <= nowSec + 60;
+  } catch (err) {
+    return true;
+  }
+}
+
+// Ensure the stored access_token is valid. If expired, attempt a refresh using
+// the stored refresh_token. On any unrecoverable failure, clear the session
+// and return null — the caller is responsible for showing the login screen.
+// This is the single choke point for every token read in the app; the IPC
+// handler, the onboarding check, and the proxy client all route through it.
+var _refreshInFlight = null; // Dedupes concurrent refreshes
+async function ensureFreshToken() {
+  var session = readSessionFromDisk();
+  if (!session || !session.access_token) return null;
+
+  if (!isJwtExpired(session.access_token)) {
+    return session.access_token;
+  }
+
+  if (!session.refresh_token) {
+    console.log('[auth] access_token expired and no refresh_token — clearing session.');
+    clearSessionFromDisk();
+    return null;
+  }
+
+  // If a refresh is already running, wait for it instead of firing a second one.
+  if (_refreshInFlight) {
+    try { return await _refreshInFlight; }
+    catch (err) { return null; }
+  }
+
+  _refreshInFlight = (async function() {
+    try {
+      console.log('[auth] access_token expired — refreshing session...');
+      var res = await fetch(BACKEND_URL + '/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if (!res.ok) {
+        console.log('[auth] Refresh failed:', res.status, '— clearing session.');
+        clearSessionFromDisk();
+        return null;
+      }
+      var data = await res.json();
+      var sess = data.session || data;
+      var newAccess = sess.access_token || null;
+      var newRefresh = sess.refresh_token || session.refresh_token;
+      var newExpires = sess.expires_at || null;
+      if (!newAccess) {
+        console.log('[auth] Refresh response missing access_token — clearing session.');
+        clearSessionFromDisk();
+        return null;
+      }
+      saveSessionToDisk({
+        access_token: newAccess,
+        refresh_token: newRefresh,
+        expires_at: newExpires,
+      });
+      console.log('[auth] Session refreshed.');
+      return newAccess;
+    } catch (err) {
+      console.error('[auth] Refresh error:', err.message);
+      clearSessionFromDisk();
+      return null;
+    } finally {
+      _refreshInFlight = null;
+    }
+  })();
+
+  return _refreshInFlight;
+}
+
 // Build a Supabase client authenticated as the current user. The user's JWT
 // is passed as an Authorization header so RLS policies using auth.uid() work.
 function createSupabaseForUser(token) {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !token) return null;
+  if (!token) return null;
   var { createClient } = require('@supabase/supabase-js');
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+  return createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: 'Bearer ' + token } },
     auth: { persistSession: false },
   });
+}
+
+// Build a ProxyClient that fetches a fresh access_token (refreshing via Supabase
+// if needed) before every request. Returning a fresh client per session keeps
+// things simple and avoids caching a stale token getter.
+function buildProxyClient() {
+  return new ProxyClient(function() { return ensureFreshToken(); });
 }
 
 // Extract the Supabase user id (`sub` claim) from a JWT without a crypto check —
@@ -246,7 +408,9 @@ function createOnboardingWindow() {
 // a user resumes an incomplete setup, and (later) by the overlay to feed the
 // closer's offer details into Claude's system prompt on each session.
 ipcMain.handle('get-profile', async function() {
-  var token = readTokenFromDisk();
+  // Use ensureFreshToken so a long-running wizard session doesn't silently 401
+  // on a token that expired while the user was filling out fields.
+  var token = await ensureFreshToken();
   var supabase = createSupabaseForUser(token);
   if (!supabase) return { error: 'Not authenticated' };
   try {
@@ -260,7 +424,7 @@ ipcMain.handle('get-profile', async function() {
 // so the wizard stops showing on future launches. On skip, any partial data
 // is saved but completed_at stays null so the wizard reappears next login.
 ipcMain.handle('save-profile', async function(event, data) {
-  var token = readTokenFromDisk();
+  var token = await ensureFreshToken();
   var supabase = createSupabaseForUser(token);
   if (!supabase) return { error: 'Not authenticated' };
   var userId = decodeUserIdFromToken(token);
@@ -316,18 +480,12 @@ ipcMain.on('open-onboarding', function() {
   else onboardingWindow.focus();
 });
 
-// Initialize knowledge base on startup
+// Initialize knowledge base on startup.
+// Supabase URL + anon key are hardcoded public values in src/config.js — no
+// env vars required. The KB is always enabled in the packaged app.
 function initKnowledgeBase() {
-  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
-    kb = new KnowledgeBase(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      process.env.ANTHROPIC_API_KEY
-    );
-    console.log('[main] Knowledge base initialized');
-  } else {
-    console.log('[main] No Supabase credentials - knowledge base disabled');
-  }
+  kb = new KnowledgeBase(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+  console.log('[main] Knowledge base initialized');
 }
 
 function createControlWindow() {
@@ -493,7 +651,23 @@ ipcMain.on('start-session', async function(event, clientId) {
     kb.activeClient = activeClient;
   }
 
-  deepgram = new DeepgramTranscriber(process.env.DEEPGRAM_API_KEY, function(data) {
+  // Mint an ephemeral (10 min) Deepgram key via the backend proxy. Deepgram
+  // only auths at WebSocket handshake, so 10 min is fine for calls of any
+  // length once the socket is open.
+  var proxy = buildProxyClient();
+  var deepgramKey;
+  try {
+    var keyRes = await proxy.getDeepgramKey();
+    deepgramKey = keyRes.key;
+  } catch (err) {
+    console.error('[main] Failed to obtain Deepgram key:', err.message);
+    if (overlayWindow) {
+      overlayWindow.webContents.send('status-update', { active: false, error: err.message });
+    }
+    return;
+  }
+
+  deepgram = new DeepgramTranscriber(deepgramKey, function(data) {
     var text = data.text;
     var isFinal = data.isFinal;
     var speaker = data.speaker;
@@ -513,12 +687,12 @@ ipcMain.on('start-session', async function(event, clientId) {
     });
   });
 
-  callMemory = new CallMemory(process.env.ANTHROPIC_API_KEY, function(discovery) {
+  callMemory = new CallMemory(proxy, function(discovery) {
     if (discoveryWindow) {
       discoveryWindow.webContents.send('discovery-update', discovery);
     }
   });
-  claude = new ClaudeCoach(process.env.ANTHROPIC_API_KEY, kb, callMemory);
+  claude = new ClaudeCoach(proxy, kb, callMemory);
 
   // Poll getSuggestion() every 1.5s so natural pauses still trigger prompts
   suggestionPollInterval = setInterval(function() {

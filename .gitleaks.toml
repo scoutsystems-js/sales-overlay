@@ -1,0 +1,11 @@
+# gitleaks config — extends the default ruleset (does not replace it).
+# Keeps all built-in secret detection rules active and only adds allowlist
+# entries for values we've verified are public-by-design.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Supabase publishable keys are intentionally public — the sb_publishable_ prefix is Supabase's own marker for client-safe keys. RLS policies enforce access control; the key itself cannot bypass them."
+regexes = [
+  '''sb_publishable_[A-Za-z0-9_\-]+''',
+]
