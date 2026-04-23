@@ -14,6 +14,8 @@ var SYSTEM_PROMPT = [
   '6. CLOSE: Summarize, temp check, investment anchor, SILENCE after price.',
   '7. OBJECTION HANDLING: Identity shifting phases. Isolate → Binary Identity → Historical Pattern → Mirror Reality → Identity Choice.',
   '',
+  'DISCOVERY COMPLETION RULE: The memory context includes a DISCOVERY STATUS section. Any item marked [DONE] — never ask about it again. If all discovery items are covered, stop asking discovery questions and move to TRANSITION or PITCH. Do not loop back.',
+  '',
   'OBJECTION FRAMEWORKS:',
   'When a prospect raises an objection, guide the closer through the identity shifting phases sequentially.',
   'Include the phase name in the headline (e.g., "MONEY Phase 2: Binary Identity").',

@@ -237,6 +237,40 @@ class CallMemory {
       parts.push('CURRENT CALL STAGE: ' + this.detectedStage);
     }
 
+    // v1.0.9: Discovery state — explicit checklist for the suggestion engine.
+    // Before this, the 7 discovery booleans (pain, goals, finances, etc.) were
+    // tracked in this.discovery but never surfaced to the prompt, so Claude had
+    // to infer coverage from the summary text and often re-asked covered topics.
+    // Now the engine sees a scannable DONE/NEEDED list every call.
+    var done = [];
+    var needed = [];
+    var discoveryLabels = {
+      pain: 'pain point',
+      goals: 'goals/desired outcome',
+      finances: 'finances/budget',
+      willingness: 'willingness/commitment',
+      timeline: 'timeline',
+      decisionMaker: 'decision maker',
+      whyNow: 'why now',
+    };
+    var dKeys = Object.keys(discoveryLabels);
+    for (var di = 0; di < dKeys.length; di++) {
+      var dk = dKeys[di];
+      if (this.discovery[dk]) {
+        done.push(discoveryLabels[dk]);
+      } else {
+        needed.push(discoveryLabels[dk]);
+      }
+    }
+    var discoveryLines = ['DISCOVERY STATUS:'];
+    if (done.length > 0) {
+      discoveryLines.push('[DONE] Already covered (do NOT re-ask): ' + done.join(', '));
+    }
+    if (needed.length > 0) {
+      discoveryLines.push('[NEEDED] Still needed: ' + needed.join(', '));
+    }
+    parts.push(discoveryLines.join('\n'));
+
     if (this.keyFacts.length > 0) {
       parts.push('KEY FACTS:\n- ' + this.keyFacts.join('\n- '));
     }
