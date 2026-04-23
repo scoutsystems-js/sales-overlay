@@ -9,6 +9,9 @@ function timingLog(msg) { if (TIMING_ENABLED) console.log(msg); }
 function makeCycleId() {
   return Math.random().toString(36).slice(2, 8);
 }
+// Diagnostic one-time startup log — fires unconditionally so we can tell
+// whether SCOUT_TIMING reached this module at all, independent of the guard.
+console.log('[timing-check] SCOUT_TIMING=' + process.env.SCOUT_TIMING + ' TIMING_ENABLED=' + TIMING_ENABLED);
 
 // Short acknowledgment words the closer says while the prospect is talking ("Yeah", "Right", "Okay").
 // These are backchannels — they should NOT reset the closer-active timer, count as turns toward
