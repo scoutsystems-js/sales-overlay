@@ -80,7 +80,9 @@ router.post('/suggest', protect, async function(req, res) {
       return res.status(500).json({ error: 'No response from Claude' });
     }
 
-    res.json({ content: content });
+    // v1.0.7-alpha: expose usage (input_tokens/output_tokens) for timing
+    // instrumentation. Strictly additive — existing clients ignore unknown fields.
+    res.json({ content: content, usage: response.usage || null });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     var f = formatProxyError(err, 'Claude');
