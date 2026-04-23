@@ -246,23 +246,32 @@ function clearSessionFromDisk() {
   } catch (err) {}
 }
 
-// Parse a JWT without verification (we only need the `exp` claim). Treat any
-// unparseable token, or one expiring within 60 seconds, as expired to avoid
-// racing the clock on a request that's in flight when the token hits TTL.
-function isJwtExpired(accessToken) {
-  if (!accessToken || typeof accessToken !== 'string') return true;
+// Treat a token with less than this many seconds remaining as expired. Gives
+// us a safety margin so we don't race the clock on an in-flight request whose
+// access_token ticks over to expired between ensureFreshToken() and the
+// downstream HTTP call.
+var JWT_EXPIRY_GRACE_SEC = 60;
+
+// Parse a JWT's payload without verifying its signature. We only read the
+// `exp` and `sub` claims (for expiry and user id); RLS enforces real
+// authorization downstream. Returns null for any malformed token.
+function decodeJwtPayload(token) {
+  if (!token || typeof token !== 'string') return null;
   try {
-    var parts = accessToken.split('.');
-    if (parts.length < 2) return true;
+    var parts = token.split('.');
+    if (parts.length < 2) return null;
     var b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     while (b64.length % 4) b64 += '=';
-    var payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
-    if (!payload.exp) return true;
-    var nowSec = Math.floor(Date.now() / 1000);
-    return payload.exp <= nowSec + 60;
+    return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
   } catch (err) {
-    return true;
+    return null;
   }
+}
+
+function isJwtExpired(accessToken) {
+  var payload = decodeJwtPayload(accessToken);
+  if (!payload || !payload.exp) return true;
+  return payload.exp <= Math.floor(Date.now() / 1000) + JWT_EXPIRY_GRACE_SEC;
 }
 
 // Ensure the stored access_token is valid. If expired, attempt a refresh using
@@ -351,18 +360,12 @@ function buildProxyClient() {
   return new ProxyClient(function() { return ensureFreshToken(); });
 }
 
-// Extract the Supabase user id (`sub` claim) from a JWT without a crypto check —
-// we only need it for upserts; RLS still enforces that users can't write anyone
-// else's row, so a forged id here just makes the insert fail.
+// Extract the Supabase user id (`sub` claim) from a JWT. RLS still enforces
+// that users can't write anyone else's row, so a forged id here just makes
+// the insert fail — no crypto check needed.
 function decodeUserIdFromToken(token) {
-  try {
-    var b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    while (b64.length % 4) b64 += '=';
-    var payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
-    return payload.sub || null;
-  } catch (err) {
-    return null;
-  }
+  var payload = decodeJwtPayload(token);
+  return payload ? (payload.sub || null) : null;
 }
 
 // True if the user has no profile row OR has started but not finished setup.
