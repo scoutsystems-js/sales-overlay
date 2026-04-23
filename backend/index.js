@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const billingRoutes = require('./routes/billing');
 const proxyRoutes = require('./routes/proxy');
 const downloadRoutes = require('./routes/download');
+const logRoutes = require('./routes/log');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -45,6 +46,7 @@ app.use('/auth', authRoutes);
 app.use('/billing', billingRoutes);
 app.use('/proxy', proxyRoutes);
 app.use('/download', downloadRoutes);
+app.use('/log', logRoutes);
 
 // Global error handler
 app.use(function(err, req, res, next) {
