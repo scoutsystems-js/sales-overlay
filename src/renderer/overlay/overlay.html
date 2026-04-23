@@ -260,6 +260,14 @@
         promptStack.removeChild(allRows[0]);
         allRows = promptStack.querySelectorAll('.prompt-row');
       }
+
+      // v1.0.7-alpha: t7 — DOM appended. Echo cycle id + delta via logToMain
+      // so the timestamp lands in main's stdout and session_logs. No env-var
+      // gate here because one log per prompt is negligible; removal in
+      // Phase B is grep-and-delete this block.
+      if (data && data._cycleId && data._t0 && window.electronAPI && window.electronAPI.logToMain) {
+        window.electronAPI.logToMain('[TIMING] cycle=' + data._cycleId + ' stage=t7_dom_appended abs_ms=' + (Date.now() - data._t0));
+      }
     }
 
     // ── IPC event handlers ──

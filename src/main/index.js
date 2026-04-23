@@ -28,6 +28,12 @@ const config = require('../config');
 
 const BACKEND_URL = config.BACKEND_URL;
 const SKIP_AUTH = process.env.SKIP_AUTH === 'true';
+
+// v1.0.7-alpha: timing instrumentation — toggle with SCOUT_TIMING=1 env var.
+// The guard lives inside the helper so every callsite is just timingLog(msg)
+// with no if-wrapping — makes Phase B removal a single grep + delete.
+const TIMING_ENABLED = process.env.SCOUT_TIMING === '1';
+function timingLog(msg) { if (TIMING_ENABLED) console.log(msg); }
 let tokenPath = null; // Set after app is ready (needs app.getPath)
 
 let authWindow = null;
@@ -702,6 +708,16 @@ ipcMain.on('start-session', async function(event, clientId) {
 
     if (controlWindow) {
       controlWindow.webContents.send('append-transcript', { speaker: speakerLabel, text: text });
+    }
+
+    // v1.0.7-alpha: t0 — stamp when a final PROSPECT transcript arrives.
+    // Reset per-cycle state so the next getSuggestion run measures against
+    // this new baseline. gate_blocked logs reference this t0 until the next
+    // prospect-final fires.
+    if (speakerLabel === 'PROSPECT' && claude) {
+      claude._lastProspectT0 = Date.now();
+      claude._gatesBlockedSinceT0 = 0;
+      timingLog('[TIMING] cycle=none stage=t0_prospect_final abs_ms=0 dt_prev=0 detail=text_len=' + text.length);
     }
 
     claude.addTurn(text, speakerLabel);

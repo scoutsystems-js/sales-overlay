@@ -1,6 +1,15 @@
 var prompts = require('./prompts');
 var objections = require('./objections');
 
+// v1.0.7-alpha: timing instrumentation — toggle with SCOUT_TIMING=1 env var.
+// Guard is inside the helper so callsites are just timingLog(msg). Removing
+// this block + all timingLog() calls is the Phase B cleanup.
+var TIMING_ENABLED = process.env.SCOUT_TIMING === '1';
+function timingLog(msg) { if (TIMING_ENABLED) console.log(msg); }
+function makeCycleId() {
+  return Math.random().toString(36).slice(2, 8);
+}
+
 // Short acknowledgment words the closer says while the prospect is talking ("Yeah", "Right", "Okay").
 // These are backchannels — they should NOT reset the closer-active timer, count as turns toward
 // auto-advance, or accumulate in delivery detection. Without this filter, saying "Yeah" every few
@@ -236,10 +245,20 @@ class ClaudeCoach {
 
   async getSuggestion(onSuggestion) {
     var now = Date.now();
+    var self = this;
+    // v1.0.7-alpha helper: log gate_blocked and bump the per-t0 counter.
+    // Captures Date.now() at call time rather than closing over the outer
+    // `now` — protects against future awaits being added before gates.
+    function gateBlocked(reason) {
+      var tNow = Date.now();
+      if (self._lastProspectT0) self._gatesBlockedSinceT0 = (self._gatesBlockedSinceT0 || 0) + 1;
+      var since = self._lastProspectT0 ? (tNow - self._lastProspectT0) : -1;
+      timingLog('[TIMING] cycle=none stage=gate_blocked reason=' + reason + ' abs_ms=' + since);
+    }
 
     // Rate limiting: time-based AND turn-based
-    if (now - this.lastCallTime < this.minInterval) return;
-    if (this.callBuffer.length < 2) return;
+    if (now - this.lastCallTime < this.minInterval) { gateBlocked('rate_limit'); return; }
+    if (this.callBuffer.length < 2) { gateBlocked('buffer_too_small'); return; }
 
     var lastTurn = this.callBuffer[this.callBuffer.length - 1];
     var transcript = this.getTranscriptString();
@@ -277,7 +296,7 @@ class ClaudeCoach {
     var closerIsActive = (this.lastCloserSpeechTime > 0 && now - this.lastCloserSpeechTime < this.closerActiveThreshold);
 
     // DELIVERY GATE + TURN GATE: Only applies to Claude API suggestions (not objections)
-    if (this.turnsSinceLastCall < this.minTurnsBetweenCalls) return;
+    if (this.turnsSinceLastCall < this.minTurnsBetweenCalls) { gateBlocked('turn_count'); return; }
     if (!this.suggestionDelivered) {
       // Time-based auto-advance — but ONLY if the closer has stopped talking
       if (!closerIsActive && this.suggestionTimestamp && now - this.suggestionTimestamp > this.maxSecondsBeforeAutoAdvance * 1000) {
@@ -286,6 +305,7 @@ class ClaudeCoach {
         this.prospectRespondedSinceDelivery = false;
         console.log('[claude] Auto-advancing in getSuggestion — timeout reached + closer silent. Waiting for prospect response.');
       } else {
+        gateBlocked('delivery');
         return;
       }
     }
@@ -295,13 +315,14 @@ class ClaudeCoach {
     // or before the prospect has had a chance to answer the question.
     if (!this.prospectRespondedSinceDelivery) {
       // Never fire while closer is actively speaking
-      if (closerIsActive) return;
+      if (closerIsActive) { gateBlocked('prospect_response_closer_active'); return; }
 
       // Safety valve: if closer stopped talking AND 45+ seconds since prompt, advance anyway
       if (this.suggestionTimestamp && now - this.suggestionTimestamp > 45000) {
         this.prospectRespondedSinceDelivery = true;
         console.log('[claude] Prospect response timeout (45s + closer silent) — advancing anyway');
       } else {
+        gateBlocked('prospect_response');
         return;
       }
     }
@@ -309,24 +330,42 @@ class ClaudeCoach {
     // Prospect-finished-speaking check: wait 1.5s after prospect's last speech before firing.
     // This prevents the next prompt from appearing while the prospect is still mid-sentence.
     // The prospect response gate already confirmed they spoke — this just waits for their pause.
-    if (this.lastProspectSpeechTime > 0 && now - this.lastProspectSpeechTime < 1500) return;
+    if (this.lastProspectSpeechTime > 0 && now - this.lastProspectSpeechTime < 1500) { gateBlocked('prospect_silence'); return; }
+    // v1.0.7-alpha: t1 — prospect-silence gate cleared
+    timingLog('[TIMING] cycle=none stage=t1_silence_ok abs_ms=' + (this._lastProspectT0 ? (now - this._lastProspectT0) : -1));
 
     // Final safety check: never generate a new prompt while the closer is mid-sentence
-    if (closerIsActive) return;
+    if (closerIsActive) { gateBlocked('closer_active_final'); return; }
+    // v1.0.7-alpha: t2 — delivery + prospect-response gates passed earlier; closer-active also clean
+    timingLog('[TIMING] cycle=none stage=t2_gates_passed abs_ms=' + (this._lastProspectT0 ? (now - this._lastProspectT0) : -1));
 
     this.lastCallTime = now;
     this.turnsSinceLastCall = 0;
+
+    // v1.0.7-alpha: t3 — committed to this cycle. Assign cycleId now.
+    var cycleId = makeCycleId();
+    var cycleT0 = this._lastProspectT0 || now;
+    var cycleGatesBefore = this._gatesBlockedSinceT0 || 0;
+    var cycleT4 = 0;
+    var cycleT5 = 0;
+    var cycleKbMs = 0;
+    this._activeCycleId = cycleId;
+    timingLog('[TIMING] cycle=' + cycleId + ' stage=t3_committed abs_ms=' + (now - cycleT0) + ' dt_prev=0 detail=gates_blocked_before=' + cycleGatesBefore);
 
     try {
       // 2. Search knowledge base for relevant context
       var kbContext = '';
       if (this.kb) {
         console.log('[claude] Searching knowledge base...');
+        // v1.0.7-alpha: measure KB search duration
+        var kbStart = Date.now();
         var kbResults = await this.kb.searchByText(lastTurn.text, 3);
+        cycleKbMs = Date.now() - kbStart;
         if (kbResults && kbResults.length > 0) {
           kbContext = this.kb.buildContext(kbResults);
           console.log('[claude] Found ' + kbResults.length + ' KB matches');
         }
+        timingLog('[TIMING] cycle=' + cycleId + ' stage=kb_done abs_ms=' + (Date.now() - cycleT0) + ' detail=kb_ms=' + cycleKbMs + ',kb_hits=' + (kbResults ? kbResults.length : 0));
       }
 
       // 3. Get call memory context
@@ -358,6 +397,10 @@ class ClaudeCoach {
       console.log('[claude] Calling Claude via proxy...');
       var userPrompt = prompts.buildSuggestionPrompt(transcript, null, kbContext, memoryContext, suggestionHistory);
 
+      // v1.0.7-alpha: t4 — Claude API request dispatched
+      cycleT4 = Date.now();
+      timingLog('[TIMING] cycle=' + cycleId + ' stage=t4_api_send abs_ms=' + (cycleT4 - cycleT0) + ' detail=prompt_chars=' + userPrompt.length + ',system_chars=' + prompts.SYSTEM_PROMPT.length);
+
       var response;
       try {
         response = await this.proxy.suggest({
@@ -367,11 +410,18 @@ class ClaudeCoach {
         });
       } catch (err) {
         console.error('[claude] Proxy suggest failed:', err.message);
+        timingLog('[TIMING] cycle=' + cycleId + ' stage=t5_api_recv_error abs_ms=' + (Date.now() - cycleT0) + ' detail=err=' + String(err.message).slice(0, 80));
+        this._activeCycleId = null; // v1.0.7-alpha: clear cycle on error so invariant holds
         return;
       }
+      // v1.0.7-alpha: t5 — Claude API response received
+      cycleT5 = Date.now();
+      var cycleInputTokens = (response && response.usage && typeof response.usage.input_tokens === 'number') ? response.usage.input_tokens : null;
+      var cycleOutputTokens = (response && response.usage && typeof response.usage.output_tokens === 'number') ? response.usage.output_tokens : null;
+      timingLog('[TIMING] cycle=' + cycleId + ' stage=t5_api_recv abs_ms=' + (cycleT5 - cycleT0) + ' dt_prev=' + (cycleT5 - cycleT4) + ' detail=api_ms=' + (cycleT5 - cycleT4) + ',in_tok=' + cycleInputTokens + ',out_tok=' + cycleOutputTokens);
 
       var content = response && response.content ? response.content : null;
-      if (!content) return;
+      if (!content) { this._activeCycleId = null; return; }
 
       // Strip markdown code fences if Claude wraps the JSON
       var jsonStr = content.trim();
@@ -444,10 +494,26 @@ class ClaudeCoach {
           }
         }
 
+        // v1.0.7-alpha: t6 — IPC dispatch to overlay. Attach cycleId + t0
+        // as hidden payload so renderer can log t7 against the same baseline.
+        newSuggestion._cycleId = cycleId;
+        newSuggestion._t0 = cycleT0;
+        var cycleT6 = Date.now();
+        timingLog('[TIMING] cycle=' + cycleId + ' stage=t6_ipc_send abs_ms=' + (cycleT6 - cycleT0) + ' dt_prev=' + (cycleT6 - cycleT5));
+        // v1.0.7-alpha: one-row-per-cycle summary. total_ms uses t6-t0 by design
+        // (renderer t7 arrives shortly after via a separate detail line).
+        // Model name deliberately omitted — recoverable from git SHA / backend
+        // deployment at analysis time, and hardcoding here would silently drift
+        // if backend/config.js CLAUDE_MODEL is bumped. Phase B can add model
+        // back by having the proxy return response.model alongside usage.
+        timingLog('[TIMING_SUMMARY] cycle=' + cycleId + ' total_ms=' + (cycleT6 - cycleT0) + ' api_ms=' + (cycleT5 - cycleT4) + ' kb_ms=' + cycleKbMs + ' gates_blocked_before=' + cycleGatesBefore + ' input_tokens=' + cycleInputTokens + ' output_tokens=' + cycleOutputTokens);
+        this._activeCycleId = null;
+
         onSuggestion(newSuggestion);
       }
     } catch (err) {
       console.error('[claude] Error:', err.message);
+      this._activeCycleId = null; // v1.0.7-alpha: clear cycle on error so invariant holds
     }
   }
 
@@ -466,6 +532,11 @@ class ClaudeCoach {
     this.lastProspectSpeechTime = 0;
     this.recentSuggestions = [];
     this.recentAngles = [];
+    // v1.0.7-alpha: clear timing state so a stop/restart doesn't carry stale
+    // baselines into the next session's logs.
+    this._lastProspectT0 = 0;
+    this._gatesBlockedSinceT0 = 0;
+    this._activeCycleId = null;
     if (this.memory) {
       this.memory.reset();
     }
