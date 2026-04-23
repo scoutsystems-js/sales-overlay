@@ -1,13 +1,16 @@
-// Thin HTTP client for the Railway backend's /proxy routes.
+// Thin HTTP client for the Railway backend's /proxy and /log routes.
 //
 // The desktop app never holds Deepgram or Anthropic API keys. Instead it sends
 // the user's session token to the backend, which uses its own server-side
 // credentials (Railway env vars) to call those services on the user's behalf.
 //
-// Three endpoints are wrapped here:
-//   suggest(...)         → POST /proxy/suggest    (Claude teleprompter call)
-//   memory(...)          → POST /proxy/memory     (Claude rolling summary call)
-//   getDeepgramKey()     → POST /proxy/deepgram-key (mint a 10-min ephemeral key)
+// Endpoints wrapped here:
+//   suggest(...)         → POST  /proxy/suggest        (Claude teleprompter)
+//   memory(...)          → POST  /proxy/memory         (Claude rolling summary)
+//   getDeepgramKey()     → POST  /proxy/deepgram-key   (mint 10-min ephemeral key)
+//   sessionStart(...)    → POST  /log/session-start    (v1.0.5 cloud logging)
+//   sessionEnd(...)      → PATCH /log/session-end/:id  (v1.0.5 cloud logging)
+//   logBatch(...)        → POST  /log                  (v1.0.5 cloud logging)
 //
 // Errors thrown by these methods are plain Error objects with a descriptive
 // message. Callers should try/catch and surface a useful message to the user.
@@ -24,7 +27,7 @@ class ProxyClient {
     this.getToken = getToken;
   }
 
-  async _post(path, body) {
+  async _request(method, path, body) {
     var token = await Promise.resolve(this.getToken());
     if (!token) {
       throw new Error('Not logged in — cannot reach backend proxy.');
@@ -33,12 +36,12 @@ class ProxyClient {
     var res;
     try {
       res = await fetch(BACKEND_URL + path, {
-        method: 'POST',
+        method: method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + token,
         },
-        body: JSON.stringify(body || {}),
+        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
     } catch (err) {
       throw new Error('Could not reach backend: ' + (err.message || err));
@@ -58,6 +61,14 @@ class ProxyClient {
     }
 
     return res.json();
+  }
+
+  async _post(path, body) {
+    return this._request('POST', path, body || {});
+  }
+
+  async _patch(path, body) {
+    return this._request('PATCH', path, body || {});
   }
 
   // Claude live-teleprompter suggestion. Returns { content: "<raw model text>" }.
@@ -82,6 +93,34 @@ class ProxyClient {
   // after the socket is open, so a 10-min TTL is fine for calls of any length.
   async getDeepgramKey() {
     return this._post('/proxy/deepgram-key', {});
+  }
+
+  // ── v1.0.5 cloud logging ──────────────────────────────────────────────────
+  // Register a new session. Returns { session_id: "<uuid>" } that must be sent
+  // with every subsequent logBatch and the eventual sessionEnd.
+  async sessionStart(args) {
+    return this._post('/log/session-start', {
+      clientVersion: args && args.clientVersion,
+      platform: args && args.platform,
+    });
+  }
+
+  // Mark a session ended. Optional outcome: 'win' | 'loss' | 'follow_up'.
+  async sessionEnd(sessionId, outcome) {
+    return this._patch('/log/session-end/' + encodeURIComponent(sessionId), {
+      outcome: outcome || null,
+    });
+  }
+
+  // Bulk-insert log entries for a session. entries = array of
+  // { level, tag?, message, logged_at }. Validation on the server silently
+  // drops malformed entries, so batches don't fail as long as at least one
+  // entry is valid.
+  async logBatch(sessionId, entries) {
+    return this._post('/log', {
+      session_id: sessionId,
+      entries: entries,
+    });
   }
 }
 

@@ -22,6 +22,8 @@ const KnowledgeBase = require('../ai/knowledge-base');
 const CallMemory = require('../ai/call-memory');
 const ScriptParser = require('../ai/script-parser');
 const ProxyClient = require('../lib/proxy-client');
+const SessionLogger = require('../lib/session-logger');
+const pkg = require('../../package.json');
 const config = require('../config');
 
 const BACKEND_URL = config.BACKEND_URL;
@@ -40,6 +42,7 @@ let callMemory = null;
 let activeClient = 'generic'; // Current client filter for KB searches
 let uploadedScripts = {};     // clientId -> array of parsed entries (in-memory for uploaded scripts)
 let suggestionPollInterval = null; // Polls getSuggestion() during natural pauses in conversation
+let sessionLogger = null; // v1.0.5: tees console.log during a session into Supabase via /log endpoints
 
 function createAuthWindow() {
   authWindow = new BrowserWindow({
@@ -648,16 +651,33 @@ ipcMain.handle('upload-script', async function(event, scriptText, clientName) {
 
 ipcMain.on('start-session', async function(event, clientId) {
   activeClient = clientId || 'generic';
-  console.log('[main] Starting session... Client: ' + activeClient);
 
   if (kb) {
     kb.activeClient = activeClient;
   }
 
+  var proxy = buildProxyClient();
+
+  // v1.0.5: start the cloud logger FIRST so every console.log from this point
+  // on gets captured alongside its session_id. If session-start fails (e.g.
+  // network drop), we continue without logging rather than block the call.
+  sessionLogger = new SessionLogger(proxy, {
+    clientVersion: pkg.version,
+    platform: process.platform + '-' + process.arch,
+  });
+  try {
+    var sid = await sessionLogger.start();
+    console.log('[main] Cloud logging session started: ' + sid);
+  } catch (err) {
+    console.error('[main] Cloud logging failed to start (continuing without it):', err.message);
+    sessionLogger = null;
+  }
+
+  console.log('[main] Starting session... Client: ' + activeClient);
+
   // Mint an ephemeral (10 min) Deepgram key via the backend proxy. Deepgram
   // only auths at WebSocket handshake, so 10 min is fine for calls of any
   // length once the socket is open.
-  var proxy = buildProxyClient();
   var deepgramKey;
   try {
     var keyRes = await proxy.getDeepgramKey();
@@ -667,6 +687,8 @@ ipcMain.on('start-session', async function(event, clientId) {
     if (overlayWindow) {
       overlayWindow.webContents.send('status-update', { active: false, error: err.message });
     }
+    // End the cloud-log session so it doesn't hang open
+    if (sessionLogger) { try { await sessionLogger.end(); } catch (_) {} sessionLogger = null; }
     return;
   }
 
@@ -729,7 +751,7 @@ ipcMain.on('start-session', async function(event, clientId) {
   }
 });
 
-ipcMain.on('stop-session', function() {
+ipcMain.on('stop-session', async function() {
   console.log('[main] Stopping session...');
   if (suggestionPollInterval) { clearInterval(suggestionPollInterval); suggestionPollInterval = null; }
   if (deepgram) { deepgram.disconnect(); deepgram = null; }
@@ -745,6 +767,12 @@ ipcMain.on('stop-session', function() {
   if (discoveryWindow) {
     discoveryWindow.webContents.send('discovery-reset');
     discoveryWindow.hide();
+  }
+  // v1.0.5: flush remaining log batch and mark session ended. Runs last so
+  // the "Stopping session..." line and all teardown logs are captured.
+  if (sessionLogger) {
+    try { await sessionLogger.end(); } catch (_) { /* best-effort */ }
+    sessionLogger = null;
   }
 });
 
