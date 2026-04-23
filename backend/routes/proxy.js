@@ -4,14 +4,23 @@ const { requireAuth, requireSubscription } = require('../middleware/auth');
 
 var router = express.Router();
 
+// Throws a helpful error if any required Railway env vars are missing. Lists
+// exactly which ones by name so operators don't have to guess which variable
+// they forgot to set. Keeps the phrase "not configured" so handleConfigError
+// below can match on it and return 503.
+function requireEnvVars(serviceName, requiredVars) {
+  var missing = requiredVars.filter(function(name) { return !process.env[name]; });
+  if (missing.length > 0) {
+    throw new Error(serviceName + ' not configured — missing: ' + missing.join(', ') + ' (set in Railway Variables).');
+  }
+}
+
 // Lazy Anthropic client — only created on first /suggest or /memory request.
 // Prevents crash on startup when ANTHROPIC_API_KEY is not yet set.
 var _anthropic = null;
 function getAnthropic() {
   if (_anthropic) return _anthropic;
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('Anthropic not configured — set ANTHROPIC_API_KEY in Railway Variables.');
-  }
+  requireEnvVars('Anthropic', ['ANTHROPIC_API_KEY']);
   _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return _anthropic;
 }
@@ -19,9 +28,7 @@ function getAnthropic() {
 // Validates Deepgram env vars just before use — same lazy pattern but there's
 // no client instance to cache, we just need the env values present.
 function getDeepgramConfig() {
-  if (!process.env.DEEPGRAM_API_KEY || !process.env.DEEPGRAM_PROJECT_ID) {
-    throw new Error('Deepgram not configured — set DEEPGRAM_API_KEY and DEEPGRAM_PROJECT_ID in Railway Variables.');
-  }
+  requireEnvVars('Deepgram', ['DEEPGRAM_API_KEY', 'DEEPGRAM_PROJECT_ID']);
   return {
     apiKey: process.env.DEEPGRAM_API_KEY,
     projectId: process.env.DEEPGRAM_PROJECT_ID,
