@@ -1,8 +1,24 @@
 const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
+const { CLAUDE_MODEL } = require('../config');
 
 var router = express.Router();
+
+// Shapes any downstream error (Anthropic SDK, fetch, plain Error) into the
+// HTTP status + JSON body we return to the client. Preserves the real status
+// code and a truncated message so failures surface directly in session_logs
+// without needing Railway dashboard access. Keep the truncation cap (200 chars)
+// so a verbose upstream error can't blow past Supabase's text column limits.
+function formatProxyError(err, serviceLabel) {
+  var status = (err && err.status) ? err.status : 500;
+  var raw = (err && err.message) ? String(err.message) : 'unknown';
+  var detail = (raw.length > 0 ? raw : 'unknown').slice(0, 200);
+  return {
+    status: status,
+    body: { error: serviceLabel + ' failed (' + status + '): ' + detail },
+  };
+}
 
 // Throws a helpful error if any required Railway env vars are missing. Lists
 // exactly which ones by name so operators don't have to guess which variable
@@ -62,7 +78,7 @@ router.post('/suggest', protect, async function(req, res) {
 
     var anthropic = getAnthropic();
     var response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_MODEL,
       max_tokens: maxTokens || 300,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -76,8 +92,9 @@ router.post('/suggest', protect, async function(req, res) {
     res.json({ content: content });
   } catch (err) {
     if (handleConfigError(err, res)) return;
-    console.error('[proxy] Claude error:', err.message);
-    res.status(500).json({ error: 'Claude API call failed' });
+    var f = formatProxyError(err, 'Claude');
+    console.error('[proxy] Claude error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
   }
 });
 
@@ -92,7 +109,7 @@ router.post('/memory', protect, async function(req, res) {
   try {
     var anthropic = getAnthropic();
     var response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_MODEL,
       max_tokens: maxTokens || 500,
       messages: [{ role: 'user', content: userPrompt }],
     });
@@ -105,8 +122,9 @@ router.post('/memory', protect, async function(req, res) {
     res.json({ content: content });
   } catch (err) {
     if (handleConfigError(err, res)) return;
-    console.error('[proxy] Memory error:', err.message);
-    res.status(500).json({ error: 'Memory API call failed' });
+    var f = formatProxyError(err, 'Memory');
+    console.error('[proxy] Memory error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
   }
 });
 
@@ -140,8 +158,9 @@ router.post('/deepgram-key', protect, async function(req, res) {
     res.json({ key: data.key });
   } catch (err) {
     if (handleConfigError(err, res)) return;
-    console.error('[proxy] Deepgram key error:', err.message);
-    res.status(500).json({ error: 'Failed to create Deepgram key' });
+    var f = formatProxyError(err, 'Deepgram key');
+    console.error('[proxy] Deepgram key error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
   }
 });
 

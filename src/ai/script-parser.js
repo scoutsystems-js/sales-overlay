@@ -14,8 +14,13 @@ class ScriptParser {
     console.log('[parser] Script length: ' + scriptText.length + ' chars');
 
     try {
+      // NOTE: still uses direct Anthropic SDK (not the backend proxy). Only
+      // works in dev (`npm start`) where .env has ANTHROPIC_API_KEY; does
+      // nothing in the packaged DMG. Refactor to use ProxyClient + a new
+      // /proxy/parse-script endpoint when script upload becomes a real
+      // feature. Model ID kept in sync with backend/config.js CLAUDE_MODEL.
       var response = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 4096,
         messages: [{
           role: 'user',
