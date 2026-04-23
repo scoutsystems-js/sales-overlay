@@ -300,8 +300,32 @@ class ClaudeCoach {
       }
     }
 
-    // Is the closer actively speaking right now? If so, NEVER interrupt with a new prompt.
-    var closerIsActive = (this.lastCloserSpeechTime > 0 && now - this.lastCloserSpeechTime < this.closerActiveThreshold);
+    // Is the closer actively speaking right now? Three conditions, ALL required:
+    //   (1) closer has spoken at least once this session                (> 0 guard)
+    //   (2) their last non-backchannel turn was within closerActiveThreshold (5s)
+    //   (3) they spoke MORE RECENTLY than the prospect — i.e. they still hold the
+    //       floor. If the prospect has already responded and gone silent, the
+    //       closer has handed off even if they spoke 1s ago. Without (3), the
+    //       trailing 5s window blocks new prompts for up to 4s after the prospect
+    //       is done — the exact thrash observed in v1.0.7-alpha cycle jo6buv.
+    //
+    // Backchannels ("yeah", "right") deliberately don't stamp lastCloserSpeechTime
+    // (see addTurn), so a closer saying "mhm" after the prospect answers doesn't
+    // re-activate the guard.
+    //
+    // This boolean feeds THREE downstream checks, all preserved:
+    //   - line ~310: !closerIsActive in the delivery auto-advance — broadened by
+    //     condition (3) so auto-advance can fire once prospect has spoken, which
+    //     is the intended "closer moved on" semantics.
+    //   - line ~326: closerIsActive in the prospect-response-gate interlock —
+    //     still blocks if closer is mid-sentence before prospect has answered.
+    //   - line ~346: closerIsActive in the final safety check — still blocks
+    //     mid-sentence, clears immediately on floor handoff.
+    var closerIsActive = (
+      this.lastCloserSpeechTime > 0 &&
+      now - this.lastCloserSpeechTime < this.closerActiveThreshold &&
+      this.lastCloserSpeechTime > this.lastProspectSpeechTime
+    );
 
     // DELIVERY GATE + TURN GATE: Only applies to Claude API suggestions (not objections)
     if (this.turnsSinceLastCall < this.minTurnsBetweenCalls) { gateBlocked('turn_count'); return; }
