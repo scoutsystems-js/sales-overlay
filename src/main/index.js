@@ -547,6 +547,14 @@ function createDiscoveryWindow() {
 
   discoveryWindow.loadFile(path.join(__dirname, '..', 'renderer', 'discovery', 'discovery.html'));
 
+  // v1.0.9: pipe renderer console output to main's stdout (and therefore
+  // SessionLogger → session_logs). Mirror of the controlWindow pipe above.
+  // Without this, TypeErrors in discovery.html fire silently — the v1.0.8
+  // discovery-IPC-break bug survived multiple releases for exactly that reason.
+  discoveryWindow.webContents.on('console-message', function(event, level, message) {
+    console.log(message);
+  });
+
   discoveryWindow.on('closed', function() {
     discoveryWindow = null;
   });
@@ -579,6 +587,13 @@ function createOverlayWindow() {
   overlayWindow.loadFile(path.join(__dirname, '..', 'renderer', 'overlay', 'overlay.html'));
 
   // Window auto-resizes to match bar height so transparent area below is never covered.
+
+  // v1.0.9: pipe renderer console output to main's stdout (and therefore
+  // SessionLogger → session_logs). Highest-traffic renderer window; silent
+  // failures here would be as invisible as the discovery bug was.
+  overlayWindow.webContents.on('console-message', function(event, level, message) {
+    console.log(message);
+  });
 
   overlayWindow.on('closed', function() {
     overlayWindow = null;
