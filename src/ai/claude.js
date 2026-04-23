@@ -151,6 +151,12 @@ class ClaudeCoach {
     this.closerSpeechSinceSuggestion = ''; // Accumulates closer speech since last suggestion
     this.suggestionTimestamp = 0;    // When the current suggestion was set
     this.turnsSinceSuggestion = 0;   // How many closer turns since current suggestion
+    // v1.0.8: timestamp of the FIRST non-backchannel closer turn after the current
+    // suggestion was set. Used by Check 2 auto-advance (elapsed-time floor) —
+    // total elapsed time since this stamp beats "gap between last two turns"
+    // on fluid conversations where turns arrive in rapid bursts (<2s apart).
+    // Resets to 0 every time a new suggestion replaces currentSuggestion.
+    this.firstCloserSpeechAfterSuggestion = 0;
 
     // Prospect response gate — after closer delivers, wait for prospect to respond
     // before generating next suggestion (so the next prompt is based on prospect's answer)
@@ -166,6 +172,14 @@ class ClaudeCoach {
     // Delivery gate fallback — if closer hasn't delivered after this many turns or seconds, advance anyway
     this.maxTurnsBeforeAutoAdvance = 4;   // 4 closer turns = they moved on
     this.maxSecondsBeforeAutoAdvance = 30; // 30 seconds of SILENCE = they moved on
+    // v1.0.8: minimum elapsed time (ms) since first closer turn post-suggestion
+    // before the turn-count auto-advance (Check 2) is allowed to fire. Prevents
+    // one continuous sentence split by Deepgram into 4 rapid sub-second chunks
+    // from tripping the auto-advance — those chunks would arrive within ~1-2s
+    // total, well under this 4000ms threshold. Previous v1.0.7 logic used a
+    // per-pair 2000ms gap between consecutive turns, which false-negatived on
+    // fluid conversations where the closer speaks in rapid real bursts.
+    this.turnAutoAdvanceMinElapsedMs = 4000;
 
     // Track when the closer last spoke — timeouts should NOT fire while closer is actively talking
     this.lastCloserSpeechTime = 0;
@@ -203,6 +217,14 @@ class ClaudeCoach {
         this.closerSpeechSinceSuggestion += ' ' + text;
         this.turnsSinceSuggestion++;
 
+        // v1.0.8: stamp the first non-backchannel closer turn post-suggestion,
+        // used by Check 2's elapsed-time floor below. Only stamps on turn 1;
+        // later turns leave it alone so Check 2 measures total elapsed time
+        // from the FIRST turn to the CURRENT turn.
+        if (this.turnsSinceSuggestion === 1) {
+          this.firstCloserSpeechAfterSuggestion = this.lastCloserSpeechTime;
+        }
+
         if (!this.suggestionDelivered) {
           // Check 1: Did closer say enough of the QUESTION words from the suggestion?
           if (hasDeliveredLine(this.closerSpeechSinceSuggestion, this.currentSuggestion)) {
@@ -212,15 +234,19 @@ class ClaudeCoach {
             console.log('[claude] Closer delivered the line — waiting for prospect to respond before next prompt');
           }
           // Check 2: Auto-advance after N closer turns (they moved on without saying it verbatim)
-          // ONLY fire if there was a real gap before this turn (> 2s) — prevents Deepgram
-          // splitting one continuous sentence into 4+ rapid chunks from triggering this
+          // v1.0.8: fires only if total elapsed time since the FIRST post-suggestion
+          // closer turn exceeds turnAutoAdvanceMinElapsedMs (4s). A continuous
+          // sentence that Deepgram split into 4+ rapid chunks would all arrive
+          // within ~1-2s total — well under 4s — so it still can't trip this.
+          // Replaces v1.0.7's per-pair 2s gap check, which false-negatived on
+          // fluid conversations where real closer bursts arrive <2s apart.
           else if (this.turnsSinceSuggestion >= this.maxTurnsBeforeAutoAdvance) {
-            var gapSinceLastTurn = prevCloserSpeechTime > 0 ? (this.lastCloserSpeechTime - prevCloserSpeechTime) : 9999;
-            if (gapSinceLastTurn > 2000) {
+            var elapsedSinceFirstTurn = this.firstCloserSpeechAfterSuggestion > 0 ? (this.lastCloserSpeechTime - this.firstCloserSpeechAfterSuggestion) : 9999;
+            if (elapsedSinceFirstTurn > this.turnAutoAdvanceMinElapsedMs) {
               this.suggestionDelivered = true;
               this.waitingForProspectResponse = true;
               this.prospectRespondedSinceDelivery = false;
-              console.log('[claude] Auto-advancing — closer spoke ' + this.turnsSinceSuggestion + ' turns without delivering. Waiting for prospect response.');
+              console.log('[claude] Auto-advancing — closer spoke ' + this.turnsSinceSuggestion + ' turns over ' + elapsedSinceFirstTurn + 'ms without delivering. Waiting for prospect response.');
             }
           }
           // NOTE: Time-based auto-advance (Check 3) is now ONLY in getSuggestion()
@@ -292,6 +318,7 @@ class ClaudeCoach {
         this.closerSpeechSinceSuggestion = '';
         this.suggestionTimestamp = Date.now();
         this.turnsSinceSuggestion = 0;
+        this.firstCloserSpeechAfterSuggestion = 0; // v1.0.8: reset with turnsSinceSuggestion
 
         onSuggestion(objSuggestion);
         this.lastCallTime = now;
@@ -481,6 +508,7 @@ class ClaudeCoach {
         this.closerSpeechSinceSuggestion = '';
         this.suggestionTimestamp = Date.now();
         this.turnsSinceSuggestion = 0;
+        this.firstCloserSpeechAfterSuggestion = 0; // v1.0.8: reset with turnsSinceSuggestion
 
         // Log what the delivery detector is listening for
         var listenParts = extractQuestionPart(parsed.suggestion);
@@ -558,6 +586,7 @@ class ClaudeCoach {
     this.closerSpeechSinceSuggestion = '';
     this.suggestionTimestamp = 0;
     this.turnsSinceSuggestion = 0;
+    this.firstCloserSpeechAfterSuggestion = 0; // v1.0.8: reset with turnsSinceSuggestion
     this.waitingForProspectResponse = false;
     this.prospectRespondedSinceDelivery = true;
     this.lastCloserSpeechTime = 0;
