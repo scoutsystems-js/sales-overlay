@@ -327,3 +327,4 @@ SKIP_AUTH=true                   # flip to false once auth is tested
 - When making code changes, always run `node -c <file>` to syntax check before declaring done
 - Push to GitHub: `git add <files> && git commit -m "message" && git push`
 - **All secrets live in `API Keys.md` (gitignored). DO NOT paste keys into `CLAUDE.md`, `.env` that's tracked, or any other committed file** — GitHub push protection will block the push.
+- **Build path (mandatory):** Always build Scout releases from `~/sales-overlay` (the local copy), never from the iCloud folder. The build command is `npm run build` run from `/Users/justinschmidt/sales-overlay`. iCloud's extended attributes cause codesign failures when building from the iCloud path. Claude must reference this rule before writing any build or release command. If the local copy is out of date, rsync from iCloud first (exclude node_modules and dist), then build.
