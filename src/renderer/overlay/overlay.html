@@ -173,7 +173,7 @@
     var btnStart    = document.getElementById('btnStart');
     var btnStop     = document.getElementById('btnStop');
     var btnQuit     = document.getElementById('btnQuit');
-    var MAX_VISIBLE_PROMPTS = 3;
+    var MAX_VISIBLE_PROMPTS = 2; // v1.0.8: reduced from 3 to 2 per product direction
 
     // ── Button handlers ──
     btnStart.addEventListener('click', function() { window.electronAPI.startSession('generic'); });
