@@ -1,7 +1,7 @@
 const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
-const { CLAUDE_MODEL } = require('../config');
+const { CLAUDE_MODEL, CLAUDE_SUGGESTION_MODEL } = require('../config');
 const { formatUpstreamError } = require('../lib/format-error');
 
 var router = express.Router();
@@ -69,7 +69,9 @@ router.post('/suggest', protect, async function(req, res) {
 
     var anthropic = getAnthropic();
     var response = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
+      // v1.0.7: Haiku for live teleprompter — see backend/config.js for rationale.
+      // Memory summaries still use CLAUDE_MODEL (Sonnet) for nuance.
+      model: CLAUDE_SUGGESTION_MODEL,
       max_tokens: maxTokens || 300,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
