@@ -48,4 +48,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resizeOverlay: function(height) { ipcRenderer.send('resize-overlay', height); },
   onTriggerStartAudio: function(callback) { ipcRenderer.on('trigger-start-audio', function() { callback(); }); },
   onTriggerStopAudio: function(callback) { ipcRenderer.on('trigger-stop-audio', function() { callback(); }); },
+
+  // Discovery tracker (v1.0.9) — receives boolean + financeDetails updates from main's
+  // CallMemory, and reports panel height back so main can resize the discovery window
+  // to content. Without these, discovery.html throws TypeError on load and every
+  // 'discovery-update' IPC from main is dropped (bug found in v1.0.8 live testing).
+  onDiscoveryUpdate: function(callback) {
+    ipcRenderer.on('discovery-update', function(event, data) { callback(data); });
+  },
+  onDiscoveryReset: function(callback) {
+    ipcRenderer.on('discovery-reset', function() { callback(); });
+  },
+  resizeDiscovery: function(height) { ipcRenderer.send('resize-discovery', height); },
 });
