@@ -1,6 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
+const { formatUpstreamError, insertWithRetry } = require('../lib/format-error');
 
 var router = express.Router();
 
@@ -55,14 +56,16 @@ router.post('/session-start', protect, async function(req, res) {
       .single();
 
     if (insert.error) {
-      console.error('[log] session-start insert failed:', insert.error.message);
-      return res.status(500).json({ error: 'Could not create session' });
+      var detail = String(insert.error.message || 'unknown').slice(0, 200);
+      console.error('[log] session-start insert failed:', detail);
+      return res.status(500).json({ error: 'Could not create session: ' + detail });
     }
     res.json({ session_id: insert.data.session_id });
   } catch (err) {
     if (handleConfigError(err, res)) return;
-    console.error('[log] session-start error:', err.message);
-    res.status(500).json({ error: 'Session start failed' });
+    var f = formatUpstreamError(err, 'Session start');
+    console.error('[log] session-start error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
   }
 });
 
@@ -90,8 +93,9 @@ router.patch('/session-end/:session_id', protect, async function(req, res) {
       .maybeSingle();
 
     if (update.error) {
-      console.error('[log] session-end update failed:', update.error.message);
-      return res.status(500).json({ error: 'Could not end session' });
+      var detail = String(update.error.message || 'unknown').slice(0, 200);
+      console.error('[log] session-end update failed:', detail);
+      return res.status(500).json({ error: 'Could not end session: ' + detail });
     }
     if (!update.data) {
       return res.status(404).json({ error: 'Session not found' });
@@ -99,8 +103,9 @@ router.patch('/session-end/:session_id', protect, async function(req, res) {
     res.json({ session_id: update.data.session_id });
   } catch (err) {
     if (handleConfigError(err, res)) return;
-    console.error('[log] session-end error:', err.message);
-    res.status(500).json({ error: 'Session end failed' });
+    var f = formatUpstreamError(err, 'Session end');
+    console.error('[log] session-end error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
   }
 });
 
@@ -150,10 +155,14 @@ router.post('/', protect, async function(req, res) {
       };
     });
 
-    var insert = await admin.from('session_logs').insert(stamped);
+    // insertWithRetry absorbs transient Supabase/Cloudflare 5xx hiccups
+    // (the 502 Bad Gateway we saw 2026-04-23 was a symptom). One retry with
+    // 500ms backoff — if that still fails, surface the error as-is.
+    var insert = await insertWithRetry(admin, 'session_logs', stamped);
     if (insert.error) {
-      console.error('[log] bulk insert failed:', insert.error.message);
-      return res.status(500).json({ error: 'Could not write logs' });
+      var detail = String(insert.error.message || 'unknown').slice(0, 200);
+      console.error('[log] bulk insert failed:', detail);
+      return res.status(500).json({ error: 'Could not write logs: ' + detail });
     }
 
     // Session counters (log_count, error_count) are recomputed on read from
@@ -162,8 +171,9 @@ router.post('/', protect, async function(req, res) {
     res.json({ accepted: stamped.length });
   } catch (err) {
     if (handleConfigError(err, res)) return;
-    console.error('[log] insert error:', err.message);
-    res.status(500).json({ error: 'Log write failed' });
+    var f = formatUpstreamError(err, 'Log write');
+    console.error('[log] insert error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
   }
 });
 

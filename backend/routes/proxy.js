@@ -2,23 +2,14 @@ const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
+const { formatUpstreamError } = require('../lib/format-error');
 
 var router = express.Router();
 
-// Shapes any downstream error (Anthropic SDK, fetch, plain Error) into the
-// HTTP status + JSON body we return to the client. Preserves the real status
-// code and a truncated message so failures surface directly in session_logs
-// without needing Railway dashboard access. Keep the truncation cap (200 chars)
-// so a verbose upstream error can't blow past Supabase's text column limits.
-function formatProxyError(err, serviceLabel) {
-  var status = (err && err.status) ? err.status : 500;
-  var raw = (err && err.message) ? String(err.message) : 'unknown';
-  var detail = (raw.length > 0 ? raw : 'unknown').slice(0, 200);
-  return {
-    status: status,
-    body: { error: serviceLabel + ' failed (' + status + '): ' + detail },
-  };
-}
+// formatProxyError was inlined here in v1.0.5; moved to backend/lib/format-error.js
+// in v1.0.6 so /log/* can reuse it. Aliased as formatProxyError for diff clarity
+// in this file — behavior is identical.
+var formatProxyError = formatUpstreamError;
 
 // Throws a helpful error if any required Railway env vars are missing. Lists
 // exactly which ones by name so operators don't have to guess which variable

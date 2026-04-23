@@ -864,9 +864,20 @@ function initAutoUpdater() {
     console.error('[updater] Error:', err.message);
   });
 
+  // One-shot startup check 5s after launch — catches releases published
+  // before this session started.
   setTimeout(function() {
     autoUpdater.checkForUpdates();
   }, 5000);
+
+  // Periodic poll every 30 minutes so a long-running Scout (left open for
+  // a full work day) still discovers releases without needing a restart.
+  // 2 requests/hour is well under GitHub's 60/hr unauthenticated rate limit.
+  // Without this, apps that were already running when a release dropped
+  // never re-check and users have to manually reinstall to update.
+  setInterval(function() {
+    autoUpdater.checkForUpdates();
+  }, 30 * 60 * 1000);
 }
 
 app.whenReady().then(async function() {
