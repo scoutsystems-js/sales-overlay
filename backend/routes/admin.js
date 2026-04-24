@@ -212,9 +212,186 @@ router.get('/sessions/:session_id/logs', protect, async function(req, res) {
   }
 });
 
+// ── GET /admin/users ────────────────────────────────────────────────────────
+// User management list. Owners see every signed-up user. Admins see users
+// they manage (managed_by = self) plus themselves — the admin's own row is
+// included so they can see their own role in context; it won't have
+// role-change controls client-side.
+//
+// Missing user_profiles rows (signups who never completed onboarding — see
+// migration 003 note) default to role='user' in the merge so the table
+// still lists them. `managed_by` stays null for those users, meaning only
+// owners will see them until an owner assigns them to an admin.
+router.get('/users', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var allUsers = await fetchUsersWithProfiles(admin);
+
+    var visible;
+    if (req.user.role === 'owner') {
+      visible = allUsers;
+    } else {
+      // admin scope: managed users + self
+      visible = allUsers.filter(function(u) {
+        return u.managed_by === req.user.id || u.user_id === req.user.id;
+      });
+    }
+
+    if (visible.length === 0) {
+      return res.json({ users: [] });
+    }
+
+    // Single batched stats query: count sessions + latest started_at per user.
+    var userIds = visible.map(function(u) { return u.user_id; });
+    var sessionsResult = await admin
+      .from('call_sessions')
+      .select('user_id, started_at')
+      .in('user_id', userIds);
+    if (sessionsResult.error) {
+      // Non-fatal — show users with zero stats rather than erroring the page.
+      console.error('[admin] user stats query failed:', sessionsResult.error.message);
+    }
+    var statsMap = computeUserSessionStats(sessionsResult.data || []);
+
+    var enriched = visible.map(function(u) {
+      var s = statsMap[u.user_id] || { session_count: 0, last_session_at: null };
+      return {
+        user_id: u.user_id,
+        email: u.email,
+        role: u.role,
+        managed_by: u.managed_by,
+        session_count: s.session_count,
+        last_session_at: s.last_session_at,
+      };
+    });
+
+    res.json({ users: enriched });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] users error:', err.message);
+    res.status(500).json({ error: 'Failed to load users' });
+  }
+});
+
+// ── PATCH /admin/users/:user_id/role ────────────────────────────────────────
+// Owner-only role change. Two server-side guards:
+//   1. Self-change is rejected (you can't change your own role).
+//   2. Last-owner demotion is rejected (system must retain at least one owner).
+// Upsert is used instead of update so un-onboarded users (no user_profiles
+// row yet) can still be promoted.
+var ALLOWED_ROLES = ['user', 'admin', 'owner'];
+
+router.patch('/users/:user_id/role', requireAuth, requireRole('owner'), async function(req, res) {
+  var targetId = req.params.user_id;
+  var newRole = req.body && req.body.role;
+
+  if (ALLOWED_ROLES.indexOf(newRole) === -1) {
+    return res.status(400).json({ error: 'role must be one of: ' + ALLOWED_ROLES.join(', ') });
+  }
+  if (targetId === req.user.id) {
+    return res.status(403).json({ error: 'Cannot change your own role' });
+  }
+
+  try {
+    var admin = getAdminClient();
+
+    var currentResult = await admin
+      .from('user_profiles')
+      .select('user_id, role')
+      .eq('user_id', targetId)
+      .maybeSingle();
+    if (currentResult.error) {
+      console.error('[admin] current role lookup failed:', currentResult.error.message);
+      return res.status(500).json({ error: 'Could not load target user' });
+    }
+    var currentRole = (currentResult.data && currentResult.data.role) || 'user';
+
+    // No-op: avoid hitting the DB if nothing would change.
+    if (currentRole === newRole) {
+      return res.json({ user_id: targetId, role: currentRole });
+    }
+
+    // Last-owner guard.
+    if (currentRole === 'owner' && newRole !== 'owner') {
+      var countResult = await admin
+        .from('user_profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'owner');
+      if (countResult.error) {
+        console.error('[admin] owner count query failed:', countResult.error.message);
+        return res.status(500).json({ error: 'Could not validate owner count' });
+      }
+      if ((countResult.count || 0) <= 1) {
+        return res.status(403).json({ error: 'Cannot demote the last owner' });
+      }
+    }
+
+    var upsertResult = await admin
+      .from('user_profiles')
+      .upsert({ user_id: targetId, role: newRole }, { onConflict: 'user_id' })
+      .select('user_id, role')
+      .single();
+    if (upsertResult.error) {
+      var detail = String(upsertResult.error.message || 'unknown').slice(0, 200);
+      console.error('[admin] role update failed:', detail);
+      return res.status(500).json({ error: 'Could not update role: ' + detail });
+    }
+
+    res.json({ user_id: upsertResult.data.user_id, role: upsertResult.data.role });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] role patch error:', err.message);
+    res.status(500).json({ error: 'Failed to update role' });
+  }
+});
+
+// Fetch all auth users + all user_profiles rows, left-merge on user_id.
+// Users without a profile row default to role='user', managed_by=null.
+async function fetchUsersWithProfiles(admin) {
+  var authResult = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (authResult.error) throw new Error('listUsers failed: ' + authResult.error.message);
+  var profilesResult = await admin
+    .from('user_profiles')
+    .select('user_id, role, managed_by');
+  if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
+
+  var profilesByUserId = {};
+  var profiles = profilesResult.data || [];
+  for (var i = 0; i < profiles.length; i++) {
+    profilesByUserId[profiles[i].user_id] = profiles[i];
+  }
+
+  var authUsers = (authResult.data && authResult.data.users) || [];
+  return authUsers.map(function(u) {
+    var p = profilesByUserId[u.id] || {};
+    return {
+      user_id: u.id,
+      email: u.email || null,
+      role: p.role || 'user',
+      managed_by: p.managed_by || null,
+    };
+  });
+}
+
+// [{ user_id, started_at }] → { <user_id>: { session_count, last_session_at } }
+function computeUserSessionStats(rows) {
+  var out = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r || !r.user_id) continue;
+    if (!out[r.user_id]) out[r.user_id] = { session_count: 0, last_session_at: null };
+    out[r.user_id].session_count += 1;
+    if (!out[r.user_id].last_session_at || r.started_at > out[r.user_id].last_session_at) {
+      out[r.user_id].last_session_at = r.started_at;
+    }
+  }
+  return out;
+}
+
 // Pure helpers exported for tests (matches log.js `_validateLogBatch` pattern).
 router._buildUserEmailMap = buildUserEmailMap;
 router._computeCountsBySession = computeCountsBySession;
 router._computeDurationSeconds = computeDurationSeconds;
+router._computeUserSessionStats = computeUserSessionStats;
 
 module.exports = router;
