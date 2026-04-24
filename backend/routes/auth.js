@@ -1,5 +1,6 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const { requireAuth } = require('../middleware/auth');
 
 var router = express.Router();
 
@@ -14,6 +15,19 @@ function getSupabase() {
   }
   _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
   return _supabase;
+}
+
+// Separate service-role client for reads that need to bypass RLS (e.g. /me
+// reading user_profiles — the SELECT policy allows it anyway, but using the
+// admin client keeps /me robust if policies change).
+var _adminSupabase = null;
+function getAdminClient() {
+  if (_adminSupabase) return _adminSupabase;
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase admin not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Railway Variables.');
+  }
+  _adminSupabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return _adminSupabase;
 }
 
 // Wraps a route handler so a getSupabase() throw turns into a 503 response.
@@ -99,6 +113,31 @@ router.get('/google', async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[auth] Google OAuth error:', err.message);
     res.status(500).json({ error: 'Google OAuth failed' });
+  }
+});
+
+// Return the caller's identity + role. Used by login.html to decide where
+// to redirect after a successful login (owner/admin → /admin, user →
+// /dashboard). Un-onboarded users have no user_profiles row — default to
+// 'user' in memory, matching the requireRole middleware's own default.
+router.get('/me', requireAuth, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var { data, error } = await admin
+      .from('user_profiles')
+      .select('role')
+      .eq('user_id', req.user.id)
+      .maybeSingle();
+    if (error) {
+      console.error('[auth] /me role lookup failed:', error.message);
+      return res.status(500).json({ error: 'Could not load user profile' });
+    }
+    var role = (data && data.role) || 'user';
+    res.json({ user_id: req.user.id, email: req.user.email, role: role });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[auth] /me error:', err.message);
+    res.status(500).json({ error: 'Failed to load user' });
   }
 });
 
