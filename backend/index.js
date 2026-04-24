@@ -8,6 +8,7 @@ const billingRoutes = require('./routes/billing');
 const proxyRoutes = require('./routes/proxy');
 const downloadRoutes = require('./routes/download');
 const logRoutes = require('./routes/log');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,12 +42,20 @@ app.get('/login', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'login.html'));
 });
 
+// Pretty URL for the admin session logs page. Must register BEFORE
+// app.use('/admin', adminRoutes) so the exact-match page serve isn't
+// shadowed by the router mount.
+app.get('/admin', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'admin.html'));
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/billing', billingRoutes);
 app.use('/proxy', proxyRoutes);
 app.use('/download', downloadRoutes);
 app.use('/log', logRoutes);
+app.use('/admin', adminRoutes);
 
 // Global error handler
 app.use(function(err, req, res, next) {

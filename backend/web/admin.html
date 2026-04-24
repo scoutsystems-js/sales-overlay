@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — Scout Systems</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    /* Admin page is a two-panel layout: session list (left) + log detail
+       (right). Styles are inline here instead of in style.css so the admin
+       surface stays self-contained — nothing else on the site needs these. */
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .admin-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,11,13,0.95);
+    }
+    .admin-top-left { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
+    .admin-top-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+    .admin-top-right .signout { cursor: pointer; }
+    .admin-top-right .signout:hover { color: var(--text); }
+
+    .admin-layout {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── LEFT: session list ──────────────────────────────────────────────── */
+    .sessions-pane {
+      width: 420px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg2);
+    }
+    .sessions-pane-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+    .sessions-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .session-card {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .session-card:hover { background: rgba(255,255,255,0.02); }
+    .session-card.active {
+      background: rgba(34,197,94,0.06);
+      border-left-color: var(--green);
+    }
+    .session-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .session-card-email {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 260px;
+    }
+    .session-card-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .session-card-tail {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .session-card-tail .err {
+      color: #f87171;
+      font-weight: 600;
+    }
+    .load-more {
+      padding: 14px 20px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .load-more:hover { color: var(--text); }
+    .load-more.hidden { display: none; }
+    .empty-msg { padding: 24px 20px; font-size: 13px; color: var(--muted); text-align: center; }
+
+    /* ── RIGHT: log detail ──────────────────────────────────────────────── */
+    .detail-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .detail-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .detail-header-left h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .detail-header-left .sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .detail-header-right {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .filter-bar {
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: var(--bg2);
+    }
+    .chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.12s;
+    }
+    .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .chip.active {
+      background: var(--green-dim);
+      color: var(--green);
+      border-color: rgba(34,197,94,0.3);
+    }
+    .filter-search {
+      flex: 1;
+      min-width: 160px;
+      max-width: 320px;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+    }
+    .filter-search:focus { border-color: var(--green); }
+    .count-indicator {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+      white-space: nowrap;
+    }
+    .count-indicator.capped { color: #fbbf24; }
+
+    /* ── Log rows ───────────────────────────────────────────────────────── */
+    .log-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .log-row {
+      display: grid;
+      grid-template-columns: 96px 14px 110px 1fr;
+      gap: 10px;
+      padding: 3px 24px;
+      align-items: start;
+    }
+    .log-row:hover { background: rgba(255,255,255,0.02); }
+    .log-time { color: var(--muted); }
+    .log-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-top: 6px;
+      justify-self: center;
+    }
+    .log-dot.warn { background: #fbbf24; }
+    .log-dot.error { background: #f87171; }
+    .log-tag { color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-msg { color: var(--text); white-space: pre-wrap; word-break: break-word; }
+    .log-row.error .log-msg { color: #fca5a5; }
+
+    .detail-placeholder {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 900px) {
+      .admin-layout { flex-direction: column; }
+      .sessions-pane { width: 100%; max-height: 50vh; border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="admin-top">
+  <div class="admin-top-left">
+    <svg width="20" height="22" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <circle cx="10" cy="12" r="1.6" fill="#22c55e"/>
+      <circle cx="10" cy="16" r="1.2" fill="#22c55e"/>
+      <circle cx="10" cy="19.5" r="0.8" fill="#22c55e"/>
+    </svg>
+    <span>Scout Admin</span>
+    <span style="color: var(--muted); font-weight: 500; font-size: 13px;">· Session logs</span>
+  </div>
+  <div class="admin-top-right">
+    <span id="signedInEmail"></span>
+    <span class="signout" onclick="signOut()">Sign out</span>
+  </div>
+</nav>
+
+<div class="admin-layout">
+  <aside class="sessions-pane">
+    <div class="sessions-pane-header">Sessions (all users)</div>
+    <div class="sessions-list" id="sessionsList">
+      <div class="empty-msg"><span class="spinner"></span></div>
+    </div>
+    <div class="load-more hidden" id="loadMore" onclick="loadOlder()">Load older</div>
+  </aside>
+
+  <main class="detail-pane" id="detailPane">
+    <div class="detail-placeholder" id="detailPlaceholder">Select a session on the left.</div>
+  </main>
+</div>
+
+<script>
+  // ── Session handling (mirrors login.html) ──────────────────────────────
+  var STORAGE_KEY = 'scout_session_v1';
+
+  function getSession() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
+  }
+  function setSession(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+  function clearSession() { localStorage.removeItem(STORAGE_KEY); }
+
+  function isSessionValid(s) {
+    if (!s || !s.access_token || !s.expires_at) return false;
+    var nowSec = Math.floor(Date.now() / 1000);
+    return s.expires_at > nowSec + 60;
+  }
+  function shouldRefresh(s) {
+    if (!s || !s.expires_at) return false;
+    var nowSec = Math.floor(Date.now() / 1000);
+    return s.expires_at - nowSec < 300;
+  }
+
+  async function refreshSessionIfNeeded() {
+    var s = getSession();
+    if (!s || !s.refresh_token) return null;
+    if (!shouldRefresh(s)) return s;
+    try {
+      var res = await fetch('/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: s.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); return null; }
+      var data = await res.json();
+      if (!data.session) { clearSession(); return null; }
+      var fresh = {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+        email: (data.user && data.user.email) || (s && s.email),
+      };
+      setSession(fresh);
+      return fresh;
+    } catch (err) {
+      clearSession();
+      return null;
+    }
+  }
+
+  function signOut() {
+    clearSession();
+    window.location.replace('/login');
+  }
+
+  function authHeader() {
+    var s = getSession();
+    return s && s.access_token ? { 'Authorization': 'Bearer ' + s.access_token } : {};
+  }
+
+  // ── State ───────────────────────────────────────────────────────────────
+  var allSessions = [];          // accumulated as user paginates
+  var oldestStartedAt = null;    // cursor for next "load older" page
+  var pageSize = 50;
+  var selectedSessionId = null;
+  var currentLogs = [];          // logs for the currently selected session
+  var currentTotal = 0;
+  var currentLimit = 2000;
+  var activeChip = 'all';        // 'all' | 'claude' | 'memory' | 'TIMING' | 'errors'
+  var searchText = '';
+
+  // ── Initial load ────────────────────────────────────────────────────────
+  async function init() {
+    var s = getSession();
+    if (!isSessionValid(s)) {
+      if (s && s.refresh_token) {
+        var refreshed = await refreshSessionIfNeeded();
+        if (!refreshed) { window.location.replace('/login'); return; }
+      } else {
+        window.location.replace('/login');
+        return;
+      }
+    }
+    var cur = getSession();
+    document.getElementById('signedInEmail').textContent = (cur && cur.email) || '';
+    await loadSessions(true);
+  }
+
+  async function loadSessions(initial) {
+    var url = '/admin/sessions?limit=' + pageSize;
+    if (!initial && oldestStartedAt) url += '&before=' + encodeURIComponent(oldestStartedAt);
+
+    var res;
+    try {
+      res = await fetch(url, { headers: authHeader() });
+    } catch (err) {
+      renderListError('Could not reach server.');
+      return;
+    }
+
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (res.status === 403) { window.location.replace('/'); return; }
+    if (!res.ok) {
+      var err;
+      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      renderListError(err.error || 'Failed to load sessions');
+      return;
+    }
+
+    var data = await res.json();
+    var sessions = (data && data.sessions) || [];
+    if (initial) {
+      allSessions = sessions;
+    } else {
+      allSessions = allSessions.concat(sessions);
+    }
+    if (sessions.length > 0) {
+      oldestStartedAt = sessions[sessions.length - 1].started_at;
+    }
+    // Hide "load older" when the page came back smaller than the requested size.
+    var loadMoreEl = document.getElementById('loadMore');
+    if (sessions.length < pageSize) loadMoreEl.classList.add('hidden');
+    else loadMoreEl.classList.remove('hidden');
+
+    renderSessionsList();
+  }
+
+  async function loadOlder() { await loadSessions(false); }
+
+  function renderListError(msg) {
+    document.getElementById('sessionsList').innerHTML =
+      '<div class="empty-msg" style="color:#f87171;">' + escapeHtml(msg) + '</div>';
+  }
+
+  function renderSessionsList() {
+    var list = document.getElementById('sessionsList');
+    if (allSessions.length === 0) {
+      list.innerHTML = '<div class="empty-msg">No sessions yet.</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < allSessions.length; i++) {
+      var s = allSessions[i];
+      var email = s.user_email || s.user_id.slice(0, 8) + '…';
+      var active = s.session_id === selectedSessionId ? ' active' : '';
+      var outcome = outcomeBadge(s.outcome, !!s.ended_at);
+      var dur = s.ended_at ? formatDuration(s.duration_seconds) : 'live';
+      var rel = relativeTime(s.started_at);
+      var errPart = s.error_count > 0
+        ? '<span class="err">' + s.error_count + ' errors</span>'
+        : '0 errors';
+      html += '<div class="session-card' + active + '" onclick="selectSession(\'' + s.session_id + '\')">'
+        + '<div class="session-card-top">'
+          + '<span class="session-card-email">' + escapeHtml(email) + '</span>'
+          + outcome
+        + '</div>'
+        + '<div class="session-card-meta">' + rel + ' · ' + dur + '</div>'
+        + '<div class="session-card-tail">' + escapeHtml(s.client_version || '—') + ' · ' + s.log_count + ' logs · ' + errPart + '</div>'
+      + '</div>';
+    }
+    list.innerHTML = html;
+  }
+
+  function outcomeBadge(outcome, ended) {
+    if (outcome === 'win') return '<span class="badge badge-win">Win</span>';
+    if (outcome === 'loss') return '<span class="badge badge-loss">Loss</span>';
+    if (outcome === 'follow_up') return '<span class="badge badge-pending">Follow-up</span>';
+    if (!ended) return '<span class="badge badge-pending">Live</span>';
+    return '<span class="badge badge-pending">—</span>';
+  }
+
+  // ── Selection + detail load ─────────────────────────────────────────────
+  async function selectSession(sessionId) {
+    selectedSessionId = sessionId;
+    renderSessionsList();
+    // Reset filters on selection change so the user sees everything by default.
+    activeChip = 'all';
+    searchText = '';
+
+    var pane = document.getElementById('detailPane');
+    pane.innerHTML = '<div class="detail-placeholder"><span class="spinner"></span></div>';
+
+    var res;
+    try {
+      res = await fetch('/admin/sessions/' + encodeURIComponent(sessionId) + '/logs', {
+        headers: authHeader(),
+      });
+    } catch (err) {
+      pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">Could not reach server.</div>';
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (res.status === 403) { window.location.replace('/'); return; }
+    if (!res.ok) {
+      var err;
+      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">' + escapeHtml(err.error || 'Failed to load logs') + '</div>';
+      return;
+    }
+    var data = await res.json();
+    currentLogs = (data && data.logs) || [];
+    currentTotal = (data && typeof data.total_count === 'number') ? data.total_count : currentLogs.length;
+    currentLimit = (data && data.limit) || 2000;
+
+    renderDetail(data.session);
+  }
+
+  function renderDetail(session) {
+    var pane = document.getElementById('detailPane');
+    var email = session.user_email || session.user_id;
+    var dur = session.ended_at ? formatDuration(session.duration_seconds) : 'live';
+    var outcome = outcomeBadge(session.outcome, !!session.ended_at);
+    var startedAbs = new Date(session.started_at).toLocaleString();
+
+    pane.innerHTML =
+      '<div class="detail-header">'
+        + '<div class="detail-header-left">'
+          + '<h2>' + escapeHtml(email) + '</h2>'
+          + '<div class="sub">' + escapeHtml(startedAbs) + ' · ' + dur + ' · ' + escapeHtml(session.client_version || '—') + ' · ' + escapeHtml(session.platform || '—') + '</div>'
+        + '</div>'
+        + '<div class="detail-header-right">' + outcome + '</div>'
+      + '</div>'
+      + '<div class="filter-bar">'
+        + chipHtml('all', 'All')
+        + chipHtml('claude', '[claude]')
+        + chipHtml('memory', '[memory]')
+        + chipHtml('TIMING', '[TIMING]')
+        + chipHtml('errors', 'Errors only')
+        + '<input class="filter-search" type="text" placeholder="Search messages…" oninput="onSearch(this.value)" value="' + escapeHtml(searchText) + '"/>'
+        + '<span class="count-indicator" id="countIndicator"></span>'
+      + '</div>'
+      + '<div class="log-list" id="logList"></div>';
+
+    renderLogList();
+  }
+
+  function chipHtml(id, label) {
+    var active = id === activeChip ? ' active' : '';
+    return '<button class="chip' + active + '" data-chip="' + id + '" onclick="onChip(\'' + id + '\')">' + escapeHtml(label) + '</button>';
+  }
+
+  function onChip(id) { activeChip = id; refreshChipStates(); renderLogList(); }
+  function onSearch(v) { searchText = v; renderLogList(); }
+
+  function refreshChipStates() {
+    var chips = document.querySelectorAll('.filter-bar .chip');
+    chips.forEach(function(c) {
+      if (c.getAttribute('data-chip') === activeChip) c.classList.add('active');
+      else c.classList.remove('active');
+    });
+  }
+
+  function renderLogList() {
+    var list = document.getElementById('logList');
+    if (!list) return;
+
+    var filtered = currentLogs.filter(function(r) {
+      if (activeChip === 'errors' && r.level !== 'error') return false;
+      if (activeChip !== 'all' && activeChip !== 'errors') {
+        var hay = ((r.tag || '') + ' ' + (r.message || '')).toLowerCase();
+        if (hay.indexOf(activeChip.toLowerCase()) === -1) return false;
+      }
+      if (searchText) {
+        var msg = (r.message || '').toLowerCase();
+        if (msg.indexOf(searchText.toLowerCase()) === -1) return false;
+      }
+      return true;
+    });
+
+    // Count indicator reflects filter state + server truncation.
+    var indicator = document.getElementById('countIndicator');
+    var capped = currentTotal > currentLimit;
+    var shown = filtered.length;
+    var baseText;
+    if (capped) {
+      baseText = 'Showing ' + shown + ' of ' + currentTotal + ' (capped at ' + currentLimit + ')';
+    } else if (shown !== currentLogs.length) {
+      baseText = 'Showing ' + shown + ' of ' + currentLogs.length;
+    } else {
+      baseText = shown + ' log' + (shown === 1 ? '' : 's');
+    }
+    indicator.textContent = baseText;
+    if (capped) indicator.classList.add('capped'); else indicator.classList.remove('capped');
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="empty-msg">No logs match the current filter.</div>';
+      return;
+    }
+
+    // Build as array then join — much faster than string concatenation at 2000 rows.
+    var parts = [];
+    for (var i = 0; i < filtered.length; i++) {
+      var r = filtered[i];
+      var dotClass = r.level === 'error' ? 'error' : (r.level === 'warn' ? 'warn' : '');
+      var rowClass = r.level === 'error' ? 'log-row error' : 'log-row';
+      parts.push(
+        '<div class="' + rowClass + '">'
+          + '<span class="log-time">' + escapeHtml(formatLogTime(r.logged_at)) + '</span>'
+          + '<span class="log-dot ' + dotClass + '"></span>'
+          + '<span class="log-tag">' + escapeHtml(r.tag || '') + '</span>'
+          + '<span class="log-msg">' + escapeHtml(r.message || '') + '</span>'
+        + '</div>'
+      );
+    }
+    list.innerHTML = parts.join('');
+  }
+
+  // ── Formatting helpers ──────────────────────────────────────────────────
+  function formatLogTime(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso || '';
+    var h = String(d.getHours()).padStart(2, '0');
+    var m = String(d.getMinutes()).padStart(2, '0');
+    var s = String(d.getSeconds()).padStart(2, '0');
+    var ms = String(d.getMilliseconds()).padStart(3, '0');
+    return h + ':' + m + ':' + s + '.' + ms;
+  }
+
+  function formatDuration(secs) {
+    if (secs == null) return '—';
+    if (secs < 60) return secs + 's';
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    if (m < 60) return m + 'm ' + s + 's';
+    var h = Math.floor(m / 60);
+    m = m % 60;
+    return h + 'h ' + m + 'm';
+  }
+
+  function relativeTime(iso) {
+    var t = new Date(iso).getTime();
+    if (isNaN(t)) return iso || '';
+    var diff = Math.max(0, (Date.now() - t) / 1000);
+    if (diff < 60) return Math.floor(diff) + 's ago';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  init();
+</script>
+
+</body>
+</html>
