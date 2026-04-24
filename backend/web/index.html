@@ -205,7 +205,9 @@
       if (loginBtn) loginBtn.remove();
       if (signupBtn) {
         signupBtn.textContent = 'Account';
-        signupBtn.setAttribute('href', '/login');
+        // /dashboard auto-redirects admins/owners to /admin — this avoids
+        // needing a role lookup in the nav script.
+        signupBtn.setAttribute('href', '/dashboard');
       }
     } catch (e) {}
   })();

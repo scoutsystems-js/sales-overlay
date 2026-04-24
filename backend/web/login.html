@@ -416,6 +416,37 @@
     document.getElementById('errorMsg').style.display = 'none';
   }
 
+  // ── Post-login redirect by role ──────────────────────────────────────────
+  // Calls /auth/me and navigates to /admin (owner/admin) or /dashboard (user).
+  // Returns true if it navigated away; false on any failure so the caller can
+  // fall back to the signed-in card (which still exposes the scout:// deep
+  // link, preserving the desktop-launch flow for transient /auth/me errors).
+  async function redirectByRole() {
+    try {
+      var s = getSession();
+      var token = s && s.access_token;
+      if (!token) return false;
+      var res = await fetch('/auth/me', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (!res.ok) {
+        console.warn('[login] /auth/me returned', res.status, '- falling back to signed-in card');
+        return false;
+      }
+      var data = await res.json();
+      var role = (data && data.role) || 'user';
+      if (role === 'owner' || role === 'admin') {
+        window.location.replace('/admin');
+      } else {
+        window.location.replace('/dashboard');
+      }
+      return true;
+    } catch (err) {
+      console.warn('[login] /auth/me network error, falling back:', err.message);
+      return false;
+    }
+  }
+
   // ── Login / signup submit ────────────────────────────────────────────────
   async function handleSubmit() {
     var email = document.getElementById('email').value.trim();
@@ -454,7 +485,11 @@
         expires_at: data.expires_at,
         email: (data.user && data.user.email) || email,
       });
-      showSignedInView(getSession());
+
+      // Redirect to the role-appropriate surface. On failure fall back to
+      // the signed-in card so the "Open Scout App" deep link stays reachable.
+      var redirected = await redirectByRole();
+      if (!redirected) showSignedInView(getSession());
 
     } catch (err) {
       showError('Could not reach server. Check your connection.');
