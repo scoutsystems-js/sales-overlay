@@ -138,11 +138,12 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 ## Current Status: Not Yet Built
 - Post-call summary
 - Stripe billing wired end-to-end (auth works; Stripe keys pending; `SKIP_BILLING` currently `true` so all logged-in users get full access)
-- Diagnostics dashboard (Phase 3 — see BUILD-PLAN.md for spec)
+- Post-call analytics dashboard — charts, aggregations, win rate, objection breakdown, stage timing (Phase 3 per BUILD-PLAN.md, at `/dashboard`). The Phase 2 raw session log viewer at `/admin` is live (v1.1.0 Feature 2); remaining Phase 2 diagnostics work: search by email/session/date and one-click log copy.
 - Automated release via `npm run release` (currently manual — DMGs uploaded to GitHub Releases via web UI since `gh` CLI isn't installed locally)
 - x64 DMG for v1.0.2 (Apple notarization server returned 500 mid-build; arm64 shipped; rebuild x64 separately when Apple servers recover)
 
 ## Resolved Issues (full history)
+- v1.1.0 Feature 2 (Admin session logs page) complete — `/admin` page at `backend/web/admin.html` with two-panel layout (session list + log detail), protected by `requireRole('owner')`. New `backend/routes/admin.js` exposes `GET /admin/sessions` (cross-user list, cursor paginated via `?before=<started_at>`, unfiltered by user_id on purpose — `requireRole` is the gate) and `GET /admin/sessions/:session_id/logs` (up to 2000 rows, `total_count` from Supabase `count: 'exact'` so client shows "Showing X of Y" when capped). Emails batch-fetched once via `admin.auth.admin.listUsers({perPage:1000})` → `{user_id: email}` map for the list route; detail route uses `getUserById` for the single user. Log counts batch-computed per page via one `.in('session_id', ids)` query + JS group-by (swap to Postgres RPC when session_logs scales). Page reuses login.html's session refresh flow (`scout_session_v1` localStorage, `/auth/refresh`); 401 → `/login`, 403 → `/`. Client-side filter chips (`[claude]`, `[memory]`, `[TIMING]`, `Errors only`) + search box; all in-memory over the capped 2000 rows. Pure helpers (`buildUserEmailMap`, `computeCountsBySession`, `computeDurationSeconds`) exported on the router per the `log.js:_validateLogBatch` pattern.
 - v1.1.0 Feature 1 (Role system) complete — migration 003 adds role/managed_by columns to user_profiles, current_user_role() security-definer helper, revised RLS policies on user_profiles/call_sessions/session_logs, and requireRole middleware in auth.js. Justin (justinschmidtsales@gmail.com) promoted to owner, Josh (josh@scoutsystems.io) at user. Railway live.
 - Overlay used to replace prompts mid-read → fixed with delivery detection + stacking
 - Delivery gate permanently blocking → fixed with timeout (30s) + turn (4) auto-advance + prospect response gate
@@ -215,7 +216,7 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 ### Project layout (iCloud root: `~/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay/`)
 - `src/` — Electron desktop app source
 - `backend/` — Railway-deployed Express backend (auth, billing, API proxy) + landing page
-- `backend/public/` — static website served by backend (`index.html` landing, `login.html`)
+- `backend/web/` — static website served by backend (`index.html` landing, `login.html`, `admin.html`). Folder is `web/` not `public/` because Railpack's Staticfile detector auto-triggers on `public/` and deploys Caddy instead of Node — rename sidesteps it (see comment at `backend/index.js:22-24`).
 - `build/` — electron-builder icons + entitlements
 - `dist` → `dist.nosync` (symlinked, kept out of iCloud). In `~/sales-overlay/dist/` (local build dir), failed/unshipped build artifacts are moved into `dist/archive/<label>/` instead of deleted — e.g., `dist/archive/failed-build-2026-04-22-unnotarized/` holds the v1.0.3 DMGs that built signed-but-not-notarized due to the env-var paste bug. Pattern: always move failed builds to a dated `archive/` subfolder so electron-builder can write fresh artifacts at the top level of `dist/` without conflicts, and old artifacts remain for forensics.
 - `node_modules` — kept local (iCloud sync breaks it; use `.nosync` pattern if re-created)
@@ -250,8 +251,9 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - **Node version:** `>=20.0.0` (per `backend/package.json` engines)
 - **Health check:** `GET /health` returns `{"status":"ok","service":"Scout Systems Backend"}`
 - **Routes served by backend:**
-  - `/` → landing page (`backend/public/index.html`)
-  - `/login` → web login page (`backend/public/login.html`)
+  - `/` → landing page (`backend/web/index.html`)
+  - `/login` → web login page (`backend/web/login.html`)
+  - `/admin` → admin session logs page (`backend/web/admin.html`; owner role only, API at `backend/routes/admin.js`)
   - `/auth/*` → signup / login / verify (Supabase-backed, `backend/routes/auth.js`)
   - `/billing/*` → Stripe checkout + webhook (`backend/routes/billing.js`; `/billing/webhook` uses raw body)
   - `/proxy/*` → API proxy (`backend/routes/proxy.js`, keeps Deepgram/Anthropic keys server-side)
