@@ -9,6 +9,7 @@ const proxyRoutes = require('./routes/proxy');
 const downloadRoutes = require('./routes/download');
 const logRoutes = require('./routes/log');
 const adminRoutes = require('./routes/admin');
+const meRoutes = require('./routes/me');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,6 +50,12 @@ app.get('/admin', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'admin.html'));
 });
 
+// Pretty URL for the user dashboard. Page-side role check routes
+// admins/owners to /admin automatically.
+app.get('/dashboard', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/billing', billingRoutes);
@@ -56,6 +63,7 @@ app.use('/proxy', proxyRoutes);
 app.use('/download', downloadRoutes);
 app.use('/log', logRoutes);
 app.use('/admin', adminRoutes);
+app.use('/me', meRoutes);
 
 // Global error handler
 app.use(function(err, req, res, next) {

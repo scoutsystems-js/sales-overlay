@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard — Scout Systems</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    /* Dashboard layout is a single scrollable column. Session cards expand
+       inline when clicked — no side panel, no cross-user browsing. Styles
+       are inline for the same reason as login.html / admin.html: page-
+       specific, self-contained. */
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,11,13,0.95);
+    }
+    .top-bar-left { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
+    .top-bar-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+    .top-bar-right .signout { cursor: pointer; }
+    .top-bar-right .signout:hover { color: var(--text); }
+
+    .page {
+      flex: 1;
+      max-width: 920px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    .welcome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 36px;
+    }
+    .welcome h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    .welcome .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+    .welcome .launch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--green);
+      color: #000;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 11px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .welcome .launch-btn:hover { background: var(--green-dark); }
+
+    /* Placeholder for future stats cards — slotted above the call list so
+       adding them later doesn't restructure the page. */
+    .stats-slot { margin-bottom: 28px; }
+
+    .section-heading {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Call list ──────────────────────────────────────────────────────── */
+    .calls-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .session-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color 0.12s;
+    }
+    .session-card:hover { border-color: rgba(255,255,255,0.14); }
+    .session-card.expanded { border-color: rgba(34,197,94,0.3); }
+
+    .session-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .session-head-left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .session-head-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .session-head-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .session-head-sub .err { color: #f87171; font-weight: 600; }
+    .expand-icon {
+      font-size: 14px;
+      color: var(--muted);
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+    .session-card.expanded .expand-icon { transform: rotate(180deg); color: var(--green); }
+
+    .session-body {
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+    .session-card.expanded .session-body { display: block; }
+
+    /* ── Filter bar + log list (inside expanded card) ───────────────────── */
+    .filter-bar {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: rgba(0,0,0,0.15);
+    }
+    .chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.12s;
+    }
+    .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .chip.active {
+      background: var(--green-dim);
+      color: var(--green);
+      border-color: rgba(34,197,94,0.3);
+    }
+    .filter-search {
+      flex: 1;
+      min-width: 140px;
+      max-width: 280px;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+    }
+    .filter-search:focus { border-color: var(--green); }
+    .count-indicator {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+      white-space: nowrap;
+    }
+    .count-indicator.capped { color: #fbbf24; }
+
+    .log-list {
+      max-height: 480px;
+      overflow-y: auto;
+      padding: 8px 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .log-row {
+      display: grid;
+      grid-template-columns: 96px 14px 110px 1fr;
+      gap: 10px;
+      padding: 3px 20px;
+      align-items: start;
+    }
+    .log-row:hover { background: rgba(255,255,255,0.02); }
+    .log-time { color: var(--muted); }
+    .log-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-top: 6px;
+      justify-self: center;
+    }
+    .log-dot.warn { background: #fbbf24; }
+    .log-dot.error { background: #f87171; }
+    .log-tag { color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-msg { color: var(--text); white-space: pre-wrap; word-break: break-word; }
+    .log-row.error .log-msg { color: #fca5a5; }
+
+    /* ── Empty + loading states ─────────────────────────────────────────── */
+    .empty-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px 24px;
+      text-align: center;
+    }
+    .empty-card h2 { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .empty-card p { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+    .load-spinner {
+      display: flex;
+      justify-content: center;
+      padding: 40px 0;
+    }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .msg-empty { padding: 16px 20px; font-size: 12px; color: var(--muted); text-align: center; font-family: inherit; }
+    .msg-error { padding: 16px 20px; font-size: 12px; color: #f87171; text-align: center; font-family: inherit; }
+
+    @media (max-width: 640px) {
+      .page { padding: 24px 16px 60px; }
+      .welcome h1 { font-size: 22px; }
+      .session-head { padding: 14px 14px; }
+      .log-row { grid-template-columns: 70px 12px 90px 1fr; padding: 3px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="top-bar">
+  <div class="top-bar-left">
+    <svg width="20" height="22" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <circle cx="10" cy="12" r="1.6" fill="#22c55e"/>
+      <circle cx="10" cy="16" r="1.2" fill="#22c55e"/>
+      <circle cx="10" cy="19.5" r="0.8" fill="#22c55e"/>
+    </svg>
+    <span>Scout</span>
+    <span style="color: var(--muted); font-weight: 500; font-size: 13px;">· Dashboard</span>
+  </div>
+  <div class="top-bar-right">
+    <span id="signedInEmail"></span>
+    <span class="signout" onclick="signOut()">Sign out</span>
+  </div>
+</nav>
+
+<main class="page">
+  <section class="welcome">
+    <div>
+      <h1 id="welcomeHeading">Welcome back</h1>
+      <div class="sub">Here's your call history.</div>
+    </div>
+    <button class="launch-btn" onclick="launchApp()">Open Scout App →</button>
+  </section>
+
+  <!-- Future stats cards (win rate, call count, avg duration, etc.) will
+       slot in here without restructuring the page. -->
+  <section class="stats-slot" id="statsSlot"></section>
+
+  <section>
+    <div class="section-heading" id="callsHeading">Your calls</div>
+    <div id="callsContainer">
+      <div class="load-spinner"><div class="spinner"></div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // ── Session handling (mirrors login.html / admin.html) ────────────────
+  var STORAGE_KEY = 'scout_session_v1';
+
+  function getSession() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
+  }
+  function setSession(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+  function clearSession() { localStorage.removeItem(STORAGE_KEY); }
+
+  function isSessionValid(s) {
+    if (!s || !s.access_token || !s.expires_at) return false;
+    var nowSec = Math.floor(Date.now() / 1000);
+    return s.expires_at > nowSec + 60;
+  }
+  function shouldRefresh(s) {
+    if (!s || !s.expires_at) return false;
+    var nowSec = Math.floor(Date.now() / 1000);
+    return s.expires_at - nowSec < 300;
+  }
+  async function refreshSessionIfNeeded() {
+    var s = getSession();
+    if (!s || !s.refresh_token) return null;
+    if (!shouldRefresh(s)) return s;
+    try {
+      var res = await fetch('/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: s.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); return null; }
+      var data = await res.json();
+      if (!data.session) { clearSession(); return null; }
+      var fresh = {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+        email: (data.user && data.user.email) || (s && s.email),
+      };
+      setSession(fresh);
+      return fresh;
+    } catch (err) {
+      clearSession();
+      return null;
+    }
+  }
+
+  function signOut() {
+    clearSession();
+    window.location.replace('/login');
+  }
+
+  function authHeader() {
+    var s = getSession();
+    return s && s.access_token ? { 'Authorization': 'Bearer ' + s.access_token } : {};
+  }
+
+  function launchApp() {
+    var s = getSession();
+    var token = s ? s.access_token : '';
+    window.location.href = 'scout://launch?token=' + encodeURIComponent(token);
+  }
+
+  // ── State ───────────────────────────────────────────────────────────────
+  var allSessions = [];
+  var expandedId = null;            // only one card expanded at a time
+  var cardState = {};               // { <session_id>: { logs, total_count, limit, filter, search } }
+
+  // ── Initial load ────────────────────────────────────────────────────────
+  async function init() {
+    var s = getSession();
+    if (!isSessionValid(s)) {
+      if (s && s.refresh_token) {
+        var refreshed = await refreshSessionIfNeeded();
+        if (!refreshed) { window.location.replace('/login'); return; }
+      } else {
+        window.location.replace('/login');
+        return;
+      }
+    }
+    var cur = getSession();
+    document.getElementById('signedInEmail').textContent = (cur && cur.email) || '';
+    document.getElementById('welcomeHeading').textContent = 'Welcome back' + (cur && cur.email ? ', ' + cur.email : '');
+
+    // Role gate: admins/owners belong on /admin. Call /auth/me and redirect
+    // before fetching sessions so we don't flash the user view at them.
+    var role = await fetchRole();
+    if (role === 'admin' || role === 'owner') {
+      window.location.replace('/admin');
+      return;
+    }
+    await loadSessions();
+  }
+
+  async function fetchRole() {
+    try {
+      var res = await fetch('/auth/me', { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return null; }
+      if (!res.ok) return 'user'; // fail-open as 'user' — safer than booting a real user out
+      var data = await res.json();
+      return (data && data.role) || 'user';
+    } catch (err) {
+      return 'user';
+    }
+  }
+
+  async function loadSessions() {
+    var container = document.getElementById('callsContainer');
+    var res;
+    try {
+      res = await fetch('/me/sessions', { headers: authHeader() });
+    } catch (err) {
+      container.innerHTML = '<div class="msg-error">Could not reach server.</div>';
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var err;
+      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      container.innerHTML = '<div class="msg-error">' + escapeHtml(err.error || 'Failed to load sessions') + '</div>';
+      return;
+    }
+    var data = await res.json();
+    allSessions = (data && data.sessions) || [];
+    renderCalls();
+  }
+
+  function renderCalls() {
+    var container = document.getElementById('callsContainer');
+    var heading = document.getElementById('callsHeading');
+
+    if (allSessions.length === 0) {
+      heading.textContent = 'Your calls';
+      container.innerHTML =
+        '<div class="empty-card">'
+          + '<h2>No calls recorded yet</h2>'
+          + '<p>Open Scout to start your first session. Your call history will appear here.</p>'
+          + '<button class="launch-btn" onclick="launchApp()">Open Scout App →</button>'
+        + '</div>';
+      return;
+    }
+
+    heading.textContent = 'Your calls (' + allSessions.length + ')';
+
+    var parts = ['<div class="calls-list">'];
+    for (var i = 0; i < allSessions.length; i++) {
+      var s = allSessions[i];
+      var expanded = s.session_id === expandedId ? ' expanded' : '';
+      var outcome = outcomeBadge(s.outcome, !!s.ended_at);
+      var dur = s.ended_at ? formatDuration(s.duration_seconds) : 'live';
+      var rel = relativeTime(s.started_at);
+      var errPart = s.error_count > 0
+        ? ' · <span class="err">' + s.error_count + ' errors</span>'
+        : '';
+      parts.push(
+        '<div class="session-card' + expanded + '" data-id="' + escapeHtml(s.session_id) + '">'
+          + '<div class="session-head" onclick="toggleCard(\'' + s.session_id + '\')">'
+            + '<div class="session-head-left">'
+              + '<div class="session-head-top">' + rel + ' · ' + dur + ' ' + outcome + '</div>'
+              + '<div class="session-head-sub">' + s.log_count + ' logs' + errPart + ' · ' + escapeHtml(s.client_version || '—') + '</div>'
+            + '</div>'
+            + '<span class="expand-icon">▾</span>'
+          + '</div>'
+          + '<div class="session-body" id="body-' + escapeHtml(s.session_id) + '"></div>'
+        + '</div>'
+      );
+    }
+    parts.push('</div>');
+    container.innerHTML = parts.join('');
+
+    // If a card was expanded before re-render, restore its body content.
+    if (expandedId && cardState[expandedId]) {
+      renderCardBody(expandedId);
+    }
+  }
+
+  function outcomeBadge(outcome, ended) {
+    if (outcome === 'win') return '<span class="badge badge-win">Win</span>';
+    if (outcome === 'loss') return '<span class="badge badge-loss">Loss</span>';
+    if (outcome === 'follow_up') return '<span class="badge badge-pending">Follow-up</span>';
+    if (!ended) return '<span class="badge badge-pending">Live</span>';
+    return '<span class="badge badge-pending">—</span>';
+  }
+
+  // ── Card expansion ──────────────────────────────────────────────────────
+  async function toggleCard(sessionId) {
+    if (expandedId === sessionId) {
+      // Collapse.
+      expandedId = null;
+      var card = document.querySelector('.session-card[data-id="' + cssEsc(sessionId) + '"]');
+      if (card) card.classList.remove('expanded');
+      return;
+    }
+    // Collapse previous.
+    if (expandedId) {
+      var prev = document.querySelector('.session-card[data-id="' + cssEsc(expandedId) + '"]');
+      if (prev) prev.classList.remove('expanded');
+    }
+    expandedId = sessionId;
+    var card = document.querySelector('.session-card[data-id="' + cssEsc(sessionId) + '"]');
+    if (card) card.classList.add('expanded');
+
+    if (!cardState[sessionId]) {
+      cardState[sessionId] = { logs: null, total_count: 0, limit: 2000, filter: 'all', search: '' };
+      await loadCardLogs(sessionId);
+    } else {
+      renderCardBody(sessionId);
+    }
+  }
+
+  async function loadCardLogs(sessionId) {
+    var body = document.getElementById('body-' + sessionId);
+    if (body) body.innerHTML = '<div class="load-spinner"><div class="spinner"></div></div>';
+
+    var res;
+    try {
+      res = await fetch('/me/sessions/' + encodeURIComponent(sessionId) + '/logs', { headers: authHeader() });
+    } catch (err) {
+      if (body) body.innerHTML = '<div class="msg-error">Could not reach server.</div>';
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var err;
+      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      if (body) body.innerHTML = '<div class="msg-error">' + escapeHtml(err.error || 'Failed to load logs') + '</div>';
+      return;
+    }
+    var data = await res.json();
+    var st = cardState[sessionId];
+    st.logs = (data && data.logs) || [];
+    st.total_count = (data && typeof data.total_count === 'number') ? data.total_count : st.logs.length;
+    st.limit = (data && data.limit) || 2000;
+    renderCardBody(sessionId);
+  }
+
+  function renderCardBody(sessionId) {
+    var body = document.getElementById('body-' + sessionId);
+    if (!body) return;
+    var st = cardState[sessionId];
+    if (!st || !st.logs) return;
+
+    body.innerHTML =
+      '<div class="filter-bar">'
+        + chipHtml(sessionId, 'all', 'All', st.filter)
+        + chipHtml(sessionId, 'claude', '[claude]', st.filter)
+        + chipHtml(sessionId, 'memory', '[memory]', st.filter)
+        + chipHtml(sessionId, 'TIMING', '[TIMING]', st.filter)
+        + chipHtml(sessionId, 'errors', 'Errors only', st.filter)
+        + '<input class="filter-search" type="text" placeholder="Search messages…" oninput="onSearch(\'' + sessionId + '\', this.value)" value="' + escapeHtml(st.search) + '"/>'
+        + '<span class="count-indicator" id="count-' + sessionId + '"></span>'
+      + '</div>'
+      + '<div class="log-list" id="list-' + sessionId + '"></div>';
+    renderCardLogList(sessionId);
+  }
+
+  function chipHtml(sessionId, id, label, activeFilter) {
+    var active = id === activeFilter ? ' active' : '';
+    return '<button class="chip' + active + '" data-chip="' + id + '" onclick="onChip(\'' + sessionId + '\', \'' + id + '\')">' + escapeHtml(label) + '</button>';
+  }
+
+  function onChip(sessionId, chipId) {
+    var st = cardState[sessionId];
+    if (!st) return;
+    st.filter = chipId;
+    var body = document.getElementById('body-' + sessionId);
+    if (body) {
+      body.querySelectorAll('.filter-bar .chip').forEach(function(c) {
+        if (c.getAttribute('data-chip') === chipId) c.classList.add('active');
+        else c.classList.remove('active');
+      });
+    }
+    renderCardLogList(sessionId);
+  }
+
+  function onSearch(sessionId, v) {
+    var st = cardState[sessionId];
+    if (!st) return;
+    st.search = v;
+    renderCardLogList(sessionId);
+  }
+
+  function renderCardLogList(sessionId) {
+    var list = document.getElementById('list-' + sessionId);
+    var indicator = document.getElementById('count-' + sessionId);
+    var st = cardState[sessionId];
+    if (!list || !st || !st.logs) return;
+
+    var filtered = st.logs.filter(function(r) {
+      if (st.filter === 'errors' && r.level !== 'error') return false;
+      if (st.filter !== 'all' && st.filter !== 'errors') {
+        var hay = ((r.tag || '') + ' ' + (r.message || '')).toLowerCase();
+        if (hay.indexOf(st.filter.toLowerCase()) === -1) return false;
+      }
+      if (st.search) {
+        var msg = (r.message || '').toLowerCase();
+        if (msg.indexOf(st.search.toLowerCase()) === -1) return false;
+      }
+      return true;
+    });
+
+    var capped = st.total_count > st.limit;
+    var shown = filtered.length;
+    var text;
+    if (capped) {
+      text = 'Showing ' + shown + ' of ' + st.total_count + ' (capped at ' + st.limit + ')';
+    } else if (shown !== st.logs.length) {
+      text = 'Showing ' + shown + ' of ' + st.logs.length;
+    } else {
+      text = shown + ' log' + (shown === 1 ? '' : 's');
+    }
+    if (indicator) {
+      indicator.textContent = text;
+      if (capped) indicator.classList.add('capped'); else indicator.classList.remove('capped');
+    }
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="msg-empty">No logs match the current filter.</div>';
+      return;
+    }
+
+    var parts = [];
+    for (var i = 0; i < filtered.length; i++) {
+      var r = filtered[i];
+      var dotClass = r.level === 'error' ? 'error' : (r.level === 'warn' ? 'warn' : '');
+      var rowClass = r.level === 'error' ? 'log-row error' : 'log-row';
+      parts.push(
+        '<div class="' + rowClass + '">'
+          + '<span class="log-time">' + escapeHtml(formatLogTime(r.logged_at)) + '</span>'
+          + '<span class="log-dot ' + dotClass + '"></span>'
+          + '<span class="log-tag">' + escapeHtml(r.tag || '') + '</span>'
+          + '<span class="log-msg">' + escapeHtml(r.message || '') + '</span>'
+        + '</div>'
+      );
+    }
+    list.innerHTML = parts.join('');
+  }
+
+  // ── Formatters ──────────────────────────────────────────────────────────
+  function formatLogTime(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso || '';
+    var h = String(d.getHours()).padStart(2, '0');
+    var m = String(d.getMinutes()).padStart(2, '0');
+    var s = String(d.getSeconds()).padStart(2, '0');
+    var ms = String(d.getMilliseconds()).padStart(3, '0');
+    return h + ':' + m + ':' + s + '.' + ms;
+  }
+  function formatDuration(secs) {
+    if (secs == null) return '—';
+    if (secs < 60) return secs + 's';
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    if (m < 60) return m + 'm ' + s + 's';
+    var h = Math.floor(m / 60);
+    m = m % 60;
+    return h + 'h ' + m + 'm';
+  }
+  function relativeTime(iso) {
+    var t = new Date(iso).getTime();
+    if (isNaN(t)) return iso || '';
+    var diff = Math.max(0, (Date.now() - t) / 1000);
+    if (diff < 60) return Math.floor(diff) + 's ago';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  // CSS selector escape for session_id (UUIDs are safe but belt-and-suspenders
+  // in case session_id format ever changes).
+  function cssEsc(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+  }
+
+  init();
+</script>
+
+</body>
+</html>
