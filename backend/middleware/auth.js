@@ -80,4 +80,60 @@ async function requireSubscription(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, requireSubscription };
+// v1.1.0: role check — gate routes on user_profiles.role. Compose after
+// requireAuth so req.user is populated. Usage:
+//   router.get('/admin/users', requireAuth, requireRole(['owner','admin']), handler)
+//   router.get('/only-owner',  requireAuth, requireRole('owner'),           handler)
+//
+// A user with no user_profiles row (signed up, never opened onboarding)
+// defaults to 'user' in memory — matches the column default for consistency.
+//
+// Caches the resolved role on req.user.role for the lifetime of the
+// request, so repeated requireRole calls or downstream handlers don't
+// re-query. Never cached across requests.
+function requireRole(allowedRoles) {
+  var roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+
+  return async function(req, res, next) {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Unauthenticated — requireRole must run after requireAuth' });
+    }
+
+    // Within-request cache: skip the DB call if an earlier middleware already stamped it.
+    if (req.user.role) {
+      if (roles.indexOf(req.user.role) !== -1) return next();
+      return res.status(403).json({ error: 'Forbidden', required: roles, actual: req.user.role });
+    }
+
+    try {
+      var supabase = getSupabase();
+      var { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[requireRole] DB error:', error.message);
+        return res.status(500).json({ error: 'Role check failed' });
+      }
+
+      var role = (data && data.role) || 'user';
+      req.user.role = role;
+
+      if (roles.indexOf(role) === -1) {
+        return res.status(403).json({ error: 'Forbidden', required: roles, actual: role });
+      }
+      next();
+    } catch (err) {
+      if (err.message && err.message.indexOf('not configured') !== -1) {
+        console.error('[requireRole] Config error:', err.message);
+        return res.status(503).json({ error: err.message });
+      }
+      console.error('[requireRole] Error:', err.message);
+      return res.status(500).json({ error: 'Role check failed' });
+    }
+  };
+}
+
+module.exports = { requireAuth, requireSubscription, requireRole };
