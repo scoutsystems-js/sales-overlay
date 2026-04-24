@@ -102,6 +102,8 @@ router.get('/sessions', protect, async function(req, res) {
     // Reject out-of-scope filter requests (admin trying to view a user they
     // don't manage). Null allowedUserIds means owner — skip the check.
     if (filterUserId && allowedUserIds && allowedUserIds.indexOf(filterUserId) === -1) {
+      console.warn('[admin] Out-of-scope filter blocked: actor=%s (%s) attempted_user=%s',
+        req.user.email, req.user.id, filterUserId);
       return res.status(403).json({ error: 'Cannot filter to that user' });
     }
 
@@ -202,6 +204,8 @@ router.get('/sessions/:session_id/logs', protect, async function(req, res) {
     if (req.user.role !== 'owner') {
       var allowedUserIds = await getAllowedUserIds(admin, req.user);
       if (allowedUserIds && allowedUserIds.indexOf(session.user_id) === -1) {
+        console.warn('[admin] Scope violation: actor=%s (%s) attempted_session=%s owner=%s',
+          req.user.email, req.user.id, sessionId, session.user_id);
         return res.status(404).json({ error: 'Session not found' });
       }
     }
@@ -330,6 +334,7 @@ router.patch('/users/:user_id/role', requireAuth, requireRole('owner'), async fu
     return res.status(400).json({ error: 'role must be one of: ' + ALLOWED_ROLES.join(', ') });
   }
   if (targetId === req.user.id) {
+    console.warn('[admin] Self-role-change blocked: actor=%s (%s)', req.user.email, req.user.id);
     return res.status(403).json({ error: 'Cannot change your own role' });
   }
 
@@ -363,6 +368,8 @@ router.patch('/users/:user_id/role', requireAuth, requireRole('owner'), async fu
         return res.status(500).json({ error: 'Could not validate owner count' });
       }
       if ((countResult.count || 0) <= 1) {
+        console.warn('[admin] Last-owner demote blocked: actor=%s (%s) target=%s',
+          req.user.email, req.user.id, targetId);
         return res.status(403).json({ error: 'Cannot demote the last owner' });
       }
     }
@@ -377,6 +384,11 @@ router.patch('/users/:user_id/role', requireAuth, requireRole('owner'), async fu
       console.error('[admin] role update failed:', detail);
       return res.status(500).json({ error: 'Could not update role: ' + detail });
     }
+
+    // Audit trail: successful role change. Expected event, not an error —
+    // logged at info level so it surfaces in Railway logs and session_logs.
+    console.log('[admin] Role changed: actor=%s (%s) target=%s role: %s->%s',
+      req.user.email, req.user.id, targetId, currentRole, upsertResult.data.role);
 
     res.json({ user_id: upsertResult.data.user_id, role: upsertResult.data.role });
   } catch (err) {

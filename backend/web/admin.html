@@ -509,9 +509,15 @@
     try {
       var res = await fetch('/auth/me', { headers: authHeader() });
       if (res.status === 401) return null;
-      if (!res.ok) return null;
+      if (!res.ok) {
+        console.error('[admin] /auth/me returned', res.status);
+        return null;
+      }
       return await res.json();
-    } catch (err) { return null; }
+    } catch (err) {
+      console.error('[admin] /auth/me network error:', err.message);
+      return null;
+    }
   }
 
   // ── SECTION A: users ───────────────────────────────────────────────────

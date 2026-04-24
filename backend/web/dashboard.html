@@ -394,10 +394,17 @@
     try {
       var res = await fetch('/auth/me', { headers: authHeader() });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return null; }
-      if (!res.ok) return 'user'; // fail-open as 'user' — safer than booting a real user out
+      if (!res.ok) {
+        // Fail-open to 'user' — safer than booting a real user out on a
+        // transient 500. Admins land on dashboard briefly; they can hit
+        // /admin manually. Log so the failure is visible in devtools.
+        console.warn('[dashboard] /auth/me returned', res.status, '- defaulting to user');
+        return 'user';
+      }
       var data = await res.json();
       return (data && data.role) || 'user';
     } catch (err) {
+      console.warn('[dashboard] /auth/me network error, defaulting to user:', err.message);
       return 'user';
     }
   }

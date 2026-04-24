@@ -135,7 +135,12 @@ router.get('/sessions/:session_id/logs', requireAuth, async function(req, res) {
       console.error('[me] session fetch failed:', sessionResult.error.message);
       return res.status(500).json({ error: 'Could not load session' });
     }
-    if (!sessionResult.data || sessionResult.data.user_id !== req.user.id) {
+    if (!sessionResult.data) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    if (sessionResult.data.user_id !== req.user.id) {
+      console.warn('[me] Scope violation: actor=%s attempted_session=%s owner=%s',
+        req.user.id, sessionId, sessionResult.data.user_id);
       return res.status(404).json({ error: 'Session not found' });
     }
     var session = sessionResult.data;
