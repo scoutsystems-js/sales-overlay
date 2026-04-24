@@ -30,7 +30,25 @@ var DEFAULT_LIMIT = 50;
 var MAX_LIMIT = 100;
 var LOG_HARD_CAP = 2000;
 
-var protect = [requireAuth, requireRole('owner')];
+// /admin/sessions and /admin/sessions/:id/logs expanded from owner-only to
+// admin+owner so the redesigned /admin page works for both roles. Scope
+// filtering inside each route keeps admins bounded to self + managed users.
+var protect = [requireAuth, requireRole(['admin', 'owner'])];
+
+// Returns null for owners ("all users visible") or an array of allowed
+// user_ids for admins (self + users where managed_by = self). Callers pass
+// the result into a query via .in('user_id', ids) when non-null.
+async function getAllowedUserIds(admin, user) {
+  if (user.role === 'owner') return null;
+  var managedResult = await admin
+    .from('user_profiles')
+    .select('user_id')
+    .eq('managed_by', user.id);
+  if (managedResult.error) throw new Error('managed lookup failed: ' + managedResult.error.message);
+  var ids = [user.id];
+  (managedResult.data || []).forEach(function(p) { if (p && p.user_id) ids.push(p.user_id); });
+  return ids;
+}
 
 // Build a { user_id: email } map from listUsers once per list request.
 // perPage=1000 is Supabase's max — covers our current scale without pagination.
@@ -75,9 +93,17 @@ router.get('/sessions', protect, async function(req, res) {
   if (!limit || limit < 1) limit = DEFAULT_LIMIT;
   if (limit > MAX_LIMIT) limit = MAX_LIMIT;
   var before = req.query.before;
+  var filterUserId = req.query.user_id || null;
 
   try {
     var admin = getAdminClient();
+    var allowedUserIds = await getAllowedUserIds(admin, req.user);
+
+    // Reject out-of-scope filter requests (admin trying to view a user they
+    // don't manage). Null allowedUserIds means owner — skip the check.
+    if (filterUserId && allowedUserIds && allowedUserIds.indexOf(filterUserId) === -1) {
+      return res.status(403).json({ error: 'Cannot filter to that user' });
+    }
 
     var q = admin
       .from('call_sessions')
@@ -85,6 +111,11 @@ router.get('/sessions', protect, async function(req, res) {
       .order('started_at', { ascending: false })
       .limit(limit);
     if (before) q = q.lt('started_at', before);
+    if (filterUserId) {
+      q = q.eq('user_id', filterUserId);
+    } else if (allowedUserIds) {
+      q = q.in('user_id', allowedUserIds);
+    }
 
     var sessionsResult = await q;
     if (sessionsResult.error) {
@@ -164,6 +195,16 @@ router.get('/sessions/:session_id/logs', protect, async function(req, res) {
       return res.status(404).json({ error: 'Session not found' });
     }
     var session = sessionResult.data;
+
+    // Admin-scope check: owners see any session; admins only sessions from
+    // users in their scope. 404 (not 403) on mismatch to avoid leaking
+    // session-id existence.
+    if (req.user.role !== 'owner') {
+      var allowedUserIds = await getAllowedUserIds(admin, req.user);
+      if (allowedUserIds && allowedUserIds.indexOf(session.user_id) === -1) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+    }
 
     // count: 'exact' returns total_count independent of limit — that's how
     // the client knows whether it hit the 2000 cap.

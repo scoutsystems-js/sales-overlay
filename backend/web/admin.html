@@ -6,9 +6,12 @@
   <title>Admin — Scout Systems</title>
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
-    /* Admin page is a two-panel layout: session list (left) + log detail
-       (right). Styles are inline here instead of in style.css so the admin
-       surface stays self-contained — nothing else on the site needs these. */
+    /* Three-section admin layout:
+         A — user management (top, full width)
+         B — session list    (bottom left)
+         C — log detail      (bottom right)
+       Below 900px the B/C split stacks. Styles live inline here (matches
+       the login.html / dashboard.html pattern). */
 
     body {
       min-height: 100vh;
@@ -30,13 +33,160 @@
     .admin-top-right .signout { cursor: pointer; }
     .admin-top-right .signout:hover { color: var(--text); }
 
-    .admin-layout {
-      display: flex;
+    .admin-page {
       flex: 1;
+      display: flex;
+      flex-direction: column;
       min-height: 0;
     }
 
-    /* ── LEFT: session list ──────────────────────────────────────────────── */
+    /* ── SECTION A: users ────────────────────────────────────────────────── */
+    .users-section {
+      padding: 20px 24px 12px;
+      flex-shrink: 0;
+    }
+    .users-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .users-header h2 {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+    .btn-add-user {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 7px;
+      border: 1px dashed var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: not-allowed;
+      opacity: 0.55;
+      font-family: inherit;
+    }
+    .btn-add-user:hover { opacity: 0.7; }
+
+    .users-table-wrap {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: auto;
+      max-height: 320px;
+    }
+    .users-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .users-table th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.15);
+      position: sticky;
+      top: 0;
+    }
+    .users-table td {
+      padding: 11px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+    .users-table tr:last-child td { border-bottom: none; }
+    .users-table tr.clickable { cursor: pointer; }
+    .users-table tr.clickable:hover td { background: rgba(255,255,255,0.02); }
+    .users-table tr.active td {
+      background: rgba(34,197,94,0.06);
+      box-shadow: inset 2px 0 0 var(--green);
+    }
+
+    .role-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 6px;
+      text-transform: lowercase;
+      letter-spacing: 0.3px;
+    }
+    .role-badge.owner { background: rgba(34,197,94,0.15); color: var(--green); }
+    .role-badge.admin { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .role-badge.user  { background: rgba(255,255,255,0.06); color: var(--muted); }
+    .role-badge .self-tag {
+      font-size: 10px;
+      color: var(--muted);
+      margin-left: 6px;
+      font-weight: 500;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .role-select {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .role-select:focus { outline: none; border-color: var(--green); }
+
+    .role-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .role-save {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: var(--green);
+      color: #000;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .role-save:hover:not(:disabled) { background: var(--green-dark); }
+    .role-save:disabled { opacity: 0.35; cursor: not-allowed; background: var(--bg3); color: var(--muted); }
+    .role-warning {
+      font-size: 11px;
+      color: #fbbf24;
+      width: 100%;
+      margin-top: 2px;
+      display: block;
+    }
+    .role-warning.hidden { display: none; }
+    .role-saved {
+      font-size: 11px;
+      color: var(--green);
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .role-saved.show { opacity: 1; }
+
+    /* ── SECTIONS B + C ──────────────────────────────────────────────────── */
+    .sessions-split {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      margin: 0 24px 24px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
     .sessions-pane {
       width: 420px;
       flex-shrink: 0;
@@ -46,36 +196,49 @@
       background: var(--bg2);
     }
     .sessions-pane-header {
-      padding: 14px 20px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--border);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }
-    .sessions-list {
-      flex: 1;
-      overflow-y: auto;
+    .sessions-pane-header #sessionsScope {
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text);
+      font-weight: 600;
     }
+    .reset-filter {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 8px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .reset-filter:hover { color: var(--text); }
+    .reset-filter.hidden { display: none; }
+
+    .sessions-list { flex: 1; overflow-y: auto; }
     .session-card {
-      padding: 14px 20px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--border);
       cursor: pointer;
       border-left: 2px solid transparent;
       transition: background 0.1s, border-color 0.1s;
     }
     .session-card:hover { background: rgba(255,255,255,0.02); }
-    .session-card.active {
-      background: rgba(34,197,94,0.06);
-      border-left-color: var(--green);
-    }
-    .session-card-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-    }
+    .session-card.active { background: rgba(34,197,94,0.06); border-left-color: var(--green); }
+    .session-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
     .session-card-email {
       font-size: 13px;
       font-weight: 600;
@@ -85,21 +248,11 @@
       white-space: nowrap;
       max-width: 260px;
     }
-    .session-card-meta {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 3px;
-    }
-    .session-card-tail {
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .session-card-tail .err {
-      color: #f87171;
-      font-weight: 600;
-    }
+    .session-card-meta { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+    .session-card-tail { font-size: 11px; color: var(--muted); }
+    .session-card-tail .err { color: #f87171; font-weight: 600; }
     .load-more {
-      padding: 14px 20px;
+      padding: 12px 18px;
       text-align: center;
       font-size: 13px;
       color: var(--muted);
@@ -111,15 +264,9 @@
     .load-more.hidden { display: none; }
     .empty-msg { padding: 24px 20px; font-size: 13px; color: var(--muted); text-align: center; }
 
-    /* ── RIGHT: log detail ──────────────────────────────────────────────── */
-    .detail-pane {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
+    .detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
     .detail-header {
-      padding: 16px 24px;
+      padding: 14px 20px;
       border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
@@ -127,24 +274,11 @@
       gap: 20px;
       flex-wrap: wrap;
     }
-    .detail-header-left h2 {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 4px;
-    }
-    .detail-header-left .sub {
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .detail-header-right {
-      font-size: 12px;
-      color: var(--muted);
-      text-align: right;
-    }
+    .detail-header-left h3 { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .detail-header-left .sub { font-size: 12px; color: var(--muted); }
 
     .filter-bar {
-      padding: 10px 24px;
+      padding: 10px 20px;
       border-bottom: 1px solid var(--border);
       display: flex;
       gap: 8px;
@@ -165,11 +299,7 @@
       transition: all 0.12s;
     }
     .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-    .chip.active {
-      background: var(--green-dim);
-      color: var(--green);
-      border-color: rgba(34,197,94,0.3);
-    }
+    .chip.active { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,0.3); }
     .filter-search {
       flex: 1;
       min-width: 160px;
@@ -184,15 +314,9 @@
       outline: none;
     }
     .filter-search:focus { border-color: var(--green); }
-    .count-indicator {
-      font-size: 11px;
-      color: var(--muted);
-      margin-left: auto;
-      white-space: nowrap;
-    }
+    .count-indicator { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
     .count-indicator.capped { color: #fbbf24; }
 
-    /* ── Log rows ───────────────────────────────────────────────────────── */
     .log-list {
       flex: 1;
       overflow-y: auto;
@@ -205,33 +329,19 @@
       display: grid;
       grid-template-columns: 96px 14px 110px 1fr;
       gap: 10px;
-      padding: 3px 24px;
+      padding: 3px 20px;
       align-items: start;
     }
     .log-row:hover { background: rgba(255,255,255,0.02); }
     .log-time { color: var(--muted); }
-    .log-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--muted);
-      margin-top: 6px;
-      justify-self: center;
-    }
+    .log-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-top: 6px; justify-self: center; }
     .log-dot.warn { background: #fbbf24; }
     .log-dot.error { background: #f87171; }
     .log-tag { color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .log-msg { color: var(--text); white-space: pre-wrap; word-break: break-word; }
     .log-row.error .log-msg { color: #fca5a5; }
 
-    .detail-placeholder {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      font-size: 14px;
-    }
+    .detail-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
 
     .spinner {
       width: 18px; height: 18px;
@@ -245,8 +355,10 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 900px) {
-      .admin-layout { flex-direction: column; }
+      .sessions-split { flex-direction: column; margin: 0 16px 16px; }
       .sessions-pane { width: 100%; max-height: 50vh; border-right: none; border-bottom: 1px solid var(--border); }
+      .users-section { padding: 16px 16px 10px; }
+      .users-table { white-space: nowrap; }
     }
   </style>
 </head>
@@ -263,7 +375,7 @@
       <circle cx="10" cy="19.5" r="0.8" fill="#22c55e"/>
     </svg>
     <span>Scout Admin</span>
-    <span style="color: var(--muted); font-weight: 500; font-size: 13px;">· Session logs</span>
+    <span style="color: var(--muted); font-weight: 500; font-size: 13px;">· <span id="roleLabel">Dashboard</span></span>
   </div>
   <div class="admin-top-right">
     <span id="signedInEmail"></span>
@@ -271,22 +383,40 @@
   </div>
 </nav>
 
-<div class="admin-layout">
-  <aside class="sessions-pane">
-    <div class="sessions-pane-header">Sessions (all users)</div>
-    <div class="sessions-list" id="sessionsList">
+<div class="admin-page">
+
+  <!-- SECTION A: Users -->
+  <section class="users-section">
+    <div class="users-header">
+      <h2>User Management</h2>
+      <button class="btn-add-user" disabled title="Coming soon — invite and assign users in v1.1.1">+ Add User</button>
+    </div>
+    <div class="users-table-wrap" id="usersTableWrap">
       <div class="empty-msg"><span class="spinner"></span></div>
     </div>
-    <div class="load-more hidden" id="loadMore" onclick="loadOlder()">Load older</div>
-  </aside>
+  </section>
 
-  <main class="detail-pane" id="detailPane">
-    <div class="detail-placeholder" id="detailPlaceholder">Select a session on the left.</div>
-  </main>
+  <!-- SECTIONS B + C -->
+  <div class="sessions-split">
+    <aside class="sessions-pane">
+      <div class="sessions-pane-header">
+        <div>Sessions · <span id="sessionsScope">all users</span></div>
+        <button id="clearFilterBtn" class="reset-filter hidden" onclick="clearUserFilter()">Show all</button>
+      </div>
+      <div class="sessions-list" id="sessionsList">
+        <div class="empty-msg"><span class="spinner"></span></div>
+      </div>
+      <div class="load-more hidden" id="loadMore" onclick="loadOlder()">Load older</div>
+    </aside>
+    <main class="detail-pane" id="detailPane">
+      <div class="detail-placeholder" id="detailPlaceholder">Select a session on the left.</div>
+    </main>
+  </div>
+
 </div>
 
 <script>
-  // ── Session handling (mirrors login.html) ──────────────────────────────
+  // ── Session handling (mirrors login.html / dashboard.html) ────────────
   var STORAGE_KEY = 'scout_session_v1';
 
   function getSession() {
@@ -305,7 +435,6 @@
     var nowSec = Math.floor(Date.now() / 1000);
     return s.expires_at - nowSec < 300;
   }
-
   async function refreshSessionIfNeeded() {
     var s = getSession();
     if (!s || !s.refresh_token) return null;
@@ -327,16 +456,10 @@
       };
       setSession(fresh);
       return fresh;
-    } catch (err) {
-      clearSession();
-      return null;
-    }
+    } catch (err) { clearSession(); return null; }
   }
 
-  function signOut() {
-    clearSession();
-    window.location.replace('/login');
-  }
+  function signOut() { clearSession(); window.location.replace('/login'); }
 
   function authHeader() {
     var s = getSession();
@@ -344,17 +467,21 @@
   }
 
   // ── State ───────────────────────────────────────────────────────────────
-  var allSessions = [];          // accumulated as user paginates
-  var oldestStartedAt = null;    // cursor for next "load older" page
+  var currentUser = null;          // { user_id, email, role } from /auth/me
+  var usersArray = [];             // Section A
+  var ownerCount = 0;              // derived from usersArray
+  var allSessions = [];            // Section B
+  var oldestStartedAt = null;
   var pageSize = 50;
   var selectedSessionId = null;
-  var currentLogs = [];          // logs for the currently selected session
+  var selectedUserId = null;       // Section B filter (click user row to set)
+  var currentLogs = [];            // Section C
   var currentTotal = 0;
   var currentLimit = 2000;
-  var activeChip = 'all';        // 'all' | 'claude' | 'memory' | 'TIMING' | 'errors'
+  var activeChip = 'all';
   var searchText = '';
 
-  // ── Initial load ────────────────────────────────────────────────────────
+  // ── Init ───────────────────────────────────────────────────────────────
   async function init() {
     var s = getSession();
     if (!isSessionValid(s)) {
@@ -368,12 +495,247 @@
     }
     var cur = getSession();
     document.getElementById('signedInEmail').textContent = (cur && cur.email) || '';
-    await loadSessions(true);
+
+    // Role gate: non-admin users belong on /dashboard.
+    currentUser = await fetchMe();
+    if (!currentUser) { clearSession(); window.location.replace('/login'); return; }
+    if (currentUser.role === 'user') { window.location.replace('/dashboard'); return; }
+    document.getElementById('roleLabel').textContent = currentUser.role === 'owner' ? 'Owner' : 'Admin';
+
+    await Promise.all([loadUsers(), loadSessions(true)]);
+  }
+
+  async function fetchMe() {
+    try {
+      var res = await fetch('/auth/me', { headers: authHeader() });
+      if (res.status === 401) return null;
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (err) { return null; }
+  }
+
+  // ── SECTION A: users ───────────────────────────────────────────────────
+  async function loadUsers() {
+    var wrap = document.getElementById('usersTableWrap');
+    var res;
+    try {
+      res = await fetch('/admin/users', { headers: authHeader() });
+    } catch (err) {
+      wrap.innerHTML = '<div class="empty-msg" style="color:#f87171;">Could not reach server.</div>';
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (res.status === 403) { window.location.replace('/dashboard'); return; }
+    if (!res.ok) {
+      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      wrap.innerHTML = '<div class="empty-msg" style="color:#f87171;">' + escapeHtml(err.error || 'Failed to load users') + '</div>';
+      return;
+    }
+    var data = await res.json();
+    usersArray = (data && data.users) || [];
+    ownerCount = usersArray.filter(function(u) { return u.role === 'owner'; }).length;
+    renderUsersTable();
+  }
+
+  function renderUsersTable() {
+    var wrap = document.getElementById('usersTableWrap');
+    if (usersArray.length === 0) {
+      wrap.innerHTML = '<div class="empty-msg">No users to display.</div>';
+      return;
+    }
+
+    var isOwnerViewer = currentUser.role === 'owner';
+    var showActions = isOwnerViewer; // admins get read-only
+
+    var header = '<tr><th>Email</th><th>Role</th><th>Sessions</th><th>Last active</th>'
+      + (showActions ? '<th>Actions</th>' : '') + '</tr>';
+
+    var rows = [];
+    for (var i = 0; i < usersArray.length; i++) {
+      var u = usersArray[i];
+      var isSelf = u.user_id === currentUser.user_id;
+      var isSelected = u.user_id === selectedUserId;
+      var trClass = 'clickable' + (isSelected ? ' active' : '');
+
+      // Role cell: dropdown for owners editing OTHER users, static badge otherwise.
+      var roleCell;
+      if (isOwnerViewer && !isSelf) {
+        roleCell = renderRoleControl(u);
+      } else {
+        roleCell = '<span class="role-badge ' + u.role + '">' + u.role
+          + (isSelf ? '<span class="self-tag">(you)</span>' : '')
+          + '</span>';
+      }
+
+      // Actions cell (only shown when viewer is owner).
+      var actionsCell = '';
+      if (showActions) {
+        if (isSelf) {
+          actionsCell = '<td style="color:var(--muted);font-size:12px;">—</td>';
+        } else {
+          actionsCell = '<td>'
+            + '<div class="role-actions">'
+              + '<button class="role-save" data-user-id="' + escapeHtml(u.user_id) + '" disabled onclick="event.stopPropagation(); handleSaveRole(\'' + u.user_id + '\')">Save</button>'
+              + '<span class="role-saved" id="saved-' + escapeHtml(u.user_id) + '">Saved</span>'
+              + '<span class="role-warning hidden" id="warn-' + escapeHtml(u.user_id) + '"></span>'
+            + '</div>'
+          + '</td>';
+        }
+      }
+
+      var lastActive = u.last_session_at ? relativeTime(u.last_session_at) : '—';
+      var emailDisplay = u.email || (u.user_id.slice(0, 8) + '…');
+
+      rows.push(
+        '<tr class="' + trClass + '" data-user-id="' + escapeHtml(u.user_id) + '" onclick="handleUserRowClick(event, \'' + u.user_id + '\')">'
+          + '<td>' + escapeHtml(emailDisplay) + '</td>'
+          + '<td>' + roleCell + '</td>'
+          + '<td>' + u.session_count + '</td>'
+          + '<td>' + lastActive + '</td>'
+          + actionsCell
+        + '</tr>'
+      );
+    }
+
+    wrap.innerHTML = '<table class="users-table"><thead>' + header + '</thead><tbody>' + rows.join('') + '</tbody></table>';
+  }
+
+  function renderRoleControl(user) {
+    // stopPropagation on interactions so they don't also trigger the row's user-filter click.
+    return '<select class="role-select" data-user-id="' + escapeHtml(user.user_id) + '" data-original-role="' + user.role
+      + '" onclick="event.stopPropagation()"'
+      + ' onchange="handleRoleChange(event, \'' + user.user_id + '\')">'
+      + '<option value="user"' + (user.role === 'user' ? ' selected' : '') + '>user</option>'
+      + '<option value="admin"' + (user.role === 'admin' ? ' selected' : '') + '>admin</option>'
+      + '<option value="owner"' + (user.role === 'owner' ? ' selected' : '') + '>owner</option>'
+      + '</select>';
+  }
+
+  function handleUserRowClick(event, userId) {
+    // Ignore clicks that started on interactive descendants (select, option, button).
+    var tag = (event.target.tagName || '').toLowerCase();
+    if (tag === 'select' || tag === 'option' || tag === 'button') return;
+    // Toggle: clicking the same active row clears the filter.
+    if (selectedUserId === userId) {
+      clearUserFilter();
+    } else {
+      setUserFilter(userId);
+    }
+  }
+
+  function handleRoleChange(event, userId) {
+    var select = event.target;
+    var newRole = select.value;
+    var originalRole = select.dataset.originalRole;
+    var saveBtn = document.querySelector('.role-save[data-user-id="' + cssEsc(userId) + '"]');
+    var warn = document.getElementById('warn-' + userId);
+
+    if (newRole === originalRole) {
+      if (saveBtn) saveBtn.disabled = true;
+      if (warn) { warn.textContent = ''; warn.classList.add('hidden'); }
+      return;
+    }
+
+    // Client-side last-owner guard (UX only — server is authoritative).
+    if (originalRole === 'owner' && newRole !== 'owner' && ownerCount <= 1) {
+      if (saveBtn) saveBtn.disabled = true;
+      if (warn) { warn.textContent = 'Cannot demote the last owner'; warn.classList.remove('hidden'); }
+      return;
+    }
+
+    if (saveBtn) saveBtn.disabled = false;
+    if (warn) { warn.textContent = ''; warn.classList.add('hidden'); }
+  }
+
+  async function handleSaveRole(userId) {
+    var select = document.querySelector('.role-select[data-user-id="' + cssEsc(userId) + '"]');
+    var saveBtn = document.querySelector('.role-save[data-user-id="' + cssEsc(userId) + '"]');
+    var savedPill = document.getElementById('saved-' + userId);
+    var warn = document.getElementById('warn-' + userId);
+    if (!select || !saveBtn) return;
+
+    var newRole = select.value;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    var res;
+    try {
+      res = await fetch('/admin/users/' + encodeURIComponent(userId) + '/role', {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ role: newRole }),
+      });
+    } catch (err) {
+      saveBtn.textContent = 'Save';
+      saveBtn.disabled = false;
+      if (warn) { warn.textContent = 'Could not reach server.'; warn.classList.remove('hidden'); }
+      return;
+    }
+
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      saveBtn.textContent = 'Save';
+      saveBtn.disabled = false;
+      if (warn) { warn.textContent = err.error || 'Failed to update role'; warn.classList.remove('hidden'); }
+      return;
+    }
+
+    var data = await res.json();
+    select.dataset.originalRole = data.role;
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = true;
+    if (warn) { warn.textContent = ''; warn.classList.add('hidden'); }
+    if (savedPill) {
+      savedPill.classList.add('show');
+      setTimeout(function() { savedPill.classList.remove('show'); }, 1600);
+    }
+
+    // Update local state and re-render so ownerCount / warnings on OTHER rows refresh.
+    var idx = -1;
+    for (var i = 0; i < usersArray.length; i++) { if (usersArray[i].user_id === userId) { idx = i; break; } }
+    if (idx !== -1) {
+      usersArray[idx].role = data.role;
+      ownerCount = usersArray.filter(function(u) { return u.role === 'owner'; }).length;
+      renderUsersTable();
+    }
+  }
+
+  // ── SECTION B: session list ────────────────────────────────────────────
+  function setUserFilter(userId) {
+    selectedUserId = userId;
+    selectedSessionId = null;
+    oldestStartedAt = null;
+
+    var user = null;
+    for (var i = 0; i < usersArray.length; i++) { if (usersArray[i].user_id === userId) { user = usersArray[i]; break; } }
+    document.getElementById('sessionsScope').textContent = user ? (user.email || user.user_id.slice(0, 8) + '…') : 'selected user';
+    document.getElementById('clearFilterBtn').classList.remove('hidden');
+
+    renderUsersTable(); // reflect active row
+    document.getElementById('detailPane').innerHTML = '<div class="detail-placeholder">Select a session on the left.</div>';
+    loadSessions(true);
+  }
+
+  function clearUserFilter() {
+    selectedUserId = null;
+    selectedSessionId = null;
+    oldestStartedAt = null;
+    document.getElementById('sessionsScope').textContent = 'all users';
+    document.getElementById('clearFilterBtn').classList.add('hidden');
+    renderUsersTable();
+    document.getElementById('detailPane').innerHTML = '<div class="detail-placeholder">Select a session on the left.</div>';
+    loadSessions(true);
   }
 
   async function loadSessions(initial) {
     var url = '/admin/sessions?limit=' + pageSize;
+    if (selectedUserId) url += '&user_id=' + encodeURIComponent(selectedUserId);
     if (!initial && oldestStartedAt) url += '&before=' + encodeURIComponent(oldestStartedAt);
+
+    if (initial) {
+      document.getElementById('sessionsList').innerHTML = '<div class="empty-msg"><span class="spinner"></span></div>';
+    }
 
     var res;
     try {
@@ -382,27 +744,19 @@
       renderListError('Could not reach server.');
       return;
     }
-
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (res.status === 403) { window.location.replace('/'); return; }
+    if (res.status === 403) { window.location.replace('/dashboard'); return; }
     if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
       renderListError(err.error || 'Failed to load sessions');
       return;
     }
-
     var data = await res.json();
     var sessions = (data && data.sessions) || [];
-    if (initial) {
-      allSessions = sessions;
-    } else {
-      allSessions = allSessions.concat(sessions);
-    }
-    if (sessions.length > 0) {
-      oldestStartedAt = sessions[sessions.length - 1].started_at;
-    }
-    // Hide "load older" when the page came back smaller than the requested size.
+    if (initial) allSessions = sessions;
+    else allSessions = allSessions.concat(sessions);
+    if (sessions.length > 0) oldestStartedAt = sessions[sessions.length - 1].started_at;
+
     var loadMoreEl = document.getElementById('loadMore');
     if (sessions.length < pageSize) loadMoreEl.classList.add('hidden');
     else loadMoreEl.classList.remove('hidden');
@@ -420,7 +774,7 @@
   function renderSessionsList() {
     var list = document.getElementById('sessionsList');
     if (allSessions.length === 0) {
-      list.innerHTML = '<div class="empty-msg">No sessions yet.</div>';
+      list.innerHTML = '<div class="empty-msg">No sessions' + (selectedUserId ? ' for this user' : '') + ' yet.</div>';
       return;
     }
     var html = '';
@@ -454,11 +808,10 @@
     return '<span class="badge badge-pending">—</span>';
   }
 
-  // ── Selection + detail load ─────────────────────────────────────────────
+  // ── SECTION C: log detail ──────────────────────────────────────────────
   async function selectSession(sessionId) {
     selectedSessionId = sessionId;
     renderSessionsList();
-    // Reset filters on selection change so the user sees everything by default.
     activeChip = 'all';
     searchText = '';
 
@@ -467,18 +820,15 @@
 
     var res;
     try {
-      res = await fetch('/admin/sessions/' + encodeURIComponent(sessionId) + '/logs', {
-        headers: authHeader(),
-      });
+      res = await fetch('/admin/sessions/' + encodeURIComponent(sessionId) + '/logs', { headers: authHeader() });
     } catch (err) {
       pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">Could not reach server.</div>';
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (res.status === 403) { window.location.replace('/'); return; }
+    if (res.status === 403) { window.location.replace('/dashboard'); return; }
     if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
       pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">' + escapeHtml(err.error || 'Failed to load logs') + '</div>';
       return;
     }
@@ -500,10 +850,10 @@
     pane.innerHTML =
       '<div class="detail-header">'
         + '<div class="detail-header-left">'
-          + '<h2>' + escapeHtml(email) + '</h2>'
+          + '<h3>' + escapeHtml(email) + '</h3>'
           + '<div class="sub">' + escapeHtml(startedAbs) + ' · ' + dur + ' · ' + escapeHtml(session.client_version || '—') + ' · ' + escapeHtml(session.platform || '—') + '</div>'
         + '</div>'
-        + '<div class="detail-header-right">' + outcome + '</div>'
+        + '<div>' + outcome + '</div>'
       + '</div>'
       + '<div class="filter-bar">'
         + chipHtml('all', 'All')
@@ -524,16 +874,15 @@
     return '<button class="chip' + active + '" data-chip="' + id + '" onclick="onChip(\'' + id + '\')">' + escapeHtml(label) + '</button>';
   }
 
-  function onChip(id) { activeChip = id; refreshChipStates(); renderLogList(); }
-  function onSearch(v) { searchText = v; renderLogList(); }
-
-  function refreshChipStates() {
-    var chips = document.querySelectorAll('.filter-bar .chip');
-    chips.forEach(function(c) {
-      if (c.getAttribute('data-chip') === activeChip) c.classList.add('active');
+  function onChip(id) {
+    activeChip = id;
+    document.querySelectorAll('.filter-bar .chip').forEach(function(c) {
+      if (c.getAttribute('data-chip') === id) c.classList.add('active');
       else c.classList.remove('active');
     });
+    renderLogList();
   }
+  function onSearch(v) { searchText = v; renderLogList(); }
 
   function renderLogList() {
     var list = document.getElementById('logList');
@@ -552,27 +901,20 @@
       return true;
     });
 
-    // Count indicator reflects filter state + server truncation.
     var indicator = document.getElementById('countIndicator');
     var capped = currentTotal > currentLimit;
     var shown = filtered.length;
-    var baseText;
-    if (capped) {
-      baseText = 'Showing ' + shown + ' of ' + currentTotal + ' (capped at ' + currentLimit + ')';
-    } else if (shown !== currentLogs.length) {
-      baseText = 'Showing ' + shown + ' of ' + currentLogs.length;
-    } else {
-      baseText = shown + ' log' + (shown === 1 ? '' : 's');
-    }
-    indicator.textContent = baseText;
+    var text;
+    if (capped) text = 'Showing ' + shown + ' of ' + currentTotal + ' (capped at ' + currentLimit + ')';
+    else if (shown !== currentLogs.length) text = 'Showing ' + shown + ' of ' + currentLogs.length;
+    else text = shown + ' log' + (shown === 1 ? '' : 's');
+    indicator.textContent = text;
     if (capped) indicator.classList.add('capped'); else indicator.classList.remove('capped');
 
     if (filtered.length === 0) {
       list.innerHTML = '<div class="empty-msg">No logs match the current filter.</div>';
       return;
     }
-
-    // Build as array then join — much faster than string concatenation at 2000 rows.
     var parts = [];
     for (var i = 0; i < filtered.length; i++) {
       var r = filtered[i];
@@ -590,7 +932,7 @@
     list.innerHTML = parts.join('');
   }
 
-  // ── Formatting helpers ──────────────────────────────────────────────────
+  // ── Formatters ──────────────────────────────────────────────────────────
   function formatLogTime(iso) {
     var d = new Date(iso);
     if (isNaN(d.getTime())) return iso || '';
@@ -600,7 +942,6 @@
     var ms = String(d.getMilliseconds()).padStart(3, '0');
     return h + ':' + m + ':' + s + '.' + ms;
   }
-
   function formatDuration(secs) {
     if (secs == null) return '—';
     if (secs < 60) return secs + 's';
@@ -611,7 +952,6 @@
     m = m % 60;
     return h + 'h ' + m + 'm';
   }
-
   function relativeTime(iso) {
     var t = new Date(iso).getTime();
     if (isNaN(t)) return iso || '';
@@ -621,7 +961,6 @@
     if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
     return Math.floor(diff / 86400) + 'd ago';
   }
-
   function escapeHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
@@ -629,6 +968,10 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+  function cssEsc(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
   }
 
   init();
