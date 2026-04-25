@@ -28,7 +28,7 @@ function handleConfigError(err, res) {
 
 var DEFAULT_LIMIT = 50;
 var MAX_LIMIT = 100;
-var LOG_HARD_CAP = 2000;
+var LOG_HARD_CAP = 10000;
 
 // Duplicated from routes/admin.js — two tiny pure helpers. If a third
 // consumer appears, extract to backend/lib/session-helpers.js.

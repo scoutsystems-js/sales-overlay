@@ -28,7 +28,7 @@ function handleConfigError(err, res) {
 
 var DEFAULT_LIMIT = 50;
 var MAX_LIMIT = 100;
-var LOG_HARD_CAP = 2000;
+var LOG_HARD_CAP = 10000;
 
 // /admin/sessions and /admin/sessions/:id/logs expanded from owner-only to
 // admin+owner so the redesigned /admin page works for both roles. Scope
@@ -173,7 +173,7 @@ router.get('/sessions', protect, async function(req, res) {
 });
 
 // ── GET /admin/sessions/:session_id/logs ────────────────────────────────────
-// Session metadata + up to LOG_HARD_CAP (2000) log rows. `total_count` is the
+// Session metadata + up to LOG_HARD_CAP (10000) log rows. `total_count` is the
 // unfiltered row count so the client can display "Showing X of Y" when capped.
 router.get('/sessions/:session_id/logs', protect, async function(req, res) {
   var sessionId = req.params.session_id;
@@ -211,7 +211,7 @@ router.get('/sessions/:session_id/logs', protect, async function(req, res) {
     }
 
     // count: 'exact' returns total_count independent of limit — that's how
-    // the client knows whether it hit the 2000 cap.
+    // the client knows whether it hit the 10000 cap.
     var logsResult = await admin
       .from('session_logs')
       .select('logged_at, level, tag, message', { count: 'exact' })

@@ -506,7 +506,7 @@
     if (card) card.classList.add('expanded');
 
     if (!cardState[sessionId]) {
-      cardState[sessionId] = { logs: null, total_count: 0, limit: 2000, filter: 'all', search: '' };
+      cardState[sessionId] = { logs: null, total_count: 0, limit: 10000, filter: 'all', search: '' };
       await loadCardLogs(sessionId);
     } else {
       renderCardBody(sessionId);
@@ -535,7 +535,7 @@
     var st = cardState[sessionId];
     st.logs = (data && data.logs) || [];
     st.total_count = (data && typeof data.total_count === 'number') ? data.total_count : st.logs.length;
-    st.limit = (data && data.limit) || 2000;
+    st.limit = (data && data.limit) || 10000;
     renderCardBody(sessionId);
   }
 

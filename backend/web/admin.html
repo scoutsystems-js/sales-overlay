@@ -477,7 +477,7 @@
   var selectedUserId = null;       // Section B filter (click user row to set)
   var currentLogs = [];            // Section C
   var currentTotal = 0;
-  var currentLimit = 2000;
+  var currentLimit = 10000;
   var activeChip = 'all';
   var searchText = '';
 
@@ -853,7 +853,7 @@
     var data = await res.json();
     currentLogs = (data && data.logs) || [];
     currentTotal = (data && typeof data.total_count === 'number') ? data.total_count : currentLogs.length;
-    currentLimit = (data && data.limit) || 2000;
+    currentLimit = (data && data.limit) || 10000;
 
     renderDetail(data.session);
   }
