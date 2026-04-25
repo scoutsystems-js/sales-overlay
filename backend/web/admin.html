@@ -1222,7 +1222,7 @@
     var rawLines = [];
     for (var i = 0; i < currentLogs.length; i++) {
       var r = currentLogs[i];
-      rawLines.push((r.logged_at || '') + ' [' + (r.level || 'info') + '] [' + (r.tag || '') + '] ' + (r.message || ''));
+      rawLines.push((r.logged_at || '') + ' [' + (r.level || 'info') + '] ' + (r.tag || '') + ' ' + (r.message || ''));
     }
     var rawText = rawLines.join('\n') + '\n';
 
