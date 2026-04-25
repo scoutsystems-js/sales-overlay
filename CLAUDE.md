@@ -139,7 +139,7 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - Post-call summary
 - Stripe billing wired end-to-end (auth works; Stripe keys pending; `SKIP_BILLING` currently `true` so all logged-in users get full access)
 - Post-call analytics dashboard — charts, aggregations, win rate, objection breakdown, stage timing (Phase 3 per BUILD-PLAN.md, at `/dashboard`). The Phase 2 raw session log viewer at `/admin` is live (v1.1.0 Feature 2); remaining Phase 2 diagnostics work: search by email/session/date and one-click log copy.
-- Automated release via `npm run release` (currently manual — DMGs uploaded to GitHub Releases via web UI since `gh` CLI isn't installed locally)
+- Automated `npm run release` end-to-end with `GH_TOKEN` (gh CLI is now installed and `gh release create` works as of v1.1.0; one remaining piece is wiring `GH_TOKEN` into the build env so electron-builder's `--publish always` flag can fire automatically without a manual asset upload step)
 - x64 DMG for v1.0.2 (Apple notarization server returned 500 mid-build; arm64 shipped; rebuild x64 separately when Apple servers recover)
 
 ## Resolved Issues (full history)
@@ -182,7 +182,7 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - Packaged app showed default Electron icon → `~/sales-overlay/build/` was missing `icon.icns` (and entitlements) AND `build.mac.icon` wasn't set in `~/sales-overlay/package.json`. Fixed by `cp`'ing icon + entitlements from the iCloud copy to `~/sales-overlay/build/` and patching `build.mac.icon = "build/icon.icns"`. Confirmed fixed in v1.0.1.
 - `~/sales-overlay` (local build dir) can drift from iCloud copy → the iCloud folder has `build/` assets the local dir may be missing. Always verify `build/icon.icns` + `build/entitlements.mac.plist` exist in `~/sales-overlay/build/` before building.
 - GitHub push protection blocking `git push` due to secrets in commits → Anthropic API key in old initial commit's `.env:2`, PAT in `CLAUDE.md`. Fix: strip secrets from tracked files, amend commit, click the `unblock-secret` URL GitHub prints for secrets in unreachable old commits, then `git push --force`. Going forward: keep all secrets in `API Keys.md` (gitignored) — NEVER commit them to `CLAUDE.md` or `.env`.
-- `gh release create` failed with `command not found: gh` → GitHub CLI not installed on Justin's Mac. Workaround: create releases via GitHub web UI (Releases → Draft a new release → drag DMGs + `.blockmap`s + `latest-mac.yml` from `dist/`). Long-term fix: `brew install gh` if we want to automate.
+- `gh release create` failed with `command not found: gh` → GitHub CLI not installed on Justin's Mac. **Resolved as of v1.1.0**: gh CLI installed and authenticated, `gh release create v1.1.0 <assets...> --repo scoutsystems-js/sales-overlay --title ... --notes ...` works one-shot. Used to publish v1.1.0 (arm64+x64 DMGs, both ZIPs, all blockmaps, latest-mac.yml). Web UI fallback no longer needed for typical releases.
 - Live site (www.scoutsystems.io) rendering as unstyled plain HTML → `website/public/index.html` references `/css/style.css` but the CSS file was never committed to GitHub (only existed in Justin's local `~/sales-overlay/website/public/css/style.css`). Fixed by `git add website/public/css/style.css && git commit && git push` (commit `75bd6a0`). Railway auto-redeployed in ~60s and the site rendered correctly. Root cause was NOT the DNS work — the CSS was missing since the initial website deploy (commit `feba9a9`) and just went unnoticed.
 - Namecheap MX records don't live in Advanced DNS → Host Records section → they live in the **Mail Settings** section, which is a separate dropdown farther down the Advanced DNS page. Set Mail Settings to **Custom MX** to enable the MX records table.
 - Namecheap ALIAS Record at apex can be flaky with Railway → switched to `URL Redirect Record @ → https://www.scoutsystems.io`. Only works over HTTP (Namecheap's redirect servers don't listen on 443); HTTPS to bare domain times out. Planned fix: migrate DNS to Cloudflare.
@@ -307,7 +307,7 @@ SKIP_AUTH=true                   # flip to false once auth is tested
 - Publish provider: `github`
 - Owner/repo: `scoutsystems-js/sales-overlay`
 - Current release: **v1.0.4** (arm64 + x64). Desktop app ships with zero secret API keys — all Claude + Deepgram traffic proxied through Railway. Includes JWT auto-refresh via `/auth/refresh`, proxy-minted 10-min ephemeral Deepgram keys, and SKIP_BILLING beta pass-through on `requireSubscription` middleware.
-- Releases currently uploaded manually via GitHub web UI (drag DMGs + `.blockmap`s + `latest-mac.yml` from `dist/`). `npm run release` will work once `gh` CLI is installed + `GH_TOKEN` set.
+- Releases published via `gh release create v<X.Y.Z> <assets...> --repo scoutsystems-js/sales-overlay --title "v<X.Y.Z>" --notes "..."` (gh CLI installed and authenticated as of v1.1.0). Fully automated `npm run release` (build + publish in one command via electron-builder's `--publish always`) needs `GH_TOKEN` set in the build env — not yet wired but the gh CLI prerequisite is no longer blocking.
 
 ## Future Plans
 - **Post-call prompt-compliance scoring (future, v1.0.7+).** Use the new session_logs table to post-process each call: compare every Claude suggestion (`[claude] Next line: ...`) against the closer's transcripts that followed it (same 35% fuzzy-match used for delivery detection). Output a per-call "delivery %" and per-stage breakdown (discovery / objection / close). Shows up in the admin dashboard as a coaching score. Scope: one backend post-call job + a UI surface. Queue after admin view (Phase 4) ships.
@@ -319,7 +319,6 @@ SKIP_AUTH=true                   # flip to false once auth is tested
 - Diagnostics dashboard (Phase 3 — see BUILD-PLAN.md)
 - **Migrate DNS from Namecheap to Cloudflare** — solves bare-domain HTTPS timeout via CNAME flattening + edge SSL. Free tier. Keep Namecheap as registrar, just change nameservers.
 - Revoke old exposed GitHub PAT at github.com/settings/tokens (the Anthropic key is already gone from console.anthropic.com; only the PAT still needs manual revocation)
-- Install `gh` CLI (`brew install gh`) so `npm run release` can push DMGs + tag in one shot instead of manual web UI upload
 - See BUILD-PLAN.md for full 4-phase roadmap
 
 ## Preferences
