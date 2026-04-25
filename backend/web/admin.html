@@ -531,7 +531,11 @@
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (res.status === 403) { window.location.replace('/dashboard'); return; }
+    if (res.status === 403) {
+      console.error('[admin] /admin/users returned 403 despite role gate passing');
+      wrap.innerHTML = '<div class="empty-msg" style="color:#f87171;">Access denied loading users. Try signing out and back in.</div>';
+      return;
+    }
     if (!res.ok) {
       var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
       wrap.innerHTML = '<div class="empty-msg" style="color:#f87171;">' + escapeHtml(err.error || 'Failed to load users') + '</div>';
@@ -751,7 +755,11 @@
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (res.status === 403) { window.location.replace('/dashboard'); return; }
+    if (res.status === 403) {
+      console.error('[admin] /admin/sessions returned 403 despite role gate passing');
+      renderListError('Access denied loading sessions. Try signing out and back in.');
+      return;
+    }
     if (!res.ok) {
       var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
       renderListError(err.error || 'Failed to load sessions');
@@ -832,7 +840,11 @@
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (res.status === 403) { window.location.replace('/dashboard'); return; }
+    if (res.status === 403) {
+      console.error('[admin] /admin/sessions/:id/logs returned 403 despite role gate passing');
+      pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">Access denied loading logs.</div>';
+      return;
+    }
     if (!res.ok) {
       var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
       pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">' + escapeHtml(err.error || 'Failed to load logs') + '</div>';

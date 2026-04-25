@@ -374,14 +374,19 @@
   async function checkExistingSession() {
     var s = getSession();
     if (isSessionValid(s)) {
-      showSignedInView(s);
       if (shouldRefresh(s)) refreshSessionIfNeeded();
+      var redirected = await redirectByRole();
+      if (!redirected) showSignedInView(s);
       return;
     }
     // Stale but has refresh token — try to refresh silently.
     if (s && s.refresh_token) {
       var refreshed = await refreshSessionIfNeeded();
-      if (refreshed) { showSignedInView(refreshed); return; }
+      if (refreshed) {
+        var redirected = await redirectByRole();
+        if (!redirected) showSignedInView(refreshed);
+        return;
+      }
     }
     // No session or refresh failed — show login form.
     if (window.location.hash === '#signup') switchTab('signup');
