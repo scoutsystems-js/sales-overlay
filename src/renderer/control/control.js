@@ -14,6 +14,11 @@ var systemStream = null;
 var audioContext = null;
 var processor = null;
 
+// Feature 4: call boundary detection state
+var callDetectCount = 0;
+var lastCallDetectTime = 0;
+var sessionActive = false;
+
 // ── Audio device enumeration (mic only) ──
 
 async function enumerateAudioDevices() {
@@ -196,6 +201,13 @@ async function startAudioCapture() {
 
     if (systemStream && systemStream.getAudioTracks().length > 0) {
       // Two-input mode: interleaved stereo (left=closer, right=prospect)
+      // Feature 4: call boundary detection thresholds. Detection runs only
+      // here (two-input path); single-input mode has no system audio to
+      // detect a call from.
+      var CALL_DETECT_THRESHOLD = 0.015;
+      var CALL_DETECT_CONFIRM_COUNT = 4;
+      var CALL_DETECT_COOLDOWN_MS = 30000;
+
       var systemSource = audioContext.createMediaStreamSource(systemStream);
 
       var merger = audioContext.createChannelMerger(2);
@@ -226,6 +238,24 @@ async function startAudioCapture() {
           leftRMS = Math.sqrt(leftRMS / left.length);
           rightRMS = Math.sqrt(rightRMS / right.length);
           window.electronAPI.logToMain('[audio] Mic level: ' + leftRMS.toFixed(4) + ' | System level: ' + rightRMS.toFixed(4));
+
+          // Feature 4: call boundary detection
+          if (!sessionActive) {
+            if (rightRMS > CALL_DETECT_THRESHOLD) {
+              callDetectCount++;
+              if (callDetectCount >= CALL_DETECT_CONFIRM_COUNT) {
+                var now = Date.now();
+                if (now - lastCallDetectTime > CALL_DETECT_COOLDOWN_MS) {
+                  lastCallDetectTime = now;
+                  callDetectCount = 0;
+                  window.electronAPI.logToMain('[control] Call detected — system audio active');
+                  window.electronAPI.callDetected();
+                }
+              }
+            } else {
+              callDetectCount = 0;
+            }
+          }
         }
 
         // Interleave stereo for Deepgram multichannel
@@ -303,8 +333,15 @@ btnStop.addEventListener('click', function() {
 });
 
 window.electronAPI.onStatusUpdate(function(data) {
-  statusText.textContent = data.status;
-  if (data.active) { statusDot.classList.add('active'); } else { statusDot.classList.remove('active'); }
+  sessionActive = data.active;
+  if (data.active) {
+    statusDot.classList.add('active');
+    statusText.textContent = 'Listening';
+  } else {
+    statusDot.classList.remove('active');
+    statusText.textContent = 'Not listening';
+    callDetectCount = 0;
+  }
 });
 
 window.electronAPI.onAppendTranscript(function(data) {

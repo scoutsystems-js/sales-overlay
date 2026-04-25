@@ -890,6 +890,18 @@ ipcMain.on('renderer-log', function(event, msg) {
   console.log(msg);
 });
 
+// Feature 4: relay call-detected signal from
+// control window to overlay. The sessionActive
+// guard lives in control.js — this relay fires
+// only when control.js determines audio is active
+// without a running session.
+ipcMain.on('call-detected', function() {
+  console.log('[main] Call detected — relaying to overlay');
+  if (overlayWindow) {
+    overlayWindow.webContents.send('call-detected');
+  }
+});
+
 ipcMain.on('quit-app', function() {
   app.quit();
 });
