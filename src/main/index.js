@@ -385,8 +385,10 @@ async function needsOnboardingCheck(token) {
   if (!token) return false;
   var supabase = createSupabaseForUser(token);
   if (!supabase) return false;
+  var userId = decodeUserIdFromToken(token);
+  if (!userId) return false;
   try {
-    var res = await supabase.from('user_profiles').select('completed_at').maybeSingle();
+    var res = await supabase.from('user_profiles').select('completed_at').eq('user_id', userId).maybeSingle();
     if (res.error) {
       console.error('[onboarding] Check error:', res.error.message);
       return false;
@@ -425,8 +427,10 @@ ipcMain.handle('get-profile', async function() {
   var token = await ensureFreshToken();
   var supabase = createSupabaseForUser(token);
   if (!supabase) return { error: 'Not authenticated' };
+  var userId = decodeUserIdFromToken(token);
+  if (!userId) return { error: 'Could not decode user id from token' };
   try {
-    var res = await supabase.from('user_profiles').select('*').maybeSingle();
+    var res = await supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
     if (res.error) return { error: res.error.message };
     return { profile: res.data || null };
   } catch (err) { return { error: err.message }; }
@@ -801,9 +805,11 @@ ipcMain.on('start-session', async function(event, clientId) {
     var scriptToken = await ensureFreshToken();
     var scriptSupabase = createSupabaseForUser(scriptToken);
     if (scriptSupabase) {
+      var scriptUserId = decodeUserIdFromToken(scriptToken);
       var scriptRes = await scriptSupabase
         .from('user_profiles')
         .select('script_summary')
+        .eq('user_id', scriptUserId)
         .maybeSingle();
       if (scriptRes.data && scriptRes.data.script_summary) {
         scriptSummary = scriptRes.data.script_summary;
