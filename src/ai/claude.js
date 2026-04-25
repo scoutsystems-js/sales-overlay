@@ -492,6 +492,7 @@ class ClaudeCoach {
       // Always send the suggestion — this is a live teleprompter, not a selective coach
       if (parsed.suggestion) {
         console.log('[claude] Next line: ' + parsed.headline);
+        console.log('[claude] Suggestion: ' + parsed.suggestion);
 
         var newSuggestion = {
           stage: parsed.stage || (this.memory ? this.memory.detectedStage : 'discovery'),
