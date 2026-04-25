@@ -99,10 +99,14 @@ function requireRole(allowedRoles) {
       return res.status(401).json({ error: 'Unauthenticated — requireRole must run after requireAuth' });
     }
 
-    // Within-request cache: skip the DB call if an earlier middleware already stamped it.
-    if (req.user.role) {
-      if (roles.indexOf(req.user.role) !== -1) return next();
-      return res.status(403).json({ error: 'Forbidden', required: roles, actual: req.user.role });
+    // Within-request cache: skip the DB call if a previous requireRole stamped
+    // it. Cache on req.userProfileRole (not req.user.role) because Supabase's
+    // auth.getUser() already populates req.user.role with the JWT role claim
+    // ("authenticated" for any logged-in user) — checking that field would
+    // incorrectly 403 every authenticated user before the profile lookup ran.
+    if (req.userProfileRole) {
+      if (roles.indexOf(req.userProfileRole) !== -1) return next();
+      return res.status(403).json({ error: 'Forbidden', required: roles, actual: req.userProfileRole });
     }
 
     try {
@@ -119,6 +123,9 @@ function requireRole(allowedRoles) {
       }
 
       var role = (data && data.role) || 'user';
+      req.userProfileRole = role;
+      // Also overwrite req.user.role (was "authenticated" from the JWT claim)
+      // so downstream handlers reading req.user.role get the profile role.
       req.user.role = role;
 
       if (roles.indexOf(role) === -1) {
