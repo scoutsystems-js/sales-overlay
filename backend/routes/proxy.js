@@ -123,6 +123,62 @@ router.post('/memory', protect, async function(req, res) {
   }
 });
 
+// Script summarization — Electron app sends raw script text on upload,
+// backend asks Claude for a structured 6-section playbook summary stored
+// in user_profiles.script_summary. The summary (not the raw script) is
+// injected into every suggestion prompt at call time via CallMemory.
+router.post('/summarize-script', protect, async function(req, res) {
+  var { scriptText } = req.body;
+
+  if (!scriptText || !scriptText.trim()) {
+    return res.status(400).json({ error: 'scriptText required' });
+  }
+
+  var summarizationPrompt =
+    'You are analyzing a sales script to produce a structured ' +
+    'reference summary for an AI sales coach. The coach reads ' +
+    'this summary before every suggestion during a live call. ' +
+    'Output must be machine-readable context — not a human summary.\n\n' +
+    'Respond in exactly this format with these six labeled sections. ' +
+    'Be specific and concrete. No filler. No prose paragraphs. ' +
+    'Total output must be 400-700 tokens.\n\n' +
+    'OFFER: [One sentence. What is being sold, to whom, at what price point ' +
+    'if stated.]\n\n' +
+    'TARGET PROSPECT: [Who this offer is for. Their situation, pain, ' +
+    'awareness level. 2-3 sentences max.]\n\n' +
+    'CALL FLOW: [Ordered list of the major stages/phases in this script. ' +
+    'Use the script\'s own stage names if present. 4-8 items.]\n\n' +
+    'KEY TALKING POINTS: [The most important things the closer must hit. ' +
+    'Specific language, proof points, emotional anchors. 4-7 bullets.]\n\n' +
+    'OBJECTION HANDLING: [Any scripted rebuttals, frameworks, or specific ' +
+    'language for handling objections. If none, write NONE.]\n\n' +
+    'CLOSE MECHANICS: [How the close is structured. Urgency levers, payment ' +
+    'options presented, specific closing language if any.]\n\n' +
+    'SCRIPT TO ANALYZE:\n' +
+    scriptText;
+
+  try {
+    var anthropic = getAnthropic();
+    var response = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: summarizationPrompt }],
+    });
+
+    var content = response.content[0] ? response.content[0].text : null;
+    if (!content) {
+      return res.status(500).json({ error: 'No response from Claude' });
+    }
+
+    res.json({ summary: content });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    var f = formatProxyError(err, 'SummarizeScript');
+    console.error('[proxy] SummarizeScript error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
+  }
+});
+
 // Deepgram temporary key — Electron app requests a short-lived key,
 // connects directly to Deepgram WebSocket with it (no proxying of audio needed).
 router.post('/deepgram-key', protect, async function(req, res) {

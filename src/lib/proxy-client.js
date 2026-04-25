@@ -5,12 +5,13 @@
 // credentials (Railway env vars) to call those services on the user's behalf.
 //
 // Endpoints wrapped here:
-//   suggest(...)         → POST  /proxy/suggest        (Claude teleprompter)
-//   memory(...)          → POST  /proxy/memory         (Claude rolling summary)
-//   getDeepgramKey()     → POST  /proxy/deepgram-key   (mint 10-min ephemeral key)
-//   sessionStart(...)    → POST  /log/session-start    (v1.0.5 cloud logging)
-//   sessionEnd(...)      → PATCH /log/session-end/:id  (v1.0.5 cloud logging)
-//   logBatch(...)        → POST  /log                  (v1.0.5 cloud logging)
+//   suggest(...)         → POST  /proxy/suggest            (Claude teleprompter)
+//   memory(...)          → POST  /proxy/memory             (Claude rolling summary)
+//   summarizeScript(...) → POST  /proxy/summarize-script   (script → playbook summary)
+//   getDeepgramKey()     → POST  /proxy/deepgram-key       (mint 10-min ephemeral key)
+//   sessionStart(...)    → POST  /log/session-start        (v1.0.5 cloud logging)
+//   sessionEnd(...)      → PATCH /log/session-end/:id      (v1.0.5 cloud logging)
+//   logBatch(...)        → POST  /log                      (v1.0.5 cloud logging)
 //
 // Errors thrown by these methods are plain Error objects with a descriptive
 // message. Callers should try/catch and surface a useful message to the user.
@@ -85,6 +86,17 @@ class ProxyClient {
     return this._post('/proxy/memory', {
       userPrompt: args.userPrompt,
       maxTokens: args.maxTokens || 500,
+    });
+  }
+
+  // Summarize an uploaded sales script into a compact playbook the
+  // suggestion engine can reference each call. The route hardcodes its
+  // own max_tokens (1500) so this method only forwards scriptText.
+  // Returns { summary: "<playbook text>" } — note the response key is
+  // `summary`, not `content`, to disambiguate from /memory at call sites.
+  async summarizeScript(args) {
+    return this._post('/proxy/summarize-script', {
+      scriptText: args.scriptText,
     });
   }
 
