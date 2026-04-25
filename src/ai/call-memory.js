@@ -25,6 +25,11 @@ class CallMemory {
                               // "AmEx balance: $15k", "Monthly cashflow: $3k"). Accumulates
                               // during the call, deduped and capped at 8 entries.
     };
+    // Feature 3: script summary injected at session
+    // start via start-session. Null if user has no
+    // script uploaded. When present, prepended to
+    // getContext() output as the first section.
+    this.scriptSummary = null;
   }
 
   // Returns whether newStage is a valid progression from currentStage
@@ -228,6 +233,10 @@ class CallMemory {
   // Build context string for the suggestion engine
   getContext() {
     var parts = [];
+
+    if (this.scriptSummary) {
+      parts.push('CLOSER\'S SCRIPT SUMMARY:\n' + this.scriptSummary);
+    }
 
     if (this.summary) {
       parts.push('CALL SUMMARY SO FAR:\n' + this.summary);

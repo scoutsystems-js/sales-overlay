@@ -464,6 +464,54 @@ ipcMain.handle('save-profile', async function(event, data) {
   } catch (err) { return { error: err.message }; }
 });
 
+// Saves a sales script: summarizes via /proxy/summarize-script, then writes
+// both script_raw and script_summary atomically. Aborts on summarization
+// failure — never persists script_raw without script_summary, since the
+// suggestion engine reads only script_summary.
+ipcMain.handle('save-script', async function(event, data) {
+  var scriptRaw = (data && data.script_raw) ? data.script_raw.trim() : '';
+  if (!scriptRaw) return { error: 'No script text provided' };
+
+  var token = await ensureFreshToken();
+  var supabase = createSupabaseForUser(token);
+  if (!supabase) return { error: 'Not authenticated' };
+  var userId = decodeUserIdFromToken(token);
+  if (!userId) return { error: 'Could not decode user id from token' };
+
+  // Step 1: Summarize via backend. If this fails, abort — never write
+  // script_raw without script_summary. Partial state is worse than no state.
+  var summary;
+  try {
+    var proxy = buildProxyClient();
+    var summaryRes = await proxy.summarizeScript({ scriptText: scriptRaw });
+    if (!summaryRes.summary) return { error: 'Summarization returned empty response' };
+    summary = summaryRes.summary;
+  } catch (err) {
+    console.error('[main] save-script summarization error:', err.message);
+    return { error: 'Could not summarize script: ' + err.message };
+  }
+
+  // Step 2: Write both columns atomically. One upsert, one DB round-trip.
+  try {
+    var row = {
+      user_id:        userId,
+      script_raw:     scriptRaw,
+      script_summary: summary,
+    };
+    var res = await supabase
+      .from('user_profiles')
+      .upsert(row, { onConflict: 'user_id' })
+      .select()
+      .maybeSingle();
+    if (res.error) return { error: res.error.message };
+    console.log('[main] Script saved successfully for user ' + userId);
+    return { ok: true };
+  } catch (err) {
+    console.error('[main] save-script DB error:', err.message);
+    return { error: err.message };
+  }
+});
+
 // Wizard finished — launch the main app windows.
 ipcMain.on('onboarding-complete', function() {
   createControlWindow();
@@ -743,11 +791,36 @@ ipcMain.on('start-session', async function(event, clientId) {
     });
   });
 
+  // Feature 3: fetch script_summary for this session.
+  // SELECT * in get-profile already returns it after
+  // migration 004 — we do a targeted select here to
+  // keep start-session self-contained and avoid
+  // depending on a prior get-profile call having run.
+  var scriptSummary = null;
+  try {
+    var scriptToken = await ensureFreshToken();
+    var scriptSupabase = createSupabaseForUser(scriptToken);
+    if (scriptSupabase) {
+      var scriptRes = await scriptSupabase
+        .from('user_profiles')
+        .select('script_summary')
+        .maybeSingle();
+      if (scriptRes.data && scriptRes.data.script_summary) {
+        scriptSummary = scriptRes.data.script_summary;
+        console.log('[main] Script summary loaded for session.');
+      }
+    }
+  } catch (err) {
+    // Non-fatal — session continues without script context.
+    console.error('[main] Could not fetch script_summary:', err.message);
+  }
+
   callMemory = new CallMemory(proxy, function(discovery) {
     if (discoveryWindow) {
       discoveryWindow.webContents.send('discovery-update', discovery);
     }
   });
+  callMemory.scriptSummary = scriptSummary;
   claude = new ClaudeCoach(proxy, kb, callMemory);
 
   // Poll getSuggestion() every 1.5s so natural pauses still trigger prompts
