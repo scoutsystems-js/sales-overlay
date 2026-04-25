@@ -137,7 +137,7 @@ class CallMemory {
       try {
         response = await this.proxy.memory({
           userPrompt: prompt,
-          maxTokens: 500,
+          maxTokens: 1500,
         });
       } catch (err) {
         console.error('[memory] Proxy memory failed:', err.message);
