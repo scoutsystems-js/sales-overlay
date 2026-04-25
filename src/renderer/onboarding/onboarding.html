@@ -288,10 +288,31 @@
       <h2>Qualifications</h2>
       <p class="sub">What makes someone a good fit? Scout uses this during discovery to flag red flags and green lights in real time.</p>
       <div class="fields">
-        <div class="error-msg" id="errorMsg"></div>
         <div class="field">
           <label for="qualifications">Your ideal prospect</label>
           <textarea id="qualifications" rows="7" placeholder="e.g. Established business doing $10k+/mo. Decision maker (not running it past a partner later). Willing to invest in themselves. Can dedicate 5 hrs/week for 90 days. Growth-minded, not looking for a magic bullet."></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="prev()">Back</button>
+        <button class="btn btn-primary" onclick="next()">Next</button>
+      </div>
+    </div>
+
+    <!-- Screen 6: Sales script (optional) -->
+    <div class="screen" id="screen6">
+      <h2>Your sales script</h2>
+      <p class="sub">Paste or upload your script and Scout will learn your call flow, talking points, and close mechanics. Optional — you can add this later.</p>
+      <div class="fields">
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="field">
+          <label for="scriptText">Script</label>
+          <textarea id="scriptText" rows="6" placeholder="Paste your script here..."></textarea>
+        </div>
+        <div class="field">
+          <input type="file" id="scriptFile" accept=".txt" style="display:none"/>
+          <button class="btn btn-secondary" style="width:100%; margin-top:4px;" onclick="handleFileUpload()">Upload .txt file</button>
+          <div class="helper">Upload a plain text file — it will populate the field above for your review.</div>
         </div>
       </div>
       <div class="actions">
@@ -305,7 +326,7 @@
 <script>
   // ── State ─────────────────────────────────────────────────────────────────
   var currentScreen = 1;
-  var TOTAL = 5;
+  var TOTAL = 6;
 
   // ── Screen nav ────────────────────────────────────────────────────────────
   function showScreen(n) {
@@ -380,6 +401,7 @@
       if (p.pif_url)        document.getElementById('pif_url').value = p.pif_url;
       if (p.twopay_url)     document.getElementById('twopay_url').value = p.twopay_url;
       if (p.affirm_url)     document.getElementById('affirm_url').value = p.affirm_url;
+      if (p.script_raw)     document.getElementById('scriptText').value = p.script_raw;
     } catch (err) {
       // Silent — wizard still works without pre-populated data
     }
@@ -392,23 +414,63 @@
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>';
 
+    // Step 1: Save profile fields
     var data = collectFormData();
-    data.completed = true; // signals main process to set completed_at = now()
-
+    data.completed = true;
     try {
-      var res = await window.electronAPI.saveProfile(data);
-      if (res && res.error) {
-        showError(res.error);
+      var profileRes = await window.electronAPI.saveProfile(data);
+      if (profileRes && profileRes.error) {
+        showError('Could not save profile: ' + profileRes.error);
         btn.disabled = false;
         btn.textContent = 'Save & continue';
         return;
       }
-      window.electronAPI.onboardingComplete();
     } catch (err) {
       showError('Could not save. Check your connection and try again.');
       btn.disabled = false;
       btn.textContent = 'Save & continue';
+      return;
     }
+
+    // Step 2: Save script if provided — optional, skip if empty
+    var scriptEl = document.getElementById('scriptText');
+    var scriptText = scriptEl ? scriptEl.value.trim() : '';
+    if (scriptText) {
+      try {
+        var scriptRes = await window.electronAPI.saveScript({ script_raw: scriptText });
+        if (scriptRes && scriptRes.error) {
+          showError('Profile saved. Script could not be processed: ' + scriptRes.error);
+          btn.disabled = false;
+          btn.textContent = 'Save & continue';
+          return;
+        }
+      } catch (err) {
+        showError('Profile saved. Script upload failed — check your connection and try again.');
+        btn.disabled = false;
+        btn.textContent = 'Save & continue';
+        return;
+      }
+    }
+
+    window.electronAPI.onboardingComplete();
+  }
+
+  function handleFileUpload() {
+    var input = document.getElementById('scriptFile');
+    input.onchange = function(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        document.getElementById('scriptText').value = ev.target.result;
+      };
+      reader.onerror = function() {
+        showError('Could not read file. Make sure it is a plain text (.txt) file.');
+      };
+      reader.readAsText(file);
+      input.value = '';
+    };
+    input.click();
   }
 
   async function handleSkip() {

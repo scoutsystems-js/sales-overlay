@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Onboarding wizard — load/save profile data + lifecycle signals
   getProfile: function() { return ipcRenderer.invoke('get-profile'); },
   saveProfile: function(data) { return ipcRenderer.invoke('save-profile', data); },
+  saveScript: function(data) { return ipcRenderer.invoke('save-script', data); },
   onboardingComplete: function() { ipcRenderer.send('onboarding-complete'); },
   onboardingSkip: function() { ipcRenderer.send('onboarding-skip'); },
   openOnboarding: function() { ipcRenderer.send('open-onboarding'); },
