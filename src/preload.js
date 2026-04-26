@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onCallDetected: function(callback) {
     ipcRenderer.on('call-detected', function() { callback(); });
   },
+  onPostCallSummary: function(callback) {
+    ipcRenderer.on('post-call-summary', function(event, data) { callback(data); });
+  },
   onboardingComplete: function() { ipcRenderer.send('onboarding-complete'); },
   onboardingSkip: function() { ipcRenderer.send('onboarding-skip'); },
   openOnboarding: function() { ipcRenderer.send('open-onboarding'); },

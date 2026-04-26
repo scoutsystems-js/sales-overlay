@@ -177,6 +177,64 @@
       line-height: 1;
     }
     .call-banner-dismiss:hover { color: #fff; }
+
+    /* ── Post-call summary panel ── */
+    .summary-panel {
+      background: rgba(255, 255, 255, 0.02);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      pointer-events: auto;
+      -webkit-app-region: no-drag;
+    }
+    .summary-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .summary-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .summary-dismiss {
+      background: rgba(255, 255, 255, 0.06);
+      border: none;
+      border-radius: 5px;
+      color: #aaa;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .summary-dismiss:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+    .summary-content {
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 10px 14px 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #ddd;
+    }
+    .summary-section { margin-bottom: 10px; }
+    .summary-section:last-child { margin-bottom: 0; }
+    .summary-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 3px;
+    }
+    .summary-section-text {
+      font-size: 13px;
+      color: #e8e8e8;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
   </style>
 </head>
 <body>
@@ -201,6 +259,15 @@
       <button class="call-banner-dismiss" id="callBannerDismiss">✕</button>
     </div>
 
+    <!-- Feature 5: post-call summary panel -->
+    <div class="summary-panel" id="summaryPanel" style="display:none">
+      <div class="summary-header">
+        <span class="summary-title">Call Summary</span>
+        <button class="summary-dismiss" id="summaryDismiss">Got it</button>
+      </div>
+      <div class="summary-content" id="summaryContent"></div>
+    </div>
+
     <div class="prompt-area" id="promptArea" style="display:none">
       <div class="status-row">
         <div class="listening-dot"></div>
@@ -223,6 +290,9 @@
     var callBanner        = document.getElementById('callBanner');
     var callBannerBtn     = document.getElementById('callBannerBtn');
     var callBannerDismiss = document.getElementById('callBannerDismiss');
+    var summaryPanel      = document.getElementById('summaryPanel');
+    var summaryContent    = document.getElementById('summaryContent');
+    var summaryDismiss    = document.getElementById('summaryDismiss');
 
     // ── Button handlers ──
     btnStart.addEventListener('click', function() { window.electronAPI.startSession('generic'); });
@@ -238,6 +308,10 @@
       callBanner.style.display = 'none';
     });
 
+    summaryDismiss.addEventListener('click', function() {
+      summaryPanel.style.display = 'none';
+    });
+
     // ── Auto-resize window to match bar content height ──
     var resizeObserver = new ResizeObserver(function() {
       window.electronAPI.resizeOverlay(bar.offsetHeight);
@@ -251,6 +325,7 @@
       btnStop.style.display     = active ? 'flex'  : 'none';
       promptArea.style.display  = active ? 'block' : 'none';
       callBanner.style.display  = 'none';
+      summaryPanel.style.display = 'none';
       if (!active) promptStack.innerHTML = '';
     }
 
@@ -351,6 +426,77 @@
       if (!isSessionActive) {
         callBanner.style.display = 'flex';
       }
+    });
+
+    // Feature 5: parse the 5-section labeled summary into a structured DOM
+    // and show the panel. Sections arrive as plain text with labels on
+    // their own lines (e.g., "STAGE REACHED: Discovery\n\nDISCOVERY...").
+    // Parser scans line-by-line, splits at each "LABEL:" line, accumulates
+    // body text until the next label. Tolerant of missing/extra sections —
+    // unknown labels render the same way; sections without a body show an
+    // empty body. Worst case: malformed input renders as one big section.
+    var SUMMARY_SECTION_LABELS = [
+      'STAGE REACHED',
+      'DISCOVERY COMPLETE',
+      'WHAT WENT WELL',
+      'AREAS TO IMPROVE',
+      'NEXT STEP',
+    ];
+    function parseSummaryToHtml(text) {
+      var raw = String(text || '').trim();
+      if (!raw) return '<div class="summary-section"><div class="summary-section-text">No summary available.</div></div>';
+      var lines = raw.split(/\r?\n/);
+      var sections = [];
+      var current = null;
+      var labelRe = /^([A-Z][A-Z ]+):\s*(.*)$/;
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        var m = line.match(labelRe);
+        if (m && SUMMARY_SECTION_LABELS.indexOf(m[1].trim()) !== -1) {
+          if (current) sections.push(current);
+          current = { label: m[1].trim(), body: m[2] ? m[2].trim() : '' };
+        } else if (current) {
+          if (line.trim() || current.body) {
+            current.body = current.body ? (current.body + '\n' + line) : line;
+          }
+        } else if (line.trim()) {
+          // Body text before any recognized label — wrap it in a labelless
+          // section so nothing is silently dropped.
+          current = { label: '', body: line };
+        }
+      }
+      if (current) sections.push(current);
+      if (sections.length === 0) {
+        return '<div class="summary-section"><div class="summary-section-text"></div></div>';
+      }
+      var parts = [];
+      for (var s = 0; s < sections.length; s++) {
+        var sec = sections[s];
+        var labelHtml = sec.label
+          ? '<div class="summary-section-label">' + escapeHtml(sec.label) + '</div>'
+          : '';
+        parts.push(
+          '<div class="summary-section">'
+            + labelHtml
+            + '<div class="summary-section-text">' + escapeHtml((sec.body || '').trim()) + '</div>'
+          + '</div>'
+        );
+      }
+      return parts.join('');
+    }
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    window.electronAPI.onPostCallSummary(function(data) {
+      var summary = data && data.summary ? data.summary : '';
+      summaryContent.innerHTML = parseSummaryToHtml(summary);
+      summaryPanel.style.display = 'block';
     });
   </script>
 </body>

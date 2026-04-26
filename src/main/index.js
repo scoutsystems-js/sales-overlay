@@ -932,18 +932,29 @@ ipcMain.on('stop-session', async function() {
   // Feature 5: fire-and-forget post-call summary. Stop-session returns
   // immediately; the IPC arrives on the overlay later when Claude responds.
   // Skipped entirely on empty calls (no context), missing session id, or
-  // closed overlay.
+  // closed overlay. Summary is auto-saved to call_sessions before being
+  // delivered to the overlay — outcome is null until the user (later)
+  // marks Win / Loss / Follow-up via a future flow.
   if (postCallContext && postCallSessionId && overlayWindow) {
     (async function() {
       try {
         var summaryProxy = buildProxyClient();
         var res = await summaryProxy.postCallSummary({ callContext: postCallContext });
-        if (res && res.summary && overlayWindow) {
-          overlayWindow.webContents.send('post-call-summary', {
-            sessionId: postCallSessionId,
-            summary: res.summary,
-          });
-          console.log('[main] Post-call summary delivered for session ' + postCallSessionId);
+        if (res && res.summary) {
+          // Persist first so a closed overlay doesn't drop the summary on the
+          // floor. Save failure is logged but does not block the IPC — the
+          // user still sees the panel and can dismiss it; the row just won't
+          // have the summary text saved.
+          try {
+            await summaryProxy.saveSessionSummary(postCallSessionId, null, res.summary);
+            console.log('[main] Post-call summary saved to call_sessions for session ' + postCallSessionId);
+          } catch (saveErr) {
+            console.error('[main] Post-call summary save failed:', saveErr.message);
+          }
+          if (overlayWindow) {
+            overlayWindow.webContents.send('post-call-summary', { summary: res.summary });
+            console.log('[main] Post-call summary delivered for session ' + postCallSessionId);
+          }
         }
       } catch (err) {
         console.error('[main] Post-call summary failed:', err.message);
@@ -977,27 +988,6 @@ ipcMain.on('call-detected', function() {
   console.log('[main] Call detected — relaying to overlay');
   if (overlayWindow) {
     overlayWindow.webContents.send('call-detected');
-  }
-});
-
-// Feature 5: persist the user's outcome choice + the AI summary text from
-// the post-call panel on the overlay. Fired once the user picks
-// Win/Loss/Follow-up. Goes through saveSessionSummary which PATCHes both
-// outcome and post_call_summary on call_sessions in one update.
-ipcMain.on('save-call-outcome', async function(event, data) {
-  var sessionId = data && data.sessionId;
-  var outcome = data && data.outcome;
-  var summary = data && data.summary;
-  if (!sessionId || !outcome) {
-    console.error('[main] save-call-outcome: missing sessionId or outcome');
-    return;
-  }
-  try {
-    var outcomeProxy = buildProxyClient();
-    await outcomeProxy.saveSessionSummary(sessionId, outcome, summary || null);
-    console.log('[main] Call outcome saved: session=' + sessionId + ' outcome=' + outcome);
-  } catch (err) {
-    console.error('[main] save-call-outcome failed:', err.message);
   }
 });
 
