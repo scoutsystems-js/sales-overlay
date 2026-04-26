@@ -5,13 +5,15 @@
 // credentials (Railway env vars) to call those services on the user's behalf.
 //
 // Endpoints wrapped here:
-//   suggest(...)         → POST  /proxy/suggest            (Claude teleprompter)
-//   memory(...)          → POST  /proxy/memory             (Claude rolling summary)
-//   summarizeScript(...) → POST  /proxy/summarize-script   (script → playbook summary)
-//   getDeepgramKey()     → POST  /proxy/deepgram-key       (mint 10-min ephemeral key)
-//   sessionStart(...)    → POST  /log/session-start        (v1.0.5 cloud logging)
-//   sessionEnd(...)      → PATCH /log/session-end/:id      (v1.0.5 cloud logging)
-//   logBatch(...)        → POST  /log                      (v1.0.5 cloud logging)
+//   suggest(...)              → POST  /proxy/suggest            (Claude teleprompter)
+//   memory(...)               → POST  /proxy/memory             (Claude rolling summary)
+//   summarizeScript(...)      → POST  /proxy/summarize-script   (script → playbook summary)
+//   postCallSummary(...)      → POST  /proxy/post-call-summary  (Feature 5: end-of-call review)
+//   getDeepgramKey()          → POST  /proxy/deepgram-key       (mint 10-min ephemeral key)
+//   sessionStart(...)         → POST  /log/session-start        (v1.0.5 cloud logging)
+//   sessionEnd(...)           → PATCH /log/session-end/:id      (v1.0.5 cloud logging)
+//   saveSessionSummary(...)   → PATCH /log/session-summary/:id  (Feature 5: outcome + summary)
+//   logBatch(...)             → POST  /log                      (v1.0.5 cloud logging)
 //
 // Errors thrown by these methods are plain Error objects with a descriptive
 // message. Callers should try/catch and surface a useful message to the user.
@@ -100,6 +102,16 @@ class ProxyClient {
     });
   }
 
+  // Feature 5: ask Claude for a 5-section post-call coaching summary
+  // (STAGE REACHED, DISCOVERY COMPLETE, WHAT WENT WELL, AREAS TO IMPROVE,
+  // NEXT STEP) given a context string assembled from CallMemory at
+  // session end. Route hardcodes max_tokens (1000). Returns { summary }.
+  async postCallSummary(args) {
+    return this._post('/proxy/post-call-summary', {
+      callContext: args.callContext,
+    });
+  }
+
   // Mint a short-lived (10 min) Deepgram key. Returns { key: "..." }.
   // The key is used once during WebSocket handshake; Deepgram doesn't re-auth
   // after the socket is open, so a 10-min TTL is fine for calls of any length.
@@ -121,6 +133,17 @@ class ProxyClient {
   async sessionEnd(sessionId, outcome) {
     return this._patch('/log/session-end/' + encodeURIComponent(sessionId), {
       outcome: outcome || null,
+    });
+  }
+
+  // Feature 5: persist the user's outcome choice and the AI-generated
+  // post-call summary in one PATCH after the user picks Win/Loss/Follow-up
+  // on the overlay. Separate from sessionEnd because the summary doesn't
+  // exist yet at the moment stop-session runs. Returns { ok: true }.
+  async saveSessionSummary(sessionId, outcome, summary) {
+    return this._patch('/log/session-summary/' + encodeURIComponent(sessionId), {
+      outcome: outcome || null,
+      summary: summary || null,
     });
   }
 

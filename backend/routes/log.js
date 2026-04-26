@@ -109,6 +109,52 @@ router.patch('/session-end/:session_id', protect, async function(req, res) {
   }
 });
 
+// ── PATCH /log/session-summary/:session_id ──────────────────────────────────
+// Feature 5: persist the user's outcome choice + the AI-generated post-call
+// summary in one update, after the user picks Win/Loss/Follow-up on the
+// overlay. Separate from session-end on purpose: session-end runs as part of
+// stop-session teardown (no summary yet), this runs later when the user
+// commits a decision. Updating both columns in one statement avoids a
+// half-saved state where outcome lands but summary doesn't.
+router.patch('/session-summary/:session_id', protect, async function(req, res) {
+  var sessionId = req.params.session_id;
+  var { outcome, summary } = req.body || {};
+
+  if (outcome && ['win', 'loss', 'follow_up'].indexOf(outcome) === -1) {
+    return res.status(400).json({ error: 'outcome must be win, loss, or follow_up' });
+  }
+
+  try {
+    var admin = getAdminClient();
+    // user_id filter doubles as ownership check — same pattern as session-end.
+    var update = await admin
+      .from('call_sessions')
+      .update({
+        outcome: outcome || null,
+        post_call_summary: summary || null,
+      })
+      .eq('session_id', sessionId)
+      .eq('user_id', req.user.id)
+      .select('session_id')
+      .maybeSingle();
+
+    if (update.error) {
+      var detail = String(update.error.message || 'unknown').slice(0, 200);
+      console.error('[log] session-summary update failed:', detail);
+      return res.status(500).json({ error: 'Could not save summary: ' + detail });
+    }
+    if (!update.data) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    var f = formatUpstreamError(err, 'Session summary');
+    console.error('[log] session-summary error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
+  }
+});
+
 // ── POST /log ───────────────────────────────────────────────────────────────
 // Accepts a batch of log entries. Validates structure, stamps user_id and
 // session_id server-side (ignores anything the client might claim), bulk

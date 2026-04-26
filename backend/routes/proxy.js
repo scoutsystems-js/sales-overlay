@@ -179,6 +179,66 @@ router.post('/summarize-script', protect, async function(req, res) {
   }
 });
 
+// Post-call summary — Feature 5. Desktop app sends a compact context
+// string assembled from CallMemory at stop-session (rolling summary,
+// keyFacts, discovery flags, final stage). Backend asks Claude for a
+// 5-section coaching summary the closer reviews on the overlay before
+// marking outcome (Win/Loss/Follow-up). Output gets persisted to
+// call_sessions.post_call_summary alongside the outcome via PATCH
+// /log/session-summary/:id.
+router.post('/post-call-summary', protect, async function(req, res) {
+  var { callContext } = req.body;
+
+  if (!callContext || !callContext.trim()) {
+    return res.status(400).json({ error: 'callContext required' });
+  }
+
+  var summarizationPrompt =
+    'You are reviewing a sales call that just ended. Produce a concise ' +
+    'post-call coaching summary the closer can read in 30 seconds. Reference ' +
+    'specific things that happened on THIS call — names, numbers, objections, ' +
+    'phases reached. NO generic sales advice. NO platitudes. If a section has ' +
+    'nothing concrete, say so plainly.\n\n' +
+    'Respond in exactly this format with these five labeled sections.\n\n' +
+    'STAGE REACHED: [The final call stage and whether the closer ran the full ' +
+    'arc to close, stalled mid-discovery, etc. One sentence.]\n\n' +
+    'DISCOVERY COMPLETE: [Which of the seven discovery items were actually ' +
+    'uncovered (pain, goals, finances, willingness, timeline, decision maker, ' +
+    'why now). Name each. If a item was missed, name it as missed.]\n\n' +
+    'WHAT WENT WELL: [2-4 specific moments. Reference actual exchanges — ' +
+    'questions that landed, objections handled, moments the closer pivoted ' +
+    'cleanly. Quote or paraphrase actual call content.]\n\n' +
+    'AREAS TO IMPROVE: [2-4 specific moments. Where the closer could have dug ' +
+    'deeper, where a stage was rushed, where an objection was answered ' +
+    'instead of isolated. Tie each to actual call content.]\n\n' +
+    'NEXT STEP: [Concrete recommended follow-up — specific to whether the ' +
+    'prospect committed, stalled, or said no, and what they shared during ' +
+    'the call. One or two sentences.]\n\n' +
+    'CALL CONTEXT:\n' +
+    callContext;
+
+  try {
+    var anthropic = getAnthropic();
+    var response = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: summarizationPrompt }],
+    });
+
+    var content = response.content[0] ? response.content[0].text : null;
+    if (!content) {
+      return res.status(500).json({ error: 'No response from Claude' });
+    }
+
+    res.json({ summary: content });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    var f = formatProxyError(err, 'PostCallSummary');
+    console.error('[proxy] PostCallSummary error:', f.status, f.body.error);
+    res.status(f.status).json(f.body);
+  }
+});
+
 // Deepgram temporary key — Electron app requests a short-lived key,
 // connects directly to Deepgram WebSocket with it (no proxying of audio needed).
 router.post('/deepgram-key', protect, async function(req, res) {
