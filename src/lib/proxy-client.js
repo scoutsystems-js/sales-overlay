@@ -9,6 +9,7 @@
 //   memory(...)               → POST  /proxy/memory             (Claude rolling summary)
 //   summarizeScript(...)      → POST  /proxy/summarize-script   (script → playbook summary)
 //   postCallSummary(...)      → POST  /proxy/post-call-summary  (Feature 5: end-of-call review)
+//   kbSearch(...)             → POST  /kb/search                (KB lookup with Voyage embeddings)
 //   getDeepgramKey()          → POST  /proxy/deepgram-key       (mint 10-min ephemeral key)
 //   sessionStart(...)         → POST  /log/session-start        (v1.0.5 cloud logging)
 //   sessionEnd(...)           → PATCH /log/session-end/:id      (v1.0.5 cloud logging)
@@ -109,6 +110,18 @@ class ProxyClient {
   async postCallSummary(args) {
     return this._post('/proxy/post-call-summary', {
       callContext: args.callContext,
+    });
+  }
+
+  // KB lookup. Backend generates the Voyage embedding (key lives only on
+  // Railway), runs the match_knowledge RPC scoped to the caller's user_id
+  // and admin_id, and returns matched rows. Falls back server-side to
+  // keyword search if Voyage is down. Returns { results, source } where
+  // source is 'embedding' | 'keyword' | 'fallback-empty' | 'error'.
+  async kbSearch(query, matchCount) {
+    return this._post('/kb/search', {
+      query: query,
+      matchCount: matchCount || 5,
     });
   }
 
