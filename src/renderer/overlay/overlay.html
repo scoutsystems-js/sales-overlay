@@ -178,6 +178,93 @@
     }
     .call-banner-dismiss:hover { color: #fff; }
 
+    /* ── Device check panel ── */
+    .device-check {
+      padding: 10px 14px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      pointer-events: auto;
+      -webkit-app-region: no-drag;
+    }
+    .device-check-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 10px;
+    }
+    .device-check-section { margin-bottom: 10px; }
+    .device-check-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 4px;
+    }
+    .device-check-select {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      color: #ddd;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
+      font-size: 12px;
+      padding: 5px 8px;
+      font-family: inherit;
+      outline: none;
+    }
+    .device-check-meter {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .device-check-meter-fill {
+      width: 0%;
+      height: 100%;
+      background: #22c55e;
+      transition: width 0.1s ease;
+    }
+    .device-check-static {
+      font-size: 12px;
+      color: #888;
+    }
+    .device-check-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .device-check-start {
+      background: #22c55e;
+      color: #000;
+      border: none;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 14px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .device-check-start:hover { opacity: 0.85; }
+    .device-check-skip {
+      background: transparent;
+      border: none;
+      color: #555;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      padding: 4px 2px;
+    }
+    .device-check-skip:hover { color: #aaa; }
+    .device-check-error {
+      font-size: 11px;
+      color: #f87171;
+      margin-bottom: 8px;
+    }
+
     /* ── Post-call summary panel ── */
     .summary-panel {
       background: rgba(255, 255, 255, 0.02);
@@ -252,6 +339,24 @@
       </div>
     </div>
 
+    <!-- Device check: confirm mic before session starts -->
+    <div class="device-check" id="deviceCheckPanel" style="display:none">
+      <div class="device-check-header">⚙ Check your mic</div>
+      <div class="device-check-section">
+        <div class="device-check-label">Closer mic</div>
+        <select class="device-check-select" id="deviceMicSelect"></select>
+        <div class="device-check-meter"><div class="device-check-meter-fill" id="micLevelFill"></div></div>
+      </div>
+      <div class="device-check-section">
+        <div class="device-check-label">Call audio</div>
+        <div class="device-check-static">✓ Captured automatically on start</div>
+      </div>
+      <div class="device-check-actions">
+        <button class="device-check-start" id="deviceCheckStart">Start Session</button>
+        <button class="device-check-skip" id="deviceCheckSkip">Skip</button>
+      </div>
+    </div>
+
     <!-- Feature 4: call boundary detection banner -->
     <div class="call-banner" id="callBanner" style="display:none">
       <span class="call-banner-text">📞 Call detected — start Scout?</span>
@@ -293,9 +398,23 @@
     var summaryPanel      = document.getElementById('summaryPanel');
     var summaryContent    = document.getElementById('summaryContent');
     var summaryDismiss    = document.getElementById('summaryDismiss');
+    var deviceCheckPanel    = document.getElementById('deviceCheckPanel');
+    var deviceMicSelect     = document.getElementById('deviceMicSelect');
+    var micLevelFill        = document.getElementById('micLevelFill');
+    var deviceCheckStartBtn = document.getElementById('deviceCheckStart');
+    var deviceCheckSkipBtn  = document.getElementById('deviceCheckSkip');
 
     // ── Button handlers ──
-    btnStart.addEventListener('click', function() { window.electronAPI.startSession('generic'); });
+    btnStart.addEventListener('click', function() {
+      // Show the device check panel and probe the mic. Start does NOT
+      // fire startSession directly anymore — the panel's commit/skip
+      // buttons trigger the session via the device-check IPC relay.
+      deviceCheckPanel.style.display = 'block';
+      btnStart.style.display = 'none';
+      // Reset the level fill in case it has stale width from a prior check.
+      micLevelFill.style.width = '0%';
+      window.electronAPI.startDeviceCheck();
+    });
     btnStop.addEventListener('click',  function() { window.electronAPI.stopSession(); });
     btnQuit.addEventListener('click',  function() { window.electronAPI.quitApp(); });
 
@@ -312,6 +431,17 @@
       summaryPanel.style.display = 'none';
     });
 
+    deviceCheckStartBtn.addEventListener('click', function() {
+      var micId = deviceMicSelect.value || '';
+      deviceCheckPanel.style.display = 'none';
+      window.electronAPI.commitDeviceCheck(micId);
+    });
+
+    deviceCheckSkipBtn.addEventListener('click', function() {
+      deviceCheckPanel.style.display = 'none';
+      window.electronAPI.cancelDeviceCheck();
+    });
+
     // ── Auto-resize window to match bar content height ──
     var resizeObserver = new ResizeObserver(function() {
       window.electronAPI.resizeOverlay(bar.offsetHeight);
@@ -326,6 +456,7 @@
       promptArea.style.display  = active ? 'block' : 'none';
       callBanner.style.display  = 'none';
       summaryPanel.style.display = 'none';
+      deviceCheckPanel.style.display = 'none';
       if (!active) promptStack.innerHTML = '';
     }
 
@@ -497,6 +628,46 @@
       var summary = data && data.summary ? data.summary : '';
       summaryContent.innerHTML = parseSummaryToHtml(summary);
       summaryPanel.style.display = 'block';
+    });
+
+    // Device check: populate the mic dropdown when control finishes probing.
+    // Error path renders an inline error + a "Start anyway" affordance —
+    // the existing Skip button does the same thing, so we reuse the visible
+    // Start Session button label by swapping its text/handler temporarily.
+    window.electronAPI.onDeviceCheckReady(function(data) {
+      deviceMicSelect.innerHTML = '';
+      // Remove any previous error notice from a prior failed check.
+      var prevErr = deviceCheckPanel.querySelector('.device-check-error');
+      if (prevErr) prevErr.remove();
+
+      if (!data || data.error) {
+        var errEl = document.createElement('div');
+        errEl.className = 'device-check-error';
+        errEl.textContent = 'Could not probe mic' + (data && data.error ? (': ' + data.error) : '') + '. You can start the session anyway.';
+        deviceCheckPanel.insertBefore(errEl, deviceCheckPanel.firstChild.nextSibling);
+        // Disable the dropdown — there's nothing to select.
+        deviceMicSelect.disabled = true;
+        return;
+      }
+
+      deviceMicSelect.disabled = false;
+      var mics = (data && data.mics) || [];
+      for (var i = 0; i < mics.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = mics[i].id;
+        opt.textContent = mics[i].label || ('Microphone ' + (i + 1));
+        deviceMicSelect.appendChild(opt);
+      }
+      if (data.selectedMicId) deviceMicSelect.value = data.selectedMicId;
+    });
+
+    // Live mic level meter. micRMS for normal speech sits around 0.015-0.05
+    // (per the [audio] log values seen in real sessions). Scale: 0.15 RMS
+    // = full bar. Clamp 0-100 so loud spikes don't overflow.
+    window.electronAPI.onAudioLevelUpdate(function(data) {
+      var rms = (data && typeof data.micRMS === 'number') ? data.micRMS : 0;
+      var pct = Math.max(0, Math.min(100, (rms / 0.15) * 100));
+      micLevelFill.style.width = pct + '%';
     });
   </script>
 </body>

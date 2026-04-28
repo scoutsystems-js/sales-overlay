@@ -39,6 +39,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('show-setup-nudge', function() { callback(); });
   },
 
+  // Device check — overlay drives the probe lifecycle, control runs it,
+  // main is a thin relay between the two windows.
+  startDeviceCheck: function() { ipcRenderer.send('device-check-start'); },
+  onDeviceCheckStart: function(callback) {
+    ipcRenderer.on('device-check-start', function() { callback(); });
+  },
+  deviceCheckReady: function(data) { ipcRenderer.send('device-check-ready', data); },
+  onDeviceCheckReady: function(callback) {
+    ipcRenderer.on('device-check-ready', function(event, data) { callback(data); });
+  },
+  audioLevelUpdate: function(micRMS) { ipcRenderer.send('audio-level-update', { micRMS: micRMS }); },
+  onAudioLevelUpdate: function(callback) {
+    ipcRenderer.on('audio-level-update', function(event, data) { callback(data); });
+  },
+  commitDeviceCheck: function(micDeviceId) { ipcRenderer.send('device-check-commit', { micDeviceId: micDeviceId }); },
+  onDeviceCheckCommit: function(callback) {
+    ipcRenderer.on('device-check-commit', function(event, data) { callback(data); });
+  },
+  cancelDeviceCheck: function() { ipcRenderer.send('device-check-cancel'); },
+  onDeviceCheckCancel: function(callback) {
+    ipcRenderer.on('device-check-cancel', function() { callback(); });
+  },
+
   onStatusUpdate: function(callback) {
     ipcRenderer.on('status-update', function(event, data) { callback(data); });
   },

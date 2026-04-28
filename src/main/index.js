@@ -722,7 +722,11 @@ ipcMain.handle('upload-script', async function(event, scriptText, clientName) {
   }
 });
 
-ipcMain.on('start-session', async function(event, clientId) {
+// Extracted v1.1.x: device-check commit/cancel paths also need to start a
+// session, so the body of 'start-session' moved into a named function. Pure
+// refactor — every line below is byte-identical to the prior handler body
+// (just receives clientId as a parameter instead of from the IPC event arg).
+async function startSessionNow(clientId) {
   activeClient = clientId || 'generic';
 
   if (kb) {
@@ -859,6 +863,12 @@ ipcMain.on('start-session', async function(event, clientId) {
       overlayWindow.webContents.send('status-update', { active: false });
     }
   }
+}
+
+// IPC entry point for the original Start path (used when the overlay
+// fires startSession directly, bypassing the device check).
+ipcMain.on('start-session', function(event, clientId) {
+  startSessionNow(clientId);
 });
 
 ipcMain.on('stop-session', async function() {
@@ -989,6 +999,41 @@ ipcMain.on('call-detected', function() {
   if (overlayWindow) {
     overlayWindow.webContents.send('call-detected');
   }
+});
+
+// ── Device check relays (overlay <-> control via main) ──
+// Five thin relays. The overlay drives the lifecycle and renders the UI;
+// control runs the actual mic probe and emits levels. main is a transparent
+// pass-through with overlayWindow / controlWindow null-checks.
+
+ipcMain.on('device-check-start', function() {
+  if (controlWindow) controlWindow.webContents.send('device-check-start');
+});
+
+ipcMain.on('device-check-ready', function(event, data) {
+  if (overlayWindow) overlayWindow.webContents.send('device-check-ready', data);
+});
+
+ipcMain.on('audio-level-update', function(event, data) {
+  // High-frequency relay (every audio buffer ~22ms while probe is active).
+  // No logging here; the volume would drown the rest of session_logs.
+  if (overlayWindow) overlayWindow.webContents.send('audio-level-update', data);
+});
+
+ipcMain.on('device-check-commit', function(event, data) {
+  console.log('[main] Device check committed — starting session');
+  if (controlWindow) controlWindow.webContents.send('device-check-commit', data);
+  // Kick off the session AFTER relaying commit so control has the chosen
+  // mic id assigned to micSelect before startAudioCapture runs.
+  startSessionNow('generic');
+});
+
+ipcMain.on('device-check-cancel', function() {
+  console.log('[main] Device check cancelled — starting session anyway');
+  if (controlWindow) controlWindow.webContents.send('device-check-cancel');
+  // Skip means: don't change the device, just start. Session begins with
+  // whatever mic was already selected in control.js.
+  startSessionNow('generic');
 });
 
 ipcMain.on('quit-app', function() {

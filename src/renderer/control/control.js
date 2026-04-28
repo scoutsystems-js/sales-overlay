@@ -19,6 +19,15 @@ var callDetectCount = 0;
 var lastCallDetectTime = 0;
 var sessionActive = false;
 
+// Device check probe state (Feature: device check panel). When the overlay
+// asks the user to confirm their mic, control opens a lightweight mic-only
+// stream and emits live RMS levels via 'audio-level-update' until the user
+// commits or cancels. Distinct from the session capture so the probe can
+// run BEFORE start-session and be torn down cleanly when the user commits.
+var micProbeStream = null;
+var micProbeContext = null;
+var deviceCheckActive = false;
+
 // ── Audio device enumeration (mic only) ──
 
 async function enumerateAudioDevices() {
@@ -239,6 +248,14 @@ async function startAudioCapture() {
           rightRMS = Math.sqrt(rightRMS / right.length);
           window.electronAPI.logToMain('[audio] Mic level: ' + leftRMS.toFixed(4) + ' | System level: ' + rightRMS.toFixed(4));
 
+          // Device check: emit mic level if a check is somehow active during
+          // a session (defensive — current UX only runs the check before
+          // start-session via micProbeStream below, but if a future flow ever
+          // re-checks mid-session this stays correct).
+          if (deviceCheckActive) {
+            window.electronAPI.audioLevelUpdate(leftRMS);
+          }
+
           // Feature 4: call boundary detection
           if (!sessionActive) {
             if (rightRMS > CALL_DETECT_THRESHOLD) {
@@ -305,6 +322,79 @@ function stopAudioCapture() {
   window.electronAPI.logToMain('[control] Audio capture stopped');
 }
 
+// ── Device check probe (runs BEFORE start-session) ──
+//
+// Lightweight mic-only stream + processor that emits leftRMS on every
+// audio buffer. The overlay drives the lifecycle: 'device-check-start'
+// opens the probe, audio-level-update fires continuously while it's open,
+// then 'device-check-commit' or 'device-check-cancel' tears it down. The
+// session capture (startAudioCapture) opens its own streams afterward,
+// so the probe MUST be fully stopped before the session begins or
+// getUserMedia will conflict on the same deviceId.
+
+function stopMicProbe() {
+  deviceCheckActive = false;
+  if (micProbeContext) {
+    try { micProbeContext.close(); } catch (e) { /* best-effort */ }
+    micProbeContext = null;
+  }
+  if (micProbeStream) {
+    micProbeStream.getTracks().forEach(function(t) { t.stop(); });
+    micProbeStream = null;
+  }
+}
+
+async function startMicProbe() {
+  // Ensure no prior probe is still running before we open a new one.
+  stopMicProbe();
+  await enumerateAudioDevices();
+
+  // Build the same mic-list shape the overlay needs to render its dropdown.
+  var mics = [];
+  for (var i = 0; i < micSelect.options.length; i++) {
+    mics.push({
+      id: micSelect.options[i].value,
+      label: micSelect.options[i].textContent,
+    });
+  }
+  var selectedMicId = micSelect.value || (mics.length > 0 ? mics[0].id : '');
+
+  var micDeviceId = selectedMicId;
+  var constraints = {
+    audio: { echoCancellation: false, noiseSuppression: false, sampleRate: 16000 },
+    video: false,
+  };
+  if (micDeviceId) constraints.audio.deviceId = { exact: micDeviceId };
+
+  try {
+    micProbeStream = await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (err) {
+    window.electronAPI.logToMain('[control] Device check probe failed to open mic: ' + err.message);
+    window.electronAPI.deviceCheckReady({ mics: mics, selectedMicId: selectedMicId, error: err.message || 'mic access failed' });
+    return;
+  }
+
+  micProbeContext = new AudioContext({ sampleRate: 16000 });
+  var src = micProbeContext.createMediaStreamSource(micProbeStream);
+  // ScriptProcessor is deprecated but matches the existing session pattern.
+  // Mono in/out (1 channel) since the probe only watches the mic.
+  var probe = micProbeContext.createScriptProcessor(4096, 1, 1);
+  probe.onaudioprocess = function(e) {
+    if (!deviceCheckActive) return;
+    var input = e.inputBuffer.getChannelData(0);
+    var sum = 0;
+    for (var j = 0; j < input.length; j++) sum += input[j] * input[j];
+    var rms = Math.sqrt(sum / input.length);
+    window.electronAPI.audioLevelUpdate(rms);
+  };
+  src.connect(probe);
+  probe.connect(micProbeContext.destination);
+
+  deviceCheckActive = true;
+  window.electronAPI.logToMain('[control] Device check probe started (mic=' + (selectedMicId || 'default') + ')');
+  window.electronAPI.deviceCheckReady({ mics: mics, selectedMicId: selectedMicId });
+}
+
 // ── Session controls ──
 
 btnStart.addEventListener('click', async function() {
@@ -355,6 +445,32 @@ window.electronAPI.onTriggerStartAudio(async function() {
 
 window.electronAPI.onTriggerStopAudio(function() {
   stopAudioCapture();
+});
+
+// ── Device check IPC handlers (driven by the overlay) ──
+window.electronAPI.onDeviceCheckStart(async function() {
+  try {
+    await startMicProbe();
+  } catch (err) {
+    window.electronAPI.logToMain('[control] startMicProbe threw: ' + err.message);
+    window.electronAPI.deviceCheckReady({ mics: [], selectedMicId: '', error: err.message || 'unknown error' });
+  }
+});
+
+window.electronAPI.onDeviceCheckCommit(function(data) {
+  var micDeviceId = data && data.micDeviceId;
+  if (micDeviceId) {
+    micSelect.value = micDeviceId;
+    window.electronAPI.logToMain('[control] Device check committed mic: ' + micDeviceId);
+  } else {
+    window.electronAPI.logToMain('[control] Device check committed with no mic id (keeping current selection)');
+  }
+  stopMicProbe();
+});
+
+window.electronAPI.onDeviceCheckCancel(function() {
+  window.electronAPI.logToMain('[control] Device check cancelled');
+  stopMicProbe();
 });
 
 // ── Init ──
