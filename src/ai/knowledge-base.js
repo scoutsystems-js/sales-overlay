@@ -1,89 +1,53 @@
+// KnowledgeBase: client for the shared Supabase knowledge_base table.
+//
+// v1.1.x architecture change: the search path now routes through the Railway
+// backend's /kb/search route (which generates Voyage embeddings server-side
+// and applies user/team scope). The legacy direct Voyage call was broken
+// (no API key in the desktop env post-v1.0.4) and the legacy direct Supabase
+// search had no scoping — both replaced by `search()`.
+//
+// `searchByText()` is kept as a local fallback for when the proxy isn't
+// available (e.g. before a session has built one, or if Railway is down).
+// `getFrameworkPhases()`, `getByCategory()`, `addEntry()`, `addEntries()`,
+// and `buildContext()` are unchanged — they query Supabase directly by
+// category/label, which doesn't need scoping.
+
 var { createClient } = require('@supabase/supabase-js');
 
 class KnowledgeBase {
-  constructor(supabaseUrl, supabaseKey) {
+  constructor(supabaseUrl, supabaseKey, proxyClient) {
     this.supabase = createClient(supabaseUrl, supabaseKey);
-    this.embeddingCache = {};
+    this.proxy = proxyClient || null;
     this.activeClient = 'generic'; // Set by main process on session start
   }
 
-  // Generate embedding for a text string using Anthropic's Voyager model
-  // Falls back to a simple keyword search if embedding fails
-  async getEmbedding(text) {
-    // Check cache first
-    var cacheKey = text.substring(0, 100);
-    if (this.embeddingCache[cacheKey]) {
-      return this.embeddingCache[cacheKey];
-    }
-
-    try {
-      // Use Supabase Edge Function or a direct fetch to an embedding API
-      // For now, we'll use a simple approach with the Anthropic API
-      // to generate a search-optimized query, then do text matching
-      var response = await fetch('https://api.voyageai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + (process.env.VOYAGE_API_KEY || ''),
-        },
-        body: JSON.stringify({
-          input: [text],
-          model: 'voyage-3-lite',
-        }),
-      });
-
-      if (response.ok) {
-        var data = await response.json();
-        var embedding = data.data[0].embedding;
-        this.embeddingCache[cacheKey] = embedding;
-        return embedding;
-      }
-    } catch (err) {
-      // Embedding API not available, fall back to text search
-    }
-
-    return null;
-  }
-
-  // Search knowledge base by vector similarity
-  async searchByEmbedding(queryText, matchCount) {
+  // Primary search method (v1.1.x). Calls /kb/search on the Railway backend,
+  // which handles Voyage embeddings + user/team/global scoping. Falls back
+  // to local text search if no proxy is available or the proxy errors.
+  async search(queryText, matchCount) {
     matchCount = matchCount || 5;
-    var embedding = await this.getEmbedding(queryText);
-
-    if (embedding) {
-      var result = await this.supabase.rpc('match_knowledge', {
-        query_embedding: embedding,
-        match_threshold: 0.5,
-        match_count: matchCount,
-      });
-
-      if (result.data && result.data.length > 0) {
-        return result.data;
+    if (this.proxy && typeof this.proxy.kbSearch === 'function') {
+      try {
+        var res = await this.proxy.kbSearch(queryText, matchCount);
+        if (res && Array.isArray(res.results)) {
+          return res.results;
+        }
+      } catch (err) {
+        console.error('[kb] Proxy search failed, falling back to local text search:', err.message);
       }
     }
-
-    // Fall back to text search
     return this.searchByText(queryText, matchCount);
   }
 
-  // Search for all phases of a specific framework
-  async getFrameworkPhases(frameworkId) {
-    var result = await this.supabase
-      .from('knowledge_base')
-      .select('*')
-      .eq('category', 'objection_framework')
-      .filter('metadata->>framework', 'eq', frameworkId)
-      .order('metadata->>phase', { ascending: true });
-
-    return result.data || [];
-  }
-
-  // Fallback: search by text matching against triggers and content
+  // Local text-search fallback. Direct Supabase fetch + JS scoring. Kept
+  // for offline/proxy-unavailable scenarios. Preserves the activeClient
+  // scoring for backwards compatibility with any pre-v1.1.x entries that
+  // used metadata.client for tagging — new uploads (v1.1.x+) use the
+  // uploaded_by/scope columns instead and don't need this filter.
   async searchByText(queryText, matchCount) {
     matchCount = matchCount || 5;
     var lower = queryText.toLowerCase();
 
-    // Search by triggers array overlap — fetch more to score properly
     var result = await this.supabase
       .from('knowledge_base')
       .select('*')
@@ -91,19 +55,18 @@ class KnowledgeBase {
 
     if (!result.data) return [];
 
-    // Score each result by how well it matches the query
     var self = this;
     var scored = result.data.map(function(row) {
       var score = 0;
 
-      // Boost client-specific results (strong preference for active client)
+      // Boost client-specific results (strong preference for active client) —
+      // legacy metadata.client tag, NOT the new scope column.
       var rowClient = (row.metadata && row.metadata.client) ? row.metadata.client : null;
       if (rowClient && rowClient === self.activeClient) {
-        score += 20; // Big boost for matching client
+        score += 20;
       } else if (rowClient && rowClient !== self.activeClient && self.activeClient !== 'generic') {
-        score -= 5; // Penalize wrong client (unless we're on generic)
+        score -= 5;
       }
-      // Core frameworks (no client tag) always score normally
 
       // Check triggers
       if (row.triggers) {
@@ -132,12 +95,25 @@ class KnowledgeBase {
       return row;
     });
 
-    // Sort by score and return top matches
     scored.sort(function(a, b) { return b._score - a._score; });
     return scored.slice(0, matchCount).filter(function(r) { return r._score > 0; });
   }
 
-  // Search by category
+  // Search for all phases of a specific framework — direct Supabase query,
+  // unchanged from pre-v1.1.x. Used by the live suggestion engine for
+  // exact-match objection framework lookups (not text search).
+  async getFrameworkPhases(frameworkId) {
+    var result = await this.supabase
+      .from('knowledge_base')
+      .select('*')
+      .eq('category', 'objection_framework')
+      .filter('metadata->>framework', 'eq', frameworkId)
+      .order('metadata->>phase', { ascending: true });
+
+    return result.data || [];
+  }
+
+  // Search by category — direct Supabase query, unchanged.
   async getByCategory(category, limit) {
     limit = limit || 10;
     var result = await this.supabase
@@ -149,7 +125,11 @@ class KnowledgeBase {
     return result.data || [];
   }
 
-  // Add a new entry to the knowledge base
+  // Legacy single-entry insert. Pre-v1.1.x used by the original script
+  // upload flow in src/ai/script-parser.js. New user uploads (v1.1.x+) go
+  // through /kb/upload on the backend, which handles chunking + embeddings
+  // + scope tagging. This path stays for backwards compat with the old
+  // upload-script IPC handler.
   async addEntry(category, label, content, triggers, metadata) {
     triggers = triggers || [];
     metadata = metadata || {};
@@ -161,12 +141,6 @@ class KnowledgeBase {
       triggers: triggers,
       metadata: metadata,
     };
-
-    // Try to generate embedding
-    var embedding = await this.getEmbedding(label + ' ' + content);
-    if (embedding) {
-      entry.embedding = embedding;
-    }
 
     var result = await this.supabase
       .from('knowledge_base')

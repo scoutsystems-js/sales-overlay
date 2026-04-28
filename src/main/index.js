@@ -729,11 +729,16 @@ ipcMain.handle('upload-script', async function(event, scriptText, clientName) {
 async function startSessionNow(clientId) {
   activeClient = clientId || 'generic';
 
+  var proxy = buildProxyClient();
+
   if (kb) {
     kb.activeClient = activeClient;
+    // v1.1.x: attach the session's authenticated proxy so kb.search() can
+    // route through /kb/search (Voyage embeddings + user/team scoping).
+    // Lazy-bind here rather than at KB construction because the proxy
+    // depends on a logged-in session, which doesn't exist at app startup.
+    kb.proxy = proxy;
   }
-
-  var proxy = buildProxyClient();
 
   // v1.0.5: start the cloud logger FIRST so every console.log from this point
   // on gets captured alongside its session_id. If session-start fails (e.g.
