@@ -205,14 +205,17 @@ function chunkTranscript(text) {
   return chunks;
 }
 
-// Diversity enforcement on search results. Guarantees at least 1 framework
-// entry (uploaded_by IS NULL) makes it into the final result set when any
-// frameworks match — prevents user uploads from saturating the top-N and
-// drowning out the seeded sales frameworks the system was designed around.
+// Result merging on search. Uploaded content (uploaded_by IS NOT NULL)
+// takes priority over seeded frameworks — the user's own materials are
+// what they care about most, and seeded frameworks only fill slots the
+// uploads don't use. If uploads fully saturate matchCount slots the
+// frameworks are dropped entirely from this query (they're still in
+// the KB, just not surfaced for this particular search).
 //
 // Inputs are already sorted by similarity (or _score for keyword path)
-// descending. We pick the top framework + top (matchCount-1) uploads,
-// then re-sort the merged set by score so the most relevant entry leads.
+// descending. We take top uploads first, then top frameworks for the
+// leftover slots, and re-sort the merged set so the most relevant
+// entry leads regardless of which bucket it came from.
 function enforceDiversity(rows, matchCount) {
   var framework = [];
   var uploads = [];
@@ -221,10 +224,11 @@ function enforceDiversity(rows, matchCount) {
     if (r.uploaded_by === null || r.uploaded_by === undefined) framework.push(r);
     else uploads.push(r);
   }
-  if (framework.length === 0) return uploads.slice(0, matchCount);
-  if (uploads.length === 0)   return framework.slice(0, matchCount);
+  if (uploads.length === 0)         return framework.slice(0, matchCount);
+  if (uploads.length >= matchCount) return uploads.slice(0, matchCount);
 
-  var picked = [framework[0]].concat(uploads.slice(0, matchCount - 1));
+  var remaining = matchCount - uploads.length;
+  var picked = uploads.concat(framework.slice(0, remaining));
   picked.sort(function(a, b) {
     var sa = (typeof a.similarity === 'number') ? a.similarity : (a._score || 0);
     var sb = (typeof b.similarity === 'number') ? b.similarity : (b._score || 0);
