@@ -537,6 +537,11 @@
     .kb-badge.kb-type-url   { color: #93c5fd; border-color: rgba(147,197,253,0.3); background: rgba(59,130,246,0.10); }
     .kb-badge.kb-type-pdf   { color: #fca5a5; border-color: rgba(252,165,165,0.3); background: rgba(239,68,68,0.10); }
     .kb-badge.kb-type-paste { color: #d4d4d8; border-color: rgba(212,212,216,0.25); background: rgba(255,255,255,0.04); }
+    /* Category badges — visually distinct from type badges (cooler hues:
+       teal for offer docs, purple for transcripts) so users can tell the
+       two at a glance even though they sit side-by-side. */
+    .kb-badge.kb-cat-offer_document { color: #5eead4; border-color: rgba(94,234,212,0.3); background: rgba(20,184,166,0.10); }
+    .kb-badge.kb-cat-winning_call   { color: #c4b5fd; border-color: rgba(196,181,253,0.3); background: rgba(139,92,246,0.10); }
     .kb-badge.kb-scope-global   { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
     .kb-badge.kb-scope-team     { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
     .kb-badge.kb-scope-personal { color: var(--muted); }
@@ -605,6 +610,25 @@
       font-family: inherit;
     }
     .kb-modal-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+    .kb-form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .kb-form-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .kb-form-row input[type="text"],
+    .kb-form-row select {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .kb-form-row input:focus,
+    .kb-form-row select:focus { border-color: var(--green); }
+    .kb-form-row select { cursor: pointer; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
 
     .kb-tabs {
       display: flex;
@@ -727,7 +751,7 @@
   <section class="kb-section">
     <div class="kb-header">
       <div class="section-heading">Knowledge Base</div>
-      <button class="kb-add-btn" onclick="openKbModal()">+ Add</button>
+      <button class="kb-add-btn" onclick="openKbModal()">+ Add resource</button>
     </div>
     <div id="kbContainer">
       <div class="load-spinner"><div class="spinner"></div></div>
@@ -763,6 +787,24 @@
     <button class="kb-modal-close" onclick="closeKbModal()" aria-label="Close">✕</button>
     <h2>Add to Knowledge Base</h2>
 
+    <!-- Label and category sit above the tabs so they're always visible
+         regardless of source type. Both are required — chunking strategy
+         depends on category, and the label is what the user sees later in
+         the list and what Claude references in [WINNING CALL: …] /
+         [OFFER DOCUMENT: …] context lines. -->
+    <div class="kb-form-row">
+      <label class="kb-form-label" for="kbLabel">Label</label>
+      <input type="text" id="kbLabel" placeholder="e.g. Silver Living landing page, or Winning call - March 2026" autocomplete="off" required/>
+    </div>
+
+    <div class="kb-form-row">
+      <label class="kb-form-label" for="kbCategory">Content type</label>
+      <select id="kbCategory">
+        <option value="offer_document">Offer document (script, landing page, FAQ, product info)</option>
+        <option value="winning_call">Winning call transcript</option>
+      </select>
+    </div>
+
     <div class="kb-tabs" role="tablist">
       <button class="kb-tab active" data-tab="url"   onclick="switchKbTab('url')">URL</button>
       <button class="kb-tab"        data-tab="pdf"   onclick="switchKbTab('pdf')">PDF</button>
@@ -771,17 +813,14 @@
 
     <div class="kb-tab-panel" data-panel="url">
       <input type="url"  id="kbUrlInput"  placeholder="https://example.com/article" autocomplete="off"/>
-      <input type="text" id="kbUrlLabel"  placeholder="Label (optional — auto-detected from page title)" autocomplete="off"/>
     </div>
 
     <div class="kb-tab-panel hidden" data-panel="pdf">
       <input type="file" id="kbPdfInput"  accept=".pdf"/>
-      <input type="text" id="kbPdfLabel"  placeholder="Label (optional — defaults to filename)" autocomplete="off"/>
     </div>
 
     <div class="kb-tab-panel hidden" data-panel="paste">
       <textarea id="kbPasteInput" placeholder="Paste your content here…" rows="8"></textarea>
-      <input type="text" id="kbPasteLabel" placeholder="Label (required)" autocomplete="off"/>
     </div>
 
     <div class="kb-status" id="kbStatus"></div>
@@ -1617,6 +1656,18 @@
       var typeBadge = it.source_type
         ? '<span class="kb-badge kb-type-' + escapeHtml(it.source_type) + '">' + escapeHtml(it.source_type) + '</span>'
         : '';
+      // Category badge — only when category is set (pre-feature uploads
+      // don't have it). Friendly labels rather than the raw enum value.
+      var catBadge = '';
+      if (it.category === 'offer_document') {
+        catBadge = '<span class="kb-badge kb-cat-offer_document">Offer doc</span>';
+      } else if (it.category === 'winning_call') {
+        catBadge = '<span class="kb-badge kb-cat-winning_call">Winning call</span>';
+      }
+      // Scope badge stays on admin: admins see uploads with mixed scopes
+      // (own personal/team plus their team members') so the badge tells
+      // them which is which. Dashboard hides it because users only ever
+      // see their own personal uploads.
       var scopeBadge = it.scope
         ? '<span class="kb-badge kb-scope-' + escapeHtml(it.scope) + '">' + escapeHtml(it.scope) + '</span>'
         : '';
@@ -1625,7 +1676,7 @@
       parts.push(
         '<div class="kb-item">'
           + '<div class="kb-item-main">'
-            + '<div class="kb-item-title">' + typeBadge + scopeBadge + escapeHtml(it.source_label || '(unlabeled)') + '</div>'
+            + '<div class="kb-item-title">' + typeBadge + catBadge + scopeBadge + escapeHtml(it.source_label || '(unlabeled)') + '</div>'
             + '<div class="kb-item-sub">' + chunkText + ' · added ' + rel + '</div>'
           + '</div>'
           + '<button class="kb-delete-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="deleteKbItem(this.getAttribute(\'data-label\'))">Delete</button>'
@@ -1664,12 +1715,17 @@
   function openKbModal() {
     var modal = document.getElementById('kbModal');
     if (!modal) return;
+    // Reset form state every time the modal opens — switching to URL tab,
+    // clearing inputs, resetting category to default, hiding any leftover
+    // error from a previous attempt.
     switchKbTab('url');
-    var ids = ['kbUrlInput','kbUrlLabel','kbPdfInput','kbPdfLabel','kbPasteInput','kbPasteLabel'];
+    var ids = ['kbLabel','kbUrlInput','kbPdfInput','kbPasteInput'];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
       if (el) el.value = '';
     }
+    var cat = document.getElementById('kbCategory');
+    if (cat) cat.value = 'offer_document';
     setKbStatus('', '');
     var submit = document.getElementById('kbSubmit');
     if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
@@ -1713,28 +1769,31 @@
 
   async function submitKbUpload() {
     var tab = getActiveKbTab();
+    var label = (document.getElementById('kbLabel').value || '').trim();
+    var category = (document.getElementById('kbCategory').value || 'offer_document');
+
+    // Label is required for every type now — it's what shows in the list
+    // and what Claude references in [WINNING CALL: …] / [OFFER DOCUMENT: …]
+    // context lines, so a meaningful name matters more than the source.
+    if (!label) { setKbStatus('Give this resource a label.', 'error'); return; }
+
     var fd = new FormData();
     fd.append('type', tab);
+    fd.append('label', label);
+    fd.append('category', category);
 
     if (tab === 'url') {
       var url = (document.getElementById('kbUrlInput').value || '').trim();
       if (!url) { setKbStatus('Enter a URL.', 'error'); return; }
       fd.append('url', url);
-      var lbl = (document.getElementById('kbUrlLabel').value || '').trim();
-      if (lbl) fd.append('label', lbl);
     } else if (tab === 'pdf') {
       var fileEl = document.getElementById('kbPdfInput');
       if (!fileEl || !fileEl.files || !fileEl.files[0]) { setKbStatus('Select a PDF file.', 'error'); return; }
       fd.append('file', fileEl.files[0]);
-      var lblP = (document.getElementById('kbPdfLabel').value || '').trim();
-      if (lblP) fd.append('label', lblP);
     } else if (tab === 'paste') {
       var text = (document.getElementById('kbPasteInput').value || '').trim();
-      var lblT = (document.getElementById('kbPasteLabel').value || '').trim();
       if (!text) { setKbStatus('Paste some content.', 'error'); return; }
-      if (!lblT) { setKbStatus('Label is required for pasted content.', 'error'); return; }
       fd.append('text', text);
-      fd.append('label', lblT);
     } else {
       setKbStatus('Pick a tab.', 'error');
       return;
