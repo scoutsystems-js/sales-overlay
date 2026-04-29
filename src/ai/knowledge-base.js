@@ -171,6 +171,10 @@ class KnowledgeBase {
       lines.push('');
       if (r.metadata && r.metadata.framework && r.metadata.phase) {
         lines.push('[FRAMEWORK: ' + r.metadata.framework.toUpperCase() + ' - PHASE ' + r.metadata.phase + ': ' + r.metadata.phaseLabel + ']');
+      } else if (r.metadata && r.metadata.category === 'winning_call') {
+        lines.push('[WINNING CALL: ' + r.label + ']');
+      } else if (r.metadata && r.metadata.category === 'offer_document') {
+        lines.push('[OFFER DOCUMENT: ' + r.label + ']');
       } else {
         lines.push('[' + r.category.toUpperCase() + '] ' + r.label);
       }

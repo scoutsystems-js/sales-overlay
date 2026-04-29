@@ -159,6 +159,80 @@ function chunkText(text) {
   return chunks;
 }
 
+// Transcript-aware chunking. Detects speaker turns at line starts (CLOSER:,
+// PROSPECT:, Speaker 1:, Agent:, etc.) and groups TURNS_PER_CHUNK turns per
+// chunk with TURN_OVERLAP turns of overlap between adjacent chunks. Falls
+// back to fixed-word chunkText() if the content doesn't look like a real
+// transcript (fewer than 4 detected turns) — protects against pasting
+// random prose into the "Winning call transcript" category.
+//
+// Trailing partial chunks are kept (unlike chunkText's <50-word drop)
+// because a 2- or 3-turn final exchange in a sales call often contains
+// the close itself, which is the most valuable part of the transcript.
+var SPEAKER_RE = /^(?:[A-Z]{2,}|[A-Z][a-z]+(?:\s+\d+)?):\s/;
+var TURNS_PER_CHUNK = 5;
+var TURN_OVERLAP = 2;
+function chunkTranscript(text) {
+  var lines = String(text || '').split(/\r?\n/);
+  var turns = [];
+  var current = null;
+  for (var i = 0; i < lines.length; i++) {
+    var trimmed = lines[i].trim();
+    if (!trimmed) continue;
+    if (SPEAKER_RE.test(trimmed)) {
+      if (current) turns.push(current);
+      current = trimmed;
+    } else if (current) {
+      // Continuation of the current speaker's turn (multi-line utterance).
+      current += ' ' + trimmed;
+    }
+    // Lines before the first speaker tag are dropped — usually transcript
+    // headers ("Recorded 2026-04-15", "Duration 47:12", etc.) that would
+    // pollute the embedding if attached to whoever spoke first.
+  }
+  if (current) turns.push(current);
+
+  if (turns.length < 4) return chunkText(text);
+
+  var chunks = [];
+  var stride = TURNS_PER_CHUNK - TURN_OVERLAP; // 3 — turn N's last 2 reappear as N+1's first 2
+  for (var j = 0; j < turns.length; j += stride) {
+    var slice = turns.slice(j, j + TURNS_PER_CHUNK);
+    if (slice.length === 0) break;
+    chunks.push(slice.join('\n'));
+    if (j + TURNS_PER_CHUNK >= turns.length) break;
+  }
+  return chunks;
+}
+
+// Diversity enforcement on search results. Guarantees at least 1 framework
+// entry (uploaded_by IS NULL) makes it into the final result set when any
+// frameworks match — prevents user uploads from saturating the top-N and
+// drowning out the seeded sales frameworks the system was designed around.
+//
+// Inputs are already sorted by similarity (or _score for keyword path)
+// descending. We pick the top framework + top (matchCount-1) uploads,
+// then re-sort the merged set by score so the most relevant entry leads.
+function enforceDiversity(rows, matchCount) {
+  var framework = [];
+  var uploads = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.uploaded_by === null || r.uploaded_by === undefined) framework.push(r);
+    else uploads.push(r);
+  }
+  if (framework.length === 0) return uploads.slice(0, matchCount);
+  if (uploads.length === 0)   return framework.slice(0, matchCount);
+
+  var picked = [framework[0]].concat(uploads.slice(0, matchCount - 1));
+  picked.sort(function(a, b) {
+    var sa = (typeof a.similarity === 'number') ? a.similarity : (a._score || 0);
+    var sb = (typeof b.similarity === 'number') ? b.similarity : (b._score || 0);
+    return sb - sa;
+  });
+  return picked;
+}
+
 // ── POST /kb/search ──────────────────────────────────────────────────────
 // Desktop app's KnowledgeBase.search() calls here. Voyage embedding +
 // match_knowledge RPC if VOYAGE_API_KEY is set; falls through to scoped
@@ -177,15 +251,18 @@ router.post('/search', protect, async function(req, res) {
 
     var embedding = await getVoyageEmbedding(query);
     if (embedding) {
+      // Request matchCount+3 so enforceDiversity has room to swap in a
+      // framework entry without truncating the user-upload tail too early.
       var rpc = await admin.rpc('match_knowledge', {
         query_embedding: embedding,
         match_threshold: 0.5,
-        match_count: matchCount,
+        match_count: matchCount + 3,
         p_user_id: scope.p_user_id,
         p_admin_id: scope.p_admin_id,
       });
       if (!rpc.error && rpc.data && rpc.data.length > 0) {
-        return res.json({ results: rpc.data, source: 'embedding' });
+        var diverse = enforceDiversity(rpc.data, matchCount);
+        return res.json({ results: diverse, source: 'embedding' });
       }
       if (rpc.error) {
         console.error('[kb] match_knowledge RPC failed:', rpc.error.message);
@@ -231,8 +308,11 @@ router.post('/search', protect, async function(req, res) {
       return row;
     });
     scored.sort(function(a, b) { return b._score - a._score; });
-    var top = scored.slice(0, matchCount).filter(function(r) { return r._score > 0; });
-    return res.json({ results: top, source: 'keyword' });
+    // Pull matchCount+3 candidates so enforceDiversity has the same swap
+    // room the embedding path gets.
+    var top = scored.slice(0, matchCount + 3).filter(function(r) { return r._score > 0; });
+    var diverse = enforceDiversity(top, matchCount);
+    return res.json({ results: diverse, source: 'keyword' });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[kb] search error:', err.message);
@@ -247,6 +327,14 @@ router.post('/search', protect, async function(req, res) {
 router.post('/upload', protect, upload.single('file'), async function(req, res) {
   var type = req.body && req.body.type;
   var providedLabel = (req.body && req.body.label) ? String(req.body.label).trim() : '';
+  // Category drives chunking strategy: winning_call → chunkTranscript()
+  // (speaker-turn aware), offer_document → chunkText() (fixed word count).
+  // Default to offer_document for backwards-compat with any client that
+  // hasn't been updated to send category yet.
+  var category = (req.body && req.body.category) || 'offer_document';
+  if (['offer_document', 'winning_call'].indexOf(category) === -1) {
+    category = 'offer_document';
+  }
   if (!type || ['url', 'pdf', 'paste'].indexOf(type) === -1) {
     return res.status(400).json({ error: "type must be 'url' | 'pdf' | 'paste'" });
   }
@@ -302,7 +390,10 @@ router.post('/upload', protect, upload.single('file'), async function(req, res) 
     text = text.trim();
     if (!text) return res.status(400).json({ error: 'No text extracted from source' });
 
-    var chunks = chunkText(text);
+    // Pick the chunker based on category. chunkTranscript falls back to
+    // chunkText internally if it can't detect speaker turns, so a mis-
+    // tagged transcript still produces usable chunks.
+    var chunks = (category === 'winning_call') ? chunkTranscript(text) : chunkText(text);
     if (chunks.length === 0) return res.status(400).json({ error: 'No usable chunks produced' });
 
     // Generate embeddings sequentially. Per-chunk failure is non-fatal —
@@ -312,6 +403,7 @@ router.post('/upload', protect, upload.single('file'), async function(req, res) 
     for (var i = 0; i < chunks.length; i++) {
       var emb = await getVoyageEmbedding(chunks[i]);
       var chunkMeta = Object.assign({}, sourceMeta, {
+        category: category,
         chunk_index: i,
         total_chunks: chunks.length,
       });
@@ -379,6 +471,10 @@ router.get('/list', protect, async function(req, res) {
         groups[key] = {
           source_label: key,
           source_type: (row.metadata && row.metadata.source_type) || null,
+          // Surface category so the frontend can render the offer-doc /
+          // winning-call badge. Pre-this-feature uploads don't have it
+          // and will simply not show a category badge.
+          category: (row.metadata && row.metadata.category) || null,
           chunk_count: 0,
           created_at: row.created_at,
           scope: row.scope,
