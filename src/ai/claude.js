@@ -418,7 +418,7 @@ class ClaudeCoach {
         console.log('[claude] Searching knowledge base...');
         // v1.0.7-alpha: measure KB search duration
         var kbStart = Date.now();
-        var kbResults = await this.kb.searchByText(lastTurn.text, 3);
+        var kbResults = await this.kb.search(lastTurn.text, 3);
         cycleKbMs = Date.now() - kbStart;
         if (kbResults && kbResults.length > 0) {
           kbContext = this.kb.buildContext(kbResults);
