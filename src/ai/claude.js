@@ -165,9 +165,9 @@ class ClaudeCoach {
 
     // Suggestion history — prevents Claude from repeating itself
     this.recentSuggestions = [];     // Last N suggestions sent to overlay
-    this.maxSuggestionHistory = 8;   // Track last 8 suggestions
+    this.maxSuggestionHistory = 15;  // Track last 15 suggestions
     this.recentAngles = [];          // Track themes/angles to prevent hammering same topic
-    this.maxAngleHistory = 5;        // Last 5 angles
+    this.maxAngleHistory = 8;        // Last 8 angles
 
     // Delivery gate fallback — if closer hasn't delivered after this many turns or seconds, advance anyway
     this.maxTurnsBeforeAutoAdvance = 4;   // 4 closer turns = they moved on

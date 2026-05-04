@@ -242,9 +242,12 @@ class CallMemory {
       parts.push('CALL SUMMARY SO FAR:\n' + this.summary);
     }
 
-    if (this.detectedStage) {
-      parts.push('CURRENT CALL STAGE: ' + this.detectedStage);
-    }
+    // detectedStage is intentionally NOT injected into the prompt anymore.
+    // The field is still maintained on the instance (set in updateSummary,
+    // surfaced via the post-call summary), but suggestions are now purely
+    // conversation-driven — anchoring to a stage label was causing Claude
+    // to push toward the next stage instead of responding to what was
+    // actually said.
 
     // v1.0.9: Discovery state — explicit checklist for the suggestion engine.
     // Before this, the 7 discovery booleans (pain, goals, finances, etc.) were

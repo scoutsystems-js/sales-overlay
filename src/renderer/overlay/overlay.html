@@ -116,23 +116,6 @@
     .prompt-row.delivered { opacity: 0.6; }
     .prompt-row + .prompt-row { border-top: 1px solid rgba(255,255,255,0.05); }
 
-    .stage-badge {
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      padding: 3px 8px;
-      border-radius: 4px;
-      white-space: nowrap;
-      margin-top: 2px;
-      flex-shrink: 0;
-      background: #3b82f6;
-      color: #fff;
-    }
-    .stage-badge.objection  { background: #ef4444; }
-    .stage-badge.close      { background: #22c55e; color: #000; }
-    .stage-badge.transition { background: #f59e0b; color: #000; }
-
     .content { flex: 1; min-width: 0; }
     .headline  { font-size: 11px; font-weight: 600; color: #999; margin-bottom: 2px; letter-spacing: 0.3px; }
     .suggestion { font-size: 14px; color: #fff; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
@@ -461,26 +444,6 @@
     }
 
     // ── Prompt helpers ──
-    function getStageClass(stage) {
-      if (stage === 'objection_handling') return 'objection';
-      if (stage === 'close')             return 'close';
-      if (stage === 'transition')        return 'transition';
-      return '';
-    }
-
-    function getStageLabel(stage) {
-      var labels = {
-        introduction:       'INTRO',
-        set:                'THE SET',
-        discovery:          'DISCOVERY',
-        transition:         'TRANSITION',
-        pitch:              'PITCH',
-        close:              'CLOSE',
-        objection_handling: 'OBJECTION',
-      };
-      return labels[stage] || (stage || '').toUpperCase();
-    }
-
     function addPrompt(data) {
       var existing = promptStack.querySelectorAll('.prompt-row');
       for (var i = 0; i < existing.length; i++) {
@@ -489,12 +452,6 @@
 
       var row      = document.createElement('div');
       row.className = 'prompt-row';
-
-      var badge      = document.createElement('span');
-      badge.className = 'stage-badge';
-      var stageClass  = getStageClass(data.stage);
-      if (stageClass) badge.classList.add(stageClass);
-      badge.textContent = getStageLabel(data.stage);
 
       var content    = document.createElement('div');
       content.className = 'content';
@@ -517,7 +474,6 @@
         content.appendChild(followUp);
       }
 
-      row.appendChild(badge);
       row.appendChild(content);
       promptStack.appendChild(row);
 
@@ -541,7 +497,6 @@
       setSessionState(data.active);
       if (data.active) {
         addPrompt({
-          stage:     'introduction',
           headline:  'INTRODUCTION — Open the call',
           suggestion: '"Hey [Name], can you hear me okay? Great to meet you. I\'m [Your Name]. Where are you calling in from today?"',
           followUp:  'Get their name, city, profession, and family in 90 seconds. Each answer becomes a close frame.',
