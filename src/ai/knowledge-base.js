@@ -175,6 +175,8 @@ class KnowledgeBase {
         lines.push('[WINNING CALL: ' + r.label + ']');
       } else if (r.metadata && r.metadata.category === 'offer_document') {
         lines.push('[OFFER DOCUMENT: ' + r.label + ']');
+      } else if (r.metadata && r.metadata.category === 'learned_pattern') {
+        lines.push('[LEARNED PATTERN: ' + r.label + ']');
       } else {
         lines.push('[' + r.category.toUpperCase() + '] ' + r.label);
       }
