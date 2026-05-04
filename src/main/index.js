@@ -885,6 +885,10 @@ ipcMain.on('stop-session', async function() {
   // build the summary from. Both reads have to happen here at the top.
   var postCallSessionId = (sessionLogger && sessionLogger.sessionId) || null;
   var postCallContext = null;
+  // Adaptive learning: snapshot the last 80 turns BEFORE reset() wipes them.
+  // Stays null on short/test calls (<10 turns) so the async block can skip
+  // pattern extraction without an extra length check at use site.
+  var postCallTranscript = null;
   if (callMemory) {
     var ctxParts = [];
     if (callMemory.summary) {
@@ -926,6 +930,17 @@ ipcMain.on('stop-session', async function() {
     if (ctxParts.length > 0) {
       postCallContext = ctxParts.join('\n\n');
     }
+
+    // Adaptive learning capture. 10-turn floor skips test/abandoned calls
+    // where there's no real signal to extract. Format mirrors what the
+    // /extract-patterns prompt expects so the backend doesn't have to
+    // reformat: "SPEAKER: text" lines, last 80 turns max.
+    if (callMemory.fullTranscript && callMemory.fullTranscript.length >= 10) {
+      var turns = callMemory.fullTranscript.slice(-80);
+      postCallTranscript = turns.map(function(t) {
+        return (t.speaker || 'UNKNOWN') + ': ' + (t.text || '');
+      }).join('\n');
+    }
   }
 
   if (suggestionPollInterval) { clearInterval(suggestionPollInterval); suggestionPollInterval = null; }
@@ -952,8 +967,8 @@ ipcMain.on('stop-session', async function() {
   // marks Win / Loss / Follow-up via a future flow.
   if (postCallContext && postCallSessionId && overlayWindow) {
     (async function() {
+      var summaryProxy = buildProxyClient();
       try {
-        var summaryProxy = buildProxyClient();
         var res = await summaryProxy.postCallSummary({ callContext: postCallContext });
         if (res && res.summary) {
           // Persist first so a closed overlay doesn't drop the summary on the
@@ -973,6 +988,27 @@ ipcMain.on('stop-session', async function() {
         }
       } catch (err) {
         console.error('[main] Post-call summary failed:', err.message);
+      }
+
+      // Adaptive learning — runs AFTER the summary reaches the overlay so
+      // the user never waits on it. Own try/catch so a pattern-extraction
+      // or store failure can't bleed into the summary path's error log
+      // and confuse diagnostics.
+      if (postCallTranscript) {
+        try {
+          var extracted = await summaryProxy.extractPatterns(postCallTranscript, postCallContext);
+          var patterns = (extracted && Array.isArray(extracted.patterns)) ? extracted.patterns : [];
+          if (patterns.length > 0) {
+            var learnedLabel = 'Learned — ' + new Date().toISOString().slice(0, 10);
+            var stored = await summaryProxy.storePatterns(patterns, learnedLabel);
+            var n = (stored && typeof stored.stored === 'number') ? stored.stored : 0;
+            console.log('[main] Adaptive learning: ' + n + ' pattern(s) stored for session ' + postCallSessionId);
+          } else {
+            console.log('[main] Adaptive learning: no high-signal patterns extracted for session ' + postCallSessionId);
+          }
+        } catch (err) {
+          console.error('[main] Adaptive learning failed:', err.message);
+        }
       }
     })();
   }

@@ -9,7 +9,9 @@
 //   memory(...)               → POST  /proxy/memory             (Claude rolling summary)
 //   summarizeScript(...)      → POST  /proxy/summarize-script   (script → playbook summary)
 //   postCallSummary(...)      → POST  /proxy/post-call-summary  (Feature 5: end-of-call review)
+//   extractPatterns(...)      → POST  /proxy/extract-patterns   (adaptive learning: high-signal moments)
 //   kbSearch(...)             → POST  /kb/search                (KB lookup with Voyage embeddings)
+//   storePatterns(...)        → POST  /kb/store-patterns        (adaptive learning: bulk-insert patterns)
 //   getDeepgramKey()          → POST  /proxy/deepgram-key       (mint 10-min ephemeral key)
 //   sessionStart(...)         → POST  /log/session-start        (v1.0.5 cloud logging)
 //   sessionEnd(...)           → PATCH /log/session-end/:id      (v1.0.5 cloud logging)
@@ -113,6 +115,19 @@ class ProxyClient {
     });
   }
 
+  // Adaptive learning: ask Claude (Sonnet) to extract up to 5 high-signal
+  // moments from the just-finished call — questions that uncovered pain,
+  // objection responses that shifted the prospect, closing language that
+  // landed. Server route NEVER throws — empty/parse-failed/Claude-down
+  // all resolve to { patterns: [] } so a flaky upstream can't disrupt
+  // the desktop's stop-session flow. Returns { patterns: Array }.
+  async extractPatterns(transcript, callSummary) {
+    return this._post('/proxy/extract-patterns', {
+      transcript: transcript,
+      callSummary: callSummary || '',
+    });
+  }
+
   // KB lookup. Backend generates the Voyage embedding (key lives only on
   // Railway), runs the match_knowledge RPC scoped to the caller's user_id
   // and admin_id, and returns matched rows. Falls back server-side to
@@ -122,6 +137,18 @@ class ProxyClient {
     return this._post('/kb/search', {
       query: query,
       matchCount: matchCount || 5,
+    });
+  }
+
+  // Adaptive learning: bulk-insert auto-extracted high-signal patterns
+  // into the caller's KB (always 'personal' scope). Fire-and-forget —
+  // server route never errors, all failures resolve to stored:0. Returns
+  // { ok: true, stored: N }. sourceLabel groups patterns from one call
+  // together in the dashboard list (e.g. "Learned — 2026-05-04").
+  async storePatterns(patterns, sourceLabel) {
+    return this._post('/kb/store-patterns', {
+      patterns: patterns || [],
+      sourceLabel: sourceLabel || '',
     });
   }
 
