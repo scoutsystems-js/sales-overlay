@@ -205,30 +205,62 @@ function chunkTranscript(text) {
   return chunks;
 }
 
-// Result merging on search. Uploaded content (uploaded_by IS NOT NULL)
-// takes priority over seeded frameworks — the user's own materials are
-// what they care about most, and seeded frameworks only fill slots the
-// uploads don't use. If uploads fully saturate matchCount slots the
-// frameworks are dropped entirely from this query (they're still in
-// the KB, just not surfaced for this particular search).
+// Result merging on search — three-tier priority:
+//   Tier 1: learned_pattern entries (auto-extracted high-signal moments
+//           from the closer's own past calls). These are the most
+//           specific signal the system has and lead every result set
+//           when present.
+//   Tier 2: other user uploads (offer documents, winning-call transcripts,
+//           etc.). The closer's curated reference material.
+//   Tier 3: seeded frameworks (uploaded_by IS NULL — the universal sales
+//           frameworks shipped with the app). Default fallback when the
+//           upper tiers don't fill the result set.
+//
+// Slots fill top-down: Tier 1 fills first up to matchCount, Tier 2 takes
+// any remainder, Tier 3 backfills whatever's still left. Final array is
+// re-sorted by similarity desc so the most relevant entry leads regardless
+// of which tier it came from. Tier 3 fallback (no Tier 1, no Tier 2) is
+// preserved unchanged from the prior two-tier logic.
 //
 // Inputs are already sorted by similarity (or _score for keyword path)
-// descending. We take top uploads first, then top frameworks for the
-// leftover slots, and re-sort the merged set so the most relevant
-// entry leads regardless of which bucket it came from.
+// descending. Result length never exceeds matchCount.
 function enforceDiversity(rows, matchCount) {
-  var framework = [];
+  var learned = [];
   var uploads = [];
+  var framework = [];
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
-    if (r.uploaded_by === null || r.uploaded_by === undefined) framework.push(r);
-    else uploads.push(r);
+    if (r.uploaded_by === null || r.uploaded_by === undefined) {
+      framework.push(r);
+    } else if (r.category === 'learned_pattern') {
+      learned.push(r);
+    } else {
+      uploads.push(r);
+    }
   }
-  if (uploads.length === 0)         return framework.slice(0, matchCount);
-  if (uploads.length >= matchCount) return uploads.slice(0, matchCount);
 
-  var remaining = matchCount - uploads.length;
-  var picked = uploads.concat(framework.slice(0, remaining));
+  // Pure Tier 3 fallback — preserves prior behavior on KBs with no user
+  // content at all (most common when a brand-new user runs their first call).
+  if (learned.length === 0 && uploads.length === 0) {
+    return framework.slice(0, matchCount);
+  }
+
+  var picked = [];
+  var remaining = matchCount;
+  if (remaining > 0 && learned.length > 0) {
+    var takeL = Math.min(learned.length, remaining);
+    picked = picked.concat(learned.slice(0, takeL));
+    remaining -= takeL;
+  }
+  if (remaining > 0 && uploads.length > 0) {
+    var takeU = Math.min(uploads.length, remaining);
+    picked = picked.concat(uploads.slice(0, takeU));
+    remaining -= takeU;
+  }
+  if (remaining > 0 && framework.length > 0) {
+    picked = picked.concat(framework.slice(0, remaining));
+  }
+
   picked.sort(function(a, b) {
     var sa = (typeof a.similarity === 'number') ? a.similarity : (a._score || 0);
     var sb = (typeof b.similarity === 'number') ? b.similarity : (b._score || 0);
@@ -438,6 +470,79 @@ router.post('/upload', protect, upload.single('file'), async function(req, res) 
     if (handleConfigError(err, res)) return;
     console.error('[kb] upload error:', err.message);
     return res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// ── POST /kb/store-patterns ───────────────────────────────────────────────
+// Adaptive learning: bulk-insert auto-extracted "high signal" moments from
+// a finished call. Called only by the desktop's stop-session flow after
+// /proxy/extract-patterns returns a non-empty array. JSON body, no multer,
+// no chunking — patterns arrive pre-formed and go straight to KB rows.
+//
+// Errors never propagate to the caller — this is fire-and-forget from the
+// desktop. Bad inputs and Supabase failures both resolve to a 200 with
+// stored:0 so the desktop's promise resolves cleanly.
+router.post('/store-patterns', protect, async function(req, res) {
+  var patterns = req.body && req.body.patterns;
+  var sourceLabel = (req.body && req.body.sourceLabel) ? String(req.body.sourceLabel).trim() : '';
+
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    return res.json({ ok: true, stored: 0 });
+  }
+  if (!sourceLabel) {
+    sourceLabel = 'Learned — ' + new Date().toISOString().slice(0, 10);
+  }
+
+  try {
+    var admin = getAdminClient();
+    var rows = [];
+    for (var i = 0; i < patterns.length; i++) {
+      var p = patterns[i] || {};
+      var situation = String(p.situation || '').trim();
+      var response  = String(p.response  || '').trim();
+      var outcome   = String(p.outcome   || '').trim();
+      var type      = String(p.type      || '').trim();
+      // Skip patterns missing the core fields — better to drop than store a
+      // half-formed entry that'll surface in search with empty quotes.
+      if (!situation || !response) continue;
+
+      var content = 'When ' + situation + ', closer responded: "' + response + '". Prospect reaction: ' + (outcome || '(unspecified)') + '.';
+      var emb = await getVoyageEmbedding(content);
+
+      rows.push({
+        category: 'learned_pattern',
+        label: sourceLabel,
+        content: content,
+        triggers: [],
+        metadata: {
+          type: type,
+          situation: situation,
+          response: response,
+          outcome: outcome,
+          source: 'auto_extracted',
+        },
+        embedding: emb,
+        uploaded_by: req.user.id,
+        scope: 'personal',
+        source_label: sourceLabel,
+      });
+    }
+
+    if (rows.length === 0) {
+      return res.json({ ok: true, stored: 0 });
+    }
+
+    var insert = await admin.from('knowledge_base').insert(rows);
+    if (insert.error) {
+      console.error('[kb] store-patterns insert failed:', String(insert.error.message || 'unknown').slice(0, 200));
+      return res.json({ ok: true, stored: 0 });
+    }
+    console.log('[kb] Patterns stored: actor=%s label=%s count=%d', req.user.email, sourceLabel, rows.length);
+    return res.json({ ok: true, stored: rows.length });
+  } catch (err) {
+    // Fire-and-forget — log and degrade. Caller already moved on.
+    console.error('[kb] store-patterns error:', err.message);
+    return res.json({ ok: true, stored: 0 });
   }
 });
 

@@ -239,6 +239,85 @@ router.post('/post-call-summary', protect, async function(req, res) {
   }
 });
 
+// Adaptive learning: post-call pattern extraction. After every call the
+// desktop fires this route with the rolling summary + last 80 transcript
+// turns; Claude Sonnet returns up to 5 high-signal moments (questions
+// that landed, objection handles that worked, closing language, rapport
+// moves) to be stored in the user's KB. Errors are NEVER returned to
+// the caller — every failure path resolves to { patterns: [] } so a
+// flaky Claude call can't disrupt the desktop's stop-session flow.
+router.post('/extract-patterns', protect, async function(req, res) {
+  var transcript = req.body && req.body.transcript;
+  var callSummary = req.body && req.body.callSummary;
+  if (!transcript || !String(transcript).trim()) {
+    return res.json({ patterns: [] });
+  }
+
+  var systemPrompt =
+    'You are analyzing a sales call to extract high-signal moments worth ' +
+    'learning from. Return only a JSON array. No markdown, no explanation, ' +
+    'no code fences.';
+
+  var userPrompt =
+    'CALL SUMMARY: ' + (callSummary || '(none)') + '\n' +
+    'TRANSCRIPT: ' + transcript + '\n\n' +
+    'Extract up to 5 high-signal moments from this call. Only include ' +
+    'moments where something clearly worked — a question that uncovered ' +
+    'real pain or commitment, an objection response that visibly shifted ' +
+    'the prospect, closing language that landed, or a moment where ' +
+    'resistance dropped.\n\n' +
+    'If nothing is clearly high-signal, return an empty array [].\n\n' +
+    'For each moment return:\n' +
+    '{\n' +
+    '  "situation": "what the prospect said or did that triggered it",\n' +
+    '  "response": "exactly what the closer said",\n' +
+    '  "outcome": "how the prospect reacted",\n' +
+    '  "type": "pain_discovery | objection_handle | closing_move | rapport_build"\n' +
+    '}\n\n' +
+    'Return ONLY a valid JSON array. No markdown, no code fences.';
+
+  try {
+    var anthropic = getAnthropic();
+    var response = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1500,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+
+    var content = response.content && response.content[0] ? response.content[0].text : null;
+    if (!content) {
+      console.warn('[proxy] ExtractPatterns: empty Claude response');
+      return res.json({ patterns: [] });
+    }
+
+    // Strip code fences if Claude ignored the rule and wrapped the array.
+    var jsonStr = content.trim();
+    if (jsonStr.indexOf('```') === 0) {
+      jsonStr = jsonStr.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim();
+    }
+
+    var parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.warn('[proxy] ExtractPatterns: JSON parse failed —', parseErr.message);
+      return res.json({ patterns: [] });
+    }
+    if (!Array.isArray(parsed)) {
+      console.warn('[proxy] ExtractPatterns: response was not an array');
+      return res.json({ patterns: [] });
+    }
+    return res.json({ patterns: parsed });
+  } catch (err) {
+    // Never propagate to the caller — log and degrade silently. Pattern
+    // extraction is best-effort; a 500 here would otherwise leak into
+    // the desktop's stop-session error log noise.
+    console.error('[proxy] ExtractPatterns error:', err.message);
+    return res.json({ patterns: [] });
+  }
+});
+
 // Deepgram temporary key — Electron app requests a short-lived key,
 // connects directly to Deepgram WebSocket with it (no proxying of audio needed).
 router.post('/deepgram-key', protect, async function(req, res) {
