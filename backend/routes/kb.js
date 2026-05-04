@@ -515,6 +515,7 @@ router.post('/store-patterns', protect, async function(req, res) {
         content: content,
         triggers: [],
         metadata: {
+          category: 'learned_pattern',
           type: type,
           situation: situation,
           response: response,
