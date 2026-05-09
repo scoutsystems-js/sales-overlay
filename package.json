@@ -1,6 +1,6 @@
 {
   "name": "sales-overlay",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Scout Systems — Real-time AI sales coaching overlay",
   "main": "src/main/index.js",
   "scripts": {
