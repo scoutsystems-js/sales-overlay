@@ -561,6 +561,57 @@
     .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
     .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
 
+    /* View patterns button — same shell as delete button, neutral hover.
+       Sits to the LEFT of delete in the kb-item flex row. Only emitted
+       for items where category === 'learned_pattern'; everything else
+       has just the delete button as before. */
+    .kb-view-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.12s;
+      flex-shrink: 0;
+      margin-right: 6px;
+    }
+    .kb-view-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+    /* Expand panel — sibling of the kb-item, slightly indented and using
+       a deeper bg so the hierarchy reads at a glance. */
+    .kb-expand-panel {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin: -2px 0 0 24px;
+      padding: 14px 16px;
+    }
+    .kb-expand-panel.hidden { display: none; }
+    .kb-pattern-loading,
+    .kb-pattern-empty { font-size: 12px; color: var(--muted); padding: 8px 0; text-align: center; }
+    .kb-pattern-card {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+    }
+    .kb-pattern-card:last-child { margin-bottom: 0; }
+    .kb-pattern-row { font-size: 12px; line-height: 1.5; margin-top: 6px; }
+    .kb-pattern-row b { color: var(--muted); display: inline-block; min-width: 130px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; font-size: 10px; vertical-align: top; }
+    .kb-pattern-text { color: var(--text); }
+    .kb-pattern-empty-text { font-size: 13px; color: var(--text); white-space: pre-wrap; }
+    /* Pattern type badges — distinct from the source-type/category/scope
+       badges above so the eye reads them as a separate vocabulary. */
+    .kb-badge.kb-ptype-pain_discovery   { color: #fca5a5; border-color: rgba(252,165,165,0.3); background: rgba(239,68,68,0.10); }
+    .kb-badge.kb-ptype-objection_handle { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
+    .kb-badge.kb-ptype-closing_move     { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
+    .kb-badge.kb-ptype-rapport_build    { color: #93c5fd; border-color: rgba(147,197,253,0.3); background: rgba(59,130,246,0.10); }
+
     /* ── Modal ──────────────────────────────────────────────────────────── */
     .kb-modal {
       position: fixed;
@@ -1673,14 +1724,25 @@
         : '';
       var chunkText = it.chunk_count + ' chunk' + (it.chunk_count === 1 ? '' : 's');
       var rel = relativeTime(it.created_at);
+      // Only learned_pattern uploads get the expand affordance — other
+      // categories are bulk text whose chunks aren't independently useful
+      // to surface in a side panel.
+      var viewBtn = '';
+      var expandPanel = '';
+      if (it.category === 'learned_pattern') {
+        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View patterns</button>';
+        expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
+      }
       parts.push(
         '<div class="kb-item">'
           + '<div class="kb-item-main">'
             + '<div class="kb-item-title">' + typeBadge + catBadge + scopeBadge + escapeHtml(it.source_label || '(unlabeled)') + '</div>'
             + '<div class="kb-item-sub">' + chunkText + ' · added ' + rel + '</div>'
           + '</div>'
+          + viewBtn
           + '<button class="kb-delete-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="deleteKbItem(this.getAttribute(\'data-label\'))">Delete</button>'
         + '</div>'
+        + expandPanel
       );
     }
     parts.push('</div>');
@@ -1827,6 +1889,87 @@
 
     closeKbModal();
     await loadKbList();
+  }
+
+  // Per-source-label cache so reopening a panel after first load doesn't
+  // refetch. Cleared implicitly on full page reload — short-lived enough
+  // that staleness from a delete-then-reopen is impossible (delete already
+  // forces loadKbList(), which doesn't touch this cache, but the panel
+  // wouldn't re-render anyway because the kb-item is gone).
+  var kbEntriesCache = {};
+
+  async function viewKbEntries(sourceLabel, slot, btn) {
+    var panel = document.getElementById('kbExpand-' + slot);
+    if (!panel) return;
+
+    // Toggle: if currently visible, just collapse. No fetch, button text reverts.
+    if (!panel.classList.contains('hidden')) {
+      panel.classList.add('hidden');
+      btn.textContent = 'View patterns';
+      return;
+    }
+
+    // Opening
+    btn.textContent = 'Hide patterns';
+    panel.classList.remove('hidden');
+
+    if (kbEntriesCache[sourceLabel]) {
+      renderKbEntries(panel, kbEntriesCache[sourceLabel]);
+      return;
+    }
+
+    panel.innerHTML = '<div class="kb-pattern-loading">Loading…</div>';
+    var res;
+    try {
+      res = await fetch('/kb/entries/' + encodeURIComponent(sourceLabel), { headers: authHeader() });
+    } catch (err) {
+      panel.innerHTML = '<div class="kb-pattern-empty">Could not reach server.</div>';
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      panel.innerHTML = '<div class="kb-pattern-empty">Failed to load patterns.</div>';
+      return;
+    }
+    var data = await res.json();
+    var entries = (data && data.entries) || [];
+    kbEntriesCache[sourceLabel] = entries;
+    renderKbEntries(panel, entries);
+  }
+
+  function renderKbEntries(panel, entries) {
+    if (!entries || entries.length === 0) {
+      panel.innerHTML = '<div class="kb-pattern-empty">No patterns found.</div>';
+      return;
+    }
+    var parts = [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      var meta = e.metadata || {};
+      // Pattern entries (auto-extracted) carry situation/response/outcome
+      // in metadata. Pre-feature uploads or any entry missing those fields
+      // fall back to showing raw content text — keeps the panel useful
+      // even on legacy data.
+      if (meta.situation || meta.response || meta.outcome) {
+        var typeRaw = String(meta.type || '');
+        var typeLabel = typeRaw.replace(/_/g, ' ');
+        var typeClass = typeRaw.replace(/[^a-z_]/g, '');
+        var typeBadge = typeClass
+          ? '<span class="kb-badge kb-ptype-' + typeClass + '">' + escapeHtml(typeLabel) + '</span>'
+          : '';
+        parts.push(
+          '<div class="kb-pattern-card">'
+            + (typeBadge ? '<div>' + typeBadge + '</div>' : '')
+            + (meta.situation ? '<div class="kb-pattern-row"><b>Situation:</b> <span class="kb-pattern-text">' + escapeHtml(meta.situation) + '</span></div>' : '')
+            + (meta.response  ? '<div class="kb-pattern-row"><b>Closer said:</b> <span class="kb-pattern-text">' + escapeHtml(meta.response) + '</span></div>' : '')
+            + (meta.outcome   ? '<div class="kb-pattern-row"><b>Prospect reacted:</b> <span class="kb-pattern-text">' + escapeHtml(meta.outcome) + '</span></div>' : '')
+          + '</div>'
+        );
+      } else {
+        parts.push('<div class="kb-pattern-card"><div class="kb-pattern-empty-text">' + escapeHtml(e.content || '(empty)') + '</div></div>');
+      }
+    }
+    panel.innerHTML = parts.join('');
   }
 
   init();

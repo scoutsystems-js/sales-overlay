@@ -250,6 +250,21 @@
     try {
       var result = await window.electronAPI.checkSubscription(token);
       if (result.error) {
+        // Before wiping the session, try refreshing the token —
+        // the error may be a transient backend issue or an expired
+        // access token that the refresh_token can recover. getToken()
+        // routes through ensureFreshToken() in main, which refreshes
+        // via /auth/refresh when exp claim is past (with 60s grace).
+        var freshToken = await window.electronAPI.getToken();
+        if (freshToken && freshToken !== token) {
+          // Got a new token — retry subscription check with it
+          // instead of giving up. freshToken !== token guards against
+          // recursion if getToken returns the same expired one back.
+          currentToken = freshToken;
+          await checkSubscription(freshToken);
+          return;
+        }
+        // Genuinely unrecoverable — clear and show login.
         await window.electronAPI.clearToken();
         showView('auth');
         showMsg('authError', 'Session expired. Please log in again.');
