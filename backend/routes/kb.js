@@ -605,6 +605,44 @@ router.get('/list', protect, async function(req, res) {
   }
 });
 
+// ── GET /kb/entries/:source_label ─────────────────────────────────────────
+// Returns the individual chunks for a given upload, in chunk order. Used by
+// the dashboard / admin "View patterns" expand panel to surface each
+// learned_pattern's situation/response/outcome metadata. Scoping mirrors
+// /list: regular users only see their own entries, admins see their team,
+// owners see all uploaded entries (uploaded_by IS NOT NULL only — never
+// seeded framework rows). Empty result returns 200 with entries:[] rather
+// than 404 so the frontend can show a clean "no patterns" state.
+router.get('/entries/:source_label', protect, async function(req, res) {
+  var sourceLabel = decodeURIComponent(req.params.source_label || '');
+  if (!sourceLabel) return res.status(400).json({ error: 'source_label required' });
+
+  try {
+    var admin = getAdminClient();
+    var scope = await resolveUserScope(admin, req.user.id);
+    var visibleIds = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+
+    var query = admin
+      .from('knowledge_base')
+      .select('id, content, metadata, category, created_at, scope')
+      .eq('source_label', sourceLabel)
+      .not('uploaded_by', 'is', null)
+      .order('created_at', { ascending: true });
+    if (visibleIds !== null) query = query.in('uploaded_by', visibleIds);
+
+    var result = await query;
+    if (result.error) {
+      console.error('[kb] entries query failed:', result.error.message);
+      return res.status(500).json({ error: 'Could not load entries' });
+    }
+    return res.json({ entries: result.data || [] });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[kb] entries error:', err.message);
+    return res.status(500).json({ error: 'Failed to load entries' });
+  }
+});
+
 // ── DELETE /kb/:source_label ──────────────────────────────────────────────
 // Deletes every chunk with a given source_label. Always scoped: even owners
 // can't delete seeded entries (uploaded_by IS NULL). Admins can delete their
