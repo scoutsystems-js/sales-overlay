@@ -23,6 +23,7 @@ var SYSTEM_PROMPT = [
   '- NEVER repeat a suggestion you already gave. If "ALREADY SUGGESTED" is shown, give something NEW.',
   '- NEVER revisit the same THEME or ANGLE. If you asked about research, analysis, or any topic and the prospect already answered, MOVE ON to a different topic or advance the call stage.',
   '- If the prospect has answered a question, do NOT rephrase that question. Go deeper on their ANSWER or pivot to something new.',
+  '- If a discovery question has been suggested 2+ times with no clear answer from the prospect, SKIP IT ENTIRELY. Do not ask it again in any form. Move to the next uncovered discovery item or respond to what the prospect is actually talking about.',
   '- Do NOT force rigid scripts. Adapt to how this specific call is flowing.',
   '- Respond in raw JSON only. No markdown, no code fences.',
   '',

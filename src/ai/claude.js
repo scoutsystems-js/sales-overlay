@@ -13,6 +13,44 @@ function makeCycleId() {
 // whether SCOUT_TIMING reached this module at all, independent of the guard.
 console.log('[timing-check] SCOUT_TIMING=' + process.env.SCOUT_TIMING + ' TIMING_ENABLED=' + TIMING_ENABLED);
 
+// Discovery-topic keyword map. Each suggestion is scanned against these
+// groups (lowercased headline + suggestion text) to infer which of the 7
+// CallMemory discovery items the prompt is targeting. The first matching
+// topic wins — order is significant only insofar as more-specific groups
+// should sit above more-generic ones. Used to drive discoveryAttempts
+// counting so we can escalate the "DO NOT ask again" instruction once a
+// topic has been suggested twice without a clear prospect answer.
+var DISCOVERY_TOPIC_KEYWORDS = {
+  finances:       ['income', 'money', 'finances', 'budget', 'invest', 'afford'],
+  goals:          ['goal', 'outcome', 'target', 'vision', 'achieve'],
+  pain:           ['pain', 'struggle', 'challenge', 'problem', 'stuck', 'cost', 'losing'],
+  willingness:    ['ready', 'commit', 'willing', 'serious', 'motivated'],
+  timeline:       ['when', 'timeline', 'how soon', 'how long', 'by when'],
+  decisionMaker:  ['decision', 'who else', 'partner', 'spouse', 'husband', 'wife'],
+  whyNow:         ['why now', 'what changed', 'what triggered'],
+};
+function detectDiscoveryTopic(headline, suggestion) {
+  var hay = ((headline || '') + ' ' + (suggestion || '')).toLowerCase();
+  var topics = Object.keys(DISCOVERY_TOPIC_KEYWORDS);
+  for (var t = 0; t < topics.length; t++) {
+    var kws = DISCOVERY_TOPIC_KEYWORDS[topics[t]];
+    for (var k = 0; k < kws.length; k++) {
+      if (hay.indexOf(kws[k]) !== -1) return topics[t];
+    }
+  }
+  return null;
+}
+// Human-readable labels for the escalated DO-NOT-ASK block.
+var DISCOVERY_TOPIC_LABELS = {
+  finances:      'FINANCES / BUDGET',
+  goals:         'GOALS / OUTCOMES',
+  pain:          'PAIN / STRUGGLE',
+  willingness:   'WILLINGNESS / COMMITMENT',
+  timeline:      'TIMELINE',
+  decisionMaker: 'DECISION MAKER',
+  whyNow:        'WHY NOW',
+};
+
 // Short acknowledgment words the closer says while the prospect is talking ("Yeah", "Right", "Okay").
 // These are backchannels — they should NOT reset the closer-active timer, count as turns toward
 // auto-advance, or accumulate in delivery detection. Without this filter, saying "Yeah" every few
@@ -168,6 +206,15 @@ class ClaudeCoach {
     this.maxSuggestionHistory = 15;  // Track last 15 suggestions
     this.recentAngles = [];          // Track themes/angles to prevent hammering same topic
     this.maxAngleHistory = 8;        // Last 8 angles
+    // Per-discovery-topic attempt counter. Keyed by the same 7 topic names
+    // CallMemory uses (finances, goals, pain, willingness, timeline,
+    // decisionMaker, whyNow). Increments every time a suggestion is
+    // detected as targeting that topic via DISCOVERY_TOPIC_KEYWORDS below.
+    // At ≥2 attempts the topic gets escalated into the suggestionHistory
+    // block with a stronger "DO NOT ask again" instruction so Claude stops
+    // looping on a question the prospect refused to answer the first two
+    // times. Reset alongside recentSuggestions in reset().
+    this.discoveryAttempts = {};
 
     // Delivery gate fallback — if closer hasn't delivered after this many turns or seconds, advance anyway
     this.maxTurnsBeforeAutoAdvance = 4;   // 4 closer turns = they moved on
@@ -449,6 +496,25 @@ class ClaudeCoach {
           return '- ' + a;
         });
         suggestionHistory += '\n\nANGLES/THEMES ALREADY EXPLORED (DO NOT revisit these topics — find a NEW angle or move to the next stage):\n' + angleLines.join('\n');
+        // Escalate any discovery topic suggested 2+ times into a stronger
+        // do-not-ask line. Angle dedupe + the standard "MOVE ON" hint hasn't
+        // been enough to stop Claude from rephrasing the same income / pain
+        // question on long calls — this calls it out by topic name.
+        var escalatedKeys = Object.keys(this.discoveryAttempts).filter(function(k) {
+          return this.discoveryAttempts[k] >= 2;
+        }, this);
+        if (escalatedKeys.length > 0) {
+          for (var ek = 0; ek < escalatedKeys.length; ek++) {
+            var lbl = DISCOVERY_TOPIC_LABELS[escalatedKeys[ek]] || escalatedKeys[ek].toUpperCase();
+            angleLines.push('- [' + lbl + '] — asked twice, no clear answer. DO NOT ask again. Move to a different discovery item or advance the conversation.');
+          }
+          // Replace the body so the escalated lines are visible in the
+          // same block (rather than appended invisibly below the hint).
+          suggestionHistory = suggestionHistory.replace(
+            /ANGLES\/THEMES ALREADY EXPLORED[\s\S]*$/,
+            'ANGLES/THEMES ALREADY EXPLORED (DO NOT revisit these topics — find a NEW angle or move to the next stage):\n' + angleLines.join('\n')
+          );
+        }
         suggestionHistory += '\nIf you\'ve asked about a topic 2+ times and the prospect answered, MOVE ON. Do not rephrase the same question.';
       }
 
@@ -535,14 +601,17 @@ class ClaudeCoach {
           var isDuplicateAngle = false;
           for (var ai = 0; ai < this.recentAngles.length; ai++) {
             var existing = this.recentAngles[ai].toLowerCase();
-            // If the new angle shares 50%+ words with an existing one, it's the same theme
+            // If the new angle shares 35%+ words with an existing one, it's the same theme.
+            // 0.35 (was 0.5) catches near-synonym rephrasings like "annual income target"
+            // vs "income goal" that previously slipped through and let Claude loop on the
+            // same discovery item.
             var newWords = angle.split(/\s+/);
             var existingWords = existing.split(/\s+/);
             var overlap = 0;
             for (var wi = 0; wi < newWords.length; wi++) {
               if (newWords[wi].length >= 4 && existingWords.indexOf(newWords[wi]) !== -1) overlap++;
             }
-            if (newWords.length > 0 && overlap / newWords.length >= 0.5) {
+            if (newWords.length > 0 && overlap / newWords.length >= 0.35) {
               isDuplicateAngle = true;
               break;
             }
@@ -553,6 +622,15 @@ class ClaudeCoach {
               this.recentAngles = this.recentAngles.slice(-this.maxAngleHistory);
             }
           }
+        }
+
+        // Discovery-topic attempt counter. Increment regardless of whether
+        // the angle was a duplicate — the angle dedupe is fuzzy keyword
+        // overlap and can miss real reattempts (e.g., "income goal" vs
+        // "afford the program"). Topic detection is the safety net.
+        var discoveryTopic = detectDiscoveryTopic(parsed.headline, parsed.suggestion);
+        if (discoveryTopic) {
+          this.discoveryAttempts[discoveryTopic] = (this.discoveryAttempts[discoveryTopic] || 0) + 1;
         }
 
         // v1.0.7-alpha: t6 — IPC dispatch to overlay. Attach cycleId + t0
@@ -594,6 +672,7 @@ class ClaudeCoach {
     this.lastProspectSpeechTime = 0;
     this.recentSuggestions = [];
     this.recentAngles = [];
+    this.discoveryAttempts = {};
     // v1.0.7-alpha: clear timing state so a stop/restart doesn't carry stale
     // baselines into the next session's logs.
     this._lastProspectT0 = 0;
