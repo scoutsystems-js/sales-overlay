@@ -796,6 +796,20 @@ async function startSessionNow(clientId) {
       timingLog('[TIMING] cycle=none stage=t0_prospect_final abs_ms=0 dt_prev=0 detail=text_len=' + text.length);
     }
 
+    if (speakerLabel === 'PROSPECT' && claude) {
+      // Schedule getSuggestion ~550ms after the prospect's last word —
+      // just past the 500ms silence gate — so we don't wait up to 1500ms
+      // for the polling timer to fire. The poll still runs as a fallback
+      // for natural pauses between turns.
+      setTimeout(function() {
+        claude.getSuggestion(function(suggestion) {
+          if (overlayWindow) {
+            overlayWindow.webContents.send('new-suggestion', suggestion);
+          }
+        });
+      }, 550);
+    }
+
     claude.addTurn(text, speakerLabel);
     claude.getSuggestion(function(suggestion) {
       if (overlayWindow) {
