@@ -75,6 +75,9 @@ function startZoomWatcher() {
         if (found) {
           if (!zoomMeetingActive) {
             console.log('[zoom] Meeting active (CptHost detected)');
+            if (overlayWindow) {
+              overlayWindow.focus();
+            }
           }
           zoomMeetingActive = true;
         } else {
