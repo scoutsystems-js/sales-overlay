@@ -6,6 +6,7 @@ API\ Keys.md
 backend/.env
 backend/.env.*
 !backend/.env.example
+build-release.sh
 
 # Dependencies
 node_modules/
