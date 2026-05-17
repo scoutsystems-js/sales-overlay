@@ -25,6 +25,7 @@ const ProxyClient = require('../lib/proxy-client');
 const SessionLogger = require('../lib/session-logger');
 const pkg = require('../../package.json');
 const config = require('../config');
+const { exec } = require('child_process');
 
 const BACKEND_URL = config.BACKEND_URL;
 const SKIP_AUTH = process.env.SKIP_AUTH === 'true';
@@ -49,6 +50,51 @@ let activeClient = 'generic'; // Current client filter for KB searches
 let uploadedScripts = {};     // clientId -> array of parsed entries (in-memory for uploaded scripts)
 let suggestionPollInterval = null; // Polls getSuggestion() during natural pauses in conversation
 let sessionLogger = null; // v1.0.5: tees console.log during a session into Supabase via /log endpoints
+
+// Zoom meeting watcher — polls for Zoom's CptHost process (audio/video capture
+// process that runs only during an active meeting, not when Zoom is idle).
+// When CptHost disappears while a Scout session is active, auto-fires
+// stop-session so the existing teardown path (post-call summary, adaptive
+// learning, session_logs flush) runs without the user having to hit Stop.
+let zoomMeetingActive = false;
+let zoomWatcherInterval = null;
+
+function startZoomWatcher() {
+  if (zoomWatcherInterval) return; // idempotent — safe to call twice
+  zoomWatcherInterval = setInterval(function() {
+    try {
+      exec('pgrep CptHost', function(err, stdout, stderr) {
+        // pgrep exits 1 when no match — that's the normal "no meeting" state,
+        // not a pgrep failure. Any other non-zero exit means pgrep itself
+        // broke; skip this tick without mutating state per spec.
+        if (err && err.code !== 1) {
+          console.error('[zoom] pgrep failed:', err.message);
+          return;
+        }
+        var found = !err; // err === null → exit 0 → CptHost present
+        if (found) {
+          if (!zoomMeetingActive) {
+            console.log('[zoom] Meeting active (CptHost detected)');
+          }
+          zoomMeetingActive = true;
+        } else {
+          if (zoomMeetingActive) {
+            console.log('[zoom] Meeting ended — auto-stopping session if active');
+            if (claude !== null) {
+              // Reuse the existing handler so all teardown (claude.reset,
+              // deepgram disconnect, post-call summary, adaptive learning,
+              // sessionLogger.end) runs the same as a manual Stop click.
+              ipcMain.emit('stop-session', {});
+            }
+            zoomMeetingActive = false;
+          }
+        }
+      });
+    } catch (e) {
+      console.error('[zoom] exec threw:', e.message);
+    }
+  }, 3000);
+}
 
 function createAuthWindow() {
   authWindow = new BrowserWindow({
@@ -1220,9 +1266,14 @@ app.whenReady().then(async function() {
     createControlWindow();
     createOverlayWindow();
     createDiscoveryWindow();
+    startZoomWatcher();
   } else {
     createAuthWindow();
+    startZoomWatcher();
   }
 });
 
-app.on('window-all-closed', function() { app.quit(); });
+app.on('window-all-closed', function() {
+  if (zoomWatcherInterval) { clearInterval(zoomWatcherInterval); zoomWatcherInterval = null; }
+  app.quit();
+});
