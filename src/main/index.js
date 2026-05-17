@@ -1044,10 +1044,15 @@ ipcMain.on('stop-session', async function() {
           } catch (saveErr) {
             console.error('[main] Post-call summary save failed:', saveErr.message);
           }
-          if (overlayWindow) {
-            overlayWindow.webContents.send('post-call-summary', { summary: res.summary });
-            console.log('[main] Post-call summary delivered for session ' + postCallSessionId);
-          }
+          // v1.1.9: post-call summary panel hidden from overlay per product
+          // direction. Summary is still generated and saved to call_sessions
+          // (visible in /admin and /dashboard) — only the overlay popup is
+          // suppressed. To re-enable, uncomment the IPC send below.
+          // if (overlayWindow) {
+          //   overlayWindow.webContents.send('post-call-summary', { summary: res.summary });
+          //   console.log('[main] Post-call summary delivered for session ' + postCallSessionId);
+          // }
+          console.log('[main] Post-call summary generated + saved (overlay panel suppressed in v1.1.9) for session ' + postCallSessionId);
         }
       } catch (err) {
         console.error('[main] Post-call summary failed:', err.message);
