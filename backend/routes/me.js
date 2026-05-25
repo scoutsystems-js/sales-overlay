@@ -242,19 +242,52 @@ function extractFirstJsonObject(text) {
 }
 
 // Map from objection label (as it appears in '[claude] Local objection match: <label>')
-// to objection_id + framework. Source of truth: src/ai/objections.js. Hardcoded
-// here to avoid cross-folder import — keep in sync manually if objections.js changes.
+// to objection_id + framework + framework_rebuttal. Source of truth:
+// src/ai/objections.js. Hardcoded here to avoid cross-folder import — keep
+// in sync manually if objections.js changes (rebuttal text is denormalized
+// onto session_objections at extraction time so historical rows preserve
+// what Scout would have suggested at that moment).
 var OBJECTION_LABEL_MAP = {
-  'Money Objection':              { id: 'money',          framework: 'money'  },
-  'Talk to My Wife':              { id: 'talk-to-spouse', framework: 'spouse' },
-  'I Need to Think About It':     { id: 'think-about-it', framework: 'think'  },
-  'No Time':                      { id: 'no-time',        framework: 'time'   },
-  'Tried Programs Before':        { id: 'tried-before',   framework: null     },
-  'Send Me Information':          { id: 'send-info',      framework: null     },
-  'What is the Guarantee':        { id: 'guarantee',      framework: null     },
-  'Need to Do More Research':     { id: 'more-research',  framework: null     },
-  'Not the Right Time':           { id: 'not-right-time', framework: null     },
-  'How Do I Know It Will Work':   { id: 'proof-it-works', framework: null     },
+  'Money Objection': {
+    id: 'money', framework: 'money',
+    rebuttal: 'Money aside, would you do it?',
+  },
+  'Talk to My Wife': {
+    id: 'talk-to-spouse', framework: 'spouse',
+    rebuttal: "How do you know that respecting your wife means you can't make a change today to make more money for your family?",
+  },
+  'I Need to Think About It': {
+    id: 'think-about-it', framework: 'think',
+    rebuttal: 'How do you know that thinking about it longer will lead you to making a better decision?',
+  },
+  'No Time': {
+    id: 'no-time', framework: 'time',
+    rebuttal: "When you say you don't have time, what are you really saying? Are you saying you don't have time, or that this isn't a priority?",
+  },
+  'Tried Programs Before': {
+    id: 'tried-before', framework: null,
+    rebuttal: 'I appreciate you being upfront about that. Most people who invest at this level have tried things that did not pan out. What do you think was missing from those experiences that kept them from working?',
+  },
+  'Send Me Information': {
+    id: 'send-info', framework: null,
+    rebuttal: 'Happy to. But honestly, most of the important stuff is what we are covering right now. What specific question do you have that, if I answered it here, would help you make a decision today?',
+  },
+  'What is the Guarantee': {
+    id: 'guarantee', framework: null,
+    rebuttal: 'Great question. We guarantee the process, the support, and the framework. What we cannot guarantee is effort. But you do not strike me as someone who has a problem with that.',
+  },
+  'Need to Do More Research': {
+    id: 'more-research', framework: null,
+    rebuttal: 'Makes sense. What would you be comparing us against, specifically? I want to make sure you are looking at the right things so you do not waste time.',
+  },
+  'Not the Right Time': {
+    id: 'not-right-time', framework: null,
+    rebuttal: 'What would have to change in the next few months for this to become the right time?',
+  },
+  'How Do I Know It Will Work': {
+    id: 'proof-it-works', framework: null,
+    rebuttal: 'The people who get results have one thing in common: they show up and do the work. Based on what you have told me today, do you see yourself as someone who would actually follow through?',
+  },
 };
 
 // Helper: enforce ownership on a session_id, returning the row or null.
@@ -359,7 +392,10 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
   var sessionId = req.params.session_id;
   try {
     var admin = getAdminClient();
-    var session = await loadOwnedSession(admin, sessionId, req.user.id, 'session_id, user_id');
+    var session = await loadOwnedSession(
+      admin, sessionId, req.user.id,
+      'session_id, user_id, prospect_name, started_at'
+    );
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
     // Pull all detector matches for this session.
@@ -424,42 +460,81 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
         console.warn('[me] window query failed for ' + label + ': ' + windowQ.error.message);
       }
       var windowRows = windowQ.data || [];
-      // The actual transcript turns are under tag '[deepgram]' with the
-      // shape '[deepgram] Transcript (final) [PROSPECT|CLOSER]: <text>'.
-      // The '[memory]' tag (which I initially thought held the transcript)
-      // is actually CallMemory's internal logs — useless for classification.
-      // Empty windows in the first backfill pass were ALL due to this tag
-      // confusion plus a separate 1000-row pagination bug, both now fixed.
+      // Transcript turns live under '[deepgram]' tag with shape
+      // '[deepgram] Transcript (final) [PROSPECT|CLOSER]: <text>'.
       var transcriptRows = windowRows.filter(function(l) {
         return l.tag === '[deepgram]' && l.message && l.message.indexOf('Transcript (final)') !== -1;
       });
-      // Fall back to all window rows ONLY if Deepgram is genuinely sparse
-      // — better to give Claude noisy context than nothing at all.
       var sourceRows = transcriptRows.length >= 3 ? transcriptRows : windowRows;
-      var windowTurns = sourceRows.map(function(l) { return l.message; }).join('\n').slice(0, 8000);  // cap context length
+      var windowTurns = sourceRows.map(function(l) { return l.message; }).join('\n').slice(0, 8000);
+
+      // Closer's actual response: filter to CLOSER transcript turns in the
+      // 0–60s AFTER the objection fired. These are the words we'll show
+      // side-by-side with the framework rebuttal on the /coaching page.
+      var afterWindow = transcriptRows.filter(function(l) {
+        var t = new Date(l.logged_at).getTime();
+        if (t < detectedAt || t > detectedAt + 60000) return false;
+        return l.message.indexOf('[CLOSER]') !== -1;
+      });
+      var closerResponseRaw = afterWindow.map(function(l) {
+        // Strip the '[deepgram] Transcript (final) [CLOSER]: ' prefix
+        var idx = l.message.indexOf('[CLOSER]:');
+        return idx !== -1 ? l.message.slice(idx + 9).trim() : l.message;
+      }).join(' ').slice(0, 800);  // cap so we don't oversize the table
+
+      // Build prompt with all context the coaching narrative needs.
+      var dateForNarrative = session.started_at
+        ? new Date(session.started_at).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })
+        : 'an unknown date';
+      var prospectRef = session.prospect_name && session.prospect_name.trim()
+        ? session.prospect_name.trim()
+        : 'the prospect';
 
       var classifyPrompt =
         'A "' + label + '" was detected in a sales call. Below is the ±90 seconds of ' +
-        'call activity around it. Did the closer overcome this objection?\n\n' +
-        '"Overcome" means the prospect moved past the objection — committed, asked the ' +
-        'next question, or agreed to continue. "Not overcome" means the objection ended ' +
-        'the conversation or the prospect doubled down on it.\n\n' +
-        'Respond with ONLY a JSON object on a single line:\n' +
-        '{"overcome":true|false|null,"confidence":"high|medium|low","notes":"<short rationale, max 150 chars>"}\n\n' +
-        'Use null for overcome when the window is ambiguous or too short to tell.\n\n' +
+        'call activity around it.\n\n' +
+        'The framework\'s recommended rebuttal for this objection is:\n' +
+        '"' + typeInfo.rebuttal + '"\n\n' +
+        'Based on what actually happened, generate a coaching analysis in JSON.\n\n' +
+        '"overcome" means the prospect moved past the objection (committed, asked the next ' +
+        'question, agreed to continue). "Not overcome" means the objection ended the ' +
+        'conversation or the prospect doubled down. Use null when the window is ambiguous ' +
+        'or transcript quality is too poor to tell.\n\n' +
+        '"coaching_note" must follow this exact narrative format (2-3 sentences):\n' +
+        '  "On the call with ' + prospectRef + ' on ' + dateForNarrative + ', ' +
+        '[describe what the prospect said/did]. You [describe what the closer did] ' +
+        'instead of [what the framework rebuttal recommends]. Try: \\"[suggested specific ' +
+        'phrasing — quote the framework rebuttal or a close variant]\\""\n' +
+        '  Be specific about what the closer actually did wrong (e.g., "let it walk by ' +
+        'agreeing to follow up later", "rushed past it with a new pitch", "agreed to ' +
+        'send info instead of isolating the real concern"). Use the prospect\'s actual ' +
+        'words where possible.\n' +
+        '  If the closer DID overcome the objection well, the coaching_note should ' +
+        'still follow the format but praise specifically (e.g., "On the call with ' +
+        prospectRef + ' on ' + dateForNarrative + ', [prospect said X]. You [did Y, ' +
+        'matching the framework]. Keep doing this — the prospect [reacted Z].")\n\n' +
+        'Respond with ONLY this JSON, no markdown, no fences:\n' +
+        '{"overcome": true|false|null, "confidence":"high|medium|low", ' +
+        '"notes":"<short classifier rationale, max 150 chars>", ' +
+        '"closer_response_summary":"<1-2 sentence summary of what closer actually said>", ' +
+        '"coaching_note":"<2-3 sentence narrative following the format above>"}\n\n' +
         'CALL WINDOW:\n' + windowTurns;
 
       try {
         var resp = await anthropic.messages.create({
           model: CLAUDE_MODEL,
-          max_tokens: 200,
+          max_tokens: 800,
           messages: [{ role: 'user', content: classifyPrompt }],
         });
         var rawText = resp.content[0] ? resp.content[0].text : '';
         var parsed = extractFirstJsonObject(rawText);
         if (!parsed) {
           console.warn('[me] classify parse failed for ' + label + ' — recording as null:', rawText.slice(0, 100));
-          parsed = { overcome: null, confidence: 'low', notes: 'classifier output unparseable' };
+          parsed = {
+            overcome: null, confidence: 'low',
+            notes: 'classifier output unparseable',
+            closer_response_summary: null, coaching_note: null,
+          };
         }
         rowsToInsert.push({
           session_id: sessionId,
@@ -468,14 +543,19 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
           objection_id: typeInfo.id,
           objection_label: label,
           framework: typeInfo.framework,
+          framework_rebuttal: typeInfo.rebuttal,
           overcome: typeof parsed.overcome === 'boolean' ? parsed.overcome : null,
           overcome_confidence: ['high', 'medium', 'low'].indexOf(parsed.confidence) !== -1 ? parsed.confidence : null,
           notes: parsed.notes ? String(parsed.notes).slice(0, 200) : null,
+          // Two related fields: closer_response is the raw quoted text from
+          // the transcript (so the UI can show their actual words);
+          // closer_response_summary (in notes/coaching_note context) is
+          // Claude's paraphrase. We surface the raw quote on the page.
+          closer_response: closerResponseRaw || (parsed.closer_response_summary ? String(parsed.closer_response_summary).slice(0, 800) : null),
+          coaching_note: parsed.coaching_note ? String(parsed.coaching_note).slice(0, 1200) : null,
         });
       } catch (classifyErr) {
         console.warn('[me] classify call failed for ' + label + ':', classifyErr.message);
-        // Record the objection event even if classification failed — better
-        // to have the event with null overcome than to silently drop it.
         rowsToInsert.push({
           session_id: sessionId,
           user_id: req.user.id,
@@ -483,9 +563,12 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
           objection_id: typeInfo.id,
           objection_label: label,
           framework: typeInfo.framework,
+          framework_rebuttal: typeInfo.rebuttal,
           overcome: null,
           overcome_confidence: null,
           notes: 'classifier error: ' + (classifyErr.message || 'unknown').slice(0, 150),
+          closer_response: closerResponseRaw || null,
+          coaching_note: null,
         });
       }
     }
@@ -556,9 +639,205 @@ router.get('/sessions/:session_id/objections', requireAuth, async function(req, 
   }
 });
 
+// ── POST /me/sessions/:session_id/extract-prospect-name ─────────────────────
+// Claude extracts the prospect's first name from the first ~10 minutes of
+// the call. Stored on call_sessions.prospect_name. Used by extract-objections
+// to populate the coaching_note narrative ("On the call with John on…").
+//
+// Idempotent — overwrites any existing name. Caller decides when to re-run.
+router.post('/sessions/:session_id/extract-prospect-name', requireAuth, async function(req, res) {
+  var sessionId = req.params.session_id;
+  try {
+    var admin = getAdminClient();
+    var session = await loadOwnedSession(admin, sessionId, req.user.id, 'session_id, user_id, started_at');
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    // Pull the first 10 minutes of transcript. Names usually surface in the
+    // intro. Filter to PROSPECT turns and the closer's opening (which often
+    // contains "Hi, am I speaking with X?" — also useful signal).
+    var startedAt = new Date(session.started_at).getTime();
+    var windowEnd = new Date(startedAt + 10 * 60 * 1000).toISOString();
+    var q = await admin
+      .from('session_logs')
+      .select('logged_at, tag, message')
+      .eq('session_id', sessionId)
+      .gte('logged_at', session.started_at)
+      .lte('logged_at', windowEnd)
+      .eq('tag', '[deepgram]')
+      .like('message', '%Transcript (final)%')
+      .order('logged_at', { ascending: true })
+      .limit(500);
+    if (q.error) {
+      console.error('[me] extract-prospect-name window query failed:', q.error.message);
+      return res.status(500).json({ error: 'Could not load intro transcript' });
+    }
+    var introText = (q.data || []).map(function(l) { return l.message; }).join('\n').slice(0, 5000);
+    if (!introText.trim()) {
+      return res.json({ prospect_name: null, reason: 'no transcript content in first 10 minutes' });
+    }
+
+    var prompt =
+      'Below is the first ~10 minutes of a sales call transcript. Extract the ' +
+      'prospect\'s FIRST NAME only. (The prospect is the person being sold to, ' +
+      'not the closer.) Return ONLY this JSON, no markdown:\n' +
+      '{"prospect_name":"<first name>"|null,"confidence":"high|medium|low"}\n' +
+      'Return null when no name is clearly stated. Don\'t guess.\n\n' +
+      'TRANSCRIPT:\n' + introText;
+
+    var anthropic = getAnthropic();
+    var resp = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 100,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    var rawText = resp.content[0] ? resp.content[0].text : '';
+    var parsed = extractFirstJsonObject(rawText);
+    if (!parsed) {
+      return res.status(502).json({ error: 'Claude returned non-JSON: ' + rawText.slice(0, 100) });
+    }
+    var name = (parsed.prospect_name && typeof parsed.prospect_name === 'string') ? parsed.prospect_name.trim() : null;
+
+    var update = await admin
+      .from('call_sessions')
+      .update({ prospect_name: name })
+      .eq('session_id', sessionId)
+      .eq('user_id', req.user.id)
+      .select('session_id')
+      .maybeSingle();
+    if (update.error) {
+      console.error('[me] extract-prospect-name update failed:', update.error.message);
+      return res.status(500).json({ error: 'Could not save prospect name' });
+    }
+
+    res.json({ prospect_name: name, confidence: parsed.confidence || null });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] extract-prospect-name error:', err.message);
+    res.status(500).json({ error: 'Failed to extract prospect name' });
+  }
+});
+
+// ── GET /me/coaching/patterns?from=&to= ─────────────────────────────────────
+// Cross-session pattern-level coaching. Pulls the user's session_objections
+// + call_sessions in the date window, asks Claude to surface 3-5 recurring
+// behaviors with specific recommendations. Distinct from /me/analytics
+// (numbers) — this returns prose recommendations grounded in the data.
+//
+// Honest caveat: with <30 sessions of data, patterns will be directional
+// not definitive. The prompt is calibrated to be cautious in low-data
+// regimes — it will state confidence and skip patterns that aren't backed
+// by enough evidence.
+router.get('/coaching/patterns', requireAuth, async function(req, res) {
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+  try {
+    var result = await computeCoachingPatterns(getAdminClient(), req.user.id, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] coaching/patterns error:', err.message);
+    res.status(500).json({ error: 'Failed to load coaching patterns: ' + (err.message || 'unknown') });
+  }
+});
+
+// Shared between /me/coaching/patterns and /admin/coaching/:user_id/patterns
+// (added later). Pure-ish helper — takes an admin client + scope.
+async function computeCoachingPatterns(adminClient, userId, from, to) {
+  // Sessions in range, plus all objection rows for those sessions.
+  var sessionsQ = await adminClient
+    .from('call_sessions')
+    .select('session_id, started_at, outcome, prospect_name, post_call_summary')
+    .eq('user_id', userId)
+    .gte('started_at', from)
+    .lte('started_at', to);
+  if (sessionsQ.error) throw new Error('sessions: ' + sessionsQ.error.message);
+  var sessions = sessionsQ.data || [];
+  if (sessions.length === 0) {
+    return { from: from, to: to, sample_size: 0, patterns: [] };
+  }
+  var sessionIds = sessions.map(function(s) { return s.session_id; });
+  var objQ = await adminClient
+    .from('session_objections')
+    .select('session_id, objection_id, objection_label, framework, overcome, overcome_confidence, notes, coaching_note')
+    .in('session_id', sessionIds);
+  var objs = (objQ.data || []);
+
+  // Compact data summary for Claude. Keep this concise — Claude sees totals
+  // + a handful of representative coaching notes, not every transcript.
+  var byLabel = {};
+  for (var i = 0; i < objs.length; i++) {
+    var o = objs[i];
+    if (!byLabel[o.objection_label]) byLabel[o.objection_label] = { total: 0, overcome: 0, not: 0, unknown: 0, sample_notes: [] };
+    var b = byLabel[o.objection_label];
+    b.total++;
+    if (o.overcome === true) b.overcome++;
+    else if (o.overcome === false) b.not++;
+    else b.unknown++;
+    if (b.sample_notes.length < 3 && o.coaching_note) b.sample_notes.push(o.coaching_note);
+  }
+  var outcomeCounts = { win: 0, loss: 0, follow_up: 0, unmarked: 0 };
+  sessions.forEach(function(s) {
+    if (s.outcome === 'win') outcomeCounts.win++;
+    else if (s.outcome === 'loss') outcomeCounts.loss++;
+    else if (s.outcome === 'follow_up') outcomeCounts.follow_up++;
+    else outcomeCounts.unmarked++;
+  });
+
+  var dataSummary = 'TOTAL SESSIONS IN WINDOW: ' + sessions.length + '\n' +
+    'OUTCOME BREAKDOWN: ' + JSON.stringify(outcomeCounts) + '\n' +
+    'OBJECTION BREAKDOWN:\n' +
+    Object.keys(byLabel).map(function(label) {
+      var b = byLabel[label];
+      var pct = (b.overcome + b.not) > 0 ? Math.round(100 * b.overcome / (b.overcome + b.not)) + '%' : 'N/A';
+      var notes = b.sample_notes.length > 0 ? '\n  Sample coaching notes from past events:\n    - ' + b.sample_notes.join('\n    - ') : '';
+      return '  - ' + label + ': ' + b.total + ' events (overcome=' + b.overcome + ', not=' + b.not + ', unknown=' + b.unknown + ', overcome% of definitive=' + pct + ')' + notes;
+    }).join('\n');
+
+  var prompt =
+    'You are an expert sales coach reviewing a single closer\'s recent calls. ' +
+    'Below is a compact summary of their session history. Identify 3-5 ' +
+    'recurring patterns or behaviors worth coaching them on. Be specific. ' +
+    'Reference the actual numbers and objection types.\n\n' +
+    'Each pattern must include:\n' +
+    ' - headline: short, punchy (8-15 words). Cite a number if possible.\n' +
+    ' - detail: 2-3 sentences. Reference specific objections or outcomes ' +
+    'from the data below. Include a SPECIFIC actionable next step.\n' +
+    ' - confidence: "high" | "medium" | "low" — given the data volume below.\n\n' +
+    'CRITICAL: With ' + sessions.length + ' sessions of data, calibrate your ' +
+    'confidence honestly. Below ~30 sessions, default to "medium" or "low". ' +
+    'Don\'t state patterns as definitive when n=5.\n\n' +
+    'If the data is too sparse to identify meaningful patterns, return ' +
+    '{"patterns":[]} — don\'t fabricate.\n\n' +
+    'Respond with ONLY this JSON, no markdown, no fences:\n' +
+    '{"patterns":[{"headline":"...","detail":"...","confidence":"high|medium|low"},...]}\n\n' +
+    'DATA:\n' + dataSummary;
+
+  var anthropic = getAnthropic();
+  var resp = await anthropic.messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: 1500,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  var rawText = resp.content[0] ? resp.content[0].text : '';
+  var parsed = extractFirstJsonObject(rawText);
+  var patterns = (parsed && Array.isArray(parsed.patterns)) ? parsed.patterns : [];
+
+  return {
+    from: from,
+    to: to,
+    sample_size: sessions.length,
+    objection_event_count: objs.length,
+    patterns: patterns,
+  };
+}
+
 router._computeCountsBySession = computeCountsBySession;
 router._computeDurationSeconds = computeDurationSeconds;
 router._extractLabelFromMatchMessage = extractLabelFromMatchMessage;
 router._OBJECTION_LABEL_MAP = OBJECTION_LABEL_MAP;
+router._computeCoachingPatterns = computeCoachingPatterns;
 
 module.exports = router;

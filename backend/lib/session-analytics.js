@@ -104,7 +104,7 @@ async function computeAnalytics(admin, userId, from, to) {
 async function loadSessionObjections(admin, sessionId) {
   var r = await admin
     .from('session_objections')
-    .select('detected_at, objection_id, objection_label, framework, overcome, overcome_confidence, notes')
+    .select('detected_at, objection_id, objection_label, framework, overcome, overcome_confidence, notes, framework_rebuttal, closer_response, coaching_note')
     .eq('session_id', sessionId)
     .order('detected_at', { ascending: true });
   if (r.error) throw new Error('objection lookup: ' + r.error.message);

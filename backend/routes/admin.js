@@ -504,6 +504,50 @@ router.get('/sessions/:session_id/objections', requireAuth, requireRole(['admin'
   }
 });
 
+// ── GET /admin/coaching/:user_id/patterns ───────────────────────────────────
+// Admin/owner view of any user's coaching patterns. Reuses the same
+// computation as /me/coaching/patterns — just calls it with a different
+// user_id after a scope check (admins see managed users + self; owners see
+// anyone). Lives on admin.js for the same reason analytics does — keeps
+// caller-scope clean from cross-user-scope.
+router.get('/coaching/:user_id/patterns', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+
+  try {
+    var admin = getAdminClient();
+    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+      var scopeCheck = await admin
+        .from('user_profiles')
+        .select('user_id, managed_by')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+      if (scopeCheck.error) {
+        console.error('[admin] coaching patterns scope check failed:', scopeCheck.error.message);
+        return res.status(500).json({ error: 'Could not verify access' });
+      }
+      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+        console.warn('[admin] Scope violation on coaching patterns: actor=%s target=%s', req.user.id, targetUserId);
+        return res.status(403).json({ error: 'Not authorized for that user' });
+      }
+    }
+    // Import lazily — keeps me.js as the canonical owner of the prompt; admin
+    // just dispatches. The require() is at function scope to avoid a circular
+    // dependency at module load (admin.js doesn't otherwise depend on me.js).
+    var meRouter = require('./me');
+    var result = await meRouter._computeCoachingPatterns(admin, targetUserId, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] coaching patterns error:', err.message);
+    res.status(500).json({ error: 'Failed to load coaching patterns: ' + (err.message || 'unknown') });
+  }
+});
+
 // Pure helpers exported for tests (matches log.js `_validateLogBatch` pattern).
 router._buildUserEmailMap = buildUserEmailMap;
 router._computeCountsBySession = computeCountsBySession;
