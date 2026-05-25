@@ -68,7 +68,7 @@ router.get('/sessions', requireAuth, async function(req, res) {
     var admin = getAdminClient();
     var q = admin
       .from('call_sessions')
-      .select('session_id, user_id, started_at, ended_at, outcome, client_version, platform')
+      .select('session_id, user_id, started_at, ended_at, outcome, outcome_source, client_version, platform, prospect_name, post_call_summary')
       .eq('user_id', req.user.id)
       .order('started_at', { ascending: false })
       .limit(limit);
@@ -103,6 +103,9 @@ router.get('/sessions', requireAuth, async function(req, res) {
         client_version: s.client_version,
         platform: s.platform,
         outcome: s.outcome,
+        outcome_source: s.outcome_source,
+        prospect_name: s.prospect_name,
+        has_summary: !!s.post_call_summary,
         log_count: c.log_count,
         error_count: c.error_count,
       };

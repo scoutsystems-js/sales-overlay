@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Coaching — Scout Systems</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    :root {
+      --bg:     #0e0e0e;
+      --bg2:    #181818;
+      --bg3:    #222;
+      --muted:  #8b8b8b;
+      --border: #2a2a2a;
+      --accent: #4a9eff;
+      --good:   #4ade80;
+      --bad:    #f87171;
+      --mid:    #facc15;
+    }
+
+    html, body { margin: 0; padding: 0; background: var(--bg); color: #e4e4e4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.55; }
+
+    .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--bg2); }
+    .top-bar-left { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+    .top-bar-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+    .top-bar-right a, .signout { color: var(--muted); cursor: pointer; text-decoration: none; }
+    .top-bar-right a:hover, .signout:hover { color: #e4e4e4; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 24px 80px; }
+
+    .page-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+    .page-header h1 { font-size: 26px; margin: 0; font-weight: 600; }
+    .page-header .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .scope-badge { font-size: 11px; color: var(--muted); background: var(--bg3); border: 1px solid var(--border); padding: 4px 10px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .filter-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+    .filter-bar select {
+      background: var(--bg2); border: 1px solid var(--border); color: inherit;
+      padding: 7px 12px; border-radius: 6px; font-size: 13px; font-family: inherit; min-width: 240px;
+    }
+    .date-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+    .date-preset {
+      background: var(--bg2); border: 1px solid var(--border); color: var(--muted);
+      padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit;
+    }
+    .date-preset:hover { background: var(--bg3); color: inherit; }
+    .date-preset.active { background: var(--bg3); color: inherit; border-color: var(--accent); }
+
+    /* ─── Section: patterns ────────────────────────────────────────────── */
+    .section { margin-bottom: 36px; }
+    .section h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+    .section h2 .sub-count { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+    .patterns-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .pattern-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+    .pattern-headline { font-size: 14px; font-weight: 600; line-height: 1.4; }
+    .pattern-detail { font-size: 13px; color: #cfcfcf; margin-top: 8px; line-height: 1.55; }
+    .pattern-confidence { font-size: 11px; color: var(--muted); margin-top: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .pattern-confidence.high   { color: var(--good); }
+    .pattern-confidence.medium { color: var(--mid); }
+    .pattern-confidence.low    { color: var(--muted); }
+
+    .data-quality-banner {
+      background: rgba(74, 158, 255, 0.08); border: 1px solid rgba(74, 158, 255, 0.25);
+      border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #b3d4ff;
+      margin-bottom: 14px;
+    }
+    .data-quality-banner strong { color: #d4e6ff; }
+
+    /* ─── Section: per-call list ───────────────────────────────────────── */
+    .call-list { display: flex; flex-direction: column; gap: 12px; }
+    .call-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+      overflow: hidden; transition: border-color 0.15s;
+    }
+    .call-card:hover { border-color: #3a3a3a; }
+    .call-card.expanded { border-color: var(--accent); }
+
+    .call-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; cursor: pointer; gap: 12px;
+    }
+    .call-head-left { flex: 1; min-width: 0; }
+    .call-head-title { font-size: 14px; font-weight: 600; }
+    .call-head-title .prospect-name { color: #e4e4e4; }
+    .call-head-title .prospect-anon { color: var(--muted); font-weight: 400; font-style: italic; }
+    .call-head-meta { font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .call-head-right { display: flex; align-items: center; gap: 12px; }
+
+    .badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .badge-win    { background: rgba(74, 222, 128, 0.15); color: var(--good); }
+    .badge-loss   { background: rgba(248, 113, 113, 0.15); color: var(--bad); }
+    .badge-fu     { background: rgba(250, 204, 21, 0.15); color: var(--mid); }
+    .badge-empty  { background: var(--bg3); color: var(--muted); }
+    .badge-live   { background: rgba(74, 158, 255, 0.15); color: var(--accent); }
+
+    .expand-icon { color: var(--muted); transition: transform 0.15s; }
+    .call-card.expanded .expand-icon { transform: rotate(180deg); }
+
+    .call-body {
+      border-top: 1px solid var(--border); padding: 18px;
+      background: #141414;
+    }
+    .call-body-empty { color: var(--muted); font-size: 13px; font-style: italic; }
+
+    .call-summary { font-size: 13px; color: #cfcfcf; margin-bottom: 16px; padding: 12px 14px; background: var(--bg3); border-radius: 6px; border-left: 3px solid var(--accent); white-space: pre-wrap; }
+
+    .obj-event { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+    .obj-event-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .obj-event-title { font-size: 14px; font-weight: 600; }
+    .obj-event-time { font-size: 11px; color: var(--muted); }
+
+    .verdict-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .verdict-overcome    { background: rgba(74, 222, 128, 0.15); color: var(--good); }
+    .verdict-not         { background: rgba(248, 113, 113, 0.15); color: var(--bad); }
+    .verdict-unknown     { background: var(--bg3); color: var(--muted); }
+    .verdict-confidence  { font-size: 10px; color: var(--muted); margin-left: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 400; }
+
+    /* Coaching narrative — the user-facing prescription */
+    .coaching-note {
+      font-size: 14px; line-height: 1.6; color: #e4e4e4;
+      background: linear-gradient(135deg, rgba(74, 158, 255, 0.06), rgba(74, 222, 128, 0.04));
+      border: 1px solid rgba(74, 158, 255, 0.2);
+      border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;
+    }
+    .coaching-note-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+
+    /* Side-by-side: framework vs actual */
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 700px) { .compare-grid { grid-template-columns: 1fr; } }
+    .compare-pane { background: var(--bg3); border-radius: 6px; padding: 12px 14px; }
+    .compare-pane .compare-label {
+      font-size: 10px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.7px; margin-bottom: 6px; font-weight: 600;
+    }
+    .compare-pane.framework { border-left: 3px solid var(--accent); }
+    .compare-pane.actual    { border-left: 3px solid var(--mid); }
+    .compare-text { font-size: 13px; color: #d6d6d6; line-height: 1.55; }
+    .compare-text.empty { color: var(--muted); font-style: italic; }
+
+    .obj-notes-row { font-size: 11px; color: var(--muted); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+    /* Spinner + status messages */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .load-spinner { display: flex; justify-content: center; padding: 28px; }
+
+    .empty-state { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 36px; text-align: center; color: var(--muted); }
+    .empty-state h3 { margin: 0 0 8px; color: #e4e4e4; font-weight: 600; }
+    .empty-state p { margin: 0; font-size: 13px; }
+
+    .msg-error { background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3); color: #fab7b7; padding: 12px 16px; border-radius: 8px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<nav class="top-bar">
+  <div class="top-bar-left">
+    <span>Scout</span>
+    <span style="color: var(--muted); font-weight: 500; font-size: 13px;">· Coaching</span>
+  </div>
+  <div class="top-bar-right">
+    <a href="/dashboard" id="dashboardLink">Dashboard</a>
+    <a href="/admin" id="adminLink" style="display:none">Admin</a>
+    <span id="signedInEmail"></span>
+    <span class="signout" onclick="signOut()">Sign out</span>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="page-header">
+    <div>
+      <h1 id="pageHeading">Coaching Review</h1>
+      <div class="sub" id="pageSub"></div>
+    </div>
+    <div class="scope-badge" id="scopeBadge" style="display:none"></div>
+  </div>
+
+  <div class="filter-bar">
+    <select id="userSelect" style="display:none" onchange="onUserChange()">
+      <option value="">Loading users…</option>
+    </select>
+    <div class="date-presets">
+      <button class="date-preset" data-days="7"    onclick="setDateRange(7)">7d</button>
+      <button class="date-preset active" data-days="30" onclick="setDateRange(30)">30d</button>
+      <button class="date-preset" data-days="90"   onclick="setDateRange(90)">90d</button>
+      <button class="date-preset" data-days="9999" onclick="setDateRange(9999)">All</button>
+    </div>
+  </div>
+
+  <!-- ─── SECTION 1: Patterns / recommendations ────────────────────────── -->
+  <section class="section">
+    <h2>Patterns to work on <span class="sub-count" id="patternsSubCount"></span></h2>
+    <div id="patternsContainer">
+      <div class="load-spinner"><div class="spinner"></div></div>
+    </div>
+  </section>
+
+  <!-- ─── SECTION 2: Per-call coaching ─────────────────────────────────── -->
+  <section class="section">
+    <h2>Calls <span class="sub-count" id="callsSubCount"></span></h2>
+    <div id="callsContainer">
+      <div class="load-spinner"><div class="spinner"></div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // ─── Session / auth (shared pattern from dashboard.html + admin.html) ──
+  var STORAGE_KEY = 'scout_session_v1';
+  function getSession() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return null; } }
+  function setSession(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+  function clearSession() { localStorage.removeItem(STORAGE_KEY); }
+  function isSessionValid(s) {
+    if (!s || !s.access_token || !s.expires_at) return false;
+    return new Date(s.expires_at).getTime() > Date.now() + 30 * 1000;
+  }
+  async function refreshSessionIfNeeded() {
+    var s = getSession();
+    if (!s || !s.refresh_token) return false;
+    try {
+      var res = await fetch('/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh_token }) });
+      if (!res.ok) return false;
+      var data = await res.json();
+      if (!data || !data.session) return false;
+      setSession({ access_token: data.session.access_token, refresh_token: data.session.refresh_token, expires_at: data.session.expires_at, email: data.session.user && data.session.user.email });
+      return true;
+    } catch (e) { return false; }
+  }
+  function signOut() { clearSession(); window.location.replace('/login'); }
+  function authHeader() {
+    var s = getSession();
+    return s && s.access_token ? { Authorization: 'Bearer ' + s.access_token } : {};
+  }
+
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]); });
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    var month = d.toLocaleDateString('en-US', { month: 'short' });
+    var day = d.getDate();
+    var year = d.getFullYear();
+    var today = new Date().getFullYear();
+    return year === today ? month + ' ' + day : month + ' ' + day + ', ' + year;
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds && seconds !== 0) return '—';
+    if (seconds < 60) return seconds + 's';
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    return m + 'm' + (s > 0 ? ' ' + s + 's' : '');
+  }
+
+  // ─── State ─────────────────────────────────────────────────────────────
+  var currentUser = null;           // { user_id, email, role }
+  var viewingUserId = null;         // user being viewed (== currentUser.user_id unless admin pivoting)
+  var allUsers = [];                // populated when admin/owner
+  var dateRange = { from: null, to: null };
+  var allCalls = [];                // session list
+  var expandedSessionId = null;
+  var objectionCache = {};          // session_id -> objections array
+
+  // ─── Init ─────────────────────────────────────────────────────────────
+  async function init() {
+    var s = getSession();
+    if (!isSessionValid(s)) {
+      if (s && s.refresh_token) {
+        var ok = await refreshSessionIfNeeded();
+        if (!ok) { window.location.replace('/login'); return; }
+      } else {
+        window.location.replace('/login');
+        return;
+      }
+    }
+    var cur = getSession();
+    document.getElementById('signedInEmail').textContent = (cur && cur.email) || '';
+
+    currentUser = await fetchMe();
+    if (!currentUser) { window.location.replace('/login'); return; }
+
+    // Show admin link in nav if applicable
+    if (currentUser.role === 'admin' || currentUser.role === 'owner') {
+      document.getElementById('adminLink').style.display = '';
+    }
+
+    // Decide whose data to load:
+    //   ?user=<id> param → admin/owner pivoting to another user (scope-checked server-side)
+    //   no param         → caller's own
+    var urlParams = new URLSearchParams(window.location.search);
+    var targetUserId = urlParams.get('user');
+    if (targetUserId && (currentUser.role === 'admin' || currentUser.role === 'owner')) {
+      viewingUserId = targetUserId;
+    } else {
+      viewingUserId = currentUser.user_id;
+    }
+
+    // If admin/owner, populate the user picker.
+    if (currentUser.role === 'admin' || currentUser.role === 'owner') {
+      await loadUsers();
+      var sel = document.getElementById('userSelect');
+      sel.style.display = '';
+      sel.value = viewingUserId;
+      updatePageHeader();
+    } else {
+      updatePageHeader();
+    }
+
+    setDateRange(30);  // triggers loadPatterns + loadCalls
+  }
+
+  async function fetchMe() {
+    try {
+      var res = await fetch('/auth/me', { headers: authHeader() });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) { return null; }
+  }
+
+  async function loadUsers() {
+    try {
+      var res = await fetch('/admin/users', { headers: authHeader() });
+      if (!res.ok) return;
+      var data = await res.json();
+      allUsers = (data && data.users) || [];
+      var sel = document.getElementById('userSelect');
+      var sorted = allUsers.slice().sort(function(a, b) { return (a.email || '').localeCompare(b.email || ''); });
+      sel.innerHTML = sorted.map(function(u) {
+        return '<option value="' + escapeHtml(u.user_id) + '">' + escapeHtml(u.email || u.user_id) + ' · ' + escapeHtml(u.role || 'user') + '</option>';
+      }).join('');
+    } catch (e) { /* silent */ }
+  }
+
+  function updatePageHeader() {
+    var heading = document.getElementById('pageHeading');
+    var sub = document.getElementById('pageSub');
+    var badge = document.getElementById('scopeBadge');
+
+    if (viewingUserId === currentUser.user_id) {
+      heading.textContent = 'Your coaching review';
+      sub.textContent = 'Pattern recommendations and per-call feedback for your recent sales calls.';
+      badge.style.display = 'none';
+    } else {
+      var viewedUser = allUsers.find(function(u) { return u.user_id === viewingUserId; });
+      var label = viewedUser ? viewedUser.email : viewingUserId;
+      heading.textContent = 'Coaching review · ' + label;
+      sub.textContent = 'Viewing as ' + currentUser.role + ' — pick another user from the dropdown above.';
+      badge.style.display = '';
+      badge.textContent = currentUser.role + ' view';
+    }
+  }
+
+  function onUserChange() {
+    var sel = document.getElementById('userSelect');
+    var newUserId = sel.value;
+    if (!newUserId || newUserId === viewingUserId) return;
+    // Update URL so reloads stick + share-able
+    var url = new URL(window.location.href);
+    if (newUserId === currentUser.user_id) {
+      url.searchParams.delete('user');
+    } else {
+      url.searchParams.set('user', newUserId);
+    }
+    window.history.replaceState({}, '', url.toString());
+    viewingUserId = newUserId;
+    expandedSessionId = null;
+    objectionCache = {};
+    updatePageHeader();
+    loadPatterns();
+    loadCalls();
+  }
+
+  function setDateRange(days) {
+    var to = new Date();
+    var from = days >= 9999
+      ? new Date('2025-01-01T00:00:00Z')
+      : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    dateRange.from = from.toISOString();
+    dateRange.to = to.toISOString();
+    document.querySelectorAll('.date-preset').forEach(function(b) { b.classList.remove('active'); });
+    var activeBtn = document.querySelector('.date-preset[data-days="' + days + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+    expandedSessionId = null;
+    objectionCache = {};
+    loadPatterns();
+    loadCalls();
+  }
+
+  // ─── Patterns ─────────────────────────────────────────────────────────
+  async function loadPatterns() {
+    var container = document.getElementById('patternsContainer');
+    container.innerHTML = '<div class="load-spinner"><div class="spinner"></div></div>';
+
+    var isSelf = viewingUserId === currentUser.user_id;
+    var url = isSelf
+      ? '/me/coaching/patterns?from=' + encodeURIComponent(dateRange.from) + '&to=' + encodeURIComponent(dateRange.to)
+      : '/admin/coaching/' + encodeURIComponent(viewingUserId) + '/patterns?from=' + encodeURIComponent(dateRange.from) + '&to=' + encodeURIComponent(dateRange.to);
+
+    var res;
+    try { res = await fetch(url, { headers: authHeader() }); }
+    catch (err) { container.innerHTML = '<div class="msg-error">Network error loading patterns.</div>'; return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (res.status === 403) { container.innerHTML = '<div class="msg-error">Not authorized to view that user.</div>'; return; }
+    if (!res.ok) { container.innerHTML = '<div class="msg-error">Could not load patterns (HTTP ' + res.status + ').</div>'; return; }
+    var data = await res.json();
+    renderPatterns(data);
+  }
+
+  function renderPatterns(data) {
+    var container = document.getElementById('patternsContainer');
+    var count = document.getElementById('patternsSubCount');
+    var patterns = (data && data.patterns) || [];
+    count.textContent = data.sample_size != null ? '· based on ' + data.sample_size + ' calls' : '';
+
+    var banner = '';
+    if (data.sample_size != null && data.sample_size < 20) {
+      banner = '<div class="data-quality-banner"><strong>Early signal</strong> — only ' + data.sample_size + ' calls in this date range. Patterns will sharpen as more calls accumulate.</div>';
+    }
+
+    if (patterns.length === 0) {
+      container.innerHTML = banner + '<div class="empty-state"><h3>No clear patterns yet</h3><p>Not enough data to identify recurring patterns. Run more calls or expand the date range.</p></div>';
+      return;
+    }
+
+    var html = banner + '<div class="patterns-grid">';
+    for (var i = 0; i < patterns.length; i++) {
+      var p = patterns[i];
+      var conf = (p.confidence || 'low').toLowerCase();
+      html += '<div class="pattern-card">'
+        + '<div class="pattern-headline">' + escapeHtml(p.headline || '') + '</div>'
+        + '<div class="pattern-detail">' + escapeHtml(p.detail || '') + '</div>'
+        + '<div class="pattern-confidence ' + conf + '">' + escapeHtml(conf) + ' confidence</div>'
+        + '</div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  // ─── Calls (list + drill-down) ────────────────────────────────────────
+  async function loadCalls() {
+    var container = document.getElementById('callsContainer');
+    container.innerHTML = '<div class="load-spinner"><div class="spinner"></div></div>';
+
+    var isSelf = viewingUserId === currentUser.user_id;
+    // /me/sessions and /admin/sessions don't take from/to today (the call
+    // list shows recent activity); we filter client-side after fetch.
+    var url = isSelf
+      ? '/me/sessions?limit=100'
+      : '/admin/sessions?limit=100&user_id=' + encodeURIComponent(viewingUserId);
+
+    var res;
+    try { res = await fetch(url, { headers: authHeader() }); }
+    catch (err) { container.innerHTML = '<div class="msg-error">Network error loading calls.</div>'; return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (res.status === 403) { container.innerHTML = '<div class="msg-error">Not authorized to view that user.</div>'; return; }
+    if (!res.ok) { container.innerHTML = '<div class="msg-error">Could not load calls (HTTP ' + res.status + ').</div>'; return; }
+    var data = await res.json();
+    var all = (data && data.sessions) || [];
+    // Client-side date filter.
+    allCalls = all.filter(function(s) {
+      return s.started_at >= dateRange.from && s.started_at <= dateRange.to;
+    });
+    renderCalls();
+  }
+
+  function renderCalls() {
+    var container = document.getElementById('callsContainer');
+    var count = document.getElementById('callsSubCount');
+    count.textContent = allCalls.length === 1 ? '· 1 call' : '· ' + allCalls.length + ' calls';
+
+    if (allCalls.length === 0) {
+      container.innerHTML = '<div class="empty-state"><h3>No calls in this date range</h3><p>Pick a wider window above, or wait for more calls to accumulate.</p></div>';
+      return;
+    }
+
+    var html = '<div class="call-list">';
+    for (var i = 0; i < allCalls.length; i++) {
+      var s = allCalls[i];
+      html += renderCallCard(s);
+    }
+    html += '</div>';
+    container.innerHTML = html;
+
+    if (expandedSessionId) {
+      var body = document.getElementById('body-' + expandedSessionId);
+      if (body) renderCallBody(expandedSessionId);
+    }
+  }
+
+  function renderCallCard(s) {
+    var expanded = s.session_id === expandedSessionId ? ' expanded' : '';
+    var titleProspect = s.prospect_name
+      ? '<span class="prospect-name">' + escapeHtml(s.prospect_name) + '</span>'
+      : '<span class="prospect-anon">unknown prospect</span>';
+    var meta = [];
+    meta.push(formatDate(s.started_at));
+    meta.push(formatDuration(s.duration_seconds));
+    if (s.outcome_source === 'inferred') meta.push('outcome inferred');
+    var badge = outcomeBadge(s.outcome, !!s.ended_at);
+
+    return '<div class="call-card' + expanded + '" id="card-' + escapeHtml(s.session_id) + '">'
+      + '<div class="call-head" onclick="toggleCall(\'' + s.session_id + '\')">'
+        + '<div class="call-head-left">'
+          + '<div class="call-head-title">Call with ' + titleProspect + '</div>'
+          + '<div class="call-head-meta">' + meta.map(escapeHtml).join(' · ') + '</div>'
+        + '</div>'
+        + '<div class="call-head-right">' + badge + ' <span class="expand-icon">▾</span></div>'
+      + '</div>'
+      + '<div class="call-body" id="body-' + escapeHtml(s.session_id) + '" style="display:' + (expanded ? 'block' : 'none') + '"></div>'
+    + '</div>';
+  }
+
+  function outcomeBadge(outcome, ended) {
+    if (outcome === 'win') return '<span class="badge badge-win">Won</span>';
+    if (outcome === 'loss') return '<span class="badge badge-loss">Lost</span>';
+    if (outcome === 'follow_up') return '<span class="badge badge-fu">Follow-up</span>';
+    if (!ended) return '<span class="badge badge-live">Live</span>';
+    return '<span class="badge badge-empty">Unmarked</span>';
+  }
+
+  async function toggleCall(sessionId) {
+    if (expandedSessionId === sessionId) {
+      // Collapse
+      var card = document.getElementById('card-' + sessionId);
+      var body = document.getElementById('body-' + sessionId);
+      if (card) card.classList.remove('expanded');
+      if (body) body.style.display = 'none';
+      expandedSessionId = null;
+      return;
+    }
+    // Collapse any previously open card
+    if (expandedSessionId) {
+      var oldCard = document.getElementById('card-' + expandedSessionId);
+      var oldBody = document.getElementById('body-' + expandedSessionId);
+      if (oldCard) oldCard.classList.remove('expanded');
+      if (oldBody) oldBody.style.display = 'none';
+    }
+    expandedSessionId = sessionId;
+    var card = document.getElementById('card-' + sessionId);
+    var body = document.getElementById('body-' + sessionId);
+    if (card) card.classList.add('expanded');
+    if (body) body.style.display = 'block';
+    renderCallBody(sessionId);
+  }
+
+  async function renderCallBody(sessionId) {
+    var body = document.getElementById('body-' + sessionId);
+    if (!body) return;
+    var session = allCalls.find(function(s) { return s.session_id === sessionId; });
+    if (!session) return;
+
+    body.innerHTML = '<div class="load-spinner"><div class="spinner"></div></div>';
+
+    // Load objections (cached after first fetch).
+    var objections = objectionCache[sessionId];
+    if (!objections) {
+      var isSelf = viewingUserId === currentUser.user_id;
+      var url = isSelf
+        ? '/me/sessions/' + encodeURIComponent(sessionId) + '/objections'
+        : '/admin/sessions/' + encodeURIComponent(sessionId) + '/objections';
+      try {
+        var res = await fetch(url, { headers: authHeader() });
+        if (res.ok) {
+          var data = await res.json();
+          objections = (data && data.objections) || [];
+          objectionCache[sessionId] = objections;
+        } else {
+          objections = [];
+        }
+      } catch (e) { objections = []; }
+    }
+
+    var html = '';
+
+    // Post-call summary (if available)
+    if (session.has_summary) {
+      // We don't have it in the list response — fetch via /me/sessions/:id/logs would
+      // also return session metadata but is heavy. Skip the summary text for now and
+      // just show whether one exists.
+      html += '<div class="call-summary">A post-call summary was generated for this call.</div>';
+    }
+
+    if (objections.length === 0) {
+      html += '<div class="call-body-empty">No objections were detected in this call.</div>';
+    } else {
+      for (var i = 0; i < objections.length; i++) {
+        html += renderObjectionEvent(objections[i]);
+      }
+    }
+    body.innerHTML = html;
+  }
+
+  function renderObjectionEvent(o) {
+    var verdict;
+    if (o.overcome === true) verdict = '<span class="verdict-badge verdict-overcome">✓ Overcome</span>';
+    else if (o.overcome === false) verdict = '<span class="verdict-badge verdict-not">✗ Not Overcome</span>';
+    else verdict = '<span class="verdict-badge verdict-unknown">? Indeterminate</span>';
+    var conf = o.overcome_confidence ? '<span class="verdict-confidence">' + escapeHtml(o.overcome_confidence) + ' confidence</span>' : '';
+    var time = o.detected_at ? new Date(o.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+
+    var coaching = o.coaching_note
+      ? '<div class="coaching-note">' + escapeHtml(o.coaching_note) + '</div>'
+      : '<div class="coaching-note-empty">No coaching narrative generated for this event.</div>';
+
+    var rebuttal = o.framework_rebuttal
+      ? '<div class="compare-text">' + escapeHtml(o.framework_rebuttal) + '</div>'
+      : '<div class="compare-text empty">No framework rebuttal recorded.</div>';
+    var said = o.closer_response
+      ? '<div class="compare-text">' + escapeHtml(o.closer_response) + '</div>'
+      : '<div class="compare-text empty">No closer transcript captured in the 60s after this objection.</div>';
+
+    return '<div class="obj-event">'
+      + '<div class="obj-event-head">'
+        + '<div>'
+          + '<span class="obj-event-title">' + escapeHtml(o.objection_label || '') + '</span>'
+          + (time ? ' <span class="obj-event-time">at ' + escapeHtml(time) + '</span>' : '')
+        + '</div>'
+        + '<div>' + verdict + conf + '</div>'
+      + '</div>'
+      + coaching
+      + '<div class="compare-grid">'
+        + '<div class="compare-pane framework"><div class="compare-label">Scout suggested</div>' + rebuttal + '</div>'
+        + '<div class="compare-pane actual"><div class="compare-label">What you said</div>' + said + '</div>'
+      + '</div>'
+      + (o.notes ? '<div class="obj-notes-row">Classifier note: ' + escapeHtml(o.notes) + '</div>' : '')
+    + '</div>';
+  }
+
+  // Kick it off
+  init();
+</script>
+
+</body>
+</html>

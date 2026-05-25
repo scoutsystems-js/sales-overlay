@@ -57,6 +57,13 @@ app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
 });
 
+// v1.1.11 coaching page — role-pivoted by client-side query param.
+// /coaching          → closer's own coaching (req.user.id)
+// /coaching?user=X   → admin/owner viewing user X (scope-checked server-side)
+app.get('/coaching', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'coaching.html'));
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/billing', billingRoutes);
