@@ -423,10 +423,18 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
         console.warn('[me] window query failed for ' + label + ': ' + windowQ.error.message);
       }
       var windowRows = windowQ.data || [];
-      // Prefer [memory]-tagged turns (actual transcript) but keep all if memory
-      // tag is sparse — better to give Claude noisy context than nothing.
-      var memoryRows = windowRows.filter(function(l) { return l.tag === '[memory]'; });
-      var sourceRows = memoryRows.length >= 3 ? memoryRows : windowRows;
+      // The actual transcript turns are under tag '[deepgram]' with the
+      // shape '[deepgram] Transcript (final) [PROSPECT|CLOSER]: <text>'.
+      // The '[memory]' tag (which I initially thought held the transcript)
+      // is actually CallMemory's internal logs — useless for classification.
+      // Empty windows in the first backfill pass were ALL due to this tag
+      // confusion plus a separate 1000-row pagination bug, both now fixed.
+      var transcriptRows = windowRows.filter(function(l) {
+        return l.tag === '[deepgram]' && l.message && l.message.indexOf('Transcript (final)') !== -1;
+      });
+      // Fall back to all window rows ONLY if Deepgram is genuinely sparse
+      // — better to give Claude noisy context than nothing at all.
+      var sourceRows = transcriptRows.length >= 3 ? transcriptRows : windowRows;
       var windowTurns = sourceRows.map(function(l) { return l.message; }).join('\n').slice(0, 8000);  // cap context length
 
       var classifyPrompt =
