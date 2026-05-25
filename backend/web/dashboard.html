@@ -542,6 +542,80 @@
       .kb-item { flex-direction: column; align-items: flex-start; }
       .kb-delete-btn { align-self: flex-end; }
     }
+
+    /* v1.1.10 analytics block — date picker + stats cards + objection table.
+       Uses the existing CSS variables (var(--bg2), var(--muted), etc.) so
+       the styling tracks the rest of the dashboard. */
+    .date-picker-bar { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .date-pickers { display: flex; gap: 12px; flex-wrap: wrap; }
+    .date-pickers label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+    .date-pickers input[type=date] {
+      background: var(--bg2); border: 1px solid #2a2a2a; color: inherit;
+      padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: inherit;
+    }
+    .date-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+    .date-preset {
+      background: var(--bg2); border: 1px solid #2a2a2a; color: var(--muted);
+      padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      font-family: inherit;
+    }
+    .date-preset:hover { background: #2a2a2a; color: inherit; }
+    .date-preset.active { background: #2a2a2a; color: inherit; border-color: #4a9eff; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .stat-card .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .stat-value { font-size: 24px; font-weight: 600; margin-top: 4px; }
+    .stat-card .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    .objection-section { margin-bottom: 24px; }
+    .objection-totals { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .objection-table {
+      width: 100%; border-collapse: collapse;
+      background: var(--bg2); border-radius: 8px; overflow: hidden;
+    }
+    .objection-table th, .objection-table td {
+      padding: 10px 14px; text-align: left; font-size: 13px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .objection-table th {
+      background: #1a1a1a; color: var(--muted); font-weight: 500;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .objection-table tr:last-child td { border-bottom: none; }
+    .objection-table .pct-cell { font-weight: 600; }
+    .pct-good { color: #4ade80; }
+    .pct-mid { color: #facc15; }
+    .pct-bad { color: #f87171; }
+    .pct-none { color: var(--muted); }
+
+    /* Per-session objection drill-down (rendered inside an expanded card) */
+    .obj-drill-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #2a2a2a; }
+    .obj-drill-heading {
+      font-size: 12px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 10px;
+    }
+    .obj-drill-item {
+      background: #1a1a1a; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
+    }
+    .obj-drill-item .obj-label { font-weight: 600; font-size: 13px; }
+    .obj-drill-item .obj-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .obj-drill-item .obj-notes { font-size: 12px; margin-top: 6px; color: #ccc; line-height: 1.5; }
+    .obj-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 500; margin-right: 6px;
+    }
+    .obj-badge.overcome-true  { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+    .obj-badge.overcome-false { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+    .obj-badge.overcome-null  { background: rgba(160, 160, 160, 0.15); color: var(--muted); }
   </style>
 </head>
 <body>
@@ -574,9 +648,30 @@
     <button class="launch-btn" onclick="launchApp()">Open Scout App →</button>
   </section>
 
-  <!-- Future stats cards (win rate, call count, avg duration, etc.) will
+  <!-- v1.1.10: analytics — date picker, outcome stats, objection breakdown.
+       Slot was reserved earlier for "future stats cards"; this is the future.
        slot in here without restructuring the page. -->
-  <section class="stats-slot" id="statsSlot"></section>
+  <section class="stats-slot" id="statsSlot">
+    <div class="date-picker-bar">
+      <div class="date-pickers">
+        <label>From <input type="date" id="dateFrom" onchange="onDateInputChange()"/></label>
+        <label>To <input type="date" id="dateTo" onchange="onDateInputChange()"/></label>
+      </div>
+      <div class="date-presets">
+        <button class="date-preset" data-days="7"    onclick="setDateRange(7)">Last 7d</button>
+        <button class="date-preset" data-days="30"   onclick="setDateRange(30)">Last 30d</button>
+        <button class="date-preset" data-days="90"   onclick="setDateRange(90)">Last 90d</button>
+        <button class="date-preset" data-days="9999" onclick="setDateRange(9999)">All time</button>
+      </div>
+    </div>
+    <div class="stats-row" id="statsRow">
+      <div class="load-spinner"><div class="spinner"></div></div>
+    </div>
+    <div class="objection-section" id="objectionSection" style="display:none">
+      <div class="section-heading">Objections</div>
+      <div id="objectionContent"></div>
+    </div>
+  </section>
 
   <section class="kb-section">
     <div class="kb-header">
@@ -738,8 +833,155 @@
       window.location.replace('/admin');
       return;
     }
-    await loadSessions();
+    // v1.1.10: set default date range to last 30 days. setDateRange also
+    // triggers loadAnalytics() + loadSessions(), so don't duplicate the call.
+    setDateRange(30);
     await loadKbList();
+  }
+
+  // ─── v1.1.10 analytics ───────────────────────────────────────────────
+  var analyticsState = { from: null, to: null };
+
+  async function loadAnalytics() {
+    var row = document.getElementById('statsRow');
+    if (!row) return;
+    var url = '/me/analytics?from=' + encodeURIComponent(analyticsState.from)
+      + '&to=' + encodeURIComponent(analyticsState.to);
+    var res;
+    try { res = await fetch(url, { headers: authHeader() }); }
+    catch (err) { row.innerHTML = '<div class="msg-error">Network error loading stats</div>'; return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      row.innerHTML = '<div class="msg-error">Could not load stats (HTTP ' + res.status + ')</div>';
+      return;
+    }
+    var data = await res.json();
+    renderStats(data.totals);
+    renderObjections(data.objections);
+  }
+
+  function renderStats(totals) {
+    var parts = [];
+    parts.push(statCard('Total calls', totals.total_calls, totals.live > 0 ? totals.live + ' still live' : null));
+    parts.push(statCard('Closed (Won)', totals.wins, pctOf(totals.wins, totals.total_calls)));
+    parts.push(statCard('Lost', totals.losses, pctOf(totals.losses, totals.total_calls)));
+    parts.push(statCard('Follow-up', totals.follow_ups, pctOf(totals.follow_ups, totals.total_calls)));
+    if (totals.unmarked > 0) {
+      parts.push(statCard('Unmarked', totals.unmarked, 'no summary yet'));
+    }
+    document.getElementById('statsRow').innerHTML = parts.join('');
+  }
+
+  function statCard(label, value, sub) {
+    var subPart = sub ? '<div class="stat-sub">' + escapeHtml(String(sub)) + '</div>' : '';
+    return '<div class="stat-card"><div class="stat-label">' + escapeHtml(label)
+      + '</div><div class="stat-value">' + escapeHtml(String(value)) + '</div>' + subPart + '</div>';
+  }
+
+  function pctOf(n, total) {
+    if (!total) return null;
+    return Math.round((n / total) * 100) + '%';
+  }
+
+  function renderObjections(objSection) {
+    var section = document.getElementById('objectionSection');
+    var content = document.getElementById('objectionContent');
+    if (!objSection || !objSection.by_type || objSection.by_type.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = 'block';
+    var t = objSection.totals;
+    var summary = t.total + ' total · ' + t.overcome + ' overcome · ' + t.not_overcome + ' not overcome';
+    if (t.unknown > 0) summary += ' · ' + t.unknown + ' indeterminate (transcript quality)';
+
+    var rows = '';
+    for (var i = 0; i < objSection.by_type.length; i++) {
+      var b = objSection.by_type[i];
+      var pct = b.overcome_pct === null
+        ? '<span class="pct-none">—</span>'
+        : '<span class="' + pctClass(b.overcome_pct) + '">' + b.overcome_pct + '%</span>';
+      rows += '<tr><td>' + escapeHtml(b.label) + '</td>'
+        + '<td>' + b.count + '</td>'
+        + '<td>' + b.overcome + '</td>'
+        + '<td>' + b.not_overcome + '</td>'
+        + '<td>' + b.unknown + '</td>'
+        + '<td class="pct-cell">' + pct + '</td></tr>';
+    }
+    content.innerHTML =
+      '<div class="objection-totals">' + escapeHtml(summary) + '</div>'
+      + '<table class="objection-table">'
+      + '<thead><tr><th>Objection</th><th>Count</th><th>Overcome</th><th>Not</th><th>?</th><th>Overcome %</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table>';
+  }
+
+  function pctClass(pct) {
+    if (pct >= 70) return 'pct-good';
+    if (pct >= 40) return 'pct-mid';
+    return 'pct-bad';
+  }
+
+  function setDateRange(days) {
+    var to = new Date();
+    var from = days >= 9999
+      ? new Date('2025-01-01T00:00:00Z')
+      : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    analyticsState.from = from.toISOString();
+    analyticsState.to = to.toISOString();
+    var fromInput = document.getElementById('dateFrom');
+    var toInput = document.getElementById('dateTo');
+    if (fromInput) fromInput.value = from.toISOString().slice(0, 10);
+    if (toInput)   toInput.value   = to.toISOString().slice(0, 10);
+    document.querySelectorAll('.date-preset').forEach(function(b) { b.classList.remove('active'); });
+    var activeBtn = document.querySelector('.date-preset[data-days="' + days + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+    loadAnalytics();
+    loadSessions();
+  }
+
+  function onDateInputChange() {
+    var f = document.getElementById('dateFrom').value;
+    var t = document.getElementById('dateTo').value;
+    if (!f || !t) return;
+    analyticsState.from = new Date(f + 'T00:00:00').toISOString();
+    analyticsState.to   = new Date(t + 'T23:59:59').toISOString();
+    document.querySelectorAll('.date-preset').forEach(function(b) { b.classList.remove('active'); });
+    loadAnalytics();
+    loadSessions();
+  }
+
+  // Per-session objection drill — called when a card expands. Renders inline
+  // below the existing log view if the session has any extracted objections.
+  async function loadSessionObjections(sessionId, containerEl) {
+    try {
+      var res = await fetch('/me/sessions/' + encodeURIComponent(sessionId) + '/objections', { headers: authHeader() });
+      if (!res.ok) return; // silent fail — drill-down is nice-to-have, not blocking
+      var data = await res.json();
+      var rows = (data && data.objections) || [];
+      if (rows.length === 0) return;
+      var html = '<div class="obj-drill-section">'
+        + '<div class="obj-drill-heading">Objections detected (' + rows.length + ')</div>';
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var badgeClass = r.overcome === true ? 'overcome-true'
+          : r.overcome === false ? 'overcome-false' : 'overcome-null';
+        var badgeText = r.overcome === true ? '✓ overcome'
+          : r.overcome === false ? '✗ not overcome' : '? indeterminate';
+        var conf = r.overcome_confidence ? ' (' + r.overcome_confidence + ' confidence)' : '';
+        var time = r.detected_at ? new Date(r.detected_at).toLocaleTimeString() : '';
+        html += '<div class="obj-drill-item">'
+          + '<span class="obj-badge ' + badgeClass + '">' + badgeText + '</span>'
+          + '<span class="obj-label">' + escapeHtml(r.objection_label) + '</span>'
+          + '<div class="obj-meta">' + escapeHtml(time) + escapeHtml(conf)
+          + (r.framework ? ' · framework: ' + escapeHtml(r.framework) : '') + '</div>'
+          + (r.notes ? '<div class="obj-notes">' + escapeHtml(r.notes) + '</div>' : '')
+          + '</div>';
+      }
+      html += '</div>';
+      containerEl.insertAdjacentHTML('beforeend', html);
+    } catch (err) {
+      // silent — log view is the primary UX
+    }
   }
 
   async function fetchRole() {
@@ -909,6 +1151,10 @@
       + '</div>'
       + '<div class="log-list" id="list-' + sessionId + '"></div>';
     renderCardLogList(sessionId);
+    // v1.1.10: append objection drill-down inline below the log view if
+    // the session has any extracted objection events. Fires async — the
+    // log list renders immediately, drill-down lands when ready.
+    loadSessionObjections(sessionId, body);
   }
 
   function chipHtml(sessionId, id, label, activeFilter) {
