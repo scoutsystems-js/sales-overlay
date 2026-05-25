@@ -8,6 +8,10 @@ backend/.env.*
 !backend/.env.example
 build-release.sh
 
+# Supabase CLI link artifacts — supabase/.temp/pooler-url contains the
+# DB password in plaintext. Never commit.
+supabase/
+
 # Dependencies
 node_modules/
 backend/node_modules/
