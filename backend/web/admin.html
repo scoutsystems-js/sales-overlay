@@ -760,6 +760,65 @@
       .kb-item { flex-direction: column; align-items: flex-start; }
       .kb-delete-btn { align-self: flex-end; }
     }
+
+    /* v1.1.10: User analytics widget. Mirrors the dashboard.html analytics
+       block. Duplicated rather than extracted to a shared CSS file because
+       admin.html uses its own --bg2/--muted set and the two pages may diverge
+       visually in future. Extract to /css/analytics.css if it grows. */
+    .analytics-section { margin: 24px 0; }
+    .analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
+    .analytics-header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+    .analytics-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .analytics-controls select {
+      background: var(--bg2); border: 1px solid #2a2a2a; color: inherit;
+      padding: 6px 28px 6px 10px; border-radius: 6px; font-size: 13px;
+      font-family: inherit; min-width: 220px;
+    }
+    .analytics-empty {
+      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: 8px;
+      padding: 32px; text-align: center; color: var(--muted); font-size: 13px;
+    }
+    .date-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+    .date-preset {
+      background: var(--bg2); border: 1px solid #2a2a2a; color: var(--muted);
+      padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      font-family: inherit;
+    }
+    .date-preset:hover { background: #2a2a2a; color: inherit; }
+    .date-preset.active { background: #2a2a2a; color: inherit; border-color: #4a9eff; }
+
+    .stats-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .stat-card .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .stat-value { font-size: 24px; font-weight: 600; margin-top: 4px; }
+    .stat-card .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    .objection-section { margin-bottom: 24px; }
+    .objection-totals { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .objection-table {
+      width: 100%; border-collapse: collapse;
+      background: var(--bg2); border-radius: 8px; overflow: hidden;
+    }
+    .objection-table th, .objection-table td {
+      padding: 10px 14px; text-align: left; font-size: 13px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .objection-table th {
+      background: #1a1a1a; color: var(--muted); font-weight: 500;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .objection-table tr:last-child td { border-bottom: none; }
+    .objection-table .pct-cell { font-weight: 600; }
+    .pct-good { color: #4ade80; }
+    .pct-mid  { color: #facc15; }
+    .pct-bad  { color: #f87171; }
+    .pct-none { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -793,6 +852,36 @@
     </div>
     <div class="users-table-wrap" id="usersTableWrap">
       <div class="empty-msg"><span class="spinner"></span></div>
+    </div>
+  </section>
+
+  <!-- SECTION ANALYTICS: per-user analytics widget (v1.1.10). Reuses the
+       /dashboard analytics view but for a user the admin/owner selects.
+       Pivots on /admin/analytics/:user_id (scope-checked: admins see
+       managed users + self, owners see anyone). Empty until a user is
+       picked from the dropdown. -->
+  <section class="analytics-section">
+    <div class="analytics-header">
+      <h2>User Analytics</h2>
+      <div class="analytics-controls">
+        <select id="analyticsUserSelect" onchange="onAnalyticsUserChange()">
+          <option value="">Select a user…</option>
+        </select>
+        <div class="date-presets">
+          <button class="date-preset" data-days="7"    onclick="setAnalyticsDateRange(7)">7d</button>
+          <button class="date-preset active" data-days="30" onclick="setAnalyticsDateRange(30)">30d</button>
+          <button class="date-preset" data-days="90"   onclick="setAnalyticsDateRange(90)">90d</button>
+          <button class="date-preset" data-days="9999" onclick="setAnalyticsDateRange(9999)">All</button>
+        </div>
+      </div>
+    </div>
+    <div class="analytics-empty" id="analyticsEmpty">Select a user above to see their analytics.</div>
+    <div class="analytics-content" id="analyticsContent" style="display:none">
+      <div class="stats-row" id="analyticsStatsRow"></div>
+      <div class="objection-section" id="analyticsObjectionSection" style="display:none">
+        <div class="section-heading">Objections</div>
+        <div id="analyticsObjectionContent"></div>
+      </div>
     </div>
   </section>
 
@@ -1011,6 +1100,140 @@
     usersArray = (data && data.users) || [];
     ownerCount = usersArray.filter(function(u) { return u.role === 'owner'; }).length;
     renderUsersTable();
+    populateAnalyticsUserSelect();
+  }
+
+  // ─── v1.1.10 user analytics ──────────────────────────────────────────
+  var analyticsState = { user_id: null, from: null, to: null };
+
+  function populateAnalyticsUserSelect() {
+    var sel = document.getElementById('analyticsUserSelect');
+    if (!sel) return;
+    // Sort by email for predictability.
+    var sorted = (usersArray || []).slice().sort(function(a, b) {
+      return (a.email || '').localeCompare(b.email || '');
+    });
+    var options = ['<option value="">Select a user…</option>'];
+    for (var i = 0; i < sorted.length; i++) {
+      var u = sorted[i];
+      options.push('<option value="' + escapeHtml(u.user_id) + '">' + escapeHtml(u.email || u.user_id) + ' · ' + escapeHtml(u.role || 'user') + '</option>');
+    }
+    sel.innerHTML = options.join('');
+    // Default the date range to last 30d so the first selection just works.
+    var to = new Date();
+    var from = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    analyticsState.from = from.toISOString();
+    analyticsState.to = to.toISOString();
+  }
+
+  function onAnalyticsUserChange() {
+    var sel = document.getElementById('analyticsUserSelect');
+    var userId = sel && sel.value;
+    if (!userId) {
+      document.getElementById('analyticsEmpty').style.display = '';
+      document.getElementById('analyticsContent').style.display = 'none';
+      analyticsState.user_id = null;
+      return;
+    }
+    analyticsState.user_id = userId;
+    document.getElementById('analyticsEmpty').style.display = 'none';
+    document.getElementById('analyticsContent').style.display = '';
+    loadAnalyticsForUser();
+  }
+
+  function setAnalyticsDateRange(days) {
+    var to = new Date();
+    var from = days >= 9999
+      ? new Date('2025-01-01T00:00:00Z')
+      : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    analyticsState.from = from.toISOString();
+    analyticsState.to = to.toISOString();
+    document.querySelectorAll('.date-preset').forEach(function(b) { b.classList.remove('active'); });
+    var activeBtn = document.querySelector('.date-preset[data-days="' + days + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
+    if (analyticsState.user_id) loadAnalyticsForUser();
+  }
+
+  async function loadAnalyticsForUser() {
+    var row = document.getElementById('analyticsStatsRow');
+    if (!row || !analyticsState.user_id) return;
+    row.innerHTML = '<div class="load-spinner"><div class="spinner"></div></div>';
+    var url = '/admin/analytics/' + encodeURIComponent(analyticsState.user_id)
+      + '?from=' + encodeURIComponent(analyticsState.from)
+      + '&to=' + encodeURIComponent(analyticsState.to);
+    var res;
+    try { res = await fetch(url, { headers: authHeader() }); }
+    catch (err) { row.innerHTML = '<div class="empty-msg" style="color:#f87171;">Network error loading analytics</div>'; return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (res.status === 403) {
+      row.innerHTML = '<div class="empty-msg" style="color:#f87171;">Not authorized to view that user.</div>';
+      return;
+    }
+    if (!res.ok) {
+      row.innerHTML = '<div class="empty-msg" style="color:#f87171;">Could not load analytics (HTTP ' + res.status + ')</div>';
+      return;
+    }
+    var data = await res.json();
+    renderAnalyticsStats(data.totals);
+    renderAnalyticsObjections(data.objections);
+  }
+
+  function renderAnalyticsStats(totals) {
+    var parts = [];
+    parts.push(analyticsStatCard('Total calls', totals.total_calls, totals.live > 0 ? totals.live + ' still live' : null));
+    parts.push(analyticsStatCard('Closed (Won)', totals.wins, analyticsPctOf(totals.wins, totals.total_calls)));
+    parts.push(analyticsStatCard('Lost', totals.losses, analyticsPctOf(totals.losses, totals.total_calls)));
+    parts.push(analyticsStatCard('Follow-up', totals.follow_ups, analyticsPctOf(totals.follow_ups, totals.total_calls)));
+    if (totals.unmarked > 0) parts.push(analyticsStatCard('Unmarked', totals.unmarked, 'no summary yet'));
+    document.getElementById('analyticsStatsRow').innerHTML = parts.join('');
+  }
+
+  function analyticsStatCard(label, value, sub) {
+    var subPart = sub ? '<div class="stat-sub">' + escapeHtml(String(sub)) + '</div>' : '';
+    return '<div class="stat-card"><div class="stat-label">' + escapeHtml(label)
+      + '</div><div class="stat-value">' + escapeHtml(String(value)) + '</div>' + subPart + '</div>';
+  }
+
+  function analyticsPctOf(n, total) {
+    if (!total) return null;
+    return Math.round((n / total) * 100) + '%';
+  }
+
+  function renderAnalyticsObjections(objSection) {
+    var section = document.getElementById('analyticsObjectionSection');
+    var content = document.getElementById('analyticsObjectionContent');
+    if (!objSection || !objSection.by_type || objSection.by_type.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = 'block';
+    var t = objSection.totals;
+    var summary = t.total + ' total · ' + t.overcome + ' overcome · ' + t.not_overcome + ' not overcome';
+    if (t.unknown > 0) summary += ' · ' + t.unknown + ' indeterminate (transcript quality)';
+    var rows = '';
+    for (var i = 0; i < objSection.by_type.length; i++) {
+      var b = objSection.by_type[i];
+      var pct = b.overcome_pct === null
+        ? '<span class="pct-none">—</span>'
+        : '<span class="' + analyticsPctClass(b.overcome_pct) + '">' + b.overcome_pct + '%</span>';
+      rows += '<tr><td>' + escapeHtml(b.label) + '</td>'
+        + '<td>' + b.count + '</td>'
+        + '<td>' + b.overcome + '</td>'
+        + '<td>' + b.not_overcome + '</td>'
+        + '<td>' + b.unknown + '</td>'
+        + '<td class="pct-cell">' + pct + '</td></tr>';
+    }
+    content.innerHTML =
+      '<div class="objection-totals">' + escapeHtml(summary) + '</div>'
+      + '<table class="objection-table">'
+      + '<thead><tr><th>Objection</th><th>Count</th><th>Overcome</th><th>Not</th><th>?</th><th>Overcome %</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody></table>';
+  }
+
+  function analyticsPctClass(pct) {
+    if (pct >= 70) return 'pct-good';
+    if (pct >= 40) return 'pct-mid';
+    return 'pct-bad';
   }
 
   function renderUsersTable() {

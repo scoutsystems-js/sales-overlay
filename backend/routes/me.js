@@ -3,6 +3,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
+const { computeAnalytics, loadSessionObjections } = require('../lib/session-analytics');
 
 var router = express.Router();
 
@@ -519,136 +520,17 @@ function extractLabelFromMatchMessage(message) {
 }
 
 // ── GET /me/analytics?from=<iso>&to=<iso> ───────────────────────────────────
-// Dashboard aggregates. Two slices: outcome distribution across call_sessions
-// (filtered by started_at in [from, to]) + objection breakdown across
-// session_objections joined to those sessions.
-//
-// from/to default to last 30 days if omitted. Both must be ISO 8601.
+// Caller-scoped dashboard aggregates. Defaults to last 30 days. Wraps the
+// shared computeAnalytics() helper (also used by /admin/analytics/:user_id).
 router.get('/analytics', requireAuth, async function(req, res) {
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
     return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
   }
-
   try {
-    var admin = getAdminClient();
-
-    // Sessions in the date window. We need both the IDs (for the objection
-    // join below) and the outcome/source fields (for the outcome distribution).
-    var sessionsQ = await admin
-      .from('call_sessions')
-      .select('session_id, outcome, outcome_source, started_at, ended_at')
-      .eq('user_id', req.user.id)
-      .gte('started_at', from)
-      .lte('started_at', to)
-      .order('started_at', { ascending: false });
-    if (sessionsQ.error) {
-      console.error('[me] analytics sessions query failed:', sessionsQ.error.message);
-      return res.status(500).json({ error: 'Could not load sessions' });
-    }
-    var sessions = sessionsQ.data || [];
-
-    // Outcome distribution. unmarked = no outcome on a closed session;
-    // live = no ended_at yet (mid-call session). We surface both so the
-    // dashboard can distinguish "still running" from "ended but not marked".
-    var dist = { win: 0, loss: 0, follow_up: 0, unmarked: 0, live: 0 };
-    var sources = { inferred: 0, manual: 0, none: 0 };
-    for (var i = 0; i < sessions.length; i++) {
-      var s = sessions[i];
-      if (!s.ended_at) dist.live++;
-      else if (s.outcome === 'win') dist.win++;
-      else if (s.outcome === 'loss') dist.loss++;
-      else if (s.outcome === 'follow_up') dist.follow_up++;
-      else dist.unmarked++;
-      if (s.outcome_source === 'inferred') sources.inferred++;
-      else if (s.outcome_source === 'manual') sources.manual++;
-      else sources.none++;
-    }
-
-    // Objection breakdown for sessions in this window. Supabase JS has no
-    // JOIN, so we use .in() with the session_id list. Skip the join entirely
-    // when there are zero sessions — saves an unnecessary round trip.
-    var sessionIds = sessions.map(function(s) { return s.session_id; });
-    var objRows = [];
-    if (sessionIds.length > 0) {
-      var objQ = await admin
-        .from('session_objections')
-        .select('objection_id, objection_label, framework, overcome, overcome_confidence')
-        .in('session_id', sessionIds);
-      if (objQ.error) {
-        console.error('[me] analytics objection query failed:', objQ.error.message);
-        // Non-fatal — render outcomes without objection breakdown.
-      } else {
-        objRows = objQ.data || [];
-      }
-    }
-
-    // Aggregate by objection_id. JS group-by; small N so no need for SQL
-    // GROUP BY round trip. Each entry tracks count/overcome/not/unknown
-    // and exposes overcome_pct for the dashboard chart.
-    var byId = {};
-    for (var j = 0; j < objRows.length; j++) {
-      var o = objRows[j];
-      if (!byId[o.objection_id]) {
-        byId[o.objection_id] = {
-          objection_id: o.objection_id,
-          label: o.objection_label,
-          framework: o.framework,
-          count: 0,
-          overcome: 0,
-          not_overcome: 0,
-          unknown: 0,
-        };
-      }
-      var bucket = byId[o.objection_id];
-      bucket.count++;
-      if (o.overcome === true) bucket.overcome++;
-      else if (o.overcome === false) bucket.not_overcome++;
-      else bucket.unknown++;
-    }
-    var byType = Object.keys(byId).map(function(k) { return byId[k]; });
-    byType.forEach(function(b) {
-      // Denominator is definitive classifications only — unknown rows are
-      // excluded from the percentage so a low-quality transcript window
-      // doesn't pull the rate down. The unknown count is still surfaced
-      // separately so the dashboard can show "data quality" context.
-      var denom = b.overcome + b.not_overcome;
-      b.overcome_pct = denom > 0 ? Math.round((b.overcome / denom) * 100) : null;
-    });
-    byType.sort(function(a, b) { return b.count - a.count; });
-
-    var objTotals = {
-      total: objRows.length,
-      overcome: 0,
-      not_overcome: 0,
-      unknown: 0,
-    };
-    for (var k = 0; k < objRows.length; k++) {
-      if (objRows[k].overcome === true) objTotals.overcome++;
-      else if (objRows[k].overcome === false) objTotals.not_overcome++;
-      else objTotals.unknown++;
-    }
-    var objDenom = objTotals.overcome + objTotals.not_overcome;
-    objTotals.overcome_pct = objDenom > 0 ? Math.round((objTotals.overcome / objDenom) * 100) : null;
-
-    res.json({
-      from: from,
-      to: to,
-      totals: {
-        total_calls: sessions.length,
-        wins: dist.win,
-        losses: dist.loss,
-        follow_ups: dist.follow_up,
-        unmarked: dist.unmarked,
-        live: dist.live,
-        outcome_sources: sources,
-      },
-      objections: {
-        totals: objTotals,
-        by_type: byType,
-      },
-    });
+    var result = await computeAnalytics(getAdminClient(), req.user.id, from, to);
+    res.json(result);
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[me] analytics error:', err.message);
@@ -657,26 +539,16 @@ router.get('/analytics', requireAuth, async function(req, res) {
 });
 
 // ── GET /me/sessions/:session_id/objections ─────────────────────────────────
-// Per-session objection drill-down. Used by the dashboard's expanded session
-// view to render each detected objection event with classifier notes — the
-// "what was said vs what should have been said" view. Ownership-checked.
+// Per-session objection drill — for the dashboard's expanded card view.
+// Ownership-checked (404 on cross-user). Admin equivalent lives in admin.js.
 router.get('/sessions/:session_id/objections', requireAuth, async function(req, res) {
   var sessionId = req.params.session_id;
   try {
     var admin = getAdminClient();
     var session = await loadOwnedSession(admin, sessionId, req.user.id, 'session_id, user_id');
     if (!session) return res.status(404).json({ error: 'Session not found' });
-
-    var rows = await admin
-      .from('session_objections')
-      .select('detected_at, objection_id, objection_label, framework, overcome, overcome_confidence, notes')
-      .eq('session_id', sessionId)
-      .order('detected_at', { ascending: true });
-    if (rows.error) {
-      console.error('[me] session-objections query failed:', rows.error.message);
-      return res.status(500).json({ error: 'Could not load objection events' });
-    }
-    res.json({ session_id: sessionId, objections: rows.data || [] });
+    var rows = await loadSessionObjections(admin, sessionId);
+    res.json({ session_id: sessionId, objections: rows });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[me] session-objections error:', err.message);
