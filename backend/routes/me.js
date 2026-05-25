@@ -205,6 +205,41 @@ function stripCodeFences(text) {
   return text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
 }
 
+// Extract the first balanced JSON object from a string. Tolerates Claude
+// wrapping JSON in prose ("Here's my analysis: {...}"), markdown fences,
+// or trailing commentary. Returns the parsed object or null on failure.
+// Switched in v1.1.10 backfill after Money Objection classifications were
+// failing JSON.parse 100% of the time — Claude returned valid JSON inside
+// a sentence-wrapped narrative the strict parser couldn't see past.
+function extractFirstJsonObject(text) {
+  if (!text) return null;
+  var cleaned = stripCodeFences(text);
+  // Try strict parse first — cheap when Claude obeyed the prompt.
+  try { return JSON.parse(cleaned); } catch (_) { /* fall through */ }
+  // Find first '{' and parse forward, tracking depth + string state to find
+  // the matching close brace.
+  var start = cleaned.indexOf('{');
+  if (start === -1) return null;
+  var depth = 0;
+  var inString = false;
+  var escape = false;
+  for (var i = start; i < cleaned.length; i++) {
+    var ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        try { return JSON.parse(cleaned.slice(start, i + 1)); } catch (_) { return null; }
+      }
+    }
+  }
+  return null;
+}
+
 // Map from objection label (as it appears in '[claude] Local objection match: <label>')
 // to objection_id + framework. Source of truth: src/ai/objections.js. Hardcoded
 // here to avoid cross-folder import — keep in sync manually if objections.js changes.
@@ -281,11 +316,9 @@ router.post('/sessions/:session_id/extract-outcome', requireAuth, async function
     });
 
     var rawText = response.content[0] ? response.content[0].text : '';
-    var parsed;
-    try {
-      parsed = JSON.parse(stripCodeFences(rawText));
-    } catch (parseErr) {
-      console.error('[me] extract-outcome JSON parse failed:', rawText.slice(0, 200));
+    var parsed = extractFirstJsonObject(rawText);
+    if (!parsed) {
+      console.error('[me] extract-outcome JSON extraction failed:', rawText.slice(0, 200));
       return res.status(502).json({ error: 'Claude returned non-JSON: ' + rawText.slice(0, 100) });
     }
 
@@ -354,19 +387,12 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
       return res.status(500).json({ error: 'Could not clear previous objection rows' });
     }
 
-    // Pull all transcript-like log lines once, then slice ±90s per objection
-    // in code — cheaper than 1 query per objection.
-    var transcriptResult = await admin
-      .from('session_logs')
-      .select('logged_at, message')
-      .eq('session_id', sessionId)
-      .order('logged_at', { ascending: true });
-    if (transcriptResult.error) {
-      console.error('[me] transcript query failed:', transcriptResult.error.message);
-      return res.status(500).json({ error: 'Could not load transcript logs' });
-    }
-    var allLogs = transcriptResult.data || [];
-
+    // Per-objection time-windowed query. Replaces an earlier "fetch all logs
+    // once and slice in JS" approach that silently truncated to 1000 rows
+    // (supabase-js default) on long sessions — sessions over ~45min have
+    // 3000-7000 log lines, so any objection in the second half landed outside
+    // the slice. Filtering by timestamp in the WHERE clause avoids that
+    // entirely and only fetches what each objection's window actually needs.
     var anthropic = getAnthropic();
     var rowsToInsert = [];
     var WINDOW_MS = 90 * 1000;
@@ -383,12 +409,25 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
       }
 
       var detectedAt = new Date(match.logged_at).getTime();
-      var windowTurns = allLogs.filter(function(l) {
-        var t = new Date(l.logged_at).getTime();
-        return t >= detectedAt - WINDOW_MS && t <= detectedAt + WINDOW_MS;
-      }).map(function(l) {
-        return l.message;
-      }).join('\n').slice(0, 6000);  // cap context length
+      var windowStart = new Date(detectedAt - WINDOW_MS).toISOString();
+      var windowEnd = new Date(detectedAt + WINDOW_MS).toISOString();
+      var windowQ = await admin
+        .from('session_logs')
+        .select('logged_at, tag, message')
+        .eq('session_id', sessionId)
+        .gte('logged_at', windowStart)
+        .lte('logged_at', windowEnd)
+        .order('logged_at', { ascending: true })
+        .limit(500);
+      if (windowQ.error) {
+        console.warn('[me] window query failed for ' + label + ': ' + windowQ.error.message);
+      }
+      var windowRows = windowQ.data || [];
+      // Prefer [memory]-tagged turns (actual transcript) but keep all if memory
+      // tag is sparse — better to give Claude noisy context than nothing.
+      var memoryRows = windowRows.filter(function(l) { return l.tag === '[memory]'; });
+      var sourceRows = memoryRows.length >= 3 ? memoryRows : windowRows;
+      var windowTurns = sourceRows.map(function(l) { return l.message; }).join('\n').slice(0, 8000);  // cap context length
 
       var classifyPrompt =
         'A "' + label + '" was detected in a sales call. Below is the ±90 seconds of ' +
@@ -408,10 +447,8 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
           messages: [{ role: 'user', content: classifyPrompt }],
         });
         var rawText = resp.content[0] ? resp.content[0].text : '';
-        var parsed;
-        try {
-          parsed = JSON.parse(stripCodeFences(rawText));
-        } catch (parseErr) {
+        var parsed = extractFirstJsonObject(rawText);
+        if (!parsed) {
           console.warn('[me] classify parse failed for ' + label + ' — recording as null:', rawText.slice(0, 100));
           parsed = { overcome: null, confidence: 'low', notes: 'classifier output unparseable' };
         }
