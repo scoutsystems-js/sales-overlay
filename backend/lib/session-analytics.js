@@ -111,4 +111,69 @@ async function loadSessionObjections(admin, sessionId) {
   return r.data || [];
 }
 
-module.exports = { computeAnalytics: computeAnalytics, loadSessionObjections: loadSessionObjections };
+// Per-type objection drill — all events of one objection_id for one user
+// in a date range, with session metadata joined. Powers the third-level
+// drill on the dashboard ("Objections" donut → type breakdown → click a
+// type → see every instance with coaching narrative).
+async function loadObjectionsByType(adminClient, userId, objectionId, from, to) {
+  var sessionsQ = await adminClient
+    .from('call_sessions')
+    .select('session_id, started_at, ended_at, prospect_name, outcome, outcome_source')
+    .eq('user_id', userId)
+    .gte('started_at', from)
+    .lte('started_at', to);
+  if (sessionsQ.error) throw new Error('sessions: ' + sessionsQ.error.message);
+  var sessions = sessionsQ.data || [];
+  if (sessions.length === 0) {
+    return { objection_id: objectionId, label: null, framework: null,
+             totals: { total: 0, overcome: 0, not_overcome: 0, unknown: 0, overcome_pct: null },
+             events: [] };
+  }
+
+  var sessionIds = sessions.map(function(s) { return s.session_id; });
+  var sessionMap = {};
+  sessions.forEach(function(s) { sessionMap[s.session_id] = s; });
+
+  var eventsQ = await adminClient
+    .from('session_objections')
+    .select('session_id, detected_at, objection_id, objection_label, framework, overcome, overcome_confidence, notes, framework_rebuttal, closer_response, coaching_note')
+    .in('session_id', sessionIds)
+    .eq('objection_id', objectionId)
+    .order('detected_at', { ascending: false });
+  if (eventsQ.error) throw new Error('objections: ' + eventsQ.error.message);
+  var events = eventsQ.data || [];
+
+  var enriched = events.map(function(e) {
+    var s = sessionMap[e.session_id] || {};
+    return Object.assign({}, e, {
+      session_started_at:   s.started_at || null,
+      session_ended_at:     s.ended_at || null,
+      prospect_name:        s.prospect_name || null,
+      session_outcome:      s.outcome || null,
+      session_outcome_source: s.outcome_source || null,
+    });
+  });
+
+  var totals = { total: events.length, overcome: 0, not_overcome: 0, unknown: 0 };
+  events.forEach(function(e) {
+    if (e.overcome === true) totals.overcome++;
+    else if (e.overcome === false) totals.not_overcome++;
+    else totals.unknown++;
+  });
+  var denom = totals.overcome + totals.not_overcome;
+  totals.overcome_pct = denom > 0 ? Math.round(100 * totals.overcome / denom) : null;
+
+  return {
+    objection_id: objectionId,
+    label: events.length > 0 ? events[0].objection_label : null,
+    framework: events.length > 0 ? events[0].framework : null,
+    totals: totals,
+    events: enriched,
+  };
+}
+
+module.exports = {
+  computeAnalytics: computeAnalytics,
+  loadSessionObjections: loadSessionObjections,
+  loadObjectionsByType: loadObjectionsByType,
+};

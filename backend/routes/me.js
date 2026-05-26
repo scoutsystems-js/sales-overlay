@@ -3,7 +3,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
-const { computeAnalytics, loadSessionObjections } = require('../lib/session-analytics');
+const { computeAnalytics, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 
 var router = express.Router();
 
@@ -621,6 +621,30 @@ router.get('/analytics', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[me] analytics error:', err.message);
     res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /me/objections?objection_id=<id>&from=&to= ──────────────────────────
+// Per-type drill: every event of one objection type across the caller's
+// sessions in the date window. Used by the dashboard's third-level drill
+// when the user clicks a type row inside the Objections drill. Joins each
+// event with the call's prospect_name + outcome so the per-event card can
+// show "On the call with X on Y...".
+router.get('/objections', requireAuth, async function(req, res) {
+  var objectionId = req.query.objection_id;
+  if (!objectionId) return res.status(400).json({ error: 'objection_id required' });
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+  try {
+    var result = await loadObjectionsByType(getAdminClient(), req.user.id, objectionId, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] objections-by-type error:', err.message);
+    res.status(500).json({ error: 'Failed to load objection events: ' + (err.message || 'unknown') });
   }
 });
 

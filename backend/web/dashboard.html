@@ -527,9 +527,125 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       font-size: 13px;
+      transition: all 0.15s var(--ease);
+    }
+    .breakdown-row.clickable {
+      cursor: pointer;
+      grid-template-columns: 12px 1fr auto auto 14px;
+    }
+    .breakdown-row.clickable:hover {
+      border-color: var(--border-focus);
+      background: var(--bg-hover);
+      transform: translateX(2px);
+    }
+    .breakdown-row.clickable::after {
+      content: '→';
+      color: var(--text-dim);
+      font-size: 14px;
+      transition: color 0.15s var(--ease);
+      grid-column: 5;
+      text-align: right;
+    }
+    .breakdown-row.clickable:hover::after { color: var(--accent); }
+    .breakdown-row:hover { border-color: var(--border-hover); }
+
+    /* Per-type drill — event cards */
+    .event-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 14px;
       transition: border-color 0.15s var(--ease);
     }
-    .breakdown-row:hover { border-color: var(--border-hover); }
+    .event-card:hover { border-color: var(--border-hover); }
+    .event-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .event-card-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .event-card-title .name { color: var(--text); }
+    .event-card-title .anon { color: var(--text-muted); font-weight: 400; font-style: italic; }
+    .event-card-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .event-card-right {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* Stats strip atop per-type drill */
+    .type-stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .type-stat {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .type-stat .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+    .type-stat .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-top: 6px;
+      line-height: 1;
+    }
+    .type-stat .stat-value.good { color: var(--good); }
+    .type-stat .stat-value.bad  { color: var(--bad); }
+    .type-stat .stat-value.mid  { color: var(--mid); }
+    .type-stat .stat-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Framework rebuttal reference card (top of per-type drill) */
+    .framework-ref {
+      background: linear-gradient(135deg, rgba(91, 158, 255, 0.06), rgba(74, 222, 128, 0.03));
+      border: 1px solid rgba(91, 158, 255, 0.18);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      margin-bottom: 32px;
+    }
+    .framework-ref-label {
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .framework-ref-text {
+      font-size: 14.5px;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.55;
+    }
     .breakdown-dot {
       width: 10px;
       height: 10px;
@@ -676,16 +792,19 @@
     users:           [],      // populated for admin/owner
     viewingUserId:   null,    // whose data we're showing
     dateRange:      { from: null, to: null, days: 30 },
-    view:           'overview', // 'overview' | 'calls' | 'objections' | 'closes'
+    view:           'overview', // 'overview' | 'calls' | 'objections' | 'closes' | 'objection-type'
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
     objectionsCache: {},      // session_id -> objection rows
+    typeEventsCache: {},      // objection_id -> response from /me/objections
+    selectedObjectionId: null, // when view === 'objection-type'
     expandedCallId:  null,
     chart1:          null,
     chart2:          null,
     chart3:          null,
     chartDrill:      null,
+    chartType:       null,
   };
 
   // ──────────────────────────────────────────────────────────────────
@@ -848,6 +967,7 @@
     else if (state.view === 'calls') renderCallsDrill();
     else if (state.view === 'objections') renderObjectionsDrill();
     else if (state.view === 'closes') renderClosesDrill();
+    else if (state.view === 'objection-type') renderObjectionTypeDrill();
   }
 
   function renderHeaderHtml() {
@@ -1189,11 +1309,21 @@
   function setView(view) {
     state.view = view;
     state.expandedCallId = null;
+    state.selectedObjectionId = null;
     render();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function backToOverview() { state.view = 'overview'; state.expandedCallId = null; render(); }
+  function setObjectionType(objectionId) {
+    state.view = 'objection-type';
+    state.selectedObjectionId = objectionId;
+    state.expandedCallId = null;
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function backToOverview() { state.view = 'overview'; state.expandedCallId = null; state.selectedObjectionId = null; render(); }
+  function backToObjections() { state.view = 'objections'; state.expandedCallId = null; state.selectedObjectionId = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
   function drillHeader(title, count) {
     var countHtml = count != null ? '<span class="count">' + escapeHtml(String(count)) + '</span>' : '';
@@ -1243,7 +1373,8 @@
     });
   }
 
-  // Drill 2: Objections — by-type breakdown with overcome bars + per-event list.
+  // Drill 2: Objections — by-type breakdown. Each row is clickable, drilling
+  // into renderObjectionTypeDrill() for per-event coaching.
   function renderObjectionsDrill() {
     var obj = state.analytics.objections;
     var content = document.getElementById('content');
@@ -1254,12 +1385,9 @@
 
     var breakdown = byType.map(function(b) {
       var pctOver = b.overcome_pct === null ? '—' : b.overcome_pct + '%';
-      var pctClass = b.overcome_pct === null ? 'pct-none'
-        : b.overcome_pct >= 70 ? 'pct-good'
-        : b.overcome_pct >= 40 ? 'pct-mid' : 'pct-bad';
       var fillWidth = b.overcome + b.not_overcome > 0 ? Math.round(100 * b.overcome / (b.overcome + b.not_overcome)) : 0;
       var color = COLORS[b.objection_id] || COLORS.other;
-      return '<div class="breakdown-row" style="grid-template-columns: 12px 1fr auto auto;">'
+      return '<div class="breakdown-row clickable" onclick="setObjectionType(\'' + escapeHtml(b.objection_id) + '\')">'
         + '<div class="breakdown-dot" style="background:' + color + ';"></div>'
         + '<div>'
           + '<div class="breakdown-label">' + escapeHtml(b.label) + '</div>'
@@ -1274,11 +1402,11 @@
       + '<div class="drill-grid fade-in">'
         + '<div class="drill-donut"><div class="donut-canvas-wrap"><canvas id="drill-chart"></canvas>'
           + '<div class="donut-center"><div class="big">' + totalCount + '</div><div class="small">events</div></div></div></div>'
-        + '<div class="drill-breakdown">' + (breakdown || '<div class="empty"><h3>No objections detected</h3></div>') + '</div>'
-      + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Calls in this window</h2>'
-        + '<div class="meta">expand any call to see its objection events + coaching</div></div>'
-        + renderCallsHtml(state.calls)
+        + '<div class="drill-breakdown">'
+          + (breakdown
+              ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;padding:0 4px;">Click a type to see every event with coaching feedback.</div>' + breakdown
+              : '<div class="empty"><h3>No objections detected</h3></div>')
+        + '</div>'
       + '</div>';
 
     requestAnimationFrame(function() {
@@ -1290,6 +1418,138 @@
           byType.map(function(b) { return b.count; }), donutColors);
       }
     });
+  }
+
+  // Drill 2.5: Per-type objection drill. The third-level view: every event
+  // of one objection_id, with stats up top + the framework rebuttal pinned
+  // for reference + a card per event showing coaching narrative + side-by-side.
+  async function renderObjectionTypeDrill() {
+    var content = document.getElementById('content');
+    var objectionId = state.selectedObjectionId;
+    if (!objectionId) { backToOverview(); return; }
+
+    // Loading placeholder
+    content.innerHTML = '<div class="drill-header fade-in">'
+      + '<button class="back-btn" onclick="backToObjections()">← Back to Objections</button>'
+      + '<div class="drill-title">Loading…</div></div>'
+      + '<div class="load-state"><div class="spinner"></div></div>';
+
+    var data;
+    var cached = state.typeEventsCache[objectionId];
+    if (cached) {
+      data = cached;
+    } else {
+      try {
+        data = await fetchObjectionsByType(objectionId);
+        state.typeEventsCache[objectionId] = data;
+      } catch (err) {
+        content.innerHTML = '<div class="drill-header"><button class="back-btn" onclick="backToObjections()">← Back</button></div>'
+          + '<div class="error">Could not load events: ' + escapeHtml(err.message || 'unknown') + '</div>';
+        return;
+      }
+    }
+
+    var label = data.label || objectionId;
+    var t = data.totals;
+    var color = COLORS[objectionId] || COLORS.other;
+    var pctOver = t.overcome_pct === null ? '—' : t.overcome_pct + '%';
+    var pctClass = t.overcome_pct === null ? '' : (t.overcome_pct >= 70 ? 'good' : t.overcome_pct >= 40 ? 'mid' : 'bad');
+
+    // Framework rebuttal — pull from the first event (all share the same rebuttal text)
+    var firstWithRebuttal = (data.events || []).find(function(e) { return e.framework_rebuttal; });
+    var frameworkRebuttal = firstWithRebuttal ? firstWithRebuttal.framework_rebuttal : null;
+
+    var stats = ''
+      + '<div class="type-stat"><div class="stat-label">Total Events</div><div class="stat-value">' + t.total + '</div></div>'
+      + '<div class="type-stat"><div class="stat-label">Overcame</div><div class="stat-value good">' + t.overcome + '</div></div>'
+      + '<div class="type-stat"><div class="stat-label">Not Overcome</div><div class="stat-value bad">' + t.not_overcome + '</div></div>'
+      + '<div class="type-stat"><div class="stat-label">Indeterminate</div><div class="stat-value">' + t.unknown + '</div><div class="stat-sub">transcript unclear</div></div>'
+      + '<div class="type-stat"><div class="stat-label">Overcome Rate</div><div class="stat-value ' + pctClass + '">' + escapeHtml(pctOver) + '</div><div class="stat-sub">of definitive</div></div>';
+
+    var frameworkBlock = frameworkRebuttal
+      ? '<div class="framework-ref">'
+        + '<div class="framework-ref-label">Scout\'s framework rebuttal — use this every time</div>'
+        + '<div class="framework-ref-text">"' + escapeHtml(frameworkRebuttal) + '"</div>'
+        + '</div>'
+      : '';
+
+    var eventsHtml;
+    if ((data.events || []).length === 0) {
+      eventsHtml = '<div class="empty"><h3>No events in this window</h3><p>No instances of this objection were detected in the selected date range.</p></div>';
+    } else {
+      eventsHtml = data.events.map(eventCardHtml).join('');
+    }
+
+    content.innerHTML = '<div class="drill-header fade-in">'
+        + '<button class="back-btn" onclick="backToObjections()">← Back to Objections</button>'
+        + '<div class="drill-title">' + escapeHtml(label) + ' <span class="count">' + t.total + '</span></div>'
+      + '</div>'
+      + '<div class="type-stats-row fade-in">' + stats + '</div>'
+      + frameworkBlock
+      + '<div class="section fade-in">'
+        + '<div class="section-header"><h2>Every event</h2>'
+        + '<div class="meta">' + t.total + (t.total === 1 ? ' instance' : ' instances') + ' in window</div></div>'
+        + eventsHtml
+      + '</div>';
+  }
+
+  async function fetchObjectionsByType(objectionId) {
+    var url = isSelf()
+      ? '/me/objections?objection_id=' + encodeURIComponent(objectionId)
+        + '&from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
+      : '/admin/objections/' + encodeURIComponent(state.viewingUserId)
+        + '?objection_id=' + encodeURIComponent(objectionId)
+        + '&from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var res = await fetch(url, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+
+  // Per-event card for the type drill — call context up top, coaching note,
+  // side-by-side framework vs actual, classifier note at bottom.
+  function eventCardHtml(e) {
+    var prospect = e.prospect_name
+      ? '<span class="name">' + escapeHtml(e.prospect_name) + '</span>'
+      : '<span class="anon">unknown prospect</span>';
+    var dateStr = e.session_started_at ? formatDate(e.session_started_at) : '—';
+    var timeStr = e.detected_at ? new Date(e.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    var sessionOutcome = e.session_outcome
+      ? outcomeBadge(e.session_outcome, !!e.session_ended_at)
+      : (e.session_ended_at ? '<span class="badge badge-empty">Unmarked</span>' : '<span class="badge badge-live">Live</span>');
+
+    var verdict;
+    if (e.overcome === true)       verdict = '<span class="verdict verdict-overcome">Overcame</span>';
+    else if (e.overcome === false) verdict = '<span class="verdict verdict-not">Not overcome</span>';
+    else                            verdict = '<span class="verdict verdict-unknown">Indeterminate</span>';
+    var conf = e.overcome_confidence ? '<span class="verdict-conf">' + escapeHtml(e.overcome_confidence) + ' confidence</span>' : '';
+
+    var coaching = e.coaching_note
+      ? '<div class="coaching-note">' + escapeHtml(e.coaching_note) + '</div>'
+      : '<div class="coaching-note-empty">No coaching narrative generated for this event.</div>';
+
+    var rebuttal = e.framework_rebuttal
+      ? '<div class="compare-text">' + escapeHtml(e.framework_rebuttal) + '</div>'
+      : '<div class="compare-text empty">No framework rebuttal recorded.</div>';
+    var said = e.closer_response
+      ? '<div class="compare-text">' + escapeHtml(e.closer_response) + '</div>'
+      : '<div class="compare-text empty">No closer transcript captured in the 60s after this objection.</div>';
+
+    return '<div class="event-card">'
+      + '<div class="event-card-head">'
+        + '<div>'
+          + '<div class="event-card-title">Call with ' + prospect + '</div>'
+          + '<div class="event-card-meta">' + escapeHtml(dateStr) + (timeStr ? ' · objection at ' + escapeHtml(timeStr) : '') + '</div>'
+        + '</div>'
+        + '<div class="event-card-right">' + verdict + conf + sessionOutcome + '</div>'
+      + '</div>'
+      + coaching
+      + '<div class="compare-grid">'
+        + '<div class="compare-pane framework"><div class="compare-label">Scout suggested</div>' + rebuttal + '</div>'
+        + '<div class="compare-pane actual"><div class="compare-label">What you said</div>' + said + '</div>'
+      + '</div>'
+      + (e.notes ? '<div class="obj-notes-row">Classifier note: ' + escapeHtml(e.notes) + '</div>' : '')
+    + '</div>';
   }
 
   // Drill 3: Close rate — won vs not-won + framework deep-dive.
