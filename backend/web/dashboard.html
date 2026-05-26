@@ -3,1591 +3,1365 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dashboard — Scout Systems</title>
-  <link rel="stylesheet" href="/css/style.css"/>
+  <title>Coaching Dashboard — Scout Systems</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
-    /* Dashboard layout is a single scrollable column. Session cards expand
-       inline when clicked — no side panel, no cross-user browsing. Styles
-       are inline for the same reason as login.html / admin.html: page-
-       specific, self-contained. */
+    /* ──────────────────────────────────────────────────────────────────
+       Coaching Dashboard v2 — donut-led, drill-down coaching tool.
+       Old version archived at backend/web/dashboard-v1.html.archived.
 
-    body {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+       Design principles (no apologies on the polish):
+         - Limited color palette (8 colors, used intentionally)
+         - 12px corner radius across cards
+         - 8px spacing rhythm
+         - System font stack (clean, fast)
+         - Subtle gradients, no heavy shadows
+         - Smooth transitions, no jarring spinners
+         - Generous whitespace
+       ────────────────────────────────────────────────────────────────── */
+
+    :root {
+      --bg:           #0a0a0a;
+      --bg-elevated:  #131313;
+      --bg-hover:     #1a1a1a;
+      --bg-deep:      #050505;
+      --border:       #1f1f1f;
+      --border-hover: #2a2a2a;
+      --border-focus: #3b3b3b;
+      --text:         #ededed;
+      --text-soft:    #cccccc;
+      --text-muted:   #8b8b8b;
+      --text-dim:     #5a5a5a;
+
+      --accent:       #5b9eff;
+      --good:         #4ade80;
+      --mid:          #fbbf24;
+      --bad:          #f87171;
+      --purple:       #c084fc;
+      --orange:       #fb923c;
+      --cyan:         #22d3ee;
+      --slate:        #64748b;
+
+      --radius-sm: 8px;
+      --radius:    12px;
+      --radius-lg: 16px;
+
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+      --shadow-md: 0 2px 4px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
       background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ── Top bar ───────────────────────────────────────────────────── */
     .top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 24px;
+      background: linear-gradient(180deg, #161616 0%, #0d0d0d 100%);
       border-bottom: 1px solid var(--border);
-      background: rgba(8,11,13,0.95);
-    }
-    .top-bar-left { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
-    .top-bar-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
-    .top-bar-right .signout { cursor: pointer; }
-    .top-bar-right .signout:hover { color: var(--text); }
-
-    .page {
-      flex: 1;
-      max-width: 920px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 40px 24px 80px;
-    }
-
-    .welcome {
+      padding: 14px 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .top-bar-left { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; }
+    .top-bar-left .sep { color: var(--text-dim); font-weight: 400; }
+    .top-bar-left .sub { color: var(--text-muted); font-weight: 500; font-size: 13px; }
+    .top-bar-right { display: flex; align-items: center; gap: 20px; font-size: 13px; color: var(--text-muted); }
+    .top-bar-right a:hover { color: var(--text); }
+    .signout { cursor: pointer; }
+    .signout:hover { color: var(--text); }
+
+    /* ── Page layout ────────────────────────────────────────────────── */
+    .page { max-width: 1200px; margin: 0 auto; padding: 36px 32px 100px; }
+
+    .page-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
       flex-wrap: wrap;
+      gap: 20px;
       margin-bottom: 36px;
     }
-    .welcome h1 {
+    .page-header h1 {
       font-size: 28px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      color: var(--text);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0;
     }
-    .welcome .sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
-    .welcome .launch-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--green);
-      color: #000;
-      font-weight: 700;
+    .page-header .subtitle {
+      color: var(--text-muted);
       font-size: 14px;
-      padding: 11px 20px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.15s;
+      margin-top: 6px;
     }
-    .welcome .launch-btn:hover { background: var(--green-dark); }
 
-    /* Placeholder for future stats cards — slotted above the call list so
-       adding them later doesn't restructure the page. */
-    .stats-slot { margin-bottom: 28px; }
+    .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
-    .section-heading {
+    .user-select {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 32px 8px 14px;
+      border-radius: var(--radius-sm);
       font-size: 13px;
-      font-weight: 700;
+      font-family: inherit;
+      min-width: 220px;
+      cursor: pointer;
+      transition: border-color 0.15s var(--ease);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b8b8b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+    .user-select:hover { border-color: var(--border-hover); }
+    .user-select:focus { outline: none; border-color: var(--accent); }
+
+    .date-presets { display: flex; gap: 4px; background: var(--bg-elevated); padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .date-preset {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s var(--ease);
+    }
+    .date-preset:hover { color: var(--text); }
+    .date-preset.active { background: var(--bg-hover); color: var(--text); }
+
+    /* ── Donut row ──────────────────────────────────────────────────── */
+    .donut-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 820px) { .donut-row { grid-template-columns: 1fr; } }
+
+    .donut-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px 28px 28px;
+      cursor: pointer;
+      transition: all 0.18s var(--ease);
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+    }
+    .donut-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 0%, rgba(91, 158, 255, 0.04), transparent 70%);
+      pointer-events: none;
+    }
+    .donut-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .donut-card:hover::before { background: radial-gradient(circle at 50% 0%, rgba(91, 158, 255, 0.08), transparent 70%); }
+
+    .donut-card .donut-label {
+      font-size: 12px;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--muted);
-      margin-bottom: 16px;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 24px;
     }
 
-    /* ── Call list ──────────────────────────────────────────────────────── */
-    .calls-list {
+    .donut-canvas-wrap {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      margin: 0 auto;
+    }
+
+    .donut-center {
+      position: absolute;
+      inset: 0;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .donut-center .big {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1;
+    }
+    .donut-center .small {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .donut-legend {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .donut-legend .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .donut-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Section heading ────────────────────────────────────────────── */
+    .section { margin-bottom: 48px; }
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      gap: 12px;
+    }
+    .section-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .section-header .meta { font-size: 12px; color: var(--text-muted); }
+
+    /* ── Coach summary patterns ─────────────────────────────────────── */
+    .patterns-list { display: flex; flex-direction: column; gap: 12px; }
+    .pattern-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      transition: border-color 0.15s var(--ease);
+    }
+    .pattern-card:hover { border-color: var(--border-hover); }
+    .pattern-headline {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: -0.005em;
+      margin-bottom: 8px;
+    }
+    .pattern-detail {
+      font-size: 13.5px;
+      color: var(--text-soft);
+      line-height: 1.6;
+    }
+    .pattern-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .pattern-confidence {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .pattern-confidence.high   { background: rgba(74, 222, 128, 0.10); color: var(--good); }
+    .pattern-confidence.medium { background: rgba(251, 191, 36, 0.10); color: var(--mid); }
+    .pattern-confidence.low    { background: rgba(139, 139, 139, 0.10); color: var(--text-muted); }
+
+    .signal-banner {
+      background: linear-gradient(135deg, rgba(91, 158, 255, 0.06), rgba(91, 158, 255, 0.02));
+      border: 1px solid rgba(91, 158, 255, 0.15);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 12.5px;
+      color: #b3d4ff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
       gap: 10px;
     }
-
-    .session-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      transition: border-color 0.12s;
+    .signal-banner-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.4;
+      flex-shrink: 0;
     }
-    .session-card:hover { border-color: rgba(255,255,255,0.14); }
-    .session-card.expanded { border-color: rgba(34,197,94,0.3); }
 
-    .session-head {
+    /* ── Calls list ─────────────────────────────────────────────────── */
+    .calls-list { display: flex; flex-direction: column; gap: 8px; }
+    .call-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.15s var(--ease);
+    }
+    .call-card:hover { border-color: var(--border-hover); }
+    .call-card.expanded { border-color: var(--border-focus); }
+
+    .call-head {
+      padding: 16px 22px;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 16px 20px;
-      cursor: pointer;
       user-select: none;
     }
-    .session-head-left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-    .session-head-top {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .session-head-sub {
+    .call-head-left { flex: 1; min-width: 0; }
+    .call-head-title { font-size: 14.5px; font-weight: 600; letter-spacing: -0.005em; }
+    .call-head-title .name { color: var(--text); }
+    .call-head-title .anon { color: var(--text-muted); font-weight: 400; font-style: italic; }
+    .call-head-meta {
       font-size: 12px;
-      color: var(--muted);
-    }
-    .session-head-sub .err { color: #f87171; font-weight: 600; }
-    .expand-icon {
-      font-size: 14px;
-      color: var(--muted);
-      transition: transform 0.15s;
-      flex-shrink: 0;
-    }
-    .session-card.expanded .expand-icon { transform: rotate(180deg); color: var(--green); }
-
-    .session-body {
-      display: none;
-      border-top: 1px solid var(--border);
-    }
-    .session-card.expanded .session-body { display: block; }
-
-    /* ── Filter bar + log list (inside expanded card) ───────────────────── */
-    .filter-bar {
-      padding: 10px 20px;
-      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      margin-top: 4px;
       display: flex;
-      gap: 8px;
-      align-items: center;
+      gap: 12px;
       flex-wrap: wrap;
-      background: rgba(0,0,0,0.15);
     }
-    .chip {
-      font-size: 11px;
+    .call-head-right { display: flex; align-items: center; gap: 14px; }
+
+    .badge {
+      font-size: 10.5px;
       font-weight: 600;
-      padding: 5px 10px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-    }
-    .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-    .chip.active {
-      background: var(--green-dim);
-      color: var(--green);
-      border-color: rgba(34,197,94,0.3);
-    }
-    .filter-search {
-      flex: 1;
-      min-width: 140px;
-      max-width: 280px;
-      font-size: 12px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      outline: none;
-    }
-    .filter-search:focus { border-color: var(--green); }
-    .count-indicator {
-      font-size: 11px;
-      color: var(--muted);
-      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
       white-space: nowrap;
     }
-    .count-indicator.capped { color: #fbbf24; }
+    .badge-win    { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+    .badge-loss   { background: rgba(248, 113, 113, 0.12); color: var(--bad); }
+    .badge-fu     { background: rgba(251, 191, 36, 0.12); color: var(--mid); }
+    .badge-live   { background: rgba(91, 158, 255, 0.12); color: var(--accent); }
+    .badge-empty  { background: rgba(139, 139, 139, 0.10); color: var(--text-muted); }
 
-    .log-list {
-      max-height: 480px;
-      overflow-y: auto;
-      padding: 8px 0;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      line-height: 1.5;
+    .expand-icon {
+      color: var(--text-dim);
+      transition: transform 0.2s var(--ease);
+      font-size: 14px;
     }
-    .log-row {
-      display: grid;
-      grid-template-columns: 96px 14px 110px 1fr;
-      gap: 10px;
-      padding: 3px 20px;
-      align-items: start;
-    }
-    .log-row:hover { background: rgba(255,255,255,0.02); }
-    .log-time { color: var(--muted); }
-    .log-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--muted);
-      margin-top: 6px;
-      justify-self: center;
-    }
-    .log-dot.warn { background: #fbbf24; }
-    .log-dot.error { background: #f87171; }
-    .log-tag { color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .log-msg { color: var(--text); white-space: pre-wrap; word-break: break-word; }
-    .log-row.error .log-msg { color: #fca5a5; }
+    .call-card.expanded .expand-icon { transform: rotate(180deg); color: var(--text-muted); }
 
-    /* ── Empty + loading states ─────────────────────────────────────────── */
-    .empty-card {
-      background: var(--bg2);
+    .call-body {
+      border-top: 1px solid var(--border);
+      padding: 22px;
+      background: var(--bg-deep);
+      display: none;
+    }
+    .call-card.expanded .call-body { display: block; }
+
+    .obj-event {
+      background: var(--bg-elevated);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 40px 24px;
-      text-align: center;
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 12px;
     }
-    .empty-card h2 { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-    .empty-card p { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
-    .load-spinner {
-      display: flex;
-      justify-content: center;
-      padding: 40px 0;
-    }
-    .spinner {
-      width: 22px; height: 22px;
-      border: 2px solid var(--border);
-      border-top-color: var(--green);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .msg-empty { padding: 16px 20px; font-size: 12px; color: var(--muted); text-align: center; font-family: inherit; }
-    .msg-error { padding: 16px 20px; font-size: 12px; color: #f87171; text-align: center; font-family: inherit; }
-
-    @media (max-width: 640px) {
-      .page { padding: 24px 16px 60px; }
-      .welcome h1 { font-size: 22px; }
-      .session-head { padding: 14px 14px; }
-      .log-row { grid-template-columns: 70px 12px 90px 1fr; padding: 3px 14px; }
-    }
-
-    /* ── Knowledge Base section ─────────────────────────────────────────── */
-    .kb-section { margin-bottom: 36px; }
-    .kb-header {
+    .obj-event:last-child { margin-bottom: 0; }
+    .obj-event-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
     }
-    .kb-header .section-heading { margin-bottom: 0; }
-    .kb-add-btn {
+    .obj-event-title { font-size: 14px; font-weight: 600; }
+    .obj-event-time { font-size: 11px; color: var(--text-muted); margin-left: 8px; font-weight: 400; }
+
+    .verdict {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .verdict-overcome  { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+    .verdict-not       { background: rgba(248, 113, 113, 0.12); color: var(--bad); }
+    .verdict-unknown   { background: rgba(139, 139, 139, 0.10); color: var(--text-muted); }
+    .verdict-conf { font-size: 10px; color: var(--text-dim); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+
+    .coaching-note {
+      background: linear-gradient(135deg, rgba(91, 158, 255, 0.06) 0%, rgba(74, 222, 128, 0.03) 100%);
+      border: 1px solid rgba(91, 158, 255, 0.18);
+      border-radius: var(--radius-sm);
+      padding: 16px 18px;
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+    .coaching-note-empty {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-bottom: 14px;
+    }
+
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 680px) { .compare-grid { grid-template-columns: 1fr; } }
+    .compare-pane {
+      background: var(--bg-deep);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      border-left: 3px solid var(--border);
+    }
+    .compare-pane.framework { border-left-color: var(--accent); }
+    .compare-pane.actual    { border-left-color: var(--mid); }
+    .compare-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .compare-text { font-size: 13px; color: var(--text-soft); line-height: 1.55; }
+    .compare-text.empty { color: var(--text-dim); font-style: italic; }
+
+    .obj-notes-row {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      line-height: 1.5;
+    }
+
+    /* ── Drill view ─────────────────────────────────────────────────── */
+    .drill-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .back-btn {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      transition: all 0.15s var(--ease);
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: var(--green);
-      color: #000;
-      font-weight: 700;
-      font-size: 13px;
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.15s;
     }
-    .kb-add-btn:hover { background: var(--green-dark); }
-    .kb-add-btn:disabled { opacity: 0.6; cursor: wait; }
+    .back-btn:hover { color: var(--text); border-color: var(--border-hover); }
 
-    .kb-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .kb-item {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      transition: border-color 0.12s;
-    }
-    .kb-item:hover { border-color: rgba(255,255,255,0.14); }
-    .kb-item-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-    .kb-item-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      word-break: break-all;
-    }
-    .kb-item-sub {
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .kb-badge {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-      padding: 2px 8px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
-    }
-    .kb-badge.kb-type-url   { color: #93c5fd; border-color: rgba(147,197,253,0.3); background: rgba(59,130,246,0.10); }
-    .kb-badge.kb-type-pdf   { color: #fca5a5; border-color: rgba(252,165,165,0.3); background: rgba(239,68,68,0.10); }
-    .kb-badge.kb-type-paste { color: #d4d4d8; border-color: rgba(212,212,216,0.25); background: rgba(255,255,255,0.04); }
-    /* Category badges — visually distinct from type badges (cooler hues:
-       teal for offer docs, purple for transcripts) so users can tell the
-       two at a glance even though they sit side-by-side. */
-    .kb-badge.kb-cat-offer_document { color: #5eead4; border-color: rgba(94,234,212,0.3); background: rgba(20,184,166,0.10); }
-    .kb-badge.kb-cat-winning_call   { color: #c4b5fd; border-color: rgba(196,181,253,0.3); background: rgba(139,92,246,0.10); }
-    .kb-badge.kb-scope-global   { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
-    .kb-badge.kb-scope-team     { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
-    .kb-badge.kb-scope-personal { color: var(--muted); }
-    .kb-delete-btn {
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-      flex-shrink: 0;
-    }
-    .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
-    .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
+    .drill-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+    .drill-title .count { color: var(--text-muted); font-weight: 400; margin-left: 8px; }
 
-    /* View patterns button — same shell as delete button, neutral hover.
-       Sits to the LEFT of delete in the kb-item flex row. Only emitted
-       for items where category === 'learned_pattern'. */
-    .kb-view-btn {
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-      flex-shrink: 0;
-      margin-right: 6px;
+    .drill-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 36px;
+      margin-bottom: 48px;
     }
-    .kb-view-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    @media (max-width: 760px) { .drill-grid { grid-template-columns: 1fr; } }
 
-    .kb-expand-panel {
-      background: var(--bg3);
+    .drill-donut {
+      background: var(--bg-elevated);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      margin: -2px 0 0 24px;
-      padding: 14px 16px;
-    }
-    .kb-expand-panel.hidden { display: none; }
-    .kb-pattern-loading,
-    .kb-pattern-empty { font-size: 12px; color: var(--muted); padding: 8px 0; text-align: center; }
-    .kb-pattern-card {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
-    }
-    .kb-pattern-card:last-child { margin-bottom: 0; }
-    .kb-pattern-row { font-size: 12px; line-height: 1.5; margin-top: 6px; }
-    .kb-pattern-row b { color: var(--muted); display: inline-block; min-width: 130px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; font-size: 10px; vertical-align: top; }
-    .kb-pattern-text { color: var(--text); }
-    .kb-pattern-empty-text { font-size: 13px; color: var(--text); white-space: pre-wrap; }
-    .kb-badge.kb-ptype-pain_discovery   { color: #fca5a5; border-color: rgba(252,165,165,0.3); background: rgba(239,68,68,0.10); }
-    .kb-badge.kb-ptype-objection_handle { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
-    .kb-badge.kb-ptype-closing_move     { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
-    .kb-badge.kb-ptype-rapport_build    { color: #93c5fd; border-color: rgba(147,197,253,0.3); background: rgba(59,130,246,0.10); }
-
-    /* ── Modal ──────────────────────────────────────────────────────────── */
-    .kb-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
+      border-radius: var(--radius-lg);
+      padding: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 24px;
-    }
-    .kb-modal.hidden { display: none; }
-    .kb-modal-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      backdrop-filter: blur(2px);
-    }
-    .kb-modal-dialog {
-      position: relative;
-      width: 100%;
-      max-width: 520px;
-      max-height: calc(100vh - 48px);
-      overflow-y: auto;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 28px;
-    }
-    .kb-modal-dialog h2 {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 18px;
-    }
-    .kb-modal-close {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: transparent;
-      color: var(--muted);
-      border: none;
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-      font-family: inherit;
-    }
-    .kb-modal-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
-
-    .kb-form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-    .kb-form-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
-    .kb-form-row input[type="text"],
-    .kb-form-row select {
-      width: 100%;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      outline: none;
-      box-sizing: border-box;
-    }
-    .kb-form-row input:focus,
-    .kb-form-row select:focus { border-color: var(--green); }
-    .kb-form-row select { cursor: pointer; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
-
-    .kb-tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 18px;
-      border-bottom: 1px solid var(--border);
-    }
-    .kb-tab {
-      background: transparent;
-      color: var(--muted);
-      border: none;
-      border-bottom: 2px solid transparent;
-      padding: 8px 14px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-      margin-bottom: -1px;
-    }
-    .kb-tab:hover { color: var(--text); }
-    .kb-tab.active {
-      color: var(--green);
-      border-bottom-color: var(--green);
     }
 
-    .kb-tab-panel { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
-    .kb-tab-panel.hidden { display: none; }
-    .kb-tab-panel input[type="text"],
-    .kb-tab-panel input[type="url"],
-    .kb-tab-panel input[type="file"],
-    .kb-tab-panel textarea {
-      width: 100%;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      outline: none;
-      box-sizing: border-box;
-    }
-    .kb-tab-panel input:focus,
-    .kb-tab-panel textarea:focus { border-color: var(--green); }
-    .kb-tab-panel textarea { resize: vertical; min-height: 140px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .kb-tab-panel input[type="file"] { padding: 8px 12px; cursor: pointer; }
-
-    .kb-status {
-      font-size: 12px;
-      min-height: 18px;
-      margin-bottom: 12px;
-      color: var(--muted);
-    }
-    .kb-status.error { color: #f87171; }
-    .kb-status.progress { color: var(--green); }
-
-    .kb-submit {
-      width: 100%;
-      background: var(--green);
-      color: #000;
-      font-weight: 700;
-      font-size: 14px;
-      padding: 12px 20px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.15s;
-    }
-    .kb-submit:hover:not(:disabled) { background: var(--green-dark); }
-    .kb-submit:disabled { opacity: 0.6; cursor: wait; }
-
-    @media (max-width: 640px) {
-      .kb-modal { padding: 12px; }
-      .kb-modal-dialog { padding: 20px; }
-      .kb-item { flex-direction: column; align-items: flex-start; }
-      .kb-delete-btn { align-self: flex-end; }
-    }
-
-    /* v1.1.10 analytics block — date picker + stats cards + objection table.
-       Uses the existing CSS variables (var(--bg2), var(--muted), etc.) so
-       the styling tracks the rest of the dashboard. */
-    .date-picker-bar { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-    .date-pickers { display: flex; gap: 12px; flex-wrap: wrap; }
-    .date-pickers label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
-    .date-pickers input[type=date] {
-      background: var(--bg2); border: 1px solid #2a2a2a; color: inherit;
-      padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: inherit;
-    }
-    .date-presets { display: flex; gap: 6px; flex-wrap: wrap; }
-    .date-preset {
-      background: var(--bg2); border: 1px solid #2a2a2a; color: var(--muted);
-      padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
-      font-family: inherit;
-    }
-    .date-preset:hover { background: #2a2a2a; color: inherit; }
-    .date-preset.active { background: #2a2a2a; color: inherit; border-color: #4a9eff; }
-
-    .stats-row {
+    .drill-breakdown { display: flex; flex-direction: column; gap: 10px; }
+    .breakdown-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      grid-template-columns: 12px 1fr auto auto;
       gap: 12px;
-      margin-bottom: 24px;
+      align-items: center;
+      padding: 14px 18px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      transition: border-color 0.15s var(--ease);
     }
-    .stat-card {
-      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: 8px;
-      padding: 14px 16px;
+    .breakdown-row:hover { border-color: var(--border-hover); }
+    .breakdown-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
     }
-    .stat-card .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-card .stat-value { font-size: 24px; font-weight: 600; margin-top: 4px; }
-    .stat-card .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .breakdown-label { font-weight: 500; }
+    .breakdown-bar {
+      grid-column: 2;
+      grid-row: 2;
+      height: 6px;
+      background: var(--bg-deep);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .breakdown-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s var(--ease); }
+    .breakdown-count { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .breakdown-pct { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 50px; text-align: right; }
 
-    .objection-section { margin-bottom: 24px; }
-    .objection-totals { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-    .objection-table {
-      width: 100%; border-collapse: collapse;
-      background: var(--bg2); border-radius: 8px; overflow: hidden;
+    /* ── Empty / spinner ────────────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
     }
-    .objection-table th, .objection-table td {
-      padding: 10px 14px; text-align: left; font-size: 13px;
-      border-bottom: 1px solid #2a2a2a;
+    .load-state { display: flex; align-items: center; justify-content: center; padding: 40px; }
+    .skeleton {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      height: 80px;
+      animation: pulse 1.4s ease-in-out infinite;
     }
-    .objection-table th {
-      background: #1a1a1a; color: var(--muted); font-weight: 500;
-      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    .skeleton-donut {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      height: 360px;
+      animation: pulse 1.4s ease-in-out infinite;
     }
-    .objection-table tr:last-child td { border-bottom: none; }
-    .objection-table .pct-cell { font-weight: 600; }
-    .pct-good { color: #4ade80; }
-    .pct-mid { color: #facc15; }
-    .pct-bad { color: #f87171; }
-    .pct-none { color: var(--muted); }
 
-    /* Per-session objection drill-down (rendered inside an expanded card) */
-    .obj-drill-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #2a2a2a; }
-    .obj-drill-heading {
-      font-size: 12px; color: var(--muted); text-transform: uppercase;
-      letter-spacing: 0.5px; margin-bottom: 10px;
+    .empty {
+      background: var(--bg-elevated);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 32px;
+      text-align: center;
+      color: var(--text-muted);
     }
-    .obj-drill-item {
-      background: #1a1a1a; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
+    .empty h3 { font-size: 16px; font-weight: 600; margin: 0 0 6px; color: var(--text); }
+    .empty p { font-size: 13px; margin: 0; }
+
+    .error {
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      color: #fab7b7;
+      padding: 14px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
     }
-    .obj-drill-item .obj-label { font-weight: 600; font-size: 13px; }
-    .obj-drill-item .obj-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-    .obj-drill-item .obj-notes { font-size: 12px; margin-top: 6px; color: #ccc; line-height: 1.5; }
-    .obj-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 4px;
-      font-size: 11px; font-weight: 500; margin-right: 6px;
+
+    /* Fade-in on initial render */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.4s var(--ease) both; }
+
+    /* Scope badge */
+    .scope-pill {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: rgba(91, 158, 255, 0.10);
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-left: 10px;
     }
-    .obj-badge.overcome-true  { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
-    .obj-badge.overcome-false { background: rgba(248, 113, 113, 0.15); color: #f87171; }
-    .obj-badge.overcome-null  { background: rgba(160, 160, 160, 0.15); color: var(--muted); }
   </style>
 </head>
 <body>
 
 <nav class="top-bar">
   <div class="top-bar-left">
-    <svg width="20" height="22" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
-      <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-      <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-      <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-      <circle cx="10" cy="12" r="1.6" fill="#22c55e"/>
-      <circle cx="10" cy="16" r="1.2" fill="#22c55e"/>
-      <circle cx="10" cy="19.5" r="0.8" fill="#22c55e"/>
-    </svg>
     <span>Scout</span>
-    <span style="color: var(--muted); font-weight: 500; font-size: 13px;">· Dashboard</span>
+    <span class="sep">·</span>
+    <span class="sub">Coaching Dashboard</span>
   </div>
   <div class="top-bar-right">
-    <a href="/coaching" style="color: var(--muted); text-decoration: none;">Coaching</a>
+    <a href="/admin" id="adminLink" style="display:none">Admin</a>
     <span id="signedInEmail"></span>
     <span class="signout" onclick="signOut()">Sign out</span>
   </div>
 </nav>
 
-<main class="page">
-  <section class="welcome">
-    <div>
-      <h1 id="welcomeHeading">Welcome back</h1>
-      <div class="sub">Here's your call history.</div>
-    </div>
-    <button class="launch-btn" onclick="launchApp()">Open Scout App →</button>
-  </section>
-
-  <!-- v1.1.10: analytics — date picker, outcome stats, objection breakdown.
-       Slot was reserved earlier for "future stats cards"; this is the future.
-       slot in here without restructuring the page. -->
-  <section class="stats-slot" id="statsSlot">
-    <div class="date-picker-bar">
-      <div class="date-pickers">
-        <label>From <input type="date" id="dateFrom" onchange="onDateInputChange()"/></label>
-        <label>To <input type="date" id="dateTo" onchange="onDateInputChange()"/></label>
-      </div>
-      <div class="date-presets">
-        <button class="date-preset" data-days="7"    onclick="setDateRange(7)">Last 7d</button>
-        <button class="date-preset" data-days="30"   onclick="setDateRange(30)">Last 30d</button>
-        <button class="date-preset" data-days="90"   onclick="setDateRange(90)">Last 90d</button>
-        <button class="date-preset" data-days="9999" onclick="setDateRange(9999)">All time</button>
-      </div>
-    </div>
-    <div class="stats-row" id="statsRow">
-      <div class="load-spinner"><div class="spinner"></div></div>
-    </div>
-    <div class="objection-section" id="objectionSection" style="display:none">
-      <div class="section-heading">Objections</div>
-      <div id="objectionContent"></div>
-    </div>
-  </section>
-
-  <section class="kb-section">
-    <div class="kb-header">
-      <div class="section-heading">Knowledge Base</div>
-      <button class="kb-add-btn" onclick="openKbModal()">+ Add resource</button>
-    </div>
-    <div id="kbContainer">
-      <div class="load-spinner"><div class="spinner"></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-heading" id="callsHeading">Your calls</div>
-    <div id="callsContainer">
-      <div class="load-spinner"><div class="spinner"></div></div>
-    </div>
-  </section>
+<main class="page" id="page">
+  <div id="content"><div class="load-state"><div class="spinner"></div></div></div>
 </main>
 
-<!-- Upload modal — hidden until openKbModal() unhides it. Three tabs share
-     a single submit handler that reads the active tab and builds FormData
-     accordingly. Multipart Content-Type header is intentionally omitted so
-     the browser sets the multipart boundary for multer to parse. -->
-<div class="kb-modal hidden" id="kbModal">
-  <div class="kb-modal-overlay" onclick="closeKbModal()"></div>
-  <div class="kb-modal-dialog">
-    <button class="kb-modal-close" onclick="closeKbModal()" aria-label="Close">✕</button>
-    <h2>Add to Knowledge Base</h2>
-
-    <!-- Label and category sit above the tabs so they're always visible
-         regardless of source type. Both are required — chunking strategy
-         depends on category, and the label is what the user sees later in
-         the list and what Claude references in [WINNING CALL: …] /
-         [OFFER DOCUMENT: …] context lines. -->
-    <div class="kb-form-row">
-      <label class="kb-form-label" for="kbLabel">Label</label>
-      <input type="text" id="kbLabel" placeholder="e.g. Silver Living landing page, or Winning call - March 2026" autocomplete="off" required/>
-    </div>
-
-    <div class="kb-form-row">
-      <label class="kb-form-label" for="kbCategory">Content type</label>
-      <select id="kbCategory">
-        <option value="offer_document">Offer document (script, landing page, FAQ, product info)</option>
-        <option value="winning_call">Winning call transcript</option>
-      </select>
-    </div>
-
-    <div class="kb-tabs" role="tablist">
-      <button class="kb-tab active" data-tab="url"   onclick="switchKbTab('url')">URL</button>
-      <button class="kb-tab"        data-tab="pdf"   onclick="switchKbTab('pdf')">PDF</button>
-      <button class="kb-tab"        data-tab="paste" onclick="switchKbTab('paste')">Paste</button>
-    </div>
-
-    <div class="kb-tab-panel" data-panel="url">
-      <input type="url"  id="kbUrlInput"  placeholder="https://example.com/article" autocomplete="off"/>
-    </div>
-
-    <div class="kb-tab-panel hidden" data-panel="pdf">
-      <input type="file" id="kbPdfInput"  accept=".pdf"/>
-    </div>
-
-    <div class="kb-tab-panel hidden" data-panel="paste">
-      <textarea id="kbPasteInput" placeholder="Paste your content here…" rows="8"></textarea>
-    </div>
-
-    <div class="kb-status" id="kbStatus"></div>
-    <button class="kb-submit" id="kbSubmit" onclick="submitKbUpload()">Add to Knowledge Base</button>
-  </div>
-</div>
-
 <script>
-  // ── Session handling (mirrors login.html / admin.html) ────────────────
+  // ──────────────────────────────────────────────────────────────────
+  // Session / auth — same pattern used across all Scout dashboards.
+  // ──────────────────────────────────────────────────────────────────
   var STORAGE_KEY = 'scout_session_v1';
-
-  function getSession() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
-  }
-  function setSession(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+  function getSession() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return null; } }
+  function setSessionStored(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
   function clearSession() { localStorage.removeItem(STORAGE_KEY); }
-
   function isSessionValid(s) {
     if (!s || !s.access_token || !s.expires_at) return false;
-    var nowSec = Math.floor(Date.now() / 1000);
-    return s.expires_at > nowSec + 60;
-  }
-  function shouldRefresh(s) {
-    if (!s || !s.expires_at) return false;
-    var nowSec = Math.floor(Date.now() / 1000);
-    return s.expires_at - nowSec < 300;
+    return new Date(s.expires_at).getTime() > Date.now() + 30 * 1000;
   }
   async function refreshSessionIfNeeded() {
     var s = getSession();
-    if (!s || !s.refresh_token) return null;
-    if (!shouldRefresh(s)) return s;
+    if (!s || !s.refresh_token) return false;
     try {
-      var res = await fetch('/auth/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: s.refresh_token }),
-      });
-      if (!res.ok) { clearSession(); return null; }
+      var res = await fetch('/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh_token }) });
+      if (!res.ok) return false;
       var data = await res.json();
-      if (!data.session) { clearSession(); return null; }
-      var fresh = {
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-        expires_at: data.session.expires_at,
-        email: (data.user && data.user.email) || (s && s.email),
-      };
-      setSession(fresh);
-      return fresh;
-    } catch (err) {
-      clearSession();
-      return null;
-    }
+      if (!data || !data.session) return false;
+      setSessionStored({ access_token: data.session.access_token, refresh_token: data.session.refresh_token, expires_at: data.session.expires_at, email: data.session.user && data.session.user.email });
+      return true;
+    } catch (e) { return false; }
   }
-
-  function signOut() {
-    clearSession();
-    window.location.replace('/login');
-  }
-
+  function signOut() { clearSession(); window.location.replace('/login'); }
   function authHeader() {
     var s = getSession();
-    return s && s.access_token ? { 'Authorization': 'Bearer ' + s.access_token } : {};
+    return s && s.access_token ? { Authorization: 'Bearer ' + s.access_token } : {};
   }
 
-  function launchApp() {
-    var s = getSession();
-    var token = s ? s.access_token : '';
-    window.location.href = 'scout://launch?token=' + encodeURIComponent(token);
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]); });
   }
 
-  // ── State ───────────────────────────────────────────────────────────────
-  var allSessions = [];
-  var expandedId = null;            // only one card expanded at a time
-  var cardState = {};               // { <session_id>: { logs, total_count, limit, filter, search } }
+  // ──────────────────────────────────────────────────────────────────
+  // State
+  // ──────────────────────────────────────────────────────────────────
+  var state = {
+    me:              null,    // { user_id, email, role }
+    users:           [],      // populated for admin/owner
+    viewingUserId:   null,    // whose data we're showing
+    dateRange:      { from: null, to: null, days: 30 },
+    view:           'overview', // 'overview' | 'calls' | 'objections' | 'closes'
+    analytics:       null,    // last /me/analytics response
+    patterns:        null,    // last /me/coaching/patterns response
+    calls:           [],      // list from /me/sessions
+    objectionsCache: {},      // session_id -> objection rows
+    expandedCallId:  null,
+    chart1:          null,
+    chart2:          null,
+    chart3:          null,
+    chartDrill:      null,
+  };
 
-  // ── Initial load ────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────
+  // Init
+  // ──────────────────────────────────────────────────────────────────
   async function init() {
     var s = getSession();
     if (!isSessionValid(s)) {
       if (s && s.refresh_token) {
-        var refreshed = await refreshSessionIfNeeded();
-        if (!refreshed) { window.location.replace('/login'); return; }
-      } else {
-        window.location.replace('/login');
-        return;
-      }
+        var ok = await refreshSessionIfNeeded();
+        if (!ok) { window.location.replace('/login'); return; }
+      } else { window.location.replace('/login'); return; }
     }
     var cur = getSession();
     document.getElementById('signedInEmail').textContent = (cur && cur.email) || '';
-    document.getElementById('welcomeHeading').textContent = 'Welcome back' + (cur && cur.email ? ', ' + cur.email : '');
 
-    // Role gate: admins/owners belong on /admin. Call /auth/me and redirect
-    // before fetching sessions so we don't flash the user view at them.
-    var role = await fetchRole();
-    if (role === 'admin' || role === 'owner') {
-      window.location.replace('/admin');
-      return;
+    state.me = await fetchMe();
+    if (!state.me) { window.location.replace('/login'); return; }
+
+    if (state.me.role === 'admin' || state.me.role === 'owner') {
+      document.getElementById('adminLink').style.display = '';
+      await loadUsers();
     }
-    // v1.1.10: set default date range to last 30 days. setDateRange also
-    // triggers loadAnalytics() + loadSessions(), so don't duplicate the call.
+
+    // Default to caller's own data; ?user=<id> pivots to another user.
+    var params = new URLSearchParams(window.location.search);
+    var target = params.get('user');
+    if (target && (state.me.role === 'admin' || state.me.role === 'owner')) {
+      state.viewingUserId = target;
+    } else {
+      state.viewingUserId = state.me.user_id;
+    }
+
     setDateRange(30);
-    await loadKbList();
   }
 
-  // ─── v1.1.10 analytics ───────────────────────────────────────────────
-  var analyticsState = { from: null, to: null };
-
-  async function loadAnalytics() {
-    var row = document.getElementById('statsRow');
-    if (!row) return;
-    var url = '/me/analytics?from=' + encodeURIComponent(analyticsState.from)
-      + '&to=' + encodeURIComponent(analyticsState.to);
-    var res;
-    try { res = await fetch(url, { headers: authHeader() }); }
-    catch (err) { row.innerHTML = '<div class="msg-error">Network error loading stats</div>'; return; }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      row.innerHTML = '<div class="msg-error">Could not load stats (HTTP ' + res.status + ')</div>';
-      return;
-    }
-    var data = await res.json();
-    renderStats(data.totals);
-    renderObjections(data.objections);
+  async function fetchMe() {
+    try {
+      var res = await fetch('/auth/me', { headers: authHeader() });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) { return null; }
   }
 
-  function renderStats(totals) {
-    var parts = [];
-    parts.push(statCard('Total calls', totals.total_calls, totals.live > 0 ? totals.live + ' still live' : null));
-    parts.push(statCard('Closed (Won)', totals.wins, pctOf(totals.wins, totals.total_calls)));
-    parts.push(statCard('Lost', totals.losses, pctOf(totals.losses, totals.total_calls)));
-    parts.push(statCard('Follow-up', totals.follow_ups, pctOf(totals.follow_ups, totals.total_calls)));
-    if (totals.unmarked > 0) {
-      parts.push(statCard('Unmarked', totals.unmarked, 'no summary yet'));
-    }
-    document.getElementById('statsRow').innerHTML = parts.join('');
+  async function loadUsers() {
+    try {
+      var res = await fetch('/admin/users', { headers: authHeader() });
+      if (!res.ok) return;
+      var d = await res.json();
+      state.users = (d && d.users) || [];
+    } catch (e) { /* silent */ }
   }
 
-  function statCard(label, value, sub) {
-    var subPart = sub ? '<div class="stat-sub">' + escapeHtml(String(sub)) + '</div>' : '';
-    return '<div class="stat-card"><div class="stat-label">' + escapeHtml(label)
-      + '</div><div class="stat-value">' + escapeHtml(String(value)) + '</div>' + subPart + '</div>';
+  // ──────────────────────────────────────────────────────────────────
+  // Data fetch
+  // ──────────────────────────────────────────────────────────────────
+  function isSelf() { return state.viewingUserId === state.me.user_id; }
+
+  async function fetchAnalytics() {
+    var url = isSelf()
+      ? '/me/analytics?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
+      : '/admin/analytics/' + encodeURIComponent(state.viewingUserId)
+        + '?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var res = await fetch(url, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
   }
 
-  function pctOf(n, total) {
-    if (!total) return null;
-    return Math.round((n / total) * 100) + '%';
+  async function fetchPatterns() {
+    var url = isSelf()
+      ? '/me/coaching/patterns?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
+      : '/admin/coaching/' + encodeURIComponent(state.viewingUserId) + '/patterns'
+        + '?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var res = await fetch(url, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
   }
 
-  function renderObjections(objSection) {
-    var section = document.getElementById('objectionSection');
-    var content = document.getElementById('objectionContent');
-    if (!objSection || !objSection.by_type || objSection.by_type.length === 0) {
-      section.style.display = 'none';
-      return;
-    }
-    section.style.display = 'block';
-    var t = objSection.totals;
-    var summary = t.total + ' total · ' + t.overcome + ' overcome · ' + t.not_overcome + ' not overcome';
-    if (t.unknown > 0) summary += ' · ' + t.unknown + ' indeterminate (transcript quality)';
-
-    var rows = '';
-    for (var i = 0; i < objSection.by_type.length; i++) {
-      var b = objSection.by_type[i];
-      var pct = b.overcome_pct === null
-        ? '<span class="pct-none">—</span>'
-        : '<span class="' + pctClass(b.overcome_pct) + '">' + b.overcome_pct + '%</span>';
-      rows += '<tr><td>' + escapeHtml(b.label) + '</td>'
-        + '<td>' + b.count + '</td>'
-        + '<td>' + b.overcome + '</td>'
-        + '<td>' + b.not_overcome + '</td>'
-        + '<td>' + b.unknown + '</td>'
-        + '<td class="pct-cell">' + pct + '</td></tr>';
-    }
-    content.innerHTML =
-      '<div class="objection-totals">' + escapeHtml(summary) + '</div>'
-      + '<table class="objection-table">'
-      + '<thead><tr><th>Objection</th><th>Count</th><th>Overcome</th><th>Not</th><th>?</th><th>Overcome %</th></tr></thead>'
-      + '<tbody>' + rows + '</tbody></table>';
+  async function fetchCalls() {
+    var url = isSelf()
+      ? '/me/sessions?limit=100'
+      : '/admin/sessions?limit=100&user_id=' + encodeURIComponent(state.viewingUserId);
+    var res = await fetch(url, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var d = await res.json();
+    var all = (d && d.sessions) || [];
+    // Client-side date filter.
+    return all.filter(function(s) {
+      return s.started_at >= state.dateRange.from && s.started_at <= state.dateRange.to;
+    });
   }
 
-  function pctClass(pct) {
-    if (pct >= 70) return 'pct-good';
-    if (pct >= 40) return 'pct-mid';
-    return 'pct-bad';
+  async function fetchObjections(sessionId) {
+    if (state.objectionsCache[sessionId]) return state.objectionsCache[sessionId];
+    var url = isSelf()
+      ? '/me/sessions/' + encodeURIComponent(sessionId) + '/objections'
+      : '/admin/sessions/' + encodeURIComponent(sessionId) + '/objections';
+    var res = await fetch(url, { headers: authHeader() });
+    if (!res.ok) return [];
+    var d = await res.json();
+    var rows = (d && d.objections) || [];
+    state.objectionsCache[sessionId] = rows;
+    return rows;
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // Date range / user controls
+  // ──────────────────────────────────────────────────────────────────
   function setDateRange(days) {
     var to = new Date();
     var from = days >= 9999
       ? new Date('2025-01-01T00:00:00Z')
       : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    analyticsState.from = from.toISOString();
-    analyticsState.to = to.toISOString();
-    var fromInput = document.getElementById('dateFrom');
-    var toInput = document.getElementById('dateTo');
-    if (fromInput) fromInput.value = from.toISOString().slice(0, 10);
-    if (toInput)   toInput.value   = to.toISOString().slice(0, 10);
-    document.querySelectorAll('.date-preset').forEach(function(b) { b.classList.remove('active'); });
-    var activeBtn = document.querySelector('.date-preset[data-days="' + days + '"]');
-    if (activeBtn) activeBtn.classList.add('active');
-    loadAnalytics();
-    loadSessions();
+    state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
+    state.view = 'overview';
+    state.expandedCallId = null;
+    state.objectionsCache = {};
+    reloadAll();
   }
 
-  function onDateInputChange() {
-    var f = document.getElementById('dateFrom').value;
-    var t = document.getElementById('dateTo').value;
-    if (!f || !t) return;
-    analyticsState.from = new Date(f + 'T00:00:00').toISOString();
-    analyticsState.to   = new Date(t + 'T23:59:59').toISOString();
-    document.querySelectorAll('.date-preset').forEach(function(b) { b.classList.remove('active'); });
-    loadAnalytics();
-    loadSessions();
+  function setUser(userId) {
+    if (!userId || userId === state.viewingUserId) return;
+    var url = new URL(window.location.href);
+    if (userId === state.me.user_id) url.searchParams.delete('user');
+    else url.searchParams.set('user', userId);
+    window.history.replaceState({}, '', url.toString());
+    state.viewingUserId = userId;
+    state.view = 'overview';
+    state.expandedCallId = null;
+    state.objectionsCache = {};
+    reloadAll();
   }
 
-  // Per-session objection drill — called when a card expands. Renders inline
-  // below the existing log view if the session has any extracted objections.
-  async function loadSessionObjections(sessionId, containerEl) {
+  async function reloadAll() {
+    renderOverview(true /* loading */);
     try {
-      var res = await fetch('/me/sessions/' + encodeURIComponent(sessionId) + '/objections', { headers: authHeader() });
-      if (!res.ok) return; // silent fail — drill-down is nice-to-have, not blocking
-      var data = await res.json();
-      var rows = (data && data.objections) || [];
-      if (rows.length === 0) return;
-      var html = '<div class="obj-drill-section">'
-        + '<div class="obj-drill-heading">Objections detected (' + rows.length + ')</div>';
-      for (var i = 0; i < rows.length; i++) {
-        var r = rows[i];
-        var badgeClass = r.overcome === true ? 'overcome-true'
-          : r.overcome === false ? 'overcome-false' : 'overcome-null';
-        var badgeText = r.overcome === true ? '✓ overcome'
-          : r.overcome === false ? '✗ not overcome' : '? indeterminate';
-        var conf = r.overcome_confidence ? ' (' + r.overcome_confidence + ' confidence)' : '';
-        var time = r.detected_at ? new Date(r.detected_at).toLocaleTimeString() : '';
-        html += '<div class="obj-drill-item">'
-          + '<span class="obj-badge ' + badgeClass + '">' + badgeText + '</span>'
-          + '<span class="obj-label">' + escapeHtml(r.objection_label) + '</span>'
-          + '<div class="obj-meta">' + escapeHtml(time) + escapeHtml(conf)
-          + (r.framework ? ' · framework: ' + escapeHtml(r.framework) : '') + '</div>'
-          + (r.notes ? '<div class="obj-notes">' + escapeHtml(r.notes) + '</div>' : '')
-          + '</div>';
-      }
-      html += '</div>';
-      containerEl.insertAdjacentHTML('beforeend', html);
+      var [analytics, patterns, calls] = await Promise.all([
+        fetchAnalytics(),
+        fetchPatterns(),
+        fetchCalls(),
+      ]);
+      state.analytics = analytics;
+      state.patterns = patterns;
+      state.calls = calls;
+      render();
     } catch (err) {
-      // silent — log view is the primary UX
+      if (err.message === 'unauth') return;
+      document.getElementById('content').innerHTML = '<div class="error">Could not load dashboard data: ' + escapeHtml(err.message || 'unknown') + '</div>';
     }
   }
 
-  async function fetchRole() {
-    try {
-      var res = await fetch('/auth/me', { headers: authHeader() });
-      if (res.status === 401) { clearSession(); window.location.replace('/login'); return null; }
-      if (!res.ok) {
-        // Fail-open to 'user' — safer than booting a real user out on a
-        // transient 500. Admins land on dashboard briefly; they can hit
-        // /admin manually. Log so the failure is visible in devtools.
-        console.warn('[dashboard] /auth/me returned', res.status, '- defaulting to user');
-        return 'user';
-      }
-      var data = await res.json();
-      return (data && data.role) || 'user';
-    } catch (err) {
-      console.warn('[dashboard] /auth/me network error, defaulting to user:', err.message);
-      return 'user';
-    }
+  // ──────────────────────────────────────────────────────────────────
+  // Top-level render — switches on state.view
+  // ──────────────────────────────────────────────────────────────────
+  function render() {
+    if (state.view === 'overview') renderOverview(false);
+    else if (state.view === 'calls') renderCallsDrill();
+    else if (state.view === 'objections') renderObjectionsDrill();
+    else if (state.view === 'closes') renderClosesDrill();
   }
 
-  async function loadSessions() {
-    var container = document.getElementById('callsContainer');
-    var res;
-    try {
-      res = await fetch('/me/sessions', { headers: authHeader() });
-    } catch (err) {
-      container.innerHTML = '<div class="msg-error">Could not reach server.</div>';
-      return;
+  function renderHeaderHtml() {
+    var heading;
+    var sub;
+    if (state.viewingUserId === state.me.user_id) {
+      heading = 'Coaching Review';
+      sub = 'Your call patterns, objection handling, and coaching feedback.';
+    } else {
+      var u = state.users.find(function(x) { return x.user_id === state.viewingUserId; });
+      heading = (u ? u.email : state.viewingUserId);
+      sub = 'Viewing as ' + state.me.role + '.';
     }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      container.innerHTML = '<div class="msg-error">' + escapeHtml(err.error || 'Failed to load sessions') + '</div>';
-      return;
+
+    var userPicker = '';
+    if (state.me.role === 'admin' || state.me.role === 'owner') {
+      var opts = state.users.slice().sort(function(a, b) { return (a.email || '').localeCompare(b.email || ''); }).map(function(u) {
+        var sel = u.user_id === state.viewingUserId ? ' selected' : '';
+        return '<option value="' + escapeHtml(u.user_id) + '"' + sel + '>' + escapeHtml(u.email || u.user_id) + '</option>';
+      }).join('');
+      userPicker = '<select class="user-select" onchange="setUser(this.value)">' + opts + '</select>';
     }
-    var data = await res.json();
-    allSessions = (data && data.sessions) || [];
-    renderCalls();
+
+    var presets = '';
+    [[7, '7d'], [30, '30d'], [90, '90d'], [9999, 'All']].forEach(function(p) {
+      var active = state.dateRange.days === p[0] ? ' active' : '';
+      presets += '<button class="date-preset' + active + '" onclick="setDateRange(' + p[0] + ')">' + p[1] + '</button>';
+    });
+
+    var scopePill = state.viewingUserId !== state.me.user_id ? '<span class="scope-pill">' + escapeHtml(state.me.role || '') + ' view</span>' : '';
+
+    return '<div class="page-header fade-in">'
+         + '<div><h1>' + escapeHtml(heading) + scopePill + '</h1>'
+         + '<div class="subtitle">' + escapeHtml(sub) + '</div></div>'
+         + '<div class="controls">' + userPicker
+         + '<div class="date-presets">' + presets + '</div>'
+         + '</div></div>';
   }
 
-  function renderCalls() {
-    var container = document.getElementById('callsContainer');
-    var heading = document.getElementById('callsHeading');
-
-    if (allSessions.length === 0) {
-      heading.textContent = 'Your calls';
-      container.innerHTML =
-        '<div class="empty-card">'
-          + '<h2>No calls recorded yet</h2>'
-          + '<p>Open Scout to start your first session. Your call history will appear here.</p>'
-          + '<button class="launch-btn" onclick="launchApp()">Open Scout App →</button>'
-        + '</div>';
-      return;
-    }
-
-    heading.textContent = 'Your calls (' + allSessions.length + ')';
-
-    var parts = ['<div class="calls-list">'];
-    for (var i = 0; i < allSessions.length; i++) {
-      var s = allSessions[i];
-      var expanded = s.session_id === expandedId ? ' expanded' : '';
-      var outcome = outcomeBadge(s.outcome, !!s.ended_at);
-      var dur = s.ended_at ? formatDuration(s.duration_seconds) : 'live';
-      var rel = relativeTime(s.started_at);
-      var errPart = s.error_count > 0
-        ? ' · <span class="err">' + s.error_count + ' errors</span>'
-        : '';
-      parts.push(
-        '<div class="session-card' + expanded + '" data-id="' + escapeHtml(s.session_id) + '">'
-          + '<div class="session-head" onclick="toggleCard(\'' + s.session_id + '\')">'
-            + '<div class="session-head-left">'
-              + '<div class="session-head-top">' + rel + ' · ' + dur + ' ' + outcome + '</div>'
-              + '<div class="session-head-sub">' + s.log_count + ' logs' + errPart + ' · ' + escapeHtml(s.client_version || '—') + '</div>'
-            + '</div>'
-            + '<span class="expand-icon">▾</span>'
-          + '</div>'
-          + '<div class="session-body" id="body-' + escapeHtml(s.session_id) + '"></div>'
+  // ──────────────────────────────────────────────────────────────────
+  // Overview view — three donuts + coach summary + recent calls
+  // ──────────────────────────────────────────────────────────────────
+  function renderOverview(isLoading) {
+    var content = document.getElementById('content');
+    if (isLoading || !state.analytics) {
+      content.innerHTML = renderHeaderHtml()
+        + '<div class="donut-row">'
+          + '<div class="skeleton-donut"></div><div class="skeleton-donut"></div><div class="skeleton-donut"></div>'
         + '</div>'
-      );
+        + '<div class="section"><div class="skeleton" style="height:60px;"></div></div>';
+      return;
     }
-    parts.push('</div>');
-    container.innerHTML = parts.join('');
 
-    // If a card was expanded before re-render, restore its body content.
-    if (expandedId && cardState[expandedId]) {
-      renderCardBody(expandedId);
+    var t = state.analytics.totals;
+    var obj = state.analytics.objections;
+
+    // Donut 1: Calls — segments by outcome. Center is total calls.
+    // Donut 2: Objections — segments by type. Center is total objections.
+    // Donut 3: Close Rate — won vs lost/follow_up. Center is %.
+    var closeDenom = t.wins + t.losses + t.follow_ups;
+    var closeRate = closeDenom > 0 ? Math.round((t.wins / closeDenom) * 100) : null;
+
+    content.innerHTML = renderHeaderHtml()
+      + '<div class="donut-row fade-in">'
+        + donutCardHtml('chart-calls', 'Calls', t.total_calls, null, 'click to drill in', 'calls')
+        + donutCardHtml('chart-objs', 'Objections', obj.totals.total, null, 'click to drill in', 'objections')
+        + donutCardHtml('chart-closes', 'Close Rate', closeRate === null ? '—' : (closeRate + '%'), null, 'click to drill in', 'closes')
+      + '</div>'
+      + '<div class="section fade-in">'
+        + '<div class="section-header"><h2>Coach summary</h2>'
+        + '<div class="meta">' + ((state.patterns && state.patterns.sample_size != null) ? 'based on ' + state.patterns.sample_size + ' calls' : '') + '</div></div>'
+        + renderPatternsHtml(state.patterns)
+      + '</div>'
+      + '<div class="section fade-in">'
+        + '<div class="section-header"><h2>Recent calls</h2>'
+        + '<div class="meta">' + state.calls.length + (state.calls.length === 1 ? ' call' : ' calls') + ' in window</div></div>'
+        + renderCallsHtml(state.calls)
+      + '</div>';
+
+    // Draw the three donuts after the DOM is laid out.
+    requestAnimationFrame(function() {
+      drawCallsDonut('chart-calls', t);
+      drawObjectionsDonut('chart-objs', obj);
+      drawClosesDonut('chart-closes', t, closeRate);
+    });
+
+    // Re-bind expanded body for any previously-open call.
+    if (state.expandedCallId) {
+      var card = document.querySelector('[data-session-id="' + state.expandedCallId + '"]');
+      if (card) {
+        card.classList.add('expanded');
+        renderCallBody(state.expandedCallId);
+      }
     }
+  }
+
+  function donutCardHtml(canvasId, label, centerBig, centerSmall, hint, clickKey) {
+    var smallHtml = centerSmall ? '<div class="small">' + escapeHtml(centerSmall) + '</div>' : '';
+    return '<div class="donut-card" onclick="setView(\'' + clickKey + '\')">'
+         + '<div class="donut-label">' + escapeHtml(label) + '</div>'
+         + '<div class="donut-canvas-wrap">'
+           + '<canvas id="' + canvasId + '"></canvas>'
+           + '<div class="donut-center"><div class="big">' + escapeHtml(String(centerBig)) + '</div>' + smallHtml + '</div>'
+         + '</div>'
+         + '<div class="donut-hint">' + escapeHtml(hint) + '</div>'
+         + '</div>';
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Chart drawing — Chart.js with custom dark theme + thin ring
+  // ──────────────────────────────────────────────────────────────────
+  var COLORS = {
+    win: '#4ade80', loss: '#f87171', follow_up: '#fbbf24', unmarked: '#64748b', live: '#5b9eff',
+    money: '#5b9eff', think: '#fbbf24', spouse: '#c084fc', time: '#fb923c',
+    guarantee: '#22d3ee', 'tried-before': '#a78bfa', 'send-info': '#34d399',
+    'more-research': '#f472b6', 'not-right-time': '#fb7185', 'proof-it-works': '#94a3b8',
+    other: '#64748b',
+  };
+
+  function donutBase(canvasId, labels, values, colors) {
+    var ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+    if (!window.Chart) return null;
+    return new Chart(ctx.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 0,
+          spacing: 2,
+          hoverOffset: 8,
+        }],
+      },
+      options: {
+        cutout: '78%',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a1a1a',
+            titleColor: '#ededed',
+            bodyColor: '#cccccc',
+            borderColor: '#2a2a2a',
+            borderWidth: 1,
+            padding: 10,
+            cornerRadius: 8,
+            displayColors: true,
+            titleFont: { size: 12, weight: 600 },
+            bodyFont: { size: 12 },
+          },
+        },
+        animation: { duration: 700, easing: 'easeOutCubic' },
+      },
+    });
+  }
+
+  function drawCallsDonut(canvasId, t) {
+    if (state.chart1) state.chart1.destroy();
+    var labels = ['Won', 'Lost', 'Follow-up', 'Unmarked'];
+    var values = [t.wins, t.losses, t.follow_ups, t.unmarked + t.live];
+    var colors = [COLORS.win, COLORS.loss, COLORS.follow_up, COLORS.unmarked];
+    // Filter zero-value entries to keep tooltips clean
+    var filtered = filterZero(labels, values, colors);
+    state.chart1 = donutBase(canvasId, filtered.labels, filtered.values, filtered.colors);
+  }
+
+  function drawObjectionsDonut(canvasId, obj) {
+    if (state.chart2) state.chart2.destroy();
+    var byType = obj.by_type || [];
+    var labels = byType.map(function(b) { return b.label; });
+    var values = byType.map(function(b) { return b.count; });
+    var colors = byType.map(function(b) { return COLORS[b.objection_id] || COLORS.other; });
+    if (labels.length === 0) {
+      // Render a single gray ring when no data so the visual doesn't collapse.
+      labels = ['No objections'];
+      values = [1];
+      colors = ['#1f1f1f'];
+    }
+    state.chart2 = donutBase(canvasId, labels, values, colors);
+  }
+
+  function drawClosesDonut(canvasId, t, closeRate) {
+    if (state.chart3) state.chart3.destroy();
+    var labels = ['Won', 'Not won'];
+    var notWon = t.losses + t.follow_ups;
+    var values = [t.wins, notWon];
+    var colors = [COLORS.win, '#1f1f1f'];
+    if (t.wins + notWon === 0) {
+      labels = ['No completed closes'];
+      values = [1];
+      colors = ['#1f1f1f'];
+    }
+    state.chart3 = donutBase(canvasId, labels, values, colors);
+  }
+
+  function filterZero(labels, values, colors) {
+    var L = [], V = [], C = [];
+    for (var i = 0; i < values.length; i++) {
+      if (values[i] > 0) { L.push(labels[i]); V.push(values[i]); C.push(colors[i]); }
+    }
+    if (V.length === 0) { L = ['Empty']; V = [1]; C = ['#1f1f1f']; }
+    return { labels: L, values: V, colors: C };
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Patterns rendering
+  // ──────────────────────────────────────────────────────────────────
+  function renderPatternsHtml(p) {
+    if (!p) return '<div class="load-state"><div class="spinner"></div></div>';
+    var patterns = (p.patterns || []);
+    var banner = '';
+    if (p.sample_size != null && p.sample_size < 20) {
+      banner = '<div class="signal-banner"><div class="signal-banner-icon"></div>'
+             + '<div><strong>Early signal.</strong> Only ' + p.sample_size + ' calls in this window — patterns will sharpen with more data.</div></div>';
+    }
+    if (patterns.length === 0) {
+      return banner + '<div class="empty"><h3>No clear patterns yet</h3><p>Not enough data to surface coaching patterns in this date range.</p></div>';
+    }
+    var rows = patterns.map(function(it) {
+      var conf = (it.confidence || 'low').toLowerCase();
+      return '<div class="pattern-card">'
+        + '<div class="pattern-headline">' + escapeHtml(it.headline || '') + '</div>'
+        + '<div class="pattern-detail">' + escapeHtml(it.detail || '') + '</div>'
+        + '<div class="pattern-meta"><span class="pattern-confidence ' + conf + '">' + escapeHtml(conf) + ' confidence</span></div>'
+        + '</div>';
+    }).join('');
+    return banner + '<div class="patterns-list">' + rows + '</div>';
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Calls list rendering (with inline drill on expand)
+  // ──────────────────────────────────────────────────────────────────
+  function renderCallsHtml(calls) {
+    if (calls.length === 0) {
+      return '<div class="empty"><h3>No calls in this window</h3><p>Pick a wider date range above, or wait for new calls to come in.</p></div>';
+    }
+    return '<div class="calls-list">' + calls.map(callCardHtml).join('') + '</div>';
+  }
+
+  function callCardHtml(s) {
+    var titleProspect = s.prospect_name
+      ? '<span class="name">' + escapeHtml(s.prospect_name) + '</span>'
+      : '<span class="anon">unknown prospect</span>';
+    var dur = formatDuration(s.duration_seconds);
+    var meta = [formatDate(s.started_at), dur];
+    if (s.outcome_source === 'inferred') meta.push('outcome inferred');
+
+    return '<div class="call-card" data-session-id="' + escapeHtml(s.session_id) + '">'
+      + '<div class="call-head" onclick="toggleCall(\'' + s.session_id + '\')">'
+        + '<div class="call-head-left">'
+          + '<div class="call-head-title">Call with ' + titleProspect + '</div>'
+          + '<div class="call-head-meta">' + meta.map(escapeHtml).join(' · ') + '</div>'
+        + '</div>'
+        + '<div class="call-head-right">' + outcomeBadge(s.outcome, !!s.ended_at) + '<span class="expand-icon">▾</span></div>'
+      + '</div>'
+      + '<div class="call-body" id="body-' + escapeHtml(s.session_id) + '"></div>'
+    + '</div>';
   }
 
   function outcomeBadge(outcome, ended) {
-    if (outcome === 'win') return '<span class="badge badge-win">Win</span>';
-    if (outcome === 'loss') return '<span class="badge badge-loss">Loss</span>';
-    if (outcome === 'follow_up') return '<span class="badge badge-pending">Follow-up</span>';
-    if (!ended) return '<span class="badge badge-pending">Live</span>';
-    return '<span class="badge badge-pending">—</span>';
+    if (outcome === 'win') return '<span class="badge badge-win">Won</span>';
+    if (outcome === 'loss') return '<span class="badge badge-loss">Lost</span>';
+    if (outcome === 'follow_up') return '<span class="badge badge-fu">Follow-up</span>';
+    if (!ended) return '<span class="badge badge-live">Live</span>';
+    return '<span class="badge badge-empty">Unmarked</span>';
   }
 
-  // ── Card expansion ──────────────────────────────────────────────────────
-  async function toggleCard(sessionId) {
-    if (expandedId === sessionId) {
-      // Collapse.
-      expandedId = null;
-      var card = document.querySelector('.session-card[data-id="' + cssEsc(sessionId) + '"]');
-      if (card) card.classList.remove('expanded');
+  async function toggleCall(sessionId) {
+    var card = document.querySelector('[data-session-id="' + sessionId + '"]');
+    if (!card) return;
+    if (state.expandedCallId === sessionId) {
+      card.classList.remove('expanded');
+      state.expandedCallId = null;
       return;
     }
-    // Collapse previous.
-    if (expandedId) {
-      var prev = document.querySelector('.session-card[data-id="' + cssEsc(expandedId) + '"]');
+    if (state.expandedCallId) {
+      var prev = document.querySelector('[data-session-id="' + state.expandedCallId + '"]');
       if (prev) prev.classList.remove('expanded');
     }
-    expandedId = sessionId;
-    var card = document.querySelector('.session-card[data-id="' + cssEsc(sessionId) + '"]');
-    if (card) card.classList.add('expanded');
-
-    if (!cardState[sessionId]) {
-      cardState[sessionId] = { logs: null, total_count: 0, limit: 10000, filter: 'all', search: '' };
-      await loadCardLogs(sessionId);
-    } else {
-      renderCardBody(sessionId);
-    }
+    state.expandedCallId = sessionId;
+    card.classList.add('expanded');
+    renderCallBody(sessionId);
   }
 
-  async function loadCardLogs(sessionId) {
-    var body = document.getElementById('body-' + sessionId);
-    if (body) body.innerHTML = '<div class="load-spinner"><div class="spinner"></div></div>';
-
-    var res;
-    try {
-      res = await fetch('/me/sessions/' + encodeURIComponent(sessionId) + '/logs', { headers: authHeader() });
-    } catch (err) {
-      if (body) body.innerHTML = '<div class="msg-error">Could not reach server.</div>';
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      if (body) body.innerHTML = '<div class="msg-error">' + escapeHtml(err.error || 'Failed to load logs') + '</div>';
-      return;
-    }
-    var data = await res.json();
-    var st = cardState[sessionId];
-    st.logs = (data && data.logs) || [];
-    st.total_count = (data && typeof data.total_count === 'number') ? data.total_count : st.logs.length;
-    st.limit = (data && data.limit) || 10000;
-    renderCardBody(sessionId);
-  }
-
-  function renderCardBody(sessionId) {
+  async function renderCallBody(sessionId) {
     var body = document.getElementById('body-' + sessionId);
     if (!body) return;
-    var st = cardState[sessionId];
-    if (!st || !st.logs) return;
+    body.innerHTML = '<div class="load-state"><div class="spinner"></div></div>';
 
-    body.innerHTML =
-      '<div class="filter-bar">'
-        + chipHtml(sessionId, 'all', 'All', st.filter)
-        + chipHtml(sessionId, 'claude', '[claude]', st.filter)
-        + chipHtml(sessionId, 'memory', '[memory]', st.filter)
-        + chipHtml(sessionId, 'TIMING', '[TIMING]', st.filter)
-        + chipHtml(sessionId, 'errors', 'Errors only', st.filter)
-        + '<input class="filter-search" type="text" placeholder="Search messages…" oninput="onSearch(\'' + sessionId + '\', this.value)" value="' + escapeHtml(st.search) + '"/>'
-        + '<span class="count-indicator" id="count-' + sessionId + '"></span>'
+    var objections = await fetchObjections(sessionId);
+
+    if (objections.length === 0) {
+      body.innerHTML = '<div class="empty"><h3>No objections detected</h3><p>This call had no detected framework objections.</p></div>';
+      return;
+    }
+    body.innerHTML = objections.map(objEventHtml).join('');
+  }
+
+  function objEventHtml(o) {
+    var verdict;
+    if (o.overcome === true)       verdict = '<span class="verdict verdict-overcome">Overcame</span>';
+    else if (o.overcome === false) verdict = '<span class="verdict verdict-not">Not overcome</span>';
+    else                            verdict = '<span class="verdict verdict-unknown">Indeterminate</span>';
+    var conf = o.overcome_confidence ? '<span class="verdict-conf">' + escapeHtml(o.overcome_confidence) + ' confidence</span>' : '';
+    var time = o.detected_at ? new Date(o.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+
+    var coaching = o.coaching_note
+      ? '<div class="coaching-note">' + escapeHtml(o.coaching_note) + '</div>'
+      : '<div class="coaching-note-empty">No coaching narrative generated for this event.</div>';
+
+    var rebuttal = o.framework_rebuttal
+      ? '<div class="compare-text">' + escapeHtml(o.framework_rebuttal) + '</div>'
+      : '<div class="compare-text empty">No framework rebuttal recorded.</div>';
+    var said = o.closer_response
+      ? '<div class="compare-text">' + escapeHtml(o.closer_response) + '</div>'
+      : '<div class="compare-text empty">No closer transcript captured in the 60s after this objection.</div>';
+
+    return '<div class="obj-event">'
+      + '<div class="obj-event-head">'
+        + '<div><span class="obj-event-title">' + escapeHtml(o.objection_label || '') + '</span>'
+          + (time ? '<span class="obj-event-time">at ' + escapeHtml(time) + '</span>' : '') + '</div>'
+        + '<div>' + verdict + conf + '</div>'
       + '</div>'
-      + '<div class="log-list" id="list-' + sessionId + '"></div>';
-    renderCardLogList(sessionId);
-    // v1.1.10: append objection drill-down inline below the log view if
-    // the session has any extracted objection events. Fires async — the
-    // log list renders immediately, drill-down lands when ready.
-    loadSessionObjections(sessionId, body);
+      + coaching
+      + '<div class="compare-grid">'
+        + '<div class="compare-pane framework"><div class="compare-label">Scout suggested</div>' + rebuttal + '</div>'
+        + '<div class="compare-pane actual"><div class="compare-label">What you said</div>' + said + '</div>'
+      + '</div>'
+      + (o.notes ? '<div class="obj-notes-row">Classifier note: ' + escapeHtml(o.notes) + '</div>' : '')
+    + '</div>';
   }
 
-  function chipHtml(sessionId, id, label, activeFilter) {
-    var active = id === activeFilter ? ' active' : '';
-    return '<button class="chip' + active + '" data-chip="' + id + '" onclick="onChip(\'' + sessionId + '\', \'' + id + '\')">' + escapeHtml(label) + '</button>';
+  // ──────────────────────────────────────────────────────────────────
+  // Drill views
+  // ──────────────────────────────────────────────────────────────────
+  function setView(view) {
+    state.view = view;
+    state.expandedCallId = null;
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function onChip(sessionId, chipId) {
-    var st = cardState[sessionId];
-    if (!st) return;
-    st.filter = chipId;
-    var body = document.getElementById('body-' + sessionId);
-    if (body) {
-      body.querySelectorAll('.filter-bar .chip').forEach(function(c) {
-        if (c.getAttribute('data-chip') === chipId) c.classList.add('active');
-        else c.classList.remove('active');
-      });
-    }
-    renderCardLogList(sessionId);
+  function backToOverview() { state.view = 'overview'; state.expandedCallId = null; render(); }
+
+  function drillHeader(title, count) {
+    var countHtml = count != null ? '<span class="count">' + escapeHtml(String(count)) + '</span>' : '';
+    return '<div class="drill-header fade-in">'
+         + '<button class="back-btn" onclick="backToOverview()">← Back</button>'
+         + '<div class="drill-title">' + escapeHtml(title) + countHtml + '</div>'
+         + '</div>';
   }
 
-  function onSearch(sessionId, v) {
-    var st = cardState[sessionId];
-    if (!st) return;
-    st.search = v;
-    renderCardLogList(sessionId);
-  }
+  // Drill 1: Calls — outcome breakdown + per-outcome bars + recent calls list filtered.
+  function renderCallsDrill() {
+    var t = state.analytics.totals;
+    var content = document.getElementById('content');
 
-  function renderCardLogList(sessionId) {
-    var list = document.getElementById('list-' + sessionId);
-    var indicator = document.getElementById('count-' + sessionId);
-    var st = cardState[sessionId];
-    if (!list || !st || !st.logs) return;
+    var rows = [
+      { key: 'win',       label: 'Won',       count: t.wins,        color: COLORS.win },
+      { key: 'loss',      label: 'Lost',      count: t.losses,      color: COLORS.loss },
+      { key: 'follow_up', label: 'Follow-up', count: t.follow_ups,  color: COLORS.follow_up },
+      { key: 'unmarked',  label: 'Unmarked',  count: t.unmarked,    color: COLORS.unmarked },
+      { key: 'live',      label: 'Live',      count: t.live,        color: COLORS.live },
+    ].filter(function(r) { return r.count > 0; });
+    var total = rows.reduce(function(s, r) { return s + r.count; }, 0);
 
-    var filtered = st.logs.filter(function(r) {
-      if (st.filter === 'errors' && r.level !== 'error') return false;
-      if (st.filter !== 'all' && st.filter !== 'errors') {
-        var hay = ((r.tag || '') + ' ' + (r.message || '')).toLowerCase();
-        if (hay.indexOf(st.filter.toLowerCase()) === -1) return false;
-      }
-      if (st.search) {
-        var msg = (r.message || '').toLowerCase();
-        if (msg.indexOf(st.search.toLowerCase()) === -1) return false;
-      }
-      return true;
+    content.innerHTML = drillHeader('Calls', t.total_calls)
+      + '<div class="drill-grid fade-in">'
+        + '<div class="drill-donut"><div class="donut-canvas-wrap"><canvas id="drill-chart"></canvas>'
+          + '<div class="donut-center"><div class="big">' + t.total_calls + '</div><div class="small">total</div></div></div></div>'
+        + '<div class="drill-breakdown">' + rows.map(function(r) {
+          var pct = total > 0 ? Math.round((r.count / total) * 100) : 0;
+          return '<div class="breakdown-row">'
+            + '<div class="breakdown-dot" style="background:' + r.color + ';"></div>'
+            + '<div class="breakdown-label">' + escapeHtml(r.label) + '</div>'
+            + '<div class="breakdown-count">' + r.count + '</div>'
+            + '<div class="breakdown-pct">' + pct + '%</div>'
+            + '</div>';
+        }).join('') + '</div>'
+      + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>All calls in window</h2>'
+        + '<div class="meta">' + state.calls.length + ' calls</div></div>'
+        + renderCallsHtml(state.calls)
+      + '</div>';
+
+    requestAnimationFrame(function() {
+      if (state.chartDrill) state.chartDrill.destroy();
+      state.chartDrill = donutBase('drill-chart', rows.map(function(r) { return r.label; }),
+        rows.map(function(r) { return r.count; }), rows.map(function(r) { return r.color; }));
     });
+  }
 
-    var capped = st.total_count > st.limit;
-    var shown = filtered.length;
-    var text;
-    if (capped) {
-      text = 'Showing ' + shown + ' of ' + st.total_count + ' (capped at ' + st.limit + ')';
-    } else if (shown !== st.logs.length) {
-      text = 'Showing ' + shown + ' of ' + st.logs.length;
-    } else {
-      text = shown + ' log' + (shown === 1 ? '' : 's');
-    }
-    if (indicator) {
-      indicator.textContent = text;
-      if (capped) indicator.classList.add('capped'); else indicator.classList.remove('capped');
-    }
+  // Drill 2: Objections — by-type breakdown with overcome bars + per-event list.
+  function renderObjectionsDrill() {
+    var obj = state.analytics.objections;
+    var content = document.getElementById('content');
+    var byType = (obj.by_type || []).slice().sort(function(a, b) { return b.count - a.count; });
+    var totalCount = obj.totals.total;
 
-    if (filtered.length === 0) {
-      list.innerHTML = '<div class="msg-empty">No logs match the current filter.</div>';
-      return;
-    }
+    var donutColors = byType.map(function(b) { return COLORS[b.objection_id] || COLORS.other; });
 
-    var parts = [];
-    for (var i = 0; i < filtered.length; i++) {
-      var r = filtered[i];
-      var dotClass = r.level === 'error' ? 'error' : (r.level === 'warn' ? 'warn' : '');
-      var rowClass = r.level === 'error' ? 'log-row error' : 'log-row';
-      parts.push(
-        '<div class="' + rowClass + '">'
-          + '<span class="log-time">' + escapeHtml(formatLogTime(r.logged_at)) + '</span>'
-          + '<span class="log-dot ' + dotClass + '"></span>'
-          + '<span class="log-tag">' + escapeHtml(r.tag || '') + '</span>'
-          + '<span class="log-msg">' + escapeHtml(r.message || '') + '</span>'
+    var breakdown = byType.map(function(b) {
+      var pctOver = b.overcome_pct === null ? '—' : b.overcome_pct + '%';
+      var pctClass = b.overcome_pct === null ? 'pct-none'
+        : b.overcome_pct >= 70 ? 'pct-good'
+        : b.overcome_pct >= 40 ? 'pct-mid' : 'pct-bad';
+      var fillWidth = b.overcome + b.not_overcome > 0 ? Math.round(100 * b.overcome / (b.overcome + b.not_overcome)) : 0;
+      var color = COLORS[b.objection_id] || COLORS.other;
+      return '<div class="breakdown-row" style="grid-template-columns: 12px 1fr auto auto;">'
+        + '<div class="breakdown-dot" style="background:' + color + ';"></div>'
+        + '<div>'
+          + '<div class="breakdown-label">' + escapeHtml(b.label) + '</div>'
+          + '<div class="breakdown-bar" style="margin-top:6px;"><div class="breakdown-bar-fill" style="width:' + fillWidth + '%;background:' + color + ';"></div></div>'
         + '</div>'
-      );
-    }
-    list.innerHTML = parts.join('');
-  }
-
-  // ── Formatters ──────────────────────────────────────────────────────────
-  function formatLogTime(iso) {
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return iso || '';
-    var h = String(d.getHours()).padStart(2, '0');
-    var m = String(d.getMinutes()).padStart(2, '0');
-    var s = String(d.getSeconds()).padStart(2, '0');
-    var ms = String(d.getMilliseconds()).padStart(3, '0');
-    return h + ':' + m + ':' + s + '.' + ms;
-  }
-  function formatDuration(secs) {
-    if (secs == null) return '—';
-    if (secs < 60) return secs + 's';
-    var m = Math.floor(secs / 60);
-    var s = secs % 60;
-    if (m < 60) return m + 'm ' + s + 's';
-    var h = Math.floor(m / 60);
-    m = m % 60;
-    return h + 'h ' + m + 'm';
-  }
-  function relativeTime(iso) {
-    var t = new Date(iso).getTime();
-    if (isNaN(t)) return iso || '';
-    var diff = Math.max(0, (Date.now() - t) / 1000);
-    if (diff < 60) return Math.floor(diff) + 's ago';
-    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    return Math.floor(diff / 86400) + 'd ago';
-  }
-  function escapeHtml(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-  // CSS selector escape for session_id (UUIDs are safe but belt-and-suspenders
-  // in case session_id format ever changes).
-  function cssEsc(s) {
-    if (window.CSS && CSS.escape) return CSS.escape(s);
-    return String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-  }
-
-  // ── Knowledge Base ──────────────────────────────────────────────────────
-  // The same JS block is reused verbatim in admin.html — backend scopes the
-  // /kb/list response by role, so admins see their team's uploads through
-  // exactly the same code path users see their own.
-  async function loadKbList() {
-    var container = document.getElementById('kbContainer');
-    if (!container) return;
-    var res;
-    try {
-      res = await fetch('/kb/list', { headers: authHeader() });
-    } catch (err) {
-      container.innerHTML = '<div class="msg-error">Could not reach server.</div>';
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      container.innerHTML = '<div class="msg-error">' + escapeHtml(err.error || 'Failed to load uploads') + '</div>';
-      return;
-    }
-    var data = await res.json();
-    renderKbList((data && data.uploads) || []);
-  }
-
-  function renderKbList(items) {
-    var container = document.getElementById('kbContainer');
-    if (!container) return;
-
-    if (!items || items.length === 0) {
-      container.innerHTML =
-        '<div class="empty-card">'
-          + '<h2>No knowledge base resources yet</h2>'
-          + '<p>Upload sales scripts, product info, FAQs, or any reference material. Scout will pull from these during live calls.</p>'
-          + '<button class="kb-add-btn" onclick="openKbModal()">+ Add your first resource</button>'
+        + '<div class="breakdown-count">' + b.count + '</div>'
+        + '<div class="breakdown-pct">' + escapeHtml(pctOver) + ' overcame</div>'
         + '</div>';
-      return;
-    }
+    }).join('');
 
-    var parts = ['<div class="kb-list">'];
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      var typeBadge = it.source_type
-        ? '<span class="kb-badge kb-type-' + escapeHtml(it.source_type) + '">' + escapeHtml(it.source_type) + '</span>'
-        : '';
-      // Category badge — only when category is set (pre-feature uploads
-      // don't have it). Friendly labels rather than the raw enum value.
-      var catBadge = '';
-      if (it.category === 'offer_document') {
-        catBadge = '<span class="kb-badge kb-cat-offer_document">Offer doc</span>';
-      } else if (it.category === 'winning_call') {
-        catBadge = '<span class="kb-badge kb-cat-winning_call">Winning call</span>';
-      }
-      // Scope badge intentionally not rendered on the user dashboard:
-      // every dashboard upload is the user's own and is always 'personal',
-      // so the badge would be permanent visual noise. Admin page renders
-      // it because admins see uploads with mixed scopes (own + team).
-      var chunkText = it.chunk_count + ' chunk' + (it.chunk_count === 1 ? '' : 's');
-      var rel = relativeTime(it.created_at);
-      // Only learned_pattern uploads get the expand affordance — other
-      // categories are bulk text whose chunks aren't independently useful
-      // to surface in a side panel.
-      var viewBtn = '';
-      var expandPanel = '';
-      if (it.category === 'learned_pattern') {
-        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View patterns</button>';
-        expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
-      }
-      parts.push(
-        '<div class="kb-item">'
-          + '<div class="kb-item-main">'
-            + '<div class="kb-item-title">' + typeBadge + catBadge + escapeHtml(it.source_label || '(unlabeled)') + '</div>'
-            + '<div class="kb-item-sub">' + chunkText + ' · added ' + rel + '</div>'
-          + '</div>'
-          + viewBtn
-          + '<button class="kb-delete-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="deleteKbItem(this.getAttribute(\'data-label\'))">Delete</button>'
-        + '</div>'
-        + expandPanel
-      );
-    }
-    parts.push('</div>');
-    container.innerHTML = parts.join('');
-  }
+    content.innerHTML = drillHeader('Objections', totalCount)
+      + '<div class="drill-grid fade-in">'
+        + '<div class="drill-donut"><div class="donut-canvas-wrap"><canvas id="drill-chart"></canvas>'
+          + '<div class="donut-center"><div class="big">' + totalCount + '</div><div class="small">events</div></div></div></div>'
+        + '<div class="drill-breakdown">' + (breakdown || '<div class="empty"><h3>No objections detected</h3></div>') + '</div>'
+      + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Calls with objections</h2>'
+        + '<div class="meta">click any to drill into the coaching</div></div>'
+        + renderCallsHtml(state.calls.filter(function(s) {
+          // Filter to calls in this window that we know have objections by checking which sessions are in the breakdown.
+          // We don't have per-call objection counts in the totals, so fetch them from the calls list later — for now show all.
+          return true;
+        }))
+      + '</div>';
 
-  async function deleteKbItem(sourceLabel) {
-    if (!sourceLabel) return;
-    var ok = window.confirm('Delete "' + sourceLabel + '"?\n\nThis removes all chunks for this resource. Cannot be undone.');
-    if (!ok) return;
-
-    var res;
-    try {
-      res = await fetch('/kb/' + encodeURIComponent(sourceLabel), {
-        method: 'DELETE',
-        headers: authHeader(),
-      });
-    } catch (err) {
-      window.alert('Could not reach server: ' + err.message);
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      window.alert('Delete failed: ' + (err.error || 'unknown error'));
-      return;
-    }
-    await loadKbList();
-  }
-
-  function openKbModal() {
-    var modal = document.getElementById('kbModal');
-    if (!modal) return;
-    // Reset form state every time the modal opens — switching to URL tab,
-    // clearing inputs, resetting category to default, hiding any leftover
-    // error from a previous attempt.
-    switchKbTab('url');
-    var ids = ['kbLabel','kbUrlInput','kbPdfInput','kbPasteInput'];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el) el.value = '';
-    }
-    var cat = document.getElementById('kbCategory');
-    if (cat) cat.value = 'offer_document';
-    setKbStatus('', '');
-    var submit = document.getElementById('kbSubmit');
-    if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
-    modal.classList.remove('hidden');
-  }
-
-  function closeKbModal() {
-    var modal = document.getElementById('kbModal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  function switchKbTab(tab) {
-    var tabs = document.querySelectorAll('#kbModal .kb-tab');
-    for (var i = 0; i < tabs.length; i++) {
-      var t = tabs[i];
-      if (t.getAttribute('data-tab') === tab) t.classList.add('active');
-      else t.classList.remove('active');
-    }
-    var panels = document.querySelectorAll('#kbModal .kb-tab-panel');
-    for (var j = 0; j < panels.length; j++) {
-      var p = panels[j];
-      if (p.getAttribute('data-panel') === tab) p.classList.remove('hidden');
-      else p.classList.add('hidden');
-    }
-    setKbStatus('', '');
-  }
-
-  function setKbStatus(message, kind) {
-    var el = document.getElementById('kbStatus');
-    if (!el) return;
-    el.textContent = message || '';
-    el.classList.remove('error', 'progress');
-    if (kind === 'error') el.classList.add('error');
-    else if (kind === 'progress') el.classList.add('progress');
-  }
-
-  function getActiveKbTab() {
-    var active = document.querySelector('#kbModal .kb-tab.active');
-    return active ? active.getAttribute('data-tab') : 'url';
-  }
-
-  async function submitKbUpload() {
-    var tab = getActiveKbTab();
-    var label = (document.getElementById('kbLabel').value || '').trim();
-    var category = (document.getElementById('kbCategory').value || 'offer_document');
-
-    // Label is required for every type now — it's what shows in the list
-    // and what Claude references in [WINNING CALL: …] / [OFFER DOCUMENT: …]
-    // context lines, so a meaningful name matters more than the source.
-    if (!label) { setKbStatus('Give this resource a label.', 'error'); return; }
-
-    var fd = new FormData();
-    fd.append('type', tab);
-    fd.append('label', label);
-    fd.append('category', category);
-
-    if (tab === 'url') {
-      var url = (document.getElementById('kbUrlInput').value || '').trim();
-      if (!url) { setKbStatus('Enter a URL.', 'error'); return; }
-      fd.append('url', url);
-    } else if (tab === 'pdf') {
-      var fileEl = document.getElementById('kbPdfInput');
-      if (!fileEl || !fileEl.files || !fileEl.files[0]) { setKbStatus('Select a PDF file.', 'error'); return; }
-      fd.append('file', fileEl.files[0]);
-    } else if (tab === 'paste') {
-      var text = (document.getElementById('kbPasteInput').value || '').trim();
-      if (!text) { setKbStatus('Paste some content.', 'error'); return; }
-      fd.append('text', text);
-    } else {
-      setKbStatus('Pick a tab.', 'error');
-      return;
-    }
-
-    var submit = document.getElementById('kbSubmit');
-    if (submit) { submit.disabled = true; submit.textContent = 'Processing…'; }
-    setKbStatus('Processing… this may take a moment for large documents.', 'progress');
-
-    var res;
-    try {
-      // Spread authHeader() so Authorization is included; do NOT set
-      // Content-Type — the browser must set the multipart boundary so
-      // multer can parse the upload server-side.
-      res = await fetch('/kb/upload', {
-        method: 'POST',
-        headers: authHeader(),
-        body: fd,
-      });
-    } catch (err) {
-      setKbStatus('Could not reach server: ' + err.message, 'error');
-      if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
-      return;
-    }
-
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var errData;
-      try { errData = await res.json(); } catch (e) { errData = { error: 'HTTP ' + res.status }; }
-      setKbStatus(errData.error || 'Upload failed', 'error');
-      if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
-      return;
-    }
-
-    closeKbModal();
-    await loadKbList();
-  }
-
-  // Per-source-label cache so reopening a panel after first load doesn't
-  // refetch. Cleared implicitly on full page reload.
-  var kbEntriesCache = {};
-
-  async function viewKbEntries(sourceLabel, slot, btn) {
-    var panel = document.getElementById('kbExpand-' + slot);
-    if (!panel) return;
-
-    // Toggle: if currently visible, just collapse. No fetch, button text reverts.
-    if (!panel.classList.contains('hidden')) {
-      panel.classList.add('hidden');
-      btn.textContent = 'View patterns';
-      return;
-    }
-
-    // Opening
-    btn.textContent = 'Hide patterns';
-    panel.classList.remove('hidden');
-
-    if (kbEntriesCache[sourceLabel]) {
-      renderKbEntries(panel, kbEntriesCache[sourceLabel]);
-      return;
-    }
-
-    panel.innerHTML = '<div class="kb-pattern-loading">Loading…</div>';
-    var res;
-    try {
-      res = await fetch('/kb/entries/' + encodeURIComponent(sourceLabel), { headers: authHeader() });
-    } catch (err) {
-      panel.innerHTML = '<div class="kb-pattern-empty">Could not reach server.</div>';
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      panel.innerHTML = '<div class="kb-pattern-empty">Failed to load patterns.</div>';
-      return;
-    }
-    var data = await res.json();
-    var entries = (data && data.entries) || [];
-    kbEntriesCache[sourceLabel] = entries;
-    renderKbEntries(panel, entries);
-  }
-
-  function renderKbEntries(panel, entries) {
-    if (!entries || entries.length === 0) {
-      panel.innerHTML = '<div class="kb-pattern-empty">No patterns found.</div>';
-      return;
-    }
-    var parts = [];
-    for (var i = 0; i < entries.length; i++) {
-      var e = entries[i];
-      var meta = e.metadata || {};
-      // Pattern entries (auto-extracted) carry situation/response/outcome
-      // in metadata. Pre-feature uploads or any entry missing those fields
-      // fall back to showing raw content text.
-      if (meta.situation || meta.response || meta.outcome) {
-        var typeRaw = String(meta.type || '');
-        var typeLabel = typeRaw.replace(/_/g, ' ');
-        var typeClass = typeRaw.replace(/[^a-z_]/g, '');
-        var typeBadge = typeClass
-          ? '<span class="kb-badge kb-ptype-' + typeClass + '">' + escapeHtml(typeLabel) + '</span>'
-          : '';
-        parts.push(
-          '<div class="kb-pattern-card">'
-            + (typeBadge ? '<div>' + typeBadge + '</div>' : '')
-            + (meta.situation ? '<div class="kb-pattern-row"><b>Situation:</b> <span class="kb-pattern-text">' + escapeHtml(meta.situation) + '</span></div>' : '')
-            + (meta.response  ? '<div class="kb-pattern-row"><b>Closer said:</b> <span class="kb-pattern-text">' + escapeHtml(meta.response) + '</span></div>' : '')
-            + (meta.outcome   ? '<div class="kb-pattern-row"><b>Prospect reacted:</b> <span class="kb-pattern-text">' + escapeHtml(meta.outcome) + '</span></div>' : '')
-          + '</div>'
-        );
+    requestAnimationFrame(function() {
+      if (state.chartDrill) state.chartDrill.destroy();
+      if (byType.length === 0) {
+        state.chartDrill = donutBase('drill-chart', ['Empty'], [1], ['#1f1f1f']);
       } else {
-        parts.push('<div class="kb-pattern-card"><div class="kb-pattern-empty-text">' + escapeHtml(e.content || '(empty)') + '</div></div>');
+        state.chartDrill = donutBase('drill-chart', byType.map(function(b) { return b.label; }),
+          byType.map(function(b) { return b.count; }), donutColors);
       }
-    }
-    panel.innerHTML = parts.join('');
+    });
+  }
+
+  // Drill 3: Close rate — won vs not-won + framework deep-dive.
+  function renderClosesDrill() {
+    var t = state.analytics.totals;
+    var content = document.getElementById('content');
+    var won = t.wins;
+    var notWon = t.losses + t.follow_ups;
+    var unmarked = t.unmarked + t.live;
+    var closeDenom = won + notWon;
+    var closeRate = closeDenom > 0 ? Math.round((won / closeDenom) * 100) : null;
+
+    var rows = [
+      { label: 'Won',       count: won,      color: COLORS.win,       pct: closeDenom > 0 ? Math.round(100 * won / closeDenom) + '%' : '—' },
+      { label: 'Lost',      count: t.losses, color: COLORS.loss,      pct: closeDenom > 0 ? Math.round(100 * t.losses / closeDenom) + '%' : '—' },
+      { label: 'Follow-up', count: t.follow_ups, color: COLORS.follow_up, pct: closeDenom > 0 ? Math.round(100 * t.follow_ups / closeDenom) + '%' : '—' },
+      { label: 'Unmarked',  count: unmarked, color: COLORS.unmarked, pct: '—' },
+    ].filter(function(r) { return r.count > 0; });
+
+    content.innerHTML = drillHeader('Close Rate', closeRate === null ? '—' : (closeRate + '%'))
+      + '<div class="drill-grid fade-in">'
+        + '<div class="drill-donut"><div class="donut-canvas-wrap"><canvas id="drill-chart"></canvas>'
+          + '<div class="donut-center"><div class="big">' + (closeRate === null ? '—' : closeRate + '%') + '</div><div class="small">closed</div></div></div></div>'
+        + '<div class="drill-breakdown">' + rows.map(function(r) {
+          return '<div class="breakdown-row">'
+            + '<div class="breakdown-dot" style="background:' + r.color + ';"></div>'
+            + '<div class="breakdown-label">' + escapeHtml(r.label) + '</div>'
+            + '<div class="breakdown-count">' + r.count + '</div>'
+            + '<div class="breakdown-pct">' + escapeHtml(r.pct) + '</div>'
+            + '</div>';
+        }).join('') + '</div>'
+      + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Calls with confirmed outcomes</h2>'
+        + '<div class="meta">won, lost, or follow-up</div></div>'
+        + renderCallsHtml(state.calls.filter(function(s) { return s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'follow_up'; }))
+      + '</div>';
+
+    requestAnimationFrame(function() {
+      if (state.chartDrill) state.chartDrill.destroy();
+      var labels = [];
+      var values = [];
+      var colors = [];
+      if (won > 0) { labels.push('Won'); values.push(won); colors.push(COLORS.win); }
+      if (notWon > 0) { labels.push('Not won'); values.push(notWon); colors.push('#1f1f1f'); }
+      if (labels.length === 0) { labels = ['No closes yet']; values = [1]; colors = ['#1f1f1f']; }
+      state.chartDrill = donutBase('drill-chart', labels, values, colors);
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Helpers
+  // ──────────────────────────────────────────────────────────────────
+  function formatDate(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    var month = d.toLocaleDateString('en-US', { month: 'short' });
+    var day = d.getDate();
+    var year = d.getFullYear();
+    var today = new Date().getFullYear();
+    return year === today ? month + ' ' + day : month + ' ' + day + ', ' + year;
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds && seconds !== 0) return '—';
+    if (seconds < 60) return seconds + 's';
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    return m + 'm' + (s > 0 ? ' ' + s + 's' : '');
   }
 
   init();
