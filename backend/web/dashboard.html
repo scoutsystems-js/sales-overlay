@@ -1276,13 +1276,9 @@
           + '<div class="donut-center"><div class="big">' + totalCount + '</div><div class="small">events</div></div></div></div>'
         + '<div class="drill-breakdown">' + (breakdown || '<div class="empty"><h3>No objections detected</h3></div>') + '</div>'
       + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Calls with objections</h2>'
-        + '<div class="meta">click any to drill into the coaching</div></div>'
-        + renderCallsHtml(state.calls.filter(function(s) {
-          // Filter to calls in this window that we know have objections by checking which sessions are in the breakdown.
-          // We don't have per-call objection counts in the totals, so fetch them from the calls list later — for now show all.
-          return true;
-        }))
+      + '<div class="section fade-in"><div class="section-header"><h2>Calls in this window</h2>'
+        + '<div class="meta">expand any call to see its objection events + coaching</div></div>'
+        + renderCallsHtml(state.calls)
       + '</div>';
 
     requestAnimationFrame(function() {
