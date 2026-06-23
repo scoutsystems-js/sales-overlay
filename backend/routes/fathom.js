@@ -233,7 +233,14 @@ function meetingToRow(userId, m) {
     var startMs = new Date(startTime).getTime();
     var endMs   = new Date(endTime).getTime();
     if (!isNaN(startMs) && !isNaN(endMs) && endMs >= startMs) {
-      durationSeconds = Math.floor((endMs - startMs) / 1000);
+      var raw = Math.floor((endMs - startMs) / 1000);
+      // Sanity cap at 8 hours. Corrupt recording_end_time values surface in
+      // real Fathom data (the demo recording shipped with the Justin account
+      // came back with duration ~95M seconds = ~3 years — endTime was set to
+      // the present moment while startTime was the 2021 demo recording).
+      // Null is honest — it tells the dashboard "we don't know" — rather
+      // than letting a fake 3-year call pollute aggregates.
+      durationSeconds = (raw > 28800) ? null : raw;
     }
   }
   return {
