@@ -347,15 +347,64 @@ SKIP_AUTH=true                   # flip to false once auth is tested
 
 ## Strategic Pivot — Scout v2.0
 
-Scout is pivoting from a live teleprompter to a **post-call intelligence platform**. The teleprompter stays as an optional feature. The new core product is **Fathom integration + post-call analysis**.
+### Product Vision: "Jarvis for closers"
+
+Scout v2.0 is an **AI operating system for high-ticket sales teams** — not a single feature, a stack of capability layers that compound as they ship. The original live-teleprompter product stays as an optional feature; the new core is post-call intelligence and CRM-level automation.
+
+**Three capability layers, shipped in order:**
+
+**Layer 1 — Call Intelligence** (building now)
+- Fathom OAuth + auto-sync (Phase 1 — **COMPLETE**)
+- Post-call analysis pipeline with 5 section grades
+- Call library dashboard with timestamp-linked clips
+- Objection intelligence dashboard
+
+**Layer 2 — CRM Integration** (after call analysis proven)
+- GHL (GoHighLevel) and Close.io to start
+- HubSpot and others added later
+- Read AND write: Scout updates pipeline stages, logs call activities, manages contact data
+- Pipeline updates after every analyzed call
+- Curated follow-up cadences per deal
+- Beginning-of-day pipeline prioritization list
+- Beginning-of-day overnight recap
+
+**Layer 3 — Proactive Intelligence** (after CRM)
+- BOD report: prioritized call list for the day
+- Overnight recap: what changed while closer was offline
+- Curated follow-ups: Scout suggests next touch per deal
+- Follow-up email generation after every call
 
 ### Build Phases (in order)
-1. **Fathom OAuth + auto-sync (v1.2.0)** — IN PROGRESS
-2. Post-call analysis pipeline with 5 section grades (v1.3.0)
-3. Call library dashboard with timestamp-linked clips (v1.3.0)
-4. Objection intelligence dashboard (v1.4.0)
-5. EOD reports (v1.5.0)
-6. Follow-up email generation (v1.5.0)
+- **v1.2.0 — Fathom OAuth + auto-sync** — **COMPLETE** (shipped to prod 2026-06-15 via commits `00c9630` / `c39954d` / `2f3abc4` / `df5fb4e`; migration 009 applied)
+- **v1.3.0 — Recording source abstraction + post-call analysis pipeline (5 section grades)** — Layer 1 step 2
+- **v1.3.0 — Call library dashboard with timestamp-linked clips** — Layer 1 step 3 (same release)
+- **v1.4.0 — Objection intelligence dashboard** — Layer 1 step 4
+- **v1.5.0 — CRM integration (GHL + Close.io, read+write)** — Layer 2
+- **v1.6.0 — Proactive intelligence (BOD reports, overnight recap, follow-up cadences)** — Layer 3
+
+### Recording Source Architecture
+Fathom is the only recording source for now. Zoom and Google Meet will be added later.
+
+**CRITICAL:** Before Phase 2 (the analysis pipeline) is built, a recording-source abstraction layer must be designed so the analysis pipeline is source-agnostic. The pipeline receives a **transcript object** regardless of where it came from. The transcript object shape MUST be defined before Phase 2 implementation begins. Locking the shape early is the only way to avoid a Zoom/Meet integration becoming an analysis-pipeline rewrite later.
+
+Shape questions to answer at design time: speaker labels and identity resolution, turn-level vs sentence-level granularity, timestamp anchoring (absolute vs relative), confidence per segment, action items / highlights / summary as separate optional fields, transcript-language metadata, and whether each segment carries a back-reference to the source recording's playable URL + offset.
+
+### CRM Integration Notes
+- **Start with GHL (GoHighLevel) and Close.io.** Both have public APIs with OAuth (same UX pattern we built for Fathom in v1.2.0).
+- **Read+write**: pipeline stages, activity logging, contact data, deal notes.
+- **Write operations require closer confirmation before executing** — never auto-write without the user seeing exactly what will change. The diff-then-confirm pattern is non-negotiable; one wrong silent overwrite of a pipeline stage in a real CRM destroys trust in the entire product.
+- **Closer connects CRM account via OAuth popup** — reuse the Fathom popup pattern (`/auth/<provider>/connect` returns `{url}`, popup posts result to opener, closes itself). The state-JWT scheme in `backend/routes/auth.js` is general enough to reuse with a per-provider secret.
+- **HubSpot et al. come later** — only after GHL + Close.io are working in production for at least one paying customer.
+
+### Call Analysis Accuracy Requirements
+**This is the single most critical feature in Scout.** A wrong grade on a closer's call is worse than no grade — it teaches the wrong lesson and burns trust. The analysis pipeline must:
+
+- **Know the source of the transcript** (Fathom, Zoom, Meet) and weight confidence accordingly. Fathom diarized transcripts get higher baseline confidence than a Zoom auto-caption export.
+- **Flag low-confidence analysis** when transcript quality is poor — never hide uncertainty behind a confident grade. The dashboard surfaces a "transcript quality unclear" badge that adjusts how the grade is presented.
+- **Reference specific transcript moments as evidence for every grade** — never make unsupported claims. Every assertion in a grade output ("missed the discovery on budget") must include a quoted prospect/closer line + timestamp anchor.
+- **Use the closer's uploaded script** (if present in the KB) **as the benchmark** for what "good" looks like for that closer / offer.
+- **Use winning-call transcripts from the KB as comparison examples** — the same three-tier KB diversity model that powers `/kb/search` (learned patterns → user uploads → seeded frameworks) extends naturally to "find the closest winning call to compare this one against."
+- **Grade on a spectrum** — not pass/fail. Five-band scoring (or similar) so closers see directional progress over time, not a binary that flattens nuance.
 
 ### Fathom OAuth Credentials (Railway env vars)
 ```
@@ -365,8 +414,8 @@ FATHOM_REDIRECT_URI=https://sales-overlay-production.up.railway.app/auth/fathom/
 FATHOM_STATE_SECRET
 ```
 
-### Future Architecture Note
-Teleprompter prompt mode should only activate for specific call sections (objection handling, closing) — not during intro/rapport. Requires section detection. Not building now but architecture must support it later.
+### Teleprompter (Future Architecture Note)
+The original live-teleprompter feature **stays as an optional feature** in v2.0 — not deprecated, just no longer the lead product. Future: prompt mode only activates for **specific call sections** (objection handling, closing) — not during intro/rapport when narration interrupts rapport-building. Requires section detection in the live audio path. Not building now. The architecture (suggestion polling timer, prospect-response gate, closer-active guard) must be preserved so the section-aware mode can slot in without a rewrite.
 
 ## Future Plans
 - **Adaptive Learning Engine (high priority, designed not built).** See "Current Status: What Works" for full architecture. Next desktop feature after v2.0 Fathom integration stabilizes.
