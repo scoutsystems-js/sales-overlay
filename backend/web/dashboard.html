@@ -716,6 +716,173 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .fade-in { animation: fadeIn 0.4s var(--ease) both; }
 
+    /* ─── Fathom integration (Scout v2.0 Phase 1) ─────────────────────── */
+
+    /* The Fathom section sits above the donut row. Layout uses the same
+       .section + .section-header pattern as the rest of the dashboard so
+       the spacing rhythm matches; the inner content varies by connection
+       state (CTA card vs. status strip). */
+    .fathom-section { margin-bottom: 32px; }
+
+    /* Flash notice at the top of the overview (above the section). Three
+       kinds: success / warn / error. Style mirrors .signal-banner so the
+       visual vocabulary stays consistent. */
+    .fathom-notice {
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 12.5px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: fadeIn 0.3s var(--ease) both;
+    }
+    .fathom-notice-text { flex: 1; min-width: 0; }
+    .fathom-notice-dismiss {
+      background: transparent;
+      border: none;
+      color: inherit;
+      opacity: 0.6;
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px 6px;
+      cursor: pointer;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .fathom-notice-dismiss:hover { opacity: 1; background: rgba(255,255,255,0.05); }
+    .fathom-notice.success {
+      background: linear-gradient(135deg, rgba(74, 222, 128, 0.10), rgba(74, 222, 128, 0.04));
+      border: 1px solid rgba(74, 222, 128, 0.25);
+      color: #b6f0c8;
+    }
+    .fathom-notice.warn {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.10), rgba(251, 191, 36, 0.04));
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      color: #fce5a3;
+    }
+    .fathom-notice.error {
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      color: #fab7b7;
+    }
+
+    /* Disconnected: full CTA card. Larger visual weight to draw attention. */
+    .fathom-connect-card {
+      background: linear-gradient(135deg, rgba(91, 158, 255, 0.08), rgba(91, 158, 255, 0.02));
+      border: 1px solid rgba(91, 158, 255, 0.25);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .fathom-connect-text { flex: 1; min-width: 280px; }
+    .fathom-connect-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .fathom-connect-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Connected / syncing / error: compact status strip. */
+    .fathom-strip {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+    .fathom-strip-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .fathom-strip-icon {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .fathom-strip-icon.ok    { background: var(--good); box-shadow: 0 0 6px rgba(74, 222, 128, 0.5); }
+    .fathom-strip-icon.warn  { background: var(--mid); }
+    .fathom-strip-icon.err   { background: var(--bad); }
+    .fathom-strip-text { color: var(--text); }
+    .fathom-strip-meta { color: var(--text-muted); }
+    .fathom-strip-sep  { color: var(--text-dim); margin: 0 4px; }
+    .fathom-strip.error {
+      border-color: rgba(248, 113, 113, 0.35);
+      background: rgba(248, 113, 113, 0.04);
+    }
+    .fathom-strip-error-text {
+      color: #fab7b7;
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    /* Buttons — Fathom-specific so we don't accidentally restyle the date
+       presets. Two variants: primary (Connect / Reconnect) and secondary
+       (Sync now). */
+    .btn-fathom-primary {
+      background: var(--accent);
+      color: #061629;
+      border: none;
+      padding: 9px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: filter 0.15s var(--ease), transform 0.15s var(--ease);
+      flex-shrink: 0;
+    }
+    .btn-fathom-primary:hover { filter: brightness(1.08); }
+    .btn-fathom-primary:active { transform: translateY(1px); }
+    .btn-fathom-primary:disabled { opacity: 0.55; cursor: wait; }
+    .btn-fathom-secondary {
+      background: var(--bg-elevated);
+      color: var(--text-soft);
+      border: 1px solid var(--border);
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s var(--ease);
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-fathom-secondary:hover { border-color: var(--border-hover); color: var(--text); }
+    .btn-fathom-secondary:disabled { opacity: 0.5; cursor: wait; }
+    .spinner-tiny {
+      width: 12px; height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
     /* Scope badge */
     .scope-pill {
       font-size: 10.5px;
@@ -805,12 +972,45 @@
     chart3:          null,
     chartDrill:      null,
     chartType:       null,
+    // Fathom integration (Scout v2.0 Phase 1)
+    fathomStatus:    null,    // null until /fathom/status fetch completes; then { connected: bool, ... }
+    fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
+    fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
   };
 
   // ──────────────────────────────────────────────────────────────────
   // Init
   // ──────────────────────────────────────────────────────────────────
   async function init() {
+    // ─── Fathom OAuth popup handoff (must run BEFORE any auth/render so the
+    // popup closes quickly without flashing the dashboard inside it). ───
+    // When the Fathom OAuth callback redirects the popup to
+    // /dashboard?fathom=connected (or denied/error), this code path detects
+    // we're in a popup, notifies the opener via postMessage, and closes.
+    // Direct visits to /dashboard?fathom=* (no opener) fall through to the
+    // normal init flow — the param is handled later in this function.
+    var initialParams = new URLSearchParams(window.location.search);
+    var fathomParam = initialParams.get('fathom');
+    if (fathomParam && window.opener && window.opener !== window) {
+      try {
+        window.opener.postMessage(
+          { type: 'scout-fathom-done', kind: fathomParam },
+          window.location.origin
+        );
+      } catch (e) { /* same-origin only — silent fail is fine */ }
+      window.close();
+      return;
+    }
+
+    // ─── postMessage listener (parent window only) — receives the popup's
+    // success/denied/error signal, sets the notice, reloads Fathom status. ───
+    window.addEventListener('message', function(e) {
+      // Same-origin check — both popup and parent are on this domain.
+      if (e.origin !== window.location.origin) return;
+      if (!e.data || e.data.type !== 'scout-fathom-done') return;
+      handleFathomDoneSignal(e.data.kind);
+    });
+
     var s = getSession();
     if (!isSessionValid(s)) {
       if (s && s.refresh_token) {
@@ -838,7 +1038,32 @@
       state.viewingUserId = state.me.user_id;
     }
 
+    // Direct visit to /dashboard?fathom=* (no popup). Set the notice and
+    // strip the param from the URL so a refresh doesn't re-fire it.
+    if (fathomParam) {
+      handleFathomDoneSignal(fathomParam);
+      params.delete('fathom');
+      var qs = params.toString();
+      var cleanUrl = window.location.pathname + (qs ? '?' + qs : '');
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     setDateRange(30);
+  }
+
+  // Converts a popup-result kind into a notice + triggers a status refresh.
+  // Called from both the postMessage handler (popup flow) and the URL-param
+  // fallback (direct visit) so the two paths produce identical behavior.
+  function handleFathomDoneSignal(kind) {
+    if (kind === 'connected') {
+      state.fathomNotice = { kind: 'success', text: 'Fathom connected successfully.' };
+    } else if (kind === 'denied') {
+      state.fathomNotice = { kind: 'warn', text: 'Fathom connection was declined. You can try again any time.' };
+    } else {
+      state.fathomNotice = { kind: 'error', text: 'Could not connect Fathom. Please try again.' };
+    }
+    // Fire-and-forget status refresh — render is non-blocking.
+    refreshFathomStatusInBackground();
   }
 
   async function fetchMe() {
@@ -883,6 +1108,227 @@
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
+  }
+
+  // /fathom/status is per-caller (no /admin equivalent for Phase 1). Only
+  // called when state.viewingUserId === state.me.user_id — see
+  // renderFathomSectionHtml below for the early-return on admin pivot.
+  async function fetchFathomStatus() {
+    var res = await fetch('/fathom/status', { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+
+  // Failure-tolerant wrapper for post-action refreshes (after Connect or
+  // Sync finishes). Never throws — sets a safe default and re-renders.
+  async function refreshFathomStatusInBackground() {
+    try {
+      state.fathomStatus = await fetchFathomStatus();
+    } catch (e) {
+      // On error, fall back to a "disconnected" view so the UI doesn't
+      // get stuck in a stale connected state.
+      state.fathomStatus = { connected: false };
+    }
+    if (state.view === 'overview') renderOverview(false);
+  }
+
+  // Button handler: kicks off OAuth in a popup window. The popup later
+  // posts a 'scout-fathom-done' message back to this window (see init()).
+  async function connectFathom() {
+    try {
+      var res = await fetch('/auth/fathom/connect', { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) {
+        state.fathomNotice = { kind: 'error', text: 'Could not start Fathom connection (HTTP ' + res.status + ').' };
+        if (state.view === 'overview') renderOverview(false);
+        return;
+      }
+      var data = await res.json();
+      if (!data || !data.url) {
+        state.fathomNotice = { kind: 'error', text: 'Fathom did not return an authorization URL.' };
+        if (state.view === 'overview') renderOverview(false);
+        return;
+      }
+      var w = 600, h = 720;
+      var left = Math.max(0, Math.floor((window.screen.width - w) / 2));
+      var top  = Math.max(0, Math.floor((window.screen.height - h) / 2));
+      var popup = window.open(
+        data.url,
+        'fathom_oauth',
+        'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes'
+      );
+      if (!popup) {
+        state.fathomNotice = { kind: 'error', text: 'Popup blocked. Please allow popups for this site and try again.' };
+        if (state.view === 'overview') renderOverview(false);
+      }
+      // Otherwise: popup is open, no further work here. handleFathomDoneSignal
+      // takes over once the user authorizes (or denies).
+    } catch (err) {
+      state.fathomNotice = { kind: 'error', text: 'Could not start Fathom connection: ' + (err && err.message || 'unknown') };
+      if (state.view === 'overview') renderOverview(false);
+    }
+  }
+
+  // Button handler: manually trigger a sync. Disables the button via the
+  // state.fathomSyncing flag (drives the spinner) so concurrent clicks
+  // can't fire two parallel requests.
+  async function syncFathomNow() {
+    if (state.fathomSyncing) return; // guard against double-click
+    state.fathomSyncing = true;
+    if (state.view === 'overview') renderOverview(false);
+
+    var noticeText = null;
+    var noticeKind = 'success';
+    try {
+      var res = await fetch('/fathom/sync', { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (res.ok) {
+        var data = await res.json();
+        var n = (data && typeof data.synced === 'number') ? data.synced : 0;
+        noticeText = 'Synced ' + n + ' new call' + (n === 1 ? '' : 's') + '.';
+        if (data && data.truncated) {
+          noticeText += ' (More calls available — run sync again to fetch the rest.)';
+          noticeKind = 'warn';
+        }
+      } else if (res.status === 404) {
+        noticeText = 'Not connected to Fathom.';
+        noticeKind = 'error';
+      } else {
+        var errBody = null;
+        try { errBody = await res.json(); } catch (e) { /* ignore */ }
+        noticeText = 'Sync failed: ' + (errBody && errBody.error ? errBody.error : 'HTTP ' + res.status);
+        noticeKind = 'error';
+      }
+    } catch (err) {
+      noticeText = 'Sync error: ' + (err && err.message || 'unknown');
+      noticeKind = 'error';
+    }
+    state.fathomNotice = { kind: noticeKind, text: noticeText };
+    state.fathomSyncing = false;
+    // Refresh status (last_sync_at + call_count) regardless of outcome,
+    // then re-render — covers the success path AND any error path so the
+    // strip reflects the connection's true current state.
+    await refreshFathomStatusInBackground();
+  }
+
+  function dismissFathomNotice() {
+    state.fathomNotice = null;
+    if (state.view === 'overview') renderOverview(false);
+  }
+
+  // ─── Fathom rendering helpers ─────────────────────────────────────────
+  // renderFathomNoticeHtml + renderFathomSectionHtml both return either ''
+  // or a fragment. Called from renderOverview between the page header and
+  // the donut row.
+
+  function renderFathomNoticeHtml() {
+    if (!state.fathomNotice) return '';
+    var n = state.fathomNotice;
+    var kind = (n.kind === 'success' || n.kind === 'warn' || n.kind === 'error') ? n.kind : 'success';
+    return '<div class="fathom-notice ' + kind + '">'
+      + '<div class="fathom-notice-text">' + escapeHtml(n.text || '') + '</div>'
+      + '<button class="fathom-notice-dismiss" type="button" aria-label="Dismiss" onclick="dismissFathomNotice()">×</button>'
+      + '</div>';
+  }
+
+  function renderFathomSectionHtml() {
+    // Hide when an admin/owner is viewing another user — Fathom connection
+    // is per-user and there is no admin endpoint for another user's status
+    // in Phase 1. The notice still renders above the donuts via the call
+    // in renderOverview so admin-triggered actions (none currently) would
+    // still produce feedback.
+    if (state.viewingUserId !== state.me.user_id) return '';
+
+    // Pre-first-fetch: render nothing to avoid a layout jump while
+    // /fathom/status is in flight (it runs in the same Promise.all as
+    // the donut data, so it's only null on the very first render call).
+    if (!state.fathomStatus) return '';
+
+    var inner;
+    if (state.fathomSyncing) {
+      inner = renderFathomStripSyncing();
+    } else if (!state.fathomStatus.connected) {
+      inner = renderFathomConnectCard();
+    } else if (state.fathomStatus.last_sync_status === 'error') {
+      inner = renderFathomStripError(state.fathomStatus);
+    } else {
+      inner = renderFathomStripConnected(state.fathomStatus);
+    }
+    return '<section class="section fade-in fathom-section">' + inner + '</section>';
+  }
+
+  function renderFathomConnectCard() {
+    return '<div class="fathom-connect-card">'
+      + '<div class="fathom-connect-text">'
+        + '<div class="fathom-connect-title">Connect Fathom</div>'
+        + '<div class="fathom-connect-sub">Auto-sync your sales calls so they show up here without manual upload. One click — Fathom handles the login.</div>'
+      + '</div>'
+      + '<button class="btn-fathom-primary" type="button" onclick="connectFathom()">Connect Fathom →</button>'
+      + '</div>';
+  }
+
+  function renderFathomStripConnected(status) {
+    var count = (typeof status.call_count === 'number') ? status.call_count : 0;
+    var lastSync = status.last_sync_at ? formatRelativeTime(status.last_sync_at) : 'never';
+    var syncBtn = state.fathomSyncing
+      ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Syncing…</button>'
+      : '<button class="btn-fathom-secondary" type="button" onclick="syncFathomNow()">↻ Sync now</button>';
+    return '<div class="fathom-strip">'
+      + '<div class="fathom-strip-left">'
+        + '<span class="fathom-strip-icon ok"></span>'
+        + '<span class="fathom-strip-text">Fathom connected</span>'
+        + '<span class="fathom-strip-sep">·</span>'
+        + '<span class="fathom-strip-meta">' + count + ' call' + (count === 1 ? '' : 's') + ' synced</span>'
+        + '<span class="fathom-strip-sep">·</span>'
+        + '<span class="fathom-strip-meta">Last sync ' + escapeHtml(lastSync) + '</span>'
+      + '</div>'
+      + syncBtn
+      + '</div>';
+  }
+
+  function renderFathomStripSyncing() {
+    return '<div class="fathom-strip">'
+      + '<div class="fathom-strip-left">'
+        + '<span class="spinner-tiny"></span>'
+        + '<span class="fathom-strip-text">Syncing Fathom calls…</span>'
+      + '</div>'
+      + '<button class="btn-fathom-secondary" type="button" disabled>Syncing…</button>'
+      + '</div>';
+  }
+
+  function renderFathomStripError(status) {
+    var errText = status.last_sync_error ? String(status.last_sync_error) : 'Last sync failed.';
+    return '<div class="fathom-strip error">'
+      + '<div class="fathom-strip-left">'
+        + '<div>'
+          + '<div><span class="fathom-strip-icon err"></span> <span class="fathom-strip-text">Fathom sync failed</span></div>'
+          + '<div class="fathom-strip-error-text">' + escapeHtml(errText) + '</div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn-fathom-secondary" type="button" onclick="syncFathomNow()"' + (state.fathomSyncing ? ' disabled' : '') + '>↻ Retry sync</button>'
+        + '<button class="btn-fathom-primary" type="button" onclick="connectFathom()">Reconnect</button>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // Format an ISO timestamp into "5m ago" / "2h ago" / "3 days ago" / "Jun 14".
+  // Phase 1 standalone formatter — keeps the Fathom block self-contained.
+  function formatRelativeTime(iso) {
+    if (!iso) return 'never';
+    var then = new Date(iso).getTime();
+    if (isNaN(then)) return 'never';
+    var diff = Math.max(0, Date.now() - then);
+    var s = Math.floor(diff / 1000);
+    if (s < 60) return 'just now';
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + 'm ago';
+    var h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    var d = Math.floor(h / 24);
+    if (d < 7) return d + (d === 1 ? ' day ago' : ' days ago');
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
   async function fetchCalls() {
@@ -944,14 +1390,24 @@
   async function reloadAll() {
     renderOverview(true /* loading */);
     try {
-      var [analytics, patterns, calls] = await Promise.all([
+      // Fathom status fetch is wrapped in a .catch so a stale token or
+      // misconfigured FATHOM_* env vars don't break the whole dashboard
+      // — the Fathom strip will simply render as "disconnected" in that
+      // case. Critical analytics fetches stay in the throw-fast path.
+      var fathomPromise = isSelf()
+        ? fetchFathomStatus().catch(function() { return { connected: false }; })
+        : Promise.resolve(null); // admin pivot: skip — section hidden anyway
+
+      var results = await Promise.all([
         fetchAnalytics(),
         fetchPatterns(),
         fetchCalls(),
+        fathomPromise,
       ]);
-      state.analytics = analytics;
-      state.patterns = patterns;
-      state.calls = calls;
+      state.analytics    = results[0];
+      state.patterns     = results[1];
+      state.calls        = results[2];
+      state.fathomStatus = results[3];
       render();
     } catch (err) {
       if (err.message === 'unauth') return;
@@ -1014,6 +1470,8 @@
     var content = document.getElementById('content');
     if (isLoading || !state.analytics) {
       content.innerHTML = renderHeaderHtml()
+        + renderFathomNoticeHtml()
+        + renderFathomSectionHtml()
         + '<div class="donut-row">'
           + '<div class="skeleton-donut"></div><div class="skeleton-donut"></div><div class="skeleton-donut"></div>'
         + '</div>'
@@ -1031,6 +1489,8 @@
     var closeRate = closeDenom > 0 ? Math.round((t.wins / closeDenom) * 100) : null;
 
     content.innerHTML = renderHeaderHtml()
+      + renderFathomNoticeHtml()
+      + renderFathomSectionHtml()
       + '<div class="donut-row fade-in">'
         + donutCardHtml('chart-calls', 'Calls', t.total_calls, null, 'click to drill in', 'calls')
         + donutCardHtml('chart-objs', 'Objections', obj.totals.total, null, 'click to drill in', 'objections')
