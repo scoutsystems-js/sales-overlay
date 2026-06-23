@@ -86,6 +86,27 @@
     .top-bar-left { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; }
     .top-bar-left .sep { color: var(--text-dim); font-weight: 400; }
     .top-bar-left .sub { color: var(--text-muted); font-weight: 500; font-size: 13px; }
+    /* Primary-nav items in the top-left. Hover lights up the text; the active
+       state adds an accent underline. Coaching Dashboard's active state spans
+       all the overview sub-drills (calls/objections/closes/objection-type)
+       because those drills are conceptually under Overview, not their own
+       sections. */
+    .top-bar-left .nav-link {
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 13px;
+      transition: color 0.15s var(--ease);
+      text-decoration: none;
+      padding: 3px 0;
+      border-bottom: 2px solid transparent;
+      user-select: none;
+    }
+    .top-bar-left .nav-link:hover { color: var(--text); }
+    .top-bar-left .nav-link.nav-active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
     .top-bar-right { display: flex; align-items: center; gap: 20px; font-size: 13px; color: var(--text-muted); }
     .top-bar-right a:hover { color: var(--text); }
     .signout { cursor: pointer; }
@@ -883,6 +904,110 @@
       display: inline-block;
     }
 
+    /* ─── Call Library (Scout v2.0 Phase 2) ─────────────────────────────── */
+
+    /* Each row in the Call Library is a clickable card that opens the call
+       review page (Phase 2 Step 4; current implementation surfaces a
+       "coming soon" notice via the existing fathomNotice system). */
+    .library-list { display: flex; flex-direction: column; gap: 10px; }
+    .library-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+    }
+    .library-card:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-hover);
+    }
+    .library-card-main { flex: 1; min-width: 0; }
+    .library-card-title {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.005em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .library-card-title.anon { color: var(--text-muted); font-weight: 400; font-style: italic; }
+    .library-card-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 5px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .library-card-meta .sep { color: var(--text-dim); }
+    .library-card-side {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Status badges — four variants matching the brief spec.
+       Pending  → grey (no analysis yet)
+       Analyzing → blue + tiny spinner (analysis_status='processing')
+       Score    → green (analysis_status='done', shows N/100)
+       Error    → red (analysis_status='error') */
+    .library-status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .library-status-badge.pending {
+      background: rgba(139, 139, 139, 0.12);
+      color: var(--text-muted);
+    }
+    .library-status-badge.analyzing {
+      background: rgba(91, 158, 255, 0.14);
+      color: var(--accent);
+    }
+    .library-status-badge.done {
+      background: rgba(74, 222, 128, 0.12);
+      color: var(--good);
+      letter-spacing: 0.02em;
+    }
+    .library-status-badge.error {
+      background: rgba(248, 113, 113, 0.12);
+      color: var(--bad);
+    }
+    .library-recording-link {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.15s var(--ease);
+    }
+    .library-recording-link:hover { color: var(--accent); }
+
+    /* Skeleton row used while the first page loads. Same animation as
+       .skeleton-donut (pulse) and same surface tokens as .library-card so
+       the transition from skeleton → real cards is smooth. */
+    .library-skeleton-row {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      height: 68px;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
     /* Scope badge */
     .scope-pill {
       font-size: 10.5px;
@@ -903,7 +1028,9 @@
   <div class="top-bar-left">
     <span>Scout</span>
     <span class="sep">·</span>
-    <span class="sub">Coaching Dashboard</span>
+    <a class="nav-link" id="navOverview" onclick="setView('overview'); return false;">Coaching Dashboard</a>
+    <span class="sep">·</span>
+    <a class="nav-link" id="navCallLibrary" onclick="setView('call-library'); return false;">Calls</a>
   </div>
   <div class="top-bar-right">
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
@@ -976,6 +1103,12 @@
     fathomStatus:    null,    // null until /fathom/status fetch completes; then { connected: bool, ... }
     fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
+    // Call Library (Scout v2.0 Phase 2 Step 3)
+    callLibrary:        null,  // null pre-load, then array of call rows from /fathom/calls
+    callLibraryLoading: false, // gates "Load more" button while a fetch is in flight
+    callLibraryHasMore: false, // true if the last page returned === limit (more might exist)
+    callLibraryOffset:  0,     // total rows fetched so far; next "Load more" uses this as offset
+    callLibraryError:   null,  // last fetch error message; cleared on successful re-fetch
   };
 
   // ──────────────────────────────────────────────────────────────────
@@ -1215,6 +1348,7 @@
   function dismissFathomNotice() {
     state.fathomNotice = null;
     if (state.view === 'overview') renderOverview(false);
+    else if (state.view === 'call-library') renderCallLibrary();
   }
 
   // ─── Fathom rendering helpers ─────────────────────────────────────────
@@ -1424,6 +1558,24 @@
     else if (state.view === 'objections') renderObjectionsDrill();
     else if (state.view === 'closes') renderClosesDrill();
     else if (state.view === 'objection-type') renderObjectionTypeDrill();
+    else if (state.view === 'call-library') renderCallLibrary();
+    updateNavActiveStates();
+  }
+
+  // Nav lives OUTSIDE #content, so it isn't re-rendered when render() swaps
+  // the content. We update the active classes imperatively here. Coaching
+  // Dashboard is "active" for any view in the overview umbrella (overview
+  // itself + its donut drills); Calls is active for the call-library view.
+  function updateNavActiveStates() {
+    var OVERVIEW_VIEWS = { overview: 1, calls: 1, objections: 1, closes: 1, 'objection-type': 1 };
+    var navOverview = document.getElementById('navOverview');
+    var navCallLibrary = document.getElementById('navCallLibrary');
+    if (navOverview) {
+      navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view]);
+    }
+    if (navCallLibrary) {
+      navCallLibrary.classList.toggle('nav-active', state.view === 'call-library');
+    }
   }
 
   function renderHeaderHtml() {
@@ -2078,6 +2230,210 @@
     var m = Math.floor(seconds / 60);
     var s = seconds % 60;
     return m + 'm' + (s > 0 ? ' ' + s + 's' : '');
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Call Library (Scout v2.0 Phase 2 Step 3)
+  //
+  // The Calls nav item opens this top-level view. It shows a paginated
+  // list of the caller's synced Fathom calls with each call's analysis
+  // state surfaced as a status badge. Clicking a card currently shows a
+  // "coming soon" notice via the existing fathomNotice flash; the full
+  // call review page is the next step (Phase 2 Step 4) and will replace
+  // the click handler with a real navigation.
+  // ──────────────────────────────────────────────────────────────────
+
+  // Date formatter for the library cards: always "Jun 23, 2026" form (with
+  // year) per the brief, even when the date is in the current calendar
+  // year. Differs from formatDate above which omits the year for current.
+  function formatNaturalDate(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // Duration formatter for the library cards: "57m" or "1h 23m" per the
+  // brief, no seconds. Null/invalid → "—". Differs from formatDuration
+  // above which keeps seconds for short calls.
+  function formatNaturalDuration(seconds) {
+    if (seconds === null || seconds === undefined) return '—';
+    if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) return '—';
+    var hours = Math.floor(seconds / 3600);
+    var minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return hours + 'h ' + minutes + 'm';
+    return minutes + 'm';
+  }
+
+  // throw-on-failure pattern matching fetchAnalytics/fetchPatterns/fetchCalls.
+  async function fetchCallLibrary(offset, limit) {
+    var qs = 'limit=' + (limit || 20) + '&offset=' + (offset || 0);
+    var res = await fetch('/fathom/calls?' + qs, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+
+  // Fire-and-forget load. When offset=0, replaces state.callLibrary; on
+  // pagination (offset>0) it concatenates onto the existing list. Re-
+  // renders the view automatically when done if still on call-library.
+  async function loadCallLibrary(offset) {
+    if (state.callLibraryLoading) return; // guard concurrent clicks
+    state.callLibraryLoading = true;
+    var requestedLimit = 20;
+    var startedOffset = offset || 0;
+    try {
+      var data = await fetchCallLibrary(startedOffset, requestedLimit);
+      var calls = (data && data.calls) || [];
+      if (startedOffset === 0) {
+        state.callLibrary = calls;
+      } else {
+        state.callLibrary = (state.callLibrary || []).concat(calls);
+      }
+      state.callLibraryHasMore = calls.length >= requestedLimit;
+      state.callLibraryOffset = startedOffset + calls.length;
+      state.callLibraryError = null;
+    } catch (err) {
+      if (err.message === 'unauth') return;
+      state.callLibraryError = err.message || 'unknown';
+    }
+    state.callLibraryLoading = false;
+    if (state.view === 'call-library') renderCallLibrary();
+  }
+
+  function renderCallLibrary() {
+    var content = document.getElementById('content');
+
+    // First render after entering the view: kick off the fetch and show
+    // skeletons. The fetch's completion handler re-calls renderCallLibrary
+    // with state populated.
+    if (state.callLibrary === null && !state.callLibraryLoading) {
+      loadCallLibrary(0); // async, no await — re-renders when done
+    }
+
+    var header = renderCallLibraryHeaderHtml();
+    var notice = renderFathomNoticeHtml(); // reuse the global flash mechanism
+
+    if (state.callLibraryError) {
+      content.innerHTML = header + notice
+        + '<div class="error fade-in">Could not load calls: ' + escapeHtml(state.callLibraryError) + '</div>';
+      return;
+    }
+
+    if (state.callLibrary === null) {
+      // Initial loading state — skeleton rows, no real data yet.
+      content.innerHTML = header + notice + renderCallLibrarySkeletonsHtml();
+      return;
+    }
+
+    if (state.callLibrary.length === 0) {
+      content.innerHTML = header + notice
+        + '<div class="empty fade-in">'
+          + '<h3>No calls synced yet</h3>'
+          + '<p>Connect Fathom and sync your calls to get started.</p>'
+        + '</div>';
+      return;
+    }
+
+    var cards = state.callLibrary.map(callLibraryCardHtml).join('');
+    var loadMore = '';
+    if (state.callLibraryHasMore) {
+      loadMore = '<div style="display:flex;justify-content:center;margin-top:18px;">'
+        + '<button class="btn-fathom-secondary" type="button" onclick="loadCallLibrary(' + state.callLibraryOffset + ')"'
+        + (state.callLibraryLoading ? ' disabled>Loading…' : '>Load more')
+        + '</button></div>';
+    }
+    content.innerHTML = header + notice
+      + '<div class="library-list fade-in">' + cards + '</div>'
+      + loadMore;
+  }
+
+  function renderCallLibraryHeaderHtml() {
+    var count = (state.callLibrary && state.callLibrary.length) || 0;
+    var sub = state.callLibrary === null
+      ? 'Loading your synced Fathom calls…'
+      : (count === 0
+          ? 'Your synced Fathom calls will appear here.'
+          : count + ' call' + (count === 1 ? '' : 's') + ' shown' + (state.callLibraryHasMore ? ' (more available)' : ''));
+    return '<div class="page-header fade-in">'
+      + '<div><h1>Call Library</h1>'
+      + '<div class="subtitle">' + escapeHtml(sub) + '</div></div>'
+      + '</div>';
+  }
+
+  function renderCallLibrarySkeletonsHtml() {
+    var rows = '';
+    for (var i = 0; i < 6; i++) rows += '<div class="library-skeleton-row"></div>';
+    return '<div class="library-list">' + rows + '</div>';
+  }
+
+  function callLibraryCardHtml(c) {
+    var title = (c.title && String(c.title).trim())
+      ? '<span>' + escapeHtml(c.title) + '</span>'
+      : '<span class="anon">Untitled call</span>';
+    var dateStr = formatNaturalDate(c.call_date);
+    var durStr = formatNaturalDuration(c.duration_seconds);
+
+    var meta = '<span>' + escapeHtml(dateStr) + '</span>'
+             + '<span class="sep">·</span>'
+             + '<span>' + escapeHtml(durStr) + '</span>';
+
+    var badge = libraryStatusBadgeHtml(c.analysis_status, c.overall_score);
+
+    var recordingLink = '';
+    if (c.recording_url && typeof c.recording_url === 'string') {
+      // event.stopPropagation prevents the card's onclick from firing when
+      // the user wanted to open the Fathom link directly.
+      recordingLink = '<a class="library-recording-link" href="' + escapeHtml(c.recording_url)
+        + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">View in Fathom →</a>';
+    }
+
+    var cardId = escapeHtml(String(c.id || ''));
+    return '<div class="library-card" onclick="openCallReview(\'' + cardId + '\')">'
+      + '<div class="library-card-main">'
+        + '<div class="library-card-title' + (c.title ? '' : ' anon') + '">' + title + '</div>'
+        + '<div class="library-card-meta">' + meta + '</div>'
+      + '</div>'
+      + '<div class="library-card-side">'
+        + badge
+        + recordingLink
+      + '</div>'
+    + '</div>';
+  }
+
+  function libraryStatusBadgeHtml(analysisStatus, overallScore) {
+    // No analysis row at all: grey "Pending" — the analysis worker hasn't
+    // picked this call up yet.
+    if (!analysisStatus || analysisStatus === 'pending') {
+      return '<span class="library-status-badge pending">Pending</span>';
+    }
+    if (analysisStatus === 'processing') {
+      return '<span class="library-status-badge analyzing"><span class="spinner-tiny"></span>Analyzing…</span>';
+    }
+    if (analysisStatus === 'done') {
+      var scoreText = (typeof overallScore === 'number') ? overallScore + '/100' : 'Done';
+      return '<span class="library-status-badge done">' + escapeHtml(scoreText) + '</span>';
+    }
+    if (analysisStatus === 'error') {
+      return '<span class="library-status-badge error">Error</span>';
+    }
+    // Unknown status — render as pending so we never blow up.
+    return '<span class="library-status-badge pending">' + escapeHtml(String(analysisStatus)) + '</span>';
+  }
+
+  // Placeholder click handler. The real call review page is Phase 2 Step 4;
+  // for now we surface a friendly notice via the existing flash mechanism
+  // so the user gets visible feedback without an alert() or silent click.
+  function openCallReview(callId) {
+    state.fathomNotice = {
+      kind: 'success',
+      text: 'The full call review page is the next Phase 2 step — coming soon. (call id: ' + callId + ')',
+    };
+    // Re-render so the notice appears immediately. The notice mechanism
+    // already lives at the top of the rendered content for both overview
+    // and call-library views (see renderFathomNoticeHtml).
+    if (state.view === 'call-library') renderCallLibrary();
+    else if (state.view === 'overview') renderOverview(false);
   }
 
   init();

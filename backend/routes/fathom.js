@@ -422,4 +422,91 @@ router.get('/status', requireAuth, async function(req, res) {
   }
 });
 
+// ── GET /fathom/calls ────────────────────────────────────────────────────────
+// Powers the v1.3.0 Call Library page on the dashboard. Returns the caller's
+// fathom_calls page joined with the corresponding call_analyses row (when one
+// exists) so each card can show its analysis state + score in one round trip.
+//
+// Pagination: limit (1..100, default 20) + offset (>=0, default 0). This
+// diverges from /me/sessions's `?before=` cursor pattern by design — the
+// brief for the Call Library specified limit/offset, and call counts per
+// user are bounded enough that offset performance isn't a concern at this
+// scale. Cursor can be added in a follow-up if user counts grow.
+//
+// The join is two queries + JS merge to match the established
+// computeCountsBySession-style pattern in /me/sessions (supabase-js v2 has
+// no Postgres JOIN syntax; embed-via-FK was considered but adds extra
+// complexity for a one-to-zero-or-one relationship like this one).
+router.get('/calls', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+
+  var limit = parseInt(req.query.limit, 10);
+  if (!limit || limit < 1) limit = 20;
+  if (limit > 100) limit = 100;
+
+  var offset = parseInt(req.query.offset, 10);
+  if (!offset || offset < 0) offset = 0;
+
+  try {
+    var admin = getAdminClient();
+
+    // 1) Page of fathom_calls for the caller, newest-first by call_date.
+    //    Rows with NULL call_date sort last so they don't outrank dated calls.
+    var callsResult = await admin
+      .from('fathom_calls')
+      .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status')
+      .eq('user_id', userId)
+      .order('call_date', { ascending: false, nullsFirst: false })
+      .range(offset, offset + limit - 1);
+    if (callsResult.error) {
+      console.error('[fathom] /calls fetch failed for user ' + userId + ': ' + callsResult.error.message);
+      return res.status(500).json({ error: 'Could not load calls' });
+    }
+    var calls = callsResult.data || [];
+    if (calls.length === 0) {
+      return res.json({ calls: [], limit: limit, offset: offset });
+    }
+
+    // 2) Companion call_analyses rows (zero-or-one per fathom_call_id).
+    //    Non-fatal — if this query fails we still render the calls list
+    //    with null analysis fields so the dashboard isn't blocked by an
+    //    analysis-table outage.
+    var fathomCallIds = calls.map(function(c) { return c.id; });
+    var analysesResult = await admin
+      .from('call_analyses')
+      .select('fathom_call_id, status, overall_score, overall_summary')
+      .in('fathom_call_id', fathomCallIds);
+    if (analysesResult.error) {
+      console.error('[fathom] /calls analyses fetch failed for user ' + userId + ': ' + analysesResult.error.message);
+    }
+    var analysisByCallId = {};
+    var analyses = analysesResult.data || [];
+    for (var i = 0; i < analyses.length; i++) {
+      analysisByCallId[analyses[i].fathom_call_id] = analyses[i];
+    }
+
+    var enriched = calls.map(function(c) {
+      var a = analysisByCallId[c.id] || null;
+      return {
+        id:               c.id,
+        fathom_call_id:   c.fathom_call_id,
+        title:            c.title,
+        call_date:        c.call_date,
+        duration_seconds: c.duration_seconds,
+        recording_url:    c.recording_url,
+        sync_status:      c.sync_status,
+        analysis_status:  a ? a.status          : null,
+        overall_score:    a ? a.overall_score   : null,
+        overall_summary:  a ? a.overall_summary : null,
+      };
+    });
+
+    res.json({ calls: enriched, limit: limit, offset: offset });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] /calls fatal for user ' + userId + ':', err.message);
+    res.status(500).json({ error: 'Failed to load calls' });
+  }
+});
+
 module.exports = router;
