@@ -376,11 +376,28 @@ Scout v2.0 is an **AI operating system for high-ticket sales teams** — not a s
 
 ### Build Phases (in order)
 - **v1.2.0 — Fathom OAuth + auto-sync** — **COMPLETE** (shipped to prod 2026-06-15 via commits `00c9630` / `c39954d` / `2f3abc4` / `df5fb4e`; migration 009 applied)
-- **v1.3.0 — Recording source abstraction + post-call analysis pipeline (5 section grades)** — Layer 1 step 2
-- **v1.3.0 — Call library dashboard with timestamp-linked clips** — Layer 1 step 3 (same release)
-- **v1.4.0 — Objection intelligence dashboard** — Layer 1 step 4
-- **v1.5.0 — CRM integration (GHL + Close.io, read+write)** — Layer 2
-- **v1.6.0 — Proactive intelligence (BOD reports, overnight recap, follow-up cadences)** — Layer 3
+- **v1.3.0 — Post-call analysis pipeline** — Layer 1 step 2 / step 3 combined release:
+  - Migration 010 (`call_analyses` + `call_highlights`)
+  - Transcript normalizer (HH:MM:SS strings + numeric seconds → single numeric-seconds representation)
+  - Section grader (Claude call — Intro / Discovery / Pitch / Objection Handling / Close)
+  - Highlight extractor (Claude call — 5-8 moments with type + quote + observation)
+  - Auto-trigger after sync completes (async; closer never waits)
+  - Call library dashboard page
+  - Call review page with highlights timeline as the lead section
+- **v1.4.0 — Objection intelligence dashboard** — Layer 1 step 4:
+  - Frequency by type across all calls
+  - Handle rate per objection type
+  - Drill-down to real examples with playable timestamp clips
+- **v1.5.0 — CRM integration (GHL + Close.io)** — Layer 2:
+  - OAuth connect per closer (same popup pattern as Fathom)
+  - Pipeline stage reading and updating
+  - Match analyzed calls to CRM contacts
+  - Follow-up checklist — hottest leads for today
+  - SMS + email draft per lead
+- **v1.6.0 — Proactive Intelligence** — Layer 3:
+  - BOD report: prioritized call list for the day
+  - Overnight recap: what changed while closer was offline
+  - Curated follow-up cadences per deal
 
 ### Recording Source Architecture
 Fathom is the only recording source for now. Zoom and Google Meet will be added later.
@@ -388,6 +405,97 @@ Fathom is the only recording source for now. Zoom and Google Meet will be added 
 **CRITICAL:** Before Phase 2 (the analysis pipeline) is built, a recording-source abstraction layer must be designed so the analysis pipeline is source-agnostic. The pipeline receives a **transcript object** regardless of where it came from. The transcript object shape MUST be defined before Phase 2 implementation begins. Locking the shape early is the only way to avoid a Zoom/Meet integration becoming an analysis-pipeline rewrite later.
 
 Shape questions to answer at design time: speaker labels and identity resolution, turn-level vs sentence-level granularity, timestamp anchoring (absolute vs relative), confidence per segment, action items / highlights / summary as separate optional fields, transcript-language metadata, and whether each segment carries a back-reference to the source recording's playable URL + offset.
+
+### Phase 2 Architecture — Post-Call Intelligence
+
+**Pipeline (end-to-end, one row at a time):**
+
+```
+fathom_calls.sync_status='pending'
+    ↓
+analysis worker picks up the row
+    ↓
+fetch transcript + highlights + summary from Fathom with include_*=true
+    ↓
+normalize timestamps (HH:MM:SS strings + numeric seconds → numeric seconds)
+    ↓
+identify CLOSER vs PROSPECT (see Speaker Identification below)
+    ↓
+TWO PARALLEL CLAUDE CALLS:
+  1. Section Grader      2. Highlight Extractor
+    ↓                      ↓
+results upsert into call_analyses + call_highlights
+    ↓
+fathom_calls.sync_status='processed'
+```
+
+**Two new tables (migration 010):**
+
+`public.call_analyses` — one row per analyzed call.
+- `id` uuid PK
+- `fathom_call_id` uuid FK → `public.fathom_calls(id) ON DELETE CASCADE`
+- `user_id` uuid FK → `auth.users(id) ON DELETE CASCADE`
+- `overall_score` integer (0–100)
+- `overall_summary` text
+- For each of the 5 sections (`intro` / `discovery` / `pitch` / `objection` / `close`), three columns each: `<section>_grade` text, `<section>_score` integer, `<section>_notes` text. (15 columns total across the 5 sections.)
+- `one_thing` text — the single actionable to do differently next time
+- `follow_up_email` text — draft email body the closer can copy
+- `transcript_stored` jsonb — the normalized turn array (`[{ speaker, role, text, start_seconds }, ...]`) kept on the row so the analysis is reproducible and the review page can render the timeline without re-fetching from Fathom
+- `speaker_closer_name` text — what name the closer's voice was identified as in this transcript (free-form match against `recorded_by.name`)
+- `analyzed_at` timestamptz
+- `status` text — `pending` / `processing` / `done` / `error` (separate from `fathom_calls.sync_status`; this one tracks the *analysis* lifecycle within the row)
+
+`public.call_highlights` — one row per highlight moment (typically 5–8 per call).
+- `id` uuid PK
+- `fathom_call_id` uuid FK → `public.fathom_calls(id) ON DELETE CASCADE`
+- `user_id` uuid FK → `auth.users(id) ON DELETE CASCADE`
+- `timestamp_seconds` integer — used in the Fathom deep link (`?t=<seconds>`)
+- `speaker` text — `CLOSER` or `PROSPECT`
+- `quote` text — exact words spoken at the moment
+- `observation` text — one factual sentence describing what happened (not commentary)
+- `type` text — `buying_signal` / `objection` / `missed_opportunity` / `strong_moment` / `rapport_moment` / `disqualify_signal`
+- `sequence_order` integer — display order within the call (the timeline)
+
+RLS on both tables mirrors `fathom_calls` (own / admin-managed / owner via `current_user_role()`). Backend writes via service-role; no INSERT/UPDATE policies.
+
+**Two parallel Claude calls (one analysis pass = both fire concurrently):**
+
+1. **Section Grader.** Inputs: normalized transcript, closer's uploaded script (if present in KB), top winning-call transcripts from KB. Output: structured JSON with `grade`, `score`, and `evidence` (quoted lines from the transcript) for each of the 5 sections (Intro / Discovery / Pitch / Objection Handling / Close). Plus `overall_score`, `overall_summary`, `one_thing`. Plus `follow_up_email` draft. Uses the Call Analysis Accuracy Requirements section as the prompting contract — every claim must cite a quoted transcript line.
+2. **Highlight Extractor.** Input: normalized transcript only (no benchmark). Output: array of 5–8 highlights with `timestamp_seconds`, `speaker`, `quote`, `observation`, `type`. Tone explicitly calibrated as **film coach reviewing tape — factual, not cheerleader or critic.** Must connect patterns across related moments (e.g. "the same 'too expensive' objection appears at 00:12:04 and again at 00:34:51 — second one was harder because the first wasn't fully isolated"). No empty validation, no generic feedback.
+
+**Timestamp handling.**
+
+Per the SDK audit in this CLAUDE.md, Fathom's timestamps are inconsistent across types:
+- `TranscriptItem.timestamp` → `"HH:MM:SS"` string
+- `ActionItem.recording_timestamp` → `"HH:MM:SS"` string
+- `Highlight.start_time` / `end_time` → numeric seconds
+- `Meeting.recording_start_time` / `recording_end_time` → ISO datetime string (absolute)
+
+The normalizer runs FIRST in the pipeline and converts everything to **numeric seconds from start of recording**. Numeric chosen because Fathom's own deep-link URL uses it: `https://fathom.video/calls/{recording_url_id}?t={seconds}`. All downstream code (analysis, UI, follow-up email "see at 00:12:04" anchors) reads from the normalized numeric form only.
+
+**Speaker identification.**
+
+The new CLAUDE.md SDK audit confirmed `TranscriptItemSpeaker.display_name` is fragile and `matched_calendar_invitee_email` is "Coming soon!" — currently never populated. Phase 2 resolves CLOSER vs PROSPECT this way:
+
+1. Fetch `recorded_by.name` from the Fathom meeting data (the Fathom user who recorded — usually the closer).
+2. Fuzzy-match against the set of `display_name` values present in the transcript turns.
+3. Tag the matched speaker as `CLOSER`; all other speakers tagged as `PROSPECT`.
+4. Store the matched name in `call_analyses.speaker_closer_name` so re-analysis is reproducible and the review page can label turns confidently.
+5. **Fallback** when no fuzzy match clears a threshold: pass through raw `display_name` values to Claude and let it infer roles from conversational cues (who asks discovery questions, who pitches, who handles objections). Store the inferred name in `speaker_closer_name`.
+
+Multi-prospect calls (more than one external participant) are out of scope for Phase 2 — first non-closer voice is treated as "the prospect" and a TODO is left for v1.4.0+ to handle panel calls.
+
+**Trigger.**
+
+Phase 2 fires automatically immediately after `/fathom/sync` completes for a row. Async via the existing fire-and-forget pattern (matches the post-call summary and adaptive-learning flows already in the desktop's `stop-session` handler). **The closer never waits.** Calls show up in the dashboard list as `"analyzing…"` (`status='processing'`) and then populate when done (`status='done'`). Errors flip to `status='error'` with an error message stored, and the dashboard surfaces a retry button.
+
+**Call Review page (dashboard).**
+
+When the user clicks a synced call from the library, the review page renders three sections **in this order** (deliberately — highlights come first, grades support):
+
+1. **Call Highlights** — the lead section, most visual prominence. Timeline of the 5–8 highlights with: clickable timestamp link (`fathom.video/calls/{id}?t={seconds}` deep link, opens in a new tab), speaker label badge, exact quote, Scout's one-sentence observation. Pattern notes inline connect related moments. Footer: **"One thing to do differently"** (the `one_thing` field) called out in an accent box.
+2. **Section Grades** — five collapsible cards, one per section, each showing the grade letter + score + evidence quotes. Supporting detail, not the focus — collapsed by default with a "show all" affordance.
+3. **Follow-up Email** — generated draft with a copy-to-clipboard button. The closer sends manually; Scout never sends.
 
 ### CRM Integration Notes
 - **Start with GHL (GoHighLevel) and Close.io.** Both have public APIs with OAuth (same UX pattern we built for Fathom in v1.2.0).
