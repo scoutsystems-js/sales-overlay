@@ -188,10 +188,17 @@ async function getValidAccessToken(admin, userId, conn) {
 // One page of meetings. Returns the parsed shape { items, next_cursor } or
 // throws on any network / shape failure. Auth is Bearer per OAuth 2.0
 // convention (SDK source uses `bearerAuth: token`).
-async function fetchMeetingsPage(accessToken, cursor, createdAfter) {
+//
+// includeTranscript / includeHighlights default to false to preserve the
+// /sync route's behavior (it only needs metadata for upserting new rows).
+// The analysis worker calls this with both = true to get the full meeting
+// payload Claude needs to grade and extract highlights from.
+async function fetchMeetingsPage(accessToken, cursor, createdAfter, includeTranscript, includeHighlights) {
   var url = new URL(FATHOM_API_BASE + '/meetings');
-  if (createdAfter) url.searchParams.append('created_after', createdAfter);
-  if (cursor)       url.searchParams.append('cursor', cursor);
+  if (createdAfter)       url.searchParams.append('created_after',      createdAfter);
+  if (cursor)             url.searchParams.append('cursor',             cursor);
+  if (includeTranscript)  url.searchParams.append('include_transcript', 'true');
+  if (includeHighlights)  url.searchParams.append('include_highlights', 'true');
 
   var resp = await fetch(url.toString(), {
     method:  'GET',
@@ -354,7 +361,32 @@ router.get('/sync', requireAuth, async function(req, res) {
       console.error('[fathom] sync status update failed for user ' + userId + ': ' + statusUpdate.error.message);
     }
 
-    console.log('[fathom] Sync complete for user ' + userId + ': fetched=' + allRows.length + ' inserted=' + insertedCount + ' malformed=' + malformedCount + ' pages=' + pageCount + (hitPageCap ? ' (CAPPED — more available)' : ''));
+    // 6. Fire-and-forget post-sync analysis. Dispatch sequentially per call
+    //    so we respect Anthropic rate limits and produce predictable ordering
+    //    in the dashboard. Lazy-required to sidestep the circular dependency
+    //    between routes/fathom.js and lib/analysis-worker.js (the worker
+    //    imports the token + fetch helpers exported below). Errors per call
+    //    are caught + logged; never propagated. The sync response has
+    //    already been sent by the time these run — closers never wait.
+    var newCallIds = (insertResult && insertResult.data || []).map(function(r) { return r.id; });
+    if (newCallIds.length > 0) {
+      (async function() {
+        try {
+          var analyzeCall = require('../lib/analysis-worker').analyzeCall;
+          for (var i = 0; i < newCallIds.length; i++) {
+            try {
+              await analyzeCall(newCallIds[i], userId);
+            } catch (innerErr) {
+              console.error('[fathom] analyzeCall failed for call ' + newCallIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown'));
+            }
+          }
+        } catch (outerErr) {
+          console.error('[fathom] background analysis loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
+        }
+      })();
+    }
+
+    console.log('[fathom] Sync complete for user ' + userId + ': fetched=' + allRows.length + ' inserted=' + insertedCount + ' malformed=' + malformedCount + ' pages=' + pageCount + (hitPageCap ? ' (CAPPED — more available)' : '') + (newCallIds.length > 0 ? ' analysis_dispatched=' + newCallIds.length : ''));
     return res.json({
       synced:    insertedCount,
       fetched:   allRows.length,
@@ -508,5 +540,17 @@ router.get('/calls', requireAuth, async function(req, res) {
     res.status(500).json({ error: 'Failed to load calls' });
   }
 });
+
+// Exported for backend/lib/analysis-worker.js — same precedent as me.js
+// (router._computeCoachingPatterns, etc.). Lib code that needs the same
+// token-refresh + Fathom-fetch logic imports these rather than duplicating.
+// Picking up a route file's helpers via attached underscore properties is a
+// slight architectural smell but matches the established Scout pattern and
+// keeps file churn minimal — if a third consumer appears (CRM client in
+// v1.5.0+), the right time to extract to backend/lib/fathom-client.js is then.
+router._getValidAccessToken = getValidAccessToken;
+router._refreshFathomToken  = refreshFathomToken;
+router._fetchMeetingsPage   = fetchMeetingsPage;
+router._markConnectionError = markConnectionError;
 
 module.exports = router;
