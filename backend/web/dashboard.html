@@ -1008,6 +1008,315 @@
       animation: pulse 1.4s ease-in-out infinite;
     }
 
+    /* ─── Call Review page (Scout v2.0 Phase 2 Step 4) ────────────────────── */
+
+    /* Header strip — back link + title row + meta row + score badge + Fathom link */
+    .review-page-header {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+    .review-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      align-self: flex-start;
+      cursor: pointer;
+      transition: all 0.15s var(--ease);
+    }
+    .review-back-link:hover { color: var(--text); border-color: var(--border-hover); }
+    .review-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .review-title-main { flex: 1; min-width: 0; }
+    .review-title {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 6px;
+      word-break: break-word;
+    }
+    .review-title.anon { color: var(--text-muted); font-weight: 400; font-style: italic; }
+    .review-meta-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .review-meta-row .sep { color: var(--text-dim); }
+    .review-title-side {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .review-fathom-link {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      transition: color 0.15s var(--ease);
+      white-space: nowrap;
+    }
+    .review-fathom-link:hover { color: var(--accent); }
+
+    /* Error banner — surfaces analysis.status='error' with the reason. */
+    .review-analysis-error {
+      background: rgba(248, 113, 113, 0.06);
+      border: 1px solid rgba(248, 113, 113, 0.22);
+      color: #fab7b7;
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      margin-bottom: 28px;
+      line-height: 1.55;
+    }
+    .review-analysis-error strong { color: #fcd0d0; font-weight: 600; }
+
+    /* Section 1: Call Highlights — the prominent timeline. */
+    .review-highlight-list { display: flex; flex-direction: column; gap: 12px; }
+    .review-highlight {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 18px;
+      align-items: start;
+      transition: border-color 0.15s var(--ease);
+    }
+    .review-highlight:hover { border-color: var(--border-hover); }
+    .review-highlight-time {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      text-decoration: none;
+      padding-top: 2px;
+      transition: filter 0.15s var(--ease);
+    }
+    .review-highlight-time:hover { filter: brightness(1.2); text-decoration: underline; }
+    .review-highlight-time.disabled {
+      color: var(--text-muted);
+      cursor: default;
+      pointer-events: none;
+    }
+    .review-highlight-body { min-width: 0; }
+    .review-highlight-row1 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .review-speaker-badge {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .review-speaker-badge.closer   { background: rgba(91, 158, 255, 0.14); color: var(--accent); }
+    .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text-soft); }
+    .review-type-badge {
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .review-type-badge.buying_signal      { background: rgba(74, 222, 128, 0.12);  color: var(--good); }
+    .review-type-badge.strong_moment      { background: rgba(74, 222, 128, 0.12);  color: var(--good); }
+    .review-type-badge.objection          { background: rgba(251, 146, 60, 0.14);  color: var(--orange); }
+    .review-type-badge.missed_opportunity { background: rgba(251, 191, 36, 0.12);  color: var(--mid); }
+    .review-type-badge.rapport_moment     { background: rgba(91, 158, 255, 0.12);  color: var(--accent); }
+    .review-type-badge.disqualify_signal  { background: rgba(100, 116, 139, 0.18); color: var(--text-soft); }
+    .review-quote {
+      font-size: 13.5px;
+      color: var(--text-soft);
+      font-style: italic;
+      margin-bottom: 6px;
+      line-height: 1.55;
+    }
+    .review-quote::before { content: '\201C'; opacity: 0.5; margin-right: 2px; }
+    .review-quote::after  { content: '\201D'; opacity: 0.5; margin-left: 2px; }
+    .review-observation {
+      font-size: 13.5px;
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    /* Pending / placeholder for the highlights section. */
+    .review-highlights-pending {
+      background: var(--bg-elevated);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* "One thing to do differently" accent box — footer of the Highlights section. */
+    .review-one-thing {
+      margin-top: 18px;
+      background: linear-gradient(135deg, rgba(91, 158, 255, 0.08), rgba(91, 158, 255, 0.02));
+      border: 1px solid rgba(91, 158, 255, 0.25);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+    }
+    .review-one-thing-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .review-one-thing-text {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .review-one-thing-text.placeholder { color: var(--text-muted); font-style: italic; }
+
+    /* Section 2: Section Grades — five collapsible cards. */
+    .review-grades-toggle {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 4px 0;
+      cursor: pointer;
+      transition: color 0.15s var(--ease);
+    }
+    .review-grades-toggle:hover { color: var(--text); }
+    .review-grade-list { display: flex; flex-direction: column; gap: 10px; }
+    .review-grade-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.15s var(--ease);
+    }
+    .review-grade-card:hover { border-color: var(--border-hover); }
+    .review-grade-card-header {
+      display: grid;
+      grid-template-columns: 1fr 60px 80px 24px;
+      gap: 16px;
+      align-items: center;
+      padding: 16px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .review-grade-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.005em;
+    }
+    .review-grade-letter {
+      font-size: 22px;
+      font-weight: 600;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .review-grade-letter.A { color: var(--good); }
+    .review-grade-letter.B { color: var(--good); opacity: 0.85; }
+    .review-grade-letter.C { color: var(--mid); }
+    .review-grade-letter.D { color: var(--orange); }
+    .review-grade-letter.F { color: var(--bad); }
+    .review-grade-letter.empty { color: var(--text-dim); font-size: 18px; font-weight: 400; }
+    .review-grade-score {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .review-grade-chevron {
+      color: var(--text-muted);
+      font-size: 13px;
+      transition: transform 0.2s var(--ease);
+    }
+    .review-grade-card.expanded .review-grade-chevron { transform: rotate(180deg); }
+    .review-grade-body {
+      padding: 0 20px 18px;
+      border-top: 1px solid var(--border);
+      margin-top: -1px;
+      animation: fadeIn 0.25s var(--ease) both;
+    }
+    .review-grade-notes {
+      font-size: 13px;
+      color: var(--text-soft);
+      line-height: 1.65;
+      white-space: pre-wrap;
+      padding-top: 16px;
+    }
+    .review-grade-notes.placeholder { color: var(--text-muted); font-style: italic; }
+    .review-grade-card.not-occurred .review-grade-name { color: var(--text-muted); font-style: italic; }
+
+    /* Skeleton grade card while loading or pending analysis. */
+    .review-grade-card.skeleton-card {
+      height: 60px;
+      animation: pulse 1.4s ease-in-out infinite;
+      cursor: default;
+    }
+    .review-grade-card.skeleton-card:hover { border-color: var(--border); }
+
+    /* Section 3: Follow-up Email — monospace box + copy button. */
+    .review-followup-wrap { display: flex; flex-direction: column; gap: 12px; }
+    .review-followup-box {
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      color: var(--text-soft);
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 460px;
+      overflow-y: auto;
+      user-select: text;
+    }
+    .review-followup-box.placeholder { color: var(--text-muted); font-style: italic; font-family: inherit; }
+    .review-followup-actions { display: flex; gap: 10px; align-items: center; }
+    .review-copy-feedback {
+      font-size: 12px;
+      color: var(--good);
+      opacity: 0;
+      transition: opacity 0.2s var(--ease);
+    }
+    .review-copy-feedback.show { opacity: 1; }
+
+    /* Loading skeleton for the whole review page (mirrors the three-section layout). */
+    .review-skeleton-section {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      height: 140px;
+      margin-bottom: 18px;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
     /* Scope badge */
     .scope-pill {
       font-size: 10.5px;
@@ -1109,6 +1418,13 @@
     callLibraryHasMore: false, // true if the last page returned === limit (more might exist)
     callLibraryOffset:  0,     // total rows fetched so far; next "Load more" uses this as offset
     callLibraryError:   null,  // last fetch error message; cleared on successful re-fetch
+    // Call Review (Scout v2.0 Phase 2 Step 4)
+    selectedCallId:     null,  // public.fathom_calls(id) UUID of the call being reviewed
+    callReview:         null,  // null pre-load, then the GET /fathom/calls/:id response
+    callReviewLoading:  false, // gates retry click while a fetch is in flight
+    callReviewError:    null,  // last fetch error message; cleared on successful re-fetch
+    expandedGradeCards: {},    // map of section key ('intro'|'discovery'|...) → true when expanded
+    followupCopied:     false, // transient "Copied!" feedback flag (set true, render, then false 2s later)
   };
 
   // ──────────────────────────────────────────────────────────────────
@@ -1349,6 +1665,7 @@
     state.fathomNotice = null;
     if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'call-library') renderCallLibrary();
+    else if (state.view === 'call-review') renderCallReview();
   }
 
   // ─── Fathom rendering helpers ─────────────────────────────────────────
@@ -1559,6 +1876,7 @@
     else if (state.view === 'closes') renderClosesDrill();
     else if (state.view === 'objection-type') renderObjectionTypeDrill();
     else if (state.view === 'call-library') renderCallLibrary();
+    else if (state.view === 'call-review') renderCallReview();
     updateNavActiveStates();
   }
 
@@ -1568,13 +1886,14 @@
   // itself + its donut drills); Calls is active for the call-library view.
   function updateNavActiveStates() {
     var OVERVIEW_VIEWS = { overview: 1, calls: 1, objections: 1, closes: 1, 'objection-type': 1 };
+    var CALL_LIBRARY_VIEWS = { 'call-library': 1, 'call-review': 1 };
     var navOverview = document.getElementById('navOverview');
     var navCallLibrary = document.getElementById('navCallLibrary');
     if (navOverview) {
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view]);
     }
     if (navCallLibrary) {
-      navCallLibrary.classList.toggle('nav-active', state.view === 'call-library');
+      navCallLibrary.classList.toggle('nav-active', !!CALL_LIBRARY_VIEWS[state.view]);
     }
   }
 
@@ -2421,19 +2740,408 @@
     return '<span class="library-status-badge pending">' + escapeHtml(String(analysisStatus)) + '</span>';
   }
 
-  // Placeholder click handler. The real call review page is Phase 2 Step 4;
-  // for now we surface a friendly notice via the existing flash mechanism
-  // so the user gets visible feedback without an alert() or silent click.
-  function openCallReview(callId) {
-    state.fathomNotice = {
-      kind: 'success',
-      text: 'The full call review page is the next Phase 2 step — coming soon. (call id: ' + callId + ')',
+  // ──────────────────────────────────────────────────────────────────
+  // Call Review page — Scout v2.0 Phase 2 Step 4
+  // Navigates to a per-call view that shows highlights timeline, section
+  // grades, and follow-up email. Three sections in fixed order — highlights
+  // come first by design (the brief's "lead with what happened, support
+  // with how it scored").
+  // ──────────────────────────────────────────────────────────────────
+
+  // Format integer seconds as "M:SS" (under 1 hour) or "H:MM:SS" — used for
+  // human-readable highlight timestamps. Raw seconds still drive the
+  // `?t=<seconds>` Fathom deep-link href; the visible label is this.
+  function formatTimestampDisplay(seconds) {
+    if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) return '—';
+    var s = Math.floor(seconds);
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    var sec = s % 60;
+    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+    if (h > 0) return h + ':' + pad(m) + ':' + pad(sec);
+    return m + ':' + pad(sec);
+  }
+
+  async function fetchCallReview(callId) {
+    var res = await fetch('/fathom/calls/' + encodeURIComponent(callId), { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (res.status === 404) throw new Error('Call not found');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+
+  // Fire-and-forget loader. Re-renders the view when done, but only if the
+  // user hasn't navigated away in the meantime AND we're still showing the
+  // call this fetch was kicked off for (guards stale resolves).
+  async function loadCallReview(callId) {
+    if (state.callReviewLoading) return;
+    state.callReviewLoading = true;
+    state.callReviewError = null;
+    try {
+      var data = await fetchCallReview(callId);
+      if (state.selectedCallId !== callId) return; // user navigated away — drop stale data
+      state.callReview = data;
+    } catch (err) {
+      if (err.message === 'unauth') return;
+      if (state.selectedCallId !== callId) return; // same stale-resolve guard for errors
+      state.callReviewError = err.message || 'unknown';
+    }
+    state.callReviewLoading = false;
+    if (state.view === 'call-review') renderCallReview();
+  }
+
+  function renderCallReview() {
+    var content = document.getElementById('content');
+    var callId = state.selectedCallId;
+    if (!callId) { backToCallLibrary(); return; }
+
+    // Pull the partial card from the library cache to render the header
+    // instantly while the full fetch is in flight. Avoids a blank flash.
+    var seed = null;
+    if (Array.isArray(state.callLibrary)) {
+      for (var i = 0; i < state.callLibrary.length; i++) {
+        if (state.callLibrary[i].id === callId) { seed = state.callLibrary[i]; break; }
+      }
+    }
+
+    var review = state.callReview;
+    var header = renderCallReviewHeaderHtml(review, seed);
+    var notice = renderFathomNoticeHtml();
+
+    if (state.callReviewError && !review) {
+      content.innerHTML = header + notice
+        + '<div class="error fade-in">'
+          + 'Could not load this call: ' + escapeHtml(state.callReviewError)
+          + ' <button class="btn-fathom-secondary" style="margin-left:12px;" type="button" onclick="loadCallReview(\'' + escapeHtml(callId) + '\')">Retry</button>'
+        + '</div>';
+      return;
+    }
+
+    if (!review) {
+      // Loading state — three section-sized skeletons under the header.
+      content.innerHTML = header + notice
+        + '<div class="fade-in">'
+          + '<div class="review-skeleton-section"></div>'
+          + '<div class="review-skeleton-section"></div>'
+          + '<div class="review-skeleton-section"></div>'
+        + '</div>';
+      return;
+    }
+
+    var errorBanner = '';
+    if (review.analysis && review.analysis.status === 'error') {
+      var reason = review.analysis.overall_summary || 'Analysis failed.';
+      errorBanner = '<div class="review-analysis-error fade-in">'
+        + '<strong>Analysis error.</strong> ' + escapeHtml(reason)
+        + '</div>';
+    }
+
+    content.innerHTML = header + notice + errorBanner
+      + '<div class="fade-in">'
+        + renderHighlightsSectionHtml(review)
+        + renderGradesSectionHtml(review)
+        + renderFollowupSectionHtml(review)
+      + '</div>';
+  }
+
+  function renderCallReviewHeaderHtml(review, seed) {
+    var src = review || seed || {};
+    var titleText = (src.title && String(src.title).trim()) ? src.title : null;
+    var titleHtml = titleText
+      ? '<h1 class="review-title">' + escapeHtml(titleText) + '</h1>'
+      : '<h1 class="review-title anon">Untitled call</h1>';
+
+    var dateStr = formatNaturalDate(src.call_date);
+    var durStr = formatNaturalDuration(src.duration_seconds);
+    var meta = '<span>' + escapeHtml(dateStr) + '</span>'
+             + '<span class="sep">·</span>'
+             + '<span>' + escapeHtml(durStr) + '</span>';
+
+    // Status badge — when full data has loaded, use analysis.status +
+    // overall_score; otherwise fall back to the library card's
+    // analysis_status field. libraryStatusBadgeHtml handles both shapes.
+    var status = review && review.analysis ? review.analysis.status : (src.analysis_status || null);
+    var score = review && review.analysis ? review.analysis.overall_score : (typeof src.overall_score === 'number' ? src.overall_score : null);
+    var badge = libraryStatusBadgeHtml(status, score);
+
+    var fathomLink = '';
+    if (src.recording_url && typeof src.recording_url === 'string') {
+      fathomLink = '<a class="review-fathom-link" href="' + escapeHtml(src.recording_url) + '" target="_blank" rel="noopener">View in Fathom →</a>';
+    }
+
+    return '<div class="review-page-header fade-in">'
+      + '<button class="review-back-link" type="button" onclick="backToCallLibrary()">← Back to Calls</button>'
+      + '<div class="review-title-row">'
+        + '<div class="review-title-main">'
+          + titleHtml
+          + '<div class="review-meta-row">' + meta + '</div>'
+        + '</div>'
+        + '<div class="review-title-side">'
+          + badge
+          + fathomLink
+        + '</div>'
+      + '</div>'
+    + '</div>';
+  }
+
+  // ─── Section 1: Highlights ────────────────────────────────────────────
+  function renderHighlightsSectionHtml(review) {
+    var analysis = review.analysis;
+    var highlights = Array.isArray(review.highlights) ? review.highlights : [];
+    var recordingUrl = review.recording_url || null;
+    var analysisDone = analysis && analysis.status === 'done';
+
+    var body;
+    if (highlights.length > 0) {
+      body = '<div class="review-highlight-list">'
+        + highlights.map(function(h) { return highlightEntryHtml(h, recordingUrl); }).join('')
+        + '</div>';
+    } else if (!analysisDone) {
+      body = '<div class="review-highlights-pending">Analysis in progress — highlights will appear here shortly.</div>';
+    } else {
+      body = '<div class="review-highlights-pending">No highlights were extracted for this call.</div>';
+    }
+
+    // One-thing footer — always rendered, falls back to a placeholder.
+    var oneThing = analysis && typeof analysis.one_thing === 'string' && analysis.one_thing.trim()
+      ? '<div class="review-one-thing-text">' + escapeHtml(analysis.one_thing) + '</div>'
+      : '<div class="review-one-thing-text placeholder">Will appear when analysis completes.</div>';
+
+    return '<section class="section">'
+      + '<div class="section-header"><h2>Call Highlights</h2></div>'
+      + body
+      + '<div class="review-one-thing">'
+        + '<div class="review-one-thing-label">One thing to do differently</div>'
+        + oneThing
+      + '</div>'
+    + '</section>';
+  }
+
+  function highlightEntryHtml(h, recordingUrl) {
+    var seconds = (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null;
+    var label = (seconds != null) ? formatTimestampDisplay(seconds) : '—';
+    var timeHtml;
+    if (seconds != null && recordingUrl && typeof recordingUrl === 'string') {
+      var href = recordingUrl + (recordingUrl.indexOf('?') !== -1 ? '&' : '?') + 't=' + seconds;
+      timeHtml = '<a class="review-highlight-time" href="' + escapeHtml(href)
+        + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + escapeHtml(label) + '</a>';
+    } else {
+      timeHtml = '<span class="review-highlight-time disabled">' + escapeHtml(label) + '</span>';
+    }
+
+    var speakerClass = (h.speaker === 'CLOSER') ? 'closer' : 'prospect';
+    var speakerBadge = '<span class="review-speaker-badge ' + speakerClass + '">' + escapeHtml(h.speaker || '') + '</span>';
+
+    var typeLabel = highlightTypeLabel(h.type);
+    var typeClass = (typeof h.type === 'string') ? h.type.toLowerCase() : '';
+    var typeBadge = '<span class="review-type-badge ' + escapeHtml(typeClass) + '">' + escapeHtml(typeLabel) + '</span>';
+
+    var quote = (typeof h.quote === 'string') ? h.quote : '';
+    var observation = (typeof h.observation === 'string') ? h.observation : '';
+
+    return '<div class="review-highlight">'
+      + timeHtml
+      + '<div class="review-highlight-body">'
+        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + '</div>'
+        + '<div class="review-quote">' + escapeHtml(quote) + '</div>'
+        + '<div class="review-observation">' + escapeHtml(observation) + '</div>'
+      + '</div>'
+    + '</div>';
+  }
+
+  function highlightTypeLabel(type) {
+    var labels = {
+      buying_signal:      'Buying signal',
+      objection:          'Objection',
+      missed_opportunity: 'Missed opportunity',
+      strong_moment:      'Strong moment',
+      rapport_moment:     'Rapport',
+      disqualify_signal:  'Disqualify signal',
     };
-    // Re-render so the notice appears immediately. The notice mechanism
-    // already lives at the top of the rendered content for both overview
-    // and call-library views (see renderFathomNoticeHtml).
-    if (state.view === 'call-library') renderCallLibrary();
-    else if (state.view === 'overview') renderOverview(false);
+    return (type && labels[type]) || (type || 'Moment');
+  }
+
+  // ─── Section 2: Section Grades — five collapsible cards ───────────────
+  var REVIEW_SECTION_KEYS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
+  var REVIEW_SECTION_LABELS = {
+    intro:     'Intro',
+    discovery: 'Discovery',
+    pitch:     'Pitch',
+    objection: 'Objection handling',
+    close:     'Close',
+  };
+
+  function renderGradesSectionHtml(review) {
+    var analysis = review.analysis;
+    var analysisDone = analysis && analysis.status === 'done';
+
+    // All-expand toggle — only meaningful when there's actual data.
+    var anyExpanded = REVIEW_SECTION_KEYS.some(function(k) { return !!state.expandedGradeCards[k]; });
+    var toggleLabel = anyExpanded ? 'Collapse all' : 'Expand all';
+    var toggleBtn = analysisDone
+      ? '<button class="review-grades-toggle" type="button" onclick="toggleAllGrades()">' + toggleLabel + '</button>'
+      : '';
+
+    var cards;
+    if (analysisDone) {
+      cards = REVIEW_SECTION_KEYS.map(function(k) { return gradeCardHtml(k, analysis); }).join('');
+    } else {
+      // Skeleton placeholders — 5 cards, pulsing, no interaction.
+      var s = '';
+      for (var i = 0; i < REVIEW_SECTION_KEYS.length; i++) s += '<div class="review-grade-card skeleton-card"></div>';
+      cards = s;
+    }
+
+    return '<section class="section">'
+      + '<div class="section-header"><h2>Section grades</h2>' + toggleBtn + '</div>'
+      + '<div class="review-grade-list">' + cards + '</div>'
+    + '</section>';
+  }
+
+  function gradeCardHtml(sectionKey, analysis) {
+    var label = REVIEW_SECTION_LABELS[sectionKey];
+    var grade = analysis[sectionKey + '_grade'];
+    var score = analysis[sectionKey + '_score'];
+    var notes = analysis[sectionKey + '_notes'];
+    var expanded = !!state.expandedGradeCards[sectionKey];
+
+    var letterHtml;
+    if (grade && /^[A-F]$/.test(grade)) {
+      letterHtml = '<div class="review-grade-letter ' + grade + '">' + grade + '</div>';
+    } else {
+      letterHtml = '<div class="review-grade-letter empty">—</div>';
+    }
+
+    var scoreText = (typeof score === 'number') ? score + '/100' : '';
+    var chevron = '<span class="review-grade-chevron">▾</span>';
+
+    var notesHtml = '';
+    if (expanded) {
+      var notesText = (typeof notes === 'string' && notes.trim()) ? notes : 'No notes recorded.';
+      var notesClass = (typeof notes === 'string' && notes.trim()) ? 'review-grade-notes' : 'review-grade-notes placeholder';
+      notesHtml = '<div class="review-grade-body">'
+        + '<div class="' + notesClass + '">' + escapeHtml(notesText) + '</div>'
+      + '</div>';
+    }
+
+    var notOccurred = (grade === null && score === null && typeof notes === 'string' && notes.indexOf('did not occur') !== -1);
+    var cardClass = 'review-grade-card'
+      + (expanded ? ' expanded' : '')
+      + (notOccurred ? ' not-occurred' : '');
+
+    return '<div class="' + cardClass + '">'
+      + '<div class="review-grade-card-header" onclick="toggleGradeCard(\'' + sectionKey + '\')">'
+        + '<div class="review-grade-name">' + escapeHtml(label) + '</div>'
+        + letterHtml
+        + '<div class="review-grade-score">' + escapeHtml(scoreText) + '</div>'
+        + chevron
+      + '</div>'
+      + notesHtml
+    + '</div>';
+  }
+
+  function toggleGradeCard(sectionKey) {
+    state.expandedGradeCards[sectionKey] = !state.expandedGradeCards[sectionKey];
+    if (state.view === 'call-review') renderCallReview();
+  }
+
+  function toggleAllGrades() {
+    var anyExpanded = REVIEW_SECTION_KEYS.some(function(k) { return !!state.expandedGradeCards[k]; });
+    var nextValue = !anyExpanded; // if any open → collapse all; else expand all
+    var next = {};
+    for (var i = 0; i < REVIEW_SECTION_KEYS.length; i++) next[REVIEW_SECTION_KEYS[i]] = nextValue;
+    state.expandedGradeCards = next;
+    if (state.view === 'call-review') renderCallReview();
+  }
+
+  // ─── Section 3: Follow-up Email ───────────────────────────────────────
+  function renderFollowupSectionHtml(review) {
+    var analysis = review.analysis;
+    var email = analysis && typeof analysis.follow_up_email === 'string' ? analysis.follow_up_email : '';
+    var hasEmail = !!(email && email.trim());
+
+    var boxHtml;
+    if (hasEmail) {
+      boxHtml = '<div class="review-followup-box" id="reviewFollowupBox">' + escapeHtml(email) + '</div>';
+    } else if (analysis && analysis.status === 'done') {
+      boxHtml = '<div class="review-followup-box placeholder">No follow-up email was generated for this call.</div>';
+    } else {
+      boxHtml = '<div class="review-followup-box placeholder">A follow-up draft will appear here once analysis completes.</div>';
+    }
+
+    var copyBtn = hasEmail
+      ? '<button class="btn-fathom-secondary" type="button" onclick="copyFollowupEmail()">Copy</button>'
+      : '<button class="btn-fathom-secondary" type="button" disabled>Copy</button>';
+    var feedback = '<span class="review-copy-feedback' + (state.followupCopied ? ' show' : '') + '">Copied!</span>';
+
+    return '<section class="section">'
+      + '<div class="section-header"><h2>Follow-up email</h2></div>'
+      + '<div class="review-followup-wrap">'
+        + boxHtml
+        + '<div class="review-followup-actions">' + copyBtn + feedback + '</div>'
+      + '</div>'
+    + '</section>';
+  }
+
+  function copyFollowupEmail() {
+    var review = state.callReview;
+    if (!review || !review.analysis || !review.analysis.follow_up_email) return;
+    var text = review.analysis.follow_up_email;
+    var writePromise = (navigator.clipboard && navigator.clipboard.writeText)
+      ? navigator.clipboard.writeText(text)
+      : new Promise(function(resolve, reject) {
+          // Fallback: textarea + execCommand. Older browsers / non-HTTPS dev contexts.
+          try {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            resolve();
+          } catch (e) { reject(e); }
+        });
+    writePromise.then(function() {
+      state.followupCopied = true;
+      if (state.view === 'call-review') renderCallReview();
+      setTimeout(function() {
+        state.followupCopied = false;
+        if (state.view === 'call-review') renderCallReview();
+      }, 1800);
+    }).catch(function(err) {
+      console.warn('[review] clipboard write failed:', err);
+    });
+  }
+
+  function backToCallLibrary() {
+    state.view = 'call-library';
+    state.selectedCallId = null;
+    // Intentionally keep state.callReview around in case the user re-opens
+    // the same call — but null it so a subsequent open kicks a fresh fetch
+    // and reflects any analysis-status changes that happened in the meantime.
+    state.callReview = null;
+    state.callReviewError = null;
+    state.expandedGradeCards = {};
+    state.followupCopied = false;
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Real navigator. Replaces the Phase 2 Step 3 placeholder that only
+  // surfaced a flash notice. Opens the call review page, kicks off the
+  // detailed fetch in the background, and scrolls to top.
+  function openCallReview(callId) {
+    state.selectedCallId = callId;
+    state.callReview = null;
+    state.callReviewError = null;
+    state.expandedGradeCards = {};
+    state.followupCopied = false;
+    state.view = 'call-review';
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    loadCallReview(callId); // async, re-renders when done
   }
 
   init();

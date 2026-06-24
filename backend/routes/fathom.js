@@ -541,6 +541,84 @@ router.get('/calls', requireAuth, async function(req, res) {
   }
 });
 
+// ── GET /fathom/calls/:id ────────────────────────────────────────────────────
+// Powers the Call Review page. Returns ONE call plus its companion
+// call_analyses row (or null) and call_highlights rows (ordered by
+// sequence_order ASC). 404 if the call doesn't exist OR belongs to a
+// different user — same opacity pattern as /me/sessions/:id/logs to avoid
+// leaking call-id validity to unauthorized users.
+//
+// Two queries + JS merge (matches the /calls precedent — supabase-js v2 has
+// no native JOIN; embed-via-FK was considered but adds complexity for a
+// zero-or-one relationship). Highlights query is non-fatal: a transient
+// call_highlights outage still surfaces the call + its analysis with
+// highlights:[].
+router.get('/calls/:id', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+  var callId = req.params.id;
+  if (!callId) return res.status(400).json({ error: 'call id required' });
+
+  try {
+    var admin = getAdminClient();
+
+    // 1) Call row — ownership-checked. 404 covers both "doesn't exist" and
+    //    "belongs to another user" to avoid leaking ID validity.
+    var callResult = await admin
+      .from('fathom_calls')
+      .select('id, user_id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status')
+      .eq('id', callId)
+      .maybeSingle();
+    if (callResult.error) {
+      console.error('[fathom] /calls/:id fetch failed for user ' + userId + ' call ' + callId + ': ' + callResult.error.message);
+      return res.status(500).json({ error: 'Could not load call' });
+    }
+    if (!callResult.data || callResult.data.user_id !== userId) {
+      return res.status(404).json({ error: 'Call not found' });
+    }
+    var call = callResult.data;
+
+    // 2) Analysis row (zero-or-one). Non-fatal: render the call without
+    //    analysis fields if the table read errors.
+    var analysisResult = await admin
+      .from('call_analyses')
+      .select('status, overall_score, overall_summary, one_thing, follow_up_email, speaker_closer_name, intro_grade, intro_score, intro_notes, discovery_grade, discovery_score, discovery_notes, pitch_grade, pitch_score, pitch_notes, objection_grade, objection_score, objection_notes, close_grade, close_score, close_notes')
+      .eq('fathom_call_id', callId)
+      .maybeSingle();
+    if (analysisResult.error) {
+      console.error('[fathom] /calls/:id analysis fetch failed for user ' + userId + ' call ' + callId + ': ' + analysisResult.error.message);
+    }
+    var analysis = analysisResult.data || null;
+
+    // 3) Highlights rows (zero or many). Non-fatal — render with empty
+    //    highlights array on failure so the page still loads.
+    var highlightsResult = await admin
+      .from('call_highlights')
+      .select('timestamp_seconds, speaker, quote, observation, type, sequence_order')
+      .eq('fathom_call_id', callId)
+      .order('sequence_order', { ascending: true });
+    if (highlightsResult.error) {
+      console.error('[fathom] /calls/:id highlights fetch failed for user ' + userId + ' call ' + callId + ': ' + highlightsResult.error.message);
+    }
+    var highlights = highlightsResult.data || [];
+
+    res.json({
+      id:               call.id,
+      fathom_call_id:   call.fathom_call_id,
+      title:            call.title,
+      call_date:        call.call_date,
+      duration_seconds: call.duration_seconds,
+      recording_url:    call.recording_url,
+      sync_status:      call.sync_status,
+      analysis:         analysis,
+      highlights:       highlights,
+    });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] /calls/:id fatal for user ' + userId + ' call ' + callId + ':', err.message);
+    res.status(500).json({ error: 'Failed to load call' });
+  }
+});
+
 // Exported for backend/lib/analysis-worker.js — same precedent as me.js
 // (router._computeCoachingPatterns, etc.). Lib code that needs the same
 // token-refresh + Fathom-fetch logic imports these rather than duplicating.
