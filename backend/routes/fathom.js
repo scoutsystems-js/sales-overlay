@@ -226,6 +226,46 @@ async function fetchMeetingsPage(accessToken, cursor, createdAfter, includeTrans
   return data;
 }
 
+// One recording's transcript via the dedicated /recordings/{id}/transcript
+// endpoint. OAuth apps CANNOT use ?include_transcript=true on /meetings — for
+// OAuth-scoped tokens that param is silently ignored, so the meeting payload
+// comes back with NO transcript and the analysis worker would see zero turns.
+// This sync-mode call (no destination_url param) returns the transcript array
+// inline in the response body. Auth is Bearer, same pattern as
+// fetchMeetingsPage. Returns response.transcript; throws on non-200 or a
+// missing/invalid transcript field. Errors logged with the [fathom] prefix.
+async function fetchRecordingTranscript(accessToken, recordingId) {
+  var url = FATHOM_API_BASE + '/recordings/' + encodeURIComponent(recordingId) + '/transcript';
+
+  var resp = await fetch(url, {
+    method:  'GET',
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'Accept':        'application/json',
+    },
+  });
+
+  if (!resp.ok) {
+    var bodyText = '';
+    try { bodyText = await resp.text(); } catch (e) { /* ignore */ }
+    console.error('[fathom] transcript fetch failed for recording ' + recordingId + ': HTTP ' + resp.status + ' — ' + bodyText.slice(0, 200));
+    throw new Error('transcript_fetch_failed: HTTP ' + resp.status + ' — ' + bodyText.slice(0, 200));
+  }
+
+  var data;
+  try {
+    data = await resp.json();
+  } catch (err) {
+    console.error('[fathom] transcript fetch returned invalid JSON for recording ' + recordingId);
+    throw new Error('transcript_fetch_failed: invalid JSON response');
+  }
+  if (!data || !Array.isArray(data.transcript)) {
+    console.error('[fathom] transcript fetch response missing transcript array for recording ' + recordingId);
+    throw new Error('transcript_fetch_failed: response missing transcript array');
+  }
+  return data.transcript;
+}
+
 // Map a Fathom Meeting object → fathom_calls row. Returns null if the
 // meeting is malformed enough that we can't safely insert it (no recording_id).
 // transcript_url stays NULL — Fathom returns transcripts inline via
@@ -629,6 +669,7 @@ router.get('/calls/:id', requireAuth, async function(req, res) {
 router._getValidAccessToken = getValidAccessToken;
 router._refreshFathomToken  = refreshFathomToken;
 router._fetchMeetingsPage   = fetchMeetingsPage;
+router._fetchRecordingTranscript = fetchRecordingTranscript;
 router._markConnectionError = markConnectionError;
 
 module.exports = router;

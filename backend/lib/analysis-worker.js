@@ -195,7 +195,11 @@ async function findMeeting(accessToken, recordingId, callDate) {
   var cursor = null;
   var pagesWalked = 0;
   for (var page = 0; page < MAX_SEARCH_PAGES; page++) {
-    var data = await fathomRoutes._fetchMeetingsPage(accessToken, cursor, createdAfter, true, true);
+    // includeTranscript=false: OAuth apps can't use include_transcript on
+    // /meetings (silently ignored), so we no longer ask for it here — the
+    // transcript is fetched separately via /recordings/{id}/transcript in
+    // analyzeCall. includeHighlights=true stays (highlights DO come back inline).
+    var data = await fathomRoutes._fetchMeetingsPage(accessToken, cursor, createdAfter, false, true);
     pagesWalked++;
     var items = Array.isArray(data.items) ? data.items : [];
     for (var i = 0; i < items.length; i++) {
@@ -443,6 +447,29 @@ async function analyzeCall(fathomCallId, userId) {
       return { status: 'error', reason: notFoundReason };
     }
     var meeting = found.meeting;
+
+    // ─── Phase 4b: fetch the transcript separately ────────────────────────
+    // The meeting payload above carries NO transcript — OAuth apps can't use
+    // ?include_transcript=true on /meetings (it's silently ignored for OAuth
+    // tokens). Pull the transcript from the dedicated /recordings/{id}/transcript
+    // endpoint and splice it onto the meeting object before normalization, which
+    // reads meeting.transcript. recording_id is Fathom's numeric id (the same
+    // value stored in fathom_calls.fathom_call_id). A transcript fetch failure
+    // marks the analysis errored and returns — same pattern as the other exits.
+    try {
+      var transcript = await fathomRoutes._fetchRecordingTranscript(accessToken, meeting.recording_id);
+      meeting.transcript = transcript;
+      console.log('[analysis] Fetched transcript for call ' + fathomCallId + ' (recording_id ' + meeting.recording_id + ', turns=' + transcript.length + ')');
+    } catch (transcriptErr) {
+      var transcriptReason = 'Transcript fetch failed for recording_id ' + meeting.recording_id + ': ' + ((transcriptErr && transcriptErr.message) || 'unknown');
+      await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
+        overall_summary: transcriptReason,
+        analyzed_at:     new Date().toISOString(),
+      });
+      await markFathomCallErrored(admin, fathomCallId, userId);
+      console.error('[analysis] ' + transcriptReason + ' (call=' + fathomCallId + ' user=' + userId + ')');
+      return { status: 'error', reason: transcriptReason };
+    }
 
     // ─── Phase 5: normalize ──────────────────────────────────────────────
     var normalized = normalizeTranscript(meeting);
