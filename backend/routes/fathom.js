@@ -441,6 +441,66 @@ router.get('/sync', requireAuth, async function(req, res) {
   }
 });
 
+// ── POST /fathom/reanalyze ────────────────────────────────────────────────────
+// Retry analysis on calls already in the DB but still sitting at
+// sync_status='pending' — e.g. rows reset back to 'pending' after a worker bug
+// fix (the OAuth transcript fix that left Josh's 200 calls stuck at 'error').
+// The /sync route only dispatches analyzeCall for NEWLY-inserted rows, so
+// pre-existing pending rows never get picked up; this route is the manual
+// re-trigger (and the foundation of the Phase 2 dashboard retry button).
+//
+// Does NOT call Fathom's /meetings — it re-analyzes what's already stored.
+// Returns { queued: N } immediately; analysis runs in the same fire-and-forget
+// IIFE pattern as /sync so the caller never waits.
+router.post('/reanalyze', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+  try {
+    var admin = getAdminClient();
+
+    // Pull every pending call for this caller. Scoped to user_id so one
+    // closer's retry can never touch another's rows.
+    var pendingResult = await admin
+      .from('fathom_calls')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('sync_status', 'pending');
+    if (pendingResult.error) {
+      console.error('[fathom] reanalyze lookup failed for user ' + userId + ': ' + pendingResult.error.message);
+      return res.status(500).json({ error: 'Could not load pending calls' });
+    }
+    var pendingIds = (pendingResult.data || []).map(function(r) { return r.id; });
+
+    // Fire-and-forget — identical dispatch shape to the /sync IIFE: sequential
+    // (Anthropic rate limits + predictable dashboard ordering), lazy-required to
+    // dodge the routes/fathom.js ↔ lib/analysis-worker.js circular dependency,
+    // per-call errors caught + logged, never propagated. The response below has
+    // already been sent by the time these run — closers never wait.
+    if (pendingIds.length > 0) {
+      (async function() {
+        try {
+          var analyzeCall = require('../lib/analysis-worker').analyzeCall;
+          for (var i = 0; i < pendingIds.length; i++) {
+            try {
+              await analyzeCall(pendingIds[i], userId);
+            } catch (innerErr) {
+              console.error('[fathom] reanalyze analyzeCall failed for call ' + pendingIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown'));
+            }
+          }
+        } catch (outerErr) {
+          console.error('[fathom] reanalyze background loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
+        }
+      })();
+    }
+
+    console.log('[fathom] Reanalyze queued for user ' + userId + ': pending=' + pendingIds.length);
+    return res.json({ queued: pendingIds.length });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] reanalyze fatal for user ' + userId + ':', err.message);
+    res.status(500).json({ error: 'Reanalyze failed' });
+  }
+});
+
 // ── GET /fathom/status ───────────────────────────────────────────────────────
 // Dashboard polls this on load to decide which Fathom strip to show.
 // Returns connection metadata (with tokens redacted — never leak) plus the
@@ -460,9 +520,18 @@ router.get('/status', requireAuth, async function(req, res) {
       .from('fathom_calls')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId);
+    // Pending-call count drives the dashboard's "Reanalyze" button visibility —
+    // the button only shows when there are calls sitting at sync_status='pending'
+    // waiting for the analysis worker (e.g. rows reset after the transcript fix).
+    var pendingCountPromise = admin
+      .from('fathom_calls')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('sync_status', 'pending');
 
     var connResult = await connPromise;
     var countResult = await countPromise;
+    var pendingCountResult = await pendingCountPromise;
 
     if (connResult.error) {
       console.error('[fathom] status connection lookup failed for user ' + userId + ': ' + connResult.error.message);
@@ -471,6 +540,10 @@ router.get('/status', requireAuth, async function(req, res) {
     if (countResult.error) {
       // Non-fatal: render with 0 calls. The strip will still show connection state.
       console.error('[fathom] status count lookup failed for user ' + userId + ': ' + countResult.error.message);
+    }
+    if (pendingCountResult.error) {
+      // Non-fatal: render with 0 pending (Reanalyze button stays hidden).
+      console.error('[fathom] status pending-count lookup failed for user ' + userId + ': ' + pendingCountResult.error.message);
     }
 
     if (!connResult.data) {
@@ -486,6 +559,7 @@ router.get('/status', requireAuth, async function(req, res) {
       scope:            c.scope,
       expires_at:       c.expires_at,
       call_count:       (typeof countResult.count === 'number') ? countResult.count : 0,
+      pending_count:    (typeof pendingCountResult.count === 'number') ? pendingCountResult.count : 0,
     });
   } catch (err) {
     if (handleConfigError(err, res)) return;

@@ -1412,6 +1412,7 @@
     fathomStatus:    null,    // null until /fathom/status fetch completes; then { connected: bool, ... }
     fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
+    fathomReanalyzing: false, // true while a /fathom/reanalyze request is in flight; drives the Reanalyze button spinner
     // Call Library (Scout v2.0 Phase 2 Step 3)
     callLibrary:        null,  // null pre-load, then array of call rows from /fathom/calls
     callLibraryLoading: false, // gates "Load more" button while a fetch is in flight
@@ -1661,6 +1662,45 @@
     await refreshFathomStatusInBackground();
   }
 
+  // Button handler: re-trigger analysis on calls already synced but still
+  // pending (POST /fathom/reanalyze — does NOT re-sync from Fathom). Used to
+  // unstick calls that were reset from 'error' back to 'pending' after the
+  // OAuth transcript fix. Mirrors syncFathomNow's flag-guarded, notice-driven
+  // shape; the queued count comes back immediately, analysis runs server-side.
+  async function reanalyzeFathomNow() {
+    if (state.fathomReanalyzing) return; // guard against double-click
+    state.fathomReanalyzing = true;
+    if (state.view === 'overview') renderOverview(false);
+
+    var noticeText = null;
+    var noticeKind = 'success';
+    try {
+      var res = await fetch('/fathom/reanalyze', { method: 'POST', headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (res.ok) {
+        var data = await res.json();
+        var n = (data && typeof data.queued === 'number') ? data.queued : 0;
+        noticeText = n === 0
+          ? 'No pending calls to reanalyze.'
+          : 'Queued ' + n + ' call' + (n === 1 ? '' : 's') + ' for reanalysis. Grades will populate as each finishes.';
+      } else {
+        var errBody = null;
+        try { errBody = await res.json(); } catch (e) { /* ignore */ }
+        noticeText = 'Reanalyze failed: ' + (errBody && errBody.error ? errBody.error : 'HTTP ' + res.status);
+        noticeKind = 'error';
+      }
+    } catch (err) {
+      noticeText = 'Reanalyze error: ' + (err && err.message || 'unknown');
+      noticeKind = 'error';
+    }
+    state.fathomNotice = { kind: noticeKind, text: noticeText };
+    state.fathomReanalyzing = false;
+    // Refresh status so pending_count (and thus button visibility) reflects the
+    // dispatch. Note the count won't drop to 0 instantly — the worker flips rows
+    // to 'processed' asynchronously; a later status poll catches up.
+    await refreshFathomStatusInBackground();
+  }
+
   function dismissFathomNotice() {
     state.fathomNotice = null;
     if (state.view === 'overview') renderOverview(false);
@@ -1721,10 +1761,22 @@
 
   function renderFathomStripConnected(status) {
     var count = (typeof status.call_count === 'number') ? status.call_count : 0;
+    var pending = (typeof status.pending_count === 'number') ? status.pending_count : 0;
     var lastSync = status.last_sync_at ? formatRelativeTime(status.last_sync_at) : 'never';
     var syncBtn = state.fathomSyncing
       ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Syncing…</button>'
       : '<button class="btn-fathom-secondary" type="button" onclick="syncFathomNow()">↻ Sync now</button>';
+    // Reanalyze button + "N pending analysis" meta only appear when calls are
+    // sitting at sync_status='pending' (newly synced or reset back to the worker).
+    var reanalyzeBtn = '';
+    if (pending > 0) {
+      reanalyzeBtn = state.fathomReanalyzing
+        ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Reanalyzing…</button>'
+        : '<button class="btn-fathom-secondary" type="button" onclick="reanalyzeFathomNow()">⟳ Reanalyze ' + pending + ' pending</button>';
+    }
+    var pendingMeta = pending > 0
+      ? '<span class="fathom-strip-sep">·</span><span class="fathom-strip-meta">' + pending + ' pending analysis</span>'
+      : '';
     return '<div class="fathom-strip">'
       + '<div class="fathom-strip-left">'
         + '<span class="fathom-strip-icon ok"></span>'
@@ -1733,8 +1785,9 @@
         + '<span class="fathom-strip-meta">' + count + ' call' + (count === 1 ? '' : 's') + ' synced</span>'
         + '<span class="fathom-strip-sep">·</span>'
         + '<span class="fathom-strip-meta">Last sync ' + escapeHtml(lastSync) + '</span>'
+        + pendingMeta
       + '</div>'
-      + syncBtn
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + syncBtn + reanalyzeBtn + '</div>'
       + '</div>';
   }
 
