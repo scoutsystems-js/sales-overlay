@@ -175,6 +175,12 @@ function formatTurnsForPrompt(turns) {
   }).join('\n');
 }
 
+// SUPERSEDED (2026-07): no longer called by analyzeCall — the /meetings search
+// below failed for all 200 of Josh's calls (created_after window + 3-page cap
+// never surfaced the target). analyzeCall now fetches the transcript directly
+// via /recordings/{id}/transcript using the stored fathom_call_id. Kept intact
+// for reference / rollback; safe to delete once the direct-fetch path is proven.
+//
 // Find the Fathom meeting matching one recording_id by walking /meetings
 // filtered by created_after = (call_date - 10min). Up to MAX_SEARCH_PAGES
 // pages — past that we surface "not found" rather than blow Anthropic budget
@@ -414,7 +420,7 @@ async function analyzeCall(fathomCallId, userId) {
     // ─── Phase 2: load the fathom_calls row ───────────────────────────────
     var callQ = await admin
       .from('fathom_calls')
-      .select('id, fathom_call_id, call_date, duration_seconds, user_id')
+      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url')
       .eq('id', fathomCallId)
       .maybeSingle();
     if (callQ.error) throw new Error('fathom_calls fetch: ' + callQ.error.message);
@@ -434,34 +440,22 @@ async function analyzeCall(fathomCallId, userId) {
     if (!connQ.data) throw new Error('Fathom connection not found for user ' + userId);
     var accessToken = await fathomRoutes._getValidAccessToken(admin, userId, connQ.data);
 
-    // ─── Phase 4: find the meeting on Fathom (transcript + highlights inline) ──
-    var found = await findMeeting(accessToken, callRow.fathom_call_id, callRow.call_date);
-    if (!found.meeting) {
-      var notFoundReason = 'Fathom returned no meeting matching recording_id ' + callRow.fathom_call_id + ' within ' + found.pagesWalked + ' page(s)';
-      await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
-        overall_summary: notFoundReason,
-        analyzed_at:     new Date().toISOString(),
-      });
-      await markFathomCallErrored(admin, fathomCallId, userId);
-      console.error('[analysis] ' + notFoundReason + ' (call=' + fathomCallId + ' user=' + userId + ')');
-      return { status: 'error', reason: notFoundReason };
-    }
-    var meeting = found.meeting;
-
-    // ─── Phase 4b: fetch the transcript separately ────────────────────────
-    // The meeting payload above carries NO transcript — OAuth apps can't use
-    // ?include_transcript=true on /meetings (it's silently ignored for OAuth
-    // tokens). Pull the transcript from the dedicated /recordings/{id}/transcript
-    // endpoint and splice it onto the meeting object before normalization, which
-    // reads meeting.transcript. recording_id is Fathom's numeric id (the same
-    // value stored in fathom_calls.fathom_call_id). A transcript fetch failure
-    // marks the analysis errored and returns — same pattern as the other exits.
+    // ─── Phase 4: fetch transcript directly by stored recording_id ────────
+    // findMeeting() bypassed (kept below, unused — see the SUPERSEDED note on
+    // the function). It re-listed /meetings and searched for a matching
+    // recording_id, which failed systematically for all 200 of Josh's calls:
+    // the created_after window + 3-page cap never surfaced the target meeting.
+    // Everything the pipeline needs is already on callRow (loaded in Phase 2)
+    // plus the transcript, which we pull straight from the recording endpoint
+    // using the stored fathom_call_id. Fathom highlights are skipped — the
+    // Claude highlight extractor derives highlights from the transcript anyway —
+    // and recorded_by is null, so speaker identification falls back to Claude
+    // role inference (normalizeTranscript sets speaker_confidence='unknown').
+    var transcript;
     try {
-      var transcript = await fathomRoutes._fetchRecordingTranscript(accessToken, meeting.recording_id);
-      meeting.transcript = transcript;
-      console.log('[analysis] Fetched transcript for call ' + fathomCallId + ' (recording_id ' + meeting.recording_id + ', turns=' + transcript.length + ')');
+      transcript = await fathomRoutes._fetchRecordingTranscript(accessToken, callRow.fathom_call_id);
     } catch (transcriptErr) {
-      var transcriptReason = 'Transcript fetch failed for recording_id ' + meeting.recording_id + ': ' + ((transcriptErr && transcriptErr.message) || 'unknown');
+      var transcriptReason = 'Transcript fetch failed for recording_id ' + callRow.fathom_call_id + ': ' + ((transcriptErr && transcriptErr.message) || 'unknown');
       await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
         overall_summary: transcriptReason,
         analyzed_at:     new Date().toISOString(),
@@ -471,10 +465,34 @@ async function analyzeCall(fathomCallId, userId) {
       return { status: 'error', reason: transcriptReason };
     }
 
+    // DIAGNOSTIC (temporary): first live exercise of /recordings/{id}/transcript.
+    // Log the turn count + raw first-turn JSON so we can confirm the per-turn
+    // field names (speaker.display_name / text / timestamp) from Railway logs.
+    // Remove once the transcript shape is verified against real data.
+    console.log('[analysis] transcript length: ' + (Array.isArray(transcript) ? transcript.length : '(not an array)') + ' (call=' + fathomCallId + ' recording_id=' + callRow.fathom_call_id + ')');
+    console.log('[analysis] transcript shape sample:', JSON.stringify(transcript && transcript[0]));
+
+    // Minimal source-agnostic meeting object built from the DB row + transcript.
+    var meeting = {
+      recording_id:  callRow.fathom_call_id,
+      title:         callRow.title,
+      recording_url: callRow.recording_url,
+      created_at:    callRow.call_date,
+      transcript:    transcript,
+      highlights:    [],    // Fathom highlights skipped — extractor derives them
+      recorded_by:   null,  // → speaker_confidence='unknown', Claude infers roles
+    };
+
     // ─── Phase 5: normalize ──────────────────────────────────────────────
     var normalized = normalizeTranscript(meeting);
     if (!normalized.turns || normalized.turns.length === 0) {
-      var emptyReason = 'Fathom meeting has no transcript turns (recording_id ' + callRow.fathom_call_id + ')';
+      // Include the raw first turn so a field-name mismatch between
+      // /recordings/{id}/transcript and what normalizeTranscript expects
+      // (turn.speaker.display_name / turn.text / turn.timestamp) is visible
+      // directly on the dashboard error card — no Railway log access required.
+      var rawSample = JSON.stringify(transcript && transcript[0]);
+      if (rawSample && rawSample.length > 500) rawSample = rawSample.slice(0, 500) + '…';
+      var emptyReason = 'No transcript turns after normalize (recording_id ' + callRow.fathom_call_id + '; fetched ' + (Array.isArray(transcript) ? transcript.length : 0) + ' raw turn(s)). First raw turn: ' + rawSample;
       await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
         overall_summary: emptyReason,
         analyzed_at:     new Date().toISOString(),
