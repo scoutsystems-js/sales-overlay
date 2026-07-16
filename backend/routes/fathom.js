@@ -457,13 +457,26 @@ router.post('/reanalyze', requireAuth, async function(req, res) {
   try {
     var admin = getAdminClient();
 
-    // Pull every pending call for this caller. Scoped to user_id so one
+    // Batch size from the request body. Default 10, hard cap 50 — keeps one
+    // click to a bounded, quality-checkable sample rather than draining a huge
+    // backlog (Josh had 381 pending) into a multi-hour, full-budget run. The
+    // detached fire-and-forget loop below isn't durable across dyno restarts,
+    // so smaller batches also bound how much is lost if a redeploy interrupts it.
+    var body = req.body || {};
+    var limit = parseInt(body.limit, 10);
+    if (!limit || limit < 1) limit = 10;
+    if (limit > 50) limit = 50;
+
+    // Pull this caller's pending calls, most recent first (recent calls are the
+    // ones worth reviewing), capped at the batch limit. Scoped to user_id so one
     // closer's retry can never touch another's rows.
     var pendingResult = await admin
       .from('fathom_calls')
       .select('id')
       .eq('user_id', userId)
-      .eq('sync_status', 'pending');
+      .eq('sync_status', 'pending')
+      .order('call_date', { ascending: false, nullsFirst: false })
+      .limit(limit);
     if (pendingResult.error) {
       console.error('[fathom] reanalyze lookup failed for user ' + userId + ': ' + pendingResult.error.message);
       return res.status(500).json({ error: 'Could not load pending calls' });
@@ -492,8 +505,8 @@ router.post('/reanalyze', requireAuth, async function(req, res) {
       })();
     }
 
-    console.log('[fathom] Reanalyze queued for user ' + userId + ': pending=' + pendingIds.length);
-    return res.json({ queued: pendingIds.length });
+    console.log('[fathom] Reanalyze queued for user ' + userId + ': queued=' + pendingIds.length + ' (batch_limit=' + limit + ')');
+    return res.json({ queued: pendingIds.length, batch_limit: limit });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] reanalyze fatal for user ' + userId + ':', err.message);
