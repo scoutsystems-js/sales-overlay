@@ -1413,6 +1413,9 @@
     fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
     fathomReanalyzing: false, // true while a /fathom/reanalyze request is in flight; drives the Reanalyze button spinner
+    fathomNeedsIdentity: false,   // true when sync returned needs_identity — show the Fathom-email prompt in the strip
+    fathomIdentitySuggestion: '', // pre-fill value for the identity input (stored email or Scout login email)
+    fathomIdentitySaving: false,  // true while POST /fathom/identity is in flight
     // Call Library (Scout v2.0 Phase 2 Step 3)
     callLibrary:        null,  // null pre-load, then array of call rows from /fathom/calls
     callLibraryLoading: false, // gates "Load more" button while a fetch is in flight
@@ -1635,6 +1638,13 @@
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
       if (res.ok) {
         var data = await res.json();
+        if (data && data.needs_identity) {
+          // Sync can't run until we know the user's Fathom email (otherwise it
+          // would pull the whole team). Show the inline prompt instead.
+          state.fathomSyncing = false;
+          await showFathomIdentityPrompt();
+          return;
+        }
         var n = (data && typeof data.synced === 'number') ? data.synced : 0;
         noticeText = 'Synced ' + n + ' new call' + (n === 1 ? '' : 's') + '.';
         if (data && data.truncated) {
@@ -1705,6 +1715,61 @@
     await refreshFathomStatusInBackground();
   }
 
+  // Fetch a suggested Fathom email (stored value, else Scout login email) and
+  // flip the strip into identity-prompt mode. Called when sync returns
+  // needs_identity. Never throws — falls back to an empty input.
+  async function showFathomIdentityPrompt() {
+    var suggestion = '';
+    try {
+      var r = await fetch('/fathom/identity-options', { headers: authHeader() });
+      if (r.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (r.ok) {
+        var d = await r.json();
+        suggestion = (d && d.current) || (d && d.suggestions && d.suggestions[0]) || '';
+      }
+    } catch (e) { /* ignore — prompt with an empty input */ }
+    state.fathomIdentitySuggestion = suggestion;
+    state.fathomNeedsIdentity = true;
+    if (state.view === 'overview') renderOverview(false);
+  }
+
+  // Save the entered Fathom email, then immediately kick off a (now-filtered)
+  // sync. Reads the input value BEFORE re-rendering so the uncontrolled field
+  // isn't cleared mid-save.
+  async function saveFathomIdentity() {
+    if (state.fathomIdentitySaving) return;
+    var input = document.getElementById('fathom-identity-input');
+    var email = input ? input.value.trim() : '';
+    if (!email) return;
+    state.fathomIdentitySaving = true;
+    if (state.view === 'overview') renderOverview(false);
+    try {
+      var res = await fetch('/fathom/identity', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ email: email }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) {
+        var errBody = null;
+        try { errBody = await res.json(); } catch (e) { /* ignore */ }
+        state.fathomNotice = { kind: 'error', text: (errBody && errBody.error) || ('Could not save email (HTTP ' + res.status + ').') };
+        state.fathomIdentitySaving = false;
+        if (state.view === 'overview') renderOverview(false);
+        return;
+      }
+    } catch (err) {
+      state.fathomNotice = { kind: 'error', text: 'Could not save email: ' + (err && err.message || 'unknown') };
+      state.fathomIdentitySaving = false;
+      if (state.view === 'overview') renderOverview(false);
+      return;
+    }
+    // Saved — clear the prompt and fire the filtered sync.
+    state.fathomNeedsIdentity = false;
+    state.fathomIdentitySaving = false;
+    await syncFathomNow();
+  }
+
   function dismissFathomNotice() {
     state.fathomNotice = null;
     if (state.view === 'overview') renderOverview(false);
@@ -1745,12 +1810,32 @@
       inner = renderFathomStripSyncing();
     } else if (!state.fathomStatus.connected) {
       inner = renderFathomConnectCard();
+    } else if (state.fathomNeedsIdentity) {
+      inner = renderFathomIdentityPrompt();
     } else if (state.fathomStatus.last_sync_status === 'error') {
       inner = renderFathomStripError(state.fathomStatus);
     } else {
       inner = renderFathomStripConnected(state.fathomStatus);
     }
     return '<section class="section fade-in fathom-section">' + inner + '</section>';
+  }
+
+  // Inline "which email do you use for Fathom?" prompt — shown when sync returns
+  // needs_identity. One input (pre-filled with the suggestion) + one Save button.
+  function renderFathomIdentityPrompt() {
+    var suggestion = state.fathomIdentitySuggestion || '';
+    var saving = state.fathomIdentitySaving;
+    return '<div class="fathom-strip">'
+      + '<div class="fathom-strip-left" style="flex-wrap:wrap;gap:10px;">'
+        + '<span class="fathom-strip-text">Which email do you use for Fathom?</span>'
+        + '<input id="fathom-identity-input" type="email" value="' + escapeHtml(suggestion) + '" placeholder="you@company.com"'
+          + ' style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg,#0d1117);color:var(--text);min-width:230px;font-size:14px;"'
+          + (saving ? ' disabled' : '') + ' />'
+      + '</div>'
+      + (saving
+          ? '<button class="btn-fathom-primary" type="button" disabled><span class="spinner-tiny"></span> Saving…</button>'
+          : '<button class="btn-fathom-primary" type="button" onclick="saveFathomIdentity()">Save &amp; sync</button>')
+      + '</div>';
   }
 
   function renderFathomConnectCard() {

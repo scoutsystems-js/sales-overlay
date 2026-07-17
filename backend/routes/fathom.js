@@ -193,14 +193,30 @@ async function getValidAccessToken(admin, userId, conn) {
 // /sync route's behavior (it only needs metadata for upserting new rows).
 // The analysis worker calls this with both = true to get the full meeting
 // payload Claude needs to grade and extract highlights from.
-async function fetchMeetingsPage(accessToken, cursor, createdAfter, includeTranscript, includeHighlights) {
+async function fetchMeetingsPage(accessToken, cursor, createdAfter, includeTranscript, includeHighlights, recordedBy) {
   var url = new URL(FATHOM_API_BASE + '/meetings');
   if (createdAfter)       url.searchParams.append('created_after',      createdAfter);
   if (cursor)             url.searchParams.append('cursor',             cursor);
   if (includeTranscript)  url.searchParams.append('include_transcript', 'true');
   if (includeHighlights)  url.searchParams.append('include_highlights', 'true');
 
-  var resp = await fetch(url.toString(), {
+  // recorded_by[] is Fathom's server-side owner filter — meetings recorded by
+  // the given email. WITHOUT it, /meetings returns the entire team workspace's
+  // recordings (there is no implicit per-user scoping on an OAuth token).
+  // Appended manually to keep the brackets literal (recorded_by[]=email, the
+  // SDK's on-the-wire form); URLSearchParams would percent-encode them to
+  // %5B%5D. The email value is URL-encoded. `recordedBy` may be a single email
+  // string or an array of emails (one recorded_by[] per address).
+  var urlStr = url.toString();
+  if (recordedBy) {
+    var emails = Array.isArray(recordedBy) ? recordedBy : [recordedBy];
+    for (var e = 0; e < emails.length; e++) {
+      if (!emails[e]) continue;
+      urlStr += (urlStr.indexOf('?') === -1 ? '?' : '&') + 'recorded_by[]=' + encodeURIComponent(emails[e]);
+    }
+  }
+
+  var resp = await fetch(urlStr, {
     method:  'GET',
     headers: {
       'Authorization': 'Bearer ' + accessToken,
@@ -316,7 +332,7 @@ router.get('/sync', requireAuth, async function(req, res) {
     // 1. Look up the connection. 404 if the caller hasn't connected Fathom.
     var connResult = await admin
       .from('fathom_connections')
-      .select('access_token, refresh_token, expires_at, last_sync_at')
+      .select('access_token, refresh_token, expires_at, last_sync_at, fathom_email')
       .eq('user_id', userId)
       .maybeSingle();
     if (connResult.error) {
@@ -327,6 +343,15 @@ router.get('/sync', requireAuth, async function(req, res) {
       return res.status(404).json({ error: 'Not connected to Fathom' });
     }
     var conn = connResult.data;
+
+    // 1b. Identity gate. Without the connected user's Fathom email we cannot
+    // apply the recorded_by[] filter — and syncing unfiltered would pull the
+    // ENTIRE team workspace's recordings (the exact bug this fixes). So refuse
+    // to sync and signal the dashboard to prompt for the email instead.
+    if (!conn.fathom_email) {
+      console.log('[fathom] sync blocked for user ' + userId + ': fathom_email not set (needs_identity)');
+      return res.json({ needs_identity: true });
+    }
 
     // 2. Make sure we have a valid access token. refreshFathomToken throws
     // if Fathom rejects the refresh — surface to caller.
@@ -346,7 +371,7 @@ router.get('/sync', requireAuth, async function(req, res) {
     var malformedCount = 0;
     try {
       while (pageCount < MAX_PAGES) {
-        var page = await fetchMeetingsPage(accessToken, cursor, conn.last_sync_at);
+        var page = await fetchMeetingsPage(accessToken, cursor, conn.last_sync_at, false, false, conn.fathom_email);
         for (var i = 0; i < page.items.length; i++) {
           var row = meetingToRow(userId, page.items[i]);
           if (row) allRows.push(row);
@@ -511,6 +536,67 @@ router.post('/reanalyze', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] reanalyze fatal for user ' + userId + ':', err.message);
     res.status(500).json({ error: 'Reanalyze failed' });
+  }
+});
+
+// ── GET /fathom/identity-options ──────────────────────────────────────────────
+// Feeds the dashboard's "which email do you use for Fathom?" prompt. Returns the
+// currently-stored fathom_email (or null) plus a suggestion list to pre-fill the
+// input. fathom_calls does not store per-call recorded_by, so the only
+// suggestion we can offer is the caller's Scout login email (the same address in
+// the vast majority of cases — closers use one work email for both).
+router.get('/identity-options', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+  try {
+    var admin = getAdminClient();
+    var connResult = await admin
+      .from('fathom_connections')
+      .select('fathom_email')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (connResult.error) {
+      console.error('[fathom] identity-options lookup failed for user ' + userId + ': ' + connResult.error.message);
+      return res.status(500).json({ error: 'Could not load Fathom identity' });
+    }
+    var current = (connResult.data && connResult.data.fathom_email) || null;
+    var suggestions = [];
+    if (req.user.email) suggestions.push(req.user.email);
+    return res.json({ current: current, suggestions: suggestions });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] identity-options fatal for user ' + userId + ':', err.message);
+    res.status(500).json({ error: 'Could not load Fathom identity' });
+  }
+});
+
+// ── POST /fathom/identity ─────────────────────────────────────────────────────
+// Stores the connected user's Fathom email (from the dashboard prompt) so sync
+// can apply the recorded_by[] filter. Plausible-email validation only — the real
+// confirmation is whether a filtered sync returns the user's own calls. UPDATE
+// (not upsert): a connection row must already exist to be setting identity.
+router.post('/identity', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+  try {
+    var body = req.body || {};
+    var email = (typeof body.email === 'string') ? body.email.trim() : '';
+    if (!email || email.length > 254 || /\s/.test(email) || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+    var admin = getAdminClient();
+    var update = await admin
+      .from('fathom_connections')
+      .update({ fathom_email: email, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+    if (update.error) {
+      console.error('[fathom] identity save failed for user ' + userId + ': ' + update.error.message);
+      return res.status(500).json({ error: 'Could not save Fathom email' });
+    }
+    console.log('[fathom] identity set for user ' + userId);
+    return res.json({ ok: true });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] identity save fatal for user ' + userId + ':', err.message);
+    res.status(500).json({ error: 'Could not save Fathom email' });
   }
 });
 
