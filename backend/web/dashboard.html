@@ -1414,7 +1414,8 @@
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
     fathomReanalyzing: false, // true while a /fathom/reanalyze request is in flight; drives the Reanalyze button spinner
     fathomNeedsIdentity: false,   // true when sync returned needs_identity — show the Fathom-email prompt in the strip
-    fathomIdentitySuggestion: '', // pre-fill value for the identity input (stored email or Scout login email)
+    fathomIdentitySuggestion: '', // pre-fill value for the identity input (stored email, else top suggestion)
+    fathomIdentitySuggestions: [],// [{email,name,count}] distinct recorded_by identities from Fathom, most frequent first
     fathomIdentitySaving: false,  // true while POST /fathom/identity is in flight
     // Call Library (Scout v2.0 Phase 2 Step 3)
     callLibrary:        null,  // null pre-load, then array of call rows from /fathom/calls
@@ -1719,18 +1720,29 @@
   // flip the strip into identity-prompt mode. Called when sync returns
   // needs_identity. Never throws — falls back to an empty input.
   async function showFathomIdentityPrompt() {
-    var suggestion = '';
+    var current = '';
+    var suggestions = [];
     try {
       var r = await fetch('/fathom/identity-options', { headers: authHeader() });
       if (r.status === 401) { clearSession(); window.location.replace('/login'); return; }
       if (r.ok) {
         var d = await r.json();
-        suggestion = (d && d.current) || (d && d.suggestions && d.suggestions[0]) || '';
+        current = (d && d.current) || '';
+        suggestions = (d && Array.isArray(d.suggestions)) ? d.suggestions : [];
       }
     } catch (e) { /* ignore — prompt with an empty input */ }
-    state.fathomIdentitySuggestion = suggestion;
+    state.fathomIdentitySuggestions = suggestions;
+    // Pre-fill: stored email, else the most-frequent recorder, else blank.
+    state.fathomIdentitySuggestion = current || (suggestions[0] && suggestions[0].email) || '';
     state.fathomNeedsIdentity = true;
     if (state.view === 'overview') renderOverview(false);
+  }
+
+  // Chip click: drop the picked email into the identity input (no re-render, so
+  // the field stays editable).
+  function selectFathomIdentity(email) {
+    var input = document.getElementById('fathom-identity-input');
+    if (input) { input.value = email; input.focus(); }
   }
 
   // Save the entered Fathom email, then immediately kick off a (now-filtered)
@@ -1824,17 +1836,37 @@
   // needs_identity. One input (pre-filled with the suggestion) + one Save button.
   function renderFathomIdentityPrompt() {
     var suggestion = state.fathomIdentitySuggestion || '';
+    var suggestions = Array.isArray(state.fathomIdentitySuggestions) ? state.fathomIdentitySuggestions : [];
     var saving = state.fathomIdentitySaving;
-    return '<div class="fathom-strip">'
-      + '<div class="fathom-strip-left" style="flex-wrap:wrap;gap:10px;">'
+
+    // Clickable chips of the actual recorder identities Fathom returned, so the
+    // user picks theirs instead of guessing. Most frequent first (per backend).
+    var chips = '';
+    if (suggestions.length > 0) {
+      chips = '<div style="display:flex;flex-wrap:wrap;gap:6px;width:100%;">'
+        + '<span class="fathom-strip-meta" style="width:100%;margin-bottom:2px;">Pick the identity Fathom stamps on your recordings, or type it below:</span>'
+        + suggestions.map(function(s) {
+            var label = (s.name ? escapeHtml(s.name) + ' · ' : '') + escapeHtml(s.email)
+              + (typeof s.count === 'number' ? ' (' + s.count + ')' : '');
+            return '<button class="btn-fathom-secondary" type="button" data-email="' + escapeHtml(s.email) + '"'
+              + ' onclick="selectFathomIdentity(this.getAttribute(\'data-email\'))"'
+              + ' style="border-radius:14px;padding:5px 10px;font-size:12px;"'
+              + (saving ? ' disabled' : '') + '>' + label + '</button>';
+          }).join('')
+        + '</div>';
+    }
+
+    return '<div class="fathom-strip" style="flex-direction:column;align-items:stretch;gap:10px;">'
+      + chips
+      + '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'
         + '<span class="fathom-strip-text">Which email do you use for Fathom?</span>'
         + '<input id="fathom-identity-input" type="email" value="' + escapeHtml(suggestion) + '" placeholder="you@company.com"'
           + ' style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg,#0d1117);color:var(--text);min-width:230px;font-size:14px;"'
           + (saving ? ' disabled' : '') + ' />'
+        + (saving
+            ? '<button class="btn-fathom-primary" type="button" disabled><span class="spinner-tiny"></span> Saving…</button>'
+            : '<button class="btn-fathom-primary" type="button" onclick="saveFathomIdentity()">Save &amp; sync</button>')
       + '</div>'
-      + (saving
-          ? '<button class="btn-fathom-primary" type="button" disabled><span class="spinner-tiny"></span> Saving…</button>'
-          : '<button class="btn-fathom-primary" type="button" onclick="saveFathomIdentity()">Save &amp; sync</button>')
       + '</div>';
   }
 

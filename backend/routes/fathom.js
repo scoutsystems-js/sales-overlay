@@ -541,26 +541,66 @@ router.post('/reanalyze', requireAuth, async function(req, res) {
 
 // ── GET /fathom/identity-options ──────────────────────────────────────────────
 // Feeds the dashboard's "which email do you use for Fathom?" prompt. Returns the
-// currently-stored fathom_email (or null) plus a suggestion list to pre-fill the
-// input. fathom_calls does not store per-call recorded_by, so the only
-// suggestion we can offer is the caller's Scout login email (the same address in
-// the vast majority of cases — closers use one work email for both).
+// currently-stored fathom_email (or null) plus a suggestion list.
+//
+// The suggestions come from Fathom itself: we fetch ONE unfiltered page of
+// meetings and tally the distinct recorded_by emails (with counts, most frequent
+// first) so the user PICKS their real recorder identity instead of guessing.
+// This is important because Fathom's recorded_by is often a workspace-assigned
+// email that differs from the user's login/Scout email (e.g. joshua.mock@8fig.co
+// vs josh@scoutsystems.io) — a guessed login email filters to zero calls. Falls
+// back to the Scout login email if the fetch fails or the user isn't connected.
 router.get('/identity-options', requireAuth, async function(req, res) {
   var userId = req.user.id;
   try {
     var admin = getAdminClient();
     var connResult = await admin
       .from('fathom_connections')
-      .select('fathom_email')
+      .select('access_token, refresh_token, expires_at, fathom_email')
       .eq('user_id', userId)
       .maybeSingle();
     if (connResult.error) {
       console.error('[fathom] identity-options lookup failed for user ' + userId + ': ' + connResult.error.message);
       return res.status(500).json({ error: 'Could not load Fathom identity' });
     }
-    var current = (connResult.data && connResult.data.fathom_email) || null;
-    var suggestions = [];
-    if (req.user.email) suggestions.push(req.user.email);
+    var conn = connResult.data;
+    var current = (conn && conn.fathom_email) || null;
+
+    // Last-resort fallback: the Scout login email (may differ from Fathom's —
+    // that's exactly why the picked-from-data suggestions below are preferred).
+    var scoutFallback = req.user.email
+      ? [{ email: req.user.email, name: null, count: null }]
+      : [];
+
+    // Not connected / no token — can't ask Fathom who recorded. Fall back.
+    if (!conn || !conn.access_token) {
+      return res.json({ current: current, suggestions: scoutFallback });
+    }
+
+    var suggestions;
+    try {
+      var accessToken = await getValidAccessToken(admin, userId, conn);
+      var page = await fetchMeetingsPage(accessToken, null, null, false, false);
+      var items = Array.isArray(page.items) ? page.items : [];
+      var byEmail = {};
+      for (var i = 0; i < items.length; i++) {
+        var rb = items[i] && items[i].recorded_by;
+        if (!rb || typeof rb.email !== 'string' || !rb.email) continue;
+        if (!byEmail[rb.email]) {
+          byEmail[rb.email] = { email: rb.email, name: (typeof rb.name === 'string' ? rb.name : null), count: 0 };
+        }
+        byEmail[rb.email].count += 1;
+      }
+      suggestions = Object.keys(byEmail).map(function(k) { return byEmail[k]; })
+        .sort(function(a, b) { return b.count - a.count; })
+        .slice(0, 8);
+      if (suggestions.length === 0) suggestions = scoutFallback;
+    } catch (fetchErr) {
+      // Best-effort: a Fathom hiccup shouldn't break the prompt.
+      console.error('[fathom] identity-options meeting fetch failed for user ' + userId + ': ' + (fetchErr.message || 'unknown'));
+      suggestions = scoutFallback;
+    }
+
     return res.json({ current: current, suggestions: suggestions });
   } catch (err) {
     if (handleConfigError(err, res)) return;
