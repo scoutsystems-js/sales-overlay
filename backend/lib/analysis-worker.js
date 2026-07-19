@@ -71,7 +71,7 @@ const ANALYSIS_PROMPT_VERSION = 'v2-2026-07-19';
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
 const SEARCH_WINDOW_MS   = 10 * 60 * 1000;   // created_after = call_date - 10min (Fathom's `created` is close to but not identical to recording_start_time)
 const MAX_HIGHLIGHTS     = 8;                // hard cap — schema-free but the dashboard layout assumes <=8
-const GRADER_MAX_TOKENS  = 3000;             // 5 sections × ~300 tokens of notes + overall + follow-up = comfortable headroom
+const GRADER_MAX_TOKENS  = 4500;             // 5 sections × notes + overall + one_thing + follow_up_email + outcome. Bumped 3000→4500: at 3000 the grader JSON truncated (unparseable) on longer calls once the outcome field was added.
 const HIGHLIGHT_MAX_TOK  = 3000;             // 8 highlights × ~300 tokens each
 
 // ─── Lazy clients — same pattern as routes/me.js + routes/proxy.js ─────────
