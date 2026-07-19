@@ -2037,9 +2037,20 @@
         ? fetchFathomStatus().catch(function() { return { connected: false }; })
         : Promise.resolve(null); // admin pivot: skip — section hidden anyway
 
+      // Coach summary patterns come from an LLM call (/coaching/patterns) and are
+      // the flakiest dependency — e.g. it 500s when the Anthropic credit balance
+      // is exhausted. The default Coaching view doesn't use patterns at all, and
+      // Live Sessions can degrade to an empty summary, so a patterns failure must
+      // NOT take the whole dashboard down. Catch it (but let auth redirects through).
+      var patternsPromise = fetchPatterns().catch(function(e) {
+        if (e && e.message === 'unauth') throw e;
+        console.warn('[dashboard] coaching patterns unavailable:', e && e.message);
+        return { patterns: [], sample_size: null, unavailable: true };
+      });
+
       var results = await Promise.all([
         fetchAnalytics(),
-        fetchPatterns(),
+        patternsPromise,
         fetchCalls(),
         fathomPromise,
         fetchAnalytics2(),
@@ -2423,6 +2434,9 @@
   // ──────────────────────────────────────────────────────────────────
   function renderPatternsHtml(p) {
     if (!p) return '<div class="load-state"><div class="spinner"></div></div>';
+    if (p.unavailable) {
+      return '<div class="empty"><h3>Coach summary unavailable</h3><p>Could not generate coaching patterns right now (the AI service may be temporarily unavailable). Your calls and analytics are unaffected.</p></div>';
+    }
     var patterns = (p.patterns || []);
     var banner = '';
     if (p.sample_size != null && p.sample_size < 20) {
