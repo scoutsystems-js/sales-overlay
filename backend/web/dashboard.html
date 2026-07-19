@@ -1418,6 +1418,8 @@
     analytics2:      null,    // last /me/analytics2 (Fathom-era) response
     objectionsIntel: null,    // last /me/objections-intel response (Objections view)
     objectionsIntelLoading: false,
+    objectionsSynthesis: null, // last /me/objections-synthesis ({available,categories} | {available:false})
+    objectionsSynthesisLoading: false,
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
@@ -3004,7 +3006,30 @@
   // ─── Objections view (objection intelligence) ──────────────────────────
   function goObjections() {
     state.objectionsIntel = null;
+    state.objectionsSynthesis = null;
     setView('objections-intel');
+  }
+
+  async function fetchObjectionsSynthesis() {
+    var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var base = isSelf() ? '/me/objections-synthesis' : '/admin/objections-synthesis/' + encodeURIComponent(state.viewingUserId);
+    var res = await fetch(base + '?' + qp, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+
+  async function loadObjectionsSynthesis() {
+    if (state.objectionsSynthesisLoading) return;
+    state.objectionsSynthesisLoading = true;
+    try {
+      state.objectionsSynthesis = await fetchObjectionsSynthesis();
+    } catch (err) {
+      if (err.message === 'unauth') return;
+      state.objectionsSynthesis = { available: false, reason: err.message || 'unknown' };
+    }
+    state.objectionsSynthesisLoading = false;
+    if (state.view === 'objections-intel') renderObjectionsIntel();
   }
 
   async function fetchObjectionsIntel() {
@@ -3087,20 +3112,55 @@
   // (ISOLATE / REFRAME / OVERCOME) ships now; content populates once the
   // synthesis generator is built (credit- + re-analysis-gated).
   function renderObjSynthPanel() {
-    var placeholder = '<span style="color:var(--muted);">Pending re-analysis + AI credits.</span>';
-    var block = function(label, body) {
-      return '<div class="synth-block"><h4>' + label + '</h4><div class="body">' + body + '</div></div>';
-    };
-    return '<div class="synth-panel fade-in">'
-      + '<div class="section-header" style="margin:0;"><h2 style="font-size:15px;">Coaching synthesis</h2>'
-        + '<div class="meta">grounded in your own handled objections</div></div>'
-      + '<div class="synth-grid">' + block('Isolate', placeholder) + block('Reframe', placeholder) + block('Overcome', placeholder) + '</div>'
+    var s = state.objectionsSynthesis;
+    var head = '<div class="section-header" style="margin:0 0 6px;"><h2 style="font-size:15px;">Coaching synthesis</h2>'
+      + '<div class="meta">grounded in your own handled objections</div></div>';
+    var body;
+    if (s === null) {
+      body = '<div class="load-state" style="padding:14px 4px;"><div class="spinner"></div> Generating coaching…</div>';
+    } else if (!s.available) {
+      body = '<div class="empty"><h3>Synthesis unavailable</h3><p>Could not generate coaching right now'
+        + (s.reason ? ' (' + escapeHtml(s.reason) + ')' : '') + '. The objection data below is unaffected.</p></div>';
+    } else if (!s.categories || s.categories.length === 0) {
+      body = '<div class="empty"><h3>No categorized objections yet</h3><p>Once objections are categorized in this window, per-category coaching appears here.</p></div>';
+    } else {
+      body = s.categories.map(objSynthSection).join('');
+    }
+    return '<div class="synth-panel fade-in">' + head + body + '</div>';
+  }
+
+  function objSynthSection(c) {
+    var labelMap = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing', partner: 'Partner' };
+    var tag = c.grounded
+      ? '<span class="badge badge-win">grounded</span>'
+      : '<span class="scope-pill">general best practice</span>';
+    var blocks = '<div class="synth-grid">'
+      + '<div class="synth-block"><h4>Isolate</h4><div class="body">' + escapeHtml(c.isolate || '—') + '</div></div>'
+      + '<div class="synth-block"><h4>Reframe</h4><div class="body">' + escapeHtml(c.reframe || '—') + '</div></div>'
+      + '<div class="synth-block"><h4>Overcome</h4><div class="body">' + escapeHtml(c.overcome || '—') + '</div></div>'
+      + '</div>';
+    var evidence = '';
+    if (c.grounded && c.evidence && c.evidence.length) {
+      evidence = '<div style="margin-top:10px;font-size:12px;color:var(--muted);">Your handled example' + (c.evidence.length > 1 ? 's' : '') + ':</div>'
+        + c.evidence.map(function(e) {
+            var clip = e.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(e.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ clip</a>' : '';
+            return '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--muted);">Closer: </span>' + escapeHtml(e.closer_response || e.quote || '') + clip + '</div>';
+          }).join('');
+    }
+    return '<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+        + '<span class="obj-surface">' + escapeHtml(labelMap[c.category] || c.category) + '</span>'
+        + '<span style="font-size:12px;color:var(--muted);">' + c.count + ' objection' + (c.count === 1 ? '' : 's') + ' · ' + c.handled + ' handled</span>'
+        + '<span style="margin-left:auto;">' + tag + '</span>'
+      + '</div>'
+      + blocks + evidence
       + '</div>';
   }
 
   function renderObjectionsIntel() {
     var content = document.getElementById('content');
     if (state.objectionsIntel === null && !state.objectionsIntelLoading) loadObjectionsIntel();
+    if (state.objectionsSynthesis === null && !state.objectionsSynthesisLoading) loadObjectionsSynthesis();
     // Reachable only via the Objections donut — provide an explicit way back.
     var header = '<button class="back-btn" onclick="backToOverview()" style="margin-bottom:14px;">← Back to dashboard</button>' + renderHeaderHtml();
     if (state.objectionsIntel === null) {
