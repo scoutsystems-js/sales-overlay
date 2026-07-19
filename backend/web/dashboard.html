@@ -2371,6 +2371,15 @@
     return s >= 70 ? COLORS.win : (s >= 50 ? COLORS.follow_up : COLORS.loss);
   }
 
+  // Avg Score donut sub-stat: surface win-quality vs the rest so a strong
+  // closer's win average isn't buried in the blend. Falls back to graded count.
+  function avgScoreSubstat(av) {
+    if (av.win_mean !== null || av.other_mean !== null) {
+      return 'Wins ' + (av.win_mean === null ? '—' : av.win_mean) + ' · Others ' + (av.other_mean === null ? '—' : av.other_mean);
+    }
+    return av.graded_calls + ' graded';
+  }
+
   function renderCoachingOverview(content) {
     var a = state.analytics2;
     // Donuts drill into a filtered Call Library (self via /fathom/calls, pivot
@@ -2381,7 +2390,7 @@
       + renderFathomSectionHtml()
       + '<div class="donut-row fade-in">'
         + donutCardHtml('chart-c-calls', 'Calls analyzed', a.calls.analyzed, a.calls.total_in_range + ' in range', 'click to drill in', '', "drillCalls('analyzed',null)")
-        + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, a.avg_score.graded_calls + ' graded', 'worst-first — click to drill in', '', "drillCalls('analyzed','score')")
+        + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, avgScoreSubstat(a.avg_score), 'worst-first — click to drill in', '', "drillCalls('analyzed','score')")
         + donutCardHtml('chart-c-obj', 'Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' total', 'click for objection intelligence', '', "goObjections()")
       + '</div>'
       + '<div class="section fade-in">'
