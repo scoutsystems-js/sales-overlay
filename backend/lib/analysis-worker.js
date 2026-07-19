@@ -65,7 +65,9 @@ const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 // highlight-extractor prompts change. Stamped on every call_analyses row so a
 // stale-prompt analysis is one query away (the guard for the Issue-1 class of
 // bug). v2 = outcome inference + objection category/resolution/closer_response/surface.
-const ANALYSIS_PROMPT_VERSION = 'v2-2026-07-19';
+// v3 = grader scale re-calibration (anchored bands + high-ticket domain context;
+//      a typical solid call lands 65-80/section — no longer graded vs a perfect ideal).
+const ANALYSIS_PROMPT_VERSION = 'v3-2026-07-19';
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -240,6 +242,18 @@ function buildSectionGraderPrompt(normalized, durationSeconds) {
 
   return [
     'You are an expert sales coach reviewing a transcript of a high-ticket sales call. Grade five sections on a 0-100 spectrum (NOT pass/fail), each with a letter grade A-F.',
+    '',
+    'DOMAIN CONTEXT: This is high-ticket sales, where a 25-35% close rate is STRONG performance. Most calls do not close, and that is normal and expected. A call that advances the prospect to a next step, or ends with an appropriate disqualification, is a SUCCESSFUL outcome — not a failure. Do not treat "did not close on this call" as a poor performance.',
+    '',
+    'SCORING SCALE — anchor every section score to these bands:',
+    '  85-100: exceptional — rare, near-perfect execution of this section',
+    '  70-84 : strong — did the job well with only minor gaps. THIS IS WHAT GOOD WORKING CLOSERS SCORE ON MOST CALLS.',
+    '  55-69 : adequate — the section happened, with real gaps that likely cost leverage',
+    '  40-54 : weak — significant misses',
+    '  <40   : the section failed or was barely attempted',
+    'A competent professional closer\'s TYPICAL call should land 65-80 per section. Reserve sub-50 for genuine failures, not for imperfection. DO NOT grade against a perfect-call ideal — grade against what a solid working closer actually does.',
+    '',
+    'RANKING INTEGRITY: this anchoring shifts the SCALE, not your discrimination. The relative differences between sections (and between calls) must still reflect real quality differences — a genuinely stronger section must still score higher than a weaker one. Calibrate the overall level up, but keep the ordering honest.',
     '',
     'CRITICAL: Every claim in `notes` MUST cite a specific transcript line by quoting it with its [HH:MM:SS] timestamp. No unsupported assertions, no generic feedback, no cheerleading.',
     '',
