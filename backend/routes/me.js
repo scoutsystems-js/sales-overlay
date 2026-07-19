@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 
 var router = express.Router();
 
@@ -661,6 +662,27 @@ router.get('/objections-intel', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[me] objections-intel error:', err.message);
     res.status(500).json({ error: 'Failed to load objection intelligence: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /me/objections-synthesis?from=&to= ──────────────────────────────────
+// Grounded ISOLATE→REFRAME→OVERCOME coaching per objection category. One Claude
+// call, cached per (user, range, analysis-set). Credit-tolerant: returns
+// { available:false, reason } (HTTP 200) on Anthropic failure so the view can
+// degrade gracefully rather than 500 the whole dashboard.
+router.get('/objections-synthesis', requireAuth, async function(req, res) {
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+  try {
+    var result = await computeObjectionSynthesis(getAdminClient(), req.user.id, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] objections-synthesis error:', err.message);
+    res.status(500).json({ error: 'Failed to load synthesis: ' + (err.message || 'unknown') });
   }
 });
 

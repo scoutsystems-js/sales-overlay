@@ -2,6 +2,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -597,6 +598,37 @@ router.get('/objections-intel/:user_id', requireAuth, requireRole(['admin', 'own
     if (handleConfigError(err, res)) return;
     console.error('[admin] objections-intel error:', err.message);
     res.status(500).json({ error: 'Failed to load objection intelligence: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /admin/objections-synthesis/:user_id ────────────────────────────────
+// Admin-pivot equivalent of /me/objections-synthesis. Same scope enforcement.
+router.get('/objections-synthesis/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+  try {
+    var admin = getAdminClient();
+    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+      var scopeCheck = await admin.from('user_profiles').select('user_id, managed_by').eq('user_id', targetUserId).maybeSingle();
+      if (scopeCheck.error) {
+        console.error('[admin] objections-synthesis scope check failed:', scopeCheck.error.message);
+        return res.status(500).json({ error: 'Could not verify access' });
+      }
+      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+        console.warn('[admin] Scope violation on objections-synthesis: actor=%s target=%s', req.user.id, targetUserId);
+        return res.status(403).json({ error: 'Not authorized for that user' });
+      }
+    }
+    var result = await computeObjectionSynthesis(admin, targetUserId, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] objections-synthesis error:', err.message);
+    res.status(500).json({ error: 'Failed to load synthesis: ' + (err.message || 'unknown') });
   }
 });
 
