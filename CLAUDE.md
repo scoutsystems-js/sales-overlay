@@ -574,6 +574,30 @@ FATHOM_STATE_SECRET
 ### Teleprompter (Future Architecture Note)
 The original live-teleprompter feature **stays as an optional feature** in v2.0 — not deprecated, just no longer the lead product. Future: prompt mode only activates for **specific call sections** (objection handling, closing) — not during intro/rapport when narration interrupts rapport-building. Requires section detection in the live audio path. Not building now. The architecture (suggestion polling timer, prospect-response gate, closer-active guard) must be preserved so the section-aware mode can slot in without a rewrite.
 
+### Desktop deferred work — persistent-login parity (ready-to-build, ships with next DMG)
+The v1.3.1 persistent-login fix was applied to the **website only** (shared
+`backend/web/js/scout-auth.js`: 401 refresh-retry interceptor + proactive timer +
+unix-seconds `expires_at` handling). The Electron app is dormant (teleprompter
+optional), so its parity work is deferred but designed and approved — build it
+into the next DMG. What's there today: full session persisted to disk
+(`userData/token.json`), `ensureFreshToken()` refreshes on launch and on
+`get-token` (deduped via `_refreshInFlight`). Three approved additions:
+1. **Proactive refresh timer (main process):** every ~4 min, if the stored
+   session is within 5 min of `expires_at`, call `ensureFreshToken()` so the app
+   never hands the renderer an about-to-expire token. Mirrors the web timer.
+2. **401 IPC handling / retry:** the desktop proxy path routes through
+   `get-token`→`ensureFreshToken`, but if a proxied request still returns 401
+   (token expired mid-flight), the renderer should signal main to
+   `ensureFreshToken()` and retry the request once — the desktop equivalent of
+   the web fetch interceptor. Add a 401-retry wrapper in `src/lib/proxy-client.js`.
+3. **Stale-token re-auth flow — distinguish transient vs genuine:**
+   `ensureFreshToken()` currently calls `clearSessionFromDisk()` on ANY non-OK
+   `/auth/refresh`. Change it to clear + reopen login ONLY on a genuine auth
+   failure (HTTP 401 / `invalid_grant`); on transient failures (network / 5xx)
+   keep the session and retry on next launch, so a Wi-Fi blip doesn't log the
+   user out. JWT TTL is 3600s; refresh tokens rotate — the disk write after each
+   refresh already persists the rotated token.
+
 ## Future Plans
 - **Adaptive Learning Engine (high priority, designed not built).** See "Current Status: What Works" for full architecture. Next desktop feature after v2.0 Fathom integration stabilizes.
 - **Pre-existing item: Post-call prompt-compliance scoring (future).** Use session_logs to post-process each call: compare every Claude suggestion against the closer's transcripts that followed it (35% fuzzy-match). Output a per-call "delivery %" and per-stage breakdown. Scope: one backend post-call job + a UI surface.
