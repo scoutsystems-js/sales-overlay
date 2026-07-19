@@ -57,6 +57,8 @@ const VALID_HIGHLIGHT_TYPES = [
 const VALID_HIGHLIGHT_SPEAKERS = ['CLOSER', 'PROSPECT'];
 // Objection sub-categories (migration 012). Only set on type='objection' rows.
 const VALID_OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+// Objection resolution (migration 013). Grounds the coaching synthesis.
+const VALID_RESOLUTIONS = ['handled', 'partial', 'unhandled'];
 // Deal outcome inferred by the section grader (migration 012).
 const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 
@@ -311,7 +313,8 @@ function buildHighlightExtractorPrompt(normalized) {
     '      "logistical" — a concrete, real-world constraint: a genuine payment/financing mechanics issue, scheduling/availability, or a hard external blocker the prospect actually describes.',
     '      "timing"     — "not now", "call me next quarter", "after X happens" — a deferral about WHEN, not whether.',
     '      "partner"    — the prospect needs to consult a spouse/partner/business partner before deciding. When you use "partner", the observation MUST cite the prospect\'s own framing (quote how they referenced the partner).',
-    '  - objection_handled: boolean — true if the closer resolved/overcame the objection on the call, false if it was left unresolved or the prospect stayed stuck.',
+    '  - resolution: exactly one of "handled" (closer resolved it and advanced toward the close), "partial" (partially addressed but prospect stayed hesitant), or "unhandled" (left unresolved).',
+    '  - closer_response: the closer\'s ACTUAL words responding to this objection, quoted verbatim from the transcript (the lines that did the handling). This is used to coach the closer from their OWN real language, so quote exactly what they said. Use null if the closer did not respond or resolution is "unhandled".',
     '',
     'Order moments chronologically (earliest first).',
     '',
@@ -319,7 +322,7 @@ function buildHighlightExtractorPrompt(normalized) {
     '',
     'Respond with ONLY a JSON array — no markdown, no code fences, no narrative wrapping:',
     '[',
-    '  {"timestamp_seconds":N,"speaker":"PROSPECT","quote":"...","observation":"...","type":"objection","objection_category":"fear","objection_handled":true},',
+    '  {"timestamp_seconds":N,"speaker":"PROSPECT","quote":"...","observation":"...","type":"objection","objection_category":"fear","resolution":"handled","closer_response":"..."},',
     '  {"timestamp_seconds":N,"speaker":"CLOSER","quote":"...","observation":"...","type":"strong_moment"},',
     '  ...',
     ']',
@@ -367,13 +370,19 @@ function sanitizeHighlights(arr, durationSeconds) {
     var type = (typeof h.type === 'string') ? h.type.toLowerCase() : null;
     if (VALID_HIGHLIGHT_TYPES.indexOf(type) === -1) continue;
     // Objection sub-fields: only kept for type='objection'; coerced to null
-    // (not dropped) when missing/invalid so a bad category never loses the moment.
+    // (not dropped) when missing/invalid so a bad value never loses the moment.
     var objCategory = null;
+    var resolution = null;
+    var closerResponse = null;
     var objHandled = null;
     if (type === 'objection') {
       var cat = (typeof h.objection_category === 'string') ? h.objection_category.toLowerCase() : null;
       objCategory = (VALID_OBJECTION_CATEGORIES.indexOf(cat) !== -1) ? cat : null;
-      objHandled = (typeof h.objection_handled === 'boolean') ? h.objection_handled : null;
+      var res = (typeof h.resolution === 'string') ? h.resolution.toLowerCase() : null;
+      resolution = (VALID_RESOLUTIONS.indexOf(res) !== -1) ? res : null;
+      objHandled = (resolution === null) ? null : (resolution === 'handled'); // back-compat with mig 012 column
+      closerResponse = (typeof h.closer_response === 'string' && h.closer_response.trim())
+        ? h.closer_response.trim().slice(0, 1500) : null;
     }
     out.push({
       timestamp_seconds:  ts,
@@ -383,6 +392,8 @@ function sanitizeHighlights(arr, durationSeconds) {
       type:               type,
       objection_category: objCategory,
       objection_handled:  objHandled,
+      resolution:         resolution,
+      closer_response:    closerResponse,
       sequence_order:     out.length + 1,
     });
   }
