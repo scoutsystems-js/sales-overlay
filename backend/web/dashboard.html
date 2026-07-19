@@ -1396,6 +1396,8 @@
     viewingUserId:   null,    // whose data we're showing
     dateRange:      { from: null, to: null, days: 30 },
     view:           'overview', // 'overview' | 'calls' | 'objections' | 'closes' | 'objection-type'
+    overviewMode:    'coaching', // 'coaching' (call_analyses, default) | 'sessions' (call_sessions, desktop-era)
+    analytics2:      null,    // last /me/analytics2 (Fathom-era) response
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
@@ -1546,6 +1548,18 @@
     var url = isSelf()
       ? '/me/analytics?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
       : '/admin/analytics/' + encodeURIComponent(state.viewingUserId)
+        + '?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var res = await fetch(url, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+
+  // Fathom-era Coaching Dashboard analytics (call_analyses). Self or admin pivot.
+  async function fetchAnalytics2() {
+    var url = isSelf()
+      ? '/me/analytics2?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
+      : '/admin/analytics2/' + encodeURIComponent(state.viewingUserId)
         + '?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
     var res = await fetch(url, { headers: authHeader() });
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
@@ -2028,11 +2042,13 @@
         fetchPatterns(),
         fetchCalls(),
         fathomPromise,
+        fetchAnalytics2(),
       ]);
       state.analytics    = results[0];
       state.patterns     = results[1];
       state.calls        = results[2];
       state.fathomStatus = results[3];
+      state.analytics2   = results[4];
       render();
     } catch (err) {
       if (err.message === 'unauth') return;
@@ -2113,8 +2129,11 @@
   // ──────────────────────────────────────────────────────────────────
   function renderOverview(isLoading) {
     var content = document.getElementById('content');
-    if (isLoading || !state.analytics) {
+    var mode = state.overviewMode || 'coaching';
+    var notReady = mode === 'coaching' ? !state.analytics2 : !state.analytics;
+    if (isLoading || notReady) {
       content.innerHTML = renderHeaderHtml()
+        + renderModeToggleHtml()
         + renderFathomNoticeHtml()
         + renderFathomSectionHtml()
         + '<div class="donut-row">'
@@ -2124,6 +2143,10 @@
       return;
     }
 
+    // Default Coaching Dashboard = Fathom-era analytics (call_analyses).
+    if (mode === 'coaching') { renderCoachingOverview(content); return; }
+
+    // ── Live Sessions (desktop teleprompter era, call_sessions) ──────────────
     var t = state.analytics.totals;
     var obj = state.analytics.objections;
 
@@ -2134,6 +2157,7 @@
     var closeRate = closeDenom > 0 ? Math.round((t.wins / closeDenom) * 100) : null;
 
     content.innerHTML = renderHeaderHtml()
+      + renderModeToggleHtml()
       + renderFathomNoticeHtml()
       + renderFathomSectionHtml()
       + '<div class="donut-row fade-in">'
@@ -2171,13 +2195,17 @@
 
   function donutCardHtml(canvasId, label, centerBig, centerSmall, hint, clickKey) {
     var smallHtml = centerSmall ? '<div class="small">' + escapeHtml(centerSmall) + '</div>' : '';
-    return '<div class="donut-card" onclick="setView(\'' + clickKey + '\')">'
+    // clickKey may be '' (non-drillable, e.g. coaching donuts under an admin
+    // pivot where /fathom/calls can't scope to the viewed user) — omit onclick.
+    var clickAttr = clickKey ? ' onclick="setView(\'' + clickKey + '\')"' : '';
+    var hintText = clickKey ? hint : '';
+    return '<div class="donut-card"' + clickAttr + '>'
          + '<div class="donut-label">' + escapeHtml(label) + '</div>'
          + '<div class="donut-canvas-wrap">'
            + '<canvas id="' + canvasId + '"></canvas>'
            + '<div class="donut-center"><div class="big">' + escapeHtml(String(centerBig)) + '</div>' + smallHtml + '</div>'
          + '</div>'
-         + '<div class="donut-hint">' + escapeHtml(hint) + '</div>'
+         + '<div class="donut-hint">' + escapeHtml(hintText) + '</div>'
          + '</div>';
   }
 
@@ -2278,6 +2306,116 @@
     }
     if (V.length === 0) { L = ['Empty']; V = [1]; C = ['#1f1f1f']; }
     return { labels: L, values: V, colors: C };
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Coaching overview (Fathom-era, call_analyses) — default view
+  // ──────────────────────────────────────────────────────────────────
+  function renderModeToggleHtml() {
+    var mode = state.overviewMode || 'coaching';
+    return '<div class="mode-toggle" style="display:flex;gap:6px;margin:-4px 0 18px;">'
+      + '<button class="date-preset' + (mode === 'coaching' ? ' active' : '') + '" onclick="setOverviewMode(\'coaching\')">Coaching</button>'
+      + '<button class="date-preset' + (mode === 'sessions' ? ' active' : '') + '" onclick="setOverviewMode(\'sessions\')">Live Sessions</button>'
+      + '</div>';
+  }
+
+  function setOverviewMode(mode) {
+    if (mode !== 'coaching' && mode !== 'sessions') return;
+    if (state.overviewMode === mode) return;
+    state.overviewMode = mode;
+    state.view = 'overview';
+    renderOverview(false); // both analytics + analytics2 already loaded — instant swap
+  }
+
+  function scoreColor(s) {
+    if (s == null) return '#1f1f1f';
+    return s >= 70 ? COLORS.win : (s >= 50 ? COLORS.follow_up : COLORS.loss);
+  }
+
+  function renderCoachingOverview(content) {
+    var a = state.analytics2;
+    // Drill to the Call Library only for self — /fathom/calls is per-caller, so
+    // it can't scope to a pivoted user (donuts + summary still pivot correctly).
+    var drill = isSelf() ? 'call-library' : '';
+    content.innerHTML = renderHeaderHtml()
+      + renderModeToggleHtml()
+      + renderFathomNoticeHtml()
+      + renderFathomSectionHtml()
+      + '<div class="donut-row fade-in">'
+        + donutCardHtml('chart-c-calls', 'Calls analyzed', a.calls.analyzed, a.calls.total_in_range + ' in range', 'click to drill in', drill)
+        + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, a.avg_score.graded_calls + ' graded', 'click to drill in', drill)
+        + donutCardHtml('chart-c-obj', 'Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' total', 'click to drill in', drill)
+      + '</div>'
+      + '<div class="section fade-in">'
+        + '<div class="section-header"><h2>Coach summary</h2>'
+        + '<div class="meta">' + (a.calls.analyzed ? 'based on ' + a.calls.analyzed + (a.calls.analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
+        + renderCoachSummary2(a)
+      + '</div>';
+
+    requestAnimationFrame(function() {
+      drawCallsDonut2('chart-c-calls', a);
+      drawScoreDonut('chart-c-score', a);
+      drawObjDonut2('chart-c-obj', a);
+    });
+  }
+
+  function drawCallsDonut2(canvasId, a) {
+    if (state.chartC1) state.chartC1.destroy();
+    var f = filterZero(
+      ['Analyzed', 'Processing', 'Error'],
+      [a.calls.analyzed, a.calls.processing, a.calls.error],
+      [COLORS.win, COLORS.live, COLORS.loss]
+    );
+    state.chartC1 = donutBase(canvasId, f.labels, f.values, f.colors);
+  }
+
+  function drawScoreDonut(canvasId, a) {
+    if (state.chartC2) state.chartC2.destroy();
+    var m = a.avg_score.mean;
+    if (m === null) { state.chartC2 = donutBase(canvasId, ['No scores'], [1], ['#1f1f1f']); return; }
+    state.chartC2 = donutBase(canvasId, ['Score', 'Remaining'], [m, Math.max(0, 100 - m)], [scoreColor(m), '#1f1f1f']);
+  }
+
+  function drawObjDonut2(canvasId, a) {
+    if (state.chartC3) state.chartC3.destroy();
+    var withObj = a.objections.calls_with_objection;
+    var without = Math.max(0, a.calls.total_in_range - withObj);
+    if (withObj + without === 0) { state.chartC3 = donutBase(canvasId, ['No calls'], [1], ['#1f1f1f']); return; }
+    state.chartC3 = donutBase(canvasId, ['With objection', 'No objection'], [withObj, without], [COLORS.money, '#1f1f1f']);
+  }
+
+  function renderCoachSummary2(a) {
+    if (!a.calls.analyzed) {
+      return '<div class="empty"><h3>No analyzed calls yet</h3><p>Sync and analyze Fathom calls to see coaching aggregates in this date range.</p></div>';
+    }
+    var SECTIONS = [['intro', 'Intro'], ['discovery', 'Discovery'], ['pitch', 'Pitch'], ['objection', 'Objection'], ['close', 'Close']];
+    var rows = SECTIONS.map(function(pair) {
+      var key = pair[0];
+      var sec = a.sections[key] || { avg: null, n: 0 };
+      var tag = a.weakest_section === key ? ' <span class="badge badge-loss">weakest</span>'
+              : (a.strongest_section === key ? ' <span class="badge badge-win">strongest</span>' : '');
+      var avgTxt = sec.avg === null ? '—' : String(sec.avg);
+      var pct = sec.avg === null ? 0 : Math.max(0, Math.min(100, sec.avg));
+      return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">'
+        + '<div style="width:92px;font-size:13px;color:var(--muted);">' + escapeHtml(pair[1]) + '</div>'
+        + '<div style="flex:1;height:8px;background:#1f1f1f;border-radius:4px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + scoreColor(sec.avg) + ';"></div></div>'
+        + '<div style="width:150px;text-align:right;font-size:13px;">' + avgTxt + ' <span style="color:var(--muted);">(n=' + sec.n + ')</span>' + tag + '</div>'
+        + '</div>';
+    }).join('');
+
+    var ot = (a.latest_one_things || []);
+    var otHtml = '';
+    if (ot.length) {
+      otHtml = '<div style="margin-top:22px;"><div class="section-header"><h2 style="font-size:14px;">Latest &ldquo;one thing to do differently&rdquo;</h2></div>'
+        + ot.map(function(o) {
+            return '<div class="pattern-card" style="cursor:pointer;" onclick="openCallReview(\'' + escapeHtml(o.fathom_call_id) + '\')">'
+              + '<div class="pattern-detail">' + escapeHtml(o.one_thing) + '</div>'
+              + '<div class="pattern-meta"><span>' + escapeHtml(o.title || 'Untitled call') + ' · ' + escapeHtml(formatDate(o.call_date)) + '</span></div>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+    }
+    return '<div>' + rows + '</div>' + otHtml;
   }
 
   // ──────────────────────────────────────────────────────────────────

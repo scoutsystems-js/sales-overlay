@@ -3,7 +3,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
-const { computeAnalytics, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computeAnalytics, computeCallAnalytics, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 
 var router = express.Router();
 
@@ -620,6 +620,26 @@ router.get('/analytics', requireAuth, async function(req, res) {
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[me] analytics error:', err.message);
+    res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /me/analytics2?from=&to= ────────────────────────────────────────────
+// Fathom-era Coaching Dashboard analytics (call_analyses + call_highlights).
+// One round trip; feeds all overview widgets (Calls / Avg Score / Objections
+// donuts + computed coach summary). Admin pivot equivalent: /admin/analytics2/:user_id.
+router.get('/analytics2', requireAuth, async function(req, res) {
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+  try {
+    var result = await computeCallAnalytics(getAdminClient(), req.user.id, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] analytics2 error:', err.message);
     res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
   }
 });

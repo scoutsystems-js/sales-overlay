@@ -1,7 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { computeAnalytics, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computeAnalytics, computeCallAnalytics, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 
 var router = express.Router();
 
@@ -485,6 +485,46 @@ router.get('/analytics/:user_id', requireAuth, requireRole(['admin', 'owner']), 
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] analytics error:', err.message);
+    res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /admin/analytics2/:user_id ──────────────────────────────────────────
+// Admin-pivot equivalent of /me/analytics2 (Fathom-era Coaching Dashboard).
+// Same scope enforcement as /admin/analytics/:user_id: admins → self + managed
+// users; owners → anyone. Wraps computeCallAnalytics().
+router.get('/analytics2/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+
+  try {
+    var admin = getAdminClient();
+
+    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+      var scopeCheck = await admin
+        .from('user_profiles')
+        .select('user_id, managed_by')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+      if (scopeCheck.error) {
+        console.error('[admin] analytics2 scope check failed:', scopeCheck.error.message);
+        return res.status(500).json({ error: 'Could not verify access' });
+      }
+      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+        console.warn('[admin] Scope violation on analytics2: actor=%s target=%s', req.user.id, targetUserId);
+        return res.status(403).json({ error: 'Not authorized for that user' });
+      }
+    }
+
+    var result = await computeCallAnalytics(admin, targetUserId, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] analytics2 error:', err.message);
     res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
   }
 });

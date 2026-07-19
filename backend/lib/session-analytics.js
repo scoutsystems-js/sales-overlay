@@ -172,8 +172,166 @@ async function loadObjectionsByType(adminClient, userId, objectionId, from, to) 
   };
 }
 
+// ─── Analytics v2 — the Fathom-era Coaching Dashboard (call_analyses) ────────
+// Powers /me/analytics2 and /admin/analytics2/:user_id. Aggregates
+// call_analyses + call_highlights for the caller's fathom_calls in a date
+// window (window applied on fathom_calls.call_date). Pure JS aggregation, one
+// logical call — but the child-table reads are CHUNKED by fathom_call_id (100
+// per batch) so we never hit supabase-js's silent 1000-row cap (an active user
+// has 200+ calls × 5-8 highlights ≈ 1000+ highlight rows). fathom_calls itself
+// is paginated in 1000-row pages for the same reason.
+//
+// Returns:
+//   {
+//     from, to,
+//     calls:      { analyzed, total_in_range, processing, error },
+//     avg_score:  { mean: 0-100|null, graded_calls },
+//     objections: { calls_with_objection, total_highlights },
+//     sections:   { intro:{avg,n}, discovery:{avg,n}, pitch:{avg,n}, objection:{avg,n}, close:{avg,n} },
+//     weakest_section, strongest_section,
+//     latest_one_things: [ { fathom_call_id, title, call_date, one_thing }, … up to 5 ],
+//   }
+var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
+
+async function computeCallAnalytics(admin, userId, from, to) {
+  // 1) fathom_calls in the date window — paginated to dodge the 1000-row cap.
+  var calls = [];
+  var PAGE = 1000;
+  var start = 0;
+  while (true) {
+    var cq = await admin
+      .from('fathom_calls')
+      .select('id, call_date, title')
+      .eq('user_id', userId)
+      .gte('call_date', from)
+      .lte('call_date', to)
+      .order('call_date', { ascending: false })
+      .range(start, start + PAGE - 1);
+    if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+    var cbatch = cq.data || [];
+    calls = calls.concat(cbatch);
+    if (cbatch.length < PAGE) break;
+    start += PAGE;
+  }
+  var callMeta = {};                          // id -> { call_date, title }
+  var callIds = [];
+  for (var i = 0; i < calls.length; i++) {
+    callMeta[calls[i].id] = calls[i];
+    callIds.push(calls[i].id);
+  }
+
+  var empty = {
+    from: from, to: to,
+    calls: { analyzed: 0, total_in_range: 0, processing: 0, error: 0 },
+    avg_score: { mean: null, graded_calls: 0 },
+    objections: { calls_with_objection: 0, total_highlights: 0 },
+    sections: sectionsShape(),
+    weakest_section: null, strongest_section: null,
+    latest_one_things: [],
+  };
+  if (callIds.length === 0) return empty;
+
+  // Chunked .in('fathom_call_id', …) helper — keeps each request small and
+  // under the row cap; scopes child rows to the in-window calls without a huge
+  // IN list or fetching the user's entire all-time history.
+  async function fetchByCallIds(table, columns, refine) {
+    var out = [];
+    for (var c = 0; c < callIds.length; c += 100) {
+      var chunk = callIds.slice(c, c + 100);
+      var qb = admin.from(table).select(columns).in('fathom_call_id', chunk);
+      if (refine) qb = refine(qb);
+      var r = await qb;
+      if (r.error) throw new Error(table + ': ' + r.error.message);
+      out = out.concat(r.data || []);
+    }
+    return out;
+  }
+
+  // 2) call_analyses for those calls — status, overall + section scores, one_thing.
+  var analyses = await fetchByCallIds(
+    'call_analyses',
+    'fathom_call_id, status, overall_score, intro_score, discovery_score, pitch_score, objection_score, close_score, one_thing'
+  );
+
+  var statusCounts = { done: 0, processing: 0, error: 0 };
+  var scoreSum = 0, scoreN = 0;
+  var sec = {};
+  CALL_ANALYTICS_SECTIONS.forEach(function(s) { sec[s] = { sum: 0, n: 0 }; });
+  var oneThings = [];
+  for (var a = 0; a < analyses.length; a++) {
+    var an = analyses[a];
+    if (an.status === 'done') statusCounts.done++;
+    else if (an.status === 'processing') statusCounts.processing++;
+    else if (an.status === 'error') statusCounts.error++;
+    if (typeof an.overall_score === 'number') { scoreSum += an.overall_score; scoreN++; }
+    CALL_ANALYTICS_SECTIONS.forEach(function(s) {
+      var v = an[s + '_score'];
+      if (typeof v === 'number') { sec[s].sum += v; sec[s].n++; }
+    });
+    if (typeof an.one_thing === 'string' && an.one_thing.trim()) {
+      var meta = callMeta[an.fathom_call_id] || {};
+      oneThings.push({
+        fathom_call_id: an.fathom_call_id,
+        title: meta.title || null,
+        call_date: meta.call_date || null,
+        one_thing: an.one_thing,
+      });
+    }
+  }
+
+  var sections = sectionsShape();
+  var weakest = null, strongest = null;
+  CALL_ANALYTICS_SECTIONS.forEach(function(s) {
+    var avg = sec[s].n > 0 ? Math.round(sec[s].sum / sec[s].n) : null;
+    sections[s] = { avg: avg, n: sec[s].n };
+    if (avg !== null) {
+      if (weakest === null || avg < sections[weakest].avg) weakest = s;
+      if (strongest === null || avg > sections[strongest].avg) strongest = s;
+    }
+  });
+
+  oneThings.sort(function(x, y) {
+    return new Date(y.call_date || 0).getTime() - new Date(x.call_date || 0).getTime();
+  });
+  var latestOneThings = oneThings.slice(0, 5);
+
+  // 3) objection highlights — distinct calls + total count.
+  var objRows = await fetchByCallIds('call_highlights', 'fathom_call_id', function(qb) {
+    return qb.eq('type', 'objection');
+  });
+  var objCalls = {};
+  for (var o = 0; o < objRows.length; o++) { objCalls[objRows[o].fathom_call_id] = true; }
+
+  return {
+    from: from, to: to,
+    calls: {
+      analyzed: statusCounts.done,
+      total_in_range: callIds.length,
+      processing: statusCounts.processing,
+      error: statusCounts.error,
+    },
+    avg_score: { mean: scoreN > 0 ? Math.round(scoreSum / scoreN) : null, graded_calls: scoreN },
+    objections: { calls_with_objection: Object.keys(objCalls).length, total_highlights: objRows.length },
+    sections: sections,
+    weakest_section: weakest,
+    strongest_section: strongest,
+    latest_one_things: latestOneThings,
+  };
+}
+
+function sectionsShape() {
+  return {
+    intro:     { avg: null, n: 0 },
+    discovery: { avg: null, n: 0 },
+    pitch:     { avg: null, n: 0 },
+    objection: { avg: null, n: 0 },
+    close:     { avg: null, n: 0 },
+  };
+}
+
 module.exports = {
   computeAnalytics: computeAnalytics,
+  computeCallAnalytics: computeCallAnalytics,
   loadSessionObjections: loadSessionObjections,
   loadObjectionsByType: loadObjectionsByType,
 };
