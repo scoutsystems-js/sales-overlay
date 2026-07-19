@@ -438,13 +438,11 @@
         console.warn('[login] /auth/me returned', res.status, '- falling back to signed-in card');
         return false;
       }
-      var data = await res.json();
-      var role = (data && data.role) || 'user';
-      if (role === 'owner' || role === 'admin') {
-        window.location.replace('/admin');
-      } else {
-        window.location.replace('/dashboard');
-      }
+      // v1.3.1: every role lands on the Coaching Dashboard. Admin/owner reach
+      // /admin via the Admin nav link shown on /dashboard — never the default
+      // destination. /auth/me is still called above to validate the token
+      // (non-ok → signed-in-card fallback).
+      window.location.replace('/dashboard');
       return true;
     } catch (err) {
       console.warn('[login] /auth/me network error, falling back:', err.message);
