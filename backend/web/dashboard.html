@@ -1329,6 +1329,24 @@
       letter-spacing: 0.08em;
       margin-left: 10px;
     }
+    /* Objection Intelligence view */
+    .synth-panel { border: 1px solid var(--border); border-top: 2px solid var(--accent); border-radius: 12px; padding: 18px 18px 6px; margin-bottom: 26px; }
+    .synth-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 12px; }
+    @media (max-width: 720px) { .synth-grid { grid-template-columns: 1fr; } }
+    .synth-block { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+    .synth-block h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .synth-block .body { font-size: 13px; color: var(--text); }
+    .obj-group-header { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 24px 0 10px; font-weight: 700; }
+    .obj-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .obj-surface { font-weight: 700; font-size: 14px; }
+    .obj-callmeta { margin-left: auto; font-size: 12px; color: var(--muted); }
+    .obj-quote { font-size: 14px; margin: 8px 0 4px; }
+    .obj-quote.clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .obj-response { display: none; margin-top: 8px; padding: 8px 10px; border-left: 2px solid var(--good); border-radius: 4px; font-size: 13px; }
+    .obj-footer { display: flex; gap: 8px; margin-top: 10px; }
+    .obj-btn { font-size: 12px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; text-decoration: none; }
+    .obj-btn:hover { border-color: var(--accent); }
+    .obj-toggle { font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -3019,24 +3037,64 @@
       + '</div>';
   }
 
+  // Collapse/expand helpers for objection cards (operate on the clicked card).
+  function toggleObjResponse(el) {
+    var card = el.closest('.pattern-card'); if (!card) return;
+    var box = card.querySelector('.obj-response'); if (!box) return;
+    var showing = box.style.display === 'block';
+    box.style.display = showing ? 'none' : 'block';
+    el.textContent = showing ? 'Show response' : 'Hide response';
+  }
+  function toggleObjQuote(el) {
+    var card = el.closest('.pattern-card'); if (!card) return;
+    var q = card.querySelector('.obj-quote'); if (!q) return;
+    q.classList.toggle('clamped');
+    el.textContent = q.classList.contains('clamped') ? 'more' : 'less';
+  }
+
+  // Compact, scannable objection card: one-line header (surface + category +
+  // resolution + call), clamped prospect quote, collapsed closer response,
+  // footer buttons. Whole-card is NOT clickable — actions are explicit buttons.
   function objFeedCard(f) {
-    var cat = (f.category && f.category !== 'uncategorized')
-      ? '<span class="scope-pill" style="margin-right:8px;">' + escapeHtml(f.category) + '</span>' : '';
+    var surface = f.surface
+      ? '<span class="obj-surface">' + escapeHtml(f.surface) + '</span>'
+      : '<span class="obj-surface" style="color:var(--muted);">objection</span>';
+    var catChip = (f.category && f.category !== 'uncategorized')
+      ? '<span class="scope-pill">' + escapeHtml(f.category) + '</span>' : '';
     var resBadge = f.resolution === 'handled' ? '<span class="badge badge-win">handled</span>'
       : (f.resolution === 'partial' ? '<span class="badge badge-fu">partial</span>'
-      : (f.resolution === 'unhandled' ? '<span class="badge badge-loss">unhandled</span>' : ''));
-    var clip = f.clip_url ? '<a href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener" style="text-decoration:underline;">▶ clip</a>' : '';
-    var resp = f.closer_response
-      ? '<div style="margin-top:8px;padding:8px 10px;border-left:2px solid var(--good,#4ade80);border-radius:4px;font-size:13px;"><span style="color:var(--muted);">Closer handled it: </span>' + escapeHtml(f.closer_response) + '</div>'
+      : (f.resolution === 'unhandled' ? '<span class="badge badge-loss">unresolved</span>' : ''));
+    var quoteMore = (f.quote && f.quote.length > 120)
+      ? ' <span class="obj-toggle" onclick="toggleObjQuote(this)">more</span>' : '';
+    var respBlock = f.closer_response
+      ? '<div style="margin-top:8px;"><span class="obj-toggle" onclick="toggleObjResponse(this)">Show response</span>'
+        + '<div class="obj-response"><span style="color:var(--muted);">Closer: </span>' + escapeHtml(f.closer_response) + '</div></div>'
       : '';
-    return '<div class="pattern-card" onclick="openCallReview(\'' + escapeHtml(f.fathom_call_id) + '\')" style="cursor:pointer;">'
-      + '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">'
-        + '<div style="font-size:12px;color:var(--muted);">' + cat + escapeHtml(f.title || 'Untitled call') + ' · ' + escapeHtml(formatDate(f.call_date)) + '</div>'
-        + '<div style="display:flex;gap:8px;align-items:center;" onclick="event.stopPropagation();">' + resBadge + clip + '</div>'
+    var clip = f.clip_url ? '<a class="obj-btn" href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener">▶ Watch clip</a>' : '';
+    var review = '<button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(f.fathom_call_id) + '\')">View call review</button>';
+    return '<div class="pattern-card">'
+      + '<div class="obj-card-head">' + surface + catChip + resBadge
+        + '<span class="obj-callmeta">' + escapeHtml(f.title || 'Untitled call') + ' · ' + escapeHtml(formatDate(f.call_date)) + '</span>'
       + '</div>'
-      + '<div class="pattern-detail" style="margin-top:6px;">' + escapeHtml(f.quote || '') + '</div>'
+      + '<div class="obj-quote clamped">' + escapeHtml(f.quote || '') + '</div>' + quoteMore
       + (f.observation ? '<div class="pattern-meta"><span>' + escapeHtml(f.observation) + '</span></div>' : '')
-      + resp
+      + respBlock
+      + '<div class="obj-footer">' + clip + review + '</div>'
+      + '</div>';
+  }
+
+  // Grounded coaching synthesis — a distinct panel ABOVE the feed. Structure
+  // (ISOLATE / REFRAME / OVERCOME) ships now; content populates once the
+  // synthesis generator is built (credit- + re-analysis-gated).
+  function renderObjSynthPanel() {
+    var placeholder = '<span style="color:var(--muted);">Pending re-analysis + AI credits.</span>';
+    var block = function(label, body) {
+      return '<div class="synth-block"><h4>' + label + '</h4><div class="body">' + body + '</div></div>';
+    };
+    return '<div class="synth-panel fade-in">'
+      + '<div class="section-header" style="margin:0;"><h2 style="font-size:15px;">Coaching synthesis</h2>'
+        + '<div class="meta">grounded in your own handled objections</div></div>'
+      + '<div class="synth-grid">' + block('Isolate', placeholder) + block('Reframe', placeholder) + block('Overcome', placeholder) + '</div>'
       + '</div>';
   }
 
@@ -3066,26 +3124,32 @@
       var pct = m.total > 0 ? Math.round(100 * b.total / m.total) : 0;
       return '<div style="display:flex;align-items:center;gap:14px;padding:7px 0;border-bottom:1px solid var(--border);">'
         + '<div style="width:110px;font-size:13px;color:var(--muted);">' + escapeHtml(pair[1]) + '</div>'
-        + '<div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:#5b9eff;border-radius:4px;"></div></div>'
+        + '<div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:var(--accent);border-radius:4px;"></div></div>'
         + '<div style="width:150px;text-align:right;font-size:13px;">' + b.total + ' <span style="color:var(--muted);">(' + b.handled + ' handled)</span></div>'
         + '</div>';
     }).join('');
     var uncat = d.by_category.uncategorized ? d.by_category.uncategorized.total : 0;
     var catNote = (m.total > 0 && uncat === m.total)
-      ? '<div class="signal-banner"><div class="signal-banner-icon"></div><div><strong>Categories pending re-analysis.</strong> These objections were analyzed before categorization shipped — re-analyze to populate fear / logistical / timing / partner + resolution + the closer\'s own handling lines.</div></div>'
+      ? '<div class="signal-banner"><div class="signal-banner-icon"></div><div><strong>Categories pending re-analysis.</strong> These objections were analyzed before categorization shipped — re-analyze to populate surface + category + resolution + the closer\'s own handling lines.</div></div>'
       : '';
 
-    var synthHtml = '<div class="empty"><h3>Grounded coaching synthesis</h3><p>Once objections are re-analyzed, this coaches each category ISOLATE → REFRAME → OVERCOME — grounded in your own handled moments (with clip links) where they exist, generic best practice where they don\'t. Generation is paused until AI credits are restored.</p></div>';
-
-    var feedHtml = d.feed.length === 0
-      ? '<div class="empty"><h3>No objections in this window</h3><p>Pick a wider date range, or wait for new analyzed calls.</p></div>'
-      : d.feed.map(objFeedCard).join('');
+    // Feed grouped by category, count header per group, ordered fear→…→uncategorized.
+    var order = ['fear', 'logistical', 'timing', 'partner', 'uncategorized'];
+    var labels = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing', partner: 'Partner', uncategorized: 'Uncategorized' };
+    var groups = {}; order.forEach(function(k) { groups[k] = []; });
+    (d.feed || []).forEach(function(f) { groups[(order.indexOf(f.category) !== -1) ? f.category : 'uncategorized'].push(f); });
+    var feedHtml = '';
+    order.forEach(function(k) {
+      if (groups[k].length === 0) return;
+      feedHtml += '<div class="obj-group-header">' + escapeHtml(labels[k]) + ' · ' + groups[k].length + '</div>' + groups[k].map(objFeedCard).join('');
+    });
+    if (!feedHtml) feedHtml = '<div class="empty"><h3>No objections in this window</h3><p>Pick a wider date range, or wait for new analyzed calls.</p></div>';
 
     content.innerHTML = header
       + metricsHtml
       + '<div class="section fade-in"><div class="section-header"><h2>By category</h2></div>' + catNote + catRows + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Coaching</h2></div>' + synthHtml + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Objection moments</h2><div class="meta">' + d.feed.length + ' shown</div></div>' + feedHtml + '</div>';
+      + renderObjSynthPanel()
+      + '<div class="section fade-in"><div class="section-header"><h2>Objection moments</h2><div class="meta">' + (d.feed || []).length + ' shown</div></div>' + feedHtml + '</div>';
   }
 
   function renderCallLibrary() {
