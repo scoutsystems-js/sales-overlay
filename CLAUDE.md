@@ -376,7 +376,7 @@ Scout v2.0 is an **AI operating system for high-ticket sales teams** — not a s
 
 ### Build Phases (in order)
 - **v1.2.0 — Fathom OAuth + auto-sync** — **COMPLETE** (shipped to prod 2026-06-15 via commits `00c9630` / `c39954d` / `2f3abc4` / `df5fb4e`; migration 009 applied)
-- **v1.3.0 — Post-call analysis pipeline** — Layer 1 step 2 / step 3 combined release:
+- **v1.3.0 — Post-call analysis pipeline** — **COMPLETE & PROVEN ON REAL CALLS** (2026-07-17: Josh's real sales calls analyzed end-to-end — section grades, highlights timeline, one-thing, and follow-up emails all validated on production data). Layer 1 step 2 / step 3 combined release:
   - Migration 010 (`call_analyses` + `call_highlights`)
   - Transcript normalizer (HH:MM:SS strings + numeric seconds → single numeric-seconds representation)
   - Section grader (Claude call — Intro / Discovery / Pitch / Objection Handling / Close)
@@ -384,20 +384,49 @@ Scout v2.0 is an **AI operating system for high-ticket sales teams** — not a s
   - Auto-trigger after sync completes (async; closer never waits)
   - Call library dashboard page
   - Call review page with highlights timeline as the lead section
-- **v1.4.0 — Objection intelligence dashboard** — Layer 1 step 4:
-  - Frequency by type across all calls
-  - Handle rate per objection type
-  - Drill-down to real examples with playable timestamp clips
-- **v1.5.0 — CRM integration (GHL + Close.io)** — Layer 2:
-  - OAuth connect per closer (same popup pattern as Fathom)
-  - Pipeline stage reading and updating
+  - **Proven in production (2026-07-17):** the OAuth transcript path (`/recordings/{id}/transcript`), the `findMeeting` bypass (metadata from the stored `fathom_calls` row + direct transcript fetch), the reanalyze/batch-limit retry flow, and the `recorded_by[]` sync filter were all shipped and validated against Josh's live Fathom workspace. See "Fathom API Constraints (learned in production)" below.
+
+#### Revised roadmap (next milestones, in priority order — set 2026-07-18)
+- **v1.3.1 — Dashboard rewire + UX fixes** (NEXT):
+  1. **Coaching Dashboard becomes the default landing view for ALL roles** including admin/owner (the admin panel stays one click away, no longer the landing page for admins/owners).
+  2. **Rewire the coaching dashboard data source** from the desktop-teleprompter era to the Fathom era. Donuts + Coach summary currently aggregate `call_sessions`; they must aggregate `call_analyses` + `call_highlights`:
+     - Calls donut = analyzed calls count (`call_analyses`)
+     - Objections donut = `call_highlights WHERE type='objection'`
+     - Close rate = from analysis outcomes
+     - Coach summary = aggregated from section grades + `one_thing` patterns
+     - Drill-downs link to call review pages
+  3. **Persistent login sessions (website + desktop):** extend Supabase session TTL + refresh-token persistence so users stay logged in indefinitely (already flagged high priority — see Future Plans).
+- **v1.4.0 — CRM Integration Phase A (read):**
+  - "Connect CRM" button: GHL and Close.io via OAuth popup (same pattern as Fathom)
+  - Read + display: contacts, pipeline stages, deal values alongside call data
   - Match analyzed calls to CRM contacts
-  - Follow-up checklist — hottest leads for today
-  - SMS + email draft per lead
-- **v1.6.0 — Proactive Intelligence** — Layer 3:
-  - BOD report: prioritized call list for the day
-  - Overnight recap: what changed while closer was offline
-  - Curated follow-up cadences per deal
+- **v1.4.5 — CRM Integration Phase B (act):**
+  - Scout as assistant: send SMS/email follow-ups (using the generated follow-up drafts), add notes to contacts, update pipeline stages
+  - **All write actions require user confirmation before executing** (diff-then-confirm — see CRM Integration Notes below)
+- **v1.5.0 — Notifications & reporting:**
+  - "Connect Slack" button — Scout posts EOD reports to a channel
+  - EOD report generation (per the existing Phase 5 spec)
+  - BOD prioritization + overnight recap (Layer 3 proactive intelligence)
+- **Carried forward — slot under the milestones above where they fit:**
+  - **Objection intelligence dashboard** (frequency by type, handle rate per type, drill-down to playable timestamp clips) — extends the v1.3.1 objections donut; was the old standalone v1.4.0.
+  - **Zoom / Google Meet as additional recording sources** — the pipeline is already source-agnostic (see Recording Source Architecture); do after CRM.
+  - **Teleprompter section-mode** (prompt only during objection/close sections) — see Teleprompter (Future Architecture Note); unscheduled, architecture preserved.
+
+### Fathom API Constraints (learned in production)
+Hard-won during the v1.3.0 rollout against Josh's real workspace. The
+fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
+- **OAuth apps cannot use `include_transcript=true` / `include_summary=true` on `/meetings`** — the SDK documents them "Unavailable for OAuth connected apps" and they return no transcript (HTTP 400 territory). Fetch the transcript separately via **`GET /recordings/{recording_id}/transcript`** instead.
+- **Transcript shape:** `/recordings/{id}/transcript` returns `{ transcript: [...] }`; each turn has `speaker.display_name`, `text`, and an `HH:MM:SS` `timestamp` string (the normalizer converts to numeric seconds).
+- **No identity endpoint — `/me` does not exist.** The entire API is 8 endpoints: `/meetings`, `/meeting_types`, `/recordings/{id}/summary`, `/recordings/{id}/transcript`, `/team_members`, `/teams`, `/webhooks`, `/webhooks/{id}`. The OAuth grant uses `scope=public_api` (not OIDC), so the token response carries no identity either.
+- **`recorded_by` identity ≠ login email.** Fathom stamps recordings with a workspace-assigned recorder email that can differ entirely from the user's login. Josh logs in as `josh@scoutsystems.io` but his recordings are `recorded_by = joshua@soberlivingriches.com`. The `fathom_connections.fathom_email` column (migration 011) holds the **`recorded_by` value**, confirmed by the user via the identity-options picker — which lists distinct `recorded_by` emails pulled from one unfiltered page of real meetings so the user *selects* theirs. **Never guess the login email** (it cost several wrong-value cycles here).
+- **`recorded_by[]=<email>` is a server-side owner filter** (literal brackets, one per email, exact-match on email). WITHOUT it, `/meetings` returns the ENTIRE team workspace's recordings — there is no implicit per-user scoping on an OAuth token. Note: `recorded_by=` WITHOUT brackets is silently ignored by Fathom (returns the default unfiltered page), so the brackets are load-bearing.
+- **`created_after` with an epoch/1970 value returns zero** regardless of other filters. OMIT the param entirely when `last_sync_at` is NULL (first sync / post-reset) — never default to `new Date(0)`. `_fetchMeetingsPage` already appends `created_after` only when truthy.
+- **Single-use refresh tokens rotate on every refresh** — each refresh returns a NEW refresh_token that MUST be persisted immediately in the same UPDATE, or the connection bricks on the next refresh.
+- **Errored calls are recoverable:** reset `fathom_calls.sync_status='pending'` (+ `call_analyses.status='pending'`) and re-run via **`POST /fathom/reanalyze`** (batch-limited: default 10, max 50, most-recent first). It does NOT re-sync from Fathom — it re-analyzes already-stored rows.
+
+### Session Learnings (Fathom analysis rollout, 2026-07)
+- **Sequential analysis is ~30–60s per call.** The post-sync analysis loop is fire-and-forget and **does not survive Railway restarts/redeploys** — an interrupted drain leaves rows stuck at `status='processing'` that need a manual reset back to `'pending'`. Keep batches bounded (that's what the reanalyze `limit` is for).
+- **Diagnostic principle: replay the pipeline stage-by-stage with counts** (`fetched → mapped → upserted`) before assuming where data is lost. In the "sync returns zero" investigation, replaying the exact fetch with Josh's token showed `FETCHED=0` at stage 1 (wrong `recorded_by` email) vs `FETCHED=200 / MAPPED=200` for the correct email — proving there was no downstream "leak" and the only variable was the identity value. Instrument the failing stage; don't guess it.
 
 ### Recording Source Architecture
 Fathom is the only recording source for now. Zoom and Google Meet will be added later.
