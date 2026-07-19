@@ -722,71 +722,105 @@ router.get('/status', requireAuth, async function(req, res) {
 // computeCountsBySession-style pattern in /me/sessions (supabase-js v2 has
 // no Postgres JOIN syntax; embed-via-FK was considered but adds extra
 // complexity for a one-to-zero-or-one relationship like this one).
-router.get('/calls', requireAuth, async function(req, res) {
-  var userId = req.user.id;
-
+// Parse the shared /calls query options (used by /fathom/calls and the admin
+// mirror). filter=analyzed|objections restricts to calls with a done analysis /
+// with ≥1 objection highlight (powers the donut drill-downs). sort=score orders
+// worst-first. from/to window on call_date so a drill matches its donut's count.
+function parseCallListOpts(req) {
   var limit = parseInt(req.query.limit, 10);
   if (!limit || limit < 1) limit = 20;
   if (limit > 100) limit = 100;
-
   var offset = parseInt(req.query.offset, 10);
   if (!offset || offset < 0) offset = 0;
+  var filter = (req.query.filter === 'analyzed' || req.query.filter === 'objections') ? req.query.filter : null;
+  var sort = (req.query.sort === 'score') ? 'score' : null;
+  var from = (req.query.from && !isNaN(Date.parse(req.query.from))) ? req.query.from : null;
+  var to = (req.query.to && !isNaN(Date.parse(req.query.to))) ? req.query.to : null;
+  return { limit: limit, offset: offset, filter: filter, sort: sort, from: from, to: to };
+}
 
-  try {
-    var admin = getAdminClient();
+// Distinct fathom_call ids for a user from a child table, optionally refined.
+// Paginated so the 1000-row cap can't truncate. Returns a plain-object id set.
+async function distinctChildCallIds(admin, table, userId, refine) {
+  var ids = {};
+  var PAGE = 1000, start = 0;
+  while (true) {
+    var qb = admin.from(table).select('fathom_call_id').eq('user_id', userId).range(start, start + PAGE - 1);
+    if (refine) qb = refine(qb);
+    var r = await qb;
+    if (r.error) throw new Error(table + ': ' + r.error.message);
+    var batch = r.data || [];
+    for (var i = 0; i < batch.length; i++) ids[batch[i].fathom_call_id] = true;
+    if (batch.length < PAGE) break;
+    start += PAGE;
+  }
+  return ids;
+}
 
-    // 1) Page of fathom_calls for the caller, newest-first by call_date.
-    //    Rows with NULL call_date sort last so they don't outrank dated calls.
-    var callsResult = await admin
-      .from('fathom_calls')
-      .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status')
-      .eq('user_id', userId)
-      .order('call_date', { ascending: false, nullsFirst: false })
-      .range(offset, offset + limit - 1);
-    if (callsResult.error) {
-      console.error('[fathom] /calls fetch failed for user ' + userId + ': ' + callsResult.error.message);
-      return res.status(500).json({ error: 'Could not load calls' });
-    }
-    var calls = callsResult.data || [];
-    if (calls.length === 0) {
-      return res.json({ calls: [], limit: limit, offset: offset });
-    }
+// Shared call-list loader (self + admin pivot). Returns { calls, limit, offset }.
+async function loadCallsList(admin, userId, opts) {
+  var restrict = null;
+  if (opts.filter === 'objections') {
+    restrict = await distinctChildCallIds(admin, 'call_highlights', userId, function(q) { return q.eq('type', 'objection'); });
+  } else if (opts.filter === 'analyzed') {
+    restrict = await distinctChildCallIds(admin, 'call_analyses', userId, function(q) { return q.eq('status', 'done'); });
+  }
+  if (restrict && Object.keys(restrict).length === 0) {
+    return { calls: [], limit: opts.limit, offset: opts.offset };
+  }
 
-    // 2) Companion call_analyses rows (zero-or-one per fathom_call_id).
-    //    Non-fatal — if this query fails we still render the calls list
-    //    with null analysis fields so the dashboard isn't blocked by an
-    //    analysis-table outage.
-    var fathomCallIds = calls.map(function(c) { return c.id; });
-    var analysesResult = await admin
+  // When restricting or sorting-by-score we need the candidate set in memory
+  // (bounded per user) to filter/sort then paginate in JS; otherwise page in DB.
+  var needFullSet = !!restrict || opts.sort === 'score';
+  var q = admin
+    .from('fathom_calls')
+    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status')
+    .eq('user_id', userId)
+    .order('call_date', { ascending: false, nullsFirst: false });
+  if (opts.from) q = q.gte('call_date', opts.from);
+  if (opts.to)   q = q.lte('call_date', opts.to);
+  q = needFullSet ? q.range(0, 9999) : q.range(opts.offset, opts.offset + opts.limit - 1);
+  var callsResult = await q;
+  if (callsResult.error) throw new Error('fathom_calls: ' + callsResult.error.message);
+  var calls = callsResult.data || [];
+  if (restrict) calls = calls.filter(function(c) { return restrict[c.id]; });
+  if (calls.length === 0) return { calls: [], limit: opts.limit, offset: opts.offset };
+
+  // Enrich with analyses (chunked .in — cap-safe).
+  var ids = calls.map(function(c) { return c.id; });
+  var analysisByCallId = {};
+  for (var c = 0; c < ids.length; c += 100) {
+    var ar = await admin
       .from('call_analyses')
       .select('fathom_call_id, status, overall_score, overall_summary')
-      .in('fathom_call_id', fathomCallIds);
-    if (analysesResult.error) {
-      console.error('[fathom] /calls analyses fetch failed for user ' + userId + ': ' + analysesResult.error.message);
-    }
-    var analysisByCallId = {};
-    var analyses = analysesResult.data || [];
-    for (var i = 0; i < analyses.length; i++) {
-      analysisByCallId[analyses[i].fathom_call_id] = analyses[i];
-    }
+      .in('fathom_call_id', ids.slice(c, c + 100));
+    if (!ar.error) (ar.data || []).forEach(function(a) { analysisByCallId[a.fathom_call_id] = a; });
+  }
+  var enriched = calls.map(function(cc) {
+    var a = analysisByCallId[cc.id] || null;
+    return {
+      id: cc.id, fathom_call_id: cc.fathom_call_id, title: cc.title, call_date: cc.call_date,
+      duration_seconds: cc.duration_seconds, recording_url: cc.recording_url, sync_status: cc.sync_status,
+      analysis_status: a ? a.status : null, overall_score: a ? a.overall_score : null, overall_summary: a ? a.overall_summary : null,
+    };
+  });
 
-    var enriched = calls.map(function(c) {
-      var a = analysisByCallId[c.id] || null;
-      return {
-        id:               c.id,
-        fathom_call_id:   c.fathom_call_id,
-        title:            c.title,
-        call_date:        c.call_date,
-        duration_seconds: c.duration_seconds,
-        recording_url:    c.recording_url,
-        sync_status:      c.sync_status,
-        analysis_status:  a ? a.status          : null,
-        overall_score:    a ? a.overall_score   : null,
-        overall_summary:  a ? a.overall_summary : null,
-      };
+  if (opts.sort === 'score') {
+    enriched.sort(function(x, y) {
+      var xs = (typeof x.overall_score === 'number') ? x.overall_score : Infinity; // nulls last
+      var ys = (typeof y.overall_score === 'number') ? y.overall_score : Infinity;
+      return xs - ys; // worst-first
     });
+  }
+  if (needFullSet) enriched = enriched.slice(opts.offset, opts.offset + opts.limit);
+  return { calls: enriched, limit: opts.limit, offset: opts.offset };
+}
 
-    res.json({ calls: enriched, limit: limit, offset: offset });
+router.get('/calls', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+  try {
+    var result = await loadCallsList(getAdminClient(), userId, parseCallListOpts(req));
+    res.json(result);
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] /calls fatal for user ' + userId + ':', err.message);
@@ -884,5 +918,7 @@ router._refreshFathomToken  = refreshFathomToken;
 router._fetchMeetingsPage   = fetchMeetingsPage;
 router._fetchRecordingTranscript = fetchRecordingTranscript;
 router._markConnectionError = markConnectionError;
+router._loadCallsList       = loadCallsList;      // shared with /admin/fathom-calls/:user_id
+router._parseCallListOpts   = parseCallListOpts;
 
 module.exports = router;

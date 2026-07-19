@@ -1339,7 +1339,7 @@
     <span class="sep">·</span>
     <a class="nav-link" id="navOverview" onclick="setView('overview'); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
-    <a class="nav-link" id="navCallLibrary" onclick="setView('call-library'); return false;">Calls</a>
+    <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
   </div>
   <div class="top-bar-right">
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
@@ -1424,6 +1424,8 @@
     callLibraryLoading: false, // gates "Load more" button while a fetch is in flight
     callLibraryHasMore: false, // true if the last page returned === limit (more might exist)
     callLibraryOffset:  0,     // total rows fetched so far; next "Load more" uses this as offset
+    callLibraryFilter:  null,  // drill filter: 'analyzed' | 'objections' | null (nav = all)
+    callLibrarySort:    null,  // drill sort: 'score' | null
     callLibraryError:   null,  // last fetch error message; cleared on successful re-fetch
     // Call Review (Scout v2.0 Phase 2 Step 4)
     selectedCallId:     null,  // public.fathom_calls(id) UUID of the call being reviewed
@@ -2204,12 +2206,13 @@
     }
   }
 
-  function donutCardHtml(canvasId, label, centerBig, centerSmall, hint, clickKey) {
+  function donutCardHtml(canvasId, label, centerBig, centerSmall, hint, clickKey, onclickExpr) {
     var smallHtml = centerSmall ? '<div class="small">' + escapeHtml(centerSmall) + '</div>' : '';
-    // clickKey may be '' (non-drillable, e.g. coaching donuts under an admin
-    // pivot where /fathom/calls can't scope to the viewed user) — omit onclick.
-    var clickAttr = clickKey ? ' onclick="setView(\'' + clickKey + '\')"' : '';
-    var hintText = clickKey ? hint : '';
+    // Prefer an explicit onclick expression (coaching donuts pass drillCalls(...));
+    // otherwise fall back to setView(clickKey). Empty = non-drillable, no onclick.
+    var expr = onclickExpr || (clickKey ? "setView('" + clickKey + "')" : '');
+    var clickAttr = expr ? ' onclick="' + expr + '"' : '';
+    var hintText = expr ? hint : '';
     return '<div class="donut-card"' + clickAttr + '>'
          + '<div class="donut-label">' + escapeHtml(label) + '</div>'
          + '<div class="donut-canvas-wrap">'
@@ -2345,17 +2348,16 @@
 
   function renderCoachingOverview(content) {
     var a = state.analytics2;
-    // Drill to the Call Library only for self — /fathom/calls is per-caller, so
-    // it can't scope to a pivoted user (donuts + summary still pivot correctly).
-    var drill = isSelf() ? 'call-library' : '';
+    // Donuts drill into a filtered Call Library (self via /fathom/calls, pivot
+    // via /admin/fathom-calls/:user_id) — each donut filters to its own subset.
     content.innerHTML = renderHeaderHtml()
       + renderModeToggleHtml()
       + renderFathomNoticeHtml()
       + renderFathomSectionHtml()
       + '<div class="donut-row fade-in">'
-        + donutCardHtml('chart-c-calls', 'Calls analyzed', a.calls.analyzed, a.calls.total_in_range + ' in range', 'click to drill in', drill)
-        + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, a.avg_score.graded_calls + ' graded', 'click to drill in', drill)
-        + donutCardHtml('chart-c-obj', 'Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' total', 'click to drill in', drill)
+        + donutCardHtml('chart-c-calls', 'Calls analyzed', a.calls.analyzed, a.calls.total_in_range + ' in range', 'click to drill in', '', "drillCalls('analyzed',null)")
+        + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, a.avg_score.graded_calls + ' graded', 'worst-first — click to drill in', '', "drillCalls('analyzed','score')")
+        + donutCardHtml('chart-c-obj', 'Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' total', 'click to drill in', '', "drillCalls('objections',null)")
       + '</div>'
       + '<div class="section fade-in">'
         + '<div class="section-header"><h2>Coach summary</h2>'
@@ -2912,11 +2914,41 @@
 
   // throw-on-failure pattern matching fetchAnalytics/fetchPatterns/fetchCalls.
   async function fetchCallLibrary(offset, limit) {
-    var qs = 'limit=' + (limit || 20) + '&offset=' + (offset || 0);
-    var res = await fetch('/fathom/calls?' + qs, { headers: authHeader() });
+    var params = ['limit=' + (limit || 20), 'offset=' + (offset || 0)];
+    var drilling = !!(state.callLibraryFilter || state.callLibrarySort);
+    if (state.callLibraryFilter) params.push('filter=' + encodeURIComponent(state.callLibraryFilter));
+    if (state.callLibrarySort)   params.push('sort=' + encodeURIComponent(state.callLibrarySort));
+    // A drill matches its donut's date window; the nav entry (no filter) shows all.
+    if (drilling && state.dateRange) {
+      params.push('from=' + encodeURIComponent(state.dateRange.from));
+      params.push('to=' + encodeURIComponent(state.dateRange.to));
+    }
+    var base = isSelf() ? '/fathom/calls' : '/admin/fathom-calls/' + encodeURIComponent(state.viewingUserId);
+    var res = await fetch(base + '?' + params.join('&'), { headers: authHeader() });
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
+  }
+
+  // Enter the Call Library from the nav — clears any drill filter (shows all).
+  function goCallLibrary() {
+    state.callLibraryFilter = null;
+    state.callLibrarySort = null;
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryError = null;
+    setView('call-library');
+  }
+
+  // Enter the Call Library from a coaching donut — applies a filter/sort so the
+  // drill shows only the relevant calls (matching the donut's date window).
+  function drillCalls(filter, sort) {
+    state.callLibraryFilter = filter || null;
+    state.callLibrarySort = sort || null;
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryError = null;
+    setView('call-library');
   }
 
   // Fire-and-forget load. When offset=0, replaces state.callLibrary; on
@@ -3000,8 +3032,17 @@
       : (count === 0
           ? 'Your synced Fathom calls will appear here.'
           : count + ' call' + (count === 1 ? '' : 's') + ' shown' + (state.callLibraryHasMore ? ' (more available)' : ''));
+    // Active drill filter chip (only present when arrived via a donut).
+    var chip = '';
+    var label = state.callLibraryFilter === 'objections' ? 'With objections'
+              : (state.callLibrarySort === 'score' ? 'Analyzed · worst score first'
+              : (state.callLibraryFilter === 'analyzed' ? 'Analyzed' : ''));
+    if (label) {
+      chip = '<span class="scope-pill" style="margin-left:10px;">' + escapeHtml(label)
+        + ' <a onclick="goCallLibrary();return false;" style="cursor:pointer;text-decoration:underline;">clear</a></span>';
+    }
     return '<div class="page-header fade-in">'
-      + '<div><h1>Call Library</h1>'
+      + '<div><h1>Call Library' + chip + '</h1>'
       + '<div class="subtitle">' + escapeHtml(sub) + '</div></div>'
       + '</div>';
   }

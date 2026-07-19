@@ -2,6 +2,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeAnalytics, computeCallAnalytics, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
 
@@ -526,6 +527,41 @@ router.get('/analytics2/:user_id', requireAuth, requireRole(['admin', 'owner']),
     if (handleConfigError(err, res)) return;
     console.error('[admin] analytics2 error:', err.message);
     res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /admin/fathom-calls/:user_id ────────────────────────────────────────
+// Admin-pivot equivalent of GET /fathom/calls — the drill-down call list for a
+// viewed user. Same scope enforcement as the other /admin analytics routes.
+// Reuses the shared _loadCallsList helper (filter=analyzed|objections, sort,
+// from/to). Lets the coaching donuts drill through under ?user=.
+router.get('/fathom-calls/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  try {
+    var admin = getAdminClient();
+
+    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+      var scopeCheck = await admin
+        .from('user_profiles')
+        .select('user_id, managed_by')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+      if (scopeCheck.error) {
+        console.error('[admin] fathom-calls scope check failed:', scopeCheck.error.message);
+        return res.status(500).json({ error: 'Could not verify access' });
+      }
+      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+        console.warn('[admin] Scope violation on fathom-calls: actor=%s target=%s', req.user.id, targetUserId);
+        return res.status(403).json({ error: 'Not authorized for that user' });
+      }
+    }
+
+    var result = await fathomRoutes._loadCallsList(admin, targetUserId, fathomRoutes._parseCallListOpts(req));
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] fathom-calls error:', err.message);
+    res.status(500).json({ error: 'Failed to load calls' });
   }
 });
 
