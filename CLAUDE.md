@@ -386,6 +386,14 @@ Scout v2.0 is an **AI operating system for high-ticket sales teams** — not a s
   - Call review page with highlights timeline as the lead section
   - **Proven in production (2026-07-17):** the OAuth transcript path (`/recordings/{id}/transcript`), the `findMeeting` bypass (metadata from the stored `fathom_calls` row + direct transcript fetch), the reanalyze/batch-limit retry flow, and the `recorded_by[]` sync filter were all shipped and validated against Josh's live Fathom workspace. See "Fathom API Constraints (learned in production)" below.
 
+#### Shipped 2026-07-18 → 2026-07-19 (v1.3.1 partial + v1.4.0 objection intelligence, pulled forward)
+- **Default Coaching Dashboard (analytics2).** All roles land on `/dashboard` (admin one click away). Fathom-era analytics from `call_analyses` + `call_highlights` via `/me/analytics2` (+ `/admin/analytics2/:user_id`): Calls-analyzed / Avg-Score / Objections(distinct-calls) donuts + computed coach summary (section averages with `n` + latest `one_things`; **no LLM on load**). Old `call_sessions` analytics moved behind a **"Live Sessions"** toggle. Per-donut **filtered drill-downs** (`/fathom/calls?filter=analyzed|objections&sort=score`; admin pivot via `/admin/fathom-calls/:user_id`).
+  - **Close Rate donut deferred** — replaced by Avg Score until `outcome` is populated (needs re-analysis).
+- **v1.4.0 Objection Intelligence — PARTIALLY SHIPPED.** Schema + prompts + view are live; synthesis + populated data are **pending on Anthropic credits**.
+  - **Shipped:** migrations 012 + 013 (see Architecture below); the section grader infers `outcome`; the highlight extractor emits `objection_category` + `resolution` + `closer_response`; the **Objections view** (nav) — `/me/objections-intel` (+ `/admin/objections-intel/:user_id`): metrics row (total / handle-rate / handled·partial·unhandled), per-category breakdown, and a feed of objection moments with prospect quote + observation + resolution badge + the closer's own handling line + a **Fathom clip link** (`recording_url?t=seconds`). Works on existing highlights today.
+  - **Pending (credit-gated, as of 2026-07-19 the Anthropic balance is exhausted):** the **re-analysis pass** that populates `objection_category` / `resolution` / `closer_response` / `outcome` (currently null / all `uncategorized`); the **grounded ISOLATE→REFRAME→OVERCOME synthesis** (LLM + cache — currently a placeholder section in the view); and the outcome **manual-override** UI on the review page.
+  - **Taxonomy as actually built:** a **single** category layer — `fear` / `logistical` / `timing` / `partner` (money-phrased objections classified as `fear` unless a genuine logistical payment constraint appears; encoded in the extractor prompt; `partner` requires the observation to cite the prospect's framing). No second "surface" layer. `outcome` is a **4-value** enum (`closed` / `follow_up` / `lost` / `no_show`) with `outcome_source` (`inferred`/`manual`/`crm`) — no confidence/evidence fields.
+
 #### Revised roadmap (next milestones, in priority order — set 2026-07-18)
 - **v1.3.1 — Dashboard rewire + UX fixes** (NEXT):
   1. **Coaching Dashboard becomes the default landing view for ALL roles** including admin/owner (the admin panel stays one click away, no longer the landing page for admins/owners).
@@ -408,7 +416,7 @@ Scout v2.0 is an **AI operating system for high-ticket sales teams** — not a s
   - EOD report generation (per the existing Phase 5 spec)
   - BOD prioritization + overnight recap (Layer 3 proactive intelligence)
 - **Carried forward — slot under the milestones above where they fit:**
-  - **Objection intelligence dashboard** (frequency by type, handle rate per type, drill-down to playable timestamp clips) — extends the v1.3.1 objections donut; was the old standalone v1.4.0.
+  - **Objection intelligence dashboard** — mostly SHIPPED as the Objections view (see "Shipped" above). Remaining: the grounded ISOLATE→REFRAME→OVERCOME synthesis and the re-analysis that populates categories/resolution — both credit-gated.
   - **Zoom / Google Meet as additional recording sources** — the pipeline is already source-agnostic (see Recording Source Architecture); do after CRM.
   - **Teleprompter section-mode** (prompt only during objection/close sections) — see Teleprompter (Future Architecture Note); unscheduled, architecture preserved.
 
@@ -427,6 +435,13 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 ### Session Learnings (Fathom analysis rollout, 2026-07)
 - **Sequential analysis is ~30–60s per call.** The post-sync analysis loop is fire-and-forget and **does not survive Railway restarts/redeploys** — an interrupted drain leaves rows stuck at `status='processing'` that need a manual reset back to `'pending'`. Keep batches bounded (that's what the reanalyze `limit` is for).
 - **Diagnostic principle: replay the pipeline stage-by-stage with counts** (`fetched → mapped → upserted`) before assuming where data is lost. In the "sync returns zero" investigation, replaying the exact fetch with Josh's token showed `FETCHED=0` at stage 1 (wrong `recorded_by` email) vs `FETCHED=200 / MAPPED=200` for the correct email — proving there was no downstream "leak" and the only variable was the identity value. Instrument the failing stage; don't guess it.
+
+### Analysis schema & outcome/objection pipeline (migrations 012–013)
+- **Migration 012:** `call_analyses.outcome` (`closed`/`follow_up`/`lost`/`no_show`), `outcome_source` (`inferred`/`manual`/`crm`), `outcome_set_at` (+ `(user_id, outcome)` index); `call_highlights.objection_category` (`fear`/`logistical`/`timing`/`partner`), `objection_handled` (bool, superseded by `resolution`).
+- **Migration 013:** `call_highlights.resolution` (`handled`/`partial`/`unhandled`), `closer_response` (the closer's verbatim handling line — the grounding quote for synthesis; the Fathom clip link is derived at render time from `recording_url` + `timestamp_seconds`).
+- **Outcome is folded into the section grader** — it's one field in the grader's JSON output, so the pipeline stays **two** Claude calls (grader + highlight extractor), NOT three. `outcome_source='inferred'`. **TODO when the manual-override UI lands:** the blind `call_analyses` upsert must stop clobbering a `'manual'` outcome (read-before-write or a DB guard) — noted in `analyzeCall`.
+- **Coaching synthesis caching (DESIGNED, not built):** the grounded ISOLATE→REFRAME→OVERCOME synthesis is to be cached per **(user, date range, analysis-set hash)** so it regenerates only when the underlying analyzed set changes. Currently a placeholder in the Objections view (credit-gated).
+- **Objections-only re-extraction is NOT possible.** The highlight extractor runs inside the full `analyzeCall` pipeline (fetch transcript → grade → extract). Any taxonomy/category change (e.g. adding a category, adjusting the money→fear rule) requires a **full re-analysis** of the call, not a cheap objection-only re-pass. Budget re-analysis accordingly (2 Claude calls/call × N calls; Josh ≈ 200).
 
 ### Recording Source Architecture
 Fathom is the only recording source for now. Zoom and Google Meet will be added later.
@@ -566,6 +581,7 @@ The original live-teleprompter feature **stays as an optional feature** in v2.0 
 - See BUILD-PLAN.md for full 4-phase roadmap
 
 ## Preferences
+- **Process rule — docs travel with the milestone.** CLAUDE.md must be updated in the **same session** as every shipped milestone — the docs commit lands alongside or immediately after the feature commits. And keep it honest: document what actually shipped vs. what's still pending (credit-gated, deferred, designed-not-built) — never mark a milestone "shipped" for features that don't exist yet.
 - **Push back when warranted.** Justin doesn't want an agreeable AI. If an idea has a flaw — logical, technical, UX, strategic — call it out and explain why before implementing. If experience says something won't work, say so. Challenge, disagree, say no with reasoning. Only implement a user idea after confirming it actually makes sense. Never water down a concern to seem easier to work with. Justin is the expert on his business; Claude is the expert on the code and product patterns — push back from that expertise.
 - Justin is not a developer — explain things simply, provide exact terminal commands
 - Always use universal sales framework structure, never client-specific content
