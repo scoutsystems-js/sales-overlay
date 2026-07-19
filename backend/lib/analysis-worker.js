@@ -55,6 +55,10 @@ const VALID_HIGHLIGHT_TYPES = [
   'disqualify_signal',
 ];
 const VALID_HIGHLIGHT_SPEAKERS = ['CLOSER', 'PROSPECT'];
+// Objection sub-categories (migration 012). Only set on type='objection' rows.
+const VALID_OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+// Deal outcome inferred by the section grader (migration 012).
+const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -250,6 +254,12 @@ function buildSectionGraderPrompt(normalized, durationSeconds) {
     '  - overall_summary: 2-3 sentences. Factual only — no encouragement, no softening. State what happened, what stage was reached, and what the apparent outcome was.',
     '  - one_thing: the single most actionable behavioral change for the closer\'s next call — specific, not generic. Bad: "ask better discovery questions." Good: "when the prospect mentioned the $50k loan at [00:08:21], you moved straight to pitch instead of isolating the urgency — pause and ask \'what would change if you didn\'t solve this in 60 days?\' next time."',
     '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words.',
+    '  - outcome: the deal outcome for THIS call, inferred from what actually happened in the transcript. Exactly one of:',
+    '      "closed"    — prospect committed, paid, or clearly agreed to buy on this call',
+    '      "follow_up" — no decision yet: another call booked, thinking time, spouse/partner check, or a next step scheduled',
+    '      "lost"      — prospect declined, disqualified, or the deal is dead',
+    '      "no_show"   — the prospect never meaningfully joined (empty or near-empty transcript, no real sales conversation)',
+    '    Infer from evidence in the transcript. If genuinely ambiguous, use "follow_up" — never guess "closed" or "lost" without clear support.',
     '',
     'Respond with ONLY this JSON object — no markdown, no code fences, no narrative wrapping:',
     '{',
@@ -261,7 +271,8 @@ function buildSectionGraderPrompt(normalized, durationSeconds) {
     '  "overall_score": N,',
     '  "overall_summary": "...",',
     '  "one_thing": "...",',
-    '  "follow_up_email": "..."',
+    '  "follow_up_email": "...",',
+    '  "outcome": "closed"|"follow_up"|"lost"|"no_show"',
     '}',
     '',
     'TRANSCRIPT:',
@@ -294,13 +305,22 @@ function buildHighlightExtractorPrompt(normalized) {
     '      "rapport_moment"     — closer or prospect built genuine connection (humor, shared experience, vulnerability)',
     '      "disqualify_signal"  — prospect revealed they\'re not a real fit (no budget, no decision authority, wrong stage)',
     '',
+    'FOR type="objection" MOMENTS ONLY, also include two extra fields (omit them for every other type):',
+    '  - objection_category: exactly one of these four values:',
+    '      "fear"       — the objection is really about fear, doubt, or self-belief. IMPORTANT: money-phrased objections ("I can\'t afford it", "it\'s too expensive", "I don\'t have the money") are ALMOST ALWAYS fear in this domain — categorize them as "fear" UNLESS the transcript shows a genuine logistical payment constraint.',
+    '      "logistical" — a concrete, real-world constraint: a genuine payment/financing mechanics issue, scheduling/availability, or a hard external blocker the prospect actually describes.',
+    '      "timing"     — "not now", "call me next quarter", "after X happens" — a deferral about WHEN, not whether.',
+    '      "partner"    — the prospect needs to consult a spouse/partner/business partner before deciding. When you use "partner", the observation MUST cite the prospect\'s own framing (quote how they referenced the partner).',
+    '  - objection_handled: boolean — true if the closer resolved/overcame the objection on the call, false if it was left unresolved or the prospect stayed stuck.',
+    '',
     'Order moments chronologically (earliest first).',
     '',
     'Quality gate: if fewer than 5 genuinely high-signal moments exist in this call, return only the ones that qualify. Never pad to reach a minimum count. An array of 3 honest moments is better than 8 diluted ones.',
     '',
     'Respond with ONLY a JSON array — no markdown, no code fences, no narrative wrapping:',
     '[',
-    '  {"timestamp_seconds":N,"speaker":"CLOSER","quote":"...","observation":"...","type":"..."},',
+    '  {"timestamp_seconds":N,"speaker":"PROSPECT","quote":"...","observation":"...","type":"objection","objection_category":"fear","objection_handled":true},',
+    '  {"timestamp_seconds":N,"speaker":"CLOSER","quote":"...","observation":"...","type":"strong_moment"},',
     '  ...',
     ']',
     '',
@@ -346,13 +366,24 @@ function sanitizeHighlights(arr, durationSeconds) {
     if (typeof h.observation !== 'string' || !h.observation.trim()) continue;
     var type = (typeof h.type === 'string') ? h.type.toLowerCase() : null;
     if (VALID_HIGHLIGHT_TYPES.indexOf(type) === -1) continue;
+    // Objection sub-fields: only kept for type='objection'; coerced to null
+    // (not dropped) when missing/invalid so a bad category never loses the moment.
+    var objCategory = null;
+    var objHandled = null;
+    if (type === 'objection') {
+      var cat = (typeof h.objection_category === 'string') ? h.objection_category.toLowerCase() : null;
+      objCategory = (VALID_OBJECTION_CATEGORIES.indexOf(cat) !== -1) ? cat : null;
+      objHandled = (typeof h.objection_handled === 'boolean') ? h.objection_handled : null;
+    }
     out.push({
-      timestamp_seconds: ts,
-      speaker:           speaker,
-      quote:             h.quote.trim().slice(0, 1000),
-      observation:       h.observation.trim().slice(0, 500),
-      type:              type,
-      sequence_order:    out.length + 1,
+      timestamp_seconds:  ts,
+      speaker:            speaker,
+      quote:              h.quote.trim().slice(0, 1000),
+      observation:        h.observation.trim().slice(0, 500),
+      type:               type,
+      objection_category: objCategory,
+      objection_handled:  objHandled,
+      sequence_order:     out.length + 1,
     });
   }
   return out;
@@ -557,9 +588,20 @@ async function analyzeCall(fathomCallId, userId) {
       ? Math.round(graderParsed.overall_score)
       : null;
 
+    // Grader-inferred deal outcome (migration 012). outcome_source='inferred'.
+    // NOTE: when the manual outcome selector lands on the review page, this
+    // blind upsert must stop clobbering a 'manual' outcome (read-before-write or
+    // a DB guard) — no manual outcomes exist yet, so overwriting is safe for now.
+    var inferredOutcome = (typeof graderParsed.outcome === 'string'
+      && VALID_OUTCOMES.indexOf(graderParsed.outcome.toLowerCase()) !== -1)
+      ? graderParsed.outcome.toLowerCase() : null;
+
     var analysisPayload = {
       fathom_call_id:      fathomCallId,
       user_id:             userId,
+      outcome:             inferredOutcome,
+      outcome_source:      inferredOutcome ? 'inferred' : null,
+      outcome_set_at:      inferredOutcome ? new Date().toISOString() : null,
       overall_score:       overallScore,
       overall_summary:     (typeof graderParsed.overall_summary === 'string') ? graderParsed.overall_summary.slice(0, 3000) : null,
       intro_grade:         intro.grade,
