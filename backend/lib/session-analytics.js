@@ -266,6 +266,11 @@ async function computeCallAnalytics(admin, userId, from, to) {
     if (an.status === 'done') statusCounts.done++;
     else if (an.status === 'processing') statusCounts.processing++;
     else if (an.status === 'error') statusCounts.error++;
+    // Only DONE analyses contribute to scores/sections/one_things. Held
+    // ('synced_unanalyzed') rows keep their stale pre-calibration scores and
+    // must NOT pollute the averages (this was inflating graded_calls and
+    // dragging the blended Avg Score down).
+    if (an.status !== 'done') continue;
     if (typeof an.overall_score === 'number') {
       scoreSum += an.overall_score; scoreN++;
       if (an.outcome === 'closed') { winSum += an.overall_score; winN++; }
