@@ -1424,6 +1424,8 @@
     objectionsIntelLoading: false,
     objectionsSynthesis: null, // last /me/objections-synthesis ({available,categories} | {available:false})
     objectionsSynthesisLoading: false,
+    perfSynthesis: null,       // last /me/performance-synthesis ({available,working,improve} | {available:false})
+    perfSynthesisLoading: false,
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
@@ -2055,6 +2057,9 @@
   }
 
   async function reloadAll() {
+    // Range/user changed — drop the cached synthesis so it re-fetches for the
+    // new (user, range); the panel re-generates (server cache handles repeats).
+    state.perfSynthesis = null;
     renderOverview(true /* loading */);
     try {
       // Fathom status fetch is wrapped in a .catch so a stale token or
@@ -2401,13 +2406,62 @@
         + '<div class="section-header"><h2>Coach summary</h2>'
         + '<div class="meta">' + (a.calls.analyzed ? 'based on ' + a.calls.analyzed + (a.calls.analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
         + renderCoachSummary2(a)
+      + '</div>'
+      + '<div class="section fade-in">'
+        + '<div class="section-header"><h2>Performance summary</h2><div class="meta">win vs loss, grounded in your calls</div></div>'
+        + renderPerfSummary()
       + '</div>';
+
+    if (a.calls.analyzed && state.perfSynthesis === null && !state.perfSynthesisLoading) loadPerfSynthesis();
 
     requestAnimationFrame(function() {
       drawCallsDonut2('chart-c-calls', a);
       drawScoreDonut('chart-c-score', a);
       drawObjDonut2('chart-c-obj', a);
     });
+  }
+
+  // ─── Performance Summary (learning loop surface) ─────────────────────────
+  async function fetchPerfSynthesis() {
+    var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var base = isSelf() ? '/me/performance-synthesis' : '/admin/performance-synthesis/' + encodeURIComponent(state.viewingUserId);
+    var res = await fetch(base + '?' + qp, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+  async function loadPerfSynthesis() {
+    if (state.perfSynthesisLoading) return;
+    state.perfSynthesisLoading = true;
+    try { state.perfSynthesis = await fetchPerfSynthesis(); }
+    catch (err) { if (err.message === 'unauth') return; state.perfSynthesis = { available: false, reason: err.message || 'unknown' }; }
+    state.perfSynthesisLoading = false;
+    if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
+  }
+  function perfInsightHtml(it, kind) {
+    var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ clip</a>' : '';
+    var review = it.call_id ? ' <button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')" style="padding:2px 8px;">call</button>' : '';
+    var data = it.data ? '<span style="color:var(--muted);"> · ' + escapeHtml(it.data) + '</span>' : '';
+    var quote = it.quote ? '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--muted);">“</span>' + escapeHtml(it.quote) + '<span style="color:var(--muted);">”</span></div>' : '';
+    var accent = kind === 'working' ? 'var(--good)' : 'var(--mid, #fbbf24)';
+    return '<div class="pattern-card" style="border-left:2px solid ' + accent + ';">'
+      + '<div class="pattern-detail">' + escapeHtml(it.claim || '') + data + '</div>'
+      + quote
+      + ((clip || review) ? '<div class="obj-footer" style="margin-top:8px;">' + clip + review + '</div>' : '')
+      + '</div>';
+  }
+  function renderPerfSummary() {
+    var s = state.perfSynthesis;
+    if (s === null) return '<div class="load-state" style="padding:14px 4px;"><div class="spinner"></div> Generating performance summary…</div>';
+    if (!s.available) return '<div class="empty"><h3>Performance summary unavailable</h3><p>Could not generate it right now' + (s.reason ? ' (' + escapeHtml(s.reason) + ')' : '') + '. Your scores above are unaffected.</p></div>';
+    var work = (s.working || []), imp = (s.improve || []);
+    if (!work.length && !imp.length) return '<div class="empty"><h3>Not enough data yet</h3><p>Analyze more calls (with win/loss outcomes) to surface a performance summary.</p></div>';
+    var block = function(title, arr, kind) {
+      return '<div style="margin-top:6px;"><div class="obj-group-header">' + title + '</div>'
+        + (arr.length ? arr.map(function(it) { return perfInsightHtml(it, kind); }).join('') : '<div style="color:var(--muted);font-size:13px;">—</div>')
+        + '</div>';
+    };
+    return block("WHAT'S WORKING", work, 'working') + block('WHAT TO IMPROVE', imp, 'improve');
   }
 
   function drawCallsDonut2(canvasId, a) {
@@ -2445,28 +2499,18 @@
       var sec = a.sections[key] || { avg: null, n: 0 };
       var tag = a.weakest_section === key ? ' <span class="badge badge-loss">weakest</span>'
               : (a.strongest_section === key ? ' <span class="badge badge-win">strongest</span>' : '');
+      // Score only — no (n=X). n=0 → avg is null → render "—".
       var avgTxt = sec.avg === null ? '—' : String(sec.avg);
       var pct = sec.avg === null ? 0 : Math.max(0, Math.min(100, sec.avg));
       return '<div style="display:flex;align-items:center;gap:14px;padding:7px 0;border-bottom:1px solid var(--border);">'
         + '<div style="width:92px;font-size:13px;color:var(--muted);">' + escapeHtml(pair[1]) + '</div>'
         + '<div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + scoreColor(sec.avg) + ';border-radius:4px;"></div></div>'
-        + '<div style="width:150px;text-align:right;font-size:13px;">' + avgTxt + ' <span style="color:var(--muted);">(n=' + sec.n + ')</span>' + tag + '</div>'
+        + '<div style="width:130px;text-align:right;font-size:13px;">' + avgTxt + tag + '</div>'
         + '</div>';
     }).join('');
-
-    var ot = (a.latest_one_things || []);
-    var otHtml = '';
-    if (ot.length) {
-      otHtml = '<div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border);"><div class="section-header"><h2 style="font-size:14px;margin:0 0 10px;">Latest &ldquo;one thing to do differently&rdquo;</h2></div>'
-        + ot.map(function(o) {
-            return '<div class="pattern-card" style="cursor:pointer;" onclick="openCallReview(\'' + escapeHtml(o.fathom_call_id) + '\')">'
-              + '<div class="pattern-detail">' + escapeHtml(o.one_thing) + '</div>'
-              + '<div class="pattern-meta"><span>' + escapeHtml(o.title || 'Untitled call') + ' · ' + escapeHtml(formatDate(o.call_date)) + '</span></div>'
-              + '</div>';
-          }).join('')
-        + '</div>';
-    }
-    return '<div>' + rows + '</div>' + otHtml;
+    // The per-call one_thing feed was replaced by the Performance Summary panel
+    // (renderPerfSummary) — one_thing stays on individual call review pages.
+    return '<div>' + rows + '</div>';
   }
 
   // ──────────────────────────────────────────────────────────────────

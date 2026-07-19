@@ -118,7 +118,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
 
   // 3) cache check.
   var cacheQ = await admin.from('objection_synthesis_cache')
-    .select('synthesis').eq('user_id', userId).eq('from_ts', from).eq('to_ts', to).eq('analysis_set_hash', hash)
+    .select('synthesis').eq('user_id', userId).eq('synthesis_type', 'objections').eq('from_ts', from).eq('to_ts', to).eq('analysis_set_hash', hash)
     .maybeSingle();
   if (!cacheQ.error && cacheQ.data && cacheQ.data.synthesis) {
     return Object.assign({ available: true, cached: true }, cacheQ.data.synthesis);
@@ -174,8 +174,8 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
 
   // 7) cache (best-effort — a cache write failure shouldn't fail the response).
   var up = await admin.from('objection_synthesis_cache').upsert(
-    { user_id: userId, from_ts: from, to_ts: to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
-    { onConflict: 'user_id,from_ts,to_ts,analysis_set_hash' });
+    { user_id: userId, synthesis_type: 'objections', from_ts: from, to_ts: to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
+    { onConflict: 'user_id,synthesis_type,from_ts,to_ts,analysis_set_hash' });
   if (up.error) console.error('[synthesis] cache write failed for user ' + userId + ': ' + up.error.message);
 
   return Object.assign({ available: true, cached: false }, synthesis);

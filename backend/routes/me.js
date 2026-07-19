@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
+const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 
 var router = express.Router();
 
@@ -683,6 +684,26 @@ router.get('/objections-synthesis', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[me] objections-synthesis error:', err.message);
     res.status(500).json({ error: 'Failed to load synthesis: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /me/performance-synthesis?from=&to= ─────────────────────────────────
+// Evidence-linked Performance Summary (WHAT'S WORKING / WHAT TO IMPROVE),
+// comparing win-class vs loss-class calls. One cached Claude call per
+// (user, range). Credit-tolerant: { available:false } (HTTP 200) on failure.
+router.get('/performance-synthesis', requireAuth, async function(req, res) {
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+  try {
+    var result = await computePerformanceSynthesis(getAdminClient(), req.user.id, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] performance-synthesis error:', err.message);
+    res.status(500).json({ error: 'Failed to load performance summary: ' + (err.message || 'unknown') });
   }
 });
 
