@@ -1348,6 +1348,7 @@
     .obj-btn:hover { border-color: var(--accent); }
     .obj-toggle { font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; }
   </style>
+  <script src="/js/scout-auth.js"></script>
 </head>
 <body>
 
@@ -1380,7 +1381,10 @@
   function clearSession() { localStorage.removeItem(STORAGE_KEY); }
   function isSessionValid(s) {
     if (!s || !s.access_token || !s.expires_at) return false;
-    return new Date(s.expires_at).getTime() > Date.now() + 30 * 1000;
+    // expires_at is UNIX SECONDS (was misread as ms via new Date() → always
+    // "expired", forcing a refresh on every load; the shared module in
+    // /js/scout-auth.js now owns silent refresh + the 401 retry regardless).
+    return (s.expires_at * 1000) > Date.now() + 30 * 1000;
   }
   async function refreshSessionIfNeeded() {
     var s = getSession();
