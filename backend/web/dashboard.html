@@ -1340,8 +1340,6 @@
     <a class="nav-link" id="navOverview" onclick="setView('overview'); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
     <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
-    <span class="sep">·</span>
-    <a class="nav-link" id="navObjections" onclick="goObjections(); return false;">Objections</a>
   </div>
   <div class="top-bar-right">
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
@@ -2097,15 +2095,13 @@
     var CALL_LIBRARY_VIEWS = { 'call-library': 1, 'call-review': 1 };
     var navOverview = document.getElementById('navOverview');
     var navCallLibrary = document.getElementById('navCallLibrary');
-    var navObjections = document.getElementById('navObjections');
+    // Objections view is reachable only via the donut (no persistent nav tab);
+    // keep the Coaching Dashboard nav highlighted while in it.
     if (navOverview) {
-      navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view]);
+      navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel');
     }
     if (navCallLibrary) {
       navCallLibrary.classList.toggle('nav-active', !!CALL_LIBRARY_VIEWS[state.view]);
-    }
-    if (navObjections) {
-      navObjections.classList.toggle('nav-active', state.view === 'objections-intel');
     }
   }
 
@@ -2366,7 +2362,7 @@
       + '<div class="donut-row fade-in">'
         + donutCardHtml('chart-c-calls', 'Calls analyzed', a.calls.analyzed, a.calls.total_in_range + ' in range', 'click to drill in', '', "drillCalls('analyzed',null)")
         + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, a.avg_score.graded_calls + ' graded', 'worst-first — click to drill in', '', "drillCalls('analyzed','score')")
-        + donutCardHtml('chart-c-obj', 'Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' total', 'click to drill in', '', "drillCalls('objections',null)")
+        + donutCardHtml('chart-c-obj', 'Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' total', 'click for objection intelligence', '', "goObjections()")
       + '</div>'
       + '<div class="section fade-in">'
         + '<div class="section-header"><h2>Coach summary</h2>'
@@ -3047,7 +3043,8 @@
   function renderObjectionsIntel() {
     var content = document.getElementById('content');
     if (state.objectionsIntel === null && !state.objectionsIntelLoading) loadObjectionsIntel();
-    var header = renderHeaderHtml();
+    // Reachable only via the Objections donut — provide an explicit way back.
+    var header = '<button class="back-btn" onclick="backToOverview()" style="margin-bottom:14px;">← Back to dashboard</button>' + renderHeaderHtml();
     if (state.objectionsIntel === null) {
       content.innerHTML = header + '<div class="section"><div class="skeleton" style="height:90px;"></div></div>';
       return;
