@@ -3,7 +3,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
-const { computeAnalytics, computeCallAnalytics, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 
 var router = express.Router();
 
@@ -641,6 +641,26 @@ router.get('/analytics2', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[me] analytics2 error:', err.message);
     res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /me/objections-intel?from=&to= ──────────────────────────────────────
+// Objection intelligence for the Objections view: metrics + per-category
+// breakdown + a feed of objection moments with Fathom clip links. Admin pivot
+// equivalent: /admin/objections-intel/:user_id.
+router.get('/objections-intel', requireAuth, async function(req, res) {
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+  try {
+    var result = await computeObjectionIntel(getAdminClient(), req.user.id, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] objections-intel error:', err.message);
+    res.status(500).json({ error: 'Failed to load objection intelligence: ' + (err.message || 'unknown') });
   }
 });
 

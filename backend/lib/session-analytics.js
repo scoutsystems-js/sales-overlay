@@ -329,9 +329,105 @@ function sectionsShape() {
   };
 }
 
+// ─── Objection intelligence (Objections view) ───────────────────────────────
+// Aggregates type='objection' highlights for the caller's calls in a window.
+// Metrics + per-category breakdown + a feed with Fathom clip links. Reads
+// existing highlights; the objection_category / resolution / closer_response
+// fields stay empty until a re-analysis populates them (Anthropic-credit gated).
+// Cap-safe: fathom_calls paginated, highlights read in chunks of 100 call ids.
+var OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+
+async function computeObjectionIntel(admin, userId, from, to) {
+  // 1) calls in window → metadata map (recording_url powers the clip link).
+  var calls = [];
+  var PAGE = 1000, start = 0;
+  while (true) {
+    var cq = await admin
+      .from('fathom_calls')
+      .select('id, title, call_date, recording_url')
+      .eq('user_id', userId)
+      .gte('call_date', from)
+      .lte('call_date', to)
+      .order('call_date', { ascending: false, nullsFirst: false })
+      .range(start, start + PAGE - 1);
+    if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+    var cb = cq.data || [];
+    calls = calls.concat(cb);
+    if (cb.length < PAGE) break;
+    start += PAGE;
+  }
+  var meta = {};
+  var callIds = [];
+  for (var i = 0; i < calls.length; i++) { meta[calls[i].id] = calls[i]; callIds.push(calls[i].id); }
+
+  var emptyCats = {};
+  OBJECTION_CATEGORIES.concat(['uncategorized']).forEach(function(c) { emptyCats[c] = { total: 0, handled: 0, partial: 0, unhandled: 0 }; });
+  var base = {
+    from: from, to: to,
+    metrics: { total: 0, calls_with_objection: 0, handled: 0, partial: 0, unhandled: 0, handled_rate: null },
+    by_category: emptyCats,
+    feed: [],
+  };
+  if (callIds.length === 0) return base;
+
+  // 2) objection highlights for those calls (chunked, cap-safe).
+  var rows = [];
+  for (var c = 0; c < callIds.length; c += 100) {
+    var hr = await admin
+      .from('call_highlights')
+      .select('fathom_call_id, timestamp_seconds, quote, observation, objection_category, resolution, closer_response')
+      .in('fathom_call_id', callIds.slice(c, c + 100))
+      .eq('type', 'objection');
+    if (hr.error) throw new Error('call_highlights: ' + hr.error.message);
+    rows = rows.concat(hr.data || []);
+  }
+
+  var callsWith = {};
+  var feed = [];
+  rows.forEach(function(r) {
+    callsWith[r.fathom_call_id] = true;
+    base.metrics.total += 1;
+    var res = (r.resolution === 'handled' || r.resolution === 'partial' || r.resolution === 'unhandled') ? r.resolution : null;
+    if (res) base.metrics[res] += 1;
+    var cat = (OBJECTION_CATEGORIES.indexOf(r.objection_category) !== -1) ? r.objection_category : 'uncategorized';
+    base.by_category[cat].total += 1;
+    if (res) base.by_category[cat][res] += 1;
+
+    var m = meta[r.fathom_call_id] || {};
+    var clip = (m.recording_url && typeof r.timestamp_seconds === 'number')
+      ? m.recording_url + (m.recording_url.indexOf('?') === -1 ? '?' : '&') + 't=' + r.timestamp_seconds
+      : null;
+    feed.push({
+      fathom_call_id: r.fathom_call_id,
+      title: m.title || null,
+      call_date: m.call_date || null,
+      timestamp_seconds: (typeof r.timestamp_seconds === 'number') ? r.timestamp_seconds : null,
+      clip_url: clip,
+      category: cat,
+      resolution: res,
+      quote: r.quote || null,
+      observation: r.observation || null,
+      closer_response: r.closer_response || null,
+    });
+  });
+  base.metrics.calls_with_objection = Object.keys(callsWith).length;
+  var denom = base.metrics.handled + base.metrics.partial + base.metrics.unhandled;
+  base.metrics.handled_rate = denom > 0 ? Math.round((base.metrics.handled / denom) * 100) : null;
+
+  // Feed newest-call-first, then by timestamp; cap to keep the payload bounded.
+  feed.sort(function(a, b) {
+    var d = new Date(b.call_date || 0).getTime() - new Date(a.call_date || 0).getTime();
+    if (d !== 0) return d;
+    return (a.timestamp_seconds || 0) - (b.timestamp_seconds || 0);
+  });
+  base.feed = feed.slice(0, 100);
+  return base;
+}
+
 module.exports = {
   computeAnalytics: computeAnalytics,
   computeCallAnalytics: computeCallAnalytics,
+  computeObjectionIntel: computeObjectionIntel,
   loadSessionObjections: loadSessionObjections,
   loadObjectionsByType: loadObjectionsByType,
 };

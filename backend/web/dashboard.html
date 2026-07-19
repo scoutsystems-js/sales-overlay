@@ -1340,6 +1340,8 @@
     <a class="nav-link" id="navOverview" onclick="setView('overview'); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
     <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
+    <span class="sep">·</span>
+    <a class="nav-link" id="navObjections" onclick="goObjections(); return false;">Objections</a>
   </div>
   <div class="top-bar-right">
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
@@ -1398,6 +1400,8 @@
     view:           'overview', // 'overview' | 'calls' | 'objections' | 'closes' | 'objection-type'
     overviewMode:    'coaching', // 'coaching' (call_analyses, default) | 'sessions' (call_sessions, desktop-era)
     analytics2:      null,    // last /me/analytics2 (Fathom-era) response
+    objectionsIntel: null,    // last /me/objections-intel response (Objections view)
+    objectionsIntelLoading: false,
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
@@ -2080,6 +2084,7 @@
     else if (state.view === 'objection-type') renderObjectionTypeDrill();
     else if (state.view === 'call-library') renderCallLibrary();
     else if (state.view === 'call-review') renderCallReview();
+    else if (state.view === 'objections-intel') renderObjectionsIntel();
     updateNavActiveStates();
   }
 
@@ -2092,11 +2097,15 @@
     var CALL_LIBRARY_VIEWS = { 'call-library': 1, 'call-review': 1 };
     var navOverview = document.getElementById('navOverview');
     var navCallLibrary = document.getElementById('navCallLibrary');
+    var navObjections = document.getElementById('navObjections');
     if (navOverview) {
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view]);
     }
     if (navCallLibrary) {
       navCallLibrary.classList.toggle('nav-active', !!CALL_LIBRARY_VIEWS[state.view]);
+    }
+    if (navObjections) {
+      navObjections.classList.toggle('nav-active', state.view === 'objections-intel');
     }
   }
 
@@ -2976,6 +2985,110 @@
     }
     state.callLibraryLoading = false;
     if (state.view === 'call-library') renderCallLibrary();
+  }
+
+  // ─── Objections view (objection intelligence) ──────────────────────────
+  function goObjections() {
+    state.objectionsIntel = null;
+    setView('objections-intel');
+  }
+
+  async function fetchObjectionsIntel() {
+    var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var base = isSelf() ? '/me/objections-intel' : '/admin/objections-intel/' + encodeURIComponent(state.viewingUserId);
+    var res = await fetch(base + '?' + qp, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+
+  async function loadObjectionsIntel() {
+    if (state.objectionsIntelLoading) return;
+    state.objectionsIntelLoading = true;
+    try {
+      state.objectionsIntel = await fetchObjectionsIntel();
+    } catch (err) {
+      if (err.message === 'unauth') return;
+      state.objectionsIntel = { error: err.message || 'unknown' };
+    }
+    state.objectionsIntelLoading = false;
+    if (state.view === 'objections-intel') renderObjectionsIntel();
+  }
+
+  function objStatCard(label, big, small) {
+    return '<div style="flex:1;border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center;">'
+      + '<div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">' + escapeHtml(label) + '</div>'
+      + '<div style="font-size:30px;font-weight:700;margin:6px 0 2px;">' + escapeHtml(String(big)) + '</div>'
+      + '<div style="font-size:12px;color:var(--muted);">' + escapeHtml(small) + '</div>'
+      + '</div>';
+  }
+
+  function objFeedCard(f) {
+    var cat = (f.category && f.category !== 'uncategorized')
+      ? '<span class="scope-pill" style="margin-right:8px;">' + escapeHtml(f.category) + '</span>' : '';
+    var resBadge = f.resolution === 'handled' ? '<span class="badge badge-win">handled</span>'
+      : (f.resolution === 'partial' ? '<span class="badge badge-fu">partial</span>'
+      : (f.resolution === 'unhandled' ? '<span class="badge badge-loss">unhandled</span>' : ''));
+    var clip = f.clip_url ? '<a href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener" style="text-decoration:underline;">▶ clip</a>' : '';
+    var resp = f.closer_response
+      ? '<div style="margin-top:8px;padding:8px 10px;border-left:2px solid var(--good,#4ade80);border-radius:4px;font-size:13px;"><span style="color:var(--muted);">Closer handled it: </span>' + escapeHtml(f.closer_response) + '</div>'
+      : '';
+    return '<div class="pattern-card" onclick="openCallReview(\'' + escapeHtml(f.fathom_call_id) + '\')" style="cursor:pointer;">'
+      + '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">'
+        + '<div style="font-size:12px;color:var(--muted);">' + cat + escapeHtml(f.title || 'Untitled call') + ' · ' + escapeHtml(formatDate(f.call_date)) + '</div>'
+        + '<div style="display:flex;gap:8px;align-items:center;" onclick="event.stopPropagation();">' + resBadge + clip + '</div>'
+      + '</div>'
+      + '<div class="pattern-detail" style="margin-top:6px;">' + escapeHtml(f.quote || '') + '</div>'
+      + (f.observation ? '<div class="pattern-meta"><span>' + escapeHtml(f.observation) + '</span></div>' : '')
+      + resp
+      + '</div>';
+  }
+
+  function renderObjectionsIntel() {
+    var content = document.getElementById('content');
+    if (state.objectionsIntel === null && !state.objectionsIntelLoading) loadObjectionsIntel();
+    var header = renderHeaderHtml();
+    if (state.objectionsIntel === null) {
+      content.innerHTML = header + '<div class="section"><div class="skeleton" style="height:90px;"></div></div>';
+      return;
+    }
+    if (state.objectionsIntel.error) {
+      content.innerHTML = header + '<div class="error fade-in">Could not load objections: ' + escapeHtml(state.objectionsIntel.error) + '</div>';
+      return;
+    }
+    var d = state.objectionsIntel, m = d.metrics;
+    var metricsHtml = '<div class="fade-in" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;">'
+      + objStatCard('Objections', m.total, m.calls_with_objection + ' call' + (m.calls_with_objection === 1 ? '' : 's'))
+      + objStatCard('Handle rate', m.handled_rate === null ? '—' : (m.handled_rate + '%'), (m.handled + m.partial + m.unhandled) + ' resolution-tagged')
+      + objStatCard('Handled', m.handled, m.partial + ' partial · ' + m.unhandled + ' unhandled')
+      + '</div>';
+
+    var cats = [['fear', 'Fear'], ['logistical', 'Logistical'], ['timing', 'Timing'], ['partner', 'Partner'], ['uncategorized', 'Uncategorized']];
+    var catRows = cats.map(function(pair) {
+      var b = d.by_category[pair[0]] || { total: 0, handled: 0 };
+      var pct = m.total > 0 ? Math.round(100 * b.total / m.total) : 0;
+      return '<div style="display:flex;align-items:center;gap:14px;padding:7px 0;border-bottom:1px solid var(--border);">'
+        + '<div style="width:110px;font-size:13px;color:var(--muted);">' + escapeHtml(pair[1]) + '</div>'
+        + '<div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:#5b9eff;border-radius:4px;"></div></div>'
+        + '<div style="width:150px;text-align:right;font-size:13px;">' + b.total + ' <span style="color:var(--muted);">(' + b.handled + ' handled)</span></div>'
+        + '</div>';
+    }).join('');
+    var uncat = d.by_category.uncategorized ? d.by_category.uncategorized.total : 0;
+    var catNote = (m.total > 0 && uncat === m.total)
+      ? '<div class="signal-banner"><div class="signal-banner-icon"></div><div><strong>Categories pending re-analysis.</strong> These objections were analyzed before categorization shipped — re-analyze to populate fear / logistical / timing / partner + resolution + the closer\'s own handling lines.</div></div>'
+      : '';
+
+    var synthHtml = '<div class="empty"><h3>Grounded coaching synthesis</h3><p>Once objections are re-analyzed, this coaches each category ISOLATE → REFRAME → OVERCOME — grounded in your own handled moments (with clip links) where they exist, generic best practice where they don\'t. Generation is paused until AI credits are restored.</p></div>';
+
+    var feedHtml = d.feed.length === 0
+      ? '<div class="empty"><h3>No objections in this window</h3><p>Pick a wider date range, or wait for new analyzed calls.</p></div>'
+      : d.feed.map(objFeedCard).join('');
+
+    content.innerHTML = header
+      + metricsHtml
+      + '<div class="section fade-in"><div class="section-header"><h2>By category</h2></div>' + catNote + catRows + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Coaching</h2></div>' + synthHtml + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Objection moments</h2><div class="meta">' + d.feed.length + ' shown</div></div>' + feedHtml + '</div>';
   }
 
   function renderCallLibrary() {
