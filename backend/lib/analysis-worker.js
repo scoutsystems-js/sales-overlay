@@ -61,6 +61,11 @@ const VALID_OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const VALID_RESOLUTIONS = ['handled', 'partial', 'unhandled'];
 // Deal outcome inferred by the section grader (migration 012).
 const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
+// Analysis prompt version (migration 014) — BUMP MANUALLY whenever the grader or
+// highlight-extractor prompts change. Stamped on every call_analyses row so a
+// stale-prompt analysis is one query away (the guard for the Issue-1 class of
+// bug). v2 = outcome inference + objection category/resolution/closer_response/surface.
+const ANALYSIS_PROMPT_VERSION = 'v2-2026-07-19';
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -307,7 +312,8 @@ function buildHighlightExtractorPrompt(normalized) {
     '      "rapport_moment"     — closer or prospect built genuine connection (humor, shared experience, vulnerability)',
     '      "disqualify_signal"  — prospect revealed they\'re not a real fit (no budget, no decision authority, wrong stage)',
     '',
-    'FOR type="objection" MOMENTS ONLY, also include two extra fields (omit them for every other type):',
+    'FOR type="objection" MOMENTS ONLY, also include these extra fields (omit them for every other type):',
+    '  - objection_surface: the SURFACE objection as the prospect ACTUALLY framed it, in 1-3 words (e.g. "too expensive", "needs spouse", "bad timing", "wants to research", "not sure it works"). This is the apparent objection in the prospect\'s own words; objection_category below is the underlying driver.',
     '  - objection_category: exactly one of these four values:',
     '      "fear"       — the objection is really about fear, doubt, or self-belief. IMPORTANT: money-phrased objections ("I can\'t afford it", "it\'s too expensive", "I don\'t have the money") are ALMOST ALWAYS fear in this domain — categorize them as "fear" UNLESS the transcript shows a genuine logistical payment constraint.',
     '      "logistical" — a concrete, real-world constraint: a genuine payment/financing mechanics issue, scheduling/availability, or a hard external blocker the prospect actually describes.',
@@ -322,7 +328,7 @@ function buildHighlightExtractorPrompt(normalized) {
     '',
     'Respond with ONLY a JSON array — no markdown, no code fences, no narrative wrapping:',
     '[',
-    '  {"timestamp_seconds":N,"speaker":"PROSPECT","quote":"...","observation":"...","type":"objection","objection_category":"fear","resolution":"handled","closer_response":"..."},',
+    '  {"timestamp_seconds":N,"speaker":"PROSPECT","quote":"...","observation":"...","type":"objection","objection_surface":"too expensive","objection_category":"fear","resolution":"handled","closer_response":"..."},',
     '  {"timestamp_seconds":N,"speaker":"CLOSER","quote":"...","observation":"...","type":"strong_moment"},',
     '  ...',
     ']',
@@ -371,11 +377,14 @@ function sanitizeHighlights(arr, durationSeconds) {
     if (VALID_HIGHLIGHT_TYPES.indexOf(type) === -1) continue;
     // Objection sub-fields: only kept for type='objection'; coerced to null
     // (not dropped) when missing/invalid so a bad value never loses the moment.
+    var objSurface = null;
     var objCategory = null;
     var resolution = null;
     var closerResponse = null;
     var objHandled = null;
     if (type === 'objection') {
+      objSurface = (typeof h.objection_surface === 'string' && h.objection_surface.trim())
+        ? h.objection_surface.trim().slice(0, 80) : null;
       var cat = (typeof h.objection_category === 'string') ? h.objection_category.toLowerCase() : null;
       objCategory = (VALID_OBJECTION_CATEGORIES.indexOf(cat) !== -1) ? cat : null;
       var res = (typeof h.resolution === 'string') ? h.resolution.toLowerCase() : null;
@@ -390,6 +399,7 @@ function sanitizeHighlights(arr, durationSeconds) {
       quote:              h.quote.trim().slice(0, 1000),
       observation:        h.observation.trim().slice(0, 500),
       type:               type,
+      objection_surface:  objSurface,
       objection_category: objCategory,
       objection_handled:  objHandled,
       resolution:         resolution,
@@ -454,6 +464,7 @@ async function markFathomCallErrored(admin, fathomCallId, userId) {
  */
 async function analyzeCall(fathomCallId, userId) {
   var admin = getAdminClient();
+  console.log('[analysis] start call ' + fathomCallId + ' (user=' + userId + ', prompt_version=' + ANALYSIS_PROMPT_VERSION + ')');
 
   try {
     // ─── Phase 1: mark processing ─────────────────────────────────────────
@@ -560,7 +571,27 @@ async function analyzeCall(fathomCallId, userId) {
       messages:   [{ role: 'user', content: highlightPrompt }],
     });
 
-    var settled = await Promise.all([graderPromise, highlighterPromise]);
+    // GUARD: an Anthropic API failure (credit/quota exhaustion, 429, 5xx,
+    // timeout) must hard-fail this call to 'error' — NEVER fall through to a
+    // 'done' row with partial nulls. A thrown SDK error already reaches the
+    // outer catch, but we handle it explicitly here so the DB reason is
+    // unambiguous ("Anthropic API failure (HTTP …)") and stamped with the
+    // prompt version.
+    var settled;
+    try {
+      settled = await Promise.all([graderPromise, highlighterPromise]);
+    } catch (apiErr) {
+      var apiStatus = (apiErr && (apiErr.status || apiErr.statusCode)) || '';
+      var apiReason = 'Anthropic API failure' + (apiStatus ? ' (HTTP ' + apiStatus + ')' : '') + ': ' + ((apiErr && apiErr.message) || 'unknown');
+      await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
+        overall_summary: apiReason.slice(0, 1000),
+        analyzed_at:     new Date().toISOString(),
+        prompt_version:  ANALYSIS_PROMPT_VERSION,
+      });
+      await markFathomCallErrored(admin, fathomCallId, userId);
+      console.error('[analysis] ' + apiReason + ' (call=' + fathomCallId + ' user=' + userId + ')');
+      return { status: 'error', reason: apiReason };
+    }
     var graderResp     = settled[0];
     var highlighterResp = settled[1];
 
@@ -635,6 +666,7 @@ async function analyzeCall(fathomCallId, userId) {
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
       analyzed_at:         new Date().toISOString(),
+      prompt_version:      ANALYSIS_PROMPT_VERSION,
       status:              'done',
     };
     var upsert = await admin

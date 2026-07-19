@@ -375,7 +375,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
   for (var c = 0; c < callIds.length; c += 100) {
     var hr = await admin
       .from('call_highlights')
-      .select('fathom_call_id, timestamp_seconds, quote, observation, objection_category, resolution, closer_response')
+      .select('fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, resolution, closer_response')
       .in('fathom_call_id', callIds.slice(c, c + 100))
       .eq('type', 'objection');
     if (hr.error) throw new Error('call_highlights: ' + hr.error.message);
@@ -403,6 +403,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
       call_date: m.call_date || null,
       timestamp_seconds: (typeof r.timestamp_seconds === 'number') ? r.timestamp_seconds : null,
       clip_url: clip,
+      surface: r.objection_surface || null,
       category: cat,
       resolution: res,
       quote: r.quote || null,
