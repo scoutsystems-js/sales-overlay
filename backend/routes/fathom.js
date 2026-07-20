@@ -868,7 +868,7 @@ router.get('/calls/:id', requireAuth, async function(req, res) {
     //    analysis fields if the table read errors.
     var analysisResult = await admin
       .from('call_analyses')
-      .select('status, overall_score, overall_summary, one_thing, follow_up_email, speaker_closer_name, intro_grade, intro_score, intro_notes, discovery_grade, discovery_score, discovery_notes, pitch_grade, pitch_score, pitch_notes, objection_grade, objection_score, objection_notes, close_grade, close_score, close_notes')
+      .select('status, overall_score, overall_summary, one_thing, outcome, why_outcome, why_quote, why_timestamp_seconds, one_thing_timestamp_seconds, follow_up_email, speaker_closer_name, intro_grade, intro_score, intro_notes, discovery_grade, discovery_score, discovery_notes, pitch_grade, pitch_score, pitch_notes, objection_grade, objection_score, objection_notes, close_grade, close_score, close_notes')
       .eq('fathom_call_id', callId)
       .maybeSingle();
     if (analysisResult.error) {

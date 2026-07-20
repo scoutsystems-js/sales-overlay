@@ -1196,6 +1196,39 @@
     }
     .review-one-thing-text.placeholder { color: var(--text-muted); font-style: italic; }
 
+    /* "Why this call closed / didn't close" — causal evidence section. */
+    .review-why { padding: 20px 22px; }
+    .review-why.loss { border-left: 3px solid var(--bad); }
+    .review-why.win  { border-left: 3px solid var(--good); }
+    .review-why-label {
+      font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+    .review-why.loss .review-why-label { color: var(--bad); }
+    .review-why.win  .review-why-label { color: var(--good); }
+    .review-why-reason { font-size: 15px; color: var(--text); line-height: 1.6; }
+    .review-why-quote {
+      margin-top: 12px; padding: 10px 14px; border-radius: var(--radius);
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      font-size: 13.5px; color: var(--text); font-style: italic; line-height: 1.5;
+    }
+    .review-why-clip {
+      display: inline-flex; align-items: center; gap: 4px; margin-top: 10px;
+      font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none;
+    }
+    .review-why-clip:hover { text-decoration: underline; }
+    /* Cause -> correction connector: one_thing rendered directly beneath the cause. */
+    .review-why-connector {
+      display: flex; align-items: center; gap: 8px; margin: 14px 0 4px;
+      color: var(--text-muted); font-size: 12px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .review-why-connector::before,
+    .review-why-connector::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .review-why .review-one-thing { margin-top: 10px; }
+
     /* Section 2: Section Grades — five collapsible cards. */
     .review-grades-toggle {
       background: transparent;
@@ -3512,10 +3545,67 @@
 
     content.innerHTML = header + notice + errorBanner
       + '<div class="fade-in">'
+        + renderWhyOutcomeSectionHtml(review)
         + renderHighlightsSectionHtml(review)
         + renderGradesSectionHtml(review)
         + renderFollowupSectionHtml(review)
       + '</div>';
+  }
+
+  // ─── "Why this call closed / didn't close" — causal evidence ──────────
+  // Between header and highlights. Loss-class: the primary cause + quote +
+  // clip, then the paired "One thing to do differently" beneath it as the
+  // correction (cause → fix). Win-class: what won it. Hidden for other/no
+  // outcome or when the (pre-v4) analysis lacks the tied why_outcome field.
+  function whyOutcomeState(review) {
+    var a = review && review.analysis;
+    if (!a || a.status !== 'done') return null;
+    var hasWhy = typeof a.why_outcome === 'string' && a.why_outcome.trim();
+    if (!hasWhy) return null;
+    if (a.outcome === 'lost')   return { kind: 'loss' };
+    if (a.outcome === 'closed') return { kind: 'win' };
+    return null; // follow_up / no_show / null → section hidden
+  }
+
+  function reviewClipHtml(seconds, recordingUrl, label) {
+    if (typeof seconds !== 'number' || !recordingUrl || typeof recordingUrl !== 'string') return '';
+    var href = recordingUrl + (recordingUrl.indexOf('?') !== -1 ? '&' : '?') + 't=' + Math.floor(seconds);
+    return '<a class="review-why-clip" href="' + escapeHtml(href)
+      + '" target="_blank" rel="noopener">▶ ' + escapeHtml(label || 'Play clip')
+      + ' (' + escapeHtml(formatTimestampDisplay(Math.floor(seconds))) + ')</a>';
+  }
+
+  function renderWhyOutcomeSectionHtml(review) {
+    var st = whyOutcomeState(review);
+    if (!st) return '';
+    var a = review.analysis;
+    var recordingUrl = review.recording_url || null;
+
+    var title = st.kind === 'loss' ? 'Why this call didn’t close' : 'Why this call closed';
+    var reason = '<div class="review-why-reason">' + escapeHtml(a.why_outcome) + '</div>';
+    var quote = (typeof a.why_quote === 'string' && a.why_quote.trim())
+      ? '<div class="review-why-quote">“' + escapeHtml(a.why_quote) + '”</div>' : '';
+    var clip = (typeof a.why_timestamp_seconds === 'number')
+      ? reviewClipHtml(a.why_timestamp_seconds, recordingUrl, 'Play this moment') : '';
+
+    var inner = '<div class="review-why-label">' + escapeHtml(title) + '</div>'
+      + reason + quote + clip;
+
+    // Loss-class: pair the correction directly beneath the cause.
+    if (st.kind === 'loss') {
+      var otText = (typeof a.one_thing === 'string' && a.one_thing.trim())
+        ? '<div class="review-one-thing-text">' + escapeHtml(a.one_thing) + '</div>'
+        : '<div class="review-one-thing-text placeholder">Will appear when analysis completes.</div>';
+      var otClip = (typeof a.one_thing_timestamp_seconds === 'number')
+        ? '<div style="margin-top:6px;">' + reviewClipHtml(a.one_thing_timestamp_seconds, recordingUrl, 'Where it belonged') + '</div>' : '';
+      inner += '<div class="review-why-connector">The fix</div>'
+        + '<div class="review-one-thing">'
+          + '<div class="review-one-thing-label">One thing to do differently</div>'
+          + otText + otClip
+        + '</div>';
+    }
+
+    return '<section class="section review-why ' + st.kind + '">' + inner + '</section>';
   }
 
   function renderCallReviewHeaderHtml(review, seed) {
@@ -3576,18 +3666,25 @@
       body = '<div class="review-highlights-pending">No highlights were extracted for this call.</div>';
     }
 
-    // One-thing footer — always rendered, falls back to a placeholder.
-    var oneThing = analysis && typeof analysis.one_thing === 'string' && analysis.one_thing.trim()
-      ? '<div class="review-one-thing-text">' + escapeHtml(analysis.one_thing) + '</div>'
-      : '<div class="review-one-thing-text placeholder">Will appear when analysis completes.</div>';
+    // One-thing footer. Normally rendered here — but for a loss-class call with
+    // the tied why_outcome, one_thing moves into the paired "Why this call
+    // didn't close" section (cause → fix), so suppress the duplicate here.
+    var whyState = whyOutcomeState(review);
+    var oneThingFooter = '';
+    if (!(whyState && whyState.kind === 'loss')) {
+      var oneThing = analysis && typeof analysis.one_thing === 'string' && analysis.one_thing.trim()
+        ? '<div class="review-one-thing-text">' + escapeHtml(analysis.one_thing) + '</div>'
+        : '<div class="review-one-thing-text placeholder">Will appear when analysis completes.</div>';
+      oneThingFooter = '<div class="review-one-thing">'
+        + '<div class="review-one-thing-label">One thing to do differently</div>'
+        + oneThing
+      + '</div>';
+    }
 
     return '<section class="section">'
       + '<div class="section-header"><h2>Call Highlights</h2></div>'
       + body
-      + '<div class="review-one-thing">'
-        + '<div class="review-one-thing-label">One thing to do differently</div>'
-        + oneThing
-      + '</div>'
+      + oneThingFooter
     + '</section>';
   }
 

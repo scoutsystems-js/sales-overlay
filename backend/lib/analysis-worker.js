@@ -67,7 +67,7 @@ const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 // bug). v2 = outcome inference + objection category/resolution/closer_response/surface.
 // v3 = grader scale re-calibration (anchored bands + high-ticket domain context;
 //      a typical solid call lands 65-80/section — no longer graded vs a perfect ideal).
-const ANALYSIS_PROMPT_VERSION = 'v3-2026-07-19';
+const ANALYSIS_PROMPT_VERSION = 'v4-2026-07-20';
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -273,7 +273,13 @@ function buildSectionGraderPrompt(normalized, durationSeconds) {
     'Then provide call-level fields:',
     '  - overall_score: 0-100, weighted gestalt across sections that occurred',
     '  - overall_summary: 2-3 sentences. Factual only — no encouragement, no softening. State what happened, what stage was reached, and what the apparent outcome was.',
-    '  - one_thing: the single most actionable behavioral change for the closer\'s next call — specific, not generic. Bad: "ask better discovery questions." Good: "when the prospect mentioned the $50k loan at [00:08:21], you moved straight to pitch instead of isolating the urgency — pause and ask \'what would change if you didn\'t solve this in 60 days?\' next time."',
+    '  - one_thing: the single most actionable behavioral change for the closer\'s next call — specific, not generic. Bad: "ask better discovery questions." Good: "when the prospect mentioned the $50k loan at [00:08:21], you moved straight to pitch instead of isolating the urgency — pause and ask \'what would change if you didn\'t solve this in 60 days?\' next time." For a "lost" call, one_thing MUST be the direct antidote to why_outcome.reason — the correction that would have addressed that exact cause, at the same or the adjacent moment. why_outcome and one_thing must read as cause → correction.',
+    '  - why_outcome: the SINGLE most decisive cause of this call\'s result, anchored to one transcript moment — an object {"reason":"...","quote":"...","timestamp_seconds":N}:',
+    '      • reason: ONE specific cause, not a list. For a "lost" call this is the primary reason the deal did not close (the one thing that most cost it). For a "closed" call this is what most won the deal (the decisive moment).',
+    '      • quote: the exact words spoken at that moment (the closer\'s or the prospect\'s), 5-30 words, trimmed.',
+    '      • timestamp_seconds: integer seconds of that moment (read the [HH:MM:SS] tag, convert to seconds).',
+    '      • Set why_outcome to null when outcome is "follow_up" or "no_show" (no decisive win/loss cause to isolate).',
+    '  - one_thing_timestamp_seconds: integer seconds of the moment the one_thing correction belonged to — the same moment as why_outcome, or the adjacent moment where the closer should have intervened. Null if not applicable.',
     '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words.',
     '  - outcome: the deal outcome for THIS call, inferred from what actually happened in the transcript. Exactly one of:',
     '      "closed"    — prospect committed, paid, or clearly agreed to buy on this call',
@@ -292,6 +298,8 @@ function buildSectionGraderPrompt(normalized, durationSeconds) {
     '  "overall_score": N,',
     '  "overall_summary": "...",',
     '  "one_thing": "...",',
+    '  "why_outcome": {"reason":"...","quote":"...","timestamp_seconds":N} | null,',
+    '  "one_thing_timestamp_seconds": N | null,',
     '  "follow_up_email": "...",',
     '  "outcome": "closed"|"follow_up"|"lost"|"no_show"',
     '}',
@@ -366,6 +374,18 @@ function sanitizeSection(s) {
     : null;
   var notes = (typeof s.notes === 'string') ? s.notes.slice(0, 4000) : null;
   return { grade: grade, score: score, notes: notes };
+}
+
+// Clamp a Claude-supplied timestamp to a sane integer second within the call.
+// Mirrors sanitizeHighlights' bound: reject negatives and anything wildly past
+// the recording's end. Returns null when unusable (so the clip link degrades
+// to a plain, unlinked reason).
+function boundTs(v, durationSeconds) {
+  if (typeof v !== 'number' || !isFinite(v)) return null;
+  var ts = Math.floor(v);
+  if (ts < 0) return null;
+  if (durationSeconds != null && ts > durationSeconds + 60) return null;
+  return ts;
 }
 
 // Validates the highlight array — drops any row with the wrong shape or
@@ -652,6 +672,22 @@ async function analyzeCall(fathomCallId, userId) {
       && VALID_OUTCOMES.indexOf(graderParsed.outcome.toLowerCase()) !== -1)
       ? graderParsed.outcome.toLowerCase() : null;
 
+    // "Why this call closed / didn't close" (migration 018, prompt v4). Only
+    // win-class (closed) and loss-class (lost) calls carry a decisive-cause
+    // object; for follow_up/no_show/null we force it null even if the model
+    // emitted one, so the review section stays hidden for ambiguous outcomes.
+    var whyRaw = graderParsed.why_outcome;
+    var whyReason = null, whyQuote = null, whyTs = null;
+    var isWinLoss = (inferredOutcome === 'closed' || inferredOutcome === 'lost');
+    if (isWinLoss && whyRaw && typeof whyRaw === 'object'
+        && typeof whyRaw.reason === 'string' && whyRaw.reason.trim()) {
+      whyReason = whyRaw.reason.trim().slice(0, 2000);
+      whyQuote  = (typeof whyRaw.quote === 'string' && whyRaw.quote.trim())
+        ? whyRaw.quote.trim().slice(0, 1000) : null;
+      whyTs     = boundTs(whyRaw.timestamp_seconds, callRow.duration_seconds);
+    }
+    var oneThingTs = boundTs(graderParsed.one_thing_timestamp_seconds, callRow.duration_seconds);
+
     var analysisPayload = {
       fathom_call_id:      fathomCallId,
       user_id:             userId,
@@ -675,7 +711,11 @@ async function analyzeCall(fathomCallId, userId) {
       close_grade:         close.grade,
       close_score:         close.score,
       close_notes:         close.notes,
-      one_thing:           (typeof graderParsed.one_thing === 'string') ? graderParsed.one_thing.slice(0, 2000) : null,
+      one_thing:                   (typeof graderParsed.one_thing === 'string') ? graderParsed.one_thing.slice(0, 2000) : null,
+      why_outcome:                 whyReason,
+      why_quote:                   whyQuote,
+      why_timestamp_seconds:       whyTs,
+      one_thing_timestamp_seconds: oneThingTs,
       follow_up_email:     (typeof graderParsed.follow_up_email === 'string') ? graderParsed.follow_up_email.slice(0, 5000) : null,
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
