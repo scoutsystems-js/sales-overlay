@@ -635,7 +635,7 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
 
     var outdatedIds;
     try {
-      outdatedIds = await outdatedProcessedCallIds(admin, userId, currentVersion);
+      outdatedIds = await outdatedCallIds(admin, userId, currentVersion);
     } catch (lookupErr) {
       console.error('[fathom] update-analyses lookup failed for user ' + userId + ': ' + lookupErr.message);
       return res.status(500).json({ error: 'Could not load outdated calls' });
@@ -789,38 +789,40 @@ router.post('/identity', requireAuth, async function(req, res) {
 // Returns connection metadata (with tokens redacted — never leak) plus the
 // total call count synced for this user. Two parallel queries since there's
 // no FK between fathom_calls and fathom_connections.
-// Calls that were successfully analyzed ('processed') but under an OLDER grader
-// prompt version than the current one. Returned most-recent-first as fathom_calls
-// UUIDs. This EXCLUDES intentionally-held ('synced_unanalyzed') and 'error' rows
-// by keying on sync_status='processed', so "Update analyses" never un-holds a
-// held call. Two queries + JS intersect (supabase-js has no JOIN); bounded by the
-// user's processed-call count (~hundreds).
-async function outdatedProcessedCallIds(admin, userId, currentVersion) {
-  var processed = await admin
-    .from('fathom_calls')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('sync_status', 'processed')
-    .order('call_date', { ascending: false, nullsFirst: false });
-  if (processed.error) throw new Error('fathom_calls: ' + processed.error.message);
-  var orderedIds = (processed.data || []).map(function(r) { return r.id; });
-  if (orderedIds.length === 0) return [];
-
-  var outdated = {};
-  for (var c = 0; c < orderedIds.length; c += 100) {
-    var chunk = orderedIds.slice(c, c + 100);
+// Every DONE analysis for this user graded on a version OTHER than the current
+// one (NULL prompt_version counts as outdated). Returned most-recent-analyzed
+// first as fathom_calls UUIDs (call_analyses.fathom_call_id === fathom_calls.id).
+//
+// Definition change (was: join fathom_calls.sync_status='processed'): the count
+// is now based PURELY on call_analyses.status='done'. Held calls carry
+// status='synced_unanalyzed', so they're excluded naturally — no sync_status join
+// is needed to protect the holdback. The old 'processed' join UNDER-counted: a
+// call reset to fathom_calls.sync_status='pending' (or left 'error') by a prior
+// "Update analyses" whose re-analysis was interrupted (deploy-race) still had a
+// done+old analysis row, but escaped the 'processed' filter. Now N == exactly
+// "all done analyses where prompt_version != CURRENT". Paginated to dodge the
+// supabase-js 1000-row cap.
+async function outdatedCallIds(admin, userId, currentVersion) {
+  var out = [];
+  var PAGE = 1000;
+  var offset = 0;
+  while (true) {
     var q = await admin
       .from('call_analyses')
       .select('fathom_call_id, prompt_version')
-      .in('fathom_call_id', chunk)
-      .eq('status', 'done');
+      .eq('user_id', userId)
+      .eq('status', 'done')
+      .order('analyzed_at', { ascending: false, nullsFirst: false })
+      .range(offset, offset + PAGE - 1);
     if (q.error) throw new Error('call_analyses: ' + q.error.message);
-    (q.data || []).forEach(function(a) {
-      if (a.prompt_version !== currentVersion) outdated[a.fathom_call_id] = true;
-    });
+    var rows = q.data || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].prompt_version !== currentVersion) out.push(rows[i].fathom_call_id);
+    }
+    if (rows.length < PAGE) break;
+    offset += PAGE;
   }
-  // Preserve the most-recent-first order from the processed query.
-  return orderedIds.filter(function(id) { return outdated[id]; });
+  return out;
 }
 
 router.get('/status', requireAuth, async function(req, res) {
@@ -856,7 +858,7 @@ router.get('/status', requireAuth, async function(req, res) {
     var currentVersion = require('../lib/analysis-worker').ANALYSIS_PROMPT_VERSION;
     var outdatedCount = 0;
     try {
-      outdatedCount = (await outdatedProcessedCallIds(admin, userId, currentVersion)).length;
+      outdatedCount = (await outdatedCallIds(admin, userId, currentVersion)).length;
     } catch (outdatedErr) {
       console.error('[fathom] status outdated-count failed for user ' + userId + ': ' + outdatedErr.message);
     }
