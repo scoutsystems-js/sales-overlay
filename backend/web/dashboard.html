@@ -2461,13 +2461,21 @@
   }
 
   function renderModeToggleHtml() {
-    // Hide the toggle entirely when there's no live-session data for the range.
+    // DORMANT (2026-07-20): the Live Sessions view is desktop-teleprompter-era and
+    // fully retired from the dashboard until the teleprompter returns. The toggle
+    // is hidden in ALL ranges regardless of data. The Live Sessions view logic
+    // (renderOverview's 'sessions' branch, hasLiveSessions, setOverviewMode) is
+    // kept intact but unreachable — nothing sets overviewMode='sessions' anymore.
+    // To revive: delete this early return to restore the toggle below.
+    return '';
+    /* former toggle — reinstate to bring Live Sessions back:
     if (!hasLiveSessions()) return '';
     var mode = state.overviewMode || 'coaching';
     return '<div class="mode-toggle" style="display:flex;gap:6px;margin:-4px 0 18px;">'
       + '<button class="date-preset' + (mode === 'coaching' ? ' active' : '') + '" onclick="setOverviewMode(\'coaching\')">Coaching</button>'
       + '<button class="date-preset' + (mode === 'sessions' ? ' active' : '') + '" onclick="setOverviewMode(\'sessions\')">Live Sessions</button>'
       + '</div>';
+    */
   }
 
   function setOverviewMode(mode) {
