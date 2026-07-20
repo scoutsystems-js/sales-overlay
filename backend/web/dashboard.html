@@ -2177,6 +2177,13 @@
   function renderOverview(isLoading) {
     var content = document.getElementById('content');
     var mode = state.overviewMode || 'coaching';
+    // Edge case: user is on Live Sessions and switches to a range with zero
+    // sessions — fall back to Coaching so they aren't stranded on a hidden tab.
+    // Only fires once analytics has loaded (state.analytics non-null).
+    if (mode === 'sessions' && state.analytics && !hasLiveSessions()) {
+      mode = 'coaching';
+      state.overviewMode = 'coaching';
+    }
     var notReady = mode === 'coaching' ? !state.analytics2 : !state.analytics;
     if (isLoading || notReady) {
       content.innerHTML = renderHeaderHtml()
@@ -2359,7 +2366,16 @@
   // ──────────────────────────────────────────────────────────────────
   // Coaching overview (Fathom-era, call_analyses) — default view
   // ──────────────────────────────────────────────────────────────────
+  // True when the current (or pivoted ?user=) target has >=1 call_sessions row
+  // in the selected range. Source: computeAnalytics totals.total_calls, already
+  // in state.analytics and already scoped to the pivoted user — no extra query.
+  function hasLiveSessions() {
+    return !!(state.analytics && state.analytics.totals && state.analytics.totals.total_calls > 0);
+  }
+
   function renderModeToggleHtml() {
+    // Hide the toggle entirely when there's no live-session data for the range.
+    if (!hasLiveSessions()) return '';
     var mode = state.overviewMode || 'coaching';
     return '<div class="mode-toggle" style="display:flex;gap:6px;margin:-4px 0 18px;">'
       + '<button class="date-preset' + (mode === 'coaching' ? ' active' : '') + '" onclick="setOverviewMode(\'coaching\')">Coaching</button>'
