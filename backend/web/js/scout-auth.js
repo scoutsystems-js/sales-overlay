@@ -41,35 +41,69 @@
   function shouldRefresh(s) { return !!(s && s.refresh_token) && msLeft(s) < 5 * 60 * 1000; } // within 5 min or expired
 
   var _refreshInFlight = null;
-  // Refresh using the stored refresh token. Deduplicated so concurrent 401s (and
-  // the proactive timer) share a single refresh. Returns the fresh session or
-  // null; clears the session on a genuine failure.
+
+  // One refresh POST with a specific refresh token. Resolves to:
+  //   { session:obj,  fatal:false } — success
+  //   { session:null, fatal:true  } — token DEFINITIVELY rejected (HTTP 400/401):
+  //                                   a genuine re-login is required
+  //   { session:null, fatal:false } — TRANSIENT failure (network down on wake,
+  //                                   5xx cold start, 429, aborted): keep the
+  //                                   session, let a later attempt recover.
+  // Treating the transient case as fatal is exactly what logged users out
+  // overnight — the machine woke, the refresh fired before Wi-Fi was back, the
+  // fetch threw, and the old code called clearSession() on that throw.
+  function _doRefresh(refreshToken) {
+    return _rawFetch(REFRESH_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).then(function (res) {
+      if (res.ok) {
+        return res.json().then(function (data) {
+          var sess = (data && data.session) || data;
+          if (!sess || !sess.access_token) return { session: null, fatal: false };
+          var cur = getSession() || {};
+          var fresh = {
+            access_token: sess.access_token,
+            refresh_token: sess.refresh_token || refreshToken,
+            expires_at: sess.expires_at,
+            email: (sess.user && sess.user.email) || (data && data.user && data.user.email) || cur.email,
+          };
+          setSession(fresh);
+          return { session: fresh, fatal: false };
+        }, function () { return { session: null, fatal: false }; });
+      }
+      // 400/401 = the refresh token itself is invalid/expired/rotated-away → fatal.
+      // Everything else (5xx, 429, 408, opaque 0) is a transient blip → non-fatal.
+      return { session: null, fatal: (res.status === 400 || res.status === 401) };
+    }, function () {
+      // Network error (offline, DNS/TLS not up yet on wake). NEVER fatal.
+      return { session: null, fatal: false };
+    });
+  }
+
+  // Refresh using the freshest stored refresh token, deduplicated so concurrent
+  // 401s + the proactive timer share one in-flight refresh. On a fatal rejection
+  // we FIRST check whether another tab already rotated the token in localStorage
+  // (the multi-tab rotation race) — if so we retry with that newer token rather
+  // than nuking a session that's actually still alive. Only clears on a true fatal.
   function refreshSession() {
     if (_refreshInFlight) return _refreshInFlight;
     var s = getSession();
-    if (!s || !s.refresh_token) return Promise.resolve(null);
-    _refreshInFlight = (function () {
-      return _rawFetch(REFRESH_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: s.refresh_token }),
-      }).then(function (res) {
-        if (!res.ok) { clearSession(); return null; }
-        return res.json().then(function (data) {
-          var sess = (data && data.session) || data;
-          if (!sess || !sess.access_token) { clearSession(); return null; }
-          var fresh = {
-            access_token: sess.access_token,
-            refresh_token: sess.refresh_token || s.refresh_token,
-            expires_at: sess.expires_at,
-            email: (sess.user && sess.user.email) || (data && data.user && data.user.email) || s.email,
-          };
-          setSession(fresh);
-          return fresh;
+    if (!s || !s.refresh_token) return Promise.resolve({ session: null, fatal: true });
+    _refreshInFlight = _doRefresh(s.refresh_token).then(function (r) {
+      if (r.session || !r.fatal) return r;
+      var latest = getSession();
+      if (latest && latest.refresh_token && latest.refresh_token !== s.refresh_token) {
+        // Another tab rotated the token out from under us — retry with the newer one.
+        return _doRefresh(latest.refresh_token).then(function (r2) {
+          if (r2.fatal && !r2.session) clearSession();
+          return r2;
         });
-      }).catch(function () { clearSession(); return null; })
-        .then(function (r) { _refreshInFlight = null; return r; });
-    })();
+      }
+      clearSession();
+      return r;
+    }).then(function (r) { _refreshInFlight = null; return r; });
     return _refreshInFlight;
   }
 
@@ -98,8 +132,15 @@
     var url = (typeof input === 'string') ? input : (input && input.url);
     return _rawFetch(input, init).then(function (res) {
       if (res.status !== 401 || !sameOriginApi(url)) return res;
-      return refreshSession().then(function (fresh) {
-        if (!fresh) { clearSession(); redirectToLogin(); return res; }
+      return refreshSession().then(function (r) {
+        var fresh = r && r.session;
+        if (!fresh) {
+          // Only bounce to /login on a DEFINITIVE auth failure. On a transient
+          // failure (network down on wake, 5xx) keep the session + return the
+          // original 401; the next call / visibility-refresh recovers silently.
+          if (r && r.fatal) { clearSession(); redirectToLogin(); }
+          return res;
+        }
         // Retry ONCE with the fresh token, via _rawFetch (no re-interception).
         if (typeof input === 'string') {
           return _rawFetch(input, withAuth(init, fresh.access_token));
@@ -114,15 +155,30 @@
   };
 
   // ── Proactive refresh: keep long-open tabs alive ────────────────────────────
-  setInterval(function () {
+  function maybeRefresh() {
     var s = getSession();
     if (s && s.refresh_token && shouldRefresh(s)) refreshSession();
-  }, 4 * 60 * 1000);
+  }
+  // setInterval is SUSPENDED while the machine sleeps, so it can't be the only
+  // trigger — an overnight-idle tab wakes with an expired access token and a
+  // frozen timer. Also fire on the events that DO fire on wake: the tab becoming
+  // visible again, the window regaining focus, and the network coming back
+  // online. Every path is failure-tolerant (see refreshSession) so a wake-time
+  // network blip can never log the user out.
+  setInterval(maybeRefresh, 4 * 60 * 1000);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') maybeRefresh();
+  });
+  window.addEventListener('online', maybeRefresh);
+  window.addEventListener('focus', maybeRefresh);
 
   // Expose a namespace for any page code that wants the corrected helpers.
   window.ScoutAuth = {
     getSession: getSession, setSession: setSession, clearSession: clearSession,
-    isSessionValid: isSessionValid, shouldRefresh: shouldRefresh, refreshSession: refreshSession,
+    isSessionValid: isSessionValid, shouldRefresh: shouldRefresh,
+    // Returns the fresh session object (or null) for back-compat with callers
+    // that awaited a session; the fatal/transient distinction stays internal.
+    refreshSession: function () { return refreshSession().then(function (r) { return r && r.session; }); },
     authHeader: function () { var s = getSession(); return s && s.access_token ? { Authorization: 'Bearer ' + s.access_token } : {}; },
   };
 })();
