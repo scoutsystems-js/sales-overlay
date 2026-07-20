@@ -782,6 +782,9 @@ async function analyzeCall(fathomCallId, userId) {
 
 module.exports = {
   analyzeCall: analyzeCall,
+  // Current grader prompt version — the dashboard uses this to surface calls
+  // analyzed under an older version ("Update analyses (N outdated)").
+  ANALYSIS_PROMPT_VERSION: ANALYSIS_PROMPT_VERSION,
   // Exported for tests / future internal callers — same precedent as me.js
   // (_computeCoachingPatterns, etc.).
   _extractFirstJsonObject:     extractFirstJsonObject,

@@ -324,12 +324,128 @@ function meetingToRow(userId, m) {
 // needed, paginates Fathom's /meetings endpoint filtered by created_after,
 // inserts new rows into fathom_calls with ON CONFLICT DO NOTHING, updates
 // last_sync_at on the connection row, returns { synced: N }.
+// Core per-user sync. Takes an already-loaded connection row (access_token,
+// refresh_token, expires_at, last_sync_at, fathom_email) and does token refresh
+// → paginate /meetings → upsert new fathom_calls → update connection status →
+// fire-and-forget analysis of NEWLY-inserted rows. Returns a result object
+// instead of touching res, so both the authed /sync route AND the cron
+// /sync-all endpoint can reuse it identically.
+//
+// The synced_unanalyzed holdback is respected for free: the upsert is ON
+// CONFLICT DO NOTHING, so held rows are never re-inserted and thus never land
+// in newCallIds — only genuinely NEW calls (which arrive as sync_status='pending'
+// via meetingToRow) get analysis dispatched.
+//
+// Result shapes:
+//   { ok:true, synced, fetched, malformed, pages, truncated, dispatched }
+//   { ok:false, kind:'needs_identity' }
+//   { ok:false, kind:'refresh_failed'|'fetch_failed'|'insert_failed', error }
+async function syncUserCalls(admin, userId, conn) {
+  // Identity gate — without the recorded_by[] email a sync would pull the whole
+  // team workspace, so refuse and signal the dashboard to prompt for it.
+  if (!conn.fathom_email) {
+    console.log('[fathom] sync blocked for user ' + userId + ': fathom_email not set (needs_identity)');
+    return { ok: false, kind: 'needs_identity' };
+  }
+
+  // Valid access token (refreshFathomToken throws if Fathom rejects the refresh).
+  var accessToken;
+  try {
+    accessToken = await getValidAccessToken(admin, userId, conn);
+  } catch (refreshErr) {
+    console.error('[fathom] sync refresh failed for user ' + userId + ': ' + refreshErr.message);
+    return { ok: false, kind: 'refresh_failed', error: refreshErr.message };
+  }
+
+  // Paginate /meetings. created_after = last_sync_at; first sync fetches all.
+  var cursor = null;
+  var pageCount = 0;
+  var allRows = [];
+  var malformedCount = 0;
+  try {
+    while (pageCount < MAX_PAGES) {
+      var page = await fetchMeetingsPage(accessToken, cursor, conn.last_sync_at, false, false, conn.fathom_email);
+      for (var i = 0; i < page.items.length; i++) {
+        var row = meetingToRow(userId, page.items[i]);
+        if (row) allRows.push(row);
+        else malformedCount += 1;
+      }
+      cursor = (typeof page.next_cursor === 'string' && page.next_cursor) ? page.next_cursor : null;
+      pageCount += 1;
+      if (!cursor) break;
+    }
+  } catch (fetchErr) {
+    await markConnectionError(admin, userId, fetchErr.message);
+    console.error('[fathom] sync fetch failed for user ' + userId + ': ' + fetchErr.message);
+    return { ok: false, kind: 'fetch_failed', error: fetchErr.message };
+  }
+  var hitPageCap = cursor !== null;  // pagination didn't finish naturally
+
+  // Upsert with ignoreDuplicates → INSERT ... ON CONFLICT DO NOTHING. Idempotent.
+  var insertedCount = 0;
+  var insertResult = null;
+  if (allRows.length > 0) {
+    insertResult = await admin
+      .from('fathom_calls')
+      .upsert(allRows, { onConflict: 'user_id,fathom_call_id', ignoreDuplicates: true })
+      .select('id');
+    if (insertResult.error) {
+      var insReason = 'sync_failed: DB insert — ' + insertResult.error.message;
+      await markConnectionError(admin, userId, insReason);
+      console.error('[fathom] sync insert failed for user ' + userId + ': ' + insertResult.error.message);
+      return { ok: false, kind: 'insert_failed', error: insertResult.error.message };
+    }
+    // .select('id') after ignoreDuplicates returns only newly-inserted rows.
+    insertedCount = (insertResult.data || []).length;
+  }
+
+  // Mark connection success.
+  var nowIso = new Date().toISOString();
+  var statusUpdate = await admin
+    .from('fathom_connections')
+    .update({ last_sync_at: nowIso, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIso })
+    .eq('user_id', userId);
+  if (statusUpdate.error) {
+    // Calls saved but status row didn't update — log; the next sync fixes it.
+    console.error('[fathom] sync status update failed for user ' + userId + ': ' + statusUpdate.error.message);
+  }
+
+  // Fire-and-forget post-sync analysis of the NEW rows only. Sequential (rate
+  // limits + predictable ordering), lazy-required to dodge the fathom↔worker
+  // circular dependency, per-call errors caught. Detached — not durable across a
+  // Railway restart (bounded batches keep the blast radius small).
+  var newCallIds = (insertResult && insertResult.data || []).map(function(r) { return r.id; });
+  if (newCallIds.length > 0) {
+    (async function() {
+      try {
+        var analyzeCall = require('../lib/analysis-worker').analyzeCall;
+        for (var i = 0; i < newCallIds.length; i++) {
+          try {
+            await analyzeCall(newCallIds[i], userId);
+          } catch (innerErr) {
+            console.error('[fathom] analyzeCall failed for call ' + newCallIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown'));
+          }
+        }
+      } catch (outerErr) {
+        console.error('[fathom] background analysis loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
+      }
+    })();
+  }
+
+  console.log('[fathom] Sync complete for user ' + userId + ': fetched=' + allRows.length + ' inserted=' + insertedCount + ' malformed=' + malformedCount + ' pages=' + pageCount + (hitPageCap ? ' (CAPPED — more available)' : '') + (newCallIds.length > 0 ? ' analysis_dispatched=' + newCallIds.length : ''));
+  return {
+    ok: true,
+    synced: insertedCount, fetched: allRows.length, malformed: malformedCount,
+    pages: pageCount, truncated: hitPageCap, dispatched: newCallIds.length,
+  };
+}
+
 router.get('/sync', requireAuth, async function(req, res) {
   var userId = req.user.id;
   try {
     var admin = getAdminClient();
 
-    // 1. Look up the connection. 404 if the caller hasn't connected Fathom.
+    // Look up the connection. 404 if the caller hasn't connected Fathom.
     var connResult = await admin
       .from('fathom_connections')
       .select('access_token, refresh_token, expires_at, last_sync_at, fathom_email')
@@ -342,127 +458,85 @@ router.get('/sync', requireAuth, async function(req, res) {
     if (!connResult.data) {
       return res.status(404).json({ error: 'Not connected to Fathom' });
     }
-    var conn = connResult.data;
 
-    // 1b. Identity gate. Without the connected user's Fathom email we cannot
-    // apply the recorded_by[] filter — and syncing unfiltered would pull the
-    // ENTIRE team workspace's recordings (the exact bug this fixes). So refuse
-    // to sync and signal the dashboard to prompt for the email instead.
-    if (!conn.fathom_email) {
-      console.log('[fathom] sync blocked for user ' + userId + ': fathom_email not set (needs_identity)');
-      return res.json({ needs_identity: true });
+    var r = await syncUserCalls(admin, userId, connResult.data);
+    if (!r.ok) {
+      if (r.kind === 'needs_identity') return res.json({ needs_identity: true });
+      if (r.kind === 'refresh_failed') return res.status(401).json({ error: r.error });
+      if (r.kind === 'fetch_failed')   return res.status(502).json({ error: r.error });
+      return res.status(500).json({ error: 'Could not save synced calls' });
     }
-
-    // 2. Make sure we have a valid access token. refreshFathomToken throws
-    // if Fathom rejects the refresh — surface to caller.
-    var accessToken;
-    try {
-      accessToken = await getValidAccessToken(admin, userId, conn);
-    } catch (refreshErr) {
-      console.error('[fathom] sync refresh failed for user ' + userId + ': ' + refreshErr.message);
-      return res.status(401).json({ error: refreshErr.message });
-    }
-
-    // 3. Paginate /meetings. created_after = last_sync_at; first sync
-    // (last_sync_at null) fetches everything.
-    var cursor = null;
-    var pageCount = 0;
-    var allRows = [];
-    var malformedCount = 0;
-    try {
-      while (pageCount < MAX_PAGES) {
-        var page = await fetchMeetingsPage(accessToken, cursor, conn.last_sync_at, false, false, conn.fathom_email);
-        for (var i = 0; i < page.items.length; i++) {
-          var row = meetingToRow(userId, page.items[i]);
-          if (row) allRows.push(row);
-          else malformedCount += 1;
-        }
-        cursor = (typeof page.next_cursor === 'string' && page.next_cursor) ? page.next_cursor : null;
-        pageCount += 1;
-        if (!cursor) break;
-      }
-    } catch (fetchErr) {
-      await markConnectionError(admin, userId, fetchErr.message);
-      console.error('[fathom] sync fetch failed for user ' + userId + ': ' + fetchErr.message);
-      return res.status(502).json({ error: fetchErr.message });
-    }
-    var hitPageCap = cursor !== null;  // pagination didn't finish naturally
-
-    // 4. Upsert with ignoreDuplicates: maps to INSERT ... ON CONFLICT
-    // (user_id, fathom_call_id) DO NOTHING. Idempotent re-syncs.
-    var insertedCount = 0;
-    if (allRows.length > 0) {
-      var insertResult = await admin
-        .from('fathom_calls')
-        .upsert(allRows, { onConflict: 'user_id,fathom_call_id', ignoreDuplicates: true })
-        .select('id');
-      if (insertResult.error) {
-        var insReason = 'sync_failed: DB insert — ' + insertResult.error.message;
-        await markConnectionError(admin, userId, insReason);
-        console.error('[fathom] sync insert failed for user ' + userId + ': ' + insertResult.error.message);
-        return res.status(500).json({ error: 'Could not save synced calls' });
-      }
-      // .select('id') after upsert with ignoreDuplicates returns only newly-
-      // inserted rows (the ones that weren't skipped), so length is the true
-      // count of new calls landed this sync.
-      insertedCount = (insertResult.data || []).length;
-    }
-
-    // 5. Mark connection success.
-    var nowIso = new Date().toISOString();
-    var statusUpdate = await admin
-      .from('fathom_connections')
-      .update({
-        last_sync_at:     nowIso,
-        last_sync_status: 'ok',
-        last_sync_error:  null,
-        updated_at:       nowIso,
-      })
-      .eq('user_id', userId);
-    if (statusUpdate.error) {
-      // Calls saved but status didn't update — log loudly. Don't fail the
-      // request; the user's data is safe and the next sync will fix the
-      // status row.
-      console.error('[fathom] sync status update failed for user ' + userId + ': ' + statusUpdate.error.message);
-    }
-
-    // 6. Fire-and-forget post-sync analysis. Dispatch sequentially per call
-    //    so we respect Anthropic rate limits and produce predictable ordering
-    //    in the dashboard. Lazy-required to sidestep the circular dependency
-    //    between routes/fathom.js and lib/analysis-worker.js (the worker
-    //    imports the token + fetch helpers exported below). Errors per call
-    //    are caught + logged; never propagated. The sync response has
-    //    already been sent by the time these run — closers never wait.
-    var newCallIds = (insertResult && insertResult.data || []).map(function(r) { return r.id; });
-    if (newCallIds.length > 0) {
-      (async function() {
-        try {
-          var analyzeCall = require('../lib/analysis-worker').analyzeCall;
-          for (var i = 0; i < newCallIds.length; i++) {
-            try {
-              await analyzeCall(newCallIds[i], userId);
-            } catch (innerErr) {
-              console.error('[fathom] analyzeCall failed for call ' + newCallIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown'));
-            }
-          }
-        } catch (outerErr) {
-          console.error('[fathom] background analysis loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
-        }
-      })();
-    }
-
-    console.log('[fathom] Sync complete for user ' + userId + ': fetched=' + allRows.length + ' inserted=' + insertedCount + ' malformed=' + malformedCount + ' pages=' + pageCount + (hitPageCap ? ' (CAPPED — more available)' : '') + (newCallIds.length > 0 ? ' analysis_dispatched=' + newCallIds.length : ''));
     return res.json({
-      synced:    insertedCount,
-      fetched:   allRows.length,
-      malformed: malformedCount,
-      pages:     pageCount,
-      truncated: hitPageCap,
+      synced:    r.synced,
+      fetched:   r.fetched,
+      malformed: r.malformed,
+      pages:     r.pages,
+      truncated: r.truncated,
     });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] sync fatal for user ' + userId + ':', err.message);
     res.status(500).json({ error: 'Sync failed' });
+  }
+});
+
+// ── POST /fathom/sync-all ─────────────────────────────────────────────────────
+// Cron-triggered bulk sync (Phase 1.5 — the auto-sync deferred from Phase 1).
+// Protected by a shared secret (X-Cron-Secret header must equal CRON_SECRET),
+// NOT requireAuth — the cron has no user session. Iterates every connection that
+// has a fathom_email set and runs the same per-user sync; per-user failures are
+// logged and DO NOT halt the loop. New calls sync in as 'pending' and analyze;
+// held ('synced_unanalyzed') calls are never re-inserted, so they stay held.
+router.post('/sync-all', async function(req, res) {
+  var secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.error('[fathom] sync-all called but CRON_SECRET is not set — refusing');
+    return res.status(503).json({ error: 'cron not configured' });
+  }
+  var provided = req.get('X-Cron-Secret') || (req.query && req.query.secret) || '';
+  if (provided !== secret) {
+    console.warn('[fathom] sync-all unauthorized attempt');
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    var admin = getAdminClient();
+    var connsResult = await admin
+      .from('fathom_connections')
+      .select('user_id, access_token, refresh_token, expires_at, last_sync_at, fathom_email')
+      .not('fathom_email', 'is', null);
+    if (connsResult.error) {
+      console.error('[fathom] sync-all connection list failed: ' + connsResult.error.message);
+      return res.status(500).json({ error: 'Could not load connections' });
+    }
+    var conns = connsResult.data || [];
+    var summary = { total: conns.length, ok: 0, synced_total: 0, dispatched_total: 0, needs_identity: 0, errors: 0 };
+    for (var i = 0; i < conns.length; i++) {
+      var conn = conns[i];
+      var uid = conn.user_id;
+      try {
+        var r = await syncUserCalls(admin, uid, conn);
+        if (r.ok) {
+          summary.ok += 1;
+          summary.synced_total += r.synced;
+          summary.dispatched_total += r.dispatched;
+        } else if (r.kind === 'needs_identity') {
+          summary.needs_identity += 1;
+        } else {
+          summary.errors += 1;
+          console.error('[fathom] sync-all user ' + uid + ' failed: ' + r.kind + ' ' + (r.error || ''));
+        }
+      } catch (perUserErr) {
+        // A single user's failure must never halt the loop.
+        summary.errors += 1;
+        console.error('[fathom] sync-all user ' + uid + ' threw: ' + (perUserErr.message || 'unknown'));
+      }
+    }
+    console.log('[fathom] sync-all done: ' + JSON.stringify(summary));
+    return res.json(summary);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] sync-all fatal: ' + err.message);
+    res.status(500).json({ error: 'sync-all failed' });
   }
 });
 
@@ -536,6 +610,76 @@ router.post('/reanalyze', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] reanalyze fatal for user ' + userId + ':', err.message);
     res.status(500).json({ error: 'Reanalyze failed' });
+  }
+});
+
+// ── POST /fathom/update-analyses ──────────────────────────────────────────────
+// Re-analyze calls that were graded under an OLDER prompt version so they pick up
+// the current grader (e.g. Josh's v3 calls → v4 "why this call closed" fields).
+// Same shape as /reanalyze, with an explicit reset step: it selects outdated
+// 'processed' calls (excluding held/error), flips fathom_calls.sync_status +
+// call_analyses.status back to 'pending', then fires the same fire-and-forget
+// analyze loop. Kept as its own route (rather than two client round-trips to
+// /reanalyze) so the reset + dispatch are atomic and can't race a status poll.
+router.post('/update-analyses', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+  try {
+    var admin = getAdminClient();
+    var worker = require('../lib/analysis-worker');
+    var currentVersion = worker.ANALYSIS_PROMPT_VERSION;
+
+    var body = req.body || {};
+    var limit = parseInt(body.limit, 10);
+    if (!limit || limit < 1) limit = 10;
+    if (limit > 50) limit = 50;
+
+    var outdatedIds;
+    try {
+      outdatedIds = await outdatedProcessedCallIds(admin, userId, currentVersion);
+    } catch (lookupErr) {
+      console.error('[fathom] update-analyses lookup failed for user ' + userId + ': ' + lookupErr.message);
+      return res.status(500).json({ error: 'Could not load outdated calls' });
+    }
+    var ids = outdatedIds.slice(0, limit);
+
+    if (ids.length > 0) {
+      // Reset step: back to 'pending' on both tables so the worker re-grades them
+      // (and so the reanalyze/pending UI reflects them if the page reloads mid-run).
+      var fcReset = await admin.from('fathom_calls').update({ sync_status: 'pending' }).in('id', ids);
+      if (fcReset.error) {
+        console.error('[fathom] update-analyses fathom_calls reset failed for user ' + userId + ': ' + fcReset.error.message);
+        return res.status(500).json({ error: 'Could not reset calls' });
+      }
+      var caReset = await admin.from('call_analyses').update({ status: 'pending' }).in('fathom_call_id', ids);
+      if (caReset.error) {
+        // Non-fatal: fathom_calls is already pending; the worker re-upserts the
+        // analysis row anyway. Log and proceed.
+        console.error('[fathom] update-analyses call_analyses reset failed for user ' + userId + ': ' + caReset.error.message);
+      }
+
+      // Fire-and-forget analyze — identical dispatch shape to /sync and /reanalyze.
+      (async function() {
+        try {
+          var analyzeCall = worker.analyzeCall;
+          for (var i = 0; i < ids.length; i++) {
+            try {
+              await analyzeCall(ids[i], userId);
+            } catch (innerErr) {
+              console.error('[fathom] update-analyses analyzeCall failed for call ' + ids[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown'));
+            }
+          }
+        } catch (outerErr) {
+          console.error('[fathom] update-analyses background loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
+        }
+      })();
+    }
+
+    console.log('[fathom] Update-analyses queued for user ' + userId + ': queued=' + ids.length + ' remaining_outdated=' + (outdatedIds.length - ids.length) + ' (batch_limit=' + limit + ')');
+    return res.json({ queued: ids.length, remaining: outdatedIds.length - ids.length, batch_limit: limit });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] update-analyses fatal for user ' + userId + ':', err.message);
+    res.status(500).json({ error: 'Update analyses failed' });
   }
 });
 
@@ -645,6 +789,40 @@ router.post('/identity', requireAuth, async function(req, res) {
 // Returns connection metadata (with tokens redacted — never leak) plus the
 // total call count synced for this user. Two parallel queries since there's
 // no FK between fathom_calls and fathom_connections.
+// Calls that were successfully analyzed ('processed') but under an OLDER grader
+// prompt version than the current one. Returned most-recent-first as fathom_calls
+// UUIDs. This EXCLUDES intentionally-held ('synced_unanalyzed') and 'error' rows
+// by keying on sync_status='processed', so "Update analyses" never un-holds a
+// held call. Two queries + JS intersect (supabase-js has no JOIN); bounded by the
+// user's processed-call count (~hundreds).
+async function outdatedProcessedCallIds(admin, userId, currentVersion) {
+  var processed = await admin
+    .from('fathom_calls')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('sync_status', 'processed')
+    .order('call_date', { ascending: false, nullsFirst: false });
+  if (processed.error) throw new Error('fathom_calls: ' + processed.error.message);
+  var orderedIds = (processed.data || []).map(function(r) { return r.id; });
+  if (orderedIds.length === 0) return [];
+
+  var outdated = {};
+  for (var c = 0; c < orderedIds.length; c += 100) {
+    var chunk = orderedIds.slice(c, c + 100);
+    var q = await admin
+      .from('call_analyses')
+      .select('fathom_call_id, prompt_version')
+      .in('fathom_call_id', chunk)
+      .eq('status', 'done');
+    if (q.error) throw new Error('call_analyses: ' + q.error.message);
+    (q.data || []).forEach(function(a) {
+      if (a.prompt_version !== currentVersion) outdated[a.fathom_call_id] = true;
+    });
+  }
+  // Preserve the most-recent-first order from the processed query.
+  return orderedIds.filter(function(id) { return outdated[id]; });
+}
+
 router.get('/status', requireAuth, async function(req, res) {
   var userId = req.user.id;
   try {
@@ -671,6 +849,17 @@ router.get('/status', requireAuth, async function(req, res) {
     var connResult = await connPromise;
     var countResult = await countPromise;
     var pendingCountResult = await pendingCountPromise;
+
+    // Outdated-analyses count — drives the "Update analyses (N outdated)" button
+    // that appears when there's nothing pending but calls were graded under an
+    // older prompt version. Non-fatal: on error, report 0 (button stays hidden).
+    var currentVersion = require('../lib/analysis-worker').ANALYSIS_PROMPT_VERSION;
+    var outdatedCount = 0;
+    try {
+      outdatedCount = (await outdatedProcessedCallIds(admin, userId, currentVersion)).length;
+    } catch (outdatedErr) {
+      console.error('[fathom] status outdated-count failed for user ' + userId + ': ' + outdatedErr.message);
+    }
 
     if (connResult.error) {
       console.error('[fathom] status connection lookup failed for user ' + userId + ': ' + connResult.error.message);
@@ -699,6 +888,8 @@ router.get('/status', requireAuth, async function(req, res) {
       expires_at:       c.expires_at,
       call_count:       (typeof countResult.count === 'number') ? countResult.count : 0,
       pending_count:    (typeof pendingCountResult.count === 'number') ? pendingCountResult.count : 0,
+      outdated_count:   outdatedCount,
+      prompt_version:   currentVersion,
     });
   } catch (err) {
     if (handleConfigError(err, res)) return;

@@ -1476,6 +1476,7 @@
     fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
     fathomReanalyzing: false, // true while a /fathom/reanalyze request is in flight; drives the Reanalyze button spinner
+    fathomUpdating: false, // true while a /fathom/update-analyses request is in flight; drives the Update-analyses button spinner
     fathomNeedsIdentity: false,   // true when sync returned needs_identity — show the Fathom-email prompt in the strip
     fathomIdentitySuggestion: '', // pre-fill value for the identity input (stored email, else top suggestion)
     fathomIdentitySuggestions: [],// [{email,name,count}] distinct recorded_by identities from Fathom, most frequent first
@@ -1793,6 +1794,50 @@
     await refreshFathomStatusInBackground();
   }
 
+  // Re-grade calls analyzed under an older prompt version (POST
+  // /fathom/update-analyses — resets them to pending + fires the batch). Shown
+  // only when there's nothing pending but outdated_count > 0. Mirrors
+  // reanalyzeFathomNow's flag-guarded, notice-driven shape.
+  async function updateOutdatedAnalysesNow() {
+    if (state.fathomUpdating) return; // guard against double-click
+    state.fathomUpdating = true;
+    if (state.view === 'overview') renderOverview(false);
+
+    var noticeText = null;
+    var noticeKind = 'success';
+    try {
+      var res = await fetch('/fathom/update-analyses', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ limit: 10 }),   // bounded batch per click
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (res.ok) {
+        var data = await res.json();
+        var n = (data && typeof data.queued === 'number') ? data.queued : 0;
+        var remaining = (data && typeof data.remaining === 'number') ? data.remaining : 0;
+        noticeText = n === 0
+          ? 'No outdated analyses to update.'
+          : 'Updating ' + n + ' call' + (n === 1 ? '' : 's') + ' to the latest analysis.'
+            + (remaining > 0 ? ' ' + remaining + ' more remain — click again when these finish.' : '')
+            + ' Grades refresh as each completes.';
+      } else {
+        var errBody = null;
+        try { errBody = await res.json(); } catch (e) { /* ignore */ }
+        noticeText = 'Update failed: ' + (errBody && errBody.error ? errBody.error : 'HTTP ' + res.status);
+        noticeKind = 'error';
+      }
+    } catch (err) {
+      noticeText = 'Update error: ' + (err && err.message || 'unknown');
+      noticeKind = 'error';
+    }
+    state.fathomNotice = { kind: noticeKind, text: noticeText };
+    state.fathomUpdating = false;
+    // Refresh status — outdated_count won't drop instantly (worker flips rows to
+    // 'processed' on the new version asynchronously); a later poll catches up.
+    await refreshFathomStatusInBackground();
+  }
+
   // Fetch a suggested Fathom email (stored value, else Scout login email) and
   // flip the strip into identity-prompt mode. Called when sync returns
   // needs_identity. Never throws — falls back to an empty input.
@@ -1960,6 +2005,7 @@
   function renderFathomStripConnected(status) {
     var count = (typeof status.call_count === 'number') ? status.call_count : 0;
     var pending = (typeof status.pending_count === 'number') ? status.pending_count : 0;
+    var outdated = (typeof status.outdated_count === 'number') ? status.outdated_count : 0;
     var lastSync = status.last_sync_at ? formatRelativeTime(status.last_sync_at) : 'never';
     var syncBtn = state.fathomSyncing
       ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Syncing…</button>'
@@ -1971,6 +2017,14 @@
       reanalyzeBtn = state.fathomReanalyzing
         ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Reanalyzing…</button>'
         : '<button class="btn-fathom-secondary" type="button" onclick="reanalyzeFathomNow()">' + (pending > 10 ? '⟳ Analyze next 10' : '⟳ Reanalyze ' + pending + ' pending') + '</button>';
+    }
+    // When nothing is pending but calls were graded under an older prompt
+    // version, offer a re-grade to the current analysis instead.
+    var updateBtn = '';
+    if (pending === 0 && outdated > 0) {
+      updateBtn = state.fathomUpdating
+        ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Updating…</button>'
+        : '<button class="btn-fathom-secondary" type="button" onclick="updateOutdatedAnalysesNow()">⟳ Update analyses (' + outdated + ' outdated)</button>';
     }
     var pendingMeta = pending > 0
       ? '<span class="fathom-strip-sep">·</span><span class="fathom-strip-meta">' + pending + ' pending analysis</span>'
@@ -1985,7 +2039,7 @@
         + '<span class="fathom-strip-meta">Last sync ' + escapeHtml(lastSync) + '</span>'
         + pendingMeta
       + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + syncBtn + reanalyzeBtn + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + syncBtn + reanalyzeBtn + updateBtn + '</div>'
       + '</div>';
   }
 
