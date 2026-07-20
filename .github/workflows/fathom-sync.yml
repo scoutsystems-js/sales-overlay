@@ -1,0 +1,49 @@
+name: Fathom auto-sync
+
+# Phase 1.5 auto-sync trigger. Every 2 hours, POST the internal /fathom/sync-all
+# endpoint (shared-secret protected) so every connected user's new Fathom calls
+# sync in and analyze without anyone clicking "Sync now". The endpoint itself is
+# idempotent and respects the synced_unanalyzed holdback.
+#
+# Requires the repo secret CRON_SECRET to match the CRON_SECRET env var on the
+# Railway web service. Until Railway has it, the endpoint returns 503 and this
+# job fails (visible in the Actions tab) — that's the signal to set the Railway var.
+#
+# Alternative trigger (Railway native cron): a dedicated Railway service off this
+# repo with start command `node backend/scripts/cron-sync.js` and cron schedule
+# `0 */2 * * *`. Either mechanism hits the same endpoint; this one needs no extra
+# Railway service.
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'   # every 2 hours (UTC)
+  workflow_dispatch: {}       # manual "Run workflow" button + gh workflow run
+
+# One sync at a time — never overlap runs.
+concurrency:
+  group: fathom-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger /fathom/sync-all
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BACKEND_URL: https://sales-overlay-production.up.railway.app
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET repo secret is not set — aborting"; exit 1
+          fi
+          code=$(curl -sS -o /tmp/sync.json -w '%{http_code}' \
+            -X POST "$BACKEND_URL/fathom/sync-all" \
+            -H "X-Cron-Secret: $CRON_SECRET")
+          echo "HTTP $code"
+          cat /tmp/sync.json || true
+          echo
+          if [ "$code" != "200" ]; then
+            echo "sync-all did not return 200 (503 = CRON_SECRET missing on Railway; 401 = secret mismatch)"
+            exit 1
+          fi
