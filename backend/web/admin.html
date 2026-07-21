@@ -458,328 +458,6 @@
       .users-table { white-space: nowrap; }
     }
 
-    /* ── Knowledge Base section ─────────────────────────────────────────── */
-    /* Utility classes used by KB markup that don't otherwise exist in this
-       page — kept scoped to the KB block so the dashboard.html copy stays
-       identical and we don't touch other admin styling. */
-    .kb-section {
-      padding: 24px 24px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .kb-section .section-heading {
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--muted);
-      margin-bottom: 0;
-    }
-    .kb-section .load-spinner { display: flex; justify-content: center; padding: 28px 0; }
-    .kb-section .load-spinner .spinner { width: 22px; height: 22px; }
-    .kb-section .msg-error { padding: 16px 20px; font-size: 12px; color: #f87171; text-align: center; font-family: inherit; }
-    .kb-section .empty-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px 24px;
-      text-align: center;
-    }
-    .kb-section .empty-card h2 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-    .kb-section .empty-card p { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
-
-    .kb-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .kb-add-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--green);
-      color: #000;
-      font-weight: 700;
-      font-size: 13px;
-      padding: 8px 14px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.15s;
-    }
-    .kb-add-btn:hover { background: var(--green-dark); }
-    .kb-add-btn:disabled { opacity: 0.6; cursor: wait; }
-
-    .kb-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .kb-item {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      transition: border-color 0.12s;
-    }
-    .kb-item:hover { border-color: rgba(255,255,255,0.14); }
-    .kb-item-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
-    .kb-item-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      word-break: break-all;
-    }
-    .kb-item-sub {
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .kb-badge {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-      padding: 2px 8px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
-    }
-    .kb-badge.kb-type-url   { color: #93c5fd; border-color: rgba(147,197,253,0.3); background: rgba(59,130,246,0.10); }
-    .kb-badge.kb-type-pdf   { color: #fca5a5; border-color: rgba(252,165,165,0.3); background: rgba(239,68,68,0.10); }
-    .kb-badge.kb-type-paste { color: #d4d4d8; border-color: rgba(212,212,216,0.25); background: rgba(255,255,255,0.04); }
-    /* Category badges — visually distinct from type badges (cooler hues:
-       teal for offer docs, purple for transcripts) so users can tell the
-       two at a glance even though they sit side-by-side. */
-    .kb-badge.kb-cat-offer_document { color: #5eead4; border-color: rgba(94,234,212,0.3); background: rgba(20,184,166,0.10); }
-    .kb-badge.kb-cat-winning_call   { color: #c4b5fd; border-color: rgba(196,181,253,0.3); background: rgba(139,92,246,0.10); }
-    .kb-badge.kb-scope-global   { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
-    .kb-badge.kb-scope-team     { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
-    .kb-badge.kb-scope-personal { color: var(--muted); }
-    .kb-delete-btn {
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-      flex-shrink: 0;
-    }
-    .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
-    .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
-
-    /* View patterns button — same shell as delete button, neutral hover.
-       Sits to the LEFT of delete in the kb-item flex row. Only emitted
-       for items where category === 'learned_pattern'; everything else
-       has just the delete button as before. */
-    .kb-view-btn {
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-      flex-shrink: 0;
-      margin-right: 6px;
-    }
-    .kb-view-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-    /* Expand panel — sibling of the kb-item, slightly indented and using
-       a deeper bg so the hierarchy reads at a glance. */
-    .kb-expand-panel {
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      margin: -2px 0 0 24px;
-      padding: 14px 16px;
-    }
-    .kb-expand-panel.hidden { display: none; }
-    .kb-pattern-loading,
-    .kb-pattern-empty { font-size: 12px; color: var(--muted); padding: 8px 0; text-align: center; }
-    .kb-pattern-card {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
-    }
-    .kb-pattern-card:last-child { margin-bottom: 0; }
-    .kb-pattern-row { font-size: 12px; line-height: 1.5; margin-top: 6px; }
-    .kb-pattern-row b { color: var(--muted); display: inline-block; min-width: 130px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; font-size: 10px; vertical-align: top; }
-    .kb-pattern-text { color: var(--text); }
-    .kb-pattern-empty-text { font-size: 13px; color: var(--text); white-space: pre-wrap; }
-    /* Pattern type badges — distinct from the source-type/category/scope
-       badges above so the eye reads them as a separate vocabulary. */
-    .kb-badge.kb-ptype-pain_discovery   { color: #fca5a5; border-color: rgba(252,165,165,0.3); background: rgba(239,68,68,0.10); }
-    .kb-badge.kb-ptype-objection_handle { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
-    .kb-badge.kb-ptype-closing_move     { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
-    .kb-badge.kb-ptype-rapport_build    { color: #93c5fd; border-color: rgba(147,197,253,0.3); background: rgba(59,130,246,0.10); }
-
-    /* ── Modal ──────────────────────────────────────────────────────────── */
-    .kb-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-    .kb-modal.hidden { display: none; }
-    .kb-modal-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      backdrop-filter: blur(2px);
-    }
-    .kb-modal-dialog {
-      position: relative;
-      width: 100%;
-      max-width: 520px;
-      max-height: calc(100vh - 48px);
-      overflow-y: auto;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 28px;
-    }
-    .kb-modal-dialog h2 {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 18px;
-    }
-    .kb-modal-close {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: transparent;
-      color: var(--muted);
-      border: none;
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-      font-family: inherit;
-    }
-    .kb-modal-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
-
-    .kb-form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-    .kb-form-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
-    .kb-form-row input[type="text"],
-    .kb-form-row select {
-      width: 100%;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      outline: none;
-      box-sizing: border-box;
-    }
-    .kb-form-row input:focus,
-    .kb-form-row select:focus { border-color: var(--green); }
-    .kb-form-row select { cursor: pointer; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
-
-    .kb-tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 18px;
-      border-bottom: 1px solid var(--border);
-    }
-    .kb-tab {
-      background: transparent;
-      color: var(--muted);
-      border: none;
-      border-bottom: 2px solid transparent;
-      padding: 8px 14px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-      margin-bottom: -1px;
-    }
-    .kb-tab:hover { color: var(--text); }
-    .kb-tab.active {
-      color: var(--green);
-      border-bottom-color: var(--green);
-    }
-
-    .kb-tab-panel { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
-    .kb-tab-panel.hidden { display: none; }
-    .kb-tab-panel input[type="text"],
-    .kb-tab-panel input[type="url"],
-    .kb-tab-panel input[type="file"],
-    .kb-tab-panel textarea {
-      width: 100%;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      outline: none;
-      box-sizing: border-box;
-    }
-    .kb-tab-panel input:focus,
-    .kb-tab-panel textarea:focus { border-color: var(--green); }
-    .kb-tab-panel textarea { resize: vertical; min-height: 140px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .kb-tab-panel input[type="file"] { padding: 8px 12px; cursor: pointer; }
-
-    .kb-status {
-      font-size: 12px;
-      min-height: 18px;
-      margin-bottom: 12px;
-      color: var(--muted);
-    }
-    .kb-status.error { color: #f87171; }
-    .kb-status.progress { color: var(--green); }
-
-    .kb-submit {
-      width: 100%;
-      background: var(--green);
-      color: #000;
-      font-weight: 700;
-      font-size: 14px;
-      padding: 12px 20px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.15s;
-    }
-    .kb-submit:hover:not(:disabled) { background: var(--green-dark); }
-    .kb-submit:disabled { opacity: 0.6; cursor: wait; }
-
-    @media (max-width: 900px) {
-      .kb-section { padding: 16px 16px 10px; }
-      .kb-modal { padding: 12px; }
-      .kb-modal-dialog { padding: 20px; }
-      .kb-item { flex-direction: column; align-items: flex-start; }
-      .kb-delete-btn { align-self: flex-end; }
-    }
-
     /* v1.1.10: User analytics widget. Mirrors the dashboard.html analytics
        block. Duplicated rather than extracted to a shared CSS file because
        admin.html uses its own --bg2/--muted set and the two pages may diverge
@@ -881,6 +559,8 @@
     <div class="modal-box">
       <div class="modal-title">Create user</div>
       <div id="createUserForm">
+        <label class="modal-label">First name<input type="text" id="cuFirstName" class="modal-input" placeholder="Ava" maxlength="60" autocomplete="off"></label>
+        <label class="modal-label">Last name<input type="text" id="cuLastName" class="modal-input" placeholder="Chen" maxlength="60" autocomplete="off"></label>
         <label class="modal-label">Email<input type="email" id="cuEmail" class="modal-input" placeholder="rep@company.com" autocomplete="off"></label>
         <label class="modal-label">Role
           <select id="cuRole" class="role-select modal-select"><option value="user">user</option><option value="manager">manager</option></select>
@@ -932,19 +612,6 @@
     </div>
   </section>
 
-  <!-- SECTION KB: Knowledge Base. Backend scopes /kb/list by role: admins
-       see their own + their team's uploads, owners see every uploaded
-       entry. The scope badge on each row makes the difference visible. -->
-  <section class="kb-section">
-    <div class="kb-header">
-      <div class="section-heading">Knowledge Base</div>
-      <button class="kb-add-btn" onclick="openKbModal()">+ Add resource</button>
-    </div>
-    <div id="kbContainer">
-      <div class="load-spinner"><div class="spinner"></div></div>
-    </div>
-  </section>
-
   <!-- SECTIONS B + C -->
   <div class="sessions-split">
     <aside class="sessions-pane">
@@ -962,57 +629,6 @@
     </main>
   </div>
 
-</div>
-
-<!-- KB upload modal — identical to dashboard.html. Three tabs share a
-     single submit handler that reads the active tab and builds FormData
-     accordingly. Multipart Content-Type header is intentionally omitted so
-     the browser sets the multipart boundary for multer to parse. -->
-<div class="kb-modal hidden" id="kbModal">
-  <div class="kb-modal-overlay" onclick="closeKbModal()"></div>
-  <div class="kb-modal-dialog">
-    <button class="kb-modal-close" onclick="closeKbModal()" aria-label="Close">✕</button>
-    <h2>Add to Knowledge Base</h2>
-
-    <!-- Label and category sit above the tabs so they're always visible
-         regardless of source type. Both are required — chunking strategy
-         depends on category, and the label is what the user sees later in
-         the list and what Claude references in [WINNING CALL: …] /
-         [OFFER DOCUMENT: …] context lines. -->
-    <div class="kb-form-row">
-      <label class="kb-form-label" for="kbLabel">Label</label>
-      <input type="text" id="kbLabel" placeholder="e.g. Silver Living landing page, or Winning call - March 2026" autocomplete="off" required/>
-    </div>
-
-    <div class="kb-form-row">
-      <label class="kb-form-label" for="kbCategory">Content type</label>
-      <select id="kbCategory">
-        <option value="offer_document">Offer document (script, landing page, FAQ, product info)</option>
-        <option value="winning_call">Winning call transcript</option>
-      </select>
-    </div>
-
-    <div class="kb-tabs" role="tablist">
-      <button class="kb-tab active" data-tab="url"   onclick="switchKbTab('url')">URL</button>
-      <button class="kb-tab"        data-tab="pdf"   onclick="switchKbTab('pdf')">PDF</button>
-      <button class="kb-tab"        data-tab="paste" onclick="switchKbTab('paste')">Paste</button>
-    </div>
-
-    <div class="kb-tab-panel" data-panel="url">
-      <input type="url"  id="kbUrlInput"  placeholder="https://example.com/article" autocomplete="off"/>
-    </div>
-
-    <div class="kb-tab-panel hidden" data-panel="pdf">
-      <input type="file" id="kbPdfInput"  accept=".pdf"/>
-    </div>
-
-    <div class="kb-tab-panel hidden" data-panel="paste">
-      <textarea id="kbPasteInput" placeholder="Paste your content here…" rows="8"></textarea>
-    </div>
-
-    <div class="kb-status" id="kbStatus"></div>
-    <button class="kb-submit" id="kbSubmit" onclick="submitKbUpload()">Add to Knowledge Base</button>
-  </div>
 </div>
 
 <script>
@@ -1121,7 +737,7 @@
     if (currentUser.role === 'user') { window.location.replace('/dashboard'); return; }
     document.getElementById('roleLabel').textContent = currentUser.role === 'owner' ? 'Owner' : 'Admin';
 
-    await Promise.all([loadUsers(), loadSessions(true), loadKbList()]);
+    await Promise.all([loadUsers(), loadSessions(true)]);
   }
 
   async function fetchMe() {
@@ -1313,7 +929,7 @@
     if (btn) btn.style.display = isOwnerViewer ? '' : 'none';
     if (usersArray.length === 0) { wrap.innerHTML = '<div class="empty-msg">No users to display.</div>'; return; }
 
-    var header = '<tr><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Created</th></tr>';
+    var header = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Created</th></tr>';
     var mgrs = managersList();
     var rows = usersArray.map(function(u) {
       var isSelf = u.user_id === currentUser.user_id;
@@ -1325,7 +941,9 @@
       var billCell = editable ? billingControlHtml(u) : '<span class="role-badge user">' + escapeHtml(u.billing_status || 'trial') + '</span>';
       var created = u.created_at ? shortDate(u.created_at) : '—';
       var emailDisplay = u.email || (u.user_id.slice(0, 8) + '…');
+      var nameDisplay = (u.first_name || u.last_name) ? ((u.first_name || '') + ' ' + (u.last_name || '')).trim() : '—';
       return '<tr class="' + trClass + '" data-user-id="' + escapeHtml(u.user_id) + '" onclick="handleUserRowClick(event, \'' + u.user_id + '\')">'
+        + '<td>' + escapeHtml(nameDisplay) + '</td>'
         + '<td>' + escapeHtml(emailDisplay) + '</td>'
         + '<td>' + roleCell + '</td>'
         + '<td>' + mbCell + '</td>'
@@ -1406,6 +1024,8 @@
   function openCreateUserModal() {
     document.getElementById('createUserForm').style.display = '';
     document.getElementById('createUserSuccess').style.display = 'none';
+    document.getElementById('cuFirstName').value = '';
+    document.getElementById('cuLastName').value = '';
     document.getElementById('cuEmail').value = '';
     document.getElementById('cuRole').value = 'user';
     var mb = document.getElementById('cuManagedBy');
@@ -1422,17 +1042,22 @@
     document.getElementById('cuEmail').value = '';
   }
   async function submitCreateUser() {
+    var firstName = document.getElementById('cuFirstName').value.trim();
+    var lastName = document.getElementById('cuLastName').value.trim();
     var email = document.getElementById('cuEmail').value.trim();
     var role = document.getElementById('cuRole').value;
     var managed_by = document.getElementById('cuManagedBy').value || null;
     var err = document.getElementById('cuError');
     var sub = document.getElementById('cuSubmit');
     err.classList.add('hidden');
+    // Mirror the server rules: names required, 1-60 chars.
+    if (!firstName || firstName.length > 60) { err.textContent = 'First name is required (1-60 chars).'; err.classList.remove('hidden'); return; }
+    if (!lastName || lastName.length > 60) { err.textContent = 'Last name is required (1-60 chars).'; err.classList.remove('hidden'); return; }
     if (!email || email.indexOf('@') === -1) { err.textContent = 'A valid email is required.'; err.classList.remove('hidden'); return; }
     sub.disabled = true; sub.textContent = 'Creating…';
     var res;
     try {
-      res = await fetch('/admin/users', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ email: email, role: role, managed_by: managed_by }) });
+      res = await fetch('/admin/users', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ email: email, role: role, managed_by: managed_by, first_name: firstName, last_name: lastName }) });
     } catch (e) { sub.disabled = false; sub.textContent = 'Create'; err.textContent = 'Could not reach server.'; err.classList.remove('hidden'); return; }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
     if (!res.ok) { var e2; try { e2 = await res.json(); } catch (x) { e2 = { error: 'HTTP ' + res.status }; } sub.disabled = false; sub.textContent = 'Create'; err.textContent = e2.error || 'Failed to create user'; err.classList.remove('hidden'); return; }
@@ -2026,312 +1651,6 @@
   // Identical to dashboard.html. Backend scopes /kb/list by role: admins
   // see their own + their team's uploads; owners see every uploaded entry.
   // Each row's scope badge surfaces the difference visually.
-  async function loadKbList() {
-    var container = document.getElementById('kbContainer');
-    if (!container) return;
-    var res;
-    try {
-      res = await fetch('/kb/list', { headers: authHeader() });
-    } catch (err) {
-      container.innerHTML = '<div class="msg-error">Could not reach server.</div>';
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      container.innerHTML = '<div class="msg-error">' + escapeHtml(err.error || 'Failed to load uploads') + '</div>';
-      return;
-    }
-    var data = await res.json();
-    renderKbList((data && data.uploads) || []);
-  }
-
-  function renderKbList(items) {
-    var container = document.getElementById('kbContainer');
-    if (!container) return;
-
-    if (!items || items.length === 0) {
-      container.innerHTML =
-        '<div class="empty-card">'
-          + '<h2>No knowledge base resources yet</h2>'
-          + '<p>Upload sales scripts, product info, FAQs, or any reference material. Scout will pull from these during live calls.</p>'
-          + '<button class="kb-add-btn" onclick="openKbModal()">+ Add your first resource</button>'
-        + '</div>';
-      return;
-    }
-
-    var parts = ['<div class="kb-list">'];
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      var typeBadge = it.source_type
-        ? '<span class="kb-badge kb-type-' + escapeHtml(it.source_type) + '">' + escapeHtml(it.source_type) + '</span>'
-        : '';
-      // Category badge — only when category is set (pre-feature uploads
-      // don't have it). Friendly labels rather than the raw enum value.
-      var catBadge = '';
-      if (it.category === 'offer_document') {
-        catBadge = '<span class="kb-badge kb-cat-offer_document">Offer doc</span>';
-      } else if (it.category === 'winning_call') {
-        catBadge = '<span class="kb-badge kb-cat-winning_call">Winning call</span>';
-      }
-      // Scope badge stays on admin: admins see uploads with mixed scopes
-      // (own personal/team plus their team members') so the badge tells
-      // them which is which. Dashboard hides it because users only ever
-      // see their own personal uploads.
-      var scopeBadge = it.scope
-        ? '<span class="kb-badge kb-scope-' + escapeHtml(it.scope) + '">' + escapeHtml(it.scope) + '</span>'
-        : '';
-      var chunkText = it.chunk_count + ' chunk' + (it.chunk_count === 1 ? '' : 's');
-      var rel = relativeTime(it.created_at);
-      // Only learned_pattern uploads get the expand affordance — other
-      // categories are bulk text whose chunks aren't independently useful
-      // to surface in a side panel.
-      var viewBtn = '';
-      var expandPanel = '';
-      if (it.category === 'learned_pattern') {
-        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View patterns</button>';
-        expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
-      }
-      parts.push(
-        '<div class="kb-item">'
-          + '<div class="kb-item-main">'
-            + '<div class="kb-item-title">' + typeBadge + catBadge + scopeBadge + escapeHtml(it.source_label || '(unlabeled)') + '</div>'
-            + '<div class="kb-item-sub">' + chunkText + ' · added ' + rel + '</div>'
-          + '</div>'
-          + viewBtn
-          + '<button class="kb-delete-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="deleteKbItem(this.getAttribute(\'data-label\'))">Delete</button>'
-        + '</div>'
-        + expandPanel
-      );
-    }
-    parts.push('</div>');
-    container.innerHTML = parts.join('');
-  }
-
-  async function deleteKbItem(sourceLabel) {
-    if (!sourceLabel) return;
-    var ok = window.confirm('Delete "' + sourceLabel + '"?\n\nThis removes all chunks for this resource. Cannot be undone.');
-    if (!ok) return;
-
-    var res;
-    try {
-      res = await fetch('/kb/' + encodeURIComponent(sourceLabel), {
-        method: 'DELETE',
-        headers: authHeader(),
-      });
-    } catch (err) {
-      window.alert('Could not reach server: ' + err.message);
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var err;
-      try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      window.alert('Delete failed: ' + (err.error || 'unknown error'));
-      return;
-    }
-    await loadKbList();
-  }
-
-  function openKbModal() {
-    var modal = document.getElementById('kbModal');
-    if (!modal) return;
-    // Reset form state every time the modal opens — switching to URL tab,
-    // clearing inputs, resetting category to default, hiding any leftover
-    // error from a previous attempt.
-    switchKbTab('url');
-    var ids = ['kbLabel','kbUrlInput','kbPdfInput','kbPasteInput'];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el) el.value = '';
-    }
-    var cat = document.getElementById('kbCategory');
-    if (cat) cat.value = 'offer_document';
-    setKbStatus('', '');
-    var submit = document.getElementById('kbSubmit');
-    if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
-    modal.classList.remove('hidden');
-  }
-
-  function closeKbModal() {
-    var modal = document.getElementById('kbModal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  function switchKbTab(tab) {
-    var tabs = document.querySelectorAll('#kbModal .kb-tab');
-    for (var i = 0; i < tabs.length; i++) {
-      var t = tabs[i];
-      if (t.getAttribute('data-tab') === tab) t.classList.add('active');
-      else t.classList.remove('active');
-    }
-    var panels = document.querySelectorAll('#kbModal .kb-tab-panel');
-    for (var j = 0; j < panels.length; j++) {
-      var p = panels[j];
-      if (p.getAttribute('data-panel') === tab) p.classList.remove('hidden');
-      else p.classList.add('hidden');
-    }
-    setKbStatus('', '');
-  }
-
-  function setKbStatus(message, kind) {
-    var el = document.getElementById('kbStatus');
-    if (!el) return;
-    el.textContent = message || '';
-    el.classList.remove('error', 'progress');
-    if (kind === 'error') el.classList.add('error');
-    else if (kind === 'progress') el.classList.add('progress');
-  }
-
-  function getActiveKbTab() {
-    var active = document.querySelector('#kbModal .kb-tab.active');
-    return active ? active.getAttribute('data-tab') : 'url';
-  }
-
-  async function submitKbUpload() {
-    var tab = getActiveKbTab();
-    var label = (document.getElementById('kbLabel').value || '').trim();
-    var category = (document.getElementById('kbCategory').value || 'offer_document');
-
-    // Label is required for every type now — it's what shows in the list
-    // and what Claude references in [WINNING CALL: …] / [OFFER DOCUMENT: …]
-    // context lines, so a meaningful name matters more than the source.
-    if (!label) { setKbStatus('Give this resource a label.', 'error'); return; }
-
-    var fd = new FormData();
-    fd.append('type', tab);
-    fd.append('label', label);
-    fd.append('category', category);
-
-    if (tab === 'url') {
-      var url = (document.getElementById('kbUrlInput').value || '').trim();
-      if (!url) { setKbStatus('Enter a URL.', 'error'); return; }
-      fd.append('url', url);
-    } else if (tab === 'pdf') {
-      var fileEl = document.getElementById('kbPdfInput');
-      if (!fileEl || !fileEl.files || !fileEl.files[0]) { setKbStatus('Select a PDF file.', 'error'); return; }
-      fd.append('file', fileEl.files[0]);
-    } else if (tab === 'paste') {
-      var text = (document.getElementById('kbPasteInput').value || '').trim();
-      if (!text) { setKbStatus('Paste some content.', 'error'); return; }
-      fd.append('text', text);
-    } else {
-      setKbStatus('Pick a tab.', 'error');
-      return;
-    }
-
-    var submit = document.getElementById('kbSubmit');
-    if (submit) { submit.disabled = true; submit.textContent = 'Processing…'; }
-    setKbStatus('Processing… this may take a moment for large documents.', 'progress');
-
-    var res;
-    try {
-      res = await fetch('/kb/upload', {
-        method: 'POST',
-        headers: authHeader(),
-        body: fd,
-      });
-    } catch (err) {
-      setKbStatus('Could not reach server: ' + err.message, 'error');
-      if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
-      return;
-    }
-
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var errData;
-      try { errData = await res.json(); } catch (e) { errData = { error: 'HTTP ' + res.status }; }
-      setKbStatus(errData.error || 'Upload failed', 'error');
-      if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
-      return;
-    }
-
-    closeKbModal();
-    await loadKbList();
-  }
-
-  // Per-source-label cache so reopening a panel after first load doesn't
-  // refetch. Cleared implicitly on full page reload — short-lived enough
-  // that staleness from a delete-then-reopen is impossible (delete already
-  // forces loadKbList(), which doesn't touch this cache, but the panel
-  // wouldn't re-render anyway because the kb-item is gone).
-  var kbEntriesCache = {};
-
-  async function viewKbEntries(sourceLabel, slot, btn) {
-    var panel = document.getElementById('kbExpand-' + slot);
-    if (!panel) return;
-
-    // Toggle: if currently visible, just collapse. No fetch, button text reverts.
-    if (!panel.classList.contains('hidden')) {
-      panel.classList.add('hidden');
-      btn.textContent = 'View patterns';
-      return;
-    }
-
-    // Opening
-    btn.textContent = 'Hide patterns';
-    panel.classList.remove('hidden');
-
-    if (kbEntriesCache[sourceLabel]) {
-      renderKbEntries(panel, kbEntriesCache[sourceLabel]);
-      return;
-    }
-
-    panel.innerHTML = '<div class="kb-pattern-loading">Loading…</div>';
-    var res;
-    try {
-      res = await fetch('/kb/entries/' + encodeURIComponent(sourceLabel), { headers: authHeader() });
-    } catch (err) {
-      panel.innerHTML = '<div class="kb-pattern-empty">Could not reach server.</div>';
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      panel.innerHTML = '<div class="kb-pattern-empty">Failed to load patterns.</div>';
-      return;
-    }
-    var data = await res.json();
-    var entries = (data && data.entries) || [];
-    kbEntriesCache[sourceLabel] = entries;
-    renderKbEntries(panel, entries);
-  }
-
-  function renderKbEntries(panel, entries) {
-    if (!entries || entries.length === 0) {
-      panel.innerHTML = '<div class="kb-pattern-empty">No patterns found.</div>';
-      return;
-    }
-    var parts = [];
-    for (var i = 0; i < entries.length; i++) {
-      var e = entries[i];
-      var meta = e.metadata || {};
-      // Pattern entries (auto-extracted) carry situation/response/outcome
-      // in metadata. Pre-feature uploads or any entry missing those fields
-      // fall back to showing raw content text — keeps the panel useful
-      // even on legacy data.
-      if (meta.situation || meta.response || meta.outcome) {
-        var typeRaw = String(meta.type || '');
-        var typeLabel = typeRaw.replace(/_/g, ' ');
-        var typeClass = typeRaw.replace(/[^a-z_]/g, '');
-        var typeBadge = typeClass
-          ? '<span class="kb-badge kb-ptype-' + typeClass + '">' + escapeHtml(typeLabel) + '</span>'
-          : '';
-        parts.push(
-          '<div class="kb-pattern-card">'
-            + (typeBadge ? '<div>' + typeBadge + '</div>' : '')
-            + (meta.situation ? '<div class="kb-pattern-row"><b>Situation:</b> <span class="kb-pattern-text">' + escapeHtml(meta.situation) + '</span></div>' : '')
-            + (meta.response  ? '<div class="kb-pattern-row"><b>Closer said:</b> <span class="kb-pattern-text">' + escapeHtml(meta.response) + '</span></div>' : '')
-            + (meta.outcome   ? '<div class="kb-pattern-row"><b>Prospect reacted:</b> <span class="kb-pattern-text">' + escapeHtml(meta.outcome) + '</span></div>' : '')
-          + '</div>'
-        );
-      } else {
-        parts.push('<div class="kb-pattern-card"><div class="kb-pattern-empty-text">' + escapeHtml(e.content || '(empty)') + '</div></div>');
-      }
-    }
-    panel.innerHTML = parts.join('');
-  }
-
   init();
 </script>
 
