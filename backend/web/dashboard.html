@@ -270,7 +270,13 @@
     }
 
     /* ── Section heading ────────────────────────────────────────────── */
-    .section { margin-bottom: 48px; }
+    /* Visual separation pass: box every major section with a thin border. Cards,
+       panels, feed items and synthesis blocks already carry their own
+       1px var(--border); this wraps the section-level groupings across the
+       dashboard, call review, and objections views. box-sizing:border-box is
+       global, so the border adds no layout shift. review-why keeps its accent
+       border-left (overrides just the left edge). */
+    .section { margin-bottom: 48px; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; }
     .section-header {
       display: flex;
       align-items: baseline;
