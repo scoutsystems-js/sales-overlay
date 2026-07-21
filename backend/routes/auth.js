@@ -134,7 +134,21 @@ router.get('/me', requireAuth, async function(req, res) {
       return res.status(500).json({ error: 'Could not load user profile' });
     }
     var role = (data && data.role) || 'user';
-    res.json({ user_id: req.user.id, email: req.user.email, role: role });
+    // has_reps: does this caller manage anyone (user_profiles.managed_by = self)?
+    // Drives the Team-view landing. head:true count = no rows returned, so callers
+    // that ignore the field pay nothing extra in payload. NEVER fail /me over this
+    // — default false + log on error.
+    var hasReps = false;
+    var repsCount = await admin
+      .from('user_profiles')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('managed_by', req.user.id);
+    if (repsCount.error) {
+      console.error('[auth] /me has_reps count failed:', repsCount.error.message);
+    } else {
+      hasReps = (repsCount.count || 0) > 0;
+    }
+    res.json({ user_id: req.user.id, email: req.user.email, role: role, has_reps: hasReps });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[auth] /me error:', err.message);

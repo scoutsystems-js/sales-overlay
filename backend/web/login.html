@@ -443,7 +443,10 @@
       // /admin via the Admin nav link shown on /dashboard — never the default
       // destination. /auth/me is still called above to validate the token
       // (non-ok → signed-in-card fallback).
-      window.location.replace('/dashboard');
+      // v1.4: managers + owners WITH assigned reps land on the Team view instead.
+      // Owner-without-reps and plain users keep the Coaching Dashboard landing.
+      var me = null; try { me = await res.json(); } catch (e) {}
+      window.location.replace((me && me.has_reps) ? '/dashboard#team' : '/dashboard');
       return true;
     } catch (err) {
       console.warn('[login] /auth/me network error, falling back:', err.message);

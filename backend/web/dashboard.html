@@ -1650,6 +1650,14 @@
     // Restore the view from the URL hash BEFORE the first load so a refresh or
     // deep link lands on the right page; the 30-day range applies underneath.
     applyHashToState();
+    // v1.4: managers/owners WITH reps default to the Team view — but only when
+    // there is NO explicit hash (an explicit hash, e.g. #calls, always wins).
+    // Uses has_reps from the /auth/me call the page already made (no new fetch).
+    // Users without reps see today's behavior unchanged.
+    if (!window.location.hash && state.me && state.me.has_reps) {
+      state.view = 'team';
+      syncHashFromState(true); // reflect #team in the URL (replace, no spurious history entry)
+    }
     setDateRange(30, true /* preserveView — keep the hash-restored view */);
     if (state.view === 'call-review' && state.selectedCallId) loadCallReview(state.selectedCallId);
   }
