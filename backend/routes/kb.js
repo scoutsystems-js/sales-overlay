@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
-const { requireAuth, requireSubscription, requireRole } = require('../middleware/auth');
+const { requireAuth, requireSubscription } = require('../middleware/auth');
 
 var router = express.Router();
 
@@ -30,11 +30,27 @@ function handleConfigError(err, res) {
 }
 
 var protect = [requireAuth, requireSubscription];
-// KB management (upload/list/delete/entries) is manager+owner only — server-side,
-// not just hidden in the UI. requireRole returns 403 for plain users. The machine
-// paths (/search, /store-patterns) keep `protect` — they're called by the desktop
-// teleprompter / dormant adaptive-learning writer, not by the KB management UI.
-var manage = [requireAuth, requireSubscription, requireRole(['manager', 'owner'])];
+// KB management (upload/list/delete/entries) requires KB access: manager, owner,
+// OR an UNMANAGED plain user (managed_by IS NULL — they curate their own personal
+// KB). Managed users are 403'd — their manager's team KB governs their coaching.
+// Server-side, not just UI hiding. The machine paths (/search, /store-patterns)
+// keep `protect` — they're the desktop teleprompter / dormant adaptive-learning
+// writer, not the KB management UI.
+async function requireKbAccess(req, res, next) {
+  try {
+    var admin = getAdminClient();
+    var scope = await resolveUserScope(admin, req.user.id);
+    if (scope.role === 'manager' || scope.role === 'owner' || (scope.role === 'user' && !scope.managed_by)) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Your manager curates your team’s knowledge base.' });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[kb] access check failed:', err.message);
+    return res.status(500).json({ error: 'Access check failed' });
+  }
+}
+var manage = [requireAuth, requireSubscription, requireKbAccess];
 
 // Multer with memory storage — uploads stay in RAM, never hit Railway's
 // filesystem. 10MB per file cap matches the spec.
@@ -384,10 +400,11 @@ router.post('/upload', manage, upload.single('file'), async function(req, res) {
     var admin = getAdminClient();
     var scope = await resolveUserScope(admin, req.user.id);
 
-    // Map role → upload scope: owner→global, manager→team. The route is gated to
-    // manager+owner (see `manage`), so the retired closer→personal path is
-    // unreachable — plain users can no longer upload.
-    var uploadScope = (scope.role === 'owner') ? 'global' : 'team';
+    // Map role → upload scope: owner→global, manager→team, unmanaged user→personal.
+    // The route (see `manage`) only admits owner/manager/unmanaged-user, so a
+    // role-'user' reaching here is always unmanaged → 'personal' is the only path
+    // that writes personal scope from the upload route.
+    var uploadScope = (scope.role === 'owner') ? 'global' : (scope.role === 'manager' ? 'team' : 'personal');
 
     var text = '';
     var sourceLabel = providedLabel;

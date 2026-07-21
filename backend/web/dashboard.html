@@ -2000,10 +2000,14 @@
     }
     if (state.me.role === 'manager' || state.me.role === 'owner') {
       document.getElementById('navTeam').style.display = '';
-      document.getElementById('navKb').style.display = '';
-      document.getElementById('navKbSep').style.display = '';
       document.getElementById('navTeamSep').style.display = '';
       await loadUsers();
+    }
+    // Knowledge Base: manager, owner, OR an unmanaged plain user (they curate
+    // their own personal KB). Managed users get no KB nav link.
+    if (canAccessKb()) {
+      document.getElementById('navKb').style.display = '';
+      document.getElementById('navKbSep').style.display = '';
     }
 
     // Default to caller's own data; ?user=<id> pivots to another user.
@@ -3473,7 +3477,7 @@
     if (h === 'calls') { state.view = 'call-library'; }
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'team') { state.view = 'team'; }
-    else if (h === 'kb') { state.view = (state.me && (state.me.role === 'manager' || state.me.role === 'owner')) ? 'kb' : 'overview'; }
+    else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
     else if (h.indexOf('call/') === 0) {
       var id = h.slice(5);
       state.selectedCallId = id ? decodeURIComponent(id) : null;
@@ -3493,6 +3497,12 @@
   window.addEventListener('hashchange', onRouteChange);
 
   // ═══ Knowledge Base view (relocated from admin.html — same ids, same JS) ═══
+  // KB access: manager, owner, or an UNMANAGED plain user. Single source of
+  // truth for the nav link + the #kb hash guard. (Server enforces it too.)
+  function canAccessKb() {
+    return !!(state.me && (state.me.role === 'manager' || state.me.role === 'owner'
+      || (state.me.role === 'user' && !state.me.is_managed)));
+  }
   function goKb() { setView('kb'); }
   var relativeTime = (typeof formatRelativeTime === 'function') ? formatRelativeTime : function (x) { return x; };
   function renderKbView() {

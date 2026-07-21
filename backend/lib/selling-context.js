@@ -30,7 +30,13 @@ async function fetchSellingContext(admin, userId, maxChars) {
       return admin.from('knowledge_base').select(cols)
         .eq('category', 'user_upload').eq('metadata->>category', INCLUDE_META_CATEGORY);
     }
-    var personal = await base().eq('uploaded_by', userId);
+    // Precedence: personal uploads apply ONLY to UNMANAGED users. When the user
+    // is managed, their coaching is governed by their manager's team KB, so
+    // personal chunks are excluded (content is never deleted — unassigning the
+    // user restores their personal context automatically). Because kbHash is
+    // computed from the actually-included chunks below, a managed_by flip changes
+    // the included set and naturally invalidates any cached synthesis.
+    var personal = managedBy ? { data: [] } : await base().eq('uploaded_by', userId);
     var team = managedBy ? await base().eq('uploaded_by', managedBy).eq('scope', 'team') : { data: [] };
     var global = await base().eq('scope', 'global');
     if (personal.error) throw new Error('personal: ' + personal.error.message);

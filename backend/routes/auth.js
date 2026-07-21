@@ -126,7 +126,7 @@ router.get('/me', requireAuth, async function(req, res) {
     var admin = getAdminClient();
     var { data, error } = await admin
       .from('user_profiles')
-      .select('role')
+      .select('role, managed_by')
       .eq('user_id', req.user.id)
       .maybeSingle();
     if (error) {
@@ -134,6 +134,10 @@ router.get('/me', requireAuth, async function(req, res) {
       return res.status(500).json({ error: 'Could not load user profile' });
     }
     var role = (data && data.role) || 'user';
+    // is_managed: does this caller have a manager (managed_by IS NOT NULL)?
+    // Derived from the row already fetched — no extra query, and it defaults to
+    // false when there's no profile, so it never introduces a new /me failure.
+    var isManaged = !!(data && data.managed_by);
     // has_reps: does this caller manage anyone (user_profiles.managed_by = self)?
     // Drives the Team-view landing. head:true count = no rows returned, so callers
     // that ignore the field pay nothing extra in payload. NEVER fail /me over this
@@ -148,7 +152,7 @@ router.get('/me', requireAuth, async function(req, res) {
     } else {
       hasReps = (repsCount.count || 0) > 0;
     }
-    res.json({ user_id: req.user.id, email: req.user.email, role: role, has_reps: hasReps });
+    res.json({ user_id: req.user.id, email: req.user.email, role: role, has_reps: hasReps, is_managed: isManaged });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[auth] /me error:', err.message);
