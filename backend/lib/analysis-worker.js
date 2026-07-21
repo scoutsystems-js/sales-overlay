@@ -67,7 +67,7 @@ const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 // bug). v2 = outcome inference + objection category/resolution/closer_response/surface.
 // v3 = grader scale re-calibration (anchored bands + high-ticket domain context;
 //      a typical solid call lands 65-80/section — no longer graded vs a perfect ideal).
-const ANALYSIS_PROMPT_VERSION = 'v4-2026-07-20';
+const ANALYSIS_PROMPT_VERSION = 'v5-2026-07-21';
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -273,12 +273,12 @@ function buildSectionGraderPrompt(normalized, durationSeconds) {
     'Then provide call-level fields:',
     '  - overall_score: 0-100, weighted gestalt across sections that occurred',
     '  - overall_summary: 2-3 sentences. Factual only — no encouragement, no softening. State what happened, what stage was reached, and what the apparent outcome was.',
-    '  - one_thing: the single most actionable behavioral change for the closer\'s next call — specific, not generic. Bad: "ask better discovery questions." Good: "when the prospect mentioned the $50k loan at [00:08:21], you moved straight to pitch instead of isolating the urgency — pause and ask \'what would change if you didn\'t solve this in 60 days?\' next time." For a "lost" call, one_thing MUST be the direct antidote to why_outcome.reason — the correction that would have addressed that exact cause, at the same or the adjacent moment. why_outcome and one_thing must read as cause → correction.',
+    '  - one_thing: the single most actionable behavioral change for the closer\'s next call — specific, not generic. Bad: "ask better discovery questions." Good: "when the prospect mentioned the $50k loan at [00:08:21], you moved straight to pitch instead of isolating the urgency — pause and ask \'what would change if you didn\'t solve this in 60 days?\' next time." For a "lost" OR "follow_up" call, one_thing MUST be the direct antidote to why_outcome.reason — the correction (for follow_up: the move that advances the deal) that addresses that exact cause, at the same or the adjacent moment. why_outcome and one_thing must read as cause → correction.',
     '  - why_outcome: the SINGLE most decisive cause of this call\'s result, anchored to one transcript moment — an object {"reason":"...","quote":"...","timestamp_seconds":N}:',
-    '      • reason: ONE specific cause, not a list. For a "lost" call this is the primary reason the deal did not close (the one thing that most cost it). For a "closed" call this is what most won the deal (the decisive moment).',
+    '      • reason: ONE specific cause, not a list. For a "lost" call this is the primary reason the deal did not close (the one thing that most cost it). For a "closed" call this is what most won the deal (the decisive moment). For a "follow_up" call this is the primary BLOCKER that kept it from closing on THIS call — the unresolved objection, hesitation, or missing piece the closer must resolve next. The deal is alive, not lost: frame it as what is standing between here and a close.',
     '      • quote: the exact words spoken at that moment (the closer\'s or the prospect\'s), 5-30 words, trimmed.',
     '      • timestamp_seconds: integer seconds of that moment (read the [HH:MM:SS] tag, convert to seconds).',
-    '      • Set why_outcome to null when outcome is "follow_up" or "no_show" (no decisive win/loss cause to isolate).',
+    '      • REQUIRED for "closed", "lost", and "follow_up". Set why_outcome to null ONLY when outcome is "no_show" (no real conversation to diagnose).',
     '  - one_thing_timestamp_seconds: integer seconds of the moment the one_thing correction belonged to — the same moment as why_outcome, or the adjacent moment where the closer should have intervened. Null if not applicable.',
     '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words.',
     '  - outcome: the deal outcome for THIS call, inferred from what actually happened in the transcript. Exactly one of:',
@@ -672,14 +672,15 @@ async function analyzeCall(fathomCallId, userId) {
       && VALID_OUTCOMES.indexOf(graderParsed.outcome.toLowerCase()) !== -1)
       ? graderParsed.outcome.toLowerCase() : null;
 
-    // "Why this call closed / didn't close" (migration 018, prompt v4). Only
-    // win-class (closed) and loss-class (lost) calls carry a decisive-cause
-    // object; for follow_up/no_show/null we force it null even if the model
-    // emitted one, so the review section stays hidden for ambiguous outcomes.
+    // "Why this call closed / didn't close / hasn't closed yet" (migration 018,
+    // prompt v5). closed (win), lost (loss), AND follow_up (the blocker keeping
+    // it open) all carry a decisive-cause object; only no_show/null force it null
+    // (no real conversation to diagnose), so the review verdict shows on every
+    // real call instead of just wins and losses.
     var whyRaw = graderParsed.why_outcome;
     var whyReason = null, whyQuote = null, whyTs = null;
-    var isWinLoss = (inferredOutcome === 'closed' || inferredOutcome === 'lost');
-    if (isWinLoss && whyRaw && typeof whyRaw === 'object'
+    var producesVerdict = (inferredOutcome === 'closed' || inferredOutcome === 'lost' || inferredOutcome === 'follow_up');
+    if (producesVerdict && whyRaw && typeof whyRaw === 'object'
         && typeof whyRaw.reason === 'string' && whyRaw.reason.trim()) {
       whyReason = whyRaw.reason.trim().slice(0, 2000);
       whyQuote  = (typeof whyRaw.quote === 'string' && whyRaw.quote.trim())

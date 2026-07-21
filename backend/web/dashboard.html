@@ -1198,14 +1198,16 @@
 
     /* "Why this call closed / didn't close" — causal evidence section. */
     .review-why { padding: 20px 22px; }
-    .review-why.loss { border-left: 3px solid var(--bad); }
-    .review-why.win  { border-left: 3px solid var(--good); }
+    .review-why.loss    { border-left: 3px solid var(--bad); }
+    .review-why.win     { border-left: 3px solid var(--good); }
+    .review-why.pending { border-left: 3px solid var(--mid); }
     .review-why-label {
       font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
       text-transform: uppercase; margin-bottom: 10px;
     }
-    .review-why.loss .review-why-label { color: var(--bad); }
-    .review-why.win  .review-why-label { color: var(--good); }
+    .review-why.loss    .review-why-label { color: var(--bad); }
+    .review-why.win     .review-why-label { color: var(--good); }
+    .review-why.pending .review-why-label { color: var(--mid); }
     .review-why-reason { font-size: 15px; color: var(--text); line-height: 1.6; }
     .review-why-quote {
       margin-top: 12px; padding: 10px 14px; border-radius: var(--radius);
@@ -3650,9 +3652,10 @@
     if (!a || a.status !== 'done') return null;
     var hasWhy = typeof a.why_outcome === 'string' && a.why_outcome.trim();
     if (!hasWhy) return null;
-    if (a.outcome === 'lost')   return { kind: 'loss' };
-    if (a.outcome === 'closed') return { kind: 'win' };
-    return null; // follow_up / no_show / null → section hidden
+    if (a.outcome === 'lost')      return { kind: 'loss' };
+    if (a.outcome === 'closed')    return { kind: 'win' };
+    if (a.outcome === 'follow_up') return { kind: 'pending' };
+    return null; // no_show / null → section hidden
   }
 
   function reviewClipHtml(seconds, recordingUrl, label) {
@@ -3669,7 +3672,9 @@
     var a = review.analysis;
     var recordingUrl = review.recording_url || null;
 
-    var title = st.kind === 'loss' ? 'Why this call didn’t close' : 'Why this call closed';
+    var title = st.kind === 'loss' ? 'Why this call didn’t close'
+      : st.kind === 'win' ? 'Why this call closed'
+      : 'Why this call hasn’t closed yet';
     var reason = '<div class="review-why-reason">' + escapeHtml(a.why_outcome) + '</div>';
     var quote = (typeof a.why_quote === 'string' && a.why_quote.trim())
       ? '<div class="review-why-quote">“' + escapeHtml(a.why_quote) + '”</div>' : '';
@@ -3679,16 +3684,18 @@
     var inner = '<div class="review-why-label">' + escapeHtml(title) + '</div>'
       + reason + quote + clip;
 
-    // Loss-class: pair the correction directly beneath the cause.
-    if (st.kind === 'loss') {
+    // Loss + pending (follow_up): pair the correction/next-move directly beneath
+    // the cause. For a follow_up it's the move that advances the deal, not a fix
+    // for a dead one, so the connector reads differently.
+    if (st.kind === 'loss' || st.kind === 'pending') {
       var otText = (typeof a.one_thing === 'string' && a.one_thing.trim())
         ? '<div class="review-one-thing-text">' + escapeHtml(a.one_thing) + '</div>'
         : '<div class="review-one-thing-text placeholder">Will appear when analysis completes.</div>';
       var otClip = (typeof a.one_thing_timestamp_seconds === 'number')
         ? '<div style="margin-top:6px;">' + reviewClipHtml(a.one_thing_timestamp_seconds, recordingUrl, 'Where it belonged') + '</div>' : '';
-      inner += '<div class="review-why-connector">The fix</div>'
+      inner += '<div class="review-why-connector">' + (st.kind === 'pending' ? 'The move' : 'The fix') + '</div>'
         + '<div class="review-one-thing">'
-          + '<div class="review-one-thing-label">One thing to do differently</div>'
+          + '<div class="review-one-thing-label">' + (st.kind === 'pending' ? 'One thing to do next' : 'One thing to do differently') + '</div>'
           + otText + otClip
         + '</div>';
     }
