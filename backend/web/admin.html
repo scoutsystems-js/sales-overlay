@@ -978,7 +978,24 @@
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
   }
   function setSession(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
-  function clearSession() { localStorage.removeItem(STORAGE_KEY); }
+  // Diagnostics shim → shared ring buffer/beacon in scout-auth.js.
+  function pdiag(e, d, beacon) {
+    try {
+      if (window.ScoutAuth && ScoutAuth.diag) {
+        if (beacon) ScoutAuth.diag.beacon(e, d || null);
+        else ScoutAuth.diag.push({ e: e, detail: d || null });
+      }
+    } catch (x) {}
+  }
+  // Choke point for this page's inline `if (401){ clearSession(); redirect }`
+  // handlers — beacon with a stack so the server log shows which one fired.
+  function clearSession() {
+    try {
+      var st = ''; try { st = (new Error()).stack || ''; } catch (e) {}
+      pdiag('admin-clearSession', { stack: st.split('\n').slice(1, 5).join(' || ').slice(0, 400) }, true);
+    } catch (e) {}
+    localStorage.removeItem(STORAGE_KEY);
+  }
 
   function isSessionValid(s) {
     if (!s || !s.access_token || !s.expires_at) return false;
