@@ -1591,7 +1591,11 @@
       window.history.replaceState({}, '', cleanUrl);
     }
 
-    setDateRange(30);
+    // Restore the view from the URL hash BEFORE the first load so a refresh or
+    // deep link lands on the right page; the 30-day range applies underneath.
+    applyHashToState();
+    setDateRange(30, true /* preserveView — keep the hash-restored view */);
+    if (state.view === 'call-review' && state.selectedCallId) loadCallReview(state.selectedCallId);
   }
 
   // Converts a popup-result kind into a notice + triggers a status refresh.
@@ -2141,13 +2145,15 @@
   // ──────────────────────────────────────────────────────────────────
   // Date range / user controls
   // ──────────────────────────────────────────────────────────────────
-  function setDateRange(days) {
+  function setDateRange(days, preserveView) {
     var to = new Date();
     var from = days >= 9999
       ? new Date('2025-01-01T00:00:00Z')
       : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
-    state.view = 'overview';
+    // Date-preset clicks reset to Coaching; the initial boot restore keeps the
+    // hash-restored view (preserveView) so a refresh on #calls stays on Calls.
+    if (!preserveView) state.view = 'overview';
     state.expandedCallId = null;
     state.objectionsCache = {};
     reloadAll();
@@ -2781,11 +2787,56 @@
   // ──────────────────────────────────────────────────────────────────
   // Drill views
   // ──────────────────────────────────────────────────────────────────
+  // ─── URL hash routing ──────────────────────────────────────────────────────
+  // Persist the active view in the URL hash so refresh / deep-link / back-forward
+  // restore it. The ?user= admin pivot stays in the query string, untouched.
+  //   overview         → (no hash)      call-library     → #calls
+  //   objections-intel → #objections    call-review      → #call/<id>
+  // (Dormant Live-Sessions drills carry no hash — they're unreachable today.)
+  function viewToHashPath() {
+    if (state.view === 'call-library')     return 'calls';
+    if (state.view === 'objections-intel') return 'objections';
+    if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
+    return ''; // overview + dormant drills
+  }
+  // Point the URL at the current view. pushState/replaceState do NOT fire
+  // hashchange, so this never re-enters the router below (no navigation loop).
+  function syncHashFromState(replace) {
+    var path = viewToHashPath();
+    if ((window.location.hash || '').replace(/^#/, '') === path) return; // already correct
+    var url = window.location.pathname + window.location.search + (path ? '#' + path : '');
+    if (replace) window.history.replaceState(null, '', url);
+    else window.history.pushState(null, '', url);
+  }
+  // URL hash → state.view (+ selectedCallId). No render, no history write.
+  function applyHashToState() {
+    var h = (window.location.hash || '').replace(/^#/, '');
+    if (h === 'calls') { state.view = 'call-library'; }
+    else if (h === 'objections') { state.view = 'objections-intel'; }
+    else if (h.indexOf('call/') === 0) {
+      var id = h.slice(5);
+      state.selectedCallId = id ? decodeURIComponent(id) : null;
+      state.view = state.selectedCallId ? 'call-review' : 'call-library';
+    } else { state.view = 'overview'; }
+  }
+  // Back/forward (and manual hash edits) fire hashchange but NOT our own
+  // pushState calls, so restoring here can't loop. call-review is the only view
+  // that doesn't self-load, so kick its fetch explicitly.
+  function onRouteChange() {
+    if (!state.me) return; // not booted yet — init() handles the initial hash
+    applyHashToState();
+    render();
+    if (state.view === 'call-review' && state.selectedCallId) loadCallReview(state.selectedCallId);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  window.addEventListener('hashchange', onRouteChange);
+
   function setView(view) {
     state.view = view;
     state.expandedCallId = null;
     state.selectedObjectionId = null;
     render();
+    syncHashFromState();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -3992,6 +4043,7 @@
     state.expandedGradeCards = {};
     state.followupCopied = false;
     render();
+    syncHashFromState();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -4006,6 +4058,7 @@
     state.followupCopied = false;
     state.view = 'call-review';
     render();
+    syncHashFromState();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     loadCallReview(callId); // async, re-renders when done
   }
