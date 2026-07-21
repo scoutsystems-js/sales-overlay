@@ -13,7 +13,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
-const { fetchSellingContext } = require('./selling-context');
+const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
@@ -102,7 +102,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
 
   // KB-grounded: the manager/owner's team selling context (cap 3000), folded into
   // the set-hash so a KB upload invalidates the cached team recommendations.
-  var selling = await fetchSellingContext(admin, keyId, 3000);
+  var selling = await fetchSellingContext(admin, keyId, 3000, SYNTHESIS_CATEGORIES);
   var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash).digest('hex');
   var cached = await cacheGet(admin, keyId, 'team', from, to, hash);
   if (cached) return Object.assign({ available: true, cached: true }, cached);

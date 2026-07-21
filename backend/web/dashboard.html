@@ -41,6 +41,14 @@
       --purple:       #c084fc;
       --orange:       #fb923c;
       --cyan:         #22d3ee;
+      /* Compat aliases for the relocated Knowledge Base CSS, which was authored
+         against admin.html's theme-var names. Without these the KB "+ Add
+         resource" button, tab pills, submit and list cards render unstyled
+         (undefined vars → transparent). Mapped to dashboard's equivalents. */
+      --green:        #4ade80;
+      --green-dark:   #3aae63;
+      --bg2:          #131313;
+      --muted:        #8b8b8b;
       --slate:        #64748b;
 
       --radius-sm: 8px;
@@ -1525,8 +1533,12 @@
     /* Category badges — visually distinct from type badges (cooler hues:
        teal for offer docs, purple for transcripts) so users can tell the
        two at a glance even though they sit side-by-side. */
-    .kb-badge.kb-cat-offer_document { color: #5eead4; border-color: rgba(94,234,212,0.3); background: rgba(20,184,166,0.10); }
-    .kb-badge.kb-cat-winning_call   { color: #c4b5fd; border-color: rgba(196,181,253,0.3); background: rgba(139,92,246,0.10); }
+    .kb-badge.kb-cat-offer_document      { color: #5eead4; border-color: rgba(94,234,212,0.3); background: rgba(20,184,166,0.10); }
+    .kb-badge.kb-cat-winning_call        { color: #c4b5fd; border-color: rgba(196,181,253,0.3); background: rgba(139,92,246,0.10); }
+    .kb-badge.kb-cat-script              { color: #93c5fd; border-color: rgba(147,197,253,0.3); background: rgba(59,130,246,0.10); }
+    .kb-badge.kb-cat-objection_framework { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
+    .kb-badge.kb-cat-case_study          { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
+    .kb-badge.kb-cat-training_material   { color: #fdba74; border-color: rgba(253,186,116,0.3); background: rgba(249,115,22,0.10); }
     .kb-badge.kb-scope-global   { color: #fcd34d; border-color: rgba(252,211,77,0.3); background: rgba(234,179,8,0.10); }
     .kb-badge.kb-scope-team     { color: #86efac; border-color: rgba(134,239,172,0.3); background: rgba(34,197,94,0.10); }
     .kb-badge.kb-scope-personal { color: var(--muted); }
@@ -1796,8 +1808,12 @@
     <div class="kb-form-row">
       <label class="kb-form-label" for="kbCategory">Content type</label>
       <select id="kbCategory">
-        <option value="offer_document">Offer document (script, landing page, FAQ, product info)</option>
+        <option value="script">Script</option>
+        <option value="offer_document" selected>Offer info</option>
+        <option value="objection_framework">Objection handling framework</option>
         <option value="winning_call">Winning call transcript</option>
+        <option value="case_study">Case study / social proof</option>
+        <option value="training_material">Training material</option>
       </select>
     </div>
 
@@ -3557,12 +3573,17 @@
         : '';
       // Category badge — only when category is set (pre-feature uploads
       // don't have it). Friendly labels rather than the raw enum value.
-      var catBadge = '';
-      if (it.category === 'offer_document') {
-        catBadge = '<span class="kb-badge kb-cat-offer_document">Offer doc</span>';
-      } else if (it.category === 'winning_call') {
-        catBadge = '<span class="kb-badge kb-cat-winning_call">Winning call</span>';
-      }
+      var catLabels = {
+        script: 'Script',
+        offer_document: 'Offer info',
+        objection_framework: 'Objection handling framework',
+        winning_call: 'Winning call transcript',
+        case_study: 'Case study / social proof',
+        training_material: 'Training material',
+      };
+      var catBadge = (it.category && catLabels[it.category])
+        ? '<span class="kb-badge kb-cat-' + escapeHtml(it.category) + '">' + escapeHtml(catLabels[it.category]) + '</span>'
+        : '';
       // Scope badge stays on admin: admins see uploads with mixed scopes
       // (own personal/team plus their team members') so the badge tells
       // them which is which. Dashboard hides it because users only ever

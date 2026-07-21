@@ -52,6 +52,10 @@ async function requireKbAccess(req, res, next) {
 }
 var manage = [requireAuth, requireSubscription, requireKbAccess];
 
+// Allowlisted KB upload categories (metadata.category). Transcript-aware chunking
+// is keyed to winning_call only; every other category uses fixed-word chunking.
+var KB_UPLOAD_CATEGORIES = ['script', 'offer_document', 'objection_framework', 'winning_call', 'case_study', 'training_material'];
+
 // Multer with memory storage — uploads stay in RAM, never hit Railway's
 // filesystem. 10MB per file cap matches the spec.
 var upload = multer({
@@ -384,13 +388,13 @@ router.post('/search', protect, async function(req, res) {
 router.post('/upload', manage, upload.single('file'), async function(req, res) {
   var type = req.body && req.body.type;
   var providedLabel = (req.body && req.body.label) ? String(req.body.label).trim() : '';
-  // Category drives chunking strategy: winning_call → chunkTranscript()
-  // (speaker-turn aware), offer_document → chunkText() (fixed word count).
-  // Default to offer_document for backwards-compat with any client that
-  // hasn't been updated to send category yet.
+  // Category drives chunking strategy: winning_call → chunkTranscript() (speaker-
+  // turn aware); everything else → chunkText() (fixed word count). Allowlisted
+  // server-side; unknown categories are rejected (no silent coercion). Default is
+  // offer_document for any client that omits it.
   var category = (req.body && req.body.category) || 'offer_document';
-  if (['offer_document', 'winning_call'].indexOf(category) === -1) {
-    category = 'offer_document';
+  if (KB_UPLOAD_CATEGORIES.indexOf(category) === -1) {
+    return res.status(400).json({ error: 'category must be one of: ' + KB_UPLOAD_CATEGORIES.join(', ') });
   }
   if (!type || ['url', 'pdf', 'paste'].indexOf(type) === -1) {
     return res.status(400).json({ error: "type must be 'url' | 'pdf' | 'paste'" });

@@ -10,7 +10,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
-const { fetchSellingContext } = require('./selling-context');
+const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
@@ -131,7 +131,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
 
   // KB-grounded: fetch the closer's selling context (offer/scripts, cap 3000) and
   // fold its hash into the set-hash so a KB upload invalidates the cached synthesis.
-  var selling = await fetchSellingContext(admin, userId, 3000);
+  var selling = await fetchSellingContext(admin, userId, 3000, SYNTHESIS_CATEGORIES);
   var hashInput = analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash;
   var hash = crypto.createHash('md5').update(hashInput).digest('hex');
 

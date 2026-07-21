@@ -16,11 +16,18 @@
 
 const crypto = require('crypto');
 
-var INCLUDE_META_CATEGORY = 'offer_document';
+// GRADER context = the closer's offer + approach material (excludes winning_call
+// transcripts + training_material, which are synthesis-side). SYNTHESIS context
+// adds winning_call + training_material on top. Callers pass the set they want;
+// grader uses the default. (Seeded framework entries never match: they carry the
+// `category` column value, not category='user_upload' + metadata.category.)
+var GRADER_CATEGORIES = ['script', 'offer_document', 'objection_framework', 'case_study'];
+var SYNTHESIS_CATEGORIES = GRADER_CATEGORIES.concat(['winning_call', 'training_material']);
 var DEFAULT_MAX_CHARS = 5000;
 
-async function fetchSellingContext(admin, userId, maxChars) {
+async function fetchSellingContext(admin, userId, maxChars, categories) {
   var cap = maxChars || DEFAULT_MAX_CHARS;
+  var cats = (Array.isArray(categories) && categories.length) ? categories : GRADER_CATEGORIES;
   try {
     var prof = await admin.from('user_profiles').select('managed_by').eq('user_id', userId).maybeSingle();
     var managedBy = (prof.data && prof.data.managed_by) || null;
@@ -28,7 +35,7 @@ async function fetchSellingContext(admin, userId, maxChars) {
     var cols = 'id, label, scope, uploaded_by, content, metadata, created_at';
     function base() {
       return admin.from('knowledge_base').select(cols)
-        .eq('category', 'user_upload').eq('metadata->>category', INCLUDE_META_CATEGORY);
+        .eq('category', 'user_upload').in('metadata->>category', cats);
     }
     // Precedence: personal uploads apply ONLY to UNMANAGED users. When the user
     // is managed, their coaching is governed by their manager's team KB, so
@@ -106,4 +113,4 @@ async function fetchSellingContext(admin, userId, maxChars) {
   }
 }
 
-module.exports = { fetchSellingContext: fetchSellingContext };
+module.exports = { fetchSellingContext: fetchSellingContext, GRADER_CATEGORIES: GRADER_CATEGORIES, SYNTHESIS_CATEGORIES: SYNTHESIS_CATEGORIES };
