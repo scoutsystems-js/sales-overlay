@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
@@ -312,6 +313,8 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
         email: u.email,
         role: u.role,
         managed_by: u.managed_by,
+        billing_status: u.billing_status,
+        created_at: u.created_at,
         session_count: s.session_count,
         last_session_at: s.last_session_at,
       };
@@ -405,6 +408,146 @@ router.patch('/users/:user_id/role', requireAuth, requireRole('owner'), async fu
   }
 });
 
+// ── PATCH /admin/users/:user_id/managed_by ──────────────────────────────────
+// Owner-only. Assign/unassign a user to a manager (the v1.4 team-assignment
+// mechanism). managed_by may be a manager/owner user_id, or null to unassign.
+// Same audit-logging shape as the role change route.
+router.patch('/users/:user_id/managed_by', requireAuth, requireRole('owner'), async function(req, res) {
+  var targetId = req.params.user_id;
+  var body = req.body || {};
+  var newManagedBy = (body.managed_by === null || body.managed_by === undefined || body.managed_by === '') ? null : body.managed_by;
+
+  // Reject self-assignment BEFORE the DB fires (mirror the no_self_manage check
+  // with a clear 400 rather than surfacing a raw constraint error).
+  if (newManagedBy && newManagedBy === targetId) {
+    return res.status(400).json({ error: 'A user cannot be managed by themselves' });
+  }
+
+  try {
+    var admin = getAdminClient();
+
+    // If assigning, the manager must exist and hold role manager or owner.
+    if (newManagedBy) {
+      var mgr = await admin.from('user_profiles').select('role').eq('user_id', newManagedBy).maybeSingle();
+      if (mgr.error) { console.error('[admin] managed_by manager lookup failed:', mgr.error.message); return res.status(500).json({ error: 'Could not verify manager' }); }
+      var mgrRole = mgr.data && mgr.data.role;
+      if (mgrRole !== 'manager' && mgrRole !== 'owner') {
+        return res.status(400).json({ error: 'managed_by must be a user with role manager or owner' });
+      }
+    }
+
+    var cur = await admin.from('user_profiles').select('managed_by').eq('user_id', targetId).maybeSingle();
+    if (cur.error) { console.error('[admin] managed_by current lookup failed:', cur.error.message); return res.status(500).json({ error: 'Could not load target user' }); }
+    var currentManagedBy = (cur.data && cur.data.managed_by) || null;
+    if (currentManagedBy === newManagedBy) return res.json({ user_id: targetId, managed_by: newManagedBy });
+
+    var up = await admin.from('user_profiles')
+      .upsert({ user_id: targetId, managed_by: newManagedBy }, { onConflict: 'user_id' })
+      .select('user_id, managed_by').single();
+    if (up.error) {
+      var detail = String(up.error.message || 'unknown').slice(0, 200);
+      console.error('[admin] managed_by update failed:', detail);
+      return res.status(500).json({ error: 'Could not update manager assignment: ' + detail });
+    }
+    console.log('[admin] managed_by changed: actor=%s (%s) target=%s %s->%s',
+      req.user.email, req.user.id, targetId, currentManagedBy || 'none', newManagedBy || 'none');
+    res.json({ user_id: up.data.user_id, managed_by: up.data.managed_by });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] managed_by patch error:', err.message);
+    res.status(500).json({ error: 'Failed to update manager assignment' });
+  }
+});
+
+// ── PATCH /admin/users/:user_id/billing_status ──────────────────────────────
+// Owner-only. Manual billing status until Stripe. Allowlisted values.
+var BILLING_STATUSES = ['trial', 'active', 'past_due', 'canceled'];
+router.patch('/users/:user_id/billing_status', requireAuth, requireRole('owner'), async function(req, res) {
+  var targetId = req.params.user_id;
+  var newStatus = req.body && req.body.billing_status;
+  if (BILLING_STATUSES.indexOf(newStatus) === -1) {
+    return res.status(400).json({ error: 'billing_status must be one of: ' + BILLING_STATUSES.join(', ') });
+  }
+  try {
+    var admin = getAdminClient();
+    var cur = await admin.from('user_profiles').select('billing_status').eq('user_id', targetId).maybeSingle();
+    if (cur.error) { console.error('[admin] billing current lookup failed:', cur.error.message); return res.status(500).json({ error: 'Could not load target user' }); }
+    var currentStatus = (cur.data && cur.data.billing_status) || 'trial';
+    if (currentStatus === newStatus) return res.json({ user_id: targetId, billing_status: newStatus });
+
+    var up = await admin.from('user_profiles')
+      .upsert({ user_id: targetId, billing_status: newStatus }, { onConflict: 'user_id' })
+      .select('user_id, billing_status').single();
+    if (up.error) {
+      var detail = String(up.error.message || 'unknown').slice(0, 200);
+      console.error('[admin] billing update failed:', detail);
+      return res.status(500).json({ error: 'Could not update billing status: ' + detail });
+    }
+    console.log('[admin] billing_status changed: actor=%s (%s) target=%s %s->%s',
+      req.user.email, req.user.id, targetId, currentStatus, up.data.billing_status);
+    res.json({ user_id: up.data.user_id, billing_status: up.data.billing_status });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] billing patch error:', err.message);
+    res.status(500).json({ error: 'Failed to update billing status' });
+  }
+});
+
+// ── POST /admin/users ───────────────────────────────────────────────────────
+// Owner-only manual user creation with a server-generated temp password.
+// Owners are NEVER created this way (role limited to user|manager). Both-or-
+// neither: if the profile insert fails after the auth user is created, the auth
+// user is deleted so no orphan remains. The temp password is returned ONCE and
+// is never stored or logged (the audit line logs the event, not the password).
+var CREATE_ROLES = ['user', 'manager'];
+router.post('/users', requireAuth, requireRole('owner'), async function(req, res) {
+  var body = req.body || {};
+  var email = (typeof body.email === 'string') ? body.email.trim() : '';
+  var role = body.role;
+  var managedBy = (body.managed_by === null || body.managed_by === undefined || body.managed_by === '') ? null : body.managed_by;
+
+  if (!email || email.indexOf('@') === -1) return res.status(400).json({ error: 'A valid email is required' });
+  if (CREATE_ROLES.indexOf(role) === -1) return res.status(400).json({ error: 'role must be one of: user, manager (owners are not created here)' });
+
+  try {
+    var admin = getAdminClient();
+
+    if (managedBy) {
+      var mgr = await admin.from('user_profiles').select('role').eq('user_id', managedBy).maybeSingle();
+      if (mgr.error) { console.error('[admin] create-user manager lookup failed:', mgr.error.message); return res.status(500).json({ error: 'Could not verify manager' }); }
+      var mgrRole = mgr.data && mgr.data.role;
+      if (mgrRole !== 'manager' && mgrRole !== 'owner') return res.status(400).json({ error: 'managed_by must be a user with role manager or owner' });
+    }
+
+    // Strong temp password — generated server-side, returned once, never logged.
+    var tempPassword = crypto.randomBytes(15).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 16) + 'aA1!';
+
+    var created = await admin.auth.admin.createUser({ email: email, password: tempPassword, email_confirm: true });
+    if (created.error) return res.status(400).json({ error: created.error.message });
+    var newId = created.data.user.id;
+
+    var ins = await admin.from('user_profiles')
+      .upsert({ user_id: newId, role: role, managed_by: managedBy, billing_status: 'trial' }, { onConflict: 'user_id' });
+    if (ins.error) {
+      // Both-or-neither: roll back the auth user so no orphan is left behind.
+      console.error('[admin] create-user profile insert failed, rolling back auth user:', ins.error.message);
+      try { await admin.auth.admin.deleteUser(newId); }
+      catch (delErr) { console.error('[admin] create-user rollback deleteUser FAILED (orphan auth user ' + newId + '):', delErr.message); }
+      return res.status(500).json({ error: 'Could not create user profile — creation rolled back' });
+    }
+
+    // Audit the creation event — WITHOUT the temp password.
+    console.log('[admin] User created: actor=%s (%s) new=%s (%s) role=%s managed_by=%s',
+      req.user.email, req.user.id, email, newId, role, managedBy || 'none');
+
+    res.json({ user_id: newId, email: email, role: role, managed_by: managedBy, billing_status: 'trial', temp_password: tempPassword });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] create-user error:', err.message);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
 // Fetch all auth users + all user_profiles rows, left-merge on user_id.
 // Users without a profile row default to role='user', managed_by=null.
 async function fetchUsersWithProfiles(admin) {
@@ -412,7 +555,7 @@ async function fetchUsersWithProfiles(admin) {
   if (authResult.error) throw new Error('listUsers failed: ' + authResult.error.message);
   var profilesResult = await admin
     .from('user_profiles')
-    .select('user_id, role, managed_by');
+    .select('user_id, role, managed_by, billing_status');
   if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
 
   var profilesByUserId = {};
@@ -429,6 +572,8 @@ async function fetchUsersWithProfiles(admin) {
       email: u.email || null,
       role: p.role || 'user',
       managed_by: p.managed_by || null,
+      billing_status: p.billing_status || 'trial',
+      created_at: u.created_at || null,
     };
   });
 }

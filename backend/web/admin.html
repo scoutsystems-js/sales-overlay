@@ -65,14 +65,33 @@
       font-weight: 600;
       padding: 7px 14px;
       border-radius: 7px;
-      border: 1px dashed var(--border);
+      border: 1px solid var(--border);
       background: transparent;
-      color: var(--muted);
-      cursor: not-allowed;
-      opacity: 0.55;
+      color: var(--text);
+      cursor: pointer;
       font-family: inherit;
     }
-    .btn-add-user:hover { opacity: 0.7; }
+    .btn-add-user:hover { border-color: var(--green); color: var(--green); }
+
+    /* Create-user modal + editable-field status (Stage 4 console) */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal-box { background: #16181d; border: 1px solid var(--border); border-radius: 10px; padding: 24px; width: 420px; max-width: 92vw; }
+    .modal-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
+    .modal-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+    .modal-input, .modal-select { display: block; width: 100%; margin-top: 5px; font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-family: inherit; }
+    .modal-input:focus, .modal-select:focus { outline: none; border-color: var(--green); }
+    .modal-err { font-size: 12px; color: #f87171; margin-bottom: 10px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+    .btn-modal-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 7px; border: none; background: var(--green); color: #0b1f12; cursor: pointer; font-family: inherit; }
+    .btn-modal-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-modal-secondary { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; }
+    .cu-created-msg { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 14px; }
+    .temp-pw-box { display: flex; align-items: center; gap: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-bottom: 16px; }
+    .temp-pw-box code { font-size: 14px; color: var(--green); font-family: ui-monospace, Menlo, monospace; flex: 1; word-break: break-all; }
+    .btn-copy { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-family: inherit; }
+    .field-status { font-size: 12px; margin-left: 6px; }
+    .field-status.ok { color: var(--green); }
+    .field-status.err { color: #f87171; }
 
     .users-table-wrap {
       background: var(--bg2);
@@ -850,12 +869,38 @@
   <section class="users-section">
     <div class="users-header">
       <h2>User Management</h2>
-      <button class="btn-add-user" disabled title="Coming soon — invite and assign users in v1.1.1">+ Add User</button>
+      <button class="btn-add-user" id="btnCreateUser" onclick="openCreateUserModal()" style="display:none">+ Create user</button>
     </div>
     <div class="users-table-wrap" id="usersTableWrap">
       <div class="empty-msg"><span class="spinner"></span></div>
     </div>
   </section>
+
+  <!-- Create-user modal (owner only). Temp password shown ONCE on success. -->
+  <div class="modal-overlay" id="createUserModal" style="display:none" onclick="if(event.target===this)closeCreateUserModal()">
+    <div class="modal-box">
+      <div class="modal-title">Create user</div>
+      <div id="createUserForm">
+        <label class="modal-label">Email<input type="email" id="cuEmail" class="modal-input" placeholder="rep@company.com" autocomplete="off"></label>
+        <label class="modal-label">Role
+          <select id="cuRole" class="role-select modal-select"><option value="user">user</option><option value="manager">manager</option></select>
+        </label>
+        <label class="modal-label">Managed by (optional)
+          <select id="cuManagedBy" class="role-select modal-select"></select>
+        </label>
+        <div class="modal-err hidden" id="cuError"></div>
+        <div class="modal-actions">
+          <button class="btn-modal-secondary" onclick="closeCreateUserModal()">Cancel</button>
+          <button class="btn-modal-primary" id="cuSubmit" onclick="submitCreateUser()">Create</button>
+        </div>
+      </div>
+      <div id="createUserSuccess" style="display:none">
+        <div class="cu-created-msg">User created. Share this temporary password with them now — <strong>it will not be shown again.</strong></div>
+        <div class="temp-pw-box"><code id="cuTempPw"></code><button class="btn-copy" onclick="copyTempPassword()">Copy</button></div>
+        <div class="modal-actions"><button class="btn-modal-primary" onclick="closeCreateUserModal()">Done</button></div>
+      </div>
+    </div>
+  </div>
 
   <!-- SECTION ANALYTICS: per-user analytics widget (v1.1.10). Reuses the
        /dashboard analytics view but for a user the admin/owner selects.
@@ -1255,78 +1300,151 @@
     return 'pct-bad';
   }
 
+  // Naming decision: role 'owner' is surfaced as "admin (owner)".
+  function roleLabel(r) { return r === 'owner' ? 'admin (owner)' : r; }
+  function roleBadgeClass(r) { return r === 'owner' ? 'owner' : (r === 'manager' ? 'admin' : 'user'); }
+  function managersList() { return usersArray.filter(function(u) { return u.role === 'manager' || u.role === 'owner'; }); }
+  function shortDate(iso) { var d = new Date(iso); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); }
+
   function renderUsersTable() {
     var wrap = document.getElementById('usersTableWrap');
-    if (usersArray.length === 0) {
-      wrap.innerHTML = '<div class="empty-msg">No users to display.</div>';
-      return;
-    }
-
     var isOwnerViewer = currentUser.role === 'owner';
-    var showActions = isOwnerViewer; // admins get read-only
+    var btn = document.getElementById('btnCreateUser');
+    if (btn) btn.style.display = isOwnerViewer ? '' : 'none';
+    if (usersArray.length === 0) { wrap.innerHTML = '<div class="empty-msg">No users to display.</div>'; return; }
 
-    var header = '<tr><th>Email</th><th>Role</th><th>Sessions</th><th>Last active</th>'
-      + (showActions ? '<th>Actions</th>' : '') + '</tr>';
-
-    var rows = [];
-    for (var i = 0; i < usersArray.length; i++) {
-      var u = usersArray[i];
+    var header = '<tr><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Created</th></tr>';
+    var mgrs = managersList();
+    var rows = usersArray.map(function(u) {
       var isSelf = u.user_id === currentUser.user_id;
-      var isSelected = u.user_id === selectedUserId;
-      var trClass = 'clickable' + (isSelected ? ' active' : '');
-
-      // Role cell: dropdown for owners editing OTHER users, static badge otherwise.
-      var roleCell;
-      if (isOwnerViewer && !isSelf) {
-        roleCell = renderRoleControl(u);
-      } else {
-        roleCell = '<span class="role-badge ' + u.role + '">' + u.role
-          + (isSelf ? '<span class="self-tag">(you)</span>' : '')
-          + '</span>';
-      }
-
-      // Actions cell (only shown when viewer is owner).
-      var actionsCell = '';
-      if (showActions) {
-        if (isSelf) {
-          actionsCell = '<td style="color:var(--muted);font-size:12px;">—</td>';
-        } else {
-          actionsCell = '<td>'
-            + '<div class="role-actions">'
-              + '<button class="role-save" data-user-id="' + escapeHtml(u.user_id) + '" disabled onclick="event.stopPropagation(); handleSaveRole(\'' + u.user_id + '\')">Save</button>'
-              + '<span class="role-saved" id="saved-' + escapeHtml(u.user_id) + '">Saved</span>'
-              + '<span class="role-warning hidden" id="warn-' + escapeHtml(u.user_id) + '"></span>'
-            + '</div>'
-          + '</td>';
-        }
-      }
-
-      var lastActive = u.last_session_at ? relativeTime(u.last_session_at) : '—';
+      var trClass = 'clickable' + (u.user_id === selectedUserId ? ' active' : '');
+      var editable = isOwnerViewer && !isSelf;   // owners edit others; self + non-owner viewers are read-only
+      var roleCell = editable ? roleControlHtml(u)
+        : '<span class="role-badge ' + roleBadgeClass(u.role) + '">' + escapeHtml(roleLabel(u.role)) + (isSelf ? '<span class="self-tag">(you)</span>' : '') + '</span>';
+      var mbCell = editable ? managedByControlHtml(u, mgrs) : managedByLabel(u);
+      var billCell = editable ? billingControlHtml(u) : '<span class="role-badge user">' + escapeHtml(u.billing_status || 'trial') + '</span>';
+      var created = u.created_at ? shortDate(u.created_at) : '—';
       var emailDisplay = u.email || (u.user_id.slice(0, 8) + '…');
-
-      rows.push(
-        '<tr class="' + trClass + '" data-user-id="' + escapeHtml(u.user_id) + '" onclick="handleUserRowClick(event, \'' + u.user_id + '\')">'
-          + '<td>' + escapeHtml(emailDisplay) + '</td>'
-          + '<td>' + roleCell + '</td>'
-          + '<td>' + u.session_count + '</td>'
-          + '<td>' + lastActive + '</td>'
-          + actionsCell
-        + '</tr>'
-      );
-    }
-
+      return '<tr class="' + trClass + '" data-user-id="' + escapeHtml(u.user_id) + '" onclick="handleUserRowClick(event, \'' + u.user_id + '\')">'
+        + '<td>' + escapeHtml(emailDisplay) + '</td>'
+        + '<td>' + roleCell + '</td>'
+        + '<td>' + mbCell + '</td>'
+        + '<td>' + billCell + '</td>'
+        + '<td style="color:var(--muted);font-size:12px;">' + escapeHtml(created) + '</td>'
+      + '</tr>';
+    });
     wrap.innerHTML = '<table class="users-table"><thead>' + header + '</thead><tbody>' + rows.join('') + '</tbody></table>';
   }
 
-  function renderRoleControl(user) {
-    // stopPropagation on interactions so they don't also trigger the row's user-filter click.
-    return '<select class="role-select" data-user-id="' + escapeHtml(user.user_id) + '" data-original-role="' + user.role
-      + '" onclick="event.stopPropagation()"'
-      + ' onchange="handleRoleChange(event, \'' + user.user_id + '\')">'
-      + '<option value="user"' + (user.role === 'user' ? ' selected' : '') + '>user</option>'
-      + '<option value="admin"' + (user.role === 'admin' ? ' selected' : '') + '>admin</option>'
-      + '<option value="owner"' + (user.role === 'owner' ? ' selected' : '') + '>owner</option>'
-      + '</select>';
+  // stopPropagation so control clicks don't also trigger the row's analytics-pivot.
+  function fieldControl(u, field, original, opts) {
+    return '<select class="role-select" data-original="' + escapeHtml(original) + '"'
+      + ' onclick="event.stopPropagation()" onchange="saveUserField(this, \'' + field + '\', \'' + u.user_id + '\')">' + opts + '</select>'
+      + '<span class="field-status" id="fs-' + field + '-' + escapeHtml(u.user_id) + '"></span>';
+  }
+  function roleControlHtml(u) {
+    var opts = [['user', 'user'], ['manager', 'manager'], ['owner', 'admin (owner)']].map(function(o) {
+      return '<option value="' + o[0] + '"' + (u.role === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+    }).join('');
+    return fieldControl(u, 'role', u.role, opts);
+  }
+  function managedByControlHtml(u, mgrs) {
+    var opts = '<option value="">None</option>' + mgrs.filter(function(m) { return m.user_id !== u.user_id; }).map(function(m) {
+      var lbl = (m.email || m.user_id.slice(0, 8)) + ' (' + roleLabel(m.role) + ')';
+      return '<option value="' + escapeHtml(m.user_id) + '"' + (u.managed_by === m.user_id ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>';
+    }).join('');
+    return fieldControl(u, 'managed_by', u.managed_by || '', opts);
+  }
+  function billingControlHtml(u) {
+    var cur = u.billing_status || 'trial';
+    var opts = ['trial', 'active', 'past_due', 'canceled'].map(function(v) {
+      return '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + v + '</option>';
+    }).join('');
+    return fieldControl(u, 'billing_status', cur, opts);
+  }
+  function managedByLabel(u) {
+    if (!u.managed_by) return '<span style="color:var(--muted);font-size:12px;">—</span>';
+    var m = usersArray.filter(function(x) { return x.user_id === u.managed_by; })[0];
+    return '<span style="font-size:12px;">' + escapeHtml(m ? (m.email || u.managed_by.slice(0, 8)) : u.managed_by.slice(0, 8)) + '</span>';
+  }
+
+  // Save-on-change for role / managed_by / billing_status. Inline ✓ / ✗ feedback;
+  // reverts the dropdown to its previous value on any failure so the UI never
+  // lies about persisted state.
+  async function saveUserField(sel, field, userId) {
+    var newVal = sel.value;
+    var original = sel.dataset.original || '';
+    if (newVal === original) return;
+    var status = document.getElementById('fs-' + field + '-' + userId);
+    function fail(msg) { sel.value = original; if (status) { status.textContent = '✗ ' + msg; status.className = 'field-status err'; } }
+
+    // Client-side last-owner guard (UX only — the server enforces it too).
+    if (field === 'role' && original === 'owner' && newVal !== 'owner' && ownerCount <= 1) { fail('last owner'); return; }
+    if (status) { status.textContent = '…'; status.className = 'field-status'; }
+
+    var endpoint = field === 'role' ? '/role' : (field === 'managed_by' ? '/managed_by' : '/billing_status');
+    var payload = {}; payload[field] = (field === 'managed_by' && newVal === '') ? null : newVal;
+    var res;
+    try {
+      res = await fetch('/admin/users/' + encodeURIComponent(userId) + endpoint, {
+        method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify(payload),
+      });
+    } catch (e) { fail('network'); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) { var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; } fail(err.error || 'failed'); return; }
+    var data = await res.json();
+    var idx = -1; for (var i = 0; i < usersArray.length; i++) { if (usersArray[i].user_id === userId) { idx = i; break; } }
+    var savedVal = (field === 'managed_by') ? (data.managed_by || null) : data[field];
+    if (idx !== -1) usersArray[idx][field] = savedVal;
+    sel.dataset.original = savedVal || '';
+    if (status) { status.textContent = '✓'; status.className = 'field-status ok'; setTimeout(function() { if (status) { status.textContent = ''; status.className = 'field-status'; } }, 1400); }
+    // Role changes can alter ownerCount + the manager option lists — re-render.
+    if (field === 'role') { ownerCount = usersArray.filter(function(u) { return u.role === 'owner'; }).length; renderUsersTable(); }
+  }
+
+  // openCreateUserModal / submitCreateUser / copyTempPassword / closeCreateUserModal
+  function openCreateUserModal() {
+    document.getElementById('createUserForm').style.display = '';
+    document.getElementById('createUserSuccess').style.display = 'none';
+    document.getElementById('cuEmail').value = '';
+    document.getElementById('cuRole').value = 'user';
+    var mb = document.getElementById('cuManagedBy');
+    mb.innerHTML = '<option value="">None</option>' + managersList().map(function(m) {
+      return '<option value="' + escapeHtml(m.user_id) + '">' + escapeHtml((m.email || m.user_id.slice(0, 8)) + ' (' + roleLabel(m.role) + ')') + '</option>';
+    }).join('');
+    var err = document.getElementById('cuError'); err.textContent = ''; err.classList.add('hidden');
+    var sub = document.getElementById('cuSubmit'); sub.disabled = false; sub.textContent = 'Create';
+    document.getElementById('createUserModal').style.display = 'flex';
+  }
+  function closeCreateUserModal() {
+    document.getElementById('createUserModal').style.display = 'none';
+    document.getElementById('cuTempPw').textContent = '';  // never leave the temp password in the DOM
+    document.getElementById('cuEmail').value = '';
+  }
+  async function submitCreateUser() {
+    var email = document.getElementById('cuEmail').value.trim();
+    var role = document.getElementById('cuRole').value;
+    var managed_by = document.getElementById('cuManagedBy').value || null;
+    var err = document.getElementById('cuError');
+    var sub = document.getElementById('cuSubmit');
+    err.classList.add('hidden');
+    if (!email || email.indexOf('@') === -1) { err.textContent = 'A valid email is required.'; err.classList.remove('hidden'); return; }
+    sub.disabled = true; sub.textContent = 'Creating…';
+    var res;
+    try {
+      res = await fetch('/admin/users', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ email: email, role: role, managed_by: managed_by }) });
+    } catch (e) { sub.disabled = false; sub.textContent = 'Create'; err.textContent = 'Could not reach server.'; err.classList.remove('hidden'); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) { var e2; try { e2 = await res.json(); } catch (x) { e2 = { error: 'HTTP ' + res.status }; } sub.disabled = false; sub.textContent = 'Create'; err.textContent = e2.error || 'Failed to create user'; err.classList.remove('hidden'); return; }
+    var data = await res.json();
+    document.getElementById('cuTempPw').textContent = data.temp_password || '';
+    document.getElementById('createUserForm').style.display = 'none';
+    document.getElementById('createUserSuccess').style.display = '';
+    loadUsers();   // refresh the table with the new user
+  }
+  function copyTempPassword() {
+    var t = document.getElementById('cuTempPw').textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
   }
 
   function handleUserRowClick(event, userId) {
