@@ -1388,6 +1388,40 @@
     .obj-btn { font-size: 12px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; text-decoration: none; }
     .obj-btn:hover { border-color: var(--accent); }
     .obj-toggle { font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+    /* ── Team (manager) view ── */
+    .page-header-main h1 { margin: 0; }
+    .page-header-side { }
+    .team-stat-row { display: flex; flex-wrap: wrap; gap: 14px; }
+    .team-stat { flex: 1; min-width: 120px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); }
+    .team-stat-val { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1.1; }
+    .team-stat-sub { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+    .team-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 6px; }
+    .trend { font-size: 13px; }
+    .trend.up { color: var(--good); } .trend.down { color: var(--bad); } .trend.flat { color: var(--text-muted); }
+    .trend-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; padding: 8px 4px 0; }
+    .trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 24px; }
+    .trend-bar { width: 60%; max-width: 46px; background: linear-gradient(180deg, var(--accent), rgba(91,158,255,0.35)); border-radius: 4px 4px 0 0; }
+    .trend-bar-val { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    .trend-bar-label { font-size: 10.5px; color: var(--text-muted); margin-top: 6px; white-space: nowrap; }
+    .team-rep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+    .team-rep-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px; cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
+    .team-rep-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .team-rep-name { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px; text-transform: capitalize; }
+    .team-rep-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .team-rep-metric .v { display: block; font-size: 17px; font-weight: 600; color: var(--text); }
+    .team-rep-metric .k { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-top: 2px; }
+    .team-insight { border-left: 3px solid var(--border); padding: 10px 0 10px 14px; margin-bottom: 12px; }
+    .team-insight.working { border-left-color: var(--good); } .team-insight.improve { border-left-color: var(--mid); }
+    .team-insight-claim { font-size: 14px; color: var(--text); line-height: 1.55; }
+    .team-insight-data { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
+    .team-insight-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .team-rep-tag { font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(91,158,255,0.10); padding: 2px 8px; border-radius: 10px; text-transform: capitalize; }
+    .team-lane-row { display: flex; flex-wrap: wrap; gap: 14px; }
+    .team-lane { flex: 1; min-width: 240px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px; }
+    .team-lane-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 700; margin-bottom: 6px; }
+    .team-lane-rep { font-size: 13px; font-weight: 600; color: var(--text); text-transform: capitalize; margin-bottom: 8px; }
+    .team-lane-why { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
   </style>
   <script src="/js/scout-auth.js"></script>
 </head>
@@ -1400,6 +1434,8 @@
     <a class="nav-link" id="navOverview" onclick="setView('overview'); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
     <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
+    <span class="sep" id="navTeamSep" style="display:none">·</span>
+    <a class="nav-link" id="navTeam" onclick="goTeam(); return false;" style="display:none">Team</a>
   </div>
   <div class="top-bar-right">
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
@@ -1487,6 +1523,15 @@
     objectionsSynthesisLoading: false,
     perfSynthesis: null,       // last /me/performance-synthesis ({available,working,improve} | {available:false})
     perfSynthesisLoading: false,
+    // ── Team (manager) view ──
+    teamContext:    null,   // /team/context: {role, is_owner, has_reps, teams}
+    teamSelected:   null,   // owner picker: team key ('all' | managerId) or null=default
+    teamTrendBucket:'week',
+    teamOverview:   null,   teamOverviewLoading: false,
+    teamTrends:     null,   teamTrendsLoading: false,
+    teamRecs:       null,   teamRecsLoading: false,
+    teamHighlights: null,   teamHighlightsLoading: false,
+    teamDigest:     null,   teamDigestLoading: false,
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
@@ -1573,8 +1618,13 @@
     state.me = await fetchMe();
     if (!state.me) { pdiag('page-init-redirect', { reason: 'fetchMe-null' }, true); window.location.replace('/login'); return; }
 
-    if (state.me.role === 'admin' || state.me.role === 'owner') {
+    // Admin console is owner-only; the Team (manager) view is for managers + owners.
+    if (state.me.role === 'owner') {
       document.getElementById('adminLink').style.display = '';
+    }
+    if (state.me.role === 'manager' || state.me.role === 'owner') {
+      document.getElementById('navTeam').style.display = '';
+      document.getElementById('navTeamSep').style.display = '';
       await loadUsers();
     }
 
@@ -2234,6 +2284,7 @@
     else if (state.view === 'call-library') renderCallLibrary();
     else if (state.view === 'call-review') renderCallReview();
     else if (state.view === 'objections-intel') renderObjectionsIntel();
+    else if (state.view === 'team') renderTeamView();
     updateNavActiveStates();
   }
 
@@ -2251,6 +2302,8 @@
     if (navOverview) {
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel');
     }
+    var navTeam = document.getElementById('navTeam');
+    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team');
     if (navCallLibrary) {
       navCallLibrary.classList.toggle('nav-active', !!CALL_LIBRARY_VIEWS[state.view]);
     }
@@ -2793,6 +2846,215 @@
   // ──────────────────────────────────────────────────────────────────
   // Drill views
   // ──────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Team (manager) view — v1.4 flagship. Reps' data is resolved + permission-
+  // checked server-side; this only renders. Owner gets a team picker.
+  // ═══════════════════════════════════════════════════════════════════════════
+  function goTeam() { setView('team'); }
+  function teamQP(extra) {
+    var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    if (state.teamSelected) qp += '&team=' + encodeURIComponent(state.teamSelected);
+    if (extra) qp += '&' + extra;
+    return qp;
+  }
+  async function fetchTeamJSON(path) {
+    var res = await fetch(path, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (res.status === 403) return { _forbidden: true };
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+  function resetTeamData() {
+    state.teamOverview = null; state.teamTrends = null; state.teamRecs = null;
+    state.teamHighlights = null; state.teamDigest = null;
+  }
+  function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamView(); }
+  function setTeamTrendBucket(b) { state.teamTrendBucket = b; state.teamTrends = null; loadTeam('trends'); }
+  function setTeamRange(days) {
+    var to = new Date();
+    var from = days >= 9999 ? new Date('2025-01-01T00:00:00Z') : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
+    resetTeamData(); renderTeamView();
+  }
+  // Generic lazy loader for each team panel.
+  async function loadTeam(which) {
+    var map = {
+      context:  { flag: null,                    set: 'teamContext',    url: '/team/context' },
+      overview: { flag: 'teamOverviewLoading',   set: 'teamOverview',   url: '/team/overview?' + teamQP() },
+      trends:   { flag: 'teamTrendsLoading',     set: 'teamTrends',     url: '/team/trends?' + teamQP('bucket=' + state.teamTrendBucket) },
+      recs:     { flag: 'teamRecsLoading',       set: 'teamRecs',       url: '/team/recommendations?' + teamQP() },
+      highlights:{flag: 'teamHighlightsLoading', set: 'teamHighlights', url: '/team/highlights?' + teamQP() },
+      digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP() },
+    };
+    var c = map[which]; if (!c) return;
+    if (c.flag && state[c.flag]) return;
+    if (c.flag) state[c.flag] = true;
+    try { state[c.set] = await fetchTeamJSON(c.url); }
+    catch (err) { if (err.message === 'unauth') return; state[c.set] = { _error: err.message || 'unknown' }; }
+    if (c.flag) state[c.flag] = false;
+    if (state.view === 'team') renderTeamView();
+  }
+
+  function renderTeamView() {
+    var content = document.getElementById('content');
+    if (state.teamContext === null) { loadTeam('context'); }
+    // kick the panels (lazy, once each)
+    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+    if (state.teamTrends === null && !state.teamTrendsLoading) loadTeam('trends');
+    if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
+    if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
+    if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
+
+    content.innerHTML =
+      teamHeaderHtml()
+      + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
+      + '<div class="section fade-in">' + teamTrendsHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Team members</h2>'
+        + '<div class="meta">click a rep to open their coaching dashboard</div></div>' + teamRepCardsHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Call Highlights of the Week</h2></div>' + teamHighlightsHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Team recommendations</h2>'
+        + '<div class="meta">grounded in the team\'s calls</div></div>' + teamRecsHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Manager daily digest</h2></div>' + teamDigestHtml() + '</div>';
+  }
+
+  function teamHeaderHtml() {
+    var label = (state.teamOverview && state.teamOverview.team && state.teamOverview.team.label) || 'Team';
+    var picker = '';
+    var ctx = state.teamContext;
+    if (ctx && ctx.is_owner && Array.isArray(ctx.teams) && ctx.teams.length) {
+      var opts = ctx.teams.map(function (t) {
+        var sel = (state.teamSelected === t.key || (!state.teamSelected && t.is_self)) ? ' selected' : '';
+        return '<option value="' + escapeHtml(t.key) + '"' + sel + '>' + escapeHtml(t.label) + ' (' + t.rep_count + ')</option>';
+      }).join('');
+      picker = '<select class="user-select" onchange="pickTeam(this.value)">' + opts + '</select>';
+    }
+    var presets = [7, 30, 90].map(function (d) {
+      return '<button class="date-preset' + (state.dateRange.days === d ? ' active' : '') + '" onclick="setTeamRange(' + d + ')">' + d + 'd</button>';
+    }).join('');
+    return '<div class="page-header fade-in">'
+      + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
+        + '<div class="review-meta-row"><span>Manager view</span></div></div>'
+      + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + picker
+        + '<div class="date-presets">' + presets + '</div></div>'
+    + '</div>';
+  }
+
+  function trendArrow(t) {
+    if (t > 0) return '<span class="trend up" title="up vs prior period">▲</span>';
+    if (t < 0) return '<span class="trend down" title="down vs prior period">▼</span>';
+    return '<span class="trend flat" title="flat vs prior period">—</span>';
+  }
+  function teamAggregateHtml() {
+    var o = state.teamOverview;
+    if (o && o._forbidden) return '<div class="error">Not authorized for this team.</div>';
+    if (o && o._error) return '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
+    if (!o) return '<div class="skeleton" style="height:80px;"></div>';
+    var t = o.totals;
+    function stat(label, val, extra) {
+      return '<div class="team-stat"><div class="team-stat-val">' + val + (extra || '') + '</div><div class="team-stat-label">' + label + '</div></div>';
+    }
+    return '<div class="team-stat-row">'
+      + stat('Reps active', t.active_reps + '<span class="team-stat-sub">/' + t.reps + '</span>')
+      + stat('Calls analyzed', t.calls_analyzed)
+      + stat('Avg score', (t.avg_score == null ? '—' : t.avg_score), ' ' + trendArrow(t.avg_score != null && t.prior_avg_score != null ? (t.avg_score - t.prior_avg_score) : 0))
+      + stat('Win-class avg', (t.win_mean == null ? '—' : t.win_mean) + (t.win_n ? '<span class="team-stat-sub"> · ' + t.win_n + ' won</span>' : ''))
+      + stat('Objection handle', (t.obj_handle_rate == null ? '—' : t.obj_handle_rate + '%') + '<span class="team-stat-sub"> ' + t.objections_handled + '/' + t.objections_total + '</span>')
+      + '</div>';
+  }
+
+  function teamTrendsHtml() {
+    var toggle = ['week', 'month', 'quarter'].map(function (b) {
+      return '<button class="date-preset' + (state.teamTrendBucket === b ? ' active' : '') + '" onclick="setTeamTrendBucket(\'' + b + '\')">' + b.charAt(0).toUpperCase() + b.slice(1) + 'ly</button>';
+    }).join('');
+    var head = '<div class="section-header"><h2>Trends</h2><div class="date-presets">' + toggle + '</div></div>';
+    var tr = state.teamTrends;
+    if (!tr) return head + '<div class="skeleton" style="height:120px;"></div>';
+    if (tr._error) return head + '<div class="error">Could not load trends: ' + escapeHtml(tr._error) + '</div>';
+    var b = tr.buckets || [];
+    if (!b.length) return head + '<div class="empty"><p>No analyzed calls in this range yet.</p></div>';
+    var max = Math.max.apply(null, b.map(function (x) { return x.avg_score || 0; }).concat([1]));
+    var bars = b.map(function (x) {
+      var h = Math.round(((x.avg_score || 0) / max) * 100);
+      return '<div class="trend-col" title="' + escapeHtml(x.label) + ': avg ' + (x.avg_score == null ? 'n/a' : x.avg_score) + ', ' + x.calls + ' calls' + (x.win_rate == null ? '' : ', ' + x.win_rate + '% win') + '">'
+        + '<div class="trend-bar-val">' + (x.avg_score == null ? '' : x.avg_score) + '</div>'
+        + '<div class="trend-bar" style="height:' + Math.max(4, h) + '%"></div>'
+        + '<div class="trend-bar-label">' + escapeHtml(x.label) + '</div></div>';
+    }).join('');
+    return head + '<div class="trend-chart">' + bars + '</div>';
+  }
+
+  function teamRepCardsHtml() {
+    var o = state.teamOverview;
+    if (!o || o._forbidden || o._error) return '';
+    var reps = o.per_rep || [];
+    if (!reps.length) return '<div class="empty"><h3>No reps in this team yet</h3><p>Assign reps to this manager in the admin console.</p></div>';
+    return '<div class="team-rep-grid">' + reps.map(function (r) {
+      var name = r.email ? r.email.split('@')[0] : (r.user_id || '').slice(0, 8);
+      return '<div class="team-rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(r.email || '') + '\'s dashboard">'
+        + '<div class="team-rep-name">' + escapeHtml(name) + '</div>'
+        + '<div class="team-rep-metrics">'
+          + '<div class="team-rep-metric"><span class="v">' + r.calls_analyzed + '</span><span class="k">calls</span></div>'
+          + '<div class="team-rep-metric"><span class="v">' + (r.avg_score == null ? '—' : r.avg_score) + ' ' + trendArrow(r.trend) + '</span><span class="k">avg score</span></div>'
+          + '<div class="team-rep-metric"><span class="v">' + (r.win_mean == null ? '—' : r.win_mean) + '</span><span class="k">win avg</span></div>'
+          + '<div class="team-rep-metric"><span class="v">' + (r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%') + '</span><span class="k">obj handled</span></div>'
+        + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  function teamInsightHtml(it, kind) {
+    var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
+    var repTag = it.rep ? '<span class="team-rep-tag">' + escapeHtml(String(it.rep).split('@')[0]) + '</span>' : '';
+    return '<div class="team-insight ' + kind + '">'
+      + '<div class="team-insight-claim">' + escapeHtml(it.claim || '') + '</div>'
+      + (it.data ? '<div class="team-insight-data">' + escapeHtml(it.data) + '</div>' : '')
+      + (it.quote ? '<div class="review-why-quote">“' + escapeHtml(it.quote) + '”</div>' : '')
+      + '<div class="team-insight-foot">' + repTag + clipBtn + '</div>'
+    + '</div>';
+  }
+  function teamRecsHtml() {
+    var r = state.teamRecs;
+    if (!r) return '<div class="skeleton" style="height:80px;"></div>';
+    if (r._error) return '<div class="error">Could not load recommendations: ' + escapeHtml(r._error) + '</div>';
+    if (!r.available) return '<div class="empty"><h3>Recommendations unavailable</h3><p>' + escapeHtml(r.reason || 'Could not generate right now.') + '</p></div>';
+    var w = r.working || [], i = r.improve || [];
+    if (!w.length && !i.length) return '<div class="empty"><p>Not enough analyzed team calls yet.</p></div>';
+    return '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
+      + (w.length ? w.map(function (x) { return teamInsightHtml(x, 'working'); }).join('') : '<div class="empty"><p>—</p></div>')
+      + '<div class="obj-group-header" style="color:var(--mid);margin-top:18px;">What to improve</div>'
+      + (i.length ? i.map(function (x) { return teamInsightHtml(x, 'improve'); }).join('') : '<div class="empty"><p>—</p></div>');
+  }
+
+  function teamHighlightsHtml() {
+    var h = state.teamHighlights;
+    if (!h) return '<div class="skeleton" style="height:80px;"></div>';
+    if (h._error) return '<div class="error">Could not load highlights: ' + escapeHtml(h._error) + '</div>';
+    if (!h.available) return '<div class="empty"><h3>Highlights unavailable</h3><p>' + escapeHtml(h.reason || '') + '</p></div>';
+    var lanes = h.lanes || {};
+    var LANE = { objection_handling: 'Best objection handling', challenging: 'Best challenger moment', pain_excavation: 'Best pain excavation' };
+    var keys = Object.keys(LANE).filter(function (k) { return lanes[k]; });
+    if (!keys.length) return '<div class="empty"><p>No standout team moments this week yet.</p></div>';
+    return '<div class="team-lane-row">' + keys.map(function (k) {
+      var m = lanes[k];
+      var clip = m.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
+      return '<div class="team-lane">'
+        + '<div class="team-lane-title">' + LANE[k] + '</div>'
+        + '<div class="team-lane-rep">' + escapeHtml(String(m.rep || '').split('@')[0]) + '</div>'
+        + '<div class="review-why-quote">“' + escapeHtml(m.quote || '') + '”</div>'
+        + (m.why ? '<div class="team-lane-why">' + escapeHtml(m.why) + '</div>' : '')
+        + '<div class="team-insight-foot">' + clip + '</div>'
+      + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function teamDigestHtml() {
+    var d = state.teamDigest;
+    if (!d) return '<div class="skeleton" style="height:60px;"></div>';
+    if (d._error) return '<div class="error">Could not load digest: ' + escapeHtml(d._error) + '</div>';
+    if (!d.available) return '<div class="empty"><h3>Digest pending</h3><p>' + escapeHtml(d.reason || 'Generated by the overnight run.') + '</p></div>';
+    // (shape rendered once the digest cron ships)
+    return '<div class="team-digest">' + escapeHtml(JSON.stringify(d)) + '</div>';
+  }
+
   // ─── URL hash routing ──────────────────────────────────────────────────────
   // Persist the active view in the URL hash so refresh / deep-link / back-forward
   // restore it. The ?user= admin pivot stays in the query string, untouched.
@@ -2802,6 +3064,7 @@
   function viewToHashPath() {
     if (state.view === 'call-library')     return 'calls';
     if (state.view === 'objections-intel') return 'objections';
+    if (state.view === 'team')             return 'team';
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     return ''; // overview + dormant drills
   }
@@ -2819,6 +3082,7 @@
     var h = (window.location.hash || '').replace(/^#/, '');
     if (h === 'calls') { state.view = 'call-library'; }
     else if (h === 'objections') { state.view = 'objections-intel'; }
+    else if (h === 'team') { state.view = 'team'; }
     else if (h.indexOf('call/') === 0) {
       var id = h.slice(5);
       state.selectedCallId = id ? decodeURIComponent(id) : null;

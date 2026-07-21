@@ -12,6 +12,7 @@ const adminRoutes = require('./routes/admin');
 const meRoutes = require('./routes/me');
 const kbRoutes = require('./routes/kb');
 const fathomRoutes = require('./routes/fathom');
+const teamRoutes = require('./routes/team');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -75,6 +76,7 @@ app.use('/admin', adminRoutes);
 app.use('/me', meRoutes);
 app.use('/kb', kbRoutes);
 app.use('/fathom', fathomRoutes);
+app.use('/team', teamRoutes);
 
 // Global error handler
 app.use(function(err, req, res, next) {
