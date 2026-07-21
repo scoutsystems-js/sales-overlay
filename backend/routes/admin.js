@@ -37,7 +37,7 @@ var LOG_HARD_CAP = 10000;
 // /admin/sessions and /admin/sessions/:id/logs expanded from owner-only to
 // admin+owner so the redesigned /admin page works for both roles. Scope
 // filtering inside each route keeps admins bounded to self + managed users.
-var protect = [requireAuth, requireRole(['admin', 'owner'])];
+var protect = [requireAuth, requireRole(['manager', 'owner'])];
 
 // Returns null for owners ("all users visible") or an array of allowed
 // user_ids for admins (self + users where managed_by = self). Callers pass
@@ -274,7 +274,7 @@ router.get('/sessions/:session_id/logs', protect, async function(req, res) {
 // migration 003 note) default to role='user' in the merge so the table
 // still lists them. `managed_by` stays null for those users, meaning only
 // owners will see them until an owner assigns them to an admin.
-router.get('/users', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/users', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   try {
     var admin = getAdminClient();
     var allUsers = await fetchUsersWithProfiles(admin);
@@ -331,7 +331,7 @@ router.get('/users', requireAuth, requireRole(['admin', 'owner']), async functio
 //   2. Last-owner demotion is rejected (system must retain at least one owner).
 // Upsert is used instead of update so un-onboarded users (no user_profiles
 // row yet) can still be promoted.
-var ALLOWED_ROLES = ['user', 'admin', 'owner'];
+var ALLOWED_ROLES = ['user', 'manager', 'owner'];
 
 router.patch('/users/:user_id/role', requireAuth, requireRole('owner'), async function(req, res) {
   var targetId = req.params.user_id;
@@ -454,7 +454,7 @@ function computeUserSessionStats(rows) {
 // pull analytics for users where user_profiles.managed_by = self, plus self.
 //
 // Wraps shared computeAnalytics(). Defaults to last 30 days.
-router.get('/analytics/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/analytics/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -467,7 +467,7 @@ router.get('/analytics/:user_id', requireAuth, requireRole(['admin', 'owner']), 
 
     // Scope enforcement: admins can only see self + their managed users.
     // Owners can see anyone — skip the check entirely.
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin
         .from('user_profiles')
         .select('user_id, managed_by')
@@ -496,7 +496,7 @@ router.get('/analytics/:user_id', requireAuth, requireRole(['admin', 'owner']), 
 // Admin-pivot equivalent of /me/analytics2 (Fathom-era Coaching Dashboard).
 // Same scope enforcement as /admin/analytics/:user_id: admins → self + managed
 // users; owners → anyone. Wraps computeCallAnalytics().
-router.get('/analytics2/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/analytics2/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -507,7 +507,7 @@ router.get('/analytics2/:user_id', requireAuth, requireRole(['admin', 'owner']),
   try {
     var admin = getAdminClient();
 
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin
         .from('user_profiles')
         .select('user_id, managed_by')
@@ -537,12 +537,12 @@ router.get('/analytics2/:user_id', requireAuth, requireRole(['admin', 'owner']),
 // viewed user. Same scope enforcement as the other /admin analytics routes.
 // Reuses the shared _loadCallsList helper (filter=analyzed|objections, sort,
 // from/to). Lets the coaching donuts drill through under ?user=.
-router.get('/fathom-calls/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/fathom-calls/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   try {
     var admin = getAdminClient();
 
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin
         .from('user_profiles')
         .select('user_id, managed_by')
@@ -569,7 +569,7 @@ router.get('/fathom-calls/:user_id', requireAuth, requireRole(['admin', 'owner']
 
 // ── GET /admin/objections-intel/:user_id ────────────────────────────────────
 // Admin-pivot equivalent of /me/objections-intel. Same scope enforcement.
-router.get('/objections-intel/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/objections-intel/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -578,7 +578,7 @@ router.get('/objections-intel/:user_id', requireAuth, requireRole(['admin', 'own
   }
   try {
     var admin = getAdminClient();
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin
         .from('user_profiles')
         .select('user_id, managed_by')
@@ -604,7 +604,7 @@ router.get('/objections-intel/:user_id', requireAuth, requireRole(['admin', 'own
 
 // ── GET /admin/objections-synthesis/:user_id ────────────────────────────────
 // Admin-pivot equivalent of /me/objections-synthesis. Same scope enforcement.
-router.get('/objections-synthesis/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/objections-synthesis/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -613,7 +613,7 @@ router.get('/objections-synthesis/:user_id', requireAuth, requireRole(['admin', 
   }
   try {
     var admin = getAdminClient();
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin.from('user_profiles').select('user_id, managed_by').eq('user_id', targetUserId).maybeSingle();
       if (scopeCheck.error) {
         console.error('[admin] objections-synthesis scope check failed:', scopeCheck.error.message);
@@ -634,7 +634,7 @@ router.get('/objections-synthesis/:user_id', requireAuth, requireRole(['admin', 
 });
 
 // ── GET /admin/performance-synthesis/:user_id ───────────────────────────────
-router.get('/performance-synthesis/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/performance-synthesis/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -643,7 +643,7 @@ router.get('/performance-synthesis/:user_id', requireAuth, requireRole(['admin',
   }
   try {
     var admin = getAdminClient();
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin.from('user_profiles').select('user_id, managed_by').eq('user_id', targetUserId).maybeSingle();
       if (scopeCheck.error) {
         console.error('[admin] performance-synthesis scope check failed:', scopeCheck.error.message);
@@ -666,7 +666,7 @@ router.get('/performance-synthesis/:user_id', requireAuth, requireRole(['admin',
 // ── GET /admin/objections/:user_id?objection_id=<id>&from=&to= ──────────────
 // Per-type drill for admins/owners viewing another user's coaching dashboard.
 // Same shape as /me/objections; scope-checked.
-router.get('/objections/:user_id', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/objections/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   var objectionId = req.query.objection_id;
   if (!objectionId) return res.status(400).json({ error: 'objection_id required' });
@@ -677,7 +677,7 @@ router.get('/objections/:user_id', requireAuth, requireRole(['admin', 'owner']),
   }
   try {
     var admin = getAdminClient();
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin
         .from('user_profiles')
         .select('user_id, managed_by')
@@ -707,7 +707,7 @@ router.get('/objections/:user_id', requireAuth, requireRole(['admin', 'owner']),
 // /admin/sessions list is already scope-filtered to managed users, so by the
 // time a session_id reaches here it's already been screened. Defensive
 // check still happens in the analytics route above.)
-router.get('/sessions/:session_id/objections', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/sessions/:session_id/objections', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var sessionId = req.params.session_id;
   try {
     var rows = await loadSessionObjections(getAdminClient(), sessionId);
@@ -725,7 +725,7 @@ router.get('/sessions/:session_id/objections', requireAuth, requireRole(['admin'
 // user_id after a scope check (admins see managed users + self; owners see
 // anyone). Lives on admin.js for the same reason analytics does — keeps
 // caller-scope clean from cross-user-scope.
-router.get('/coaching/:user_id/patterns', requireAuth, requireRole(['admin', 'owner']), async function(req, res) {
+router.get('/coaching/:user_id/patterns', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -735,7 +735,7 @@ router.get('/coaching/:user_id/patterns', requireAuth, requireRole(['admin', 'ow
 
   try {
     var admin = getAdminClient();
-    if (req.user.role === 'admin' && targetUserId !== req.user.id) {
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
       var scopeCheck = await admin
         .from('user_profiles')
         .select('user_id, managed_by')

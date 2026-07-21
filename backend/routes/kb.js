@@ -82,7 +82,7 @@ async function resolveUserScope(adminClient, userId) {
   var role = (profile.data && profile.data.role) || 'user';
   var managed_by = (profile.data && profile.data.managed_by) || null;
   var p_admin_id;
-  if (role === 'admin' || role === 'owner') {
+  if (role === 'manager' || role === 'owner') {
     p_admin_id = userId;
   } else {
     p_admin_id = managed_by;
@@ -95,7 +95,7 @@ async function resolveUserScope(adminClient, userId) {
 async function getVisibleUploaderIds(adminClient, userId, role) {
   if (role === 'owner') return null;
   var ids = [userId];
-  if (role === 'admin') {
+  if (role === 'manager') {
     var managed = await adminClient
       .from('user_profiles')
       .select('user_id')
@@ -382,7 +382,7 @@ router.post('/upload', protect, upload.single('file'), async function(req, res) 
     // Map role → upload scope (owner→global, admin→team, user→personal)
     var uploadScope;
     if (scope.role === 'owner') uploadScope = 'global';
-    else if (scope.role === 'admin') uploadScope = 'team';
+    else if (scope.role === 'manager') uploadScope = 'team';
     else uploadScope = 'personal';
 
     var text = '';
