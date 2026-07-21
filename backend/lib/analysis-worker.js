@@ -42,6 +42,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
+const { fetchSellingContext } = require('./selling-context');
 const fathomRoutes = require('../routes/fathom');
 
 // ─── Schema-locked vocabularies (mirror migration 010 CHECK constraints) ────
@@ -67,7 +68,7 @@ const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 // bug). v2 = outcome inference + objection category/resolution/closer_response/surface.
 // v3 = grader scale re-calibration (anchored bands + high-ticket domain context;
 //      a typical solid call lands 65-80/section — no longer graded vs a perfect ideal).
-const ANALYSIS_PROMPT_VERSION = 'v5-2026-07-21';
+const ANALYSIS_PROMPT_VERSION = 'v6-2026-07-21';
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -233,14 +234,17 @@ async function findMeeting(accessToken, recordingId, callDate) {
 }
 
 // ─── Section Grader prompt ────────────────────────────────────────────────
-function buildSectionGraderPrompt(normalized, durationSeconds) {
+function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
   var transcriptText = formatTurnsForPrompt(normalized.turns);
   var durationLabel = (durationSeconds != null) ? Math.round(durationSeconds / 60) + ' minutes' : 'unknown duration';
   var closerLabel = (normalized.speaker_confidence === 'matched')
     ? 'The closer is "' + normalized.closer_name + '", labeled CLOSER in the transcript. The prospect is labeled PROSPECT.'
     : 'Speaker identity is uncertain — the transcript shows raw display names. Infer who the closer is from conversational cues (asks discovery questions, makes the pitch, handles objections). Map both roles to CLOSER and PROSPECT in your evidence quotes.';
 
-  return [
+  // The array below is IDENTICAL to v5. The SELLING CONTEXT block is spliced in
+  // ONLY when non-empty, so with empty context a v6 prompt is byte-identical to
+  // v5 (the version bump is DB-stamp only — no version text lives in the prompt).
+  var lines = [
     'You are an expert sales coach reviewing a transcript of a high-ticket sales call. Grade five sections on a 0-100 spectrum (NOT pass/fail), each with a letter grade A-F.',
     '',
     'DOMAIN CONTEXT: This is high-ticket sales, where a 25-35% close rate is STRONG performance. Most calls do not close, and that is normal and expected. A call that advances the prospect to a next step, or ends with an appropriate disqualification, is a SUCCESSFUL outcome — not a failure. Do not treat "did not close on this call" as a poor performance.',
@@ -306,7 +310,21 @@ function buildSectionGraderPrompt(normalized, durationSeconds) {
     '',
     'TRANSCRIPT:',
     transcriptText,
-  ].join('\n');
+  ];
+
+  // Splice SELLING CONTEXT between DOMAIN CONTEXT and the SCORING SCALE, present
+  // only when there is content. When empty, `lines` is untouched → identical to v5.
+  if (sellingContext && sellingContext.trim()) {
+    var at = lines.indexOf('SCORING SCALE — anchor every section score to these bands:');
+    if (at !== -1) {
+      lines.splice(at, 0,
+        'SELLING CONTEXT: The following is this closer\'s actual offer and sales approach, uploaded by their team. Ground your grading in it: judge the call against THIS offer and THIS selling style. Do not penalize approaches this material explicitly endorses (e.g., a logical, ROI-driven close for a B2B offer must not be marked down for lacking emotional urgency). Where the closer deviates from their own script/offer in a way that hurt the call, say so and cite it.',
+        '',
+        sellingContext.trim(),
+        '');
+    }
+  }
+  return lines.join('\n');
 }
 
 // ─── Highlight Extractor prompt ───────────────────────────────────────────
@@ -590,8 +608,13 @@ async function analyzeCall(fathomCallId, userId) {
     }
 
     // ─── Phase 6: two parallel Claude calls ──────────────────────────────
+    // KB grounding: one read-only fetch of the closer's selling context (offer
+    // docs / scripts). Never throws (empty on any failure) → the grader falls
+    // back to the v5-identical prompt. Highlight extractor is unchanged. No new
+    // Claude call — still exactly two per analysis.
+    var selling = await fetchSellingContext(admin, userId);
     var anthropic = getAnthropic();
-    var sectionPrompt   = buildSectionGraderPrompt(normalized, callRow.duration_seconds);
+    var sectionPrompt   = buildSectionGraderPrompt(normalized, callRow.duration_seconds, selling.contextText);
     var highlightPrompt = buildHighlightExtractorPrompt(normalized);
 
     var graderPromise = anthropic.messages.create({

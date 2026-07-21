@@ -10,6 +10,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
+const { fetchSellingContext } = require('./selling-context');
 
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
@@ -63,7 +64,7 @@ function candidateScore(type, cls) {
   return 1;
 }
 
-function buildPrompt(agg, oneThings, candidates) {
+function buildPrompt(agg, oneThings, candidates, sellingContext) {
   var lines = [
     'You are a sales coach writing a Performance Summary for one high-ticket closer, comparing their WIN-class calls (outcome=closed) vs LOSS-class calls (outcome=lost) over this period. Be specific and grounded — cite real moments, tie claims to the numbers. No generic praise.',
     '',
@@ -73,6 +74,11 @@ function buildPrompt(agg, oneThings, candidates) {
     '',
     'GRADER "one thing to improve" notes across calls — synthesize the recurring THEME, do NOT quote these individually:',
   ];
+  if (sellingContext && sellingContext.trim()) {
+    lines.splice(2, 0,
+      'SELLING CONTEXT (this closer\'s actual offer / sales approach — ground your assessment in it; judge against THIS offer and selling style, do not penalize approaches it endorses):',
+      sellingContext.trim(), '');
+  }
   oneThings.forEach(function (t) { lines.push('  - ' + t.slice(0, 220)); });
   lines.push('');
   lines.push('EVIDENCE MOMENTS (cite exactly one by its id in evidence_id; do not invent quotes):');
@@ -123,7 +129,10 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
     function (q) { return q.eq('status', 'done'); });
   if (analyses.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
 
-  var hashInput = analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|');
+  // KB-grounded: fetch the closer's selling context (offer/scripts, cap 3000) and
+  // fold its hash into the set-hash so a KB upload invalidates the cached synthesis.
+  var selling = await fetchSellingContext(admin, userId, 3000);
+  var hashInput = analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash;
   var hash = crypto.createHash('md5').update(hashInput).digest('hex');
 
   // 3) cache check.
@@ -186,7 +195,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   try {
     resp = await getAnthropic().messages.create({
       model: CLAUDE_MODEL, max_tokens: SYNTH_MAX_TOKENS,
-      messages: [{ role: 'user', content: buildPrompt(agg, oneThings, candidates) }],
+      messages: [{ role: 'user', content: buildPrompt(agg, oneThings, candidates, selling.contextText) }],
     });
   } catch (apiErr) {
     return { available: false, reason: 'Anthropic API failure' + ((apiErr && apiErr.status) ? ' (HTTP ' + apiErr.status + ')' : '') + ': ' + ((apiErr && apiErr.message) || 'unknown') };

@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
+const { fetchSellingContext } = require('../lib/selling-context');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -545,6 +546,31 @@ router.post('/users', requireAuth, requireRole('owner'), async function(req, res
     if (handleConfigError(err, res)) return;
     console.error('[admin] create-user error:', err.message);
     res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// ── GET /admin/selling-context/:user_id ─────────────────────────────────────
+// Verification harness (owner-only, read-only): resolves the KB selling context
+// for a user WITHOUT running an analysis — so scope resolution can be verified
+// (sources, char count, hash). Optional ?maxchars= (default 5000, the grader cap).
+router.get('/selling-context/:user_id', requireAuth, requireRole('owner'), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var cap = parseInt(req.query.maxchars, 10); if (!cap || cap < 1) cap = 5000;
+    var sc = await fetchSellingContext(admin, req.params.user_id, cap);
+    res.json({
+      user_id: req.params.user_id,
+      max_chars: cap,
+      empty: !sc.contextText,
+      char_count: sc.contextText.length,
+      kb_hash: sc.kbHash,
+      sources: sc.sources || [],
+      preview: sc.contextText.slice(0, 600),
+    });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] selling-context harness error:', err.message);
+    res.status(500).json({ error: 'Failed to resolve selling context' });
   }
 });
 

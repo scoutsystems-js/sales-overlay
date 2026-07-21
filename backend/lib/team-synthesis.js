@@ -13,6 +13,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
+const { fetchSellingContext } = require('./selling-context');
 
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
@@ -99,7 +100,10 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     function (q) { return q.eq('status', 'done'); });
   if (analyses.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
 
-  var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|')).digest('hex');
+  // KB-grounded: the manager/owner's team selling context (cap 3000), folded into
+  // the set-hash so a KB upload invalidates the cached team recommendations.
+  var selling = await fetchSellingContext(admin, keyId, 3000);
+  var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash).digest('hex');
   var cached = await cacheGet(admin, keyId, 'team', from, to, hash);
   if (cached) return Object.assign({ available: true, cached: true }, cached);
 
@@ -136,7 +140,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   candidates.forEach(function (c, i) { c.id = 'm' + (i + 1); });
   var byId = {}; candidates.forEach(function (c) { byId[c.id] = c; });
 
-  var prompt = [
+  var promptLines = [
     'You are a sales manager coach. Synthesize a TEAM performance review across ' + repIds.length + ' reps for this period. Be specific, grounded, and cite reps by name where relevant. No generic praise.',
     'TEAM SECTION AVERAGES (0-100): ' + SECTIONS.map(function (s) { return s + ' ' + (sections[s] == null ? 'n/a' : sections[s]); }).join(', ') + '. Strongest: ' + (strongest || 'n/a') + '. Weakest: ' + (weakest || 'n/a') + '.',
     'WIN-class avg ' + (avg(winSum, winN) || 'n/a') + ' (' + winN + '), LOSS-class avg ' + (avg(lossSum, lossN) || 'n/a') + ' (' + lossN + ').',
@@ -150,7 +154,13 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     '',
     'Produce: WHATS WORKING (2-3 team strengths, each grounded in an evidence_id + a number), WHAT TO IMPROVE (2-3 team gaps: the team-wide weakest section, the most-lost objection category, and the synthesized one-thing theme; cite the rep(s) it most applies to and a representative evidence_id).',
     'Respond with ONLY this JSON — no markdown: {"working":[{"claim":"...","data":"...","evidence_id":"m1"}],"improve":[{"claim":"...","data":"...","evidence_id":"m2"}]}',
-  ]).join('\n');
+  ]);
+  if (selling.contextText && selling.contextText.trim()) {
+    promptLines.splice(1, 0,
+      'SELLING CONTEXT (the team\'s actual offer / sales approach — ground your assessment in it; judge against THIS offer and selling style, do not penalize approaches it endorses):',
+      selling.contextText.trim(), '');
+  }
+  var prompt = promptLines.join('\n');
 
   var resp;
   try { resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: 2600, messages: [{ role: 'user', content: prompt }] }); }
