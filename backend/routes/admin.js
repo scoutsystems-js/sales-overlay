@@ -315,6 +315,8 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
         role: u.role,
         managed_by: u.managed_by,
         billing_status: u.billing_status,
+        first_name: u.first_name,
+        last_name: u.last_name,
         created_at: u.created_at,
         session_count: s.session_count,
         last_session_at: s.last_session_at,
@@ -506,9 +508,13 @@ router.post('/users', requireAuth, requireRole('owner'), async function(req, res
   var email = (typeof body.email === 'string') ? body.email.trim() : '';
   var role = body.role;
   var managedBy = (body.managed_by === null || body.managed_by === undefined || body.managed_by === '') ? null : body.managed_by;
+  var firstName = (typeof body.first_name === 'string') ? body.first_name.trim() : '';
+  var lastName = (typeof body.last_name === 'string') ? body.last_name.trim() : '';
 
   if (!email || email.indexOf('@') === -1) return res.status(400).json({ error: 'A valid email is required' });
   if (CREATE_ROLES.indexOf(role) === -1) return res.status(400).json({ error: 'role must be one of: user, manager (owners are not created here)' });
+  if (!firstName || firstName.length > 60) return res.status(400).json({ error: 'first_name is required (1-60 chars)' });
+  if (!lastName || lastName.length > 60) return res.status(400).json({ error: 'last_name is required (1-60 chars)' });
 
   try {
     var admin = getAdminClient();
@@ -528,7 +534,7 @@ router.post('/users', requireAuth, requireRole('owner'), async function(req, res
     var newId = created.data.user.id;
 
     var ins = await admin.from('user_profiles')
-      .upsert({ user_id: newId, role: role, managed_by: managedBy, billing_status: 'trial' }, { onConflict: 'user_id' });
+      .upsert({ user_id: newId, role: role, managed_by: managedBy, billing_status: 'trial', first_name: firstName, last_name: lastName }, { onConflict: 'user_id' });
     if (ins.error) {
       // Both-or-neither: roll back the auth user so no orphan is left behind.
       console.error('[admin] create-user profile insert failed, rolling back auth user:', ins.error.message);
@@ -537,11 +543,11 @@ router.post('/users', requireAuth, requireRole('owner'), async function(req, res
       return res.status(500).json({ error: 'Could not create user profile — creation rolled back' });
     }
 
-    // Audit the creation event — WITHOUT the temp password.
-    console.log('[admin] User created: actor=%s (%s) new=%s (%s) role=%s managed_by=%s',
-      req.user.email, req.user.id, email, newId, role, managedBy || 'none');
+    // Audit the creation event — includes the name, but NEVER the temp password.
+    console.log('[admin] User created: actor=%s (%s) new=%s (%s) name="%s %s" role=%s managed_by=%s',
+      req.user.email, req.user.id, email, newId, firstName, lastName, role, managedBy || 'none');
 
-    res.json({ user_id: newId, email: email, role: role, managed_by: managedBy, billing_status: 'trial', temp_password: tempPassword });
+    res.json({ user_id: newId, email: email, first_name: firstName, last_name: lastName, role: role, managed_by: managedBy, billing_status: 'trial', temp_password: tempPassword });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] create-user error:', err.message);
@@ -581,7 +587,7 @@ async function fetchUsersWithProfiles(admin) {
   if (authResult.error) throw new Error('listUsers failed: ' + authResult.error.message);
   var profilesResult = await admin
     .from('user_profiles')
-    .select('user_id, role, managed_by, billing_status');
+    .select('user_id, role, managed_by, billing_status, first_name, last_name');
   if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
 
   var profilesByUserId = {};
@@ -599,6 +605,8 @@ async function fetchUsersWithProfiles(admin) {
       role: p.role || 'user',
       managed_by: p.managed_by || null,
       billing_status: p.billing_status || 'trial',
+      first_name: p.first_name || null,
+      last_name: p.last_name || null,
       created_at: u.created_at || null,
     };
   });

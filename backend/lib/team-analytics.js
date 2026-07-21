@@ -3,6 +3,8 @@
 // permission before calling in here. All queries are chunked .in() to dodge the
 // supabase-js 1000-row cap, same as session-analytics.js.
 
+var { resolveDisplayName } = require('./display-name');
+
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
@@ -65,6 +67,14 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
   var priorFrom = new Date(new Date(from).getTime() - span).toISOString();
   var prior = await aggregateWindow(admin, repIds, priorFrom, from);
 
+  // Names for the rep cards — resolved through the shared helper (real name when
+  // set, email prefix fallback otherwise), so the fallback lives in one place.
+  var profileMap = {};
+  if (repIds.length > 0) {
+    var profs = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', repIds);
+    if (!profs.error) (profs.data || []).forEach(function (p) { profileMap[p.user_id] = p; });
+  }
+
   var per_rep = repIds.map(function (id) {
     var c = cur.rep[id];
     var p = prior.rep[id];
@@ -75,6 +85,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     return {
       user_id: id,
       email: (emailMap && emailMap[id]) || null,
+      display_name: resolveDisplayName(profileMap[id], (emailMap && emailMap[id]) || null, id),
       calls_analyzed: c.calls_analyzed,
       avg_score: curAvg,
       prior_avg_score: priAvg,

@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
-const { requireAuth, requireSubscription } = require('../middleware/auth');
+const { requireAuth, requireSubscription, requireRole } = require('../middleware/auth');
 
 var router = express.Router();
 
@@ -30,6 +30,11 @@ function handleConfigError(err, res) {
 }
 
 var protect = [requireAuth, requireSubscription];
+// KB management (upload/list/delete/entries) is manager+owner only — server-side,
+// not just hidden in the UI. requireRole returns 403 for plain users. The machine
+// paths (/search, /store-patterns) keep `protect` — they're called by the desktop
+// teleprompter / dormant adaptive-learning writer, not by the KB management UI.
+var manage = [requireAuth, requireSubscription, requireRole(['manager', 'owner'])];
 
 // Multer with memory storage — uploads stay in RAM, never hit Railway's
 // filesystem. 10MB per file cap matches the spec.
@@ -360,7 +365,7 @@ router.post('/search', protect, async function(req, res) {
 // Multipart: type='url'|'pdf'|'paste', plus the corresponding payload.
 // Extracts text → chunks → embeds → bulk inserts. Embedding failures are
 // per-chunk non-fatal so a Voyage outage doesn't abort the whole upload.
-router.post('/upload', protect, upload.single('file'), async function(req, res) {
+router.post('/upload', manage, upload.single('file'), async function(req, res) {
   var type = req.body && req.body.type;
   var providedLabel = (req.body && req.body.label) ? String(req.body.label).trim() : '';
   // Category drives chunking strategy: winning_call → chunkTranscript()
@@ -379,11 +384,10 @@ router.post('/upload', protect, upload.single('file'), async function(req, res) 
     var admin = getAdminClient();
     var scope = await resolveUserScope(admin, req.user.id);
 
-    // Map role → upload scope (owner→global, admin→team, user→personal)
-    var uploadScope;
-    if (scope.role === 'owner') uploadScope = 'global';
-    else if (scope.role === 'manager') uploadScope = 'team';
-    else uploadScope = 'personal';
+    // Map role → upload scope: owner→global, manager→team. The route is gated to
+    // manager+owner (see `manage`), so the retired closer→personal path is
+    // unreachable — plain users can no longer upload.
+    var uploadScope = (scope.role === 'owner') ? 'global' : 'team';
 
     var text = '';
     var sourceLabel = providedLabel;
@@ -551,7 +555,7 @@ router.post('/store-patterns', protect, async function(req, res) {
 // Lists uploads visible to the caller, grouped by source_label. Users see
 // their own. Admins see their own + their managed users'. Owners see every
 // uploaded entry (all rows where uploaded_by is not null).
-router.get('/list', protect, async function(req, res) {
+router.get('/list', manage, async function(req, res) {
   try {
     var admin = getAdminClient();
     var scope = await resolveUserScope(admin, req.user.id);
@@ -613,7 +617,7 @@ router.get('/list', protect, async function(req, res) {
 // owners see all uploaded entries (uploaded_by IS NOT NULL only — never
 // seeded framework rows). Empty result returns 200 with entries:[] rather
 // than 404 so the frontend can show a clean "no patterns" state.
-router.get('/entries/:source_label', protect, async function(req, res) {
+router.get('/entries/:source_label', manage, async function(req, res) {
   var sourceLabel = decodeURIComponent(req.params.source_label || '');
   if (!sourceLabel) return res.status(400).json({ error: 'source_label required' });
 
@@ -647,7 +651,7 @@ router.get('/entries/:source_label', protect, async function(req, res) {
 // Deletes every chunk with a given source_label. Always scoped: even owners
 // can't delete seeded entries (uploaded_by IS NULL). Admins can delete their
 // managed users' uploads; owners can delete any uploaded entry.
-router.delete('/:source_label', protect, async function(req, res) {
+router.delete('/:source_label', manage, async function(req, res) {
   var sourceLabel = decodeURIComponent(req.params.source_label || '');
   if (!sourceLabel) return res.status(400).json({ error: 'source_label required' });
 
