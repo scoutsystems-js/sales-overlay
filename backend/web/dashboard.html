@@ -3605,9 +3605,14 @@
         + '</div>';
     }
 
-    content.innerHTML = header + notice + errorBanner
+    // The verdict LEADS — "Why this call closed / didn't close" is the first
+    // content below the page header (above the Fathom notice, error banner, and
+    // Call Highlights). Everything else is supporting evidence. Returns '' for
+    // follow_up/no_show/pre-v4 calls, so those pages simply start at the notice.
+    content.innerHTML = header
+      + renderWhyOutcomeSectionHtml(review)
+      + notice + errorBanner
       + '<div class="fade-in">'
-        + renderWhyOutcomeSectionHtml(review)
         + renderHighlightsSectionHtml(review)
         + renderGradesSectionHtml(review)
         + renderFollowupSectionHtml(review)
@@ -3667,7 +3672,7 @@
         + '</div>';
     }
 
-    return '<section class="section review-why ' + st.kind + '">' + inner + '</section>';
+    return '<section class="section review-why fade-in ' + st.kind + '">' + inner + '</section>';
   }
 
   function renderCallReviewHeaderHtml(review, seed) {
