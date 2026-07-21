@@ -29,7 +29,7 @@
   var LOGIN_PATH = '/login';
   // Same-origin endpoints that must NOT trigger the refresh-retry (they either
   // establish a session or would recurse).
-  var AUTH_EXEMPT = { '/auth/refresh': 1, '/auth/login': 1, '/auth/signup': 1 };
+  var AUTH_EXEMPT = { '/auth/refresh': 1, '/auth/login': 1, '/auth/signup': 1, '/auth/diag': 1 };
 
   // Capture the real fetch before we override it.
   var _rawFetch = window.fetch.bind(window);
@@ -38,7 +38,7 @@
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return null; }
   }
   function setSession(s) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (e) {} }
-  function clearSession() { try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} }
+  function clearSession() { try { diagPush({ e: 'clearSession (scout-auth)' }); } catch (e) {} try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} }
 
   // expires_at is UNIX SECONDS. (The old dashboard bug did new Date(seconds),
   // interpreting it as milliseconds — always ~1970, always "expired".)
@@ -104,13 +104,79 @@
   var LS_LOCK_TTL = 8000;    // a refresh should take < 8s; an older lock is stale → take over
   var LS_LOCK_WAIT = 9000;   // a loser waits up to ~9s, then proceeds (the critical section re-reads tokens)
 
-  // Lightweight, always-on instrumentation so an overnight failure (if any
-  // remains) is diagnosable from the morning console (grep "[scout-auth").
-  function _log(msg, s) {
+  // ── Persistent diagnostics ──────────────────────────────────────────────────
+  // A localStorage RING BUFFER (survives reloads) records every [auth] event, and
+  // a BEACON ships failures + logout triggers to the backend so the server log
+  // captures an overnight logout even when nobody is watching the console. Read
+  // the ring anytime with scoutAuthDump() (or copy(scoutAuthDump())).
+  var DIAG_KEY = 'scout_auth_diag_v1';
+  var DIAG_MAX = 200;
+  var DIAG_ENDPOINT = '/auth/diag';
+  var TAB_ID = Math.random().toString(36).slice(2, 10);
+
+  // Snapshot of which auth-storage keys are present RIGHT NOW — captured at boot
+  // (before any refresh) to tell "refresh failed" apart from "storage was already
+  // empty" (browser/Safari-ITP clearing localStorage on idle).
+  function storageSnapshot() {
+    var rawStr = null, lockStr = null;
+    try { rawStr = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    try { lockStr = localStorage.getItem(LS_LOCK_KEY); } catch (e) {}
+    var raw = null; try { raw = JSON.parse(rawStr || 'null'); } catch (e) {}
+    return {
+      session_present: !!rawStr,
+      has_access: !!(raw && raw.access_token),
+      has_refresh: !!(raw && raw.refresh_token),
+      expires_at: (raw && raw.expires_at) || null,
+      ms_left: (raw && raw.expires_at) ? (raw.expires_at * 1000 - Date.now()) : null,
+      lock_present: !!lockStr,
+    };
+  }
+
+  function diagDump() { try { return JSON.parse(localStorage.getItem(DIAG_KEY) || '[]'); } catch (e) { return []; } }
+  function diagClear() { try { localStorage.removeItem(DIAG_KEY); } catch (e) {} }
+
+  function diagPush(entry) {
+    entry = entry || {};
+    entry.t = new Date().toISOString();
+    entry.tab = TAB_ID;
+    try { console.info('[auth] ' + entry.t + ' ' + entry.e + (entry.detail ? ' ' + JSON.stringify(entry.detail) : '')); } catch (e) {}
     try {
-      console.info('[scout-auth ' + new Date().toISOString() + '] ' + msg
-        + (s && s.expires_at ? ' (exp ' + new Date(s.expires_at * 1000).toISOString() + ')' : ''));
+      var arr = diagDump();
+      if (!Array.isArray(arr)) arr = [];
+      arr.push(entry);
+      if (arr.length > DIAG_MAX) arr = arr.slice(arr.length - DIAG_MAX);
+      localStorage.setItem(DIAG_KEY, JSON.stringify(arr));
     } catch (e) {}
+    return entry;
+  }
+
+  // Ring-log AND ship to the backend (sendBeacon survives the page unload/redirect;
+  // keepalive fetch is the fallback). Reserve for FAILURES + LOGOUT triggers so the
+  // server-side signal stays high. Carries UA, path, the storage snapshot, and the
+  // last ~25 ring events so one beacon narrates the moment on its own.
+  function diagBeacon(event, detail) {
+    var entry = diagPush({ e: event, detail: detail || null, beacon: true });
+    try {
+      var payload = {
+        tab: TAB_ID, ts: entry.t, event: event, detail: detail || null,
+        ua: navigator.userAgent, path: location.pathname,
+        storage: storageSnapshot(), recent: diagDump().slice(-25),
+      };
+      var body = JSON.stringify(payload);
+      var sent = false;
+      if (navigator.sendBeacon) {
+        try { sent = navigator.sendBeacon(DIAG_ENDPOINT, new Blob([body], { type: 'application/json' })); } catch (e) {}
+      }
+      if (!sent) {
+        try { _rawFetch(DIAG_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {}); } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  // [auth] event → ring buffer + console (no beacon). Kept the _log name so the
+  // existing call sites keep working; failure paths use diagBeacon instead.
+  function _log(msg, s) {
+    diagPush({ e: msg, detail: (s && s.expires_at) ? { exp: s.expires_at, ms_left: (s.expires_at * 1000 - Date.now()) } : null });
   }
 
   // localStorage lock. Resolves to the owned lock id, or null if we gave up
@@ -187,18 +253,18 @@
       _log('refresh start', s);
       return _doRefresh(s.refresh_token).then(function (r) {
         if (r.session) { _log('refresh ok', r.session); return r; }
-        if (!r.fatal) { _log('refresh transient — session kept'); return r; }
+        if (!r.fatal) { diagBeacon('refresh-transient-kept', { had_stale: !!staleToken }); return r; }
         var latest = getSession();
         if (latest && latest.refresh_token && latest.refresh_token !== s.refresh_token) {
           _log('refresh fatal but token rotated elsewhere — retrying with newer token');
           return _doRefresh(latest.refresh_token).then(function (r2) {
             if (r2.session) { _log('refresh ok (2nd token)', r2.session); }
-            else if (r2.fatal) { clearSession(); _log('refresh fatal — cleared'); }
+            else if (r2.fatal) { clearSession(); diagBeacon('refresh-fatal-cleared', { via: '2nd-token' }); }
             return r2;
           });
         }
         clearSession();
-        _log('refresh fatal — cleared');
+        diagBeacon('refresh-fatal-cleared', { via: 'primary' });
         return r;
       });
     }).then(function (r) { _refreshInFlight = null; return r; });
@@ -214,7 +280,10 @@
   }
 
   function redirectToLogin() {
-    if (window.location.pathname !== LOGIN_PATH) window.location.replace(LOGIN_PATH);
+    if (window.location.pathname !== LOGIN_PATH) {
+      diagBeacon('redirect-to-login (scout-auth)', { from: window.location.pathname });
+      window.location.replace(LOGIN_PATH);
+    }
   }
 
   function withAuth(init, token) {
@@ -294,5 +363,22 @@
     // that awaited a session; the fatal/transient distinction stays internal.
     refreshSession: function () { return refreshSession().then(function (r) { return r && r.session; }); },
     authHeader: function () { var s = getSession(); return s && s.access_token ? { Authorization: 'Bearer ' + s.access_token } : {}; },
+    // Diagnostics — page code records logout triggers here; devs read the ring.
+    diag: { push: diagPush, beacon: diagBeacon, snapshot: storageSnapshot, dump: diagDump, clear: diagClear, tab: TAB_ID },
   };
+  // Convenience: run scoutAuthDump() in the console (or copy(scoutAuthDump())).
+  window.scoutAuthDump = diagDump;
+
+  // ── Boot snapshot ───────────────────────────────────────────────────────────
+  // Runs at module load, BEFORE any refresh — records UA, path, timestamp, and
+  // which auth-storage keys were present. If we booted on a real app page with NO
+  // session at all, that's storage being cleared from under us (browser/ITP idle
+  // eviction) rather than a refresh failure — beacon it distinctly.
+  (function () {
+    var snap = storageSnapshot();
+    diagPush({ e: 'boot', detail: { ua: navigator.userAgent, path: location.pathname, storage: snap } });
+    if (!snap.session_present && location.pathname !== LOGIN_PATH) {
+      diagBeacon('boot-no-session', { ua: navigator.userAgent });
+    }
+  })();
 })();

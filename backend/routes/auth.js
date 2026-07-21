@@ -143,6 +143,23 @@ router.get('/me', requireAuth, async function(req, res) {
 });
 
 // Refresh a session token
+// ── POST /auth/diag ───────────────────────────────────────────────────────────
+// Client auth-diagnostics beacon (scout-auth.js). UNAUTHENTICATED on purpose —
+// it fires precisely when auth may be broken (refresh failure, logout, empty
+// storage at boot), so it must not depend on a valid session. It only writes to
+// the server log so an overnight logout is captured in Railway logs even if no
+// one is watching the browser console. Fire-and-forget: always 204, never throws.
+router.post('/diag', function(req, res) {
+  try {
+    var s = JSON.stringify(req.body || {});
+    if (s.length > 8000) s = s.slice(0, 8000) + '…[trunc]';
+    console.log('[auth-diag] ' + s);
+  } catch (e) {
+    console.log('[auth-diag] <unloggable body>');
+  }
+  res.status(204).end();
+});
+
 router.post('/refresh', async function(req, res) {
   var { refresh_token } = req.body;
   if (!refresh_token) {
