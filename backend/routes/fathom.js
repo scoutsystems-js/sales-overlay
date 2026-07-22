@@ -657,7 +657,25 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
       console.error('[fathom] update-analyses lookup failed for user ' + userId + ': ' + lookupErr.message);
       return res.status(500).json({ error: 'Could not load outdated calls' });
     }
-    var ids = outdatedIds.slice(0, limit);
+    // One batch covers BOTH stale-version analyses and calls already sitting at
+    // sync_status='pending' (manually reset / recovered rows) — pending rows are
+    // status!='done' so outdatedCallIds can't see them, and without this union a
+    // reset call would need a separate /reanalyze click. Pending first (they
+    // were explicitly queued), then outdated; sets are disjoint by construction
+    // (pending analyses are never status='done') but dedupe anyway.
+    var pendingQ = await admin
+      .from('fathom_calls')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('sync_status', 'pending')
+      .order('call_date', { ascending: false, nullsFirst: false });
+    var pendingIds2 = pendingQ.error ? [] : (pendingQ.data || []).map(function (r) { return r.id; });
+    if (pendingQ.error) console.error('[fathom] update-analyses pending lookup failed (proceeding with outdated only): ' + pendingQ.error.message);
+    var seenIds = {};
+    var unionIds = pendingIds2.concat(outdatedIds).filter(function (id) {
+      if (seenIds[id]) return false; seenIds[id] = true; return true;
+    });
+    var ids = unionIds.slice(0, limit);
 
     if (ids.length > 0) {
       // Reset step: back to 'pending' on both tables so the worker re-grades them
@@ -691,8 +709,8 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
       })();
     }
 
-    console.log('[fathom] Update-analyses queued for user ' + userId + ': queued=' + ids.length + ' remaining_outdated=' + (outdatedIds.length - ids.length) + ' (batch_limit=' + limit + ')');
-    return res.json({ queued: ids.length, remaining: outdatedIds.length - ids.length, batch_limit: limit });
+    console.log('[fathom] Update-analyses queued for user ' + userId + ': queued=' + ids.length + ' remaining=' + (unionIds.length - ids.length) + ' (outdated=' + outdatedIds.length + ', pending=' + pendingIds2.length + ', batch_limit=' + limit + ')');
+    return res.json({ queued: ids.length, remaining: unionIds.length - ids.length, batch_limit: limit });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] update-analyses fatal for user ' + userId + ':', err.message);

@@ -1414,6 +1414,17 @@
     .digest-notable .meta { margin-top: 4px; }
     .digest-focus { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--good); border-radius: var(--radius); background: var(--bg-elevated); }
     .digest-focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 600; margin-bottom: 6px; }
+    /* EOD Report */
+    .eod-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .eod-toolbar input[type="date"] { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 6px 10px; font-size: 13px; }
+    .eod-call { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 14px 16px; margin-bottom: 12px; }
+    .eod-row { display: flex; align-items: baseline; gap: 8px; margin: 6px 0; }
+    .eod-label { flex: 0 0 110px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .eod-input, .eod-textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 6px 9px; font-size: 13px; font-family: inherit; }
+    .eod-textarea { min-height: 60px; resize: vertical; line-height: 1.45; }
+    .eod-input.edited, .eod-textarea.edited { border-color: var(--accent); }
+    .eod-edited-dot { font-size: 10px; color: var(--accent); }
+    .eod-copy-note { font-size: 12px; color: var(--good); margin-left: 8px; }
     .trend { font-size: 13px; }
     .trend.up { color: var(--good); } .trend.down { color: var(--bad); } .trend.flat { color: var(--text-muted); }
     .trend-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; padding: 8px 4px 0; }
@@ -1778,6 +1789,7 @@
     <a class="nav-link" id="navOverview" onclick="setView('overview'); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
     <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
+    <a class="nav-link" id="navEod" onclick="goEod(); return false;">EOD Report</a>
     <span class="sep" id="navTeamSep" style="display:none">·</span>
     <a class="nav-link" id="navTeam" onclick="goTeam(); return false;" style="display:none">Team</a>
     <span class="sep" id="navKbSep" style="display:none">·</span>
@@ -1933,6 +1945,7 @@
     teamRecs:       null,   teamRecsLoading: false,
     teamHighlights: null,   teamHighlightsLoading: false,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
+    eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
@@ -2511,18 +2524,20 @@
     // Reanalyze button + "N pending analysis" meta only appear when calls are
     // sitting at sync_status='pending' (newly synced or reset back to the worker).
     var reanalyzeBtn = '';
-    if (pending > 0) {
+    if (pending > 0 && outdated === 0) {
       reanalyzeBtn = state.fathomReanalyzing
         ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Reanalyzing…</button>'
         : '<button class="btn-fathom-secondary" type="button" onclick="reanalyzeFathomNow()">' + (pending > 10 ? '⟳ Analyze next 10' : '⟳ Reanalyze ' + pending + ' pending') + '</button>';
     }
-    // When nothing is pending but calls were graded under an older prompt
-    // version, offer a re-grade to the current analysis instead.
+    // When calls were graded under an older prompt version, offer a re-grade.
+    // /fathom/update-analyses also sweeps up already-pending calls (one batch
+    // covers both), so when outdated > 0 this button REPLACES the reanalyze
+    // button and its count is outdated + pending (disjoint sets).
     var updateBtn = '';
-    if (pending === 0 && outdated > 0) {
+    if (outdated > 0) {
       updateBtn = state.fathomUpdating
         ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Updating…</button>'
-        : '<button class="btn-fathom-secondary" type="button" onclick="updateOutdatedAnalysesNow()">⟳ Update analyses (' + outdated + ' outdated)</button>';
+        : '<button class="btn-fathom-secondary" type="button" onclick="updateOutdatedAnalysesNow()">⟳ Update analyses (' + (outdated + pending) + ')</button>';
     }
     var pendingMeta = pending > 0
       ? '<span class="fathom-strip-sep">·</span><span class="fathom-strip-meta">' + pending + ' pending analysis</span>'
@@ -2701,6 +2716,7 @@
     else if (state.view === 'objections-intel') renderObjectionsIntel();
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'kb') renderKbView();
+    else if (state.view === 'eod') renderEodView();
     updateNavActiveStates();
   }
 
@@ -2713,6 +2729,8 @@
     var CALL_LIBRARY_VIEWS = { 'call-library': 1, 'call-review': 1 };
     var navOverview = document.getElementById('navOverview');
     var navCallLibrary = document.getElementById('navCallLibrary');
+    var navEod = document.getElementById('navEod');
+    if (navEod) navEod.classList.toggle('nav-active', state.view === 'eod');
     // Objections view is reachable only via the donut (no persistent nav tab);
     // keep the Coaching Dashboard nav highlighted while in it.
     if (navOverview) {
@@ -3527,6 +3545,7 @@
     if (state.view === 'call-library')     return 'calls';
     if (state.view === 'objections-intel') return 'objections';
     if (state.view === 'kb')               return 'kb';
+    if (state.view === 'eod')              return 'eod';
     if (state.view === 'team')             return 'team';
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     return ''; // overview + dormant drills
@@ -3544,6 +3563,7 @@
   function applyHashToState() {
     var h = (window.location.hash || '').replace(/^#/, '');
     if (h === 'calls') { state.view = 'call-library'; }
+    else if (h === 'eod') { state.view = 'eod'; }
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'team') { state.view = 'team'; }
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
@@ -3564,6 +3584,163 @@
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
   window.addEventListener('hashchange', onRouteChange);
+
+  // ═══ EOD Report view ═══════════════════════════════════════════════════
+  // Per-user daily report: analysis-prefilled, inline-editable (edits persist
+  // via PUT /eod/edit and always win over analysis), copy-for-Slack plain
+  // text. "Today" is the ET calendar day (server-side default).
+  function goEod() { setView('eod'); }
+
+  async function loadEod() {
+    if (state.eodLoading) return;
+    state.eodLoading = true;
+    try {
+      var qs = state.eodDate ? '?date=' + encodeURIComponent(state.eodDate) : '';
+      var res = await fetch('/eod' + qs, { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      state.eodData = await res.json();
+      if (!state.eodDate) state.eodDate = state.eodData.date;
+    } catch (err) {
+      state.eodData = { _error: err.message || 'unknown' };
+    }
+    state.eodLoading = false;
+    if (state.view === 'eod') renderEodView();
+  }
+
+  function eodShiftDay(deltaDays) {
+    var d = state.eodDate || (state.eodData && state.eodData.date);
+    if (!d) return;
+    var parts = d.split('-').map(Number);
+    var next = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]) + deltaDays * 86400000).toISOString().slice(0, 10);
+    eodSetDate(next);
+  }
+  function eodSetDate(dateStr) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+    state.eodDate = dateStr;
+    state.eodData = null;
+    renderEodView();
+  }
+  function eodToday() { state.eodDate = null; state.eodData = null; renderEodView(); }
+
+  // Inline edit: save on change. Empty string is a deliberate clear-to-blank
+  // (still an override); we never send null from the UI (no un-override
+  // affordance yet — analysis values remain visible by clearing the row's edit
+  // via support if ever needed).
+  async function eodSaveField(callId, field, el) {
+    var value = el.value;
+    try {
+      var res = await fetch('/eod/edit', {
+        method: 'PUT',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ call_id: callId, field: field, value: value }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      el.classList.add('edited');
+      // update local state so a re-render (or Slack copy) uses the new value
+      var call = ((state.eodData && state.eodData.calls) || []).find(function (c) { return c.call_id === callId; });
+      if (call) { call.fields[field] = value; call.edited[field] = true; }
+    } catch (err) {
+      alert('Could not save edit: ' + (err.message || 'unknown'));
+    }
+  }
+
+  function eodCashDisplay(v) {
+    var n = parseFloat(v);
+    if (isNaN(n)) return String(v == null ? '0' : v);
+    return n % 1 === 0 ? String(n) : n.toFixed(2);
+  }
+  function eodOutcomeLabel(oc) {
+    if (oc === 'closed') return 'Closed';
+    if (oc === 'follow_up') return 'Follow-up';
+    if (oc === 'lost') return 'Lost';
+    if (oc === 'no_show') return 'No-show';
+    return oc || 'Unknown';
+  }
+
+  // Plain text for Slack — EXACT field order per spec: prospect name, outcome,
+  // Fathom link, cash collected, brief summary. All calls, one paste.
+  function eodSlackText() {
+    var d = state.eodData;
+    if (!d || !Array.isArray(d.calls)) return '';
+    var lines = ['EOD Report — ' + d.date, ''];
+    if (d.calls.length === 0) lines.push('No calls today.');
+    d.calls.forEach(function (c, i) {
+      var f = c.fields;
+      lines.push(f.prospect_name || 'Unknown prospect');
+      lines.push('Outcome: ' + eodOutcomeLabel(f.outcome));
+      lines.push('Call: ' + (c.recording_url || '—'));
+      lines.push('Cash collected: $' + eodCashDisplay(f.cash_collected));
+      lines.push('Summary: ' + (f.summary || '—'));
+      if (i < d.calls.length - 1) lines.push('');
+    });
+    return lines.join('\n');
+  }
+
+  async function eodCopyForSlack() {
+    var text = eodSlackText();
+    var note = document.getElementById('eodCopyNote');
+    try {
+      await navigator.clipboard.writeText(text);
+      if (note) { note.textContent = 'Copied ✓'; setTimeout(function () { if (note) note.textContent = ''; }, 2500); }
+    } catch (err) {
+      // clipboard API can fail on some setups — fall back to a prompt
+      window.prompt('Copy the report below:', text);
+    }
+  }
+
+  function renderEodView() {
+    var content = document.getElementById('content');
+    if (state.eodData === null && !state.eodLoading) loadEod();
+    var d = state.eodData;
+    var dateVal = state.eodDate || (d && d.date) || '';
+
+    var toolbar = '<div class="eod-toolbar">'
+      + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(-1)">← Prev day</button>'
+      + '<input type="date" value="' + escapeHtml(dateVal) + '" onchange="eodSetDate(this.value)">'
+      + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(1)">Next day →</button>'
+      + '<button class="btn-fathom-secondary" type="button" onclick="eodToday()">Today</button>'
+      + '<button class="btn-fathom-secondary" type="button" onclick="eodCopyForSlack()">📋 Copy for Slack</button>'
+      + '<span class="eod-copy-note" id="eodCopyNote"></span>'
+      + '</div>';
+
+    var body;
+    if (!d) body = '<div class="skeleton" style="height:120px;"></div>';
+    else if (d._error) body = '<div class="error">Could not load EOD report: ' + escapeHtml(d._error) + '</div>';
+    else if (!d.calls || d.calls.length === 0) {
+      body = '<div class="empty"><h3>No calls on ' + escapeHtml(d.date || '') + '</h3><p>Days without calls have nothing to report — pick another day above.</p></div>';
+    } else {
+      body = d.calls.map(function (c) {
+        var f = c.fields, e = c.edited || {};
+        function row(label, field, value, isArea) {
+          var cls = (isArea ? 'eod-textarea' : 'eod-input') + (e[field] ? ' edited' : '');
+          var dot = e[field] ? ' <span class="eod-edited-dot">● edited</span>' : '';
+          var handler = ' onchange="eodSaveField(\'' + c.call_id + '\', \'' + field + '\', this)"';
+          var inner = isArea
+            ? '<textarea class="' + cls + '"' + handler + '>' + escapeHtml(value == null ? '' : String(value)) + '</textarea>'
+            : '<input type="text" class="' + cls + '" value="' + escapeHtml(value == null ? '' : String(value)) + '"' + handler + '>';
+          return '<div class="eod-row"><div class="eod-label">' + label + dot + '</div>' + inner + '</div>';
+        }
+        var link = c.recording_url
+          ? '<a class="review-fathom-link" href="' + escapeHtml(c.recording_url) + '" target="_blank" rel="noopener">View in Fathom →</a>'
+          : '<span class="meta">no recording link</span>';
+        var pendingNote = (c.analysis_status && c.analysis_status !== 'done')
+          ? '<span class="meta"> · analysis ' + escapeHtml(c.analysis_status) + ' — prefills may update</span>' : '';
+        return '<div class="eod-call">'
+          + '<div class="eod-row"><div class="eod-label">Call</div><div>' + link + pendingNote + '</div></div>'
+          + row('Prospect', 'prospect_name', f.prospect_name)
+          + row('Outcome', 'outcome', f.outcome)
+          + row('Cash ($)', 'cash_collected', f.cash_collected)
+          + row('Summary', 'summary', f.summary, true)
+          + '</div>';
+      }).join('');
+    }
+
+    content.innerHTML = '<div class="section fade-in">'
+      + '<div class="section-header"><h2>EOD Report</h2>'
+      + '<div class="meta">your calls for the day — edit inline, then copy for Slack</div></div>'
+      + toolbar + body + '</div>';
+  }
 
   // ═══ Knowledge Base view (relocated from admin.html — same ids, same JS) ═══
   // KB access: manager, owner, or an UNMANAGED plain user. Single source of
