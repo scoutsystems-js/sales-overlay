@@ -71,7 +71,10 @@ const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 // bug). v2 = outcome inference + objection category/resolution/closer_response/surface.
 // v3 = grader scale re-calibration (anchored bands + high-ticket domain context;
 //      a typical solid call lands 65-80/section — no longer graded vs a perfect ideal).
-const ANALYSIS_PROMPT_VERSION = 'v6-2026-07-21';
+// v7 = (a) cash_collected extraction — explicit-only, zero-default, never inferred;
+//      (b) follow_up_email greeting contract — transcript-established name only,
+//      omitted entirely when unclear (fixes title-vs-attendee greeting bugs).
+const ANALYSIS_PROMPT_VERSION = 'v7-2026-07-22';
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -244,9 +247,10 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     ? 'The closer is "' + normalized.closer_name + '", labeled CLOSER in the transcript. The prospect is labeled PROSPECT.'
     : 'Speaker identity is uncertain — the transcript shows raw display names. Infer who the closer is from conversational cues (asks discovery questions, makes the pitch, handles objections). Map both roles to CLOSER and PROSPECT in your evidence quotes.';
 
-  // The array below is IDENTICAL to v5. The SELLING CONTEXT block is spliced in
-  // ONLY when non-empty, so with empty context a v6 prompt is byte-identical to
-  // v5 (the version bump is DB-stamp only — no version text lives in the prompt).
+  // v7 diverges from v5/v6: cash_collected extraction + the follow_up_email
+  // greeting contract (transcript-name-only, omit when unclear). The SELLING
+  // CONTEXT block is still spliced in ONLY when non-empty. No version text
+  // lives in the prompt — the version is a DB stamp.
   var lines = [
     'You are an expert sales coach reviewing a transcript of a high-ticket sales call. Grade five sections on a 0-100 spectrum (NOT pass/fail), each with a letter grade A-F.',
     '',
@@ -287,7 +291,8 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '      • timestamp_seconds: integer seconds of that moment (read the [HH:MM:SS] tag, convert to seconds).',
     '      • REQUIRED for "closed", "lost", and "follow_up". Set why_outcome to null ONLY when outcome is "no_show" (no real conversation to diagnose).',
     '  - one_thing_timestamp_seconds: integer seconds of the moment the one_thing correction belonged to — the same moment as why_outcome, or the adjacent moment where the closer should have intervened. Null if not applicable.',
-    '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words.',
+    '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words. Greeting rule: greet the prospect ONLY by the name they are actually called (or call themselves) in the transcript. If no name is clearly established in the transcript, omit the name from the greeting entirely (e.g. \'Hey — great talking today.\'). Never take a name from the meeting title or any source other than the transcript itself.',
+    '  - cash_collected: the dollar amount ACTUALLY collected or charged on THIS call (deposit, first payment, or payment in full), as a plain number with no currency symbol. ONLY report an amount that is EXPLICITLY stated in the transcript as collected/charged/processed on the call (e.g. running a card, confirming a payment went through). If nothing was collected, or no explicit amount is stated, return 0. NEVER guess or infer an amount — a price that was merely quoted, offered, or discussed is NOT cash collected. When in doubt: 0.',
     '  - outcome: the deal outcome for THIS call, inferred from what actually happened in the transcript. Exactly one of:',
     '      "closed"    — prospect committed, paid, or clearly agreed to buy on this call',
     '      "follow_up" — no decision yet: another call booked, thinking time, spouse/partner check, or a next step scheduled',
@@ -308,6 +313,7 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '  "why_outcome": {"reason":"...","quote":"...","timestamp_seconds":N} | null,',
     '  "one_thing_timestamp_seconds": N | null,',
     '  "follow_up_email": "...",',
+    '  "cash_collected": N,',
     '  "outcome": "closed"|"follow_up"|"lost"|"no_show"',
     '}',
     '',
@@ -385,6 +391,29 @@ function buildHighlightExtractorPrompt(normalized) {
 // Validates Claude's section output against the schema CHECK constraints.
 // Coerces invalid values to NULL rather than throwing — partial output is
 // better than no analysis. The schema allows NULL on every section column.
+// cash_collected guard (v7): numbers, plus clean string formats normalized —
+// leading $, thousands separators, plain numeric strings (the model sometimes
+// echoes the transcript's formatting despite the prompt asking for a number).
+// Anything that doesn't normalize unambiguously to a single non-negative
+// amount → 0; then the same bounds (0–$1M) + cents rounding. The
+// never-fabricate rule is unchanged — this widens FORMAT tolerance only,
+// never inference.
+function sanitizeCashCollected(v) {
+  var n = null;
+  if (typeof v === 'number') {
+    n = v;
+  } else if (typeof v === 'string') {
+    var t = v.trim().replace(/^\$/, '');
+    // Exactly one clean amount: 1234 | 1,234 | 1234.56 | 1,234.56
+    if (/^\d{1,3}(,\d{3})*(\.\d{1,2})?$/.test(t) || /^\d+(\.\d{1,2})?$/.test(t)) {
+      n = parseFloat(t.replace(/,/g, ''));
+    }
+  }
+  if (typeof n !== 'number' || !isFinite(n)) return 0;
+  if (n < 0 || n > 1000000) return 0;
+  return Math.round(n * 100) / 100;
+}
+
 function sanitizeSection(s) {
   if (!s || typeof s !== 'object') return { grade: null, score: null, notes: null };
   var grade = (typeof s.grade === 'string' && VALID_GRADES.indexOf(s.grade.toUpperCase()) !== -1)
@@ -808,6 +837,7 @@ async function analyzeCall(fathomCallId, userId) {
       why_timestamp_seconds:       whyTs,
       one_thing_timestamp_seconds: oneThingTs,
       follow_up_email:     (typeof graderParsed.follow_up_email === 'string') ? graderParsed.follow_up_email.slice(0, 5000) : null,
+      cash_collected:      sanitizeCashCollected(graderParsed.cash_collected),
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
       analyzed_at:         new Date().toISOString(),
@@ -888,6 +918,7 @@ module.exports = {
   _buildSectionGraderPrompt:   buildSectionGraderPrompt,
   _buildHighlightExtractorPrompt: buildHighlightExtractorPrompt,
   _markFathomCallErrored:      markFathomCallErrored,
+  _sanitizeCashCollected:      sanitizeCashCollected,
   _claimAnalysisRun:           claimAnalysisRun,
   _CLAIM_STALE_MS:             CLAIM_STALE_MS,
 };
