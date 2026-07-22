@@ -6,9 +6,10 @@
 //     it returns {sent:true} | {sent:false, reason} (KB/digest isolation rule).
 //   • Missing/blank env vars = feature silently OFF: {sent:false,
 //     reason:'not_configured'}, no transport built, no crash, no config error.
-//   • The temp password appears in the email body ONLY. Never logged here —
-//     not in errors, not in reasons (reasons are scrubbed in case an upstream
-//     error echoes message content) — same discipline as the create route.
+//   • The set-password action link appears in the email body ONLY. Never
+//     logged here — not in errors, not in reasons (reasons are scrubbed in
+//     case an upstream error echoes message content). Same discipline as the
+//     create route's temp password.
 //   • Transport is a lazy singleton, verified ONCE (init() at server startup
 //     when configured), never rebuilt per send.
 //
@@ -23,19 +24,21 @@ function isConfigured(env) {
          && e.WELCOME_SMTP_PASS && String(e.WELCOME_SMTP_PASS).trim());
 }
 
-// Exact content per spec — plain text, subject "Your Scout login".
-function welcomeEmailContent(firstName, email, tempPassword) {
+// Exact content per spec — plain text, subject "Your Scout login". The link
+// is the Supabase recovery action link (set-password flow); no credential
+// ever appears in the body.
+function welcomeEmailContent(firstName, actionLink) {
   return {
     subject: 'Your Scout login',
     text: 'Hi ' + firstName + ',\n'
       + '\n'
-      + 'Your Scout account is ready. Log in here: https://scoutsystems.io\n'
+      + 'Your Scout account is ready. Click here to set your password and\n'
+      + 'get started: ' + actionLink + '\n'
       + '\n'
-      + 'Email: ' + email + '\n'
-      + 'Temporary password: ' + tempPassword + '\n'
+      + "Once you're in, you'll connect your Fathom account so Scout can\n"
+      + 'start grading your calls.\n'
       + '\n'
-      + 'Please change your password after your first login. If anything\n'
-      + "isn't working, just reply to this email.\n"
+      + "If anything isn't working, just reply to this email.\n"
       + '\n'
       + '— Justin',
   };
@@ -80,7 +83,7 @@ function scrub(msg) {
 async function sendWelcomeEmail(args) {
   try {
     if (!isConfigured()) return { sent: false, reason: 'not_configured' };
-    var content = welcomeEmailContent(args.firstName, args.email, args.tempPassword);
+    var content = welcomeEmailContent(args.firstName, args.actionLink);
     var fromName = (process.env.WELCOME_FROM_NAME && String(process.env.WELCOME_FROM_NAME).trim()) || 'Justin';
     await getTransport().sendMail({
       from: '"' + fromName + '" <' + process.env.WELCOME_SMTP_USER + '>',
@@ -98,6 +101,7 @@ async function sendWelcomeEmail(args) {
 
 module.exports = {
   sendWelcomeEmail: sendWelcomeEmail,
+  isConfigured: isConfigured,
   init: init,
   // test surface
   _welcomeEmailContent: welcomeEmailContent,

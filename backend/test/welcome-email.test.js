@@ -8,23 +8,25 @@ const test = require('node:test');
 const assert = require('node:assert');
 const we = require('../lib/welcome-email');
 
-const ARGS = { firstName: 'Tasha', email: 'tasha@example.com', tempPassword: 'Zz9SECRETzz9aA1!' };
+const LINK = 'https://vkprybqmryiuwbdwdlpk.supabase.co/auth/v1/verify?token=pkce_SECRETTOKEN123456&type=recovery&redirect_to=https://www.scoutsystems.io/set-password';
+const ARGS = { firstName: 'Tasha', email: 'tasha@example.com', actionLink: LINK };
 
-test('content: exact plain-text body and subject per spec', () => {
-  const c = we._welcomeEmailContent(ARGS.firstName, ARGS.email, ARGS.tempPassword);
+test('content: exact plain-text body and subject per spec (set-password link, no credential)', () => {
+  const c = we._welcomeEmailContent(ARGS.firstName, ARGS.actionLink);
   assert.strictEqual(c.subject, 'Your Scout login');
   assert.strictEqual(c.text,
     'Hi Tasha,\n' +
     '\n' +
-    'Your Scout account is ready. Log in here: https://scoutsystems.io\n' +
+    'Your Scout account is ready. Click here to set your password and\n' +
+    'get started: ' + LINK + '\n' +
     '\n' +
-    'Email: tasha@example.com\n' +
-    'Temporary password: Zz9SECRETzz9aA1!\n' +
+    "Once you're in, you'll connect your Fathom account so Scout can\n" +
+    'start grading your calls.\n' +
     '\n' +
-    'Please change your password after your first login. If anything\n' +
-    "isn't working, just reply to this email.\n" +
+    "If anything isn't working, just reply to this email.\n" +
     '\n' +
     '— Justin');
+  assert.ok(!/password:/i.test(c.text.replace('set your password','')), 'no credential lines in the body');
 });
 
 test('isConfigured: both SMTP vars required; FROM_NAME optional', () => {
@@ -61,7 +63,7 @@ test('send: success path passes from/to/subject/text to the transport', async ()
     assert.strictEqual(got.from, '"Justin Schmidt" <justin@scoutsystems.io>');
     assert.strictEqual(got.to, ARGS.email);
     assert.strictEqual(got.subject, 'Your Scout login');
-    assert.ok(got.text.includes('Temporary password: ' + ARGS.tempPassword));
+    assert.ok(got.text.includes('get started: ' + ARGS.actionLink));
   } finally {
     we._setTransportForTest(null);
     delete process.env.WELCOME_SMTP_USER; delete process.env.WELCOME_SMTP_PASS; delete process.env.WELCOME_FROM_NAME;
@@ -71,12 +73,12 @@ test('send: success path passes from/to/subject/text to the transport', async ()
 test('send: transport throw is swallowed — {sent:false}, reason NEVER contains the password', async () => {
   process.env.WELCOME_SMTP_USER = 'justin@scoutsystems.io';
   process.env.WELCOME_SMTP_PASS = 'app-pass';
-  we._setTransportForTest({ sendMail: async () => { throw new Error('SMTP 535 auth rejected for ' + ARGS.tempPassword); } });
+  we._setTransportForTest({ sendMail: async () => { throw new Error('SMTP 535 rejected, message body: ' + ARGS.actionLink); } });
   try {
     const r = await we.sendWelcomeEmail(ARGS);
     assert.strictEqual(r.sent, false);
     assert.ok(typeof r.reason === 'string' && r.reason.length > 0);
-    assert.ok(!r.reason.includes(ARGS.tempPassword), 'reason must scrub the temp password even if the transport echoes it');
+    assert.ok(!r.reason.includes('SECRETTOKEN'), 'reason must scrub the action-link token even if the transport echoes it');
   } finally {
     we._setTransportForTest(null);
     delete process.env.WELCOME_SMTP_USER; delete process.env.WELCOME_SMTP_PASS;
