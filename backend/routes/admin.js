@@ -6,6 +6,8 @@ const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessi
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 const { fetchSellingContext } = require('../lib/selling-context');
+const welcomeEmail = require('../lib/welcome-email');
+const { CANONICAL_ORIGIN } = require('../config');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -502,6 +504,48 @@ router.patch('/users/:user_id/billing_status', requireAuth, requireRole('owner')
 // neither: if the profile insert fails after the auth user is created, the auth
 // user is deleted so no orphan remains. The temp password is returned ONCE and
 // is never stored or logged (the audit line logs the event, not the password).
+// Mint a one-time set-password action link (Supabase recovery-type — invite
+// type rejects existing users; generateLink never sends Supabase's own email).
+// Returns the action link, or null on failure (logged; no token exists in
+// mint-failure messages). Requires the Supabase Auth redirect allowlist to
+// include CANONICAL_ORIGIN + '/set-password'.
+async function mintSetPasswordLink(admin, email) {
+  var r = await admin.auth.admin.generateLink({
+    type: 'recovery',
+    email: email,
+    options: { redirectTo: CANONICAL_ORIGIN + '/set-password' },
+  });
+  if (r.error || !r.data || !r.data.properties || !r.data.properties.action_link) {
+    console.error('[admin] set-password link mint failed for ' + email + ': ' + ((r.error && r.error.message) || 'no action_link in response'));
+    return null;
+  }
+  // GoTrue silently swaps in the project Site URL when redirect_to isn't
+  // allowlisted (observed in recon: links pointed at localhost:3000). A link
+  // that won't land on our set-password page is a broken invite — fail loudly
+  // instead of reporting 'invite_sent' on a dud.
+  var link = r.data.properties.action_link;
+  if (link.indexOf('/set-password') === -1) {
+    console.error('[admin] set-password link mint REJECTED for ' + email + ': redirect_to was not honored — add ' + CANONICAL_ORIGIN + '/set-password to the Supabase Auth redirect allowlist (Dashboard → Auth → URL Configuration)');
+    return null;
+  }
+  return link;
+}
+
+// Shared by create + resend: mint the link, send the welcome email, and map to
+// a console status. Isolation contract: never throws; any failure → 'failed'.
+async function sendWelcomeInvite(admin, email, firstName) {
+  if (!welcomeEmail.isConfigured()) return 'not_configured';
+  try {
+    var link = await mintSetPasswordLink(admin, email);
+    if (!link) return 'failed';
+    var sent = await welcomeEmail.sendWelcomeEmail({ firstName: firstName, email: email, actionLink: link });
+    return sent.sent ? 'invite_sent' : 'failed';
+  } catch (err) {
+    console.error('[admin] welcome invite threw unexpectedly (creation unaffected): ' + (err && err.message));
+    return 'failed';
+  }
+}
+
 var CREATE_ROLES = ['user', 'manager'];
 router.post('/users', requireAuth, requireRole('owner'), async function(req, res) {
   var body = req.body || {};
@@ -552,20 +596,36 @@ router.post('/users', requireAuth, requireRole('owner'), async function(req, res
     // sendWelcomeEmail never throws (KB/digest isolation contract); the extra
     // try/catch is belt-and-braces so even a lib bug can't 500 this request.
     // Awaited deliberately: the console shows the TRUE sent/failed status.
-    var welcomeStatus = 'not_configured';
-    try {
-      var emailResult = await require('../lib/welcome-email').sendWelcomeEmail({ firstName: firstName, email: email, tempPassword: tempPassword });
-      welcomeStatus = emailResult.sent ? 'sent' : (emailResult.reason === 'not_configured' ? 'not_configured' : 'failed');
-    } catch (mailErr) {
-      welcomeStatus = 'failed';
-      console.error('[admin] welcome email threw unexpectedly (creation unaffected): ' + (mailErr && mailErr.message));
-    }
+    var welcomeStatus = await sendWelcomeInvite(admin, email, firstName);
 
     res.json({ user_id: newId, email: email, first_name: firstName, last_name: lastName, role: role, managed_by: managedBy, billing_status: 'trial', temp_password: tempPassword, welcome_email: welcomeStatus });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] create-user error:', err.message);
     res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// ── POST /admin/users/:user_id/welcome-email ─────────────────────────────────
+// Owner-only resend: mints a FRESH set-password link (supersedes any prior
+// one) and sends the welcome email again. Same isolation contract as creation
+// — failures report status, never 500 for email reasons.
+router.post('/users/:user_id/welcome-email', requireAuth, requireRole('owner'), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var uid = req.params.user_id;
+    var got = await admin.auth.admin.getUserById(uid);
+    if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
+    var email = got.data.user.email;
+    var prof = await admin.from('user_profiles').select('first_name').eq('user_id', uid).maybeSingle();
+    var firstName = (prof.data && prof.data.first_name) || 'there';
+    var status = await sendWelcomeInvite(admin, email, firstName);
+    console.log('[admin] welcome-email resend: actor=%s target=%s status=%s', req.user.id, uid, status);
+    res.json({ welcome_email: status, email: email });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] welcome-email resend error:', err.message);
+    res.status(500).json({ error: 'Failed to resend welcome email' });
   }
 });
 

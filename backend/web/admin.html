@@ -133,6 +133,10 @@
       box-shadow: inset 2px 0 0 var(--green);
     }
 
+    .btn-resend { font-size: 11px; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--muted); cursor: pointer; white-space: nowrap; }
+
+    .btn-resend:hover:not(:disabled) { color: var(--text); border-color: var(--green); }
+
     .role-badge {
       display: inline-block;
       font-size: 11px;
@@ -931,7 +935,7 @@
     if (btn) btn.style.display = isOwnerViewer ? '' : 'none';
     if (usersArray.length === 0) { wrap.innerHTML = '<div class="empty-msg">No users to display.</div>'; return; }
 
-    var header = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Created</th></tr>';
+    var header = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Created</th><th></th></tr>';
     var mgrs = managersList();
     var rows = usersArray.map(function(u) {
       var isSelf = u.user_id === currentUser.user_id;
@@ -951,6 +955,9 @@
         + '<td>' + mbCell + '</td>'
         + '<td>' + billCell + '</td>'
         + '<td style="color:var(--muted);font-size:12px;">' + escapeHtml(created) + '</td>'
+        + '<td>' + (editable
+            ? '<button class="btn-resend" onclick="event.stopPropagation(); resendWelcomeEmail(this, \'' + u.user_id + '\')">Resend welcome email</button>'
+            : '') + '</td>'
       + '</tr>';
     });
     wrap.innerHTML = '<table class="users-table"><thead>' + header + '</thead><tbody>' + rows.join('') + '</tbody></table>';
@@ -1065,17 +1072,46 @@
     if (!res.ok) { var e2; try { e2 = await res.json(); } catch (x) { e2 = { error: 'HTTP ' + res.status }; } sub.disabled = false; sub.textContent = 'Create'; err.textContent = e2.error || 'Failed to create user'; err.classList.remove('hidden'); return; }
     var data = await res.json();
     document.getElementById('cuTempPw').textContent = data.temp_password || '';
-    // Welcome-email status (manual copy stays the fallback, never removed):
+    // Invite-first presentation: on invite_sent the temp password stays
+    // hidden (the user sets their own via the emailed link). On failure or
+    // unconfigured email, the temp-password box IS the fallback, exactly as
+    // the pre-email flow worked.
     var es = document.getElementById('cuEmailStatus');
+    var pwBox = document.querySelector('#createUserSuccess .temp-pw-box');
+    var msg = document.querySelector('#createUserSuccess .cu-created-msg');
+    var inviteSent = data.welcome_email === 'invite_sent';
+    if (pwBox) pwBox.style.display = inviteSent ? 'none' : '';
+    if (msg) msg.innerHTML = inviteSent
+      ? 'User created.'
+      : 'User created. Share this temporary password with them now — <strong>it will not be shown again.</strong>';
     if (es) {
-      if (data.welcome_email === 'sent') { es.textContent = '✓ Welcome email sent'; es.style.color = 'var(--good)'; }
-      else if (data.welcome_email === 'failed') { es.textContent = '✗ Email failed — send the password manually.'; es.style.color = 'var(--bad)'; }
-      else { es.textContent = 'Email not configured — send the password manually.'; es.style.color = 'var(--text-muted)'; }
+      if (inviteSent) { es.textContent = '✓ Invite sent — they\'ll set their own password from the email.'; es.style.color = 'var(--good)'; }
+      else if (data.welcome_email === 'failed') { es.textContent = '✗ Email failed — temp password fallback shown below.'; es.style.color = 'var(--bad)'; }
+      else { es.textContent = 'Email not configured — temp password fallback shown below.'; es.style.color = 'var(--text-muted)'; }
     }
     document.getElementById('createUserForm').style.display = 'none';
     document.getElementById('createUserSuccess').style.display = '';
     loadUsers();   // refresh the table with the new user
   }
+  // Owner-only resend: mints a FRESH set-password link server-side and sends
+  // the welcome email again. Button reports status inline; failures never
+  // block anything (same isolation as creation).
+  async function resendWelcomeEmail(btn, userId) {
+    var original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Sending…';
+    var res;
+    try {
+      res = await fetch('/admin/users/' + encodeURIComponent(userId) + '/welcome-email', { method: 'POST', headers: authHeader() });
+    } catch (e) { btn.disabled = false; btn.textContent = 'Retry — no server'; return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    var data = null; try { data = await res.json(); } catch (e) {}
+    var status = data && data.welcome_email;
+    btn.disabled = false;
+    if (status === 'invite_sent') { btn.textContent = '✓ Invite sent'; setTimeout(function () { btn.textContent = original; }, 4000); }
+    else if (status === 'not_configured') { btn.textContent = 'Email not configured'; }
+    else { btn.textContent = '✗ Failed — retry'; }
+  }
+
   function copyTempPassword() {
     var t = document.getElementById('cuTempPw').textContent;
     if (navigator.clipboard) navigator.clipboard.writeText(t);
