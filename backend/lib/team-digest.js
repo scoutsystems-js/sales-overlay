@@ -316,6 +316,8 @@ module.exports = {
   computeDailyDigest: computeDailyDigest,
   generateDailyDigests: generateDailyDigests,
   etYesterday: etYesterday,   // used by routes/team.js for the default digest date
+  etDateOf: etDateOf,         // used by routes/eod.js — one ET convention platform-wide
+  etDayBoundsUtc: etDayBoundsUtc,
   // pure helpers exported for tests (underscore = test-only surface)
   _etDateOf: etDateOf,
   _etYesterday: etYesterday,
