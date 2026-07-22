@@ -532,6 +532,23 @@ router.post('/sync-all', async function(req, res) {
       }
     }
     console.log('[fathom] sync-all done: ' + JSON.stringify(summary));
+
+    // Post-sync step: daily manager digests (v1.4 final stage). Fires AFTER
+    // every user's sync has completed (the loop above is sequential). Detached
+    // fire-and-forget + internally per-manager error-isolated — a digest
+    // problem must never fail or block the sync cron (same degrade-gracefully
+    // rule as KB). Idempotent across the every-2h cron: the digest cache is
+    // keyed per (manager, ET-yesterday, analysis-set+kb hash), so repeat runs
+    // in the same day are cache hits with zero Claude spend.
+    (async function () {
+      try {
+        var generateDailyDigests = require('../lib/team-digest').generateDailyDigests;
+        await generateDailyDigests(admin);
+      } catch (digestErr) {
+        console.error('[fathom] sync-all digest pass threw (isolated): ' + (digestErr.message || 'unknown'));
+      }
+    })();
+
     return res.json(summary);
   } catch (err) {
     if (handleConfigError(err, res)) return;

@@ -230,4 +230,11 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap)
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-module.exports = { computeTeamRecommendations: computeTeamRecommendations, computeWeeklyHighlights: computeWeeklyHighlights };
+module.exports = {
+  computeTeamRecommendations: computeTeamRecommendations,
+  computeWeeklyHighlights: computeWeeklyHighlights,
+  // shared with lib/team-digest.js (same cache table + window loader)
+  loadTeamWindow: loadTeamWindow,
+  cacheGet: cacheGet,
+  cachePut: cachePut,
+};
