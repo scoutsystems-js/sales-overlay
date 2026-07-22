@@ -1,27 +1,34 @@
-// Welcome email on manual user creation (owner console). Google Workspace
-// SMTP via nodemailer — sent as justin@scoutsystems.io (WELCOME_SMTP_USER).
+// Welcome email on manual user creation (owner console). Resend HTTPS API via
+// native fetch — Railway blocks outbound SMTP on this plan tier (root cause of
+// the 2026-07-23 two-minute console hangs), so email goes over HTTPS like every
+// other outbound integration in this backend.
 //
-// Contracts (Justin's ruling, 2026-07-23):
+// Contracts (Justin's rulings, 2026-07-23):
 //   • Failure NEVER fails or blocks creation — sendWelcomeEmail never throws;
 //     it returns {sent:true} | {sent:false, reason} (KB/digest isolation rule).
-//   • Missing/blank env vars = feature silently OFF: {sent:false,
-//     reason:'not_configured'}, no transport built, no crash, no config error.
+//   • HARD 10-SECOND BOUND on the HTTP call (AbortController). Timeout or any
+//     failure → 'failed'; the console shows the temp-password fallback. The
+//     console can never wait longer than the bound.
+//   • RESEND_API_KEY present = configured; absent/blank = feature silently OFF
+//     ({sent:false, reason:'not_configured'}, no fetch, no crash). The old
+//     WELCOME_SMTP_* vars are gone.
 //   • The set-password action link appears in the email body ONLY. Never
-//     logged here — not in errors, not in reasons (reasons are scrubbed in
-//     case an upstream error echoes message content). Same discipline as the
-//     create route's temp password.
-//   • Transport is a lazy singleton, verified ONCE (init() at server startup
-//     when configured), never rebuilt per send.
+//     logged — not in errors, not in reasons (scrubbed in case an upstream
+//     error echoes request content). The API key never appears anywhere.
 //
-// Env (Railway Variables): WELCOME_SMTP_USER, WELCOME_SMTP_PASS,
-// WELCOME_FROM_NAME (optional display name; defaults to "Justin").
+// Env (Railway Variables): RESEND_API_KEY. Sender is a constant — the domain
+// is verified in Resend, replies land in Justin's real inbox.
 
-const nodemailer = require('nodemailer');
+const RESEND_URL = 'https://api.resend.com/emails';
+const WELCOME_FROM = 'Justin <justin@scoutsystems.io>';
+const SEND_TIMEOUT_MS = 10000;
+
+var _testFetch = null;
+var _testTimeoutMs = null;
 
 function isConfigured(env) {
   var e = env || process.env;
-  return !!(e.WELCOME_SMTP_USER && String(e.WELCOME_SMTP_USER).trim()
-         && e.WELCOME_SMTP_PASS && String(e.WELCOME_SMTP_PASS).trim());
+  return !!(e.RESEND_API_KEY && String(e.RESEND_API_KEY).trim());
 }
 
 // Exact content per spec — plain text, subject "Your Scout login". The link
@@ -44,58 +51,59 @@ function welcomeEmailContent(firstName, actionLink) {
   };
 }
 
-var _transport = null;
-var _testTransport = null;
-function getTransport() {
-  if (_testTransport) return _testTransport;
-  if (_transport) return _transport;
-  _transport = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user: process.env.WELCOME_SMTP_USER, pass: process.env.WELCOME_SMTP_PASS },
-  });
-  return _transport;
-}
-
-// Startup hook (index.js): verify the transport once when configured, so a bad
-// app password surfaces in the boot log instead of on the first creation.
-// Non-fatal either way — the send path degrades per contract regardless.
+// Startup hook (index.js): configuration visibility in the boot log. No
+// network at boot — the send path is bounded and self-reporting.
 function init() {
   if (!isConfigured()) {
-    console.log('[welcome-email] not configured (WELCOME_SMTP_USER/PASS unset) — feature off');
+    console.log('[welcome-email] not configured (RESEND_API_KEY unset) — feature off');
     return;
   }
-  getTransport().verify().then(function () {
-    console.log('[welcome-email] SMTP transport verified as ' + process.env.WELCOME_SMTP_USER);
-  }).catch(function (err) {
-    console.error('[welcome-email] SMTP verify failed (sends will report failed until fixed): ' + scrub(err && err.message));
-  });
+  console.log('[welcome-email] Resend transport configured — sending as ' + WELCOME_FROM);
 }
 
 // Defensive: strip anything that looks like a long credential-ish token from
 // upstream error text before it can reach a reason string or log line.
 function scrub(msg) {
-  return String(msg || 'unknown').replace(/[A-Za-z0-9!@#$%^&*+=]{12,}/g, '[scrubbed]').slice(0, 200);
+  return String(msg || 'unknown').replace(/[A-Za-z0-9!@#$%^&*+=_-]{12,}/g, '[scrubbed]').slice(0, 200);
 }
 
-// Never throws. {sent:true} | {sent:false, reason}
+// Never throws. {sent:true} | {sent:false, reason}. Hard-bounded at
+// SEND_TIMEOUT_MS — a blackholed connection resolves 'failed' at the bound,
+// never at some transport default measured in minutes.
 async function sendWelcomeEmail(args) {
+  var timer = null;
   try {
     if (!isConfigured()) return { sent: false, reason: 'not_configured' };
     var content = welcomeEmailContent(args.firstName, args.actionLink);
-    var fromName = (process.env.WELCOME_FROM_NAME && String(process.env.WELCOME_FROM_NAME).trim()) || 'Justin';
-    await getTransport().sendMail({
-      from: '"' + fromName + '" <' + process.env.WELCOME_SMTP_USER + '>',
-      to: args.email,
-      subject: content.subject,
-      text: content.text,
+    var doFetch = _testFetch || fetch;
+    var bound = _testTimeoutMs || SEND_TIMEOUT_MS;
+    var ac = new AbortController();
+    timer = setTimeout(function () { ac.abort(); }, bound);
+    var resp = await doFetch(RESEND_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + process.env.RESEND_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: WELCOME_FROM, to: args.email, subject: content.subject, text: content.text }),
+      signal: ac.signal,
     });
+    if (!resp.ok) {
+      var detail = '';
+      try { var b = await resp.json(); detail = (b && b.message) ? ' — ' + scrub(b.message) : ''; } catch (e) { /* body optional */ }
+      var reason = 'Resend HTTP ' + resp.status + detail;
+      console.error('[welcome-email] send failed for ' + (args && args.email) + ': ' + reason);
+      return { sent: false, reason: reason };
+    }
     return { sent: true };
   } catch (err) {
-    var reason = scrub(err && err.message);
-    console.error('[welcome-email] send failed for ' + (args && args.email) + ': ' + reason);
-    return { sent: false, reason: reason };
+    var why = (err && err.name === 'AbortError') || /abort/i.test((err && err.message) || '')
+      ? 'timed out after ' + ((_testTimeoutMs || SEND_TIMEOUT_MS) / 1000) + 's'
+      : scrub(err && err.message);
+    console.error('[welcome-email] send failed for ' + (args && args.email) + ': ' + why);
+    return { sent: false, reason: why };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -106,5 +114,6 @@ module.exports = {
   // test surface
   _welcomeEmailContent: welcomeEmailContent,
   _isConfigured: isConfigured,
-  _setTransportForTest: function (t) { _testTransport = t; _transport = null; },
+  _setFetchForTest: function (f) { _testFetch = f; },
+  _setTimeoutForTest: function (ms) { _testTimeoutMs = ms; },
 };
