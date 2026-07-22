@@ -86,6 +86,7 @@
     .btn-modal-primary:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-modal-secondary { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; }
     .cu-created-msg { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 14px; }
+    .cu-email-status { font-size: 13px; margin: 6px 0 10px; }
     .temp-pw-box { display: flex; align-items: center; gap: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-bottom: 16px; }
     .temp-pw-box code { font-size: 14px; color: var(--green); font-family: ui-monospace, Menlo, monospace; flex: 1; word-break: break-all; }
     .btn-copy { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-family: inherit; }
@@ -576,6 +577,7 @@
       </div>
       <div id="createUserSuccess" style="display:none">
         <div class="cu-created-msg">User created. Share this temporary password with them now — <strong>it will not be shown again.</strong></div>
+        <div class="cu-email-status" id="cuEmailStatus"></div>
         <div class="temp-pw-box"><code id="cuTempPw"></code><button class="btn-copy" onclick="copyTempPassword()">Copy</button></div>
         <div class="modal-actions"><button class="btn-modal-primary" onclick="closeCreateUserModal()">Done</button></div>
       </div>
@@ -1063,6 +1065,13 @@
     if (!res.ok) { var e2; try { e2 = await res.json(); } catch (x) { e2 = { error: 'HTTP ' + res.status }; } sub.disabled = false; sub.textContent = 'Create'; err.textContent = e2.error || 'Failed to create user'; err.classList.remove('hidden'); return; }
     var data = await res.json();
     document.getElementById('cuTempPw').textContent = data.temp_password || '';
+    // Welcome-email status (manual copy stays the fallback, never removed):
+    var es = document.getElementById('cuEmailStatus');
+    if (es) {
+      if (data.welcome_email === 'sent') { es.textContent = '✓ Welcome email sent'; es.style.color = 'var(--good)'; }
+      else if (data.welcome_email === 'failed') { es.textContent = '✗ Email failed — send the password manually.'; es.style.color = 'var(--bad)'; }
+      else { es.textContent = 'Email not configured — send the password manually.'; es.style.color = 'var(--text-muted)'; }
+    }
     document.getElementById('createUserForm').style.display = 'none';
     document.getElementById('createUserSuccess').style.display = '';
     loadUsers();   // refresh the table with the new user

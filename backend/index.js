@@ -14,6 +14,7 @@ const kbRoutes = require('./routes/kb');
 const fathomRoutes = require('./routes/fathom');
 const teamRoutes = require('./routes/team');
 const eodRoutes = require('./routes/eod');
+const welcomeEmail = require('./lib/welcome-email');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -106,6 +107,8 @@ function reportEnv() {
     console.log('  ' + k + ': ' + (process.env[k] ? 'set' : 'not set (optional)'));
   });
 }
+
+welcomeEmail.init(); // one-time SMTP verify at boot; feature-off log when unconfigured
 
 app.listen(PORT, '0.0.0.0', function() {
   console.log('[server] Scout backend running on port ' + PORT);

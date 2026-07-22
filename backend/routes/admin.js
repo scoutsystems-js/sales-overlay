@@ -547,7 +547,21 @@ router.post('/users', requireAuth, requireRole('owner'), async function(req, res
     console.log('[admin] User created: actor=%s (%s) new=%s (%s) name="%s %s" role=%s managed_by=%s',
       req.user.email, req.user.id, email, newId, firstName, lastName, role, managedBy || 'none');
 
-    res.json({ user_id: newId, email: email, first_name: firstName, last_name: lastName, role: role, managed_by: managedBy, billing_status: 'trial', temp_password: tempPassword });
+    // Welcome email — AFTER the rollback-able section (user + profile are
+    // committed), so no email outcome can ever unwind or fail the creation.
+    // sendWelcomeEmail never throws (KB/digest isolation contract); the extra
+    // try/catch is belt-and-braces so even a lib bug can't 500 this request.
+    // Awaited deliberately: the console shows the TRUE sent/failed status.
+    var welcomeStatus = 'not_configured';
+    try {
+      var emailResult = await require('../lib/welcome-email').sendWelcomeEmail({ firstName: firstName, email: email, tempPassword: tempPassword });
+      welcomeStatus = emailResult.sent ? 'sent' : (emailResult.reason === 'not_configured' ? 'not_configured' : 'failed');
+    } catch (mailErr) {
+      welcomeStatus = 'failed';
+      console.error('[admin] welcome email threw unexpectedly (creation unaffected): ' + (mailErr && mailErr.message));
+    }
+
+    res.json({ user_id: newId, email: email, first_name: firstName, last_name: lastName, role: role, managed_by: managedBy, billing_status: 'trial', temp_password: tempPassword, welcome_email: welcomeStatus });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] create-user error:', err.message);
