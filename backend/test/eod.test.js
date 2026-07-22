@@ -16,21 +16,35 @@ test('prospectNameFromTitle: takes the segment after the last pipe, falls back w
 });
 
 test('applyEdits: user override wins per-field, analysis value otherwise, edited flags accurate', () => {
-  const analysis = { prospect_name: 'Tasha Presberry', outcome: 'follow_up', cash_collected: 0, summary: 'Grader summary.' };
+  const analysis = { prospect_name: 'Tasha Presberry', outcome: 'follow_up', cash_collected: 0, summary: 'Grader summary.', payment_structure: 'none_stated' };
   const edits = { cash_collected: '500', summary: 'My own words.' };
   const out = eod._applyEdits(analysis, edits);
   assert.strictEqual(out.fields.prospect_name, 'Tasha Presberry');
   assert.strictEqual(out.fields.outcome, 'follow_up');
   assert.strictEqual(out.fields.cash_collected, '500');
   assert.strictEqual(out.fields.summary, 'My own words.');
-  assert.deepStrictEqual(out.edited, { prospect_name: false, outcome: false, cash_collected: true, summary: true });
+  assert.strictEqual(out.fields.payment_structure, 'none_stated');
+  assert.deepStrictEqual(out.edited, { prospect_name: false, outcome: false, cash_collected: true, summary: true, payment_structure: false });
   // empty-string override is still an override (user cleared the field on purpose)
   const cleared = eod._applyEdits(analysis, { summary: '' });
   assert.strictEqual(cleared.fields.summary, '');
   assert.strictEqual(cleared.edited.summary, true);
 });
 
-test('EDITABLE_FIELDS matches the migration CHECK constraint exactly', () => {
+test('EDITABLE_FIELDS matches the migration CHECK constraint exactly (022: + payment_structure)', () => {
   assert.deepStrictEqual(eod._EDITABLE_FIELDS.slice().sort(),
-    ['cash_collected', 'outcome', 'prospect_name', 'summary']);
+    ['cash_collected', 'outcome', 'payment_structure', 'prospect_name', 'summary']);
+});
+
+test('payment_structure edits are a constrained choice (route-level allowlist)', () => {
+  assert.deepStrictEqual(eod._PAYMENT_STRUCTURES.slice().sort(),
+    ['bnpl', 'none_stated', 'paid_in_full', 'payment_plan']);
+});
+
+test('summary prefill: eod_summary wins, overall_summary is the pre-v8 fallback', () => {
+  const f = eod._summaryPrefill;
+  assert.strictEqual(f({ eod_summary: 'First person.', overall_summary: 'Analytical.' }), 'First person.');
+  assert.strictEqual(f({ eod_summary: null, overall_summary: 'Analytical.' }), 'Analytical.');
+  assert.strictEqual(f({ eod_summary: '', overall_summary: 'Analytical.' }), 'Analytical.');
+  assert.strictEqual(f({}), null);
 });

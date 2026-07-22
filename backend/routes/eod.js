@@ -18,9 +18,19 @@ const teamDigest = require('../lib/team-digest');
 
 const router = express.Router();
 
-// Must match migration 021's CHECK (field IN (...)) exactly.
-const EDITABLE_FIELDS = ['prospect_name', 'outcome', 'cash_collected', 'summary'];
-const VALUE_CAPS = { prospect_name: 200, outcome: 60, cash_collected: 20, summary: 3000 };
+// Must match migration 022's CHECK (field IN (...)) exactly.
+const EDITABLE_FIELDS = ['prospect_name', 'outcome', 'cash_collected', 'summary', 'payment_structure'];
+const VALUE_CAPS = { prospect_name: 200, outcome: 60, cash_collected: 20, summary: 3000, payment_structure: 20 };
+// payment_structure is a CONSTRAINED choice — mirrors the analysis-worker
+// allowlist; the route rejects anything else (no free text).
+const PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_stated'];
+
+// EOD prefill rule (v8): the first-person eod_summary when present, falling
+// back to the analytical overall_summary for pre-v8 rows. Edits override both.
+function summaryPrefill(a) {
+  return (a && typeof a.eod_summary === 'string' && a.eod_summary.trim()) ? a.eod_summary
+    : ((a && a.overall_summary) || null);
+}
 
 var _admin = null;
 function getAdmin() {
@@ -79,7 +89,7 @@ router.get('/', requireAuth, async function (req, res) {
 
     var callIds = calls.map(function (c) { return c.id; });
     var anQ = await admin.from('call_analyses')
-      .select('fathom_call_id, status, outcome, overall_summary, cash_collected')
+      .select('fathom_call_id, status, outcome, overall_summary, eod_summary, cash_collected, payment_structure')
       .in('fathom_call_id', callIds);
     if (anQ.error) throw new Error('call_analyses: ' + anQ.error.message);
     var anByCall = {};
@@ -100,7 +110,8 @@ router.get('/', requireAuth, async function (req, res) {
         prospect_name: prospectNameFromTitle(c.title),
         outcome: a.outcome || null,
         cash_collected: (typeof a.cash_collected === 'number' || typeof a.cash_collected === 'string') ? String(a.cash_collected) : '0',
-        summary: a.overall_summary || null,
+        summary: summaryPrefill(a),
+        payment_structure: a.payment_structure || 'none_stated',
       };
       var merged = applyEdits(analysis, edByCall[c.id] || {});
       return {
@@ -131,6 +142,10 @@ router.put('/edit', requireAuth, async function (req, res) {
     var callId = body.call_id, field = body.field;
     if (!callId || typeof callId !== 'string') return res.status(400).json({ error: 'call_id required' });
     if (EDITABLE_FIELDS.indexOf(field) === -1) return res.status(400).json({ error: 'field must be one of ' + EDITABLE_FIELDS.join(', ') });
+    if (field === 'payment_structure' && body.value !== null && body.value !== undefined
+        && PAYMENT_STRUCTURES.indexOf(String(body.value)) === -1) {
+      return res.status(400).json({ error: 'payment_structure must be one of ' + PAYMENT_STRUCTURES.join(', ') });
+    }
 
     var own = await admin.from('fathom_calls').select('id').eq('id', callId).eq('user_id', userId).maybeSingle();
     if (own.error) throw new Error('ownership check: ' + own.error.message);
@@ -161,3 +176,5 @@ module.exports = router;
 module.exports._prospectNameFromTitle = prospectNameFromTitle;
 module.exports._applyEdits = applyEdits;
 module.exports._EDITABLE_FIELDS = EDITABLE_FIELDS;
+module.exports._PAYMENT_STRUCTURES = PAYMENT_STRUCTURES;
+module.exports._summaryPrefill = summaryPrefill;
