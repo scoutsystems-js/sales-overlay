@@ -65,6 +65,9 @@ const VALID_OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const VALID_RESOLUTIONS = ['handled', 'partial', 'unhandled'];
 // Deal outcome inferred by the section grader (migration 012).
 const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
+// Payment structures (migration 022). Closed calls only — the worker forces
+// 'none_stated' for every other outcome.
+const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_stated'];
 // Analysis prompt version (migration 014) — BUMP MANUALLY whenever the grader or
 // highlight-extractor prompts change. Stamped on every call_analyses row so a
 // stale-prompt analysis is one query away (the guard for the Issue-1 class of
@@ -74,7 +77,12 @@ const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 // v7 = (a) cash_collected extraction — explicit-only, zero-default, never inferred;
 //      (b) follow_up_email greeting contract — transcript-established name only,
 //      omitted entirely when unclear (fixes title-vs-attendee greeting bugs).
-const ANALYSIS_PROMPT_VERSION = 'v7-2026-07-22';
+// v8 = (a) cash extraction hunts transaction evidence (card runs, deposits,
+//      charge confirmations, BNPL approvals, plan first-payments) with
+//      per-structure cash rules; (b) payment_structure field (closed-only);
+//      (c) eod_summary — first-person closer-voice EOD report summary
+//      (coaching's overall_summary untouched). Never-fabricate unchanged.
+const ANALYSIS_PROMPT_VERSION = 'v8-2026-07-22';
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -292,7 +300,15 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '      • REQUIRED for "closed", "lost", and "follow_up". Set why_outcome to null ONLY when outcome is "no_show" (no real conversation to diagnose).',
     '  - one_thing_timestamp_seconds: integer seconds of the moment the one_thing correction belonged to — the same moment as why_outcome, or the adjacent moment where the closer should have intervened. Null if not applicable.',
     '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words. Greeting rule: greet the prospect ONLY by the name they are actually called (or call themselves) in the transcript. If no name is clearly established in the transcript, omit the name from the greeting entirely (e.g. \'Hey — great talking today.\'). Never take a name from the meeting title or any source other than the transcript itself.',
-    '  - cash_collected: the dollar amount ACTUALLY collected or charged on THIS call (deposit, first payment, or payment in full), as a plain number with no currency symbol. ONLY report an amount that is EXPLICITLY stated in the transcript as collected/charged/processed on the call (e.g. running a card, confirming a payment went through). If nothing was collected, or no explicit amount is stated, return 0. NEVER guess or infer an amount — a price that was merely quoted, offered, or discussed is NOT cash collected. When in doubt: 0.',
+    '  - cash_collected + payment_structure: for CLOSED calls, actively look for transaction evidence anywhere in the transcript — card details being taken or run, a deposit being made, confirmation that a charge went through, financing approvals (Affirm, Klarna, or similar BNPL — buy now pay later), or a first payment on a payment plan. Then report BOTH fields:',
+    '      • payment_structure: exactly one of "paid_in_full" | "payment_plan" | "bnpl" | "none_stated". Only a closed call can have a structure other than "none_stated" — for follow_up, lost, and no_show ALWAYS return "none_stated". If the call closed but how it was paid is not evidenced, return "none_stated".',
+    '      • cash_collected: a plain number, no currency symbol. THE CASH DEFINITION DEPENDS ON THE STRUCTURE — apply the matching rule:',
+    '          - paid_in_full: the full amount charged on the call.',
+    '          - payment_plan: ONLY the money actually collected on the call (the deposit or first payment) — NEVER the total contract value of the plan.',
+    '          - bnpl: the full financed amount approved on the call.',
+    '          - none_stated: 0.',
+    '      • The never-fabricate rule is unchanged: NEVER guess or infer an amount — only report an amount EXPLICITLY evidenced in the transcript. A price merely quoted, offered, or discussed is NOT cash collected. If no amount is actually evidenced, return 0 even for a closed call. When in doubt: 0.',
+    '  - eod_summary: a 2-4 sentence end-of-day report summary written in FIRST PERSON as the closer, as if they wrote it themselves for their team\'s Slack channel ("Spoke with X about... She\'s deciding between... I set a follow-up for Friday."). Factual and professional — names, decisions, next steps. State losses plainly with no self-criticism and no coaching language. NO AI tells: no hedging filler, and never narrate the closer in the third person — you ARE the closer\'s voice here. This is separate from overall_summary (which stays analytical).',
     '  - outcome: the deal outcome for THIS call, inferred from what actually happened in the transcript. Exactly one of:',
     '      "closed"    — prospect committed, paid, or clearly agreed to buy on this call',
     '      "follow_up" — no decision yet: another call booked, thinking time, spouse/partner check, or a next step scheduled',
@@ -314,6 +330,8 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '  "one_thing_timestamp_seconds": N | null,',
     '  "follow_up_email": "...",',
     '  "cash_collected": N,',
+    '  "payment_structure": "paid_in_full"|"payment_plan"|"bnpl"|"none_stated",',
+    '  "eod_summary": "...",',
     '  "outcome": "closed"|"follow_up"|"lost"|"no_show"',
     '}',
     '',
@@ -412,6 +430,22 @@ function sanitizeCashCollected(v) {
   if (typeof n !== 'number' || !isFinite(n)) return 0;
   if (n < 0 || n > 1000000) return 0;
   return Math.round(n * 100) / 100;
+}
+
+// payment_structure guard (v8): allowlist, case-normalized; anything unknown
+// → 'none_stated'. Coupling enforced HERE, not just in the prompt: a non-closed
+// outcome always yields 'none_stated' whatever the model said.
+function sanitizePaymentStructure(v, outcome) {
+  if (outcome !== 'closed') return 'none_stated';
+  var t = (typeof v === 'string') ? v.trim().toLowerCase() : '';
+  return VALID_PAYMENT_STRUCTURES.indexOf(t) !== -1 ? t : 'none_stated';
+}
+
+// eod_summary guard (v8): non-empty string, trimmed, capped to 2000; else null
+// (NULL = "no v8 summary" — the EOD view falls back to overall_summary).
+function sanitizeEodSummary(v) {
+  if (typeof v !== 'string' || !v.trim()) return null;
+  return v.trim().slice(0, 2000);
 }
 
 function sanitizeSection(s) {
@@ -838,6 +872,8 @@ async function analyzeCall(fathomCallId, userId) {
       one_thing_timestamp_seconds: oneThingTs,
       follow_up_email:     (typeof graderParsed.follow_up_email === 'string') ? graderParsed.follow_up_email.slice(0, 5000) : null,
       cash_collected:      sanitizeCashCollected(graderParsed.cash_collected),
+      payment_structure:   sanitizePaymentStructure(graderParsed.payment_structure, inferredOutcome),
+      eod_summary:         sanitizeEodSummary(graderParsed.eod_summary),
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
       analyzed_at:         new Date().toISOString(),
@@ -919,6 +955,8 @@ module.exports = {
   _buildHighlightExtractorPrompt: buildHighlightExtractorPrompt,
   _markFathomCallErrored:      markFathomCallErrored,
   _sanitizeCashCollected:      sanitizeCashCollected,
+  _sanitizePaymentStructure:   sanitizePaymentStructure,
+  _sanitizeEodSummary:         sanitizeEodSummary,
   _claimAnalysisRun:           claimAnalysisRun,
   _CLAIM_STALE_MS:             CLAIM_STALE_MS,
 };

@@ -8,8 +8,9 @@ const worker = require('../lib/analysis-worker');
 
 const NORM = { turns: [{ speaker: 'A', text: 'hello', start_seconds: 0 }], closer_name: 'Josh', speaker_confidence: 'matched' };
 
-test('ANALYSIS_PROMPT_VERSION is bumped to v7', () => {
-  assert.match(worker.ANALYSIS_PROMPT_VERSION, /^v7-/);
+test('ANALYSIS_PROMPT_VERSION is at least v7 (v7 contracts below are version-independent)', () => {
+  const m = worker.ANALYSIS_PROMPT_VERSION.match(/^v(\d+)-/);
+  assert.ok(m && parseInt(m[1], 10) >= 7, 'version must be v7+');
 });
 
 test('grader prompt defines cash_collected: explicit-only, zero-default, never inferred', () => {
