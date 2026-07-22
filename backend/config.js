@@ -19,7 +19,13 @@ const CLAUDE_MODEL = 'claude-sonnet-4-6';
 // via formatUpstreamError — one-line fix.
 const CLAUDE_SUGGESTION_MODEL = 'claude-haiku-4-5-20251001';
 
+// Canonical public origin. www is the real host (apex HTTPS times out —
+// Namecheap URL-redirect limitation, see CLAUDE.md DNS notes). Used by the
+// set-password redirect and anywhere else that mints absolute site URLs.
+const CANONICAL_ORIGIN = 'https://www.scoutsystems.io';
+
 module.exports = {
+  CANONICAL_ORIGIN,
   CLAUDE_MODEL: CLAUDE_MODEL,
   CLAUDE_SUGGESTION_MODEL: CLAUDE_SUGGESTION_MODEL,
 };

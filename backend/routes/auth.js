@@ -121,6 +121,51 @@ router.get('/google', async function(req, res) {
 // to redirect after a successful login (owner/admin → /admin, user →
 // /dashboard). Un-onboarded users have no user_profiles row — default to
 // 'user' in memory, matching the requireRole middleware's own default.
+// ── POST /auth/set-password ──────────────────────────────────────────────────
+// Called by the /set-password page with the recovery-session access token from
+// the Supabase verify redirect (Authorization: Bearer <access_token>). Verifies
+// the token server-side, then sets the password via the admin API. Never logs
+// the password or the token — uid only.
+var _adminAuth = null;
+function getAdminAuth() {
+  if (_adminAuth) return _adminAuth;
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase admin not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Railway Variables.');
+  }
+  _adminAuth = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  return _adminAuth;
+}
+
+router.post('/set-password', async function(req, res) {
+  try {
+    var authHeader = req.get('Authorization') || '';
+    var token = authHeader.indexOf('Bearer ') === 0 ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing access token' });
+    var password = req.body && req.body.password;
+    if (typeof password !== 'string' || password.length < 10) {
+      return res.status(400).json({ error: 'Password must be at least 10 characters.' });
+    }
+    if (password.length > 200) return res.status(400).json({ error: 'Password is too long.' });
+
+    var admin = getAdminAuth();
+    var who = await admin.auth.getUser(token);
+    if (who.error || !who.data || !who.data.user) {
+      return res.status(401).json({ error: 'This link has expired or already been used.' });
+    }
+    var upd = await admin.auth.admin.updateUserById(who.data.user.id, { password: password });
+    if (upd.error) {
+      console.error('[auth] set-password update failed for user ' + who.data.user.id + ': ' + upd.error.message);
+      return res.status(500).json({ error: 'Could not set the password. Please try again.' });
+    }
+    console.log('[auth] set-password: password set for user ' + who.data.user.id);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
+    console.error('[auth] set-password error:', err.message);
+    res.status(500).json({ error: 'Could not set the password. Please try again.' });
+  }
+});
+
 router.get('/me', requireAuth, async function(req, res) {
   try {
     var admin = getAdminClient();

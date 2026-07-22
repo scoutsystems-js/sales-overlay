@@ -57,6 +57,10 @@ app.get('/admin', function(req, res) {
 
 // Pretty URL for the user dashboard. Page-side role check routes
 // admins/owners to /admin automatically.
+app.get('/set-password', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'set-password.html'));
+});
+
 app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
 });
