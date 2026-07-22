@@ -2320,7 +2320,12 @@
       var res = await fetch('/fathom/update-analyses', {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ limit: 10 }),   // bounded batch per click
+        // Request the full outdated+pending sweep up to the server's per-dispatch
+        // cap (50). The route slices to its own cap regardless; the notice
+        // reports how many remain for a follow-up click. Was 10/click, which
+        // made a 50+ call prompt-migration silently need 5+ clicks (the v7
+        // batch stopped at 13 for exactly this reason).
+        body: JSON.stringify({ limit: 50 }),
       });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
       if (res.ok) {
