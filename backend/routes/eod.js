@@ -25,6 +25,19 @@ const VALUE_CAPS = { prospect_name: 200, outcome: 60, cash_collected: 20, summar
 // allowlist; the route rejects anything else (no free text).
 const PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_stated'];
 
+// Outcome prefill (product ruling 2026-07-22): closed calls with a KNOWN
+// payment structure prefill as a composed label ("Closed - PIF" etc.) instead
+// of the raw enum — the structure no longer renders as its own EOD row.
+// Non-closed (and closed-but-none_stated) stay plain. Free-text editable as
+// before; a stored outcome edit wins over the composed label untouched.
+var COMPOSED_OUTCOME = { paid_in_full: 'Closed - PIF', payment_plan: 'Closed - Payment plan', bnpl: 'Closed - Financed' };
+function outcomePrefill(a) {
+  if (a && a.outcome === 'closed' && COMPOSED_OUTCOME[a.payment_structure]) {
+    return COMPOSED_OUTCOME[a.payment_structure];
+  }
+  return (a && a.outcome) || null;
+}
+
 // EOD prefill rule (v8): the first-person eod_summary when present, falling
 // back to the analytical overall_summary for pre-v8 rows. Edits override both.
 function summaryPrefill(a) {
@@ -108,7 +121,7 @@ router.get('/', requireAuth, async function (req, res) {
       var a = anByCall[c.id] || {};
       var analysis = {
         prospect_name: prospectNameFromTitle(c.title),
-        outcome: a.outcome || null,
+        outcome: outcomePrefill(a),
         cash_collected: (typeof a.cash_collected === 'number' || typeof a.cash_collected === 'string') ? String(a.cash_collected) : '0',
         summary: summaryPrefill(a),
         payment_structure: a.payment_structure || 'none_stated',
@@ -178,3 +191,4 @@ module.exports._applyEdits = applyEdits;
 module.exports._EDITABLE_FIELDS = EDITABLE_FIELDS;
 module.exports._PAYMENT_STRUCTURES = PAYMENT_STRUCTURES;
 module.exports._summaryPrefill = summaryPrefill;
+module.exports._outcomePrefill = outcomePrefill;

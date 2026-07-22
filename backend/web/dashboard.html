@@ -3654,16 +3654,8 @@
     if (isNaN(n)) return String(v == null ? '0' : v);
     return n % 1 === 0 ? String(n) : n.toFixed(2);
   }
-  var EOD_PAYMENT_STRUCTURES = [
-    { value: 'none_stated',  label: 'Not stated' },
-    { value: 'paid_in_full', label: 'Paid in full' },
-    { value: 'payment_plan', label: 'Payment plan' },
-    { value: 'bnpl',         label: 'BNPL' },
-  ];
-  function eodPaymentLabel(v) {
-    var hit = EOD_PAYMENT_STRUCTURES.find(function (o) { return o.value === v; });
-    return hit ? hit.label : 'Not stated';
-  }
+  // (EOD Payment row removed by product ruling 2026-07-22 — the outcome
+  // prefill now carries the composed "Closed - PIF" style label server-side.)
   function eodOutcomeLabel(oc) {
     if (oc === 'closed') return 'Closed';
     if (oc === 'follow_up') return 'Follow-up';
@@ -3685,9 +3677,6 @@
       lines.push('Outcome: ' + eodOutcomeLabel(f.outcome));
       lines.push('Call: ' + (c.recording_url || '—'));
       lines.push('Cash collected: $' + eodCashDisplay(f.cash_collected));
-      if (f.payment_structure && f.payment_structure !== 'none_stated') {
-        lines.push('Payment: ' + eodPaymentLabel(f.payment_structure));
-      }
       lines.push('Summary: ' + (f.summary || '—'));
       if (i < d.calls.length - 1) lines.push('');
     });
@@ -3748,16 +3737,6 @@
           + row('Prospect', 'prospect_name', f.prospect_name)
           + row('Outcome', 'outcome', f.outcome)
           + row('Cash ($)', 'cash_collected', f.cash_collected)
-          + (function () {
-              // payment structure: constrained choice, not free text
-              var cls = 'eod-input' + (e.payment_structure ? ' edited' : '');
-              var dot = e.payment_structure ? ' <span class="eod-edited-dot">● edited</span>' : '';
-              var opts = EOD_PAYMENT_STRUCTURES.map(function (o) {
-                return '<option value="' + o.value + '"' + (o.value === (f.payment_structure || 'none_stated') ? ' selected' : '') + '>' + o.label + '</option>';
-              }).join('');
-              return '<div class="eod-row"><div class="eod-label">Payment' + dot + '</div>'
-                + '<select class="' + cls + '" onchange="eodSaveField(\'' + c.call_id + '\', \'payment_structure\', this)">' + opts + '</select></div>';
-            })()
           + row('Summary', 'summary', f.summary, true)
           + '</div>';
       }).join('');

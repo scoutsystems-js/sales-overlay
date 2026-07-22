@@ -41,6 +41,20 @@ test('payment_structure edits are a constrained choice (route-level allowlist)',
     ['bnpl', 'none_stated', 'paid_in_full', 'payment_plan']);
 });
 
+test('outcome prefill: composed label for closed + known structure, plain outcome otherwise', () => {
+  const f = eod._outcomePrefill;
+  assert.strictEqual(f({ outcome: 'closed', payment_structure: 'paid_in_full' }), 'Closed - PIF');
+  assert.strictEqual(f({ outcome: 'closed', payment_structure: 'payment_plan' }), 'Closed - Payment plan');
+  assert.strictEqual(f({ outcome: 'closed', payment_structure: 'bnpl' }), 'Closed - Financed');
+  // closed but structure unknown → plain outcome, no composition
+  assert.strictEqual(f({ outcome: 'closed', payment_structure: 'none_stated' }), 'closed');
+  assert.strictEqual(f({ outcome: 'closed' }), 'closed');
+  // non-closed never composes, whatever structure claims
+  assert.strictEqual(f({ outcome: 'follow_up', payment_structure: 'paid_in_full' }), 'follow_up');
+  assert.strictEqual(f({ outcome: 'lost' }), 'lost');
+  assert.strictEqual(f({}), null);
+});
+
 test('summary prefill: eod_summary wins, overall_summary is the pre-v8 fallback', () => {
   const f = eod._summaryPrefill;
   assert.strictEqual(f({ eod_summary: 'First person.', overall_summary: 'Analytical.' }), 'First person.');
