@@ -12,7 +12,10 @@
  * response has already been sent by the time the worker runs.
  *
  * Pipeline (per call):
- *   1. Mark call_analyses status='processing' (upsert; idempotent for re-runs)
+ *   1. Atomically claim the run (claimAnalysisRun: conditional UPDATE to
+ *      status='processing', or INSERT arbitrated by the fathom_call_id unique
+ *      index). A run that loses the claim exits as a quiet no-op — overlapping
+ *      dispatches can no longer double-analyze a call.
  *   2. Load the fathom_calls row → fathom_call_id (Fathom's recording_id) + call_date
  *   3. Load fathom_connections, refresh access token if needed
  *   4. Fetch the meeting (transcript + highlights inline) by paginating
@@ -505,6 +508,61 @@ async function markFathomCallErrored(admin, fathomCallId, userId) {
   return result;
 }
 
+// How long a 'processing' claim stays valid before another run may steal it.
+// Sized from real drain data (2026-07 batches: p50 50s, p95 64s, max 247s per
+// call) — 10 min is ~2.4x the longest observed analysis, so a live run is never
+// preempted, while a crashed run (Railway redeploy mid-drain) self-heals
+// without the manual status reset the old flow needed.
+var CLAIM_STALE_MS = 10 * 60 * 1000;
+
+// Atomically claim this call's analysis run. Returns true when this run may
+// proceed, false when another run holds a fresh claim (caller must exit as a
+// quiet no-op). Why: the dispatch loops (/sync, /reanalyze, /update-analyses)
+// share no lock, so two overlapping dispatches could both analyze the SAME
+// call — double Claude spend, and the non-atomic highlight delete+insert let
+// both sets persist (the 2026-07-20 duplicate-objections bug).
+//
+// Atomicity, without client-side transactions:
+//   • Row exists → ONE conditional UPDATE. Concurrent updates serialize on the
+//     row lock; the loser re-evaluates the WHERE against the winner's committed
+//     claim and matches 0 rows.
+//   • No row yet → INSERT; the unique index on fathom_call_id (the upsert's
+//     onConflict target) makes the loser's insert fail cleanly.
+// analyzed_at doubles as the claim timestamp while status='processing' (it is
+// overwritten at every terminal upsert anyway). NULL branches are explicit in
+// the .or() per the 2026-07 silent-null lesson: NULL status and NULL
+// analyzed_at must both be claimable, or pre-claim rows become unclaimable.
+async function claimAnalysisRun(admin, fathomCallId, userId, nowIso) {
+  var cutoffIso = new Date(new Date(nowIso).getTime() - CLAIM_STALE_MS).toISOString();
+  var upd = await admin
+    .from('call_analyses')
+    .update({ status: 'processing', analyzed_at: nowIso, user_id: userId })
+    .eq('fathom_call_id', fathomCallId)
+    .or('status.neq.processing,status.is.null,analyzed_at.is.null,analyzed_at.lt.' + cutoffIso)
+    .select('id');
+  if (upd.error) {
+    // Fail closed: without a registered claim we must not run (the race would
+    // be back). The row stays pending and rides the next batch.
+    console.error('[analysis] claim update failed for call ' + fathomCallId + ' — not proceeding: ' + upd.error.message);
+    return false;
+  }
+  if (upd.data && upd.data.length > 0) return true;
+
+  // 0 rows: either no call_analyses row exists yet, or another run holds a
+  // fresh claim. Try to create the row — the unique index arbitrates.
+  var ins = await admin
+    .from('call_analyses')
+    .insert({ fathom_call_id: fathomCallId, user_id: userId, status: 'processing', analyzed_at: nowIso })
+    .select('id');
+  if (!ins.error && ins.data && ins.data.length > 0) return true;
+  // 23505 (unique violation) = we lost the race — expected and quiet. Anything
+  // else is a real failure worth surfacing; either way we fail closed.
+  if (ins.error && ins.error.code !== '23505') {
+    console.error('[analysis] claim insert failed for call ' + fathomCallId + ' — not proceeding: ' + ins.error.message);
+  }
+  return false;
+}
+
 /**
  * Analyze a single Fathom call end-to-end. Designed for the fire-and-forget
  * IIFE in routes/fathom.js /sync, but safe for manual re-runs (idempotent
@@ -519,8 +577,17 @@ async function analyzeCall(fathomCallId, userId) {
   console.log('[analysis] start call ' + fathomCallId + ' (user=' + userId + ', prompt_version=' + ANALYSIS_PROMPT_VERSION + ')');
 
   try {
-    // ─── Phase 1: mark processing ─────────────────────────────────────────
-    await setAnalysisStatus(admin, fathomCallId, userId, 'processing');
+    // ─── Phase 1: claim the run (atomic; replaces the blind 'processing' upsert) ──
+    // was: await setAnalysisStatus(admin, fathomCallId, userId, 'processing');
+    //      (blind upsert — replaced 2026-07-22 by the atomic claim: two
+    //      overlapping dispatch loops could both pass it and double-analyze)
+    var claimed = await claimAnalysisRun(admin, fathomCallId, userId, new Date().toISOString());
+    if (!claimed) {
+      // Another dispatch loop is already analyzing this call (or just did).
+      // Quiet no-op — NOT an error: no status change, no Claude spend.
+      console.log('[analysis] claim lost for call ' + fathomCallId + ' (user=' + userId + ') — another run holds it; skipping');
+      return { status: 'skipped', reason: 'claim_held_by_another_run' };
+    }
 
     // ─── Phase 2: load the fathom_calls row ───────────────────────────────
     var callQ = await admin
@@ -821,4 +888,6 @@ module.exports = {
   _buildSectionGraderPrompt:   buildSectionGraderPrompt,
   _buildHighlightExtractorPrompt: buildHighlightExtractorPrompt,
   _markFathomCallErrored:      markFathomCallErrored,
+  _claimAnalysisRun:           claimAnalysisRun,
+  _CLAIM_STALE_MS:             CLAIM_STALE_MS,
 };
