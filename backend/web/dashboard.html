@@ -4719,6 +4719,16 @@
     return null; // no_show / null → section hidden
   }
 
+  // Single source of truth for "does the verdict section pair one_thing under
+  // the cause?" — loss ("The fix") and pending/follow_up ("The move") do; win
+  // shows the cause only, so its one_thing stays in the highlights footer.
+  // BOTH renderWhyOutcomeSectionHtml and the footer suppression key on this —
+  // the Item D double-render happened because the two sites drifted apart when
+  // grader v5 added follow_up to the verdict pairing.
+  function verdictKindShowsOneThing(kind) {
+    return kind === 'loss' || kind === 'pending';
+  }
+
   function reviewClipHtml(seconds, recordingUrl, label) {
     if (typeof seconds !== 'number' || !recordingUrl || typeof recordingUrl !== 'string') return '';
     var href = recordingUrl + (recordingUrl.indexOf('?') !== -1 ? '&' : '?') + 't=' + Math.floor(seconds);
@@ -4748,7 +4758,8 @@
     // Loss + pending (follow_up): pair the correction/next-move directly beneath
     // the cause. For a follow_up it's the move that advances the deal, not a fix
     // for a dead one, so the connector reads differently.
-    if (st.kind === 'loss' || st.kind === 'pending') {
+    // was inlined as st.kind checks — now the shared predicate (Item D 2026-07-22)
+    if (verdictKindShowsOneThing(st.kind)) {
       var otText = (typeof a.one_thing === 'string' && a.one_thing.trim())
         ? '<div class="review-one-thing-text">' + escapeHtml(a.one_thing) + '</div>'
         : '<div class="review-one-thing-text placeholder">Will appear when analysis completes.</div>';
@@ -4822,12 +4833,14 @@
       body = '<div class="review-highlights-pending">No highlights were extracted for this call.</div>';
     }
 
-    // One-thing footer. Normally rendered here — but for a loss-class call with
-    // the tied why_outcome, one_thing moves into the paired "Why this call
-    // didn't close" section (cause → fix), so suppress the duplicate here.
+    // One-thing footer. Normally rendered here — but whenever the verdict
+    // section already pairs one_thing under the cause (loss AND follow_up),
+    // suppress the duplicate. Win-class keeps it here (footer only).
+    // was keyed on kind 'loss' alone — drifted when grader v5 added follow_up
+    // to the verdict pairing, double-rendering one_thing (Item D 2026-07-22).
     var whyState = whyOutcomeState(review);
     var oneThingFooter = '';
-    if (!(whyState && whyState.kind === 'loss')) {
+    if (!(whyState && verdictKindShowsOneThing(whyState.kind))) {
       var oneThing = analysis && typeof analysis.one_thing === 'string' && analysis.one_thing.trim()
         ? '<div class="review-one-thing-text">' + escapeHtml(analysis.one_thing) + '</div>'
         : '<div class="review-one-thing-text placeholder">Will appear when analysis completes.</div>';
