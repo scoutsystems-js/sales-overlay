@@ -633,6 +633,24 @@ router.post('/reanalyze', requireAuth, async function(req, res) {
 // ── POST /fathom/update-analyses ──────────────────────────────────────────────
 // Re-analyze calls that were graded under an OLDER prompt version so they pick up
 // the current grader (e.g. Josh's v3 calls → v4 "why this call closed" fields).
+// Batch ordering (scope ruling 2026-07-22: batches = the 20 most-recent calls,
+// not full sweeps — older calls stay on their old prompt versions on purpose).
+// Pending block first (explicitly queued work outranks staleness), then
+// outdated; BOTH newest-first by fathom_calls.call_date. Missing dates sort
+// last within their block. Pure — exported for tests.
+function orderBatchIds(pendingIds, outdatedIds, dateById) {
+  function newestFirst(ids) {
+    return ids.slice().sort(function (a, b) {
+      var da = dateById[a] || '', db = dateById[b] || '';
+      return da < db ? 1 : (da > db ? -1 : 0);
+    });
+  }
+  var seen = {};
+  return newestFirst(pendingIds).concat(newestFirst(outdatedIds)).filter(function (id) {
+    if (seen[id]) return false; seen[id] = true; return true;
+  });
+}
+
 // Same shape as /reanalyze, with an explicit reset step: it selects outdated
 // 'processed' calls (excluding held/error), flips fathom_calls.sync_status +
 // call_analyses.status back to 'pending', then fires the same fire-and-forget
@@ -671,10 +689,17 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
       .order('call_date', { ascending: false, nullsFirst: false });
     var pendingIds2 = pendingQ.error ? [] : (pendingQ.data || []).map(function (r) { return r.id; });
     if (pendingQ.error) console.error('[fathom] update-analyses pending lookup failed (proceeding with outdated only): ' + pendingQ.error.message);
-    var seenIds = {};
-    var unionIds = pendingIds2.concat(outdatedIds).filter(function (id) {
-      if (seenIds[id]) return false; seenIds[id] = true; return true;
-    });
+    // Newest-first by CALL date across both blocks (outdatedCallIds orders by
+    // analyzed_at, which is analysis recency, not call recency) — fetch the
+    // call dates for the union and let orderBatchIds do the rest.
+    var dateById = {};
+    var allIds = pendingIds2.concat(outdatedIds);
+    for (var ci = 0; ci < allIds.length; ci += 100) {
+      var dq = await admin.from('fathom_calls').select('id, call_date').in('id', allIds.slice(ci, ci + 100));
+      if (dq.error) { console.error('[fathom] update-analyses date lookup failed (order degrades to analyzed_at): ' + dq.error.message); break; }
+      (dq.data || []).forEach(function (r) { dateById[r.id] = r.call_date || ''; });
+    }
+    var unionIds = orderBatchIds(pendingIds2, outdatedIds, dateById);
     var ids = unionIds.slice(0, limit);
 
     if (ids.length > 0) {
@@ -1150,3 +1175,5 @@ router._loadCallsList       = loadCallsList;      // shared with /admin/fathom-c
 router._parseCallListOpts   = parseCallListOpts;
 
 module.exports = router;
+// pure helper exported for tests (log.js:_validateLogBatch pattern)
+module.exports._orderBatchIds = orderBatchIds;
