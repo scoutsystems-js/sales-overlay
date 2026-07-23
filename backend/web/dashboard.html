@@ -1417,6 +1417,13 @@
     .digest-notable { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0; background: var(--bg-elevated); border-radius: 0 var(--radius) var(--radius) 0; }
     .digest-notable .meta { margin-top: 4px; }
     .digest-focus { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--good); border-radius: var(--radius); background: var(--bg-elevated); }
+    /* Account Connections rows */
+    .conn-row { align-items: center; }
+    .conn-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .conn-state { font-size: 13px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; }
+    .conn-state.ok { color: var(--text); }
+    .conn-disconnect { color: var(--bad); border-color: var(--border-strong); }
+    .conn-disconnect:hover { border-color: var(--bad); }
     .digest-focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 600; margin-bottom: 6px; }
     /* EOD Report */
     .eod-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -2160,7 +2167,7 @@
   async function refreshZoomStatusInBackground() {
     try { state.zoomStatus = await fetchZoomStatus(); }
     catch (e) { if (e.message === 'unauth') return; state.zoomStatus = { connected: false }; }
-    if (state.view === 'overview') renderOverview(false);
+    rerenderConnectionViews();
   }
 
   // Mirror of connectFathom — opens the Zoom OAuth popup; handleZoomDoneSignal
@@ -2251,6 +2258,39 @@
 
   // Failure-tolerant wrapper for post-action refreshes (after Connect or
   // Sync finishes). Never throws — sets a safe default and re-renders.
+  // Disconnect a provider (confirm first). Deletes only the connection —
+  // history (calls/analyses/highlights) is preserved server-side.
+  async function disconnectProvider(provider) {
+    var label = provider === 'zoom' ? 'Zoom' : 'Fathom';
+    if (!window.confirm('Disconnect ' + label + '? Your already-synced calls, grades, and clips stay — but Scout will stop pulling in new ' + label + ' calls until you reconnect.')) return;
+    var path = provider === 'zoom' ? '/zoom/disconnect' : '/fathom/disconnect';
+    try {
+      var res = await fetch(path, { method: 'DELETE', headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) {
+        var e = null; try { e = await res.json(); } catch (x) {}
+        window.alert((e && e.error) || ('Could not disconnect ' + label + '.'));
+        return;
+      }
+      if (provider === 'zoom') { state.zoomStatus = { connected: false }; state.zoomNotice = null; }
+      else { state.fathomStatus = { connected: false }; state.fathomNotice = null; }
+      rerenderConnectionViews();
+    } catch (err) {
+      window.alert('Could not reach the server.');
+    }
+  }
+
+  function anySourceConnected() {
+    return !!((state.fathomStatus && state.fathomStatus.connected) ||
+              (state.zoomStatus && state.zoomStatus.connected));
+  }
+  // Re-render whichever view shows connection state (overview strips OR the
+  // account Connections section) after a status change.
+  function rerenderConnectionViews() {
+    if (state.view === 'overview') renderOverview(false);
+    else if (state.view === 'account') renderAccountView();
+  }
+
   async function refreshFathomStatusInBackground() {
     try {
       state.fathomStatus = await fetchFathomStatus();
@@ -2259,7 +2299,7 @@
       // get stuck in a stale connected state.
       state.fathomStatus = { connected: false };
     }
-    if (state.view === 'overview') renderOverview(false);
+    rerenderConnectionViews();
   }
 
   // Button handler: kicks off OAuth in a popup window. The popup later
@@ -2544,6 +2584,10 @@
     if (state.fathomSyncing) {
       inner = renderFathomStripSyncing();
     } else if (!state.fathomStatus.connected) {
+      // First-run-only: the connect card shows on the dashboard ONLY when no
+      // source is connected yet. Once any source is connected, Fathom's connect
+      // button lives solely in the #account Connections section.
+      if (anySourceConnected()) return '';
       inner = renderFathomConnectCard();
     } else if (state.fathomNeedsIdentity) {
       inner = renderFathomIdentityPrompt();
@@ -2572,6 +2616,7 @@
     if (!state.zoomStatus) return '';
     var inner;
     if (!state.zoomStatus.connected) {
+      if (anySourceConnected()) return '';  // first-run-only; Connect lives in #account Connections
       inner = '<div class="fathom-connect-card">'
         + '<div class="fathom-connect-text">'
           + '<div class="fathom-connect-title">Connect Zoom</div>'
@@ -3752,6 +3797,9 @@
       state.account = { _error: err.message || 'unknown' };
     }
     state.accountLoading = false;
+    // Connections section needs both provider statuses; fetch if not already loaded.
+    if (state.fathomStatus === null) refreshFathomStatusInBackground();
+    if (state.zoomStatus === null) refreshZoomStatusInBackground();
     if (state.view === 'account') renderAccountView();
   }
 
@@ -3802,6 +3850,38 @@
 
   function acctRow(label, inner) {
     return '<div class="eod-row"><div class="eod-label">' + label + '</div>' + inner + '</div>';
+  }
+
+  // Connections section for #account — the ONLY management surface. Both
+  // providers, each with state + Connect/Reconnect/Disconnect. Shown to ALL
+  // users (exempt from the managed lock, same rationale as Password).
+  function connectionRowHtml(provider) {
+    var isZoom = provider === 'zoom';
+    var label = isZoom ? 'Zoom' : 'Fathom';
+    var st = isZoom ? state.zoomStatus : state.fathomStatus;
+    var connectFn = isZoom ? 'connectZoom()' : 'connectFathom()';
+    var right;
+    if (st === null) {
+      right = '<span class="meta">…</span>';
+    } else if (!st.connected) {
+      right = '<span class="conn-state">Not connected</span>'
+        + '<button class="btn-fathom-primary" type="button" onclick="' + connectFn + '">Connect</button>';
+    } else {
+      var email = isZoom ? st.account_email : (st.fathom_email || null);
+      var since = st.connected_at ? formatRelativeTime(st.connected_at) : null;
+      var meta = [email ? escapeHtml(email) : null, since ? 'since ' + escapeHtml(since) : null].filter(Boolean).join(' · ');
+      right = '<span class="conn-state ok"><span class="fathom-strip-icon ok"></span> Connected' + (meta ? ' <span class="meta">· ' + meta + '</span>' : '') + '</span>'
+        + '<button class="btn-fathom-secondary" type="button" onclick="' + connectFn + '">Reconnect</button>'
+        + '<button class="btn-fathom-secondary conn-disconnect" type="button" onclick="disconnectProvider(\'' + provider + '\')">Disconnect</button>';
+    }
+    return '<div class="eod-row conn-row"><div class="eod-label">' + label + '</div>'
+      + '<div class="conn-right">' + right + '</div></div>';
+  }
+  function renderConnectionsSectionHtml() {
+    return renderZoomNoticeHtml() + renderFathomNoticeHtml()
+      + connectionRowHtml('fathom')
+      + connectionRowHtml('zoom')
+      + '<div class="meta" style="margin-top:8px;">Disconnecting keeps your synced calls, grades, and clips — it only stops new calls from coming in.</div>';
   }
 
   function renderAccountView() {
@@ -3865,6 +3945,7 @@
 
     content.innerHTML =
         '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Connections</h2><div class="meta">your call recording sources</div></div>' + renderConnectionsSectionHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>';
