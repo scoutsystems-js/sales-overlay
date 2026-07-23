@@ -1985,6 +1985,8 @@
     chartType:       null,
     // Fathom integration (Scout v2.0 Phase 1)
     fathomStatus:    null,    // null until /fathom/status fetch completes; then { connected: bool, ... }
+    zoomStatus:      null,    // null until /zoom/status fetch completes; then { connected: bool, ... }
+    zoomNotice:      null,    // {kind,text} after a connect attempt
     fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
     fathomReanalyzing: false, // true while a /fathom/reanalyze request is in flight; drives the Reanalyze button spinner
@@ -2033,14 +2035,23 @@
       window.close();
       return;
     }
+    var zoomParamEarly = initialParams.get('zoom');
+    if (zoomParamEarly && window.opener && window.opener !== window) {
+      try {
+        window.opener.postMessage({ type: 'scout-zoom-done', kind: zoomParamEarly }, window.location.origin);
+      } catch (e) { /* silent */ }
+      window.close();
+      return;
+    }
 
     // ─── postMessage listener (parent window only) — receives the popup's
     // success/denied/error signal, sets the notice, reloads Fathom status. ───
     window.addEventListener('message', function(e) {
       // Same-origin check — both popup and parent are on this domain.
       if (e.origin !== window.location.origin) return;
-      if (!e.data || e.data.type !== 'scout-fathom-done') return;
-      handleFathomDoneSignal(e.data.kind);
+      if (!e.data) return;
+      if (e.data.type === 'scout-fathom-done') return handleFathomDoneSignal(e.data.kind);
+      if (e.data.type === 'scout-zoom-done') return handleZoomDoneSignal(e.data.kind);
     });
 
     pdiag('page-init-start', { snapshot: (window.ScoutAuth && ScoutAuth.diag) ? ScoutAuth.diag.snapshot() : null });
@@ -2091,6 +2102,13 @@
       var cleanUrl = window.location.pathname + (qs ? '?' + qs : '');
       window.history.replaceState({}, '', cleanUrl);
     }
+    var zoomParam = params.get('zoom');
+    if (zoomParam) {
+      handleZoomDoneSignal(zoomParam);
+      params.delete('zoom');
+      var zqs = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (zqs ? '?' + zqs : ''));
+    }
 
     // Restore the view from the URL hash BEFORE the first load so a refresh or
     // deep link lands on the right page; the 30-day range applies underneath.
@@ -2120,6 +2138,49 @@
     }
     // Fire-and-forget status refresh — render is non-blocking.
     refreshFathomStatusInBackground();
+  }
+
+  function handleZoomDoneSignal(kind) {
+    if (kind === 'connected') {
+      state.zoomNotice = { kind: 'success', text: 'Zoom connected successfully.' };
+    } else if (kind === 'denied') {
+      state.zoomNotice = { kind: 'warn', text: 'Zoom connection was declined. You can try again any time.' };
+    } else {
+      state.zoomNotice = { kind: 'error', text: 'Could not connect Zoom. Please try again.' };
+    }
+    refreshZoomStatusInBackground();
+  }
+
+  async function fetchZoomStatus() {
+    var res = await fetch('/zoom/status', { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+  async function refreshZoomStatusInBackground() {
+    try { state.zoomStatus = await fetchZoomStatus(); }
+    catch (e) { if (e.message === 'unauth') return; state.zoomStatus = { connected: false }; }
+    if (state.view === 'overview') renderOverview(false);
+  }
+
+  // Mirror of connectFathom — opens the Zoom OAuth popup; handleZoomDoneSignal
+  // takes over when the popup lands on /dashboard?zoom=*.
+  async function connectZoom() {
+    try {
+      var res = await fetch('/auth/zoom/connect', { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) { state.zoomNotice = { kind: 'error', text: 'Could not start Zoom connection (HTTP ' + res.status + ').' }; if (state.view === 'overview') renderOverview(false); return; }
+      var data = await res.json();
+      if (!data || !data.url) { state.zoomNotice = { kind: 'error', text: 'Zoom did not return an authorization URL.' }; if (state.view === 'overview') renderOverview(false); return; }
+      var w = 600, h = 720;
+      var left = Math.max(0, Math.floor((window.screen.width - w) / 2));
+      var top  = Math.max(0, Math.floor((window.screen.height - h) / 2));
+      var popup = window.open(data.url, 'zoom_oauth', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
+      if (!popup) { state.zoomNotice = { kind: 'error', text: 'Popup blocked. Please allow popups for this site and try again.' }; if (state.view === 'overview') renderOverview(false); }
+    } catch (err) {
+      state.zoomNotice = { kind: 'error', text: 'Could not start Zoom connection.' };
+      if (state.view === 'overview') renderOverview(false);
+    }
   }
 
   async function fetchMe() {
@@ -2494,6 +2555,45 @@
     return '<section class="section fade-in fathom-section">' + inner + '</section>';
   }
 
+  // Zoom connect section — identical SHAPE to Fathom (same card/strip classes),
+  // connect + connected states only. Paid-plan detection messaging is sub-stage 4.
+  function renderZoomNoticeHtml() {
+    if (!state.zoomNotice) return '';
+    var n = state.zoomNotice;
+    var kind = (n.kind === 'success' || n.kind === 'warn' || n.kind === 'error') ? n.kind : 'success';
+    return '<div class="fathom-notice ' + kind + '">'
+      + '<div class="fathom-notice-text">' + escapeHtml(n.text || '') + '</div>'
+      + '<button class="fathom-notice-dismiss" type="button" aria-label="Dismiss" onclick="dismissZoomNotice()">×</button>'
+      + '</div>';
+  }
+  function dismissZoomNotice() { state.zoomNotice = null; if (state.view === 'overview') renderOverview(false); }
+  function renderZoomSectionHtml() {
+    if (state.viewingUserId !== state.me.user_id) return '';
+    if (!state.zoomStatus) return '';
+    var inner;
+    if (!state.zoomStatus.connected) {
+      inner = '<div class="fathom-connect-card">'
+        + '<div class="fathom-connect-text">'
+          + '<div class="fathom-connect-title">Connect Zoom</div>'
+          + '<div class="fathom-connect-sub">Auto-sync your Zoom cloud recordings so they get graded here — no manual upload. One click, Zoom handles the login.</div>'
+        + '</div>'
+        + '<button class="btn-fathom-primary" type="button" onclick="connectZoom()">Connect Zoom →</button>'
+      + '</div>';
+    } else {
+      var email = state.zoomStatus.account_email ? escapeHtml(state.zoomStatus.account_email) : 'your Zoom account';
+      inner = '<div class="fathom-strip">'
+        + '<div class="fathom-strip-left">'
+          + '<span class="fathom-strip-icon ok"></span>'
+          + '<span class="fathom-strip-text">Zoom connected</span>'
+          + '<span class="fathom-strip-sep">·</span>'
+          + '<span class="fathom-strip-meta">' + email + '</span>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn-fathom-secondary" type="button" onclick="connectZoom()">Reconnect</button></div>'
+      + '</div>';
+    }
+    return '<section class="section fade-in fathom-section">' + renderZoomNoticeHtml() + inner + '</section>';
+  }
+
   // Inline "which email do you use for Fathom?" prompt — shown when sync returns
   // needs_identity. One input (pre-filled with the suggestion) + one Save button.
   function renderFathomIdentityPrompt() {
@@ -2700,6 +2800,9 @@
       var fathomPromise = isSelf()
         ? fetchFathomStatus().catch(function() { return { connected: false }; })
         : Promise.resolve(null); // admin pivot: skip — section hidden anyway
+      var zoomPromise = isSelf()
+        ? fetchZoomStatus().catch(function() { return { connected: false }; })
+        : Promise.resolve(null);
 
       // Coach summary patterns come from an LLM call (/coaching/patterns) and are
       // the flakiest dependency — e.g. it 500s when the Anthropic credit balance
@@ -2718,12 +2821,14 @@
         fetchCalls(),
         fathomPromise,
         fetchAnalytics2(),
+        zoomPromise,
       ]);
       state.analytics    = results[0];
       state.patterns     = results[1];
       state.calls        = results[2];
       state.fathomStatus = results[3];
       state.analytics2   = results[4];
+      state.zoomStatus   = results[5];
       render();
     } catch (err) {
       if (err.message === 'unauth') return;
@@ -2833,6 +2938,7 @@
         + renderModeToggleHtml()
         + renderFathomNoticeHtml()
         + renderFathomSectionHtml()
+        + renderZoomSectionHtml()
         + '<div class="donut-row">'
           + '<div class="skeleton-donut"></div><div class="skeleton-donut"></div><div class="skeleton-donut"></div>'
         + '</div>'
@@ -2857,6 +2963,7 @@
       + renderModeToggleHtml()
       + renderFathomNoticeHtml()
       + renderFathomSectionHtml()
+      + renderZoomSectionHtml()
       + '<div class="donut-row fade-in">'
         + donutCardHtml('chart-calls', 'Calls', t.total_calls, null, 'click to drill in', 'calls')
         + donutCardHtml('chart-objs', 'Objections', obj.totals.total, null, 'click to drill in', 'objections')
@@ -3064,6 +3171,7 @@
       + renderModeToggleHtml()
       + renderFathomNoticeHtml()
       + renderFathomSectionHtml()
+      + renderZoomSectionHtml()
       + '<div class="donut-row fade-in">'
         + donutCardHtml('chart-c-calls', 'Calls analyzed', a.calls.analyzed, a.calls.total_in_range + ' in range', 'click to drill in', '', "drillCalls('analyzed',null)")
         + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, avgScoreSubstat(a.avg_score), 'worst-first — click to drill in', '', "drillCalls('analyzed','score')")
