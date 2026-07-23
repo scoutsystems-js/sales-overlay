@@ -564,6 +564,21 @@ router.get('/zoom/callback', async function(req, res) {
     var email = await fetchZoomAccountEmail(data.access_token);
 
     var admin = getAdminClient();
+
+    // Guard: one Zoom account maps to at most one Scout user. If this Zoom
+    // account (by email) is already connected to a DIFFERENT user, reject —
+    // otherwise a shared/auto-approved Zoom session could silently re-pair to
+    // the wrong Scout login. Reconnecting to the SAME user is allowed (upsert).
+    // Skipped when email is null (best-effort fetch failed — can't dedup).
+    if (email) {
+      var existing = await admin.from('call_connections')
+        .select('user_id').eq('provider', 'zoom').eq('external_account_email', email).maybeSingle();
+      if (!existing.error && existing.data && existing.data.user_id !== userId) {
+        console.warn('[auth] Zoom account ' + email + ' already linked to another Scout user — rejecting connect for ' + userId);
+        return res.redirect('/dashboard?zoom=already_linked');
+      }
+    }
+
     try {
       await callConnections.upsertConnection(admin, {
         user_id:                userId,

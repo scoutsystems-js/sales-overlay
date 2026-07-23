@@ -2152,6 +2152,8 @@
       state.zoomNotice = { kind: 'success', text: 'Zoom connected successfully.' };
     } else if (kind === 'denied') {
       state.zoomNotice = { kind: 'warn', text: 'Zoom connection was declined. You can try again any time.' };
+    } else if (kind === 'already_linked') {
+      state.zoomNotice = { kind: 'error', text: 'This Zoom account is already connected to another Scout user. Disconnect it there first, or use a different Zoom account.' };
     } else {
       state.zoomNotice = { kind: 'error', text: 'Could not connect Zoom. Please try again.' };
     }
