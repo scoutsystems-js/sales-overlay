@@ -166,6 +166,49 @@ router.post('/set-password', async function(req, res) {
   }
 });
 
+// ── POST /auth/change-password ───────────────────────────────────────────────
+// Logged-in password change. RULING: requires CURRENT-password verification
+// server-side (signInWithPassword against the caller's email is the GoTrue
+// verification primitive); the recovery-token path (/auth/set-password) stays
+// exempt — the one-time token is the proof there. Wrong current password →
+// generic 401. No password material is ever logged (standing rule).
+// EXEMPT from the managed lock by ruling: personal security, not business config.
+router.post('/change-password', requireAuth, async function(req, res) {
+  try {
+    var body = req.body || {};
+    var current = body.current_password;
+    var next = body.new_password;
+    if (typeof current !== 'string' || current.length === 0) {
+      return res.status(400).json({ error: 'Current password is required.' });
+    }
+    if (typeof next !== 'string' || next.length < 10) {
+      return res.status(400).json({ error: 'New password must be at least 10 characters.' });
+    }
+    if (next.length > 200) return res.status(400).json({ error: 'New password is too long.' });
+
+    // Verify the current password. A throwaway anon-key client — never the
+    // shared one — so the sign-in attempt can't disturb any other session state.
+    var verifier = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+    var check = await verifier.auth.signInWithPassword({ email: req.user.email, password: current });
+    if (check.error) {
+      return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+
+    var admin = getAdminAuth();
+    var upd = await admin.auth.admin.updateUserById(req.user.id, { password: next });
+    if (upd.error) {
+      console.error('[auth] change-password update failed for user ' + req.user.id + ': ' + upd.error.message);
+      return res.status(500).json({ error: 'Could not change the password. Please try again.' });
+    }
+    console.log('[auth] change-password: password changed for user ' + req.user.id);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
+    console.error('[auth] change-password error:', err.message);
+    res.status(500).json({ error: 'Could not change the password. Please try again.' });
+  }
+});
+
 router.get('/me', requireAuth, async function(req, res) {
   try {
     var admin = getAdminClient();

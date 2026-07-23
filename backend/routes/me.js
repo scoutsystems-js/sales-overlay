@@ -950,4 +950,85 @@ router._extractLabelFromMatchMessage = extractLabelFromMatchMessage;
 router._OBJECTION_LABEL_MAP = OBJECTION_LABEL_MAP;
 router._computeCoachingPatterns = computeCoachingPatterns;
 
+// ─── Account page (Stage 5) ──────────────────────────────────────────────────
+// Self-serve account surface. The managed lock (user_profiles.managed_by IS
+// NOT NULL — the platform's single source of truth, same as kb.js) applies to
+// name edits here; password changes live in routes/auth.js and are EXEMPT
+// from the lock by ruling (personal security, not business config).
+
+function validateNameField(v) {
+  if (typeof v !== 'string') return null;
+  var t = v.trim();
+  return (t.length >= 1 && t.length <= 60) ? t : null;
+}
+
+function buildAccountPayload(prof, email) {
+  prof = prof || {};
+  return {
+    email: email,
+    first_name: prof.first_name || null,
+    last_name: prof.last_name || null,
+    role: prof.role || 'user',
+    is_managed: !!prof.managed_by,
+    billing: {
+      status: prof.billing_status || 'trial',
+      plan: prof.billing_plan || null,
+      provider: prof.billing_provider || null,
+    },
+  };
+}
+
+// GET /me/account — everything the account page renders.
+router.get('/account', requireAuth, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var q = await admin.from('user_profiles')
+      .select('first_name, last_name, role, managed_by, billing_status, billing_plan, billing_provider')
+      .eq('user_id', req.user.id).maybeSingle();
+    if (q.error) throw new Error('user_profiles: ' + q.error.message);
+    res.json(buildAccountPayload(q.data, req.user.email));
+  } catch (err) {
+    console.error('[me] account:', err.message);
+    res.status(500).json({ error: 'Failed to load account' });
+  }
+});
+
+// PATCH /me/account — allowlisted self-edits (first_name, last_name).
+// FRESH managed_by check per mutation: the lock's source of truth is the
+// column, not a stale UI flag. Managed users → 403.
+router.patch('/account', requireAuth, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var lock = await admin.from('user_profiles').select('managed_by').eq('user_id', req.user.id).maybeSingle();
+    if (lock.error) throw new Error('lock check: ' + lock.error.message);
+    if (lock.data && lock.data.managed_by) {
+      return res.status(403).json({ error: 'Your account is managed by your admin — ask them to make changes.' });
+    }
+    var body = req.body || {};
+    var updates = {};
+    if (body.first_name !== undefined) {
+      var fn = validateNameField(body.first_name);
+      if (!fn) return res.status(400).json({ error: 'first_name must be 1-60 characters' });
+      updates.first_name = fn;
+    }
+    if (body.last_name !== undefined) {
+      var ln = validateNameField(body.last_name);
+      if (!ln) return res.status(400).json({ error: 'last_name must be 1-60 characters' });
+      updates.last_name = ln;
+    }
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: first_name, last_name)' });
+    updates.updated_at = new Date().toISOString();
+    var up = await admin.from('user_profiles').update(updates).eq('user_id', req.user.id);
+    if (up.error) throw new Error('update: ' + up.error.message);
+    console.log('[me] account updated: user=%s fields=%s', req.user.id, Object.keys(updates).filter(function(k){return k!=='updated_at';}).join(','));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[me] account update:', err.message);
+    res.status(500).json({ error: 'Failed to update account' });
+  }
+});
+
 module.exports = router;
+// pure helpers exported for tests (log.js:_validateLogBatch pattern)
+module.exports._validateNameField = validateNameField;
+module.exports._buildAccountPayload = buildAccountPayload;
