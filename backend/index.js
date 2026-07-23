@@ -14,6 +14,7 @@ const kbRoutes = require('./routes/kb');
 const fathomRoutes = require('./routes/fathom');
 const teamRoutes = require('./routes/team');
 const eodRoutes = require('./routes/eod');
+const zoomRoutes = require('./routes/zoom');
 const welcomeEmail = require('./lib/welcome-email');
 
 const app = express();
@@ -84,6 +85,7 @@ app.use('/kb', kbRoutes);
 app.use('/fathom', fathomRoutes);
 app.use('/team', teamRoutes);
 app.use('/eod', eodRoutes);
+app.use('/zoom', zoomRoutes);
 
 // Global error handler
 app.use(function(err, req, res, next) {
