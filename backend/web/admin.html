@@ -976,7 +976,7 @@
     return fieldControl(u, 'role', u.role, opts);
   }
   function managedByControlHtml(u, mgrs) {
-    var opts = '<option value="">None</option>' + mgrs.filter(function(m) { return m.user_id !== u.user_id; }).map(function(m) {
+    var opts = '<option value="">None — single user</option>' + mgrs.filter(function(m) { return m.user_id !== u.user_id; }).map(function(m) {
       var lbl = (m.email || m.user_id.slice(0, 8)) + ' (' + roleLabel(m.role) + ')';
       return '<option value="' + escapeHtml(m.user_id) + '"' + (u.managed_by === m.user_id ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>';
     }).join('');
@@ -1038,7 +1038,7 @@
     document.getElementById('cuEmail').value = '';
     document.getElementById('cuRole').value = 'user';
     var mb = document.getElementById('cuManagedBy');
-    mb.innerHTML = '<option value="">None</option>' + managersList().map(function(m) {
+    mb.innerHTML = '<option value="">None — single user</option>' + managersList().map(function(m) {
       return '<option value="' + escapeHtml(m.user_id) + '">' + escapeHtml((m.email || m.user_id.slice(0, 8)) + ' (' + roleLabel(m.role) + ')') + '</option>';
     }).join('');
     var err = document.getElementById('cuError'); err.textContent = ''; err.classList.add('hidden');

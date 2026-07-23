@@ -27,6 +27,8 @@
       --bg-hover:     #1a1a1a;
       --bg-deep:      #050505;
       --border:       #1f1f1f;
+      --border-strong: #2e2e2e;  /* visible on both --bg and --bg-elevated — sections + form fields */
+      --bg-field:      #1c1c1c;  /* form-field surface: one step lighter than the section card */
       --border-hover: #2a2a2a;
       --border-focus: #3b3b3b;
       --text:         #ededed;
@@ -284,7 +286,9 @@
        dashboard, call review, and objections views. box-sizing:border-box is
        global, so the border adds no layout shift. review-why keeps its accent
        border-left (overrides just the left edge). */
-    .section { margin-bottom: 48px; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px 22px; }
+    /* Sections are distinct surfaces (2026-07-23 ruling — --border alone was
+       invisible on --bg, which is why the earlier separation pass didn't stick). */
+    .section { margin-bottom: 48px; background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 20px 22px; }
     .section-header {
       display: flex;
       align-items: baseline;
@@ -1420,7 +1424,7 @@
     .eod-call { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 14px 16px; margin-bottom: 12px; }
     .eod-row { display: flex; align-items: baseline; gap: 8px; margin: 6px 0; }
     .eod-label { flex: 0 0 110px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
-    .eod-input, .eod-textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 6px 9px; font-size: 13px; font-family: inherit; }
+    .eod-input, .eod-textarea { flex: 1; background: var(--bg-field); border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--text); padding: 6px 9px; font-size: 13px; font-family: inherit; }
     .eod-textarea { min-height: 60px; resize: vertical; line-height: 1.45; }
     .eod-input.edited, .eod-textarea.edited { border-color: var(--accent); }
     .eod-edited-dot { font-size: 10px; color: var(--accent); }
@@ -1783,6 +1787,19 @@
       .kb-modal-dialog { padding: 20px; }
       .kb-item { flex-direction: column; align-items: flex-start; }
       .kb-delete-btn { align-self: flex-end; }
+    }
+    /* Platform-wide form-field visibility (2026-07-23 ruling): no field ever
+       sits black-on-black. Lighter surface + visible border, accent on focus.
+       Placed last so it wins specificity ties with older per-view rules. */
+    .page input[type="text"], .page input[type="password"], .page input[type="date"], .page select, .page textarea {
+      background: var(--bg-field);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      border-radius: var(--radius);
+    }
+    .page input[type="text"]:focus, .page input[type="password"]:focus, .page input[type="date"]:focus, .page select:focus, .page textarea:focus {
+      border-color: var(--accent);
+      outline: none;
     }
   </style>
   <script src="/js/scout-auth.js"></script>
@@ -3580,7 +3597,7 @@
     var h = (window.location.hash || '').replace(/^#/, '');
     if (h === 'calls') { state.view = 'call-library'; }
     else if (h === 'eod') { state.view = 'eod'; }
-    else if (h === 'account') { state.view = 'account'; }
+    else if (h === 'account') { state.view = 'account'; state.account = null; /* fresh on hash entry too */ }
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'team') { state.view = 'team'; }
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
@@ -3608,7 +3625,12 @@
   // editor), Billing (badge + provider-keyed action slot; dead-ends to a
   // contact-admin mailto until billing_provider is set by a future
   // integration stage).
-  function goAccount() { setView('account'); }
+  // Fresh on every entry: the account payload (incl. is_managed) must reflect
+  // admin-side changes immediately — clear the cached copy on BOTH entry paths
+  // (nav click here; hash/back-forward in applyHashToState). Server side is
+  // already fresh per request: GET /me/account reads user_profiles live, and
+  // PATCH re-checks managed_by on every mutation.
+  function goAccount() { state.account = null; setView('account'); }
 
   async function loadAccount() {
     if (state.accountLoading) return;
@@ -3692,7 +3714,12 @@
         + acctRow('Last name', '<input type="text" class="eod-input" id="acctLast" value="' + escapeHtml(a.last_name || '') + '">')
         + '<div class="eod-row"><div class="eod-label"></div><div><button class="btn-fathom-secondary" type="button" onclick="saveAccountNames()">Save</button><span class="acct-save-note" id="acctSaveNote"></span></div></div>';
     }
-    profileBody += acctRow('Email', '<div>' + escapeHtml(a.email || '') + ' <span class="meta">· to change your email, contact your admin</span></div>');
+    // Platform-wide dead-end, audience-aware copy (NOT the managed lock —
+    // wording only): managed users route to their admin, unmanaged to us.
+    var emailNote = a.is_managed
+      ? '<span class="meta">· to change your email, contact your admin</span>'
+      : '<span class="meta">· to change your email, <a href="mailto:justin@scoutsystems.io?subject=Scout%20email%20change">contact us</a></span>';
+    profileBody += acctRow('Email', '<div>' + escapeHtml(a.email || '') + ' ' + emailNote + '</div>');
 
     // Password — all users (exempt from the managed lock by ruling)
     var passwordBody =
@@ -3715,9 +3742,16 @@
     // Future integration stage: when billing.provider is non-NULL, this slot
     // becomes the provider's customer-portal link. Until then it dead-ends to
     // the admin, by design.
-    var billingAction = b.provider
-      ? '<a class="btn-fathom-secondary" href="#" onclick="return false;">Manage billing</a>'
-      : '<a class="btn-fathom-secondary" href="mailto:justin@scoutsystems.io?subject=Scout%20billing" style="text-decoration:none;">Billing is handled by your admin — contact us</a>';
+    // Provider-keyed slot semantics unchanged; the NULL-provider dead-end is
+    // audience-aware copy only (not the managed lock).
+    var billingAction;
+    if (b.provider) {
+      billingAction = '<a class="btn-fathom-secondary" href="#" onclick="return false;">Manage billing</a>';
+    } else if (a.is_managed) {
+      billingAction = '<span class="meta">Billing is handled by your admin</span>';
+    } else {
+      billingAction = '<a class="btn-fathom-secondary" href="mailto:justin@scoutsystems.io?subject=Scout%20billing" style="text-decoration:none;">Billing setup is coming soon — questions? Contact us</a>';
+    }
     var billingBody = acctRow('Status', '<div>' + badge + '</div>') + planRow
       + '<div class="eod-row"><div class="eod-label"></div><div>' + billingAction + '</div></div>';
 
