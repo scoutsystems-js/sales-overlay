@@ -25,8 +25,8 @@
       --text-soft:     #cccccc;
       --text-muted:    #8b8b8b;
       --text-dim:      #5a5a5a;
-      --accent:        #5b9eff;
       --good:          #4ade80;
+      --accent:        var(--good);   /* Scout green (logo green) — marketing-page accent only, 2026-07-23. Product/dashboard accent stays blue. */
       --mid:           #fbbf24;
       --radius-sm: 8px;
       --radius:    12px;
@@ -61,7 +61,7 @@
       font-size: 14px; padding: 9px 16px; cursor: pointer; transition: all 0.15s ease;
       border: 1px solid transparent; white-space: nowrap;
     }
-    .btn-primary { background: var(--accent); color: #04122b; }
+    .btn-primary { background: var(--accent); color: #052e16; }  /* dark green-black — readable on the green fill (was navy, tuned for the old blue) */
     .btn-primary:hover { filter: brightness(1.08); }
     .btn-outline { border-color: var(--border-strong); color: var(--text-soft); }
     .btn-outline:hover { border-color: var(--accent); color: var(--text); }
