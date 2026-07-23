@@ -42,4 +42,22 @@ router.get('/status', requireAuth, async function(req, res) {
   }
 });
 
+// ── DELETE /zoom/disconnect ──────────────────────────────────────────────────
+// Deletes the caller's OWN Zoom connection (call_connections, provider='zoom').
+// NEVER touches synced calls / analyses / highlights — history stays.
+router.delete('/disconnect', requireAuth, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var del = await admin.from('call_connections').delete()
+      .eq('user_id', req.user.id).eq('provider', 'zoom');
+    if (del.error) throw new Error('call_connections delete: ' + del.error.message);
+    console.log('[zoom] disconnected user ' + req.user.id + ' (history preserved)');
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
+    console.error('[zoom] disconnect error:', err.message);
+    res.status(500).json({ error: 'Could not disconnect Zoom' });
+  }
+});
+
 module.exports = router;

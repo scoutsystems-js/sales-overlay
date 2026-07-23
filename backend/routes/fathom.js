@@ -892,7 +892,7 @@ router.get('/status', requireAuth, async function(req, res) {
 
     var connPromise = admin
       .from('fathom_connections')
-      .select('connected_at, last_sync_at, last_sync_status, last_sync_error, scope, expires_at')
+      .select('connected_at, last_sync_at, last_sync_status, last_sync_error, scope, expires_at, fathom_email')
       .eq('user_id', userId)
       .maybeSingle();
     var countPromise = admin
@@ -942,6 +942,7 @@ router.get('/status', requireAuth, async function(req, res) {
     var c = connResult.data;
     return res.json({
       connected:        true,
+      fathom_email:     c.fathom_email || null,
       connected_at:     c.connected_at,
       last_sync_at:     c.last_sync_at,
       last_sync_status: c.last_sync_status,
@@ -1173,6 +1174,24 @@ router._fetchRecordingTranscript = fetchRecordingTranscript;
 router._markConnectionError = markConnectionError;
 router._loadCallsList       = loadCallsList;      // shared with /admin/fathom-calls/:user_id
 router._parseCallListOpts   = parseCallListOpts;
+
+// ── DELETE /fathom/disconnect ────────────────────────────────────────────────
+// Deletes the caller's OWN Fathom connection (stops syncing new calls). NEVER
+// touches fathom_calls / call_analyses / call_highlights — history stays.
+// Idempotent: succeeds whether or not a row existed.
+router.delete('/disconnect', requireAuth, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var del = await admin.from('fathom_connections').delete().eq('user_id', req.user.id);
+    if (del.error) throw new Error('fathom_connections delete: ' + del.error.message);
+    console.log('[fathom] disconnected user ' + req.user.id + ' (history preserved)');
+    res.json({ ok: true });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] disconnect error:', err.message);
+    res.status(500).json({ error: 'Could not disconnect Fathom' });
+  }
+});
 
 module.exports = router;
 // pure helper exported for tests (log.js:_validateLogBatch pattern)
