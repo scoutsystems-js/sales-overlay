@@ -487,4 +487,107 @@ router.get('/fathom/callback', async function(req, res) {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Zoom OAuth (sub-stage 1) — mirrors the Fathom connect/callback shape. Writes
+// to the unified call_connections table (provider='zoom'). Reuses the same
+// HMAC state signer (FATHOM_STATE_SECRET) — state only proves user identity,
+// and the callback path is provider-specific, so no new secret is needed.
+// Zoom user-managed OAuth: Basic-auth token endpoint, redirect fixed to
+// ZOOM_REDIRECT_URI (https://www.scoutsystems.io/auth/zoom/callback).
+// ─────────────────────────────────────────────────────────────────────────────
+const zoomClient = require('../lib/zoom-client');
+const callConnections = require('../lib/call-connections');
+
+function requireZoomEnv() {
+  var missing = [];
+  if (!process.env.ZOOM_CLIENT_ID)      missing.push('ZOOM_CLIENT_ID');
+  if (!process.env.ZOOM_CLIENT_SECRET)  missing.push('ZOOM_CLIENT_SECRET');
+  if (!process.env.ZOOM_REDIRECT_URI)   missing.push('ZOOM_REDIRECT_URI');
+  if (!process.env.FATHOM_STATE_SECRET) missing.push('FATHOM_STATE_SECRET'); // shared state signer
+  if (missing.length > 0) throw new Error('Zoom OAuth not configured — set ' + missing.join(', ') + ' in Railway Variables.');
+}
+
+// Best-effort Zoom account email for identity mapping (external_account_email).
+// Never fails the connect — returns null on any error.
+async function fetchZoomAccountEmail(accessToken) {
+  try {
+    var r = await fetch('https://api.zoom.us/v2/users/me', { headers: { 'Authorization': 'Bearer ' + accessToken } });
+    if (!r.ok) return null;
+    var b = await r.json();
+    return (b && typeof b.email === 'string') ? b.email : null;
+  } catch (e) { return null; }
+}
+
+// GET /auth/zoom/connect — returns { url } for the dashboard popup.
+router.get('/zoom/connect', requireAuth, function(req, res) {
+  try {
+    requireZoomEnv();
+    var state = signFathomState(req.user.id); // shared signer
+    var url = zoomClient.buildAuthorizeUrl(process.env.ZOOM_CLIENT_ID, process.env.ZOOM_REDIRECT_URI, state);
+    console.log('[auth] Zoom connect initiated for user ' + req.user.id);
+    res.json({ url: url });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[auth] Zoom connect error:', err.message);
+    res.status(500).json({ error: 'Could not start Zoom OAuth' });
+  }
+});
+
+// GET /auth/zoom/callback — Zoom redirects here (plain browser nav, no auth
+// header). Identity from the signed state only. Every failure REDIRECTS.
+router.get('/zoom/callback', async function(req, res) {
+  if (req.query.error) {
+    console.warn('[auth] Zoom callback returned error: ' + String(req.query.error).slice(0, 200));
+    return res.redirect('/dashboard?zoom=denied');
+  }
+  var code = req.query.code;
+  var state = req.query.state;
+  if (!code || !state) return res.status(400).send('Missing code or state');
+
+  var userId = null;
+  try {
+    requireZoomEnv();
+    var payload = verifyFathomState(state);
+    if (!payload) return res.status(400).send('Invalid or expired state');
+    userId = payload.user_id;
+
+    var data;
+    try {
+      data = await zoomClient.exchangeCode(code, process.env.ZOOM_REDIRECT_URI);
+    } catch (exErr) {
+      console.error('[auth] Zoom token exchange failed for user ' + userId + ': ' + exErr.message);
+      return res.redirect('/dashboard?zoom=error');
+    }
+
+    var nowSec = Math.floor(Date.now() / 1000);
+    var expiresAt = new Date((nowSec + data.expires_in - TOKEN_EXPIRY_TOLERANCE_SECONDS) * 1000).toISOString();
+    var email = await fetchZoomAccountEmail(data.access_token);
+
+    var admin = getAdminClient();
+    try {
+      await callConnections.upsertConnection(admin, {
+        user_id:                userId,
+        provider:               'zoom',
+        access_token:           data.access_token,
+        refresh_token:          data.refresh_token,
+        expires_at:             expiresAt,
+        scope:                  data.scope || null,
+        external_account_email: email,
+        connected_at:           new Date().toISOString(),
+        last_sync_status:       null,
+        last_sync_error:        null,
+      });
+    } catch (upErr) {
+      console.error('[auth] Zoom connection upsert failed for user ' + userId + ': ' + upErr.message);
+      return res.redirect('/dashboard?zoom=error');
+    }
+
+    console.log('[auth] Zoom connection stored for user ' + userId + ' (expires_in=' + data.expires_in + 's, email=' + (email ? 'set' : 'null') + ')');
+    return res.redirect('/dashboard?zoom=connected');
+  } catch (err) {
+    console.error('[auth] Zoom callback fatal for user ' + (userId || 'unknown') + ':', err.message);
+    return res.redirect('/dashboard?zoom=error');
+  }
+});
+
 module.exports = router;
