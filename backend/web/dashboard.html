@@ -1425,6 +1425,13 @@
     .eod-input.edited, .eod-textarea.edited { border-color: var(--accent); }
     .eod-edited-dot { font-size: 10px; color: var(--accent); }
     .eod-copy-note { font-size: 12px; color: var(--good); margin-left: 8px; }
+    /* Account view */
+    .acct-notice { font-size: 13px; color: var(--text-muted); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin: 8px 0; }
+    .acct-save-note { font-size: 12px; margin-left: 10px; }
+    .badge-billing-trial    { background: rgba(251, 191, 36, 0.12); color: var(--mid); }
+    .badge-billing-active   { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+    .badge-billing-past_due { background: rgba(248, 113, 113, 0.12); color: var(--bad); }
+    .badge-billing-canceled { background: rgba(139, 139, 139, 0.10); color: var(--text-muted); }
     .trend { font-size: 13px; }
     .trend.up { color: var(--good); } .trend.down { color: var(--bad); } .trend.flat { color: var(--text-muted); }
     .trend-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; padding: 8px 4px 0; }
@@ -1797,7 +1804,7 @@
   </div>
   <div class="top-bar-right">
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
-    <span id="signedInEmail"></span>
+    <a id="signedInEmail" onclick="goAccount(); return false;" title="Account settings" style="cursor:pointer"></a>
     <span class="signout" onclick="signOut()">Sign out</span>
   </div>
 </nav>
@@ -1946,6 +1953,7 @@
     teamHighlights: null,   teamHighlightsLoading: false,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
+    account:        null,   accountLoading: false,   // Account view (#account)
     analytics:       null,    // last /me/analytics response
     patterns:        null,    // last /me/coaching/patterns response
     calls:           [],      // list from /me/sessions
@@ -2721,6 +2729,7 @@
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'kb') renderKbView();
     else if (state.view === 'eod') renderEodView();
+    else if (state.view === 'account') renderAccountView();
     updateNavActiveStates();
   }
 
@@ -2735,6 +2744,8 @@
     var navCallLibrary = document.getElementById('navCallLibrary');
     var navEod = document.getElementById('navEod');
     if (navEod) navEod.classList.toggle('nav-active', state.view === 'eod');
+    var emailLink = document.getElementById('signedInEmail');
+    if (emailLink) emailLink.classList.toggle('nav-active', state.view === 'account');
     // Objections view is reachable only via the donut (no persistent nav tab);
     // keep the Coaching Dashboard nav highlighted while in it.
     if (navOverview) {
@@ -3550,6 +3561,7 @@
     if (state.view === 'objections-intel') return 'objections';
     if (state.view === 'kb')               return 'kb';
     if (state.view === 'eod')              return 'eod';
+    if (state.view === 'account')          return 'account';
     if (state.view === 'team')             return 'team';
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     return ''; // overview + dormant drills
@@ -3568,6 +3580,7 @@
     var h = (window.location.hash || '').replace(/^#/, '');
     if (h === 'calls') { state.view = 'call-library'; }
     else if (h === 'eod') { state.view = 'eod'; }
+    else if (h === 'account') { state.view = 'account'; }
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'team') { state.view = 'team'; }
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
@@ -3588,6 +3601,132 @@
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
   window.addEventListener('hashchange', onRouteChange);
+
+  // ═══ Account view (#account, Stage 5) ════════════════════════════════════
+  // Profile (name edits — managed lock applies), Password (all users —
+  // exempt from the lock by ruling), Offer (link to KB, never a second
+  // editor), Billing (badge + provider-keyed action slot; dead-ends to a
+  // contact-admin mailto until billing_provider is set by a future
+  // integration stage).
+  function goAccount() { setView('account'); }
+
+  async function loadAccount() {
+    if (state.accountLoading) return;
+    state.accountLoading = true;
+    try {
+      var res = await fetch('/me/account', { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      state.account = await res.json();
+    } catch (err) {
+      state.account = { _error: err.message || 'unknown' };
+    }
+    state.accountLoading = false;
+    if (state.view === 'account') renderAccountView();
+  }
+
+  async function saveAccountNames() {
+    var note = document.getElementById('acctSaveNote');
+    var body = {
+      first_name: document.getElementById('acctFirst').value,
+      last_name: document.getElementById('acctLast').value,
+    };
+    try {
+      var res = await fetch('/me/account', {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify(body),
+      });
+      var data = null; try { data = await res.json(); } catch (e) {}
+      if (!res.ok) { note.textContent = (data && data.error) || 'Save failed'; note.style.color = 'var(--bad)'; return; }
+      note.textContent = '✓ Saved'; note.style.color = 'var(--good)';
+      if (state.account) { state.account.first_name = body.first_name; state.account.last_name = body.last_name; }
+      setTimeout(function () { if (note) note.textContent = ''; }, 3000);
+    } catch (e) { note.textContent = 'Could not reach server'; note.style.color = 'var(--bad)'; }
+  }
+
+  async function changePassword() {
+    var note = document.getElementById('pwChangeNote');
+    var cur = document.getElementById('pwCurrent').value;
+    var n1 = document.getElementById('pwNew').value;
+    var n2 = document.getElementById('pwNew2').value;
+    note.style.color = 'var(--bad)';
+    if (!cur) { note.textContent = 'Enter your current password.'; return; }
+    if (n1.length < 10) { note.textContent = 'New password must be at least 10 characters.'; return; }
+    if (n1 !== n2) { note.textContent = "Those passwords don't match."; return; }
+    try {
+      var res = await fetch('/auth/change-password', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ current_password: cur, new_password: n1 }),
+      });
+      var data = null; try { data = await res.json(); } catch (e) {}
+      if (!res.ok) { note.textContent = (data && data.error) || 'Could not change the password.'; return; }
+      note.textContent = '✓ Password changed'; note.style.color = 'var(--good)';
+      document.getElementById('pwCurrent').value = '';
+      document.getElementById('pwNew').value = '';
+      document.getElementById('pwNew2').value = '';
+      setTimeout(function () { if (note) note.textContent = ''; }, 4000);
+    } catch (e) { note.textContent = 'Could not reach server'; }
+  }
+
+  function acctRow(label, inner) {
+    return '<div class="eod-row"><div class="eod-label">' + label + '</div>' + inner + '</div>';
+  }
+
+  function renderAccountView() {
+    var content = document.getElementById('content');
+    if (state.account === null && !state.accountLoading) loadAccount();
+    var a = state.account;
+    if (!a) { content.innerHTML = '<div class="section fade-in"><div class="skeleton" style="height:160px;"></div></div>'; return; }
+    if (a._error) { content.innerHTML = '<div class="section fade-in"><div class="error">Could not load account: ' + escapeHtml(a._error) + '</div></div>'; return; }
+
+    var managedNotice = '<div class="acct-notice">Your account is managed by your admin — ask them to make changes.</div>';
+
+    // Profile
+    var profileBody;
+    if (a.is_managed) {
+      profileBody = acctRow('Name', '<div>' + escapeHtml([a.first_name, a.last_name].filter(Boolean).join(' ') || '—') + '</div>') + managedNotice;
+    } else {
+      profileBody = acctRow('First name', '<input type="text" class="eod-input" id="acctFirst" value="' + escapeHtml(a.first_name || '') + '">')
+        + acctRow('Last name', '<input type="text" class="eod-input" id="acctLast" value="' + escapeHtml(a.last_name || '') + '">')
+        + '<div class="eod-row"><div class="eod-label"></div><div><button class="btn-fathom-secondary" type="button" onclick="saveAccountNames()">Save</button><span class="acct-save-note" id="acctSaveNote"></span></div></div>';
+    }
+    profileBody += acctRow('Email', '<div>' + escapeHtml(a.email || '') + ' <span class="meta">· to change your email, contact your admin</span></div>');
+
+    // Password — all users (exempt from the managed lock by ruling)
+    var passwordBody =
+        acctRow('Current', '<input type="password" class="eod-input" id="pwCurrent" autocomplete="current-password">')
+      + acctRow('New', '<input type="password" class="eod-input" id="pwNew" autocomplete="new-password" placeholder="At least 10 characters">')
+      + acctRow('Confirm', '<input type="password" class="eod-input" id="pwNew2" autocomplete="new-password">')
+      + '<div class="eod-row"><div class="eod-label"></div><div><button class="btn-fathom-secondary" type="button" onclick="changePassword()">Change password</button><span class="acct-save-note" id="pwChangeNote"></span></div></div>';
+
+    // Offer — link to the KB, never a second editor
+    var offerBody = a.is_managed
+      ? '<div class="acct-notice">Your offer materials and knowledge base are managed by your admin.</div>'
+      : '<div class="acct-notice" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;">'
+        + '<span>Your offer docs, scripts, and winning calls live in your Knowledge Base — they ground your call grading.</span>'
+        + '<button class="btn-fathom-secondary" type="button" onclick="goKb()">Open Knowledge Base →</button></div>';
+
+    // Billing — badge + provider-keyed action slot
+    var b = a.billing || {};
+    var badge = '<span class="badge badge-billing-' + escapeHtml(b.status || 'trial') + '">' + escapeHtml((b.status || 'trial').replace('_', ' ')) + '</span>';
+    var planRow = b.plan ? acctRow('Plan', '<div>' + escapeHtml(b.plan) + '</div>') : '';
+    // Future integration stage: when billing.provider is non-NULL, this slot
+    // becomes the provider's customer-portal link. Until then it dead-ends to
+    // the admin, by design.
+    var billingAction = b.provider
+      ? '<a class="btn-fathom-secondary" href="#" onclick="return false;">Manage billing</a>'
+      : '<a class="btn-fathom-secondary" href="mailto:justin@scoutsystems.io?subject=Scout%20billing" style="text-decoration:none;">Billing is handled by your admin — contact us</a>';
+    var billingBody = acctRow('Status', '<div>' + badge + '</div>') + planRow
+      + '<div class="eod-row"><div class="eod-label"></div><div>' + billingAction + '</div></div>';
+
+    content.innerHTML =
+        '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>';
+  }
 
   // ═══ EOD Report view ═══════════════════════════════════════════════════
   // Per-user daily report: analysis-prefilled, inline-editable (edits persist
