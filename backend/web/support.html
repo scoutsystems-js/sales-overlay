@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Support — Scout Systems</title>
+  <meta name="robots" content="all"/>
+  <style>
+    :root {
+      --bg: #0a0a0a; --bg-elevated: #131313; --border: #1f1f1f; --border-strong: #2e2e2e;
+      --text: #ededed; --text-soft: #cccccc; --text-muted: #8b8b8b; --text-dim: #5a5a5a;
+      --accent: #4ade80; --radius: 12px; --radius-lg: 16px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.65; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; max-width: 900px; margin: 0 auto; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; color: var(--text); }
+    .wrap { max-width: 780px; margin: 0 auto; padding: 24px; }
+    .legal-head { padding: 24px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 28px; }
+    h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 800; letter-spacing: -0.02em; }
+    .updated { color: var(--text-dim); font-size: 13px; margin-top: 8px; }
+    .legal-body h2 { font-size: 20px; font-weight: 700; margin: 28px 0 10px; color: var(--text); }
+    .legal-body p, .legal-body li { color: var(--text-soft); font-size: 15px; margin-bottom: 12px; }
+    .legal-body ul { margin: 0 0 12px 22px; }
+    .footer { max-width: 900px; margin: 40px auto 0; padding: 24px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+    .footer a { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="/" class="nav-logo">
+      <svg width="22" height="24" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="#4ade80" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="#4ade80" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="#4ade80" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <circle cx="10" cy="12" r="1.6" fill="#4ade80"/><circle cx="10" cy="16" r="1.2" fill="#4ade80"/><circle cx="10" cy="19.5" r="0.8" fill="#4ade80"/>
+      </svg>
+      <span>Scout</span>
+    </a>
+    <a href="/" style="color:var(--text-muted);font-size:14px;">&#8592; Back to site</a>
+  </nav>
+  <main class="wrap">
+    <div class="legal-head">
+      <h1>Scout Support</h1>
+    </div>
+    <div class="legal-body">
+      <p>Need help with Scout? We&#8217;re a small team and we answer fast.</p>
+      <p><strong>Email:</strong> <a href="mailto:justin@scoutsystems.io">justin@scoutsystems.io</a> &#8212; every message is read by a founder.<br>
+      <strong>Hours:</strong> Monday&#8211;Friday, 9:00 AM&#8211;6:00 PM Eastern Time.<br>
+      <strong>Response time:</strong> within 1 business day (usually much faster).</p>
+      <p>Common questions &#8212; adding Scout, connecting Zoom or Fathom, and removing Scout &#8212; are covered in our documentation at <a href="https://www.scoutsystems.io/docs">https://www.scoutsystems.io/docs</a>.</p>
+      <p>For account access issues, billing questions, or data deletion requests, email us and we&#8217;ll take care of it.</p>
+    </div>
+  </main>
+  <footer class="footer">
+    <span>&#169; 2026 Scout Systems. All rights reserved.</span>
+    <span><a href="/privacy">Privacy</a> &#183; <a href="/terms">Terms</a> &#183; <a href="/docs">Docs</a> &#183; <a href="/support">Support</a></span>
+  </footer>
+</body>
+</html>

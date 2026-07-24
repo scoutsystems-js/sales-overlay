@@ -105,6 +105,9 @@ app.get('/terms', function(req, res) {
 app.get('/docs', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'docs.html'));
 });
+app.get('/support', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'support.html'));
+});
 
 app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
