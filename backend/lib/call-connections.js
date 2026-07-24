@@ -31,6 +31,15 @@ var REFRESHERS = {
   zoom: function (refreshToken) { return require('./zoom-client').refreshTokens(refreshToken); },
 };
 
+// SERIALIZED SINGLE-FLIGHT refresh (design ruling 2026-07-24). Zoom refresh
+// tokens are single-use and rotate every refresh, so two concurrent refreshes
+// for the same connection brick it (the loser presents an already-consumed
+// token). This map holds the in-flight refresh promise per (user, provider) so
+// concurrent callers JOIN one refresh instead of racing. In-process (one
+// Railway instance; analysis dispatch loops are already sequential) — a DB
+// advisory lock would be the multi-instance extension.
+var _inflight = {};
+
 // Returns a valid access token for (user, provider), refreshing + persisting
 // the rotated refresh_token when stale. Throws if no connection exists or the
 // refresh fails (caller decides how to surface — mirrors Fathom's behavior).
@@ -39,9 +48,24 @@ async function getValidAccessToken(admin, userId, provider, conn) {
   if (!conn) throw new Error(provider + ' connection not found for user ' + userId);
   if (!needsRefresh(conn.expires_at, Date.now())) return conn.access_token;
 
+  var key = userId + '::' + provider;
+  if (_inflight[key]) return _inflight[key];              // join the in-flight refresh
+  _inflight[key] = _refreshAndPersist(admin, userId, provider)
+    .finally(function () { delete _inflight[key]; });      // clear on settle (success OR failure)
+  return _inflight[key];
+}
+
+async function _refreshAndPersist(admin, userId, provider) {
+  // Double-checked: re-read the row inside the critical section. If another
+  // path already refreshed (token now fresh), USE it — never burn a second
+  // single-use refresh token.
+  var cur = await getConnection(admin, userId, provider);
+  if (!cur) throw new Error(provider + ' connection vanished for user ' + userId);
+  if (!needsRefresh(cur.expires_at, Date.now())) return cur.access_token;
+
   var refresher = REFRESHERS[provider];
   if (!refresher) throw new Error('No refresher for provider ' + provider);
-  var data = await refresher(conn.refresh_token);
+  var data = await refresher(cur.refresh_token);
 
   var nowSec = Math.floor(Date.now() / 1000);
   var expiresAt = new Date((nowSec + data.expires_in - 300) * 1000).toISOString(); // 5-min safety margin
@@ -49,7 +73,7 @@ async function getValidAccessToken(admin, userId, provider, conn) {
     access_token:  data.access_token,
     refresh_token: data.refresh_token, // ROTATED — persist in the same write or the connection bricks
     expires_at:    expiresAt,
-    scope:         data.scope || conn.scope || null,
+    scope:         data.scope || cur.scope || null,
     updated_at:    new Date().toISOString(),
   }).eq('user_id', userId).eq('provider', provider);
   if (upd.error) throw new Error('call_connections token persist: ' + upd.error.message);
@@ -68,4 +92,9 @@ module.exports = {
   getValidAccessToken: getValidAccessToken,
   upsertConnection: upsertConnection,
   _needsRefresh: needsRefresh,
+  // test hook: override a provider's refresher, or pass null to restore default
+  _setRefresher: function (provider, fn) {
+    if (fn) REFRESHERS[provider] = fn;
+    else REFRESHERS[provider] = function (rt) { return require('./zoom-client').refreshTokens(rt); };
+  },
 };
