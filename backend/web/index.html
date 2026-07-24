@@ -121,7 +121,9 @@
     .feature p { color: var(--text-muted); font-size: 15px; }
 
     /* ── Pricing ── */
-    .pricing { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 760px; }
+    .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; align-items: stretch; }
+    .price-range { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+    .price-addon { font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
     .price-card {
       background: var(--bg-elevated); border: 1px solid var(--border-strong);
       border-radius: var(--radius-lg); padding: 30px; display: flex; flex-direction: column;
@@ -253,30 +255,40 @@
     <div class="section-label">Pricing</div>
     <h2>Simple pricing</h2>
     <div class="pricing">
-      <div class="price-card featured">
+      <div class="price-card">
         <div class="price-name">Single User</div>
         <div class="price-amount">$199<span class="per">/mo</span></div>
         <div class="price-desc">For the individual closer who wants every call graded.</div>
         <ul class="price-features">
           <li>Unlimited call grading</li>
           <li>Objection clips</li>
-          <li>Coaching &amp; verdicts</li>
+          <li>Coaching</li>
           <li>EOD reports</li>
           <li>Your personal knowledge base</li>
         </ul>
         <a href="mailto:justin@scoutsystems.io?subject=Scout%20access" class="btn btn-primary">Get Scout</a>
       </div>
-      <div class="price-card">
-        <div class="price-name">Team</div>
-        <div class="price-soon">Coming soon</div>
-        <div class="price-desc">For managers running a floor of closers.</div>
+      <div class="price-card featured">
+        <div class="price-name">Teams<div class="price-range">1&#8211;19 users</div></div>
+        <div class="price-amount">$1,500<span class="per">/mo</span></div>
+        <div class="price-addon">+ $97 per user</div>
+        <div class="price-desc">Everything in Single User for every rep, plus:</div>
         <ul class="price-features">
           <li>Manager dashboards</li>
           <li>Team-wide insights</li>
           <li>Daily digests</li>
-          <li>Call highlights of the week</li>
         </ul>
-        <a href="mailto:justin@scoutsystems.io?subject=Scout%20team%20waitlist" class="btn btn-outline">Get on the list →</a>
+        <a href="mailto:justin@scoutsystems.io?subject=Scout%20team" class="btn btn-primary">Get Scout for your team</a>
+      </div>
+      <div class="price-card">
+        <div class="price-name">Agency<div class="price-range">20+ users</div></div>
+        <div class="price-amount">$5,000<span class="per">/mo</span></div>
+        <div class="price-addon">+ $97 per user</div>
+        <div class="price-desc">For sales organizations running 20+ closers.</div>
+        <ul class="price-features">
+          <li>Everything in Teams, at scale</li>
+        </ul>
+        <a href="mailto:justin@scoutsystems.io?subject=Scout%20agency" class="btn btn-outline">Talk to us</a>
       </div>
     </div>
   </div>
