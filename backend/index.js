@@ -68,6 +68,9 @@ app.get('/privacy', function(req, res) {
 app.get('/terms', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'terms.html'));
 });
+app.get('/docs', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'docs.html'));
+});
 
 app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
