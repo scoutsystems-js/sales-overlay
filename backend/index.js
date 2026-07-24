@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 
 const authRoutes = require('./routes/auth');
@@ -23,6 +24,39 @@ const PORT = process.env.PORT || 3000;
 // Stripe webhooks need raw body — must be before express.json()
 app.use('/billing/webhook', express.raw({ type: 'application/json' }));
 
+// Security headers (helmet). CSP is PERMISSIVE-BUT-REAL by design (2026-07-24
+// DAST pass): the served pages use inline <script>/onclick and inline styles
+// everywhere, and load Chart.js from jsdelivr — so script/style-src allow
+// 'unsafe-inline' + the jsdelivr CDN, or the product breaks. Tighten to nonces
+// later. connect/frame/media-src pre-allow the provider hosts (Supabase signed
+// clips, Zoom/Fathom) so sub-stage-3 playback + OAuth popups keep working.
+// COEP left OFF (require-corp breaks cross-origin images); CORP cross-origin +
+// open CORS stay for the desktop Electron client (API is Bearer-auth'd).
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:     ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      // MUST override helmet's default script-src-attr:'none' or every inline
+      // onclick= handler across the product is blocked (curl can't see this —
+      // CSP only bites in a browser).
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc:      ["'self'", "'unsafe-inline'"],
+      imgSrc:      ["'self'", "data:", "https:"],
+      fontSrc:     ["'self'", "data:"],
+      connectSrc:  ["'self'", "https://*.supabase.co", "https://api.zoom.us", "https://*.fathom.video", "https://api.anthropic.com", "https://api.github.com"],
+      frameSrc:    ["'self'", "https://*.fathom.video", "https://*.zoom.us"],
+      mediaSrc:    ["'self'", "https://*.supabase.co", "blob:"],
+      objectSrc:   ["'none'"],
+      baseUri:     ["'self'"],
+      formAction:  ["'self'"],
+      frameAncestors: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  hsts: { maxAge: 15552000, includeSubDomains: true },
+}));
 app.use(cors());
 app.use(express.json());
 
