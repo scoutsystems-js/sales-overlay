@@ -62,6 +62,13 @@ app.get('/set-password', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'set-password.html'));
 });
 
+app.get('/privacy', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'privacy.html'));
+});
+app.get('/terms', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'terms.html'));
+});
+
 app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
 });
