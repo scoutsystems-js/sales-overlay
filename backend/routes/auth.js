@@ -507,15 +507,18 @@ function requireZoomEnv() {
   if (missing.length > 0) throw new Error('Zoom OAuth not configured — set ' + missing.join(', ') + ' in Railway Variables.');
 }
 
-// Best-effort Zoom account email for identity mapping (external_account_email).
-// Never fails the connect — returns null on any error.
-async function fetchZoomAccountEmail(accessToken) {
+// Best-effort Zoom account identity (email for display, id for deauthorization
+// targeting). Never fails the connect — returns {email:null,id:null} on error.
+async function fetchZoomAccountInfo(accessToken) {
   try {
     var r = await fetch('https://api.zoom.us/v2/users/me', { headers: { 'Authorization': 'Bearer ' + accessToken } });
-    if (!r.ok) return null;
+    if (!r.ok) return { email: null, id: null };
     var b = await r.json();
-    return (b && typeof b.email === 'string') ? b.email : null;
-  } catch (e) { return null; }
+    return {
+      email: (b && typeof b.email === 'string') ? b.email : null,
+      id:    (b && typeof b.id === 'string') ? b.id : null,
+    };
+  } catch (e) { return { email: null, id: null }; }
 }
 
 // GET /auth/zoom/connect — returns { url } for the dashboard popup.
@@ -561,7 +564,8 @@ router.get('/zoom/callback', async function(req, res) {
 
     var nowSec = Math.floor(Date.now() / 1000);
     var expiresAt = new Date((nowSec + data.expires_in - TOKEN_EXPIRY_TOLERANCE_SECONDS) * 1000).toISOString();
-    var email = await fetchZoomAccountEmail(data.access_token);
+    var zoomInfo = await fetchZoomAccountInfo(data.access_token);
+    var email = zoomInfo.email;
 
     var admin = getAdminClient();
 
@@ -588,6 +592,7 @@ router.get('/zoom/callback', async function(req, res) {
         expires_at:             expiresAt,
         scope:                  data.scope || null,
         external_account_email: email,
+        external_account_id:    zoomInfo.id,
         connected_at:           new Date().toISOString(),
         last_sync_status:       null,
         last_sync_error:        null,
