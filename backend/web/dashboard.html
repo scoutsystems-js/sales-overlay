@@ -1480,6 +1480,11 @@
     .team-detail-fill { height: 100%; background: var(--accent); border-radius: 5px; }
     .team-detail-val { width: 150px; text-align: right; font-size: 15px; font-weight: 600; color: var(--text); flex-shrink: 0; }
     .team-detail-sub { display: block; font-size: 11px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
+    /* B-1 redesign: compact recommendations card → dedicated expanded page */
+    .team-recs-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px 18px; cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
+    .team-recs-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .team-recs-teaser { font-size: 14px; color: var(--text); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .team-recs-expand { font-size: 12px; font-weight: 600; color: var(--accent); margin-top: 8px; }
     .team-lane-row { display: flex; flex-wrap: wrap; gap: 14px; }
     .team-lane { flex: 1; min-width: 240px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px; }
     .team-lane-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 700; margin-bottom: 6px; }
@@ -1994,6 +1999,7 @@
     teamHighlights: null,   teamHighlightsLoading: false,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
     teamDetailMetric: null, // glance-box detail drill: null | 'cash' | 'close' | 'objection'
+    teamRangeInit:  false,  // team view forces a 7-day default on first entry, then user presets stick
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     account:        null,   accountLoading: false,   // Account view (#account)
     analytics:       null,    // last /me/analytics response
@@ -2914,6 +2920,7 @@
     else if (state.view === 'call-review') renderCallReview();
     else if (state.view === 'objections-intel') renderObjectionsIntel();
     else if (state.view === 'team') renderTeamView();
+    else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'kb') renderKbView();
     else if (state.view === 'eod') renderEodView();
     else if (state.view === 'account') renderAccountView();
@@ -2939,7 +2946,7 @@
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel');
     }
     var navTeam = document.getElementById('navTeam');
-    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team');
+    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded');
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
     if (navCallLibrary) {
@@ -3510,13 +3517,15 @@
     state.teamHighlights = null; state.teamDigest = null; state.teamDigestDate = null;
     state.teamDetailMetric = null; // exit any glance-box detail when team/range changes
   }
-  function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamView(); }
+  // Re-render whichever team surface is active (main view or the expanded page).
+  function renderTeamSurface() { if (state.view === 'team-expanded') renderTeamExpanded(); else renderTeamView(); }
+  function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamSurface(); }
   function setTeamTrendBucket(b) { state.teamTrendBucket = b; state.teamTrends = null; loadTeam('trends'); }
   function setTeamRange(days) {
     var to = new Date();
     var from = days >= 9999 ? new Date('2025-01-01T00:00:00Z') : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
-    resetTeamData(); renderTeamView();
+    resetTeamData(); renderTeamSurface();
   }
   // Generic lazy loader for each team panel.
   async function loadTeam(which) {
@@ -3535,16 +3544,26 @@
     catch (err) { if (err.message === 'unauth') return; state[c.set] = { _error: err.message || 'unknown' }; }
     if (c.flag) state[c.flag] = false;
     if (state.view === 'team') renderTeamView();
+    else if (state.view === 'team-expanded') renderTeamExpanded();
+  }
+
+  // Team view defaults to LAST 7 DAYS (Justin's spec) — set once on first entry,
+  // then the manager's own preset choices stick.
+  function ensureTeamDefaultRange() {
+    if (state.teamRangeInit) return;
+    state.teamRangeInit = true;
+    var to = new Date(), from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: 7 };
   }
 
   function renderTeamView() {
     var content = document.getElementById('content');
+    ensureTeamDefaultRange();
     if (state.teamContext === null) { loadTeam('context'); }
-    // kick the panels (lazy, once each)
+    // kick the panels this view needs (lazy, once each). Trends removed from the
+    // team view; recs+highlights load lazily but only render on the expanded page.
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
-    if (state.teamTrends === null && !state.teamTrendsLoading) loadTeam('trends');
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
-    if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
 
     // Glance-box detail drill: a team-scoped per-rep breakdown of one metric,
@@ -3554,20 +3573,91 @@
       return;
     }
 
-    // Layout (Justin's spec): Team members lead the view (in Coach-Summary bar
-    // styling), directly under the header; the three glance insight boxes sit
-    // BELOW them (B-2's What-needs-work slots directly under the glance boxes
-    // when it lands); trends/highlights/recs/digest follow.
+    // Layout (Justin's live-review spec), top→bottom:
+    //   1. glance stat blocks (at the very top, under the header)
+    //   2. Team overview  — each member + avg TOTAL score  (ranked bars)
+    //   3. Closing        — each member + avg CLOSE section score
+    //   4. Objection handling — each member + avg OBJECTION section score
+    //   5. Team recommendations — compact card → dedicated expanded page
+    //   6. Manager daily digest
+    // Trends + the standalone Call Highlights section are REMOVED from this view
+    // (Highlights now live on the expanded recommendations page).
     content.innerHTML =
       teamHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><h2>Team members</h2>'
-        + '<div class="meta">click a rep to open their coaching dashboard</div></div>' + teamRepCardsHtml() + '</div>'
       + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
-      + '<div class="section fade-in">' + teamTrendsHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Call Highlights of the Week</h2></div>' + teamHighlightsHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Team recommendations</h2>'
-        + '<div class="meta">grounded in the team\'s calls</div></div>' + teamRecsHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Team overview</h2>'
+        + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
+        + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Closing</h2>'
+        + '<div class="meta">avg Close-section score</div></div>'
+        + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Objection handling</h2>'
+        + '<div class="meta">avg Objection-section score</div></div>'
+        + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Team recommendations</h2></div>' + teamRecsCompactHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Manager daily digest</h2></div>' + teamDigestHtml() + '</div>';
+  }
+
+  // The dedicated (hidden, no-nav-tab) expanded page: full recommendations +
+  // Call Highlights of the Week. Reachable only from the compact recs card.
+  function openTeamExpanded() { setView('team-expanded'); }
+  function renderTeamExpanded() {
+    var content = document.getElementById('content');
+    ensureTeamDefaultRange();
+    if (state.teamContext === null) { loadTeam('context'); }
+    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+    if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
+    if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
+    content.innerHTML =
+      teamHeaderHtml()
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Team recommendations</h2>'
+        + '<div class="meta">grounded in the team\'s calls</div></div>'
+        + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>' + teamRecsHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Call Highlights of the Week</h2></div>' + teamHighlightsHtml() + '</div>';
+  }
+
+  // Compact recommendations card on the main team view: a one/two-line teaser +
+  // "click to expand" affordance → opens the dedicated expanded page.
+  function teamRecsCompactHtml() {
+    var r = state.teamRecs;
+    if (!r) return '<div class="skeleton" style="height:60px;"></div>';
+    var teaser, sub = 'click to expand →';
+    if (r._error) { teaser = 'Could not load recommendations.'; }
+    else if (!r.available) { teaser = r.reason || 'Recommendations not available yet.'; }
+    else {
+      var w = r.working || [], i = r.improve || [];
+      if (!w.length && !i.length) { teaser = 'Not enough analyzed team calls yet.'; }
+      else { teaser = (i[0] && i[0].claim) || (w[0] && w[0].claim) || 'Team recommendations ready.'; }
+    }
+    return '<div class="team-recs-card" onclick="openTeamExpanded()" title="Open full recommendations + Call Highlights of the Week">'
+      + '<div class="team-recs-teaser">' + escapeHtml(teaser) + '</div>'
+      + '<div class="team-recs-expand">' + sub + '</div>'
+    + '</div>';
+  }
+
+  // Ranked-bar list of every rep by one 0–100 score (name · bar · value), sorted
+  // high→low, each row click-through to the rep's coaching dashboard. Bar width =
+  // the score itself (absolute out of 100), colored by scoreColor. null → "—", last.
+  function teamScoreListHtml(scoreFn) {
+    var o = state.teamOverview;
+    if (!o) return '<div class="skeleton" style="height:80px;"></div>';
+    if (o._forbidden) return '<div class="error">Not authorized for this team.</div>';
+    if (o._error) return '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
+    var reps = (o.per_rep || []).slice();
+    if (!reps.length) return '<div class="empty"><p>No reps in this team yet.</p></div>';
+    reps.sort(function (a, b) {
+      var va = scoreFn(a), vb = scoreFn(b);
+      return (vb == null ? -1 : vb) - (va == null ? -1 : va);
+    });
+    return '<div class="team-detail-list">' + reps.map(function (r) {
+      var v = scoreFn(r);
+      var pct = v == null ? 0 : Math.max(0, Math.min(100, v));
+      return '<div class="team-detail-row" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(r.email || '') + '\'s dashboard">'
+        + '<div class="team-detail-name">' + escapeHtml(repName(r)) + '</div>'
+        + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;background:' + scoreColor(v) + ';"></div></div>'
+        + '<div class="team-detail-val">' + (v == null ? '—' : v) + '</div>'
+        + '</div>';
+    }).join('') + '</div>';
   }
 
   // Open/close a glance-box detail (per-rep breakdown of one team metric).
@@ -3633,7 +3723,10 @@
     var v = Number(n); if (!isFinite(v)) v = 0;
     return '$' + Math.round(v).toLocaleString('en-US');
   }
-  // Five section score bars in Coach-Summary styling (mirrors renderCoachSummary2).
+  // RETIRED 2026-07-26 (B-1 redesign): the five-bar Coach-Summary member cards
+  // were replaced by three ranked score lists (Team overview / Closing / Objection
+  // handling). sectionBarsHtml + teamRepCardsHtml kept here, commented, for reference.
+  /*
   function sectionBarsHtml(sections) {
     var S = [['intro', 'Intro'], ['discovery', 'Discovery'], ['pitch', 'Pitch'], ['objection', 'Objection'], ['close', 'Close']];
     return S.map(function (pair) {
@@ -3647,7 +3740,10 @@
         + '</div>';
     }).join('');
   }
+  */
 
+  // teamTrendsHtml — DORMANT (Trends removed from the team view in the B-1 redesign);
+  // kept intact but no longer rendered.
   function teamTrendsHtml() {
     var toggle = ['week', 'month', 'quarter'].map(function (b) {
       return '<button class="date-preset' + (state.teamTrendBucket === b ? ' active' : '') + '" onclick="setTeamTrendBucket(\'' + b + '\')">' + b.charAt(0).toUpperCase() + b.slice(1) + 'ly</button>';
@@ -3671,6 +3767,7 @@
 
   function repName(r) { return r.display_name || (r.email ? r.email.split('@')[0] : (r.user_id || '').slice(0, 8)); }
 
+  /* RETIRED 2026-07-26 (B-1 redesign) — replaced by the three ranked score lists.
   function teamRepCardsHtml() {
     var o = state.teamOverview;
     if (!o || o._forbidden || o._error) return '';
@@ -3692,6 +3789,7 @@
         + '</div>';
     }).join('') + '</div>';
   }
+  */
 
   // Glance-box detail: the clicked team metric broken down per rep (reuses the
   // /team/overview per_rep data — no extra fetch). Rows click through to the
@@ -3845,6 +3943,7 @@
     if (state.view === 'eod')              return 'eod';
     if (state.view === 'account')          return 'account';
     if (state.view === 'team')             return 'team';
+    if (state.view === 'team-expanded')    return 'team-recs';
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     return ''; // overview + dormant drills
   }
@@ -3865,6 +3964,7 @@
     else if (h === 'account') { state.view = 'account'; state.account = null; /* fresh on hash entry too */ }
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'team') { state.view = 'team'; }
+    else if (h === 'team-recs') { state.view = 'team-expanded'; }
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
     else if (h.indexOf('call/') === 0) {
       var id = h.slice(5);
