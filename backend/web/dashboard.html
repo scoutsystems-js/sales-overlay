@@ -1463,6 +1463,23 @@
     .team-insight-data { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
     .team-insight-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
     .team-rep-tag { font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(91,158,255,0.10); padding: 2px 8px; border-radius: 10px; text-transform: capitalize; }
+    /* B-1: clickable team glance box + Coach-Summary-styled rep rows + glance-box detail */
+    .team-glance { cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
+    .team-glance:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .team-glance-caret { color: var(--accent); font-weight: 700; margin-left: 5px; }
+    .team-rep-list { display: flex; flex-direction: column; gap: 12px; }
+    .team-rep-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+    .team-rep-quick { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: var(--text-muted); }
+    .team-rep-quick span { white-space: nowrap; }
+    .team-rep-bars { max-width: 560px; }
+    .team-detail-list { display: flex; flex-direction: column; gap: 4px; }
+    .team-detail-row { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); cursor: pointer; transition: border-color 0.15s var(--ease); }
+    .team-detail-row:hover { border-color: var(--accent); }
+    .team-detail-name { width: 130px; font-size: 14px; font-weight: 600; color: var(--text); text-transform: capitalize; flex-shrink: 0; }
+    .team-detail-track { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+    .team-detail-fill { height: 100%; background: var(--accent); border-radius: 5px; }
+    .team-detail-val { width: 150px; text-align: right; font-size: 15px; font-weight: 600; color: var(--text); flex-shrink: 0; }
+    .team-detail-sub { display: block; font-size: 11px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
     .team-lane-row { display: flex; flex-wrap: wrap; gap: 14px; }
     .team-lane { flex: 1; min-width: 240px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px; }
     .team-lane-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 700; margin-bottom: 6px; }
@@ -1976,6 +1993,7 @@
     teamRecs:       null,   teamRecsLoading: false,
     teamHighlights: null,   teamHighlightsLoading: false,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
+    teamDetailMetric: null, // glance-box detail drill: null | 'cash' | 'close' | 'objection'
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     account:        null,   accountLoading: false,   // Account view (#account)
     analytics:       null,    // last /me/analytics response
@@ -3473,7 +3491,7 @@
   // Team (manager) view — v1.4 flagship. Reps' data is resolved + permission-
   // checked server-side; this only renders. Owner gets a team picker.
   // ═══════════════════════════════════════════════════════════════════════════
-  function goTeam() { setView('team'); }
+  function goTeam() { state.teamDetailMetric = null; setView('team'); }
   function teamQP(extra) {
     var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
     if (state.teamSelected) qp += '&team=' + encodeURIComponent(state.teamSelected);
@@ -3490,6 +3508,7 @@
   function resetTeamData() {
     state.teamOverview = null; state.teamTrends = null; state.teamRecs = null;
     state.teamHighlights = null; state.teamDigest = null; state.teamDigestDate = null;
+    state.teamDetailMetric = null; // exit any glance-box detail when team/range changes
   }
   function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamView(); }
   function setTeamTrendBucket(b) { state.teamTrendBucket = b; state.teamTrends = null; loadTeam('trends'); }
@@ -3528,17 +3547,32 @@
     if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
 
+    // Glance-box detail drill: a team-scoped per-rep breakdown of one metric,
+    // reached by clicking a clickable glance box. Replaces the normal team body.
+    if (state.teamDetailMetric) {
+      content.innerHTML = teamHeaderHtml() + '<div class="section fade-in">' + teamDetailHtml() + '</div>';
+      return;
+    }
+
+    // Layout (Justin's spec): Team members lead the view (in Coach-Summary bar
+    // styling), directly under the header; the three glance insight boxes sit
+    // BELOW them (B-2's What-needs-work slots directly under the glance boxes
+    // when it lands); trends/highlights/recs/digest follow.
     content.innerHTML =
       teamHeaderHtml()
-      + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
-      + '<div class="section fade-in">' + teamTrendsHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team members</h2>'
         + '<div class="meta">click a rep to open their coaching dashboard</div></div>' + teamRepCardsHtml() + '</div>'
+      + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
+      + '<div class="section fade-in">' + teamTrendsHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Call Highlights of the Week</h2></div>' + teamHighlightsHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team recommendations</h2>'
         + '<div class="meta">grounded in the team\'s calls</div></div>' + teamRecsHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Manager daily digest</h2></div>' + teamDigestHtml() + '</div>';
   }
+
+  // Open/close a glance-box detail (per-rep breakdown of one team metric).
+  function openTeamDetail(metric) { state.teamDetailMetric = metric; renderTeamView(); }
+  function closeTeamDetail() { state.teamDetailMetric = null; renderTeamView(); }
 
   function teamHeaderHtml() {
     var label = (state.teamOverview && state.teamOverview.team && state.teamOverview.team.label) || 'Team';
@@ -3576,13 +3610,42 @@
     function stat(label, val, extra) {
       return '<div class="team-stat"><div class="team-stat-val">' + val + (extra || '') + '</div><div class="team-stat-label">' + label + '</div></div>';
     }
+    // Clickable glance box → per-rep detail breakdown of that metric.
+    function glance(metric, label, val, sub) {
+      return '<div class="team-stat team-glance" onclick="openTeamDetail(\'' + metric + '\')" title="Break ' + label + ' down by rep">'
+        + '<div class="team-stat-val">' + val + '</div>'
+        + '<div class="team-stat-label">' + label + '<span class="team-glance-caret">›</span></div>'
+        + (sub ? '<div class="team-stat-sub" style="display:block;margin-top:3px;">' + sub + '</div>' : '')
+        + '</div>';
+    }
     return '<div class="team-stat-row">'
       + stat('Reps active', t.active_reps + '<span class="team-stat-sub">/' + t.reps + '</span>')
       + stat('Calls analyzed', t.calls_analyzed)
+      + glance('cash', 'Cash collected', fmtCash(t.cash_collected), 'across closed calls')
+      + glance('close', 'Close rate', (t.close_rate == null ? '—' : t.close_rate + '%'), (t.close_decided ? t.close_wins + '/' + t.close_decided + ' of decided calls' : 'of decided calls'))
+      + glance('objection', 'Objection handle', (t.obj_handle_rate == null ? '—' : t.obj_handle_rate + '%'), t.objections_handled + '/' + t.objections_total + ' handled')
       + stat('Avg score', (t.avg_score == null ? '—' : t.avg_score), ' ' + trendArrow(t.avg_score != null && t.prior_avg_score != null ? (t.avg_score - t.prior_avg_score) : 0))
-      + stat('Win-class avg', (t.win_mean == null ? '—' : t.win_mean) + (t.win_n ? '<span class="team-stat-sub"> · ' + t.win_n + ' won</span>' : ''))
-      + stat('Objection handle', (t.obj_handle_rate == null ? '—' : t.obj_handle_rate + '%') + '<span class="team-stat-sub"> ' + t.objections_handled + '/' + t.objections_total + '</span>')
       + '</div>';
+  }
+
+  // "$12,900" — whole dollars, thousands separators. Non-finite → "$0".
+  function fmtCash(n) {
+    var v = Number(n); if (!isFinite(v)) v = 0;
+    return '$' + Math.round(v).toLocaleString('en-US');
+  }
+  // Five section score bars in Coach-Summary styling (mirrors renderCoachSummary2).
+  function sectionBarsHtml(sections) {
+    var S = [['intro', 'Intro'], ['discovery', 'Discovery'], ['pitch', 'Pitch'], ['objection', 'Objection'], ['close', 'Close']];
+    return S.map(function (pair) {
+      var v = (sections && sections[pair[0]] != null) ? sections[pair[0]] : null;
+      var avgTxt = v === null ? '—' : String(v);
+      var pct = v === null ? 0 : Math.max(0, Math.min(100, v));
+      return '<div style="display:flex;align-items:center;gap:12px;padding:5px 0;">'
+        + '<div style="width:74px;font-size:12px;color:var(--text-muted);">' + pair[1] + '</div>'
+        + '<div style="flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + scoreColor(v) + ';border-radius:4px;"></div></div>'
+        + '<div style="width:28px;text-align:right;font-size:12px;color:var(--text);">' + avgTxt + '</div>'
+        + '</div>';
+    }).join('');
   }
 
   function teamTrendsHtml() {
@@ -3606,22 +3669,69 @@
     return head + '<div class="trend-chart">' + bars + '</div>';
   }
 
+  function repName(r) { return r.display_name || (r.email ? r.email.split('@')[0] : (r.user_id || '').slice(0, 8)); }
+
   function teamRepCardsHtml() {
     var o = state.teamOverview;
     if (!o || o._forbidden || o._error) return '';
     var reps = o.per_rep || [];
     if (!reps.length) return '<div class="empty"><h3>No reps in this team yet</h3><p>Assign reps to this manager in the admin console.</p></div>';
-    return '<div class="team-rep-grid">' + reps.map(function (r) {
-      var name = r.display_name || (r.email ? r.email.split('@')[0] : (r.user_id || '').slice(0, 8));
+    return '<div class="team-rep-list">' + reps.map(function (r) {
+      var name = repName(r);
+      // Compact quick-stats line, then the Coach-Summary section bars.
+      var quick = '<div class="team-rep-quick">'
+        + '<span>' + r.calls_analyzed + ' calls</span>'
+        + '<span>' + fmtCash(r.cash_collected) + '</span>'
+        + '<span>' + (r.close_rate == null ? '—' : r.close_rate + '%') + ' close</span>'
+        + '<span>' + (r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%') + ' obj</span>'
+        + '<span>avg ' + (r.avg_score == null ? '—' : r.avg_score) + ' ' + trendArrow(r.trend) + '</span>'
+        + '</div>';
       return '<div class="team-rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(r.email || '') + '\'s dashboard">'
-        + '<div class="team-rep-name">' + escapeHtml(name) + '</div>'
-        + '<div class="team-rep-metrics">'
-          + '<div class="team-rep-metric"><span class="v">' + r.calls_analyzed + '</span><span class="k">calls</span></div>'
-          + '<div class="team-rep-metric"><span class="v">' + (r.avg_score == null ? '—' : r.avg_score) + ' ' + trendArrow(r.trend) + '</span><span class="k">avg score</span></div>'
-          + '<div class="team-rep-metric"><span class="v">' + (r.win_mean == null ? '—' : r.win_mean) + '</span><span class="k">win avg</span></div>'
-          + '<div class="team-rep-metric"><span class="v">' + (r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%') + '</span><span class="k">obj handled</span></div>'
-        + '</div></div>';
+        + '<div class="team-rep-head"><div class="team-rep-name">' + escapeHtml(name) + '</div>' + quick + '</div>'
+        + '<div class="team-rep-bars">' + sectionBarsHtml(r.sections) + '</div>'
+        + '</div>';
     }).join('') + '</div>';
+  }
+
+  // Glance-box detail: the clicked team metric broken down per rep (reuses the
+  // /team/overview per_rep data — no extra fetch). Rows click through to the
+  // rep's pivoted coaching dashboard.
+  var TEAM_DETAIL = {
+    cash:      { title: 'Cash collected', meta: 'closed-call cash, by rep',
+                 value: function (r) { return r.cash_collected || 0; },
+                 label: function (r) { return fmtCash(r.cash_collected); },
+                 sub:   function (r) { return r.close_wins + ' closed'; } },
+    close:     { title: 'Close rate', meta: 'closed / (closed + lost) — decided calls only, by rep',
+                 value: function (r) { return r.close_rate == null ? -1 : r.close_rate; },
+                 label: function (r) { return r.close_rate == null ? '—' : r.close_rate + '%'; },
+                 sub:   function (r) { return r.close_decided ? (r.close_wins + '/' + r.close_decided + ' decided') : 'no decided calls'; } },
+    objection: { title: 'Objection handle rate', meta: 'objections resolved "handled", by rep',
+                 value: function (r) { return r.obj_handle_rate == null ? -1 : r.obj_handle_rate; },
+                 label: function (r) { return r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%'; },
+                 sub:   function (r) { return r.obj_total ? (r.obj_handled + '/' + r.obj_total + ' handled') : 'no objections'; } },
+  };
+  function teamDetailHtml() {
+    var cfg = TEAM_DETAIL[state.teamDetailMetric];
+    var back = '<button class="date-preset" onclick="closeTeamDetail()">← back to team</button>';
+    var o = state.teamOverview;
+    if (!cfg) { state.teamDetailMetric = null; return ''; }
+    var head = '<div class="section-header"><div><h2>' + escapeHtml(cfg.title) + '</h2><div class="meta">' + escapeHtml(cfg.meta) + '</div></div>' + back + '</div>';
+    if (!o || o._forbidden) return head + '<div class="error">Not authorized for this team.</div>';
+    if (o._error) return head + '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
+    var reps = (o.per_rep || []).slice();
+    if (!reps.length) return head + '<div class="empty"><p>No reps in this team yet.</p></div>';
+    reps.sort(function (a, b) { return cfg.value(b) - cfg.value(a); });
+    var max = Math.max.apply(null, reps.map(function (r) { return Math.max(0, cfg.value(r)); }).concat([1]));
+    var rows = reps.map(function (r) {
+      var v = Math.max(0, cfg.value(r));
+      var pct = Math.round((v / max) * 100);
+      return '<div class="team-detail-row" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(r.email || '') + '\'s dashboard">'
+        + '<div class="team-detail-name">' + escapeHtml(repName(r)) + '</div>'
+        + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;"></div></div>'
+        + '<div class="team-detail-val">' + cfg.label(r) + '<span class="team-detail-sub">' + escapeHtml(cfg.sub(r)) + '</span></div>'
+        + '</div>';
+    }).join('');
+    return head + '<div class="team-detail-list">' + rows + '</div>';
   }
 
   function teamInsightHtml(it, kind) {
