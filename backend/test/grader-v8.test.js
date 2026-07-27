@@ -7,8 +7,8 @@ const worker = require('../lib/analysis-worker');
 
 const NORM = { turns: [{ speaker: 'A', text: 'hello', start_seconds: 0 }], closer_name: 'Josh', speaker_confidence: 'matched' };
 
-test('ANALYSIS_PROMPT_VERSION is bumped to v8', () => {
-  assert.match(worker.ANALYSIS_PROMPT_VERSION, /^v8-/);
+test('ANALYSIS_PROMPT_VERSION is at least v9 (v9 = sharper outcome criteria; v8 content intact)', () => {
+  assert.match(worker.ANALYSIS_PROMPT_VERSION, /^v9-/);
 });
 
 test('v8 prompt hunts transaction evidence and names the vehicles', () => {
@@ -68,4 +68,13 @@ test('eod_summary persists as a capped string, null otherwise', () => {
   assert.strictEqual(f(123), null);
   assert.strictEqual(f(null), null);
   assert.strictEqual(f('x'.repeat(3000)).length, 2000);   // capped
+});
+
+// v9 (2026-07-27): sharper outcome criteria (Thread 1, ruling 5).
+test('v9 outcome criteria: disqualified→lost, no_show=very short/no discovery-pitch-close, follow_up needs a live path', () => {
+  const p = worker._buildSectionGraderPrompt(NORM, 1800, '');
+  assert.match(p, /DISQUALIFIED/);
+  assert.match(p, /"lost", NOT "follow_up"/);
+  assert.match(p, /under ~2 minutes.*NO discovery, NO pitch, and NO close/);
+  assert.match(p, /live path forward/);
 });

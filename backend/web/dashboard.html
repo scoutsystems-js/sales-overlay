@@ -197,6 +197,16 @@
     .glance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 8px; }
     .glance-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
     .glance-skeleton { height: 92px; border-radius: var(--radius); }
+    /* Thread 1: manual outcome tag (Calls page + review) */
+    .outcome-tag { display: inline-flex; align-items: center; gap: 4px; }
+    .outcome-tag-select { font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-field); color: var(--text); cursor: pointer; }
+    .outcome-tag-select.closed { border-color: var(--good); color: var(--good); }
+    .outcome-tag-select.lost { border-color: var(--bad); color: var(--bad); }
+    .outcome-tag-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--text-muted); }
+    .outcome-tag-badge.closed { color: var(--good); border-color: var(--good); }
+    .outcome-tag-badge.lost { color: var(--bad); border-color: var(--bad); }
+    .outcome-tag-src { font-size: 10px; font-weight: 700; color: var(--good); }
+    .outcome-tag-src.ai { color: var(--text-muted); background: var(--bg-field); border: 1px solid var(--border); border-radius: 6px; padding: 0 4px; }
     /* C-1: Generate summary button + popup body */
     .summary-btn { white-space: nowrap; }
     .summary-text { font-size: 15px; line-height: 1.6; color: var(--text); white-space: normal; }
@@ -4867,7 +4877,9 @@
         return '<div class="eod-call">'
           + '<div class="eod-row"><div class="eod-label">Call</div><div>' + link + pendingNote + '</div></div>'
           + row('Prospect', 'prospect_name', f.prospect_name)
-          + row('Outcome', 'outcome', f.outcome)
+          // Outcome is READ-ONLY here now (Thread 1): it's the canonical call tag
+          // (set on the Calls page / call review), composed with payment structure.
+          + '<div class="eod-row"><div class="eod-label">Outcome</div><div class="eod-input" style="opacity:0.8;cursor:default;">' + escapeHtml(f.outcome == null ? '—' : String(f.outcome)) + '</div></div>'
           + row('Cash ($)', 'cash_collected', f.cash_collected)
           + row('Summary', 'summary', f.summary, true)
           + '</div>';
@@ -6010,6 +6022,42 @@
     return '<div class="library-list">' + rows + '</div>';
   }
 
+  // Thread 1: manual outcome tag. UX gate (server is authoritative): a
+  // manager/owner may tag calls in scope; an UNMANAGED user may tag their own.
+  // A managed rep viewing their own calls gets a read-only badge.
+  function canTagOutcomeClient() {
+    if (state.me && (state.me.role === 'manager' || state.me.role === 'owner')) return true;
+    return !!(state.me && !state.me.is_managed && isSelf());
+  }
+  var OUTCOME_OPTS = [['closed', 'Closed'], ['follow_up', 'Follow up'], ['lost', 'Lost'], ['no_show', 'No show']];
+  function outcomeTagHtml(callId, outcome, source, stopProp) {
+    var sp = stopProp ? 'event.stopPropagation();' : '';
+    if (!canTagOutcomeClient()) {
+      var lbl = (OUTCOME_OPTS.filter(function (o) { return o[0] === outcome; })[0] || [null, outcome || '—'])[1];
+      return '<span class="outcome-tag-badge ' + escapeHtml(outcome || 'none') + '">' + escapeHtml(lbl || '—') + '</span>';
+    }
+    var opts = '<option value=""' + (outcome ? '' : ' selected') + ' disabled>Set outcome…</option>'
+      + OUTCOME_OPTS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === outcome ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+    var mark = source === 'manual' ? ' <span class="outcome-tag-src" title="set by a person">✓</span>' : (source === 'inferred' ? ' <span class="outcome-tag-src ai" title="AI-inferred — confirm or correct">AI</span>' : '');
+    return '<span class="outcome-tag" onclick="' + sp + '">'
+      + '<select class="outcome-tag-select ' + escapeHtml(outcome || 'none') + '" onchange="' + sp + 'setCallOutcome(\'' + escapeHtml(callId) + '\', this.value)">' + opts + '</select>' + mark + '</span>';
+  }
+  async function setCallOutcome(callId, outcome) {
+    if (!outcome) return;
+    try {
+      var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/outcome', {
+        method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ outcome: outcome }) });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      var d = null; try { d = await res.json(); } catch (e) {}
+      if (!res.ok) { alert((d && d.error) || 'Could not update outcome'); return; }
+      // Refresh whatever surface is showing so close rate / tiles reflect the change.
+      if (state.view === 'call-library') { state.callLibrary = null; renderCallLibrary(); }
+      else if (state.view === 'call-review') { state.callReview = null; loadCallReview(state.selectedCallId); }
+      state.analytics2 = null; state.needsWork = null; // stale after an outcome change
+      if (state.view === 'overview') reloadAll();
+    } catch (err) { alert('Could not update outcome: ' + (err.message || 'unknown')); }
+  }
+
   function callLibraryCardHtml(c) {
     var title = (c.title && String(c.title).trim())
       ? '<span>' + escapeHtml(c.title) + '</span>'
@@ -6038,6 +6086,7 @@
         + '<div class="library-card-meta">' + meta + '</div>'
       + '</div>'
       + '<div class="library-card-side">'
+        + (c.analysis_status === 'done' ? outcomeTagHtml(c.id, c.outcome, c.outcome_source, true) : '')
         + badge
         + recordingLink
       + '</div>'
@@ -6279,6 +6328,7 @@
           + '<div class="review-meta-row">' + meta + '</div>'
         + '</div>'
         + '<div class="review-title-side">'
+          + (status === 'done' ? outcomeTagHtml((src.id || (review && review.id) || ''), (review && review.analysis ? review.analysis.outcome : src.outcome), (review && review.analysis ? review.analysis.outcome_source : src.outcome_source), false) : '')
           + badge
           + fathomLink
         + '</div>'

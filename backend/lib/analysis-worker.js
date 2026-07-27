@@ -46,6 +46,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
 const { fetchSellingContext } = require('./selling-context');
+const { effectiveCloseScore } = require('./outcome-tag');
 const fathomRoutes = require('../routes/fathom');
 
 // ─── Schema-locked vocabularies (mirror migration 010 CHECK constraints) ────
@@ -82,7 +83,7 @@ const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_
 //      per-structure cash rules; (b) payment_structure field (closed-only);
 //      (c) eod_summary — first-person closer-voice EOD report summary
 //      (coaching's overall_summary untouched). Never-fabricate unchanged.
-const ANALYSIS_PROMPT_VERSION = 'v8-2026-07-22';
+const ANALYSIS_PROMPT_VERSION = 'v9-2026-07-27'; // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward). FUTURE calls only — no bulk re-analysis; the no-outcome-flips delta gate does NOT apply (flipping outcomes is the intent). Validate by sampling.
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -311,10 +312,10 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '  - eod_summary: a 2-4 sentence end-of-day report summary written in FIRST PERSON as the closer, as if they wrote it themselves for their team\'s Slack channel ("Spoke with X about... She\'s deciding between... I set a follow-up for Friday."). Factual and professional — names, decisions, next steps. State losses plainly with no self-criticism and no coaching language. NO AI tells: no hedging filler, and never narrate the closer in the third person — you ARE the closer\'s voice here. This is separate from overall_summary (which stays analytical).',
     '  - outcome: the deal outcome for THIS call, inferred from what actually happened in the transcript. Exactly one of:',
     '      "closed"    — prospect committed, paid, or clearly agreed to buy on this call',
-    '      "follow_up" — no decision yet: another call booked, thinking time, spouse/partner check, or a next step scheduled',
-    '      "lost"      — prospect declined, disqualified, or the deal is dead',
-    '      "no_show"   — the prospect never meaningfully joined (empty or near-empty transcript, no real sales conversation)',
-    '    Infer from evidence in the transcript. If genuinely ambiguous, use "follow_up" — never guess "closed" or "lost" without clear support.',
+    '      "follow_up" — the deal is ALIVE with a genuine path forward: a booked next call, active thinking time, or a spouse/partner check the prospect intends to complete. There must be real intent to continue — not just the absence of a "no".',
+    '      "lost"      — the prospect declined, walked with no path forward, or was DISQUALIFIED. A disqualification (e.g. they fail a qualification on credit/finances/fit) that the closer accepts and does not overcome is "lost", NOT "follow_up". A vague "reschedule" with no date and no real intent is "lost", not "follow_up".',
+    '      "no_show"   — the prospect never meaningfully joined, OR the call ended almost immediately: a very short call (roughly under ~2 minutes) with NO discovery, NO pitch, and NO close. Empty/near-empty transcript, no real sales conversation.',
+    '    Infer from evidence in the transcript. Use "follow_up" ONLY when there is a real live path forward; if the prospect was disqualified or walked with no path, that is "lost"; if the call never got going, that is "no_show". Never guess "closed" without clear support.',
     '',
     'Respond with ONLY this JSON object — no markdown, no code fences, no narrative wrapping:',
     '{',
@@ -842,12 +843,25 @@ async function analyzeCall(fathomCallId, userId) {
     }
     var oneThingTs = boundTs(graderParsed.one_thing_timestamp_seconds, callRow.duration_seconds);
 
+    // Manual-override protection (Thread 1, load-bearing): if a human tagged the
+    // outcome, a re-analysis must NEVER overwrite it. Read the existing tag +
+    // earned close score. The EFFECTIVE outcome (manual if locked, else inferred)
+    // drives close_score (Thread 2) and payment_structure.
+    var existingRow = await admin.from('call_analyses')
+      .select('outcome, outcome_source, outcome_set_at, outcome_set_by')
+      .eq('fathom_call_id', fathomCallId).maybeSingle();
+    var manualLocked = !!(existingRow.data && existingRow.data.outcome_source === 'manual');
+    var effectiveOutcome = manualLocked ? existingRow.data.outcome : inferredOutcome;
+    var earnedClose = (typeof close.score === 'number') ? close.score : null;
+
     var analysisPayload = {
       fathom_call_id:      fathomCallId,
       user_id:             userId,
-      outcome:             inferredOutcome,
-      outcome_source:      inferredOutcome ? 'inferred' : null,
-      outcome_set_at:      inferredOutcome ? new Date().toISOString() : null,
+      // Outcome columns are FROZEN when a human tag exists.
+      outcome:             manualLocked ? existingRow.data.outcome : inferredOutcome,
+      outcome_source:      manualLocked ? 'manual' : (inferredOutcome ? 'inferred' : null),
+      outcome_set_at:      manualLocked ? existingRow.data.outcome_set_at : (inferredOutcome ? new Date().toISOString() : null),
+      outcome_set_by:      manualLocked ? existingRow.data.outcome_set_by : null,
       overall_score:       overallScore,
       overall_summary:     (typeof graderParsed.overall_summary === 'string') ? graderParsed.overall_summary.slice(0, 3000) : null,
       intro_grade:         intro.grade,
@@ -863,7 +877,10 @@ async function analyzeCall(fathomCallId, userId) {
       objection_score:     objection.score,
       objection_notes:     objection.notes,
       close_grade:         close.grade,
-      close_score:         close.score,
+      // Thread 2: displayed Close = 100 when the effective outcome is 'closed';
+      // the grader's earned score is preserved in close_score_earned.
+      close_score:         effectiveCloseScore(effectiveOutcome, earnedClose, earnedClose),
+      close_score_earned:  earnedClose,
       close_notes:         close.notes,
       one_thing:                   (typeof graderParsed.one_thing === 'string') ? graderParsed.one_thing.slice(0, 2000) : null,
       why_outcome:                 whyReason,
@@ -872,7 +889,7 @@ async function analyzeCall(fathomCallId, userId) {
       one_thing_timestamp_seconds: oneThingTs,
       follow_up_email:     (typeof graderParsed.follow_up_email === 'string') ? graderParsed.follow_up_email.slice(0, 5000) : null,
       cash_collected:      sanitizeCashCollected(graderParsed.cash_collected),
-      payment_structure:   sanitizePaymentStructure(graderParsed.payment_structure, inferredOutcome),
+      payment_structure:   sanitizePaymentStructure(graderParsed.payment_structure, effectiveOutcome),
       eod_summary:         sanitizeEodSummary(graderParsed.eod_summary),
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,

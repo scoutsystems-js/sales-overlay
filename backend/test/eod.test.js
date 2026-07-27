@@ -20,20 +20,23 @@ test('applyEdits: user override wins per-field, analysis value otherwise, edited
   const edits = { cash_collected: '500', summary: 'My own words.' };
   const out = eod._applyEdits(analysis, edits);
   assert.strictEqual(out.fields.prospect_name, 'Tasha Presberry');
-  assert.strictEqual(out.fields.outcome, 'follow_up');
+  assert.strictEqual(out.fields.outcome, 'follow_up'); // outcome still shown (read-only), just not user-editable
   assert.strictEqual(out.fields.cash_collected, '500');
   assert.strictEqual(out.fields.summary, 'My own words.');
   assert.strictEqual(out.fields.payment_structure, 'none_stated');
-  assert.deepStrictEqual(out.edited, { prospect_name: false, outcome: false, cash_collected: true, summary: true, payment_structure: false });
+  assert.deepStrictEqual(out.edited, { prospect_name: false, cash_collected: true, summary: true, payment_structure: false });
   // empty-string override is still an override (user cleared the field on purpose)
   const cleared = eod._applyEdits(analysis, { summary: '' });
   assert.strictEqual(cleared.fields.summary, '');
   assert.strictEqual(cleared.edited.summary, true);
 });
 
-test('EDITABLE_FIELDS matches the migration CHECK constraint exactly (022: + payment_structure)', () => {
+test('EDITABLE_FIELDS: outcome RETIRED (Thread 1) — canonical outcome is the call tag now', () => {
+  // The eod_edits CHECK still ALLOWS 'outcome' (for the column/history), but the
+  // route no longer offers it as an editable field.
   assert.deepStrictEqual(eod._EDITABLE_FIELDS.slice().sort(),
-    ['cash_collected', 'outcome', 'payment_structure', 'prospect_name', 'summary']);
+    ['cash_collected', 'payment_structure', 'prospect_name', 'summary']);
+  assert.strictEqual(eod._EDITABLE_FIELDS.indexOf('outcome'), -1);
 });
 
 test('payment_structure edits are a constrained choice (route-level allowlist)', () => {

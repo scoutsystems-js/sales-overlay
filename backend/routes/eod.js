@@ -19,8 +19,12 @@ const teamDigest = require('../lib/team-digest');
 const router = express.Router();
 
 // Must match migration 022's CHECK (field IN (...)) exactly.
-const EDITABLE_FIELDS = ['prospect_name', 'outcome', 'cash_collected', 'summary', 'payment_structure'];
-const VALUE_CAPS = { prospect_name: 200, outcome: 60, cash_collected: 20, summary: 3000, payment_structure: 20 };
+// 'outcome' RETIRED from EOD editing (Thread 1, 2026-07-27): the canonical outcome
+// is the manual call tag (PATCH /me/calls/:id/outcome), composed with payment
+// structure into the EOD label. The EOD view shows it read-only; this route no
+// longer accepts outcome edits. (No eod_edits.outcome rows existed to migrate.)
+const EDITABLE_FIELDS = ['prospect_name', 'cash_collected', 'summary', 'payment_structure'];
+const VALUE_CAPS = { prospect_name: 200, cash_collected: 20, summary: 3000, payment_structure: 20 };
 // payment_structure is a CONSTRAINED choice — mirrors the analysis-worker
 // allowlist; the route rejects anything else (no free text).
 const PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_stated'];
@@ -70,6 +74,9 @@ function prospectNameFromTitle(title) {
 
 // The one merge rule: override if present (even empty-string — a deliberate
 // clear), else analysis value. Returns effective fields + per-field edited flags.
+// Read-only display fields (Thread 1): shown in the EOD view but not editable
+// (outcome is the canonical call tag now). Carried into fields with no edited flag.
+var READONLY_FIELDS = ['outcome'];
 function applyEdits(analysis, edits) {
   var fields = {}, edited = {};
   EDITABLE_FIELDS.forEach(function (f) {
@@ -77,6 +84,7 @@ function applyEdits(analysis, edits) {
     fields[f] = has ? edits[f] : analysis[f];
     edited[f] = !!has;
   });
+  READONLY_FIELDS.forEach(function (f) { fields[f] = analysis[f]; });
   return { fields: fields, edited: edited };
 }
 

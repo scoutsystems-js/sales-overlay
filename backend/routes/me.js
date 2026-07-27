@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 const { computePersonalNeedsWork } = require('../lib/team-needs-work');
+const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome } = require('../lib/outcome-tag');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 
@@ -663,6 +664,47 @@ router.get('/needs-work', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[me] needs-work error:', err.message);
     res.status(500).json({ error: 'Failed to load needs-work: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── PATCH /me/calls/:call_id/outcome — manual outcome tag (Thread 1) ─────────
+// One permission-aware endpoint (canTagOutcome): owner → any call; manager →
+// own + managed reps; UNMANAGED user → own calls; MANAGED rep → NOT their own.
+// Writes the canonical call_analyses.outcome (source=manual) so it flows into
+// close rate / team analytics / needs-work / EOD, and recomputes the displayed
+// Close score (100 when closed, else the earned score). Re-analysis can't
+// overwrite this (analyzeCall freezes manual outcomes).
+router.patch('/calls/:call_id/outcome', requireAuth, async function(req, res) {
+  var callId = req.params.call_id;
+  var outcome = req.body && req.body.outcome;
+  if (VALID_OUTCOMES.indexOf(outcome) === -1) return res.status(400).json({ error: 'outcome must be one of: ' + VALID_OUTCOMES.join(', ') });
+  try {
+    var admin = getAdminClient();
+    var a = await admin.from('call_analyses').select('fathom_call_id, user_id, close_score, close_score_earned').eq('fathom_call_id', callId).maybeSingle();
+    if (a.error) throw new Error('call lookup: ' + a.error.message);
+    if (!a.data) return res.status(404).json({ error: 'Call analysis not found' });
+    var ownerId = a.data.user_id;
+    var profs = await admin.from('user_profiles').select('user_id, role, managed_by').in('user_id', [ownerId, req.user.id]);
+    var rows = (profs.data || []);
+    var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0] || { user_id: ownerId, managed_by: null };
+    var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
+    var actorRole = (actorRow && actorRow.role) || req.userProfileRole || 'user';
+    if (!canTagOutcome({ id: req.user.id, role: actorRole }, ownerProfile)) {
+      console.warn('[me] outcome-tag denied: actor=%s call=%s owner=%s', req.user.id, callId, ownerId);
+      return res.status(403).json({ error: 'You are not allowed to tag this call' });
+    }
+    var closeScore = effectiveCloseScore(outcome, a.data.close_score_earned, a.data.close_score);
+    var up = await admin.from('call_analyses').update({
+      outcome: outcome, outcome_source: 'manual', outcome_set_at: new Date().toISOString(),
+      outcome_set_by: req.user.id, close_score: closeScore,
+    }).eq('fathom_call_id', callId).select('fathom_call_id').single();
+    if (up.error) throw new Error('update: ' + up.error.message);
+    console.log('[me] outcome tagged: actor=%s call=%s owner=%s -> %s (close_score %s)', req.user.id, callId, ownerId, outcome, closeScore);
+    res.json({ call_id: callId, outcome: outcome, outcome_source: 'manual', close_score: closeScore });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] outcome tag error:', err.message);
+    res.status(500).json({ error: 'Failed to tag outcome' });
   }
 });
 
