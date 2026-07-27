@@ -2053,6 +2053,7 @@
     callLibraryFilter:  null,  // drill filter: 'analyzed' | 'objections' | null (nav = all)
     callLibrarySort:    null,  // drill sort: 'score' | null
     callLibraryError:   null,  // last fetch error message; cleared on successful re-fetch
+    callLibraryRange:   null,  // manager Calls view date window {from,to,days}; default 7d (non-managers unaffected)
     // Call Review (Scout v2.0 Phase 2 Step 4)
     selectedCallId:     null,  // public.fathom_calls(id) UUID of the call being reviewed
     callReview:         null,  // null pre-load, then the GET /fathom/calls/:id response
@@ -2134,10 +2135,13 @@
       document.getElementById('navKbSep').style.display = '';
     }
 
-    // Default to caller's own data; ?user=<id> pivots to another user.
+    // Default to caller's own data; ?user=<id> pivots to another user. Managers
+    // are honored too (not just admin/owner) so a pivoted Calls/coaching view
+    // survives refresh — permission is enforced server-side on every /admin/*
+    // fetch (managed_by === self, else 403), so restoring the param can't leak.
     var params = new URLSearchParams(window.location.search);
     var target = params.get('user');
-    if (target && (state.me.role === 'admin' || state.me.role === 'owner')) {
+    if (target && (state.me.role === 'manager' || state.me.role === 'admin' || state.me.role === 'owner')) {
       state.viewingUserId = target;
     } else {
       state.viewingUserId = state.me.user_id;
@@ -5137,30 +5141,49 @@
   }
 
   // throw-on-failure pattern matching fetchAnalytics/fetchPatterns/fetchCalls.
+  // "Manager context" — the same gate as the Team view (manager or owner).
+  // These users get the Calls rep-selector + a date-range control (default 7d);
+  // everyone else sees the Calls view exactly as before.
+  function hasManagerContext() { return !!(state.me && (state.me.role === 'manager' || state.me.role === 'owner')); }
+  function callLibRangeFor(days) {
+    var to = new Date();
+    var from = days >= 9999 ? new Date('2025-01-01T00:00:00Z') : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    return { from: from.toISOString(), to: to.toISOString(), days: days };
+  }
+
   async function fetchCallLibrary(offset, limit) {
     var params = ['limit=' + (limit || 20), 'offset=' + (offset || 0)];
     var drilling = !!(state.callLibraryFilter || state.callLibrarySort);
     if (state.callLibraryFilter) params.push('filter=' + encodeURIComponent(state.callLibraryFilter));
     if (state.callLibrarySort)   params.push('sort=' + encodeURIComponent(state.callLibrarySort));
-    // A drill matches its donut's date window; the nav entry (no filter) shows all.
-    if (drilling && state.dateRange) {
-      params.push('from=' + encodeURIComponent(state.dateRange.from));
-      params.push('to=' + encodeURIComponent(state.dateRange.to));
+    // Manager-context: always window by the Calls date control (default 7d),
+    //   covering their own calls and any rep they pivot to.
+    // Everyone else: unchanged — a drill matches its donut's window; a plain
+    //   nav entry (no filter) sends no range and shows all calls.
+    var range = null;
+    if (hasManagerContext()) { if (!state.callLibraryRange) state.callLibraryRange = callLibRangeFor(7); range = state.callLibraryRange; }
+    else if (drilling && state.dateRange) { range = state.dateRange; }
+    if (range) {
+      params.push('from=' + encodeURIComponent(range.from));
+      params.push('to=' + encodeURIComponent(range.to));
     }
     var base = isSelf() ? '/fathom/calls' : '/admin/fathom-calls/' + encodeURIComponent(state.viewingUserId);
     var res = await fetch(base + '?' + params.join('&'), { headers: authHeader() });
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (res.status === 403) throw new Error('Not authorized for that rep');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
   }
 
   // Enter the Call Library from the nav — clears any drill filter (shows all).
+  // Manager-context resets the date window to the 7-day default on entry.
   function goCallLibrary() {
     state.callLibraryFilter = null;
     state.callLibrarySort = null;
     state.callLibrary = null;
     state.callLibraryOffset = 0;
     state.callLibraryError = null;
+    if (hasManagerContext()) state.callLibraryRange = callLibRangeFor(7);
     setView('call-library');
   }
 
@@ -5172,7 +5195,35 @@
     state.callLibrary = null;
     state.callLibraryOffset = 0;
     state.callLibraryError = null;
+    // Manager-context: seed the Calls date control with the donut's window so the
+    // header presets reflect (and can adjust) the drill range.
+    if (hasManagerContext()) state.callLibraryRange = state.dateRange ? { from: state.dateRange.from, to: state.dateRange.to, days: state.dateRange.days } : callLibRangeFor(7);
     setView('call-library');
+  }
+
+  // Calls-view date preset (manager-context only). Re-fetches for the new window.
+  function setCallLibraryRange(days) {
+    state.callLibraryRange = callLibRangeFor(days);
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryError = null;
+    renderCallLibrary(); // kicks loadCallLibrary(0)
+  }
+
+  // Calls-view rep selector (manager-context only). Reuses the ?user= pivot
+  // machinery (viewingUserId + isSelf() → /admin/fathom-calls/<id>), but stays on
+  // the Calls view instead of jumping to overview like setUser. Writes ?user= so
+  // the pivot survives refresh; server enforces the managed_by permission.
+  function setCallLibraryUser(userId) {
+    if (!userId || userId === state.viewingUserId) return;
+    var url = new URL(window.location.href);
+    if (userId === state.me.user_id) url.searchParams.delete('user'); else url.searchParams.set('user', userId);
+    window.history.replaceState({}, '', url.toString());
+    state.viewingUserId = userId;
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryError = null;
+    renderCallLibrary(); // kicks loadCallLibrary(0)
   }
 
   // Fire-and-forget load. When offset=0, replaces state.callLibrary; on
@@ -5474,9 +5525,33 @@
       chip = '<span class="scope-pill" style="margin-left:10px;">' + escapeHtml(label)
         + ' <a onclick="goCallLibrary();return false;" style="cursor:pointer;text-decoration:underline;">clear</a></span>';
     }
+    // Manager-context controls: a rep selector (self + managed reps for a manager;
+    // everyone for an owner — server-filtered in state.users) + date presets.
+    var controls = '';
+    if (hasManagerContext()) {
+      var picker = '';
+      var users = (state.users || []).slice().sort(function (a, b) { return (a.email || '').localeCompare(b.email || ''); });
+      if (users.length >= 2) {
+        var opts = users.map(function (u) {
+          var self = u.user_id === state.me.user_id;
+          var lbl = (self ? 'Me — ' : '') + (u.email || u.user_id);
+          return '<option value="' + escapeHtml(u.user_id) + '"' + (u.user_id === state.viewingUserId ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>';
+        }).join('');
+        picker = '<select class="user-select" onchange="setCallLibraryUser(this.value)">' + opts + '</select>';
+      }
+      var range = state.callLibraryRange || callLibRangeFor(7);
+      var presets = [[7, '7d'], [30, '30d'], [90, '90d']].map(function (p) {
+        return '<button class="date-preset' + (range.days === p[0] ? ' active' : '') + '" onclick="setCallLibraryRange(' + p[0] + ')">' + p[1] + '</button>';
+      }).join('');
+      controls = '<div class="controls">' + picker + '<div class="date-presets">' + presets + '</div></div>';
+    }
+    // When pivoted to another rep, show whose calls these are.
+    var scopePill = (hasManagerContext() && state.viewingUserId !== state.me.user_id)
+      ? '<span class="scope-pill" style="margin-left:10px;">' + escapeHtml((state.me.role || '') + ' view') + '</span>' : '';
     return '<div class="page-header fade-in">'
-      + '<div><h1>Call Library' + chip + '</h1>'
+      + '<div><h1>Call Library' + chip + scopePill + '</h1>'
       + '<div class="subtitle">' + escapeHtml(sub) + '</div></div>'
+      + controls
       + '</div>';
   }
 
