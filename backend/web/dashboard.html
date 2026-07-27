@@ -2073,6 +2073,7 @@
     callLibrarySort:    null,  // drill sort: 'score' | null
     callLibraryError:   null,  // last fetch error message; cleared on successful re-fetch
     callLibraryRange:   null,  // manager Calls view date window {from,to,days}; default 7d (non-managers unaffected)
+    callLibraryShowAllUsers: false, // owner-only: picker revealed the full user set (default = assigned reps + self)
     // Call Review (Scout v2.0 Phase 2 Step 4)
     selectedCallId:     null,  // public.fathom_calls(id) UUID of the call being reviewed
     callReview:         null,  // null pre-load, then the GET /fathom/calls/:id response
@@ -5278,6 +5279,20 @@
   // machinery (viewingUserId + isSelf() → /admin/fathom-calls/<id>), but stays on
   // the Calls view instead of jumping to overview like setUser. Writes ?user= so
   // the pivot survives refresh; server enforces the managed_by permission.
+  // Picker onchange: the two sentinel options toggle the owner-only "All users"
+  // reveal; anything else is a real rep pivot.
+  function onCallLibraryPick(value) {
+    if (value === '__all__') { state.callLibraryShowAllUsers = true; renderCallLibrary(); return; }
+    if (value === '__scoped__') {
+      state.callLibraryShowAllUsers = false;
+      var me = state.me.user_id;
+      var stillScoped = state.viewingUserId === me || (state.users || []).some(function (u) { return u.user_id === state.viewingUserId && u.managed_by === me; });
+      if (!stillScoped) { setCallLibraryUser(me); return; } // viewed user left the scoped list → snap to self
+      renderCallLibrary();
+      return;
+    }
+    setCallLibraryUser(value);
+  }
   function setCallLibraryUser(userId) {
     if (!userId || userId === state.viewingUserId) return;
     var url = new URL(window.location.href);
@@ -5594,14 +5609,32 @@
     var controls = '';
     if (hasManagerContext()) {
       var picker = '';
-      var users = (state.users || []).slice().sort(function (a, b) { return (a.email || '').localeCompare(b.email || ''); });
-      if (users.length >= 2) {
-        var opts = users.map(function (u) {
-          var self = u.user_id === state.me.user_id;
+      var me = state.me.user_id, isOwner = state.me.role === 'owner';
+      var all = (state.users || []).slice().sort(function (a, b) {
+        if (a.user_id === me) return -1; if (b.user_id === me) return 1; // self first
+        return (a.email || '').localeCompare(b.email || '');
+      });
+      // Scope by ASSIGNMENT for ALL roles: the picker lists the user's assigned
+      // reps (managed_by === me) + themselves — owners no longer default to every
+      // user. Owners keep the capability via an explicit "All users" reveal.
+      var scoped = all.filter(function (u) { return u.user_id === me || u.managed_by === me; });
+      var list, tail = '';
+      if (isOwner && state.callLibraryShowAllUsers) {
+        list = all;
+        tail = '<option value="__scoped__">↑ My reps only</option>';
+      } else {
+        list = scoped;
+        if (isOwner) tail = '<option value="__all__">All users…</option>';
+      }
+      // Manager: only worth a picker if there's someone besides self. Owner:
+      // always render it (the "All users" reveal is meaningful even with 0 reps).
+      if (list.length >= 2 || isOwner) {
+        var opts = list.map(function (u) {
+          var self = u.user_id === me;
           var lbl = (self ? 'Me — ' : '') + (u.email || u.user_id);
           return '<option value="' + escapeHtml(u.user_id) + '"' + (u.user_id === state.viewingUserId ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>';
         }).join('');
-        picker = '<select class="user-select" onchange="setCallLibraryUser(this.value)">' + opts + '</select>';
+        picker = '<select class="user-select" onchange="onCallLibraryPick(this.value)">' + opts + tail + '</select>';
       }
       var range = state.callLibraryRange || callLibRangeFor(7);
       var presets = [[7, '7d'], [30, '30d'], [90, '90d']].map(function (p) {
