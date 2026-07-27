@@ -107,10 +107,58 @@ async function sendWelcomeEmail(args) {
   }
 }
 
+// Account-takeover safeguard (User Management, 2026-07-27): when a rep's login
+// email is changed by an admin/manager, the OLD address is notified — what
+// changed + who did it — so a hijack is visible to the prior owner of the inbox.
+// Same Resend transport, same 10s bound + scrub discipline. Best-effort: never
+// throws to the caller (the email change already happened).
+function emailChangeNoticeContent(newEmail, actorEmail) {
+  return {
+    subject: 'Your Scout login email was changed',
+    text: 'Hi,\n\nThe login email on your Scout account was just changed to ' + newEmail + ' by ' + (actorEmail || 'an administrator') + '.\n\n' +
+      'If you made this change or expected it, no action is needed. If you did NOT expect this, contact your administrator immediately — this message was sent to your previous email address as a security precaution.\n\n— Scout',
+  };
+}
+async function sendEmailChangeNotice(args) {
+  var timer = null;
+  try {
+    if (!isConfigured()) return { sent: false, reason: 'not_configured' };
+    if (!args || !args.oldEmail) return { sent: false, reason: 'no_old_email' };
+    var content = emailChangeNoticeContent(args.newEmail, args.actorEmail);
+    var doFetch = _testFetch || fetch;
+    var bound = _testTimeoutMs || SEND_TIMEOUT_MS;
+    var ac = new AbortController();
+    timer = setTimeout(function () { ac.abort(); }, bound);
+    var resp = await doFetch(RESEND_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: WELCOME_FROM, to: args.oldEmail, subject: content.subject, text: content.text }),
+      signal: ac.signal,
+    });
+    if (!resp.ok) {
+      var detail = '';
+      try { var b = await resp.json(); detail = (b && b.message) ? ' — ' + scrub(b.message) : ''; } catch (e) { /* optional */ }
+      var reason = 'Resend HTTP ' + resp.status + detail;
+      console.error('[email-change-notice] send failed for ' + scrub(args.oldEmail) + ': ' + reason);
+      return { sent: false, reason: reason };
+    }
+    return { sent: true };
+  } catch (err) {
+    var why = (err && err.name === 'AbortError') || /abort/i.test((err && err.message) || '')
+      ? 'timed out' : scrub(err && err.message);
+    console.error('[email-change-notice] send failed: ' + why);
+    return { sent: false, reason: why };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 module.exports = {
   sendWelcomeEmail: sendWelcomeEmail,
+  sendEmailChangeNotice: sendEmailChangeNotice,
   isConfigured: isConfigured,
   init: init,
+  _emailChangeNoticeContent: emailChangeNoticeContent,
   // test surface
   _welcomeEmailContent: welcomeEmailContent,
   _isConfigured: isConfigured,

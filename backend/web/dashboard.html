@@ -202,6 +202,23 @@
     .summary-text { font-size: 15px; line-height: 1.6; color: var(--text); white-space: normal; }
     .summary-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
     .copy-note { font-size: 13px; font-weight: 600; color: var(--good); }
+    /* User Management: #team-members table */
+    .members-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .members-seats { font-size: 14px; color: var(--text-muted); }
+    .members-seats b { color: var(--text); }
+    .members-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .members-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .members-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .members-table tr.inactive td { opacity: 0.6; }
+    .members-name { font-weight: 600; color: var(--text); }
+    .members-email { font-size: 12px; color: var(--text-muted); }
+    .member-badge.on { color: var(--good); font-weight: 600; font-size: 12px; }
+    .member-badge.off { color: var(--text-muted); font-weight: 600; font-size: 12px; }
+    .members-actions { white-space: nowrap; }
+    .members-act { background: var(--bg-field); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 9px; font-size: 12px; cursor: pointer; margin-left: 4px; }
+    .members-act:hover { border-color: var(--accent); }
+    .members-act.danger { color: var(--bad); } .members-act.danger:hover { border-color: var(--bad); }
+    .members-move { padding: 4px 6px; font-size: 12px; }
     /* A-1: collapsed accordion sections on the overview */
     .overview-acc-head { cursor: pointer; user-select: none; }
     .overview-acc-head h2 { display: flex; align-items: center; gap: 8px; }
@@ -1901,6 +1918,20 @@
      single submit handler that reads the active tab and builds FormData
      accordingly. Multipart Content-Type header is intentionally omitted so
      the browser sets the multipart boundary for multer to parse. -->
+<!-- User Management: add-rep popup (reuses the kb-modal pattern) -->
+<div class="kb-modal hidden" id="memberAddModal">
+  <div class="kb-modal-overlay" onclick="closeAddMember()"></div>
+  <div class="kb-modal-dialog">
+    <button class="kb-modal-close" onclick="closeAddMember()" aria-label="Close">✕</button>
+    <h2>Add rep</h2>
+    <div class="kb-form-row"><label class="kb-form-label" for="maEmail">Email</label><input type="email" id="maEmail" placeholder="rep@company.com" autocomplete="off"/></div>
+    <div class="kb-form-row"><label class="kb-form-label" for="maFirst">First name</label><input type="text" id="maFirst" autocomplete="off"/></div>
+    <div class="kb-form-row"><label class="kb-form-label" for="maLast">Last name</label><input type="text" id="maLast" autocomplete="off"/></div>
+    <div class="summary-actions"><button class="btn-fathom-secondary" type="button" onclick="submitAddMember()">Create + invite</button><span id="maNote" class="copy-note" style="color:var(--text-muted);"></span></div>
+    <div class="meta" style="margin-top:10px;">Creates the account under you and emails a login link. Adds a seat.</div>
+  </div>
+</div>
+
 <!-- C-1: page-summary popup (reuses the kb-modal pattern) -->
 <div class="kb-modal hidden" id="summaryModal">
   <div class="kb-modal-overlay" onclick="closeSummaryModal()"></div>
@@ -2971,6 +3002,7 @@
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+    else if (state.view === 'team-members') renderTeamMembersView();
     else if (state.view === 'kb') renderKbView();
     else if (state.view === 'eod') renderEodView();
     else if (state.view === 'account') renderAccountView();
@@ -2996,7 +3028,7 @@
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel');
     }
     var navTeam = document.getElementById('navTeam');
-    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work');
+    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-members');
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
     if (navCallLibrary) {
@@ -3626,6 +3658,7 @@
   function renderTeamSurface() {
     if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+    else if (state.view === 'team-members') renderTeamMembersView();
     else renderTeamView();
   }
   function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamSurface(); }
@@ -3656,6 +3689,7 @@
     if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+    else if (state.view === 'team-members') renderTeamMembersView();
   }
 
   // Team view defaults to LAST 7 DAYS (Justin's spec) — set once on first entry,
@@ -3901,9 +3935,14 @@
       + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
         + '<div class="review-meta-row"><span>Manager view</span></div></div>'
       + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + picker
-        + '<div class="date-presets">' + presets + '</div>' + summaryBtnHtml() + '</div>'
+        + '<div class="date-presets">' + presets + '</div>' + manageMembersBtnHtml() + summaryBtnHtml() + '</div>'
     + '</div>';
   }
+  // "Manage members" opens the hidden #team-members page (not on the page itself).
+  function manageMembersBtnHtml() {
+    return state.view !== 'team-members' ? '<button class="btn-fathom-secondary" type="button" onclick="openTeamMembers()">Manage members</button>' : '';
+  }
+  function openTeamMembers() { setView('team-members'); }
 
   // ── C-1: "Generate summary" — page-agnostic executive summary ──────────────
   // One button across the manager-view pages. It summarizes the page's ALREADY-
@@ -4004,6 +4043,133 @@
         + '<span id="summaryCopyNote" class="copy-note"></span></div>';
     } catch (err) {
       bodyEl.innerHTML = '<div class="error">Could not generate summary: ' + escapeHtml(err.message || 'unknown') + '</div>';
+    }
+  }
+  // ── User Management: #team-members hidden page (manager+owner) ─────────────
+  function renderTeamMembersView() {
+    var content = document.getElementById('content');
+    ensureTeamDefaultRange();
+    if (state.teamContext === null) loadTeam('context');
+    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+    content.innerHTML = teamHeaderHtml()
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Manage members</h2>'
+        + '<div class="meta">add, deactivate, move, reset password, or update a rep\'s email</div></div>'
+        + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
+        + teamMembersBodyHtml() + '</div>';
+  }
+  function teamMembersScope() {
+    var o = state.teamOverview;
+    var key = (o && o.team && o.team.key) || state.me.user_id;
+    return { key: key, members: (state.users || []).filter(function (u) { return u.managed_by === key; }) };
+  }
+  function teamMembersBodyHtml() {
+    if (!state.users) return '<div class="skeleton" style="height:120px;"></div>';
+    var isOwner = state.me.role === 'owner';
+    var sc = teamMembersScope();
+    var members = sc.members.slice().sort(function (a, b) {
+      // active first, then by email
+      if ((a.active !== false) !== (b.active !== false)) return (a.active !== false) ? -1 : 1;
+      return (a.email || '').localeCompare(b.email || '');
+    });
+    var seatsActive = members.filter(function (m) { return m.active !== false; }).length;
+    var managerOpts = (state.users || []).filter(function (u) { return u.role === 'manager' || u.role === 'owner'; });
+    var head = '<div class="members-toolbar"><div class="members-seats">Seats: <b>' + seatsActive + ' active</b>'
+      + (members.length !== seatsActive ? ' <span class="team-stat-sub">· ' + (members.length - seatsActive) + ' inactive</span>' : '') + '</div>'
+      + '<button class="btn-fathom-secondary" type="button" onclick="openAddMember()">+ Add rep</button></div>';
+    if (!members.length) return head + '<div class="empty"><p>No reps on this team yet. Use “+ Add rep” to invite one.</p></div>';
+    var rows = members.map(function (m) {
+      var active = m.active !== false;
+      var name = ((m.first_name || '') + ' ' + (m.last_name || '')).trim() || (m.email || '').split('@')[0];
+      var moveSel = '<select class="user-select members-move" onchange="moveMember(\'' + m.user_id + '\', this.value)">'
+        + managerOpts.map(function (mo) {
+          return '<option value="' + escapeHtml(mo.user_id) + '"' + (mo.user_id === m.managed_by ? ' selected' : '') + '>'
+            + escapeHtml((mo.user_id === state.me.user_id ? 'Me' : (mo.email || mo.user_id))) + '</option>';
+        }).join('') + '</select>';
+      var acts = '<button class="members-act" onclick="' + (active ? 'deactivateMember' : 'reactivateMember') + '(\'' + m.user_id + '\')">' + (active ? 'Deactivate' : 'Reactivate') + '</button>'
+        + '<button class="members-act" onclick="editMemberEmail(\'' + m.user_id + '\', \'' + escapeHtml(m.email || '') + '\')">Email</button>'
+        + '<button class="members-act" onclick="sendMemberReset(\'' + m.user_id + '\')">Reset link</button>'
+        + (isOwner ? '<button class="members-act danger" onclick="deleteMember(\'' + m.user_id + '\', \'' + escapeHtml(m.email || '') + '\')">Delete</button>' : '');
+      return '<tr class="' + (active ? '' : 'inactive') + '">'
+        + '<td><div class="members-name">' + escapeHtml(name) + '</div><div class="members-email">' + escapeHtml(m.email || '') + '</div></td>'
+        + '<td>' + escapeHtml(m.role || 'user') + '</td>'
+        + '<td>' + (active ? '<span class="member-badge on">● active</span>' : '<span class="member-badge off">○ inactive</span>') + '</td>'
+        + '<td>' + escapeHtml(m.billing_plan || '—') + '</td>'
+        + '<td>' + moveSel + '</td>'
+        + '<td class="members-actions">' + acts + '</td>'
+        + '</tr>';
+    }).join('');
+    return head + '<div style="overflow-x:auto;"><table class="members-table"><thead><tr>'
+      + '<th>Rep</th><th>Role</th><th>Status</th><th>Plan</th><th>Manager</th><th></th></tr></thead><tbody>'
+      + rows + '</tbody></table></div>'
+      + '<div class="meta" style="margin-top:10px;">Seat = an active user. Deactivating frees a seat; adding or reactivating adds one. Plan is per-user until the billing block adds an account entity.</div>';
+  }
+  // Re-fetch users (+ team roster when membership changed) and re-render.
+  async function refreshMembers(rosterChanged) {
+    try { await loadUsers(); } catch (e) {}
+    if (rosterChanged) { state.teamOverview = null; if (state.view === 'team-members') loadTeam('overview'); }
+    if (state.view === 'team-members') renderTeamMembersView();
+  }
+  async function memberAction(url, opts, okMsg) {
+    try {
+      var res = await fetch(url, Object.assign({ headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()) }, opts || {}));
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return { ok: false }; }
+      var d = null; try { d = await res.json(); } catch (e) {}
+      if (!res.ok) { alert((d && d.error) || ('Request failed (HTTP ' + res.status + ')')); return { ok: false, data: d, status: res.status }; }
+      if (okMsg) alert(okMsg);
+      return { ok: true, data: d };
+    } catch (err) { alert('Request failed: ' + (err.message || 'unknown')); return { ok: false }; }
+  }
+  async function deactivateMember(uid) {
+    if (!confirm('Deactivate this rep? They will be unable to log in and the seat is freed. Their calls and history stay.')) return;
+    var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/deactivate', { method: 'POST', body: '{}' });
+    if (r.ok) refreshMembers(false);
+  }
+  async function reactivateMember(uid) {
+    if (!confirm('Reactivate this rep? This adds a billable seat and restores their login.')) return;
+    var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/reactivate', { method: 'POST', body: '{}' });
+    if (r.ok) refreshMembers(false);
+  }
+  async function moveMember(uid, newManagedBy) {
+    if (!newManagedBy || newManagedBy === '') return;
+    var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/managed_by', { method: 'PATCH', body: JSON.stringify({ managed_by: newManagedBy }) });
+    refreshMembers(true); // roster changed either way (re-sync the picker state)
+  }
+  async function sendMemberReset(uid) {
+    var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/welcome-email', { method: 'POST', body: '{}' });
+    if (r.ok) alert((r.data && r.data.welcome_email === 'invite_sent') ? 'Reset link sent.' : ('Status: ' + (r.data && r.data.welcome_email)));
+  }
+  async function editMemberEmail(uid, oldEmail) {
+    var ne = window.prompt('New login email (a heads-up is sent to the old address):', oldEmail || '');
+    if (!ne || !ne.trim() || ne.trim() === oldEmail) return;
+    var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/email', { method: 'PATCH', body: JSON.stringify({ email: ne.trim() }) });
+    if (r.ok) { alert('Email updated' + (r.data && r.data.old_notified === 'sent' ? ' — old address notified.' : '.')); refreshMembers(false); }
+  }
+  async function deleteMember(uid, email) {
+    var typed = window.prompt('DELETE permanently removes this account. Only allowed for reps with NO call history (otherwise deactivate). Type the email to confirm:\n' + email);
+    if (typed == null) return;
+    var r = await memberAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: JSON.stringify({ confirm_email: typed.trim() }) });
+    if (r.ok) { alert('User deleted.'); refreshMembers(true); }
+  }
+  function openAddMember() {
+    var m = document.getElementById('memberAddModal'); if (!m) return;
+    ['maEmail', 'maFirst', 'maLast'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+    var note = document.getElementById('maNote'); if (note) note.textContent = '';
+    m.classList.remove('hidden');
+  }
+  function closeAddMember() { var m = document.getElementById('memberAddModal'); if (m) m.classList.add('hidden'); }
+  async function submitAddMember() {
+    var email = (document.getElementById('maEmail') || {}).value || '';
+    var first = (document.getElementById('maFirst') || {}).value || '';
+    var last = (document.getElementById('maLast') || {}).value || '';
+    var note = document.getElementById('maNote');
+    if (!email.trim() || email.indexOf('@') === -1 || !first.trim() || !last.trim()) { if (note) note.textContent = 'Email, first and last name are required.'; return; }
+    var r = await memberAction('/admin/users', { method: 'POST', body: JSON.stringify({ email: email.trim(), first_name: first.trim(), last_name: last.trim(), role: 'user' }) });
+    if (r.ok) {
+      var tp = r.data && r.data.temp_password;
+      var we = r.data && r.data.welcome_email;
+      if (note) note.textContent = (we === 'invite_sent') ? 'Invited — a login email was sent.' : ('Created. Temp password: ' + tp);
+      refreshMembers(true);
+      if (we === 'invite_sent') setTimeout(closeAddMember, 1200);
     }
   }
   function closeSummaryModal() { var m = document.getElementById('summaryModal'); if (m) m.classList.add('hidden'); }
@@ -4274,6 +4440,7 @@
     if (state.view === 'team')             return 'team';
     if (state.view === 'team-expanded')    return 'team-recs';
     if (state.view === 'team-needs-work')  return 'team-needs-work';
+    if (state.view === 'team-members')     return 'team-members';
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     return ''; // overview + dormant drills
   }
@@ -4296,6 +4463,7 @@
     else if (h === 'team') { state.view = 'team'; }
     else if (h === 'team-recs') { state.view = 'team-expanded'; }
     else if (h === 'team-needs-work') { state.view = 'team-needs-work'; }
+    else if (h === 'team-members') { state.view = 'team-members'; }
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
     else if (h.indexOf('call/') === 0) {
       var id = h.slice(5);

@@ -509,10 +509,20 @@ router.post('/sync-all', async function(req, res) {
       return res.status(500).json({ error: 'Could not load connections' });
     }
     var conns = connsResult.data || [];
-    var summary = { total: conns.length, ok: 0, synced_total: 0, dispatched_total: 0, needs_identity: 0, errors: 0 };
+    // Skip DEACTIVATED users (User Management, 2026-07-27): a freed seat stops
+    // pulling NEW calls. Their existing calls/history are untouched. Absent
+    // profile row → active by default (matches the column default).
+    var inactive = {};
+    if (conns.length) {
+      var uids = conns.map(function (c) { return c.user_id; });
+      var actQ = await admin.from('user_profiles').select('user_id, active').in('user_id', uids);
+      if (!actQ.error) (actQ.data || []).forEach(function (p) { if (p.active === false) inactive[p.user_id] = true; });
+    }
+    var summary = { total: conns.length, ok: 0, synced_total: 0, dispatched_total: 0, needs_identity: 0, skipped_inactive: 0, errors: 0 };
     for (var i = 0; i < conns.length; i++) {
       var conn = conns[i];
       var uid = conn.user_id;
+      if (inactive[uid]) { summary.skipped_inactive += 1; continue; }
       try {
         var r = await syncUserCalls(admin, uid, conn);
         if (r.ok) {

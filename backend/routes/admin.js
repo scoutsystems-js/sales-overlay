@@ -7,6 +7,7 @@ const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 const { fetchSellingContext } = require('../lib/selling-context');
 const welcomeEmail = require('../lib/welcome-email');
+const { canManageTarget, deleteBlockReason, deactivateBlockReason } = require('../lib/user-management');
 const { CANONICAL_ORIGIN } = require('../config');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
@@ -42,6 +43,34 @@ var LOG_HARD_CAP = 10000;
 // admin+owner so the redesigned /admin page works for both roles. Scope
 // filtering inside each route keeps admins bounded to self + managed users.
 var protect = [requireAuth, requireRole(['manager', 'owner'])];
+
+// Loads {role, managed_by, active} for a target user (or null).
+async function loadTargetProfile(admin, targetId) {
+  var r = await admin.from('user_profiles').select('role, managed_by, active').eq('user_id', targetId).maybeSingle();
+  if (r.error) throw new Error('target lookup: ' + r.error.message);
+  return r.data || null;
+}
+// Manager rep-scope guard. Sends a 404/403 and returns true when the actor may
+// NOT manage the target (owner: anyone; manager: only own reps). false = proceed.
+function denyIfCannotManage(req, res, target) {
+  if (!target) { res.status(404).json({ error: 'User not found' }); return true; }
+  if (!canManageTarget(req.user.role, req.user.id, target)) {
+    console.warn('[admin] scope violation: actor=%s (%s) target=%s', req.user.email, req.user.id, req.params.user_id);
+    res.status(403).json({ error: 'Not authorized for that user' }); return true;
+  }
+  return false;
+}
+// Count of reps a user manages (for the deactivate "move reps first" guard).
+async function countManagedReps(admin, userId) {
+  var r = await admin.from('user_profiles').select('user_id', { count: 'exact', head: true }).eq('managed_by', userId);
+  return r.error ? 0 : (r.count || 0);
+}
+// Total recorded calls for the zero-history delete gate (fathom + sessions).
+async function countUserHistory(admin, userId) {
+  var fc = await admin.from('fathom_calls').select('id', { count: 'exact', head: true }).eq('user_id', userId);
+  var cs = await admin.from('call_sessions').select('id', { count: 'exact', head: true }).eq('user_id', userId);
+  return { calls: fc.error ? 0 : (fc.count || 0), sessions: cs.error ? 0 : (cs.count || 0) };
+}
 
 // Returns null for owners ("all users visible") or an array of allowed
 // user_ids for admins (self + users where managed_by = self). Callers pass
@@ -317,6 +346,8 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
         role: u.role,
         managed_by: u.managed_by,
         billing_status: u.billing_status,
+        billing_plan: u.billing_plan,
+        active: u.active,
         first_name: u.first_name,
         last_name: u.last_name,
         created_at: u.created_at,
@@ -325,7 +356,9 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
       };
     });
 
-    res.json({ users: enriched });
+    // Seat count = active users in the visible scope (billing: seat = active user).
+    var seatsActive = visible.filter(function (u) { return u.active !== false; }).length;
+    res.json({ users: enriched, seats_active: seatsActive, seats_total: visible.length });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] users error:', err.message);
@@ -417,19 +450,27 @@ router.patch('/users/:user_id/role', requireAuth, requireRole('owner'), async fu
 // Owner-only. Assign/unassign a user to a manager (the v1.4 team-assignment
 // mechanism). managed_by may be a manager/owner user_id, or null to unassign.
 // Same audit-logging shape as the role change route.
-router.patch('/users/:user_id/managed_by', requireAuth, requireRole('owner'), async function(req, res) {
+router.patch('/users/:user_id/managed_by', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetId = req.params.user_id;
   var body = req.body || {};
   var newManagedBy = (body.managed_by === null || body.managed_by === undefined || body.managed_by === '') ? null : body.managed_by;
 
+  // Reassignment only — never unassign (a rep always has an owner/manager).
+  if (!newManagedBy) {
+    return res.status(400).json({ error: 'A rep must be reassigned to another manager (unassign is not allowed)' });
+  }
   // Reject self-assignment BEFORE the DB fires (mirror the no_self_manage check
   // with a clear 400 rather than surfacing a raw constraint error).
-  if (newManagedBy && newManagedBy === targetId) {
+  if (newManagedBy === targetId) {
     return res.status(400).json({ error: 'A user cannot be managed by themselves' });
   }
 
   try {
     var admin = getAdminClient();
+
+    // Rep-scope: a manager may only move a rep they currently manage.
+    var moveTarget = await loadTargetProfile(admin, targetId);
+    if (denyIfCannotManage(req, res, moveTarget)) return;
 
     // If assigning, the manager must exist and hold role manager or owner.
     if (newManagedBy) {
@@ -547,13 +588,20 @@ async function sendWelcomeInvite(admin, email, firstName) {
 }
 
 var CREATE_ROLES = ['user', 'manager'];
-router.post('/users', requireAuth, requireRole('owner'), async function(req, res) {
+router.post('/users', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var body = req.body || {};
   var email = (typeof body.email === 'string') ? body.email.trim() : '';
   var role = body.role;
   var managedBy = (body.managed_by === null || body.managed_by === undefined || body.managed_by === '') ? null : body.managed_by;
   var firstName = (typeof body.first_name === 'string') ? body.first_name.trim() : '';
   var lastName = (typeof body.last_name === 'string') ? body.last_name.trim() : '';
+
+  // A manager may only create their OWN reps: force managed_by=self and role=user
+  // (only an owner can mint managers or assign a rep to a different manager).
+  if (req.user.role !== 'owner') {
+    managedBy = req.user.id;
+    role = 'user';
+  }
 
   if (!email || email.indexOf('@') === -1) return res.status(400).json({ error: 'A valid email is required' });
   if (CREATE_ROLES.indexOf(role) === -1) return res.status(400).json({ error: 'role must be one of: user, manager (owners are not created here)' });
@@ -610,10 +658,13 @@ router.post('/users', requireAuth, requireRole('owner'), async function(req, res
 // Owner-only resend: mints a FRESH set-password link (supersedes any prior
 // one) and sends the welcome email again. Same isolation contract as creation
 // — failures report status, never 500 for email reasons.
-router.post('/users/:user_id/welcome-email', requireAuth, requireRole('owner'), async function(req, res) {
+router.post('/users/:user_id/welcome-email', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   try {
     var admin = getAdminClient();
     var uid = req.params.user_id;
+    // Rep-scope: a manager may only send a reset link to their own reps.
+    var t = await loadTargetProfile(admin, uid);
+    if (denyIfCannotManage(req, res, t)) return;
     var got = await admin.auth.admin.getUserById(uid);
     if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
     var email = got.data.user.email;
@@ -626,6 +677,122 @@ router.post('/users/:user_id/welcome-email', requireAuth, requireRole('owner'), 
     if (handleConfigError(err, res)) return;
     console.error('[admin] welcome-email resend error:', err.message);
     res.status(500).json({ error: 'Failed to resend welcome email' });
+  }
+});
+
+// ── POST /admin/users/:user_id/deactivate — ban + active=false (frees a seat) ──
+// manager (own reps) + owner. Blocks self, owners, and managers who still have
+// reps (move them first). Ban blocks new login+refresh; the active flag is what
+// rejects a still-valid access token (see middleware/auth.js).
+router.post('/users/:user_id/deactivate', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var uid = req.params.user_id;
+    var t = await loadTargetProfile(admin, uid);
+    if (denyIfCannotManage(req, res, t)) return;
+    var repCount = (t.role === 'manager' || t.role === 'owner') ? await countManagedReps(admin, uid) : 0;
+    var reason = deactivateBlockReason({ actorId: req.user.id, targetId: uid, targetRole: t.role, repCount: repCount });
+    if (reason) return res.status(409).json({ error: reason });
+
+    var banned = await admin.auth.admin.updateUserById(uid, { ban_duration: '876000h' }); // ~100y
+    if (banned.error) return res.status(500).json({ error: 'Could not deactivate: ' + banned.error.message });
+    var up = await admin.from('user_profiles').upsert({ user_id: uid, active: false }, { onConflict: 'user_id' }).select('user_id, active').single();
+    if (up.error) {
+      // roll the ban back so state stays consistent
+      await admin.auth.admin.updateUserById(uid, { ban_duration: 'none' }).catch(function () {});
+      return res.status(500).json({ error: 'Could not deactivate: ' + up.error.message });
+    }
+    console.log('[admin] user deactivated: actor=%s (%s) target=%s', req.user.email, req.user.id, uid);
+    res.json({ user_id: uid, active: false });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] deactivate error:', err.message);
+    res.status(500).json({ error: 'Failed to deactivate user' });
+  }
+});
+
+// ── POST /admin/users/:user_id/reactivate — un-ban + active=true (adds a seat) ─
+router.post('/users/:user_id/reactivate', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var uid = req.params.user_id;
+    var t = await loadTargetProfile(admin, uid);
+    if (denyIfCannotManage(req, res, t)) return;
+    var unban = await admin.auth.admin.updateUserById(uid, { ban_duration: 'none' });
+    if (unban.error) return res.status(500).json({ error: 'Could not reactivate: ' + unban.error.message });
+    var up = await admin.from('user_profiles').upsert({ user_id: uid, active: true }, { onConflict: 'user_id' }).select('user_id, active').single();
+    if (up.error) return res.status(500).json({ error: 'Could not reactivate: ' + up.error.message });
+    console.log('[admin] user reactivated: actor=%s (%s) target=%s', req.user.email, req.user.id, uid);
+    res.json({ user_id: uid, active: true });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] reactivate error:', err.message);
+    res.status(500).json({ error: 'Failed to reactivate user' });
+  }
+});
+
+// ── PATCH /admin/users/:user_id/email — change login email + notify OLD address ─
+// manager (own reps) + owner. The old address is emailed a heads-up (account-
+// takeover safeguard) naming what changed and who did it — best-effort, never
+// blocks or fails the change.
+router.patch('/users/:user_id/email', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var uid = req.params.user_id;
+    var newEmail = (req.body && typeof req.body.email === 'string') ? req.body.email.trim() : '';
+    if (!newEmail || newEmail.indexOf('@') === -1) return res.status(400).json({ error: 'A valid email is required' });
+    var t = await loadTargetProfile(admin, uid);
+    if (denyIfCannotManage(req, res, t)) return;
+    var got = await admin.auth.admin.getUserById(uid);
+    if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
+    var oldEmail = got.data.user.email;
+    if (oldEmail && oldEmail.toLowerCase() === newEmail.toLowerCase()) return res.json({ user_id: uid, email: oldEmail });
+
+    var upd = await admin.auth.admin.updateUserById(uid, { email: newEmail, email_confirm: true });
+    if (upd.error) return res.status(400).json({ error: upd.error.message });
+    console.log('[admin] email changed: actor=%s (%s) target=%s', req.user.email, req.user.id, uid);
+    // Notify the OLD address — best-effort, isolated from the change outcome.
+    var notified = 'skipped';
+    if (oldEmail) {
+      try { var r = await welcomeEmail.sendEmailChangeNotice({ oldEmail: oldEmail, newEmail: newEmail, actorEmail: req.user.email }); notified = r && r.sent ? 'sent' : (r && r.reason ? r.reason : 'failed'); }
+      catch (e) { notified = 'failed'; console.error('[admin] email-change notice threw (change unaffected): ' + (e && e.message)); }
+    }
+    res.json({ user_id: uid, email: newEmail, old_notified: notified });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] email change error:', err.message);
+    res.status(500).json({ error: 'Failed to update email' });
+  }
+});
+
+// ── DELETE /admin/users/:user_id — OWNER-ONLY, zero-history gate + typed confirm ─
+// A user with ANY recorded call cannot be hard-deleted (call history is the
+// company's asset) → 409, steer to deactivate. Requires the user's email echoed
+// in the body (typed confirmation). Hard delete cascades the empty profile/rows.
+router.delete('/users/:user_id', requireAuth, requireRole('owner'), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var uid = req.params.user_id;
+    if (uid === req.user.id) return res.status(400).json({ error: 'You can’t delete your own account.' });
+    var got = await admin.auth.admin.getUserById(uid);
+    if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
+    var email = got.data.user.email;
+    var confirm = (req.body && typeof req.body.confirm_email === 'string') ? req.body.confirm_email.trim() : '';
+    if (!email || confirm.toLowerCase() !== String(email).toLowerCase()) {
+      return res.status(400).json({ error: 'Type the user’s email exactly to confirm deletion.' });
+    }
+    var hist = await countUserHistory(admin, uid);
+    var block = deleteBlockReason(hist.calls, hist.sessions);
+    if (block) return res.status(409).json({ error: block });
+
+    var del = await admin.auth.admin.deleteUser(uid);
+    if (del.error) return res.status(500).json({ error: 'Could not delete user: ' + del.error.message });
+    console.log('[admin] user DELETED: actor=%s (%s) target=%s (%s)', req.user.email, req.user.id, uid, email);
+    res.json({ deleted: true, user_id: uid });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] delete error:', err.message);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 
@@ -661,7 +828,7 @@ async function fetchUsersWithProfiles(admin) {
   if (authResult.error) throw new Error('listUsers failed: ' + authResult.error.message);
   var profilesResult = await admin
     .from('user_profiles')
-    .select('user_id, role, managed_by, billing_status, first_name, last_name');
+    .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name');
   if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
 
   var profilesByUserId = {};
@@ -679,6 +846,8 @@ async function fetchUsersWithProfiles(admin) {
       role: p.role || 'user',
       managed_by: p.managed_by || null,
       billing_status: p.billing_status || 'trial',
+      billing_plan: p.billing_plan || null,
+      active: p.active !== false, // profile-less or unset → active (matches column default)
       first_name: p.first_name || null,
       last_name: p.last_name || null,
       created_at: u.created_at || null,

@@ -29,6 +29,24 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
     req.user = data.user;
+
+    // Deactivation enforcement (User Management, 2026-07-27). Empirically, a
+    // Supabase ban blocks new login + refresh but does NOT reject an already-
+    // issued access token, and supabase-js can't revoke sessions by user id — so
+    // this app-level flag is the enforcer: a deactivated user's live token is
+    // rejected here. One lookup that ALSO stamps the profile role so requireRole
+    // reuses it (net-neutral for role-gated routes). Fail-open on a DB error —
+    // the ban still locks the account within the access-token TTL.
+    try {
+      var prof = await supabase.from('user_profiles').select('role, active').eq('user_id', data.user.id).maybeSingle();
+      if (!prof.error && prof.data) {
+        if (prof.data.active === false) {
+          return res.status(401).json({ error: 'Account deactivated. Contact your manager.' });
+        }
+        req.userProfileRole = prof.data.role || 'user';
+        req.user.role = prof.data.role || 'user';
+      }
+    } catch (e) { console.warn('[auth] active-check skipped (fail-open):', e && e.message); }
     next();
   } catch (err) {
     if (err.message && err.message.indexOf('not configured') !== -1) {
