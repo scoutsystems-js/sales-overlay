@@ -13,6 +13,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
 const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/team-synthesis');
 const { computeTeamNeedsWork } = require('../lib/team-needs-work');
+const { computePageSummary } = require('../lib/page-summary');
 
 const router = express.Router();
 const teamGate = [requireAuth, requireRole(['manager', 'owner'])];
@@ -145,6 +146,25 @@ router.get('/recommendations', teamGate, async function (req, res) {
     var data = await computeTeamRecommendations(admin, team.keyId, team.repIds, range.from, range.to, em);
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] recommendations:', err.message); res.status(500).json({ error: 'Failed to load team recommendations' }); }
+});
+
+// C-1: "Generate summary" — page-agnostic executive summary. The client hands
+// us a page label + the page's ALREADY-LOADED data (no re-fetch, no analytics
+// computation here); Claude writes exec-voice prose around the handed numbers.
+// Gated to manager+owner (credit protection); the data is the caller's own
+// already-permission-checked page payload, so there's no new data exposure.
+router.post('/summary', teamGate, async function (req, res) {
+  try {
+    var body = req.body || {};
+    var pageLabel = (typeof body.page_label === 'string' && body.page_label.trim()) ? body.page_label.trim().slice(0, 160) : null;
+    var data = body.data;
+    if (!pageLabel || data == null || typeof data !== 'object') {
+      return res.status(400).json({ error: 'page_label (string) and data (object) are required' });
+    }
+    var admin = getAdmin();
+    var out = await computePageSummary(admin, req.user.id, pageLabel, data);
+    res.json(out);
+  } catch (err) { if (handleConfigError(err, res)) return; console.error('[team] summary:', err.message); res.status(500).json({ error: 'Failed to generate summary' }); }
 });
 
 // "What needs work" — the objection-bucket counterfactual (B-2). On-demand,

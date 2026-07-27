@@ -197,6 +197,11 @@
     .glance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 8px; }
     .glance-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
     .glance-skeleton { height: 92px; border-radius: var(--radius); }
+    /* C-1: Generate summary button + popup body */
+    .summary-btn { white-space: nowrap; }
+    .summary-text { font-size: 15px; line-height: 1.6; color: var(--text); white-space: normal; }
+    .summary-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+    .copy-note { font-size: 13px; font-weight: 600; color: var(--good); }
     /* A-1: collapsed accordion sections on the overview */
     .overview-acc-head { cursor: pointer; user-select: none; }
     .overview-acc-head h2 { display: flex; align-items: center; gap: 8px; }
@@ -1896,6 +1901,16 @@
      single submit handler that reads the active tab and builds FormData
      accordingly. Multipart Content-Type header is intentionally omitted so
      the browser sets the multipart boundary for multer to parse. -->
+<!-- C-1: page-summary popup (reuses the kb-modal pattern) -->
+<div class="kb-modal hidden" id="summaryModal">
+  <div class="kb-modal-overlay" onclick="closeSummaryModal()"></div>
+  <div class="kb-modal-dialog">
+    <button class="kb-modal-close" onclick="closeSummaryModal()" aria-label="Close">✕</button>
+    <h2 id="summaryModalTitle">Summary</h2>
+    <div id="summaryModalBody"></div>
+  </div>
+</div>
+
 <div class="kb-modal hidden" id="kbModal">
   <div class="kb-modal-overlay" onclick="closeKbModal()"></div>
   <div class="kb-modal-dialog">
@@ -3022,7 +3037,7 @@
          + '<div><h1>' + escapeHtml(heading) + scopePill + '</h1>'
          + '<div class="subtitle">' + escapeHtml(sub) + '</div></div>'
          + '<div class="controls">' + userPicker
-         + '<div class="date-presets">' + presets + '</div>'
+         + '<div class="date-presets">' + presets + '</div>' + summaryBtnHtml()
          + '</div></div>';
   }
 
@@ -3886,8 +3901,118 @@
       + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
         + '<div class="review-meta-row"><span>Manager view</span></div></div>'
       + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + picker
-        + '<div class="date-presets">' + presets + '</div></div>'
+        + '<div class="date-presets">' + presets + '</div>' + summaryBtnHtml() + '</div>'
     + '</div>';
+  }
+
+  // ── C-1: "Generate summary" — page-agnostic executive summary ──────────────
+  // One button across the manager-view pages. It summarizes the page's ALREADY-
+  // LOADED data (no re-fetch); the /team/summary endpoint hands Claude the numbers
+  // and Claude writes exec-voice prose around them. Popup reuses the kb-modal
+  // pattern; copy reuses the eodCopyForSlack clipboard + "Copied ✓" confirmation.
+  var _lastSummaryText = '';
+
+  function summaryBtnHtml() {
+    // Only render where a summarizable page is active (see currentSummaryPage).
+    return currentSummaryPage() ? '<button class="btn-fathom-secondary summary-btn" type="button" onclick="openPageSummary()">✨ Generate summary</button>' : '';
+  }
+
+  // Which manager-view page is on screen (drives both button visibility + payload).
+  function currentSummaryPage() {
+    if (state.view === 'team') return { key: state.teamDetailMetric ? 'detail' : 'team' };
+    if (state.view === 'team-needs-work') return { key: 'needs-work' };
+    if (state.view === 'team-expanded') return { key: 'team-recs' };
+    if (state.view === 'overview' && hasManagerContext() && !isSelf()) return { key: 'rep-coaching' };
+    return null;
+  }
+
+  function _summaryTeamLabel() { var o = state.teamOverview; return (o && o.team && o.team.label) || 'Team'; }
+  function _trimRep(r) {
+    return { name: r.display_name || r.email || (r.user_id || '').slice(0, 8), calls_analyzed: r.calls_analyzed, avg_score: r.avg_score,
+      cash_collected: r.cash_collected, close_rate: r.close_rate, obj_handle_rate: r.obj_handle_rate, sections: r.sections };
+  }
+
+  // Assemble {label, data} from state for the current page — no fetching.
+  // Returns null if the page's data isn't loaded/available yet.
+  function buildPageSummaryPayload() {
+    var p = currentSummaryPage(); if (!p) return null;
+    var o = state.teamOverview;
+    if (p.key === 'team') {
+      if (!o || o._error || o._forbidden || !o.totals) return null;
+      return { label: _summaryTeamLabel() + ' — team overview', data: { team: o.team, totals: o.totals, reps: (o.per_rep || []).map(_trimRep) } };
+    }
+    if (p.key === 'detail') {
+      if (!o || !o.per_rep) return null;
+      var m = state.teamDetailMetric;
+      var ml = m === 'cash' ? 'Cash collected' : (m === 'close' ? 'Close rate' : 'Objection handling');
+      return { label: _summaryTeamLabel() + ' — ' + ml + ' by rep', data: { metric: ml, reps: (o.per_rep || []).map(_trimRep) } };
+    }
+    if (p.key === 'needs-work') {
+      var d = state.teamNeedsWork; if (!d || d.available === false || !d.card_text) return null;
+      return { label: _summaryTeamLabel() + ' — what needs work', data: {
+        headline: d.card_text, bucket: d.bucket, extra: d.extra,
+        buckets: d.detail && d.detail.buckets, linkage: d.detail && d.detail.linkage, avg_cash: d.detail && d.detail.avg_cash } };
+    }
+    if (p.key === 'team-recs') {
+      var r = state.teamRecs, h = state.teamHighlights;
+      var data = {};
+      if (r && r.available !== false) data.recommendations = { working: r.working || [], improve: r.improve || [] };
+      if (h && h.available !== false) data.highlights = h.lanes || {};
+      if (!data.recommendations && !data.highlights) return null;
+      return { label: _summaryTeamLabel() + ' — recommendations & highlights', data: data };
+    }
+    if (p.key === 'rep-coaching') {
+      var a = state.analytics2; if (!a || !a.calls) return null;
+      var u = (state.users || []).filter(function (x) { return x.user_id === state.viewingUserId; })[0];
+      var who = (u && u.email) || 'This rep';
+      return { label: who + ' — coaching dashboard', data: {
+        rep: who, calls: a.calls, avg_score: a.avg_score, objections: a.objections,
+        cash_collected: a.cash_collected, close_rate: a.close_rate, close_wins: a.close_wins, close_decided: a.close_decided,
+        sections: a.sections, weakest_section: a.weakest_section, strongest_section: a.strongest_section } };
+    }
+    return null;
+  }
+
+  async function openPageSummary() {
+    var modal = document.getElementById('summaryModal');
+    var titleEl = document.getElementById('summaryModalTitle');
+    var bodyEl = document.getElementById('summaryModalBody');
+    if (!modal || !bodyEl) return;
+    var payload = buildPageSummaryPayload();
+    if (!payload) {
+      titleEl.textContent = 'Summary';
+      bodyEl.innerHTML = '<div class="empty"><p>This page is still loading — give it a moment, then generate the summary.</p></div>';
+      modal.classList.remove('hidden'); return;
+    }
+    titleEl.textContent = payload.label;
+    bodyEl.innerHTML = '<div class="load-state" style="padding:16px 4px;"><div class="spinner"></div> Generating summary…</div>';
+    modal.classList.remove('hidden');
+    try {
+      var res = await fetch('/team/summary', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ page_label: payload.label, data: payload.data }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (res.status === 403) { bodyEl.innerHTML = '<div class="empty"><p>Not authorized.</p></div>'; return; }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var d = await res.json();
+      if (!d.available) { bodyEl.innerHTML = '<div class="empty"><p>' + escapeHtml(d.reason || 'Could not generate a summary right now.') + '</p></div>'; return; }
+      _lastSummaryText = d.summary || '';
+      bodyEl.innerHTML = '<div class="summary-text">' + escapeHtml(_lastSummaryText).replace(/\n/g, '<br>') + '</div>'
+        + '<div class="summary-actions"><button class="btn-fathom-secondary" type="button" onclick="copyPageSummary()">Copy for Slack</button>'
+        + '<span id="summaryCopyNote" class="copy-note"></span></div>';
+    } catch (err) {
+      bodyEl.innerHTML = '<div class="error">Could not generate summary: ' + escapeHtml(err.message || 'unknown') + '</div>';
+    }
+  }
+  function closeSummaryModal() { var m = document.getElementById('summaryModal'); if (m) m.classList.add('hidden'); }
+  async function copyPageSummary() {
+    var note = document.getElementById('summaryCopyNote');
+    try {
+      await navigator.clipboard.writeText(_lastSummaryText);
+      if (note) { note.textContent = 'Copied ✓'; setTimeout(function () { if (note) note.textContent = ''; }, 2500); }
+    } catch (e) { window.prompt('Copy the summary below:', _lastSummaryText); }
   }
 
   function trendArrow(t) {
