@@ -3005,6 +3005,7 @@
     else if (state.view === 'call-review') renderCallReview();
     else if (state.view === 'objections-intel') renderObjectionsIntel();
     else if (state.view === 'needs-work') renderNeedsWorkView();
+    else if (state.view === 'performance') renderPerformanceView();
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
@@ -3031,7 +3032,7 @@
     // Objections view is reachable only via the donut (no persistent nav tab);
     // keep the Coaching Dashboard nav highlighted while in it.
     if (navOverview) {
-      navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel' || state.view === 'needs-work');
+      navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel' || state.view === 'needs-work' || state.view === 'performance');
     }
     var navTeam = document.getElementById('navTeam');
     if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-members');
@@ -3334,19 +3335,6 @@
       + (sub ? '<div class="glance-sub">' + escapeHtml(sub) + '</div>' : '')
       + '</div>';
   }
-  // A-1: a collapsed accordion section — header + chevron; body HTML only emitted
-  // when expanded (nothing heavy renders on first paint).
-  function overviewSectionHtml(key, title, meta, bodyFn) {
-    var open = !!state.overviewExpanded[key];
-    return '<div class="section fade-in overview-acc' + (open ? ' expanded' : '') + '">'
-      + '<div class="section-header overview-acc-head" onclick="toggleOverviewSection(\'' + key + '\')">'
-        + '<h2>' + escapeHtml(title) + '<span class="acc-chevron">▾</span></h2>'
-        + (meta ? '<div class="meta">' + escapeHtml(meta) + '</div>' : '')
-      + '</div>'
-      + (open ? '<div class="overview-acc-body">' + bodyFn() + '</div>' : '')
-    + '</div>';
-  }
-
   function renderCoachingOverview(content) {
     var a = state.analytics2;
     var analyzed = a.calls.analyzed;
@@ -3361,6 +3349,9 @@
       + glanceTileHtml('Close rate', a.close_rate == null ? '—' : a.close_rate + '%', (a.close_decided ? a.close_wins + '/' + a.close_decided + ' decided' : 'of decided calls'), "drillCalls('analyzed',null)")
     + '</div>';
 
+    // A-2.2 layout: tiles → What-needs-work card → Coach summary (OPEN inline) →
+    // Performance summary (card → #performance page, LLM on open) → Recent calls
+    // (card → the Call Library). No accordions.
     content.innerHTML = renderHeaderHtml()
       + renderModeToggleHtml()
       + renderFathomNoticeHtml()
@@ -3368,22 +3359,39 @@
       + renderZoomSectionHtml()
       + tiles
       + '<div class="section fade-in">' + needsWorkCardHtml() + '</div>'
-      + overviewSectionHtml('coach', 'Coach summary', analyzed ? ('based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls')) : '', function () { return renderCoachSummary2(a); })
-      + overviewSectionHtml('perf', 'Performance summary (AI)', 'win vs loss, grounded in your calls', function () { return renderPerfSummary(); })
-      + overviewSectionHtml('recent', 'Recent calls', '', function () { return renderOverviewRecentHtml(); });
+      + '<div class="section fade-in"><div class="section-header"><h2>Coach summary</h2>'
+        + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
+        + renderCoachSummary2(a) + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Performance summary</h2></div>' + overviewLinkCardHtml('Your wins and what to improve, drawn from your calls.', 'openPerformance()') + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Recent calls</h2></div>' + overviewLinkCardHtml('Open your Call Library to review recent calls.', 'goCallLibrary()') + '</div>';
 
     // Personal What-needs-work loads once (cheap: cache hit = no Claude).
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
-    // Performance Summary's LLM call fires ONLY when its section is expanded (and
-    // there's data), never on load. Recent calls lazy-loads on its own expand.
-    if (state.overviewExpanded.perf && analyzed && state.perfSynthesis === null && !state.perfSynthesisLoading) loadPerfSynthesis();
-    if (state.overviewExpanded.recent && state.overviewRecent === null && !state.overviewRecentLoading) loadOverviewRecent();
+    // NOTE: Performance's LLM call fires on the #performance page open, not here.
   }
 
-  function toggleOverviewSection(key) {
-    state.overviewExpanded[key] = !state.overviewExpanded[key];
-    renderOverview(false);
+  // A-2.2: a link card (teaser + visible "click to expand →") that opens a page.
+  function overviewLinkCardHtml(teaser, onclick) {
+    return '<div class="team-recs-card" onclick="' + onclick + '">'
+      + '<div class="team-recs-teaser">' + escapeHtml(teaser) + '</div>'
+      + '<div class="team-recs-expand">click to expand →</div></div>';
   }
+  // Performance summary detail page — the LLM fires on open (deferred, cached).
+  function openPerformance() { setView('performance'); }
+  function renderPerformanceView() {
+    var content = document.getElementById('content');
+    if (state.perfSynthesis === null && !state.perfSynthesisLoading) loadPerfSynthesis();
+    content.innerHTML = renderHeaderHtml()
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Performance summary</h2>'
+        + '<div class="meta">win vs loss, grounded in your calls</div></div>'
+        + '<button class="date-preset" onclick="backToOverview()">← back</button></div>'
+        + renderPerfSummary() + '</div>';
+  }
+  /* A-2.2: accordion machinery RETIRED — Coach summary is inline, Performance and
+     Recent are pages/links now. Kept commented for reference.
+  function overviewSectionHtml(key, title, meta, bodyFn) { ... }
+  function toggleOverviewSection(key) { state.overviewExpanded[key] = !state.overviewExpanded[key]; renderOverview(false); }
+  */
 
   // ── A-2.1: personal "What needs work" (card under the tiles + #needs-work page)
   async function fetchNeedsWork() {
@@ -3436,32 +3444,12 @@
   }
 
   // Recent calls (A-1): the 5 most-recent calls in range, lazy on expand, via the
-  // same endpoint the Call Library uses (self / pivot). Reuses callLibraryCardHtml.
-  async function fetchOverviewRecent() {
-    var params = ['limit=5', 'offset=0'];
-    if (state.dateRange) { params.push('from=' + encodeURIComponent(state.dateRange.from)); params.push('to=' + encodeURIComponent(state.dateRange.to)); }
-    var base = isSelf() ? '/fathom/calls' : '/admin/fathom-calls/' + encodeURIComponent(state.viewingUserId);
-    var res = await fetch(base + '?' + params.join('&'), { headers: authHeader() });
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  }
-  async function loadOverviewRecent() {
-    if (state.overviewRecentLoading) return;
-    state.overviewRecentLoading = true;
-    try { var d = await fetchOverviewRecent(); state.overviewRecent = (d && d.calls) || []; }
-    catch (err) { if (err.message === 'unauth') return; state.overviewRecent = { _error: err.message || 'unknown' }; }
-    state.overviewRecentLoading = false;
-    if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
-  }
-  function renderOverviewRecentHtml() {
-    var r = state.overviewRecent;
-    if (r === null) return '<div class="load-state" style="padding:12px 4px;"><div class="spinner"></div> Loading recent calls…</div>';
-    if (r._error) return '<div class="error">Could not load recent calls: ' + escapeHtml(r._error) + '</div>';
-    if (!r.length) return '<div class="empty"><p>No calls in this range yet.</p></div>';
-    return r.map(callLibraryCardHtml).join('')
-      + '<div style="margin-top:12px;"><a class="obj-btn" onclick="goCallLibrary();return false;" style="cursor:pointer;">See all calls →</a></div>';
-  }
+  /* A-2.2: the inline Recent-calls loader is RETIRED — Recent calls now links
+     straight to the Call Library. Kept commented for reference.
+  async function fetchOverviewRecent() { ... }
+  async function loadOverviewRecent() { ... }
+  function renderOverviewRecentHtml() { ... }
+  */
 
   // ─── Performance Summary (learning loop surface) ─────────────────────────
   async function fetchPerfSynthesis() {
@@ -3478,7 +3466,8 @@
     try { state.perfSynthesis = await fetchPerfSynthesis(); }
     catch (err) { if (err.message === 'unauth') return; state.perfSynthesis = { available: false, reason: err.message || 'unknown' }; }
     state.perfSynthesisLoading = false;
-    if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
+    if (state.view === 'performance') renderPerformanceView();
+    else if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
   }
   function perfInsightHtml(it, kind) {
     var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ clip</a>' : '';
@@ -4501,6 +4490,7 @@
     if (state.view === 'call-library')     return 'calls';
     if (state.view === 'objections-intel') return 'objections';
     if (state.view === 'needs-work')       return 'needs-work';
+    if (state.view === 'performance')      return 'performance';
     if (state.view === 'kb')               return 'kb';
     if (state.view === 'eod')              return 'eod';
     if (state.view === 'account')          return 'account';
@@ -4528,6 +4518,7 @@
     else if (h === 'account') { state.view = 'account'; state.account = null; /* fresh on hash entry too */ }
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'needs-work') { state.view = 'needs-work'; }
+    else if (h === 'performance') { state.view = 'performance'; }
     else if (h === 'team') { state.view = 'team'; }
     else if (h === 'team-recs') { state.view = 'team-expanded'; }
     else if (h === 'team-needs-work') { state.view = 'team-needs-work'; }
