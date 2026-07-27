@@ -12,6 +12,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
 const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/team-synthesis');
+const { computeTeamNeedsWork } = require('../lib/team-needs-work');
 
 const router = express.Router();
 const teamGate = [requireAuth, requireRole(['manager', 'owner'])];
@@ -144,6 +145,19 @@ router.get('/recommendations', teamGate, async function (req, res) {
     var data = await computeTeamRecommendations(admin, team.keyId, team.repIds, range.from, range.to, em);
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] recommendations:', err.message); res.status(500).json({ error: 'Failed to load team recommendations' }); }
+});
+
+// "What needs work" — the objection-bucket counterfactual (B-2). On-demand,
+// cached (synthesis_type='team_needs_work'); a cache hit spends no Claude.
+router.get('/needs-work', teamGate, async function (req, res) {
+  var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var em = await emailMap(admin);
+    var data = await computeTeamNeedsWork(admin, team.keyId, team.repIds, range.from, range.to, em);
+    res.json(data);
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] needs-work:', err.message); res.status(500).json({ error: 'Failed to load what-needs-work' }); }
 });
 
 // Call Highlights of the Week. ?week=<ISO monday> optional; default = this week.

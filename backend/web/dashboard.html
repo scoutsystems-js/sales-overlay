@@ -1485,6 +1485,24 @@
     .team-recs-card:hover { border-color: var(--accent); transform: translateY(-1px); }
     .team-recs-teaser { font-size: 14px; color: var(--text); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .team-recs-expand { font-size: 12px; font-weight: 600; color: var(--accent); margin-top: 8px; }
+    /* B-2 "What needs work" card + detail */
+    .nw-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .nw-chip { font-size: 12px; color: var(--text-muted); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
+    .nw-chip b { color: var(--text); }
+    .nw-chip-cash { border-color: var(--mid); } .nw-chip-cash b { color: var(--mid); }
+    .nw-para { font-size: 15px; line-height: 1.55; color: var(--text); margin-bottom: 20px; }
+    .section-subhead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; margin: 22px 0 10px; }
+    .nw-focus-tag { font-size: 10px; font-weight: 600; color: var(--mid); background: rgba(230,170,60,0.12); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .nw-miss { font-size: 11px; font-weight: 600; color: var(--mid); }
+    .nw-map { display: flex; flex-direction: column; gap: 2px; }
+    .nw-map-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .nw-map-phrase { color: var(--text); }
+    .nw-map-arrow { color: var(--text-muted); }
+    .nw-map-bucket { color: var(--accent); font-weight: 600; }
+    .nw-map-n { margin-left: auto; font-size: 11.5px; color: var(--text-muted); }
+    .nw-method { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+    .nw-method b { color: var(--text); } .nw-method em { color: var(--text); font-style: italic; }
+    .nw-caveat { font-size: 12px; color: var(--text-muted); margin-top: 8px; opacity: 0.9; }
     .team-lane-row { display: flex; flex-wrap: wrap; gap: 14px; }
     .team-lane { flex: 1; min-width: 240px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px; }
     .team-lane-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 700; margin-bottom: 6px; }
@@ -2000,6 +2018,7 @@
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
     teamDetailMetric: null, // glance-box detail drill: null | 'cash' | 'close' | 'objection'
     teamRangeInit:  false,  // team view forces a 7-day default on first entry, then user presets stick
+    teamNeedsWork:  null,   teamNeedsWorkLoading: false, // "What needs work" card + detail (B-2)
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     account:        null,   accountLoading: false,   // Account view (#account)
     analytics:       null,    // last /me/analytics response
@@ -2921,6 +2940,7 @@
     else if (state.view === 'objections-intel') renderObjectionsIntel();
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
+    else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
     else if (state.view === 'kb') renderKbView();
     else if (state.view === 'eod') renderEodView();
     else if (state.view === 'account') renderAccountView();
@@ -2946,7 +2966,7 @@
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel');
     }
     var navTeam = document.getElementById('navTeam');
-    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded');
+    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work');
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
     if (navCallLibrary) {
@@ -3515,10 +3535,15 @@
   function resetTeamData() {
     state.teamOverview = null; state.teamTrends = null; state.teamRecs = null;
     state.teamHighlights = null; state.teamDigest = null; state.teamDigestDate = null;
+    state.teamNeedsWork = null;
     state.teamDetailMetric = null; // exit any glance-box detail when team/range changes
   }
   // Re-render whichever team surface is active (main view or the expanded page).
-  function renderTeamSurface() { if (state.view === 'team-expanded') renderTeamExpanded(); else renderTeamView(); }
+  function renderTeamSurface() {
+    if (state.view === 'team-expanded') renderTeamExpanded();
+    else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+    else renderTeamView();
+  }
   function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamSurface(); }
   function setTeamTrendBucket(b) { state.teamTrendBucket = b; state.teamTrends = null; loadTeam('trends'); }
   function setTeamRange(days) {
@@ -3534,6 +3559,7 @@
       overview: { flag: 'teamOverviewLoading',   set: 'teamOverview',   url: '/team/overview?' + teamQP() },
       trends:   { flag: 'teamTrendsLoading',     set: 'teamTrends',     url: '/team/trends?' + teamQP('bucket=' + state.teamTrendBucket) },
       recs:     { flag: 'teamRecsLoading',       set: 'teamRecs',       url: '/team/recommendations?' + teamQP() },
+      needsWork:{ flag: 'teamNeedsWorkLoading',  set: 'teamNeedsWork',  url: '/team/needs-work?' + teamQP() },
       highlights:{flag: 'teamHighlightsLoading', set: 'teamHighlights', url: '/team/highlights?' + teamQP() },
       digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP(state.teamDigestDate ? 'date=' + state.teamDigestDate : '') },
     };
@@ -3545,6 +3571,7 @@
     if (c.flag) state[c.flag] = false;
     if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
+    else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
   }
 
   // Team view defaults to LAST 7 DAYS (Justin's spec) — set once on first entry,
@@ -3563,6 +3590,7 @@
     // kick the panels this view needs (lazy, once each). Trends removed from the
     // team view; recs+highlights load lazily but only render on the expanded page.
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+    if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
 
@@ -3585,6 +3613,7 @@
     content.innerHTML =
       teamHeaderHtml()
       + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
+      + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
         + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>'
@@ -3659,6 +3688,112 @@
         + '</div>';
     }).join('') + '</div>';
   }
+
+  // ── "What needs work" (B-2) — compact card + hidden detail page ────────────
+  // Compact card directly under the glance boxes: the money paragraph (or the
+  // rate-gap sentence, or the insufficient message) + click → detail page.
+  function teamNeedsWorkCardHtml() {
+    var d = state.teamNeedsWork;
+    if (!d) return '<div class="skeleton" style="height:70px;"></div>';
+    var head = '<div class="section-header"><h2>What needs work</h2></div>';
+    if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
+    // insufficient → deterministic message, not clickable (no detail worth opening).
+    if (d.state === 'insufficient') {
+      return head + '<div class="team-recs-card" style="cursor:default;"><div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div></div>';
+    }
+    var b = d.bucket || {};
+    var chips = '<div class="nw-chips">'
+      + '<span class="nw-chip"><b>' + (b.rate_pct == null ? '—' : b.rate_pct + '%') + '</b> ' + escapeHtml(b.label || '') + ' handled</span>'
+      + '<span class="nw-chip">team baseline <b>' + (b.baseline_pct == null ? '—' : b.baseline_pct + '%') + '</b></span>'
+      + (d.state === 'money' && d.extra ? '<span class="nw-chip nw-chip-cash"><b>+$' + fmtCashNum(moneyRound(d.extra.extra_cash)) + '</b> at stake</span>' : '')
+      + '</div>';
+    return head + '<div class="team-recs-card" onclick="openTeamNeedsWork()" title="See the per-bucket breakdown, mapping, and quotes">'
+      + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>'
+      + chips
+      + '<div class="team-recs-expand">click to expand →</div>'
+    + '</div>';
+  }
+
+  function openTeamNeedsWork() { setView('team-needs-work'); }
+  function renderTeamNeedsWorkView() {
+    var content = document.getElementById('content');
+    ensureTeamDefaultRange();
+    if (state.teamContext === null) { loadTeam('context'); }
+    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+    if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
+    content.innerHTML = teamHeaderHtml()
+      + '<div class="section fade-in"><div class="section-header"><div><h2>What needs work</h2>'
+        + '<div class="meta">objection-handling focus for this period</div></div>'
+        + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
+        + teamNeedsWorkDetailHtml() + '</div>';
+  }
+
+  function teamNeedsWorkDetailHtml() {
+    var d = state.teamNeedsWork;
+    if (!d) return '<div class="skeleton" style="height:200px;"></div>';
+    if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d.available === false) return '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
+    var det = d.detail || {};
+    // headline paragraph
+    var out = '<div class="nw-para">' + escapeHtml(d.card_text || '') + '</div>';
+
+    // per-bucket rate breakdown (ranked bars, focus highlighted)
+    var buckets = (det.buckets || []).slice();
+    if (buckets.length) {
+      out += '<div class="section-subhead">Handle rate by objection type</div><div class="team-detail-list">'
+        + buckets.map(function (b) {
+          var pct = b.rate_pct == null ? 0 : Math.max(0, Math.min(100, b.rate_pct));
+          var star = b.is_focus ? ' <span class="nw-focus-tag">focus</span>' : '';
+          return '<div class="team-detail-row" style="cursor:default;">'
+            + '<div class="team-detail-name">' + escapeHtml(b.label) + star + '</div>'
+            + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;background:' + (b.is_focus ? 'var(--mid)' : 'var(--accent)') + ';"></div></div>'
+            + '<div class="team-detail-val">' + (b.rate_pct == null ? '—' : b.rate_pct + '%') + '<span class="team-detail-sub">' + b.handled + '/' + b.total + ' handled</span></div>'
+            + '</div>';
+        }).join('') + '</div>';
+    }
+
+    // grounding quotes
+    var quotes = det.quotes || [];
+    if (quotes.length) {
+      out += '<div class="section-subhead">From the calls</div>';
+      out += quotes.map(function (q) {
+        var clip = q.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(q.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
+        return '<div class="team-insight ' + (q.handled ? 'working' : 'improve') + '">'
+          + '<div class="review-why-quote">“' + escapeHtml(q.text || '') + '”</div>'
+          + (q.observation ? '<div class="team-insight-data">' + escapeHtml(q.observation) + '</div>' : '')
+          + '<div class="team-insight-foot">' + (q.rep ? '<span class="team-rep-tag">' + escapeHtml(String(q.rep)) + '</span>' : '') + (q.handled ? '' : '<span class="nw-miss">not handled</span>') + clip + '</div>'
+        + '</div>';
+      }).join('');
+    }
+
+    // the surface→bucket mapping (visibility per ruling)
+    var mapping = det.mapping || [];
+    if (mapping.length) {
+      out += '<div class="section-subhead">Which phrases landed in which bucket</div><div class="nw-map">'
+        + mapping.map(function (m) {
+          return '<div class="nw-map-row"><span class="nw-map-phrase">“' + escapeHtml(m.surface) + '”</span>'
+            + '<span class="nw-map-arrow">→</span><span class="nw-map-bucket">' + escapeHtml(m.bucket) + '</span>'
+            + '<span class="nw-map-n">' + m.handled + '/' + m.n + ' handled</span></div>';
+        }).join('') + '</div>';
+    }
+
+    // honesty contract / how this is computed
+    var lk = det.linkage || {};
+    var deltaPP = (typeof lk.delta === 'number') ? Math.round(lk.delta * 1000) / 10 : null;
+    out += '<div class="section-subhead">How this is estimated</div>'
+      + '<div class="nw-method">'
+      + '<p>Raising a bucket\'s handle rate to the team\'s rate on all <em>other</em> objections implies handling a few more of them. We multiply those by the <b>measured link</b> between handling an objection and the call closing this period '
+      + (deltaPP == null ? '' : '(handled objections sat in a closed call ' + Math.round((lk.p_closed_handled || 0) * 100) + '% of the time vs ' + Math.round((lk.p_closed_nothandled || 0) * 100) + '% when not handled — a ' + deltaPP + '-point lift, over ' + (lk.handled_n || 0) + ' handled / ' + (lk.nothandled_n || 0) + ' not-handled objections)')
+      + ', then by average cash per closed call (' + fmtCash(det.avg_cash) + ' over ' + (det.closed_calls || 0) + ' closed calls).</p>'
+      + '<p class="nw-caveat">This is a correlation in this period\'s own ' + (det.analyzed_calls || 0) + ' analyzed calls, not a guarantee — figures use “≈”. We refuse a dollar figure below the sample thresholds (bucket ≥ ' + '6' + ', clear gap, ≥ 10 objections each side of the link, ≥ 5 closed calls).</p>'
+      + '</div>';
+    return out;
+  }
+
+  // money helpers (frontend): round to nearest $100, comma-format an integer.
+  function moneyRound(x) { var v = Number(x); if (!isFinite(v)) v = 0; return Math.round(v / 100) * 100; }
+  function fmtCashNum(n) { var v = Number(n); if (!isFinite(v)) v = 0; return Math.round(v).toLocaleString('en-US'); }
 
   // Open/close a glance-box detail (per-rep breakdown of one team metric).
   function openTeamDetail(metric) { state.teamDetailMetric = metric; renderTeamView(); }
@@ -3944,6 +4079,7 @@
     if (state.view === 'account')          return 'account';
     if (state.view === 'team')             return 'team';
     if (state.view === 'team-expanded')    return 'team-recs';
+    if (state.view === 'team-needs-work')  return 'team-needs-work';
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     return ''; // overview + dormant drills
   }
@@ -3965,6 +4101,7 @@
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'team') { state.view = 'team'; }
     else if (h === 'team-recs') { state.view = 'team-expanded'; }
+    else if (h === 'team-needs-work') { state.view = 'team-needs-work'; }
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
     else if (h.indexOf('call/') === 0) {
       var id = h.slice(5);
