@@ -187,6 +187,8 @@ async function loadObjectionsByType(adminClient, userId, objectionId, from, to) 
 //     calls:      { analyzed, total_in_range, processing, error },
 //     avg_score:  { mean: 0-100|null, graded_calls },
 //     objections: { calls_with_objection, total_highlights },
+//     cash_collected: <sum over done analyses>,
+//     close_rate: 0-100|null, close_wins, close_decided,   // closed/(closed+lost), decided only
 //     sections:   { intro:{avg,n}, discovery:{avg,n}, pitch:{avg,n}, objection:{avg,n}, close:{avg,n} },
 //     weakest_section, strongest_section,
 //     latest_one_things: [ { fathom_call_id, title, call_date, one_thing }, … up to 5 ],
@@ -225,6 +227,8 @@ async function computeCallAnalytics(admin, userId, from, to) {
     calls: { analyzed: 0, total_in_range: 0, processing: 0, error: 0 },
     avg_score: { mean: null, graded_calls: 0, win_mean: null, win_n: 0, other_mean: null, other_n: 0 },
     objections: { calls_with_objection: 0, total_highlights: 0 },
+    cash_collected: 0,
+    close_rate: null, close_wins: 0, close_decided: 0,
     sections: sectionsShape(),
     weakest_section: null, strongest_section: null,
     latest_one_things: [],
@@ -250,11 +254,14 @@ async function computeCallAnalytics(admin, userId, from, to) {
   // 2) call_analyses for those calls — status, overall + section scores, one_thing.
   var analyses = await fetchByCallIds(
     'call_analyses',
-    'fathom_call_id, status, outcome, overall_score, intro_score, discovery_score, pitch_score, objection_score, close_score, one_thing'
+    'fathom_call_id, status, outcome, overall_score, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, one_thing'
   );
 
   var statusCounts = { done: 0, processing: 0, error: 0 };
   var scoreSum = 0, scoreN = 0;
+  // A-1 glance tiles: cash collected (sum) + close rate = closed/(closed+lost),
+  // DECIDED calls only (ruling 1: follow_up is open pipeline, no_show excluded).
+  var cashSum = 0, closeWon = 0, closeDecided = 0;
   // Win (outcome='closed') vs others split, so a strong closer's win quality is
   // visible instead of buried in the blended average.
   var winSum = 0, winN = 0, otherSum = 0, otherN = 0;
@@ -276,6 +283,11 @@ async function computeCallAnalytics(admin, userId, from, to) {
       if (an.outcome === 'closed') { winSum += an.overall_score; winN++; }
       else { otherSum += an.overall_score; otherN++; }
     }
+    // cash_collected: numeric(12,2), grader-forced 0 on non-closed. PostgREST may
+    // return numeric as a string, so coerce defensively.
+    var cash = Number(an.cash_collected); if (isFinite(cash)) cashSum += cash;
+    if (an.outcome === 'closed') { closeWon++; closeDecided++; }
+    else if (an.outcome === 'lost') { closeDecided++; }
     CALL_ANALYTICS_SECTIONS.forEach(function(s) {
       var v = an[s + '_score'];
       if (typeof v === 'number') { sec[s].sum += v; sec[s].n++; }
@@ -329,6 +341,9 @@ async function computeCallAnalytics(admin, userId, from, to) {
       other_mean: otherN > 0 ? Math.round(otherSum / otherN) : null, other_n: otherN,
     },
     objections: { calls_with_objection: Object.keys(objCalls).length, total_highlights: objRows.length },
+    cash_collected: Math.round(cashSum * 100) / 100,
+    close_rate: closeDecided > 0 ? Math.round((closeWon / closeDecided) * 100) : null,
+    close_wins: closeWon, close_decided: closeDecided,
     sections: sections,
     weakest_section: weakest,
     strongest_section: strongest,

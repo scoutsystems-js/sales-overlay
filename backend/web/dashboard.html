@@ -189,6 +189,21 @@
     }
     @media (max-width: 820px) { .donut-row { grid-template-columns: 1fr; } }
 
+    /* A-1: compact glance tiles (replace the donut row on the coaching overview) */
+    .glance-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 28px; }
+    .glance-tile { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
+    .glance-tile:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .glance-big { font-size: 30px; font-weight: 700; color: var(--text); line-height: 1.05; }
+    .glance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 8px; }
+    .glance-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .glance-skeleton { height: 92px; border-radius: var(--radius); }
+    /* A-1: collapsed accordion sections on the overview */
+    .overview-acc-head { cursor: pointer; user-select: none; }
+    .overview-acc-head h2 { display: flex; align-items: center; gap: 8px; }
+    .acc-chevron { font-size: 13px; color: var(--text-muted); transition: transform 0.15s var(--ease); }
+    .overview-acc.expanded .acc-chevron { transform: rotate(180deg); }
+    .overview-acc-body { margin-top: 14px; }
+
     .donut-card {
       background: var(--bg-elevated);
       border: 1px solid var(--border);
@@ -2007,6 +2022,10 @@
     objectionsSynthesisLoading: false,
     perfSynthesis: null,       // last /me/performance-synthesis ({available,working,improve} | {available:false})
     perfSynthesisLoading: false,
+    // A-1 collapsed overview: sections start collapsed; nothing heavy renders
+    // until expanded (Coach summary + Performance summary + Recent calls).
+    overviewExpanded: { coach: false, perf: false, recent: false },
+    overviewRecent: null, overviewRecentLoading: false, // lazy 5 recent calls on expand
     // ── Team (manager) view ──
     teamContext:    null,   // /team/context: {role, is_owner, has_reps, teams}
     teamSelected:   null,   // owner picker: team key ('all' | managerId) or null=default
@@ -2882,9 +2901,11 @@
   }
 
   async function reloadAll() {
-    // Range/user changed — drop the cached synthesis so it re-fetches for the
-    // new (user, range); the panel re-generates (server cache handles repeats).
+    // Range/user changed — drop the cached synthesis + recent calls so they
+    // re-fetch for the new (user, range). Expanded state persists (UX), the DATA
+    // resets. (Server cache handles repeat synthesis requests.)
     state.perfSynthesis = null;
+    state.overviewRecent = null;
     renderOverview(true /* loading */);
     try {
       // Fathom status fetch is wrapped in a .catch so a stale token or
@@ -2898,31 +2919,20 @@
         ? fetchZoomStatus().catch(function() { return { connected: false }; })
         : Promise.resolve(null);
 
-      // Coach summary patterns come from an LLM call (/coaching/patterns) and are
-      // the flakiest dependency — e.g. it 500s when the Anthropic credit balance
-      // is exhausted. The default Coaching view doesn't use patterns at all, and
-      // Live Sessions can degrade to an empty summary, so a patterns failure must
-      // NOT take the whole dashboard down. Catch it (but let auth redirects through).
-      var patternsPromise = fetchPatterns().catch(function(e) {
-        if (e && e.message === 'unauth') throw e;
-        console.warn('[dashboard] coaching patterns unavailable:', e && e.message);
-        return { patterns: [], sample_size: null, unavailable: true };
-      });
-
+      // A-1 boot trim: the default coaching overview only needs /me/analytics2
+      // (cheap, no LLM) + the connection strips. The old boot also fetched
+      // /me/analytics, /me/sessions, and the LLM /me/coaching/patterns — all
+      // three feed only the dormant Live-Sessions branch, so they're dropped
+      // (kills a Claude call on every dashboard load). Performance Summary's LLM
+      // call is now deferred to its accordion expand, not fired here.
       var results = await Promise.all([
-        fetchAnalytics(),
-        patternsPromise,
-        fetchCalls(),
         fathomPromise,
         fetchAnalytics2(),
         zoomPromise,
       ]);
-      state.analytics    = results[0];
-      state.patterns     = results[1];
-      state.calls        = results[2];
-      state.fathomStatus = results[3];
-      state.analytics2   = results[4];
-      state.zoomStatus   = results[5];
+      state.fathomStatus = results[0];
+      state.analytics2   = results[1];
+      state.zoomStatus   = results[2];
       render();
     } catch (err) {
       if (err.message === 'unauth') return;
@@ -3030,15 +3040,17 @@
     }
     var notReady = mode === 'coaching' ? !state.analytics2 : !state.analytics;
     if (isLoading || notReady) {
+      // A-1: skeleton TILES (not donuts) so the placeholder matches the collapsed
+      // glance-tile layout — no ghost donuts before the real tiles paint.
       content.innerHTML = renderHeaderHtml()
         + renderModeToggleHtml()
         + renderFathomNoticeHtml()
         + renderFathomSectionHtml()
         + renderZoomSectionHtml()
-        + '<div class="donut-row">'
-          + '<div class="skeleton-donut"></div><div class="skeleton-donut"></div><div class="skeleton-donut"></div>'
+        + '<div class="glance-row">'
+          + '<div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div>'
         + '</div>'
-        + '<div class="section"><div class="skeleton" style="height:60px;"></div></div>';
+        + '<div class="section"><div class="skeleton" style="height:44px;"></div></div>';
       return;
     }
 
@@ -3259,37 +3271,89 @@
     return av.graded_calls + ' graded';
   }
 
+  // A-1: compact clickable glance tile (text only — no Chart.js). Reuses the
+  // donut drill targets so each tile behaves like the old donut, minus the rings.
+  function glanceTileHtml(label, big, sub, onclick) {
+    return '<div class="glance-tile" onclick="' + onclick + '" title="' + escapeHtml(label) + ' — click to drill in">'
+      + '<div class="glance-big">' + big + '</div>'
+      + '<div class="glance-label">' + escapeHtml(label) + '</div>'
+      + (sub ? '<div class="glance-sub">' + escapeHtml(sub) + '</div>' : '')
+      + '</div>';
+  }
+  // A-1: a collapsed accordion section — header + chevron; body HTML only emitted
+  // when expanded (nothing heavy renders on first paint).
+  function overviewSectionHtml(key, title, meta, bodyFn) {
+    var open = !!state.overviewExpanded[key];
+    return '<div class="section fade-in overview-acc' + (open ? ' expanded' : '') + '">'
+      + '<div class="section-header overview-acc-head" onclick="toggleOverviewSection(\'' + key + '\')">'
+        + '<h2>' + escapeHtml(title) + '<span class="acc-chevron">▾</span></h2>'
+        + (meta ? '<div class="meta">' + escapeHtml(meta) + '</div>' : '')
+      + '</div>'
+      + (open ? '<div class="overview-acc-body">' + bodyFn() + '</div>' : '')
+    + '</div>';
+  }
+
   function renderCoachingOverview(content) {
     var a = state.analytics2;
-    // Donuts drill into a filtered Call Library (self via /fathom/calls, pivot
-    // via /admin/fathom-calls/:user_id) — each donut filters to its own subset.
+    var analyzed = a.calls.analyzed;
+    // Default first paint = above-the-fold glance tiles + collapsed sections.
+    // No Chart.js, no LLM, nothing heavy until the closer clicks. Tiles reuse the
+    // old donut drill targets (self /fathom/calls, pivot /admin/fathom-calls/:id).
+    var tiles = '<div class="glance-row fade-in">'
+      + glanceTileHtml('Calls analyzed', analyzed, 'of ' + a.calls.total_in_range + ' in range', "drillCalls('analyzed',null)")
+      + glanceTileHtml('Avg score', a.avg_score.mean === null ? '—' : a.avg_score.mean, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
+      + glanceTileHtml('Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' moments', "goObjections()")
+      + glanceTileHtml('Cash collected', fmtCash(a.cash_collected), 'closed-call cash', "drillCalls('analyzed',null)")
+      + glanceTileHtml('Close rate', a.close_rate == null ? '—' : a.close_rate + '%', (a.close_decided ? a.close_wins + '/' + a.close_decided + ' decided' : 'of decided calls'), "drillCalls('analyzed',null)")
+    + '</div>';
+
     content.innerHTML = renderHeaderHtml()
       + renderModeToggleHtml()
       + renderFathomNoticeHtml()
       + renderFathomSectionHtml()
       + renderZoomSectionHtml()
-      + '<div class="donut-row fade-in">'
-        + donutCardHtml('chart-c-calls', 'Calls analyzed', a.calls.analyzed, a.calls.total_in_range + ' in range', 'click to drill in', '', "drillCalls('analyzed',null)")
-        + donutCardHtml('chart-c-score', 'Avg Score', a.avg_score.mean === null ? '—' : a.avg_score.mean, avgScoreSubstat(a.avg_score), 'worst-first — click to drill in', '', "drillCalls('analyzed','score')")
-        + donutCardHtml('chart-c-obj', 'Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' total', 'click for objection intelligence', '', "goObjections()")
-      + '</div>'
-      + '<div class="section fade-in">'
-        + '<div class="section-header"><h2>Coach summary</h2>'
-        + '<div class="meta">' + (a.calls.analyzed ? 'based on ' + a.calls.analyzed + (a.calls.analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
-        + renderCoachSummary2(a)
-      + '</div>'
-      + '<div class="section fade-in">'
-        + '<div class="section-header"><h2>Performance summary</h2><div class="meta">win vs loss, grounded in your calls</div></div>'
-        + renderPerfSummary()
-      + '</div>';
+      + tiles
+      + overviewSectionHtml('coach', 'Coach summary', analyzed ? ('based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls')) : '', function () { return renderCoachSummary2(a); })
+      + overviewSectionHtml('perf', 'Performance summary (AI)', 'win vs loss, grounded in your calls', function () { return renderPerfSummary(); })
+      + overviewSectionHtml('recent', 'Recent calls', '', function () { return renderOverviewRecentHtml(); });
 
-    if (a.calls.analyzed && state.perfSynthesis === null && !state.perfSynthesisLoading) loadPerfSynthesis();
+    // Performance Summary's LLM call fires ONLY when its section is expanded (and
+    // there's data), never on load. Recent calls lazy-loads on its own expand.
+    if (state.overviewExpanded.perf && analyzed && state.perfSynthesis === null && !state.perfSynthesisLoading) loadPerfSynthesis();
+    if (state.overviewExpanded.recent && state.overviewRecent === null && !state.overviewRecentLoading) loadOverviewRecent();
+  }
 
-    requestAnimationFrame(function() {
-      drawCallsDonut2('chart-c-calls', a);
-      drawScoreDonut('chart-c-score', a);
-      drawObjDonut2('chart-c-obj', a);
-    });
+  function toggleOverviewSection(key) {
+    state.overviewExpanded[key] = !state.overviewExpanded[key];
+    renderOverview(false);
+  }
+
+  // Recent calls (A-1): the 5 most-recent calls in range, lazy on expand, via the
+  // same endpoint the Call Library uses (self / pivot). Reuses callLibraryCardHtml.
+  async function fetchOverviewRecent() {
+    var params = ['limit=5', 'offset=0'];
+    if (state.dateRange) { params.push('from=' + encodeURIComponent(state.dateRange.from)); params.push('to=' + encodeURIComponent(state.dateRange.to)); }
+    var base = isSelf() ? '/fathom/calls' : '/admin/fathom-calls/' + encodeURIComponent(state.viewingUserId);
+    var res = await fetch(base + '?' + params.join('&'), { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+  async function loadOverviewRecent() {
+    if (state.overviewRecentLoading) return;
+    state.overviewRecentLoading = true;
+    try { var d = await fetchOverviewRecent(); state.overviewRecent = (d && d.calls) || []; }
+    catch (err) { if (err.message === 'unauth') return; state.overviewRecent = { _error: err.message || 'unknown' }; }
+    state.overviewRecentLoading = false;
+    if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
+  }
+  function renderOverviewRecentHtml() {
+    var r = state.overviewRecent;
+    if (r === null) return '<div class="load-state" style="padding:12px 4px;"><div class="spinner"></div> Loading recent calls…</div>';
+    if (r._error) return '<div class="error">Could not load recent calls: ' + escapeHtml(r._error) + '</div>';
+    if (!r.length) return '<div class="empty"><p>No calls in this range yet.</p></div>';
+    return r.map(callLibraryCardHtml).join('')
+      + '<div style="margin-top:12px;"><a class="obj-btn" onclick="goCallLibrary();return false;" style="cursor:pointer;">See all calls →</a></div>';
   }
 
   // ─── Performance Summary (learning loop surface) ─────────────────────────
