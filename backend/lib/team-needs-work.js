@@ -31,6 +31,14 @@ const MIN_CLOSED = 5;        // closed calls needed for a meaningful avg cash
 const MIN_ANALYZED = 10;     // analyzed calls needed to model at all
 const MIN_DEALS_FOR_CASH = 0.5; // below this expected extra deals, suppress $
 
+// Personal (A-2.1) softer floors: one closer has a fraction of a team's
+// objections. The bucket floor drops (still ≥ a handful) and the analyzed floor
+// drops so a modest closer can still surface a rate-gap focus. The MONEY clause
+// keeps the full linkage/cash gates — its stability comes from TEAM-BORROWED
+// coefficients, not from lowering the money bar.
+const PERSONAL_MIN_BUCKET = 4;
+const PERSONAL_MIN_ANALYZED = 3;
+
 const BUCKET_MAX_TOKENS = 1500;
 
 var _anthropic = null;
@@ -64,43 +72,64 @@ function money100(x) { return Math.round(x / 100) * 100; }
 function pctWhole(n, d) { return d > 0 ? Math.round((100 * n) / d) : null; }
 function round1(x) { return Math.round(x * 10) / 10; }
 
+// Pooled handled→closed linkage + cash facts for a set of objections+analyses.
+// Used both for a group's OWN coefficients and (personal) for the TEAM-BORROWED
+// ones. Pure.
+function computeLinkage(objs, analyses) {
+  var outcomeByCall = {}, closedCount = 0, cashSum = 0;
+  (analyses || []).forEach(function (a) {
+    outcomeByCall[a.fathom_call_id] = a.outcome;
+    if (a.outcome === 'closed') { closedCount++; var c = Number(a.cash_collected); if (isFinite(c)) cashSum += c; }
+  });
+  var avgCash = closedCount > 0 ? cashSum / closedCount : 0;
+  var scoped = (objs || []).filter(function (o) { return Object.prototype.hasOwnProperty.call(outcomeByCall, o.call_id); });
+  var hN = 0, hClosed = 0, nN = 0, nClosed = 0;
+  scoped.forEach(function (o) {
+    var closed = outcomeByCall[o.call_id] === 'closed';
+    if (o.handled) { hN++; if (closed) hClosed++; } else { nN++; if (closed) nClosed++; }
+  });
+  var pH = hN > 0 ? hClosed / hN : null, pN = nN > 0 ? nClosed / nN : null;
+  return { outcomeByCall: outcomeByCall, closedCount: closedCount, avgCash: avgCash,
+    handledN: hN, notHandledN: nN, pH: pH, pN: pN, delta: (pH != null && pN != null) ? pH - pN : null };
+}
+
 // ── The deterministic core (pure — no DB, no Claude, no I/O) ─────────────────
 // objs:     [{ call_id, surface, handled:boolean, quote, observation, rep, clip_url }]
 // analyses: [{ fathom_call_id, outcome, cash_collected }]  (done rows only)
 // mapping:  { <normalized surface>: <bucket label> }  (Claude's output, normalized)
+// opts (optional): { subject:'team'|'personal', minBucket, minAnalyzed, injected }
+//   subject   — 'personal' switches the card copy to "You handled …" + raw counts.
+//   minBucket / minAnalyzed — personal uses softer floors (bucket 4) since one
+//     closer has far fewer objections than a team.
+//   injected  — TEAM-BORROWED money coefficients (from computeLinkage on the
+//     team) so the personal $ clause is backed by a stable sample. When absent,
+//     the group's OWN linkage powers the money math (team behaviour, unchanged).
 // Returns the card + detail envelope. NEVER throws for content reasons.
-function computeNeedsWork(objs, analyses, mapping) {
-  objs = objs || []; analyses = analyses || []; mapping = mapping || {};
+function computeNeedsWork(objs, analyses, mapping, opts) {
+  objs = objs || []; analyses = analyses || []; mapping = mapping || {}; opts = opts || {};
+  var subject = opts.subject === 'personal' ? 'personal' : 'team';
+  var minBucket = opts.minBucket || MIN_BUCKET;
+  var minAnalyzed = (opts.minAnalyzed != null) ? opts.minAnalyzed : MIN_ANALYZED;
   var analyzed = analyses.length;
 
-  // Cash + outcome facts.
-  var outcomeByCall = {}, closedCount = 0, cashSum = 0;
-  analyses.forEach(function (a) {
-    outcomeByCall[a.fathom_call_id] = a.outcome;
-    if (a.outcome === 'closed') {
-      closedCount++;
-      var c = Number(a.cash_collected); if (isFinite(c)) cashSum += c;
-    }
-  });
-  var avgCash = closedCount > 0 ? cashSum / closedCount : 0;
+  var link = computeLinkage(objs, analyses);
+  var outcomeByCall = link.outcomeByCall;
 
   // Only objections whose parent call has a known (done-analysis) outcome.
   var scoped = objs.filter(function (o) { return Object.prototype.hasOwnProperty.call(outcomeByCall, o.call_id); });
   var totalObj = scoped.length;
   var totalHandled = scoped.filter(function (o) { return o.handled; }).length;
 
-  // Team-wide handled→closed linkage Δ (per-objection marginal, pooled). "Not
-  // handled" = every objection whose resolution isn't 'handled' (partial /
-  // unhandled / unknown), matching the bucket rate's handled/total definition.
-  var hN = 0, hClosed = 0, nN = 0, nClosed = 0;
-  scoped.forEach(function (o) {
-    var closed = outcomeByCall[o.call_id] === 'closed';
-    if (o.handled) { hN++; if (closed) hClosed++; }
-    else { nN++; if (closed) nClosed++; }
-  });
-  var pH = hN > 0 ? hClosed / hN : null;
-  var pN = nN > 0 ? nClosed / nN : null;
-  var delta = (pH != null && pN != null) ? pH - pN : null;
+  // Money coefficients: TEAM-BORROWED when injected (personal), else OWN.
+  var inj = opts.injected || null;
+  var borrowed = !!inj;
+  var mDelta = borrowed ? inj.delta : link.delta;
+  var mAvgCash = borrowed ? inj.avgCash : link.avgCash;
+  var mHN = borrowed ? inj.handledN : link.handledN;
+  var mNN = borrowed ? inj.notHandledN : link.notHandledN;
+  var mClosed = borrowed ? inj.closedCount : link.closedCount;
+  var mPH = borrowed ? inj.pH : link.pH;
+  var mPN = borrowed ? inj.pN : link.pN;
 
   // Buckets.
   var buckets = {}; // label -> { label, total, handled, surfaces:{}, rows:[] }
@@ -126,41 +155,43 @@ function computeNeedsWork(objs, analyses, mapping) {
     });
     mappingOut.sort(function (a, b) { return b.n - a.n; });
     return {
-      buckets: list, mapping: mappingOut, quotes: [],
-      linkage: { p_closed_handled: pH, p_closed_nothandled: pN, delta: delta, handled_n: hN, nothandled_n: nN },
-      avg_cash: Math.round(avgCash * 100) / 100, closed_calls: closedCount, analyzed_calls: analyzed, objections: totalObj,
+      buckets: list, mapping: mappingOut, quotes: [], subject: subject,
+      linkage: { p_closed_handled: mPH, p_closed_nothandled: mPN, delta: mDelta, handled_n: mHN, nothandled_n: mNN, borrowed: borrowed },
+      avg_cash: Math.round(mAvgCash * 100) / 100, closed_calls: mClosed, analyzed_calls: analyzed, objections: totalObj,
     };
   }
 
+  var insufficientText = subject === 'personal'
+    ? 'Not enough of your objections yet to pinpoint a focus area — keep logging calls.'
+    : 'Not enough objection volume this period to pinpoint a focus area.';
   // Overall-volume gate → deterministic insufficient (cacheable, no Claude).
-  if (analyzed < MIN_ANALYZED || totalObj === 0) {
-    return { state: 'insufficient', headline: 'What needs work',
-      card_text: 'Not enough objection volume this period to pinpoint a focus area.',
+  if (analyzed < minAnalyzed || totalObj === 0) {
+    return { state: 'insufficient', headline: 'What needs work', card_text: insufficientText,
       bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
   }
 
-  var moneyGatesGlobal = (delta != null && delta > 0 && hN >= MIN_LINK_GROUP && nN >= MIN_LINK_GROUP && closedCount >= MIN_CLOSED && avgCash > 0);
+  var moneyGatesGlobal = (mDelta != null && mDelta > 0 && mHN >= MIN_LINK_GROUP && mNN >= MIN_LINK_GROUP && mClosed >= MIN_CLOSED && mAvgCash > 0);
 
   // Candidate weak buckets (exclude the 'Other' grab-bag from being the focus).
   var candidates = [];
   Object.keys(buckets).forEach(function (label) {
     if (label === 'Other') return;
     var b = buckets[label];
-    if (b.total < MIN_BUCKET) return;
+    if (b.total < minBucket) return;
     var otherTotal = totalObj - b.total, otherHandled = totalHandled - b.handled;
     var baseline = otherTotal > 0 ? otherHandled / otherTotal : 0;
     var rate = b.total > 0 ? b.handled / b.total : 0;
     var gapPP = (baseline - rate) * 100;
     if (gapPP < MIN_GAP_PP) return; // not a relative weakness
     var addHandled = Math.max(0, Math.min(b.total - b.handled, baseline * b.total - b.handled));
-    var extraDeals = moneyGatesGlobal ? addHandled * delta : null;
-    var extraCash = (extraDeals != null) ? extraDeals * avgCash : null;
-    candidates.push({ b: b, baseline: baseline, rate: rate, gapPP: gapPP, addHandled: addHandled, extraDeals: extraDeals, extraCash: extraCash });
+    var extraDeals = moneyGatesGlobal ? addHandled * mDelta : null;
+    var extraCash = (extraDeals != null) ? extraDeals * mAvgCash : null;
+    candidates.push({ b: b, baseline: baseline, otherTotal: otherTotal, otherHandled: otherHandled, rate: rate, gapPP: gapPP, addHandled: addHandled, extraDeals: extraDeals, extraCash: extraCash });
   });
 
   if (candidates.length === 0) {
     return { state: 'insufficient', headline: 'What needs work',
-      card_text: 'No single objection type stands out as a weakness this period.',
+      card_text: subject === 'personal' ? 'No single objection type stands out as a weak spot for you yet.' : 'No single objection type stands out as a weakness this period.',
       bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
   }
 
@@ -171,7 +202,8 @@ function computeNeedsWork(objs, analyses, mapping) {
   else { candidates.sort(function (a, b) { return b.gapPP - a.gapPP; }); focus = candidates[0]; state = 'rate_gap'; }
 
   var label = focus.b.label;
-  var rateW = pctWhole(focus.b.handled, focus.b.total);
+  var bH = focus.b.handled, bT = focus.b.total;
+  var rateW = pctWhole(bH, bT);
   var baseW = Math.round(focus.baseline * 100);
   var detail = baseDetail(label);
   // Grounding quotes: not-handled examples from the focus bucket first (what's
@@ -185,20 +217,32 @@ function computeNeedsWork(objs, analyses, mapping) {
   if (state === 'money') {
     var deals = Math.max(1, Math.round(focus.extraDeals));
     var cash = money100(focus.extraCash);
-    extra = { additional_handled: round1(focus.addHandled), delta: delta, avg_cash: avgCash, extra_deals: focus.extraDeals, extra_cash: focus.extraCash };
-    card_text = 'Your team handles “' + label + '” objections at ' + rateW + '%, vs ' + baseW +
-      '% on every other objection this period. Closing that gap ≈ ' + round1(focus.addHandled) +
-      ' more handled ≈ ' + deals + ' more ' + (deals === 1 ? 'deal' : 'deals') +
-      ' ≈ $' + cash.toLocaleString('en-US') + ' more collected.';
+    extra = { additional_handled: round1(focus.addHandled), delta: mDelta, avg_cash: mAvgCash, extra_deals: focus.extraDeals, extra_cash: focus.extraCash, borrowed: borrowed };
+    if (subject === 'personal') {
+      // Raw counts beside every rate (ruling 4); plain team-borrow phrasing (ruling 3).
+      card_text = 'You handled “' + label + '” objections ' + bH + ' of ' + bT + ' times (' + rateW + '%) — your weakest area, vs ' + baseW +
+        '% on your other objections. Closing that gap ≈ ' + deals + ' more ' + (deals === 1 ? 'deal' : 'deals') +
+        ' ≈ $' + cash.toLocaleString('en-US') + ' more collected' + (borrowed ? ', based on your team’s typical deal size.' : '.');
+    } else {
+      card_text = 'Your team handles “' + label + '” objections at ' + rateW + '%, vs ' + baseW +
+        '% on every other objection this period. Closing that gap ≈ ' + round1(focus.addHandled) +
+        ' more handled ≈ ' + deals + ' more ' + (deals === 1 ? 'deal' : 'deals') +
+        ' ≈ $' + cash.toLocaleString('en-US') + ' more collected.';
+    }
   } else {
-    extra = { additional_handled: round1(focus.addHandled), delta: delta, avg_cash: avgCash, extra_deals: null, extra_cash: null };
-    card_text = 'Your team handles “' + label + '” objections at ' + rateW + '%, the biggest gap vs ' + baseW +
-      '% on every other objection this period.';
+    extra = { additional_handled: round1(focus.addHandled), delta: mDelta, avg_cash: mAvgCash, extra_deals: null, extra_cash: null, borrowed: borrowed };
+    if (subject === 'personal') {
+      card_text = 'You handled “' + label + '” objections ' + bH + ' of ' + bT + ' times (' + rateW + '%) — your weakest area, vs ' + baseW +
+        '% on your other objections this period.';
+    } else {
+      card_text = 'Your team handles “' + label + '” objections at ' + rateW + '%, the biggest gap vs ' + baseW +
+        '% on every other objection this period.';
+    }
   }
 
   return {
     state: state, headline: 'What needs work',
-    bucket: { label: label, total: focus.b.total, handled: focus.b.handled, rate_pct: rateW, baseline_pct: baseW, gap_pp: round1(focus.gapPP) },
+    bucket: { label: label, total: bT, handled: bH, rate_pct: rateW, baseline_pct: baseW, baseline_handled: focus.otherHandled, baseline_total: focus.otherTotal, gap_pp: round1(focus.gapPP) },
     extra: extra, card_text: card_text, detail: detail, generated_at: new Date().toISOString(),
   };
 }
@@ -258,19 +302,29 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
     return Object.assign({ available: true, cached: false }, pre);
   }
 
-  // Claude: bucket the DISTINCT surfaces only. It returns a mapping, no numbers.
+  var mapRes = await getBucketMapping(objs);
+  if (!mapRes.ok) {
+    if (mapRes.empty) { var none = computeNeedsWork(objs, analyses, {}); await cachePut(admin, keyId, 'team_needs_work', from, to, hash, none); return Object.assign({ available: true, cached: false }, none); }
+    return { available: false, reason: mapRes.reason };
+  }
+
+  var result = computeNeedsWork(objs, analyses, mapRes.mapping);
+  await cachePut(admin, keyId, 'team_needs_work', from, to, hash, result);
+  return Object.assign({ available: true, cached: false }, result);
+}
+
+// Claude bucketing of the DISTINCT surfaces only (no numbers). Shared by the
+// team + personal lanes. Returns {ok:true, mapping} | {ok:false, empty:true}
+// (no phrases → caller treats as insufficient) | {ok:false, reason} (API fail).
+async function getBucketMapping(objs) {
   var counts = {};
   objs.forEach(function (o) { var k = String(o.surface == null ? '' : o.surface).trim(); if (k) counts[k] = (counts[k] || 0) + 1; });
   var distinct = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
-  if (distinct.length === 0) {
-    var none = computeNeedsWork(objs, analyses, {});
-    await cachePut(admin, keyId, 'team_needs_work', from, to, hash, none);
-    return Object.assign({ available: true, cached: false }, none);
-  }
+  if (distinct.length === 0) return { ok: false, empty: true };
 
   var prompt = [
     'You are grouping sales-objection phrases into a small set of named buckets.',
-    'Below is every DISTINCT objection phrase a sales team heard this period (with how many times it came up). Group them into 4-8 buckets by MEANING, and give each bucket a short human label in the team\'s language (e.g. "Think about it", "Price / too expensive", "Spouse / partner", "Timing", "Payment / financing", "Trust / proof").',
+    'Below is every DISTINCT objection phrase a salesperson heard this period (with how many times it came up). Group them into 4-8 buckets by MEANING, and give each bucket a short human label (e.g. "Think about it", "Price / too expensive", "Spouse / partner", "Timing", "Payment / financing", "Trust / proof").',
     'Rules: assign EVERY phrase to exactly one bucket. Do NOT output counts, rates, money, or any number other than referencing the phrases. Do NOT invent phrases. Labels must be short (<= 30 chars).',
     '',
     'PHRASES (phrase — count):',
@@ -284,28 +338,104 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
   try {
     var resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: BUCKET_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] });
     var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
-    if (!parsed || !Array.isArray(parsed.buckets)) {
-      return { available: false, reason: 'Bucketing returned unusable output — will retry on the next load.' };
-    }
+    if (!parsed || !Array.isArray(parsed.buckets)) return { ok: false, reason: 'Bucketing returned unusable output — will retry on the next load.' };
     parsed.buckets.forEach(function (bk) {
       var label = str(bk && bk.label, 30); if (!label) return;
-      (Array.isArray(bk && bk.phrases) ? bk.phrases : []).forEach(function (p) {
-        var k = normSurface(p); if (k) mapping[k] = label;
-      });
+      (Array.isArray(bk && bk.phrases) ? bk.phrases : []).forEach(function (p) { var k = normSurface(p); if (k) mapping[k] = label; });
     });
   } catch (e) {
-    return { available: false, reason: 'Anthropic API failure' + ((e && e.status) ? ' (HTTP ' + e.status + ')' : '') + ': ' + ((e && e.message) || 'unknown') };
+    return { ok: false, reason: 'Anthropic API failure' + ((e && e.status) ? ' (HTTP ' + e.status + ')' : '') + ': ' + ((e && e.message) || 'unknown') };
+  }
+  return { ok: true, mapping: mapping };
+}
+
+// Map raw call_highlights objection rows → the core's obj shape.
+function toObjs(objRows, w) {
+  var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
+  return objRows.map(function (r) {
+    return { call_id: r.fathom_call_id, surface: r.objection_surface, handled: r.resolution === 'handled',
+      quote: str(r.quote, 300), observation: str(r.observation, 240), rep: null, clip_url: clip(r.fathom_call_id, r.timestamp_seconds) };
+  });
+}
+var OBJ_COLS = 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, resolution, type';
+var ANALYSIS_COLS = 'fathom_call_id, analyzed_at, outcome, cash_collected, status';
+
+// ── Personal "What needs work" (A-2.1) ──────────────────────────────────────
+// The closer's OWN objection buckets (self-vs-self rate + gap). The MONEY clause
+// borrows the closer's TEAM's pooled Δ + avg-cash (stable sample) when they're on
+// a team; otherwise it degrades to rate-gap-only. Cache lane 'needs_work' keyed
+// by the user. Same envelope family as the team lane.
+// Personal cache uses a FIXED window identity (not the drifting from/to) so
+// there is exactly ONE entry per user; the analyses-set hash is what refreshes
+// it as the rolling 90d content changes. window_days is echoed for the UI label.
+var PERSONAL_WINDOW_DAYS = 90;
+var PERSONAL_CACHE_TS = '2000-01-01T00:00:00.000Z';
+async function computePersonalNeedsWork(admin, userId, from, to) {
+  var personalOpts = { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED };
+  function stamp(r) { r.window_days = PERSONAL_WINDOW_DAYS; return r; }
+  var w = await loadTeamWindow(admin, [userId], from, to);
+  if (w.callIds.length === 0) return Object.assign({ available: true, cached: false }, stamp(computeNeedsWork([], [], {}, personalOpts)));
+
+  var analyses = await w.inChunks('call_analyses', ANALYSIS_COLS, function (q) { return q.eq('status', 'done'); });
+  var objRows = await w.inChunks('call_highlights', OBJ_COLS, function (q) { return q.eq('type', 'objection'); });
+  var objs = toObjs(objRows, w);
+
+  // Team-borrow: resolve the closer's manager, then pool that manager's whole
+  // rep set over the SAME window for stable Δ + avg-cash coefficients.
+  var injected = null, teamKeyForHash = '';
+  var prof = await admin.from('user_profiles').select('managed_by').eq('user_id', userId).maybeSingle();
+  var managedBy = prof && prof.data && prof.data.managed_by;
+  if (managedBy) {
+    var repsQ = await admin.from('user_profiles').select('user_id').eq('managed_by', managedBy);
+    var repIds = (repsQ.error ? [] : (repsQ.data || []).map(function (x) { return x.user_id; }));
+    if (repIds.length) {
+      var tw = await loadTeamWindow(admin, repIds, from, to);
+      if (tw.callIds.length) {
+        var tAnalyses = await tw.inChunks('call_analyses', ANALYSIS_COLS, function (q) { return q.eq('status', 'done'); });
+        var tObjRows = await tw.inChunks('call_highlights', 'fathom_call_id, objection_surface, resolution, type', function (q) { return q.eq('type', 'objection'); });
+        var tObjs = tObjRows.map(function (r) { return { call_id: r.fathom_call_id, surface: r.objection_surface, handled: r.resolution === 'handled' }; });
+        var link = computeLinkage(tObjs, tAnalyses);
+        if (link.delta != null) { injected = { delta: link.delta, avgCash: link.avgCash, handledN: link.handledN, notHandledN: link.notHandledN, closedCount: link.closedCount, pH: link.pH, pN: link.pN }; }
+        teamKeyForHash = managedBy + ':' + repIds.slice().sort().join(',');
+      }
+    }
   }
 
-  var result = computeNeedsWork(objs, analyses, mapping);
-  await cachePut(admin, keyId, 'team_needs_work', from, to, hash, result);
-  return Object.assign({ available: true, cached: false }, result);
+  var selling = await fetchSellingContext(admin, userId, 1, SYNTHESIS_CATEGORIES);
+  var hash = crypto.createHash('md5').update(
+    analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|')
+    + '||surf:' + objs.map(function (o) { return normSurface(o.surface); }).sort().join(',')
+    + '||inj:' + (injected ? (injected.delta.toFixed(4) + '/' + Math.round(injected.avgCash)) : 'none')
+    + '||kb:' + selling.kbHash
+  ).digest('hex');
+
+  var cached = await cacheGet(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash);
+  if (cached) return Object.assign({ available: true, cached: true }, stamp(cached));
+
+  if (analyses.length < PERSONAL_MIN_ANALYZED || objs.length === 0) {
+    var pre = computeNeedsWork(objs, analyses, {}, personalOpts);
+    await cachePut(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash, pre);
+    return Object.assign({ available: true, cached: false }, stamp(pre));
+  }
+
+  var mapRes = await getBucketMapping(objs);
+  if (!mapRes.ok) {
+    if (mapRes.empty) { var none = computeNeedsWork(objs, analyses, {}, personalOpts); await cachePut(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash, none); return Object.assign({ available: true, cached: false }, stamp(none)); }
+    return { available: false, reason: mapRes.reason };
+  }
+
+  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, injected: injected });
+  await cachePut(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash, result);
+  return Object.assign({ available: true, cached: false }, stamp(result));
 }
 
 module.exports = {
   computeTeamNeedsWork: computeTeamNeedsWork,
+  computePersonalNeedsWork: computePersonalNeedsWork,
   // pure test surface (underscore = test-only)
   _computeNeedsWork: computeNeedsWork,
+  _computeLinkage: computeLinkage,
   _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP, _MIN_LINK_GROUP: MIN_LINK_GROUP,
   _MIN_CLOSED: MIN_CLOSED, _MIN_ANALYZED: MIN_ANALYZED, _MIN_DEALS_FOR_CASH: MIN_DEALS_FOR_CASH,
+  _PERSONAL_MIN_BUCKET: PERSONAL_MIN_BUCKET, _PERSONAL_MIN_ANALYZED: PERSONAL_MIN_ANALYZED,
 };

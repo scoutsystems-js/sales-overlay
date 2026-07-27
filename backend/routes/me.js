@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computePersonalNeedsWork } = require('../lib/team-needs-work');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 
@@ -643,6 +644,25 @@ router.get('/analytics2', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[me] analytics2 error:', err.message);
     res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
+  }
+});
+
+// ── GET /me/needs-work?from=&to= ────────────────────────────────────────────
+// Personal "What needs work" (A-2.1): the closer's own weakest objection bucket
+// with team-borrowed money economics. Default window 90d (objections are sparse
+// per-person). Cached; a cache hit spends no Claude.
+router.get('/needs-work', requireAuth, async function(req, res) {
+  // FIXED 90-day window, decoupled from the dashboard range picker (the picker
+  // governs the tiles/sections only). The result labels its own window.
+  var to = new Date().toISOString();
+  var from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    var result = await computePersonalNeedsWork(getAdminClient(), req.user.id, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] needs-work error:', err.message);
+    res.status(500).json({ error: 'Failed to load needs-work: ' + (err.message || 'unknown') });
   }
 });
 

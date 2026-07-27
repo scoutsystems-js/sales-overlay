@@ -2072,6 +2072,7 @@
     // until expanded (Coach summary + Performance summary + Recent calls).
     overviewExpanded: { coach: false, perf: false, recent: false },
     overviewRecent: null, overviewRecentLoading: false, // lazy 5 recent calls on expand
+    needsWork: null, needsWorkLoading: false, // A-2.1 personal "What needs work"
     // ── Team (manager) view ──
     teamContext:    null,   // /team/context: {role, is_owner, has_reps, teams}
     teamSelected:   null,   // owner picker: team key ('all' | managerId) or null=default
@@ -2944,6 +2945,7 @@
     state.view = 'overview';
     state.expandedCallId = null;
     state.objectionsCache = {};
+    state.needsWork = null; // fixed-window card, but it IS per-user → refetch on pivot
     reloadAll();
   }
 
@@ -2953,6 +2955,9 @@
     // resets. (Server cache handles repeat synthesis requests.)
     state.perfSynthesis = null;
     state.overviewRecent = null;
+    // NOTE: state.needsWork is deliberately NOT reset here — it's a fixed 90-day
+    // window, independent of the range picker. It resets only on a user pivot
+    // (setUser), so changing the tile range never refetches it.
     renderOverview(true /* loading */);
     try {
       // Fathom status fetch is wrapped in a .catch so a stale token or
@@ -2999,6 +3004,7 @@
     else if (state.view === 'call-library') renderCallLibrary();
     else if (state.view === 'call-review') renderCallReview();
     else if (state.view === 'objections-intel') renderObjectionsIntel();
+    else if (state.view === 'needs-work') renderNeedsWorkView();
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
@@ -3025,7 +3031,7 @@
     // Objections view is reachable only via the donut (no persistent nav tab);
     // keep the Coaching Dashboard nav highlighted while in it.
     if (navOverview) {
-      navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel');
+      navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel' || state.view === 'needs-work');
     }
     var navTeam = document.getElementById('navTeam');
     if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-members');
@@ -3361,10 +3367,13 @@
       + renderFathomSectionHtml()
       + renderZoomSectionHtml()
       + tiles
+      + '<div class="section fade-in">' + needsWorkCardHtml() + '</div>'
       + overviewSectionHtml('coach', 'Coach summary', analyzed ? ('based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls')) : '', function () { return renderCoachSummary2(a); })
       + overviewSectionHtml('perf', 'Performance summary (AI)', 'win vs loss, grounded in your calls', function () { return renderPerfSummary(); })
       + overviewSectionHtml('recent', 'Recent calls', '', function () { return renderOverviewRecentHtml(); });
 
+    // Personal What-needs-work loads once (cheap: cache hit = no Claude).
+    if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
     // Performance Summary's LLM call fires ONLY when its section is expanded (and
     // there's data), never on load. Recent calls lazy-loads on its own expand.
     if (state.overviewExpanded.perf && analyzed && state.perfSynthesis === null && !state.perfSynthesisLoading) loadPerfSynthesis();
@@ -3374,6 +3383,56 @@
   function toggleOverviewSection(key) {
     state.overviewExpanded[key] = !state.overviewExpanded[key];
     renderOverview(false);
+  }
+
+  // ── A-2.1: personal "What needs work" (card under the tiles + #needs-work page)
+  async function fetchNeedsWork() {
+    // Fixed 90-day window server-side — decoupled from the range picker.
+    var base = isSelf() ? '/me/needs-work' : '/admin/needs-work/' + encodeURIComponent(state.viewingUserId);
+    var res = await fetch(base, { headers: authHeader() });
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  }
+  async function loadNeedsWork() {
+    if (state.needsWorkLoading) return;
+    state.needsWorkLoading = true;
+    try { state.needsWork = await fetchNeedsWork(); }
+    catch (err) { if (err.message === 'unauth') return; state.needsWork = { _error: err.message || 'unknown' }; }
+    state.needsWorkLoading = false;
+    if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
+    else if (state.view === 'needs-work') renderNeedsWorkView();
+  }
+  // Compact card under the glance tiles. Mirrors the team needs-work card.
+  function needsWorkCardHtml() {
+    var d = state.needsWork;
+    var win = (d && d.window_days) ? d.window_days : 90;
+    var head = '<div class="section-header"><h2>What needs work</h2><div class="meta">your last ' + win + ' days</div></div>';
+    if (!d) return head + '<div class="skeleton" style="height:70px;"></div>';
+    if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
+    if (d.state === 'insufficient') {
+      return head + '<div class="team-recs-card" style="cursor:default;"><div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div></div>';
+    }
+    var b = d.bucket || {};
+    var chips = '<div class="nw-chips">'
+      + '<span class="nw-chip"><b>' + b.handled + ' of ' + b.total + '</b> · ' + (b.rate_pct == null ? '—' : b.rate_pct + '%') + ' handled</span>'
+      + '<span class="nw-chip">your baseline <b>' + (b.baseline_pct == null ? '—' : b.baseline_pct + '%') + '</b></span>'
+      + (d.state === 'money' && d.extra ? '<span class="nw-chip nw-chip-cash"><b>+$' + fmtCashNum(moneyRound(d.extra.extra_cash)) + '</b> at stake</span>' : '')
+      + '</div>';
+    return head + '<div class="team-recs-card" onclick="openNeedsWork()" title="See your buckets, the mapping, and your quotes">'
+      + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>' + chips
+      + '<div class="team-recs-expand">click to expand →</div></div>';
+  }
+  function openNeedsWork() { setView('needs-work'); }
+  function renderNeedsWorkView() {
+    var content = document.getElementById('content');
+    if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
+    content.innerHTML = renderHeaderHtml()
+      + '<div class="section fade-in"><div class="section-header"><div><h2>What needs work</h2>'
+        + '<div class="meta">your objection-handling focus · last ' + ((state.needsWork && state.needsWork.window_days) || 90) + ' days</div></div>'
+        + '<button class="date-preset" onclick="backToOverview()">← back</button></div>'
+        + needsWorkDetailBodyHtml(state.needsWork) + '</div>';
   }
 
   // Recent calls (A-1): the 5 most-recent calls in range, lazy on expand, via the
@@ -3847,12 +3906,15 @@
         + teamNeedsWorkDetailHtml() + '</div>';
   }
 
-  function teamNeedsWorkDetailHtml() {
-    var d = state.teamNeedsWork;
+  function teamNeedsWorkDetailHtml() { return needsWorkDetailBodyHtml(state.teamNeedsWork); }
+  // Shared detail body for team + personal What-needs-work (subject-aware copy).
+  function needsWorkDetailBodyHtml(d) {
     if (!d) return '<div class="skeleton" style="height:200px;"></div>';
     if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     var det = d.detail || {};
+    var personal = det.subject === 'personal';
+    var whose = personal ? 'your' : 'the team\'s';
     // headline paragraph
     var out = '<div class="nw-para">' + escapeHtml(d.card_text || '') + '</div>';
 
@@ -3896,15 +3958,19 @@
         }).join('') + '</div>';
     }
 
-    // honesty contract / how this is computed
+    // honesty contract / how this is computed (subject-aware; borrow disclosed)
     var lk = det.linkage || {};
     var deltaPP = (typeof lk.delta === 'number') ? Math.round(lk.delta * 1000) / 10 : null;
+    var borrowed = !!lk.borrowed;
+    var minBucket = personal ? 4 : 6;
     out += '<div class="section-subhead">How this is estimated</div>'
       + '<div class="nw-method">'
-      + '<p>Raising a bucket\'s handle rate to the team\'s rate on all <em>other</em> objections implies handling a few more of them. We multiply those by the <b>measured link</b> between handling an objection and the call closing this period '
-      + (deltaPP == null ? '' : '(handled objections sat in a closed call ' + Math.round((lk.p_closed_handled || 0) * 100) + '% of the time vs ' + Math.round((lk.p_closed_nothandled || 0) * 100) + '% when not handled — a ' + deltaPP + '-point lift, over ' + (lk.handled_n || 0) + ' handled / ' + (lk.nothandled_n || 0) + ' not-handled objections)')
-      + ', then by average cash per closed call (' + fmtCash(det.avg_cash) + ' over ' + (det.closed_calls || 0) + ' closed calls).</p>'
-      + '<p class="nw-caveat">This is a correlation in this period\'s own ' + (det.analyzed_calls || 0) + ' analyzed calls, not a guarantee — figures use “≈”. We refuse a dollar figure below the sample thresholds (bucket ≥ ' + '6' + ', clear gap, ≥ 10 objections each side of the link, ≥ 5 closed calls).</p>'
+      + '<p>Raising a bucket\'s handle rate to ' + whose + ' rate on all <em>other</em> objections implies handling a few more of them. We multiply those by the <b>measured link</b> between handling an objection and the call closing '
+      + (borrowed ? 'across your team ' : (personal ? 'in your calls ' : 'this period '))
+      + (deltaPP == null ? '' : '(handled objections sat in a closed call ' + Math.round((lk.p_closed_handled || 0) * 100) + '% of the time vs ' + Math.round((lk.p_closed_nothandled || 0) * 100) + '% when not — a ' + deltaPP + '-point lift, over ' + (lk.handled_n || 0) + ' handled / ' + (lk.nothandled_n || 0) + ' not-handled objections)')
+      + ', then by ' + (borrowed ? 'your team\'s ' : '') + 'average cash per closed call (' + fmtCash(det.avg_cash) + ' over ' + (det.closed_calls || 0) + ' closed calls).'
+      + (borrowed ? ' Your own bucket rate is the signal; the deal economics are borrowed from your team, a larger and steadier sample.' : '') + '</p>'
+      + '<p class="nw-caveat">This is a correlation in ' + (personal ? 'your' : 'this period\'s') + ' ' + (det.analyzed_calls || 0) + ' analyzed calls, not a guarantee — figures use “≈”. We refuse a dollar figure below the sample thresholds (bucket ≥ ' + minBucket + ', clear gap' + (personal ? ', with the deal economics from a sample of ≥ 10 objections each side + ≥ 5 closed calls' : ', ≥ 10 objections each side of the link, ≥ 5 closed calls') + ').</p>'
       + '</div>';
     return out;
   }
@@ -4434,6 +4500,7 @@
   function viewToHashPath() {
     if (state.view === 'call-library')     return 'calls';
     if (state.view === 'objections-intel') return 'objections';
+    if (state.view === 'needs-work')       return 'needs-work';
     if (state.view === 'kb')               return 'kb';
     if (state.view === 'eod')              return 'eod';
     if (state.view === 'account')          return 'account';
@@ -4460,6 +4527,7 @@
     else if (h === 'eod') { state.view = 'eod'; }
     else if (h === 'account') { state.view = 'account'; state.account = null; /* fresh on hash entry too */ }
     else if (h === 'objections') { state.view = 'objections-intel'; }
+    else if (h === 'needs-work') { state.view = 'needs-work'; }
     else if (h === 'team') { state.view = 'team'; }
     else if (h === 'team-recs') { state.view = 'team-expanded'; }
     else if (h === 'team-needs-work') { state.view = 'team-needs-work'; }
