@@ -2561,22 +2561,34 @@
   // /fathom/update-analyses — resets them to pending + fires the batch). Shown
   // only when there's nothing pending but outdated_count > 0. Mirrors
   // reanalyzeFathomNow's flag-guarded, notice-driven shape.
-  async function updateOutdatedAnalysesNow() {
+  // How-far-back re-grade (2026-07-27): pick a window (7d/30d/all), see the
+  // exact count via a dry-run, and confirm before triggering — all-time on 250+
+  // calls is 250+ Claude calls. Manual outcome tags are preserved (analyzeCall
+  // freezes them).
+  async function updateOutdatedAnalysesNow(scope) {
     if (state.fathomUpdating) return; // guard against double-click
+    scope = scope || '30d';
+    // 1) dry-run: how many calls will this touch?
+    var count = 0;
+    try {
+      var pre = await fetch('/fathom/update-analyses', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ scope: scope, dry_run: true }) });
+      if (pre.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!pre.ok) { var e = null; try { e = await pre.json(); } catch (x) {} state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (e && e.error ? e.error : 'HTTP ' + pre.status) }; if (state.view === 'overview') renderOverview(false); return; }
+      count = ((await pre.json()) || {}).count || 0;
+    } catch (err) { state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (err.message || 'unknown') }; if (state.view === 'overview') renderOverview(false); return; }
+    var label = scope === 'all' ? 'all time' : (scope === '7d' ? 'the last 7 days' : 'the last 30 days');
+    if (count === 0) { state.fathomNotice = { kind: 'success', text: 'No outdated analyses in ' + label + '.' }; if (state.view === 'overview') renderOverview(false); return; }
+    if (!confirm('Re-analyze ' + count + ' call' + (count === 1 ? '' : 's') + ' from ' + label + '?\n\nThis runs ' + count + ' AI analysis' + (count === 1 ? '' : 'es') + ' and can take a while. Your manual outcome tags are preserved.')) return;
+    // 2) run for real.
     state.fathomUpdating = true;
     if (state.view === 'overview') renderOverview(false);
-
     var noticeText = null;
     var noticeKind = 'success';
     try {
       var res = await fetch('/fathom/update-analyses', {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        // Scope ruling (2026-07-22): batches are the 20 MOST-RECENT calls, not
-        // full sweeps — the server selects newest-first (pending ahead of
-        // outdated) and older calls intentionally stay on their old prompt
-        // versions. The button count still shows the full outdated number.
-        body: JSON.stringify({ limit: 20 }),
+        body: JSON.stringify({ scope: scope }),
       });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
       if (res.ok) {
@@ -2835,9 +2847,15 @@
     // button and its count is outdated + pending (disjoint sets).
     var updateBtn = '';
     if (outdated > 0) {
+      // How-far-back dropdown (2026-07-27): pick a window; a dry-run + confirm
+      // shows the exact count before running (all-time can be 250+ Claude calls).
       updateBtn = state.fathomUpdating
         ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Updating…</button>'
-        : '<button class="btn-fathom-secondary" type="button" onclick="updateOutdatedAnalysesNow()">⟳ Update analyses (' + (outdated + pending) + ')</button>';
+        : '<span class="update-scope"><span class="update-scope-label">⟳ Update analyses (' + (outdated + pending) + '):</span>'
+          + '<select class="user-select" onchange="if(this.value){updateOutdatedAnalysesNow(this.value);this.selectedIndex=0;}">'
+          + '<option value="" selected>choose window…</option>'
+          + '<option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="all">All time</option>'
+          + '</select></span>';
     }
     var pendingMeta = pending > 0
       ? '<span class="fathom-strip-sep">·</span><span class="fathom-strip-meta">' + pending + ' pending analysis</span>'
@@ -2937,6 +2955,11 @@
       ? new Date('2025-01-01T00:00:00Z')
       : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
+    state.needsWork = null; // range-responsive (2026-07-27) — refetch for the new window
+    // Range-responsive sub-views update IN PLACE — never bounce back to the
+    // coaching overview when the range changes while inside them.
+    if (state.view === 'needs-work') { renderNeedsWorkView(); return; }
+    if (state.view === 'performance') { state.perfSynthesis = null; renderPerformanceView(); return; }
     // Date-preset clicks reset to Coaching; the initial boot restore keeps the
     // hash-restored view (preserveView) so a refresh on #calls stays on Calls.
     if (!preserveView) state.view = 'overview';
@@ -3354,7 +3377,7 @@
     var tiles = '<div class="glance-row fade-in">'
       + glanceTileHtml('Calls analyzed', analyzed, 'of ' + a.calls.total_in_range + ' in range', "drillCalls('analyzed',null)")
       + glanceTileHtml('Avg score', a.avg_score.mean === null ? '—' : a.avg_score.mean, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
-      + glanceTileHtml('Objections', a.objections.calls_with_objection, a.objections.total_highlights + ' moments', "goObjections()")
+      + glanceTileHtml('Objection moments', a.objections.total_highlights, 'across ' + a.objections.calls_with_objection + ' call' + (a.objections.calls_with_objection === 1 ? '' : 's'), "goObjections()")
       + glanceTileHtml('Cash collected', fmtCash(a.cash_collected), 'closed-call cash', "drillCalls('analyzed',null)")
       + glanceTileHtml('Close rate', a.close_rate == null ? '—' : a.close_rate + '%', (a.close_decided ? a.close_wins + '/' + a.close_decided + ' decided' : 'of decided calls'), "drillCalls('analyzed',null)")
     + '</div>';
@@ -3405,9 +3428,10 @@
 
   // ── A-2.1: personal "What needs work" (card under the tiles + #needs-work page)
   async function fetchNeedsWork() {
-    // Fixed 90-day window server-side — decoupled from the range picker.
+    // Range-responsive: computes on the selected window (default 90d server-side).
+    var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
     var base = isSelf() ? '/me/needs-work' : '/admin/needs-work/' + encodeURIComponent(state.viewingUserId);
-    var res = await fetch(base, { headers: authHeader() });
+    var res = await fetch(base + '?' + qp, { headers: authHeader() });
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
@@ -3422,6 +3446,11 @@
     else if (state.view === 'needs-work') renderNeedsWorkView();
   }
   // Compact card under the glance tiles. Mirrors the team needs-work card.
+  // Personal needs-work degrades honestly when a short window is too thin.
+  function needsWorkThinHint(d) {
+    var win = (d && d.window_days) || 90;
+    return win < 60 ? ' Not enough volume in this window — try 30 or 90 days.' : '';
+  }
   function needsWorkCardHtml() {
     var d = state.needsWork;
     var win = (d && d.window_days) ? d.window_days : 90;
@@ -3430,7 +3459,7 @@
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     if (d.state === 'insufficient') {
-      return head + '<div class="team-recs-card" style="cursor:default;"><div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div></div>';
+      return head + '<div class="team-recs-card" style="cursor:default;"><div class="team-recs-teaser">' + escapeHtml((d.card_text || '') + needsWorkThinHint(d)) + '</div></div>';
     }
     var b = d.bucket || {};
     var chips = '<div class="nw-chips">'

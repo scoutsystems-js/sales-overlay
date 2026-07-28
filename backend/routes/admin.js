@@ -800,9 +800,10 @@ router.delete('/users/:user_id', requireAuth, requireRole('owner'), async functi
 // ── GET /admin/needs-work/:user_id — personal What-needs-work for a pivoted rep ─
 router.get('/needs-work/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
-  // FIXED 90-day window (decoupled from the range picker), same as /me/needs-work.
-  var to = new Date().toISOString();
-  var from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  // Range-responsive (default 90d), same as /me/needs-work.
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
   try {
     var admin = getAdminClient();
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {

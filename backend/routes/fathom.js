@@ -710,7 +710,29 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
       (dq.data || []).forEach(function (r) { dateById[r.id] = r.call_date || ''; });
     }
     var unionIds = orderBatchIds(pendingIds2, outdatedIds, dateById);
-    var ids = unionIds.slice(0, limit);
+
+    // How-far-back scope (2026-07-27): '7d' | '30d' | 'all' re-grades EVERY
+    // outdated/pending call in that window (not just the newest 20). Backward-
+    // compatible: without `scope`, the old newest-`limit` batch behaviour holds.
+    // dry_run returns the count only, so the UI can confirm before triggering
+    // (all-time on 250+ calls = 250+ Claude calls).
+    var scope = (typeof body.scope === 'string') ? body.scope : null;
+    var ids;
+    if (scope) {
+      var days = scope === 'all' ? null : (scope === '7d' ? 7 : scope === '30d' ? 30 : NaN);
+      if (Number.isNaN(days)) return res.status(400).json({ error: "scope must be '7d', '30d', or 'all'" });
+      if (days == null) { ids = unionIds; }
+      else {
+        var cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+        ids = unionIds.filter(function (id) { return (dateById[id] || '') >= cutoff; });
+      }
+    } else {
+      ids = unionIds.slice(0, limit);
+    }
+
+    if (body.dry_run) {
+      return res.json({ count: ids.length, scope: scope || null, outdated: outdatedIds.length, pending: pendingIds2.length });
+    }
 
     if (ids.length > 0) {
       // Reset step: back to 'pending' on both tables so the worker re-grades them

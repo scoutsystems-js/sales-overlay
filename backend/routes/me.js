@@ -653,10 +653,11 @@ router.get('/analytics2', requireAuth, async function(req, res) {
 // with team-borrowed money economics. Default window 90d (objections are sparse
 // per-person). Cached; a cache hit spends no Claude.
 router.get('/needs-work', requireAuth, async function(req, res) {
-  // FIXED 90-day window, decoupled from the dashboard range picker (the picker
-  // governs the tiles/sections only). The result labels its own window.
-  var to = new Date().toISOString();
-  var from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  // Range-responsive: computes on the SELECTED window (default 90d). Objections
+  // are sparse per-person, so a short range may degrade to "not enough volume".
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
   try {
     var result = await computePersonalNeedsWork(getAdminClient(), req.user.id, from, to);
     res.json(result);

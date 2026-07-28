@@ -368,11 +368,12 @@ var ANALYSIS_COLS = 'fathom_call_id, analyzed_at, outcome, cash_collected, statu
 // Personal cache uses a FIXED window identity (not the drifting from/to) so
 // there is exactly ONE entry per user; the analyses-set hash is what refreshes
 // it as the rolling 90d content changes. window_days is echoed for the UI label.
-var PERSONAL_WINDOW_DAYS = 90;
-var PERSONAL_CACHE_TS = '2000-01-01T00:00:00.000Z';
 async function computePersonalNeedsWork(admin, userId, from, to) {
   var personalOpts = { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED };
-  function stamp(r) { r.window_days = PERSONAL_WINDOW_DAYS; return r; }
+  // Range-responsive (2026-07-27): computes on the SELECTED window, labels it,
+  // and caches per range. window_days echoed for the UI label.
+  var windowDays = Math.max(1, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000));
+  function stamp(r) { r.window_days = windowDays; return r; }
   var w = await loadTeamWindow(admin, [userId], from, to);
   if (w.callIds.length === 0) return Object.assign({ available: true, cached: false }, stamp(computeNeedsWork([], [], {}, personalOpts)));
 
@@ -409,23 +410,23 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
     + '||kb:' + selling.kbHash
   ).digest('hex');
 
-  var cached = await cacheGet(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash);
+  var cached = await cacheGet(admin, userId, 'needs_work', from, to, hash);
   if (cached) return Object.assign({ available: true, cached: true }, stamp(cached));
 
   if (analyses.length < PERSONAL_MIN_ANALYZED || objs.length === 0) {
     var pre = computeNeedsWork(objs, analyses, {}, personalOpts);
-    await cachePut(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash, pre);
+    await cachePut(admin, userId, 'needs_work', from, to, hash, pre);
     return Object.assign({ available: true, cached: false }, stamp(pre));
   }
 
   var mapRes = await getBucketMapping(objs);
   if (!mapRes.ok) {
-    if (mapRes.empty) { var none = computeNeedsWork(objs, analyses, {}, personalOpts); await cachePut(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash, none); return Object.assign({ available: true, cached: false }, stamp(none)); }
+    if (mapRes.empty) { var none = computeNeedsWork(objs, analyses, {}, personalOpts); await cachePut(admin, userId, 'needs_work', from, to, hash, none); return Object.assign({ available: true, cached: false }, stamp(none)); }
     return { available: false, reason: mapRes.reason };
   }
 
   var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, injected: injected });
-  await cachePut(admin, userId, 'needs_work', PERSONAL_CACHE_TS, PERSONAL_CACHE_TS, hash, result);
+  await cachePut(admin, userId, 'needs_work', from, to, hash, result);
   return Object.assign({ available: true, cached: false }, stamp(result));
 }
 
