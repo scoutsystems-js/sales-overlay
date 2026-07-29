@@ -3,7 +3,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
-const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome } = require('../lib/outcome-tag');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
@@ -62,130 +62,12 @@ function computeDurationSeconds(startedAt, endedAt) {
 // ── GET /me/sessions ────────────────────────────────────────────────────────
 // Caller's own sessions. Same payload shape as /admin/sessions but
 // auto-filtered to req.user.id — no email enrichment needed.
-router.get('/sessions', requireAuth, async function(req, res) {
-  var limit = parseInt(req.query.limit, 10);
-  if (!limit || limit < 1) limit = DEFAULT_LIMIT;
-  if (limit > MAX_LIMIT) limit = MAX_LIMIT;
-  var before = req.query.before;
-
-  try {
-    var admin = getAdminClient();
-    var q = admin
-      .from('call_sessions')
-      .select('session_id, user_id, started_at, ended_at, outcome, outcome_source, client_version, platform, prospect_name, post_call_summary')
-      .eq('user_id', req.user.id)
-      .order('started_at', { ascending: false })
-      .limit(limit);
-    if (before) q = q.lt('started_at', before);
-
-    var sessionsResult = await q;
-    if (sessionsResult.error) {
-      console.error('[me] sessions query failed:', sessionsResult.error.message);
-      return res.status(500).json({ error: 'Could not fetch sessions' });
-    }
-    var sessions = sessionsResult.data || [];
-    if (sessions.length === 0) return res.json({ sessions: [] });
-
-    var sessionIds = sessions.map(function(s) { return s.session_id; });
-    var logsResult = await admin
-      .from('session_logs')
-      .select('session_id, level')
-      .in('session_id', sessionIds);
-    if (logsResult.error) {
-      // Non-fatal — render with zero counts.
-      console.error('[me] counts query failed:', logsResult.error.message);
-    }
-    var countsMap = computeCountsBySession(logsResult.data || []);
-
-    var enriched = sessions.map(function(s) {
-      var c = countsMap[s.session_id] || { log_count: 0, error_count: 0 };
-      return {
-        session_id: s.session_id,
-        started_at: s.started_at,
-        ended_at: s.ended_at,
-        duration_seconds: computeDurationSeconds(s.started_at, s.ended_at),
-        client_version: s.client_version,
-        platform: s.platform,
-        outcome: s.outcome,
-        outcome_source: s.outcome_source,
-        prospect_name: s.prospect_name,
-        has_summary: !!s.post_call_summary,
-        log_count: c.log_count,
-        error_count: c.error_count,
-      };
-    });
-
-    res.json({ sessions: enriched });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[me] sessions error:', err.message);
-    res.status(500).json({ error: 'Failed to load sessions' });
-  }
-});
 
 // ── GET /me/sessions/:session_id/logs ───────────────────────────────────────
 // Caller's own session logs. Ownership check: 404 if the session doesn't
 // belong to req.user.id — prevents an authenticated user from iterating
 // UUIDs to snoop on other users' logs. 404 rather than 403 to avoid
 // leaking session-id validity.
-router.get('/sessions/:session_id/logs', requireAuth, async function(req, res) {
-  var sessionId = req.params.session_id;
-  var limit = parseInt(req.query.limit, 10);
-  if (!limit || limit < 1) limit = LOG_HARD_CAP;
-  if (limit > LOG_HARD_CAP) limit = LOG_HARD_CAP;
-
-  try {
-    var admin = getAdminClient();
-    var sessionResult = await admin
-      .from('call_sessions')
-      .select('session_id, user_id, started_at, ended_at, outcome, client_version, platform')
-      .eq('session_id', sessionId)
-      .maybeSingle();
-    if (sessionResult.error) {
-      console.error('[me] session fetch failed:', sessionResult.error.message);
-      return res.status(500).json({ error: 'Could not load session' });
-    }
-    if (!sessionResult.data) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-    if (sessionResult.data.user_id !== req.user.id) {
-      console.warn('[me] Scope violation: actor=%s attempted_session=%s owner=%s',
-        req.user.id, sessionId, sessionResult.data.user_id);
-      return res.status(404).json({ error: 'Session not found' });
-    }
-    var session = sessionResult.data;
-
-    var logsResult = await admin
-      .from('session_logs')
-      .select('logged_at, level, tag, message', { count: 'exact' })
-      .eq('session_id', sessionId)
-      .order('logged_at', { ascending: true })
-      .limit(limit);
-    if (logsResult.error) {
-      console.error('[me] logs fetch failed:', logsResult.error.message);
-      return res.status(500).json({ error: 'Could not load logs' });
-    }
-
-    res.json({
-      session: {
-        session_id: session.session_id,
-        started_at: session.started_at,
-        ended_at: session.ended_at,
-        duration_seconds: computeDurationSeconds(session.started_at, session.ended_at),
-        outcome: session.outcome,
-        client_version: session.client_version,
-        platform: session.platform,
-      },
-      logs: logsResult.data || [],
-      total_count: typeof logsResult.count === 'number' ? logsResult.count : (logsResult.data || []).length,
-      limit: limit,
-    });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[me] logs error:', err.message);
-    res.status(500).json({ error: 'Failed to load logs' });
-  }
-});
 
 // ────────────────────────────────────────────────────────────────────────────
 // Analytics extraction (Milestone 1 for v1.1.10 /dashboard)
@@ -612,21 +494,6 @@ function extractLabelFromMatchMessage(message) {
 // ── GET /me/analytics?from=<iso>&to=<iso> ───────────────────────────────────
 // Caller-scoped dashboard aggregates. Defaults to last 30 days. Wraps the
 // shared computeAnalytics() helper (also used by /admin/analytics/:user_id).
-router.get('/analytics', requireAuth, async function(req, res) {
-  var to = req.query.to || new Date().toISOString();
-  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
-    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
-  }
-  try {
-    var result = await computeAnalytics(getAdminClient(), req.user.id, from, to);
-    res.json(result);
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[me] analytics error:', err.message);
-    res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
-  }
-});
 
 // ── GET /me/analytics2?from=&to= ────────────────────────────────────────────
 // Fathom-era Coaching Dashboard analytics (call_analyses + call_highlights).
@@ -795,41 +662,10 @@ router.get('/performance-synthesis', requireAuth, async function(req, res) {
 // when the user clicks a type row inside the Objections drill. Joins each
 // event with the call's prospect_name + outcome so the per-event card can
 // show "On the call with X on Y...".
-router.get('/objections', requireAuth, async function(req, res) {
-  var objectionId = req.query.objection_id;
-  if (!objectionId) return res.status(400).json({ error: 'objection_id required' });
-  var to = req.query.to || new Date().toISOString();
-  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
-    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
-  }
-  try {
-    var result = await loadObjectionsByType(getAdminClient(), req.user.id, objectionId, from, to);
-    res.json(result);
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[me] objections-by-type error:', err.message);
-    res.status(500).json({ error: 'Failed to load objection events: ' + (err.message || 'unknown') });
-  }
-});
 
 // ── GET /me/sessions/:session_id/objections ─────────────────────────────────
 // Per-session objection drill — for the dashboard's expanded card view.
 // Ownership-checked (404 on cross-user). Admin equivalent lives in admin.js.
-router.get('/sessions/:session_id/objections', requireAuth, async function(req, res) {
-  var sessionId = req.params.session_id;
-  try {
-    var admin = getAdminClient();
-    var session = await loadOwnedSession(admin, sessionId, req.user.id, 'session_id, user_id');
-    if (!session) return res.status(404).json({ error: 'Session not found' });
-    var rows = await loadSessionObjections(admin, sessionId);
-    res.json({ session_id: sessionId, objections: rows });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[me] session-objections error:', err.message);
-    res.status(500).json({ error: 'Failed to load objections' });
-  }
-});
 
 // ── POST /me/sessions/:session_id/extract-prospect-name ─────────────────────
 // Claude extracts the prospect's first name from the first ~10 minutes of
@@ -919,118 +755,11 @@ router.post('/sessions/:session_id/extract-prospect-name', requireAuth, async fu
 // not definitive. The prompt is calibrated to be cautious in low-data
 // regimes — it will state confidence and skip patterns that aren't backed
 // by enough evidence.
-router.get('/coaching/patterns', requireAuth, async function(req, res) {
-  var to = req.query.to || new Date().toISOString();
-  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
-    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
-  }
-  try {
-    var result = await computeCoachingPatterns(getAdminClient(), req.user.id, from, to);
-    res.json(result);
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[me] coaching/patterns error:', err.message);
-    res.status(500).json({ error: 'Failed to load coaching patterns: ' + (err.message || 'unknown') });
-  }
-});
-
-// Shared between /me/coaching/patterns and /admin/coaching/:user_id/patterns
-// (added later). Pure-ish helper — takes an admin client + scope.
-async function computeCoachingPatterns(adminClient, userId, from, to) {
-  // Sessions in range, plus all objection rows for those sessions.
-  var sessionsQ = await adminClient
-    .from('call_sessions')
-    .select('session_id, started_at, outcome, prospect_name, post_call_summary')
-    .eq('user_id', userId)
-    .gte('started_at', from)
-    .lte('started_at', to);
-  if (sessionsQ.error) throw new Error('sessions: ' + sessionsQ.error.message);
-  var sessions = sessionsQ.data || [];
-  if (sessions.length === 0) {
-    return { from: from, to: to, sample_size: 0, patterns: [] };
-  }
-  var sessionIds = sessions.map(function(s) { return s.session_id; });
-  var objQ = await adminClient
-    .from('session_objections')
-    .select('session_id, objection_id, objection_label, framework, overcome, overcome_confidence, notes, coaching_note')
-    .in('session_id', sessionIds);
-  var objs = (objQ.data || []);
-
-  // Compact data summary for Claude. Keep this concise — Claude sees totals
-  // + a handful of representative coaching notes, not every transcript.
-  var byLabel = {};
-  for (var i = 0; i < objs.length; i++) {
-    var o = objs[i];
-    if (!byLabel[o.objection_label]) byLabel[o.objection_label] = { total: 0, overcome: 0, not: 0, unknown: 0, sample_notes: [] };
-    var b = byLabel[o.objection_label];
-    b.total++;
-    if (o.overcome === true) b.overcome++;
-    else if (o.overcome === false) b.not++;
-    else b.unknown++;
-    if (b.sample_notes.length < 3 && o.coaching_note) b.sample_notes.push(o.coaching_note);
-  }
-  var outcomeCounts = { win: 0, loss: 0, follow_up: 0, unmarked: 0 };
-  sessions.forEach(function(s) {
-    if (s.outcome === 'win') outcomeCounts.win++;
-    else if (s.outcome === 'loss') outcomeCounts.loss++;
-    else if (s.outcome === 'follow_up') outcomeCounts.follow_up++;
-    else outcomeCounts.unmarked++;
-  });
-
-  var dataSummary = 'TOTAL SESSIONS IN WINDOW: ' + sessions.length + '\n' +
-    'OUTCOME BREAKDOWN: ' + JSON.stringify(outcomeCounts) + '\n' +
-    'OBJECTION BREAKDOWN:\n' +
-    Object.keys(byLabel).map(function(label) {
-      var b = byLabel[label];
-      var pct = (b.overcome + b.not) > 0 ? Math.round(100 * b.overcome / (b.overcome + b.not)) + '%' : 'N/A';
-      var notes = b.sample_notes.length > 0 ? '\n  Sample coaching notes from past events:\n    - ' + b.sample_notes.join('\n    - ') : '';
-      return '  - ' + label + ': ' + b.total + ' events (overcome=' + b.overcome + ', not=' + b.not + ', unknown=' + b.unknown + ', overcome% of definitive=' + pct + ')' + notes;
-    }).join('\n');
-
-  var prompt =
-    'You are an expert sales coach reviewing a single closer\'s recent calls. ' +
-    'Below is a compact summary of their session history. Identify 3-5 ' +
-    'recurring patterns or behaviors worth coaching them on. Be specific. ' +
-    'Reference the actual numbers and objection types.\n\n' +
-    'Each pattern must include:\n' +
-    ' - headline: short, punchy (8-15 words). Cite a number if possible.\n' +
-    ' - detail: 2-3 sentences. Reference specific objections or outcomes ' +
-    'from the data below. Include a SPECIFIC actionable next step.\n' +
-    ' - confidence: "high" | "medium" | "low" — given the data volume below.\n\n' +
-    'CRITICAL: With ' + sessions.length + ' sessions of data, calibrate your ' +
-    'confidence honestly. Below ~30 sessions, default to "medium" or "low". ' +
-    'Don\'t state patterns as definitive when n=5.\n\n' +
-    'If the data is too sparse to identify meaningful patterns, return ' +
-    '{"patterns":[]} — don\'t fabricate.\n\n' +
-    'Respond with ONLY this JSON, no markdown, no fences:\n' +
-    '{"patterns":[{"headline":"...","detail":"...","confidence":"high|medium|low"},...]}\n\n' +
-    'DATA:\n' + dataSummary;
-
-  var anthropic = getAnthropic();
-  var resp = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 1500,
-    messages: [{ role: 'user', content: prompt }],
-  });
-  var rawText = resp.content[0] ? resp.content[0].text : '';
-  var parsed = extractFirstJsonObject(rawText);
-  var patterns = (parsed && Array.isArray(parsed.patterns)) ? parsed.patterns : [];
-
-  return {
-    from: from,
-    to: to,
-    sample_size: sessions.length,
-    objection_event_count: objs.length,
-    patterns: patterns,
-  };
-}
 
 router._computeCountsBySession = computeCountsBySession;
 router._computeDurationSeconds = computeDurationSeconds;
 router._extractLabelFromMatchMessage = extractLabelFromMatchMessage;
 router._OBJECTION_LABEL_MAP = OBJECTION_LABEL_MAP;
-router._computeCoachingPatterns = computeCoachingPatterns;
 
 // ─── Account page (Stage 5) ──────────────────────────────────────────────────
 // Self-serve account surface. The managed lock (user_profiles.managed_by IS

@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
+const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
@@ -126,177 +126,10 @@ function computeDurationSeconds(startedAt, endedAt) {
 // ── GET /admin/sessions ─────────────────────────────────────────────────────
 // Returns the latest N sessions across ALL users. `before` cursor = started_at
 // ISO timestamp, strictly less-than, for paginating older pages.
-router.get('/sessions', protect, async function(req, res) {
-  var limit = parseInt(req.query.limit, 10);
-  if (!limit || limit < 1) limit = DEFAULT_LIMIT;
-  if (limit > MAX_LIMIT) limit = MAX_LIMIT;
-  var before = req.query.before;
-  var filterUserId = req.query.user_id || null;
-
-  try {
-    var admin = getAdminClient();
-    var allowedUserIds = await getAllowedUserIds(admin, req.user);
-
-    // Reject out-of-scope filter requests (admin trying to view a user they
-    // don't manage). Null allowedUserIds means owner — skip the check.
-    if (filterUserId && allowedUserIds && allowedUserIds.indexOf(filterUserId) === -1) {
-      console.warn('[admin] Out-of-scope filter blocked: actor=%s (%s) attempted_user=%s',
-        req.user.email, req.user.id, filterUserId);
-      return res.status(403).json({ error: 'Cannot filter to that user' });
-    }
-
-    var q = admin
-      .from('call_sessions')
-      .select('session_id, user_id, started_at, ended_at, outcome, outcome_source, client_version, platform, prospect_name, post_call_summary')
-      .order('started_at', { ascending: false })
-      .limit(limit);
-    if (before) q = q.lt('started_at', before);
-    if (filterUserId) {
-      q = q.eq('user_id', filterUserId);
-    } else if (allowedUserIds) {
-      q = q.in('user_id', allowedUserIds);
-    }
-
-    var sessionsResult = await q;
-    if (sessionsResult.error) {
-      var sDetail = String(sessionsResult.error.message || 'unknown').slice(0, 200);
-      console.error('[admin] sessions query failed:', sDetail);
-      return res.status(500).json({ error: 'Could not fetch sessions: ' + sDetail });
-    }
-    var sessions = sessionsResult.data || [];
-
-    if (sessions.length === 0) {
-      return res.json({ sessions: [] });
-    }
-
-    var emailMap = await buildUserEmailMap(admin);
-
-    // Single batched count query across all returned sessions. At our scale
-    // (tens of sessions × hundreds of logs) this is trivial; if session_logs
-    // ever grows large per session, swap to a Postgres RPC with group-by.
-    var sessionIds = sessions.map(function(s) { return s.session_id; });
-    var logsResult = await admin
-      .from('session_logs')
-      .select('session_id, level')
-      .in('session_id', sessionIds);
-    if (logsResult.error) {
-      // Non-fatal: show sessions with zero counts rather than erroring the page.
-      console.error('[admin] counts query failed:', logsResult.error.message);
-    }
-    var countsMap = computeCountsBySession(logsResult.data || []);
-
-    var enriched = sessions.map(function(s) {
-      var counts = countsMap[s.session_id] || { log_count: 0, error_count: 0 };
-      return {
-        session_id: s.session_id,
-        user_id: s.user_id,
-        user_email: emailMap[s.user_id] || null,
-        started_at: s.started_at,
-        ended_at: s.ended_at,
-        duration_seconds: computeDurationSeconds(s.started_at, s.ended_at),
-        client_version: s.client_version,
-        platform: s.platform,
-        outcome: s.outcome,
-        outcome_source: s.outcome_source,
-        prospect_name: s.prospect_name,
-        has_summary: !!s.post_call_summary,
-        log_count: counts.log_count,
-        error_count: counts.error_count,
-      };
-    });
-
-    res.json({ sessions: enriched });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[admin] sessions error:', err.message);
-    res.status(500).json({ error: 'Failed to load sessions' });
-  }
-});
 
 // ── GET /admin/sessions/:session_id/logs ────────────────────────────────────
 // Session metadata + up to LOG_HARD_CAP (10000) log rows. `total_count` is the
 // unfiltered row count so the client can display "Showing X of Y" when capped.
-router.get('/sessions/:session_id/logs', protect, async function(req, res) {
-  var sessionId = req.params.session_id;
-  var limit = parseInt(req.query.limit, 10);
-  if (!limit || limit < 1) limit = LOG_HARD_CAP;
-  if (limit > LOG_HARD_CAP) limit = LOG_HARD_CAP;
-
-  try {
-    var admin = getAdminClient();
-
-    var sessionResult = await admin
-      .from('call_sessions')
-      .select('session_id, user_id, started_at, ended_at, outcome, client_version, platform')
-      .eq('session_id', sessionId)
-      .maybeSingle();
-    if (sessionResult.error) {
-      console.error('[admin] session fetch failed:', sessionResult.error.message);
-      return res.status(500).json({ error: 'Could not load session' });
-    }
-    if (!sessionResult.data) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-    var session = sessionResult.data;
-
-    // Admin-scope check: owners see any session; admins only sessions from
-    // users in their scope. 404 (not 403) on mismatch to avoid leaking
-    // session-id existence.
-    if (req.user.role !== 'owner') {
-      var allowedUserIds = await getAllowedUserIds(admin, req.user);
-      if (allowedUserIds && allowedUserIds.indexOf(session.user_id) === -1) {
-        console.warn('[admin] Scope violation: actor=%s (%s) attempted_session=%s owner=%s',
-          req.user.email, req.user.id, sessionId, session.user_id);
-        return res.status(404).json({ error: 'Session not found' });
-      }
-    }
-
-    // count: 'exact' returns total_count independent of limit — that's how
-    // the client knows whether it hit the 10000 cap.
-    var logsResult = await admin
-      .from('session_logs')
-      .select('logged_at, level, tag, message', { count: 'exact' })
-      .eq('session_id', sessionId)
-      .order('logged_at', { ascending: true })
-      .limit(limit);
-    if (logsResult.error) {
-      console.error('[admin] logs fetch failed:', logsResult.error.message);
-      return res.status(500).json({ error: 'Could not load logs' });
-    }
-
-    var userEmail = null;
-    try {
-      var userResult = await admin.auth.admin.getUserById(session.user_id);
-      if (userResult && userResult.data && userResult.data.user) {
-        userEmail = userResult.data.user.email || null;
-      }
-    } catch (e) {
-      // Email is cosmetic — don't fail the request if the auth lookup misfires.
-      console.error('[admin] getUserById failed:', e.message);
-    }
-
-    res.json({
-      session: {
-        session_id: session.session_id,
-        user_id: session.user_id,
-        user_email: userEmail,
-        started_at: session.started_at,
-        ended_at: session.ended_at,
-        duration_seconds: computeDurationSeconds(session.started_at, session.ended_at),
-        outcome: session.outcome,
-        client_version: session.client_version,
-        platform: session.platform,
-      },
-      logs: logsResult.data || [],
-      total_count: typeof logsResult.count === 'number' ? logsResult.count : (logsResult.data || []).length,
-      limit: limit,
-    });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[admin] logs error:', err.message);
-    res.status(500).json({ error: 'Failed to load logs' });
-  }
-});
 
 // ── GET /admin/users ────────────────────────────────────────────────────────
 // User management list. Owners see every signed-up user. Admins see users
@@ -925,43 +758,6 @@ function computeUserSessionStats(rows) {
 // pull analytics for users where user_profiles.managed_by = self, plus self.
 //
 // Wraps shared computeAnalytics(). Defaults to last 30 days.
-router.get('/analytics/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
-  var targetUserId = req.params.user_id;
-  var to = req.query.to || new Date().toISOString();
-  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
-    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
-  }
-
-  try {
-    var admin = getAdminClient();
-
-    // Scope enforcement: admins can only see self + their managed users.
-    // Owners can see anyone — skip the check entirely.
-    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] analytics scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
-        console.warn('[admin] Scope violation on analytics: actor=%s target=%s', req.user.id, targetUserId);
-        return res.status(403).json({ error: 'Not authorized for that user' });
-      }
-    }
-
-    var result = await computeAnalytics(admin, targetUserId, from, to);
-    res.json(result);
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[admin] analytics error:', err.message);
-    res.status(500).json({ error: 'Failed to load analytics: ' + (err.message || 'unknown') });
-  }
-});
 
 // ── GET /admin/analytics2/:user_id ──────────────────────────────────────────
 // Admin-pivot equivalent of /me/analytics2 (Fathom-era Coaching Dashboard).
@@ -1137,40 +933,6 @@ router.get('/performance-synthesis/:user_id', requireAuth, requireRole(['manager
 // ── GET /admin/objections/:user_id?objection_id=<id>&from=&to= ──────────────
 // Per-type drill for admins/owners viewing another user's coaching dashboard.
 // Same shape as /me/objections; scope-checked.
-router.get('/objections/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
-  var targetUserId = req.params.user_id;
-  var objectionId = req.query.objection_id;
-  if (!objectionId) return res.status(400).json({ error: 'objection_id required' });
-  var to = req.query.to || new Date().toISOString();
-  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
-    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
-  }
-  try {
-    var admin = getAdminClient();
-    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] objections-by-type scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
-        console.warn('[admin] Scope violation on objections-by-type: actor=%s target=%s', req.user.id, targetUserId);
-        return res.status(403).json({ error: 'Not authorized for that user' });
-      }
-    }
-    var result = await loadObjectionsByType(admin, targetUserId, objectionId, from, to);
-    res.json(result);
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[admin] objections-by-type error:', err.message);
-    res.status(500).json({ error: 'Failed to load objection events: ' + (err.message || 'unknown') });
-  }
-});
 
 // ── GET /admin/sessions/:session_id/objections ──────────────────────────────
 // Per-session objection drill for the admin/owner view. No user_id filter —
@@ -1178,17 +940,6 @@ router.get('/objections/:user_id', requireAuth, requireRole(['manager', 'owner']
 // /admin/sessions list is already scope-filtered to managed users, so by the
 // time a session_id reaches here it's already been screened. Defensive
 // check still happens in the analytics route above.)
-router.get('/sessions/:session_id/objections', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
-  var sessionId = req.params.session_id;
-  try {
-    var rows = await loadSessionObjections(getAdminClient(), sessionId);
-    res.json({ session_id: sessionId, objections: rows });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[admin] session-objections error:', err.message);
-    res.status(500).json({ error: 'Failed to load objections' });
-  }
-});
 
 // ── GET /admin/coaching/:user_id/patterns ───────────────────────────────────
 // Admin/owner view of any user's coaching patterns. Reuses the same
@@ -1196,43 +947,6 @@ router.get('/sessions/:session_id/objections', requireAuth, requireRole(['manage
 // user_id after a scope check (admins see managed users + self; owners see
 // anyone). Lives on admin.js for the same reason analytics does — keeps
 // caller-scope clean from cross-user-scope.
-router.get('/coaching/:user_id/patterns', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
-  var targetUserId = req.params.user_id;
-  var to = req.query.to || new Date().toISOString();
-  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
-    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
-  }
-
-  try {
-    var admin = getAdminClient();
-    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] coaching patterns scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
-        console.warn('[admin] Scope violation on coaching patterns: actor=%s target=%s', req.user.id, targetUserId);
-        return res.status(403).json({ error: 'Not authorized for that user' });
-      }
-    }
-    // Import lazily — keeps me.js as the canonical owner of the prompt; admin
-    // just dispatches. The require() is at function scope to avoid a circular
-    // dependency at module load (admin.js doesn't otherwise depend on me.js).
-    var meRouter = require('./me');
-    var result = await meRouter._computeCoachingPatterns(admin, targetUserId, from, to);
-    res.json(result);
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[admin] coaching patterns error:', err.message);
-    res.status(500).json({ error: 'Failed to load coaching patterns: ' + (err.message || 'unknown') });
-  }
-});
 
 // Pure helpers exported for tests (matches log.js `_validateLogBatch` pattern).
 router._buildUserEmailMap = buildUserEmailMap;

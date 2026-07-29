@@ -593,47 +593,6 @@
        Pivots on /admin/analytics/:user_id (scope-checked: admins see
        managed users + self, owners see anyone). Empty until a user is
        picked from the dropdown. -->
-  <section class="analytics-section">
-    <div class="analytics-header">
-      <h2>User Analytics</h2>
-      <div class="analytics-controls">
-        <select id="analyticsUserSelect" onchange="onAnalyticsUserChange()">
-          <option value="">Select a user…</option>
-        </select>
-        <div class="date-presets">
-          <button class="date-preset" data-days="7"    onclick="setAnalyticsDateRange(7)">7d</button>
-          <button class="date-preset active" data-days="30" onclick="setAnalyticsDateRange(30)">30d</button>
-          <button class="date-preset" data-days="90"   onclick="setAnalyticsDateRange(90)">90d</button>
-          <button class="date-preset" data-days="9999" onclick="setAnalyticsDateRange(9999)">All</button>
-        </div>
-      </div>
-    </div>
-    <div class="analytics-empty" id="analyticsEmpty">Select a user above to see their analytics.</div>
-    <div class="analytics-content" id="analyticsContent" style="display:none">
-      <div class="stats-row" id="analyticsStatsRow"></div>
-      <div class="objection-section" id="analyticsObjectionSection" style="display:none">
-        <div class="section-heading">Objections</div>
-        <div id="analyticsObjectionContent"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- SECTIONS B + C -->
-  <div class="sessions-split">
-    <aside class="sessions-pane">
-      <div class="sessions-pane-header">
-        <div>Sessions · <span id="sessionsScope">all users</span></div>
-        <button id="clearFilterBtn" class="reset-filter hidden" onclick="clearUserFilter()">Show all</button>
-      </div>
-      <div class="sessions-list" id="sessionsList">
-        <div class="empty-msg"><span class="spinner"></span></div>
-      </div>
-      <div class="load-more hidden" id="loadMore" onclick="loadOlder()">Load older</div>
-    </aside>
-    <main class="detail-pane" id="detailPane">
-      <div class="detail-placeholder" id="detailPlaceholder">Select a session on the left.</div>
-    </main>
-  </div>
 
 </div>
 
@@ -743,7 +702,7 @@
     if (currentUser.role === 'user') { window.location.replace('/dashboard'); return; }
     document.getElementById('roleLabel').textContent = currentUser.role === 'owner' ? 'Owner' : 'Admin';
 
-    await Promise.all([loadUsers(), loadSessions(true)]);
+    await loadUsers();
   }
 
   async function fetchMe() {
