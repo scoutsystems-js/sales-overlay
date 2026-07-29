@@ -2092,8 +2092,7 @@
     users:           [],      // populated for admin/owner
     viewingUserId:   null,    // whose data we're showing
     dateRange:      { from: null, to: null, days: 30 },
-    view:           'overview', // 'overview' | 'calls' | 'objections' | 'closes' | 'objection-type'
-    overviewMode:    'coaching', // 'coaching' (call_analyses, default) | 'sessions' (call_sessions, desktop-era)
+    view:           'overview', // 'overview' | 'call-library' | 'call-review' | 'objections-intel' | 'needs-work' | 'performance' | 'team*' | 'kb' | 'eod' | 'account'
     analytics2:      null,    // last /me/analytics2 (Fathom-era) response
     objectionsIntel: null,    // last /me/objections-intel response (Objections view)
     objectionsIntelLoading: false,
@@ -2120,18 +2119,6 @@
     teamNeedsWork:  null,   teamNeedsWorkLoading: false, // "What needs work" card + detail (B-2)
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     account:        null,   accountLoading: false,   // Account view (#account)
-    analytics:       null,    // last /me/analytics response
-    patterns:        null,    // last /me/coaching/patterns response
-    calls:           [],      // list from /me/sessions
-    objectionsCache: {},      // session_id -> objection rows
-    typeEventsCache: {},      // objection_id -> response from /me/objections
-    selectedObjectionId: null, // when view === 'objection-type'
-    expandedCallId:  null,
-    chart1:          null,
-    chart2:          null,
-    chart3:          null,
-    chartDrill:      null,
-    chartType:       null,
     // Fathom integration (Scout v2.0 Phase 1)
     fathomStatus:    null,    // null until /fathom/status fetch completes; then { connected: bool, ... }
     zoomStatus:      null,    // null until /zoom/status fetch completes; then { connected: bool, ... }
@@ -2361,16 +2348,6 @@
   // ──────────────────────────────────────────────────────────────────
   function isSelf() { return state.viewingUserId === state.me.user_id; }
 
-  async function fetchAnalytics() {
-    var url = isSelf()
-      ? '/me/analytics?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
-      : '/admin/analytics/' + encodeURIComponent(state.viewingUserId)
-        + '?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
-    var res = await fetch(url, { headers: authHeader() });
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  }
 
   // Fathom-era Coaching Dashboard analytics (call_analyses). Self or admin pivot.
   async function fetchAnalytics2() {
@@ -2384,16 +2361,6 @@
     return await res.json();
   }
 
-  async function fetchPatterns() {
-    var url = isSelf()
-      ? '/me/coaching/patterns?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
-      : '/admin/coaching/' + encodeURIComponent(state.viewingUserId) + '/patterns'
-        + '?from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
-    var res = await fetch(url, { headers: authHeader() });
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  }
 
   // /fathom/status is per-caller (no /admin equivalent for Phase 1). Only
   // called when state.viewingUserId === state.me.user_id — see
@@ -2941,33 +2908,6 @@
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
-  async function fetchCalls() {
-    var url = isSelf()
-      ? '/me/sessions?limit=100'
-      : '/admin/sessions?limit=100&user_id=' + encodeURIComponent(state.viewingUserId);
-    var res = await fetch(url, { headers: authHeader() });
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    var d = await res.json();
-    var all = (d && d.sessions) || [];
-    // Client-side date filter.
-    return all.filter(function(s) {
-      return s.started_at >= state.dateRange.from && s.started_at <= state.dateRange.to;
-    });
-  }
-
-  async function fetchObjections(sessionId) {
-    if (state.objectionsCache[sessionId]) return state.objectionsCache[sessionId];
-    var url = isSelf()
-      ? '/me/sessions/' + encodeURIComponent(sessionId) + '/objections'
-      : '/admin/sessions/' + encodeURIComponent(sessionId) + '/objections';
-    var res = await fetch(url, { headers: authHeader() });
-    if (!res.ok) return [];
-    var d = await res.json();
-    var rows = (d && d.objections) || [];
-    state.objectionsCache[sessionId] = rows;
-    return rows;
-  }
 
   // ──────────────────────────────────────────────────────────────────
   // Date range / user controls
@@ -2986,8 +2926,6 @@
     // Date-preset clicks reset to Coaching; the initial boot restore keeps the
     // hash-restored view (preserveView) so a refresh on #calls stays on Calls.
     if (!preserveView) state.view = 'overview';
-    state.expandedCallId = null;
-    state.objectionsCache = {};
     reloadAll();
   }
 
@@ -2999,8 +2937,6 @@
     window.history.replaceState({}, '', url.toString());
     state.viewingUserId = userId;
     state.view = 'overview';
-    state.expandedCallId = null;
-    state.objectionsCache = {};
     state.needsWork = null; // fixed-window card, but it IS per-user → refetch on pivot
     reloadAll();
   }
@@ -3053,10 +2989,6 @@
   // ──────────────────────────────────────────────────────────────────
   function render() {
     if (state.view === 'overview') renderOverview(false);
-    else if (state.view === 'calls') renderCallsDrill();
-    else if (state.view === 'objections') renderObjectionsDrill();
-    else if (state.view === 'closes') renderClosesDrill();
-    else if (state.view === 'objection-type') renderObjectionTypeDrill();
     else if (state.view === 'call-library') renderCallLibrary();
     else if (state.view === 'call-review') renderCallReview();
     else if (state.view === 'objections-intel') renderObjectionsIntel();
@@ -3077,7 +3009,7 @@
   // Dashboard is "active" for any view in the overview umbrella (overview
   // itself + its donut drills); Calls is active for the call-library view.
   function updateNavActiveStates() {
-    var OVERVIEW_VIEWS = { overview: 1, calls: 1, objections: 1, closes: 1, 'objection-type': 1 };
+    var OVERVIEW_VIEWS = { overview: 1 };
     var CALL_LIBRARY_VIEWS = { 'call-library': 1, 'call-review': 1 };
     var navOverview = document.getElementById('navOverview');
     var navCallLibrary = document.getElementById('navCallLibrary');
@@ -3141,20 +3073,10 @@
   // ──────────────────────────────────────────────────────────────────
   function renderOverview(isLoading) {
     var content = document.getElementById('content');
-    var mode = state.overviewMode || 'coaching';
-    // Edge case: user is on Live Sessions and switches to a range with zero
-    // sessions — fall back to Coaching so they aren't stranded on a hidden tab.
-    // Only fires once analytics has loaded (state.analytics non-null).
-    if (mode === 'sessions' && state.analytics && !hasLiveSessions()) {
-      mode = 'coaching';
-      state.overviewMode = 'coaching';
-    }
-    var notReady = mode === 'coaching' ? !state.analytics2 : !state.analytics;
-    if (isLoading || notReady) {
+    if (isLoading || !state.analytics2) {
       // A-1: skeleton TILES (not donuts) so the placeholder matches the collapsed
       // glance-tile layout — no ghost donuts before the real tiles paint.
       content.innerHTML = renderHeaderHtml()
-        + renderModeToggleHtml()
         + renderFathomNoticeHtml()
         + renderFathomSectionHtml()
         + renderZoomSectionHtml()
@@ -3165,73 +3087,9 @@
       return;
     }
 
-    // Default Coaching Dashboard = Fathom-era analytics (call_analyses).
-    if (mode === 'coaching') { renderCoachingOverview(content); return; }
-
-    // ── Live Sessions (desktop teleprompter era, call_sessions) ──────────────
-    var t = state.analytics.totals;
-    var obj = state.analytics.objections;
-
-    // Donut 1: Calls — segments by outcome. Center is total calls.
-    // Donut 2: Objections — segments by type. Center is total objections.
-    // Donut 3: Close Rate — won vs lost/follow_up. Center is %.
-    var closeDenom = t.wins + t.losses + t.follow_ups;
-    var closeRate = closeDenom > 0 ? Math.round((t.wins / closeDenom) * 100) : null;
-
-    content.innerHTML = renderHeaderHtml()
-      + renderModeToggleHtml()
-      + renderFathomNoticeHtml()
-      + renderFathomSectionHtml()
-      + renderZoomSectionHtml()
-      + '<div class="donut-row fade-in">'
-        + donutCardHtml('chart-calls', 'Calls', t.total_calls, null, 'click to drill in', 'calls')
-        + donutCardHtml('chart-objs', 'Objections', obj.totals.total, null, 'click to drill in', 'objections')
-        + donutCardHtml('chart-closes', 'Close Rate', closeRate === null ? '—' : (closeRate + '%'), null, 'click to drill in', 'closes')
-      + '</div>'
-      + '<div class="section fade-in">'
-        + '<div class="section-header"><h2>Coach summary</h2>'
-        + '<div class="meta">' + ((state.patterns && state.patterns.sample_size != null) ? 'based on ' + state.patterns.sample_size + ' calls' : '') + '</div></div>'
-        + renderPatternsHtml(state.patterns)
-      + '</div>'
-      + '<div class="section fade-in">'
-        + '<div class="section-header"><h2>Recent calls</h2>'
-        + '<div class="meta">' + state.calls.length + (state.calls.length === 1 ? ' call' : ' calls') + ' in window</div></div>'
-        + renderCallsHtml(state.calls)
-      + '</div>';
-
-    // Draw the three donuts after the DOM is laid out.
-    requestAnimationFrame(function() {
-      drawCallsDonut('chart-calls', t);
-      drawObjectionsDonut('chart-objs', obj);
-      drawClosesDonut('chart-closes', t, closeRate);
-    });
-
-    // Re-bind expanded body for any previously-open call.
-    if (state.expandedCallId) {
-      var card = document.querySelector('[data-session-id="' + state.expandedCallId + '"]');
-      if (card) {
-        card.classList.add('expanded');
-        renderCallBody(state.expandedCallId);
-      }
-    }
+    renderCoachingOverview(content);
   }
 
-  function donutCardHtml(canvasId, label, centerBig, centerSmall, hint, clickKey, onclickExpr) {
-    var smallHtml = centerSmall ? '<div class="small">' + escapeHtml(centerSmall) + '</div>' : '';
-    // Prefer an explicit onclick expression (coaching donuts pass drillCalls(...));
-    // otherwise fall back to setView(clickKey). Empty = non-drillable, no onclick.
-    var expr = onclickExpr || (clickKey ? "setView('" + clickKey + "')" : '');
-    var clickAttr = expr ? ' onclick="' + expr + '"' : '';
-    var hintText = expr ? hint : '';
-    return '<div class="donut-card"' + clickAttr + '>'
-         + '<div class="donut-label">' + escapeHtml(label) + '</div>'
-         + '<div class="donut-canvas-wrap">'
-           + '<canvas id="' + canvasId + '"></canvas>'
-           + '<div class="donut-center"><div class="big">' + escapeHtml(String(centerBig)) + '</div>' + smallHtml + '</div>'
-         + '</div>'
-         + '<div class="donut-hint">' + escapeHtml(hintText) + '</div>'
-         + '</div>';
-  }
 
   // ──────────────────────────────────────────────────────────────────
   // Chart drawing — Chart.js with custom dark theme + thin ring
@@ -3284,44 +3142,6 @@
     });
   }
 
-  function drawCallsDonut(canvasId, t) {
-    if (state.chart1) state.chart1.destroy();
-    var labels = ['Won', 'Lost', 'Follow-up', 'Unmarked'];
-    var values = [t.wins, t.losses, t.follow_ups, t.unmarked + t.live];
-    var colors = [COLORS.win, COLORS.loss, COLORS.follow_up, COLORS.unmarked];
-    // Filter zero-value entries to keep tooltips clean
-    var filtered = filterZero(labels, values, colors);
-    state.chart1 = donutBase(canvasId, filtered.labels, filtered.values, filtered.colors);
-  }
-
-  function drawObjectionsDonut(canvasId, obj) {
-    if (state.chart2) state.chart2.destroy();
-    var byType = obj.by_type || [];
-    var labels = byType.map(function(b) { return b.label; });
-    var values = byType.map(function(b) { return b.count; });
-    var colors = byType.map(function(b) { return COLORS[b.objection_id] || COLORS.other; });
-    if (labels.length === 0) {
-      // Render a single gray ring when no data so the visual doesn't collapse.
-      labels = ['No objections'];
-      values = [1];
-      colors = ['#1f1f1f'];
-    }
-    state.chart2 = donutBase(canvasId, labels, values, colors);
-  }
-
-  function drawClosesDonut(canvasId, t, closeRate) {
-    if (state.chart3) state.chart3.destroy();
-    var labels = ['Won', 'Not won'];
-    var notWon = t.losses + t.follow_ups;
-    var values = [t.wins, notWon];
-    var colors = [COLORS.win, '#1f1f1f'];
-    if (t.wins + notWon === 0) {
-      labels = ['No completed closes'];
-      values = [1];
-      colors = ['#1f1f1f'];
-    }
-    state.chart3 = donutBase(canvasId, labels, values, colors);
-  }
 
   function filterZero(labels, values, colors) {
     var L = [], V = [], C = [];
@@ -3335,38 +3155,6 @@
   // ──────────────────────────────────────────────────────────────────
   // Coaching overview (Fathom-era, call_analyses) — default view
   // ──────────────────────────────────────────────────────────────────
-  // True when the current (or pivoted ?user=) target has >=1 call_sessions row
-  // in the selected range. Source: computeAnalytics totals.total_calls, already
-  // in state.analytics and already scoped to the pivoted user — no extra query.
-  function hasLiveSessions() {
-    return !!(state.analytics && state.analytics.totals && state.analytics.totals.total_calls > 0);
-  }
-
-  function renderModeToggleHtml() {
-    // DORMANT (2026-07-20): the Live Sessions view is desktop-teleprompter-era and
-    // fully retired from the dashboard until the teleprompter returns. The toggle
-    // is hidden in ALL ranges regardless of data. The Live Sessions view logic
-    // (renderOverview's 'sessions' branch, hasLiveSessions, setOverviewMode) is
-    // kept intact but unreachable — nothing sets overviewMode='sessions' anymore.
-    // To revive: delete this early return to restore the toggle below.
-    return '';
-    /* former toggle — reinstate to bring Live Sessions back:
-    if (!hasLiveSessions()) return '';
-    var mode = state.overviewMode || 'coaching';
-    return '<div class="mode-toggle" style="display:flex;gap:6px;margin:-4px 0 18px;">'
-      + '<button class="date-preset' + (mode === 'coaching' ? ' active' : '') + '" onclick="setOverviewMode(\'coaching\')">Coaching</button>'
-      + '<button class="date-preset' + (mode === 'sessions' ? ' active' : '') + '" onclick="setOverviewMode(\'sessions\')">Live Sessions</button>'
-      + '</div>';
-    */
-  }
-
-  function setOverviewMode(mode) {
-    if (mode !== 'coaching' && mode !== 'sessions') return;
-    if (state.overviewMode === mode) return;
-    state.overviewMode = mode;
-    state.view = 'overview';
-    renderOverview(false); // both analytics + analytics2 already loaded — instant swap
-  }
 
   function scoreColor(s) {
     if (s == null) return '#1f1f1f';
@@ -3409,7 +3197,6 @@
     // Performance summary (card → #performance page, LLM on open) → Recent calls
     // (card → the Call Library). No accordions.
     content.innerHTML = renderHeaderHtml()
-      + renderModeToggleHtml()
       + renderFathomNoticeHtml()
       + renderFathomSectionHtml()
       + renderZoomSectionHtml()
@@ -3465,7 +3252,7 @@
     try { state.needsWork = await fetchNeedsWork(); }
     catch (err) { if (err.message === 'unauth') return; state.needsWork = { _error: err.message || 'unknown' }; }
     state.needsWorkLoading = false;
-    if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
+    if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'needs-work') renderNeedsWorkView();
   }
   // Compact card under the glance tiles. Mirrors the team needs-work card.
@@ -3539,7 +3326,7 @@
     catch (err) { if (err.message === 'unauth') return; state.perfSynthesis = { available: false, reason: err.message || 'unknown' }; }
     state.perfSynthesisLoading = false;
     if (state.view === 'performance') renderPerformanceView();
-    else if (state.view === 'overview' && state.overviewMode === 'coaching') renderOverview(false);
+    else if (state.view === 'overview') renderOverview(false);
   }
   function perfInsightHtml(it, kind) {
     var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ clip</a>' : '';
@@ -3616,140 +3403,6 @@
     return '<div>' + rows + '</div>';
   }
 
-  // ──────────────────────────────────────────────────────────────────
-  // Patterns rendering
-  // ──────────────────────────────────────────────────────────────────
-  function renderPatternsHtml(p) {
-    if (!p) return '<div class="load-state"><div class="spinner"></div></div>';
-    if (p.unavailable) {
-      return '<div class="empty"><h3>Coach summary unavailable</h3><p>Could not generate coaching patterns right now (the AI service may be temporarily unavailable). Your calls and analytics are unaffected.</p></div>';
-    }
-    var patterns = (p.patterns || []);
-    var banner = '';
-    if (p.sample_size != null && p.sample_size < 20) {
-      banner = '<div class="signal-banner"><div class="signal-banner-icon"></div>'
-             + '<div><strong>Early signal.</strong> Only ' + p.sample_size + ' calls in this window — patterns will sharpen with more data.</div></div>';
-    }
-    if (patterns.length === 0) {
-      return banner + '<div class="empty"><h3>No clear patterns yet</h3><p>Not enough data to surface coaching patterns in this date range.</p></div>';
-    }
-    var rows = patterns.map(function(it) {
-      var conf = (it.confidence || 'low').toLowerCase();
-      return '<div class="pattern-card">'
-        + '<div class="pattern-headline">' + escapeHtml(it.headline || '') + '</div>'
-        + '<div class="pattern-detail">' + escapeHtml(it.detail || '') + '</div>'
-        + '<div class="pattern-meta"><span class="pattern-confidence ' + conf + '">' + escapeHtml(conf) + ' confidence</span></div>'
-        + '</div>';
-    }).join('');
-    return banner + '<div class="patterns-list">' + rows + '</div>';
-  }
-
-  // ──────────────────────────────────────────────────────────────────
-  // Calls list rendering (with inline drill on expand)
-  // ──────────────────────────────────────────────────────────────────
-  function renderCallsHtml(calls) {
-    if (calls.length === 0) {
-      return '<div class="empty"><h3>No calls in this window</h3><p>Pick a wider date range above, or wait for new calls to come in.</p></div>';
-    }
-    return '<div class="calls-list">' + calls.map(callCardHtml).join('') + '</div>';
-  }
-
-  function callCardHtml(s) {
-    var titleProspect = s.prospect_name
-      ? '<span class="name">' + escapeHtml(s.prospect_name) + '</span>'
-      : '<span class="anon">unknown prospect</span>';
-    var dur = formatDuration(s.duration_seconds);
-    var meta = [formatDate(s.started_at), dur];
-    if (s.outcome_source === 'inferred') meta.push('outcome inferred');
-
-    return '<div class="call-card" data-session-id="' + escapeHtml(s.session_id) + '">'
-      + '<div class="call-head" onclick="toggleCall(\'' + s.session_id + '\')">'
-        + '<div class="call-head-left">'
-          + '<div class="call-head-title">Call with ' + titleProspect + '</div>'
-          + '<div class="call-head-meta">' + meta.map(escapeHtml).join(' · ') + '</div>'
-        + '</div>'
-        + '<div class="call-head-right">' + outcomeBadge(s.outcome, !!s.ended_at) + '<span class="expand-icon">▾</span></div>'
-      + '</div>'
-      + '<div class="call-body" id="body-' + escapeHtml(s.session_id) + '"></div>'
-    + '</div>';
-  }
-
-  function outcomeBadge(outcome, ended) {
-    if (outcome === 'win') return '<span class="badge badge-win">Won</span>';
-    if (outcome === 'loss') return '<span class="badge badge-loss">Lost</span>';
-    if (outcome === 'follow_up') return '<span class="badge badge-fu">Follow-up</span>';
-    if (!ended) return '<span class="badge badge-live">Live</span>';
-    return '<span class="badge badge-empty">Unmarked</span>';
-  }
-
-  async function toggleCall(sessionId) {
-    var card = document.querySelector('[data-session-id="' + sessionId + '"]');
-    if (!card) return;
-    if (state.expandedCallId === sessionId) {
-      card.classList.remove('expanded');
-      state.expandedCallId = null;
-      return;
-    }
-    if (state.expandedCallId) {
-      var prev = document.querySelector('[data-session-id="' + state.expandedCallId + '"]');
-      if (prev) prev.classList.remove('expanded');
-    }
-    state.expandedCallId = sessionId;
-    card.classList.add('expanded');
-    renderCallBody(sessionId);
-  }
-
-  async function renderCallBody(sessionId) {
-    var body = document.getElementById('body-' + sessionId);
-    if (!body) return;
-    body.innerHTML = '<div class="load-state"><div class="spinner"></div></div>';
-
-    var objections = await fetchObjections(sessionId);
-
-    if (objections.length === 0) {
-      body.innerHTML = '<div class="empty"><h3>No objections detected</h3><p>This call had no detected framework objections.</p></div>';
-      return;
-    }
-    body.innerHTML = objections.map(objEventHtml).join('');
-  }
-
-  function objEventHtml(o) {
-    var verdict;
-    if (o.overcome === true)       verdict = '<span class="verdict verdict-overcome">Overcame</span>';
-    else if (o.overcome === false) verdict = '<span class="verdict verdict-not">Not overcome</span>';
-    else                            verdict = '<span class="verdict verdict-unknown">Indeterminate</span>';
-    var conf = o.overcome_confidence ? '<span class="verdict-conf">' + escapeHtml(o.overcome_confidence) + ' confidence</span>' : '';
-    var time = o.detected_at ? new Date(o.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-
-    var coaching = o.coaching_note
-      ? '<div class="coaching-note">' + escapeHtml(o.coaching_note) + '</div>'
-      : '<div class="coaching-note-empty">No coaching narrative generated for this event.</div>';
-
-    var rebuttal = o.framework_rebuttal
-      ? '<div class="compare-text">' + escapeHtml(o.framework_rebuttal) + '</div>'
-      : '<div class="compare-text empty">No framework rebuttal recorded.</div>';
-    var said = o.closer_response
-      ? '<div class="compare-text">' + escapeHtml(o.closer_response) + '</div>'
-      : '<div class="compare-text empty">No closer transcript captured in the 60s after this objection.</div>';
-
-    return '<div class="obj-event">'
-      + '<div class="obj-event-head">'
-        + '<div><span class="obj-event-title">' + escapeHtml(o.objection_label || '') + '</span>'
-          + (time ? '<span class="obj-event-time">at ' + escapeHtml(time) + '</span>' : '') + '</div>'
-        + '<div>' + verdict + conf + '</div>'
-      + '</div>'
-      + coaching
-      + '<div class="compare-grid">'
-        + '<div class="compare-pane framework"><div class="compare-label">Scout suggested</div>' + rebuttal + '</div>'
-        + '<div class="compare-pane actual"><div class="compare-label">What you said</div>' + said + '</div>'
-      + '</div>'
-      + (o.notes ? '<div class="obj-notes-row">Classifier note: ' + escapeHtml(o.notes) + '</div>' : '')
-    + '</div>';
-  }
-
-  // ──────────────────────────────────────────────────────────────────
-  // Drill views
-  // ──────────────────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
   // Team (manager) view — v1.4 flagship. Reps' data is resolved + permission-
   // checked server-side; this only renders. Owner gets a team picker.
@@ -5312,297 +4965,14 @@
 
   function setView(view) {
     state.view = view;
-    state.expandedCallId = null;
-    state.selectedObjectionId = null;
     render();
     syncHashFromState();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function setObjectionType(objectionId) {
-    state.view = 'objection-type';
-    state.selectedObjectionId = objectionId;
-    state.expandedCallId = null;
-    render();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
 
-  function backToOverview() { state.view = 'overview'; state.expandedCallId = null; state.selectedObjectionId = null; render(); }
-  function backToObjections() { state.view = 'objections'; state.expandedCallId = null; state.selectedObjectionId = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function backToOverview() { state.view = 'overview'; render(); }
 
-  function drillHeader(title, count) {
-    var countHtml = count != null ? '<span class="count">' + escapeHtml(String(count)) + '</span>' : '';
-    return '<div class="drill-header fade-in">'
-         + '<button class="back-btn" onclick="backToOverview()">← Back</button>'
-         + '<div class="drill-title">' + escapeHtml(title) + countHtml + '</div>'
-         + '</div>';
-  }
-
-  // Drill 1: Calls — outcome breakdown + per-outcome bars + recent calls list filtered.
-  function renderCallsDrill() {
-    var t = state.analytics.totals;
-    var content = document.getElementById('content');
-
-    var rows = [
-      { key: 'win',       label: 'Won',       count: t.wins,        color: COLORS.win },
-      { key: 'loss',      label: 'Lost',      count: t.losses,      color: COLORS.loss },
-      { key: 'follow_up', label: 'Follow-up', count: t.follow_ups,  color: COLORS.follow_up },
-      { key: 'unmarked',  label: 'Unmarked',  count: t.unmarked,    color: COLORS.unmarked },
-      { key: 'live',      label: 'Live',      count: t.live,        color: COLORS.live },
-    ].filter(function(r) { return r.count > 0; });
-    var total = rows.reduce(function(s, r) { return s + r.count; }, 0);
-
-    content.innerHTML = drillHeader('Calls', t.total_calls)
-      + '<div class="drill-grid fade-in">'
-        + '<div class="drill-donut"><div class="donut-canvas-wrap"><canvas id="drill-chart"></canvas>'
-          + '<div class="donut-center"><div class="big">' + t.total_calls + '</div><div class="small">total</div></div></div></div>'
-        + '<div class="drill-breakdown">' + rows.map(function(r) {
-          var pct = total > 0 ? Math.round((r.count / total) * 100) : 0;
-          return '<div class="breakdown-row">'
-            + '<div class="breakdown-dot" style="background:' + r.color + ';"></div>'
-            + '<div class="breakdown-label">' + escapeHtml(r.label) + '</div>'
-            + '<div class="breakdown-count">' + r.count + '</div>'
-            + '<div class="breakdown-pct">' + pct + '%</div>'
-            + '</div>';
-        }).join('') + '</div>'
-      + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>All calls in window</h2>'
-        + '<div class="meta">' + state.calls.length + ' calls</div></div>'
-        + renderCallsHtml(state.calls)
-      + '</div>';
-
-    requestAnimationFrame(function() {
-      if (state.chartDrill) state.chartDrill.destroy();
-      state.chartDrill = donutBase('drill-chart', rows.map(function(r) { return r.label; }),
-        rows.map(function(r) { return r.count; }), rows.map(function(r) { return r.color; }));
-    });
-  }
-
-  // Drill 2: Objections — by-type breakdown. Each row is clickable, drilling
-  // into renderObjectionTypeDrill() for per-event coaching.
-  function renderObjectionsDrill() {
-    var obj = state.analytics.objections;
-    var content = document.getElementById('content');
-    var byType = (obj.by_type || []).slice().sort(function(a, b) { return b.count - a.count; });
-    var totalCount = obj.totals.total;
-
-    var donutColors = byType.map(function(b) { return COLORS[b.objection_id] || COLORS.other; });
-
-    var breakdown = byType.map(function(b) {
-      var pctOver = b.overcome_pct === null ? '—' : b.overcome_pct + '%';
-      var fillWidth = b.overcome + b.not_overcome > 0 ? Math.round(100 * b.overcome / (b.overcome + b.not_overcome)) : 0;
-      var color = COLORS[b.objection_id] || COLORS.other;
-      return '<div class="breakdown-row clickable" onclick="setObjectionType(\'' + escapeHtml(b.objection_id) + '\')">'
-        + '<div class="breakdown-dot" style="background:' + color + ';"></div>'
-        + '<div>'
-          + '<div class="breakdown-label">' + escapeHtml(b.label) + '</div>'
-          + '<div class="breakdown-bar" style="margin-top:6px;"><div class="breakdown-bar-fill" style="width:' + fillWidth + '%;background:' + color + ';"></div></div>'
-        + '</div>'
-        + '<div class="breakdown-count">' + b.count + '</div>'
-        + '<div class="breakdown-pct">' + escapeHtml(pctOver) + ' overcame</div>'
-        + '</div>';
-    }).join('');
-
-    content.innerHTML = drillHeader('Objections', totalCount)
-      + '<div class="drill-grid fade-in">'
-        + '<div class="drill-donut"><div class="donut-canvas-wrap"><canvas id="drill-chart"></canvas>'
-          + '<div class="donut-center"><div class="big">' + totalCount + '</div><div class="small">events</div></div></div></div>'
-        + '<div class="drill-breakdown">'
-          + (breakdown
-              ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;padding:0 4px;">Click a type to see every event with coaching feedback.</div>' + breakdown
-              : '<div class="empty"><h3>No objections detected</h3></div>')
-        + '</div>'
-      + '</div>';
-
-    requestAnimationFrame(function() {
-      if (state.chartDrill) state.chartDrill.destroy();
-      if (byType.length === 0) {
-        state.chartDrill = donutBase('drill-chart', ['Empty'], [1], ['#1f1f1f']);
-      } else {
-        state.chartDrill = donutBase('drill-chart', byType.map(function(b) { return b.label; }),
-          byType.map(function(b) { return b.count; }), donutColors);
-      }
-    });
-  }
-
-  // Drill 2.5: Per-type objection drill. The third-level view: every event
-  // of one objection_id, with stats up top + the framework rebuttal pinned
-  // for reference + a card per event showing coaching narrative + side-by-side.
-  async function renderObjectionTypeDrill() {
-    var content = document.getElementById('content');
-    var objectionId = state.selectedObjectionId;
-    if (!objectionId) { backToOverview(); return; }
-
-    // Loading placeholder
-    content.innerHTML = '<div class="drill-header fade-in">'
-      + '<button class="back-btn" onclick="backToObjections()">← Back to Objections</button>'
-      + '<div class="drill-title">Loading…</div></div>'
-      + '<div class="load-state"><div class="spinner"></div></div>';
-
-    var data;
-    var cached = state.typeEventsCache[objectionId];
-    if (cached) {
-      data = cached;
-    } else {
-      try {
-        data = await fetchObjectionsByType(objectionId);
-        state.typeEventsCache[objectionId] = data;
-      } catch (err) {
-        content.innerHTML = '<div class="drill-header"><button class="back-btn" onclick="backToObjections()">← Back</button></div>'
-          + '<div class="error">Could not load events: ' + escapeHtml(err.message || 'unknown') + '</div>';
-        return;
-      }
-    }
-
-    var label = data.label || objectionId;
-    var t = data.totals;
-    var color = COLORS[objectionId] || COLORS.other;
-    var pctOver = t.overcome_pct === null ? '—' : t.overcome_pct + '%';
-    var pctClass = t.overcome_pct === null ? '' : (t.overcome_pct >= 70 ? 'good' : t.overcome_pct >= 40 ? 'mid' : 'bad');
-
-    // Framework rebuttal — pull from the first event (all share the same rebuttal text)
-    var firstWithRebuttal = (data.events || []).find(function(e) { return e.framework_rebuttal; });
-    var frameworkRebuttal = firstWithRebuttal ? firstWithRebuttal.framework_rebuttal : null;
-
-    var stats = ''
-      + '<div class="type-stat"><div class="stat-label">Total Events</div><div class="stat-value">' + t.total + '</div></div>'
-      + '<div class="type-stat"><div class="stat-label">Overcame</div><div class="stat-value good">' + t.overcome + '</div></div>'
-      + '<div class="type-stat"><div class="stat-label">Not Overcome</div><div class="stat-value bad">' + t.not_overcome + '</div></div>'
-      + '<div class="type-stat"><div class="stat-label">Indeterminate</div><div class="stat-value">' + t.unknown + '</div><div class="stat-sub">transcript unclear</div></div>'
-      + '<div class="type-stat"><div class="stat-label">Overcome Rate</div><div class="stat-value ' + pctClass + '">' + escapeHtml(pctOver) + '</div><div class="stat-sub">of definitive</div></div>';
-
-    var frameworkBlock = frameworkRebuttal
-      ? '<div class="framework-ref">'
-        + '<div class="framework-ref-label">Scout\'s framework rebuttal — use this every time</div>'
-        + '<div class="framework-ref-text">"' + escapeHtml(frameworkRebuttal) + '"</div>'
-        + '</div>'
-      : '';
-
-    var eventsHtml;
-    if ((data.events || []).length === 0) {
-      eventsHtml = '<div class="empty"><h3>No events in this window</h3><p>No instances of this objection were detected in the selected date range.</p></div>';
-    } else {
-      eventsHtml = data.events.map(eventCardHtml).join('');
-    }
-
-    content.innerHTML = '<div class="drill-header fade-in">'
-        + '<button class="back-btn" onclick="backToObjections()">← Back to Objections</button>'
-        + '<div class="drill-title">' + escapeHtml(label) + ' <span class="count">' + t.total + '</span></div>'
-      + '</div>'
-      + '<div class="type-stats-row fade-in">' + stats + '</div>'
-      + frameworkBlock
-      + '<div class="section fade-in">'
-        + '<div class="section-header"><h2>Every event</h2>'
-        + '<div class="meta">' + t.total + (t.total === 1 ? ' instance' : ' instances') + ' in window</div></div>'
-        + eventsHtml
-      + '</div>';
-  }
-
-  async function fetchObjectionsByType(objectionId) {
-    var url = isSelf()
-      ? '/me/objections?objection_id=' + encodeURIComponent(objectionId)
-        + '&from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to)
-      : '/admin/objections/' + encodeURIComponent(state.viewingUserId)
-        + '?objection_id=' + encodeURIComponent(objectionId)
-        + '&from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
-    var res = await fetch(url, { headers: authHeader() });
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  }
-
-  // Per-event card for the type drill — call context up top, coaching note,
-  // side-by-side framework vs actual, classifier note at bottom.
-  function eventCardHtml(e) {
-    var prospect = e.prospect_name
-      ? '<span class="name">' + escapeHtml(e.prospect_name) + '</span>'
-      : '<span class="anon">unknown prospect</span>';
-    var dateStr = e.session_started_at ? formatDate(e.session_started_at) : '—';
-    var timeStr = e.detected_at ? new Date(e.detected_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
-    var sessionOutcome = e.session_outcome
-      ? outcomeBadge(e.session_outcome, !!e.session_ended_at)
-      : (e.session_ended_at ? '<span class="badge badge-empty">Unmarked</span>' : '<span class="badge badge-live">Live</span>');
-
-    var verdict;
-    if (e.overcome === true)       verdict = '<span class="verdict verdict-overcome">Overcame</span>';
-    else if (e.overcome === false) verdict = '<span class="verdict verdict-not">Not overcome</span>';
-    else                            verdict = '<span class="verdict verdict-unknown">Indeterminate</span>';
-    var conf = e.overcome_confidence ? '<span class="verdict-conf">' + escapeHtml(e.overcome_confidence) + ' confidence</span>' : '';
-
-    var coaching = e.coaching_note
-      ? '<div class="coaching-note">' + escapeHtml(e.coaching_note) + '</div>'
-      : '<div class="coaching-note-empty">No coaching narrative generated for this event.</div>';
-
-    var rebuttal = e.framework_rebuttal
-      ? '<div class="compare-text">' + escapeHtml(e.framework_rebuttal) + '</div>'
-      : '<div class="compare-text empty">No framework rebuttal recorded.</div>';
-    var said = e.closer_response
-      ? '<div class="compare-text">' + escapeHtml(e.closer_response) + '</div>'
-      : '<div class="compare-text empty">No closer transcript captured in the 60s after this objection.</div>';
-
-    return '<div class="event-card">'
-      + '<div class="event-card-head">'
-        + '<div>'
-          + '<div class="event-card-title">Call with ' + prospect + '</div>'
-          + '<div class="event-card-meta">' + escapeHtml(dateStr) + (timeStr ? ' · objection at ' + escapeHtml(timeStr) : '') + '</div>'
-        + '</div>'
-        + '<div class="event-card-right">' + verdict + conf + sessionOutcome + '</div>'
-      + '</div>'
-      + coaching
-      + '<div class="compare-grid">'
-        + '<div class="compare-pane framework"><div class="compare-label">Scout suggested</div>' + rebuttal + '</div>'
-        + '<div class="compare-pane actual"><div class="compare-label">What you said</div>' + said + '</div>'
-      + '</div>'
-      + (e.notes ? '<div class="obj-notes-row">Classifier note: ' + escapeHtml(e.notes) + '</div>' : '')
-    + '</div>';
-  }
-
-  // Drill 3: Close rate — won vs not-won + framework deep-dive.
-  function renderClosesDrill() {
-    var t = state.analytics.totals;
-    var content = document.getElementById('content');
-    var won = t.wins;
-    var notWon = t.losses + t.follow_ups;
-    var unmarked = t.unmarked + t.live;
-    var closeDenom = won + notWon;
-    var closeRate = closeDenom > 0 ? Math.round((won / closeDenom) * 100) : null;
-
-    var rows = [
-      { label: 'Won',       count: won,      color: COLORS.win,       pct: closeDenom > 0 ? Math.round(100 * won / closeDenom) + '%' : '—' },
-      { label: 'Lost',      count: t.losses, color: COLORS.loss,      pct: closeDenom > 0 ? Math.round(100 * t.losses / closeDenom) + '%' : '—' },
-      { label: 'Follow-up', count: t.follow_ups, color: COLORS.follow_up, pct: closeDenom > 0 ? Math.round(100 * t.follow_ups / closeDenom) + '%' : '—' },
-      { label: 'Unmarked',  count: unmarked, color: COLORS.unmarked, pct: '—' },
-    ].filter(function(r) { return r.count > 0; });
-
-    content.innerHTML = drillHeader('Close Rate', closeRate === null ? '—' : (closeRate + '%'))
-      + '<div class="drill-grid fade-in">'
-        + '<div class="drill-donut"><div class="donut-canvas-wrap"><canvas id="drill-chart"></canvas>'
-          + '<div class="donut-center"><div class="big">' + (closeRate === null ? '—' : closeRate + '%') + '</div><div class="small">closed</div></div></div></div>'
-        + '<div class="drill-breakdown">' + rows.map(function(r) {
-          return '<div class="breakdown-row">'
-            + '<div class="breakdown-dot" style="background:' + r.color + ';"></div>'
-            + '<div class="breakdown-label">' + escapeHtml(r.label) + '</div>'
-            + '<div class="breakdown-count">' + r.count + '</div>'
-            + '<div class="breakdown-pct">' + escapeHtml(r.pct) + '</div>'
-            + '</div>';
-        }).join('') + '</div>'
-      + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Calls with confirmed outcomes</h2>'
-        + '<div class="meta">won, lost, or follow-up</div></div>'
-        + renderCallsHtml(state.calls.filter(function(s) { return s.outcome === 'win' || s.outcome === 'loss' || s.outcome === 'follow_up'; }))
-      + '</div>';
-
-    requestAnimationFrame(function() {
-      if (state.chartDrill) state.chartDrill.destroy();
-      var labels = [];
-      var values = [];
-      var colors = [];
-      if (won > 0) { labels.push('Won'); values.push(won); colors.push(COLORS.win); }
-      if (notWon > 0) { labels.push('Not won'); values.push(notWon); colors.push('#1f1f1f'); }
-      if (labels.length === 0) { labels = ['No closes yet']; values = [1]; colors = ['#1f1f1f']; }
-      state.chartDrill = donutBase('drill-chart', labels, values, colors);
-    });
-  }
 
   // ──────────────────────────────────────────────────────────────────
   // Helpers
@@ -5615,14 +4985,6 @@
     var year = d.getFullYear();
     var today = new Date().getFullYear();
     return year === today ? month + ' ' + day : month + ' ' + day + ', ' + year;
-  }
-
-  function formatDuration(seconds) {
-    if (!seconds && seconds !== 0) return '—';
-    if (seconds < 60) return seconds + 's';
-    var m = Math.floor(seconds / 60);
-    var s = seconds % 60;
-    return m + 'm' + (s > 0 ? ' ' + s + 's' : '');
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -5647,8 +5009,7 @@
   }
 
   // Duration formatter for the library cards: "57m" or "1h 23m" per the
-  // brief, no seconds. Null/invalid → "—". Differs from formatDuration
-  // above which keeps seconds for short calls.
+  // brief, no seconds. Null/invalid → "—".
   function formatNaturalDuration(seconds) {
     if (seconds === null || seconds === undefined) return '—';
     if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) return '—';
@@ -5658,7 +5019,6 @@
     return minutes + 'm';
   }
 
-  // throw-on-failure pattern matching fetchAnalytics/fetchPatterns/fetchCalls.
   // "Manager context" — the same gate as the Team view (manager or owner).
   // These users get the Calls rep-selector + a date-range control (default 7d);
   // everyone else sees the Calls view exactly as before.
