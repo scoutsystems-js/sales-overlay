@@ -140,45 +140,6 @@
     }
     .signed-in-email strong { color: var(--text); }
 
-    .launch-steps {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px 20px;
-      margin-bottom: 20px;
-      text-align: left;
-    }
-    .launch-steps p {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-    .launch-steps ol {
-      list-style: none;
-      counter-reset: steps;
-      padding: 0;
-    }
-    .launch-steps li {
-      counter-increment: steps;
-      font-size: 13px;
-      color: var(--text);
-      padding: 5px 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .launch-steps li::before {
-      content: counter(steps);
-      width: 20px; height: 20px;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px;
-      color: var(--green);
-      flex-shrink: 0;
-    }
-
     .launch-btn {
       width: 100%;
       padding: 13px;
@@ -197,15 +158,6 @@
       transition: background 0.15s;
     }
     .launch-btn:hover { background: var(--green-dark); }
-
-    .divider { text-align: center; font-size: 12px; color: var(--muted); margin: 20px 0; }
-    .download-link {
-      display: block;
-      text-align: center;
-      font-size: 13px;
-      color: var(--muted);
-    }
-    .download-link:hover { color: var(--text); }
 
     .signout-row {
       text-align: center;
@@ -260,12 +212,14 @@
   <div class="card">
     <div class="card-header">
       <h1 id="cardTitle">Welcome back</h1>
-      <p id="cardSub">Sign in to launch Scout</p>
+      <p id="cardSub">Sign in to your Scout dashboard</p>
     </div>
 
     <!-- Auth form -->
     <div id="authForm">
-      <div class="tab-row">
+      <!-- Scout is invite-only (Terms) — no self-serve signup. The tab row is
+           hidden; the login/signup elements remain so switchTab() stays valid. -->
+      <div class="tab-row" id="tabRow" style="display:none">
         <div class="tab active" id="loginTab" onclick="switchTab('login')">Log In</div>
         <div class="tab" id="signupTab" onclick="switchTab('signup')">Sign Up</div>
       </div>
@@ -302,22 +256,14 @@
       </div>
     </div>
 
-    <!-- Success / Launch view -->
+    <!-- Signed-in fallback (shown only if the post-login redirect can't resolve
+         the role, e.g. a transient /auth/me error). Web-appropriate: continue to
+         the dashboard — Scout runs in the browser. -->
     <div class="success-view" id="successView">
       <div class="success-icon">✓</div>
       <h2>You're signed in</h2>
       <p class="signed-in-email">Logged in as <strong id="signedInEmail"></strong></p>
-      <div class="launch-steps">
-        <p>Launch Scout on your Mac:</p>
-        <ol>
-          <li>Download the Mac app if you haven't yet</li>
-          <li>Open it — it'll use this login automatically</li>
-          <li>Click Start on any sales call</li>
-        </ol>
-      </div>
-      <button class="launch-btn" onclick="launchApp()">Open Scout App →</button>
-      <div class="divider">or</div>
-      <a href="/download" class="download-link">Download Scout for Mac →</a>
+      <button class="launch-btn" onclick="window.location.href='/dashboard'">Continue to dashboard →</button>
       <div class="signout-row">
         <a onclick="signOut()">Sign out</a>
       </div>
@@ -445,7 +391,7 @@
     document.getElementById('signupTab').className = 'tab' + (tab === 'signup' ? ' active' : '');
     document.getElementById('submitBtn').textContent = tab === 'login' ? 'Log In' : 'Create Account';
     document.getElementById('cardTitle').textContent = tab === 'login' ? 'Welcome back' : 'Create your account';
-    document.getElementById('cardSub').textContent = tab === 'login' ? 'Sign in to launch Scout' : 'Free during early access';
+    document.getElementById('cardSub').textContent = tab === 'login' ? 'Sign in to your Scout dashboard' : 'Free during early access';
     // Forgot-password is a login-only affordance.
     var fr = document.getElementById('forgotRow');
     if (fr) fr.style.display = tab === 'login' ? 'block' : 'none';
@@ -514,10 +460,10 @@
   }
 
   // ── Post-login redirect by role ──────────────────────────────────────────
-  // Calls /auth/me and navigates to /admin (owner/admin) or /dashboard (user).
+  // Calls /auth/me and navigates to /dashboard (or a validated ?return= path).
   // Returns true if it navigated away; false on any failure so the caller can
-  // fall back to the signed-in card (which still exposes the scout:// deep
-  // link, preserving the desktop-launch flow for transient /auth/me errors).
+  // fall back to the signed-in card (which offers a "Continue to dashboard"
+  // button for transient /auth/me errors).
   async function redirectByRole() {
     try {
       var s = getSession();
@@ -599,19 +545,12 @@
     }
   }
 
-  function launchApp() {
-    var s = getSession();
-    var token = s ? s.access_token : '';
-    // Deep link opens the Scout desktop app and passes the access token.
-    window.location.href = 'scout://launch?token=' + encodeURIComponent(token);
-  }
-
   function signOut() {
     clearSession();
     document.getElementById('successView').style.display = 'none';
     document.getElementById('authForm').style.display = 'block';
     document.getElementById('cardTitle').textContent = 'Welcome back';
-    document.getElementById('cardSub').textContent = 'Sign in to launch Scout';
+    document.getElementById('cardSub').textContent = 'Sign in to your Scout dashboard';
     document.getElementById('email').value = '';
     document.getElementById('password').value = '';
     switchTab('login');

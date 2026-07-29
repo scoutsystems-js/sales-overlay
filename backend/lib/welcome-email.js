@@ -42,8 +42,8 @@ function welcomeEmailContent(firstName, actionLink) {
       + 'Your Scout account is ready. Click here to set your password and\n'
       + 'get started: ' + actionLink + '\n'
       + '\n'
-      + "Once you're in, you'll connect your Fathom account so Scout can\n"
-      + 'start grading your calls.\n'
+      + "Once you're in, connect your recording source (Zoom or Fathom) so\n"
+      + 'Scout can start grading your calls.\n'
       + '\n'
       + "If anything isn't working, just reply to this email.\n"
       + '\n'
