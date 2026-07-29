@@ -126,12 +126,6 @@
       vertical-align: middle;
     }
     .users-table tr:last-child td { border-bottom: none; }
-    .users-table tr.clickable { cursor: pointer; }
-    .users-table tr.clickable:hover td { background: rgba(255,255,255,0.02); }
-    .users-table tr.active td {
-      background: rgba(34,197,94,0.06);
-      box-shadow: inset 2px 0 0 var(--green);
-    }
 
     .btn-resend { font-size: 11px; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--muted); cursor: pointer; white-space: nowrap; }
 
@@ -201,171 +195,7 @@
     }
     .role-saved.show { opacity: 1; }
 
-    /* ── SECTIONS B + C ──────────────────────────────────────────────────── */
-    .sessions-split {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      margin: 0 24px 24px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .sessions-pane {
-      width: 420px;
-      flex-shrink: 0;
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      background: var(--bg2);
-    }
-    .sessions-pane-header {
-      padding: 12px 18px;
-      border-bottom: 1px solid var(--border);
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .sessions-pane-header #sessionsScope {
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--text);
-      font-weight: 600;
-    }
-    .reset-filter {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      padding: 3px 8px;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .reset-filter:hover { color: var(--text); }
-    .reset-filter.hidden { display: none; }
-
-    .sessions-list { flex: 1; overflow-y: auto; }
-    .session-card {
-      padding: 12px 18px;
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-      border-left: 2px solid transparent;
-      transition: background 0.1s, border-color 0.1s;
-    }
-    .session-card:hover { background: rgba(255,255,255,0.02); }
-    .session-card.active { background: rgba(34,197,94,0.06); border-left-color: var(--green); }
-    .session-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    .session-card-email {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 260px;
-    }
-    .session-card-meta { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
-    .session-card-tail { font-size: 11px; color: var(--muted); }
-    .session-card-tail .err { color: #f87171; font-weight: 600; }
-    .load-more {
-      padding: 12px 18px;
-      text-align: center;
-      font-size: 13px;
-      color: var(--muted);
-      cursor: pointer;
-      border-top: 1px solid var(--border);
-      background: var(--bg2);
-    }
-    .load-more:hover { color: var(--text); }
-    .load-more.hidden { display: none; }
     .empty-msg { padding: 24px 20px; font-size: 13px; color: var(--muted); text-align: center; }
-
-    .detail-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
-    .detail-header {
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-    .detail-header-left h3 { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-    .detail-header-left .sub { font-size: 12px; color: var(--muted); }
-
-    .filter-bar {
-      padding: 10px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      background: var(--bg2);
-    }
-    .chip {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 5px 10px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.12s;
-    }
-    .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-    .chip.active { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,0.3); }
-    .filter-search {
-      flex: 1;
-      min-width: 160px;
-      max-width: 320px;
-      font-size: 12px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: var(--bg3);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      outline: none;
-    }
-    .filter-search:focus { border-color: var(--green); }
-    .count-indicator { font-size: 11px; color: var(--muted); margin-left: auto; white-space: nowrap; }
-    .count-indicator.capped { color: #fbbf24; }
-
-    .log-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px 0;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      line-height: 1.5;
-    }
-    .log-row {
-      display: grid;
-      grid-template-columns: 96px 14px 110px 1fr;
-      gap: 10px;
-      padding: 3px 20px;
-      align-items: start;
-    }
-    .log-row:hover { background: rgba(255,255,255,0.02); }
-    .log-time { color: var(--muted); }
-    .log-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-top: 6px; justify-self: center; }
-    .log-dot.warn { background: #fbbf24; }
-    .log-dot.error { background: #f87171; }
-    .log-tag { color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .log-msg { color: var(--text); white-space: pre-wrap; word-break: break-word; }
-    .log-row.error .log-msg { color: #fca5a5; }
-
-    .detail-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
 
     .spinner {
       width: 18px; height: 18px;
@@ -378,87 +208,8 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Detail header right (outcome + download) ────────────────────────── */
-    .detail-header-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-    .btn-download {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 5px 11px;
-      border-radius: 6px;
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      cursor: pointer;
-      font-family: inherit;
-      transition: color 0.12s, border-color 0.12s;
-    }
-    .btn-download:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-    /* ── View tabs (logs vs transcript) ──────────────────────────────────── */
-    .view-tabs {
-      display: flex;
-      padding: 0 20px;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg2);
-      flex-shrink: 0;
-    }
-    .view-tab {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 9px 16px;
-      background: transparent;
-      border: none;
-      border-bottom: 2px solid transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-family: inherit;
-      transition: color 0.12s, border-color 0.12s;
-    }
-    .view-tab:hover { color: var(--text); }
-    .view-tab.active { color: var(--green); border-bottom-color: var(--green); }
-
-    /* The two view containers each fill the remaining detail-pane height. */
-    #logView, #transcriptView {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    /* ── Transcript view ─────────────────────────────────────────────────── */
-    .transcript-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px 0;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      line-height: 1.55;
-    }
-    .transcript-row { padding: 8px 20px; }
-    .transcript-row.prospect { background: rgba(255,255,255,0.015); }
-    .transcript-row.closer { background: rgba(34,197,94,0.04); }
-    .transcript-row.scout {
-      background: rgba(34,197,94,0.06);
-      border-left: 2px solid var(--green);
-      padding: 8px 20px 10px 18px;
-    }
-    .t-time { color: var(--muted); margin-right: 6px; }
-    .t-speaker { color: var(--green); font-weight: 700; margin-right: 6px; }
-    .t-text { color: var(--text); white-space: pre-wrap; word-break: break-word; }
-    .scout-head { color: var(--muted); }
-    .t-scout-label { color: var(--green); font-weight: 700; }
-    .scout-body { padding-left: 13px; padding-top: 4px; }
-    .scout-headline { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
-    .scout-text { color: var(--text); white-space: pre-wrap; word-break: break-word; }
 
     @media (max-width: 900px) {
-      .sessions-split { flex-direction: column; margin: 0 16px 16px; }
-      .sessions-pane { width: 100%; max-height: 50vh; border-right: none; border-bottom: 1px solid var(--border); }
       .users-section { padding: 16px 16px 10px; }
       .users-table { white-space: nowrap; }
     }
@@ -668,18 +419,6 @@
   var currentUser = null;          // { user_id, email, role } from /auth/me
   var usersArray = [];             // Section A
   var ownerCount = 0;              // derived from usersArray
-  var allSessions = [];            // Section B
-  var oldestStartedAt = null;
-  var pageSize = 50;
-  var selectedSessionId = null;
-  var selectedUserId = null;       // Section B filter (click user row to set)
-  var currentLogs = [];            // Section C
-  var currentSession = null;       // session metadata for the open detail (used by download)
-  var currentTotal = 0;
-  var currentLimit = 10000;
-  var activeChip = 'all';
-  var searchText = '';
-  var activeView = 'logs';         // 'logs' | 'transcript' — which Section C tab is visible
 
   // ── Init ───────────────────────────────────────────────────────────────
   async function init() {
@@ -898,7 +637,6 @@
     var mgrs = managersList();
     var rows = usersArray.map(function(u) {
       var isSelf = u.user_id === currentUser.user_id;
-      var trClass = 'clickable' + (u.user_id === selectedUserId ? ' active' : '');
       var editable = isOwnerViewer && !isSelf;   // owners edit others; self + non-owner viewers are read-only
       var roleCell = editable ? roleControlHtml(u)
         : '<span class="role-badge ' + roleBadgeClass(u.role) + '">' + escapeHtml(roleLabel(u.role)) + (isSelf ? '<span class="self-tag">(you)</span>' : '') + '</span>';
@@ -907,7 +645,7 @@
       var created = u.created_at ? shortDate(u.created_at) : '—';
       var emailDisplay = u.email || (u.user_id.slice(0, 8) + '…');
       var nameDisplay = (u.first_name || u.last_name) ? ((u.first_name || '') + ' ' + (u.last_name || '')).trim() : '—';
-      return '<tr class="' + trClass + '" data-user-id="' + escapeHtml(u.user_id) + '" onclick="handleUserRowClick(event, \'' + u.user_id + '\')">'
+      return '<tr>'
         + '<td>' + escapeHtml(nameDisplay) + '</td>'
         + '<td>' + escapeHtml(emailDisplay) + '</td>'
         + '<td>' + roleCell + '</td>'
@@ -915,17 +653,16 @@
         + '<td>' + billCell + '</td>'
         + '<td style="color:var(--muted);font-size:12px;">' + escapeHtml(created) + '</td>'
         + '<td>' + (editable
-            ? '<button class="btn-resend" onclick="event.stopPropagation(); resendWelcomeEmail(this, \'' + u.user_id + '\')">Resend welcome email</button>'
+            ? '<button class="btn-resend" onclick="resendWelcomeEmail(this, \'' + u.user_id + '\')">Resend welcome email</button>'
             : '') + '</td>'
       + '</tr>';
     });
     wrap.innerHTML = '<table class="users-table"><thead>' + header + '</thead><tbody>' + rows.join('') + '</tbody></table>';
   }
 
-  // stopPropagation so control clicks don't also trigger the row's analytics-pivot.
   function fieldControl(u, field, original, opts) {
     return '<select class="role-select" data-original="' + escapeHtml(original) + '"'
-      + ' onclick="event.stopPropagation()" onchange="saveUserField(this, \'' + field + '\', \'' + u.user_id + '\')">' + opts + '</select>'
+      + ' onchange="saveUserField(this, \'' + field + '\', \'' + u.user_id + '\')">' + opts + '</select>'
       + '<span class="field-status" id="fs-' + field + '-' + escapeHtml(u.user_id) + '"></span>';
   }
   function roleControlHtml(u) {
@@ -1076,17 +813,6 @@
     if (navigator.clipboard) navigator.clipboard.writeText(t);
   }
 
-  function handleUserRowClick(event, userId) {
-    // Ignore clicks that started on interactive descendants (select, option, button).
-    var tag = (event.target.tagName || '').toLowerCase();
-    if (tag === 'select' || tag === 'option' || tag === 'button') return;
-    // Toggle: clicking the same active row clears the filter.
-    if (selectedUserId === userId) {
-      clearUserFilter();
-    } else {
-      setUserFilter(userId);
-    }
-  }
 
   function handleRoleChange(event, userId) {
     var select = event.target;
@@ -1166,289 +892,8 @@
     }
   }
 
-  // ── SECTION B: session list ────────────────────────────────────────────
-  function setUserFilter(userId) {
-    selectedUserId = userId;
-    selectedSessionId = null;
-    oldestStartedAt = null;
-
-    var user = null;
-    for (var i = 0; i < usersArray.length; i++) { if (usersArray[i].user_id === userId) { user = usersArray[i]; break; } }
-    document.getElementById('sessionsScope').textContent = user ? (user.email || user.user_id.slice(0, 8) + '…') : 'selected user';
-    document.getElementById('clearFilterBtn').classList.remove('hidden');
-
-    renderUsersTable(); // reflect active row
-    document.getElementById('detailPane').innerHTML = '<div class="detail-placeholder">Select a session on the left.</div>';
-    loadSessions(true);
-  }
-
-  function clearUserFilter() {
-    selectedUserId = null;
-    selectedSessionId = null;
-    oldestStartedAt = null;
-    document.getElementById('sessionsScope').textContent = 'all users';
-    document.getElementById('clearFilterBtn').classList.add('hidden');
-    renderUsersTable();
-    document.getElementById('detailPane').innerHTML = '<div class="detail-placeholder">Select a session on the left.</div>';
-    loadSessions(true);
-  }
-
-  async function loadSessions(initial) {
-    var url = '/admin/sessions?limit=' + pageSize;
-    if (selectedUserId) url += '&user_id=' + encodeURIComponent(selectedUserId);
-    if (!initial && oldestStartedAt) url += '&before=' + encodeURIComponent(oldestStartedAt);
-
-    if (initial) {
-      document.getElementById('sessionsList').innerHTML = '<div class="empty-msg"><span class="spinner"></span></div>';
-    }
-
-    var res;
-    try {
-      res = await fetch(url, { headers: authHeader() });
-    } catch (err) {
-      renderListError('Could not reach server.');
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (res.status === 403) {
-      console.error('[admin] /admin/sessions returned 403 despite role gate passing');
-      renderListError('Access denied loading sessions. Try signing out and back in.');
-      return;
-    }
-    if (!res.ok) {
-      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      renderListError(err.error || 'Failed to load sessions');
-      return;
-    }
-    var data = await res.json();
-    var sessions = (data && data.sessions) || [];
-    if (initial) allSessions = sessions;
-    else allSessions = allSessions.concat(sessions);
-    if (sessions.length > 0) oldestStartedAt = sessions[sessions.length - 1].started_at;
-
-    var loadMoreEl = document.getElementById('loadMore');
-    if (sessions.length < pageSize) loadMoreEl.classList.add('hidden');
-    else loadMoreEl.classList.remove('hidden');
-
-    renderSessionsList();
-  }
-
-  async function loadOlder() { await loadSessions(false); }
-
-  function renderListError(msg) {
-    document.getElementById('sessionsList').innerHTML =
-      '<div class="empty-msg" style="color:#f87171;">' + escapeHtml(msg) + '</div>';
-  }
-
-  function renderSessionsList() {
-    var list = document.getElementById('sessionsList');
-    if (allSessions.length === 0) {
-      list.innerHTML = '<div class="empty-msg">No sessions' + (selectedUserId ? ' for this user' : '') + ' yet.</div>';
-      return;
-    }
-    var html = '';
-    for (var i = 0; i < allSessions.length; i++) {
-      var s = allSessions[i];
-      var email = s.user_email || s.user_id.slice(0, 8) + '…';
-      var active = s.session_id === selectedSessionId ? ' active' : '';
-      var outcome = outcomeBadge(s.outcome, !!s.ended_at);
-      var dur = s.ended_at ? formatDuration(s.duration_seconds) : 'live';
-      var rel = relativeTime(s.started_at);
-      var errPart = s.error_count > 0
-        ? '<span class="err">' + s.error_count + ' errors</span>'
-        : '0 errors';
-      html += '<div class="session-card' + active + '" onclick="selectSession(\'' + s.session_id + '\')">'
-        + '<div class="session-card-top">'
-          + '<span class="session-card-email">' + escapeHtml(email) + '</span>'
-          + outcome
-        + '</div>'
-        + '<div class="session-card-meta">' + rel + ' · ' + dur + '</div>'
-        + '<div class="session-card-tail">' + escapeHtml(s.client_version || '—') + ' · ' + s.log_count + ' logs · ' + errPart + '</div>'
-      + '</div>';
-    }
-    list.innerHTML = html;
-  }
-
-  function outcomeBadge(outcome, ended) {
-    if (outcome === 'win') return '<span class="badge badge-win">Win</span>';
-    if (outcome === 'loss') return '<span class="badge badge-loss">Loss</span>';
-    if (outcome === 'follow_up') return '<span class="badge badge-pending">Follow-up</span>';
-    if (!ended) return '<span class="badge badge-pending">Live</span>';
-    return '<span class="badge badge-pending">—</span>';
-  }
-
-  // ── SECTION C: log detail ──────────────────────────────────────────────
-  async function selectSession(sessionId) {
-    selectedSessionId = sessionId;
-    renderSessionsList();
-    activeChip = 'all';
-    searchText = '';
-    activeView = 'logs';
-
-    var pane = document.getElementById('detailPane');
-    pane.innerHTML = '<div class="detail-placeholder"><span class="spinner"></span></div>';
-
-    var res;
-    try {
-      res = await fetch('/admin/sessions/' + encodeURIComponent(sessionId) + '/logs', { headers: authHeader() });
-    } catch (err) {
-      pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">Could not reach server.</div>';
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (res.status === 403) {
-      console.error('[admin] /admin/sessions/:id/logs returned 403 despite role gate passing');
-      pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">Access denied loading logs.</div>';
-      return;
-    }
-    if (!res.ok) {
-      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
-      pane.innerHTML = '<div class="detail-placeholder" style="color:#f87171;">' + escapeHtml(err.error || 'Failed to load logs') + '</div>';
-      return;
-    }
-    var data = await res.json();
-    currentLogs = (data && data.logs) || [];
-    currentSession = (data && data.session) || null;
-    currentTotal = (data && typeof data.total_count === 'number') ? data.total_count : currentLogs.length;
-    currentLimit = (data && data.limit) || 10000;
-
-    renderDetail(data.session);
-  }
-
-  function renderDetail(session) {
-    var pane = document.getElementById('detailPane');
-    var email = session.user_email || session.user_id;
-    var dur = session.ended_at ? formatDuration(session.duration_seconds) : 'live';
-    var outcome = outcomeBadge(session.outcome, !!session.ended_at);
-    var startedAbs = new Date(session.started_at).toLocaleString();
-
-    pane.innerHTML =
-      '<div class="detail-header">'
-        + '<div class="detail-header-left">'
-          + '<h3>' + escapeHtml(email) + '</h3>'
-          + '<div class="sub">' + escapeHtml(startedAbs) + ' · ' + dur + ' · ' + escapeHtml(session.client_version || '—') + ' · ' + escapeHtml(session.platform || '—') + '</div>'
-        + '</div>'
-        + '<div class="detail-header-right">'
-          + outcome
-          + '<button class="btn-download" onclick="downloadSessionFiles()" title="Download raw logs and transcript as .txt files">↓ Download</button>'
-        + '</div>'
-      + '</div>'
-      + '<div class="view-tabs">'
-        + '<button class="view-tab' + (activeView === 'logs' ? ' active' : '') + '" data-view="logs" onclick="switchView(\'logs\')">Raw Logs</button>'
-        + '<button class="view-tab' + (activeView === 'transcript' ? ' active' : '') + '" data-view="transcript" onclick="switchView(\'transcript\')">Transcript</button>'
-      + '</div>'
-      + '<div id="logView"' + (activeView === 'transcript' ? ' style="display:none"' : '') + '>'
-        + '<div class="filter-bar">'
-          + chipHtml('all', 'All')
-          + chipHtml('claude', '[claude]')
-          + chipHtml('memory', '[memory]')
-          + chipHtml('TIMING', '[TIMING]')
-          + chipHtml('errors', 'Errors only')
-          + '<input class="filter-search" type="text" placeholder="Search messages…" oninput="onSearch(this.value)" value="' + escapeHtml(searchText) + '"/>'
-          + '<span class="count-indicator" id="countIndicator"></span>'
-        + '</div>'
-        + '<div class="log-list" id="logList"></div>'
-      + '</div>'
-      + '<div id="transcriptView"' + (activeView === 'logs' ? ' style="display:none"' : '') + '>'
-        + '<div class="transcript-list" id="transcriptList"></div>'
-      + '</div>';
-
-    renderLogList();
-    if (activeView === 'transcript') renderTranscriptView();
-  }
-
-  function chipHtml(id, label) {
-    var active = id === activeChip ? ' active' : '';
-    return '<button class="chip' + active + '" data-chip="' + id + '" onclick="onChip(\'' + id + '\')">' + escapeHtml(label) + '</button>';
-  }
-
-  function onChip(id) {
-    activeChip = id;
-    document.querySelectorAll('.filter-bar .chip').forEach(function(c) {
-      if (c.getAttribute('data-chip') === id) c.classList.add('active');
-      else c.classList.remove('active');
-    });
-    renderLogList();
-  }
-  function onSearch(v) { searchText = v; renderLogList(); }
-
-  function renderLogList() {
-    var list = document.getElementById('logList');
-    if (!list) return;
-
-    var filtered = currentLogs.filter(function(r) {
-      if (activeChip === 'errors' && r.level !== 'error') return false;
-      if (activeChip !== 'all' && activeChip !== 'errors') {
-        var hay = ((r.tag || '') + ' ' + (r.message || '')).toLowerCase();
-        if (hay.indexOf(activeChip.toLowerCase()) === -1) return false;
-      }
-      if (searchText) {
-        var msg = (r.message || '').toLowerCase();
-        if (msg.indexOf(searchText.toLowerCase()) === -1) return false;
-      }
-      return true;
-    });
-
-    var indicator = document.getElementById('countIndicator');
-    var capped = currentTotal > currentLimit;
-    var shown = filtered.length;
-    var text;
-    if (capped) text = 'Showing ' + shown + ' of ' + currentTotal + ' (capped at ' + currentLimit + ')';
-    else if (shown !== currentLogs.length) text = 'Showing ' + shown + ' of ' + currentLogs.length;
-    else text = shown + ' log' + (shown === 1 ? '' : 's');
-    indicator.textContent = text;
-    if (capped) indicator.classList.add('capped'); else indicator.classList.remove('capped');
-
-    if (filtered.length === 0) {
-      list.innerHTML = '<div class="empty-msg">No logs match the current filter.</div>';
-      return;
-    }
-    var parts = [];
-    for (var i = 0; i < filtered.length; i++) {
-      var r = filtered[i];
-      var dotClass = r.level === 'error' ? 'error' : (r.level === 'warn' ? 'warn' : '');
-      var rowClass = r.level === 'error' ? 'log-row error' : 'log-row';
-      parts.push(
-        '<div class="' + rowClass + '">'
-          + '<span class="log-time">' + escapeHtml(formatLogTime(r.logged_at)) + '</span>'
-          + '<span class="log-dot ' + dotClass + '"></span>'
-          + '<span class="log-tag">' + escapeHtml(r.tag || '') + '</span>'
-          + '<span class="log-msg">' + escapeHtml(r.message || '') + '</span>'
-        + '</div>'
-      );
-    }
-    list.innerHTML = parts.join('');
-  }
 
   // ── Formatters ──────────────────────────────────────────────────────────
-  function formatLogTime(iso) {
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return iso || '';
-    var h = String(d.getHours()).padStart(2, '0');
-    var m = String(d.getMinutes()).padStart(2, '0');
-    var s = String(d.getSeconds()).padStart(2, '0');
-    var ms = String(d.getMilliseconds()).padStart(3, '0');
-    return h + ':' + m + ':' + s + '.' + ms;
-  }
-  function formatDuration(secs) {
-    if (secs == null) return '—';
-    if (secs < 60) return secs + 's';
-    var m = Math.floor(secs / 60);
-    var s = secs % 60;
-    if (m < 60) return m + 'm ' + s + 's';
-    var h = Math.floor(m / 60);
-    m = m % 60;
-    return h + 'h ' + m + 'm';
-  }
-  function relativeTime(iso) {
-    var t = new Date(iso).getTime();
-    if (isNaN(t)) return iso || '';
-    var diff = Math.max(0, (Date.now() - t) / 1000);
-    if (diff < 60) return Math.floor(diff) + 's ago';
-    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    return Math.floor(diff / 86400) + 'd ago';
-  }
   function escapeHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;')
@@ -1462,194 +907,7 @@
     return String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
   }
 
-  function formatHHMMSS(iso) {
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return '00:00:00';
-    var h = String(d.getHours()).padStart(2, '0');
-    var m = String(d.getMinutes()).padStart(2, '0');
-    var s = String(d.getSeconds()).padStart(2, '0');
-    return h + ':' + m + ':' + s;
-  }
 
-  // ── View tab switching ─────────────────────────────────────────────────
-  function switchView(view) {
-    if (view !== 'logs' && view !== 'transcript') return;
-    activeView = view;
-    document.querySelectorAll('.view-tab').forEach(function(t) {
-      if (t.getAttribute('data-view') === view) t.classList.add('active');
-      else t.classList.remove('active');
-    });
-    var logView = document.getElementById('logView');
-    var tView = document.getElementById('transcriptView');
-    if (!logView || !tView) return;
-    if (view === 'logs') {
-      logView.style.display = '';
-      tView.style.display = 'none';
-    } else {
-      logView.style.display = 'none';
-      tView.style.display = '';
-      renderTranscriptView();
-    }
-  }
-
-  // ── Transcript parser ──────────────────────────────────────────────────
-  // Walks session_logs in chronological order and produces a clean event list:
-  //   { type: 'transcript', time, speaker, text }
-  //   { type: 'scout', time, headline, suggestion?, question? }
-  // Skips interim transcripts, [audio], [TIMING], and [claude] internals
-  // other than Next line / Suggestion / Listening for QUESTION. Suggestion
-  // and question lines attach to the most recent open SCOUT block; a new
-  // [claude] Next line closes the previous block.
-  function buildTranscriptModel(logs) {
-    var events = [];
-    var currentScout = null;
-    function flushScout() { if (currentScout) { events.push(currentScout); currentScout = null; } }
-
-    for (var i = 0; i < logs.length; i++) {
-      var log = logs[i];
-      var msg = log.message || '';
-      var tag = log.tag || '';
-
-      if (tag === '[audio]' || tag === '[TIMING]') continue;
-      if (msg.indexOf('[deepgram] Transcript (interim)') !== -1) continue;
-
-      var t = msg.match(/^\[deepgram\] Transcript \(final\) \[(CLOSER|PROSPECT)\]: ([\s\S]*)$/);
-      if (t) {
-        flushScout();
-        events.push({ type: 'transcript', time: log.logged_at, speaker: t[1], text: t[2] });
-        continue;
-      }
-
-      var nl = msg.match(/^\[claude\] Next line: ([\s\S]*)$/);
-      if (nl) {
-        flushScout();
-        currentScout = { type: 'scout', time: log.logged_at, headline: nl[1], suggestion: null, question: null };
-        continue;
-      }
-
-      var sg = msg.match(/^\[claude\] Suggestion: ([\s\S]*)$/);
-      if (sg && currentScout) { currentScout.suggestion = sg[1]; continue; }
-
-      var q = msg.match(/^\[claude\] Listening for QUESTION: "([\s\S]*)"$/);
-      if (q && currentScout) { currentScout.question = q[1]; continue; }
-      // Everything else: skipped (other [claude], [main], [memory], etc.)
-    }
-    flushScout();
-    return events;
-  }
-
-  function renderTranscriptView() {
-    var list = document.getElementById('transcriptList');
-    if (!list) return;
-    var model = buildTranscriptModel(currentLogs);
-
-    if (model.length === 0) {
-      list.innerHTML = '<div class="empty-msg">No transcript events found in this session\'s logs.</div>';
-      return;
-    }
-
-    var parts = [];
-    for (var i = 0; i < model.length; i++) {
-      var e = model[i];
-      if (e.type === 'transcript') {
-        var rowClass = e.speaker === 'PROSPECT' ? 'transcript-row prospect' : 'transcript-row closer';
-        parts.push(
-          '<div class="' + rowClass + '">'
-            + '<span class="t-time">[' + escapeHtml(formatHHMMSS(e.time)) + ']</span>'
-            + '<span class="t-speaker">' + e.speaker + ':</span>'
-            + '<span class="t-text">' + escapeHtml(e.text) + '</span>'
-          + '</div>'
-        );
-      } else if (e.type === 'scout') {
-        var hasHeadline = !!(e.headline && e.headline.trim());
-        var hasSuggestion = !!(e.suggestion && e.suggestion.trim());
-        var hasQuestion = !!(e.question && e.question.trim());
-        // Never render an empty SCOUT block.
-        if (!hasHeadline && !hasSuggestion && !hasQuestion) continue;
-
-        var bodyHtml = '';
-        if (hasHeadline) bodyHtml += '<div class="scout-headline">Headline: ' + escapeHtml(e.headline) + '</div>';
-        if (hasSuggestion) bodyHtml += '<div class="scout-text">' + escapeHtml(e.suggestion) + '</div>';
-        else if (hasQuestion) bodyHtml += '<div class="scout-text">' + escapeHtml(e.question) + '</div>';
-
-        parts.push(
-          '<div class="transcript-row scout">'
-            + '<div class="scout-head">'
-              + '<span class="t-time">[' + escapeHtml(formatHHMMSS(e.time)) + ']</span>'
-              + '<span class="t-scout-label">── SCOUT ──────────────────</span>'
-            + '</div>'
-            + '<div class="scout-body">' + bodyHtml + '</div>'
-          + '</div>'
-        );
-      }
-    }
-    list.innerHTML = parts.join('');
-  }
-
-  // ── Download buttons ───────────────────────────────────────────────────
-  // Generates two .txt files from the currently loaded session and triggers
-  // browser downloads. Uses Blob + object URL — no backend round-trip.
-  function downloadSessionFiles() {
-    if (!currentSession || !currentSession.session_id) return;
-    var sessionId = currentSession.session_id;
-
-    // File 1: raw logs, one per line.
-    var rawLines = [];
-    for (var i = 0; i < currentLogs.length; i++) {
-      var r = currentLogs[i];
-      rawLines.push((r.logged_at || '') + ' [' + (r.level || 'info') + '] ' + (r.tag || '') + ' ' + (r.message || ''));
-    }
-    var rawText = rawLines.join('\n') + '\n';
-
-    // File 2: clean transcript with header.
-    var dur = currentSession.ended_at ? formatDuration(currentSession.duration_seconds) : 'live';
-    var startedAbs = currentSession.started_at ? new Date(currentSession.started_at).toLocaleString() : '—';
-    var lines = [
-      '=== SCOUT SYSTEMS CALL TRANSCRIPT ===',
-      'Session: ' + sessionId,
-      'Date: ' + startedAbs,
-      'Duration: ' + dur,
-      'Outcome: ' + (currentSession.outcome || '—'),
-      ''
-    ];
-    var model = buildTranscriptModel(currentLogs);
-    for (var j = 0; j < model.length; j++) {
-      var e = model[j];
-      if (e.type === 'transcript') {
-        lines.push('[' + formatHHMMSS(e.time) + '] ' + e.speaker + ': ' + e.text);
-      } else if (e.type === 'scout') {
-        var hasHeadline = !!(e.headline && e.headline.trim());
-        var hasSuggestion = !!(e.suggestion && e.suggestion.trim());
-        var hasQuestion = !!(e.question && e.question.trim());
-        if (!hasHeadline && !hasSuggestion && !hasQuestion) continue;
-        lines.push('[' + formatHHMMSS(e.time) + '] ── SCOUT ──────────────────────────────');
-        if (hasHeadline) lines.push('             Headline: ' + e.headline);
-        if (hasSuggestion) lines.push('             ' + e.suggestion);
-        else if (hasQuestion) lines.push('             ' + e.question);
-      }
-    }
-    var transcriptText = lines.join('\n') + '\n';
-
-    triggerDownload(sessionId + '_raw_logs.txt', rawText);
-    // Slight delay to avoid browsers throttling back-to-back downloads.
-    setTimeout(function() {
-      triggerDownload(sessionId + '_transcript.txt', transcriptText);
-    }, 100);
-  }
-
-  function triggerDownload(filename, text) {
-    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-  }
 
   // ── Knowledge Base ──────────────────────────────────────────────────────
   // Identical to dashboard.html. Backend scopes /kb/list by role: admins
