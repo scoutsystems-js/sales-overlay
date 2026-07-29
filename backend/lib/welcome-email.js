@@ -153,14 +153,68 @@ async function sendEmailChangeNotice(args) {
   }
 }
 
+// Self-service password reset (FD-1). Same Resend transport + 10s bound + scrub
+// discipline. Source-agnostic copy (never Fathom-only), and states plainly that
+// an unrequested email is safe to ignore — the link is single-use and expires.
+function passwordResetEmailContent(actionLink) {
+  return {
+    subject: 'Reset your Scout password',
+    text: 'Hi,\n'
+      + '\n'
+      + 'We got a request to reset the password on your Scout account. Click\n'
+      + 'here to choose a new one: ' + actionLink + '\n'
+      + '\n'
+      + "This link is single-use and expires soon. If you didn't request a\n"
+      + 'reset, you can safely ignore this email — your password stays the same.\n'
+      + '\n'
+      + '— Justin',
+  };
+}
+// Never throws. {sent:true} | {sent:false, reason}. Same hard 10s bound.
+async function sendPasswordResetEmail(args) {
+  var timer = null;
+  try {
+    if (!isConfigured()) return { sent: false, reason: 'not_configured' };
+    if (!args || !args.email || !args.actionLink) return { sent: false, reason: 'missing_args' };
+    var content = passwordResetEmailContent(args.actionLink);
+    var doFetch = _testFetch || fetch;
+    var bound = _testTimeoutMs || SEND_TIMEOUT_MS;
+    var ac = new AbortController();
+    timer = setTimeout(function () { ac.abort(); }, bound);
+    var resp = await doFetch(RESEND_URL, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: WELCOME_FROM, to: args.email, subject: content.subject, text: content.text }),
+      signal: ac.signal,
+    });
+    if (!resp.ok) {
+      var detail = '';
+      try { var b = await resp.json(); detail = (b && b.message) ? ' — ' + scrub(b.message) : ''; } catch (e) { /* optional */ }
+      var reason = 'Resend HTTP ' + resp.status + detail;
+      console.error('[password-reset-email] send failed for ' + (args && args.email) + ': ' + reason);
+      return { sent: false, reason: reason };
+    }
+    return { sent: true };
+  } catch (err) {
+    var why = (err && err.name === 'AbortError') || /abort/i.test((err && err.message) || '')
+      ? 'timed out' : scrub(err && err.message);
+    console.error('[password-reset-email] send failed: ' + why);
+    return { sent: false, reason: why };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 module.exports = {
   sendWelcomeEmail: sendWelcomeEmail,
   sendEmailChangeNotice: sendEmailChangeNotice,
+  sendPasswordResetEmail: sendPasswordResetEmail,
   isConfigured: isConfigured,
   init: init,
   _emailChangeNoticeContent: emailChangeNoticeContent,
   // test surface
   _welcomeEmailContent: welcomeEmailContent,
+  _passwordResetEmailContent: passwordResetEmailContent,
   _isConfigured: isConfigured,
   _setFetchForTest: function (f) { _testFetch = f; },
   _setTimeoutForTest: function (ms) { _testTimeoutMs = ms; },

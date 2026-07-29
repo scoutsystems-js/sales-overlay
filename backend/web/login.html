@@ -279,8 +279,27 @@
         <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
       </div>
 
+      <div id="forgotRow" style="text-align:right;margin:-6px 0 6px;">
+        <a onclick="showForgot()" style="font-size:12px;color:var(--muted);cursor:pointer;">Forgot password?</a>
+      </div>
+
       <button class="submit-btn" id="submitBtn" onclick="handleSubmit()">Log In</button>
       <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <!-- Forgot-password request (self-service reset). Enumeration-safe: the
+         confirmation is identical whether or not the address has an account. -->
+    <div class="forgot-view" id="forgotView" style="display:none">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="forgotEmail" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <button class="submit-btn" id="forgotBtn" onclick="submitForgot()">Send reset link</button>
+      <div class="error-msg" id="forgotError"></div>
+      <div id="forgotSent" style="display:none;font-size:13px;color:var(--text);margin-top:12px;line-height:1.5;"></div>
+      <div class="signout-row" style="margin-top:16px;text-align:center;">
+        <a onclick="hideForgot()" style="cursor:pointer;color:var(--muted);font-size:13px;">← Back to login</a>
+      </div>
     </div>
 
     <!-- Success / Launch view -->
@@ -427,7 +446,61 @@
     document.getElementById('submitBtn').textContent = tab === 'login' ? 'Log In' : 'Create Account';
     document.getElementById('cardTitle').textContent = tab === 'login' ? 'Welcome back' : 'Create your account';
     document.getElementById('cardSub').textContent = tab === 'login' ? 'Sign in to launch Scout' : 'Free during early access';
+    // Forgot-password is a login-only affordance.
+    var fr = document.getElementById('forgotRow');
+    if (fr) fr.style.display = tab === 'login' ? 'block' : 'none';
     hideError();
+  }
+
+  // ── Forgot password (self-service reset) ──────────────────────────────────
+  function showForgot() {
+    document.getElementById('authForm').style.display = 'none';
+    document.getElementById('forgotView').style.display = 'block';
+    document.getElementById('cardTitle').textContent = 'Reset your password';
+    document.getElementById('cardSub').textContent = "Enter your email and we'll send a reset link.";
+    var e = (document.getElementById('email').value || '').trim();
+    if (e) document.getElementById('forgotEmail').value = e;
+    document.getElementById('forgotError').style.display = 'none';
+    document.getElementById('forgotSent').style.display = 'none';
+    document.getElementById('forgotEmail').focus();
+  }
+  function hideForgot() {
+    document.getElementById('forgotView').style.display = 'none';
+    document.getElementById('authForm').style.display = 'block';
+    switchTab('login'); // restores the "Welcome back" title/subtitle
+  }
+  async function submitForgot() {
+    var email = (document.getElementById('forgotEmail').value || '').trim();
+    var err = document.getElementById('forgotError');
+    err.style.display = 'none';
+    if (!email || email.indexOf('@') === -1) { err.textContent = 'Enter a valid email address.'; err.style.display = 'block'; return; }
+    var btn = document.getElementById('forgotBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+    try {
+      var res = await fetch('/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email }),
+      });
+      var body = null; try { body = await res.json(); } catch (e) {}
+      if (res.status === 429) {
+        err.textContent = (body && body.error) || 'Too many requests. Please wait a bit and try again.';
+        err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Send reset link'; return;
+      }
+      if (res.status === 400) {
+        err.textContent = (body && body.error) || 'Enter a valid email address.';
+        err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Send reset link'; return;
+      }
+      // Success — reveal the neutral, enumeration-safe confirmation.
+      document.getElementById('forgotEmail').disabled = true;
+      btn.style.display = 'none';
+      var sent = document.getElementById('forgotSent');
+      sent.textContent = (body && body.message) || "If an account exists for that email, we've emailed a password reset link. Check your inbox (and spam).";
+      sent.style.display = 'block';
+    } catch (e2) {
+      err.textContent = 'Could not reach the server — please try again.';
+      err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Send reset link';
+    }
   }
 
   function showError(msg) {

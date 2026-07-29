@@ -2,6 +2,10 @@ const express = require('express');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
+const welcomeEmail = require('../lib/welcome-email');
+const { CANONICAL_ORIGIN } = require('../config');
+const { linkTargetsSetPassword } = require('../lib/recovery-link');
+const { createRateLimiter } = require('../lib/rate-limiter');
 
 var router = express.Router();
 
@@ -165,6 +169,89 @@ router.post('/set-password', async function(req, res) {
     res.status(500).json({ error: 'Could not set the password. Please try again.' });
   }
 });
+
+// ── POST /auth/forgot-password ───────────────────────────────────────────────
+// Unauthenticated self-service password reset (FD-1). Reuses the invite
+// machinery exactly: generateLink({type:'recovery'}) → Resend → /set-password →
+// POST /auth/set-password. Differs only by trigger (?flow=reset for copy) and by
+// the three NON-NEGOTIABLES below, all because it's unauthenticated + sends mail:
+//   1. ENUMERATION-SAFE — identical 200 body whether or not the address has an
+//      account; mint+send run AFTER responding (setImmediate) so neither body nor
+//      timing can reveal existence.
+//   2. RATE LIMITED per-IP AND per-email (built here — nothing to reuse); either
+//      bucket full → generic 429, existence-agnostic.
+//   3. LOUD-FAIL link guard — a minted link that doesn't target /set-password is
+//      a dud (GoTrue Site-URL fallback) and is never emailed (linkTargetsSetPassword).
+var _resetIpLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });   // 10 / 15 min / IP
+var _resetEmailLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 }); // 5 / hour / email
+
+// Behind Railway's proxy the real client is the first hop of X-Forwarded-For.
+function clientIp(req) {
+  var xff = req.headers['x-forwarded-for'];
+  if (xff) return String(xff).split(',')[0].trim();
+  return req.ip || (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+function looksLikeEmail(s) {
+  if (typeof s !== 'string') return false;
+  var v = s.trim();
+  return v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+// One identical success body — the enumeration-safe contract.
+var RESET_SENT_BODY = { ok: true, message: "If an account exists for that email, we've emailed a password reset link." };
+
+router.post('/forgot-password', function(req, res) {
+  var raw = req.body && req.body.email;
+  if (!looksLikeEmail(raw)) {
+    return res.status(400).json({ error: 'Enter a valid email address.' });
+  }
+  var email = String(raw).trim().toLowerCase();
+
+  // Both limiters are checked BEFORE any account lookup, so a 429 is identical
+  // for real and non-existent addresses (no enumeration via throttling).
+  var ipHit = _resetIpLimiter.hit('ip:' + clientIp(req));
+  var emailHit = _resetEmailLimiter.hit('email:' + email);
+  if (!ipHit.allowed || !emailHit.allowed) {
+    var retryMs = Math.max(ipHit.retryAfterMs || 0, emailHit.retryAfterMs || 0);
+    res.set('Retry-After', String(Math.ceil(retryMs / 1000)));
+    return res.status(429).json({ error: 'Too many requests. Please wait a bit and try again.' });
+  }
+
+  // Respond immediately + identically; do the mint+send off the response path.
+  res.status(200).json(RESET_SENT_BODY);
+  setImmediate(function () { deliverPasswordReset(email); });
+});
+
+// Fire-and-forget delivery. Never touches the (already-sent) response. Silent on
+// "no account" (the common not-found case); loud (server log only, no PII) on a
+// dud link or a send failure.
+async function deliverPasswordReset(email) {
+  try {
+    if (!welcomeEmail.isConfigured()) {
+      console.warn('[auth] forgot-password: RESEND not configured — reset request received but no email can be sent');
+      return;
+    }
+    var admin = getAdminAuth();
+    var r = await admin.auth.admin.generateLink({
+      type: 'recovery',
+      email: email,
+      options: { redirectTo: CANONICAL_ORIGIN + '/set-password?flow=reset' },
+    });
+    if (r.error || !r.data || !r.data.properties || !r.data.properties.action_link) {
+      console.log('[auth] forgot-password: no recovery link minted (likely no account for this address)');
+      return;
+    }
+    var link = r.data.properties.action_link;
+    if (!linkTargetsSetPassword(link)) {
+      console.error('[auth] forgot-password: minted link REJECTED — redirect_to was not honored. Add ' + CANONICAL_ORIGIN + '/set-password?flow=reset (or a /set-password* wildcard) to the Supabase Auth redirect allowlist. No email sent.');
+      return;
+    }
+    var sent = await welcomeEmail.sendPasswordResetEmail({ email: email, actionLink: link });
+    if (!sent.sent) console.error('[auth] forgot-password: reset email send failed: ' + sent.reason);
+    else console.log('[auth] forgot-password: reset link emailed');
+  } catch (err) {
+    console.error('[auth] forgot-password delivery error: ' + (err && err.message));
+  }
+}
 
 // ── POST /auth/change-password ───────────────────────────────────────────────
 // Logged-in password change. RULING: requires CURRENT-password verification

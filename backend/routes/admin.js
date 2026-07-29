@@ -10,6 +10,7 @@ const { fetchSellingContext } = require('../lib/selling-context');
 const welcomeEmail = require('../lib/welcome-email');
 const { canManageTarget, deleteBlockReason, deactivateBlockReason } = require('../lib/user-management');
 const { CANONICAL_ORIGIN } = require('../config');
+const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -399,7 +400,7 @@ async function mintSetPasswordLink(admin, email) {
   // that won't land on our set-password page is a broken invite — fail loudly
   // instead of reporting 'invite_sent' on a dud.
   var link = r.data.properties.action_link;
-  if (link.indexOf('/set-password') === -1) {
+  if (!linkTargetsSetPassword(link)) {
     console.error('[admin] set-password link mint REJECTED for ' + email + ': redirect_to was not honored — add ' + CANONICAL_ORIGIN + '/set-password to the Supabase Auth redirect allowlist (Dashboard → Auth → URL Configuration)');
     return null;
   }
