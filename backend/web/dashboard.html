@@ -1550,6 +1550,19 @@
     .nw-method { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
     .nw-method b { color: var(--text); } .nw-method em { color: var(--text); font-style: italic; }
     .nw-caveat { font-size: 12px; color: var(--text-muted); margin-top: 8px; opacity: 0.9; }
+    /* #5 context + #3 clickable buckets + evidence */
+    .nw-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-muted); }
+    .nw-context { font-size: 13px; color: var(--text-muted); background: var(--bg-field); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-top: 14px; }
+    .nw-context b { color: var(--text); }
+    .nw-bucket-row { cursor: pointer; }
+    .nw-bucket-row:hover { border-color: var(--accent); }
+    .evidence-list { display: flex; flex-direction: column; gap: 12px; }
+    .evidence-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: var(--bg-elevated); }
+    .evidence-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+    .evidence-title { font-weight: 600; color: var(--text); }
+    .evidence-date { font-size: 12px; color: var(--text-muted); }
+    .evidence-response { font-size: 13px; color: var(--text); margin-top: 6px; }
+    .evidence-response b { color: var(--text-muted); }
     .team-lane-row { display: flex; flex-wrap: wrap; gap: 14px; }
     .team-lane { flex: 1; min-width: 240px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px; }
     .team-lane-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 700; margin-bottom: 6px; }
@@ -1943,6 +1956,16 @@
 </div>
 
 <!-- C-1: page-summary popup (reuses the kb-modal pattern) -->
+<!-- Item #3: per-call bucket evidence popup (reuses the kb-modal pattern) -->
+<div class="kb-modal hidden" id="bucketEvidenceModal">
+  <div class="kb-modal-overlay" onclick="closeBucketEvidence()"></div>
+  <div class="kb-modal-dialog">
+    <button class="kb-modal-close" onclick="closeBucketEvidence()" aria-label="Close">✕</button>
+    <h2 id="bucketEvidenceTitle">The calls</h2>
+    <div id="bucketEvidenceBody"></div>
+  </div>
+</div>
+
 <div class="kb-modal hidden" id="summaryModal">
   <div class="kb-modal-overlay" onclick="closeSummaryModal()"></div>
   <div class="kb-modal-dialog">
@@ -3467,9 +3490,19 @@
       + '<span class="nw-chip">your baseline <b>' + (b.baseline_pct == null ? '—' : b.baseline_pct + '%') + '</b></span>'
       + (d.state === 'money' && d.extra ? '<span class="nw-chip nw-chip-cash"><b>+$' + fmtCashNum(moneyRound(d.extra.extra_cash)) + '</b> at stake</span>' : '')
       + '</div>';
-    return head + '<div class="team-recs-card" onclick="openNeedsWork()" title="See your buckets, the mapping, and your quotes">'
-      + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>' + chips
+    return head + '<div class="team-recs-card" onclick="openNeedsWork()" title="See your buckets and the calls behind them">'
+      + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>' + chips + nwContextLineHtml(d)
       + '<div class="team-recs-expand">click to expand →</div></div>';
+  }
+  // Small context line under a needs-work card (logistical + DQ, not coachable).
+  function nwContextLineHtml(d) {
+    var c = (d && d.detail && d.detail.context) || {};
+    var dq = c.disqualifications || 0, log = c.logistical || 0;
+    if (!dq && !log) return '';
+    var parts = [];
+    if (dq) parts.push(dq + ' disqualification' + (dq === 1 ? '' : 's'));
+    if (log) parts.push(log + ' payment/logistical');
+    return '<div class="nw-context" style="margin-top:10px;">Also: ' + parts.join(' · ') + ' — not counted as objections.</div>';
   }
   function openNeedsWork() { setView('needs-work'); }
   function renderNeedsWorkView() {
@@ -3913,9 +3946,9 @@
       + '<span class="nw-chip">team baseline <b>' + (b.baseline_pct == null ? '—' : b.baseline_pct + '%') + '</b></span>'
       + (d.state === 'money' && d.extra ? '<span class="nw-chip nw-chip-cash"><b>+$' + fmtCashNum(moneyRound(d.extra.extra_cash)) + '</b> at stake</span>' : '')
       + '</div>';
-    return head + '<div class="team-recs-card" onclick="openTeamNeedsWork()" title="See the per-bucket breakdown, mapping, and quotes">'
+    return head + '<div class="team-recs-card" onclick="openTeamNeedsWork()" title="See the per-bucket breakdown and the calls behind it">'
       + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>'
-      + chips
+      + chips + nwContextLineHtml(d)
       + '<div class="team-recs-expand">click to expand →</div>'
     + '</div>';
   }
@@ -3946,44 +3979,32 @@
     // headline paragraph
     var out = '<div class="nw-para">' + escapeHtml(d.card_text || '') + '</div>';
 
-    // per-bucket rate breakdown (ranked bars, focus highlighted)
+    // Per-bucket rate breakdown (TRUE objections only). Each row is CLICKABLE →
+    // the per-call evidence for that bucket (item #3). Focus highlighted.
     var buckets = (det.buckets || []).slice();
+    var subj = personal ? 'personal' : 'team';
     if (buckets.length) {
-      out += '<div class="section-subhead">Handle rate by objection type</div><div class="team-detail-list">'
+      out += '<div class="section-subhead">Handle rate by objection type <span class="nw-hint">— click a row to see the calls</span></div><div class="team-detail-list">'
         + buckets.map(function (b) {
           var pct = b.rate_pct == null ? 0 : Math.max(0, Math.min(100, b.rate_pct));
           var star = b.is_focus ? ' <span class="nw-focus-tag">focus</span>' : '';
-          return '<div class="team-detail-row" style="cursor:default;">'
+          return '<div class="team-detail-row nw-bucket-row" onclick="openBucketEvidence(\'' + subj + '\', ' + JSON.stringify(escapeHtml(b.label)).replace(/"/g, '&quot;') + ')" title="See the calls in this bucket">'
             + '<div class="team-detail-name">' + escapeHtml(b.label) + star + '</div>'
             + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;background:' + (b.is_focus ? 'var(--mid)' : 'var(--accent)') + ';"></div></div>'
-            + '<div class="team-detail-val">' + (b.rate_pct == null ? '—' : b.rate_pct + '%') + '<span class="team-detail-sub">' + b.handled + '/' + b.total + ' handled</span></div>'
+            + '<div class="team-detail-val">' + (b.rate_pct == null ? '—' : b.rate_pct + '%') + '<span class="team-detail-sub">' + b.handled + '/' + b.total + ' handled ›</span></div>'
             + '</div>';
         }).join('') + '</div>';
     }
 
-    // grounding quotes
-    var quotes = det.quotes || [];
-    if (quotes.length) {
-      out += '<div class="section-subhead">From the calls</div>';
-      out += quotes.map(function (q) {
-        var clip = q.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(q.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
-        return '<div class="team-insight ' + (q.handled ? 'working' : 'improve') + '">'
-          + '<div class="review-why-quote">“' + escapeHtml(q.text || '') + '”</div>'
-          + (q.observation ? '<div class="team-insight-data">' + escapeHtml(q.observation) + '</div>' : '')
-          + '<div class="team-insight-foot">' + (q.rep ? '<span class="team-rep-tag">' + escapeHtml(String(q.rep)) + '</span>' : '') + (q.handled ? '' : '<span class="nw-miss">not handled</span>') + clip + '</div>'
-        + '</div>';
-      }).join('');
-    }
-
-    // the surface→bucket mapping (visibility per ruling)
-    var mapping = det.mapping || [];
-    if (mapping.length) {
-      out += '<div class="section-subhead">Which phrases landed in which bucket</div><div class="nw-map">'
-        + mapping.map(function (m) {
-          return '<div class="nw-map-row"><span class="nw-map-phrase">“' + escapeHtml(m.surface) + '”</span>'
-            + '<span class="nw-map-arrow">→</span><span class="nw-map-bucket">' + escapeHtml(m.bucket) + '</span>'
-            + '<span class="nw-map-n">' + m.handled + '/' + m.n + ' handled</span></div>';
-        }).join('') + '</div>';
+    // Context block (item #5): logistical barriers + disqualifications are NOT
+    // coachable objections — shown here, excluded from the math above.
+    var ctx = det.context || {};
+    var dq = ctx.disqualifications || 0, log = ctx.logistical || 0;
+    if (dq > 0 || log > 0) {
+      var parts = [];
+      if (dq > 0) parts.push(dq + ' disqualification' + (dq === 1 ? '' : 's'));
+      if (log > 0) parts.push(log + ' payment/logistical barrier' + (log === 1 ? '' : 's'));
+      out += '<div class="nw-context">Also this period: <b>' + parts.join('</b> and <b>') + '</b> — not counted as coachable objections.</div>';
     }
 
     // honesty contract / how this is computed (subject-aware; borrow disclosed)
@@ -4267,6 +4288,45 @@
     }
   }
   function closeSummaryModal() { var m = document.getElementById('summaryModal'); if (m) m.classList.add('hidden'); }
+
+  // ── Item #3: per-call bucket evidence (click a bucket in the needs-work detail)
+  async function openBucketEvidence(subject, label) {
+    var d = subject === 'personal' ? state.needsWork : state.teamNeedsWork;
+    if (!d || !d.detail) return;
+    var surfaces = (d.detail.mapping || []).filter(function (m) { return m.bucket === label; }).map(function (m) { return m.surface; });
+    var modal = document.getElementById('bucketEvidenceModal');
+    var titleEl = document.getElementById('bucketEvidenceTitle');
+    var bodyEl = document.getElementById('bucketEvidenceBody');
+    if (!modal) return;
+    titleEl.textContent = label + ' — the calls';
+    bodyEl.innerHTML = '<div class="load-state" style="padding:16px 4px;"><div class="spinner"></div> Loading calls…</div>';
+    modal.classList.remove('hidden');
+    if (!surfaces.length) { bodyEl.innerHTML = '<div class="empty"><p>No phrases mapped to this bucket.</p></div>'; return; }
+    var url, body = { surfaces: surfaces, from: state.dateRange.from, to: state.dateRange.to };
+    if (subject === 'team') url = '/team/needs-work/bucket?' + teamQP();
+    else url = isSelf() ? '/me/needs-work/bucket' : '/admin/needs-work/' + encodeURIComponent(state.viewingUserId) + '/bucket';
+    try {
+      var res = await fetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify(body) });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) { var e = null; try { e = await res.json(); } catch (x) {} bodyEl.innerHTML = '<div class="error">Could not load: ' + escapeHtml((e && e.error) || ('HTTP ' + res.status)) + '</div>'; return; }
+      var calls = ((await res.json()) || {}).calls || [];
+      if (!calls.length) { bodyEl.innerHTML = '<div class="empty"><p>No calls found for this bucket in the selected period.</p></div>'; return; }
+      bodyEl.innerHTML = '<div class="evidence-list">' + calls.map(evidenceRowHtml).join('') + '</div>';
+    } catch (err) { bodyEl.innerHTML = '<div class="error">Could not load: ' + escapeHtml(err.message || 'unknown') + '</div>'; }
+  }
+  function evidenceRowHtml(c) {
+    var date = c.date ? formatNaturalDate(c.date) : '';
+    var clip = c.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(c.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
+    return '<div class="evidence-row">'
+      + '<div class="evidence-head"><span class="evidence-title">' + escapeHtml(c.title || 'Untitled call') + '</span>'
+        + '<span class="evidence-date">' + escapeHtml(date) + '</span>'
+        + (c.handled ? '<span class="member-badge on">handled</span>' : '<span class="nw-miss">not handled</span>') + '</div>'
+      + (c.quote ? '<div class="review-why-quote">“' + escapeHtml(c.quote) + '”</div>' : '')
+      + (c.closer_response ? '<div class="evidence-response"><b>Your response:</b> ' + escapeHtml(c.closer_response) + '</div>' : '')
+      + (clip ? '<div class="team-insight-foot">' + clip + '</div>' : '')
+    + '</div>';
+  }
+  function closeBucketEvidence() { var m = document.getElementById('bucketEvidenceModal'); if (m) m.classList.add('hidden'); }
   async function copyPageSummary() {
     var note = document.getElementById('summaryCopyNote');
     try {

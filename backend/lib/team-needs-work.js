@@ -40,6 +40,10 @@ const PERSONAL_MIN_BUCKET = 4;
 const PERSONAL_MIN_ANALYZED = 3;
 
 const BUCKET_MAX_TOKENS = 1500;
+// Bumped when the bucketing/classification logic changes — folded into the cache
+// hash so cached needs-work results regenerate on deploy (a prompt change alone
+// doesn't move the analyses/surface hash). v2 = taxonomy (true-objections-only).
+const NEEDS_WORK_LANE_VERSION = 'v2-taxonomy';
 
 var _anthropic = null;
 function getAnthropic() {
@@ -112,13 +116,34 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   var minAnalyzed = (opts.minAnalyzed != null) ? opts.minAnalyzed : MIN_ANALYZED;
   var analyzed = analyses.length;
 
-  var link = computeLinkage(objs, analyses);
-  var outcomeByCall = link.outcomeByCall;
+  // Classification (item #5): the objection MATH counts TRUE OBJECTIONS ONLY.
+  // Logistical barriers (e.g. a declined payment) and disqualifications (e.g.
+  // "can't afford") are NOT coachable objections — they're excluded from the
+  // math and surfaced separately as context. bucketClass maps a bucket label to
+  // its class; absent/unknown → 'true_objection' (backward-compatible default).
+  var bucketClass = opts.bucketClass || {};
+  function classOf(label) { return bucketClass[label] || 'true_objection'; }
+  function labelOf(o) { return mapping[normSurface(o.surface)] || 'Other'; }
 
-  // Only objections whose parent call has a known (done-analysis) outcome.
-  var scoped = objs.filter(function (o) { return Object.prototype.hasOwnProperty.call(outcomeByCall, o.call_id); });
+  var outcomeByCall = computeLinkage(objs, analyses).outcomeByCall; // over ALL objs, just to scope by parent outcome
+
+  // Only objections whose parent call has a known (done-analysis) outcome, then
+  // split TRUE objections (the math) from context (logistical + DQ).
+  var scopedAll = objs.filter(function (o) { return Object.prototype.hasOwnProperty.call(outcomeByCall, o.call_id); });
+  var scoped = [], context = { disqualifications: 0, logistical: 0 };
+  scopedAll.forEach(function (o) {
+    var cls = classOf(labelOf(o));
+    if (cls === 'disqualification') context.disqualifications++;
+    else if (cls === 'logistical_barrier') context.logistical++;
+    else scoped.push(o); // true_objection (the default) → counted in the math
+  });
   var totalObj = scoped.length;
   var totalHandled = scoped.filter(function (o) { return o.handled; }).length;
+
+  // Linkage Δ over TRUE objections only (a DQ objection in a closed call must not
+  // inflate the handled→closed marginal). Own coefficients; injected (personal
+  // borrow) coefficients are the caller's responsibility to keep true-only.
+  var link = computeLinkage(scoped, analyses);
 
   // Money coefficients: TEAM-BORROWED when injected (personal), else OWN.
   var inj = opts.injected || null;
@@ -156,6 +181,7 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
     mappingOut.sort(function (a, b) { return b.n - a.n; });
     return {
       buckets: list, mapping: mappingOut, quotes: [], subject: subject,
+      context: { disqualifications: context.disqualifications, logistical: context.logistical },
       linkage: { p_closed_handled: mPH, p_closed_nothandled: mPN, delta: mDelta, handled_n: mHN, nothandled_n: mNN, borrowed: borrowed },
       avg_cash: Math.round(mAvgCash * 100) / 100, closed_calls: mClosed, analyzed_calls: analyzed, objections: totalObj,
     };
@@ -288,7 +314,7 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
   var hash = crypto.createHash('md5').update(
     analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|')
     + '||surf:' + objs.map(function (o) { return normSurface(o.surface); }).sort().join(',')
-    + '||kb:' + selling.kbHash
+    + '||kb:' + selling.kbHash + '||lane:' + NEEDS_WORK_LANE_VERSION
   ).digest('hex');
 
   var cached = await cacheGet(admin, keyId, 'team_needs_work', from, to, hash);
@@ -308,14 +334,15 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
     return { available: false, reason: mapRes.reason };
   }
 
-  var result = computeNeedsWork(objs, analyses, mapRes.mapping);
+  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { bucketClass: mapRes.bucketClass });
   await cachePut(admin, keyId, 'team_needs_work', from, to, hash, result);
   return Object.assign({ available: true, cached: false }, result);
 }
 
-// Claude bucketing of the DISTINCT surfaces only (no numbers). Shared by the
-// team + personal lanes. Returns {ok:true, mapping} | {ok:false, empty:true}
-// (no phrases → caller treats as insufficient) | {ok:false, reason} (API fail).
+var BUCKET_CLASSES = ['true_objection', 'logistical_barrier', 'disqualification'];
+// Claude bucketing of the DISTINCT surfaces only (no numbers). It (a) groups
+// COARSELY — collapses synonyms into one bucket — and (b) CLASSIFIES each bucket.
+// Returns {ok:true, mapping, bucketClass} | {ok:false, empty:true} | {ok:false, reason}.
 async function getBucketMapping(objs) {
   var counts = {};
   objs.forEach(function (o) { var k = String(o.surface == null ? '' : o.surface).trim(); if (k) counts[k] = (counts[k] || 0) + 1; });
@@ -323,30 +350,62 @@ async function getBucketMapping(objs) {
   if (distinct.length === 0) return { ok: false, empty: true };
 
   var prompt = [
-    'You are grouping sales-objection phrases into a small set of named buckets.',
-    'Below is every DISTINCT objection phrase a salesperson heard this period (with how many times it came up). Group them into 4-8 buckets by MEANING, and give each bucket a short human label (e.g. "Think about it", "Price / too expensive", "Spouse / partner", "Timing", "Payment / financing", "Trust / proof").',
-    'Rules: assign EVERY phrase to exactly one bucket. Do NOT output counts, rates, money, or any number other than referencing the phrases. Do NOT invent phrases. Labels must be short (<= 30 chars).',
+    'You are grouping and classifying sales-objection phrases.',
+    'Below is every DISTINCT objection phrase a salesperson heard this period (with how many times it came up).',
+    '',
+    'STEP 1 — GROUP COARSELY. Collapse synonyms and near-duplicates into ONE bucket; do NOT make several buckets that mean the same thing. Aim for 4-8 buckets. Examples of coarse buckets: "Price / too expensive", "Timing", "Spouse / partner", "Trust / proof". Give each a short human label (<= 30 chars).',
+    'Keep each bucket CLASSIFICATION-COHERENT (step 2): never mix, say, a price objection with a declined payment in the same bucket — split them.',
+    '',
+    'STEP 2 — CLASSIFY each bucket as exactly one "class":',
+    '  "true_objection"     — a real, coachable objection the closer can overcome (price/too expensive, timing, needs to think, spouse approval, trust/proof, competitor).',
+    '  "logistical_barrier" — a mechanical/process problem, NOT a coachable objection. A FAILED or DECLINED PAYMENT belongs here (card declined, payment failed, plan lapsed, financing fell through).',
+    '  "disqualification"   — the prospect is not a fit / cannot buy. "No money", "can\'t afford it", "no funding" is a DISQUALIFICATION, not an objection.',
+    'Rule of thumb: a declined payment = logistical_barrier; "no money / can\'t buy" = disqualification; both are NOT coachable objections.',
+    '',
+    'Rules: assign EVERY phrase to exactly one bucket. Do NOT output counts, rates, money, or any number. Do NOT invent phrases.',
     '',
     'PHRASES (phrase — count):',
   ].concat(distinct.map(function (s) { return '  - ' + s + ' — ' + counts[s]; })).concat([
     '',
     'Respond with ONLY this JSON — no markdown:',
-    '{ "buckets": [ { "label": "Think about it", "phrases": ["needs to think", "needs a few days"] } ] }',
+    '{ "buckets": [ { "label": "Price / too expensive", "class": "true_objection", "phrases": ["too expensive", "wants lower price"] }, { "label": "Payment failure", "class": "logistical_barrier", "phrases": ["card declined"] } ] }',
   ]).join('\n');
 
-  var mapping = {};
+  var mapping = {}, bucketClass = {};
   try {
     var resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: BUCKET_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] });
     var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
     if (!parsed || !Array.isArray(parsed.buckets)) return { ok: false, reason: 'Bucketing returned unusable output — will retry on the next load.' };
     parsed.buckets.forEach(function (bk) {
       var label = str(bk && bk.label, 30); if (!label) return;
+      var cls = (bk && BUCKET_CLASSES.indexOf(bk.class) !== -1) ? bk.class : 'true_objection'; // default coachable
+      bucketClass[label] = cls;
       (Array.isArray(bk && bk.phrases) ? bk.phrases : []).forEach(function (p) { var k = normSurface(p); if (k) mapping[k] = label; });
     });
   } catch (e) {
     return { ok: false, reason: 'Anthropic API failure' + ((e && e.status) ? ' (HTTP ' + e.status + ')' : '') + ': ' + ((e && e.message) || 'unknown') };
   }
-  return { ok: true, mapping: mapping };
+  return { ok: true, mapping: mapping, bucketClass: bucketClass };
+}
+
+// Item #3: per-call evidence for one bucket — the objection moments whose
+// surface is in `surfaces`, across `userIds` in [from,to], newest-first.
+// Returns [{ call_id, date, title, quote, closer_response, clip_url }].
+async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
+  if (!userIds || !userIds.length || !surfaces || !surfaces.length) return [];
+  var want = {}; surfaces.forEach(function (s) { want[normSurface(s)] = true; });
+  var w = await loadTeamWindow(admin, userIds, from, to);
+  if (!w.callIds.length) return [];
+  var rows = await w.inChunks('call_highlights',
+    'fathom_call_id, timestamp_seconds, quote, closer_response, objection_surface, resolution, type',
+    function (q) { return q.eq('type', 'objection'); });
+  var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
+  return rows.filter(function (r) { return want[normSurface(r.objection_surface)]; }).map(function (r) {
+    var c = w.meta[r.fathom_call_id] || {};
+    return { call_id: r.fathom_call_id, date: c.call_date || null, title: c.title || null,
+      surface: r.objection_surface, handled: r.resolution === 'handled',
+      quote: str(r.quote, 400), closer_response: str(r.closer_response, 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds) };
+  }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
 }
 
 // Map raw call_highlights objection rows → the core's obj shape.
@@ -407,7 +466,7 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
     analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|')
     + '||surf:' + objs.map(function (o) { return normSurface(o.surface); }).sort().join(',')
     + '||inj:' + (injected ? (injected.delta.toFixed(4) + '/' + Math.round(injected.avgCash)) : 'none')
-    + '||kb:' + selling.kbHash
+    + '||kb:' + selling.kbHash + '||lane:' + NEEDS_WORK_LANE_VERSION
   ).digest('hex');
 
   var cached = await cacheGet(admin, userId, 'needs_work', from, to, hash);
@@ -425,7 +484,7 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
     return { available: false, reason: mapRes.reason };
   }
 
-  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, injected: injected });
+  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, injected: injected, bucketClass: mapRes.bucketClass });
   await cachePut(admin, userId, 'needs_work', from, to, hash, result);
   return Object.assign({ available: true, cached: false }, stamp(result));
 }
@@ -433,6 +492,7 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
 module.exports = {
   computeTeamNeedsWork: computeTeamNeedsWork,
   computePersonalNeedsWork: computePersonalNeedsWork,
+  loadBucketEvidence: loadBucketEvidence,
   // pure test surface (underscore = test-only)
   _computeNeedsWork: computeNeedsWork,
   _computeLinkage: computeLinkage,

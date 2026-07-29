@@ -5,7 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
-const { computePersonalNeedsWork } = require('../lib/team-needs-work');
+const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { fetchSellingContext } = require('../lib/selling-context');
 const welcomeEmail = require('../lib/welcome-email');
 const { canManageTarget, deleteBlockReason, deactivateBlockReason } = require('../lib/user-management');
@@ -819,6 +819,29 @@ router.get('/needs-work/:user_id', requireAuth, requireRole(['manager', 'owner']
     if (handleConfigError(err, res)) return;
     console.error('[admin] needs-work error:', err.message);
     res.status(500).json({ error: 'Failed to load needs-work' });
+  }
+});
+
+// ── POST /admin/needs-work/:user_id/bucket — per-call bucket evidence (pivot) ─
+router.post('/needs-work/:user_id/bucket', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  var b = req.body || {};
+  var surfaces = Array.isArray(b.surfaces) ? b.surfaces.slice(0, 200) : null;
+  if (!surfaces || !surfaces.length) return res.status(400).json({ error: 'surfaces[] required' });
+  var to = b.to || new Date().toISOString();
+  var from = b.from || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    var admin = getAdminClient();
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
+      var t = await loadTargetProfile(admin, targetUserId);
+      if (!t || t.managed_by !== req.user.id) return res.status(403).json({ error: 'Not authorized for that user' });
+    }
+    var rows = await loadBucketEvidence(admin, [targetUserId], surfaces, from, to);
+    res.json({ calls: rows });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] needs-work bucket error:', err.message);
+    res.status(500).json({ error: 'Failed to load bucket evidence' });
   }
 });
 

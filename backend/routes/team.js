@@ -12,7 +12,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
 const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/team-synthesis');
-const { computeTeamNeedsWork } = require('../lib/team-needs-work');
+const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
 
 const router = express.Router();
@@ -165,6 +165,21 @@ router.post('/summary', teamGate, async function (req, res) {
     var out = await computePageSummary(admin, req.user.id, pageLabel, data);
     res.json(out);
   } catch (err) { if (handleConfigError(err, res)) return; console.error('[team] summary:', err.message); res.status(500).json({ error: 'Failed to generate summary' }); }
+});
+
+// POST /team/needs-work/bucket — per-call evidence for one bucket across the team.
+router.post('/needs-work/bucket', teamGate, async function (req, res) {
+  var b = req.body || {};
+  var surfaces = Array.isArray(b.surfaces) ? b.surfaces.slice(0, 200) : null;
+  if (!surfaces || !surfaces.length) return res.status(400).json({ error: 'surfaces[] required' });
+  var to = b.to || new Date().toISOString();
+  var from = b.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var rows = await loadBucketEvidence(admin, team.repIds, surfaces, from, to);
+    res.json({ calls: rows });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] needs-work bucket:', err.message); res.status(500).json({ error: 'Failed to load bucket evidence' }); }
 });
 
 // "What needs work" — the objection-bucket counterfactual (B-2). On-demand,

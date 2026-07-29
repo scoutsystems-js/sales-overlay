@@ -4,7 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeAnalytics, computeCallAnalytics, computeObjectionIntel, loadSessionObjections, loadObjectionsByType } = require('../lib/session-analytics');
-const { computePersonalNeedsWork } = require('../lib/team-needs-work');
+const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome } = require('../lib/outcome-tag');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
@@ -706,6 +706,25 @@ router.patch('/calls/:call_id/outcome', requireAuth, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[me] outcome tag error:', err.message);
     res.status(500).json({ error: 'Failed to tag outcome' });
+  }
+});
+
+// ── POST /me/needs-work/bucket — per-call evidence for one bucket (item #3) ──
+// Body: { surfaces:[...], from, to }. The client sends the bucket's surfaces
+// (from the needs-work result's mapping) so we don't re-run the Claude bucketing.
+router.post('/needs-work/bucket', requireAuth, async function(req, res) {
+  var b = req.body || {};
+  var surfaces = Array.isArray(b.surfaces) ? b.surfaces.slice(0, 200) : null;
+  if (!surfaces || !surfaces.length) return res.status(400).json({ error: 'surfaces[] required' });
+  var to = b.to || new Date().toISOString();
+  var from = b.from || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  try {
+    var rows = await loadBucketEvidence(getAdminClient(), [req.user.id], surfaces, from, to);
+    res.json({ calls: rows });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] needs-work bucket error:', err.message);
+    res.status(500).json({ error: 'Failed to load bucket evidence' });
   }
 });
 
