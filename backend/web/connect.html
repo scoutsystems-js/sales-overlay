@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect Zoom — Scout Systems</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    /* Mirrors login.html's layout on top of the shared brand stylesheet. */
+    body { min-height: 100vh; display: flex; flex-direction: column; }
+    .login-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 40px; border-bottom: 1px solid var(--border);
+    }
+    .login-nav .nav-logo { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: var(--text); }
+    .login-nav .back { font-size: 13px; color: var(--muted); }
+    .login-nav .back:hover { color: var(--text); }
+    .login-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
+    .card { width: 100%; max-width: 440px; text-align: center; }
+    .connect-icon {
+      width: 52px; height: 52px; margin: 0 auto 18px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg2); border: 1px solid var(--border); font-size: 24px;
+    }
+    .card h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .card p { font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .connect-status { margin-top: 22px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--text);
+      border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .connect-manual { margin-top: 20px; font-size: 13px; }
+    .connect-manual a { color: var(--text); }
+    .login-footer { text-align: center; padding: 20px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<nav class="login-nav">
+  <a href="/" class="nav-logo">
+    <svg width="22" height="24" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+      <circle cx="10" cy="12" r="1.6" fill="#22c55e"/>
+      <circle cx="10" cy="16" r="1.2" fill="#22c55e"/>
+      <circle cx="10" cy="19.5" r="0.8" fill="#22c55e"/>
+    </svg>
+    <span>Scout</span>
+  </a>
+  <a href="/" class="back">← Back to site</a>
+</nav>
+
+<main class="login-main">
+  <div class="card">
+    <div class="connect-icon">🎥</div>
+    <h1>Connect your Zoom account to Scout</h1>
+    <p>Scout imports your Zoom cloud recordings so it can grade your calls and surface coaching. We'll take you to your connection settings, where the <strong>Connect Zoom</strong> button lives.</p>
+    <div class="connect-status" id="connectStatus">
+      <span class="spinner"></span>
+      <span id="connectStatusText">Taking you to your connection settings…</span>
+    </div>
+    <div class="connect-manual">
+      <a href="/dashboard#connect" id="connectManual">Continue to connect Zoom →</a>
+    </div>
+    <noscript>
+      <p style="margin-top:16px;">JavaScript is required to continue. Please enable it, or
+        <a href="/dashboard#connect">open your connection settings</a> directly (you'll be asked to sign in if needed).</p>
+    </noscript>
+  </div>
+</main>
+
+<footer class="login-footer">scoutsystems.io</footer>
+
+<script src="/js/scout-auth.js"></script>
+<script>
+  // GET /connect — Zoom submission "Direct Landing URL".
+  // Logged-in  → the #account Connections section (where Connect Zoom lives), no extra clicks.
+  // Logged-out → /login with a return path back to that same Connections surface.
+  (function () {
+    var CONNECT_TARGET = '/dashboard#connect'; // dashboard routes #connect → account view, scrolled to Connections
+    function go(url) { window.location.replace(url); }
+    function toLogin() { go('/login?return=' + encodeURIComponent(CONNECT_TARGET)); }
+
+    var SA = window.ScoutAuth;
+    if (!SA || typeof SA.getSession !== 'function') { toLogin(); return; } // no auth helper → sign in first
+
+    var s = SA.getSession();
+    if (SA.isSessionValid(s)) { go(CONNECT_TARGET); return; }
+
+    // Stale session but a refresh token exists — try a silent refresh before
+    // falling back to login, so a returning reviewer isn't bounced needlessly.
+    if (s && s.refresh_token && typeof SA.refreshSession === 'function') {
+      var settled = false;
+      var settle = function (fresh) { if (settled) return; settled = true; fresh ? go(CONNECT_TARGET) : toLogin(); };
+      SA.refreshSession().then(settle).catch(function () { settle(null); });
+      setTimeout(function () { settle(null); }, 6000); // network-hang guard → login-first
+      return;
+    }
+    toLogin();
+  })();
+</script>
+
+</body>
+</html>

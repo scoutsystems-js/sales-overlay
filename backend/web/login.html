@@ -322,6 +322,24 @@
   var STORAGE_KEY = 'scout_session_v1';
   var currentTab = 'login';
 
+  // ── Post-login return path (open-redirect guarded) ────────────────────────
+  // /connect sends signed-out users here as /login?return=%2Fdashboard%23connect
+  // so that AFTER login they continue to the Zoom Connections surface, not the
+  // generic dashboard. safeReturnPath is the CANONICAL copy from
+  // backend/lib/safe-return-path.js (kept in sync; static pages can't require()).
+  function safeReturnPath(raw, fallback) {
+    if (typeof raw !== 'string') return fallback;
+    if (raw.length < 2) return fallback;                  // '' or bare '/' — nothing useful to return to
+    if (raw.charAt(0) !== '/') return fallback;           // must be an absolute same-origin path
+    if (raw.charAt(1) === '/' || raw.charAt(1) === '\\') return fallback; // '//host' or '/\host' -> off-site
+    for (var i = 0; i < raw.length; i++) { if (raw.charCodeAt(i) <= 0x20) return fallback; } // control/whitespace
+    return raw;
+  }
+  var RETURN_PATH = safeReturnPath(
+    (function () { try { return new URLSearchParams(window.location.search).get('return'); } catch (e) { return null; } })(),
+    null
+  );
+
   function getSession() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
   }
@@ -446,7 +464,10 @@
       // v1.4: managers + owners WITH assigned reps land on the Team view instead.
       // Owner-without-reps and plain users keep the Coaching Dashboard landing.
       var me = null; try { me = await res.json(); } catch (e) {}
-      window.location.replace((me && me.has_reps) ? '/dashboard#team' : '/dashboard');
+      // A validated ?return= path (e.g. from /connect) wins over the role default
+      // so the user continues to where they were headed (the Zoom Connections surface).
+      var dest = RETURN_PATH || ((me && me.has_reps) ? '/dashboard#team' : '/dashboard');
+      window.location.replace(dest);
       return true;
     } catch (err) {
       console.warn('[login] /auth/me network error, falling back:', err.message);
@@ -532,6 +553,13 @@
 
   // Kick off session check on page load
   checkExistingSession();
+
+  // Reviewer/user arriving from /connect while signed out: name the next step so
+  // the login page reads as "log in first, then connect Zoom" (Zoom's requirement).
+  if (RETURN_PATH === '/dashboard#connect') {
+    var connSub = document.getElementById('cardSub');
+    if (connSub) connSub.textContent = 'Sign in to connect your Zoom account';
+  }
 </script>
 </body>
 </html>

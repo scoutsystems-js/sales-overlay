@@ -113,6 +113,15 @@ app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
 });
 
+// Zoom app-submission "Direct Landing URL" (install method = "From Your Site").
+// Zoom requires this to be a page where a LOGGED-IN user can connect Zoom and a
+// LOGGED-OUT user is sent to log in first. connect.html does the client-side
+// session gate: signed-in → /dashboard#connect (the #account Connections section
+// where Connect Zoom lives); signed-out → /login?return=... back to that surface.
+app.get('/connect', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'connect.html'));
+});
+
 // v1.1.11 coaching page — role-pivoted by client-side query param.
 // /coaching          → closer's own coaching (req.user.id)
 // /coaching?user=X   → admin/owner viewing user X (scope-checked server-side)

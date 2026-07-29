@@ -1471,6 +1471,12 @@
     .conn-state.ok { color: var(--text); }
     .conn-disconnect { color: var(--bad); border-color: var(--border-strong); }
     .conn-disconnect:hover { border-color: var(--bad); }
+    /* /connect landing: pulse the Zoom row so the Connect button is unmissable. */
+    .conn-row-focus { animation: connFocusPulse 2.4s ease-in-out; border-radius: var(--radius); }
+    @keyframes connFocusPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); background: transparent; }
+      15%, 55% { box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.55); background: rgba(74, 222, 128, 0.06); }
+    }
     .digest-focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 600; margin-bottom: 6px; }
     /* EOD Report */
     .eod-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -4262,11 +4268,16 @@
     if (replace) window.history.replaceState(null, '', url);
     else window.history.pushState(null, '', url);
   }
+  // Set when the user arrives via /connect (#connect): render the Account view
+  // AND scroll/highlight the Connections section so the Zoom Connect button is
+  // immediately visible (Zoom submission "Direct Landing URL" requirement).
+  var pendingConnectFocus = false;
   // URL hash → state.view (+ selectedCallId). No render, no history write.
   function applyHashToState() {
     var h = (window.location.hash || '').replace(/^#/, '');
     if (h === 'calls') { state.view = 'call-library'; }
     else if (h === 'eod') { state.view = 'eod'; }
+    else if (h === 'connect') { state.view = 'account'; state.account = null; pendingConnectFocus = true; }
     else if (h === 'account') { state.view = 'account'; state.account = null; /* fresh on hash entry too */ }
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'needs-work') { state.view = 'needs-work'; }
@@ -4396,7 +4407,8 @@
         + '<button class="btn-fathom-secondary" type="button" onclick="' + connectFn + '">Reconnect</button>'
         + '<button class="btn-fathom-secondary conn-disconnect" type="button" onclick="disconnectProvider(\'' + provider + '\')">Disconnect</button>';
     }
-    return '<div class="eod-row conn-row"><div class="eod-label">' + label + '</div>'
+    var rowId = isZoom ? ' id="connRowZoom"' : '';
+    return '<div class="eod-row conn-row"' + rowId + '><div class="eod-label">' + label + '</div>'
       + '<div class="conn-right">' + right + '</div></div>';
   }
   function renderConnectionsSectionHtml() {
@@ -4467,10 +4479,35 @@
 
     content.innerHTML =
         '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Connections</h2><div class="meta">your call recording sources</div></div>' + renderConnectionsSectionHtml() + '</div>'
+      + '<div class="section fade-in" id="connectionsSection"><div class="section-header"><h2>Connections</h2><div class="meta">your call recording sources</div></div>' + renderConnectionsSectionHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>';
+
+    // Arrived via /connect → bring the Connections section (Zoom Connect button)
+    // into view and briefly highlight the Zoom row. Runs once, on the first
+    // full-content render (skeleton branch returns above before reaching here).
+    if (pendingConnectFocus) { pendingConnectFocus = false; focusConnections(); }
+  }
+
+  // Scroll the #account Connections section into view and pulse the Zoom row, so
+  // a reviewer landing from /connect immediately sees the Zoom Connect action.
+  function focusConnections() {
+    requestAnimationFrame(function() {
+      var sec = document.getElementById('connectionsSection');
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var row = document.getElementById('connRowZoom');
+      if (row) {
+        row.classList.add('conn-row-focus');
+        setTimeout(function() { row.classList.remove('conn-row-focus'); }, 2600);
+      }
+      // Normalize #connect → #account so a refresh/bookmark lands cleanly (no re-pulse).
+      try {
+        if ((window.location.hash || '') === '#connect') {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search + '#account');
+        }
+      } catch (e) { /* history API unavailable — harmless */ }
+    });
   }
 
   // ═══ EOD Report view ═══════════════════════════════════════════════════
