@@ -44,37 +44,18 @@ function handleConfigError(err, res) {
   return null;
 }
 
-// Sign up with email + password
-router.post('/signup', async function(req, res) {
-  var { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password required' });
-  }
-
-  try {
-    var supabase = getSupabase();
-    var { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return res.status(400).json({ error: error.message });
-    // If session is null, Supabase requires email confirmation
-    if (!data.session) {
-      return res.status(400).json({ error: 'Please check your email to confirm your account before logging in.' });
-    }
-    // Return full session — includes refresh token and expires_at so the
-    // frontend can persist login across browser restarts and auto-refresh.
-    // `token` kept for backwards compat with existing Electron app code.
-    res.json({
-      token: data.session.access_token,
-      access_token: data.session.access_token,
-      refresh_token: data.session.refresh_token,
-      expires_at: data.session.expires_at,
-      user: data.user,
-    });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[auth] Signup error:', err.message);
-    res.status(500).json({ error: 'Signup failed' });
-  }
-});
+// Sign up — DISABLED (2026-07-31). Scout is invite-only. FD-2 hid the Sign Up tab,
+// but this endpoint kept provisioning accounts via supabase.auth.signUp — which
+// contradicts invite-only and was a source of orphan auth rows (auth user, no
+// user_profiles). Accounts are created ONLY through the admin flow
+// (POST /admin/users → provisionUser). This handler now rejects WITHOUT ever
+// touching Supabase, so it can never provision. The only prior callers were the
+// dead desktop app and the hidden web tab — no live legitimate caller.
+function signupDisabled(req, res) {
+  return res.status(403).json({ error: 'Scout is invite-only — ask your admin for an invite. Public sign-up is disabled.' });
+}
+router.post('/signup', signupDisabled);
+router._signupDisabled = signupDisabled;
 
 // Log in with email + password
 router.post('/login', async function(req, res) {
