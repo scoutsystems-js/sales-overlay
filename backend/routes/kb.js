@@ -3,6 +3,7 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
+const { kbReadRowVisible } = require('../lib/kb-visibility');
 
 var router = express.Router();
 
@@ -576,20 +577,38 @@ router.post('/store-patterns', protect, async function(req, res) {
 // Lists uploads visible to the caller, grouped by source_label. Users see
 // their own. Admins see their own + their managed users'. Owners see every
 // uploaded entry (all rows where uploaded_by is not null).
-router.get('/list', manage, async function(req, res) {
+// FD-4: read routes use `protect` (not `manage`) so MANAGED reps are admitted
+// read-only. Writers (manager/owner/unmanaged-user) keep their existing
+// uploader-id-set visibility unchanged; a managed rep instead gets a team-scoped
+// READ view via kbReadRowVisible (global + own-team + own-personal). Writes
+// (/upload, /delete) stay on `manage` and still 403 managed reps.
+router.get('/list', protect, async function(req, res) {
   try {
     var admin = getAdminClient();
     var scope = await resolveUserScope(admin, req.user.id);
-    var visibleIds = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+    var managedReader = scope.role === 'user' && !!scope.managed_by;
 
-    var query = admin
-      .from('knowledge_base')
-      .select('source_label, scope, metadata, created_at, uploaded_by')
-      .not('uploaded_by', 'is', null)
-      .order('created_at', { ascending: false });
-    if (visibleIds !== null) query = query.in('uploaded_by', visibleIds);
-
-    var result = await query;
+    var result;
+    if (managedReader) {
+      // Fetch only team-relevant candidates (global scope, or uploaded by the
+      // manager/self), then apply the visibility predicate for exactness.
+      result = await admin
+        .from('knowledge_base')
+        .select('source_label, scope, metadata, created_at, uploaded_by')
+        .not('uploaded_by', 'is', null)
+        .or('scope.eq.global,uploaded_by.eq.' + scope.p_admin_id + ',uploaded_by.eq.' + scope.p_user_id)
+        .order('created_at', { ascending: false });
+      if (!result.error) result.data = (result.data || []).filter(function (row) { return kbReadRowVisible(row, scope); });
+    } else {
+      var visibleIds = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+      var query = admin
+        .from('knowledge_base')
+        .select('source_label, scope, metadata, created_at, uploaded_by')
+        .not('uploaded_by', 'is', null)
+        .order('created_at', { ascending: false });
+      if (visibleIds !== null) query = query.in('uploaded_by', visibleIds);
+      result = await query;
+    }
     if (result.error) {
       console.error('[kb] list query failed:', result.error.message);
       return res.status(500).json({ error: 'Could not list uploads' });
@@ -638,29 +657,36 @@ router.get('/list', manage, async function(req, res) {
 // owners see all uploaded entries (uploaded_by IS NOT NULL only — never
 // seeded framework rows). Empty result returns 200 with entries:[] rather
 // than 404 so the frontend can show a clean "no patterns" state.
-router.get('/entries/:source_label', manage, async function(req, res) {
+router.get('/entries/:source_label', protect, async function(req, res) {
   var sourceLabel = decodeURIComponent(req.params.source_label || '');
   if (!sourceLabel) return res.status(400).json({ error: 'source_label required' });
 
   try {
     var admin = getAdminClient();
     var scope = await resolveUserScope(admin, req.user.id);
-    var visibleIds = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+    var managedReader = scope.role === 'user' && !!scope.managed_by;
 
     var query = admin
       .from('knowledge_base')
-      .select('id, content, metadata, category, created_at, scope')
+      .select('id, content, metadata, category, created_at, scope, uploaded_by')
       .eq('source_label', sourceLabel)
       .not('uploaded_by', 'is', null)
       .order('created_at', { ascending: true });
-    if (visibleIds !== null) query = query.in('uploaded_by', visibleIds);
+    if (!managedReader) {
+      var visibleIds = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+      if (visibleIds !== null) query = query.in('uploaded_by', visibleIds);
+    }
 
     var result = await query;
     if (result.error) {
       console.error('[kb] entries query failed:', result.error.message);
       return res.status(500).json({ error: 'Could not load entries' });
     }
-    return res.json({ entries: result.data || [] });
+    // A managed rep only sees rows their team scope permits (never another team's).
+    var entries = managedReader
+      ? (result.data || []).filter(function (row) { return kbReadRowVisible(row, scope); })
+      : (result.data || []);
+    return res.json({ entries: entries });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[kb] entries error:', err.message);
