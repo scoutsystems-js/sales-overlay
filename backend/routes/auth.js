@@ -474,7 +474,7 @@ router.get('/fathom/callback', async function(req, res) {
   // no code to exchange in this case.
   if (req.query.error) {
     console.warn('[auth] Fathom callback returned error: ' + String(req.query.error).slice(0, 200));
-    return res.redirect('/dashboard?fathom=denied');
+    return res.redirect('/connected?provider=fathom&status=denied');
   }
 
   var code = req.query.code;
@@ -510,7 +510,7 @@ router.get('/fathom/callback', async function(req, res) {
     if (!tokenResp.ok) {
       var errText = await tokenResp.text();
       console.error('[auth] Fathom token exchange HTTP ' + tokenResp.status + ' for user ' + userId + ': ' + errText.slice(0, 200));
-      return res.redirect('/dashboard?fathom=error');
+      return res.redirect('/connected?provider=fathom&status=error');
     }
 
     var data = await tokenResp.json();
@@ -520,7 +520,7 @@ router.get('/fathom/callback', async function(req, res) {
               || typeof data.refresh_token !== 'string'
               || typeof data.expires_in !== 'number') {
       console.error('[auth] Fathom token response missing required fields for user ' + userId);
-      return res.redirect('/dashboard?fathom=error');
+      return res.redirect('/connected?provider=fathom&status=error');
     }
 
     var nowSec = Math.floor(Date.now() / 1000);
@@ -544,14 +544,14 @@ router.get('/fathom/callback', async function(req, res) {
 
     if (upsert.error) {
       console.error('[auth] Fathom connection upsert failed for user ' + userId + ': ' + upsert.error.message);
-      return res.redirect('/dashboard?fathom=error');
+      return res.redirect('/connected?provider=fathom&status=error');
     }
 
     console.log('[auth] Fathom connection stored for user ' + userId + ' (expires_in=' + data.expires_in + 's)');
-    return res.redirect('/dashboard?fathom=connected');
+    return res.redirect('/connected?provider=fathom&status=connected');
   } catch (err) {
     console.error('[auth] Fathom callback fatal for user ' + (userId || 'unknown') + ':', err.message);
-    return res.redirect('/dashboard?fathom=error');
+    return res.redirect('/connected?provider=fathom&status=error');
   }
 });
 
@@ -609,7 +609,7 @@ router.get('/zoom/connect', requireAuth, function(req, res) {
 router.get('/zoom/callback', async function(req, res) {
   if (req.query.error) {
     console.warn('[auth] Zoom callback returned error: ' + String(req.query.error).slice(0, 200));
-    return res.redirect('/dashboard?zoom=denied');
+    return res.redirect('/connected?provider=zoom&status=denied');
   }
   var code = req.query.code;
   var state = req.query.state;
@@ -627,7 +627,7 @@ router.get('/zoom/callback', async function(req, res) {
       data = await zoomClient.exchangeCode(code, process.env.ZOOM_REDIRECT_URI);
     } catch (exErr) {
       console.error('[auth] Zoom token exchange failed for user ' + userId + ': ' + exErr.message);
-      return res.redirect('/dashboard?zoom=error');
+      return res.redirect('/connected?provider=zoom&status=error');
     }
 
     var nowSec = Math.floor(Date.now() / 1000);
@@ -647,7 +647,7 @@ router.get('/zoom/callback', async function(req, res) {
         .select('user_id').eq('provider', 'zoom').eq('external_account_email', email).maybeSingle();
       if (!existing.error && existing.data && existing.data.user_id !== userId) {
         console.warn('[auth] Zoom account ' + email + ' already linked to another Scout user — rejecting connect for ' + userId);
-        return res.redirect('/dashboard?zoom=already_linked');
+        return res.redirect('/connected?provider=zoom&status=already_linked');
       }
     }
 
@@ -667,14 +667,14 @@ router.get('/zoom/callback', async function(req, res) {
       });
     } catch (upErr) {
       console.error('[auth] Zoom connection upsert failed for user ' + userId + ': ' + upErr.message);
-      return res.redirect('/dashboard?zoom=error');
+      return res.redirect('/connected?provider=zoom&status=error');
     }
 
     console.log('[auth] Zoom connection stored for user ' + userId + ' (expires_in=' + data.expires_in + 's, email=' + (email ? 'set' : 'null') + ')');
-    return res.redirect('/dashboard?zoom=connected');
+    return res.redirect('/connected?provider=zoom&status=connected');
   } catch (err) {
     console.error('[auth] Zoom callback fatal for user ' + (userId || 'unknown') + ':', err.message);
-    return res.redirect('/dashboard?zoom=error');
+    return res.redirect('/connected?provider=zoom&status=error');
   }
 });
 

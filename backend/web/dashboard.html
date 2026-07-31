@@ -2213,6 +2213,27 @@
       if (e.data.type === 'scout-zoom-done') return handleZoomDoneSignal(e.data.kind);
     });
 
+    // ─── Opener-FREE connect signals (the reliable path). Cross-origin OAuth
+    // (Zoom) severs the popup's window.opener, so the postMessage handoff above
+    // can be dead on arrival. The /connected popup page also signals us via
+    // BroadcastChannel + a localStorage write — both same-origin, no opener needed.
+    // (A status poll started in connectZoom/connectFathom is the final fallback.)
+    try {
+      var _oauthBC = new BroadcastChannel('scout-oauth');
+      _oauthBC.onmessage = function (e) { if (e.data && e.data.provider) routeConnectSignal(e.data.provider, e.data.status); };
+    } catch (e) { /* BroadcastChannel unsupported — storage + poll still cover it */ }
+    window.addEventListener('storage', function (e) {
+      if (e.key !== OAUTH_SIGNAL_KEY || !e.newValue) return; // removeItem fires with newValue=null → skip
+      consumeStoredOauthSignal(e.newValue);
+    });
+    // Boot read-on-load: catch a connect signal the live event missed (this window
+    // was reloading when /connected wrote it). consumeStoredOauthSignal clears it and
+    // rejects any stale value, so this can never fire a spurious notice.
+    try {
+      var _bootSignal = localStorage.getItem(OAUTH_SIGNAL_KEY);
+      if (_bootSignal) consumeStoredOauthSignal(_bootSignal);
+    } catch (e) {}
+
     pdiag('page-init-start', { snapshot: (window.ScoutAuth && ScoutAuth.diag) ? ScoutAuth.diag.snapshot() : null });
     var s = getSession();
     if (!isSessionValid(s)) {
@@ -2315,6 +2336,44 @@
     refreshZoomStatusInBackground();
   }
 
+  // Route an opener-free connect signal (BroadcastChannel / storage / poll) to the
+  // right provider handler — same destinations as the legacy postMessage path.
+  function routeConnectSignal(provider, status) {
+    if (provider === 'zoom') return handleZoomDoneSignal(status);
+    if (provider === 'fathom') return handleFathomDoneSignal(status);
+  }
+  // The localStorage connect signal is NON-PERSISTENT: consume it (clear the key)
+  // the instant it's read, and reject anything older than the freshness window, so
+  // a signal left behind by a previous session can never fire a spurious
+  // "connected" notice on a later page load. Used by BOTH the live storage event
+  // (fires while both windows are open) and the boot read-on-load below (catches a
+  // signal the live event missed because this window was reloading).
+  var OAUTH_SIGNAL_KEY = 'scout_oauth_signal';
+  var OAUTH_SIGNAL_FRESH_MS = 5 * 60 * 1000; // 5 min — a real connect signals within seconds
+  function consumeStoredOauthSignal(rawValue) {
+    try { localStorage.removeItem(OAUTH_SIGNAL_KEY); } catch (e) {} // clear on read, always
+    var d = null;
+    try { d = JSON.parse(rawValue); } catch (e) { return; }
+    if (!d || !d.provider) return;
+    if (typeof d.ts !== 'number' || (Date.now() - d.ts) > OAUTH_SIGNAL_FRESH_MS) return; // stale — ignore
+    routeConnectSignal(d.provider, d.status);
+  }
+  // Final fallback: after opening a connect popup, poll the provider's status for a
+  // bounded window so the card updates itself even if every cross-window signal
+  // fails (opener severed AND BroadcastChannel/storage blocked).
+  var _connectPoll = null;
+  function startConnectPoll(provider) {
+    if (_connectPoll) clearInterval(_connectPoll);
+    var deadline = Date.now() + 120000; // up to 2 minutes
+    _connectPoll = setInterval(async function () {
+      if (Date.now() > deadline) { clearInterval(_connectPoll); _connectPoll = null; return; }
+      try {
+        var st = provider === 'zoom' ? await fetchZoomStatus() : await fetchFathomStatus();
+        if (st && st.connected) { clearInterval(_connectPoll); _connectPoll = null; routeConnectSignal(provider, 'connected'); }
+      } catch (e) { /* transient — keep polling until the deadline */ }
+    }, 2500);
+  }
+
   async function fetchZoomStatus() {
     var res = await fetch('/zoom/status', { headers: authHeader() });
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
@@ -2341,6 +2400,7 @@
       var top  = Math.max(0, Math.floor((window.screen.height - h) / 2));
       var popup = window.open(data.url, 'zoom_oauth', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
       if (!popup) { state.zoomNotice = { kind: 'error', text: 'Popup blocked. Please allow popups for this site and try again.' }; if (state.view === 'overview') renderOverview(false); }
+      else startConnectPoll('zoom'); // fallback: card updates even if the popup can't signal back
     } catch (err) {
       state.zoomNotice = { kind: 'error', text: 'Could not start Zoom connection.' };
       if (state.view === 'overview') renderOverview(false);
@@ -2467,9 +2527,11 @@
       if (!popup) {
         state.fathomNotice = { kind: 'error', text: 'Popup blocked. Please allow popups for this site and try again.' };
         if (state.view === 'overview') renderOverview(false);
+      } else {
+        startConnectPoll('fathom'); // fallback: card updates even if the popup can't signal back
       }
-      // Otherwise: popup is open, no further work here. handleFathomDoneSignal
-      // takes over once the user authorizes (or denies).
+      // Otherwise: popup is open. handleFathomDoneSignal (postMessage), the
+      // BroadcastChannel/storage signal from /connected, or the poll takes over.
     } catch (err) {
       state.fathomNotice = { kind: 'error', text: 'Could not start Fathom connection: ' + (err && err.message || 'unknown') };
       if (state.view === 'overview') renderOverview(false);

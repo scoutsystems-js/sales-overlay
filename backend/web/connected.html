@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connected — Scout</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px 20px; text-align: center; }
+    .cx { max-width: 420px; }
+    .cx-icon { width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; background: var(--bg2, #131313); border: 1px solid var(--border, #2a2a2a); }
+    .cx h1 { font-size: 20px; font-weight: 600; color: var(--text, #ededed); margin-bottom: 8px; }
+    .cx p { font-size: 14px; color: var(--muted, #9a9a9a); line-height: 1.5; }
+    .cx a { display: inline-block; margin-top: 18px; font-size: 14px; color: var(--text, #ededed); }
+  </style>
+</head>
+<body>
+  <div class="cx">
+    <div class="cx-icon" id="cxIcon">✓</div>
+    <h1 id="cxTitle">You're connected</h1>
+    <p id="cxMsg">You can close this window and head back to Scout.</p>
+    <a href="/dashboard" id="cxBack">← Back to Scout</a>
+  </div>
+
+<script>
+  // Popup landing page for OAuth connect. It must signal the main window WITHOUT
+  // relying on window.opener — cross-origin OAuth (Zoom) severs the opener, so the
+  // opener/postMessage handoff can be null on return. Same-origin BroadcastChannel
+  // + a localStorage write (storage event) reach the main window regardless. The
+  // main window ALSO polls status as a final fallback, so it updates even if every
+  // signal here fails. This page is deliberately tiny — never the full dashboard —
+  // so a non-technical user is never left staring at a second copy of the app.
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var provider = (params.get('provider') === 'fathom') ? 'fathom' : 'zoom';
+    var status = params.get('status') || 'connected';
+    var providerLabel = provider === 'fathom' ? 'Fathom' : 'Zoom';
+
+    // Copy per outcome.
+    var copy = {
+      connected:      { icon: '✓',  title: providerLabel + ' connected', msg: 'You can close this window — Scout is picking it up now.' },
+      denied:         { icon: '↩',  title: 'Connection cancelled',       msg: 'No problem. Close this window and try again whenever you like.' },
+      already_linked: { icon: '⚠',  title: 'Already connected elsewhere', msg: 'That ' + providerLabel + ' account is connected to another Scout user. Close this window and try a different account.' },
+      error:          { icon: '⚠',  title: 'Something went wrong',        msg: 'We couldn’t finish connecting ' + providerLabel + '. Close this window and try again.' },
+    };
+    var c = copy[status] || copy.error;
+    document.getElementById('cxIcon').textContent = c.icon;
+    document.getElementById('cxTitle').textContent = c.title;
+    document.getElementById('cxMsg').textContent = c.msg;
+
+    // Opener-free signals to the main window (both same-origin). `ts` lets the
+    // reader reject a stale signal; `nonce` guarantees the stored value changes so
+    // the storage event always fires even for a repeat status.
+    var payload = { provider: provider, status: status, ts: Date.now(), nonce: Math.random() };
+    try { var bc = new BroadcastChannel('scout-oauth'); bc.postMessage(payload); bc.close(); } catch (e) {}
+    try { localStorage.setItem('scout_oauth_signal', JSON.stringify(payload)); } catch (e) {}
+    // Legacy opener path too — harmless when opener is null, works when it survived.
+    try { if (window.opener && window.opener !== window) window.opener.postMessage({ type: 'scout-' + provider + '-done', kind: status }, window.location.origin); } catch (e) {}
+
+    // Best-effort self-close. If the browser blocks it (common once the opener was
+    // severed), the message above stays visible — a tiny "you can close this" page,
+    // NOT the whole product. The main window has already been signalled/polled.
+    setTimeout(function () { try { window.close(); } catch (e) {} }, 250);
+  })();
+</script>
+</body>
+</html>
