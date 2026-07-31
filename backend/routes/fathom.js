@@ -388,7 +388,7 @@ async function syncUserCalls(admin, userId, conn) {
     insertResult = await admin
       .from('fathom_calls')
       .upsert(allRows, { onConflict: 'user_id,fathom_call_id', ignoreDuplicates: true })
-      .select('id');
+      .select('id, call_date');
     if (insertResult.error) {
       var insReason = 'sync_failed: DB insert — ' + insertResult.error.message;
       await markConnectionError(admin, userId, insReason);
@@ -414,7 +414,14 @@ async function syncUserCalls(admin, userId, conn) {
   // limits + predictable ordering), lazy-required to dodge the fathom↔worker
   // circular dependency, per-call errors caught. Detached — not durable across a
   // Railway restart (bounded batches keep the blast radius small).
-  var newCallIds = (insertResult && insertResult.data || []).map(function(r) { return r.id; });
+  // FD-4 cap: auto-analyze only the newest FIRST_SYNC_ANALYZE_CAP newly-synced
+  // calls. The rest were still inserted (sync_status='pending') and are reachable
+  // via Update-analyses backfill — they just don't fire a Claude call on connect.
+  var newRows = (insertResult && insertResult.data) || [];
+  var newCallIds = pickNewestForAnalysis(newRows, FIRST_SYNC_ANALYZE_CAP);
+  if (newRows.length > newCallIds.length) {
+    console.log('[fathom] sync: capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
+  }
   if (newCallIds.length > 0) {
     (async function() {
       try {
@@ -643,11 +650,11 @@ router.post('/reanalyze', requireAuth, async function(req, res) {
 // ── POST /fathom/update-analyses ──────────────────────────────────────────────
 // Re-analyze calls that were graded under an OLDER prompt version so they pick up
 // the current grader (e.g. Josh's v3 calls → v4 "why this call closed" fields).
-// Batch ordering (scope ruling 2026-07-22: batches = the 20 most-recent calls,
-// not full sweeps — older calls stay on their old prompt versions on purpose).
-// Pending block first (explicitly queued work outranks staleness), then
-// outdated; BOTH newest-first by fathom_calls.call_date. Missing dates sort
-// last within their block. Pure — exported for tests.
+// Batch ORDERING only (not sizing): pending block first (explicitly queued work
+// outranks staleness), then outdated; BOTH newest-first by fathom_calls.call_date,
+// missing dates last within their block. Batch SIZE is set by the caller — the
+// first-sync cap (FIRST_SYNC_ANALYZE_CAP) or the re-grade `limit` (default 10) —
+// never a fixed 20. Pure — exported for tests.
 function orderBatchIds(pendingIds, outdatedIds, dateById) {
   function newestFirst(ids) {
     return ids.slice().sort(function (a, b) {
@@ -659,6 +666,25 @@ function orderBatchIds(pendingIds, outdatedIds, dateById) {
   return newestFirst(pendingIds).concat(newestFirst(outdatedIds)).filter(function (id) {
     if (seen[id]) return false; seen[id] = true; return true;
   });
+}
+
+// First-sync analysis cap (ruling 2026-07-31, Option B). On a sync, only the
+// newest FIRST_SYNC_ANALYZE_CAP newly-synced calls are auto-analyzed; the rest
+// sync (sync_status='pending') and stay unanalyzed until the user backfills via
+// Update-analyses (7d/30d/all, dry-run + confirm). Rationale: "analyze everything
+// on connect" is unbounded — a customer with years of history would auto-fire
+// hundreds of Claude analyses, slow + costly, never chosen. Capping gives fast
+// time-to-value and loses nothing (the dropdown is the deliberate backfill path).
+// MIRROR this cap for Zoom sync when that lands (sub-stage 2).
+var FIRST_SYNC_ANALYZE_CAP = 20;
+
+// Pure: given newly-inserted rows [{id, call_date}], return the ids of the newest
+// `cap` by call_date (descending; missing/null dates sort last). Exported for tests.
+function pickNewestForAnalysis(rows, cap) {
+  return (rows || []).slice().sort(function (a, b) {
+    var da = (a && a.call_date) || '', db = (b && b.call_date) || '';
+    return da < db ? 1 : (da > db ? -1 : 0); // newest first; '' (missing date) sorts last
+  }).slice(0, cap).map(function (r) { return r.id; });
 }
 
 // Same shape as /reanalyze, with an explicit reset step: it selects outdated
@@ -1229,3 +1255,5 @@ router.delete('/disconnect', requireAuth, async function(req, res) {
 module.exports = router;
 // pure helper exported for tests (log.js:_validateLogBatch pattern)
 module.exports._orderBatchIds = orderBatchIds;
+module.exports._pickNewestForAnalysis = pickNewestForAnalysis;
+module.exports._FIRST_SYNC_ANALYZE_CAP = FIRST_SYNC_ANALYZE_CAP;
