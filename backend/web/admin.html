@@ -894,9 +894,8 @@
     if (r.ok) loadUsers();
   }
   async function adminDelete(uid, email) {
-    var typed = window.prompt('DELETE permanently removes this account. Allowed only for users with NO call history (otherwise deactivate). Type the email to confirm:\n' + email);
-    if (typed == null) return;
-    var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: JSON.stringify({ confirm_email: typed.trim() }) });
+    if (!confirm('Permanently delete ' + (email || 'this user') + '?\n\nThis removes their account and all their data, and can’t be undone.\n\n(Only allowed if they have no call history — otherwise deactivate instead.)')) return;
+    var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: '{}' });
     if (r.ok) { alert('User deleted.'); loadUsers(); }
   }
 

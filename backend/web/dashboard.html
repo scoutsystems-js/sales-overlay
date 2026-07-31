@@ -3227,12 +3227,36 @@
         + (action || '') + '</div></div>';
     }
 
-    var s1 = stepHtml(connected, 'Connect Fathom or Zoom',
-      'Scout grades the calls it syncs from your recording source.',
-      connected ? '' : '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="goConnectSource()">Connect a recording source →</button>');
+    var fathomConnected = !!(state.fathomStatus && state.fathomStatus.connected);
+    var zoomConnected = !!(state.zoomStatus && state.zoomStatus.connected);
 
-    var s2 = stepHtml(analyzed, 'Run your first analysis',
-      'Once a source is connected, Scout automatically grades your most recent calls. To grade further back, use <b>Update analyses</b> on the Calls page any time.', '');
+    // Step 1 — connect. Direct buttons (they open the OAuth popup and keep you on
+    // this page). After you finish, this step checks itself with no reload.
+    var s1;
+    if (connected) {
+      var sources = [fathomConnected ? 'Fathom' : null, zoomConnected ? 'Zoom' : null].filter(Boolean).join(' + ');
+      s1 = stepHtml(true, 'Connect Zoom or Fathom', 'Connected: ' + sources + '. Scout grades the calls it syncs.', '');
+    } else {
+      s1 = stepHtml(false, 'Connect Zoom or Fathom', 'Scout grades the calls it records for you — pick where your calls live.',
+        '<div class="gs-actions"><button class="btn-fathom-primary" type="button" onclick="connectZoom()">Connect Zoom</button>'
+        + '<button class="btn-fathom-primary" type="button" onclick="connectFathom()">Connect Fathom</button></div>');
+    }
+
+    // Step 2 — get calls graded. Connecting does NOT auto-sync, so this step carries
+    // the action itself (Fathom has a sync; Zoom's is still rolling out).
+    var s2;
+    if (analyzed) {
+      s2 = stepHtml(true, 'Get your calls graded', 'Your recent calls are graded — your scores are up top.', '');
+    } else if (fathomConnected) {
+      s2 = state.fathomSyncing
+        ? stepHtml(false, 'Get your calls graded', 'Syncing your calls now — this usually takes a few minutes. Your grades appear up top as each one finishes.', '')
+        : stepHtml(false, 'Get your calls graded', 'Pull in your most recent calls and grade them — one click.',
+            '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="syncFathomNow()">Sync &amp; grade my recent calls</button>');
+    } else if (zoomConnected) {
+      s2 = stepHtml(false, 'Get your calls graded', 'Zoom call grading is rolling out now — once it’s live your recent calls are graded automatically. Nothing to do here for the moment.', '');
+    } else {
+      s2 = stepHtml(false, 'Get your calls graded', 'After you connect above, grade your most recent calls in one click.', '');
+    }
 
     var s3;
     if (canManageKb) {
@@ -3996,9 +4020,8 @@
     if (r.ok) { alert('Email updated' + (r.data && r.data.old_notified === 'sent' ? ' — old address notified.' : '.')); refreshMembers(false); }
   }
   async function deleteMember(uid, email) {
-    var typed = window.prompt('DELETE permanently removes this account. Only allowed for reps with NO call history (otherwise deactivate). Type the email to confirm:\n' + email);
-    if (typed == null) return;
-    var r = await memberAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: JSON.stringify({ confirm_email: typed.trim() }) });
+    if (!confirm('Permanently delete ' + (email || 'this rep') + '?\n\nThis removes their account and all their data, and can’t be undone.\n\n(Only allowed if they have no call history — otherwise deactivate instead.)')) return;
+    var r = await memberAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: '{}' });
     if (r.ok) { alert('User deleted.'); refreshMembers(true); }
   }
   function openAddMember() {

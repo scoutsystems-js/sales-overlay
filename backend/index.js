@@ -55,6 +55,13 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  // OAuth popups (Zoom/Fathom connect) rely on window.opener for the
+  // postMessage-close handoff. Helmet's DEFAULT COOP 'same-origin' SEVERS
+  // window.opener the moment the popup navigates cross-origin to the provider,
+  // so the popup can't notify the main window or close itself → it strands on
+  // /dashboard. 'same-origin-allow-popups' keeps the opener for popups we open,
+  // which restores the handoff while still isolating us from cross-origin openers.
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   hsts: { maxAge: 15552000, includeSubDomains: true },
 }));
 app.use(cors());

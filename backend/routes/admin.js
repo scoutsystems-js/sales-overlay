@@ -669,10 +669,12 @@ router.patch('/users/:user_id/email', requireAuth, requireRole(['manager', 'owne
   }
 });
 
-// ── DELETE /admin/users/:user_id — OWNER-ONLY, zero-history gate + typed confirm ─
+// ── DELETE /admin/users/:user_id — OWNER-ONLY, zero-history gate ────────────────
 // A user with ANY recorded call cannot be hard-deleted (call history is the
-// company's asset) → 409, steer to deactivate. Requires the user's email echoed
-// in the body (typed confirmation). Hard delete cascades the empty profile/rows.
+// company's asset) → 409, steer to deactivate. Hard delete cascades the empty
+// profile/rows. (2026-07-31: the typed-email confirmation was removed as redundant
+// friction — delete is already owner-only + zero-history-gated; a plain
+// name-the-user warning dialog on the client is the confirmation now.)
 router.delete('/users/:user_id', requireAuth, requireRole('owner'), async function(req, res) {
   try {
     var admin = getAdminClient();
@@ -681,10 +683,6 @@ router.delete('/users/:user_id', requireAuth, requireRole('owner'), async functi
     var got = await admin.auth.admin.getUserById(uid);
     if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
     var email = got.data.user.email;
-    var confirm = (req.body && typeof req.body.confirm_email === 'string') ? req.body.confirm_email.trim() : '';
-    if (!email || confirm.toLowerCase() !== String(email).toLowerCase()) {
-      return res.status(400).json({ error: 'Type the user’s email exactly to confirm deletion.' });
-    }
     var hist = await countUserHistory(admin, uid);
     var block = deleteBlockReason(hist.calls, hist.sessions);
     if (block) return res.status(409).json({ error: block });
