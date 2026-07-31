@@ -310,6 +310,20 @@
     </div>
   </section>
 
+  <!-- Owner-only: password-reset diagnostics. Tells you WHY a reset didn't arrive
+       (no account / rejected link / email off) without reading Railway logs. Dry
+       run — sends nothing. Owner-gated, so the public reset stays enumeration-safe. -->
+  <section class="users-section" id="resetDiagSection" style="display:none">
+    <div class="users-header"><h2>Password reset diagnostics</h2></div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Check what a password-reset request for an email would do right now — nothing is sent.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <input type="email" id="rdEmail" placeholder="user@example.com" autocomplete="off"
+             style="flex:1;min-width:220px;padding:8px 10px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;">
+      <button class="btn-add-user" id="rdBtn" onclick="runResetDiagnose()">Check</button>
+    </div>
+    <div id="rdResult" style="margin-top:12px;font-size:13px;line-height:1.5;"></div>
+  </section>
+
   <!-- Create-user modal (owner only). Temp password shown ONCE on success. -->
   <div class="modal-overlay" id="createUserModal" style="display:none" onclick="if(event.target===this)closeCreateUserModal()">
     <div class="modal-box">
@@ -440,8 +454,40 @@
     if (!currentUser) { clearSession(); window.location.replace('/login'); return; }
     if (currentUser.role === 'user') { window.location.replace('/dashboard'); return; }
     document.getElementById('roleLabel').textContent = currentUser.role === 'owner' ? 'Owner' : 'Admin';
+    if (currentUser.role === 'owner') {
+      var rd = document.getElementById('resetDiagSection');
+      if (rd) rd.style.display = '';
+    }
 
     await loadUsers();
+  }
+
+  // Owner-only dry-run: what would a password reset for this email do right now?
+  async function runResetDiagnose() {
+    var email = (document.getElementById('rdEmail').value || '').trim();
+    var out = document.getElementById('rdResult');
+    if (!email || email.indexOf('@') === -1) { out.innerHTML = '<span style="color:#f87171;">Enter a valid email address.</span>'; return; }
+    var btn = document.getElementById('rdBtn'); var prev = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Checking…'; out.textContent = '';
+    try {
+      var res = await fetch('/admin/reset-diagnose', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ email: email }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      var data = null; try { data = await res.json(); } catch (e) {}
+      if (!res.ok) { out.innerHTML = '<span style="color:#f87171;">' + escapeHtml((data && data.error) || ('HTTP ' + res.status)) + '</span>'; return; }
+      var color = data.status === 'would_send' ? '#4ade80' : (data.status === 'no_account' ? 'var(--muted)' : '#fbbf24');
+      var label = { would_send: '✓ Would send a reset link', no_account: '○ No Scout account', link_rejected: '✗ Link rejected (dud)', email_not_configured: '✗ Email transport off' }[data.status] || escapeHtml(data.status || 'unknown');
+      var extra = data.resolved_redirect ? '<div style="color:var(--muted);font-size:12px;margin-top:4px;">resolved redirect_to: ' + escapeHtml(data.resolved_redirect) + '</div>' : '';
+      out.innerHTML = '<div style="color:' + color + ';font-weight:600;">' + label + '</div>'
+        + '<div style="color:var(--muted);margin-top:2px;">' + escapeHtml(data.message || '') + '</div>' + extra;
+    } catch (e2) {
+      out.innerHTML = '<span style="color:#f87171;">Could not reach the server.</span>';
+    } finally {
+      btn.disabled = false; btn.textContent = prev;
+    }
   }
 
   async function fetchMe() {

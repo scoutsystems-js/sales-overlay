@@ -422,6 +422,44 @@ async function sendWelcomeInvite(admin, email, firstName) {
   }
 }
 
+// ── POST /admin/reset-diagnose (owner-only) ──────────────────────────────────
+// Visibility for FD-1: an owner can tell WHY a password reset didn't arrive —
+// no Scout account, a rejected/dud link, or email transport off — WITHOUT reading
+// Railway logs. Dry run: mints the recovery link exactly as the real endpoint
+// (redirect_to = /set-password?flow=reset) and runs the same guard, but sends
+// NOTHING. Owner-gated, so revealing account existence here is fine; the public
+// POST /auth/forgot-password stays enumeration-safe (the requester sees no change).
+router.post('/reset-diagnose', requireAuth, requireRole(['owner']), async function(req, res) {
+  try {
+    var raw = req.body && req.body.email;
+    if (typeof raw !== 'string' || raw.indexOf('@') === -1) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    var email = raw.trim().toLowerCase();
+    if (!welcomeEmail.isConfigured()) {
+      return res.json({ status: 'email_not_configured', message: 'RESEND_API_KEY is unset — no reset email can be sent for anyone until it is configured.' });
+    }
+    var admin = getAdminClient();
+    var r = await admin.auth.admin.generateLink({
+      type: 'recovery', email: email,
+      options: { redirectTo: CANONICAL_ORIGIN + '/set-password?flow=reset' },
+    });
+    if (r.error || !r.data || !r.data.properties || !r.data.properties.action_link) {
+      return res.json({ status: 'no_account', message: 'No Scout account for this email. A real request returns the same neutral message but sends nothing.' });
+    }
+    if (!linkTargetsSetPassword(r.data.properties.action_link)) {
+      var resolved = '';
+      try { resolved = new URL(r.data.properties.action_link).searchParams.get('redirect_to') || ''; } catch (e) {}
+      return res.json({ status: 'link_rejected', message: 'A link was minted but does not target /set-password (redirect-allowlist / Site-URL fallback). It would be refused — no email sends.', resolved_redirect: resolved });
+    }
+    return res.json({ status: 'would_send', message: 'All good — a real reset request for this email would email a working link.' });
+  } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
+    console.error('[admin] reset-diagnose error: ' + (err && err.message));
+    return res.status(500).json({ error: 'Diagnostic failed. Please try again.' });
+  }
+});
+
 var CREATE_ROLES = ['user', 'manager'];
 router.post('/users', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var body = req.body || {};
