@@ -3275,7 +3275,11 @@
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     if (d.state === 'insufficient') {
-      return head + '<div class="team-recs-card" style="cursor:default;"><div class="team-recs-teaser">' + escapeHtml((d.card_text || '') + needsWorkThinHint(d)) + '</div></div>';
+      // Only nudge to connect when there's genuinely no source — this state also
+      // fires for established users whose objection data is merely thin, and
+      // telling them to "connect a source" they already have would be wrong.
+      var nwCta = !anySourceConnected() ? connectSourceCtaHtml() : '';
+      return head + '<div class="team-recs-card" style="cursor:default;"><div class="team-recs-teaser">' + escapeHtml((d.card_text || '') + needsWorkThinHint(d)) + '</div>' + nwCta + '</div>';
     }
     var b = d.bucket || {};
     var chips = '<div class="nw-chips">'
@@ -4318,6 +4322,14 @@
   // PATCH re-checks managed_by on every mutation.
   function goAccount() { state.account = null; setView('account'); }
 
+  // FD-3: send the user to the connect surface (the #account Connections section,
+  // scrolled to + highlighted — same landing as /connect). Used by the empty-state
+  // CTAs on the overview-adjacent surfaces (Call Library, What-needs-work, EOD).
+  function goConnectSource() { state.account = null; pendingConnectFocus = true; setView('account'); }
+  function connectSourceCtaHtml() {
+    return '<button class="btn-fathom-primary" type="button" style="margin-top:14px;" onclick="goConnectSource()">Connect a recording source →</button>';
+  }
+
   async function loadAccount() {
     if (state.accountLoading) return;
     state.accountLoading = true;
@@ -4635,7 +4647,16 @@
     if (!d) body = '<div class="skeleton" style="height:120px;"></div>';
     else if (d._error) body = '<div class="error">Could not load EOD report: ' + escapeHtml(d._error) + '</div>';
     else if (!d.calls || d.calls.length === 0) {
-      body = '<div class="empty"><h3>No calls on ' + escapeHtml(d.date || '') + '</h3><p>Days without calls have nothing to report — pick another day above.</p></div>';
+      // FD-3 (Option A): a never-synced user (no recording source connected → no
+      // calls at all) gets a "no calls yet" state + connect CTA. The "pick another
+      // day" copy is only right for users who DO have calls, just not on this date.
+      if (!anySourceConnected()) {
+        body = '<div class="empty"><h3>No calls yet</h3>'
+          + '<p>Connect a recording source (Zoom or Fathom) to start syncing calls — your daily report fills in automatically once they come in.</p>'
+          + connectSourceCtaHtml() + '</div>';
+      } else {
+        body = '<div class="empty"><h3>No calls on ' + escapeHtml(d.date || '') + '</h3><p>Days without calls have nothing to report — pick another day above.</p></div>';
+      }
     } else {
       body = d.calls.map(function (c) {
         var f = c.fields, e = c.edited || {};
@@ -5420,7 +5441,8 @@
       content.innerHTML = header + notice
         + '<div class="empty fade-in">'
           + '<h3>No calls synced yet</h3>'
-          + '<p>Connect Fathom and sync your calls to get started.</p>'
+          + '<p>Connect a recording source (Zoom or Fathom) and your synced calls will show up here for grading.</p>'
+          + connectSourceCtaHtml()
         + '</div>';
       return;
     }
