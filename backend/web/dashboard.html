@@ -197,6 +197,21 @@
     .glance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 8px; }
     .glance-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
     .glance-skeleton { height: 92px; border-radius: var(--radius); }
+    /* FD-4: Get-started onboarding card */
+    .gs-card { position: relative; border-color: var(--accent); background: linear-gradient(180deg, rgba(91,158,255,0.05), var(--bg-elevated)); }
+    .gs-dismiss { position: absolute; top: 12px; right: 14px; background: none; border: none; color: var(--text-muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+    .gs-dismiss:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .gs-head h2 { margin: 0; }
+    .gs-head .meta { margin: 2px 0 14px; }
+    .gs-step { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+    .gs-step:first-of-type { border-top: none; }
+    .gs-check { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border-strong); color: var(--good); display: flex; align-items: center; justify-content: center; font-size: 13px; margin-top: 1px; }
+    .gs-check.done { background: rgba(74,222,128,0.12); border-color: var(--good); }
+    .gs-step-body { flex: 1; min-width: 0; }
+    .gs-step-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .gs-step-sub { font-size: 13px; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }
+    .gs-optional { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: 99px; padding: 1px 7px; margin-left: 8px; font-weight: 600; }
+    .gs-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
     /* Thread 1: manual outcome tag (Calls page + review) */
     .outcome-tag { display: inline-flex; align-items: center; gap: 4px; }
     .outcome-tag-select { font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-field); color: var(--text); cursor: pointer; }
@@ -3185,6 +3200,60 @@
       + (sub ? '<div class="glance-sub">' + escapeHtml(sub) + '</div>' : '')
       + '</div>';
   }
+  // ── FD-4: light first-run "Get started" card ──────────────────────────────
+  // A single dismissible card on the overview with a 3-step checklist (connect →
+  // first analysis → optional KB). NOT a wizard. Auto-hides once a source is
+  // connected AND the first analysis has run, or when dismissed. Dismissal is
+  // per-user (localStorage keyed by user_id) so it doesn't bleed across accounts
+  // on a shared browser.
+  function gsKey(suffix) { return 'scout_gs_' + suffix + '_' + ((state.me && state.me.user_id) || 'anon'); }
+  function gsDismissed(suffix) { try { return localStorage.getItem(gsKey(suffix)) === '1'; } catch (e) { return false; } }
+  function gsDismiss(suffix) { try { localStorage.setItem(gsKey(suffix), '1'); } catch (e) {} }
+  function dismissGetStarted() { gsDismiss('card'); if (state.view === 'overview') renderOverview(false); }
+  function dismissGsKb() { gsDismiss('kb'); if (state.view === 'overview') renderOverview(false); }
+
+  function getStartedCardHtml() {
+    if (gsDismissed('card')) return '';
+    var connected = anySourceConnected();
+    var analyzed = !!(state.analytics2 && state.analytics2.calls && state.analytics2.calls.analyzed > 0);
+    if (connected && analyzed) return ''; // essentials done — nothing left to onboard
+    var canManageKb = kbCanManage();
+
+    function stepHtml(done, title, body, action) {
+      return '<div class="gs-step">'
+        + '<div class="gs-check' + (done ? ' done' : '') + '">' + (done ? '✓' : '') + '</div>'
+        + '<div class="gs-step-body"><div class="gs-step-title">' + title + '</div>'
+        + (body ? '<div class="gs-step-sub">' + body + '</div>' : '')
+        + (action || '') + '</div></div>';
+    }
+
+    var s1 = stepHtml(connected, 'Connect Fathom or Zoom',
+      'Scout grades the calls it syncs from your recording source.',
+      connected ? '' : '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="goConnectSource()">Connect a recording source →</button>');
+
+    var s2 = stepHtml(analyzed, 'Run your first analysis',
+      'Once a source is connected, Scout automatically grades your most recent calls. To grade further back, use <b>Update analyses</b> on the Calls page any time.', '');
+
+    var s3;
+    if (canManageKb) {
+      var kbDone = gsDismissed('kb');
+      s3 = stepHtml(kbDone, 'Add your Knowledge Base <span class="gs-optional">optional</span>',
+        'Grading gets measurably more specific when Scout knows how you actually sell — add your offer docs, scripts, and winning calls.',
+        kbDone ? '' : '<div class="gs-actions"><button class="btn-fathom-secondary" type="button" onclick="goKb()">Add to Knowledge Base →</button><button class="btn-fathom-secondary" type="button" onclick="dismissGsKb()">Not now</button></div>');
+    } else {
+      // Managed rep: they can't add KB, but they can view what they're graded against.
+      s3 = stepHtml(true, 'Your team’s Knowledge Base',
+        'Your manager’s offer docs, scripts, and winning calls are what Scout grades your calls against — you can view them anytime.',
+        '<button class="btn-fathom-secondary" type="button" style="margin-top:10px;" onclick="goKb()">Open Knowledge Base →</button>');
+    }
+
+    return '<div class="section fade-in gs-card">'
+      + '<button class="gs-dismiss" type="button" title="Dismiss" onclick="dismissGetStarted()">×</button>'
+      + '<div class="gs-head"><h2>Get started with Scout</h2><div class="meta">A couple of quick steps to make your grading sharp.</div></div>'
+      + s1 + s2 + s3
+      + '</div>';
+  }
+
   function renderCoachingOverview(content) {
     var a = state.analytics2;
     var analyzed = a.calls.analyzed;
@@ -3202,10 +3271,14 @@
     // A-2.2 layout: tiles → What-needs-work card → Coach summary (OPEN inline) →
     // Performance summary (card → #performance page, LLM on open) → Recent calls
     // (card → the Call Library). No accordions.
+    // While the Get-started card is showing, it owns the connect prompt — suppress
+    // the standalone Fathom/Zoom connect cards so there's no duplicate "Connect".
+    var gsCard = getStartedCardHtml();
+    var connectSections = gsCard ? '' : (renderFathomSectionHtml() + renderZoomSectionHtml());
     content.innerHTML = renderHeaderHtml()
       + renderFathomNoticeHtml()
-      + renderFathomSectionHtml()
-      + renderZoomSectionHtml()
+      + gsCard
+      + connectSections
       + tiles
       + '<div class="section fade-in">' + needsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Coach summary</h2>'
