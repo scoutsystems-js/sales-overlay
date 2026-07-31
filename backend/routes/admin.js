@@ -11,6 +11,7 @@ const welcomeEmail = require('../lib/welcome-email');
 const { canManageTarget, deleteBlockReason, deactivateBlockReason } = require('../lib/user-management');
 const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
+const provisionUser = require('../lib/provision-user');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -494,19 +495,49 @@ router.post('/users', requireAuth, requireRole(['manager', 'owner']), async func
     // Strong temp password — generated server-side, returned once, never logged.
     var tempPassword = crypto.randomBytes(15).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 16) + 'aA1!';
 
-    var created = await admin.auth.admin.createUser({ email: email, password: tempPassword, email_confirm: true });
-    if (created.error) return res.status(400).json({ error: created.error.message });
-    var newId = created.data.user.id;
-
-    var ins = await admin.from('user_profiles')
-      .upsert({ user_id: newId, role: role, managed_by: managedBy, billing_status: 'trial', first_name: firstName, last_name: lastName }, { onConflict: 'user_id' });
-    if (ins.error) {
-      // Both-or-neither: roll back the auth user so no orphan is left behind.
-      console.error('[admin] create-user profile insert failed, rolling back auth user:', ins.error.message);
-      try { await admin.auth.admin.deleteUser(newId); }
-      catch (delErr) { console.error('[admin] create-user rollback deleteUser FAILED (orphan auth user ' + newId + '):', delErr.message); }
-      return res.status(500).json({ error: 'Could not create user profile — creation rolled back' });
+    // Atomic provisioning (ruling 2026-07-31): fully succeed or leave nothing new
+    // behind, and reclaim a stale orphan (auth row with no profile) instead of
+    // failing "already registered" on a fresh-looking email. See lib/provision-user.
+    var deps = {
+      createAuthUser: async function (em, pw) {
+        var r = await admin.auth.admin.createUser({ email: em, password: pw, email_confirm: true });
+        return r.error ? { error: r.error.message } : { id: r.data.user.id };
+      },
+      findAuthUserByEmail: async function (em) {
+        // Current scale is tiny; listUsers(perPage:1000) is fine. Revisit if users > 1000.
+        var lu = await admin.auth.admin.listUsers({ perPage: 1000 });
+        if (lu.error) return null;
+        var f = (lu.data.users || []).find(function (u) { return (u.email || '').toLowerCase() === em.toLowerCase(); });
+        return f ? { id: f.id } : null;
+      },
+      profileExists: async function (uid) {
+        var p = await admin.from('user_profiles').select('user_id').eq('user_id', uid).maybeSingle();
+        return !p.error && !!(p.data && p.data.user_id);
+      },
+      setPassword: async function (uid, pw) {
+        var u = await admin.auth.admin.updateUserById(uid, { password: pw });
+        return u.error ? { error: u.error.message } : {};
+      },
+      insertProfile: async function (uid, f) {
+        var ins = await admin.from('user_profiles').upsert(
+          { user_id: uid, role: f.role, managed_by: f.managed_by, billing_status: 'trial', first_name: f.firstName, last_name: f.lastName },
+          { onConflict: 'user_id' });
+        return ins.error ? { error: ins.error.message } : {};
+      },
+      deleteAuthUser: async function (uid) {
+        try { var d = await admin.auth.admin.deleteUser(uid); return (d && d.error) ? { error: d.error.message } : {}; }
+        catch (e) { return { error: e.message }; }
+      },
+    };
+    var prov = await provisionUser(deps, { email: email, role: role, managedBy: managedBy, firstName: firstName, lastName: lastName, password: tempPassword });
+    if (!prov.ok) {
+      if (prov.code === 'duplicate') return res.status(409).json({ error: prov.error });
+      if (prov.code === 'rollback_failed') { console.error('[admin] create-user CRITICAL: ' + prov.error); return res.status(500).json({ error: 'Could not create the user. Please try again or contact support.' }); }
+      console.error('[admin] create-user failed (' + prov.code + '): ' + prov.error);
+      return res.status(prov.code === 'create_failed' ? 400 : 500).json({ error: prov.error });
     }
+    var newId = prov.user_id;
+    if (prov.reclaimed) console.log('[admin] create-user reclaimed a stale orphan auth row for ' + email + ' (id=' + newId + ')');
 
     // Audit the creation event — includes the name, but NEVER the temp password.
     console.log('[admin] User created: actor=%s (%s) new=%s (%s) name="%s %s" role=%s managed_by=%s',

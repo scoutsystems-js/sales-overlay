@@ -4014,7 +4014,11 @@
     var last = (document.getElementById('maLast') || {}).value || '';
     var note = document.getElementById('maNote');
     if (!email.trim() || email.indexOf('@') === -1 || !first.trim() || !last.trim()) { if (note) note.textContent = 'Email, first and last name are required.'; return; }
-    var r = await memberAction('/admin/users', { method: 'POST', body: JSON.stringify({ email: email.trim(), first_name: first.trim(), last_name: last.trim(), role: 'user' }) });
+    // BUGFIX (2026-07-31): send managed_by = the team being managed. Without it an
+    // OWNER adding a rep here created it UNMANAGED (the "force managed_by=self" only
+    // runs for non-owners), leaving the rep with no manager. A manager's value is
+    // ignored server-side (forced to self), so this is correct for both roles.
+    var r = await memberAction('/admin/users', { method: 'POST', body: JSON.stringify({ email: email.trim(), first_name: first.trim(), last_name: last.trim(), role: 'user', managed_by: teamMembersScope().key }) });
     if (r.ok) {
       var tp = r.data && r.data.temp_password;
       var we = r.data && r.data.welcome_email;

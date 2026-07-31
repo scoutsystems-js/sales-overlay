@@ -130,6 +130,9 @@
     .btn-resend { font-size: 11px; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--muted); cursor: pointer; white-space: nowrap; }
 
     .btn-resend:hover:not(:disabled) { color: var(--text); border-color: var(--green); }
+    .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .admin-danger { color: #f87171; border-color: rgba(248,113,113,0.35); }
+    .admin-danger:hover:not(:disabled) { color: #fca5a5; border-color: rgba(248,113,113,0.6); }
 
     .role-badge {
       display: inline-block;
@@ -679,7 +682,7 @@
     if (btn) btn.style.display = isOwnerViewer ? '' : 'none';
     if (usersArray.length === 0) { wrap.innerHTML = '<div class="empty-msg">No users to display.</div>'; return; }
 
-    var header = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Created</th><th></th></tr>';
+    var header = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Status</th><th>Created</th><th></th></tr>';
     var mgrs = managersList();
     var rows = usersArray.map(function(u) {
       var isSelf = u.user_id === currentUser.user_id;
@@ -691,16 +694,29 @@
       var created = u.created_at ? shortDate(u.created_at) : '—';
       var emailDisplay = u.email || (u.user_id.slice(0, 8) + '…');
       var nameDisplay = (u.first_name || u.last_name) ? ((u.first_name || '') + ' ' + (u.last_name || '')).trim() : '—';
+      var active = u.active !== false;
+      var statusCell = active
+        ? '<span style="color:var(--green);font-size:12px;white-space:nowrap;">● active</span>'
+        : '<span style="color:var(--muted);font-size:12px;white-space:nowrap;">○ inactive</span>';
+      // Full member action set in /admin (owner console) — deactivate/reactivate +
+      // delete, alongside the existing role/managed-by(move)/billing controls. Same
+      // server-side gates + zero-history delete rule as Team → Manage members.
+      var actions = editable
+        ? '<div class="admin-actions">'
+            + '<button class="btn-resend" title="Resend the set-password / welcome email" onclick="resendWelcomeEmail(this, \'' + u.user_id + '\')">Resend</button>'
+            + '<button class="btn-resend" onclick="' + (active ? 'adminDeactivate' : 'adminReactivate') + '(\'' + u.user_id + '\')">' + (active ? 'Deactivate' : 'Reactivate') + '</button>'
+            + '<button class="btn-resend admin-danger" onclick="adminDelete(\'' + u.user_id + '\', \'' + escapeHtml(u.email || '') + '\')">Delete</button>'
+          + '</div>'
+        : '';
       return '<tr>'
         + '<td>' + escapeHtml(nameDisplay) + '</td>'
         + '<td>' + escapeHtml(emailDisplay) + '</td>'
         + '<td>' + roleCell + '</td>'
         + '<td>' + mbCell + '</td>'
         + '<td>' + billCell + '</td>'
+        + '<td>' + statusCell + '</td>'
         + '<td style="color:var(--muted);font-size:12px;">' + escapeHtml(created) + '</td>'
-        + '<td>' + (editable
-            ? '<button class="btn-resend" onclick="resendWelcomeEmail(this, \'' + u.user_id + '\')">Resend welcome email</button>'
-            : '') + '</td>'
+        + '<td>' + actions + '</td>'
       + '</tr>';
     });
     wrap.innerHTML = '<table class="users-table"><thead>' + header + '</thead><tbody>' + rows.join('') + '</tbody></table>';
@@ -852,6 +868,36 @@
     if (status === 'invite_sent') { btn.textContent = '✓ Invite sent'; setTimeout(function () { btn.textContent = original; }, 4000); }
     else if (status === 'not_configured') { btn.textContent = 'Email not configured'; }
     else { btn.textContent = '✗ Failed — retry'; }
+  }
+
+  // Full member actions in /admin (owner console). Hit the SAME endpoints and
+  // gates as Team → Manage members — no new permission paths. Delete keeps the
+  // server-side zero-history rule (type-email confirm; backend rejects if the rep
+  // has call history → deactivate instead).
+  async function adminUserAction(url, opts) {
+    try {
+      var res = await fetch(url, Object.assign({ headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()) }, opts || {}));
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return { ok: false }; }
+      var d = null; try { d = await res.json(); } catch (e) {}
+      if (!res.ok) { alert((d && d.error) || ('Request failed (HTTP ' + res.status + ')')); return { ok: false, data: d }; }
+      return { ok: true, data: d };
+    } catch (err) { alert('Request failed: ' + (err.message || 'unknown')); return { ok: false }; }
+  }
+  async function adminDeactivate(uid) {
+    if (!confirm('Deactivate this user? They can’t log in and the seat is freed. Their calls and history stay.')) return;
+    var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid) + '/deactivate', { method: 'POST', body: '{}' });
+    if (r.ok) loadUsers();
+  }
+  async function adminReactivate(uid) {
+    if (!confirm('Reactivate this user? This adds a billable seat and restores their login.')) return;
+    var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid) + '/reactivate', { method: 'POST', body: '{}' });
+    if (r.ok) loadUsers();
+  }
+  async function adminDelete(uid, email) {
+    var typed = window.prompt('DELETE permanently removes this account. Allowed only for users with NO call history (otherwise deactivate). Type the email to confirm:\n' + email);
+    if (typed == null) return;
+    var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: JSON.stringify({ confirm_email: typed.trim() }) });
+    if (r.ok) { alert('User deleted.'); loadUsers(); }
   }
 
   function copyTempPassword() {
