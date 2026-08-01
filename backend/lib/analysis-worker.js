@@ -54,6 +54,8 @@ const fathomRoutes = require('../routes/fathom');
 const callConnections = require('./call-connections');
 const zoomClient = require('./zoom-client');
 const { parseVttToTranscript } = require('./vtt-adapter');
+// Section tagging for highlights (Call Review Context, Part 1a).
+const { sanitizeSectionValue } = require('./highlight-section');
 
 // Which transcript path a call takes. 'zoom' → Zoom (call_connections + VTT);
 // anything else (fathom / null / legacy pre-source rows) → Fathom, unchanged.
@@ -96,7 +98,7 @@ const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_
 //      per-structure cash rules; (b) payment_structure field (closed-only);
 //      (c) eod_summary — first-person closer-voice EOD report summary
 //      (coaching's overall_summary untouched). Never-fabricate unchanged.
-const ANALYSIS_PROMPT_VERSION = 'v9-2026-07-27'; // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward). FUTURE calls only — no bulk re-analysis; the no-outcome-flips delta gate does NOT apply (flipping outcomes is the intent). Validate by sampling.
+const ANALYSIS_PROMPT_VERSION = 'v10-2026-07-31'; // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -385,6 +387,7 @@ function buildHighlightExtractorPrompt(normalized) {
     '  - speaker: exactly "CLOSER" or "PROSPECT"',
     '  - quote: the exact words spoken at that moment (5-30 words, trim filler)',
     '  - observation: one factual sentence, 25 words max. Describe what happened. No commentary, no validation, no "great job" or "should have done X". If two moments are part of the same pattern, the second observation may reference the first by timestamp.',
+    '  - section: which part of the call this moment happened in — exactly one of "intro", "discovery", "pitch", "objection", "close". Use the ACTUAL flow of THIS call, not a fixed order: a call may run discovery after the pitch, revisit objections late, etc. — pick the section the moment genuinely belongs to.',
     '  - type: exactly one of these six values:',
     '      "buying_signal"      — prospect indicates intent (asks about onboarding, mentions next steps, asks price/timing like a buyer)',
     '      "objection"          — prospect raises a concern (money, time, spouse, doubt, comparison shopping)',
@@ -409,8 +412,8 @@ function buildHighlightExtractorPrompt(normalized) {
     '',
     'Respond with ONLY a JSON array — no markdown, no code fences, no narrative wrapping:',
     '[',
-    '  {"timestamp_seconds":N,"speaker":"PROSPECT","quote":"...","observation":"...","type":"objection","objection_surface":"too expensive","objection_category":"fear","resolution":"handled","closer_response":"..."},',
-    '  {"timestamp_seconds":N,"speaker":"CLOSER","quote":"...","observation":"...","type":"strong_moment"},',
+    '  {"timestamp_seconds":N,"speaker":"PROSPECT","quote":"...","observation":"...","section":"objection","type":"objection","objection_surface":"too expensive","objection_category":"fear","resolution":"handled","closer_response":"..."},',
+    '  {"timestamp_seconds":N,"speaker":"CLOSER","quote":"...","observation":"...","section":"discovery","type":"strong_moment"},',
     '  ...',
     ']',
     '',
@@ -531,6 +534,9 @@ function sanitizeHighlights(arr, durationSeconds) {
       quote:              h.quote.trim().slice(0, 1000),
       observation:        h.observation.trim().slice(0, 500),
       type:               type,
+      // Section tag (nullable): coerced to null when missing/invalid so a bad
+      // value never loses the moment — same discipline as the objection sub-fields.
+      section:            sanitizeSectionValue(h.section),
       objection_surface:  objSurface,
       objection_category: objCategory,
       objection_handled:  objHandled,
@@ -540,6 +546,55 @@ function sanitizeHighlights(arr, durationSeconds) {
     });
   }
   return out;
+}
+
+// Persist a call's highlights with a NO-WIPE-ON-FAILURE ordering (house rule):
+// the prior rows are deleted ONLY AFTER the new set is successfully inserted, so
+// a failed/empty extraction — realistic on a large backfill — never leaves a call
+// with zero highlights. Steps: (1) empty new set → do nothing, keep existing;
+// (2) capture the prior rows' ids; (3) insert the new set; if that fails, keep
+// existing (no delete); (4) only then delete exactly the prior ids. If the final
+// cleanup fails, the new set is already saved (dupes self-heal next run) — never a
+// wipe. Non-fatal throughout (grades are already saved). Exported for tests.
+async function persistHighlights(admin, fathomCallId, userId, sanitizedHighlights) {
+  if (!sanitizedHighlights || sanitizedHighlights.length === 0) {
+    console.warn('[analysis] no new highlights extracted for ' + fathomCallId + ' — preserving existing highlights (no delete)');
+    return { inserted: 0, deleted: 0, kept_existing: true };
+  }
+
+  // Capture the prior rows BEFORE inserting so we can delete exactly those after.
+  var existing = await admin.from('call_highlights').select('id').eq('fathom_call_id', fathomCallId);
+  var oldIds = (existing && existing.data ? existing.data : []).map(function (r) { return r.id; });
+  if (existing && existing.error) {
+    // Couldn't read the old ids — proceed with insert anyway (worst case: old
+    // rows linger as dupes and self-heal next run). NEVER a data-loss path.
+    console.warn('[analysis] highlight old-id read failed for ' + fathomCallId + ' (proceeding; dupes may linger): ' + existing.error.message);
+  }
+
+  var rows = sanitizedHighlights.map(function (h) {
+    return Object.assign({ fathom_call_id: fathomCallId, user_id: userId }, h);
+  });
+  var ins = await admin.from('call_highlights').insert(rows);
+  if (ins && ins.error) {
+    // Insert failed → DO NOT delete. Existing highlights stay intact; the next
+    // re-analysis retries.
+    console.warn('[analysis] highlight insert failed for ' + fathomCallId + ' — keeping existing highlights (no delete): ' + ins.error.message);
+    return { inserted: 0, deleted: 0, kept_existing: true };
+  }
+
+  // New set is safely in — now delete exactly the prior rows.
+  var deleted = 0;
+  if (oldIds.length > 0) {
+    var del = await admin.from('call_highlights').delete().in('id', oldIds);
+    if (del && del.error) {
+      // New highlights saved; old rows lingering is cosmetic and self-heals on
+      // the next re-analysis. Not a wipe — log and move on.
+      console.warn('[analysis] old-highlight cleanup failed for ' + fathomCallId + ' (new set saved; dupes self-heal next run): ' + del.error.message);
+    } else {
+      deleted = oldIds.length;
+    }
+  }
+  return { inserted: rows.length, deleted: deleted, kept_existing: false };
 }
 
 // Upserts a call_analyses row to the given status. Used for the initial
@@ -853,10 +908,9 @@ async function analyzeCall(fathomCallId, userId) {
       ? Math.round(graderParsed.overall_score)
       : null;
 
-    // Grader-inferred deal outcome (migration 012). outcome_source='inferred'.
-    // NOTE: when the manual outcome selector lands on the review page, this
-    // blind upsert must stop clobbering a 'manual' outcome (read-before-write or
-    // a DB guard) — no manual outcomes exist yet, so overwriting is safe for now.
+    // Grader-inferred deal outcome (migration 012). This is only APPLIED when the
+    // row isn't manually locked — the read-before-write guard below (manualLocked)
+    // freezes a human-set 'manual' outcome, so a re-analysis never clobbers it.
     var inferredOutcome = (typeof graderParsed.outcome === 'string'
       && VALID_OUTCOMES.indexOf(graderParsed.outcome.toLowerCase()) !== -1)
       ? graderParsed.outcome.toLowerCase() : null;
@@ -937,28 +991,11 @@ async function analyzeCall(fathomCallId, userId) {
       .upsert(analysisPayload, { onConflict: 'fathom_call_id' });
     if (upsert.error) throw new Error('call_analyses upsert: ' + upsert.error.message);
 
-    // Highlights: delete existing for this call, then insert fresh. Re-analysis
-    // semantics (per the brief): old highlights gone, new highlights win.
-    var del = await admin
-      .from('call_highlights')
-      .delete()
-      .eq('fathom_call_id', fathomCallId);
-    if (del.error) {
-      // Non-fatal — log and continue. Worst case: stale highlights linger
-      // alongside the new ones; the dashboard can dedupe at render time.
-      console.warn('[analysis] highlight delete failed for ' + fathomCallId + ': ' + del.error.message);
-    }
+    // Highlights: insert the new set FIRST, then delete the prior rows — so a
+    // failed/empty extraction (or a failed insert) never wipes a call's existing
+    // highlights. Non-fatal: grades are already saved.
     var sanitizedHighlights = sanitizeHighlights(highlightParsed, callRow.duration_seconds);
-    if (sanitizedHighlights.length > 0) {
-      var highlightRows = sanitizedHighlights.map(function(h) {
-        return Object.assign({ fathom_call_id: fathomCallId, user_id: userId }, h);
-      });
-      var hIns = await admin.from('call_highlights').insert(highlightRows);
-      if (hIns.error) {
-        // Non-fatal — grades are already saved. Log loudly.
-        console.warn('[analysis] highlight insert failed for ' + fathomCallId + ': ' + hIns.error.message);
-      }
-    }
+    await persistHighlights(admin, fathomCallId, userId, sanitizedHighlights);
 
     // ─── Phase 8: advance fathom_calls.sync_status ───────────────────────
     var processed = await admin
@@ -1003,6 +1040,7 @@ module.exports = {
   _extractFirstJsonArray:      extractFirstJsonArray,
   _sanitizeSection:            sanitizeSection,
   _sanitizeHighlights:         sanitizeHighlights,
+  _persistHighlights:          persistHighlights,
   _findMeeting:                findMeeting,
   _formatTurnsForPrompt:       formatTurnsForPrompt,
   _formatSeconds:              formatSeconds,

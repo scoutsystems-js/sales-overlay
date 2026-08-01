@@ -8,7 +8,10 @@ const worker = require('../lib/analysis-worker');
 const NORM = { turns: [{ speaker: 'A', text: 'hello', start_seconds: 0 }], closer_name: 'Josh', speaker_confidence: 'matched' };
 
 test('ANALYSIS_PROMPT_VERSION is at least v9 (v9 = sharper outcome criteria; v8 content intact)', () => {
-  assert.match(worker.ANALYSIS_PROMPT_VERSION, /^v9-/);
+  // "at least v9" — numeric parse so later bumps (v10 added highlight sections) don't break it.
+  const m = worker.ANALYSIS_PROMPT_VERSION.match(/^v(\d+)-/);
+  assert.ok(m, 'version should look like vN-YYYY-MM-DD');
+  assert.ok(parseInt(m[1], 10) >= 9, 'expected >= v9, got ' + worker.ANALYSIS_PROMPT_VERSION);
 });
 
 test('v8 prompt hunts transaction evidence and names the vehicles', () => {
