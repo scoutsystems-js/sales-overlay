@@ -1,9 +1,13 @@
-name: Fathom auto-sync
+name: Call auto-sync (Fathom + Zoom)
 
 # Phase 1.5 auto-sync trigger. Every 2 hours, POST the internal /fathom/sync-all
-# endpoint (shared-secret protected) so every connected user's new Fathom calls
-# sync in and analyze without anyone clicking "Sync now". The endpoint itself is
-# idempotent and respects the synced_unanalyzed holdback.
+# AND /zoom/sync-all endpoints (shared-secret protected) so every connected
+# user's new calls sync in and analyze without anyone clicking "Sync now". Both
+# endpoints are idempotent and respect the synced_unanalyzed holdback.
+#
+# Zoom step tolerates HTTP 503 (Zoom not yet configured / CRON_SECRET unset on
+# Railway) so it never falsely fails the run before Zoom goes live; it fails only
+# on a genuine error (e.g. 401 secret mismatch, or 5xx that isn't 503).
 #
 # Requires the repo secret CRON_SECRET to match the CRON_SECRET env var on the
 # Railway web service. Until Railway has it, the endpoint returns 503 and this
@@ -45,5 +49,27 @@ jobs:
           echo
           if [ "$code" != "200" ]; then
             echo "sync-all did not return 200 (503 = CRON_SECRET missing on Railway; 401 = secret mismatch)"
+            exit 1
+          fi
+      - name: Trigger /zoom/sync-all
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BACKEND_URL: https://sales-overlay-production.up.railway.app
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET repo secret is not set — aborting"; exit 1
+          fi
+          code=$(curl -sS -o /tmp/zoom-sync.json -w '%{http_code}' \
+            -X POST "$BACKEND_URL/zoom/sync-all" \
+            -H "X-Cron-Secret: $CRON_SECRET")
+          echo "HTTP $code"
+          cat /tmp/zoom-sync.json || true
+          echo
+          if [ "$code" = "503" ]; then
+            echo "zoom/sync-all returned 503 — Zoom not configured on Railway yet (expected pre-launch); not failing the run"
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "zoom/sync-all did not return 200 or 503 (401 = secret mismatch; 5xx = server error)"
             exit 1
           fi
