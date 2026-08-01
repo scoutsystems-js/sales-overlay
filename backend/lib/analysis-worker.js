@@ -48,6 +48,19 @@ const { normalizeTranscript } = require('./transcript-normalizer');
 const { fetchSellingContext } = require('./selling-context');
 const { effectiveCloseScore } = require('./outcome-tag');
 const fathomRoutes = require('../routes/fathom');
+// Zoom source (sub-stage 2). Token via the unified call_connections store (its
+// serialized single-flight refresh is a correctness requirement for Zoom's
+// single-use refresh tokens — never bypass it); transcript via the VTT adapter.
+const callConnections = require('./call-connections');
+const zoomClient = require('./zoom-client');
+const { parseVttToTranscript } = require('./vtt-adapter');
+
+// Which transcript path a call takes. 'zoom' → Zoom (call_connections + VTT);
+// anything else (fathom / null / legacy pre-source rows) → Fathom, unchanged.
+// PURE — the analyzeCall branch keys on this so the decision is unit-testable.
+function transcriptSourceFor(callRow) {
+  return (callRow && callRow.source === 'zoom') ? 'zoom' : 'fathom';
+}
 
 // ─── Schema-locked vocabularies (mirror migration 010 CHECK constraints) ────
 const VALID_GRADES = ['A', 'B', 'C', 'D', 'F'];
@@ -656,7 +669,7 @@ async function analyzeCall(fathomCallId, userId) {
     // ─── Phase 2: load the fathom_calls row ───────────────────────────────
     var callQ = await admin
       .from('fathom_calls')
-      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url')
+      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url, source')
       .eq('id', fathomCallId)
       .maybeSingle();
     if (callQ.error) throw new Error('fathom_calls fetch: ' + callQ.error.message);
@@ -666,39 +679,61 @@ async function analyzeCall(fathomCallId, userId) {
     }
     var callRow = callQ.data;
 
-    // ─── Phase 3: load Fathom connection + refresh token if needed ────────
-    var connQ = await admin
-      .from('fathom_connections')
-      .select('access_token, refresh_token, expires_at')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (connQ.error) throw new Error('fathom_connections fetch: ' + connQ.error.message);
-    if (!connQ.data) throw new Error('Fathom connection not found for user ' + userId);
-    var accessToken = await fathomRoutes._getValidAccessToken(admin, userId, connQ.data);
-
-    // ─── Phase 4: fetch transcript directly by stored recording_id ────────
-    // findMeeting() bypassed (kept below, unused — see the SUPERSEDED note on
-    // the function). It re-listed /meetings and searched for a matching
-    // recording_id, which failed systematically for all 200 of Josh's calls:
-    // the created_after window + 3-page cap never surfaced the target meeting.
-    // Everything the pipeline needs is already on callRow (loaded in Phase 2)
-    // plus the transcript, which we pull straight from the recording endpoint
-    // using the stored fathom_call_id. Fathom highlights are skipped — the
-    // Claude highlight extractor derives highlights from the transcript anyway —
-    // and recorded_by is null, so speaker identification falls back to Claude
-    // role inference (normalizeTranscript sets speaker_confidence='unknown').
-    var transcript;
-    try {
-      transcript = await fathomRoutes._fetchRecordingTranscript(accessToken, callRow.fathom_call_id);
-    } catch (transcriptErr) {
-      var transcriptReason = 'Transcript fetch failed for recording_id ' + callRow.fathom_call_id + ': ' + ((transcriptErr && transcriptErr.message) || 'unknown');
+    // ─── Phase 3+4: fetch the transcript, SOURCE-AWARE ────────────────────
+    // Everything downstream (normalize → grade → extract) is source-agnostic:
+    // both branches produce `transcript` = an array of
+    //   { speaker: { display_name }, text, timestamp: "HH:MM:SS" }
+    // that feeds the same `meeting` object below. Only token store + fetch differ.
+    //
+    // Shared error exit: on any token/transcript failure, mark the analysis +
+    // fathom_calls row errored with a human reason and stop (recoverable — the
+    // user can retry via Update-analyses / a later sync).
+    async function failTranscript(reason) {
       await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
-        overall_summary: transcriptReason,
+        overall_summary: reason,
         analyzed_at:     new Date().toISOString(),
       });
       await markFathomCallErrored(admin, fathomCallId, userId);
-      console.error('[analysis] ' + transcriptReason + ' (call=' + fathomCallId + ' user=' + userId + ')');
-      return { status: 'error', reason: transcriptReason };
+      console.error('[analysis] ' + reason + ' (call=' + fathomCallId + ' user=' + userId + ')');
+      return { status: 'error', reason: reason };
+    }
+
+    var transcript;
+    if (transcriptSourceFor(callRow) === 'zoom') {
+      // ── Zoom ── token via call_connections (serialized single-flight refresh —
+      // Zoom's single-use rotating refresh tokens make this mandatory), transcript
+      // via /meetings/{uuid}/recordings → the transcript VTT → the VTT adapter.
+      var zoomToken;
+      try {
+        zoomToken = await callConnections.getValidAccessToken(admin, userId, 'zoom');
+      } catch (zTokErr) {
+        return await failTranscript('Zoom token unavailable for user ' + userId + ': ' + ((zTokErr && zTokErr.message) || 'unknown'));
+      }
+      try {
+        var vtt = await zoomClient.fetchTranscriptVtt(zoomToken, callRow.fathom_call_id);
+        transcript = parseVttToTranscript(vtt);
+      } catch (zErr) {
+        return await failTranscript('Zoom transcript fetch failed for meeting ' + callRow.fathom_call_id + ': ' + ((zErr && zErr.message) || 'unknown'));
+      }
+    } else {
+      // ── Fathom (unchanged) ── fathom_connections token + /recordings/{id}/transcript.
+      // findMeeting() is bypassed (kept below, unused): everything the pipeline
+      // needs is on callRow (Phase 2) plus the transcript pulled straight from the
+      // recording endpoint by stored recording_id. Fathom highlights skipped (the
+      // Claude extractor derives them); recorded_by null → Claude infers roles.
+      var connQ = await admin
+        .from('fathom_connections')
+        .select('access_token, refresh_token, expires_at')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (connQ.error) throw new Error('fathom_connections fetch: ' + connQ.error.message);
+      if (!connQ.data) throw new Error('Fathom connection not found for user ' + userId);
+      var accessToken = await fathomRoutes._getValidAccessToken(admin, userId, connQ.data);
+      try {
+        transcript = await fathomRoutes._fetchRecordingTranscript(accessToken, callRow.fathom_call_id);
+      } catch (transcriptErr) {
+        return await failTranscript('Transcript fetch failed for recording_id ' + callRow.fathom_call_id + ': ' + ((transcriptErr && transcriptErr.message) || 'unknown'));
+      }
     }
 
     // DIAGNOSTIC (temporary): first live exercise of /recordings/{id}/transcript.
@@ -959,6 +994,9 @@ module.exports = {
   // Current grader prompt version — the dashboard uses this to surface calls
   // analyzed under an older version ("Update analyses (N outdated)").
   ANALYSIS_PROMPT_VERSION: ANALYSIS_PROMPT_VERSION,
+  // Source-switch predicate (sub-stage 2) — 'zoom' | 'fathom'. Exported so the
+  // branch decision is unit-testable without exercising the full analyzeCall.
+  transcriptSourceFor: transcriptSourceFor,
   // Exported for tests / future internal callers — same precedent as me.js
   // (_computeCoachingPatterns, etc.).
   _extractFirstJsonObject:     extractFirstJsonObject,

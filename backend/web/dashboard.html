@@ -2144,6 +2144,7 @@
     fathomStatus:    null,    // null until /fathom/status fetch completes; then { connected: bool, ... }
     zoomStatus:      null,    // null until /zoom/status fetch completes; then { connected: bool, ... }
     zoomNotice:      null,    // {kind,text} after a connect attempt
+    zoomSyncing:     false,   // true while a /zoom/sync request is in flight; drives spinner state
     fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
     fathomReanalyzing: false, // true while a /fathom/reanalyze request is in flight; drives the Reanalyze button spinner
@@ -2585,6 +2586,47 @@
     // then re-render — covers the success path AND any error path so the
     // strip reflects the connection's true current state.
     await refreshFathomStatusInBackground();
+  }
+
+  // Zoom "Sync & grade my recent calls" — mirrors syncFathomNow (POST /zoom/sync).
+  // Honest about the free-plan / no-cloud-recording case: Zoom returns
+  // no_recordings and we say so plainly rather than showing a scary error.
+  async function syncZoomNow() {
+    if (state.zoomSyncing) return; // guard against double-click
+    state.zoomSyncing = true;
+    if (state.view === 'overview') renderOverview(false);
+
+    var noticeText = null;
+    var noticeKind = 'success';
+    try {
+      var res = await fetch('/zoom/sync', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()) });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (res.ok) {
+        var data = await res.json();
+        if (data && data.no_recordings) {
+          noticeText = 'No Zoom cloud recordings found yet. Zoom only grades cloud recordings with transcription on — record a meeting to the cloud and sync again.';
+          noticeKind = 'warn';
+        } else {
+          var n = (data && typeof data.synced === 'number') ? data.synced : 0;
+          noticeText = 'Synced ' + n + ' new call' + (n === 1 ? '' : 's') + '.';
+          if (data && data.truncated) { noticeText += ' (More calls available — run sync again to fetch the rest.)'; noticeKind = 'warn'; }
+        }
+      } else if (res.status === 404) {
+        noticeText = 'Not connected to Zoom.';
+        noticeKind = 'error';
+      } else {
+        var errBody = null;
+        try { errBody = await res.json(); } catch (e) { /* ignore */ }
+        noticeText = 'Sync failed: ' + (errBody && errBody.error ? errBody.error : 'HTTP ' + res.status);
+        noticeKind = 'error';
+      }
+    } catch (err) {
+      noticeText = 'Sync error: ' + (err && err.message || 'unknown');
+      noticeKind = 'error';
+    }
+    state.zoomNotice = { kind: noticeKind, text: noticeText };
+    state.zoomSyncing = false;
+    await refreshZoomStatusInBackground();
   }
 
   // Button handler: re-trigger analysis on calls already synced but still
@@ -3305,7 +3347,7 @@
     }
 
     // Step 2 — get calls graded. Connecting does NOT auto-sync, so this step carries
-    // the action itself (Fathom has a sync; Zoom's is still rolling out).
+    // the action itself. Both Fathom and Zoom now have a real one-click sync.
     var s2;
     if (analyzed) {
       s2 = stepHtml(true, 'Get your calls graded', 'Your recent calls are graded — your scores are up top.', '');
@@ -3315,7 +3357,10 @@
         : stepHtml(false, 'Get your calls graded', 'Pull in your most recent calls and grade them — one click.',
             '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="syncFathomNow()">Sync &amp; grade my recent calls</button>');
     } else if (zoomConnected) {
-      s2 = stepHtml(false, 'Get your calls graded', 'Zoom call grading is rolling out now — once it’s live your recent calls are graded automatically. Nothing to do here for the moment.', '');
+      s2 = state.zoomSyncing
+        ? stepHtml(false, 'Get your calls graded', 'Syncing your calls now — this usually takes a few minutes. Your grades appear up top as each one finishes.', '')
+        : stepHtml(false, 'Get your calls graded', 'Pull in your most recent Zoom cloud recordings and grade them — one click. (Zoom grades cloud recordings that have transcription turned on.)',
+            '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="syncZoomNow()">Sync &amp; grade my recent calls</button>');
     } else {
       s2 = stepHtml(false, 'Get your calls graded', 'After you connect above, grade your most recent calls in one click.', '');
     }

@@ -414,13 +414,14 @@ async function syncUserCalls(admin, userId, conn) {
   // limits + predictable ordering), lazy-required to dodge the fathom↔worker
   // circular dependency, per-call errors caught. Detached — not durable across a
   // Railway restart (bounded batches keep the blast radius small).
-  // FD-4 cap: auto-analyze only the newest FIRST_SYNC_ANALYZE_CAP newly-synced
-  // calls. The rest were still inserted (sync_status='pending') and are reachable
-  // via Update-analyses backfill — they just don't fire a Claude call on connect.
+  // FD-4 cap — FIRST SYNC ONLY: on connect (last_sync_at null) auto-analyze only
+  // the newest FIRST_SYNC_ANALYZE_CAP of a large backlog (rest stay pending for the
+  // Update-analyses backfill). On steady-state syncs (last_sync_at set) analyze
+  // EVERY new call — a per-run cap would silently drop a busy day's calls past #20.
   var newRows = (insertResult && insertResult.data) || [];
-  var newCallIds = pickNewestForAnalysis(newRows, FIRST_SYNC_ANALYZE_CAP);
+  var newCallIds = callIdsToAnalyze(newRows, conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
   if (newRows.length > newCallIds.length) {
-    console.log('[fathom] sync: capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
+    console.log('[fathom] sync: first-sync backlog — capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
   }
   if (newCallIds.length > 0) {
     (async function() {
@@ -685,6 +686,21 @@ function pickNewestForAnalysis(rows, cap) {
     var da = (a && a.call_date) || '', db = (b && b.call_date) || '';
     return da < db ? 1 : (da > db ? -1 : 0); // newest first; '' (missing date) sorts last
   }).slice(0, cap).map(function (r) { return r.id; });
+}
+
+// Which of this run's NEW calls to auto-analyze. The cap is FIRST-SYNC ONLY:
+//   • FIRST sync (last_sync_at is null) = the whole backlog lands on connect —
+//     cap to the newest `cap` so a customer with years of history doesn't auto-fire
+//     hundreds of Claude analyses; the rest stay pending for the Update-analyses
+//     backfill (7d/30d/all dropdown).
+//   • STEADY-STATE (last_sync_at set) = only calls recorded since the last sync
+//     arrive this run (created_after / from filter) — a naturally-bounded window.
+//     Analyze EVERY new one. A per-run cap here would silently leave a busy day's
+//     calls past #20 ungraded, which is exactly the failure to avoid.
+// Newest-first ordering is preserved either way (predictable dashboard fill). Pure.
+function callIdsToAnalyze(newRows, lastSyncAt, cap) {
+  var effectiveCap = lastSyncAt ? ((newRows && newRows.length) || 0) : cap;
+  return pickNewestForAnalysis(newRows, effectiveCap);
 }
 
 // Same shape as /reanalyze, with an explicit reset step: it selects outdated
@@ -1256,4 +1272,5 @@ module.exports = router;
 // pure helper exported for tests (log.js:_validateLogBatch pattern)
 module.exports._orderBatchIds = orderBatchIds;
 module.exports._pickNewestForAnalysis = pickNewestForAnalysis;
+module.exports._callIdsToAnalyze = callIdsToAnalyze;
 module.exports._FIRST_SYNC_ANALYZE_CAP = FIRST_SYNC_ANALYZE_CAP;

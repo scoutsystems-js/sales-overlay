@@ -6,7 +6,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fathom = require('../routes/fathom');
+const zoomRoute = require('../routes/zoom');
 const pick = fathom._pickNewestForAnalysis;
+const idsToAnalyze = fathom._callIdsToAnalyze;
 
 test('caps to the newest N by call_date, descending', () => {
   const rows = [
@@ -49,4 +51,40 @@ test('empty / missing input → empty', () => {
   assert.deepStrictEqual(pick([], 20), []);
   assert.deepStrictEqual(pick(null, 20), []);
   assert.deepStrictEqual(pick(undefined, 20), []);
+});
+
+// ── callIdsToAnalyze: the cap is FIRST-SYNC ONLY, not per-run ─────────────────
+// The bug this guards against: capping every run would silently leave a busy day's
+// calls past #20 ungraded. First sync (no last_sync_at) = backlog on connect → cap.
+// Steady-state (last_sync_at set) = only new-since-last-sync calls → grade them ALL.
+function rowsN(n) {
+  var r = [];
+  for (var i = 0; i < n; i++) r.push({ id: 'id-' + i, call_date: '2026-07-' + String(i + 1).padStart(2, '0') });
+  return r;
+}
+
+test('FIRST sync (no last_sync_at) caps a >20 backlog to the newest 20', () => {
+  var out = idsToAnalyze(rowsN(25), null, 20);
+  assert.strictEqual(out.length, 20);
+  assert.strictEqual(out[0], 'id-24');            // newest first
+  assert.ok(out.indexOf('id-0') === -1);          // oldest 5 dropped (backfill later)
+});
+
+test('STEADY-STATE (last_sync_at set) analyzes EVERY new call, even past 20', () => {
+  var out = idsToAnalyze(rowsN(25), '2026-07-20T00:00:00Z', 20);
+  assert.strictEqual(out.length, 25);             // no per-run cap — nothing dropped
+  assert.strictEqual(out[0], 'id-24');            // still newest-first ordered
+});
+
+test('STEADY-STATE with a small batch returns all of them', () => {
+  assert.strictEqual(idsToAnalyze(rowsN(3), '2026-07-20T00:00:00Z', 20).length, 3);
+});
+
+test('empty batch → empty regardless of sync state', () => {
+  assert.deepStrictEqual(idsToAnalyze([], null, 20), []);
+  assert.deepStrictEqual(idsToAnalyze([], '2026-07-20T00:00:00Z', 20), []);
+});
+
+test('Zoom reuses the exact same first-sync-only selector', () => {
+  assert.strictEqual(zoomRoute._callIdsToAnalyze, fathom._callIdsToAnalyze);
 });

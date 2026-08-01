@@ -5,6 +5,16 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { requireAuth } = require('../middleware/auth');
+const callConnections = require('../lib/call-connections');
+const zoomClient = require('../lib/zoom-client');
+// Reuse Fathom's first-sync cap + newest-picker VERBATIM so the two sources share
+// one rule (the FD-4 cap, coming due for Zoom here). Not duplicated — imported.
+const fathomRoutes = require('./fathom');
+const FIRST_SYNC_ANALYZE_CAP = fathomRoutes._FIRST_SYNC_ANALYZE_CAP;
+const pickNewestForAnalysis  = fathomRoutes._pickNewestForAnalysis;
+const callIdsToAnalyze       = fathomRoutes._callIdsToAnalyze; // FIRST-SYNC-ONLY cap (shared)
+
+const MAX_ZOOM_PAGES = 12; // next_page_token safety cap for the recordings list
 
 const router = express.Router();
 
@@ -40,6 +50,216 @@ router.get('/status', requireAuth, async function(req, res) {
     if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
     console.error('[zoom] status:', err.message);
     res.status(500).json({ error: 'Failed to load Zoom status' });
+  }
+});
+
+// ── Zoom sync (sub-stage 2) ──────────────────────────────────────────────────
+// Mirror of Fathom's syncUserCalls: refresh the token via call_connections'
+// SERIALIZED single-flight refresh (never bypassed — Zoom's single-use rotating
+// refresh tokens make that a correctness requirement), page the user's cloud
+// recordings, map each → a fathom_calls row (source='zoom'), upsert ON CONFLICT
+// DO NOTHING, update the connection's sync status, and fire-and-forget analysis
+// of the NEWEST FIRST_SYNC_ANALYZE_CAP new calls (the shared FD-4 cap).
+//
+// Degrade cleanly: a user with NO cloud recordings (free Zoom plan — the common
+// case) is NOT an error. Zoom returns { meetings: [] } (200); we return
+// { ok:true, synced:0, no_recordings:true } and the UI says so honestly.
+//
+// Result shapes (parallels Fathom):
+//   { ok:true, synced, fetched, malformed, pages, truncated, dispatched, no_recordings }
+//   { ok:false, kind:'refresh_failed'|'fetch_failed'|'insert_failed', error }
+async function markZoomConnError(admin, userId, reason) {
+  try {
+    await admin.from('call_connections')
+      .update({ last_sync_status: 'error', last_sync_error: String(reason).slice(0, 500), updated_at: new Date().toISOString() })
+      .eq('user_id', userId).eq('provider', 'zoom');
+  } catch (e) {
+    console.error('[zoom] markZoomConnError failed for user ' + userId + ': ' + (e && e.message));
+  }
+}
+
+// Zoom's `from` is a YYYY-MM-DD date. LIMITATION (sub-stage 2): Zoom caps each
+// from→to span at ~1 month and defaults to the last month when `from` is omitted,
+// so a first sync (last_sync_at=null) pulls roughly the last month of recordings;
+// older history needs a wider backfill (a later refinement). Steady-state (the
+// 2h cron, last_sync_at set to ~2h ago) is always inside one window.
+function zoomFromDate(lastSyncAtIso) {
+  if (!lastSyncAtIso) return null;
+  var d = new Date(lastSyncAtIso);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+async function syncZoomCalls(admin, userId, conn) {
+  // Valid access token (serialized refresh; throws if Zoom rejects the refresh).
+  var accessToken;
+  try {
+    accessToken = await callConnections.getValidAccessToken(admin, userId, 'zoom', conn);
+  } catch (refreshErr) {
+    await markZoomConnError(admin, userId, 'refresh_failed: ' + (refreshErr && refreshErr.message));
+    console.error('[zoom] sync refresh failed for user ' + userId + ': ' + (refreshErr && refreshErr.message));
+    return { ok: false, kind: 'refresh_failed', error: (refreshErr && refreshErr.message) || 'refresh failed' };
+  }
+
+  // Page the recordings list (next_page_token), bounded by MAX_ZOOM_PAGES.
+  var from = zoomFromDate(conn && conn.last_sync_at);
+  var token = null, pageCount = 0, allRows = [], malformedCount = 0;
+  try {
+    while (pageCount < MAX_ZOOM_PAGES) {
+      var page = await zoomClient.listRecordings(accessToken, { from: from, pageSize: 100, nextPageToken: token });
+      var meetings = Array.isArray(page.meetings) ? page.meetings : [];
+      for (var i = 0; i < meetings.length; i++) {
+        var row = zoomClient.zoomRecordingToRow(userId, meetings[i]);
+        if (row) allRows.push(row);
+        else malformedCount += 1;
+      }
+      token = (typeof page.next_page_token === 'string' && page.next_page_token) ? page.next_page_token : null;
+      pageCount += 1;
+      if (!token) break;
+    }
+  } catch (fetchErr) {
+    await markZoomConnError(admin, userId, fetchErr.message);
+    console.error('[zoom] sync fetch failed for user ' + userId + ': ' + fetchErr.message);
+    return { ok: false, kind: 'fetch_failed', error: fetchErr.message };
+  }
+  var hitPageCap = token !== null;
+
+  // No recordings at all — free plan / nothing recorded. Mark ok, report honestly.
+  if (allRows.length === 0) {
+    var nowIsoEmpty = new Date().toISOString();
+    await admin.from('call_connections')
+      .update({ last_sync_at: nowIsoEmpty, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIsoEmpty })
+      .eq('user_id', userId).eq('provider', 'zoom');
+    console.log('[zoom] Sync complete for user ' + userId + ': no cloud recordings (fetched=0, malformed=' + malformedCount + ')');
+    return { ok: true, synced: 0, fetched: 0, malformed: malformedCount, pages: pageCount, truncated: hitPageCap, dispatched: 0, no_recordings: true };
+  }
+
+  // Upsert ON CONFLICT DO NOTHING (idempotent). .select() returns only new rows.
+  var insertResult = await admin
+    .from('fathom_calls')
+    .upsert(allRows, { onConflict: 'user_id,fathom_call_id', ignoreDuplicates: true })
+    .select('id, call_date');
+  if (insertResult.error) {
+    await markZoomConnError(admin, userId, 'sync_failed: DB insert — ' + insertResult.error.message);
+    console.error('[zoom] sync insert failed for user ' + userId + ': ' + insertResult.error.message);
+    return { ok: false, kind: 'insert_failed', error: insertResult.error.message };
+  }
+  var newRows = insertResult.data || [];
+  var insertedCount = newRows.length;
+
+  // Mark connection success.
+  var nowIso = new Date().toISOString();
+  var statusUpdate = await admin.from('call_connections')
+    .update({ last_sync_at: nowIso, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIso })
+    .eq('user_id', userId).eq('provider', 'zoom');
+  if (statusUpdate.error) console.error('[zoom] sync status update failed for user ' + userId + ': ' + statusUpdate.error.message);
+
+  // FD-4 cap — FIRST SYNC ONLY (shared with Fathom): cap the connect backlog to the
+  // newest N; on steady-state syncs analyze every new call so a busy day isn't
+  // silently truncated. The rest of a first-sync backlog stay pending for backfill.
+  var newCallIds = callIdsToAnalyze(newRows, conn && conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
+  if (newRows.length > newCallIds.length) {
+    console.log('[zoom] sync: first-sync backlog — capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
+  }
+  if (newCallIds.length > 0) {
+    (async function() {
+      try {
+        var analyzeCall = require('../lib/analysis-worker').analyzeCall; // lazy — dodge require cycle
+        for (var i = 0; i < newCallIds.length; i++) {
+          try { await analyzeCall(newCallIds[i], userId); }
+          catch (innerErr) { console.error('[zoom] analyzeCall failed for call ' + newCallIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown')); }
+        }
+      } catch (outerErr) {
+        console.error('[zoom] background analysis loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
+      }
+    })();
+  }
+
+  console.log('[zoom] Sync complete for user ' + userId + ': fetched=' + allRows.length + ' inserted=' + insertedCount + ' malformed=' + malformedCount + ' pages=' + pageCount + (hitPageCap ? ' (CAPPED — more available)' : '') + (newCallIds.length > 0 ? ' analysis_dispatched=' + newCallIds.length : ''));
+  return { ok: true, synced: insertedCount, fetched: allRows.length, malformed: malformedCount, pages: pageCount, truncated: hitPageCap, dispatched: newCallIds.length, no_recordings: false };
+}
+
+// ── POST /zoom/sync ──────────────────────────────────────────────────────────
+// Manual "Sync & grade my recent calls" trigger from the dashboard (mirrors
+// GET /fathom/sync). 404 when the caller hasn't connected Zoom.
+router.post('/sync', requireAuth, async function(req, res) {
+  var userId = req.user.id;
+  try {
+    var admin = getAdminClient();
+    var conn = await callConnections.getConnection(admin, userId, 'zoom');
+    if (!conn) return res.status(404).json({ error: 'Not connected to Zoom' });
+
+    // getConnection doesn't select last_sync_at; fetch it for the sync window.
+    var lsQ = await admin.from('call_connections').select('last_sync_at').eq('user_id', userId).eq('provider', 'zoom').maybeSingle();
+    if (!lsQ.error && lsQ.data) conn.last_sync_at = lsQ.data.last_sync_at;
+
+    var r = await syncZoomCalls(admin, userId, conn);
+    if (!r.ok) {
+      if (r.kind === 'refresh_failed') return res.status(401).json({ error: r.error });
+      if (r.kind === 'fetch_failed')   return res.status(502).json({ error: r.error });
+      return res.status(500).json({ error: 'Could not save synced calls' });
+    }
+    return res.json({
+      synced: r.synced, fetched: r.fetched, malformed: r.malformed,
+      pages: r.pages, truncated: r.truncated, no_recordings: r.no_recordings,
+    });
+  } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
+    console.error('[zoom] sync fatal for user ' + userId + ':', err.message);
+    res.status(500).json({ error: 'Sync failed' });
+  }
+});
+
+// ── POST /zoom/sync-all ──────────────────────────────────────────────────────
+// Cron-triggered bulk Zoom sync (shared-secret X-Cron-Secret === CRON_SECRET),
+// mirroring /fathom/sync-all. Iterates every provider='zoom' connection, skips
+// DEACTIVATED users, runs the same per-user sync, error-isolated per user.
+router.post('/sync-all', async function(req, res) {
+  var secret = process.env.CRON_SECRET;
+  if (!secret) { console.error('[zoom] sync-all called but CRON_SECRET is not set — refusing'); return res.status(503).json({ error: 'cron not configured' }); }
+  var provided = req.get('X-Cron-Secret') || (req.query && req.query.secret) || '';
+  if (provided !== secret) { console.warn('[zoom] sync-all unauthorized attempt'); return res.status(401).json({ error: 'unauthorized' }); }
+  try {
+    var admin = getAdminClient();
+    var connsResult = await admin.from('call_connections')
+      .select('user_id, provider, access_token, refresh_token, expires_at, last_sync_at')
+      .eq('provider', 'zoom');
+    if (connsResult.error) { console.error('[zoom] sync-all connection list failed: ' + connsResult.error.message); return res.status(500).json({ error: 'Could not load connections' }); }
+    var conns = connsResult.data || [];
+    // Skip deactivated users (a freed seat stops pulling NEW calls; history stays).
+    var inactive = {};
+    if (conns.length) {
+      var uids = conns.map(function (c) { return c.user_id; });
+      var actQ = await admin.from('user_profiles').select('user_id, active').in('user_id', uids);
+      if (!actQ.error) (actQ.data || []).forEach(function (p) { if (p.active === false) inactive[p.user_id] = true; });
+    }
+    var summary = { total: conns.length, ok: 0, synced_total: 0, dispatched_total: 0, no_recordings: 0, skipped_inactive: 0, errors: 0 };
+    for (var i = 0; i < conns.length; i++) {
+      var conn = conns[i];
+      var uid = conn.user_id;
+      if (inactive[uid]) { summary.skipped_inactive += 1; continue; }
+      try {
+        var r = await syncZoomCalls(admin, uid, conn);
+        if (r.ok) {
+          summary.ok += 1;
+          summary.synced_total += r.synced;
+          summary.dispatched_total += r.dispatched;
+          if (r.no_recordings) summary.no_recordings += 1;
+        } else {
+          summary.errors += 1;
+          console.error('[zoom] sync-all user ' + uid + ' failed: ' + r.kind + ' ' + (r.error || ''));
+        }
+      } catch (perUserErr) {
+        summary.errors += 1;
+        console.error('[zoom] sync-all user ' + uid + ' threw: ' + (perUserErr.message || 'unknown'));
+      }
+    }
+    console.log('[zoom] sync-all done: ' + JSON.stringify(summary));
+    return res.json(summary);
+  } catch (err) {
+    if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
+    console.error('[zoom] sync-all fatal: ' + err.message);
+    res.status(500).json({ error: 'sync-all failed' });
   }
 });
 
@@ -125,6 +345,13 @@ router.post('/deauthorization', async function(req, res) {
 });
 
 module.exports = router;
+// sub-stage 2 sync — reused Fathom cap/picker (exposed so tests can prove Zoom
+// uses the SAME rule) + the date-window helper + the sync core.
+module.exports._FIRST_SYNC_ANALYZE_CAP = FIRST_SYNC_ANALYZE_CAP;
+module.exports._pickNewestForAnalysis  = pickNewestForAnalysis;
+module.exports._callIdsToAnalyze       = callIdsToAnalyze;
+module.exports._zoomFromDate = zoomFromDate;
+module.exports._syncZoomCalls = syncZoomCalls;
 // pure helpers for tests
 module.exports._deauthUrlValidation = deauthUrlValidation;
 module.exports._deauthIsUrlValidation = deauthIsUrlValidation;
