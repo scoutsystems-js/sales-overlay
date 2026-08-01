@@ -196,6 +196,9 @@
     .glance-big { font-size: 30px; font-weight: 700; color: var(--text); line-height: 1.05; }
     .glance-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 8px; }
     .glance-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    /* Avg-score tile period-over-period trend (arrow reuses .trend.up/.down/.flat). */
+    .glance-trend { font-size: 13px; font-weight: 600; margin-left: 8px; vertical-align: 4px; white-space: nowrap; }
+    .glance-trend-pct { margin-left: 2px; color: var(--text-muted); font-weight: 500; }
     .glance-skeleton { height: 92px; border-radius: var(--radius); }
     /* FD-4: Get-started onboarding card */
     .gs-card { position: relative; border-color: var(--accent); background: linear-gradient(180deg, rgba(91,158,255,0.05), var(--bg-elevated)); }
@@ -3331,6 +3334,37 @@
       + (sub ? '<div class="glance-sub">' + escapeHtml(sub) + '</div>' : '')
       + '</div>';
   }
+
+  // Tile metrics — MIRROR of backend lib/tile-metrics.js (pinned by
+  // tile-metrics-mirror.test.js). Keep in sync.
+  function objectionHandleRate(needsWork) {
+    var d = needsWork && needsWork.detail;
+    if (!d || !Array.isArray(d.buckets)) return null;
+    var handled = 0, total = 0;
+    for (var i = 0; i < d.buckets.length; i++) {
+      var b = d.buckets[i] || {};
+      handled += (typeof b.handled === 'number') ? b.handled : 0;
+      total += (typeof b.total === 'number') ? b.total : 0;
+    }
+    if (total <= 0) return null;
+    if (handled > total) handled = total;
+    return { rate: Math.round((handled / total) * 100), handled: handled, total: total };
+  }
+  function scoreTrend(cur, prior) {
+    if (typeof cur !== 'number' || typeof prior !== 'number') return { dir: null, delta_pct: null };
+    if (prior <= 0) return { dir: null, delta_pct: null };
+    var pct = Math.round(((cur - prior) / prior) * 100);
+    var dir = pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat');
+    return { dir: dir, delta_pct: pct };
+  }
+  // Renders the Avg-score tile trend (arrow + delta %) reusing trendArrow's styling.
+  // Empty string when there's no prior baseline → the tile shows no arrow.
+  function tileTrendHtml(st) {
+    if (!st || !st.dir) return '';
+    var sign = st.dir === 'up' ? 1 : (st.dir === 'down' ? -1 : 0);
+    var pctText = (st.delta_pct > 0 ? '+' : '') + st.delta_pct + '%';
+    return '<span class="glance-trend">' + trendArrow(sign) + '<span class="glance-trend-pct">' + pctText + '</span></span>';
+  }
   // ── FD-4: light first-run "Get started" card ──────────────────────────────
   // A single dismissible card on the overview with a 3-step checklist (connect →
   // first analysis → optional KB). NOT a wizard. Auto-hides once a source is
@@ -3418,10 +3452,19 @@
     // Default first paint = above-the-fold glance tiles + collapsed sections.
     // No Chart.js, no LLM, nothing heavy until the closer clicks. Tiles reuse the
     // old donut drill targets (self /fathom/calls, pivot /admin/fathom-calls/:id).
+    // Avg-score tile: mean + period-over-period trend (arrow + delta %). prior_mean
+    // comes from the reused team prior-window machinery; no prior → no arrow.
+    var avgBig = (a.avg_score.mean === null ? '—' : a.avg_score.mean)
+      + tileTrendHtml(scoreTrend(a.avg_score.mean, a.avg_score.prior_mean));
+    // Objection HANDLE RATE over TRUE objections (needs-work taxonomy — logistical
+    // + disqualifications excluded, so it agrees with the card below). Reads the
+    // already-loaded needs-work classification; "—" until it's available (never
+    // falls back to counting all moments).
+    var ohr = objectionHandleRate(state.needsWork);
     var tiles = '<div class="glance-row fade-in">'
       + glanceTileHtml('Calls analyzed', analyzed, 'of ' + a.calls.total_in_range + ' in range', "drillCalls('analyzed',null)")
-      + glanceTileHtml('Avg score', a.avg_score.mean === null ? '—' : a.avg_score.mean, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
-      + glanceTileHtml('Objection moments', a.objections.total_highlights, 'across ' + a.objections.calls_with_objection + ' call' + (a.objections.calls_with_objection === 1 ? '' : 's'), "goObjections()")
+      + glanceTileHtml('Avg score', avgBig, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
+      + glanceTileHtml('Objection handle rate', ohr ? ohr.rate + '%' : '—', ohr ? (ohr.handled + ' of ' + ohr.total + ' handled') : 'true objections', "goObjections()")
       + glanceTileHtml('Cash collected', fmtCash(a.cash_collected), 'closed-call cash', "drillCalls('analyzed',null)")
       + glanceTileHtml('Close rate', a.close_rate == null ? '—' : a.close_rate + '%', (a.close_decided ? a.close_wins + '/' + a.close_decided + ' decided' : 'of decided calls'), "drillCalls('analyzed',null)")
     + '</div>';

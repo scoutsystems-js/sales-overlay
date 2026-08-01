@@ -6,6 +6,26 @@
 // loadObjectionsByType — were removed 2026-07-29 with the Live-Sessions cleanup.)
 
 var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
+// Reuse the TEAM view's prior-window machinery for the Avg-score tile trend, so
+// "prior period" means the exact same thing everywhere (no second implementation).
+var teamAnalytics = require('./team-analytics');
+
+// Prior equal-length window's avg score for `userId`, via the reused team
+// aggregator. Returns a rounded mean, or null when there are no graded calls in
+// the prior window (new user / window predates their first call) → tile shows no
+// arrow. Non-fatal: any failure yields null (the trend just doesn't render).
+async function priorWindowAvgScore(admin, userId, from, to) {
+  try {
+    var span = new Date(to).getTime() - new Date(from).getTime();
+    if (!(span > 0)) return null;
+    var priorFrom = new Date(new Date(from).getTime() - span).toISOString();
+    var prior = await teamAnalytics._aggregateWindow(admin, [userId], priorFrom, from);
+    var pr = prior && prior.rep && prior.rep[userId];
+    return (pr && pr.score_n > 0) ? Math.round(pr.score_sum / pr.score_n) : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 async function computeCallAnalytics(admin, userId, from, to) {
   // 1) fathom_calls in the date window — paginated to dodge the 1000-row cap.
@@ -138,7 +158,7 @@ async function computeCallAnalytics(admin, userId, from, to) {
   var objCalls = {};
   for (var o = 0; o < objRows.length; o++) { objCalls[objRows[o].fathom_call_id] = true; }
 
-  return {
+  var result = {
     from: from, to: to,
     calls: {
       analyzed: statusCounts.done,
@@ -161,6 +181,11 @@ async function computeCallAnalytics(admin, userId, from, to) {
     strongest_section: strongest,
     latest_one_things: latestOneThings,
   };
+  // Avg-score tile trend baseline (period-over-period). Attached to avg_score so
+  // the client can render the arrow + delta % next to the mean; null when there's
+  // no prior-window data (→ no arrow).
+  result.avg_score.prior_mean = await priorWindowAvgScore(admin, userId, from, to);
+  return result;
 }
 
 function sectionsShape() {
