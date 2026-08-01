@@ -1386,6 +1386,33 @@
     }
     .review-grade-notes.placeholder { color: var(--text-muted); font-style: italic; }
     .review-grade-card.not-occurred .review-grade-name { color: var(--text-muted); font-style: italic; }
+    /* Part 1b — section highlight breakdown inside an expanded grade card. */
+    .review-section-summary {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.55;
+      padding-top: 16px;
+    }
+    .review-section-group { margin-top: 16px; }
+    .review-section-group-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .review-section-group-label::before {
+      content: '';
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .review-section-group.good  .review-section-group-label { color: var(--pos, #46b17b); }
+    .review-section-group.good  .review-section-group-label::before { background: var(--pos, #46b17b); }
+    .review-section-group.bad   .review-section-group-label { color: var(--warn, #d99a3d); }
+    .review-section-group.bad   .review-section-group-label::before { background: var(--warn, #d99a3d); }
+    .review-section-group .review-highlight-list { gap: 10px; }
 
     /* Skeleton grade card while loading or pending analysis. */
     .review-grade-card.skeleton-card {
@@ -6158,6 +6185,30 @@
     return (type && labels[type]) || (type || 'Moment');
   }
 
+  // Section highlight breakdown (Part 1b) — MIRRORS backend lib/highlight-section.js
+  // (highlightGroup + sectionBreakdown; contract pinned by highlight-section.test.js).
+  // Keep the two in sync. 'good' = What worked, 'bad' = What to fix.
+  var HL_GOOD_TYPES = ['strong_moment', 'rapport_moment', 'buying_signal'];
+  function highlightGroup(h) {
+    if (!h || typeof h !== 'object') return 'bad';
+    var type = (typeof h.type === 'string') ? h.type.toLowerCase() : '';
+    if (type === 'objection') return (h.resolution === 'handled') ? 'good' : 'bad';
+    return (HL_GOOD_TYPES.indexOf(type) !== -1) ? 'good' : 'bad';
+  }
+  // 'highlights' when ≥1 highlight is tagged to this section (two-group view),
+  // else 'notes' (fall back to the section-notes prose — the COMMON case, since
+  // only backfilled calls carry section tags).
+  function sectionBreakdown(highlights, sectionKey) {
+    var arr = Array.isArray(highlights) ? highlights : [];
+    var good = [], bad = [], any = false;
+    for (var i = 0; i < arr.length; i++) {
+      if (!arr[i] || arr[i].section !== sectionKey) continue;
+      any = true;
+      if (highlightGroup(arr[i]) === 'good') good.push(arr[i]); else bad.push(arr[i]);
+    }
+    return any ? { mode: 'highlights', good: good, bad: bad } : { mode: 'notes', good: [], bad: [] };
+  }
+
   // ─── Section 2: Section Grades — five collapsible cards ───────────────
   var REVIEW_SECTION_KEYS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
   var REVIEW_SECTION_LABELS = {
@@ -6181,7 +6232,9 @@
 
     var cards;
     if (analysisDone) {
-      cards = REVIEW_SECTION_KEYS.map(function(k) { return gradeCardHtml(k, analysis); }).join('');
+      var hls = Array.isArray(review.highlights) ? review.highlights : [];
+      var recUrl = review.recording_url || null;
+      cards = REVIEW_SECTION_KEYS.map(function(k) { return gradeCardHtml(k, analysis, hls, recUrl); }).join('');
     } else {
       // Skeleton placeholders — 5 cards, pulsing, no interaction.
       var s = '';
@@ -6195,7 +6248,7 @@
     + '</section>';
   }
 
-  function gradeCardHtml(sectionKey, analysis) {
+  function gradeCardHtml(sectionKey, analysis, highlights, recordingUrl) {
     var label = REVIEW_SECTION_LABELS[sectionKey];
     var grade = analysis[sectionKey + '_grade'];
     var score = analysis[sectionKey + '_score'];
@@ -6214,11 +6267,33 @@
 
     var notesHtml = '';
     if (expanded) {
-      var notesText = (typeof notes === 'string' && notes.trim()) ? notes : 'No notes recorded.';
-      var notesClass = (typeof notes === 'string' && notes.trim()) ? 'review-grade-notes' : 'review-grade-notes placeholder';
-      notesHtml = '<div class="review-grade-body">'
-        + '<div class="' + notesClass + '">' + escapeHtml(notesText) + '</div>'
-      + '</div>';
+      var hasNotes = (typeof notes === 'string' && notes.trim());
+      var breakdown = sectionBreakdown(highlights, sectionKey);
+      var bodyInner;
+      if (breakdown.mode === 'highlights') {
+        // This section has tagged moments → two-group breakdown. Notes are kept
+        // but DEMOTED to a one-line summary above the groups (not lost). Only
+        // non-empty groups render — a section where nothing worked (or nothing to
+        // fix) shows just the one group, never an empty column.
+        var summary = hasNotes ? '<div class="review-section-summary">' + escapeHtml(notes) + '</div>' : '';
+        var groups = '';
+        if (breakdown.good.length) {
+          groups += '<div class="review-section-group good"><div class="review-section-group-label">What worked</div>'
+            + '<div class="review-highlight-list">' + breakdown.good.map(function(h) { return highlightEntryHtml(h, recordingUrl); }).join('') + '</div></div>';
+        }
+        if (breakdown.bad.length) {
+          groups += '<div class="review-section-group bad"><div class="review-section-group-label">What to fix</div>'
+            + '<div class="review-highlight-list">' + breakdown.bad.map(function(h) { return highlightEntryHtml(h, recordingUrl); }).join('') + '</div></div>';
+        }
+        bodyInner = summary + groups;
+      } else {
+        // FALLBACK (common case — calls without section tags): the notes prose is
+        // the primary content, rendered cleanly. Never an empty/broken state.
+        var notesText = hasNotes ? notes : 'No notes recorded.';
+        var notesClass = hasNotes ? 'review-grade-notes' : 'review-grade-notes placeholder';
+        bodyInner = '<div class="' + notesClass + '">' + escapeHtml(notesText) + '</div>';
+      }
+      notesHtml = '<div class="review-grade-body">' + bodyInner + '</div>';
     }
 
     var notOccurred = (grade === null && score === null && typeof notes === 'string' && notes.indexOf('did not occur') !== -1);

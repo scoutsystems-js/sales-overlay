@@ -35,8 +35,30 @@ function highlightGroup(h) {
   return (GOOD_TYPES.indexOf(type) !== -1) ? 'good' : 'bad';
 }
 
+// Decide how a Call Review section card expands (Part 1b). 'highlights' → the
+// section has ≥1 tagged moment, so show the two-group (What worked / What to fix)
+// breakdown; 'notes' → no tagged moment for this section, so fall back to the
+// section-notes prose. The fallback is the COMMON case (only backfilled calls have
+// tags). An empty group is just an empty array — the UI renders only non-empty
+// groups (never an empty column). Pure — dashboard.html mirrors this for render.
+function sectionBreakdown(highlights, sectionKey) {
+  var arr = Array.isArray(highlights) ? highlights : [];
+  var inSection = [];
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] && arr[i].section === sectionKey) inSection.push(arr[i]);
+  }
+  if (inSection.length === 0) return { mode: 'notes', good: [], bad: [] };
+  var good = [], bad = [];
+  for (var j = 0; j < inSection.length; j++) {
+    if (highlightGroup(inSection[j]) === 'good') good.push(inSection[j]);
+    else bad.push(inSection[j]);
+  }
+  return { mode: 'highlights', good: good, bad: bad };
+}
+
 module.exports = {
   VALID_HIGHLIGHT_SECTIONS: VALID_HIGHLIGHT_SECTIONS,
   sanitizeSectionValue: sanitizeSectionValue,
   highlightGroup: highlightGroup,
+  sectionBreakdown: sectionBreakdown,
 };

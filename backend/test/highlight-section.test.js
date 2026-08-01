@@ -56,3 +56,46 @@ test('type matching is case-insensitive', function () {
   assert.strictEqual(hs.highlightGroup({ type: 'STRONG_MOMENT' }), 'good');
   assert.strictEqual(hs.highlightGroup({ type: 'Objection', resolution: 'handled' }), 'good');
 });
+
+// ── sectionBreakdown: the UI branch selection (highlights vs notes fallback) ──
+const HL = [
+  { section: 'discovery', type: 'strong_moment' },       // good
+  { section: 'discovery', type: 'missed_opportunity' },   // bad
+  { section: 'discovery', type: 'objection', resolution: 'unhandled' }, // bad
+  { section: 'close', type: 'buying_signal' },            // good (other section)
+  { section: null, type: 'rapport_moment' },              // untagged
+];
+
+test('sectionBreakdown → "notes" fallback when NO highlights are tagged to the section (common case)', function () {
+  assert.strictEqual(hs.sectionBreakdown([], 'discovery').mode, 'notes');
+  assert.strictEqual(hs.sectionBreakdown(null, 'discovery').mode, 'notes');
+  // has highlights, but none for THIS section (e.g. pre-backfill call, or empty section)
+  assert.strictEqual(hs.sectionBreakdown(HL, 'intro').mode, 'notes');
+});
+
+test('sectionBreakdown → "highlights" with good/bad split when the section has tagged moments', function () {
+  const r = hs.sectionBreakdown(HL, 'discovery');
+  assert.strictEqual(r.mode, 'highlights');
+  assert.strictEqual(r.good.length, 1);  // strong_moment
+  assert.strictEqual(r.bad.length, 2);   // missed_opportunity + unhandled objection
+});
+
+test('sectionBreakdown → one group empty renders the other (never an empty column)', function () {
+  const allGood = [{ section: 'close', type: 'strong_moment' }, { section: 'close', type: 'buying_signal' }];
+  const rg = hs.sectionBreakdown(allGood, 'close');
+  assert.strictEqual(rg.mode, 'highlights');
+  assert.strictEqual(rg.good.length, 2);
+  assert.strictEqual(rg.bad.length, 0);   // UI skips the empty "What to fix" group
+
+  const allBad = [{ section: 'close', type: 'missed_opportunity' }];
+  const rb = hs.sectionBreakdown(allBad, 'close');
+  assert.strictEqual(rb.good.length, 0);  // UI skips the empty "What worked" group
+  assert.strictEqual(rb.bad.length, 1);
+});
+
+test('sectionBreakdown does not count other sections or untagged highlights', function () {
+  const r = hs.sectionBreakdown(HL, 'close');
+  assert.strictEqual(r.mode, 'highlights');
+  assert.strictEqual(r.good.length, 1);   // only the close buying_signal
+  assert.strictEqual(r.bad.length, 0);
+});
