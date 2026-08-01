@@ -1209,7 +1209,7 @@ router.get('/calls/:id', requireAuth, async function(req, res) {
     //    highlights array on failure so the page still loads.
     var highlightsResult = await admin
       .from('call_highlights')
-      .select('timestamp_seconds, speaker, quote, observation, type, sequence_order')
+      .select('timestamp_seconds, speaker, quote, observation, type, sequence_order, section, resolution')
       .eq('fathom_call_id', callId)
       .order('sequence_order', { ascending: true });
     if (highlightsResult.error) {
