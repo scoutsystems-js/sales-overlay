@@ -13,9 +13,17 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), '
 
 test('the /calls/:id highlights select includes section and resolution', () => {
   // The highlights query line selecting timestamp_seconds ... must carry both.
-  const m = src.match(/\.select\('timestamp_seconds[^']*'\)/);
+  const m = src.match(/\.select\('id, timestamp_seconds[^']*'\)/);
   assert.ok(m, 'highlights select on timestamp_seconds not found in routes/fathom.js');
   const line = m[0];
   assert.ok(/\bsection\b/.test(line), 'highlights select must include `section` (else the breakdown always falls back to notes)');
   assert.ok(/\bresolution\b/.test(line), 'highlights select must include `resolution` (else handled objections misgroup)');
+});
+
+test('the /calls/:id highlights select includes id (Part 2b Add-to-KB)', () => {
+  // The Add-to-Knowledge-Base button sends IDS ONLY — without `id` the client has
+  // nothing to send and every button is inert. Same failure class as the missing
+  // `section`/`resolution` above: unit tests feed highlights directly and can't see it.
+  const m = src.match(/\.select\('id, timestamp_seconds[^']*'\)/);
+  assert.ok(m, 'highlights select must lead with `id` for the Add-to-KB button');
 });

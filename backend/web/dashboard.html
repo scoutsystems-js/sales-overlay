@@ -1767,6 +1767,25 @@
     }
     .kb-promote-btn.is-team:hover { color: var(--text-dim); border-color: var(--border-strong); background: none; }
     .kb-promote-btn:disabled { opacity: 0.5; cursor: wait; }
+    /* Add-to-KB on a section-breakdown moment row (Part 2b). Sits with the
+       speaker/type badges, pushed right so it never crowds the quote. */
+    .review-kb-btn {
+      margin-left: auto;
+      flex-shrink: 0;
+      background: none;
+      border: 1px solid var(--border-strong);
+      color: var(--text-dim);
+      border-radius: 5px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .review-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+    .review-kb-btn.is-saved { color: var(--accent); border-color: var(--accent); opacity: 1; cursor: default; }
+    .review-kb-btn:disabled:not(.is-saved) { opacity: 0.5; cursor: wait; }
     .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
     .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
 
@@ -2222,6 +2241,7 @@
     callReviewLoading:  false, // gates retry click while a fetch is in flight
     callReviewError:    null,  // last fetch error message; cleared on successful re-fetch
     expandedGradeCards: {},    // map of section key ('intro'|'discovery'|...) → true when expanded
+    savedMomentIds: {},        // Part 2b: highlight id → true when already in the caller's KB
     followupCopied:     false, // transient "Copied!" feedback flag (set true, render, then false 2s later)
   };
 
@@ -5087,6 +5107,9 @@
         winning_call: 'Winning call transcript',
         case_study: 'Case study / social proof',
         training_material: 'Training material',
+        // Part 2b: moments harvested from call reviews. Deliberately NOT a
+        // grader/synthesis category (ruling 1) — see lib/kb-entry.js.
+        call_moment: 'Call moment',
       };
       var catBadge = (it.category && catLabels[it.category])
         ? '<span class="kb-badge kb-cat-' + escapeHtml(it.category) + '">' + escapeHtml(catLabels[it.category]) + '</span>'
@@ -5105,7 +5128,7 @@
       // to surface in a side panel.
       var viewBtn = '';
       var expandPanel = '';
-      if (it.category === 'learned_pattern') {
+      if (it.category === 'learned_pattern' || it.category === 'call_moment') {
         viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View patterns</button>';
         expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
       }
@@ -6038,6 +6061,61 @@
     }
     state.callReviewLoading = false;
     if (state.view === 'call-review') renderCallReview();
+    // Which moments are already in this caller's KB (Part 2b). Fire-and-forget and
+    // fully degradable: on any failure every row just renders as unsaved, and
+    // adding again is idempotent server-side anyway.
+    loadSavedMoments(callId);
+  }
+
+  // Server computes the saved set (it owns the quote-normalization), so the
+  // browser never needs a copy of normalizeQuote — that would be exactly the
+  // mirrored-predicate duplication 2a spent its budget retiring.
+  async function loadSavedMoments(callId) {
+    try {
+      var res = await fetch('/kb/saved-moments/' + encodeURIComponent(callId), { headers: authHeader() });
+      if (!res.ok) return;
+      var data = await res.json();
+      if (state.selectedCallId !== callId) return; // navigated away
+      var map = {};
+      ((data && data.saved_highlight_ids) || []).forEach(function(id) { map[id] = true; });
+      state.savedMomentIds = map;
+      if (state.view === 'call-review') renderCallReview();
+    } catch (err) { /* degrade silently — unsaved is the safe default */ }
+  }
+
+  // Add-to-KB click. Sends IDS ONLY. A duplicate is reported as success, because
+  // the user's intent ("this moment should be in my KB") is already satisfied —
+  // that is what makes the button idempotent with 2d's auto-population.
+  async function addMomentToKb(highlightId, btn) {
+    if (!highlightId || !state.selectedCallId) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    var res;
+    try {
+      res = await fetch('/kb/from-highlight', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ fathom_call_id: state.selectedCallId, highlight_id: highlightId }),
+      });
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
+      window.alert('Could not reach server: ' + err.message);
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var e;
+      try { e = await res.json(); } catch (x) { e = { error: 'HTTP ' + res.status }; }
+      if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
+      window.alert('Could not add to knowledge base: ' + (e.error || 'unknown error'));
+      return;
+    }
+    if (!state.savedMomentIds) state.savedMomentIds = {};
+    state.savedMomentIds[highlightId] = true;
+    if (btn) {
+      btn.textContent = 'In KB ✓';
+      btn.classList.add('is-saved');
+      btn.disabled = true;
+    }
   }
 
   function renderCallReview() {
@@ -6255,7 +6333,10 @@
     + '</section>';
   }
 
-  function highlightEntryHtml(h, recordingUrl) {
+  // opts.addToKb — render the Part 2b "Add to Knowledge Base" button on this row.
+  // Only the SECTION BREAKDOWN passes it; the main highlights timeline does not,
+  // so the button appears exactly where the spec put the slot (Part 1b left it).
+  function highlightEntryHtml(h, recordingUrl, opts) {
     var seconds = (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null;
     var label = (seconds != null) ? formatTimestampDisplay(seconds) : '—';
     var timeHtml;
@@ -6277,10 +6358,22 @@
     var quote = (typeof h.quote === 'string') ? h.quote : '';
     var observation = (typeof h.observation === 'string') ? h.observation : '';
 
+    // Add-to-KB (Part 2b). Needs the highlight id — the button sends IDS ONLY and
+    // the server re-reads the row, so nothing rendered here is trusted on write.
+    var kbBtn = '';
+    if (opts && opts.addToKb && h.id) {
+      var alreadySaved = !!(state.savedMomentIds && state.savedMomentIds[h.id]);
+      kbBtn = alreadySaved
+        ? '<button class="review-kb-btn is-saved" disabled title="Already in your knowledge base">In KB ✓</button>'
+        : '<button class="review-kb-btn" data-hid="' + escapeHtml(String(h.id)) + '"'
+          + ' onclick="addMomentToKb(this.getAttribute(\'data-hid\'), this)"'
+          + ' title="Save this moment to your knowledge base">+ Add to KB</button>';
+    }
+
     return '<div class="review-highlight">'
       + timeHtml
       + '<div class="review-highlight-body">'
-        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + '</div>'
+        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + kbBtn + '</div>'
         + '<div class="review-quote">' + escapeHtml(quote) + '</div>'
         + '<div class="review-observation">' + escapeHtml(observation) + '</div>'
       + '</div>'
@@ -6393,11 +6486,11 @@
         var groups = '';
         if (breakdown.good.length) {
           groups += '<div class="review-section-group good"><div class="review-section-group-label">What worked</div>'
-            + '<div class="review-highlight-list">' + breakdown.good.map(function(h) { return highlightEntryHtml(h, recordingUrl); }).join('') + '</div></div>';
+            + '<div class="review-highlight-list">' + breakdown.good.map(function(h) { return highlightEntryHtml(h, recordingUrl, { addToKb: true }); }).join('') + '</div></div>';
         }
         if (breakdown.bad.length) {
           groups += '<div class="review-section-group bad"><div class="review-section-group-label">What to fix</div>'
-            + '<div class="review-highlight-list">' + breakdown.bad.map(function(h) { return highlightEntryHtml(h, recordingUrl); }).join('') + '</div></div>';
+            + '<div class="review-highlight-list">' + breakdown.bad.map(function(h) { return highlightEntryHtml(h, recordingUrl, { addToKb: true }); }).join('') + '</div></div>';
         }
         bodyInner = summary + groups;
       } else {

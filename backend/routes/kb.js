@@ -4,6 +4,10 @@ const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
 const { kbReadRowVisible } = require('../lib/kb-scope');
+const { sanitizeSectionValue } = require('../lib/highlight-section');
+const {
+  quoteHash, buildEntryContent, resolveEntryTarget, KB_ENTRY_METADATA_CATEGORY,
+} = require('../lib/kb-entry');
 
 var router = express.Router();
 
@@ -700,6 +704,179 @@ router.get('/entries/:source_label', protect, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[kb] entries error:', err.message);
     return res.status(500).json({ error: 'Failed to load entries' });
+  }
+});
+
+// ── POST /kb/from-highlight ───────────────────────────────────────────────
+// The "Add to Knowledge Base" button in a Call Review section-breakdown row.
+// KB Part 2, sub-stage 2b.
+//
+// CONTRACT: the client sends IDS ONLY — { fathom_call_id, highlight_id }. The
+// server re-reads the highlight from the DB and builds the entry from THAT.
+// Client-supplied quote/observation is never trusted: this store may one day
+// feed grading (ruling 1 keeps it out for now), and a tampered quote landing in
+// it would be a content-injection route into coaching.
+//
+// GATE is `protect`, not `manage`: ruling 5 lets a MANAGED rep add moments from
+// their OWN call, and requireKbAccess deliberately 403s managed reps. Authority
+// over OTHER users' calls is enforced below via getVisibleUploaderIds.
+//
+// RULING 1: the category COLUMN is written as 'learned_pattern' and
+// metadata.category as KB_ENTRY_METADATA_CATEGORY ('call_moment'). Those two
+// choices — not any filter added later — are what keep harvested material out
+// of the grader. See the header of lib/kb-entry.js.
+router.post('/from-highlight', protect, async function(req, res) {
+  var fathomCallId = req.body && req.body.fathom_call_id;
+  var highlightId  = req.body && req.body.highlight_id;
+  if (!fathomCallId || !highlightId) {
+    return res.status(400).json({ error: 'fathom_call_id and highlight_id required' });
+  }
+
+  try {
+    var admin = getAdminClient();
+    var scope = await resolveUserScope(admin, req.user.id);
+
+    // Re-read the moment from the DB — the row is the source of truth.
+    var hl = await admin
+      .from('call_highlights')
+      .select('id, fathom_call_id, user_id, timestamp_seconds, speaker, quote, observation, type, section, resolution, closer_response')
+      .eq('id', highlightId)
+      .maybeSingle();
+    if (hl.error) {
+      console.error('[kb] from-highlight read failed:', hl.error.message);
+      return res.status(500).json({ error: 'Could not load that moment' });
+    }
+    if (!hl.data) return res.status(404).json({ error: 'Moment not found' });
+    // Consistency: the client must not be able to pair a highlight with an
+    // unrelated call id and skew the dedupe key onto the wrong call.
+    if (hl.data.fathom_call_id !== fathomCallId) {
+      return res.status(400).json({ error: 'Moment does not belong to that call' });
+    }
+
+    var callOwnerId = hl.data.user_id;
+
+    // Authority: whose calls may this caller act on? Same helper the delete and
+    // promotion paths use — own id for a plain user, own + managed reps for a
+    // manager, unrestricted (null) for an owner.
+    var allowedOwners = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+    if (allowedOwners !== null && allowedOwners.indexOf(callOwnerId) === -1) {
+      console.warn('[kb] from-highlight scope violation: actor=%s call_owner=%s', req.user.id, callOwnerId);
+      return res.status(403).json({ error: 'You do not have access to that call' });
+    }
+
+    // Which KB this lands in (ruling 5): own call → own KB; manager on a rep's
+    // call → the TEAM KB.
+    var t = resolveEntryTarget(scope, callOwnerId);
+    if (!t.ok) return res.status(403).json({ error: t.error });
+
+    var section = sanitizeSectionValue(hl.data.section);
+    var qHash = quoteHash(hl.data.quote);
+    var content = buildEntryContent(hl.data);
+    // Distinct labels per KB so the list doesn't merge a manager's personal and
+    // team moments into one mixed-scope group.
+    var label = (t.target.scope === 'team') ? 'Team call moments' : 'My call moments';
+
+    var emb = await getVoyageEmbedding(content);
+
+    var row = {
+      category: 'learned_pattern',            // RULING 1 — filter (a)
+      label: label,
+      content: content,
+      triggers: [],
+      metadata: {
+        category: KB_ENTRY_METADATA_CATEGORY, // RULING 1 — filter (b)
+        source: 'manual_add',
+        section: section,
+        type: hl.data.type || null,
+        resolution: hl.data.resolution || null,
+        speaker: hl.data.speaker || null,
+        quote: hl.data.quote || null,
+        observation: hl.data.observation || null,
+        closer_response: hl.data.closer_response || null,
+        timestamp_seconds: (typeof hl.data.timestamp_seconds === 'number') ? hl.data.timestamp_seconds : null,
+        source_fathom_call_id: fathomCallId,
+        source_highlight_id: hl.data.id,       // provenance only — NEVER the dedupe key
+        source_user_id: callOwnerId,           // whose call it came from (attribution)
+        added_by: req.user.id,
+      },
+      embedding: emb,
+      uploaded_by: t.target.uploaded_by,
+      scope: t.target.scope,
+      team_owner_id: t.target.team_owner_id,
+      source_label: label,
+      source_fathom_call_id: fathomCallId,
+      source_section: section,
+      source_quote_hash: qHash,
+    };
+
+    var insert = await admin.from('knowledge_base').insert(row);
+    if (insert.error) {
+      // 23505 = unique violation on knowledge_base_call_moment_dedupe_idx. That
+      // means this exact moment is already in this KB — from an earlier click or
+      // (once 2d ships) from auto-population. Idempotent success, not an error.
+      if (insert.error.code === '23505') {
+        return res.json({ ok: true, added: false, duplicate: true, scope: t.target.scope });
+      }
+      console.error('[kb] from-highlight insert failed:', String(insert.error.message || 'unknown').slice(0, 200));
+      return res.status(500).json({ error: 'Could not save that moment' });
+    }
+
+    console.log('[kb] Moment added: actor=%s call=%s section=%s scope=%s', req.user.email, fathomCallId, section, t.target.scope);
+    return res.json({ ok: true, added: true, duplicate: false, scope: t.target.scope });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[kb] from-highlight error:', err.message);
+    return res.status(500).json({ error: 'Could not save that moment' });
+  }
+});
+
+// ── GET /kb/saved-moments/:fathom_call_id ─────────────────────────────────
+// Which of this call's moments are ALREADY in the caller's target KB. Returns
+// current highlight IDS so the review page can render those rows as saved.
+//
+// Hashing happens server-side on purpose: the alternative — returning hashes and
+// having the browser recompute them — would mean a fifth mirrored copy of
+// normalizeQuote, exactly the duplication 2a spent its budget retiring.
+router.get('/saved-moments/:fathom_call_id', protect, async function(req, res) {
+  var fathomCallId = req.params.fathom_call_id;
+  if (!fathomCallId) return res.status(400).json({ error: 'fathom_call_id required' });
+
+  try {
+    var admin = getAdminClient();
+    var scope = await resolveUserScope(admin, req.user.id);
+
+    var hl = await admin
+      .from('call_highlights')
+      .select('id, user_id, quote, section')
+      .eq('fathom_call_id', fathomCallId);
+    if (hl.error || !hl.data || hl.data.length === 0) return res.json({ saved_highlight_ids: [] });
+
+    var t = resolveEntryTarget(scope, hl.data[0].user_id);
+    if (!t.ok) return res.json({ saved_highlight_ids: [] });
+
+    var saved = await admin
+      .from('knowledge_base')
+      .select('source_section, source_quote_hash')
+      .eq('source_fathom_call_id', fathomCallId)
+      .eq('uploaded_by', t.target.uploaded_by)
+      .not('source_quote_hash', 'is', null);
+    if (saved.error) return res.json({ saved_highlight_ids: [] });
+
+    var have = {};
+    (saved.data || []).forEach(function(r) { have[String(r.source_section) + '|' + r.source_quote_hash] = true; });
+
+    var ids = [];
+    hl.data.forEach(function(h) {
+      var k = String(sanitizeSectionValue(h.section)) + '|' + quoteHash(h.quote);
+      if (have[k]) ids.push(h.id);
+    });
+    return res.json({ saved_highlight_ids: ids });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    // Degrade silently — an unknown saved-state just renders every row as unsaved,
+    // and adding again is idempotent anyway.
+    console.error('[kb] saved-moments error:', err.message);
+    return res.json({ saved_highlight_ids: [] });
   }
 });
 
