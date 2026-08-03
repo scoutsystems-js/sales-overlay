@@ -48,6 +48,7 @@ const { normalizeTranscript } = require('./transcript-normalizer');
 const { fetchSellingContext } = require('./selling-context');
 const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
 const { resolveProspectName } = require('./prospect-name');
+const { nameKey } = require('./prospect-entity');
 const { effectiveCloseScore } = require('./outcome-tag');
 const fathomRoutes = require('../routes/fathom');
 // Zoom source (sub-stage 2). Token via the unified call_connections store (its
@@ -1075,6 +1076,46 @@ async function analyzeCall(fathomCallId, userId) {
       }).catch(function (e) {
         console.error('[kb-harvest] unexpected: ' + ((e && e.message) || 'unknown'));
       });
+    }
+
+    // ─── Phase 7c: attach the call to its PROSPECT (3d-1) ───────────────
+    // EXACT-match attach only. Fuzzy joins are PROPOSALS for human review
+    // (3d-2), never automatic — a wrong merge silently fabricates close-rate
+    // numbers and is invisible in the aggregate.
+    //
+    // A call with no resolved name gets NO prospect. It must not join an
+    // "Unknown" bucket: that would merge every unidentified prospect into one
+    // row and wreck both the numerator and the denominator.
+    //
+    // Non-fatal throughout — grades are already saved and a grouping failure
+    // must never fail an analysis.
+    try {
+      var pKey = nameKey(resolvedProspect.name);
+      if (pKey) {
+        var found = await admin.from('prospects').select('id')
+          .eq('user_id', userId).eq('name_key', pKey).maybeSingle();
+        var prospectId = found.data ? found.data.id : null;
+        if (!prospectId) {
+          var ins = await admin.from('prospects')
+            .insert({ user_id: userId, display_name: resolvedProspect.name, name_key: pKey })
+            .select('id').maybeSingle();
+          if (ins.error && ins.error.code === '23505') {
+            // Lost a race with a concurrent analysis of the same prospect —
+            // the unique index arbitrated; just read the winner.
+            var again = await admin.from('prospects').select('id')
+              .eq('user_id', userId).eq('name_key', pKey).maybeSingle();
+            prospectId = again.data ? again.data.id : null;
+          } else if (!ins.error) {
+            prospectId = ins.data ? ins.data.id : null;
+          }
+        }
+        if (prospectId) {
+          await admin.from('fathom_calls').update({ prospect_id: prospectId })
+            .eq('id', fathomCallId).eq('user_id', userId);
+        }
+      }
+    } catch (pErr) {
+      console.warn('[analysis] prospect attach failed for ' + fathomCallId + ': ' + ((pErr && pErr.message) || 'unknown'));
     }
 
     // ─── Phase 8: advance fathom_calls.sync_status ───────────────────────

@@ -353,3 +353,67 @@ test('MULTI-SPEAKER: REFUSES when the title matches more than one attendee', () 
   });
   assert.strictEqual(r.name, null);
 });
+
+// ── 3d-0: closer-exclusion must apply to EVERY name-producing path ────────
+//
+// Root cause of the bug this guards: closer-exclusion was written when the ONLY
+// name source was diarization. v11 gave the GRADER the job of producing names,
+// and the guard did not follow. Live consequence: "PS … | Sam Walker" resolved
+// to "Josh" (grader, high confidence) on a CLOSED call — a phantom closed
+// prospect AND a real call stripped out of Sam Walker's group, corrupting the
+// close-rate numerator and denominator at once.
+//
+// This block is table-driven over PROSPECT_NAME_SOURCES so that ADDING a new
+// source without guarding it fails here rather than in production.
+const { PROSPECT_NAME_SOURCES } = require('../lib/prospect-name');
+
+test('PROSPECT_NAME_SOURCES enumerates every source the resolver can emit', () => {
+  // If a new path is added and not listed, the coverage test below silently
+  // stops covering it. Pin the list.
+  assert.deepStrictEqual(PROSPECT_NAME_SOURCES, ['grader', 'diarized', 'title']);
+});
+
+test('NO name-producing path may ever return the CLOSER as the prospect', () => {
+  const CLOSER = 'Joshua Pinner';
+  const cands = ['joshua@soberlivingriches.com', 'joshua'];
+
+  // One input per source, each rigged so THAT source supplies the closer's name.
+  const rigged = {
+    grader:   { graderName: CLOSER, turns: turns([CLOSER, 'Real Prospect']), closerCandidates: cands, title: 'PS Sober Living Riches | Sam Walker' },
+    diarized: { graderName: null,   turns: turns([CLOSER, CLOSER]),          closerCandidates: cands, title: 'Impromptu Zoom Meeting' },
+    title:    { graderName: null,   turns: [],                               closerCandidates: cands, title: 'PS Sober Living Riches | Joshua Pinner' },
+  };
+
+  for (const source of PROSPECT_NAME_SOURCES) {
+    const r = resolveProspectName(rigged[source]);
+    assert.ok(
+      r.name === null || !/josh/i.test(r.name),
+      'CLOSER LEAK via the "' + source + '" path: returned ' + JSON.stringify(r.name) +
+      '. Every name-producing path must exclude the closer — see 3d-0.'
+    );
+  }
+});
+
+test('the grader path falls THROUGH to diarization when it names the closer', () => {
+  // Refusing outright would lose a perfectly good diarized name. The grader
+  // being wrong should demote it, not blank the call.
+  const r = resolveProspectName({
+    graderName: 'Josh',
+    turns: turns(['Joshua Pinner', 'Sam Walker', 'Sam Walker']),
+    closerCandidates: ['joshua@soberlivingriches.com', 'joshua'],
+    title: 'PS Sober Living Riches | Sam Walker',
+  });
+  assert.strictEqual(r.name, 'Sam Walker');
+  assert.strictEqual(r.source, 'diarized');
+});
+
+test('a grader name that is NOT the closer is still preferred (no over-correction)', () => {
+  const r = resolveProspectName({
+    graderName: 'Jamie Ellis',
+    turns: turns(['Joshua Pinner', 'Tasha P']),
+    closerCandidates: ['joshua'],
+    title: 'PS Sober Living Riches | Tasha Presberry',
+  });
+  assert.strictEqual(r.name, 'Jamie Ellis');
+  assert.strictEqual(r.source, 'grader');
+});

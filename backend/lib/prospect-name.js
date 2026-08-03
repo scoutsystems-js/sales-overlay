@@ -185,22 +185,42 @@ function resolveProspectName(input) {
   var opts = input || {};
   var REFUSED = { name: null, source: null, confidence: 'low' };
 
+  // Closer identity is hoisted so EVERY name-producing path can exclude it.
+  //
+  // 3d-0 root cause: this exclusion originally lived inside the diarized branch
+  // only, because when it was written diarization was the sole name source. v11
+  // gave the GRADER that job and the guard did not follow — producing "PS … |
+  // Sam Walker" → "Josh" (the closer) on a CLOSED call: a phantom closed
+  // prospect plus a real call stripped from Sam Walker's group, corrupting the
+  // close-rate numerator and denominator simultaneously. Any future source must
+  // pass through isCloserName too; test/prospect-name.test.js enumerates
+  // PROSPECT_NAME_SOURCES and fails if one is left unguarded.
+  var closerIds = [];
+  if (opts.closerName) closerIds.push(opts.closerName);
+  if (Array.isArray(opts.closerCandidates)) closerIds = closerIds.concat(opts.closerCandidates);
+  var closerKnown = closerIds.length > 0;
+  function isCloserName(n) {
+    if (!n) return false;
+    for (var ci = 0; ci < closerIds.length; ci++) {
+      if (sameIdentity(n, closerIds[ci])) return true;
+    }
+    return false;
+  }
+
   // ── 1. Grader field (3b). Most accurate source: who actually spoke, under
-  // the transcript-only contract. Still subject to the rejection rules.
+  // the transcript-only contract. Still subject to the rejection rules AND to
+  // closer-exclusion — a grader that names the closer FALLS THROUGH to
+  // diarization rather than refusing outright, so one bad grader answer demotes
+  // the source instead of blanking an otherwise resolvable call.
   var grader = cleanDiarizedName(opts.graderName);
-  if (grader) return { name: grader, source: 'grader', confidence: 'high' };
+  if (grader && !isCloserName(grader)) {
+    return { name: grader, source: 'grader', confidence: 'high' };
+  }
 
   // ── 2. Diarized speakers, minus the closer.
   var speakers = speakerTally(opts.turns);
   if (speakers.length > 0) {
-    var closerIds = [];
-    if (opts.closerName) closerIds.push(opts.closerName);
-    if (Array.isArray(opts.closerCandidates)) closerIds = closerIds.concat(opts.closerCandidates);
-
-    var closerKnown = closerIds.length > 0;
-    var nonCloser = speakers.filter(function (s) {
-      return !closerIds.some(function (c) { return sameIdentity(s.name, c); });
-    });
+    var nonCloser = speakers.filter(function (s) { return !isCloserName(s.name); });
 
     // No closer identity at all → we cannot tell closer from prospect, so we
     // REFUSE rather than guess. The turn-count heuristic ("the closer talks
@@ -268,12 +288,19 @@ function resolveProspectName(input) {
   // ── 3. Title, last resort. It is the BOOKED name — wrong person ~34% of the
   // time — so it is always LOW confidence even when it looks like a person.
   var fromTitle = nameFromTitle(opts.title);
-  if (fromTitle) return { name: fromTitle, source: 'title', confidence: 'low' };
+  if (fromTitle && !isCloserName(fromTitle)) {
+    return { name: fromTitle, source: 'title', confidence: 'low' };
+  }
 
   return REFUSED;
 }
 
+// Every source resolveProspectName can emit. The coverage test iterates this
+// and fails if any of them can return the closer — add new sources here.
+var PROSPECT_NAME_SOURCES = ['grader', 'diarized', 'title'];
+
 module.exports = {
+  PROSPECT_NAME_SOURCES: PROSPECT_NAME_SOURCES,
   isRejectedName: isRejectedName,
   cleanDiarizedName: cleanDiarizedName,
   nameFromTitle: nameFromTitle,
