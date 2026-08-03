@@ -1744,6 +1744,29 @@
       transition: all 0.12s;
       flex-shrink: 0;
     }
+    /* Promote-to-team (KB Part 2, 2a). Neutral until promoted, then accent-filled
+       so a manager can see at a glance which resources the whole team is graded on. */
+    .kb-promote-btn {
+      flex-shrink: 0;
+      background: none;
+      border: 1px solid var(--border-strong);
+      color: var(--text-dim);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .kb-promote-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .kb-promote-btn.is-team {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(91,158,255,0.10); /* --accent #5b9eff at 10% */
+    }
+    .kb-promote-btn.is-team:hover { color: var(--text-dim); border-color: var(--border-strong); background: none; }
+    .kb-promote-btn:disabled { opacity: 0.5; cursor: wait; }
     .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
     .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
 
@@ -1944,7 +1967,7 @@
       .kb-modal { padding: 12px; }
       .kb-modal-dialog { padding: 20px; }
       .kb-item { flex-direction: column; align-items: flex-start; }
-      .kb-delete-btn { align-self: flex-end; }
+      .kb-delete-btn, .kb-promote-btn { align-self: flex-end; }
     }
     /* Platform-wide form-field visibility (2026-07-23 ruling): no field ever
        sits black-on-black. Lighter surface + visible border, accent on focus.
@@ -4986,6 +5009,12 @@
     return !!(state.me && (state.me.role === 'manager' || state.me.role === 'owner'
       || (state.me.role === 'user' && !state.me.is_managed)));
   }
+  // Promotion is narrower than management: an UNMANAGED plain user can manage
+  // their own KB (kbCanManage) but has no team, so they can't promote into one.
+  // Mirrors resolvePromotion's role gate in routes/kb.js.
+  function kbCanPromote() {
+    return !!(state.me && (state.me.role === 'manager' || state.me.role === 'owner'));
+  }
   function goKb() { setView('kb'); }
   var relativeTime = (typeof formatRelativeTime === 'function') ? formatRelativeTime : function (x) { return x; };
   function renderKbView() {
@@ -5080,6 +5109,16 @@
         viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View patterns</button>';
         expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
       }
+      // Promotion affordance (KB Part 2, sub-stage 2a). Manager/owner only — a
+      // plain unmanaged user has no team to promote INTO, so showing them the
+      // button would only produce a 400. Global (owner-wide) resources are not
+      // re-scopable through this route, so they get no button either.
+      var promoteBtn = '';
+      if (kbCanPromote() && it.scope !== 'global') {
+        promoteBtn = (it.scope === 'team')
+          ? '<button class="kb-promote-btn is-team" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'personal\')" title="Remove from the team knowledge base">Team ✓</button>'
+          : '<button class="kb-promote-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'team\')" title="Share with your whole team">Promote to team</button>';
+      }
       parts.push(
         '<div class="kb-item">'
           + '<div class="kb-item-main">'
@@ -5087,6 +5126,7 @@
             + '<div class="kb-item-sub">' + chunkText + ' · added ' + rel + '</div>'
           + '</div>'
           + viewBtn
+          + promoteBtn
           + (canManage ? '<button class="kb-delete-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="deleteKbItem(this.getAttribute(\'data-label\'))">Delete</button>' : '')
         + '</div>'
         + expandPanel
@@ -5094,6 +5134,37 @@
     }
     parts.push('</div>');
     container.innerHTML = parts.join('');
+  }
+
+  // Promote a resource into the team KB, or pull it back to personal.
+  // PATCH /kb/:source_label/scope. Provenance (who uploaded it) is never
+  // rewritten server-side — only the team key changes.
+  async function setKbScope(sourceLabel, targetScope) {
+    if (!sourceLabel || (targetScope !== 'team' && targetScope !== 'personal')) return;
+    var msg = (targetScope === 'team')
+      ? 'Promote "' + sourceLabel + '" to the team knowledge base?\n\nEveryone on your team will be able to see it, and Scout will ground their coaching in it.'
+      : 'Remove "' + sourceLabel + '" from the team knowledge base?\n\nIt goes back to being personal to whoever uploaded it. Nothing is deleted.';
+    if (!window.confirm(msg)) return;
+
+    var res;
+    try {
+      res = await fetch('/kb/' + encodeURIComponent(sourceLabel) + '/scope', {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ scope: targetScope }),
+      });
+    } catch (err) {
+      window.alert('Could not reach server: ' + err.message);
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var err2;
+      try { err2 = await res.json(); } catch (e) { err2 = { error: 'HTTP ' + res.status }; }
+      window.alert('Could not change scope: ' + (err2.error || 'unknown error'));
+      return;
+    }
+    await loadKbList();
   }
 
   async function deleteKbItem(sourceLabel) {

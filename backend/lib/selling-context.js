@@ -15,6 +15,7 @@
 //   global (scope='global'). Dedup by chunk id.
 
 const crypto = require('crypto');
+const { TEAM_KEY_COLUMN } = require('./kb-scope');
 
 // GRADER context = the closer's offer + approach material (excludes winning_call
 // transcripts + training_material, which are synthesis-side). SYNTHESIS context
@@ -43,8 +44,14 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
     // user restores their personal context automatically). Because kbHash is
     // computed from the actually-included chunks below, a managed_by flip changes
     // the included set and naturally invalidates any cached synthesis.
+    // 2a: the team branch keys on team_owner_id (lib/kb-scope.js TEAM_KEY_COLUMN),
+    // not uploaded_by. Pre-2a this read `.eq('uploaded_by', managedBy)` — the 4th
+    // copy of the visibility rule. Migration 029 backfills team_owner_id for every
+    // existing team row and the upload/promotion writers always stamp it, so a
+    // direct .eq() is exact here; the COALESCE fallback lives in the row predicate
+    // for defence in depth.
     var personal = managedBy ? { data: [] } : await base().eq('uploaded_by', userId);
-    var team = managedBy ? await base().eq('uploaded_by', managedBy).eq('scope', 'team') : { data: [] };
+    var team = managedBy ? await base().eq(TEAM_KEY_COLUMN, managedBy).eq('scope', 'team') : { data: [] };
     var global = await base().eq('scope', 'global');
     if (personal.error) throw new Error('personal: ' + personal.error.message);
     if (team.error) throw new Error('team: ' + team.error.message);

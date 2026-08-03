@@ -3,7 +3,7 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
-const { kbReadRowVisible } = require('../lib/kb-visibility');
+const { kbReadRowVisible } = require('../lib/kb-scope');
 
 var router = express.Router();
 
@@ -337,19 +337,18 @@ router.post('/search', protect, async function(req, res) {
     // behavior is consistent with what the desktop app used to do directly.
     var rows = await admin
       .from('knowledge_base')
-      .select('id, category, label, content, triggers, metadata, uploaded_by, scope')
+      .select('id, category, label, content, triggers, metadata, uploaded_by, scope, team_owner_id')
       .limit(200);
     if (rows.error) {
       console.error('[kb] fallback fetch failed:', rows.error.message);
       return res.json({ results: [], source: 'fallback-empty' });
     }
 
+    // 2a: was a 4th inline copy of the visibility rule. Now the canonical
+    // predicate (lib/kb-scope.js) — same rule the match_knowledge RPC applies on
+    // the embedding path, so the keyword fallback can't diverge from it.
     var visible = (rows.data || []).filter(function(row) {
-      if (row.uploaded_by === null || row.uploaded_by === undefined) return true;
-      if (row.scope === 'global') return true;
-      if (row.scope === 'personal' && row.uploaded_by === scope.p_user_id) return true;
-      if (row.scope === 'team' && scope.p_admin_id && row.uploaded_by === scope.p_admin_id) return true;
-      return false;
+      return kbReadRowVisible(row, scope);
     });
 
     var lower = query.toLowerCase();
@@ -410,6 +409,12 @@ router.post('/upload', manage, upload.single('file'), async function(req, res) {
     // role-'user' reaching here is always unmanaged → 'personal' is the only path
     // that writes personal scope from the upload route.
     var uploadScope = (scope.role === 'owner') ? 'global' : (scope.role === 'manager' ? 'team' : 'personal');
+    // 2a: a team row must carry its team key explicitly. For a manager uploading
+    // directly, p_admin_id is their own id — so team_owner_id === uploaded_by here
+    // and behaviour is identical to pre-2a. The column only diverges from
+    // uploaded_by on PROMOTED rows (rep created it, manager's team owns it).
+    // Non-team scopes leave it null.
+    var uploadTeamOwner = (uploadScope === 'team') ? scope.p_admin_id : null;
 
     var text = '';
     var sourceLabel = providedLabel;
@@ -478,6 +483,7 @@ router.post('/upload', manage, upload.single('file'), async function(req, res) {
         embedding: emb,
         uploaded_by: req.user.id,
         scope: uploadScope,
+        team_owner_id: uploadTeamOwner,
         source_label: sourceLabel,
       });
     }
@@ -590,13 +596,16 @@ router.get('/list', protect, async function(req, res) {
 
     var result;
     if (managedReader) {
-      // Fetch only team-relevant candidates (global scope, or uploaded by the
-      // manager/self), then apply the visibility predicate for exactness.
+      // Fetch only team-relevant candidates, then apply the visibility predicate
+      // for exactness. 2a: the candidate set must now ALSO include rows keyed to
+      // the team via team_owner_id — a PROMOTED row has uploaded_by = the rep who
+      // created it, not the manager, so the old three-branch .or() would have
+      // filtered promoted material out before the predicate ever saw it.
       result = await admin
         .from('knowledge_base')
-        .select('source_label, scope, metadata, created_at, uploaded_by')
+        .select('source_label, scope, metadata, created_at, uploaded_by, team_owner_id')
         .not('uploaded_by', 'is', null)
-        .or('scope.eq.global,uploaded_by.eq.' + scope.p_admin_id + ',uploaded_by.eq.' + scope.p_user_id)
+        .or('scope.eq.global,uploaded_by.eq.' + scope.p_admin_id + ',uploaded_by.eq.' + scope.p_user_id + ',team_owner_id.eq.' + scope.p_admin_id)
         .order('created_at', { ascending: false });
       if (!result.error) result.data = (result.data || []).filter(function (row) { return kbReadRowVisible(row, scope); });
     } else {
@@ -668,7 +677,7 @@ router.get('/entries/:source_label', protect, async function(req, res) {
 
     var query = admin
       .from('knowledge_base')
-      .select('id, content, metadata, category, created_at, scope, uploaded_by')
+      .select('id, content, metadata, category, created_at, scope, uploaded_by, team_owner_id')
       .eq('source_label', sourceLabel)
       .not('uploaded_by', 'is', null)
       .order('created_at', { ascending: true });
@@ -691,6 +700,89 @@ router.get('/entries/:source_label', protect, async function(req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[kb] entries error:', err.message);
     return res.status(500).json({ error: 'Failed to load entries' });
+  }
+});
+
+// ── PATCH /kb/:source_label/scope ─────────────────────────────────────────
+// Promote an upload into the TEAM knowledge base, or demote it back to the
+// uploader's personal KB. KB Part 2, sub-stage 2a.
+//
+// Ruling 5: a manager promoting a rep's material is THE promotion path — there
+// is no separate curation queue. Part 2b's "Add to Knowledge Base" button on a
+// rep's call reuses this same write.
+//
+// The load-bearing invariant: promotion writes team_owner_id and NEVER touches
+// uploaded_by. Pre-2a the only way to make a rep's row team-visible was to
+// rewrite uploaded_by to the manager, which permanently destroyed "which rep's
+// call did this come from" — the attribution the manager UI needs.
+//
+// resolvePromotion is exported (the log.js `_validateLogBatch` pattern) so the
+// decision is unit-tested without standing up Express or Supabase.
+function resolvePromotion(scope, requestedScope) {
+  if (requestedScope !== 'team' && requestedScope !== 'personal') {
+    // 'global' is deliberately unreachable: it is assigned at upload time by
+    // role mapping, and letting one click publish a rep's call material across
+    // every team on the platform is not a promotion, it's a leak.
+    return { ok: false, error: "scope must be 'team' or 'personal'" };
+  }
+  // A managed rep has a team key but doesn't curate it (requireKbAccess already
+  // 403s them; this is defence in depth for any future caller).
+  if (scope.role !== 'manager' && scope.role !== 'owner') {
+    return { ok: false, error: 'Only a manager or owner can change team scope.' };
+  }
+  if (requestedScope === 'team') {
+    if (!scope.p_admin_id) {
+      return { ok: false, error: 'You have no team to promote into.' };
+    }
+    return { ok: true, patch: { scope: 'team', team_owner_id: scope.p_admin_id } };
+  }
+  // Demote: clear the team key too. Leaving it set would be a latent leak — a
+  // later flip back to 'team' would silently republish to the old team.
+  return { ok: true, patch: { scope: 'personal', team_owner_id: null } };
+}
+
+router.patch('/:source_label/scope', manage, async function(req, res) {
+  var sourceLabel = decodeURIComponent(req.params.source_label || '');
+  if (!sourceLabel) return res.status(400).json({ error: 'source_label required' });
+  var requested = req.body && req.body.scope;
+
+  try {
+    var admin = getAdminClient();
+    var scope = await resolveUserScope(admin, req.user.id);
+
+    var decision = resolvePromotion(scope, requested);
+    if (!decision.ok) return res.status(400).json({ error: decision.error });
+
+    // Same scoping as DELETE: own uploads + (manager) managed reps' uploads;
+    // owners unrestricted. Seeded rows (uploaded_by IS NULL) are never touchable.
+    var visibleIds = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+
+    var q = admin
+      .from('knowledge_base')
+      .update(decision.patch, { count: 'exact' })
+      .eq('source_label', sourceLabel)
+      .not('uploaded_by', 'is', null)
+      // Never re-scope owner-global material through this route.
+      .neq('scope', 'global');
+    if (visibleIds !== null) q = q.in('uploaded_by', visibleIds);
+
+    var result = await q;
+    if (result.error) {
+      console.error('[kb] scope update failed:', result.error.message);
+      return res.status(500).json({ error: 'Could not change scope' });
+    }
+    var updated = (typeof result.count === 'number') ? result.count : 0;
+    if (updated === 0) {
+      return res.status(404).json({ error: 'No matching upload you can re-scope' });
+    }
+
+    console.log('[kb] Scope changed: actor=%s label=%s scope=%s team_owner=%s rows=%d',
+      req.user.email, sourceLabel, decision.patch.scope, decision.patch.team_owner_id || 'none', updated);
+    return res.json({ ok: true, updated: updated, scope: decision.patch.scope });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[kb] scope change error:', err.message);
+    return res.status(500).json({ error: 'Scope change failed' });
   }
 });
 
@@ -730,5 +822,9 @@ router.delete('/:source_label', manage, async function(req, res) {
     return res.status(500).json({ error: 'Delete failed' });
   }
 });
+
+// Pure decision helper hung off the router for unit testing — same pattern as
+// log.js `_validateLogBatch` / me.js `_computeCoachingPatterns`.
+router.resolvePromotion = resolvePromotion;
 
 module.exports = router;
