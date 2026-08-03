@@ -158,6 +158,92 @@ test('auto-population writes to the REP’s OWN KB (personal, no team key)', () 
   assert.strictEqual(row.uploaded_by, 'rep-9');
 });
 
+// ── Embedding: batched, and a batch failure must NEVER lose the harvest ──
+// Regression guard for the defect found in the 2d in-situ run (3 of 5 embedded,
+// then HTTP 429). These drive harvestClosedCall itself with a stubbed fetch and
+// a fake Supabase, so they cover the wiring, not just the batch helper.
+function fakeAdminCapturing(inserted) {
+  return { from() { return { insert(row) { inserted.push(row); return Promise.resolve({ error: null }); } }; } };
+}
+const CLOSED = {
+  outcome: 'closed', userId: 'rep-1', fathomCallId: 'call-1',
+  highlights: [
+    hl('discovery', 'strong_moment', 'd1'), hl('pitch', 'strong_moment', 'p1'),
+    hl('close', 'strong_moment', 'c1'), hl('close', 'strong_moment', 'c2'),
+  ],
+};
+
+test('EMBEDDING: one batched Voyage request per call, not one per moment', async () => {
+  const { harvestClosedCall } = require('../lib/kb-harvest');
+  const realFetch = global.fetch;
+  const prevKey = process.env.VOYAGE_API_KEY;
+  process.env.VOYAGE_API_KEY = 'test-key';
+  let requests = 0;
+  global.fetch = (url, o) => {
+    requests++;
+    const input = JSON.parse(o.body).input;
+    return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ data: input.map((_, i) => ({ index: i, embedding: [i] })) }) });
+  };
+  try {
+    const inserted = [];
+    const s = await harvestClosedCall(fakeAdminCapturing(inserted), CLOSED);
+    assert.strictEqual(requests, 1, 'must batch into ONE request');
+    assert.strictEqual(s.added, 4);
+    assert.strictEqual(s.unembedded, 0);
+    assert.ok(inserted.every((r) => Array.isArray(r.embedding)));
+  } finally {
+    global.fetch = realFetch;
+    if (prevKey === undefined) delete process.env.VOYAGE_API_KEY; else process.env.VOYAGE_API_KEY = prevKey;
+  }
+});
+
+test('EMBEDDING PARTIAL FAILURE: every row is still written, unembedded ones as null', async () => {
+  // The exact 2026-08-03 shape: some embeddings come back, some don't. The
+  // harvest must not lose the rows that missed out — they stay keyword-searchable.
+  const { harvestClosedCall } = require('../lib/kb-harvest');
+  const realFetch = global.fetch;
+  const prevKey = process.env.VOYAGE_API_KEY;
+  process.env.VOYAGE_API_KEY = 'test-key';
+  global.fetch = () => Promise.resolve({
+    ok: true, status: 200,
+    json: () => Promise.resolve({ data: [{ index: 0, embedding: [1] }, { index: 2, embedding: [3] }] }),
+  });
+  try {
+    const inserted = [];
+    const s = await harvestClosedCall(fakeAdminCapturing(inserted), CLOSED);
+    assert.strictEqual(s.added, 4, 'ALL four rows must still be written');
+    assert.strictEqual(s.unembedded, 2);
+    assert.strictEqual(inserted.filter((r) => r.embedding === null).length, 2);
+    assert.strictEqual(inserted.filter((r) => Array.isArray(r.embedding)).length, 2);
+    // Alignment: the embedded rows are the ones Voyage actually returned.
+    assert.deepStrictEqual(inserted[0].embedding, [1]);
+    assert.strictEqual(inserted[1].embedding, null);
+    assert.deepStrictEqual(inserted[2].embedding, [3]);
+  } finally {
+    global.fetch = realFetch;
+    if (prevKey === undefined) delete process.env.VOYAGE_API_KEY; else process.env.VOYAGE_API_KEY = prevKey;
+  }
+});
+
+test('EMBEDDING TOTAL FAILURE (429): the whole harvest still lands, all unembedded', async () => {
+  const { harvestClosedCall } = require('../lib/kb-harvest');
+  const realFetch = global.fetch;
+  const prevKey = process.env.VOYAGE_API_KEY;
+  process.env.VOYAGE_API_KEY = 'test-key';
+  global.fetch = () => Promise.resolve({ ok: false, status: 429, json: () => Promise.resolve({}) });
+  try {
+    const inserted = [];
+    const s = await harvestClosedCall(fakeAdminCapturing(inserted), CLOSED);
+    assert.strictEqual(s.added, 4, 'a 429 must not cost us the harvest');
+    assert.strictEqual(s.unembedded, 4);
+    assert.ok(inserted.every((r) => r.embedding === null));
+    assert.ok(inserted.every((r) => r.source_quote_hash), 'dedupe keys still populated');
+  } finally {
+    global.fetch = realFetch;
+    if (prevKey === undefined) delete process.env.VOYAGE_API_KEY; else process.env.VOYAGE_API_KEY = prevKey;
+  }
+});
+
 test('RULING 1 holds automatically for harvested rows (same shape as 2b)', () => {
   const { buildMomentRow, KB_ENTRY_METADATA_CATEGORY } = require('../lib/kb-entry');
   const { GRADER_CATEGORIES, SYNTHESIS_CATEGORIES } = require('../lib/selling-context');

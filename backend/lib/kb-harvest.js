@@ -3,9 +3,10 @@
 //
 // Runs as its own fire-and-forget pass AFTER persistHighlights, deliberately NOT
 // inline in the analysis drain: the drain is already documented as dying on a
-// Railway redeploy (it has stranded batches twice), and adding N sequential
-// Voyage round-trips inside it would lengthen the window where a deploy kills a
-// call mid-analysis. Nothing here can fail, stall, or slow an analysis.
+// Railway redeploy (it has stranded batches twice), and adding Voyage round-trips
+// inside it would lengthen the window where a deploy kills a call mid-analysis.
+// Nothing here can fail, stall, or slow an analysis. Embedding is ONE batched
+// request per call (see the embedding block below for why batching, not delays).
 //
 // ── The rulings this file implements ──────────────────────────────────────
 // RULING 4 — the gate is `outcome === 'closed'` ALONE. NOT cash_collected > 0.
@@ -35,7 +36,7 @@
 
 var { highlightGroup } = require('./highlight-section');
 var { buildMomentRow, insertMoment, quoteHash } = require('./kb-entry');
-var { getVoyageEmbedding } = require('./voyage');
+var { getVoyageEmbeddings } = require('./voyage');
 
 // Ruling 3. Per SECTION, per call.
 var HARVEST_SECTION_CAP = 2;
@@ -79,7 +80,7 @@ function selectHarvestMoments(highlights, cap) {
 // caller is the analysis worker, and the standing house rule is that a KB
 // problem can never fail or stall an analysis. Returns a summary for logging.
 async function harvestClosedCall(admin, opts) {
-  var summary = { attempted: 0, added: 0, duplicate: 0, failed: 0, skipped_reason: null };
+  var summary = { attempted: 0, added: 0, duplicate: 0, failed: 0, unembedded: 0, skipped_reason: null };
   try {
     if (!shouldHarvest(opts && opts.outcome)) {
       summary.skipped_reason = 'not_closed';
@@ -95,10 +96,16 @@ async function harvestClosedCall(admin, opts) {
     // key identical to a manual self-add and therefore idempotent with it.
     var target = { scope: 'personal', team_owner_id: null, uploaded_by: opts.userId };
 
-    for (var i = 0; i < moments.length; i++) {
-      summary.attempted++;
-      var h = moments[i];
-      var row = buildMomentRow({
+    // Build every row first, then embed them in ONE batched Voyage request.
+    //
+    // This used to be N sequential single embeds, which rate-limited partway
+    // through (observed 2026-08-03: 3 of 5, then HTTP 429). Because
+    // selectHarvestMoments preserves chronological order, the dropouts were
+    // always the LATE-call sections — `close` above all — so the defect
+    // systematically left the most search-worthy moments unsearchable. One
+    // request removes the per-item limit exposure; a delay would not have.
+    var rows = moments.map(function (h) {
+      return buildMomentRow({
         highlight: h,
         target: target,
         fathomCallId: opts.fathomCallId,
@@ -106,11 +113,20 @@ async function harvestClosedCall(admin, opts) {
         sourceUserId: opts.userId,
         addedBy: null, // no human actor
       });
-      // A null embedding is tolerable (the row stays keyword-searchable), so an
-      // embedding failure must not skip the write.
-      row.embedding = await getVoyageEmbedding(row.content, 'kb-harvest');
+    });
 
-      var res = await insertMoment(admin, row);
+    // Contract: same length as the input, each slot a vector or null. A partial
+    // or total embedding failure must never lose the harvest — every row is
+    // still written, just unembedded (and still keyword-searchable).
+    var embeddings = await getVoyageEmbeddings(rows.map(function (r) { return r.content; }), 'kb-harvest');
+    for (var e = 0; e < rows.length; e++) {
+      rows[e].embedding = embeddings[e] || null;
+      if (rows[e].embedding === null) summary.unembedded++;
+    }
+
+    for (var i = 0; i < rows.length; i++) {
+      summary.attempted++;
+      var res = await insertMoment(admin, rows[i]);
       if (res.added) summary.added++;
       else if (res.duplicate) summary.duplicate++;
       else { summary.failed++; console.warn('[kb-harvest] insert failed for call ' + opts.fathomCallId + ': ' + res.error); }

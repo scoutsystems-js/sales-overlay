@@ -1020,8 +1020,8 @@ async function analyzeCall(fathomCallId, userId) {
         outcome:      effectiveOutcome,
         highlights:   sanitizedHighlights,
       }).then(function (s) {
-        console.log('[kb-harvest] call=%s added=%d duplicate=%d failed=%d%s',
-          fathomCallId, s.added, s.duplicate, s.failed, s.skipped_reason ? ' skipped=' + s.skipped_reason : '');
+        console.log('[kb-harvest] call=%s added=%d duplicate=%d failed=%d unembedded=%d%s',
+          fathomCallId, s.added, s.duplicate, s.failed, s.unembedded, s.skipped_reason ? ' skipped=' + s.skipped_reason : '');
       }).catch(function (e) {
         console.error('[kb-harvest] unexpected: ' + ((e && e.message) || 'unknown'));
       });

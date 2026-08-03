@@ -41,4 +41,74 @@ async function getVoyageEmbedding(text, label) {
   }
 }
 
-module.exports = { getVoyageEmbedding: getVoyageEmbedding, VOYAGE_MODEL: VOYAGE_MODEL };
+// Batch embed. ONE request for many texts, returning an array the SAME LENGTH
+// as the input where each slot is a vector or null.
+//
+// ── Why this exists (defect found 2026-08-03) ─────────────────────────────
+// KB harvesting used to call getVoyageEmbedding once per moment, sequentially.
+// The first in-situ run embedded 3 of 5 and then took HTTP 429 on the last two,
+// which stored with embedding null. Adding a delay would only slow the pass and
+// still rate-limit at scale — and, worse, it would NOT remove the systematic
+// bias: selectHarvestMoments preserves chronological order, so the dropouts are
+// always the late-call sections (`close` above all), precisely the moments a
+// "how do I close" semantic search needs to find. One request removes the
+// per-item limit exposure entirely.
+//
+// ── Contract ──────────────────────────────────────────────────────────────
+// • Output length ALWAYS equals input length. Callers index into it positionally.
+// • Mapping uses the response's `index` field, never array order — trusting
+//   order would silently attach the wrong vector to the wrong moment, a
+//   corruption invisible until search results stopped making sense.
+// • PARTIAL failure degrades per-item to null; TOTAL failure degrades to
+//   all-nulls. Never throws, never returns a short array. A batch error must
+//   never lose the harvest — every row stays writable, just unembedded.
+async function getVoyageEmbeddings(texts, label) {
+  var tag = label || 'kb';
+  if (!Array.isArray(texts) || texts.length === 0) return [];
+  var out = new Array(texts.length).fill(null);
+
+  if (!process.env.VOYAGE_API_KEY) {
+    console.error('[' + tag + '] VOYAGE_API_KEY not configured — batch embedding skipped');
+    return out;
+  }
+  try {
+    var res = await fetch('https://api.voyageai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + process.env.VOYAGE_API_KEY,
+      },
+      body: JSON.stringify({ input: texts, model: VOYAGE_MODEL }),
+    });
+    if (!res.ok) {
+      console.error('[' + tag + '] Voyage batch embedding failed: HTTP ' + res.status + ' (' + texts.length + ' texts)');
+      return out;
+    }
+    var data = await res.json();
+    if (!data || !Array.isArray(data.data)) {
+      console.error('[' + tag + '] Voyage batch embedding: unexpected response shape');
+      return out;
+    }
+    for (var i = 0; i < data.data.length; i++) {
+      var item = data.data[i];
+      if (!item || typeof item.index !== 'number') continue;
+      if (item.index < 0 || item.index >= out.length) continue;   // never write past the end
+      if (!Array.isArray(item.embedding)) continue;               // malformed → stays null
+      out[item.index] = item.embedding;
+    }
+    var missing = out.filter(function (v) { return v === null; }).length;
+    if (missing > 0) {
+      console.warn('[' + tag + '] Voyage batch returned ' + (out.length - missing) + '/' + out.length + ' embeddings');
+    }
+    return out;
+  } catch (err) {
+    console.error('[' + tag + '] Voyage batch embedding error:', err.message);
+    return out;
+  }
+}
+
+module.exports = {
+  getVoyageEmbedding: getVoyageEmbedding,
+  getVoyageEmbeddings: getVoyageEmbeddings,
+  VOYAGE_MODEL: VOYAGE_MODEL,
+};
