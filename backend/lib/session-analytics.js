@@ -9,6 +9,7 @@ var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'clos
 // Reuse the TEAM view's prior-window machinery for the Avg-score tile trend, so
 // "prior period" means the exact same thing everywhere (no second implementation).
 var teamAnalytics = require('./team-analytics');
+var { fetchProspectCloseRates } = require('./prospect-entity');
 
 // Prior equal-length window's avg score for `userId`, via the reused team
 // aggregator. Returns a rounded mean, or null when there are no graded calls in
@@ -28,6 +29,11 @@ async function priorWindowAvgScore(admin, userId, from, to) {
 }
 
 async function computeCallAnalytics(admin, userId, from, to) {
+  // 3d-3: the ONE shared prospect close-rate computation (lib/prospect-entity).
+  // Degrades to {pct:null} on any failure so a close-rate problem renders "—"
+  // rather than breaking the analytics response.
+  var _pcr = await fetchProspectCloseRates(admin, [userId], from, to);
+  var prospectRate = _pcr[userId] || { closed: 0, total: 0, pct: null };
   // 1) fathom_calls in the date window — paginated to dodge the 1000-row cap.
   var calls = [];
   var PAGE = 1000;
@@ -174,8 +180,14 @@ async function computeCallAnalytics(admin, userId, from, to) {
     },
     objections: { calls_with_objection: Object.keys(objCalls).length, total_highlights: objRows.length },
     cash_collected: Math.round(cashSum * 100) / 100,
+    // 3d-3: close rate is now closed PROSPECTS / TOTAL prospects. The old
+    // decided-only per-CALL figure is kept ONLY as close_wins/close_decided for
+    // any legacy caller; the rendered rate comes from prospect_close_* below.
     close_rate: closeDecided > 0 ? Math.round((closeWon / closeDecided) * 100) : null,
     close_wins: closeWon, close_decided: closeDecided,
+    prospect_close_rate:  prospectRate.pct,
+    prospect_close_wins:  prospectRate.closed,
+    prospect_close_total: prospectRate.total,
     sections: sections,
     weakest_section: weakest,
     strongest_section: strongest,

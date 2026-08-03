@@ -3509,7 +3509,7 @@
       + glanceTileHtml('Avg score', avgBig, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
       + glanceTileHtml('Objection handle rate', ohr ? ohr.rate + '%' : '—', ohr ? (ohr.handled + ' of ' + ohr.total + ' handled') : 'true objections', "goObjections()")
       + glanceTileHtml('Cash collected', fmtCash(a.cash_collected), 'closed-call cash', "drillCalls('analyzed',null)")
-      + glanceTileHtml('Close rate', a.close_rate == null ? '—' : a.close_rate + '%', (a.close_decided ? a.close_wins + '/' + a.close_decided + ' decided' : 'of decided calls'), "drillCalls('analyzed',null)")
+      + glanceTileHtml('Close rate', closeRateDisplay(a).value, closeRateDisplay(a).sub, "drillCalls('analyzed',null)")
     + '</div>';
 
     // A-2.2 layout: tiles → What-needs-work card → Coach summary (OPEN inline) →
@@ -4344,7 +4344,7 @@
       + stat('Reps active', t.active_reps + '<span class="team-stat-sub">/' + t.reps + '</span>')
       + stat('Calls analyzed', t.calls_analyzed)
       + glance('cash', 'Cash collected', fmtCash(t.cash_collected), 'across closed calls')
-      + glance('close', 'Close rate', (t.close_rate == null ? '—' : t.close_rate + '%'), (t.close_decided ? t.close_wins + '/' + t.close_decided + ' of decided calls' : 'of decided calls'))
+      + glance('close', 'Close rate', closeRateDisplay(t).value, closeRateDisplay(t).sub)
       + glance('objection', 'Objection handle', (t.obj_handle_rate == null ? '—' : t.obj_handle_rate + '%'), t.objections_handled + '/' + t.objections_total + ' handled')
       + stat('Avg score', (t.avg_score == null ? '—' : t.avg_score), ' ' + trendArrow(t.avg_score != null && t.prior_avg_score != null ? (t.avg_score - t.prior_avg_score) : 0))
       + '</div>';
@@ -4411,7 +4411,7 @@
       var quick = '<div class="team-rep-quick">'
         + '<span>' + r.calls_analyzed + ' calls</span>'
         + '<span>' + fmtCash(r.cash_collected) + '</span>'
-        + '<span>' + (r.close_rate == null ? '—' : r.close_rate + '%') + ' close</span>'
+        + '<span>' + closeRateDisplay(r).value + ' close</span>'
         + '<span>' + (r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%') + ' obj</span>'
         + '<span>avg ' + (r.avg_score == null ? '—' : r.avg_score) + ' ' + trendArrow(r.trend) + '</span>'
         + '</div>';
@@ -4431,10 +4431,10 @@
                  value: function (r) { return r.cash_collected || 0; },
                  label: function (r) { return fmtCash(r.cash_collected); },
                  sub:   function (r) { return r.close_wins + ' closed'; } },
-    close:     { title: 'Close rate', meta: 'closed / (closed + lost) — decided calls only, by rep',
-                 value: function (r) { return r.close_rate == null ? -1 : r.close_rate; },
-                 label: function (r) { return r.close_rate == null ? '—' : r.close_rate + '%'; },
-                 sub:   function (r) { return r.close_decided ? (r.close_wins + '/' + r.close_decided + ' decided') : 'no decided calls'; } },
+    close:     { title: 'Close rate', meta: 'closed prospects / total prospects, by rep',
+                 value: function (r) { return r.prospect_close_rate == null ? -1 : r.prospect_close_rate; },
+                 label: function (r) { return closeRateDisplay(r).value; },
+                 sub:   function (r) { return closeRateDisplay(r).sub; } },
     objection: { title: 'Objection handle rate', meta: 'objections resolved "handled", by rep',
                  value: function (r) { return r.obj_handle_rate == null ? -1 : r.obj_handle_rate; },
                  label: function (r) { return r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%'; },
@@ -5081,6 +5081,24 @@
     var n = c && c.prospect_name;
     if (n && String(n).trim()) return String(n).trim();
     return null;
+  }
+
+  // PROSPECT NAMES 3d-3 — THE single close-rate display. Every site that shows a
+  // close rate routes through this, so the coaching tile, the team glance box and
+  // the team score list cannot drift into different definitions (which is exactly
+  // what "closed / (closed + lost) — decided calls only" had become, in three
+  // places, before this).
+  //
+  // Definition: closed PROSPECTS / TOTAL prospects. A prospect who takes three
+  // calls to close counts ONCE; an open prospect counts as not-closed. Raw counts
+  // always travel with the percentage, per the house rule.
+  function closeRateDisplay(o) {
+    var src = o || {};
+    var pct = src.prospect_close_rate;
+    var won = src.prospect_close_wins;
+    var tot = src.prospect_close_total;
+    if (pct == null || !tot) return { value: '\u2014', sub: 'no prospects yet' };
+    return { value: pct + '%', sub: won + ' of ' + tot + ' prospects' };
   }
 
   function renderKbList(items) {

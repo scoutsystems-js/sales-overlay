@@ -7,6 +7,8 @@ var { resolveDisplayName } = require('./display-name');
 
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
+var { fetchProspectCloseRates, closeRate } = require('./prospect-entity');
+
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 
 // One window's raw per-rep accumulation. Returns { rep: {id: {...}}, done_call_ids }.
@@ -49,7 +51,8 @@ async function aggregateWindow(admin, repIds, from, to) {
       // cash_collected: numeric(12,2), grader-forced to 0 on non-closed. PostgREST
       // may return numeric as a string, so coerce defensively.
       var cash = Number(a.cash_collected); if (isFinite(cash)) r.cash_sum += cash;
-      // close_rate denominator = DECIDED calls only (ruling 1): closed + lost.
+      // LEGACY per-call figure, retained only for compatibility. The RENDERED
+      // rate is prospect_close_* (3d-3): closed PROSPECTS / TOTAL prospects.
       // follow_up = still-open pipeline (not a loss); no_show also excluded.
       if (a.outcome === 'closed') { r.close_won++; r.close_decided++; }
       else if (a.outcome === 'lost') { r.close_decided++; }
@@ -68,6 +71,8 @@ async function aggregateWindow(admin, repIds, from, to) {
 // Team overview: per-rep cards (with a trend arrow vs the immediately-prior equal
 // window) + team totals. emailMap: { user_id: email }.
 async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
+  // 3d-3: one shared prospect close-rate computation for the whole team.
+  var prospectRates = await fetchProspectCloseRates(admin, repIds, from, to);
   var cur = await aggregateWindow(admin, repIds, from, to);
   // prior window = same length immediately before `from`
   var span = new Date(to).getTime() - new Date(from).getTime();
@@ -103,6 +108,11 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       close_wins: c.close_won,
       close_decided: c.close_decided,
       close_rate: c.close_decided > 0 ? Math.round((c.close_won / c.close_decided) * 100) : null,
+      // 3d-3: the RENDERED rate — closed PROSPECTS / TOTAL prospects, from the
+      // one shared computation in lib/prospect-entity.
+      prospect_close_rate:  (prospectRates[id] || {}).pct != null ? prospectRates[id].pct : null,
+      prospect_close_wins:  (prospectRates[id] || {}).closed || 0,
+      prospect_close_total: (prospectRates[id] || {}).total || 0,
       obj_total: c.obj_total,
       obj_handled: c.obj_handled,
       obj_handle_rate: c.obj_total > 0 ? Math.round((c.obj_handled / c.obj_total) * 100) : null,
@@ -119,6 +129,20 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     t.win_sum += c.win_sum; t.win_n += c.win_n; t.obj_total += c.obj_total; t.obj_handled += c.obj_handled;
     t.cash_sum += c.cash_sum; t.close_won += c.close_won; t.close_decided += c.close_decided;
   });
+  // Team prospect totals: sum the per-rep prospect counts. Summing counts (not
+  // averaging percentages) keeps the team rate consistent with the rep rates —
+  // averaging rates would weight a 1-prospect rep the same as a 30-prospect one.
+  var teamProspectClosed = 0, teamProspectTotal = 0;
+  repIds.forEach(function (id) {
+    var pr = prospectRates[id];
+    if (pr) { teamProspectClosed += pr.closed; teamProspectTotal += pr.total; }
+  });
+  var teamProspect = {
+    closed: teamProspectClosed,
+    total: teamProspectTotal,
+    pct: teamProspectTotal > 0 ? Math.round((100 * teamProspectClosed) / teamProspectTotal) : null,
+  };
+
   var tp = { score_sum: 0, score_n: 0 };
   repIds.forEach(function (id) { tp.score_sum += prior.rep[id].score_sum; tp.score_n += prior.rep[id].score_n; });
 
@@ -134,6 +158,9 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     close_wins: t.close_won,
     close_decided: t.close_decided,
     close_rate: t.close_decided > 0 ? Math.round((t.close_won / t.close_decided) * 100) : null,
+    prospect_close_wins:  teamProspect.closed,
+    prospect_close_total: teamProspect.total,
+    prospect_close_rate:  teamProspect.pct,
     objections_total: t.obj_total,
     objections_handled: t.obj_handled,
     obj_handle_rate: t.obj_total > 0 ? Math.round((t.obj_handled / t.obj_total) * 100) : null,

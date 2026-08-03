@@ -91,3 +91,65 @@ test('the display contract: counts always travel with the percentage', () => {
   assert.ok(typeof r.closed === 'number' && typeof r.total === 'number',
     'closeRate must return the counts, not just a percentage');
 });
+
+// ── rollupProspects — the shared computation every surface routes through ──
+const { rollupProspects } = require('../lib/prospect-entity');
+
+const call = (id, user, prospect, outcome, date) => ({ id, user_id: user, prospect_id: prospect, call_date: date, outcome });
+
+test('rollup collapses a multi-call prospect into ONE entry', () => {
+  const r = rollupProspects([
+    call('c1', 'u1', 'p1', 'follow_up', '2026-07-01'),
+    call('c2', 'u1', 'p1', 'follow_up', '2026-07-05'),
+    call('c3', 'u1', 'p1', 'closed', '2026-07-09'),
+  ], {});
+  assert.strictEqual(r.u1.total, 1);
+  assert.strictEqual(r.u1.closed, 1);
+  assert.strictEqual(r.u1.pct, 100);
+});
+
+test('rollup follows merged_into so a merged prospect counts ONCE', () => {
+  // p2 was merged into p1 by the review. Both its calls must roll into p1,
+  // or the merge would silently fail to affect the headline number.
+  const r = rollupProspects([
+    call('c1', 'u1', 'p1', 'follow_up', '2026-07-01'),
+    call('c2', 'u1', 'p2', 'closed', '2026-07-02'),
+  ], { p2: 'p1' });
+  assert.strictEqual(r.u1.total, 1);
+  assert.strictEqual(r.u1.closed, 1);
+});
+
+test('rollup EXCLUDES calls with no prospect — never an Unknown bucket', () => {
+  // Lumping unnamed calls together would merge every unidentified prospect into
+  // one row and corrupt both halves of the rate.
+  const r = rollupProspects([
+    call('c1', 'u1', 'p1', 'closed', '2026-07-01'),
+    call('c2', 'u1', null, 'closed', '2026-07-02'),
+  ], {});
+  assert.strictEqual(r.u1.total, 1);
+  assert.strictEqual(r.u1.closed, 1);
+});
+
+test('rollup keeps users separate', () => {
+  const r = rollupProspects([
+    call('c1', 'u1', 'p1', 'closed', '2026-07-01'),
+    call('c2', 'u2', 'p2', 'follow_up', '2026-07-01'),
+  ], {});
+  assert.strictEqual(r.u1.pct, 100);
+  assert.strictEqual(r.u2.pct, 0);
+  assert.strictEqual(r.u2.total, 1);
+});
+
+test('rollup returns counts with the percentage, and null pct when empty', () => {
+  const r = rollupProspects([], {});
+  assert.deepStrictEqual(r, {});
+  const r2 = rollupProspects([call('c1', 'u1', 'p1', 'follow_up', '2026-07-01')], {});
+  assert.strictEqual(r2.u1.pct, 0);      // an open prospect IS 0%, not null
+  assert.strictEqual(r2.u1.total, 1);
+});
+
+test('rollup is total on junk', () => {
+  for (const v of [null, undefined, 'nope', [null], [{}]]) {
+    assert.strictEqual(typeof rollupProspects(v, null), 'object');
+  }
+});

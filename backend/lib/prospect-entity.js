@@ -78,8 +78,97 @@ function closeRate(prospects) {
   };
 }
 
+// Roll a flat list of calls up into per-user prospect close rates.
+// THE shared computation — every surface that shows a close rate routes through
+// this, so the coaching tile, the team glance box and the team score list can
+// never drift into three different definitions (which is what "closed/(closed+
+// lost) — decided calls only" was, in three places, before 3d-3).
+//
+// calls: [{ id, user_id, prospect_id, call_date, outcome }] — prospect_id NULL
+//        means unresolved, and those calls are EXCLUDED rather than bucketed
+//        together (an "Unknown" bucket would merge every unidentified prospect
+//        into one row and corrupt both halves of the rate).
+// mergedInto: { losingProspectId: survivingProspectId } — applied so a merge
+//        performed in the review actually moves the headline number.
+//
+// Returns { [user_id]: { closed, total, pct } }. Pure and total.
+function rollupProspects(calls, mergedInto) {
+  var arr = Array.isArray(calls) ? calls : [];
+  var merged = mergedInto || {};
+  var perUser = {};
+
+  for (var i = 0; i < arr.length; i++) {
+    var c = arr[i];
+    if (!c || !c.user_id || !c.prospect_id) continue;
+    var pid = merged[c.prospect_id] || c.prospect_id;
+    var u = (perUser[c.user_id] = perUser[c.user_id] || {});
+    var p = (u[pid] = u[pid] || []);
+    p.push({ outcome: c.outcome, date: c.call_date });
+  }
+
+  var out = {};
+  Object.keys(perUser).forEach(function (uid) {
+    var prospects = Object.keys(perUser[uid]).map(function (pid) {
+      var calls_ = perUser[uid][pid].slice().sort(function (a, b) {
+        return String(a.date || '').localeCompare(String(b.date || ''));
+      });
+      return { outcomes: calls_.map(function (x) { return x.outcome; }) };
+    });
+    out[uid] = closeRate(prospects);
+  });
+  return out;
+}
+
+// DB wrapper around rollupProspects. Never throws — a close-rate failure must
+// degrade to "—" rather than break an analytics response.
+async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
+  try {
+    var ids = Array.isArray(userIds) ? userIds : [userIds];
+    if (!ids.length) return {};
+
+    var cq = admin.from('fathom_calls')
+      .select('id, user_id, prospect_id, call_date')
+      .in('user_id', ids)
+      .not('prospect_id', 'is', null);
+    if (fromIso) cq = cq.gte('call_date', fromIso);
+    if (toIso) cq = cq.lte('call_date', toIso);
+    var calls = await cq;
+    if (calls.error || !calls.data || !calls.data.length) return {};
+
+    var byId = {};
+    calls.data.forEach(function (c) { byId[c.id] = c; });
+
+    // Outcomes come from call_analyses; only 'done' rows carry a real outcome.
+    var an = await admin.from('call_analyses')
+      .select('fathom_call_id, outcome')
+      .in('fathom_call_id', Object.keys(byId))
+      .eq('status', 'done');
+    if (an.error) return {};
+    var outcomeBy = {};
+    (an.data || []).forEach(function (a) { outcomeBy[a.fathom_call_id] = a.outcome; });
+
+    var pr = await admin.from('prospects').select('id, merged_into').in('user_id', ids);
+    var mergedInto = {};
+    if (!pr.error) {
+      (pr.data || []).forEach(function (p) { if (p.merged_into) mergedInto[p.id] = p.merged_into; });
+    }
+
+    var joined = calls.data
+      .filter(function (c) { return Object.prototype.hasOwnProperty.call(outcomeBy, c.id); })
+      .map(function (c) {
+        return { id: c.id, user_id: c.user_id, prospect_id: c.prospect_id, call_date: c.call_date, outcome: outcomeBy[c.id] };
+      });
+    return rollupProspects(joined, mergedInto);
+  } catch (err) {
+    console.error('[prospect-entity] close-rate fetch failed: ' + ((err && err.message) || 'unknown'));
+    return {};
+  }
+}
+
 module.exports = {
   nameKey: nameKey,
   prospectOutcome: prospectOutcome,
   closeRate: closeRate,
+  rollupProspects: rollupProspects,
+  fetchProspectCloseRates: fetchProspectCloseRates,
 };
