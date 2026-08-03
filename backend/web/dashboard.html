@@ -1746,6 +1746,34 @@
     }
     /* Promote-to-team (KB Part 2, 2a). Neutral until promoted, then accent-filled
        so a manager can see at a glance which resources the whole team is graded on. */
+    /* ── Prospect merge review (3d-2) ───────────────────────────────── */
+    .merge-list { display: flex; flex-direction: column; gap: 16px; }
+    .merge-card { border: 1px solid var(--border-strong); border-radius: 10px; padding: 16px; background: var(--bg-elevated); }
+    .merge-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .merge-reason { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 7px; }
+    .merge-impact { font-size: 12px; color: var(--text-dim); }
+    .merge-body { display: flex; gap: 14px; align-items: stretch; flex-wrap: wrap; }
+    .merge-side { flex: 1 1 260px; min-width: 240px; border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .merge-vs { align-self: center; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+    .merge-name { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+    .merge-callcount { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; }
+    .merge-call { border-top: 1px solid var(--border); padding: 8px 0; }
+    .merge-call-top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 3px; }
+    .merge-date { font-size: 12px; color: var(--text-dim); }
+    .merge-outcome { font-size: 11px; border-radius: 3px; padding: 1px 6px; border: 1px solid var(--border-strong); color: var(--text-dim); }
+    .merge-outcome.closed { color: #6ee7a8; border-color: rgba(110,231,168,0.4); }
+    .merge-outcome.lost { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
+    /* name provenance — stored by 3a, surfaced here for the first time */
+    .merge-src, .merge-conf { font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; border-radius: 3px; padding: 1px 5px; border: 1px solid var(--border-strong); color: var(--text-dim); }
+    .merge-src.grader { color: var(--accent); border-color: var(--accent); }
+    .merge-conf.low { color: #f6c177; border-color: rgba(246,193,119,0.45); }
+    .merge-title { font-size: 12px; color: var(--text-dim); }
+    .merge-prose { font-size: 12px; margin-top: 4px; color: var(--text); opacity: 0.85; }
+    .merge-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .merge-btn { border-radius: 6px; padding: 7px 13px; font-size: 13px; font-family: inherit; cursor: pointer; background: none; border: 1px solid var(--border-strong); color: var(--text-dim); }
+    .merge-btn.do:hover { color: var(--accent); border-color: var(--accent); }
+    .merge-btn.keep:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+    @media (max-width: 720px) { .merge-vs { display: none; } }
     .kb-promote-btn {
       flex-shrink: 0;
       background: none;
@@ -2016,6 +2044,8 @@
     <a class="nav-link" id="navEod" onclick="goEod(); return false;">EOD Report</a>
     <span class="sep" id="navTeamSep" style="display:none">·</span>
     <a class="nav-link" id="navTeam" onclick="goTeam(); return false;" style="display:none">Team</a>
+    <span class="sep">·</span>
+    <a class="nav-link" id="navProspects" onclick="goProspects(); return false;">Prospects</a>
     <span class="sep" id="navKbSep" style="display:none">·</span>
     <a class="nav-link" id="navKb" onclick="goKb(); return false;" style="display:none">Knowledge Base</a>
   </div>
@@ -2242,6 +2272,8 @@
     callReviewError:    null,  // last fetch error message; cleared on successful re-fetch
     expandedGradeCards: {},    // map of section key ('intro'|'discovery'|...) → true when expanded
     savedMomentIds: {},        // Part 2b: highlight id → true when already in the caller's KB
+    mergeCandidates: [],       // 3d-2: prospect merge proposals awaiting human review
+    mergeLoading: false,
     followupCopied:     false, // transient "Copied!" feedback flag (set true, render, then false 2s later)
   };
 
@@ -3197,6 +3229,7 @@
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
     else if (state.view === 'team-members') renderTeamMembersView();
     else if (state.view === 'kb') renderKbView();
+    else if (state.view === 'prospects') renderProspectsView();
     else if (state.view === 'eod') renderEodView();
     else if (state.view === 'account') renderAccountView();
     updateNavActiveStates();
@@ -3224,6 +3257,8 @@
     if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-members');
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
+    var navPr = document.getElementById('navProspects');
+    if (navPr) navPr.classList.toggle('nav-active', state.view === 'prospects');
     if (navCallLibrary) {
       navCallLibrary.classList.toggle('nav-active', !!CALL_LIBRARY_VIEWS[state.view]);
     }
@@ -4574,6 +4609,7 @@
     if (state.view === 'needs-work')       return 'needs-work';
     if (state.view === 'performance')      return 'performance';
     if (state.view === 'kb')               return 'kb';
+    if (state.view === 'prospects')        return 'prospects';
     if (state.view === 'eod')              return 'eod';
     if (state.view === 'account')          return 'account';
     if (state.view === 'team')             return 'team';
@@ -5037,6 +5073,126 @@
   }
   function goKb() { setView('kb'); }
   var relativeTime = (typeof formatRelativeTime === 'function') ? formatRelativeTime : function (x) { return x; };
+
+  // ── PROSPECT MERGE REVIEW (3d-2) ────────────────────────────────────────
+  // Close rate is closed prospects / total prospects, so an unmerged duplicate
+  // moves the headline number. But a WRONG merge fuses two people and is
+  // invisible in the aggregate — so this surface PROPOSES and a human decides.
+  // Live proof it is needed: the title generator proposed "Mark-Anthony ~ Forb"
+  // on a shared booked title, and that call's own summary said Forb "got routed
+  // into the wrong Zoom meeting".
+  function goProspects() { setView('prospects'); }
+
+  async function loadMergeCandidates() {
+    state.mergeLoading = true;
+    try {
+      var res = await fetch('/me/prospects/merge-candidates', { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      var data = await res.json();
+      state.mergeCandidates = (data && data.candidates) || [];
+    } catch (err) { state.mergeCandidates = []; }
+    state.mergeLoading = false;
+    if (state.view === 'prospects') renderProspectsView();
+  }
+
+  var MERGE_REASON_LABEL = {
+    name:  'names overlap',
+    first: 'same first name',
+    inits: 'initials match',
+    title: 'same booked meeting title',
+  };
+
+  // The evidence a human needs to judge "are these one person?". name_source and
+  // name_confidence are stored by 3a and surfaced HERE for the first time — a
+  // title-sourced name is the BOOKED name and much weaker evidence than a
+  // grader-sourced one.
+  function mergeCallRowHtml(c) {
+    var src = c.name_source ? '<span class="merge-src ' + escapeHtml(c.name_source) + '">' + escapeHtml(c.name_source) + '</span>' : '';
+    var conf = c.name_confidence ? '<span class="merge-conf ' + escapeHtml(c.name_confidence) + '">' + escapeHtml(c.name_confidence) + '</span>' : '';
+    return '<div class="merge-call">'
+      + '<div class="merge-call-top">'
+        + '<span class="merge-date">' + escapeHtml(formatDate(c.call_date)) + '</span>'
+        + '<span class="merge-outcome ' + escapeHtml(c.outcome || 'none') + '">' + escapeHtml(c.outcome || 'no outcome') + '</span>'
+        + src + conf
+      + '</div>'
+      + '<div class="merge-title">' + escapeHtml(c.title || 'untitled') + '</div>'
+      + (c.prose_opening ? '<div class="merge-prose">' + escapeHtml(c.prose_opening) + '…</div>' : '')
+    + '</div>';
+  }
+
+  function mergeSideHtml(p) {
+    return '<div class="merge-side">'
+      + '<div class="merge-name">' + escapeHtml(p.display_name) + '</div>'
+      + '<div class="merge-callcount">' + p.calls.length + ' call' + (p.calls.length === 1 ? '' : 's') + '</div>'
+      + p.calls.map(mergeCallRowHtml).join('')
+    + '</div>';
+  }
+
+  function mergeCandidateHtml(c, i) {
+    // State the rate consequence up front. It is NOT always positive: merging two
+    // CLOSED prospects drops the numerator too, so the rate can fall.
+    var d = c.rate_impact || {};
+    var impact = (d.closed_delta === 0)
+      ? 'closed unchanged, prospects −1 → rate rises slightly'
+      : 'closed −1, prospects −1 → rate falls slightly';
+    return '<div class="merge-card">'
+      + '<div class="merge-head">'
+        + '<span class="merge-reason">' + escapeHtml(MERGE_REASON_LABEL[c.reason] || c.reason) + '</span>'
+        + '<span class="merge-impact">' + escapeHtml(impact) + '</span>'
+      + '</div>'
+      + '<div class="merge-body">' + mergeSideHtml(c.a) + '<div class="merge-vs">same person?</div>' + mergeSideHtml(c.b) + '</div>'
+      + '<div class="merge-actions">'
+        + '<button class="merge-btn keep" onclick="dismissMerge(' + i + ')">Not the same</button>'
+        + '<button class="merge-btn do" onclick="applyMerge(\'' + escapeHtml(c.a.id) + '\',\'' + escapeHtml(c.b.id) + '\',' + i + ')">Merge into &ldquo;' + escapeHtml(c.b.display_name) + '&rdquo;</button>'
+        + '<button class="merge-btn do" onclick="applyMerge(\'' + escapeHtml(c.b.id) + '\',\'' + escapeHtml(c.a.id) + '\',' + i + ')">Merge into &ldquo;' + escapeHtml(c.a.display_name) + '&rdquo;</button>'
+      + '</div>'
+    + '</div>';
+  }
+
+  function renderProspectsView() {
+    var content = document.getElementById('content');
+    if (!content) return;
+    var cands = state.mergeCandidates || [];
+    var body;
+    if (state.mergeLoading) body = '<div class="empty-card"><p>Loading…</p></div>';
+    else if (!cands.length) {
+      body = '<div class="empty-card"><h2>No merge suggestions</h2>'
+        + '<p>Every prospect looks distinct. Suggestions appear when two prospects share a name, initials, or the same booked meeting title.</p></div>';
+    } else {
+      body = '<div class="merge-list">' + cands.map(mergeCandidateHtml).join('') + '</div>';
+    }
+    content.innerHTML = '<div class="page-header"><div><h1>Prospects</h1>'
+      + '<p class="page-sub">Merge suggestions — a prospect counted twice makes your close rate read low. Nothing merges without your confirmation, and every merge can be undone.</p></div></div>'
+      + body;
+  }
+
+  function dismissMerge(i) {
+    // Dismiss is view-only: the proposal is regenerated next load. Persisting
+    // "not the same" is a separate decision — a stored rejection list would need
+    // its own table and its own undo.
+    (state.mergeCandidates || []).splice(i, 1);
+    renderProspectsView();
+  }
+
+  async function applyMerge(fromId, intoId, i) {
+    if (!window.confirm('Merge these two into one prospect?\n\nThis changes your close rate. It can be undone.')) return;
+    var res;
+    try {
+      res = await fetch('/me/prospects/merge', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ from_id: fromId, into_id: intoId }),
+      });
+    } catch (err) { window.alert('Could not reach server: ' + err.message); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var e; try { e = await res.json(); } catch (x) { e = { error: 'HTTP ' + res.status }; }
+      window.alert('Merge failed: ' + (e.error || 'unknown'));
+      return;
+    }
+    await loadMergeCandidates();
+  }
+
   function renderKbView() {
     var content = document.getElementById('content');
     var canManage = kbCanManage();
@@ -5442,6 +5598,7 @@
   }
 
   function setView(view) {
+    if (view === 'prospects' && !state.mergeLoading) loadMergeCandidates();
     state.view = view;
     render();
     syncHashFromState();

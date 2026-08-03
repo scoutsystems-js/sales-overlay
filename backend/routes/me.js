@@ -4,6 +4,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
+const { generateCandidates } = require('../lib/prospect-merge');
+const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome } = require('../lib/outcome-tag');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
@@ -836,6 +838,144 @@ router.patch('/account', requireAuth, async function(req, res) {
   } catch (err) {
     console.error('[me] account update:', err.message);
     res.status(500).json({ error: 'Failed to update account' });
+  }
+});
+
+// ── PROSPECT MERGE REVIEW (3d-2) ─────────────────────────────────────────
+// Close rate is closed PROSPECTS / TOTAL prospects, so every unmerged duplicate
+// moves the headline number — and a WRONG merge silently fuses two people and is
+// invisible in the aggregate. These routes therefore PROPOSE and APPLY, but a
+// human always decides. Proven necessary on live data: the title generator
+// proposed "Mark-Anthony ~ Forb" and that call's summary said Forb "got routed
+// into the wrong Zoom meeting".
+
+// GET /me/prospects/merge-candidates — proposals with the evidence a reviewer
+// needs: both names, per-call source/confidence/date/title/outcome, the prose
+// opening, and what the merge would do to the close rate.
+router.get('/prospects/merge-candidates', requireAuth, async function (req, res) {
+  try {
+    var admin = getAdminClient();
+    // Caller-scoped only. A manager reviewing a rep's prospects would need the
+    // /admin pivot's scope check; deliberately out of scope for 3d-2 rather than
+    // hand-rolling a second authorization path here.
+    var userId = req.user.id;
+
+    var pq = await admin.from('prospects')
+      .select('id, display_name, merged_into').eq('user_id', userId);
+    if (pq.error) throw new Error('prospects: ' + pq.error.message);
+    var prospects = (pq.data || []).map(function (p) { return { id: p.id, display_name: p.display_name, merged_into: p.merged_into, calls: [] }; });
+    if (!prospects.length) return res.json({ candidates: [] });
+
+    var byId = {}; prospects.forEach(function (p) { byId[p.id] = p; });
+
+    var cq = await admin.from('fathom_calls')
+      .select('id, prospect_id, title, call_date, recording_url')
+      .eq('user_id', userId).not('prospect_id', 'is', null);
+    if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+    var callIds = (cq.data || []).map(function (c) { return c.id; });
+
+    var aq = callIds.length ? await admin.from('call_analyses')
+      .select('fathom_call_id, outcome, prospect_name, prospect_name_source, prospect_name_confidence, eod_summary, overall_summary')
+      .in('fathom_call_id', callIds) : { data: [] };
+    var anBy = {}; ((aq && aq.data) || []).forEach(function (a) { anBy[a.fathom_call_id] = a; });
+
+    (cq.data || []).forEach(function (c) {
+      var p = byId[c.prospect_id];
+      if (!p) return;
+      var a = anBy[c.id] || {};
+      var prose = (a.eod_summary || a.overall_summary || '');
+      p.calls.push({
+        call_id: c.id,
+        title: c.title || null,
+        call_date: c.call_date || null,
+        recording_url: c.recording_url || null,
+        outcome: a.outcome || null,
+        observed_name: a.prospect_name || null,
+        name_source: a.prospect_name_source || null,       // 3a stored these;
+        name_confidence: a.prospect_name_confidence || null, // this is where they finally matter
+        prose_opening: prose ? String(prose).slice(0, 160) : null,
+      });
+    });
+    prospects.forEach(function (p) {
+      p.calls.sort(function (x, y) { return String(x.call_date || '').localeCompare(String(y.call_date || '')); });
+    });
+
+    return res.json({ candidates: generateCandidates(prospects) });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] merge-candidates error:', err.message);
+    return res.status(500).json({ error: 'Could not load merge candidates' });
+  }
+});
+
+// POST /me/prospects/merge {from_id, into_id} — apply a confirmed merge.
+// Reversible and audited: the losing row is POINTED via merged_into, never
+// rewritten or deleted, so an incorrect merge can always be undone.
+router.post('/prospects/merge', requireAuth, async function (req, res) {
+  var fromId = req.body && req.body.from_id;
+  var intoId = req.body && req.body.into_id;
+  if (!fromId || !intoId || fromId === intoId) {
+    return res.status(400).json({ error: 'from_id and into_id required and must differ' });
+  }
+  try {
+    var admin = getAdminClient();
+    var rows = await admin.from('prospects').select('id, user_id, merged_into').in('id', [fromId, intoId]);
+    if (rows.error) throw new Error(rows.error.message);
+    if (!rows.data || rows.data.length !== 2) return res.status(404).json({ error: 'Prospect not found' });
+    // Ownership: both must belong to the caller (or a rep they may act for).
+    for (var i = 0; i < rows.data.length; i++) {
+      if (rows.data[i].user_id !== req.user.id) return res.status(403).json({ error: 'Not your prospect' });
+    }
+    var target = rows.data.filter(function (r) { return r.id === intoId; })[0];
+    if (target && target.merged_into) {
+      return res.status(400).json({ error: 'Target prospect is itself merged — merge into the survivor instead' });
+    }
+
+    await admin.from('fathom_calls').update({ prospect_id: intoId }).eq('prospect_id', fromId);
+    var up = await admin.from('prospects').update({
+      merged_into: intoId, merged_at: new Date().toISOString(), merged_by: req.user.id,
+    }).eq('id', fromId);
+    if (up.error) throw new Error(up.error.message);
+
+    console.log('[me] prospect merged: actor=%s from=%s into=%s', req.user.email, fromId, intoId);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[me] prospect merge error:', err.message);
+    return res.status(500).json({ error: 'Merge failed' });
+  }
+});
+
+// POST /me/prospects/unmerge {id} — undo. The reason merges are safe to make.
+router.post('/prospects/unmerge', requireAuth, async function (req, res) {
+  var id = req.body && req.body.id;
+  if (!id) return res.status(400).json({ error: 'id required' });
+  try {
+    var admin = getAdminClient();
+    var row = await admin.from('prospects').select('id, user_id, merged_into').eq('id', id).maybeSingle();
+    if (row.error || !row.data) return res.status(404).json({ error: 'Prospect not found' });
+    if (row.data.user_id !== req.user.id) return res.status(403).json({ error: 'Not your prospect' });
+    if (!row.data.merged_into) return res.status(400).json({ error: 'Prospect is not merged' });
+
+    // Re-point only the calls whose OBSERVED name still keys to this prospect,
+    // so undoing one merge cannot steal calls that belonged to the survivor.
+    var back = await admin.from('prospects').select('name_key').eq('id', id).maybeSingle();
+    var key = back.data ? back.data.name_key : null;
+    if (key) {
+      var cand = await admin.from('fathom_calls').select('id').eq('prospect_id', row.data.merged_into);
+      var ids = (cand.data || []).map(function (c) { return c.id; });
+      if (ids.length) {
+        var ans = await admin.from('call_analyses').select('fathom_call_id, prospect_name').in('fathom_call_id', ids);
+        var moveBack = ((ans && ans.data) || []).filter(function (a) { return nameKey(a.prospect_name) === key; })
+          .map(function (a) { return a.fathom_call_id; });
+        if (moveBack.length) await admin.from('fathom_calls').update({ prospect_id: id }).in('id', moveBack);
+      }
+    }
+    await admin.from('prospects').update({ merged_into: null, merged_at: null, merged_by: null }).eq('id', id);
+    console.log('[me] prospect unmerged: actor=%s id=%s', req.user.email, id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[me] prospect unmerge error:', err.message);
+    return res.status(500).json({ error: 'Unmerge failed' });
   }
 });
 
