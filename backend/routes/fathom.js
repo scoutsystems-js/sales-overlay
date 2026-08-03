@@ -1120,7 +1120,7 @@ async function loadCallsList(admin, userId, opts) {
   for (var c = 0; c < ids.length; c += 100) {
     var ar = await admin
       .from('call_analyses')
-      .select('fathom_call_id, status, overall_score, overall_summary, outcome, outcome_source')
+      .select('fathom_call_id, status, overall_score, overall_summary, outcome, outcome_source, prospect_name')
       .in('fathom_call_id', ids.slice(c, c + 100));
     if (!ar.error) (ar.data || []).forEach(function(a) { analysisByCallId[a.fathom_call_id] = a; });
   }
@@ -1197,7 +1197,7 @@ router.get('/calls/:id', requireAuth, async function(req, res) {
     //    analysis fields if the table read errors.
     var analysisResult = await admin
       .from('call_analyses')
-      .select('status, overall_score, overall_summary, one_thing, outcome, outcome_source, why_outcome, why_quote, why_timestamp_seconds, one_thing_timestamp_seconds, follow_up_email, speaker_closer_name, intro_grade, intro_score, intro_notes, discovery_grade, discovery_score, discovery_notes, pitch_grade, pitch_score, pitch_notes, objection_grade, objection_score, objection_notes, close_grade, close_score, close_notes')
+      .select('status, prospect_name, overall_score, overall_summary, one_thing, outcome, outcome_source, why_outcome, why_quote, why_timestamp_seconds, one_thing_timestamp_seconds, follow_up_email, speaker_closer_name, intro_grade, intro_score, intro_notes, discovery_grade, discovery_score, discovery_notes, pitch_grade, pitch_score, pitch_notes, objection_grade, objection_score, objection_notes, close_grade, close_score, close_notes')
       .eq('fathom_call_id', callId)
       .maybeSingle();
     if (analysisResult.error) {

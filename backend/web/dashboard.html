@@ -5073,6 +5073,16 @@
     renderKbList((data && data.uploads) || []);
   }
 
+  // PROSPECT NAMES 3a — what to LABEL a call with. Prefers the resolved prospect
+  // name (call_analyses.prospect_name); falls back to the raw meeting title only
+  // when no name was resolved. A null resolution renders "Unknown prospect"
+  // rather than a meeting label — a wrong name is worse than no name.
+  function callLabel(c) {
+    var n = c && c.prospect_name;
+    if (n && String(n).trim()) return String(n).trim();
+    return null;
+  }
+
   function renderKbList(items) {
     var container = document.getElementById('kbContainer');
     if (!container) return;
@@ -5959,7 +5969,10 @@
   }
 
   function callLibraryCardHtml(c) {
-    var title = (c.title && String(c.title).trim())
+    var resolvedName = callLabel(c);
+    var title = resolvedName
+      ? '<span>' + escapeHtml(resolvedName) + '</span>'
+      : (c.title && String(c.title).trim())
       ? '<span>' + escapeHtml(c.title) + '</span>'
       : '<span class="anon">Untitled call</span>';
     var dateStr = formatNaturalDate(c.call_date);
@@ -6252,7 +6265,7 @@
 
   function renderCallReviewHeaderHtml(review, seed) {
     var src = review || seed || {};
-    var titleText = (src.title && String(src.title).trim()) ? src.title : null;
+    var titleText = callLabel(src) || ((src.title && String(src.title).trim()) ? src.title : null);
     var titleHtml = titleText
       ? '<h1 class="review-title">' + escapeHtml(titleText) + '</h1>'
       : '<h1 class="review-title anon">Untitled call</h1>';

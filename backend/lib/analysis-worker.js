@@ -47,6 +47,7 @@ const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
 const { fetchSellingContext } = require('./selling-context');
 const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
+const { resolveProspectName } = require('./prospect-name');
 const { effectiveCloseScore } = require('./outcome-tag');
 const fathomRoutes = require('../routes/fathom');
 // Zoom source (sub-stage 2). Token via the unified call_connections store (its
@@ -897,6 +898,45 @@ async function analyzeCall(fathomCallId, userId) {
       console.warn('[analysis] highlight extractor returned unparseable JSON for ' + fathomCallId + ' — proceeding with grades only');
     }
 
+    // ─── Phase 6b: resolve the prospect name ─────────────────────────────
+    // The closer must be excluded from the diarized speakers, but
+    // `normalized.closer_name` is NULL in practice — the meeting object above
+    // hardcodes `recorded_by: null`, so the normalizer's fuzzy match never runs
+    // (all 83 live rows have speaker_closer_name NULL). The connection's stored
+    // recorded-by email is the reliable identity: "joshua@soberlivingriches.com"
+    // → local part "joshua" → matches the display name "Joshua Pinner".
+    //
+    // This matters concretely: on 6 of 83 live calls the PROSPECT out-talked the
+    // closer, so the turn-count fallback alone would have returned the CLOSER as
+    // the prospect — precisely the wrong-name failure the governing principle
+    // forbids. Never let this degrade to that path when an email is available.
+    var closerCandidates = [];
+    try {
+      var connTable = (transcriptSourceFor(callRow) === 'zoom') ? 'call_connections' : 'fathom_connections';
+      var emailCol  = (connTable === 'call_connections') ? 'external_account_email' : 'fathom_email';
+      var connQ = admin.from(connTable).select(emailCol).eq('user_id', userId);
+      if (connTable === 'call_connections') connQ = connQ.eq('provider', 'zoom');
+      var connRow = await connQ.maybeSingle();
+      var closerEmail = connRow && connRow.data ? connRow.data[emailCol] : null;
+      if (closerEmail && typeof closerEmail === 'string') {
+        closerCandidates.push(closerEmail);
+        var localPart = closerEmail.split('@')[0];
+        if (localPart) closerCandidates.push(localPart);
+      }
+    } catch (connErr) {
+      // Non-fatal: without an email the resolver falls back to the turn-count
+      // heuristic and marks the result low-confidence.
+      console.warn('[analysis] closer-identity lookup failed for ' + fathomCallId + ': ' + ((connErr && connErr.message) || 'unknown'));
+    }
+
+    var resolvedProspect = resolveProspectName({
+      graderName:       null, // 3b adds the grader field; precedence already prefers it
+      turns:            normalized.turns,
+      closerName:       normalized.closer_name,
+      closerCandidates: closerCandidates,
+      title:            callRow.title,
+    });
+
     // ─── Phase 7: persist ────────────────────────────────────────────────
     var intro     = sanitizeSection(graderParsed.intro);
     var discovery = sanitizeSection(graderParsed.discovery);
@@ -983,6 +1023,14 @@ async function analyzeCall(fathomCallId, userId) {
       eod_summary:         sanitizeEodSummary(graderParsed.eod_summary),
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
+      // PROSPECT NAMES 3a — resolve WHO this call was with, at write time.
+      // Governing principle: a wrong name is worse than no name, so this stores
+      // NULL rather than a plausible guess (renders "Unknown prospect").
+      // Precedence grader → diarized → title; source + confidence recorded but
+      // not surfaced until 3d's merge review (ruling 4).
+      prospect_name:            resolvedProspect.name,
+      prospect_name_source:     resolvedProspect.source,
+      prospect_name_confidence: resolvedProspect.confidence,
       analyzed_at:         new Date().toISOString(),
       prompt_version:      ANALYSIS_PROMPT_VERSION,
       status:              'done',

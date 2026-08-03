@@ -4,15 +4,32 @@ const test = require('node:test');
 const assert = require('node:assert');
 const eod = require('../routes/eod');
 
-test('prospectNameFromTitle: takes the segment after the last pipe, falls back whole/unknown', () => {
-  const f = eod._prospectNameFromTitle;
-  assert.strictEqual(f('PS Sober Living Riches | Tasha Presberry'), 'Tasha Presberry');
-  assert.strictEqual(f('A | B | Carol Jones'), 'Carol Jones');
-  assert.strictEqual(f('Fathom Demo'), 'Fathom Demo');
-  assert.strictEqual(f('  padded  '), 'padded');
-  assert.strictEqual(f('Trailing pipe | '), 'Trailing pipe');   // empty tail → fall back to whole
-  assert.strictEqual(f(''), 'Unknown prospect');
-  assert.strictEqual(f(null), 'Unknown prospect');
+// PROSPECT NAMES 3a: EOD no longer derives the name from the title. It reads
+// call_analyses.prospect_name, falling back to a CLEANED title parse only for
+// rows 3c has not backfilled yet.
+test('prospectNameFor: the stored resolved name wins over the title', () => {
+  const f = eod._prospectNameFor;
+  // The bug that opened the stage: title is a meeting label, grader knew the person.
+  assert.strictEqual(f({ prospect_name: 'Katina Goss' }, 'Impromptu Zoom Meeting'), 'Katina Goss');
+  // And the booked-name case: title names someone who did not attend.
+  assert.strictEqual(f({ prospect_name: 'Jamie Ellis' }, 'PS Sober Living Riches | Tasha Presberry'), 'Jamie Ellis');
+});
+
+test('prospectNameFor: falls back to a CLEANED title parse when not yet resolved', () => {
+  const f = eod._prospectNameFor;
+  assert.strictEqual(f({}, 'PS Sober Living Riches | Tasha Presberry'), 'Tasha Presberry');
+  assert.strictEqual(f({ prospect_name: null }, 'A | B | Carol Jones'), 'Carol Jones');
+  assert.strictEqual(f({ prospect_name: '   ' }, 'Katina Goss'), 'Katina Goss');
+});
+
+test('prospectNameFor: a meeting label NEVER becomes a prospect, even unresolved', () => {
+  // The old helper returned these verbatim, collapsing 11 real prospects into one.
+  const f = eod._prospectNameFor;
+  assert.strictEqual(f({}, 'Impromptu Zoom Meeting'), 'Unknown prospect');
+  assert.strictEqual(f({}, 'Zoom Meeting'), 'Unknown prospect');
+  assert.strictEqual(f({}, 'IH Sober Living Riches | X'), 'Unknown prospect');
+  assert.strictEqual(f({}, ''), 'Unknown prospect');
+  assert.strictEqual(f({}, null), 'Unknown prospect');
 });
 
 test('applyEdits: user override wins per-field, analysis value otherwise, edited flags accurate', () => {

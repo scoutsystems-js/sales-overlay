@@ -23,6 +23,8 @@ const router = express.Router();
 // is the manual call tag (PATCH /me/calls/:id/outcome), composed with payment
 // structure into the EOD label. The EOD view shows it read-only; this route no
 // longer accepts outcome edits. (No eod_edits.outcome rows existed to migrate.)
+const { nameFromTitle } = require('../lib/prospect-name');
+
 const EDITABLE_FIELDS = ['prospect_name', 'cash_collected', 'summary', 'payment_structure'];
 const VALUE_CAPS = { prospect_name: 200, cash_collected: 20, summary: 3000, payment_structure: 20 };
 // payment_structure is a CONSTRAINED choice — mirrors the analysis-worker
@@ -63,13 +65,28 @@ function handleConfigError(err, res) {
   return false;
 }
 
-// "PS Sober Living Riches | Tasha Presberry" → "Tasha Presberry". Fathom
-// titles put the prospect after the last pipe; without one, the whole title
-// is the best available prefill. Display prefill only — the user can edit it.
-function prospectNameFromTitle(title) {
-  if (!title || typeof title !== 'string' || !title.trim()) return 'Unknown prospect';
-  var parts = title.split('|').map(function (p) { return p.trim(); }).filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : 'Unknown prospect';
+// PROSPECT NAMES 3a — the resolved name replaces the title-derived one.
+//
+// Precedence: the stored resolved name → a CLEANED title parse → "Unknown
+// prospect". The middle branch matters during the window between 3a shipping
+// and 3c's backfill: un-backfilled rows still get a name, but `nameFromTitle`
+// REFUSES meeting labels, so "Impromptu Zoom Meeting" can never appear as a
+// prospect again even before the backfill runs.
+//
+// The original implementation is preserved below, commented in place. It
+// returned the last '|' segment unconditionally — which is why 11 distinct real
+// prospects all displayed as the single prospect "Impromptu Zoom Meeting", and
+// why booked-name titles displayed over the person who actually attended.
+//
+// function prospectNameFromTitle(title) {
+//   if (!title || typeof title !== 'string' || !title.trim()) return 'Unknown prospect';
+//   var parts = title.split('|').map(function (p) { return p.trim(); }).filter(Boolean);
+//   return parts.length ? parts[parts.length - 1] : 'Unknown prospect';
+// }
+function prospectNameFor(analysisRow, title) {
+  var stored = analysisRow && analysisRow.prospect_name;
+  if (stored && String(stored).trim()) return String(stored).trim();
+  return nameFromTitle(title) || 'Unknown prospect';
 }
 
 // The one merge rule: override if present (even empty-string — a deliberate
@@ -110,7 +127,7 @@ router.get('/', requireAuth, async function (req, res) {
 
     var callIds = calls.map(function (c) { return c.id; });
     var anQ = await admin.from('call_analyses')
-      .select('fathom_call_id, status, outcome, overall_summary, eod_summary, cash_collected, payment_structure')
+      .select('fathom_call_id, status, outcome, overall_summary, eod_summary, cash_collected, payment_structure, prospect_name')
       .in('fathom_call_id', callIds);
     if (anQ.error) throw new Error('call_analyses: ' + anQ.error.message);
     var anByCall = {};
@@ -128,7 +145,7 @@ router.get('/', requireAuth, async function (req, res) {
     var out = calls.map(function (c) {
       var a = anByCall[c.id] || {};
       var analysis = {
-        prospect_name: prospectNameFromTitle(c.title),
+        prospect_name: prospectNameFor(a, c.title),
         outcome: outcomePrefill(a),
         cash_collected: (typeof a.cash_collected === 'number' || typeof a.cash_collected === 'string') ? String(a.cash_collected) : '0',
         summary: summaryPrefill(a),
@@ -194,7 +211,7 @@ router.put('/edit', requireAuth, async function (req, res) {
 
 module.exports = router;
 // pure helpers exported for tests (log.js:_validateLogBatch pattern)
-module.exports._prospectNameFromTitle = prospectNameFromTitle;
+module.exports._prospectNameFor = prospectNameFor;
 module.exports._applyEdits = applyEdits;
 module.exports._EDITABLE_FIELDS = EDITABLE_FIELDS;
 module.exports._PAYMENT_STRUCTURES = PAYMENT_STRUCTURES;
