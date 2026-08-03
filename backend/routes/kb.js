@@ -6,8 +6,9 @@ const { requireAuth, requireSubscription } = require('../middleware/auth');
 const { kbReadRowVisible } = require('../lib/kb-scope');
 const { sanitizeSectionValue } = require('../lib/highlight-section');
 const {
-  quoteHash, buildEntryContent, resolveEntryTarget, KB_ENTRY_METADATA_CATEGORY,
+  quoteHash, resolveEntryTarget, buildMomentRow, insertMoment,
 } = require('../lib/kb-entry');
+const { getVoyageEmbedding } = require('../lib/voyage');
 
 var router = express.Router();
 
@@ -73,31 +74,35 @@ var upload = multer({
 // Single Voyage REST call. Returns the embedding vector or null on any
 // failure. Never throws — the caller decides what to do without an embedding
 // (search falls back to keyword scoring, upload still inserts the chunk).
-async function getVoyageEmbedding(text) {
-  if (!process.env.VOYAGE_API_KEY) {
-    console.error('[kb] VOYAGE_API_KEY not configured — embedding skipped');
-    return null;
-  }
-  try {
-    var res = await fetch('https://api.voyageai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + process.env.VOYAGE_API_KEY,
-      },
-      body: JSON.stringify({ input: [text], model: 'voyage-3-lite' }),
-    });
-    if (!res.ok) {
-      console.error('[kb] Voyage embedding failed: HTTP ' + res.status);
-      return null;
-    }
-    var data = await res.json();
-    return (data.data && data.data[0] && data.data[0].embedding) || null;
-  } catch (err) {
-    console.error('[kb] Voyage embedding error:', err.message);
-    return null;
-  }
-}
+// 2d: the Voyage call moved to lib/voyage.js so the analysis worker
+// (auto-population) can share ONE implementation instead of carrying a copy.
+// Original body preserved below, commented in place.
+//
+// async function getVoyageEmbedding(text) {
+//   if (!process.env.VOYAGE_API_KEY) {
+//     console.error('[kb] VOYAGE_API_KEY not configured — embedding skipped');
+//     return null;
+//   }
+//   try {
+//     var res = await fetch('https://api.voyageai.com/v1/embeddings', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//         'Authorization': 'Bearer ' + process.env.VOYAGE_API_KEY,
+//       },
+//       body: JSON.stringify({ input: [text], model: 'voyage-3-lite' }),
+//     });
+//     if (!res.ok) {
+//       console.error('[kb] Voyage embedding failed: HTTP ' + res.status);
+//       return null;
+//     }
+//     var data = await res.json();
+//     return (data.data && data.data[0] && data.data[0].embedding) || null;
+//   } catch (err) {
+//     console.error('[kb] Voyage embedding error:', err.message);
+//     return null;
+//   }
+// }
 
 // Resolve the caller's role + team relationships in one trip. Returns
 // { role, managed_by, p_user_id, p_admin_id } where p_admin_id =
@@ -769,55 +774,27 @@ router.post('/from-highlight', protect, async function(req, res) {
     var t = resolveEntryTarget(scope, callOwnerId);
     if (!t.ok) return res.status(403).json({ error: t.error });
 
+    // 2c ruling 2: this route is a THIN WRAPPER over lib/kb-entry.js. The row
+    // shape and the insert live there, shared verbatim with the analysis
+    // worker's auto-population — one implementation, two callers.
     var section = sanitizeSectionValue(hl.data.section);
-    var qHash = quoteHash(hl.data.quote);
-    var content = buildEntryContent(hl.data);
-    // Distinct labels per KB so the list doesn't merge a manager's personal and
-    // team moments into one mixed-scope group.
-    var label = (t.target.scope === 'team') ? 'Team call moments' : 'My call moments';
+    var row = buildMomentRow({
+      highlight: hl.data,
+      target: t.target,
+      section: section,
+      fathomCallId: fathomCallId,
+      source: 'manual_add',
+      sourceUserId: callOwnerId,   // whose call it came from (attribution)
+      addedBy: req.user.id,        // who clicked
+    });
+    row.embedding = await getVoyageEmbedding(row.content, 'kb');
 
-    var emb = await getVoyageEmbedding(content);
-
-    var row = {
-      category: 'learned_pattern',            // RULING 1 — filter (a)
-      label: label,
-      content: content,
-      triggers: [],
-      metadata: {
-        category: KB_ENTRY_METADATA_CATEGORY, // RULING 1 — filter (b)
-        source: 'manual_add',
-        section: section,
-        type: hl.data.type || null,
-        resolution: hl.data.resolution || null,
-        speaker: hl.data.speaker || null,
-        quote: hl.data.quote || null,
-        observation: hl.data.observation || null,
-        closer_response: hl.data.closer_response || null,
-        timestamp_seconds: (typeof hl.data.timestamp_seconds === 'number') ? hl.data.timestamp_seconds : null,
-        source_fathom_call_id: fathomCallId,
-        source_highlight_id: hl.data.id,       // provenance only — NEVER the dedupe key
-        source_user_id: callOwnerId,           // whose call it came from (attribution)
-        added_by: req.user.id,
-      },
-      embedding: emb,
-      uploaded_by: t.target.uploaded_by,
-      scope: t.target.scope,
-      team_owner_id: t.target.team_owner_id,
-      source_label: label,
-      source_fathom_call_id: fathomCallId,
-      source_section: section,
-      source_quote_hash: qHash,
-    };
-
-    var insert = await admin.from('knowledge_base').insert(row);
-    if (insert.error) {
-      // 23505 = unique violation on knowledge_base_call_moment_dedupe_idx. That
-      // means this exact moment is already in this KB — from an earlier click or
-      // (once 2d ships) from auto-population. Idempotent success, not an error.
-      if (insert.error.code === '23505') {
-        return res.json({ ok: true, added: false, duplicate: true, scope: t.target.scope });
-      }
-      console.error('[kb] from-highlight insert failed:', String(insert.error.message || 'unknown').slice(0, 200));
+    var result = await insertMoment(admin, row);
+    if (result.duplicate) {
+      return res.json({ ok: true, added: false, duplicate: true, scope: t.target.scope });
+    }
+    if (!result.added) {
+      console.error('[kb] from-highlight insert failed:', result.error);
       return res.status(500).json({ error: 'Could not save that moment' });
     }
 

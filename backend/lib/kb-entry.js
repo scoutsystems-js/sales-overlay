@@ -105,10 +105,79 @@ function resolveEntryTarget(callerScope, callOwnerId) {
   return { ok: false, error: 'You can only add moments from your own calls.' };
 }
 
+// Build the knowledge_base row for a harvested moment. THE single row shape —
+// POST /kb/from-highlight (manual, source 'manual_add') and the analysis worker
+// (auto-population, source 'auto_closed_call') both go through here, so there is
+// ONE insert implementation with two callers (ruling 2, 2c).
+//
+// The two category choices below are what enforce ruling 1. Changing either
+// exposes harvested material to the grader — see the header of this file and
+// test/kb-hash-guard.test.js.
+function buildMomentRow(opts) {
+  var h = opts.highlight || {};
+  var target = opts.target;
+  var section = opts.section !== undefined ? opts.section : (h.section || null);
+  var label = (target.scope === 'team') ? 'Team call moments' : 'My call moments';
+
+  return {
+    category: 'learned_pattern',              // RULING 1 — filter (a)
+    label: label,
+    content: buildEntryContent(h),
+    triggers: [],
+    metadata: {
+      category: KB_ENTRY_METADATA_CATEGORY,   // RULING 1 — filter (b)
+      source: opts.source,
+      section: section,
+      type: h.type || null,
+      resolution: h.resolution || null,
+      speaker: h.speaker || null,
+      quote: h.quote || null,
+      observation: h.observation || null,
+      closer_response: h.closer_response || null,
+      timestamp_seconds: (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null,
+      source_fathom_call_id: opts.fathomCallId,
+      source_highlight_id: h.id || null,      // provenance only — NEVER the dedupe key
+      source_user_id: opts.sourceUserId || null,
+      added_by: opts.addedBy || null,
+    },
+    embedding: opts.embedding === undefined ? null : opts.embedding,
+    uploaded_by: target.uploaded_by,
+    scope: target.scope,
+    team_owner_id: target.team_owner_id,
+    source_label: label,
+    source_fathom_call_id: opts.fathomCallId,
+    source_section: section,
+    source_quote_hash: quoteHash(h.quote),
+  };
+}
+
+// Insert a built row, translating the dedupe index into a normal outcome.
+// Returns { added, duplicate, error } and NEVER throws — a KB write must never
+// be able to fail its caller (critical for the worker, per the house rule that
+// a KB problem can never fail or stall an analysis).
+async function insertMoment(admin, row) {
+  try {
+    var res = await admin.from('knowledge_base').insert(row);
+    if (res && res.error) {
+      // 23505 = knowledge_base_call_moment_dedupe_idx. The moment is already in
+      // this KB — from an earlier manual click or a prior auto-population run.
+      // Idempotent success, not an error. This is the mechanism that makes the
+      // manual button and auto-population safe to run over each other.
+      if (res.error.code === '23505') return { added: false, duplicate: true };
+      return { added: false, duplicate: false, error: String(res.error.message || 'unknown').slice(0, 200) };
+    }
+    return { added: true, duplicate: false };
+  } catch (err) {
+    return { added: false, duplicate: false, error: (err && err.message) || 'unknown' };
+  }
+}
+
 module.exports = {
   normalizeQuote: normalizeQuote,
   quoteHash: quoteHash,
   buildEntryContent: buildEntryContent,
   resolveEntryTarget: resolveEntryTarget,
+  buildMomentRow: buildMomentRow,
+  insertMoment: insertMoment,
   KB_ENTRY_METADATA_CATEGORY: KB_ENTRY_METADATA_CATEGORY,
 };

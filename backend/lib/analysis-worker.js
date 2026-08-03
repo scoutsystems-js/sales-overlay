@@ -46,6 +46,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
 const { fetchSellingContext } = require('./selling-context');
+const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
 const { effectiveCloseScore } = require('./outcome-tag');
 const fathomRoutes = require('../routes/fathom');
 // Zoom source (sub-stage 2). Token via the unified call_connections store (its
@@ -996,6 +997,35 @@ async function analyzeCall(fathomCallId, userId) {
     // highlights. Non-fatal: grades are already saved.
     var sanitizedHighlights = sanitizeHighlights(highlightParsed, callRow.duration_seconds);
     await persistHighlights(admin, fathomCallId, userId, sanitizedHighlights);
+
+    // ─── Phase 7b: auto-populate the rep's KB from a CLOSED call ─────────
+    // KB Part 2, sub-stage 2d. Gated on effectiveOutcome — the manual-override-
+    // aware value, so a human-tagged outcome drives this exactly as it drives
+    // close_score and payment_structure. Ruling 4: outcome alone, never cash
+    // (a payment-plan close legitimately records zero at signing).
+    //
+    // NOT awaited, on purpose. The analysis drain is fire-and-forget and dies on
+    // a Railway redeploy; this adds ~2-10 Voyage round-trips per closed call and
+    // must not lengthen the window where a deploy can kill a call mid-analysis.
+    // Zero new Claude calls — it files moments the extractor already produced.
+    //
+    // Fully swallowed: a KB failure can never fail or stall an analysis (the same
+    // degrade rule fetchSellingContext follows). Idempotent with the manual
+    // Add-to-KB button by construction — identical dedupe key, so whichever runs
+    // second is a no-op.
+    if (shouldHarvest(effectiveOutcome)) {
+      harvestClosedCall(admin, {
+        fathomCallId: fathomCallId,
+        userId:       userId,
+        outcome:      effectiveOutcome,
+        highlights:   sanitizedHighlights,
+      }).then(function (s) {
+        console.log('[kb-harvest] call=%s added=%d duplicate=%d failed=%d%s',
+          fathomCallId, s.added, s.duplicate, s.failed, s.skipped_reason ? ' skipped=' + s.skipped_reason : '');
+      }).catch(function (e) {
+        console.error('[kb-harvest] unexpected: ' + ((e && e.message) || 'unknown'));
+      });
+    }
 
     // ─── Phase 8: advance fathom_calls.sync_status ───────────────────────
     var processed = await admin
