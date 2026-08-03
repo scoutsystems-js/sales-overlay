@@ -302,3 +302,54 @@ test('the resolved name is always trimmed and never a bare empty string', () => 
   const r = resolveProspectName({ graderName: '  Katina Goss  ', turns: [], title: null });
   assert.strictEqual(r.name, 'Katina Goss');
 });
+
+// ── Refinements from the 3c dry run (real defects on live data) ───────────
+test('CORROBORATION: an abbreviated first name still matches the fuller title', () => {
+  // Live: title "Lisa Williams", diarized "L. Williams" (228 turns). Plain
+  // containment misses it, so the ABBREVIATION was winning and the given name
+  // was lost — a regression against the old behaviour and bad for 3d grouping.
+  const r = resolveProspectName({
+    graderName: null, turns: turns(['Joshua Pinner', 'L. Williams', 'L. Williams']),
+    closerCandidates: ['joshua'], title: 'IH Sober Living Riches | Lisa Williams',
+  });
+  assert.strictEqual(r.name, 'Lisa Williams');
+  assert.strictEqual(r.confidence, 'high');
+});
+
+test('initial+surname matching does NOT merge two different people with the same surname', () => {
+  // "J. Smith" must not silently equal both Jane and John. Ambiguity like this
+  // belongs in 3d's human-confirmed merge review, never in an automatic rule.
+  const { sameIdentity } = require('../lib/prospect-name');
+  assert.strictEqual(sameIdentity('J. Smith', 'Jane Smith'), true);   // consistent prefix
+  assert.strictEqual(sameIdentity('Jane Smith', 'John Smith'), false); // different people
+  assert.strictEqual(sameIdentity('L. Williams', 'Lisa Brown'), false); // surname differs
+});
+
+test('MULTI-SPEAKER: the title disambiguates when it matches exactly one attendee', () => {
+  // Live: "IH … | Ty Downey" with speakers David Summers / Ty Downey / Amanda
+  // Jolley. Refusing threw away a title that names someone actually in the room.
+  const r = resolveProspectName({
+    graderName: null,
+    turns: turns(['Joshua Pinner', 'David Summers', 'Ty Downey', 'Amanda Jolley', 'Ty Downey']),
+    closerCandidates: ['joshua'], title: 'IH Sober Living Riches | Ty Downey',
+  });
+  assert.strictEqual(r.name, 'Ty Downey');
+  assert.strictEqual(r.confidence, 'low'); // multi-speaker stays low confidence
+});
+
+test('MULTI-SPEAKER: still REFUSES when the title matches nobody', () => {
+  const r = resolveProspectName({
+    graderName: null, turns: turns(['Joshua Pinner', 'Ann', 'Ben', 'Cara']),
+    closerCandidates: ['joshua'], title: 'PS Sober Living Riches | Someone Else',
+  });
+  assert.strictEqual(r.name, null);
+});
+
+test('MULTI-SPEAKER: REFUSES when the title matches more than one attendee', () => {
+  // Two Williamses in the room and a title of "Williams" is ambiguous; refuse.
+  const r = resolveProspectName({
+    graderName: null, turns: turns(['Joshua Pinner', 'A. Williams', 'B. Williams', 'Cara']),
+    closerCandidates: ['joshua'], title: 'PS Sober Living Riches | C. Williams',
+  });
+  assert.strictEqual(r.name, null);
+});

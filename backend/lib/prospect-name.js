@@ -139,7 +139,26 @@ function sameIdentity(a, b) {
   var strip = function (s) { return norm(s).toLowerCase().replace(/[.,'’-]/g, '').replace(/\s+/g, ' ').trim(); };
   var x = strip(a), y = strip(b);
   if (!x || !y) return false;
-  return x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
+  if (x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1) return true;
+
+  // Initial + surname agreement: "L. Williams" ↔ "Lisa Williams". Containment
+  // misses this (neither string contains the other), and without it the
+  // abbreviated diarized form WINS over the fuller title — losing the given
+  // name that 3d's grouping needs. Requires the surname to match exactly AND
+  // one first name to be an initial/prefix of the other, so "J. Smith" can
+  // still never merge with "Jane Smith" AND "John Smith" simultaneously
+  // without a human seeing it (that ambiguity is 3d's merge review, not ours).
+  var xs = x.split(' '), ys = y.split(' ');
+  if (xs.length >= 2 && ys.length >= 2) {
+    var xSur = xs[xs.length - 1], ySur = ys[ys.length - 1];
+    if (xSur === ySur) {
+      var xf = xs[0], yf = ys[0];
+      if (xf === yf) return true;
+      if (xf.length === 1 && yf.indexOf(xf) === 0) return true;
+      if (yf.length === 1 && xf.indexOf(yf) === 0) return true;
+    }
+  }
+  return false;
 }
 
 // Tally distinct speakers by turn count, preserving first-appearance order.
@@ -223,8 +242,27 @@ function resolveProspectName(input) {
       return { name: pair[0].name + ' and ' + pair[1].name, source: 'diarized', confidence: 'low' };
     }
     // Three or more distinct prospect-side speakers is not a couple and not one
-    // prospect. Combining would invent an identity; refuse and let 3c/3d sort it.
-    if (valid.length > 2) return REFUSED;
+    // prospect. Combining would invent an identity.
+    //
+    // BUT: if the meeting title corroborates EXACTLY ONE of those speakers, that
+    // agreement between two independent sources identifies the prospect and the
+    // others are incidental attendees. Live cases this recovers: "IH … | Ty
+    // Downey" (speakers: David Summers, Ty Downey, Amanda Jolley) and "PS … |
+    // LaTanya Giles" (Tanya Giles, Brianna M, Dr. B. Gibson, Nekesha McCarter).
+    // Refusing those discarded a title that literally names one of the people in
+    // the room. Requires exactly one match — two would be ambiguous, and
+    // ambiguity refuses.
+    if (valid.length > 2) {
+      var tName = nameFromTitle(opts.title);
+      if (tName) {
+        var matches = valid.filter(function (x) { return sameIdentity(x.name, tName); });
+        if (matches.length === 1) {
+          var fullest = (tName.length >= matches[0].name.length) ? tName : matches[0].name;
+          return { name: fullest, source: 'diarized', confidence: 'low' };
+        }
+      }
+      return REFUSED;
+    }
   }
 
   // ── 3. Title, last resort. It is the BOOKED name — wrong person ~34% of the
