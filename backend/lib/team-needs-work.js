@@ -400,9 +400,20 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
     'fathom_call_id, timestamp_seconds, quote, closer_response, objection_surface, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
   var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
+  // PROSPECT NAMES 3a — this evidence view is meant to read "July 12th Call with
+  // Jim Stone", so it shows the resolved PROSPECT NAME, falling back to the raw
+  // meeting title when the name could not be resolved. (Deliberately NOT applied
+  // to the objections feed or the team digest — see CLAUDE.md: on those
+  // cross-call scanning surfaces the title is a call LABEL and its program
+  // prefix carries information a bare name loses.)
+  var nameRows = await w.inChunks('call_analyses', 'fathom_call_id, prospect_name');
+  var nameByCall = {};
+  nameRows.forEach(function (n) { if (n && n.prospect_name) nameByCall[n.fathom_call_id] = n.prospect_name; });
   return rows.filter(function (r) { return want[normSurface(r.objection_surface)]; }).map(function (r) {
     var c = w.meta[r.fathom_call_id] || {};
-    return { call_id: r.fathom_call_id, date: c.call_date || null, title: c.title || null,
+    return { call_id: r.fathom_call_id, date: c.call_date || null,
+      title: nameByCall[r.fathom_call_id] || c.title || null,
+      prospect_name: nameByCall[r.fathom_call_id] || null,
       surface: r.objection_surface, handled: r.resolution === 'handled',
       quote: str(r.quote, 400), closer_response: str(r.closer_response, 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds) };
   }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });

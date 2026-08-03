@@ -100,7 +100,7 @@ const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_
 //      per-structure cash rules; (b) payment_structure field (closed-only);
 //      (c) eod_summary — first-person closer-voice EOD report summary
 //      (coaching's overall_summary untouched). Never-fabricate unchanged.
-const ANALYSIS_PROMPT_VERSION = 'v10-2026-07-31'; // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
+const ANALYSIS_PROMPT_VERSION = 'v11-2026-08-03'; // v11: grader emits `prospect_name` (PROSPECT NAMES 3b), reusing the v7 follow-up-email greeting contract VERBATIM — transcript-only, null when no name is established, never the meeting title. A couple returns as ONE joined name (ruling: couples are one prospect). ADDITIVE — scoring/outcome/section prompts are UNCHANGED from v10, so NO delta-gate (same reasoning that let v10 ship without one). Feeds lib/prospect-name.js, which already ranked a grader name above diarized and title. // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -317,6 +317,7 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '      • timestamp_seconds: integer seconds of that moment (read the [HH:MM:SS] tag, convert to seconds).',
     '      • REQUIRED for "closed", "lost", and "follow_up". Set why_outcome to null ONLY when outcome is "no_show" (no real conversation to diagnose).',
     '  - one_thing_timestamp_seconds: integer seconds of the moment the one_thing correction belonged to — the same moment as why_outcome, or the adjacent moment where the closer should have intervened. Null if not applicable.',
+    '  - prospect_name: the prospect\'s name, using the SAME rule as the follow-up email greeting: the name they are actually called (or call themselves) IN THE TRANSCRIPT. If no name is clearly established in the transcript, return null. Never take a name from the meeting title or any source other than the transcript itself. If two people are on the prospect side (a couple or business partners buying together), return them as one name joined by \" and \" (e.g. \"Alan and Jen\") \u2014 they are ONE prospect. Return the name only, with no title, company, or location.',
     '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words. Greeting rule: greet the prospect ONLY by the name they are actually called (or call themselves) in the transcript. If no name is clearly established in the transcript, omit the name from the greeting entirely (e.g. \'Hey — great talking today.\'). Never take a name from the meeting title or any source other than the transcript itself.',
     '  - cash_collected + payment_structure: for CLOSED calls, actively look for transaction evidence anywhere in the transcript — card details being taken or run, a deposit being made, confirmation that a charge went through, financing approvals (Affirm, Klarna, or similar BNPL — buy now pay later), or a first payment on a payment plan. Then report BOTH fields:',
     '      • payment_structure: exactly one of "paid_in_full" | "payment_plan" | "bnpl" | "none_stated". Only a closed call can have a structure other than "none_stated" — for follow_up, lost, and no_show ALWAYS return "none_stated". If the call closed but how it was paid is not evidenced, return "none_stated".',
@@ -346,6 +347,7 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '  "one_thing": "...",',
     '  "why_outcome": {"reason":"...","quote":"...","timestamp_seconds":N} | null,',
     '  "one_thing_timestamp_seconds": N | null,',
+    '  "prospect_name": "..." | null,',
     '  "follow_up_email": "...",',
     '  "cash_collected": N,',
     '  "payment_structure": "paid_in_full"|"payment_plan"|"bnpl"|"none_stated",',
@@ -930,7 +932,7 @@ async function analyzeCall(fathomCallId, userId) {
     }
 
     var resolvedProspect = resolveProspectName({
-      graderName:       null, // 3b adds the grader field; precedence already prefers it
+      graderName:       (typeof graderParsed.prospect_name === 'string') ? graderParsed.prospect_name : null,
       turns:            normalized.turns,
       closerName:       normalized.closer_name,
       closerCandidates: closerCandidates,
