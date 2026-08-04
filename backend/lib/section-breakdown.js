@@ -95,6 +95,11 @@ function buildSectionBreakdown(section, input) {
   var average = scores.length
     ? Math.round(scores.reduce(function (x, y) { return x + y; }, 0) / scores.length)
     : null;
+  // ACTUAL min/max, not bucket edges. The plain-language read quotes these, and
+  // quoting bucket boundaries instead overstated the range ("0 to 84" for a
+  // section whose real spread was 15-75).
+  var lo = scores.length ? Math.min.apply(null, scores) : null;
+  var hi = scores.length ? Math.max.apply(null, scores) : null;
 
   // ── moments ────────────────────────────────────────────────────────────
   var good = [], bad = [];
@@ -150,6 +155,8 @@ function buildSectionBreakdown(section, input) {
     section: section,
     average: average,
     scored_calls: scores.length,
+    min_score: lo,
+    max_score: hi,
     histogram: buildHistogram(scores),
     good: good,
     bad: bad,

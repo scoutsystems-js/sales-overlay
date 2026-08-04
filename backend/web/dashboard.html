@@ -1761,6 +1761,10 @@
     .sec-hbar-fill { width: 100%; background: var(--accent); opacity: 0.65; border-radius: 3px 3px 0 0; min-height: 2px; }
     .sec-hbar-n { font-size: 12px; color: var(--text); margin-top: 4px; }
     .sec-hbar-l { font-size: 11px; color: var(--text-dim); }
+    .sec-read { font-size: 14px; line-height: 1.5; margin: 2px 0 10px; }
+    .sec-more { display: block; width: 100%; margin-top: 4px; padding: 9px; font-size: 13px; font-family: inherit;
+                background: none; border: 1px dashed var(--border-strong); color: var(--text-dim); border-radius: 8px; cursor: pointer; }
+    .sec-more:hover { color: var(--accent); border-color: var(--accent); }
     .sec-note { font-size: 12px; color: var(--text-dim); margin-bottom: 18px; font-style: italic; }
     .sec-group { margin-top: 22px; }
     .sec-group h2 { font-size: 15px; margin-bottom: 10px; }
@@ -2076,8 +2080,10 @@
     <a class="nav-link" id="navEod" onclick="goEod(); return false;">EOD Report</a>
     <span class="sep" id="navTeamSep" style="display:none">·</span>
     <a class="nav-link" id="navTeam" onclick="goTeam(); return false;" style="display:none">Team</a>
-    <span class="sep">·</span>
-    <a class="nav-link" id="navProspects" onclick="goProspects(); return false;">Prospects</a>
+    <!-- Prospects nav link REMOVED 2026-08-04 (Justin: distracting). The page,
+         its routes and merge review all remain — reachable at #prospects. Merge
+         quality still moves the close rate, so SQL must not become the only way
+         in. Hash entry is wired in applyHashToState + onRouteChange below. -->
     <span class="sep" id="navKbSep" style="display:none">·</span>
     <a class="nav-link" id="navKb" onclick="goKb(); return false;" style="display:none">Knowledge Base</a>
   </div>
@@ -2305,6 +2311,7 @@
     expandedGradeCards: {},    // map of section key ('intro'|'discovery'|...) → true when expanded
     savedMomentIds: {},        // Part 2b: highlight id → true when already in the caller's KB
     selectedSection: null,     // 4a: which section the drilldown is showing
+    sectionExpanded: {},       // which moment groups are expanded past the first 5
     sectionData: null,
     sectionLoading: false,
     mergeCandidates: [],       // 3d-2: prospect merge proposals awaiting human review
@@ -2447,6 +2454,9 @@
     }
     setDateRange(30, true /* preserveView — keep the hash-restored view */);
     if (state.view === 'call-review' && state.selectedCallId) loadCallReview(state.selectedCallId);
+    // #prospects has no nav entry any more, so hash entry must kick its own load
+    // (applyHashToState sets state.view directly and bypasses setView).
+    if (state.view === 'prospects' && !state.mergeLoading) loadMergeCandidates();
   }
 
   // Converts a popup-result kind into a notice + triggers a status refresh.
@@ -3293,8 +3303,6 @@
     if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-members');
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
-    var navPr = document.getElementById('navProspects');
-    if (navPr) navPr.classList.toggle('nav-active', state.view === 'prospects');
     if (navCallLibrary) {
       navCallLibrary.classList.toggle('nav-active', !!CALL_LIBRARY_VIEWS[state.view]);
     }
@@ -4685,6 +4693,7 @@
     else if (h === 'team-needs-work') { state.view = 'team-needs-work'; }
     else if (h === 'team-members') { state.view = 'team-members'; }
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
+    else if (h === 'prospects') { state.view = 'prospects'; }
     else if (h.indexOf('call/') === 0) {
       var id = h.slice(5);
       state.selectedCallId = id ? decodeURIComponent(id) : null;
@@ -5307,6 +5316,7 @@
   function goSection(key) {
     state.selectedSection = key;
     state.sectionData = null;
+    state.sectionExpanded = {};
     setView('section');
     loadSectionBreakdown(key);
   }
@@ -5350,7 +5360,33 @@
     + '</div>';
   }
 
-  function sectionHistogramHtml(h, usesEarned) {
+  // Plain-language read of the distribution. Justin couldn't tell what the
+  // histogram was FOR, and a chart nobody can read is decoration. Rather than
+  // drop it, it now states its own point in a sentence — the bars are the
+  // evidence for the sentence, not the message.
+  function histogramRead(h, avg, label, lo, hi) {
+    var counted = h.filter(function (b) { return b.count > 0; });
+    if (!counted.length || avg == null) return '';
+    var total = h.reduce(function (n, b) { return n + b.count; }, 0);
+    var span = counted.length;
+    // Quote the REAL lowest and highest score, never the bucket edges.
+    if (typeof lo !== 'number' || typeof hi !== 'number') { lo = counted[0].lo; hi = counted[counted.length - 1].hi; }
+    var sec = String(label).toLowerCase();
+    if (span === 1) {
+      return 'Your ' + sec + ' scores are consistently ' + lo + '-' + hi + ' — a steady level, not a mix of good and bad calls.';
+    }
+    // Where the weight sits matters more than the extremes.
+    var biggest = counted.slice().sort(function (a, b) { return b.count - a.count; })[0];
+    var share = Math.round((biggest.count / total) * 100);
+    if (span >= 4) {
+      return 'Your ' + sec + ' scores range from ' + lo + ' to ' + hi
+        + ' — the issue is consistency rather than a ceiling. Most calls land in ' + biggest.label + ' (' + share + '%).';
+    }
+    return 'Your ' + sec + ' scores range from ' + lo + ' to ' + hi
+      + ', with most in ' + biggest.label + ' (' + share + '%).';
+  }
+
+  function sectionHistogramHtml(h, usesEarned, avg, label, lo, hi) {
     var max = Math.max.apply(null, h.map(function (b) { return b.count; }).concat([1]));
     var bars = h.map(function (b) {
       var pct = Math.round((b.count / max) * 100);
@@ -5361,7 +5397,29 @@
     var note = usesEarned
       ? '<div class="sec-note">Uses the score this section actually earned. Closed calls display 100 for Close elsewhere on the dashboard.</div>'
       : '';
-    return '<div class="sec-hist">' + bars + '</div>' + note;
+    var read = histogramRead(h, avg, label, lo, hi);
+    return (read ? '<div class="sec-read">' + escapeHtml(read) + '</div>' : '')
+      + '<div class="sec-hist">' + bars + '</div>' + note;
+  }
+
+  var SECTION_MOMENTS_SHOWN = 5;
+  function sectionGroupHtml(key, title, moments, canSave) {
+    var expanded = !!(state.sectionExpanded && state.sectionExpanded[key]);
+    var shown = expanded ? moments : moments.slice(0, SECTION_MOMENTS_SHOWN);
+    var hidden = moments.length - shown.length;
+    var more = '';
+    if (hidden > 0) {
+      more = '<button class="sec-more" onclick="expandSectionGroup(\'' + key + '\')">Show ' + hidden + ' more</button>';
+    } else if (expanded && moments.length > SECTION_MOMENTS_SHOWN) {
+      more = '<button class="sec-more" onclick="expandSectionGroup(\'' + key + '\')">Show fewer</button>';
+    }
+    return '<div class="sec-group"><h2>' + escapeHtml(title) + ' <span class="sec-count">' + moments.length + '</span></h2>'
+      + shown.map(function (m) { return sectionMomentHtml(m, canSave); }).join('') + more + '</div>';
+  }
+  function expandSectionGroup(key) {
+    if (!state.sectionExpanded) state.sectionExpanded = {};
+    state.sectionExpanded[key] = !state.sectionExpanded[key];
+    renderSectionView();
   }
 
   function renderSectionView() {
@@ -5397,15 +5455,12 @@
     + '</div>';
 
     var canSave = !state.viewingUserId; // saving into someone else's KB is not this screen's job
+    // Show 5, hide the rest behind an expander. 48 good discovery moments as a
+    // single wall is unreadable; the first few are the point and the rest are
+    // there when wanted.
     var groups = '';
-    if (d.good.length) {
-      groups += '<div class="sec-group"><h2>What worked <span class="sec-count">' + d.good.length + '</span></h2>'
-        + d.good.map(function (m) { return sectionMomentHtml(m, canSave); }).join('') + '</div>';
-    }
-    if (d.bad.length) {
-      groups += '<div class="sec-group"><h2>What to fix <span class="sec-count">' + d.bad.length + '</span></h2>'
-        + d.bad.map(function (m) { return sectionMomentHtml(m, canSave); }).join('') + '</div>';
-    }
+    if (d.good.length) groups += sectionGroupHtml('good', 'What worked', d.good, canSave);
+    if (d.bad.length)  groups += sectionGroupHtml('bad', 'What to fix', d.bad, canSave);
     if (!d.good.length && !d.bad.length) {
       groups = '<div class="empty-card"><h2>No tagged moments for ' + escapeHtml(label) + ' in this range</h2>'
         + '<p>Section moments come from calls analysed recently. Widen the date range or analyse more calls.</p></div>';
@@ -5422,7 +5477,7 @@
     }
 
     content.innerHTML = head + headline + coverage
-      + sectionHistogramHtml(d.histogram || [], d.uses_earned_close_score) + groups + examples;
+      + sectionHistogramHtml(d.histogram || [], d.uses_earned_close_score, d.average, label, d.min_score, d.max_score) + groups + examples;
   }
 
   async function addSectionMomentToKb(btn) {
