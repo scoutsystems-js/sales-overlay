@@ -1746,6 +1746,38 @@
     }
     /* Promote-to-team (KB Part 2, 2a). Neutral until promoted, then accent-filled
        so a manager can see at a glance which resources the whole team is graded on. */
+    /* ── Section drilldown (4a/4b) ──────────────────────────────────── */
+    .coach-section-row:hover { background: rgba(255,255,255,0.03); }
+    .sec-back { display: inline-block; font-size: 13px; color: var(--text-dim); cursor: pointer; margin-bottom: 6px; }
+    .sec-back:hover { color: var(--accent); }
+    .sec-headline { display: flex; align-items: center; gap: 20px; margin: 8px 0 6px; }
+    .sec-avg { font-size: 46px; font-weight: 600; line-height: 1; }
+    .sec-meta { font-size: 13px; color: var(--text-dim); display: flex; flex-direction: column; gap: 2px; }
+    .sec-delta.up { color: #6ee7a8; } .sec-delta.down { color: #fca5a5; }
+    .sec-coverage { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; }
+    .sec-warn { color: #f6c177; font-weight: 600; }
+    .sec-hist { display: flex; align-items: flex-end; gap: 10px; height: 110px; margin: 4px 0 6px; }
+    .sec-hbar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+    .sec-hbar-fill { width: 100%; background: var(--accent); opacity: 0.65; border-radius: 3px 3px 0 0; min-height: 2px; }
+    .sec-hbar-n { font-size: 12px; color: var(--text); margin-top: 4px; }
+    .sec-hbar-l { font-size: 11px; color: var(--text-dim); }
+    .sec-note { font-size: 12px; color: var(--text-dim); margin-bottom: 18px; font-style: italic; }
+    .sec-group { margin-top: 22px; }
+    .sec-group h2 { font-size: 15px; margin-bottom: 10px; }
+    .sec-count { font-size: 12px; color: var(--text-dim); font-weight: 400; margin-left: 6px; }
+    .sec-moment { border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; margin-bottom: 9px; }
+    .sec-moment-top { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; flex-wrap: wrap; }
+    .sec-clip { font-size: 12px; color: var(--accent); text-decoration: none; }
+    .sec-clip.disabled { color: var(--text-dim); }
+    .sec-who { font-size: 13px; font-weight: 600; }
+    .sec-when { font-size: 12px; color: var(--text-dim); }
+    .sec-saved { margin-left: auto; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 1px 6px; }
+    .sec-kb-btn { margin-left: auto; font-size: 12px; font-family: inherit; background: none; border: 1px solid var(--border-strong); color: var(--text-dim); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+    .sec-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+    .sec-quote { font-size: 14px; }
+    .sec-obs { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+    .sec-example { border-left: 2px solid var(--border-strong); padding-left: 11px; margin-bottom: 12px; }
+    .sec-ex-head { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
     /* ── Prospect merge review (3d-2) ───────────────────────────────── */
     .merge-list { display: flex; flex-direction: column; gap: 16px; }
     .merge-card { border: 1px solid var(--border-strong); border-radius: 10px; padding: 16px; background: var(--bg-elevated); }
@@ -2272,6 +2304,9 @@
     callReviewError:    null,  // last fetch error message; cleared on successful re-fetch
     expandedGradeCards: {},    // map of section key ('intro'|'discovery'|...) → true when expanded
     savedMomentIds: {},        // Part 2b: highlight id → true when already in the caller's KB
+    selectedSection: null,     // 4a: which section the drilldown is showing
+    sectionData: null,
+    sectionLoading: false,
     mergeCandidates: [],       // 3d-2: prospect merge proposals awaiting human review
     mergeLoading: false,
     followupCopied:     false, // transient "Copied!" feedback flag (set true, render, then false 2s later)
@@ -3230,6 +3265,7 @@
     else if (state.view === 'team-members') renderTeamMembersView();
     else if (state.view === 'kb') renderKbView();
     else if (state.view === 'prospects') renderProspectsView();
+    else if (state.view === 'section') renderSectionView();
     else if (state.view === 'eod') renderEodView();
     else if (state.view === 'account') renderAccountView();
     updateNavActiveStates();
@@ -3754,7 +3790,8 @@
       // Score only — no (n=X). n=0 → avg is null → render "—".
       var avgTxt = sec.avg === null ? '—' : String(sec.avg);
       var pct = sec.avg === null ? 0 : Math.max(0, Math.min(100, sec.avg));
-      return '<div style="display:flex;align-items:center;gap:14px;padding:7px 0;border-bottom:1px solid var(--border);">'
+      // Stage 4a: the bar is the entry point into the section drilldown.
+      return '<div class="coach-section-row" onclick="goSection(\'' + key + '\')" title="See the moments behind this score" style="display:flex;align-items:center;gap:14px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer;">'
         + '<div style="width:92px;font-size:13px;color:var(--muted);">' + escapeHtml(pair[1]) + '</div>'
         + '<div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + scoreColor(sec.avg) + ';border-radius:4px;"></div></div>'
         + '<div style="width:130px;text-align:right;font-size:13px;">' + avgTxt + tag + '</div>'
@@ -4610,6 +4647,7 @@
     if (state.view === 'performance')      return 'performance';
     if (state.view === 'kb')               return 'kb';
     if (state.view === 'prospects')        return 'prospects';
+    if (state.view === 'section')          return 'section';
     if (state.view === 'eod')              return 'eod';
     if (state.view === 'account')          return 'account';
     if (state.view === 'team')             return 'team';
@@ -5255,6 +5293,153 @@
     var tot = src.prospect_close_total;
     if (pct == null || !tot) return { value: '\u2014', sub: 'no prospects yet' };
     return { value: pct + '%', sub: won + ' of ' + tot + ' prospects' };
+  }
+
+
+  // ── SECTION DRILLDOWN (stage 4a/4b) ─────────────────────────────────────
+  // Clicking a Coach-summary bar shows the MOMENTS over the period that earned
+  // that score, plus how to improve — drawn from calls that went well.
+  //
+  // Close reads close_score_earned (migration 027 forces the displayed score to
+  // 100 on closed calls). The discrepancy is LABELLED rather than hidden.
+  var SECTION_LABEL = { intro: 'Intro', discovery: 'Discovery', pitch: 'Pitch', objection: 'Objection', close: 'Close' };
+
+  function goSection(key) {
+    state.selectedSection = key;
+    state.sectionData = null;
+    setView('section');
+    loadSectionBreakdown(key);
+  }
+  function backFromSection() { state.selectedSection = null; state.sectionData = null; setView('overview'); }
+
+  async function loadSectionBreakdown(key) {
+    state.sectionLoading = true;
+    var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    // Manager pivot (ruling 3) — same ?user= convention as every other coaching
+    // surface, routed through the standard /admin mirror.
+    var url = state.viewingUserId
+      ? '/admin/sections/' + encodeURIComponent(state.viewingUserId) + '/' + encodeURIComponent(key) + '?' + qp
+      : '/me/sections/' + encodeURIComponent(key) + '?' + qp;
+    try {
+      var res = await fetch(url, { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      state.sectionData = res.ok ? await res.json() : null;
+    } catch (err) { state.sectionData = null; }
+    state.sectionLoading = false;
+    if (state.view === 'section') renderSectionView();
+  }
+
+  function sectionMomentHtml(m, canSave) {
+    var when = m.call_date ? formatDate(m.call_date) : '';
+    var who = m.prospect_name ? escapeHtml(m.prospect_name) : 'Unknown prospect';
+    var time = (m.clip_url && typeof m.timestamp_seconds === 'number')
+      ? '<a class="sec-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">' + escapeHtml(formatTimestampDisplay(m.timestamp_seconds)) + '</a>'
+      : '<span class="sec-clip disabled">—</span>';
+    // 4b: harvested moments carry a "saved" badge; unsaved rows get the
+    // Add-to-KB button, reusing POST /kb/from-highlight unchanged (it takes ids
+    // and re-reads the row server-side).
+    var kb = m.saved_to_kb
+      ? '<span class="sec-saved">saved</span>'
+      : (canSave && m.highlight_id
+          ? '<button class="sec-kb-btn" data-hid="' + escapeHtml(String(m.highlight_id)) + '" data-cid="' + escapeHtml(String(m.fathom_call_id)) + '" onclick="addSectionMomentToKb(this)">+ Save</button>'
+          : '');
+    return '<div class="sec-moment">'
+      + '<div class="sec-moment-top">' + time + '<span class="sec-who">' + who + '</span><span class="sec-when">' + escapeHtml(when) + '</span>' + kb + '</div>'
+      + '<div class="sec-quote">' + escapeHtml(m.quote || '') + '</div>'
+      + (m.observation ? '<div class="sec-obs">' + escapeHtml(m.observation) + '</div>' : '')
+    + '</div>';
+  }
+
+  function sectionHistogramHtml(h, usesEarned) {
+    var max = Math.max.apply(null, h.map(function (b) { return b.count; }).concat([1]));
+    var bars = h.map(function (b) {
+      var pct = Math.round((b.count / max) * 100);
+      return '<div class="sec-hbar"><div class="sec-hbar-fill" style="height:' + pct + '%"></div>'
+        + '<div class="sec-hbar-n">' + b.count + '</div><div class="sec-hbar-l">' + escapeHtml(b.label) + '</div></div>';
+    }).join('');
+    // Ruling 1: state the close discrepancy plainly rather than hide it.
+    var note = usesEarned
+      ? '<div class="sec-note">Uses the score this section actually earned. Closed calls display 100 for Close elsewhere on the dashboard.</div>'
+      : '';
+    return '<div class="sec-hist">' + bars + '</div>' + note;
+  }
+
+  function renderSectionView() {
+    var content = document.getElementById('content');
+    if (!content) return;
+    var key = state.selectedSection;
+    var label = SECTION_LABEL[key] || key;
+    var head = '<div class="page-header"><div>'
+      + '<a class="sec-back" onclick="backFromSection(); return false;">&larr; Back to coaching</a>'
+      + '<h1>' + escapeHtml(label) + '</h1></div></div>';
+
+    if (state.sectionLoading) { content.innerHTML = head + '<div class="empty-card"><p>Loading…</p></div>'; return; }
+    var d = state.sectionData;
+    if (!d) { content.innerHTML = head + '<div class="empty-card"><h2>Could not load this section</h2></div>'; return; }
+
+    var delta = '';
+    if (typeof d.average === 'number' && typeof d.prior_average === 'number' && d.prior_average > 0) {
+      var diff = d.average - d.prior_average;
+      var cls = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+      delta = '<span class="sec-delta ' + cls + '">' + (diff > 0 ? '▲ +' : (diff < 0 ? '▼ ' : '')) + diff + ' vs previous period</span>';
+    }
+    var headline = '<div class="sec-headline">'
+      + '<div class="sec-avg">' + (d.average == null ? '—' : d.average) + '</div>'
+      + '<div class="sec-meta"><div>average across ' + d.scored_calls + ' call' + (d.scored_calls === 1 ? '' : 's') + '</div>'
+      + '<div>' + (d.rank ? 'ranked ' + d.rank + ' of ' + d.section_count + ' sections' : 'not ranked') + '</div>' + delta + '</div>'
+    + '</div>';
+
+    // Coverage honesty — objection reads thin, and that is information.
+    var cov = d.coverage || {};
+    var coverage = '<div class="sec-coverage">' + cov.moments + ' moment' + (cov.moments === 1 ? '' : 's')
+      + ' from ' + cov.calls_with_moments + ' of your ' + cov.calls_total + ' calls'
+      + (d.bad_outnumber_good ? ' · <strong class="sec-warn">more went wrong than right in this section</strong>' : '')
+    + '</div>';
+
+    var canSave = !state.viewingUserId; // saving into someone else's KB is not this screen's job
+    var groups = '';
+    if (d.good.length) {
+      groups += '<div class="sec-group"><h2>What worked <span class="sec-count">' + d.good.length + '</span></h2>'
+        + d.good.map(function (m) { return sectionMomentHtml(m, canSave); }).join('') + '</div>';
+    }
+    if (d.bad.length) {
+      groups += '<div class="sec-group"><h2>What to fix <span class="sec-count">' + d.bad.length + '</span></h2>'
+        + d.bad.map(function (m) { return sectionMomentHtml(m, canSave); }).join('') + '</div>';
+    }
+    if (!d.good.length && !d.bad.length) {
+      groups = '<div class="empty-card"><h2>No tagged moments for ' + escapeHtml(label) + ' in this range</h2>'
+        + '<p>Section moments come from calls analysed recently. Widen the date range or analyse more calls.</p></div>';
+    }
+
+    // Ruling 2: notes are two labelled EXAMPLES, never an aggregate.
+    var ex = d.examples || {};
+    var examples = '';
+    if (ex.best || ex.worst) {
+      examples = '<div class="sec-group"><h2>Two calls, for contrast</h2>'
+        + (ex.best ? '<div class="sec-example"><div class="sec-ex-head">Best ' + escapeHtml(label) + ' — ' + (ex.best.score) + (ex.best.prospect_name ? ' · ' + escapeHtml(ex.best.prospect_name) : '') + '</div><div class="sec-obs">' + escapeHtml(ex.best.notes || '') + '</div></div>' : '')
+        + (ex.worst ? '<div class="sec-example"><div class="sec-ex-head">Weakest ' + escapeHtml(label) + ' — ' + (ex.worst.score) + (ex.worst.prospect_name ? ' · ' + escapeHtml(ex.worst.prospect_name) : '') + '</div><div class="sec-obs">' + escapeHtml(ex.worst.notes || '') + '</div></div>' : '')
+      + '</div>';
+    }
+
+    content.innerHTML = head + headline + coverage
+      + sectionHistogramHtml(d.histogram || [], d.uses_earned_close_score) + groups + examples;
+  }
+
+  async function addSectionMomentToKb(btn) {
+    var hid = btn.getAttribute('data-hid'), cid = btn.getAttribute('data-cid');
+    if (!hid || !cid) return;
+    btn.disabled = true; btn.textContent = 'Saving…';
+    var res;
+    try {
+      res = await fetch('/kb/from-highlight', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ fathom_call_id: cid, highlight_id: hid }),
+      });
+    } catch (err) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not reach server: ' + err.message); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not save that moment'); return; }
+    btn.outerHTML = '<span class="sec-saved">saved</span>';
   }
 
   function renderKbList(items) {

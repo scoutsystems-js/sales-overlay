@@ -5,6 +5,8 @@ const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
 const { generateCandidates } = require('../lib/prospect-merge');
+const { buildSectionBreakdown, sectionScoreOf, rankSections, SECTIONS } = require('../lib/section-breakdown');
+const { quoteHash } = require('../lib/kb-entry');
 const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome } = require('../lib/outcome-tag');
@@ -979,7 +981,101 @@ router.post('/prospects/unmerge', requireAuth, async function (req, res) {
   }
 });
 
+
+// ── SECTION DRILLDOWN (stage 4a/4b) ──────────────────────────────────────
+// Clicking a Coach-summary bar opens ONE section across the selected period:
+// the moments that earned the score, plus how to improve, drawn from calls that
+// went well. Shared by /me/sections/:section and the /admin pivot mirror.
+//
+// Close reads close_score_earned throughout — see lib/section-breakdown.js.
+async function computeSectionBreakdown(admin, userId, section, from, to) {
+  var calls = await admin.from('fathom_calls')
+    .select('id, title, call_date, recording_url, prospect_id')
+    .eq('user_id', userId).gte('call_date', from).lte('call_date', to);
+  if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
+  var callIds = (calls.data || []).map(function (c) { return c.id; });
+  if (!callIds.length) return buildSectionBreakdown(section, { analyses: [], highlights: [], callMeta: {} });
+
+  var cols = 'fathom_call_id, prospect_name, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned, '
+    + 'intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes';
+  var an = await admin.from('call_analyses').select(cols).in('fathom_call_id', callIds).eq('status', 'done');
+  if (an.error) throw new Error('call_analyses: ' + an.error.message);
+
+  var hl = await admin.from('call_highlights')
+    .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds')
+    .in('fathom_call_id', callIds).eq('section', section);
+  if (hl.error) throw new Error('call_highlights: ' + hl.error.message);
+
+  // Prospect name comes from the analysis row (3a); fall back to nothing rather
+  // than the meeting title, which is the booked name and often the wrong person.
+  var nameBy = {};
+  (an.data || []).forEach(function (a) { if (a.prospect_name) nameBy[a.fathom_call_id] = a.prospect_name; });
+  var meta = {};
+  (calls.data || []).forEach(function (c) {
+    meta[c.id] = { prospect_name: nameBy[c.id] || null, recording_url: c.recording_url || null, call_date: c.call_date || null };
+  });
+
+  var out = buildSectionBreakdown(section, { analyses: an.data || [], highlights: hl.data || [], callMeta: meta });
+
+  // Rank among the five, computed on the SAME earned-close basis.
+  var averages = {};
+  SECTIONS.forEach(function (sec) {
+    var vals = (an.data || []).map(function (a) { return sectionScoreOf(a, sec); }).filter(function (v) { return typeof v === 'number'; });
+    averages[sec] = vals.length ? Math.round(vals.reduce(function (x, y) { return x + y; }, 0) / vals.length) : null;
+  });
+  out.rank = rankSections(averages)[section];
+  out.section_count = SECTIONS.length;
+
+  // Prior-window delta, reusing the team view's window machinery so the trend
+  // means the same thing here as it does on the glance tiles.
+  try {
+    var span = new Date(to).getTime() - new Date(from).getTime();
+    var prevFrom = new Date(new Date(from).getTime() - span).toISOString();
+    var prev = await admin.from('fathom_calls').select('id').eq('user_id', userId).gte('call_date', prevFrom).lt('call_date', from);
+    var prevIds = (prev.data || []).map(function (c) { return c.id; });
+    if (prevIds.length) {
+      var pa = await admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds).eq('status', 'done');
+      var pv = (pa.data || []).map(function (a) { return sectionScoreOf(a, section); }).filter(function (v) { return typeof v === 'number'; });
+      out.prior_average = pv.length ? Math.round(pv.reduce(function (x, y) { return x + y; }, 0) / pv.length) : null;
+    } else out.prior_average = null;
+  } catch (e) { out.prior_average = null; }
+
+  // 4b: mark moments already saved to the closer's KB. Exact match on
+  // source_section + quote hash — NO similarity search, which is why the
+  // queued /kb/upload embedding issue is not load-bearing here.
+  try {
+    var saved = await admin.from('knowledge_base')
+      .select('source_quote_hash').eq('uploaded_by', userId).eq('source_section', section)
+      .not('source_quote_hash', 'is', null);
+    var have = {};
+    ((saved && saved.data) || []).forEach(function (r) { have[r.source_quote_hash] = true; });
+    var mark = function (m) { m.saved_to_kb = !!have[quoteHash(m.quote)]; };
+    out.good.forEach(mark); out.bad.forEach(mark);
+  } catch (e) { /* unsaved is the safe default */ }
+
+  return out;
+}
+
+
+// GET /me/sections/:section?from=&to= — the caller's own section drilldown.
+router.get('/sections/:section', requireAuth, async function (req, res) {
+  var section = req.params.section;
+  if (SECTIONS.indexOf(section) === -1) return res.status(400).json({ error: 'unknown section' });
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  try {
+    var admin = getAdminClient();
+    return res.json(await computeSectionBreakdown(admin, req.user.id, section, from, to));
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] section drilldown error:', err.message);
+    return res.status(500).json({ error: 'Could not load section' });
+  }
+});
+
 module.exports = router;
 // pure helpers exported for tests (log.js:_validateLogBatch pattern)
 module.exports._validateNameField = validateNameField;
+module.exports._computeSectionBreakdown = computeSectionBreakdown;
 module.exports._buildAccountPayload = buildAccountPayload;

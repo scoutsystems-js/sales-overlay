@@ -867,6 +867,51 @@ router.get('/analytics2/:user_id', requireAuth, requireRole(['manager', 'owner']
   }
 });
 
+
+// ── GET /admin/sections/:user_id/:section ───────────────────────────────────
+// Admin-pivot equivalent of /me/sections/:section (stage 4a/4b). Same scope
+// enforcement as every other coaching mirror: managers → self + managed users;
+// owners → anyone. Ruling 3: the drilldown honours ?user= like every other
+// coaching surface, and it does so through the standard /admin mirror rather
+// than a second authorization path inside /me.
+router.get('/sections/:user_id/:section', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  var section = req.params.section;
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) {
+    return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  }
+
+  try {
+    var admin = getAdminClient();
+
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
+      var scopeCheck = await admin
+        .from('user_profiles')
+        .select('user_id, managed_by')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+      if (scopeCheck.error) {
+        console.error('[admin] sections scope check failed:', scopeCheck.error.message);
+        return res.status(500).json({ error: 'Could not verify access' });
+      }
+      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+        console.warn('[admin] Scope violation on sections: actor=%s target=%s', req.user.id, targetUserId);
+        return res.status(403).json({ error: 'Not authorized for that user' });
+      }
+    }
+
+    var meRoutes = require('./me');
+    var result = await meRoutes._computeSectionBreakdown(admin, targetUserId, section, from, to);
+    res.json(result);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] sections error:', err.message);
+    res.status(500).json({ error: 'Failed to load section: ' + (err.message || 'unknown') });
+  }
+});
+
 // ── GET /admin/fathom-calls/:user_id ────────────────────────────────────────
 // Admin-pivot equivalent of GET /fathom/calls — the drill-down call list for a
 // viewed user. Same scope enforcement as the other /admin analytics routes.
