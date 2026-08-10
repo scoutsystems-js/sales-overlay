@@ -16,6 +16,7 @@
 
 const crypto = require('crypto');
 const { TEAM_KEY_COLUMN } = require('./kb-scope');
+const { allocate, usableProfileField, chunkForContext } = require('./selling-budget');
 
 // GRADER context = the closer's offer + approach material (excludes winning_call
 // transcripts + training_material, which are synthesis-side). SYNTHESIS context
@@ -30,26 +31,26 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
   var cap = maxChars || DEFAULT_MAX_CHARS;
   var cats = (Array.isArray(categories) && categories.length) ? categories : GRADER_CATEGORIES;
   try {
-    var prof = await admin.from('user_profiles').select('managed_by').eq('user_id', userId).maybeSingle();
-    var managedBy = (prof.data && prof.data.managed_by) || null;
+    // The ONBOARDING-WIZARD material. user_profiles.offer / qualifications /
+    // script_raw were written by the old onboarding wizard and the desktop
+    // script upload, and lived in a table the grader never read — so every
+    // grade to date was scored against generic standards while the closer's
+    // actual criteria ("10k saved, not living paycheck to paycheck, 640 or
+    // above credit score") sat one table away. Wiring them in is an INPUT
+    // change: the SELLING CONTEXT prompt block already existed and is unchanged.
+    var prof = await admin.from('user_profiles')
+      .select('managed_by, niche, offer, qualifications, script_raw')
+      .eq('user_id', userId).maybeSingle();
+    var pdata = (prof && prof.data) || {};
+    var managedBy = pdata.managed_by || null;
 
     var cols = 'id, label, scope, uploaded_by, content, metadata, created_at';
     function base() {
       return admin.from('knowledge_base').select(cols)
         .eq('category', 'user_upload').in('metadata->>category', cats);
     }
-    // Precedence: personal uploads apply ONLY to UNMANAGED users. When the user
-    // is managed, their coaching is governed by their manager's team KB, so
-    // personal chunks are excluded (content is never deleted — unassigning the
-    // user restores their personal context automatically). Because kbHash is
-    // computed from the actually-included chunks below, a managed_by flip changes
-    // the included set and naturally invalidates any cached synthesis.
-    // 2a: the team branch keys on team_owner_id (lib/kb-scope.js TEAM_KEY_COLUMN),
-    // not uploaded_by. Pre-2a this read `.eq('uploaded_by', managedBy)` — the 4th
-    // copy of the visibility rule. Migration 029 backfills team_owner_id for every
-    // existing team row and the upload/promotion writers always stamp it, so a
-    // direct .eq() is exact here; the COALESCE fallback lives in the row predicate
-    // for defence in depth.
+    // Precedence unchanged: personal uploads apply ONLY to UNMANAGED users; a
+    // managed user's coaching is governed by their manager's team KB.
     var personal = managedBy ? { data: [] } : await base().eq('uploaded_by', userId);
     var team = managedBy ? await base().eq(TEAM_KEY_COLUMN, managedBy).eq('scope', 'team') : { data: [] };
     var global = await base().eq('scope', 'global');
@@ -57,62 +58,66 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
     if (team.error) throw new Error('team: ' + team.error.message);
     if (global.error) throw new Error('global: ' + global.error.message);
 
-    // Group into sources (by label), grouped personal(0) → team(1) → global(2),
-    // dedup chunk ids across scopes (a global doc uploaded by the user won't
-    // double-count). Within a source, sort chunks by chunk_index asc.
-    var seen = {}, sources = [], byKey = {};
-    function addGroup(rows, groupPri) {
+    // ── Build the lanes ──────────────────────────────────────────────────
+    // usableProfileField rejects stray values — the demo accounts store
+    // offer = "Ava"/"Ben"/"Cara", which must never reach the grader as an offer.
+    var qualChunks = [], offerChunks = [], scriptChunks = [];
+    if (usableProfileField(pdata.qualifications)) {
+      qualChunks = chunkForContext('QUALIFYING CRITERIA for this offer (the bar a prospect must clear): ' + pdata.qualifications.trim());
+    }
+    var offerParts = [];
+    if (usableProfileField(pdata.niche)) offerParts.push('NICHE: ' + pdata.niche.trim());
+    if (usableProfileField(pdata.offer)) offerParts.push('OFFER: ' + pdata.offer.trim());
+    if (offerParts.length) offerChunks = chunkForContext(offerParts.join('\n'));
+    if (usableProfileField(pdata.script_raw, 200)) {
+      scriptChunks = chunkForContext("THE CLOSER'S OWN CALL SCRIPT (their intended questions and framing):\n" + pdata.script_raw.trim());
+    }
+
+    // KB uploads, deduped across scopes, personal → team → global.
+    var seen = {}, kbChunks = [], kbUsed = [], kbSources = {};
+    function addKb(rows) {
       (rows || []).forEach(function (r) {
         if (seen[r.id]) return; seen[r.id] = true;
-        var key = groupPri + '::' + (r.label || r.id);
-        var s = byKey[key];
-        if (!s) { s = { label: r.label || '(untitled)', group: groupPri, order: sources.length, chunks: [] }; byKey[key] = s; sources.push(s); }
-        var ci = (r.metadata && typeof r.metadata.chunk_index === 'number') ? r.metadata.chunk_index : 0;
-        s.chunks.push({ id: r.id, content: r.content || '', chunk_index: ci, created_at: r.created_at });
+        kbChunks.push(r.content || '');
+        kbUsed.push(r);
+        kbSources[r.label || r.id] = true;
       });
     }
-    addGroup(personal.data, 0);
-    addGroup(team.data, 1);
-    addGroup(global.data, 2);
-    if (sources.length === 0) return { contextText: '', kbHash: 'none', sources: [] };
+    addKb(personal.data); addKb(team.data); addKb(global.data);
 
-    sources.sort(function (a, b) { return (a.group - b.group) || (a.order - b.order); });
-    sources.forEach(function (s) { s.chunks.sort(function (a, b) { return a.chunk_index - b.chunk_index; }); });
+    var lanes = [
+      { key: 'qualifications', priority: 1, reserve: 600,  chunks: qualChunks },
+      { key: 'offer',          priority: 2, reserve: 900,  chunks: offerChunks },
+      { key: 'script',         priority: 3, reserve: 1500, chunks: scriptChunks },
+      { key: 'kb',             priority: 4, reserve: 1500, chunks: kbChunks },
+    ];
+    var picked = allocate(lanes, cap);
 
-    // Breadth-first selection under the char cap: round-robin over sources so
-    // the first chunks of every source are preferred over deep chunks of one.
-    // Chunk-boundary truncation — never include a partial chunk.
-    var maxRounds = sources.reduce(function (m, s) { return Math.max(m, s.chunks.length); }, 0);
-    var take = {}, total = 0;
-    outer:
-    for (var r = 0; r < maxRounds; r++) {
-      for (var si = 0; si < sources.length; si++) {
-        var c = sources[si].chunks[r];
-        if (!c) continue;
-        var cost = c.content.length + (total > 0 ? 2 : 0); // '\n\n' between chunks
-        if (total + cost > cap) break outer;
-        total += cost;
-        take[si] = (take[si] || 0) + 1;
-      }
-    }
-    // Emit grouped by source (personal→team→global), chunk_index asc — the taken
-    // prefix. `sources` summary is for the dev harness only (grader/synthesis
-    // read contextText + kbHash only).
-    var groupName = ['personal', 'team', 'global'];
-    var out = [], usedChunks = [], sourceSummary = [];
-    for (var s2 = 0; s2 < sources.length; s2++) {
-      var n = take[s2] || 0;
-      if (n === 0) continue;
-      var chars = 0;
-      for (var k = 0; k < n; k++) { out.push(sources[s2].chunks[k].content); usedChunks.push(sources[s2].chunks[k]); chars += sources[s2].chunks[k].content.length; }
-      sourceSummary.push({ label: sources[s2].label, group: groupName[sources[s2].group], chunks_total: sources[s2].chunks.length, chunks_used: n, chars: chars });
-    }
-    if (usedChunks.length === 0) return { contextText: '', kbHash: 'none', sources: [] };
+    var out = [], sourceSummary = [];
+    ['qualifications', 'offer', 'script', 'kb'].forEach(function (k) {
+      var got = picked[k] || [];
+      if (!got.length) return;
+      got.forEach(function (c) { out.push(c); });
+      sourceSummary.push({
+        label: k, group: (k === 'kb') ? 'knowledge_base' : 'profile',
+        chunks_total: lanes.filter(function (l) { return l.key === k; })[0].chunks.length,
+        chunks_used: got.length,
+        chars: got.reduce(function (n, c) { return n + c.length; }, 0),
+      });
+    });
+    if (!out.length) return { contextText: '', kbHash: 'none', sources: [] };
 
     var contextText = out.join('\n\n');
-    var kbHash = crypto.createHash('sha1')
-      .update(usedChunks.map(function (c) { return c.id + ':' + (c.created_at || ''); }).sort().join('|'))
-      .digest('hex');
+    // Hash covers BOTH sources so a profile edit invalidates cached syntheses
+    // exactly as a KB upload does. KB rows hash by id+created_at as before;
+    // profile material hashes by content, since it has no row identity here.
+    var hashParts = kbUsed.map(function (r) { return r.id + ':' + (r.created_at || ''); }).sort();
+    ['qualifications', 'offer', 'script'].forEach(function (k) {
+      (picked[k] || []).forEach(function (c) { hashParts.push(k + ':' + crypto.createHash('sha1').update(c).digest('hex')); });
+    });
+    var kbHash = hashParts.length
+      ? crypto.createHash('sha1').update(hashParts.join('|')).digest('hex')
+      : 'none';
     return { contextText: contextText, kbHash: kbHash, sources: sourceSummary };
   } catch (err) {
     console.error('[selling-context] fetch failed for user ' + userId + ' — returning empty: ' + (err && err.message));
