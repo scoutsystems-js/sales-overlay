@@ -43,6 +43,34 @@ test('THE UNSOUND-MATCH TRAP: a short unrelated turn inside the quote must not w
   assert.strictEqual(r.speakerName, 'Leonard', 'must attribute to the speaker who actually said the whole quote');
 });
 
+test('a quote split by the OTHER speaker interjecting still reconstructs', () => {
+  // Measured gap: 7 of 88 unreconstructible closer_responses were fully present
+  // in the transcript but split by a short interjection. Concatenating turns
+  // verbatim inserts the interjection INTO the middle of the candidate string,
+  // so the quote no longer appears as a substring. The speaker's own words are
+  // still consecutive contributions, so reconstruct from those.
+  const r = locateQuoteSpeaker([
+    t('Joshua Pinner', "Well, don't pay it over thirty six months,"),
+    t('Leonard', 'Right.'),
+    t('Joshua Pinner', 'please, pay it off early instead.'),
+  ], "Well, don't pay it over thirty six months, please, pay it off early instead.");
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.speakerName, 'Joshua Pinner');
+  assert.strictEqual(r.mixed, false, 'every word came from one speaker — an interjection between them does not make it mixed');
+});
+
+test('interjection tolerance does not let an unrelated speaker donate words', () => {
+  // The words must all come from the anchor speaker. If the quote only
+  // reconstructs by borrowing the other party's words, that is a genuinely
+  // mixed quote and must be reported as such, not laundered into a clean one.
+  const r = locateQuoteSpeaker([
+    t('Joshua Pinner', 'So what would that look like'),
+    t('Leonard', 'for you in the next six months?'),
+  ], 'So what would that look like for you in the next six months?');
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.mixed, true);
+});
+
 test('AMBIGUOUS — two speakers can each produce the quote → refuse', () => {
   // Live case: closer and prospect both say this on the same call.
   const r = locateQuoteSpeaker([

@@ -56,6 +56,9 @@ var MIN_ANCHOR_WORDS = 4;
 var MIN_ANCHOR_CHARS = 12;
 var MIN_QUOTE_WORDS = 4;
 var MIN_QUOTE_CHARS = 16;
+// Bound the forward walk in TURNS as well as characters: with interjections
+// tolerated, a character budget alone would let the walk wander down the call.
+var MAX_WALK_TURNS = 14;
 
 /**
  * Find who spoke `quote`.
@@ -89,18 +92,39 @@ function locateQuoteSpeaker(turns, quote) {
     for (var i = 0; i < turns.length; i++) {
       if (normTurns[i].indexOf(head) === -1) continue;
 
+      // Two accumulators, because a real quote is split two different ways:
+      //   acc     — every turn in order (handles a quote genuinely spanning
+      //             speakers, e.g. the closer finishing the prospect's sentence)
+      //   accSame — ONLY the anchor speaker's turns (handles the far more
+      //             common case: one person's continuous point interrupted by
+      //             a short "Right." / "Mhm." from the other side)
+      //
+      // Concatenating verbatim inserts the interjection INTO the middle of the
+      // candidate string, so the quote stops appearing as a substring. Measured:
+      // 7 of 88 unreconstructible responses failed for exactly this reason.
+      // accSame is not a loosening — every word still has to come from one
+      // speaker's own consecutive contributions.
+      var anchorName = speakerNameOf(turns[i]);
       var acc = normTurns[i];
+      var accSame = normTurns[i];
       var j = i;
-      var speakers = [speakerNameOf(turns[i])];
-      while (acc.indexOf(nq) === -1 && j + 1 < turns.length && acc.length < nq.length + OVERRUN_CHARS) {
+      var walked = 0;
+      var speakers = [anchorName];
+      while (acc.indexOf(nq) === -1 && accSame.indexOf(nq) === -1
+             && j + 1 < turns.length && walked < MAX_WALK_TURNS
+             && accSame.length < nq.length + OVERRUN_CHARS) {
         j++;
-        acc = acc + ' ' + normTurns[j];
+        walked++;
         var nm = speakerNameOf(turns[j]);
+        acc = acc + ' ' + normTurns[j];
+        if (nm === anchorName) accSame = accSame + ' ' + normTurns[j];
         if (speakers.indexOf(nm) === -1) speakers.push(nm);
       }
-      if (acc.indexOf(nq) !== -1) {
-        hits.push({ name: speakerNameOf(turns[i]), mixed: speakers.length > 1 });
-      }
+      // Prefer the single-speaker reconstruction: if the anchor said all of it
+      // themselves, an interjection sitting between their turns does not make
+      // the quote "mixed".
+      if (accSame.indexOf(nq) !== -1)      hits.push({ name: anchorName, mixed: false });
+      else if (acc.indexOf(nq) !== -1)     hits.push({ name: anchorName, mixed: speakers.length > 1 });
     }
     if (hits.length === 0) continue;
 

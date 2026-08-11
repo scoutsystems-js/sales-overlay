@@ -12,15 +12,61 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
 
-test('ANALYSIS_PROMPT_VERSION is the current shipped version (v13)', () => {
+test('ANALYSIS_PROMPT_VERSION is the current shipped version (v14)', () => {
   // House rule: a prompt change and its version bump are ONE atomic change. If
   // the constant lags the prompt, every downstream system lies coherently.
   //
   // This pin is a deliberate TRIPWIRE, kept strict on purpose: every bump must
-  // consciously touch this line. v13 = 6a deterministic speaker labelling —
-  // the template is unedited but the prompt STRING changes (closer identified
-  // by name, transcript lines prefixed CLOSER/PROSPECT instead of raw names).
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v13-2026-08-11'/);
+  // consciously touch this line. v14 = verbatim quoting for every quoted field
+  // the extractor emits. (v13 = 6a deterministic speaker labelling.)
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v14-2026-08-11'/);
+});
+
+// v14 assertions run against the BUILT PROMPT STRINGS, not the source file.
+// Scanning source would let a comment that merely DISCUSSES the removed wording
+// satisfy (or break) the check — the thing that matters is what the model reads.
+const _w = require('../lib/analysis-worker');
+const FAKE = { turns: [{ speaker: 'CLOSER', display_name: 'C', text: 'hello there', start_seconds: 1 }], highlights: [], closer_name: 'C', speaker_confidence: 'matched' };
+const EXTRACTOR_PROMPT = _w._buildHighlightExtractorPrompt(FAKE);
+const GRADER_PROMPT = _w._buildSectionGraderPrompt(FAKE, 1800, '');
+
+test('v14: the verbatim contract is MECHANICAL, not just the word "verbatim"', () => {
+  // closer_response already said "quoted verbatim" under v13 and still failed
+  // reconstruction 67% of the time. The adjective does not work; the rule has
+  // to describe the operation (copy a contiguous span from one line).
+  assert.ok(/HOW TO QUOTE/.test(EXTRACTOR_PROMPT), 'the shared quoting contract is missing');
+  assert.ok(/contiguous run of characters from ONE transcript line/.test(EXTRACTOR_PROMPT));
+  assert.ok(/CUT FROM THE ENDS ONLY/.test(EXTRACTOR_PROMPT), 'shortening must be truncation, never stitching');
+  assert.ok(/Do not merge two lines/.test(EXTRACTOR_PROMPT));
+});
+
+test('v14: the instructions that CAUSED paraphrasing are gone from BOTH prompts', () => {
+  // "trim filler" licensed editing the words; the 30-word cap forced the model
+  // to compress longer lines. Both produced quotes that begin verbatim and then
+  // drift — 86% of sampled failures.
+  [['extractor', EXTRACTOR_PROMPT], ['grader', GRADER_PROMPT]].forEach(function (pair) {
+    assert.ok(!/trim filler/.test(pair[1]), pair[0] + ': "trim filler" authorises altering the quote');
+    assert.ok(!/5-30 words/.test(pair[1]), pair[0] + ': the 30-word cap forces compression of longer lines');
+  });
+});
+
+test('v14: the contract binds EVERY quoted field, not just the objection lane', () => {
+  // Scope ruling: fixing only closer_response would repair one section and
+  // leave the identical defect capping stored highlights, the review page's
+  // decisive-moment quote, and harvested KB moments.
+  const resp = EXTRACTOR_PROMPT.split('\n').find((l) => l.indexOf('- closer_response:') !== -1);
+  assert.ok(resp, 'closer_response instruction not found');
+  assert.ok(/contiguous verbatim span/.test(resp));
+  assert.ok(/HOW TO QUOTE/.test(resp), 'must point at the shared contract rather than restating it loosely');
+
+  // why_outcome.quote — rendered on the review page as the decisive moment.
+  const why = GRADER_PROMPT.split('\n').find((l) => l.indexOf('• quote:') !== -1);
+  assert.ok(why, 'why_outcome quote instruction not found');
+  assert.ok(/CONTIGUOUS run of words copied EXACTLY/.test(why));
+
+  // qualification_covered.evidence — the field whose whole value is checkability.
+  const qual = GRADER_PROMPT.split('\n').find((l) => l.indexOf('- qualification_covered:') !== -1);
+  assert.ok(/copied EXACTLY as a contiguous run of words/.test(qual));
 });
 
 test('the grader asks for prospect_name and declares it in the JSON shape', () => {
@@ -69,7 +115,10 @@ test('v12: the field is requested, with a quote, and declared in the JSON shape'
   const line = src.split('\n').find((l) => l.indexOf('- qualification_covered:') !== -1);
   assert.ok(line, 'qualification_covered instruction missing');
   assert.ok(/financial position/i.test(line));
-  assert.ok(/quoted verbatim/i.test(line), 'must demand a verbatim quote as evidence');
+  // v14 replaced the adjective "quoted verbatim" with the mechanical rule —
+  // the evidence must be a copyable span, since checkability is the entire
+  // point of this field.
+  assert.ok(/copied EXACTLY as a contiguous run of words/.test(line), 'must demand an exact, checkable span as evidence');
   assert.ok(/"qualification_covered": \{"financial": true\|false/.test(src), 'JSON shape entry missing');
 });
 
