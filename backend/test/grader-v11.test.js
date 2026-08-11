@@ -12,10 +12,15 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
 
-test('ANALYSIS_PROMPT_VERSION is bumped to v12', () => {
+test('ANALYSIS_PROMPT_VERSION is the current shipped version (v13)', () => {
   // House rule: a prompt change and its version bump are ONE atomic change. If
   // the constant lags the prompt, every downstream system lies coherently.
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v12-2026-08-11'/);
+  //
+  // This pin is a deliberate TRIPWIRE, kept strict on purpose: every bump must
+  // consciously touch this line. v13 = 6a deterministic speaker labelling —
+  // the template is unedited but the prompt STRING changes (closer identified
+  // by name, transcript lines prefixed CLOSER/PROSPECT instead of raw names).
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v13-2026-08-11'/);
 });
 
 test('the grader asks for prospect_name and declares it in the JSON shape', () => {

@@ -744,7 +744,7 @@ router.post('/from-highlight', protect, async function(req, res) {
     // Re-read the moment from the DB — the row is the source of truth.
     var hl = await admin
       .from('call_highlights')
-      .select('id, fathom_call_id, user_id, timestamp_seconds, speaker, quote, observation, type, section, resolution, closer_response')
+      .select('id, fathom_call_id, user_id, timestamp_seconds, speaker, quote, observation, type, section, resolution, closer_response, speaker_verified')
       .eq('id', highlightId)
       .maybeSingle();
     if (hl.error) {
@@ -778,6 +778,28 @@ router.post('/from-highlight', protect, async function(req, res) {
     // shape and the insert live there, shared verbatim with the analysis
     // worker's auto-population — one implementation, two callers.
     var section = sanitizeSectionValue(hl.data.section);
+
+    // 6a: was this call's CLOSER/PROSPECT labelling matched deterministically
+    // or inferred by the model? A manually added moment must carry the same
+    // honesty stamp as an auto-harvested one.
+    //
+    // `speaker_confidence` is NOT a column — the worker only returns it. The
+    // persisted equivalent is `speaker_closer_name`, which the normalizer sets
+    // in the SAME branch that sets confidence='matched' and leaves null in the
+    // unknown branch, so non-null ⟺ matched. That invariant is pinned by a test
+    // in speaker-identity.test.js; do not decouple them.
+    var speakerConfidence = null;
+    try {
+      var confQ = await admin
+        .from('call_analyses')
+        .select('speaker_closer_name')
+        .eq('fathom_call_id', fathomCallId)
+        .maybeSingle();
+      if (confQ && confQ.data && confQ.data.speaker_closer_name) speakerConfidence = 'matched';
+    } catch (confErr) {
+      console.warn('[kb] closer-name read failed for %s: %s', fathomCallId, (confErr && confErr.message) || 'unknown');
+    }
+
     var row = buildMomentRow({
       highlight: hl.data,
       target: t.target,
@@ -786,6 +808,7 @@ router.post('/from-highlight', protect, async function(req, res) {
       source: 'manual_add',
       sourceUserId: callOwnerId,   // whose call it came from (attribution)
       addedBy: req.user.id,        // who clicked
+      speakerConfidence: speakerConfidence,
     });
     row.embedding = await getVoyageEmbedding(row.content, 'kb');
 

@@ -13,14 +13,38 @@
  *     highlights use numeric seconds; we collapse both to numeric
  *     seconds from start of recording. This is also the format Fathom's
  *     deep-link URLs use (https://fathom.video/calls/{id}?t={seconds}).
- *   - Speaker identity: TranscriptItemSpeaker.display_name is the only
- *     thing Fathom reliably populates today (matched_calendar_invitee_email
- *     is "Coming soon!"). We fuzzy-match recorded_by.name against
- *     transcript display_names to identify the CLOSER; everyone else is
- *     PROSPECT. When no match clears the threshold, we pass display
- *     names through verbatim and the analysis pipeline asks Claude to
- *     infer roles from conversational cues (per the CLAUDE.md Speaker
- *     Identification fallback).
+ *   - Speaker identity: PRIMARY signal is per-turn
+ *     `speaker.matched_calendar_invitee_email` compared for EXACT EQUALITY
+ *     against the connection's recorded-by email (`meeting.closer_email`).
+ *
+ *     (The header used to say this field was "Coming soon!" and never
+ *     populated. That was STALE and it cost us: because the comment said the
+ *     signal didn't exist, the code never looked for it, every call fell to
+ *     the model-inference fallback, and ~8% of speaker labels corpus-wide were
+ *     wrong — including prospect quotes filed into reps' knowledge bases as
+ *     their own winning material. Settled by live fetch 2026-08-11: ONLY the
+ *     recorded_by user's turns carry the email — closer 47/47, 551/551,
+ *     653/653; prospects 0/180, 0/257. Presence/absence is a perfect
+ *     discriminator, so equality needs no threshold and no heuristic.)
+ *
+ *     RULING (2026-08-11): email equality is the ONLY discriminator the
+ *     pipeline uses. No name fallback, no talk-time heuristic, no fuzzy
+ *     matching — each of those can and did return the CLOSER as the prospect.
+ *     The legacy recorded_by-name fuzzy match below is kept for callers that
+ *     still pass `recorded_by`, but the Fathom and Zoom paths pass null and
+ *     MUST NOT be wired to it.
+ *
+ *     RULING 1 (2026-08-11): the email is resolved to a role here and then
+ *     DISCARDED. It is never copied onto a turn, because `turns` is persisted
+ *     verbatim into `call_analyses.transcript_stored` — writing a personal
+ *     email onto every row of every transcript would spread PII for no
+ *     downstream gain, since the label is the only thing anything reads.
+ *
+ *     When no email signal is available (no connection email, a Zoom VTT, or
+ *     a call recorded by a different workspace member) we pass display names
+ *     through verbatim and the pipeline asks Claude to infer roles. That path
+ *     is a GUESS and is recorded as such via speaker_confidence='unknown' —
+ *     downstream surfaces must not present it as established fact.
  *
  * Three possible speaker_confidence values:
  *   - 'matched'  — fuzzy match found; speakers tagged CLOSER/PROSPECT
@@ -201,10 +225,17 @@ function normalizeTranscript(meeting) {
 
     var seconds = hhmmssToSeconds(t.timestamp);
 
+    // Per-turn invitee email, normalized for comparison ONLY. Deliberately held
+    // on the intermediate `preTurns` and dropped before output (RULING 1).
+    var turnEmail = (typeof speakerObj.matched_calendar_invitee_email === 'string')
+      ? speakerObj.matched_calendar_invitee_email.trim().toLowerCase()
+      : null;
+
     preTurns.push({
       display_name:  displayName,
       text:          text,
       start_seconds: seconds,  // may be null if timestamp unparseable; analysis tolerates
+      email:         turnEmail || null,
     });
 
     // Track first encounter of each display_name for the matcher.
@@ -214,6 +245,24 @@ function normalizeTranscript(meeting) {
   }
 
   // ─── Speaker identification ──────────────────────────────────────────
+  // PRIMARY: exact equality on the per-turn invitee email. Only the recorded_by
+  // user's turns carry it, so a match is proof rather than evidence.
+  var closerEmail = (typeof meeting.closer_email === 'string' && meeting.closer_email.trim())
+    ? meeting.closer_email.trim().toLowerCase()
+    : null;
+
+  var emailCloserName = null;
+  if (closerEmail) {
+    for (var ei = 0; ei < preTurns.length; ei++) {
+      if (preTurns[ei].email && preTurns[ei].email === closerEmail) {
+        emailCloserName = preTurns[ei].display_name;
+        break;
+      }
+    }
+  }
+
+  // LEGACY (unwired): recorded_by-name fuzzy match. The Fathom and Zoom paths
+  // both pass recorded_by:null — see the RULING in the header before wiring it.
   var recordedByName = (meeting.recorded_by && typeof meeting.recorded_by.name === 'string')
     ? meeting.recorded_by.name
     : null;
@@ -223,7 +272,21 @@ function normalizeTranscript(meeting) {
   var closerName;
   var speakerConfidence;
 
-  if (matchedCloser) {
+  if (emailCloserName) {
+    // Label by EMAIL, not by the matched display name — Fathom sometimes splits
+    // one speaker across two display names, and the email survives that.
+    turns = preTurns.map(function(p) {
+      return {
+        speaker:       (p.email === closerEmail) ? 'CLOSER' : 'PROSPECT',
+        display_name:  p.display_name,
+        text:          p.text,
+        start_seconds: p.start_seconds,
+        // NOTE: `email` deliberately absent — RULING 1.
+      };
+    });
+    closerName = emailCloserName;
+    speakerConfidence = 'matched';
+  } else if (matchedCloser) {
     // Matched case: tag CLOSER vs PROSPECT.
     turns = preTurns.map(function(p) {
       return {

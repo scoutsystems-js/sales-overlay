@@ -131,6 +131,20 @@ function buildMomentRow(opts) {
       type: h.type || null,
       resolution: h.resolution || null,
       speaker: h.speaker || null,
+      // Is this speaker PROVEN, or is it the model's guess?
+      // 6b had to repair harvested rows (some of them prospect quotes filed as
+      // the rep's own winning material) precisely because nothing recorded that
+      // the label was a guess.
+      //
+      // The highlight's OWN verdict wins when present: a call can be matched
+      // overall while an individual quote is paraphrased and therefore not
+      // reconstructible from the transcript. Trusting the call-level flag alone
+      // would stamp such a moment "verified" on the strength of its neighbours.
+      // Falls back to call-level confidence for rows predating migration 034,
+      // and fails closed in every other case.
+      speaker_verified: (typeof h.speaker_verified === 'boolean')
+        ? h.speaker_verified
+        : opts.speakerConfidence === 'matched',
       quote: h.quote || null,
       observation: h.observation || null,
       closer_response: h.closer_response || null,

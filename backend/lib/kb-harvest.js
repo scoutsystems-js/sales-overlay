@@ -112,6 +112,10 @@ async function harvestClosedCall(admin, opts) {
         source: 'auto_closed_call',
         sourceUserId: opts.userId,
         addedBy: null, // no human actor
+        // 6a: record whether the CLOSER/PROSPECT label was matched
+        // deterministically or inferred by the model. Fails closed — an
+        // inferred label is never filed as verified material.
+        speakerConfidence: opts.speakerConfidence || null,
       });
     });
 

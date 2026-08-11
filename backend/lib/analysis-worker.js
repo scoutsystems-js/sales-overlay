@@ -59,6 +59,8 @@ const zoomClient = require('./zoom-client');
 const { parseVttToTranscript } = require('./vtt-adapter');
 // Section tagging for highlights (Call Review Context, Part 1a).
 const { sanitizeSectionValue } = require('./highlight-section');
+// 6a: independent quote→speaker attribution (refuses rather than guesses).
+const { labelForQuote } = require('./quote-locate');
 
 // Which transcript path a call takes. 'zoom' → Zoom (call_connections + VTT);
 // anything else (fathom / null / legacy pre-source rows) → Fathom, unchanged.
@@ -101,7 +103,7 @@ const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_
 //      per-structure cash rules; (b) payment_structure field (closed-only);
 //      (c) eod_summary — first-person closer-voice EOD report summary
 //      (coaching's overall_summary untouched). Never-fabricate unchanged.
-const ANALYSIS_PROMPT_VERSION = 'v12-2026-08-11'; // v12: (1) qualification_covered {financial, evidence} — a MEASUREMENT-ONLY structured field, additive, drives NOTHING (no score, no UI). Adopted after three attempts to encode qualification enforcement as grader WORDING all failed: the intended effect is smaller than the grader's noise floor (see GRADER NOISE PROFILE in CLAUDE.md), so it cannot be validated by score deltas and must be validated by READING the boolean against transcripts. (2) the anti-literal-matching guidance kept as prompt text — it gated clean and costs nothing. NOT a scoring change; under new-calls-only the outdated count it produces is cosmetic. // v11: grader emits `prospect_name` (PROSPECT NAMES 3b), reusing the v7 follow-up-email greeting contract VERBATIM — transcript-only, null when no name is established, never the meeting title. A couple returns as ONE joined name (ruling: couples are one prospect). ADDITIVE — scoring/outcome/section prompts are UNCHANGED from v10, so NO delta-gate (same reasoning that let v10 ship without one). Feeds lib/prospect-name.js, which already ranked a grader name above diarized and title. // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
+const ANALYSIS_PROMPT_VERSION = 'v13-2026-08-11'; // v13 (6a — deterministic speaker labelling): the prompt TEMPLATE is unedited, but the prompt STRING sent to Claude changes materially on every call where the closer is now identified — `closerLabel`/`speakerNote` flip from "Speaker identity is uncertain — infer who the closer is" to "The closer is X, labeled CLOSER", and EVERY transcript line's speaker prefix changes from a raw display name to CLOSER/PROSPECT. That is a different input to the model, so it gets a version stamp: prompt_version is the ONLY way to tell which analyses were graded with MATCHED speakers versus GUESSED ones, and that distinction is load-bearing for every closer-side feature built on top. Cost, stated plainly: this marks every prior analysis outdated. Per the standing new-calls-only ruling, do NOT mass re-analyze to clear it — the count is cosmetic and the corpus corrects itself as new calls arrive. // v12: (1) qualification_covered {financial, evidence} — a MEASUREMENT-ONLY structured field, additive, drives NOTHING (no score, no UI). Adopted after three attempts to encode qualification enforcement as grader WORDING all failed: the intended effect is smaller than the grader's noise floor (see GRADER NOISE PROFILE in CLAUDE.md), so it cannot be validated by score deltas and must be validated by READING the boolean against transcripts. (2) the anti-literal-matching guidance kept as prompt text — it gated clean and costs nothing. NOT a scoring change; under new-calls-only the outdated count it produces is cosmetic. // v11: grader emits `prospect_name` (PROSPECT NAMES 3b), reusing the v7 follow-up-email greeting contract VERBATIM — transcript-only, null when no name is established, never the meeting title. A couple returns as ONE joined name (ruling: couples are one prospect). ADDITIVE — scoring/outcome/section prompts are UNCHANGED from v10, so NO delta-gate (same reasoning that let v10 ship without one). Feeds lib/prospect-name.js, which already ranked a grader name above diarized and title. // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -821,6 +823,27 @@ async function analyzeCall(fathomCallId, userId) {
     console.log('[analysis] transcript length: ' + (Array.isArray(transcript) ? transcript.length : '(not an array)') + ' (call=' + fathomCallId + ' recording_id=' + callRow.fathom_call_id + ')');
     console.log('[analysis] transcript shape sample:', JSON.stringify(transcript && transcript[0]));
 
+    // ─── Closer identity (6a) ────────────────────────────────────────────
+    // Hoisted ABOVE normalize because the normalizer now needs it: speaker
+    // labelling is deterministic via exact equality between the per-turn
+    // `matched_calendar_invitee_email` and this address. Phase 6b (prospect
+    // name) reuses the same lookup rather than issuing a second query.
+    //
+    // Failure is non-fatal by design: no email → speaker_confidence 'unknown'
+    // → the model infers roles, exactly as before 6a. Degraded, never wrong.
+    var closerEmail = null;
+    try {
+      var connTable = (transcriptSourceFor(callRow) === 'zoom') ? 'call_connections' : 'fathom_connections';
+      var emailCol  = (connTable === 'call_connections') ? 'external_account_email' : 'fathom_email';
+      var emailConnQ = admin.from(connTable).select(emailCol).eq('user_id', userId);
+      if (connTable === 'call_connections') emailConnQ = emailConnQ.eq('provider', 'zoom');
+      var emailConnRow = await emailConnQ.maybeSingle();
+      var rawCloserEmail = emailConnRow && emailConnRow.data ? emailConnRow.data[emailCol] : null;
+      if (rawCloserEmail && typeof rawCloserEmail === 'string') closerEmail = rawCloserEmail;
+    } catch (connErr) {
+      console.warn('[analysis] closer-identity lookup failed for ' + fathomCallId + ': ' + ((connErr && connErr.message) || 'unknown'));
+    }
+
     // Minimal source-agnostic meeting object built from the DB row + transcript.
     var meeting = {
       recording_id:  callRow.fathom_call_id,
@@ -829,7 +852,10 @@ async function analyzeCall(fathomCallId, userId) {
       created_at:    callRow.call_date,
       transcript:    transcript,
       highlights:    [],    // Fathom highlights skipped — extractor derives them
-      recorded_by:   null,  // → speaker_confidence='unknown', Claude infers roles
+      // recorded_by stays null — the legacy fuzzy NAME match is deliberately
+      // not wired (it returned the CLOSER as the prospect on 6 of 83 calls).
+      recorded_by:   null,
+      closer_email:  closerEmail,  // 6a: exact-equality speaker labelling
     };
 
     // ─── Phase 5: normalize ──────────────────────────────────────────────
@@ -920,34 +946,25 @@ async function analyzeCall(fathomCallId, userId) {
     }
 
     // ─── Phase 6b: resolve the prospect name ─────────────────────────────
-    // The closer must be excluded from the diarized speakers, but
-    // `normalized.closer_name` is NULL in practice — the meeting object above
-    // hardcodes `recorded_by: null`, so the normalizer's fuzzy match never runs
-    // (all 83 live rows have speaker_closer_name NULL). The connection's stored
-    // recorded-by email is the reliable identity: "joshua@soberlivingriches.com"
-    // → local part "joshua" → matches the display name "Joshua Pinner".
+    // The closer must be excluded from the diarized speakers.
+    //
+    // 6a UPDATE: `normalized.closer_name` is now POPULATED whenever the invitee
+    // email is available (it used to be NULL on every row, because the meeting
+    // object hardcoded recorded_by:null and the fuzzy match never ran). The
+    // local-part candidates below remain as the path for calls with no email
+    // signal — Zoom, and users with no connection email.
     //
     // This matters concretely: on 6 of 83 live calls the PROSPECT out-talked the
     // closer, so the turn-count fallback alone would have returned the CLOSER as
     // the prospect — precisely the wrong-name failure the governing principle
     // forbids. Never let this degrade to that path when an email is available.
+    // 6a: the lookup is hoisted above normalize now (the normalizer needs the
+    // same address). Reuse it here rather than querying twice.
     var closerCandidates = [];
-    try {
-      var connTable = (transcriptSourceFor(callRow) === 'zoom') ? 'call_connections' : 'fathom_connections';
-      var emailCol  = (connTable === 'call_connections') ? 'external_account_email' : 'fathom_email';
-      var connQ = admin.from(connTable).select(emailCol).eq('user_id', userId);
-      if (connTable === 'call_connections') connQ = connQ.eq('provider', 'zoom');
-      var connRow = await connQ.maybeSingle();
-      var closerEmail = connRow && connRow.data ? connRow.data[emailCol] : null;
-      if (closerEmail && typeof closerEmail === 'string') {
-        closerCandidates.push(closerEmail);
-        var localPart = closerEmail.split('@')[0];
-        if (localPart) closerCandidates.push(localPart);
-      }
-    } catch (connErr) {
-      // Non-fatal: without an email the resolver falls back to the turn-count
-      // heuristic and marks the result low-confidence.
-      console.warn('[analysis] closer-identity lookup failed for ' + fathomCallId + ': ' + ((connErr && connErr.message) || 'unknown'));
+    if (closerEmail) {
+      closerCandidates.push(closerEmail);
+      var localPart = closerEmail.split('@')[0];
+      if (localPart) closerCandidates.push(localPart);
     }
 
     var resolvedProspect = resolveProspectName({
@@ -1068,6 +1085,35 @@ async function analyzeCall(fathomCallId, userId) {
     // failed/empty extraction (or a failed insert) never wipes a call's existing
     // highlights. Non-fatal: grades are already saved.
     var sanitizedHighlights = sanitizeHighlights(highlightParsed, callRow.duration_seconds);
+
+    // ─── 6a: verify each highlight's speaker against the transcript ──────
+    // On a matched call the model is READING labelled turns rather than
+    // inferring, which is far stronger — but it is still the model copying a
+    // label, not proof. So attribute each quote independently: reconstruct it
+    // from consecutive turns and take the speaker who opened it.
+    //
+    // speaker_verified (migration 034) is deliberately three-valued:
+    //   true  — reconstructed from the transcript, proven
+    //   false — could not be reconstructed (or two speakers could have said
+    //           it); the label stands but is the model's guess
+    //   null  — never assessed (no closer identity available at all)
+    // Closer-side features must require true. Corrections are logged, because
+    // a silent correction hides how often the extractor mis-attributes.
+    if (normalized.speaker_confidence === 'matched') {
+      var vStats = { proven: 0, unproven: 0, corrected: 0 };
+      sanitizedHighlights.forEach(function (h) {
+        var label = labelForQuote(normalized.turns, h.quote);
+        if (!label) { h.speaker_verified = false; vStats.unproven++; return; }
+        if (label !== h.speaker) { h.speaker = label; vStats.corrected++; }
+        h.speaker_verified = true;
+        vStats.proven++;
+      });
+      console.log('[analysis] speaker verify call=%s proven=%d unproven=%d corrected=%d',
+        fathomCallId, vStats.proven, vStats.unproven, vStats.corrected);
+    } else {
+      // No deterministic identity → every label is an inference. Say so.
+      sanitizedHighlights.forEach(function (h) { h.speaker_verified = false; });
+    }
     await persistHighlights(admin, fathomCallId, userId, sanitizedHighlights);
 
     // ─── Phase 7b: auto-populate the rep's KB from a CLOSED call ─────────
@@ -1091,6 +1137,7 @@ async function analyzeCall(fathomCallId, userId) {
         userId:       userId,
         outcome:      effectiveOutcome,
         highlights:   sanitizedHighlights,
+        speakerConfidence: normalized.speaker_confidence,
       }).then(function (s) {
         console.log('[kb-harvest] call=%s added=%d duplicate=%d failed=%d unembedded=%d%s',
           fathomCallId, s.added, s.duplicate, s.failed, s.unembedded, s.skipped_reason ? ' skipped=' + s.skipped_reason : '');
