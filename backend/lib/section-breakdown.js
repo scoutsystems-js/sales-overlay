@@ -80,6 +80,31 @@ function num(v) { return (typeof v === 'number') ? v : null; }
 //
 // input: { analyses: [call_analyses rows], highlights: [call_highlights rows],
 //          callMeta: { [fathom_call_id]: { prospect_name, recording_url, call_date } } }
+// The prospect line a closer moment is answering: the LATEST prospect moment
+// that comes BEFORE it, in the SAME call. Nearest-preceding rather than
+// first-in-section, because a section can hold several exchanges and the
+// earliest line is usually about something else entirely. Returns null rather
+// than reaching for a later line — a reply cannot be context for the thing
+// that prompted it.
+function nearestPrecedingProspect(prospectLines, moment) {
+  if (moment.timestamp_seconds === null) return null;
+  var best = null;
+  for (var i = 0; i < prospectLines.length; i++) {
+    var p = prospectLines[i];
+    if (p.fathom_call_id !== moment.fathom_call_id) continue;
+    if (p.timestamp_seconds === null) continue;
+    if (p.timestamp_seconds > moment.timestamp_seconds) continue;
+    if (!best || p.timestamp_seconds > best.timestamp_seconds) best = p;
+  }
+  return best ? { quote: best.quote, speaker: 'PROSPECT', timestamp_seconds: best.timestamp_seconds, verified: best.verified } : null;
+}
+
+function byDateDescThenTime(a, b) {
+  var d = String(b.call_date || '').localeCompare(String(a.call_date || ''));
+  if (d !== 0) return d;
+  return (a.timestamp_seconds || 0) - (b.timestamp_seconds || 0);
+}
+
 function buildSectionBreakdown(section, input) {
   var d = input || {};
   var analyses = Array.isArray(d.analyses) ? d.analyses : [];
@@ -123,10 +148,53 @@ function buildSectionBreakdown(section, input) {
       // Null rather than a half-built href when there is no recording.
       clip_url: (rec && ts !== null) ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null,
       saved_to_kb: false, // set by the route from knowledge_base.source_quote_hash
+      // 6a/6d: true = speaker proven from the transcript, false = assessed but
+      // not provable (model's guess), null = never assessed. Carried through so
+      // the closer view can require proof; the good/bad groups ignore it.
+      speaker_verified: (typeof h.speaker_verified === 'boolean') ? h.speaker_verified : null,
     };
     callsWithMoments[h.fathom_call_id] = true;
     if (highlightGroup(h) === 'good') good.push(moment); else bad.push(moment);
   });
+
+  // ── closer view (6d) ───────────────────────────────────────────────────
+  // "What worked", told from the rep's side: what THEY said, with the
+  // prospect's preceding line as context.
+  //
+  // The bar is PROOF, not plausibility. This feature sat blocked because a
+  // closer-only filter over model-inferred labels hands the rep the PROSPECT's
+  // words as their own winning material — measured, not hypothetical. So an
+  // unproven label is excluded, and a never-assessed one (no closer identity
+  // exists for that call) is excluded outright rather than shown as a guess.
+  //
+  // The two exclusion reasons are counted SEPARATELY and surfaced, because
+  // "we could not prove this" and "we never had the means to check" are
+  // different messages to a user staring at a thin screen.
+  var closerCounts = { verified: 0, hidden_unverified: 0, hidden_unassessed: 0 };
+  var closerMoments = [];
+  var prospectLines = [];
+
+  highlights.forEach(function (h) {
+    if (!h || h.section !== section) return;
+    if (h.speaker === 'PROSPECT') {
+      prospectLines.push({
+        fathom_call_id: h.fathom_call_id,
+        quote: h.quote || null,
+        timestamp_seconds: num(h.timestamp_seconds),
+        verified: (typeof h.speaker_verified === 'boolean') ? h.speaker_verified : null,
+      });
+    }
+  });
+
+  good.forEach(function (m) {
+    if (m.speaker !== 'CLOSER') return;
+    if (m.speaker_verified === null)  { closerCounts.hidden_unassessed++; return; }
+    if (m.speaker_verified !== true)  { closerCounts.hidden_unverified++; return; }
+    closerCounts.verified++;
+    closerMoments.push(Object.assign({}, m, { context: nearestPrecedingProspect(prospectLines, m) }));
+  });
+
+  closerMoments.sort(byDateDescThenTime);
 
   var byDateDesc = function (a, b) { return String(b.call_date || '').localeCompare(String(a.call_date || '')); };
   good.sort(byDateDesc);
@@ -160,6 +228,11 @@ function buildSectionBreakdown(section, input) {
     histogram: buildHistogram(scores),
     good: good,
     bad: bad,
+    // 6d — "What worked", from the rep's own side. PROVEN closer moments only.
+    // Deliberately a SEPARATE field, not a filter on `good`: the call-review
+    // section breakdown must keep showing every moment regardless of proof.
+    closer_moments: closerMoments,
+    closer_counts: closerCounts,
     // Objection reads thin on live data (33 moments from 16 of 55 calls). That
     // is information about the closer's calls, not a defect in the screen.
     coverage: {

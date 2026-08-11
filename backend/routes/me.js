@@ -1002,7 +1002,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
   if (an.error) throw new Error('call_analyses: ' + an.error.message);
 
   var hl = await admin.from('call_highlights')
-    .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds')
+    .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified')
     .in('fathom_call_id', callIds).eq('section', section);
   if (hl.error) throw new Error('call_highlights: ' + hl.error.message);
 

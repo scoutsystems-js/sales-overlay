@@ -1780,6 +1780,15 @@
     .sec-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
     .sec-quote { font-size: 14px; }
     .sec-obs { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+    /* 6d — the rep's own proven moments. The accent marks "this is you", so it
+       must never appear on a moment whose speaker wasn't matched. */
+    .sec-moment-closer { border-left: 2px solid var(--accent); padding-left: 10px; }
+    .sec-quote-you { font-weight: 600; }
+    .sec-you-label { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+                     text-transform: uppercase; color: var(--accent); margin-right: 6px; }
+    .sec-ctx { margin-top: 6px; padding-left: 10px; border-left: 1px dashed var(--border-strong); }
+    .sec-ctx-label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 1px; }
+    .sec-ctx-q { font-size: 13px; color: var(--text-dim); font-style: italic; }
     .sec-example { border-left: 2px solid var(--border-strong); padding-left: 11px; margin-bottom: 12px; }
     .sec-ex-head { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
     /* ── Prospect merge review (3d-2) ───────────────────────────────── */
@@ -5402,8 +5411,51 @@
       + '<div class="sec-hist">' + bars + '</div>' + note;
   }
 
+  // 6d — a closer moment: what the REP said, led by their own line, with the
+  // prospect's preceding line beneath it as context. Only PROVEN moments reach
+  // here (the server filters on speaker_verified), so this is the one surface
+  // that may say "you" about a quote.
+  function closerMomentHtml(m, canSave) {
+    var when = m.call_date ? formatDate(m.call_date) : '';
+    var who = m.prospect_name ? escapeHtml(m.prospect_name) : 'Unknown prospect';
+    var time = (m.clip_url && typeof m.timestamp_seconds === 'number')
+      ? '<a class="sec-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">' + escapeHtml(formatTimestampDisplay(m.timestamp_seconds)) + '</a>'
+      : '<span class="sec-clip disabled">—</span>';
+    var kb = m.saved_to_kb
+      ? '<span class="sec-saved">saved</span>'
+      : (canSave && m.highlight_id
+          ? '<button class="sec-kb-btn" data-hid="' + escapeHtml(String(m.highlight_id)) + '" data-cid="' + escapeHtml(String(m.fathom_call_id)) + '" onclick="addSectionMomentToKb(this)">+ Save</button>'
+          : '');
+    // Context is explicitly attributed to the prospect and never to the rep.
+    var ctx = (m.context && m.context.quote)
+      ? '<div class="sec-ctx"><span class="sec-ctx-label">' + who + ' had just said</span>'
+        + '<span class="sec-ctx-q">' + escapeHtml(m.context.quote) + '</span></div>'
+      : '';
+    return '<div class="sec-moment sec-moment-closer">'
+      + '<div class="sec-moment-top">' + time + '<span class="sec-who">' + who + '</span><span class="sec-when">' + escapeHtml(when) + '</span>' + kb + '</div>'
+      + '<div class="sec-quote sec-quote-you"><span class="sec-you-label">You said</span>' + escapeHtml(m.quote || '') + '</div>'
+      + ctx
+      + (m.observation ? '<div class="sec-obs">' + escapeHtml(m.observation) + '</div>' : '')
+    + '</div>';
+  }
+
+  // Say plainly what is being withheld and why. Two different reasons, two
+  // different messages — collapsing them into one number would read as though
+  // the data is merely sparse, when for some rows we never had any means to
+  // check who was speaking.
+  function closerHiddenNoteHtml(c) {
+    if (!c) return '';
+    var bits = [];
+    if (c.hidden_unverified) bits.push(c.hidden_unverified + ' where we could not confirm who was speaking');
+    if (c.hidden_unassessed) bits.push(c.hidden_unassessed + ' from calls with no speaker identity on file');
+    if (!bits.length) return '';
+    return '<div class="sec-note">Not shown: ' + escapeHtml(bits.join(', '))
+      + '. These are excluded rather than guessed — a moment shown as yours has been matched to the transcript.</div>';
+  }
+
   var SECTION_MOMENTS_SHOWN = 5;
-  function sectionGroupHtml(key, title, moments, canSave) {
+  function sectionGroupHtml(key, title, moments, canSave, renderer) {
+    var renderMoment = renderer || sectionMomentHtml;
     var expanded = !!(state.sectionExpanded && state.sectionExpanded[key]);
     var shown = expanded ? moments : moments.slice(0, SECTION_MOMENTS_SHOWN);
     var hidden = moments.length - shown.length;
@@ -5414,7 +5466,7 @@
       more = '<button class="sec-more" onclick="expandSectionGroup(\'' + key + '\')">Show fewer</button>';
     }
     return '<div class="sec-group"><h2>' + escapeHtml(title) + ' <span class="sec-count">' + moments.length + '</span></h2>'
-      + shown.map(function (m) { return sectionMomentHtml(m, canSave); }).join('') + more + '</div>';
+      + shown.map(function (m) { return renderMoment(m, canSave); }).join('') + more + '</div>';
   }
   function expandSectionGroup(key) {
     if (!state.sectionExpanded) state.sectionExpanded = {};
@@ -5458,8 +5510,22 @@
     // Show 5, hide the rest behind an expander. 48 good discovery moments as a
     // single wall is unreadable; the first few are the point and the rest are
     // there when wanted.
+    // 6d: "What worked" is the REP's own proven moments. Everything else that
+    // happened to go well stays out of this lane rather than being attributed
+    // to them on the strength of a model's guess.
+    var closer = d.closer_moments || [];
     var groups = '';
-    if (d.good.length) groups += sectionGroupHtml('good', 'What worked', d.good, canSave);
+    if (closer.length) {
+      groups += sectionGroupHtml('good', 'What worked', closer, canSave, closerMomentHtml);
+      groups += closerHiddenNoteHtml(d.closer_counts);
+    } else if (d.good.length) {
+      // Moments exist, but none are provably the rep's. Say that, rather than
+      // filling the space with moments that may be the prospect's words.
+      groups += '<div class="empty-card"><h2>No confirmed moments of your own in ' + escapeHtml(label) + ' yet</h2>'
+        + '<p>There are ' + d.good.length + ' good moments in this range, but none could be matched to you in the transcript, '
+        + 'so none are shown here as yours.</p></div>'
+        + closerHiddenNoteHtml(d.closer_counts);
+    }
     if (d.bad.length)  groups += sectionGroupHtml('bad', 'What to fix', d.bad, canSave);
     if (!d.good.length && !d.bad.length) {
       groups = '<div class="empty-card"><h2>No tagged moments for ' + escapeHtml(label) + ' in this range</h2>'
