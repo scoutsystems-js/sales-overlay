@@ -12,10 +12,10 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
 
-test('ANALYSIS_PROMPT_VERSION is bumped to v11', () => {
+test('ANALYSIS_PROMPT_VERSION is bumped to v12', () => {
   // House rule: a prompt change and its version bump are ONE atomic change. If
   // the constant lags the prompt, every downstream system lies coherently.
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v11-2026-08-03'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v12-2026-08-11'/);
 });
 
 test('the grader asks for prospect_name and declares it in the JSON shape', () => {
@@ -52,4 +52,68 @@ test('v11 is ADDITIVE — the scoring/outcome instructions are untouched', () =>
   assert.ok(/ADDITIVE/.test(src));
   assert.ok(/85-100: exceptional/.test(src), 'the anchored rubric must still be present');
   assert.ok(/25-35% close rate is STRONG/.test(src), 'domain context must still be present');
+});
+
+// ── v12: qualification_covered — a MEASUREMENT-ONLY structured field ──────
+// Adopted because three attempts to encode this as grader WORDING failed: the
+// intended effect is smaller than the grader's noise floor, so it could not be
+// validated by score deltas. A boolean with a quote can be validated by reading.
+const worker = require('../lib/analysis-worker');
+
+test('v12: the field is requested, with a quote, and declared in the JSON shape', () => {
+  const line = src.split('\n').find((l) => l.indexOf('- qualification_covered:') !== -1);
+  assert.ok(line, 'qualification_covered instruction missing');
+  assert.ok(/financial position/i.test(line));
+  assert.ok(/quoted verbatim/i.test(line), 'must demand a verbatim quote as evidence');
+  assert.ok(/"qualification_covered": \{"financial": true\|false/.test(src), 'JSON shape entry missing');
+});
+
+test('v12: the field is framed as an OBSERVATION that must not move any score', () => {
+  // This is what keeps it measurement-only. Without it the model may treat the
+  // observation as a judgement and let it bleed into the section scores — which
+  // is precisely the coupling that made the wording attempts unmeasurable.
+  const line = src.split('\n').find((l) => l.indexOf('- qualification_covered:') !== -1);
+  assert.ok(/OBSERVATION, NOT A JUDGEMENT/.test(line));
+  assert.ok(/must not influence any section score/i.test(line));
+});
+
+test('v12: credit is given for ANY conversational route, not specific words', () => {
+  const line = src.split('\n').find((l) => l.indexOf('- qualification_covered:') !== -1);
+  assert.ok(/BY ANY conversational route/.test(line));
+  assert.ok(/No specific words, figures or criteria need to appear/.test(line));
+});
+
+test('v12: anti-literal-matching guidance is present and is PROHIBITIVE, not permissive', () => {
+  // The one-sided "credit any route, count FULLY" phrasing read as general
+  // leniency and lifted every section by 7 points. This wording only ever
+  // REMOVES a penalty; it must never instruct extra generosity.
+  const line = src.split('\n').find((l) => l.indexOf('HOW TO JUDGE EVERY SECTION') !== -1 && l.indexOf('DO NOT REDUCE') !== -1);
+  assert.ok(line, 'guidance line missing');
+  assert.ok(/DO NOT REDUCE/.test(line));
+  assert.ok(/does NOT make you more generous overall/.test(line));
+  assert.ok(!/count FULLY/.test(src), 'the rejected permissive phrasing is back');
+});
+
+test('sanitizeQualificationCovered FAILS CLOSED on anything malformed', () => {
+  const f = worker._sanitizeQualificationCovered;
+  for (const junk of [null, undefined, 'yes', 42, [], {}]) {
+    assert.deepStrictEqual(f(junk), { financial: false, evidence: null }, 'junk: ' + JSON.stringify(junk));
+  }
+});
+
+test('sanitizeQualificationCovered rejects a TRUE with no supporting quote', () => {
+  // Over-reporting coverage defeats the entire purpose — the field exists to
+  // measure how often the ground is genuinely covered.
+  assert.deepStrictEqual(worker._sanitizeQualificationCovered({ financial: true }), { financial: false, evidence: null });
+  assert.deepStrictEqual(worker._sanitizeQualificationCovered({ financial: true, evidence: '  ' }), { financial: false, evidence: null });
+});
+
+test('sanitizeQualificationCovered keeps a well-formed observation', () => {
+  const out = worker._sanitizeQualificationCovered({ financial: true, evidence: 'I have about 15k set aside for this' });
+  assert.strictEqual(out.financial, true);
+  assert.strictEqual(out.evidence, 'I have about 15k set aside for this');
+});
+
+test('sanitizeQualificationCovered drops evidence when financial is false', () => {
+  assert.deepStrictEqual(worker._sanitizeQualificationCovered({ financial: false, evidence: 'stray' }), { financial: false, evidence: null });
 });

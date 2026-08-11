@@ -101,7 +101,7 @@ const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_
 //      per-structure cash rules; (b) payment_structure field (closed-only);
 //      (c) eod_summary — first-person closer-voice EOD report summary
 //      (coaching's overall_summary untouched). Never-fabricate unchanged.
-const ANALYSIS_PROMPT_VERSION = 'v11-2026-08-03'; // v11: grader emits `prospect_name` (PROSPECT NAMES 3b), reusing the v7 follow-up-email greeting contract VERBATIM — transcript-only, null when no name is established, never the meeting title. A couple returns as ONE joined name (ruling: couples are one prospect). ADDITIVE — scoring/outcome/section prompts are UNCHANGED from v10, so NO delta-gate (same reasoning that let v10 ship without one). Feeds lib/prospect-name.js, which already ranked a grader name above diarized and title. // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
+const ANALYSIS_PROMPT_VERSION = 'v12-2026-08-11'; // v12: (1) qualification_covered {financial, evidence} — a MEASUREMENT-ONLY structured field, additive, drives NOTHING (no score, no UI). Adopted after three attempts to encode qualification enforcement as grader WORDING all failed: the intended effect is smaller than the grader's noise floor (see GRADER NOISE PROFILE in CLAUDE.md), so it cannot be validated by score deltas and must be validated by READING the boolean against transcripts. (2) the anti-literal-matching guidance kept as prompt text — it gated clean and costs nothing. NOT a scoring change; under new-calls-only the outdated count it produces is cosmetic. // v11: grader emits `prospect_name` (PROSPECT NAMES 3b), reusing the v7 follow-up-email greeting contract VERBATIM — transcript-only, null when no name is established, never the meeting title. A couple returns as ONE joined name (ruling: couples are one prospect). ADDITIVE — scoring/outcome/section prompts are UNCHANGED from v10, so NO delta-gate (same reasoning that let v10 ship without one). Feeds lib/prospect-name.js, which already ranked a grader name above diarized and title. // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -305,6 +305,9 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '  4. OBJECTION   — handling resistance via isolation + framework rebuttal',
     '  5. CLOSE       — was a clear assumptive or direct close attempted, was price presented confidently without apologizing, were final objections handled before the call ended',
     '',
+    '',
+    'HOW TO JUDGE EVERY SECTION: the bullets above name the AREAS each section must establish — they are not required words, questions or techniques. DO NOT REDUCE a score because the closer reached the required ground by a DIFFERENT ROUTE: a different order, their own wording, a technique used without naming it, an area established by inference or volunteered by the prospect, or a thread picked up again later in the call. Named methods (isolation, framework rebuttal, assumptive close, agenda-setting) are examples of routes that work, not requirements. Route alone is never a fault. This does NOT make you more generous overall — it changes what counts as a fault, not the scoring scale.',
+    '',
     'For each section return: {"grade":"A"|"B"|"C"|"D"|"F","score":0-100,"notes":"<evidence + reasoning, including 1-2 quoted transcript lines with timestamps>"}',
     'If a section did not occur (e.g. no objections were raised), return {"grade":null,"score":null,"notes":"Section did not occur in this call."} — null is honest.',
     '',
@@ -319,6 +322,7 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '      • REQUIRED for "closed", "lost", and "follow_up". Set why_outcome to null ONLY when outcome is "no_show" (no real conversation to diagnose).',
     '  - one_thing_timestamp_seconds: integer seconds of the moment the one_thing correction belonged to — the same moment as why_outcome, or the adjacent moment where the closer should have intervened. Null if not applicable.',
     '  - prospect_name: the prospect\'s name, using the SAME rule as the follow-up email greeting: the name they are actually called (or call themselves) IN THE TRANSCRIPT. If no name is clearly established in the transcript, return null. Never take a name from the meeting title or any source other than the transcript itself. If two people are on the prospect side (a couple or business partners buying together), return them as one name joined by \" and \" (e.g. \"Alan and Jen\") \u2014 they are ONE prospect. Return the name only, with no title, company, or location.',
+    '  - qualification_covered: a factual OBSERVATION about whether the closer established the prospect\'s FINANCIAL POSITION on this call — their budget, what they earn, what they have saved, or what they are able to invest. Return {"financial": true, "evidence": "<the line that establishes it, quoted verbatim from the transcript, 5-30 words>"} when that ground was covered BY ANY conversational route: a direct question, an indirect one, an inference the prospect confirms, or something the prospect volunteers all count equally. No specific words, figures or criteria need to appear. Return {"financial": false, "evidence": null} ONLY when the call genuinely never establishes it. THIS IS AN OBSERVATION, NOT A JUDGEMENT: it must not influence any section score, grade or the overall score in any way.',
     '  - follow_up_email: a draft the closer can copy + send today. Reference specific moments from this call. First-person, written as the closer (not an AI). No \'I hope this finds you well\', no \'don\'t hesitate to reach out\'. Sound like a real person following up on a real conversation. Under 200 words. Greeting rule: greet the prospect ONLY by the name they are actually called (or call themselves) in the transcript. If no name is clearly established in the transcript, omit the name from the greeting entirely (e.g. \'Hey — great talking today.\'). Never take a name from the meeting title or any source other than the transcript itself.',
     '  - cash_collected + payment_structure: for CLOSED calls, actively look for transaction evidence anywhere in the transcript — card details being taken or run, a deposit being made, confirmation that a charge went through, financing approvals (Affirm, Klarna, or similar BNPL — buy now pay later), or a first payment on a payment plan. Then report BOTH fields:',
     '      • payment_structure: exactly one of "paid_in_full" | "payment_plan" | "bnpl" | "none_stated". Only a closed call can have a structure other than "none_stated" — for follow_up, lost, and no_show ALWAYS return "none_stated". If the call closed but how it was paid is not evidenced, return "none_stated".',
@@ -349,6 +353,7 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext) {
     '  "why_outcome": {"reason":"...","quote":"...","timestamp_seconds":N} | null,',
     '  "one_thing_timestamp_seconds": N | null,',
     '  "prospect_name": "..." | null,',
+    '  "qualification_covered": {"financial": true|false, "evidence": "..."|null},',
     '  "follow_up_email": "...",',
     '  "cash_collected": N,',
     '  "payment_structure": "paid_in_full"|"payment_plan"|"bnpl"|"none_stated",',
@@ -465,6 +470,19 @@ function sanitizePaymentStructure(v, outcome) {
 
 // eod_summary guard (v8): non-empty string, trimmed, capped to 2000; else null
 // (NULL = "no v8 summary" — the EOD view falls back to overall_summary).
+// qualification_covered — a measurement-only field (v12). Fails CLOSED: anything
+// malformed becomes {financial:false, evidence:null} rather than a truthy guess,
+// because a field that over-reports coverage is worse than one that under-reports
+// (the whole point is to measure how often the ground is actually covered).
+function sanitizeQualificationCovered(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return { financial: false, evidence: null };
+  var fin = (v.financial === true);
+  var ev = (typeof v.evidence === 'string' && v.evidence.trim()) ? v.evidence.trim().slice(0, 400) : null;
+  // A true with no evidence is not trustworthy — the contract asks for a quote.
+  if (fin && !ev) return { financial: false, evidence: null };
+  return { financial: fin, evidence: fin ? ev : null };
+}
+
 function sanitizeEodSummary(v) {
   if (typeof v !== 'string' || !v.trim()) return null;
   return v.trim().slice(0, 2000);
@@ -1024,6 +1042,9 @@ async function analyzeCall(fathomCallId, userId) {
       cash_collected:      sanitizeCashCollected(graderParsed.cash_collected),
       payment_structure:   sanitizePaymentStructure(graderParsed.payment_structure, effectiveOutcome),
       eod_summary:         sanitizeEodSummary(graderParsed.eod_summary),
+      // v12 measurement-only: stored so coverage can be checked by READING, never
+      // consumed by a score. What it eventually feeds is a separate decision.
+      qualification_covered: sanitizeQualificationCovered(graderParsed.qualification_covered),
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
       // PROSPECT NAMES 3a — resolve WHO this call was with, at write time.
@@ -1166,6 +1187,7 @@ module.exports = {
   _formatTurnsForPrompt:       formatTurnsForPrompt,
   _formatSeconds:              formatSeconds,
   _buildSectionGraderPrompt:   buildSectionGraderPrompt,
+  _sanitizeQualificationCovered: sanitizeQualificationCovered,
   _buildHighlightExtractorPrompt: buildHighlightExtractorPrompt,
   _markFathomCallErrored:      markFathomCallErrored,
   _sanitizeCashCollected:      sanitizeCashCollected,
