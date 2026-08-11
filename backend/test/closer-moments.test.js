@@ -28,8 +28,10 @@ test('GUARD: the drilldown query SELECTS speaker_verified', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'me.js'), 'utf8');
   const sel = src.match(/\.select\('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds[^']*'\)/);
   assert.ok(sel, 'section-drilldown highlights select not found');
-  assert.ok(sel[0].indexOf('speaker_verified') !== -1,
-    'the drilldown select must include speaker_verified or the closer view silently renders empty');
+  ['speaker_verified', 'closer_response', 'closer_response_verified'].forEach(function (col) {
+    assert.ok(sel[0].indexOf(col) !== -1,
+      'the drilldown select must include ' + col + ' or the closer view silently renders empty');
+  });
 });
 
 const META = { c1: { prospect_name: 'Leonard', recording_url: 'https://fathom.video/calls/1', call_date: '2026-08-01T10:00:00Z' } };

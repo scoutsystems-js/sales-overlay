@@ -1100,19 +1100,34 @@ async function analyzeCall(fathomCallId, userId) {
     // Closer-side features must require true. Corrections are logged, because
     // a silent correction hides how often the extractor mis-attributes.
     if (normalized.speaker_confidence === 'matched') {
-      var vStats = { proven: 0, unproven: 0, corrected: 0 };
+      var vStats = { proven: 0, unproven: 0, corrected: 0, resp_proven: 0, resp_rejected: 0 };
       sanitizedHighlights.forEach(function (h) {
         var label = labelForQuote(normalized.turns, h.quote);
-        if (!label) { h.speaker_verified = false; vStats.unproven++; return; }
-        if (label !== h.speaker) { h.speaker = label; vStats.corrected++; }
-        h.speaker_verified = true;
-        vStats.proven++;
+        if (!label) { h.speaker_verified = false; vStats.unproven++; }
+        else {
+          if (label !== h.speaker) { h.speaker = label; vStats.corrected++; }
+          h.speaker_verified = true;
+          vStats.proven++;
+        }
+
+        // 6e: `closer_response` is model-quoted text on the PROSPECT's row. The
+        // field name is not evidence — measured, 3 of 53 responses that
+        // reconstruct were actually the prospect speaking. Prove it separately.
+        var resp = (typeof h.closer_response === 'string') ? h.closer_response.trim() : '';
+        if (!resp) return;
+        var respLabel = labelForQuote(normalized.turns, resp);
+        h.closer_response_verified = (respLabel === 'CLOSER');
+        if (h.closer_response_verified) vStats.resp_proven++; else vStats.resp_rejected++;
       });
-      console.log('[analysis] speaker verify call=%s proven=%d unproven=%d corrected=%d',
-        fathomCallId, vStats.proven, vStats.unproven, vStats.corrected);
+      console.log('[analysis] speaker verify call=%s proven=%d unproven=%d corrected=%d resp_proven=%d resp_rejected=%d',
+        fathomCallId, vStats.proven, vStats.unproven, vStats.corrected, vStats.resp_proven, vStats.resp_rejected);
     } else {
-      // No deterministic identity → every label is an inference. Say so.
-      sanitizedHighlights.forEach(function (h) { h.speaker_verified = false; });
+      // No deterministic identity → every label is an inference. Say so, and
+      // never let a response through on the strength of its field name.
+      sanitizedHighlights.forEach(function (h) {
+        h.speaker_verified = false;
+        if ((typeof h.closer_response === 'string') && h.closer_response.trim()) h.closer_response_verified = false;
+      });
     }
     await persistHighlights(admin, fathomCallId, userId, sanitizedHighlights);
 

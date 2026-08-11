@@ -194,6 +194,55 @@ function buildSectionBreakdown(section, input) {
     closerMoments.push(Object.assign({}, m, { context: nearestPrecedingProspect(prospectLines, m) }));
   });
 
+  // ── 6e: the closer's objection handling ────────────────────────────────
+  // An objection is the PROSPECT's row with the rep's reply in `closer_response`,
+  // so without this the rep's objection work is invisible to a CLOSER filter —
+  // 257 responses in the data against 1 moment on screen.
+  //
+  // The field NAME is not evidence: of 53 responses that reconstruct from the
+  // transcript, 3 were actually the prospect speaking. So the response is only
+  // the rep's words when `closer_response_verified` is true (reconstructed AND
+  // spoken by the closer). Refuse otherwise.
+  //
+  // Only HANDLED objections reach this lane — the lane is "what worked", and a
+  // partial or unhandled objection is what to fix. The row itself still appears
+  // in the ordinary good/bad groups either way.
+  highlights.forEach(function (h) {
+    if (!h || h.section !== section) return;
+    if (String(h.type || '').toLowerCase() !== 'objection') return;
+    var resp = (typeof h.closer_response === 'string') ? h.closer_response.trim() : '';
+    if (!resp) return;                                   // no response is not a withheld response
+    if (h.resolution !== 'handled') return;              // belongs in "what to fix"
+
+    var verdict = (typeof h.closer_response_verified === 'boolean') ? h.closer_response_verified : null;
+    if (verdict === null)  { closerCounts.hidden_unassessed++; return; }
+    if (verdict !== true)  { closerCounts.hidden_unverified++; return; }
+
+    var m = meta[h.fathom_call_id] || {};
+    var ts = num(h.timestamp_seconds);
+    var rec = m.recording_url;
+    closerCounts.verified++;
+    closerMoments.push({
+      highlight_id: h.id || null,
+      fathom_call_id: h.fathom_call_id,
+      quote: resp,                                       // the REP's line leads
+      observation: h.observation || null,
+      type: h.type || null,
+      resolution: h.resolution || null,
+      speaker: 'CLOSER',
+      speaker_verified: true,
+      timestamp_seconds: ts,
+      call_date: m.call_date || null,
+      prospect_name: m.prospect_name || null,
+      clip_url: (rec && ts !== null) ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null,
+      saved_to_kb: false,
+      // EXACT context, not a nearest-preceding guess: the objection this reply
+      // answers is on the same row.
+      context: { quote: h.quote || null, speaker: 'PROSPECT', timestamp_seconds: ts, verified: (typeof h.speaker_verified === 'boolean') ? h.speaker_verified : null },
+      from_closer_response: true,
+    });
+  });
+
   closerMoments.sort(byDateDescThenTime);
 
   var byDateDesc = function (a, b) { return String(b.call_date || '').localeCompare(String(a.call_date || '')); };
