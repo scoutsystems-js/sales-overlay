@@ -1280,6 +1280,11 @@
     .review-one-thing-text.placeholder { color: var(--text-muted); font-style: italic; }
 
     /* "Why this call closed / didn't close" — causal evidence section. */
+    .review-mattered { padding: 20px 22px; border-left: 3px solid var(--accent); }
+    .review-mattered.inverted { border-left-color: var(--mid); }
+    .review-mattered-area { font-size: 20px; font-weight: 650; margin: 6px 0 10px; }
+    .review-mattered-because { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+    .review-mattered-note { font-size: 13px; color: var(--text-dim); margin-top: 10px; }
     .review-why { padding: 20px 22px; }
     .review-why.loss    { border-left: 3px solid var(--bad); }
     .review-why.win     { border-left: 3px solid var(--good); }
@@ -6664,6 +6669,10 @@
     // follow_up/no_show/pre-v4 calls, so those pages simply start at the notice.
     content.innerHTML = header
       + renderWhyOutcomeSectionHtml(review)
+      // 7d sits directly under the verdict: the verdict says what happened,
+      // this says which ground would have changed it. Renders '' unless the
+      // server verified all three claims, so it never leaves an empty shell.
+      + renderWhatMatteredHtml(review)
       + notice + errorBanner
       + '<div class="fade-in">'
         + renderHighlightsSectionHtml(review)
@@ -6704,6 +6713,49 @@
     return '<a class="review-why-clip" href="' + escapeHtml(href)
       + '" target="_blank" rel="noopener">▶ ' + escapeHtml(label || 'Play clip')
       + ' (' + escapeHtml(formatTimestampDisplay(Math.floor(seconds))) + ')</a>';
+  }
+
+
+  // ─── 7d: "the question that mattered" ────────────────────────────────────
+  // Per call, on the review page. Names an AREA the rep's own material says
+  // matters, which this call did not establish, and quotes the prospect's own
+  // words as the reason it mattered for THEM. The server only ever stores this
+  // when all three are independently verified, so anything here is provable.
+  function renderWhatMatteredHtml(review) {
+    var a = (review && review.analysis) || {};
+
+    // Role-inverted call: the recorded user was the one being sold to, so the
+    // "prospect ground" is really their own situation and any gap we named
+    // would be coaching a fiction. SAY SO — a blank panel reads as a bug.
+    if (a.role_inverted === true) {
+      return '<section class="review-block review-mattered inverted">'
+        + '<div class="review-why-label">Coaching skipped for this call</div>'
+        + '<div class="review-why-reason">This recording looks inverted — the person who recorded it appears to be the one being sold to, '
+        + 'so the details we would normally read as the prospect’s are theirs. Rather than coach from that, we have left it out.</div>'
+        + '</section>';
+    }
+
+    var wm = a.what_mattered;
+    if (!wm || !wm.area_key || !wm.reason_evidence) return '';
+    var label = areaLabelFor(review, wm.area_key);
+
+    return '<section class="review-block review-mattered">'
+      + '<div class="review-why-label">The question that mattered here</div>'
+      + '<div class="review-mattered-area">' + escapeHtml(label) + '</div>'
+      + '<div class="review-mattered-because">Because this prospect said</div>'
+      + '<div class="review-why-quote">“' + escapeHtml(wm.reason_evidence) + '”</div>'
+      + '<div class="review-mattered-note">This ground wasn’t established on this call.</div>'
+      + '</section>';
+  }
+
+  // Human label for an area key, falling back to a readable form of the key
+  // itself rather than showing raw snake_case.
+  function areaLabelFor(review, key) {
+    var areas = (review && review.coaching_areas) || [];
+    for (var i = 0; i < areas.length; i++) {
+      if (areas[i] && areas[i].key === key && areas[i].label) return areas[i].label;
+    }
+    return String(key || '').replace(/_/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); });
   }
 
   function renderWhyOutcomeSectionHtml(review) {

@@ -105,7 +105,7 @@ const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_
 //      per-structure cash rules; (b) payment_structure field (closed-only);
 //      (c) eod_summary — first-person closer-voice EOD report summary
 //      (coaching's overall_summary untouched). Never-fabricate unchanged.
-const ANALYSIS_PROMPT_VERSION = 'v15-2026-08-12'; // v15 (7c COVERAGE MAP): the grader additionally emits `coverage` (per-area: was this ground established on this call, by ANY conversational route, with a verbatim line) and `prospect_context` (1-3 factual attributes the prospect stated about themselves). BOTH DRIVE NOTHING — no score, no grade, no surface — the same measure-then-read discipline that made qualification_covered work after three attempts to express the intent as score nudging failed against the ±14 noise floor. Areas come from the rep's OWN material and are cached on its hash, so the prompt is byte-identical to v14 for any rep without material (7 of 8 live profiles). Evidence is verified at WRITE TIME by quote-locate, never trusted from the model. TRUNCATION MEASURED BEFORE SHIPPING on the six longest calls in the corpus (1645-2123 turns): worst-case output 3211/4500 tokens vs 2691 for v14 alone, +520 marginal, 0 unparseable — re-measure if further fields are added. // v14 (VERBATIM QUOTING): every quoted field the extractor emits (quote, closer_response) must be a CONTIGUOUS character-for-character span of ONE transcript line. Removed "trim filler" (it licensed editing) and the 30-word cap (it forced compression); shortening is now cut-from-the-ends only, never stitching a beginning to a later ending. WHY IT IS MECHANICAL RATHER THAN AN ADJECTIVE: closer_response ALREADY said "quoted verbatim" under v13 and still failed reconstruction 67% of the time — measured on 88 failures, 86% began verbatim and drifted mid-sentence. This is validated by RECONSTRUCTION RATE, never by score deltas: the grader noise floor makes a score comparison meaningless, and reconstruction is directly checkable (the same reasoning that made qualification_covered work). Scope is deliberately every quoted field, not just the objection lane — the same defect caps stored highlights and harvested KB moments alike. // v13 (6a — deterministic speaker labelling): the prompt TEMPLATE is unedited, but the prompt STRING sent to Claude changes materially on every call where the closer is now identified — `closerLabel`/`speakerNote` flip from "Speaker identity is uncertain — infer who the closer is" to "The closer is X, labeled CLOSER", and EVERY transcript line's speaker prefix changes from a raw display name to CLOSER/PROSPECT. That is a different input to the model, so it gets a version stamp: prompt_version is the ONLY way to tell which analyses were graded with MATCHED speakers versus GUESSED ones, and that distinction is load-bearing for every closer-side feature built on top. Cost, stated plainly: this marks every prior analysis outdated. Per the standing new-calls-only ruling, do NOT mass re-analyze to clear it — the count is cosmetic and the corpus corrects itself as new calls arrive. // v12: (1) qualification_covered {financial, evidence} — a MEASUREMENT-ONLY structured field, additive, drives NOTHING (no score, no UI). Adopted after three attempts to encode qualification enforcement as grader WORDING all failed: the intended effect is smaller than the grader's noise floor (see GRADER NOISE PROFILE in CLAUDE.md), so it cannot be validated by score deltas and must be validated by READING the boolean against transcripts. (2) the anti-literal-matching guidance kept as prompt text — it gated clean and costs nothing. NOT a scoring change; under new-calls-only the outdated count it produces is cosmetic. // v11: grader emits `prospect_name` (PROSPECT NAMES 3b), reusing the v7 follow-up-email greeting contract VERBATIM — transcript-only, null when no name is established, never the meeting title. A couple returns as ONE joined name (ruling: couples are one prospect). ADDITIVE — scoring/outcome/section prompts are UNCHANGED from v10, so NO delta-gate (same reasoning that let v10 ship without one). Feeds lib/prospect-name.js, which already ranked a grader name above diarized and title. // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
+const ANALYSIS_PROMPT_VERSION = 'v16-2026-08-12'; // v16 (7d WHAT MATTERED): the grader additionally picks, from the areas it marked covered:false, the ONE that mattered most for THIS prospect, citing the prospect's own verbatim line as the reason. Rides the same coverage block, so it is absent entirely for a rep with no derived areas. ACCEPTED ONLY WHEN INDEPENDENTLY VERIFIED server-side — the area must exist for this rep, must be marked uncovered, and the reason must reconstruct from the transcript AS THE PROSPECT'''S WORDS; any failure stores NULL. Suppressed outright on role-inverted calls (recorded user being sold to), where the closer'''s own disclosures would otherwise read as covered prospect ground. DRIVES NO SCORE. // v15 (7c COVERAGE MAP): the grader additionally emits `coverage` (per-area: was this ground established on this call, by ANY conversational route, with a verbatim line) and `prospect_context` (1-3 factual attributes the prospect stated about themselves). BOTH DRIVE NOTHING — no score, no grade, no surface — the same measure-then-read discipline that made qualification_covered work after three attempts to express the intent as score nudging failed against the ±14 noise floor. Areas come from the rep's OWN material and are cached on its hash, so the prompt is byte-identical to v14 for any rep without material (7 of 8 live profiles). Evidence is verified at WRITE TIME by quote-locate, never trusted from the model. TRUNCATION MEASURED BEFORE SHIPPING on the six longest calls in the corpus (1645-2123 turns): worst-case output 3211/4500 tokens vs 2691 for v14 alone, +520 marginal, 0 unparseable — re-measure if further fields are added. // v14 (VERBATIM QUOTING): every quoted field the extractor emits (quote, closer_response) must be a CONTIGUOUS character-for-character span of ONE transcript line. Removed "trim filler" (it licensed editing) and the 30-word cap (it forced compression); shortening is now cut-from-the-ends only, never stitching a beginning to a later ending. WHY IT IS MECHANICAL RATHER THAN AN ADJECTIVE: closer_response ALREADY said "quoted verbatim" under v13 and still failed reconstruction 67% of the time — measured on 88 failures, 86% began verbatim and drifted mid-sentence. This is validated by RECONSTRUCTION RATE, never by score deltas: the grader noise floor makes a score comparison meaningless, and reconstruction is directly checkable (the same reasoning that made qualification_covered work). Scope is deliberately every quoted field, not just the objection lane — the same defect caps stored highlights and harvested KB moments alike. // v13 (6a — deterministic speaker labelling): the prompt TEMPLATE is unedited, but the prompt STRING sent to Claude changes materially on every call where the closer is now identified — `closerLabel`/`speakerNote` flip from "Speaker identity is uncertain — infer who the closer is" to "The closer is X, labeled CLOSER", and EVERY transcript line's speaker prefix changes from a raw display name to CLOSER/PROSPECT. That is a different input to the model, so it gets a version stamp: prompt_version is the ONLY way to tell which analyses were graded with MATCHED speakers versus GUESSED ones, and that distinction is load-bearing for every closer-side feature built on top. Cost, stated plainly: this marks every prior analysis outdated. Per the standing new-calls-only ruling, do NOT mass re-analyze to clear it — the count is cosmetic and the corpus corrects itself as new calls arrive. // v12: (1) qualification_covered {financial, evidence} — a MEASUREMENT-ONLY structured field, additive, drives NOTHING (no score, no UI). Adopted after three attempts to encode qualification enforcement as grader WORDING all failed: the intended effect is smaller than the grader's noise floor (see GRADER NOISE PROFILE in CLAUDE.md), so it cannot be validated by score deltas and must be validated by READING the boolean against transcripts. (2) the anti-literal-matching guidance kept as prompt text — it gated clean and costs nothing. NOT a scoring change; under new-calls-only the outdated count it produces is cosmetic. // v11: grader emits `prospect_name` (PROSPECT NAMES 3b), reusing the v7 follow-up-email greeting contract VERBATIM — transcript-only, null when no name is established, never the meeting title. A couple returns as ONE joined name (ruling: couples are one prospect). ADDITIVE — scoring/outcome/section prompts are UNCHANGED from v10, so NO delta-gate (same reasoning that let v10 ship without one). Feeds lib/prospect-name.js, which already ranked a grader name above diarized and title. // v10: highlight extractor now tags each moment with its `section` (intro/discovery/pitch/objection/close) for the Call Review section breakdown (migration 028). ADDITIVE — an extractor-only field; grader scoring/outcome prompts are UNCHANGED from v9, so no delta-gate needed (the score/outcome noise on re-analysis is the same as any re-grade). Backfill = last 30 days only (reviewed step); older calls stay v9 (no section tags → UI falls back to notes prose). Manual outcomes are frozen by the outcome_source='manual' guard, so re-analysis can't clobber them. // v9: sharper outcome criteria (no_show = very short/no discovery-pitch-close; disqualified/no-path = lost; follow_up requires a live path forward).
 
 // ─── Tuning ────────────────────────────────────────────────────────────────
 const MAX_SEARCH_PAGES   = 3;                // upper bound on /meetings pagination when finding one specific call
@@ -340,6 +340,69 @@ function normalizeAreaKey(k) {
   return s || null;
 }
 
+
+// ─── 7d: "the question that mattered" ──────────────────────────────────────
+//
+// Accepts the model's pick ONLY when every claim in it is independently true:
+// the area is one the rep actually has, it was NOT covered on this call, and
+// the stated reason is a line the PROSPECT really spoke. Any failure returns
+// null — emitting nothing beats reaching for the nearest plausible pairing,
+// because a fabricated "the question that mattered" is coaching the rep on a
+// call that did not happen.
+function resolveWhatMattered(raw, ctx) {
+  if (!raw || typeof raw !== 'object') return null;
+  var c = ctx || {};
+  var coverage = Array.isArray(c.coverage) ? c.coverage : [];
+  var areas = Array.isArray(c.areas) ? c.areas : [];
+  var turns = Array.isArray(c.turns) ? c.turns : [];
+
+  // Without deterministic speakers we cannot say the PROSPECT said anything,
+  // and the whole claim rests on that.
+  if (c.speakerConfidence !== 'matched') return null;
+
+  var key = normalizeAreaKey(raw.area_key);
+  if (!key) return null;
+  if (!areas.some(function (a) { return a && a.key === key; })) return null;
+
+  // It must be a genuine GAP. A covered area is not "the question that
+  // mattered" — and an area missing from the map was never assessed.
+  var row = coverage.filter(function (r) { return r && r.area_key === key; })[0];
+  if (!row || row.covered !== false) return null;
+
+  var quote = (typeof raw.reason_evidence === 'string') ? raw.reason_evidence.trim() : '';
+  if (!quote) return null;
+  if (labelForQuote(turns, quote) !== 'PROSPECT') return null;
+
+  return { area_key: key, reason_evidence: quote, reason_verified: true };
+}
+
+// Detect a call where the recorded user is the one being SOLD TO, so the
+// closer/prospect roles are inverted relative to what recorded_by implies.
+//
+// The detector keys on WHO SPOKE the supposed prospect attributes, not on
+// whether they verified. That distinction matters: an unverified quote is
+// usually just a paraphrase, and treating it as inversion would flag any call
+// where the model tidied a line. On a genuinely inverted call the attributes
+// reconstruct cleanly — to the CLOSER, because he is describing himself.
+//
+// Requires the closer-spoken attributes to OUTWEIGH the prospect-spoken ones:
+// one stray is an extraction slip, not an inverted call, and suppressing
+// coaching on a normal call is its own harm.
+function detectRoleInversion(prospectContext, turns, speakerConfidence) {
+  var none = { inverted: false, closer_spoken: 0, prospect_spoken: 0 };
+  if (speakerConfidence !== 'matched') return none;
+  if (!Array.isArray(prospectContext) || prospectContext.length === 0) return none;
+
+  var closer = 0, prospect = 0;
+  prospectContext.forEach(function (p) {
+    if (!p || typeof p.evidence !== 'string') return;
+    var who = labelForQuote(turns, p.evidence);
+    if (who === 'CLOSER') closer++;
+    else if (who === 'PROSPECT') prospect++;
+  });
+  return { inverted: closer > 0 && closer > prospect, closer_spoken: closer, prospect_spoken: prospect };
+}
+
 function coverageInstruction(areas) {
   if (!Array.isArray(areas) || areas.length === 0) return '';
   var list = areas.map(function (a) { return a.key + ' (' + a.label + ')'; }).join('; ');
@@ -349,6 +412,7 @@ function coverageInstruction(areas) {
     '      evidence: the line that establishes it, copied EXACTLY as a contiguous run of words from ONE transcript line — no merging lines, no tidying, cut from the ends only to shorten. Use null when covered is false.',
     '      THIS IS AN OBSERVATION, NOT A JUDGEMENT: it must not influence any section score, grade or the overall score in any way.',
     '      AREAS: ' + list,
+    '  - what_mattered: of the areas above that you marked covered:false, the ONE that mattered most FOR THIS PROSPECT given what they said about themselves, as {"area_key":"...","reason_evidence":"..."}. reason_evidence must be THE PROSPECT\'S OWN line explaining why that ground mattered for them, copied EXACTLY as a contiguous run of words from ONE transcript line. Return null if every area was covered, or if you cannot point to a line the prospect actually said that shows why it mattered. Do not reach for the nearest plausible pairing.',
     '  - prospect_context: 1-3 factual attributes THIS prospect stated about themselves (their situation, role, holdings, constraints), as [{"attribute":"...","evidence":"..."}]. attribute is 2-8 words. evidence is the prospect\'s own line, copied EXACTLY as a contiguous run of words from ONE transcript line. Return [] if the prospect stated nothing factual about themselves.',
   ].join('\n');
 }
@@ -1117,6 +1181,23 @@ async function analyzeCall(fathomCallId, userId) {
       }
     });
 
+    // ─── 7d: the question that mattered, and role inversion ─────────────
+    // Suppressed entirely on an inverted call: if the recorded user is the one
+    // being sold to, the "prospect ground" is really the closer's own
+    // situation, so any gap we name would be coaching a fiction.
+    var roleInv = detectRoleInversion(prospectContextOut, normalized.turns, normalized.speaker_confidence);
+    var whatMattered = roleInv.inverted
+      ? null
+      : resolveWhatMattered(graderParsed.what_mattered, {
+          coverage: coverageOut, areas: coachingAreas,
+          turns: normalized.turns, speakerConfidence: normalized.speaker_confidence,
+        });
+    if (coachingAreas.length) {
+      console.log('[analysis] what_mattered call=%s area=%s inverted=%s (closer_spoken=%d prospect_spoken=%d)',
+        fathomCallId, whatMattered ? whatMattered.area_key : 'none',
+        roleInv.inverted, roleInv.closer_spoken, roleInv.prospect_spoken);
+    }
+
     if (coachingAreas.length) {
       console.log('[analysis] coverage call=%s areas=%d covered=%d evidence=%d/%d context=%d/%d',
         fathomCallId, coachingAreas.length,
@@ -1242,6 +1323,8 @@ async function analyzeCall(fathomCallId, userId) {
       // consumed by a score. What it eventually feeds is a separate decision.
       qualification_covered: sanitizeQualificationCovered(graderParsed.qualification_covered),
       coverage:              coverageOut,
+      what_mattered:         whatMattered,
+      role_inverted:         (normalized.speaker_confidence === 'matched') ? roleInv.inverted : null,
       prospect_context:      prospectContextOut,
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
@@ -1433,6 +1516,8 @@ module.exports = {
   _sanitizeQualificationCovered: sanitizeQualificationCovered,
   _sanitizeCoverage:            sanitizeCoverage,
   _sanitizeProspectContext:     sanitizeProspectContext,
+  _resolveWhatMattered:         resolveWhatMattered,
+  _detectRoleInversion:         detectRoleInversion,
   _buildHighlightExtractorPrompt: buildHighlightExtractorPrompt,
   _markFathomCallErrored:      markFathomCallErrored,
   _sanitizeCashCollected:      sanitizeCashCollected,
