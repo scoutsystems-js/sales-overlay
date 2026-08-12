@@ -37,8 +37,34 @@ test('risk_signal and barrier both exist and are distinguished by attitude vs ob
   assert.ok(risk, 'risk_signal missing');
   assert.ok(barrier, 'barrier missing');
   assert.ok(/doubt|skeptic|attitud/i.test(risk), 'risk_signal must be attitudinal');
-  assert.ok(/concrete|practical|obstacle/i.test(barrier), 'barrier must be concrete');
-  assert.ok(/not an attitude|rather than an attitude/i.test(barrier), 'barrier must be contrasted with attitude');
+  assert.ok(/concrete|external|constraint/i.test(barrier), 'barrier must be concrete/external');
+});
+
+test('objection vs barrier is separated by the DECISION TEST, with both worked examples', () => {
+  // Two earlier phrasings each improved the canonical case without settling it:
+  // post-price timing (both are post-price) and "fact reported vs position
+  // taken" (left it 2/3). The operative test is now: could the prospect change
+  // it by deciding differently? Stated as an operation with both examples, the
+  // way v14 stated the copy operation instead of repeating "verbatim".
+  const obj = PROMPT.split('\n').find((l) => /^\s*"objection"\s+—/.test(l));
+  const bar = PROMPT.split('\n').find((l) => /^\s*"barrier"\s+—/.test(l));
+
+  assert.ok(/deciding differently|decide their way out/i.test(obj), 'objection must state the decision test');
+  assert.ok(/deciding differently|decide their way out/i.test(bar), 'barrier must state the same test in reverse');
+
+  // The worked examples must be present, not just the abstract rule.
+  assert.ok(/4,800/.test(obj), 'the canonical objection example must be in the prompt');
+  assert.ok(/5,000/.test(bar) && /spouse|sign/i.test(bar), 'the barrier examples must be in the prompt');
+});
+
+test('a question is NOT resistance merely for being a question', () => {
+  // Justin's sales-manager lens. Manner and timing are the discriminators, and
+  // typing a question as resistance requires evidence in HOW it was asked.
+  assert.ok(/HOW TO TYPE A QUESTION/.test(PROMPT), 'the question-typing block is missing');
+  assert.ok(/NOT resistance/i.test(PROMPT));
+  assert.ok(/price break down|logistical question/i.test(PROMPT), 'the benign example must be present');
+  assert.ok(/hurry up|impatient|demanding/i.test(PROMPT), 'the red-flag example must be present');
+  assert.ok(/prefer the non-resistance reading/i.test(PROMPT), 'ambiguity must default AWAY from resistance');
 });
 
 test('rapport is restricted to GENUINE CONNECTION so disclosures stop landing there', () => {
