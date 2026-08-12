@@ -1280,6 +1280,13 @@
     .review-one-thing-text.placeholder { color: var(--text-muted); font-style: italic; }
 
     /* "Why this call closed / didn't close" — causal evidence section. */
+    .review-trace { padding: 20px 22px; border-left: 3px solid var(--mid); }
+    .trace-row { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; }
+    .trace-tag { flex: 0 0 auto; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--text-dim); min-width: 108px; }
+    .trace-area { font-size: 17px; font-weight: 650; }
+    .trace-quote { font-size: 14px; line-height: 1.5; }
+    .trace-note { font-size: 12px; color: var(--text-dim); margin-top: 14px; font-style: italic; }
     .review-risk { padding: 20px 22px; border-left: 3px solid var(--mid); }
     .rs-lead { font-size: 13px; color: var(--text-dim); margin: 4px 0 12px; }
     .rs-item { padding: 12px 0; border-top: 1px solid var(--border); }
@@ -6694,6 +6701,7 @@
       // server verified all three claims, so it never leaves an empty shell.
       + renderWhatMatteredHtml(review)
       + renderRiskSignalsHtml(review)
+      + renderBarrierTraceHtml(review)
       + notice + errorBanner
       + '<div class="fade-in">'
         + renderHighlightsSectionHtml(review)
@@ -6742,6 +6750,35 @@
   // matters, which this call did not establish, and quotes the prospect's own
   // words as the reason it mattered for THEM. The server only ever stores this
   // when all three are independently verified, so anything here is provable.
+
+
+  // ─── 8c/8d: an obstacle, and ground that was never established ───────────
+  // Justin's target: "the lender only approved $5,000 — and financial
+  // qualification was never established in discovery, which is where that
+  // would have surfaced."
+  //
+  // ⚠ WORDING IS LOAD-BEARING. Causation is NOT provable here and the server
+  // does not claim it — only the scaffolding is checked (this ground was not
+  // established; this obstacle appeared later, in the prospect's own proven
+  // words). So the panel STATES THE TWO FACTS AND STOPS, and says outright that
+  // the connection is the closer's call. Anything reading as a finding —
+  // "this cost you the deal", "because you skipped X" — is overclaiming.
+  function renderBarrierTraceHtml(review) {
+    var a = (review && review.analysis) || {};
+    if (a.role_inverted === true) return '';
+    var t = a.barrier_trace;
+    if (!t || !t.area_key || !t.obstacle_quote) return '';
+
+    var label = areaLabelFor(review, t.area_key);
+    return '<section class="review-block review-trace">'
+      + '<div class="review-why-label">Worth connecting</div>'
+      + '<div class="trace-row"><span class="trace-tag">Not established</span>'
+        + '<span class="trace-area">' + escapeHtml(label) + '</span></div>'
+      + '<div class="trace-row trace-later"><span class="trace-tag">Came up later</span>'
+        + '<span class="trace-quote">“' + escapeHtml(t.obstacle_quote) + '”</span></div>'
+      + '<div class="trace-note">Discovery is usually where this surfaces. Whether the two are connected on this call is your read, not ours.</div>'
+    + '</section>';
+  }
 
   // ─── 8b: risk signals — raised, and what happened next ───────────────────
   // The coachable event is a signal being raised and then MOVED PAST. That is
