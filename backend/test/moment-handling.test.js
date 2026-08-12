@@ -122,11 +122,27 @@ test('closer_response must INCLUDE short interjections, not tidy them out', () =
   // the middle — which HOW TO QUOTE already forbids in the abstract, but which
   // a human transcriber would naturally omit. The span broke and the quote was
   // discarded, leaving the handling verdict with no evidence.
+  // v20 (Justin's ruling) supersedes v19 here: rather than teaching the model
+  // to keep a long span intact, take the SINGLE SHARPEST LINE. Single-line
+  // spans reconstruct reliably; multi-turn ones are where it broke (2 of 3).
+  // Seeing the real words beats reading an explanation of why there are none.
   const r = PROMPT.split('\n').filter((l) => l.indexOf('- closer_response:') !== -1).pop();
-  assert.ok(/INCLUDE EVERY WORD BETWEEN THE START AND END/i.test(r));
-  assert.ok(/interjection/i.test(r), 'must name the thing being dropped');
-  assert.ok(/shorter unbroken span always beats a longer tidied one/i.test(r),
+  assert.ok(/SINGLE SHARPEST LINE, NOT THE FULLEST REPLY/i.test(r), 'v20 ruling missing');
+  assert.ok(/rather than stitching several together/i.test(r));
+  assert.ok(/interjection/i.test(r), 'the multi-line fallback must still name what gets dropped');
+  assert.ok(/A short quote that survives beats a fuller one that does not/i.test(r),
     'must tell it which way to trade off, not just what to avoid');
+});
+
+test('the OBJECTION closer_response instruction was not collateral damage', () => {
+  // Both blocks contain a line starting "- closer_response: the closer", and a
+  // prefix-matching edit overwrote the objection one while leaving the
+  // risk/barrier one untouched. Pin both so the next edit cannot repeat it.
+  const all = PROMPT.split('\n').filter((l) => l.indexOf('- closer_response:') !== -1);
+  assert.strictEqual(all.length, 2, 'expected exactly two closer_response instructions');
+  const objection = all[0];
+  assert.ok(/answering this objection/i.test(objection), 'the objection instruction must address objections');
+  assert.ok(/HOW TO QUOTE/.test(objection), 'and still inherit the verbatim contract');
 });
 
 // ─── 8b surface guards ─────────────────────────────────────────────────────
