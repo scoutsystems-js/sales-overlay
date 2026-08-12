@@ -113,7 +113,66 @@ test('a missing closer_response is null, not an empty string', () => {
   assert.strictEqual(out[0].handling, 'ignored', 'ignored is meaningful precisely when there is no response');
 });
 
-test('the version moved with the prompt', () => {
-  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v18-2026-08-12'/);
+test('closer_response must INCLUDE short interjections, not tidy them out', () => {
+  // The version pin lives in ONE place (the tripwire in grader-v11.test.js).
+  // What belongs here is the contract this file is about.
+  //
+  // Measured cause of the failure this fixes: the deflection spans four closer
+  // turns, and the model quoted it while dropping "You know what I mean?" from
+  // the middle — which HOW TO QUOTE already forbids in the abstract, but which
+  // a human transcriber would naturally omit. The span broke and the quote was
+  // discarded, leaving the handling verdict with no evidence.
+  const r = PROMPT.split('\n').filter((l) => l.indexOf('- closer_response:') !== -1).pop();
+  assert.ok(/INCLUDE EVERY WORD BETWEEN THE START AND END/i.test(r));
+  assert.ok(/interjection/i.test(r), 'must name the thing being dropped');
+  assert.ok(/shorter unbroken span always beats a longer tidied one/i.test(r),
+    'must tell it which way to trade off, not just what to avoid');
+});
+
+// ─── 8b surface guards ─────────────────────────────────────────────────────
+
+const fs = require('node:fs');
+const path = require('node:path');
+const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+const PANEL = HTML.slice(HTML.indexOf('function renderRiskSignalsHtml'), HTML.indexOf('function renderWhatMatteredHtml'));
+
+test('GUARD: the review API selects the fields the panel needs', () => {
+  // Same omission has shipped twice before (Part 1b's `section`, 2b's `id`).
+  // Here the panel would render verdicts with no reply and no proof state.
+  const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8');
+  const sel = src.match(/\.select\('id, timestamp_seconds, speaker, quote[^']*'\)/);
+  assert.ok(sel, 'review highlights select not found');
+  ['handling', 'closer_response', 'closer_response_verified'].forEach((c) => {
+    assert.ok(sel[0].indexOf(c) !== -1, 'select must include ' + c);
+  });
+});
+
+test('WORDING: the panel never implies it captured everything', () => {
+  assert.ok(/Risk signals captured on this call/.test(PANEL), 'must say CAPTURED, not a bare count');
+  assert.ok(/not every one/i.test(PANEL) && /Absence here doesn/i.test(PANEL),
+    'must state explicitly that absence is not evidence of absence');
+});
+
+test('an UNPROVEN reply is never quoted, but its existence is still stated', () => {
+  // Withholding silently would read as "he said nothing", which is a different
+  // and wrong claim — the verdict already says he replied.
+  assert.ok(/closer_response_verified === true/.test(PANEL), 'quoting must require proof');
+  assert.ok(/couldn’t be matched to the transcript/.test(PANEL), 'the withheld case must be explained');
+});
+
+test('the verdict shows even with no quote at all', () => {
+  // The judgement is real whether or not the evidence survived verification.
+  const verdictIdx = PANEL.indexOf('rs-verdict');
+  const replyIdx = PANEL.indexOf('rs-reply');
+  assert.ok(verdictIdx !== -1 && replyIdx !== -1);
+  assert.ok(verdictIdx < replyIdx, 'the verdict is built independently of, and before, the reply');
+});
+
+test('deflected is the state made visually obvious', () => {
+  assert.ok(/is-deflected/.test(PANEL), 'deflected rows must carry their own class');
+  assert.ok(/rs-verdict\.deflected/.test(HTML), 'and its own styling');
+});
+
+test('the panel is suppressed on a role-inverted call, like 7d', () => {
+  assert.ok(/role_inverted === true/.test(PANEL));
 });

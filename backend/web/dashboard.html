@@ -1280,6 +1280,24 @@
     .review-one-thing-text.placeholder { color: var(--text-muted); font-style: italic; }
 
     /* "Why this call closed / didn't close" — causal evidence section. */
+    .review-risk { padding: 20px 22px; border-left: 3px solid var(--mid); }
+    .rs-lead { font-size: 13px; color: var(--text-dim); margin: 4px 0 12px; }
+    .rs-item { padding: 12px 0; border-top: 1px solid var(--border); }
+    .rs-item.is-deflected { border-left: 2px solid var(--bad); padding-left: 12px; margin-left: -14px; }
+    .rs-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .rs-kind { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); }
+    .rs-quote { font-size: 14px; line-height: 1.5; }
+    .rs-verdict { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 650;
+                  padding: 2px 8px; border-radius: 3px; }
+    .rs-verdict.deflected { color: var(--bad); background: rgba(220,80,80,.10); }
+    .rs-verdict.ignored   { color: var(--bad); background: rgba(220,80,80,.10); }
+    .rs-verdict.addressed { color: var(--good); background: rgba(80,180,120,.10); }
+    .rs-reply { margin-top: 8px; font-size: 13px; color: var(--text-dim); }
+    .rs-reply.muted { font-style: italic; }
+    .rs-reply-label { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+                      text-transform: uppercase; color: var(--accent); margin-right: 6px; }
+    .rs-obs { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+    .rs-note { font-size: 12px; color: var(--text-dim); margin-top: 14px; font-style: italic; }
     .review-mattered { padding: 20px 22px; border-left: 3px solid var(--accent); }
     .review-mattered.inverted { border-left-color: var(--mid); }
     .review-mattered-area { font-size: 20px; font-weight: 650; margin: 6px 0 10px; }
@@ -6675,6 +6693,7 @@
       // this says which ground would have changed it. Renders '' unless the
       // server verified all three claims, so it never leaves an empty shell.
       + renderWhatMatteredHtml(review)
+      + renderRiskSignalsHtml(review)
       + notice + errorBanner
       + '<div class="fade-in">'
         + renderHighlightsSectionHtml(review)
@@ -6723,6 +6742,73 @@
   // matters, which this call did not establish, and quotes the prospect's own
   // words as the reason it mattered for THEM. The server only ever stores this
   // when all three are independently verified, so anything here is provable.
+
+  // ─── 8b: risk signals — raised, and what happened next ───────────────────
+  // The coachable event is a signal being raised and then MOVED PAST. That is
+  // invisible without re-listening, and no transcript heuristic can see it: on
+  // the motivating call the closer's reply came 53s later and was long, warm
+  // and sympathetic while never touching the concern.
+  //
+  // WORDING RULE: the extractor surfaces 5-8 moments from a call that may run
+  // over an hour, so this is what was CAPTURED, never everything that happened.
+  // Nothing here may imply completeness.
+  function renderRiskSignalsHtml(review) {
+    var a = (review && review.analysis) || {};
+    var hls = (review && review.highlights) || [];
+    var rows = hls.filter(function (h) { return h && (h.type === 'risk_signal' || h.type === 'barrier'); });
+    if (!rows.length) return '';
+    if (a.role_inverted === true) return '';   // same suppression as 7d
+
+    var recordingUrl = review.recording_url || null;
+    var items = rows.map(function (h) {
+      var when = (typeof h.timestamp_seconds === 'number')
+        ? reviewClipHtml(h.timestamp_seconds, recordingUrl, 'Play this moment') : '';
+      var kind = (h.type === 'barrier') ? 'Barrier' : 'Risk signal';
+
+      // The verdict shows even when the quote is withheld — the judgement is
+      // real either way — but it must never imply a quote exists.
+      var v = h.handling;
+      var verdict = '';
+      if (v === 'deflected') {
+        verdict = '<div class="rs-verdict deflected">Acknowledged, then moved past</div>';
+      } else if (v === 'ignored') {
+        verdict = '<div class="rs-verdict ignored">Not responded to</div>';
+      } else if (v === 'addressed') {
+        verdict = '<div class="rs-verdict addressed">Engaged with</div>';
+      }
+
+      // Only a PROVEN quote is shown as the closer's words. Unproven is
+      // withheld, and we say the reply exists without putting words in his
+      // mouth — never a bare gap that reads as "he said nothing".
+      var reply = '';
+      if (h.closer_response && h.closer_response_verified === true) {
+        reply = '<div class="rs-reply"><span class="rs-reply-label">You said</span>'
+          + escapeHtml(h.closer_response) + '</div>';
+      } else if (h.closer_response) {
+        reply = '<div class="rs-reply muted">Your reply couldn’t be matched to the transcript word-for-word, so it isn’t quoted here.</div>';
+      }
+
+      return '<div class="rs-item' + (v === 'deflected' ? ' is-deflected' : '') + '">'
+        + '<div class="rs-top"><span class="rs-kind">' + kind + '</span>' + when + '</div>'
+        + '<div class="rs-quote">“' + escapeHtml(h.quote || '') + '”</div>'
+        + verdict + reply
+        + (h.observation ? '<div class="rs-obs">' + escapeHtml(h.observation) + '</div>' : '')
+      + '</div>';
+    }).join('');
+
+    var deflected = rows.filter(function (h) { return h.handling === 'deflected'; }).length;
+    var lead = deflected
+      ? deflected + ' of these ' + (deflected === 1 ? 'was' : 'were') + ' acknowledged and moved past.'
+      : '';
+
+    return '<section class="review-block review-risk">'
+      + '<div class="review-why-label">Risk signals captured on this call</div>'
+      + (lead ? '<div class="rs-lead">' + escapeHtml(lead) + '</div>' : '')
+      + items
+      + '<div class="rs-note">Scout captures a handful of moments per call, not every one. Absence here doesn’t mean nothing else was raised.</div>'
+    + '</section>';
+  }
+
   function renderWhatMatteredHtml(review) {
     var a = (review && review.analysis) || {};
 
