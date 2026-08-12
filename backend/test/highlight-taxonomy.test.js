@@ -76,9 +76,10 @@ test('rapport is restricted to GENUINE CONNECTION so disclosures stop landing th
   assert.ok(/risk_signal/.test(line), 'must point disclosures-of-doubt at risk_signal instead');
 });
 
-test('the JSON shape and the version both moved with the prompt', () => {
-  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v17-2026-08-12'/);
+test('the new types are in the schema vocabulary', () => {
+  // The VERSION pin lives in exactly one place — the tripwire in
+  // grader-v11.test.js. A second pin here meant every bump had to touch two
+  // files, which is how a tripwire quietly becomes a chore people route around.
   assert.ok(worker._VALID_HIGHLIGHT_TYPES.indexOf('risk_signal') !== -1);
   assert.ok(worker._VALID_HIGHLIGHT_TYPES.indexOf('barrier') !== -1);
 });
