@@ -1396,8 +1396,10 @@
     .review-grade-card.not-occurred .review-grade-name { color: var(--text-muted); font-style: italic; }
     /* Part 1b — section highlight breakdown inside an expanded grade card. */
     .review-section-summary {
-      font-size: 12.5px;
-      color: var(--text-muted);
+      /* Justin 2026-08-12: this is the section detail people actually read on
+         the review page, and it was small and grey. +1pt and full-strength text. */
+      font-size: 13.5px;
+      color: var(--text);
       line-height: 1.55;
       padding-top: 16px;
     }
