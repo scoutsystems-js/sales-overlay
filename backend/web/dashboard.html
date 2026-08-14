@@ -6711,8 +6711,6 @@
       // 7d sits directly under the verdict: the verdict says what happened,
       // this says which ground would have changed it. Renders '' unless the
       // server verified all three claims, so it never leaves an empty shell.
-      + renderWhatMatteredHtml(review)
-      + renderBarrierTraceHtml(review)
       + notice + errorBanner
       + '<div class="fade-in">'
         + renderHighlightsSectionHtml(review)
@@ -6774,30 +6772,41 @@
   // words). So the panel STATES THE TWO FACTS AND STOPS, and says outright that
   // the connection is the closer's call. Anything reading as a finding —
   // "this cost you the deal", "because you skipped X" — is overclaiming.
-  function renderBarrierTraceHtml(review) {
-    var a = (review && review.analysis) || {};
-    if (a.role_inverted === true) return '';
-    var t = a.barrier_trace;
-    if (!t || !t.cue_quote || !t.obstacle_quote) return '';
-
-    var mins = Math.round((t.gap_seconds || 0) / 60);
-    var recordingUrl = review.recording_url || null;
-    var cueClip = (typeof t.cue_timestamp_seconds === 'number')
-      ? reviewClipHtml(t.cue_timestamp_seconds, recordingUrl, 'Hear the cue') : '';
-    var obsClip = (typeof t.obstacle_timestamp_seconds === 'number')
-      ? reviewClipHtml(t.obstacle_timestamp_seconds, recordingUrl, 'Hear what came later') : '';
-
-    return '<section class="review-block review-trace">'
-      + '<div class="review-why-label">A signal you didn\u2019t qualify on</div>'
-      + '<div class="trace-row"><span class="trace-tag">They said</span>'
-        + '<span class="trace-quote">\u201C' + escapeHtml(t.cue_quote) + '\u201D</span>' + cueClip + '</div>'
-      + (t.closer_said ? '<div class="trace-row trace-reply"><span class="trace-tag">You said</span>'
-            + '<span class="trace-quote">\u201C' + escapeHtml(t.closer_said) + '\u201D</span></div>' : '')
-      + '<div class="trace-row trace-later"><span class="trace-tag">' + escapeHtml(mins + ' min later') + '</span>'
-        + '<span class="trace-quote">\u201C' + escapeHtml(t.obstacle_quote) + '\u201D</span>' + obsClip + '</div>'
-      + '<div class="trace-note">You had a signal here and didn\u2019t qualify on it. This is where the time went \u2014 not proof the deal was winnable.</div>'
-    + '</section>';
-  }
+  // ⚠ REMOVED FROM THE RENDER PATH 2026-08-14 (Justin's ruling).
+  // "It just replaced the old section with a new section. I just want the call
+  //  highlights and this is basically it — I think we just keep over
+  //  complicating things here."
+  //
+  // ⚠ THIS IS A RENDERING DECISION, NOT A DATA ONE. what_mattered, coverage,
+  // prospect_context and barrier_trace ALL KEEP WRITING to call_analyses. Any
+  // of it can be folded into a Call Highlights row later with NO re-analysis.
+  // Do NOT read these removals as the features being abandoned.
+  // Kept commented in place, per the standing convention.
+  // (9a) A SIGNAL YOU DIDN'T QUALIFY ON
+  // function renderBarrierTraceHtml(review) {
+  // var a = (review && review.analysis) || {};
+  // if (a.role_inverted === true) return '';
+  // var t = a.barrier_trace;
+  // if (!t || !t.cue_quote || !t.obstacle_quote) return '';
+  //
+  // var mins = Math.round((t.gap_seconds || 0) / 60);
+  // var recordingUrl = review.recording_url || null;
+  // var cueClip = (typeof t.cue_timestamp_seconds === 'number')
+  // ? reviewClipHtml(t.cue_timestamp_seconds, recordingUrl, 'Hear the cue') : '';
+  // var obsClip = (typeof t.obstacle_timestamp_seconds === 'number')
+  // ? reviewClipHtml(t.obstacle_timestamp_seconds, recordingUrl, 'Hear what came later') : '';
+  //
+  // return '<section class="review-block review-trace">'
+  // + '<div class="review-why-label">A signal you didn\u2019t qualify on</div>'
+  // + '<div class="trace-row"><span class="trace-tag">They said</span>'
+  // + '<span class="trace-quote">\u201C' + escapeHtml(t.cue_quote) + '\u201D</span>' + cueClip + '</div>'
+  // + (t.closer_said ? '<div class="trace-row trace-reply"><span class="trace-tag">You said</span>'
+  // + '<span class="trace-quote">\u201C' + escapeHtml(t.closer_said) + '\u201D</span></div>' : '')
+  // + '<div class="trace-row trace-later"><span class="trace-tag">' + escapeHtml(mins + ' min later') + '</span>'
+  // + '<span class="trace-quote">\u201C' + escapeHtml(t.obstacle_quote) + '\u201D</span>' + obsClip + '</div>'
+  // + '<div class="trace-note">You had a signal here and didn\u2019t qualify on it. This is where the time went \u2014 not proof the deal was winnable.</div>'
+  // + '</section>';
+  // }
 
 
   // ⚠ REMOVED 2026-08-13 (Justin's ruling). The standalone risk-signal panel
@@ -6873,32 +6882,43 @@
   // + '</section>';
   // }
   //
-  function renderWhatMatteredHtml(review) {
-    var a = (review && review.analysis) || {};
-
-    // Role-inverted call: the recorded user was the one being sold to, so the
-    // "prospect ground" is really their own situation and any gap we named
-    // would be coaching a fiction. SAY SO — a blank panel reads as a bug.
-    if (a.role_inverted === true) {
-      return '<section class="review-block review-mattered inverted">'
-        + '<div class="review-why-label">Coaching skipped for this call</div>'
-        + '<div class="review-why-reason">This recording looks inverted — the person who recorded it appears to be the one being sold to, '
-        + 'so the details we would normally read as the prospect’s are theirs. Rather than coach from that, we have left it out.</div>'
-        + '</section>';
-    }
-
-    var wm = a.what_mattered;
-    if (!wm || !wm.area_key || !wm.reason_evidence) return '';
-    var label = areaLabelFor(review, wm.area_key);
-
-    return '<section class="review-block review-mattered">'
-      + '<div class="review-why-label">The question that mattered here</div>'
-      + '<div class="review-mattered-area">' + escapeHtml(label) + '</div>'
-      + '<div class="review-mattered-because">Because this prospect said</div>'
-      + '<div class="review-why-quote">“' + escapeHtml(wm.reason_evidence) + '”</div>'
-      + '<div class="review-mattered-note">This ground wasn’t established on this call.</div>'
-      + '</section>';
-  }
+  // ⚠ REMOVED FROM THE RENDER PATH 2026-08-14 (Justin's ruling).
+  // "It just replaced the old section with a new section. I just want the call
+  //  highlights and this is basically it — I think we just keep over
+  //  complicating things here."
+  //
+  // ⚠ THIS IS A RENDERING DECISION, NOT A DATA ONE. what_mattered, coverage,
+  // prospect_context and barrier_trace ALL KEEP WRITING to call_analyses. Any
+  // of it can be folded into a Call Highlights row later with NO re-analysis.
+  // Do NOT read these removals as the features being abandoned.
+  // Kept commented in place, per the standing convention.
+  // (7d) THE QUESTION THAT MATTERED HERE
+  // function renderWhatMatteredHtml(review) {
+  // var a = (review && review.analysis) || {};
+  //
+  // // Role-inverted call: the recorded user was the one being sold to, so the
+  // // "prospect ground" is really their own situation and any gap we named
+  // // would be coaching a fiction. SAY SO — a blank panel reads as a bug.
+  // if (a.role_inverted === true) {
+  // return '<section class="review-block review-mattered inverted">'
+  // + '<div class="review-why-label">Coaching skipped for this call</div>'
+  // + '<div class="review-why-reason">This recording looks inverted — the person who recorded it appears to be the one being sold to, '
+  // + 'so the details we would normally read as the prospect’s are theirs. Rather than coach from that, we have left it out.</div>'
+  // + '</section>';
+  // }
+  //
+  // var wm = a.what_mattered;
+  // if (!wm || !wm.area_key || !wm.reason_evidence) return '';
+  // var label = areaLabelFor(review, wm.area_key);
+  //
+  // return '<section class="review-block review-mattered">'
+  // + '<div class="review-why-label">The question that mattered here</div>'
+  // + '<div class="review-mattered-area">' + escapeHtml(label) + '</div>'
+  // + '<div class="review-mattered-because">Because this prospect said</div>'
+  // + '<div class="review-why-quote">“' + escapeHtml(wm.reason_evidence) + '”</div>'
+  // + '<div class="review-mattered-note">This ground wasn’t established on this call.</div>'
+  // + '</section>';
+  // }
 
   // Human label for an area key, falling back to a readable form of the key
   // itself rather than showing raw snake_case.

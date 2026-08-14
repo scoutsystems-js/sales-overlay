@@ -20,7 +20,15 @@ const worker = require('../lib/analysis-worker');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-const PANEL = HTML.slice(HTML.indexOf('function renderBarrierTraceHtml'), HTML.indexOf('// ─── 8b: risk signals'));
+
+function assertNotInRenderPath(html, fn) {
+  assert.strictEqual((html.match(new RegExp('^  function ' + fn, 'gm')) || []).length, 0,
+    fn + ' must not be a live function — these panels were removed from the render path');
+  assert.strictEqual((html.match(new RegExp('^\\s*\\+ ' + fn, 'gm')) || []).length, 0, fn + ' must not be called');
+  assert.ok(/REMOVED FROM THE RENDER PATH 2026-08-14|REMOVED 2026-08-13/.test(html),
+    'the removal must be commented in place, not deleted');
+}
+
 
 const FAKE = { turns: [{ speaker: 'CLOSER', display_name: 'C', text: 'hello there friend', start_seconds: 1 }], highlights: [], closer_name: 'C', speaker_confidence: 'matched' };
 const AREAS = [{ key: 'financial_qualification', label: 'Financial qualification' }];
@@ -109,25 +117,22 @@ test('NO model decline step exists — the judgement was made at capture', () =>
   assert.ok(/selectMissedCuePair\(sanitizedHighlights/.test(SRC), 'it is paired in the worker');
 });
 
-// ─── the surface ───────────────────────────────────────────────────────────
+// ─── the surface was REMOVED; the DATA layer stays ───────────────────────
 
-test('the panel states the two facts and refuses the causal reading', () => {
-  assert.ok(/They said/.test(PANEL), 'must show the cue');
-  assert.ok(/min later/.test(PANEL), 'must show how much later it bit');
-  assert.ok(/didn.{1,8}t qualify on it/i.test(PANEL), "Justin's wording");
-  assert.ok(/where the time went/i.test(PANEL), "Justin's wording");
-  assert.ok(/not proof the deal was winnable/i.test(PANEL), 'must refuse "you would have closed it"');
-  [/because you/i, /cost you/i, /caused/i, /led to/i, /would have closed/i].forEach(rx => {
-    assert.ok(!rx.test(PANEL), 'panel must not assert causation: ' + rx);
-  });
+test('the 9a panel is out of the render path', () => {
+  // Justin 2026-08-14: "I just want the call highlights and this is basically
+  // it — I think we just keep over complicating things here."
+  assertNotInRenderPath(HTML, 'renderBarrierTraceHtml');
 });
 
-test('the panel renders nothing without a complete pair', () => {
-  assert.ok(/if \(!t \|\| !t\.cue_quote \|\| !t\.obstacle_quote\) return '';/.test(PANEL));
+test('but barrier_trace KEEPS being written — a rendering decision, not a data one', () => {
+  // So it can be folded into a Call Highlights row later with no re-analysis.
+  assert.ok(/barrier_trace:\s+barrierTrace/.test(SRC), 'the field must still persist');
+  assert.ok(/selectMissedCuePair\(sanitizedHighlights/.test(SRC), 'the pairing must still run');
 });
 
-test('GUARD: the review API selects barrier_trace', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8');
-  const sel = src.match(/\.select\('status, prospect_name[^']*'\)/);
+test('GUARD: the review API still selects barrier_trace', () => {
+  const sel = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8')
+    .match(/\.select\('status, prospect_name[^']*'\)/);
   assert.ok(sel && sel[0].indexOf('barrier_trace') !== -1);
 });

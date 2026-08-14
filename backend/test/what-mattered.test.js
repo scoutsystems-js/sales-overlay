@@ -172,13 +172,17 @@ test('GUARD: the review API selects what_mattered and role_inverted', () => {
   });
 });
 
-test('GUARD: an inverted call SAYS SO on screen rather than rendering blank', () => {
-  // A blank panel reads as a bug. The suppression must be visible and explained.
+test('the 7d panel is out of the render path', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-  const fn = html.slice(html.indexOf('function renderWhatMatteredHtml'), html.indexOf('function areaLabelFor'));
-  assert.ok(/role_inverted === true/.test(fn), 'must branch on the inversion flag');
-  assert.ok(/Coaching skipped for this call/.test(fn), 'must state that coaching was skipped');
-  assert.ok(fn.indexOf('being sold to') !== -1, 'must explain WHY it was skipped');
+  assert.strictEqual((html.match(/^  function renderWhatMatteredHtml/gm) || []).length, 0,
+    'removed from the render path 2026-08-14 — Call Highlights only');
+  assert.strictEqual((html.match(/^\s*\+ renderWhatMatteredHtml/gm) || []).length, 0);
+  assert.ok(/REMOVED FROM THE RENDER PATH 2026-08-14/.test(html), 'commented in place, not deleted');
+});
+
+test('but what_mattered KEEPS being written — rendering decision, not data', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
+  assert.ok(/what_mattered:\s+whatMattered/.test(src), 'the field must still persist');
 });
 
 test('RULING GUARD: what_mattered never reaches selling-context', () => {

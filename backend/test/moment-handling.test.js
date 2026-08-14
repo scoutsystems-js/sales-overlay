@@ -145,50 +145,40 @@ test('the OBJECTION closer_response instruction was not collateral damage', () =
   assert.ok(/HOW TO QUOTE/.test(objection), 'and still inherit the verbatim contract');
 });
 
-// ─── 8b surface guards ─────────────────────────────────────────────────────
+// ─── the 8b panel was REMOVED; its good parts live in the ROW ────────────
 
 const fs = require('node:fs');
 const path = require('node:path');
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-const PANEL = HTML.slice(HTML.indexOf('function renderRiskSignalsHtml'), HTML.indexOf('function renderWhatMatteredHtml'));
+const ROW = HTML.slice(HTML.indexOf('function highlightEntryHtml'), HTML.indexOf('function highlightTypeLabel'));
 
-test('GUARD: the review API selects the fields the panel needs', () => {
-  // Same omission has shipped twice before (Part 1b's `section`, 2b's `id`).
-  // Here the panel would render verdicts with no reply and no proof state.
-  const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8');
-  const sel = src.match(/\.select\('id, timestamp_seconds, speaker, quote[^']*'\)/);
+test('the standalone risk-signal panel is out of the render path', () => {
+  assert.strictEqual((HTML.match(/^  function renderRiskSignalsHtml/gm) || []).length, 0);
+  assert.strictEqual((HTML.match(/^\s*\+ renderRiskSignalsHtml/gm) || []).length, 0);
+});
+
+test('the handling badge and the reply now live in the Call Highlights ROW', () => {
+  // This is what Justin actually asked for: the existing section improved.
+  assert.ok(/HANDLING_TYPES.indexOf\(h\.type\) !== -1 && h\.handling/.test(ROW), 'badge is in the row');
+  assert.ok(/Engaged with/.test(ROW) && /Moved past/.test(ROW) && /No response/.test(ROW));
+  assert.ok(/closer_response_verified === true/.test(ROW), '"You said" requires a proven quote');
+});
+
+test('ONLY the three types a closer response bears on are badged', () => {
+  assert.ok(/var HANDLING_TYPES = \['risk_signal', 'barrier', 'objection'\]/.test(HTML),
+    'badging every type alike is what made the removed panel feel cluttered');
+});
+
+test('the row does NOT carry the panel unmatched-quote explanation', () => {
+  assert.ok(!/could not be matched/.test(ROW) && ROW.indexOf('\u2019t be matched') === -1,
+    'inside a row that reads as noise — the badge carries the meaning');
+});
+
+test('GUARD: the review API still selects the fields the row needs', () => {
+  const sel = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8')
+    .match(/\.select\('id, timestamp_seconds, speaker, quote[^']*'\)/);
   assert.ok(sel, 'review highlights select not found');
   ['handling', 'closer_response', 'closer_response_verified'].forEach((c) => {
     assert.ok(sel[0].indexOf(c) !== -1, 'select must include ' + c);
   });
-});
-
-test('WORDING: the panel never implies it captured everything', () => {
-  assert.ok(/Risk signals captured on this call/.test(PANEL), 'must say CAPTURED, not a bare count');
-  assert.ok(/not every one/i.test(PANEL) && /Absence here doesn/i.test(PANEL),
-    'must state explicitly that absence is not evidence of absence');
-});
-
-test('an UNPROVEN reply is never quoted, but its existence is still stated', () => {
-  // Withholding silently would read as "he said nothing", which is a different
-  // and wrong claim — the verdict already says he replied.
-  assert.ok(/closer_response_verified === true/.test(PANEL), 'quoting must require proof');
-  assert.ok(/couldn’t be matched to the transcript/.test(PANEL), 'the withheld case must be explained');
-});
-
-test('the verdict shows even with no quote at all', () => {
-  // The judgement is real whether or not the evidence survived verification.
-  const verdictIdx = PANEL.indexOf('rs-verdict');
-  const replyIdx = PANEL.indexOf('rs-reply');
-  assert.ok(verdictIdx !== -1 && replyIdx !== -1);
-  assert.ok(verdictIdx < replyIdx, 'the verdict is built independently of, and before, the reply');
-});
-
-test('deflected is the state made visually obvious', () => {
-  assert.ok(/is-deflected/.test(PANEL), 'deflected rows must carry their own class');
-  assert.ok(/rs-verdict\.deflected/.test(HTML), 'and its own styling');
-});
-
-test('the panel is suppressed on a role-inverted call, like 7d', () => {
-  assert.ok(/role_inverted === true/.test(PANEL));
 });
