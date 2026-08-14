@@ -6767,18 +6767,25 @@
     var a = (review && review.analysis) || {};
     if (a.role_inverted === true) return '';
     var t = a.barrier_trace;
-    if (!t || !t.area_key || !t.obstacle_quote) return '';
+    if (!t || !t.cue_quote || !t.obstacle_quote) return '';
 
-    var label = areaLabelFor(review, t.area_key);
+    var mins = Math.round((t.gap_seconds || 0) / 60);
+    var recordingUrl = review.recording_url || null;
+    var cueClip = (typeof t.cue_timestamp_seconds === 'number')
+      ? reviewClipHtml(t.cue_timestamp_seconds, recordingUrl, 'Hear the cue') : '';
+    var obsClip = (typeof t.obstacle_timestamp_seconds === 'number')
+      ? reviewClipHtml(t.obstacle_timestamp_seconds, recordingUrl, 'Hear what came later') : '';
+
     return '<section class="review-block review-trace">'
-      + '<div class="review-why-label">Worth connecting</div>'
-      + '<div class="trace-row"><span class="trace-tag">Not established</span>'
-        + '<span class="trace-area">' + escapeHtml(label) + '</span></div>'
-      + '<div class="trace-row trace-later"><span class="trace-tag">Came up later</span>'
-        + '<span class="trace-quote">“' + escapeHtml(t.obstacle_quote) + '”</span></div>'
-      + '<div class="trace-note">Discovery is usually where this surfaces. Whether the two are connected on this call is your read, not ours.</div>'
+      + '<div class="review-why-label">A signal you didn\u2019t qualify on</div>'
+      + '<div class="trace-row"><span class="trace-tag">They said</span>'
+        + '<span class="trace-quote">\u201C' + escapeHtml(t.cue_quote) + '\u201D</span>' + cueClip + '</div>'
+      + '<div class="trace-row trace-later"><span class="trace-tag">' + escapeHtml(mins + ' min later') + '</span>'
+        + '<span class="trace-quote">\u201C' + escapeHtml(t.obstacle_quote) + '\u201D</span>' + obsClip + '</div>'
+      + '<div class="trace-note">You had a signal here and didn\u2019t qualify on it. This is where the time went \u2014 not proof the deal was winnable.</div>'
     + '</section>';
   }
+
 
   // ─── 8b: risk signals — raised, and what happened next ───────────────────
   // The coachable event is a signal being raised and then MOVED PAST. That is

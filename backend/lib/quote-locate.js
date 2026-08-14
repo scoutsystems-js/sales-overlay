@@ -123,8 +123,8 @@ function locateQuoteSpeaker(turns, quote) {
       // Prefer the single-speaker reconstruction: if the anchor said all of it
       // themselves, an interjection sitting between their turns does not make
       // the quote "mixed".
-      if (accSame.indexOf(nq) !== -1)      hits.push({ name: anchorName, mixed: false });
-      else if (acc.indexOf(nq) !== -1)     hits.push({ name: anchorName, mixed: speakers.length > 1 });
+      if (accSame.indexOf(nq) !== -1)      hits.push({ name: anchorName, mixed: false, index: i });
+      else if (acc.indexOf(nq) !== -1)     hits.push({ name: anchorName, mixed: speakers.length > 1, index: i });
     }
     if (hits.length === 0) continue;
 
@@ -137,7 +137,9 @@ function locateQuoteSpeaker(turns, quote) {
     // closer's "winning material".
     if (distinct.length > 1) return { ok: false, reason: 'ambiguous' };
 
-    return { ok: true, speakerName: hits[0].name, mixed: hits[0].mixed };
+    // `index` is the anchor turn — callers read start_seconds off it to
+    // measure separation between two located quotes (9a's cue->obstacle gap).
+    return { ok: true, speakerName: hits[0].name, mixed: hits[0].mixed, index: hits[0].index };
   }
 
   return { ok: false, reason: 'not_reconstructible' };

@@ -26,46 +26,56 @@ const FAKE = { turns: [{ speaker: 'CLOSER', display_name: 'C', text: 'hello ther
 const AREAS = [{ key: 'financial_qualification', label: 'Financial qualification' }];
 
 test('the trace is asked for ONLY when the rep has derived areas', () => {
-  assert.ok(!/barrier_trace/.test(worker._buildSectionGraderPrompt(FAKE, 1800, '', [])),
+  assert.ok(!/missed_cue/.test(worker._buildSectionGraderPrompt(FAKE, 1800, '', [])),
     'a rep with no material must not be asked to trace anything');
-  assert.ok(/- barrier_trace:/.test(worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS)));
+  assert.ok(/- missed_cue:/.test(worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS)));
 });
 
 test('the prompt tells the model to DECLINE, and says why', () => {
   // With 25 of 39 calls carrying 2+ gaps this is a real choice — but calls with
   // exactly one gap still exist and must not force a link.
-  const line = worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS).split('\n').find(l => l.indexOf('- barrier_trace:') !== -1);
+  const line = worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS).split('\n').find(l => l.indexOf('- missed_cue:') !== -1);
   assert.ok(/RETURN null FREELY/i.test(line), 'declining must be made easy, not grudging');
-  assert.ok(/AVAILABLE is not the same as it being the CAUSE/i.test(line),
-    'must state the distinction explicitly — this is the whole risk');
-  assert.ok(/only one, or the nearest one/i.test(line), 'must name the specific failure mode');
+  assert.ok(/Proximity in time is NOT causation/i.test(line),
+    'must state the distinction explicitly — with 87% of calls eligible, over-firing is now the risk');
+  assert.ok(/Do not reach for the nearest available pair/i.test(line), 'must name the specific failure mode');
 });
 
 test('the obstacle quote must be the PROSPECT\'s own words, verbatim', () => {
-  const line = worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS).split('\n').find(l => l.indexOf('- barrier_trace:') !== -1);
-  assert.ok(/PROSPECT\\?'S OWN line/i.test(line));
+  const line = worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS).split('\n').find(l => l.indexOf('- missed_cue:') !== -1);
+  assert.ok(/PROSPECT\\?'S OWN lines/i.test(line), 'BOTH quotes must be the prospect');
   assert.ok(/contiguous run of words/i.test(line));
 });
 
-test('ONE validation chain — the trace reuses resolveWhatMattered, not a copy', () => {
-  // Two chains would drift. The obstacle quote is mapped onto reason_evidence
-  // so it inherits area-exists, area-uncovered and proven-prospect-quote.
-  assert.ok(/resolveWhatMattered\(\s*\n?\s*\{ area_key: rawTrace\.area_key, reason_evidence: rawTrace\.obstacle_quote \}/.test(SRC),
-    'barrier_trace must be resolved through resolveWhatMattered');
+test('validation reuses the PROVING primitive, and the gap is deterministic', () => {
+  // resolveWhatMattered's area checks do not apply — there is no area here. What
+  // carries over is labelForQuote, applied to BOTH quotes, plus a separation
+  // check that is arithmetic rather than judgement.
+  assert.ok(/cueRole = labelForQuote\(normalized\.turns, rawTrace\.cue_quote\)/.test(SRC));
+  assert.ok(/obsRole = labelForQuote\(normalized\.turns, rawTrace\.obstacle_quote\)/.test(SRC));
+  assert.ok(/cueRole !== 'PROSPECT' \|\| obsRole !== 'PROSPECT'/.test(SRC), 'both must be the prospect');
+  assert.ok(/obsTs - cueTs < MIN_CUE_GAP_SECONDS/.test(SRC), 'the gap must be enforced in code');
   assert.ok(!/function resolveBarrierTrace/.test(SRC), 'a second validator must not exist');
 });
 
+test('the separation threshold is derived and documented, not a round guess', () => {
+  assert.ok(/MIN_CUE_GAP_SECONDS = 120/.test(SRC));
+  assert.ok(/top out at 101s/.test(SRC), 'the derivation must be recorded beside the constant');
+  assert.ok(/SECTION constraint[\s\S]{0,200}REJECTED/.test(SRC), 'the rejected alternative must be recorded too');
+});
+
 test('the trace is suppressed on a role-inverted call', () => {
-  assert.ok(/roleInv\.inverted \|\| !rawTrace/.test(SRC));
+  assert.ok(/!roleInv\.inverted && rawTrace/.test(SRC));
 });
 
 // ─── the surface: wording is the load-bearing part ─────────────────────────
 
 test('the panel states the two facts and does NOT assert causation', () => {
-  assert.ok(/Not established/.test(PANEL), 'must say what was uncovered');
-  assert.ok(/Came up later/.test(PANEL), 'must say what showed up later');
-  // Explicitly hands the judgement over.
-  assert.ok(/your read, not ours/i.test(PANEL), 'the connection must be the closer\'s call');
+  assert.ok(/They said/.test(PANEL), 'must show the cue');
+  assert.ok(/min later/.test(PANEL), 'must show how much later the obstacle came');
+  assert.ok(/didn.{1,8}t qualify on it/i.test(PANEL), 'the message Justin specified');
+  assert.ok(/where the time went/i.test(PANEL), 'the message Justin specified');
+  assert.ok(/not proof the deal was winnable/i.test(PANEL), 'must refuse the you-would-have-closed-it reading');
   // Nothing that reads as a finding.
   [/because you/i, /cost you/i, /caused/i, /this is why/i, /led to/i].forEach(rx => {
     assert.ok(!rx.test(PANEL), 'panel must not assert causation: ' + rx);
@@ -73,7 +83,7 @@ test('the panel states the two facts and does NOT assert causation', () => {
 });
 
 test('the panel renders nothing without a validated trace', () => {
-  assert.ok(/if \(!t \|\| !t\.area_key \|\| !t\.obstacle_quote\) return '';/.test(PANEL),
+  assert.ok(/if \(!t \|\| !t\.cue_quote \|\| !t\.obstacle_quote\) return '';/.test(PANEL),
     'a partial trace must render nothing rather than half a claim');
 });
 
