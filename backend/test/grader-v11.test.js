@@ -12,14 +12,14 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
 
-test('ANALYSIS_PROMPT_VERSION is the current shipped version (v22)', () => {
+test('ANALYSIS_PROMPT_VERSION is the current shipped version (v23)', () => {
   // House rule: a prompt change and its version bump are ONE atomic change. If
   // the constant lags the prompt, every downstream system lies coherently.
   //
   // This pin is a deliberate TRIPWIRE, kept strict on purpose: every bump must
   // consciously touch this line. v14 = verbatim quoting for every quoted field
   // the extractor emits. (v13 = 6a deterministic speaker labelling.)
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v22-2026-08-13'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v23-2026-08-13'/);
 });
 
 // v14 assertions run against the BUILT PROMPT STRINGS, not the source file.

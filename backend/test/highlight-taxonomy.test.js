@@ -126,3 +126,56 @@ test('resolution and objection_category remain OBJECTION-only', () => {
   assert.strictEqual(out[0].resolution, null, 'a barrier is not "handled"');
   assert.strictEqual(out[0].objection_category, null);
 });
+
+// ─── v23: three live typing fixes (Justin's screenshot) ───────────────────
+
+test('BARRIER must IMPEDE the purchase, with both live negatives named', () => {
+  const bar = PROMPT.split('\n').find((l) => /^\s*"barrier"\s+—/.test(l));
+  assert.ok(/IMPEDES the purchase/i.test(bar), 'the operative word is impede');
+  // 1. clarifying the deal is not resisting it — same family as
+  //    "a question is not an objection".
+  assert.ok(/CLARIFYING/i.test(bar) && /545/.test(bar), 'the payment-clarification negative must be present');
+  // 2. moving to pay is the opposite of a barrier.
+  assert.ok(/credit card/i.test(bar) && /buying_signal/.test(bar), 'the moving-to-pay negative must be present');
+  assert.ok(/moves the purchase FORWARD/i.test(bar), 'must state the general rule, not only the examples');
+});
+
+test('HANDLING cuts BOTH ways — a challenge is engagement', () => {
+  // The mirror of the v18 warmth fix. Scored a pointed challenge as "moved
+  // past"; Justin called that response phenomenal.
+  const h = PROMPT.split('\n').find((l) => l.indexOf('- handling:') !== -1);
+  assert.ok(/warmth, length and sympathy are NOT engagement/i.test(h), 'the original direction must survive');
+  assert.ok(/CHALLENGE IS ENGAGEMENT/i.test(h), 'the new direction');
+  assert.ok(/taking you a year/i.test(h), 'the worked example must be present');
+  assert.ok(/whether the concern was TOUCHED/i.test(h), 'must state the principle behind both directions');
+});
+
+test('the UI badges ONLY the types a closer response bears on', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  assert.ok(/var HANDLING_TYPES = \['risk_signal', 'barrier', 'objection'\]/.test(html),
+    'badging every type alike is what made the removed panel feel cluttered');
+  assert.ok(/No response/.test(html), 'the third state is labelled "No response"');
+  assert.ok(/Engaged with/.test(html) && /Moved past/.test(html));
+});
+
+test('the standalone risk-signal panel is GONE from the render path', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  assert.strictEqual((html.match(/^  function renderRiskSignalsHtml/gm) || []).length, 0,
+    'the panel must not be live — Justin never wanted a second section');
+  assert.strictEqual((html.match(/^\s*\+ renderRiskSignalsHtml/gm) || []).length, 0, 'and it must not be called');
+  assert.ok(/REMOVED 2026-08-13/.test(html), 'kept commented in place, per the standing convention');
+});
+
+test('an unverified reply is absent from the row, with no explanatory noise', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  const fn = html.slice(html.indexOf('function highlightEntryHtml'), html.indexOf('function highlightTypeLabel'));
+  assert.ok(/closer_response_verified === true/.test(fn), 'quoting requires proof');
+  assert.ok(!/couldn’t be matched|could not be matched/.test(fn),
+    'the panel\'s explanatory line must NOT be carried into a row — it reads as noise there');
+});

@@ -1216,14 +1216,25 @@
     .review-speaker-badge.closer   { background: rgba(91, 158, 255, 0.14); color: var(--accent); }
     .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text-soft); }
     .review-type-badge {
-      font-size: 10.5px;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      white-space: nowrap;
+      /* Justin 2026-08-13: the type read small, grey and messy. Bigger and
+         full-strength, and it now shares the line with the handling badge. */
+      font-size: 12px;
+      font-weight: 650;
+      color: var(--text);
+      letter-spacing: .01em;
+      padding: 3px 9px;
+      border-radius: 3px;
+      text-transform: none;
     }
+    .review-handling-badge {
+      font-size: 12px; font-weight: 650; padding: 3px 9px; border-radius: 3px; margin-left: 6px;
+    }
+    .review-handling-badge.addressed { background: rgba(74,222,128,.12); color: var(--good); }
+    .review-handling-badge.deflected { background: rgba(220,80,80,.12);  color: var(--bad); }
+    .review-handling-badge.ignored   { background: rgba(220,80,80,.12);  color: var(--bad); }
+    .review-reply { margin-top: 6px; font-size: 13px; color: var(--text-dim); }
+    .review-reply-label { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+                          text-transform: uppercase; color: var(--accent); margin-right: 6px; }
     .review-type-badge.buying_signal      { background: rgba(74, 222, 128, 0.12);  color: var(--good); }
     .review-type-badge.strong_moment      { background: rgba(74, 222, 128, 0.12);  color: var(--good); }
     .review-type-badge.objection          { background: rgba(251, 146, 60, 0.14);  color: var(--orange); }
@@ -6701,7 +6712,6 @@
       // this says which ground would have changed it. Renders '' unless the
       // server verified all three claims, so it never leaves an empty shell.
       + renderWhatMatteredHtml(review)
-      + renderRiskSignalsHtml(review)
       + renderBarrierTraceHtml(review)
       + notice + errorBanner
       + '<div class="fade-in">'
@@ -6790,72 +6800,79 @@
   }
 
 
-  // ─── 8b: risk signals — raised, and what happened next ───────────────────
-  // The coachable event is a signal being raised and then MOVED PAST. That is
-  // invisible without re-listening, and no transcript heuristic can see it: on
-  // the motivating call the closer's reply came 53s later and was long, warm
-  // and sympathetic while never touching the concern.
+  // ⚠ REMOVED 2026-08-13 (Justin's ruling). The standalone risk-signal panel
+  // duplicated moments that already appeared in Call Highlights below it:
+  // "I never wanted an additional section — I just wanted the current Call
+  // Highlights improved using better logic." Its good parts (the handling
+  // badge and the closer's reply) now live INLINE in highlightEntryHtml, where
+  // ONLY the types a closer response bears on are badged.
+  // Kept commented rather than deleted, per the standing convention.
+  // // ─── 8b: risk signals — raised, and what happened next ───────────────────
+  // // The coachable event is a signal being raised and then MOVED PAST. That is
+  // // invisible without re-listening, and no transcript heuristic can see it: on
+  // // the motivating call the closer's reply came 53s later and was long, warm
+  // // and sympathetic while never touching the concern.
+  // //
+  // // WORDING RULE: the extractor surfaces 5-8 moments from a call that may run
+  // // over an hour, so this is what was CAPTURED, never everything that happened.
+  // // Nothing here may imply completeness.
+  // function renderRiskSignalsHtml(review) {
+  // var a = (review && review.analysis) || {};
+  // var hls = (review && review.highlights) || [];
+  // var rows = hls.filter(function (h) { return h && (h.type === 'risk_signal' || h.type === 'barrier'); });
+  // if (!rows.length) return '';
+  // if (a.role_inverted === true) return '';   // same suppression as 7d
   //
-  // WORDING RULE: the extractor surfaces 5-8 moments from a call that may run
-  // over an hour, so this is what was CAPTURED, never everything that happened.
-  // Nothing here may imply completeness.
-  function renderRiskSignalsHtml(review) {
-    var a = (review && review.analysis) || {};
-    var hls = (review && review.highlights) || [];
-    var rows = hls.filter(function (h) { return h && (h.type === 'risk_signal' || h.type === 'barrier'); });
-    if (!rows.length) return '';
-    if (a.role_inverted === true) return '';   // same suppression as 7d
-
-    var recordingUrl = review.recording_url || null;
-    var items = rows.map(function (h) {
-      var when = (typeof h.timestamp_seconds === 'number')
-        ? reviewClipHtml(h.timestamp_seconds, recordingUrl, 'Play this moment') : '';
-      var kind = (h.type === 'barrier') ? 'Barrier' : 'Risk signal';
-
-      // The verdict shows even when the quote is withheld — the judgement is
-      // real either way — but it must never imply a quote exists.
-      var v = h.handling;
-      var verdict = '';
-      if (v === 'deflected') {
-        verdict = '<div class="rs-verdict deflected">Acknowledged, then moved past</div>';
-      } else if (v === 'ignored') {
-        verdict = '<div class="rs-verdict ignored">Not responded to</div>';
-      } else if (v === 'addressed') {
-        verdict = '<div class="rs-verdict addressed">Engaged with</div>';
-      }
-
-      // Only a PROVEN quote is shown as the closer's words. Unproven is
-      // withheld, and we say the reply exists without putting words in his
-      // mouth — never a bare gap that reads as "he said nothing".
-      var reply = '';
-      if (h.closer_response && h.closer_response_verified === true) {
-        reply = '<div class="rs-reply"><span class="rs-reply-label">You said</span>'
-          + escapeHtml(h.closer_response) + '</div>';
-      } else if (h.closer_response) {
-        reply = '<div class="rs-reply muted">Your reply couldn’t be matched to the transcript word-for-word, so it isn’t quoted here.</div>';
-      }
-
-      return '<div class="rs-item' + (v === 'deflected' ? ' is-deflected' : '') + '">'
-        + '<div class="rs-top"><span class="rs-kind">' + kind + '</span>' + when + '</div>'
-        + '<div class="rs-quote">“' + escapeHtml(h.quote || '') + '”</div>'
-        + verdict + reply
-        + (h.observation ? '<div class="rs-obs">' + escapeHtml(h.observation) + '</div>' : '')
-      + '</div>';
-    }).join('');
-
-    var deflected = rows.filter(function (h) { return h.handling === 'deflected'; }).length;
-    var lead = deflected
-      ? deflected + ' of these ' + (deflected === 1 ? 'was' : 'were') + ' acknowledged and moved past.'
-      : '';
-
-    return '<section class="review-block review-risk">'
-      + '<div class="review-why-label">Risk signals captured on this call</div>'
-      + (lead ? '<div class="rs-lead">' + escapeHtml(lead) + '</div>' : '')
-      + items
-      + '<div class="rs-note">Scout captures a handful of moments per call, not every one. Absence here doesn’t mean nothing else was raised.</div>'
-    + '</section>';
-  }
-
+  // var recordingUrl = review.recording_url || null;
+  // var items = rows.map(function (h) {
+  // var when = (typeof h.timestamp_seconds === 'number')
+  // ? reviewClipHtml(h.timestamp_seconds, recordingUrl, 'Play this moment') : '';
+  // var kind = (h.type === 'barrier') ? 'Barrier' : 'Risk signal';
+  //
+  // // The verdict shows even when the quote is withheld — the judgement is
+  // // real either way — but it must never imply a quote exists.
+  // var v = h.handling;
+  // var verdict = '';
+  // if (v === 'deflected') {
+  // verdict = '<div class="rs-verdict deflected">Acknowledged, then moved past</div>';
+  // } else if (v === 'ignored') {
+  // verdict = '<div class="rs-verdict ignored">Not responded to</div>';
+  // } else if (v === 'addressed') {
+  // verdict = '<div class="rs-verdict addressed">Engaged with</div>';
+  // }
+  //
+  // // Only a PROVEN quote is shown as the closer's words. Unproven is
+  // // withheld, and we say the reply exists without putting words in his
+  // // mouth — never a bare gap that reads as "he said nothing".
+  // var reply = '';
+  // if (h.closer_response && h.closer_response_verified === true) {
+  // reply = '<div class="rs-reply"><span class="rs-reply-label">You said</span>'
+  // + escapeHtml(h.closer_response) + '</div>';
+  // } else if (h.closer_response) {
+  // reply = '<div class="rs-reply muted">Your reply couldn’t be matched to the transcript word-for-word, so it isn’t quoted here.</div>';
+  // }
+  //
+  // return '<div class="rs-item' + (v === 'deflected' ? ' is-deflected' : '') + '">'
+  // + '<div class="rs-top"><span class="rs-kind">' + kind + '</span>' + when + '</div>'
+  // + '<div class="rs-quote">“' + escapeHtml(h.quote || '') + '”</div>'
+  // + verdict + reply
+  // + (h.observation ? '<div class="rs-obs">' + escapeHtml(h.observation) + '</div>' : '')
+  // + '</div>';
+  // }).join('');
+  //
+  // var deflected = rows.filter(function (h) { return h.handling === 'deflected'; }).length;
+  // var lead = deflected
+  // ? deflected + ' of these ' + (deflected === 1 ? 'was' : 'were') + ' acknowledged and moved past.'
+  // : '';
+  //
+  // return '<section class="review-block review-risk">'
+  // + '<div class="review-why-label">Risk signals captured on this call</div>'
+  // + (lead ? '<div class="rs-lead">' + escapeHtml(lead) + '</div>' : '')
+  // + items
+  // + '<div class="rs-note">Scout captures a handful of moments per call, not every one. Absence here doesn’t mean nothing else was raised.</div>'
+  // + '</section>';
+  // }
+  //
   function renderWhatMatteredHtml(review) {
     var a = (review && review.analysis) || {};
 
@@ -7017,6 +7034,10 @@
   // opts.addToKb — render the Part 2b "Add to Knowledge Base" button on this row.
   // Only the SECTION BREAKDOWN passes it; the main highlights timeline does not,
   // so the button appears exactly where the spec put the slot (Part 1b left it).
+  // The three types a closer response bears on. One definition, so the row and
+  // any future consumer cannot disagree about which moments earn a badge.
+  var HANDLING_TYPES = ['risk_signal', 'barrier', 'objection'];
+
   function highlightEntryHtml(h, recordingUrl, opts) {
     var seconds = (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null;
     var label = (seconds != null) ? formatTimestampDisplay(seconds) : '—';
@@ -7051,11 +7072,33 @@
           + ' title="Save this moment to your knowledge base">+ Add to KB</button>';
     }
 
+    // Handling badge, INLINE with the type chip, so one line carries both what
+    // happened and whether the closer dealt with it.
+    //
+    // ONLY moments the prospect raised against the deal are badged. A buying
+    // signal or a rapport moment gets none — badging everything alike is what
+    // made the removed panel feel cluttered.
+    var handlingBadge = '';
+    if (HANDLING_TYPES.indexOf(h.type) !== -1 && h.handling) {
+      var hLabel = { addressed: 'Engaged with', deflected: 'Moved past', ignored: 'No response' }[h.handling];
+      if (hLabel) handlingBadge = '<span class="review-handling-badge ' + escapeHtml(h.handling) + '">' + escapeHtml(hLabel) + '</span>';
+    }
+
+    // "You said" ONLY when the quote is proven. The removed panel explained
+    // itself when a reply failed verification; inside a row that reads as noise,
+    // so an unverified reply is simply absent and the badge carries the meaning.
+    var replyHtml = '';
+    if (h.closer_response && h.closer_response_verified === true) {
+      replyHtml = '<div class="review-reply"><span class="review-reply-label">You said</span>'
+        + escapeHtml(h.closer_response) + '</div>';
+    }
+
     return '<div class="review-highlight">'
       + timeHtml
       + '<div class="review-highlight-body">'
-        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + kbBtn + '</div>'
+        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + handlingBadge + kbBtn + '</div>'
         + '<div class="review-quote">' + escapeHtml(quote) + '</div>'
+        + replyHtml
         + '<div class="review-observation">' + escapeHtml(observation) + '</div>'
       + '</div>'
     + '</div>';
@@ -7068,6 +7111,8 @@
       missed_opportunity: 'Missed opportunity',
       strong_moment:      'Strong moment',
       rapport_moment:     'Rapport',
+      risk_signal:        'Risk signal',
+      barrier:            'Barrier',
       disqualify_signal:  'Disqualify signal',
     };
     return (type && labels[type]) || (type || 'Moment');
