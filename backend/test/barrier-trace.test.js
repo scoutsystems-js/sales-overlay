@@ -25,70 +25,109 @@ const PANEL = HTML.slice(HTML.indexOf('function renderBarrierTraceHtml'), HTML.i
 const FAKE = { turns: [{ speaker: 'CLOSER', display_name: 'C', text: 'hello there friend', start_seconds: 1 }], highlights: [], closer_name: 'C', speaker_confidence: 'matched' };
 const AREAS = [{ key: 'financial_qualification', label: 'Financial qualification' }];
 
-test('the trace is asked for ONLY when the rep has derived areas', () => {
-  assert.ok(!/missed_cue/.test(worker._buildSectionGraderPrompt(FAKE, 1800, '', [])),
-    'a rep with no material must not be asked to trace anything');
-  assert.ok(/- missed_cue:/.test(worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS)));
+const pick = worker._selectMissedCuePair;
+const GAP = worker.MIN_CUE_GAP_SECONDS;
+
+function cue(over) {
+  return Object.assign({ type: 'risk_signal', handling: 'deflected', speaker_verified: true,
+    timestamp_seconds: 100, quote: 'I have only a couple of thousand ready right now' }, over);
+}
+function obstacle(over) {
+  return Object.assign({ type: 'barrier', speaker_verified: true,
+    timestamp_seconds: 1000, quote: 'it says we are unable to approve you for the offer' }, over);
+}
+
+test('pairs an unaddressed cue with a later obstacle', () => {
+  const r = pick([cue(), obstacle()], GAP);
+  assert.ok(r);
+  assert.strictEqual(r.gap_seconds, 900);
+  assert.ok(r.cue_quote.indexOf('couple of thousand') !== -1);
 });
 
-test('the prompt tells the model to DECLINE, and says why', () => {
-  // With 25 of 39 calls carrying 2+ gaps this is a real choice — but calls with
-  // exactly one gap still exist and must not force a link.
-  const line = worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS).split('\n').find(l => l.indexOf('- missed_cue:') !== -1);
-  assert.ok(/RETURN null FREELY/i.test(line), 'declining must be made easy, not grudging');
-  assert.ok(/Proximity in time is NOT causation/i.test(line),
-    'must state the distinction explicitly — with 87% of calls eligible, over-firing is now the risk');
-  assert.ok(/Do not reach for the nearest available pair/i.test(line), 'must name the specific failure mode');
+test('an ADDRESSED cue is not a missed cue', () => {
+  // That is shape (b), deferred as its own stage — `addressed` is far too weak
+  // a proxy for "dug and the prospect genuinely had nothing".
+  assert.strictEqual(pick([cue({ handling: 'addressed' }), obstacle()], GAP), null);
+  assert.strictEqual(pick([cue({ handling: null }), obstacle()], GAP), null);
 });
 
-test('the obstacle quote must be the PROSPECT\'s own words, verbatim', () => {
-  const line = worker._buildSectionGraderPrompt(FAKE, 1800, '', AREAS).split('\n').find(l => l.indexOf('- missed_cue:') !== -1);
-  assert.ok(/PROSPECT\\?'S OWN lines/i.test(line), 'BOTH quotes must be the prospect');
-  assert.ok(/contiguous run of words/i.test(line));
+test('IGNORED counts as missed, alongside deflected', () => {
+  assert.ok(pick([cue({ handling: 'ignored' }), obstacle()], GAP));
 });
 
-test('validation reuses the PROVING primitive, and the gap is deterministic', () => {
-  // resolveWhatMattered's area checks do not apply — there is no area here. What
-  // carries over is labelForQuote, applied to BOTH quotes, plus a separation
-  // check that is arithmetic rather than judgement.
-  assert.ok(/cueRole = labelForQuote\(normalized\.turns, rawTrace\.cue_quote\)/.test(SRC));
-  assert.ok(/obsRole = labelForQuote\(normalized\.turns, rawTrace\.obstacle_quote\)/.test(SRC));
-  assert.ok(/cueRole !== 'PROSPECT' \|\| obsRole !== 'PROSPECT'/.test(SRC), 'both must be the prospect');
-  assert.ok(/obsTs - cueTs < MIN_CUE_GAP_SECONDS/.test(SRC), 'the gap must be enforced in code');
-  assert.ok(!/function resolveBarrierTrace/.test(SRC), 'a second validator must not exist');
+test('the separation threshold is enforced', () => {
+  // Derived, not rounded: degenerate pairs top out at 101s, the next genuine
+  // one is 183s, so 120 sits in an observed empty band.
+  assert.strictEqual(GAP, 120);
+  assert.strictEqual(pick([cue({ timestamp_seconds: 100 }), obstacle({ timestamp_seconds: 201 })], GAP), null, '101s must be rejected');
+  assert.ok(pick([cue({ timestamp_seconds: 100 }), obstacle({ timestamp_seconds: 283 })], GAP), '183s must be accepted');
 });
 
-test('the separation threshold is derived and documented, not a round guess', () => {
-  assert.ok(/MIN_CUE_GAP_SECONDS = 120/.test(SRC));
-  assert.ok(/top out at 101s/.test(SRC), 'the derivation must be recorded beside the constant');
-  assert.ok(/SECTION constraint[\s\S]{0,200}REJECTED/.test(SRC), 'the rejected alternative must be recorded too');
+test('an obstacle BEFORE the cue is never paired', () => {
+  assert.strictEqual(pick([cue({ timestamp_seconds: 2000 }), obstacle({ timestamp_seconds: 100 })], GAP), null);
 });
 
-test('the trace is suppressed on a role-inverted call', () => {
-  assert.ok(/!roleInv\.inverted && rawTrace/.test(SRC));
+test('UNPROVEN quotes are excluded — the panel quotes both as the prospect', () => {
+  assert.strictEqual(pick([cue({ speaker_verified: false }), obstacle()], GAP), null);
+  assert.strictEqual(pick([cue(), obstacle({ speaker_verified: null })], GAP), null);
 });
 
-// ─── the surface: wording is the load-bearing part ─────────────────────────
+test('SELECTION: earliest cue, and its FIRST qualifying obstacle', () => {
+  // 44 pairs across 20 calls but only 24 distinct cues — the multiplication is
+  // one cue against several later obstacles, so showing all is repetition.
+  const r = pick([
+    cue({ timestamp_seconds: 900, quote: 'a later cue about financing worries here' }),
+    cue({ timestamp_seconds: 100, quote: 'the earliest cue about money set aside' }),
+    obstacle({ timestamp_seconds: 2000, quote: 'the later obstacle about approval limits' }),
+    obstacle({ timestamp_seconds: 1000, quote: 'the first obstacle about the loan amount' }),
+  ], GAP);
+  assert.ok(r.cue_quote.indexOf('earliest cue') !== -1, 'earliest cue anchors the story');
+  assert.ok(r.obstacle_quote.indexOf('first obstacle') !== -1, 'first consequence, not the last — the last inflates the gap');
+});
 
-test('the panel states the two facts and does NOT assert causation', () => {
+test('only ONE pair is returned per call', () => {
+  const r = pick([cue(), obstacle(), obstacle({ timestamp_seconds: 1500 })], GAP);
+  assert.ok(r && !Array.isArray(r));
+});
+
+test('the closer\'s own reply travels with the pair when it exists', () => {
+  const r = pick([cue({ closer_response: 'But that is set aside for business, right?' }), obstacle()], GAP);
+  assert.strictEqual(r.closer_said, 'But that is set aside for business, right?');
+});
+
+test('no cues or no obstacles yields nothing, never throws', () => {
+  assert.strictEqual(pick([cue()], GAP), null);
+  assert.strictEqual(pick([obstacle()], GAP), null);
+  assert.strictEqual(pick([], GAP), null);
+  assert.strictEqual(pick(null, GAP), null);
+});
+
+test('NO model decline step exists — the judgement was made at capture', () => {
+  // Ruling 2026-08-13. Restoring a decline step would put the judgement back
+  // where its evidence is not, which is what produced 0 links in 8 calls.
+  assert.ok(!/missed_cue: did the PROSPECT/.test(SRC), 'the grader must not be asked for this');
+  assert.ok(/selectMissedCuePair\(sanitizedHighlights/.test(SRC), 'it is paired in the worker');
+});
+
+// ─── the surface ───────────────────────────────────────────────────────────
+
+test('the panel states the two facts and refuses the causal reading', () => {
   assert.ok(/They said/.test(PANEL), 'must show the cue');
-  assert.ok(/min later/.test(PANEL), 'must show how much later the obstacle came');
-  assert.ok(/didn.{1,8}t qualify on it/i.test(PANEL), 'the message Justin specified');
-  assert.ok(/where the time went/i.test(PANEL), 'the message Justin specified');
-  assert.ok(/not proof the deal was winnable/i.test(PANEL), 'must refuse the you-would-have-closed-it reading');
-  // Nothing that reads as a finding.
-  [/because you/i, /cost you/i, /caused/i, /this is why/i, /led to/i].forEach(rx => {
+  assert.ok(/min later/.test(PANEL), 'must show how much later it bit');
+  assert.ok(/didn.{1,8}t qualify on it/i.test(PANEL), "Justin's wording");
+  assert.ok(/where the time went/i.test(PANEL), "Justin's wording");
+  assert.ok(/not proof the deal was winnable/i.test(PANEL), 'must refuse "you would have closed it"');
+  [/because you/i, /cost you/i, /caused/i, /led to/i, /would have closed/i].forEach(rx => {
     assert.ok(!rx.test(PANEL), 'panel must not assert causation: ' + rx);
   });
 });
 
-test('the panel renders nothing without a validated trace', () => {
-  assert.ok(/if \(!t \|\| !t\.cue_quote \|\| !t\.obstacle_quote\) return '';/.test(PANEL),
-    'a partial trace must render nothing rather than half a claim');
+test('the panel renders nothing without a complete pair', () => {
+  assert.ok(/if \(!t \|\| !t\.cue_quote \|\| !t\.obstacle_quote\) return '';/.test(PANEL));
 });
 
 test('GUARD: the review API selects barrier_trace', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8');
   const sel = src.match(/\.select\('status, prospect_name[^']*'\)/);
-  assert.ok(sel && sel[0].indexOf('barrier_trace') !== -1, 'select must include barrier_trace');
+  assert.ok(sel && sel[0].indexOf('barrier_trace') !== -1);
 });

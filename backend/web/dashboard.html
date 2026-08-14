@@ -1286,6 +1286,7 @@
                  text-transform: uppercase; color: var(--text-dim); min-width: 108px; }
     .trace-area { font-size: 17px; font-weight: 650; }
     .trace-quote { font-size: 14px; line-height: 1.5; }
+    .trace-reply .trace-quote { color: var(--text-dim); }
     .trace-note { font-size: 12px; color: var(--text-dim); margin-top: 14px; font-style: italic; }
     .review-risk { padding: 20px 22px; border-left: 3px solid var(--mid); }
     .rs-lead { font-size: 13px; color: var(--text-dim); margin: 4px 0 12px; }
@@ -6780,6 +6781,8 @@
       + '<div class="review-why-label">A signal you didn\u2019t qualify on</div>'
       + '<div class="trace-row"><span class="trace-tag">They said</span>'
         + '<span class="trace-quote">\u201C' + escapeHtml(t.cue_quote) + '\u201D</span>' + cueClip + '</div>'
+      + (t.closer_said ? '<div class="trace-row trace-reply"><span class="trace-tag">You said</span>'
+            + '<span class="trace-quote">\u201C' + escapeHtml(t.closer_said) + '\u201D</span></div>' : '')
       + '<div class="trace-row trace-later"><span class="trace-tag">' + escapeHtml(mins + ' min later') + '</span>'
         + '<span class="trace-quote">\u201C' + escapeHtml(t.obstacle_quote) + '\u201D</span>' + obsClip + '</div>'
       + '<div class="trace-note">You had a signal here and didn\u2019t qualify on it. This is where the time went \u2014 not proof the deal was winnable.</div>'
