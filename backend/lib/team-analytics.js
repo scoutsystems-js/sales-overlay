@@ -229,4 +229,14 @@ async function computeTeamTrends(admin, repIds, bucket, from, to) {
   return { bucket: bucket, buckets: out };
 }
 
-module.exports = { computeTeamAnalytics: computeTeamAnalytics, computeTeamTrends: computeTeamTrends, _aggregateWindow: aggregateWindow };
+module.exports = {
+  computeTeamAnalytics: computeTeamAnalytics,
+  computeTeamTrends: computeTeamTrends,
+  _aggregateWindow: aggregateWindow,
+  // Exported for lib/rep-series.js (10a) so the manager board's weekly buckets
+  // are the SAME DST-safe boundaries the team trends already use. One
+  // definition — two chart lanes that disagreed about where a week starts
+  // would be a very quiet bug.
+  bucketStart: bucketStart,
+  bucketLabel: bucketLabel,
+};
