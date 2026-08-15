@@ -11,6 +11,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
+const { buildRepSeries, OBJECTION_CATEGORIES } = require('../lib/rep-series');
 const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/team-synthesis');
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
@@ -135,6 +136,85 @@ router.get('/trends', teamGate, async function (req, res) {
     var data = await computeTeamTrends(admin, team.repIds, bucket, range.from, range.to);
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] trends:', err.message); res.status(500).json({ error: 'Failed to load team trends' }); }
+});
+
+
+// ─── the manager board's two graphs (10b) ──────────────────────────────────
+//
+// RULING 1 (2026-08-15): a manager who also takes calls IS a rep on their own
+// board. Normal player-coach behaviour on a small team, and it is what makes
+// the board real — Josh's 173 calls anchor it instead of three demo accounts
+// with five copied calls each. A manager with no calls of their own simply
+// does not appear, which falls out of the has-calls filter rather than needing
+// a special case.
+//
+// ⚠ SCOPED TO THIS LANE ON PURPOSE. repIdsFor() is shared by the overview
+// cards, trends, needs-work, highlights and the digest; widening it there would
+// change five surfaces at once. Whether the same ruling should apply to them is
+// a decision for Justin, not a side effect of a graph stage.
+//
+// Zero model cost: buildRepSeries is arithmetic over rows.
+router.get('/rep-series', teamGate, async function (req, res) {
+  var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
+  var bucket = req.query.bucket === 'month' ? 'month' : (req.query.bucket === 'quarter' ? 'quarter' : 'week');
+  var cat = (OBJECTION_CATEGORIES.indexOf(req.query.objection_category) !== -1) ? req.query.objection_category : null;
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+
+    // Ruling 1: include the board owner themselves as a candidate rep.
+    var candidates = team.repIds.slice();
+    if (team.keyId && candidates.indexOf(team.keyId) === -1) candidates.push(team.keyId);
+    if (candidates.length === 0) return res.json({ bucket: bucket, buckets: [], reps: [], team: { handle: [], close: [] } });
+
+    var calls = [], start = 0;
+    for (;;) {
+      var cq = await admin.from('fathom_calls').select('id, user_id, call_date, prospect_id')
+        .in('user_id', candidates).gte('call_date', range.from).lte('call_date', range.to)
+        .range(start, start + 999);
+      if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+      calls = calls.concat(cq.data || []);
+      if (!cq.data || cq.data.length < 1000) break;
+      start += 1000;
+    }
+
+    var ids = calls.map(function (c) { return c.id; });
+    var analyses = [], objections = [];
+    for (var i = 0; i < ids.length; i += 100) {
+      var slice = ids.slice(i, i + 100);
+      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome').in('fathom_call_id', slice).eq('status', 'done');
+      if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
+      analyses = analyses.concat(aq.data || []);
+      var oq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')
+        .in('fathom_call_id', slice).eq('type', 'objection');
+      if (oq.error) throw new Error('call_highlights: ' + oq.error.message);
+      objections = objections.concat(oq.data || []);
+    }
+
+    // A rep with NO calls in the window is absent from the chart entirely —
+    // not drawn as a flat zero, and not an empty legend entry implying a line.
+    var withCalls = {}; calls.forEach(function (c) { withCalls[c.user_id] = true; });
+    var em = await emailMap(admin);
+    var profs = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', candidates);
+    var nameOf = {};
+    (profs.data || []).forEach(function (p) {
+      var n = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
+      if (n) nameOf[p.user_id] = n;
+    });
+    var reps = candidates.filter(function (id) { return withCalls[id]; }).map(function (id) {
+      return { user_id: id, name: nameOf[id] || String(em[id] || id).split('@')[0] };
+    });
+
+    res.json(buildRepSeries({
+      reps: reps, calls: calls, analyses: analyses, objections: objections,
+      from: range.from, to: range.to, bucket: bucket, objectionCategory: cat,
+    }));
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[team] rep-series:', err.message);
+    res.status(500).json({ error: 'Failed to load rep series' });
+  }
 });
 
 router.get('/recommendations', teamGate, async function (req, res) {

@@ -1215,6 +1215,12 @@
     }
     .review-speaker-badge.closer   { background: rgba(91, 158, 255, 0.14); color: var(--accent); }
     .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text-soft); }
+    .rep-graph { height: 300px; margin-top: 12px; }
+    .rep-graph-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .rep-graph-select {
+      background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong);
+      border-radius: 6px; padding: 7px 10px; font-size: 13px; font-weight: 600;
+    }
     .review-type-badge {
       /* Justin 2026-08-13: the type read small, grey and messy. Bigger and
          full-strength, and it now shares the line with the handling badge. */
@@ -2331,6 +2337,9 @@
     teamDetailMetric: null, // glance-box detail drill: null | 'cash' | 'close' | 'objection'
     teamRangeInit:  false,  // team view forces a 7-day default on first entry, then user presets stick
     teamNeedsWork:  null,   teamNeedsWorkLoading: false, // "What needs work" card + detail (B-2)
+    // 10b manager board: per-rep weekly series + the objection selector.
+    // '' = all objections; otherwise one of Scout's four objection_category values.
+    teamRepSeries:  null,   teamRepSeriesLoading: false, teamObjectionCategory: '',
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     account:        null,   accountLoading: false,   // Account view (#account)
     // Fathom integration (Scout v2.0 Phase 1)
@@ -3912,6 +3921,9 @@
       needsWork:{ flag: 'teamNeedsWorkLoading',  set: 'teamNeedsWork',  url: '/team/needs-work?' + teamQP() },
       highlights:{flag: 'teamHighlightsLoading', set: 'teamHighlights', url: '/team/highlights?' + teamQP() },
       digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP(state.teamDigestDate ? 'date=' + state.teamDigestDate : '') },
+      // 10b: per-rep weekly series for the two line graphs. Deterministic and
+      // model-free, so it is cheap to refetch when the selector changes.
+      repSeries:{ flag: 'teamRepSeriesLoading',  set: 'teamRepSeries',  url: '/team/rep-series?' + teamQP('bucket=week' + (state.teamObjectionCategory ? '&objection_category=' + state.teamObjectionCategory : '')) },
     };
     var c = map[which]; if (!c) return;
     if (c.flag && state[c.flag]) return;
@@ -3934,6 +3946,130 @@
     state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: 7 };
   }
 
+
+  // ─── manager board: the two line graphs (10b) ────────────────────────────
+  //
+  // X = time (weeks), Y = rate. One line per rep, plus a BOLD DOTTED team
+  // average. Justin rejected rep-vs-objection axes twice: a line implies
+  // continuity, so connecting one rep to the next reads as a progression that
+  // does not exist. Time on X is the shape that makes a line honest.
+  //
+  // ⚠ EMPTY WEEKS BREAK THE LINE (spanGaps:false + null). A week with no
+  // objections is "no data"; drawing 0% would say "handled nothing", which is a
+  // different and damaging claim. A week where every objection genuinely went
+  // unhandled IS 0 and stays drawn.
+  //
+  // ⚠ A REP WITH NO DATA AT ALL IS ABSENT — not a flat zero, and not an empty
+  // legend entry implying a line that just happens to be off-screen.
+  //
+  // NO GREY TEXT: axes, ticks, legend and tooltips all use full-strength text.
+  var REP_LINE_COLORS = ['#60a5fa', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#22d3ee', '#fb7185'];
+  var repCharts = {};
+
+  // Ruling 2026-08-15: the selector uses Scout's EXISTING labelling — the four
+  // stored objection_category values. There is deliberately NO "price" option:
+  // money-phrased objections are classified `fear` by standing rule unless a
+  // genuine logistical payment constraint appears. That is the taxonomy working
+  // as designed, not a gap — do not add a parallel vocabulary here.
+  var OBJECTION_CATEGORY_OPTIONS = [
+    { key: '', label: 'All objections' },
+    { key: 'fear', label: 'Fear / money' },
+    { key: 'timing', label: 'Timing' },
+    { key: 'logistical', label: 'Logistical' },
+    { key: 'partner', label: 'Partner / spouse' },
+  ];
+
+  function repSeriesChart(canvasId, series, pick, yLabel) {
+    var ctx = document.getElementById(canvasId);
+    if (!ctx || !window.Chart || !series) return;
+    if (repCharts[canvasId]) { repCharts[canvasId].destroy(); repCharts[canvasId] = null; }
+
+    // Drop reps with no point at all in this window.
+    var reps = (series.reps || []).filter(function (r) {
+      return pick(r).some(function (p) { return p && p.rate !== null; });
+    });
+
+    var datasets = reps.map(function (r, i) {
+      var pts = pick(r);
+      return {
+        label: r.name,
+        data: pts.map(function (p) { return p.rate; }),
+        _raw: pts,
+        borderColor: REP_LINE_COLORS[i % REP_LINE_COLORS.length],
+        backgroundColor: REP_LINE_COLORS[i % REP_LINE_COLORS.length],
+        borderWidth: 2, pointRadius: 3, tension: 0.25, spanGaps: false,
+      };
+    });
+
+    var teamPts = (series.team && (yLabel === 'Handle rate' ? series.team.handle : series.team.close)) || [];
+    if (teamPts.some(function (p) { return p && p.rate !== null; })) {
+      datasets.push({
+        label: 'Team average',
+        data: teamPts.map(function (p) { return p.rate; }),
+        _raw: teamPts,
+        borderColor: '#ffffff', backgroundColor: '#ffffff',
+        borderWidth: 3, borderDash: [6, 4], pointRadius: 0, tension: 0.25, spanGaps: false,
+      });
+    }
+
+    repCharts[canvasId] = new Chart(ctx.getContext('2d'), {
+      type: 'line',
+      data: { labels: (series.buckets || []).map(function (b) { return b.label; }), datasets: datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false },
+        scales: {
+          y: {
+            beginAtZero: true, max: 100,
+            ticks: { color: '#ededed', callback: function (v) { return v + '%'; } },
+            grid: { color: 'rgba(255,255,255,0.08)' },
+            title: { display: true, text: yLabel, color: '#ededed' },
+          },
+          x: { ticks: { color: '#ededed' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        },
+        plugins: {
+          legend: { labels: { color: '#ededed', usePointStyle: true, boxWidth: 10 } },
+          tooltip: {
+            callbacks: {
+              // House rule: a rate never renders without its raw counts.
+              label: function (c) {
+                var raw = (c.dataset._raw || [])[c.dataIndex] || {};
+                if (raw.rate === null || raw.rate === undefined) return c.dataset.label + ': no data';
+                var n = (raw.handled !== undefined) ? raw.handled : raw.closed;
+                var unit = (raw.handled !== undefined) ? 'handled' : 'prospects closed';
+                if (raw.reps_counted !== undefined) {
+                  return c.dataset.label + ': ' + raw.rate + '%  (' + raw.numerator + ' of ' + raw.total
+                    + ', ' + raw.reps_counted + ' rep' + (raw.reps_counted === 1 ? '' : 's') + ')';
+                }
+                return c.dataset.label + ': ' + raw.rate + '%  (' + n + ' of ' + raw.total + ' ' + unit + ')';
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function repSeriesSectionHtml() {
+    var opts = OBJECTION_CATEGORY_OPTIONS.map(function (o) {
+      var sel = ((state.teamObjectionCategory || '') === o.key) ? ' selected' : '';
+      return '<option value="' + o.key + '"' + sel + '>' + escapeHtml(o.label) + '</option>';
+    }).join('');
+    return '<div class="section fade-in">'
+      + '<div class="rep-graph-head"><h2>Objection handling over time</h2>'
+        + '<select class="rep-graph-select" onchange="setTeamObjectionCategory(this.value)">' + opts + '</select></div>'
+      + '<div class="rep-graph"><canvas id="repHandleChart"></canvas></div>'
+      + '<h2 style="margin-top:26px;">Closing rate over time</h2>'
+      + '<div class="rep-graph"><canvas id="repCloseChart"></canvas></div>'
+    + '</div>';
+  }
+
+  function setTeamObjectionCategory(v) {
+    state.teamObjectionCategory = v || '';
+    state.teamRepSeries = null;
+    loadTeam('repSeries');
+  }
+
   function renderTeamView() {
     var content = document.getElementById('content');
     ensureTeamDefaultRange();
@@ -3944,6 +4080,7 @@
     if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
+    if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
 
     // Glance-box detail drill: a team-scoped per-rep breakdown of one metric,
     // reached by clicking a clickable glance box. Replaces the normal team body.
@@ -3967,7 +4104,15 @@
       + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
-        + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>'
+        + teamScoreListHtml(function (r) { return r.avg_score;
+
+    // 10b: the two line graphs mount under the existing body, then Chart.js
+    // draws after the canvases exist in the DOM.
+    content.insertAdjacentHTML('beforeend', repSeriesSectionHtml());
+    if (state.teamRepSeries && !state.teamRepSeries._error) {
+      repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle rate');
+      repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing rate');
+    } }) + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Closing</h2>'
         + '<div class="meta">avg Close-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>'
