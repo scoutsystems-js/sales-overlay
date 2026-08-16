@@ -950,6 +950,13 @@ into the next DMG. What's there today: full session persisted to disk
 - **THE RULE: sort, rank, compare and threshold on the exact value; call the rounding function only where the number is written into markup.** If a rounded value must be compared (e.g. against a stored rounded floor), say so explicitly at that line.
 - Caught by a unit test whose expectation was written from the raw data rather than from the implementation — which is the argument for writing the expected value from the source numbers, not from what the code currently returns.
 
+### ⚠ VERIFY AGAINST THE REAL ENTRY POINT AND THE REAL DATA SHAPE (2026-08-16)
+**A test that drives the wrong function, or feeds an invented fixture shape, passes or fails for reasons unrelated to the code under test.** Both faults appeared in one block (10e) and both would have reported success while exercising nothing:
+- **WRONG ENTRY POINT.** The harness drove `renderTeamView` while the feature renders in `renderOverview`. Zero charts were built; the assertion failed, but for a reason that had nothing to do with the feature. Had the assertion been a negative one ("this must NOT appear"), it would have PASSED — vacuously.
+- **INVENTED FIXTURE SHAPE.** `analytics2` was written from memory rather than copied from `lib/session-analytics`. The real render threw `Cannot read properties of undefined (reading 'analyzed')` before ever reaching the code under test.
+- **THE RULE: take the entry point and the data shape FROM THE SOURCE, not from memory.** Copy the empty-shape literal out of the lib that produces it; call the function the app actually calls. If a test needs a fixture, derive it from the producer rather than approximating it.
+- **This is the same family as** the deploy-marker rule, the hash-navigation rule, the dead-call-site rule and the slice-boundary faults: **the thing you are testing may not be the thing that runs.** Every instance so far has been caught by exercising the real path — never by reading the code.
+
 ### ⚠⚠ A VERIFIER MUST BIND THE CLAIM TO THE EVIDENCE, NOT MERELY TO ITS PRESENCE (2026-08-16)
 **A check of the form "is there a claim where there is no evidence?" passes ANYTHING once evidence exists.** That is a hole with a specific shape, and it is the most valuable finding of the 10d block.
 - **The live case:** 10d's `verifyWhySentence` refused a causal claim when the rep had no tier-2 evidence. Josh HAS tier-2 evidence, so the check did not run — and the fabricated cause *"because he rushes past rapport"*, which has nothing to do with the counted area (`income goal and motivation`), **was accepted**. The guard was satisfied by the mere existence of *a* cause rather than by the sentence stating *the counted* one.
