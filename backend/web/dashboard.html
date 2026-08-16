@@ -1237,6 +1237,8 @@
     .rep-weak-cmp { margin-left: auto; }
     /* Unmeasured: the sentence IS the value, so there is no dash to misread. */
     /* Same vertical slot the big number occupies, so mixed rows stay aligned. */
+    .rep-why { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+               font-size: 13px; line-height: 1.5; color: var(--text); }
     .rep-stat-none-val { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.2; margin-top: 3px; padding: 4px 0; }
     .rep-graph-skeleton { height: 100%; width: 100%; border-radius: var(--radius); }
     /* Date-range picker (stage 1). All text full strength — the no-grey rule. */
@@ -2390,6 +2392,7 @@
     teamDetailMetric: null, // glance-box detail drill: null | 'cash' | 'close' | 'objection'
     // ⚠ TEAM OWNS ITS OWN RANGE (stage 2). state.dateRange stays COACHING's until
     // stage 3 splits the rest — every view owning its own range is the ruling.
+    teamWhy:        null,   teamWhyLoading: false,   // 10d: one verified sentence per rep
     teamRange:      null,   // {from,to} ISO; the team date picker writes only this
     teamRangeInit:  false,  // team view seeds a 7-day default on first entry
     teamNeedsWork:  null,   teamNeedsWorkLoading: false, // "What needs work" card + detail (B-2)
@@ -4026,6 +4029,7 @@
     // Without this the previous team's / previous range's lines stay on screen
     // until the refetch lands, which reads as real data for the new selection.
     state.teamRepSeries = null;
+    state.teamWhy = null;
     state.teamDetailMetric = null; // exit any glance-box detail when team/range changes
   }
   // Re-render whichever team surface is active (main view or the expanded page).
@@ -4058,6 +4062,7 @@
       digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP(state.teamDigestDate ? 'date=' + state.teamDigestDate : '') },
       // 10b: per-rep weekly series for the two line graphs. Deterministic and
       // model-free, so it is cheap to refetch when the selector changes.
+      why:      { flag: 'teamWhyLoading',         set: 'teamWhy',        url: '/team/why-prose?' + teamQP() },
       repSeries:{ flag: 'teamRepSeriesLoading',  set: 'teamRepSeries',  url: '/team/rep-series?' + teamQP('bucket=' + repSeriesBucket() + (state.teamObjectionCategory ? '&objection_category=' + state.teamObjectionCategory : '')) },
     };
     var c = map[which]; if (!c) return;
@@ -4246,6 +4251,9 @@
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
     if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
+    // 10d is lazy and separate: it can spend a model call per rep on a changed
+    // period, and the board must never wait on it.
+    if (state.teamWhy === null && !state.teamWhyLoading) loadTeam('why');
 
     // Glance-box detail drill: a team-scoped per-rep breakdown of one metric,
     // reached by clicking a clickable glance box. Replaces the normal team body.
@@ -5227,8 +5235,13 @@
           objUnmeasured ? 'No objections yet' : (r.obj_handled + ' of ' + r.obj_total + ' handled'),
           objUnmeasured);
 
-    // 10d's slot. Deliberately empty — the prose is counted, not written here.
-    var why = '';
+    // 10d: the verified sentence, if it has loaded. Absent while loading and
+    // absent on failure — the card is complete without it, and a half-sentence
+    // or a spinner in a summary slot is worse than nothing.
+    var w = state.teamWhy && state.teamWhy.by_rep && state.teamWhy.by_rep[r.user_id];
+    var why = (w && w.sentence)
+      ? '<div class="rep-why">' + escapeHtml(w.sentence) + '</div>'
+      : '';
 
     return '<div class="rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')"'
       + ' title="Open ' + escapeHtml(repName(r)) + '\'s report">'

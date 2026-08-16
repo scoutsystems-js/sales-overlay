@@ -342,10 +342,31 @@ test('cards click through via the EXISTING pivot, not a parallel path', () => {
   assert.ok(/onclick="setUser\('u-josh'\)"/.test(out.html));
 });
 
-test('the 10d WHY slot is present but EMPTY — the prose is not built yet', () => {
-  const out = renderCards(REPS);
-  assert.ok(/10d's slot|WHY slot/.test(HTML), 'the slot must be marked in the source');
-  assert.ok(out.html.indexOf('rep-why') === -1, 'and nothing rendered into it yet');
+test('10d: the verified sentence renders on the card when it has loaded', () => {
+  const out = renderTeam(Object.assign({}, BASE, {
+    teamOverview: { reps: [], per_rep: REPS, totals: {} }, teamOverviewLoading: false,
+    teamWhy: { by_rep: { 'u-josh': { sentence: 'Josh closed 39 of 142 prospects (27%).', tier: 2 } } },
+  }));
+  assert.ok(out.html.indexOf('rep-why') !== -1);
+  assert.ok(out.html.indexOf('Josh closed 39 of 142 prospects (27%).') !== -1);
+});
+
+test('10d: a card WITHOUT a sentence renders complete, with no placeholder', () => {
+  // Absent while loading and absent on failure. A spinner or a half-sentence in
+  // a summary slot is worse than nothing.
+  const out = renderTeam(Object.assign({}, BASE, {
+    teamOverview: { reps: [], per_rep: REPS, totals: {} }, teamOverviewLoading: false,
+    teamWhy: { by_rep: { 'u-josh': { sentence: 'x', tier: 1 } } },
+  }));
+  const avaCard = out.html.slice(out.html.indexOf('>demo-ava<'), out.html.indexOf('>demo-ava<') + 1600);
+  assert.strictEqual(avaCard.indexOf('rep-why'), -1, 'no empty slot for a rep with no sentence');
+  assert.ok(avaCard.indexOf('Discovery 45') !== -1, 'the rest of the card is intact');
+});
+
+test('10d loads LAZILY and is cleared when the team or range changes', () => {
+  assert.ok(/why:\s*\{ flag: 'teamWhyLoading'/.test(HTML), 'has its own loader entry');
+  const reset = HTML.slice(HTML.indexOf('function resetTeamData'), HTML.indexOf('function renderTeamSurface'));
+  assert.ok(/state\.teamWhy = null/.test(reset), 'stale sentences must not survive a range change');
 });
 
 test('the cards sit between the graphs and What Needs Work', () => {

@@ -12,6 +12,17 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
 const { buildRepSeries, OBJECTION_CATEGORIES } = require('../lib/rep-series');
+const { computeWhyProse } = require('../lib/why-prose');
+const Anthropic = require('@anthropic-ai/sdk');
+const { CLAUDE_MODEL } = require('../config');
+// Same lazy shape the synthesis lanes use: never constructed at import time, so
+// a missing key is a clean per-request error rather than a boot failure.
+var _anthropic = null;
+function getAnthropic() {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('Anthropic not configured — missing ANTHROPIC_API_KEY (set in Railway Variables).');
+  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  return _anthropic;
+}
 const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/team-synthesis');
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
@@ -154,6 +165,42 @@ router.get('/trends', teamGate, async function (req, res) {
 // a decision for Justin, not a side effect of a graph stage.
 //
 // Zero model cost: buildRepSeries is arithmetic over rows.
+// GET /team/why-prose — one verified sentence per rep (10d).
+// Lazy and separate from /team/overview: it can spend a model call per rep on a
+// changed period, and the board must never wait on it.
+router.get('/why-prose', teamGate, async function (req, res) {
+  var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
+  try {
+    var admin = getAdminClient();
+    var team = await resolveTeam(req, admin);
+    var em = await emailMap(admin);
+    var analytics = await computeTeamAnalytics(admin, team.repIds, range.from, range.to, em);
+    var ask = async function (prompt) {
+      var r = await getAnthropic().messages.create({
+        model: CLAUDE_MODEL, max_tokens: 300, messages: [{ role: 'user', content: prompt }],
+      });
+      return r.content[0] ? r.content[0].text : '';
+    };
+    var by_rep = {};
+    for (var i = 0; i < analytics.per_rep.length; i++) {
+      var rep = analytics.per_rep[i];
+      try {
+        var out = await computeWhyProse(admin, rep, range.from, range.to, ask);
+        if (out) by_rep[rep.user_id] = { sentence: out.sentence, tier: out.tier };
+      } catch (e) {
+        // One rep failing must not lose the others.
+        console.warn('[team] why-prose for ' + rep.user_id + ': ' + ((e && e.message) || 'unknown'));
+      }
+    }
+    res.json({ by_rep: by_rep });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[team] why-prose:', err.message);
+    res.status(500).json({ error: 'Failed to load rep summaries' });
+  }
+});
+
 router.get('/rep-series', teamGate, async function (req, res) {
   var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
   // 'day' added for the 7-day manager graphs (ruling 2026-08-15): weekly buckets
