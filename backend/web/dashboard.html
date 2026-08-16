@@ -2393,6 +2393,7 @@
     // ⚠ TEAM OWNS ITS OWN RANGE (stage 2). state.dateRange stays COACHING's until
     // stage 3 splits the rest — every view owning its own range is the ruling.
     teamWhy:        null,   teamWhyLoading: false,   // 10d: one verified sentence per rep
+    repGraph:       null,   repGraphLoading: false,  // 10e: the pivoted rep's own series
     teamRange:      null,   // {from,to} ISO; the team date picker writes only this
     teamRangeInit:  false,  // team view seeds a 7-day default on first entry
     teamNeedsWork:  null,   teamNeedsWorkLoading: false, // "What needs work" card + detail (B-2)
@@ -3333,6 +3334,7 @@
   function setCoachingRange(from, to) {
     state.dateRange = { from: from, to: to };
     state.needsWork = null;                 // range-responsive — refetch for the new window
+    state.repGraph = null;                  // 10e windows by this range too
     syncHashFromState(true);                // the range lives in the URL
     if (state.view === 'needs-work') { renderNeedsWorkView(); return; }
     if (state.view === 'performance') { state.perfSynthesis = null; renderPerformanceView(); return; }
@@ -3368,6 +3370,7 @@
     state.viewingUserId = userId;
     state.view = 'overview';
     state.needsWork = null; // fixed-window card, but it IS per-user → refetch on pivot
+    state.repGraph = null;  // 10e: otherwise the PREVIOUS rep's line survives the pivot
     reloadAll();
   }
 
@@ -3764,6 +3767,7 @@
       + gsCard
       + connectSections
       + tiles
+      + repOwnGraphHtml()
       + '<div class="section fade-in">' + needsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Coach summary</h2>'
         + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
@@ -3771,8 +3775,13 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Performance summary</h2></div>' + overviewLinkCardHtml('Your wins and what to improve, drawn from your calls.', 'openPerformance()') + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Recent calls</h2></div>' + overviewLinkCardHtml('Open your Call Library to review recent calls.', 'goCallLibrary()') + '</div>';
 
+    // 10e: the canvas exists only after the assignment above.
+    drawRepOwnChart();
+
     // Personal What-needs-work loads once (cheap: cache hit = no Claude).
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
+    // 10e is lazy and only for a manager viewing someone else's report.
+    if (repOwnGraphVisible() && state.repGraph === null && !state.repGraphLoading) loadRepGraph();
     // NOTE: Performance's LLM call fires on the #performance page open, not here.
   }
 
@@ -4002,12 +4011,12 @@
   // 0% or 50%). Past a fortnight the noise wins and the weekly line is the
   // readable one. Empty days still BREAK the line rather than plotting 0%.
   var DAILY_BUCKET_MAX_DAYS = 14;
-  function repSeriesBucket() {
-    var r = state.teamRange;
+  function bucketForRange(r) {
     if (!r || !r.from || !r.to) return 'week';
     var days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
     return days <= DAILY_BUCKET_MAX_DAYS ? 'day' : 'week';
   }
+  function repSeriesBucket() { return bucketForRange(state.teamRange); }
   function teamQP(extra) {
     var r = teamRange();
     var qp = 'from=' + encodeURIComponent(r.from) + '&to=' + encodeURIComponent(r.to);
@@ -4218,6 +4227,66 @@
       + (loading ? '<div class="rep-graph-skeleton skeleton"></div>' : '')
       + '<canvas id="' + canvasId + '"' + (loading ? ' style="display:none;"' : '') + '></canvas>'
       + '</div>';
+  }
+
+  // ══ 10e: the pivoted rep's own objection graph ═══════════════════════════
+  //
+  // Reuses /team/rep-series and filters to the one rep — no parallel path and no
+  // new route, per the ruling. The pivot itself is the existing setUser.
+  //
+  // ⚠ It windows by COACHING's range (state.dateRange), because that is the range
+  // control on the page it renders on. Using the team range here would show a
+  // graph that disagrees with every other number on the same screen.
+  function repOwnGraphVisible() {
+    return hasManagerContext() && !isSelf() && !!state.viewingUserId;
+  }
+  async function loadRepGraph() {
+    if (state.repGraphLoading) return;
+    state.repGraphLoading = true;
+    try {
+      var r = state.dateRange;
+      var qp = 'from=' + encodeURIComponent(r.from) + '&to=' + encodeURIComponent(r.to)
+        + '&bucket=' + bucketForRange(r);
+      var res = await fetch('/team/rep-series?' + qp, { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      state.repGraph = await res.json();
+    } catch (err) {
+      if (err.message === 'unauth') return;
+      state.repGraph = { _error: err.message || 'unknown' };
+    }
+    state.repGraphLoading = false;
+    if (state.view === 'overview') renderOverview(false);
+  }
+  // The series narrowed to ONE rep. The team average is kept as a dashed
+  // reference line — a single line with nothing to read it against says little —
+  // but the rep's own line is the subject and is always present.
+  function repOwnSeries() {
+    var d = state.repGraph;
+    if (!d || d._error || !Array.isArray(d.reps)) return null;
+    var mine = d.reps.filter(function (x) { return x.user_id === state.viewingUserId; });
+    if (!mine.length) return null;
+    return { buckets: d.buckets, reps: mine, team: d.team };
+  }
+  function repOwnGraphHtml() {
+    if (!repOwnGraphVisible()) return '';
+    var series = repOwnSeries();
+    var loading = state.repGraphLoading || state.repGraph === null;
+    var body = loading
+      ? '<div class="rep-graph"><div class="rep-graph-skeleton skeleton"></div></div>'
+      : (series
+          ? '<div class="rep-graph"><canvas id="repOwnChart"></canvas></div>'
+          : '<div class="empty"><p>No objection data for this rep in the selected range.</p></div>');
+    return '<div class="section fade-in">'
+      + '<div class="section-header"><h2>Objection Handling Over Time</h2>'
+        + '<div class="meta">this rep, against the team average</div></div>'
+      + body + '</div>';
+  }
+  function drawRepOwnChart() {
+    if (!repOwnGraphVisible()) return;
+    var series = repOwnSeries();
+    if (!series) return;
+    repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle rate');
   }
 
   function repSeriesSectionHtml() {

@@ -102,13 +102,15 @@ function renderTeam(overrides) {
 
   const runner = new Function('document', 'window', 'Chart', 'localStorage', 'fetch', 'console',
     SCRIPT + '\n;return { state: state, renderTeamView: renderTeamView, resetTeamData: resetTeamData,'
-           + ' viewToHashPath: viewToHashPath, parseRangeFromHash: parseRangeFromHash };');
+           + ' viewToHashPath: viewToHashPath, parseRangeFromHash: parseRangeFromHash,'
+           + ' renderOverview: renderOverview };');
 
   const api = runner(doc, win, Chart, win.localStorage, win.fetch,
     { log() {}, warn() {}, error() {} });
 
   Object.assign(api.state, overrides);
-  api.renderTeamView();
+  if (overrides && overrides.__entry === 'overview') api.renderOverview(false);
+  else api.renderTeamView();
   return { html: assigned, charts: charts, events: events, api: api };
 }
 
@@ -402,4 +404,103 @@ test('MIRROR GUARD: the inline sort matches lib/rep-card-metrics', () => {
     assert.deepStrictEqual((inline(f) || []).map((r) => r.display_name),
                            (lib(f) || []).map((r) => r.display_name), JSON.stringify(f));
   });
+});
+
+// ─── 10e: the pivoted rep's own graph, through the real render path ────────
+
+function renderOverviewAs(overrides) {
+  const out = renderTeam(Object.assign({
+    __entry: 'overview',
+    view: 'overview',
+    me: { user_id: 'mgr', role: 'manager' },
+    viewingUserId: 'u-josh',
+    dateRange: { from: '2026-08-01T00:00:00.000Z', to: '2026-08-14T23:59:59.999Z' },
+    // The REAL analytics2 shape from lib/session-analytics — a made-up one threw
+    // inside renderCoachingOverview and exercised nothing.
+    analytics2: {
+      calls: { analyzed: 10, total_in_range: 10, processing: 0, error: 0 },
+      avg_score: { mean: 60, graded_calls: 10, win_mean: null, win_n: 0, other_mean: null, other_n: 0 },
+      objections: { calls_with_objection: 4, total_highlights: 9 },
+      cash_collected: 0, close_rate: null, close_wins: 0, close_decided: 0,
+      sections: { intro: { mean: 57, n: 10 }, discovery: { mean: 47, n: 10 }, pitch: { mean: 65, n: 10 },
+                  objection: { mean: 64, n: 10 }, close: { mean: 64, n: 10 } },
+      weakest_section: 'discovery', strongest_section: 'pitch', latest_one_things: [],
+    },
+    needsWork: { available: false }, needsWorkLoading: false,
+    repGraph: null, repGraphLoading: false,
+  }, overrides));
+  return out;
+}
+
+const REP_SERIES = {
+  buckets: [{ label: 'Aug 3' }, { label: 'Aug 10' }],
+  reps: [
+    { user_id: 'u-josh', name: 'josh', handle: [{ rate: 14, handled: 1, total: 7 }, { rate: 26, handled: 5, total: 19 }],
+      close: [{ rate: 40, closed: 2, total: 5 }, { rate: 20, closed: 1, total: 5 }] },
+    { user_id: 'u-other', name: 'someone else', handle: [{ rate: 90, handled: 9, total: 10 }, { rate: 80, handled: 8, total: 10 }],
+      close: [{ rate: 50, closed: 1, total: 2 }, { rate: 50, closed: 1, total: 2 }] },
+  ],
+  team: { handle: [{ rate: 52, reps_counted: 2, numerator: 10, total: 17 }, { rate: 53, reps_counted: 2, numerator: 13, total: 29 }],
+          close:  [{ rate: 43, reps_counted: 2, numerator: 3, total: 7 }, { rate: 29, reps_counted: 2, numerator: 2, total: 7 }] },
+};
+
+test('10e: THE GRAPH SHOWS THAT REP\'S LINE, NOT THE WHOLE TEAM\'S', () => {
+  // The failure to guard against is a rep page rendering team data.
+  const out = renderOverviewAs({ repGraph: REP_SERIES });
+  assert.strictEqual(out.charts.length, 1, 'exactly one chart on the rep report');
+  const labels = out.charts[0].cfg.data.datasets.map((d) => d.label);
+  assert.ok(labels.indexOf('josh') !== -1, "the pivoted rep's own line is present");
+  assert.strictEqual(labels.indexOf('someone else'), -1, 'another rep must NOT appear');
+  const mine = out.charts[0].cfg.data.datasets.find((d) => d.label === 'josh');
+  assert.deepStrictEqual(mine.data, [14, 26], "and it carries THAT rep's numbers");
+});
+
+test('10e: the team average stays as a labelled reference line', () => {
+  const out = renderOverviewAs({ repGraph: REP_SERIES });
+  const team = out.charts[0].cfg.data.datasets.find((d) => d.label === 'Team average');
+  assert.ok(team, 'a single line with nothing to read it against says little');
+  assert.deepStrictEqual(team.data, [52, 53]);
+});
+
+test('10e: NOT shown on your OWN report, nor to a non-manager', () => {
+  const own = renderOverviewAs({ viewingUserId: 'mgr', repGraph: REP_SERIES });
+  assert.strictEqual(own.charts.length, 0, 'your own coaching page is unchanged');
+  const rep = renderOverviewAs({ me: { user_id: 'mgr', role: 'user' }, repGraph: REP_SERIES });
+  assert.strictEqual(rep.charts.length, 0, 'a plain user never sees it');
+});
+
+test('10e: it windows by COACHING\'s range, not the team\'s', () => {
+  // Using the team range here would show a graph disagreeing with every other
+  // number on the same screen.
+  const loader = HTML.slice(HTML.indexOf('async function loadRepGraph'), HTML.indexOf('function repOwnSeries'));
+  assert.ok(/state\.dateRange/.test(loader));
+  assert.ok(!/state\.teamRange/.test(loader));
+  assert.ok(/bucketForRange\(r\)/.test(loader), 'and shares the stage-5 bucket thresholds');
+});
+
+test('10e: reuses /team/rep-series — no parallel route', () => {
+  const loader = HTML.slice(HTML.indexOf('async function loadRepGraph'), HTML.indexOf('function repOwnSeries'));
+  assert.ok(/\/team\/rep-series\?/.test(loader));
+});
+
+test('10e: a stale rep\'s line cannot survive a pivot or a range change', () => {
+  const setUser = HTML.slice(HTML.indexOf('function setUser'), HTML.indexOf('function setCoachingRange') > HTML.indexOf('function setUser')
+    ? HTML.indexOf('function setCoachingRange') : HTML.length);
+  assert.ok(/state\.repGraph = null/.test(HTML.slice(HTML.indexOf('function setUser'), HTML.indexOf('function setUser') + 700)),
+    'setUser must clear it');
+  const range = HTML.slice(HTML.indexOf('function setCoachingRange'), HTML.indexOf('function setCoachingRange') + 700);
+  assert.ok(/state\.repGraph = null/.test(range), 'a range change must clear it too');
+});
+
+test('10e: no data for that rep renders a plain message, not an empty canvas', () => {
+  const out = renderOverviewAs({ repGraph: { buckets: [], reps: [], team: { handle: [], close: [] } } });
+  assert.strictEqual(out.charts.length, 0);
+  assert.ok(out.html.indexOf('No objection data for this rep') !== -1);
+});
+
+test('10e: the chart is drawn AFTER the canvas is in the DOM', () => {
+  const out = renderOverviewAs({ repGraph: REP_SERIES });
+  const firstAssign = out.events.indexOf('assign');
+  const firstChart = out.events.findIndex((e) => e.indexOf('chart:') === 0);
+  assert.ok(firstAssign !== -1 && firstChart > firstAssign);
 });
