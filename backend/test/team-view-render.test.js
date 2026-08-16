@@ -133,26 +133,34 @@ test('renderTeamView ACTUALLY EMITS the graph section — the regression that sh
     'the closing-rate canvas is absent from the rendered markup');
 });
 
-test('the graphs sit ABOVE "What needs work" and BELOW the glance blocks', () => {
-  // Justin's spec: the first thing he wants to see on the manager view.
+test('the graphs are the FIRST thing on the team view, above What Needs Work', () => {
+  // The glance stat card was removed 2026-08-16 (Justin, twice), so the graphs
+  // now sit directly under the header — which is what "the first thing he wants
+  // to see" asked for in the first place.
   const out = renderTeam(BASE);
-  const glance = out.html.indexOf('team-glance');
+  const header = out.html.indexOf('page-header');
   const graphs = out.html.indexOf('repHandleChart');
   const needsWork = out.html.indexOf('What Needs Work');
   const overview = out.html.indexOf('Team Overview');
 
-  // Every anchor asserted present FIRST. A conditional ordering check passes
-  // vacuously when its anchor is missing, which is the same class of weak
-  // verification that let the dead mount ship. `needs-work` was exactly that:
-  // the card renders its heading, not that class, so the check never ran.
   assert.notStrictEqual(graphs, -1, 'graph canvas missing');
-  assert.notStrictEqual(needsWork, -1, 'What needs work heading missing — anchor is stale');
-  assert.notStrictEqual(overview, -1, 'Team overview heading missing — anchor is stale');
-  assert.notStrictEqual(glance, -1, 'glance blocks missing — anchor is stale');
+  assert.notStrictEqual(needsWork, -1, 'What Needs Work heading missing — anchor is stale');
+  assert.notStrictEqual(overview, -1, 'Team Overview heading missing — anchor is stale');
+  assert.notStrictEqual(header, -1, 'page header missing — anchor is stale');
 
-  assert.ok(glance < graphs, 'graphs must come AFTER the glance stat blocks');
+  assert.ok(header < graphs, 'graphs come after the header');
   assert.ok(graphs < needsWork, 'graphs must come BEFORE What Needs Work');
-  assert.ok(graphs < overview, 'graphs must come BEFORE Team overview');
+  assert.ok(graphs < overview, 'graphs must come BEFORE Team Overview');
+  assert.strictEqual(out.html.indexOf('team-glance'), -1, 'the glance card must be gone');
+});
+
+test('removing the glance card left its drill-down machinery intact', () => {
+  // Restoring the card is re-adding one line. Nothing else was ripped out, so
+  // the trade Justin overruled stays cheaply reversible.
+  assert.ok(/function openTeamDetail/.test(HTML));
+  assert.ok(/var TEAM_DETAIL = \{/.test(HTML));
+  assert.ok(/function teamAggregateHtml/.test(HTML), 'the builder itself is kept');
+  assert.ok(/REMOVED 2026-08-16/.test(HTML), 'and the removal is commented in place');
 });
 
 test('the charts are built AFTER the canvases are in the DOM', () => {

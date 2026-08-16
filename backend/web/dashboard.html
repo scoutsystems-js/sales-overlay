@@ -125,7 +125,18 @@
     /* ── Page layout ────────────────────────────────────────────────── */
     .page { max-width: 1200px; margin: 0 auto; padding: 36px 32px 100px; }
 
+    /* ⚠ STACKING CONTEXT, NOT z-index ON THE PANEL. `.fade-in` animates a
+       transform with `both` fill, so EVERY .page-header and .section keeps a
+       non-none transform permanently — and a transformed element creates its own
+       stacking context. The date panel's z-index:60 is therefore scoped INSIDE
+       the header's context and cannot rise above a later sibling, whatever value
+       it is given. Measured: elementFromPoint over the open calendar returned the
+       glance card, so the dates were neither readable nor clickable.
+       The header needs its own z-index so the whole context sits above the
+       sections that follow it. Raising the panel's z-index does nothing. */
     .page-header {
+      position: relative;
+      z-index: 50;
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
@@ -4346,7 +4357,14 @@
     // (Highlights now live on the expanded recommendations page).
     content.innerHTML =
       teamHeaderHtml()
-      + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
+      /* REMOVED 2026-08-16 — Justin asked twice: the glance stat card between the
+         picker and the graphs is gone. Its Cash Collected / Close Rate /
+         Objection Handle drill-downs went with it; that trade was raised and
+         overruled. openTeamDetail/teamDetailHtml and the TEAM_DETAIL map are
+         LEFT INTACT and still reachable by state (state.teamDetailMetric), so
+         restoring the card is re-adding this one line — nothing else was ripped
+         out. The equivalent numbers now live on the rep cards, per rep.
+      + '<div class="section fade-in">' + teamAggregateHtml() + '</div>' */
       + repSeriesSectionHtml()
       + repCardsHtml()
       + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
