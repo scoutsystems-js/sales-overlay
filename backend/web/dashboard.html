@@ -3894,6 +3894,9 @@
     state.teamOverview = null; state.teamTrends = null; state.teamRecs = null;
     state.teamHighlights = null; state.teamDigest = null; state.teamDigestDate = null;
     state.teamNeedsWork = null;
+    // Without this the previous team's / previous range's lines stay on screen
+    // until the refetch lands, which reads as real data for the new selection.
+    state.teamRepSeries = null;
     state.teamDetailMetric = null; // exit any glance-box detail when team/range changes
   }
   // Re-render whichever team surface is active (main view or the expanded page).
@@ -4091,28 +4094,25 @@
 
     // Layout (Justin's live-review spec), top→bottom:
     //   1. glance stat blocks (at the very top, under the header)
-    //   2. Team overview  — each member + avg TOTAL score  (ranked bars)
-    //   3. Closing        — each member + avg CLOSE section score
-    //   4. Objection handling — each member + avg OBJECTION section score
-    //   5. Team recommendations — compact card → dedicated expanded page
-    //   6. Manager daily digest
+    //   2. the two rep line graphs — objection handling, then closing rate.
+    //      Justin: "the first thing he wants to see on the manager view", so
+    //      they sit directly under the glance blocks and ABOVE What needs work.
+    //   3. What needs work
+    //   4. Team overview  — each member + avg TOTAL score  (ranked bars)
+    //   5. Closing        — each member + avg CLOSE section score
+    //   6. Objection handling — each member + avg OBJECTION section score
+    //   7. Team recommendations — compact card → dedicated expanded page
+    //   8. Manager daily digest
     // Trends + the standalone Call Highlights section are REMOVED from this view
     // (Highlights now live on the expanded recommendations page).
     content.innerHTML =
       teamHeaderHtml()
       + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
+      + repSeriesSectionHtml()
       + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
-        + teamScoreListHtml(function (r) { return r.avg_score;
-
-    // 10b: the two line graphs mount under the existing body, then Chart.js
-    // draws after the canvases exist in the DOM.
-    content.insertAdjacentHTML('beforeend', repSeriesSectionHtml());
-    if (state.teamRepSeries && !state.teamRepSeries._error) {
-      repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle rate');
-      repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing rate');
-    } }) + '</div>'
+        + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Closing</h2>'
         + '<div class="meta">avg Close-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>'
@@ -4121,6 +4121,19 @@
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team recommendations</h2></div>' + teamRecsCompactHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Manager daily digest</h2></div>' + teamDigestHtml() + '</div>';
+
+    // Chart.js draws only after the assignment above has put the canvases in
+    // the DOM. Keep this AFTER content.innerHTML — a canvas that does not exist
+    // yet silently produces no chart.
+    drawRepSeriesCharts();
+  }
+
+  // Both graphs, guarded so a missing/failed series simply leaves the empty
+  // state that repSeriesSectionHtml already rendered.
+  function drawRepSeriesCharts() {
+    if (!state.teamRepSeries || state.teamRepSeries._error) return;
+    repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle rate');
+    repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing rate');
   }
 
   // The dedicated (hidden, no-nav-tab) expanded page: full recommendations +
