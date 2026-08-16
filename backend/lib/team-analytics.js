@@ -8,6 +8,7 @@ var { resolveDisplayName } = require('./display-name');
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 var { fetchProspectCloseRates, closeRate } = require('./prospect-entity');
+var { weakestSection, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
 
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 
@@ -15,7 +16,7 @@ function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 async function aggregateWindow(admin, repIds, from, to) {
   var rep = {};
   repIds.forEach(function (id) {
-    rep[id] = { calls_analyzed: 0, score_sum: 0, score_n: 0, win_sum: 0, win_n: 0, cash_sum: 0, close_won: 0, close_decided: 0, obj_total: 0, obj_handled: 0, sec_sum: {}, sec_n: {} };
+    rep[id] = { calls_analyzed: 0, score_sum: 0, score_n: 0, win_sum: 0, win_n: 0, cash_sum: 0, close_won: 0, close_decided: 0, obj_total: 0, obj_handled: 0, sec_sum: {}, sec_n: {}, obj_by_cat: {}, close_earned_sum: 0, close_earned_n: 0 };
     SECTIONS.forEach(function (s) { rep[id].sec_sum[s] = 0; rep[id].sec_n[s] = 0; });
   });
   if (repIds.length === 0) return { rep: rep, doneCallIds: [] };
@@ -37,7 +38,7 @@ async function aggregateWindow(admin, repIds, from, to) {
   var doneCallIds = [];
   for (var i = 0; i < callIds.length; i += 100) {
     var aq = await admin.from('call_analyses')
-      .select('fathom_call_id, analyzed_at, overall_score, outcome, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score')
+      .select('fathom_call_id, analyzed_at, overall_score, outcome, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned')
       .in('fathom_call_id', callIds.slice(i, i + 100)).eq('status', 'done');
     if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
     (aq.data || []).forEach(function (a) {
@@ -57,13 +58,29 @@ async function aggregateWindow(admin, repIds, from, to) {
       if (a.outcome === 'closed') { r.close_won++; r.close_decided++; }
       else if (a.outcome === 'lost') { r.close_decided++; }
       SECTIONS.forEach(function (s) { var v = a[s + '_score']; if (typeof v === 'number') { r.sec_sum[s] += v; r.sec_n[s]++; } });
+      // ⚠ The EARNED close score, tracked alongside the displayed one. Migration
+      // 027 forces close_score to 100 on closed calls, so "weakest section" must
+      // not read it — the section drilldown already reads earned for this reason.
+      if (typeof a.close_score_earned === 'number') { r.close_earned_sum += a.close_score_earned; r.close_earned_n++; }
     });
   }
   for (var j = 0; j < callIds.length; j += 100) {
-    var hq = await admin.from('call_highlights').select('fathom_call_id, resolution')
+    var hq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')
       .in('fathom_call_id', callIds.slice(j, j + 100)).eq('type', 'objection');
     if (hq.error) throw new Error('call_highlights: ' + hq.error.message);
-    (hq.data || []).forEach(function (h) { var r = rep[callRep[h.fathom_call_id]]; if (!r) return; r.obj_total++; if (h.resolution === 'handled') r.obj_handled++; });
+    (hq.data || []).forEach(function (h) {
+      var r = rep[callRep[h.fathom_call_id]]; if (!r) return;
+      var handled = h.resolution === 'handled';
+      r.obj_total++; if (handled) r.obj_handled++;
+      // Per-category, for the card's weakest-objection field. Uncategorised
+      // objections still count in the aggregate above but cannot be attributed
+      // to a category, so they are left out here rather than bucketed as 'other'
+      // — an invented category would be rankable and wrong.
+      var cat = h.objection_category;
+      if (!cat) return;
+      if (!r.obj_by_cat[cat]) r.obj_by_cat[cat] = { total: 0, handled: 0 };
+      r.obj_by_cat[cat].total++; if (handled) r.obj_by_cat[cat].handled++;
+    });
   }
   return { rep: rep, doneCallIds: doneCallIds };
 }
@@ -86,6 +103,27 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     var profs = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', repIds);
     if (!profs.error) (profs.data || []).forEach(function (p) { profileMap[p.user_id] = p; });
   }
+
+  // Team per-category totals + how many reps have enough volume to be ranked
+  // against. Built BEFORE the per-rep map because a ranking needs every rep's
+  // numbers in hand at once.
+  var teamByCat = {};
+  repIds.forEach(function (id) {
+    var byCat = cur.rep[id].obj_by_cat || {};
+    Object.keys(byCat).forEach(function (cat) {
+      if (!teamByCat[cat]) teamByCat[cat] = { reps_with_volume: 0, total: 0, handled: 0, lowest_rate: null };
+      var c = byCat[cat];
+      teamByCat[cat].total += c.total;
+      teamByCat[cat].handled += c.handled;
+      if (c.total >= MIN_CATEGORY_OBJECTIONS) {
+        teamByCat[cat].reps_with_volume++;
+        var rate = Math.round((c.handled / c.total) * 100);
+        if (teamByCat[cat].lowest_rate === null || rate < teamByCat[cat].lowest_rate) {
+          teamByCat[cat].lowest_rate = rate;
+        }
+      }
+    });
+  });
 
   var per_rep = repIds.map(function (id) {
     var c = cur.rep[id];
@@ -117,6 +155,13 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       obj_handled: c.obj_handled,
       obj_handle_rate: c.obj_total > 0 ? Math.round((c.obj_handled / c.obj_total) * 100) : null,
       sections: sections,
+      // 10c-1, for the rep cards. Both are pure derivations — see rep-card-metrics.
+      // weakest_section reads the EARNED close score, never the displayed one.
+      objection_categories: c.obj_by_cat,
+      weakest_section: weakestSection(Object.assign({}, sections, {
+        close: avg(c.close_earned_sum, c.close_earned_n),
+      })),
+      weakest_objection: weakestObjection(c.obj_by_cat, teamByCat),
     };
   });
   // sort: most calls first, then score
@@ -165,7 +210,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     objections_handled: t.obj_handled,
     obj_handle_rate: t.obj_total > 0 ? Math.round((t.obj_handled / t.obj_total) * 100) : null,
   };
-  return { from: from, to: to, totals: totals, per_rep: per_rep };
+  return { from: from, to: to, totals: totals, per_rep: per_rep, objection_categories: teamByCat };
 }
 
 // Trend buckets across the team by call_date. bucket ∈ week|month|quarter.
