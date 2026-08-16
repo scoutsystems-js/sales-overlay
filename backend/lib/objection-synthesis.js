@@ -8,6 +8,7 @@
 // objection_synthesis_cache and invalidated by the analysis_set_hash.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 
@@ -117,8 +118,11 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   var hash = crypto.createHash('md5').update(hashInput || 'empty').digest('hex');
 
   // 3) cache check.
+  // Key snapped to UTC day boundaries — see lib/cache-window.js. The hash above
+  // already carries freshness, so the millisecond precision only forced misses.
+  var ck = snapCacheWindow(from, to);
   var cacheQ = await admin.from('objection_synthesis_cache')
-    .select('synthesis').eq('user_id', userId).eq('synthesis_type', 'objections').eq('from_ts', from).eq('to_ts', to).eq('analysis_set_hash', hash)
+    .select('synthesis').eq('user_id', userId).eq('synthesis_type', 'objections').eq('from_ts', ck.from).eq('to_ts', ck.to).eq('analysis_set_hash', hash)
     .maybeSingle();
   if (!cacheQ.error && cacheQ.data && cacheQ.data.synthesis) {
     return Object.assign({ available: true, cached: true }, cacheQ.data.synthesis);
@@ -174,7 +178,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
 
   // 7) cache (best-effort — a cache write failure shouldn't fail the response).
   var up = await admin.from('objection_synthesis_cache').upsert(
-    { user_id: userId, synthesis_type: 'objections', from_ts: from, to_ts: to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
+    { user_id: userId, synthesis_type: 'objections', from_ts: ck.from, to_ts: ck.to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
     { onConflict: 'user_id,synthesis_type,from_ts,to_ts,analysis_set_hash' });
   if (up.error) console.error('[synthesis] cache write failed for user ' + userId + ': ' + up.error.message);
 

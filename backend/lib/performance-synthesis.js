@@ -8,6 +8,7 @@
 // (same set-hash invalidation, same credit-tolerant unavailable state).
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
@@ -136,8 +137,10 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   var hash = crypto.createHash('md5').update(hashInput).digest('hex');
 
   // 3) cache check.
+  // Key snapped to UTC day boundaries — see lib/cache-window.js.
+  var ck = snapCacheWindow(from, to);
   var cacheQ = await admin.from('objection_synthesis_cache').select('synthesis')
-    .eq('user_id', userId).eq('synthesis_type', 'performance').eq('from_ts', from).eq('to_ts', to).eq('analysis_set_hash', hash).maybeSingle();
+    .eq('user_id', userId).eq('synthesis_type', 'performance').eq('from_ts', ck.from).eq('to_ts', ck.to).eq('analysis_set_hash', hash).maybeSingle();
   if (!cacheQ.error && cacheQ.data && cacheQ.data.synthesis) return Object.assign({ available: true, cached: true }, cacheQ.data.synthesis);
 
   var outcomeByCall = {};
@@ -220,7 +223,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
 
   // 8) cache (best-effort).
   var up = await admin.from('objection_synthesis_cache').upsert(
-    { user_id: userId, synthesis_type: 'performance', from_ts: from, to_ts: to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
+    { user_id: userId, synthesis_type: 'performance', from_ts: ck.from, to_ts: ck.to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
     { onConflict: 'user_id,synthesis_type,from_ts,to_ts,analysis_set_hash' });
   if (up.error) console.error('[perf-synthesis] cache write failed for user ' + userId + ': ' + up.error.message);
 

@@ -11,6 +11,7 @@
 //     quote + clip + why.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
@@ -77,14 +78,21 @@ async function loadTeamWindow(admin, repIds, from, to) {
   return { meta: meta, callIds: callIds, inChunks: inChunks };
 }
 
+// ⚠ from/to are snapped to UTC day boundaries HERE, in the one place both the
+// read and the write pass through, so a get and a put can never disagree about
+// the key. See lib/cache-window.js for the measurement that motivated it and
+// why analysis_set_hash makes the collapse safe. Callers keep passing exact
+// timestamps — only the KEY is coarsened, never the data window.
 async function cacheGet(admin, keyId, type, from, to, hash) {
+  var k = snapCacheWindow(from, to);
   var q = await admin.from('objection_synthesis_cache').select('synthesis')
-    .eq('user_id', keyId).eq('synthesis_type', type).eq('from_ts', from).eq('to_ts', to).eq('analysis_set_hash', hash).maybeSingle();
+    .eq('user_id', keyId).eq('synthesis_type', type).eq('from_ts', k.from).eq('to_ts', k.to).eq('analysis_set_hash', hash).maybeSingle();
   return (!q.error && q.data && q.data.synthesis) ? q.data.synthesis : null;
 }
 async function cachePut(admin, keyId, type, from, to, hash, synthesis) {
+  var k = snapCacheWindow(from, to);
   var up = await admin.from('objection_synthesis_cache').upsert(
-    { user_id: keyId, synthesis_type: type, from_ts: from, to_ts: to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
+    { user_id: keyId, synthesis_type: type, from_ts: k.from, to_ts: k.to, analysis_set_hash: hash, synthesis: synthesis, generated_at: synthesis.generated_at },
     { onConflict: 'user_id,synthesis_type,from_ts,to_ts,analysis_set_hash' });
   if (up.error) console.error('[team-synthesis] cache write failed (' + type + ', key ' + keyId + '): ' + up.error.message);
 }
