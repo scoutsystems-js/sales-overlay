@@ -334,14 +334,12 @@ test('the trigger reports its expanded state and the panel is a labelled dialog'
   assert.strictEqual((open.match(/tabindex="0"/g) || []).length, 1);
 });
 
-test('STAGE 3: team AND coaching each mount their own instance', () => {
+test('team and coaching each mount their own instance', () => {
   const rendered = HTML.replace(SRC, '');
   const teamHeader = HTML.slice(HTML.indexOf('function teamHeaderHtml'), HTML.indexOf('function teamAggregateHtml'));
   assert.ok(/datePickerHtml\('team'\)/.test(teamHeader) && /ensureTeamPicker\(\)/.test(teamHeader));
   assert.ok(/datePickerHtml\('coaching'\)/.test(rendered) && /ensureCoachingPicker\(\)/.test(rendered));
-  // Two instances, two DIFFERENT keys — a shared key would silently re-couple them.
-  const keys = (rendered.match(/registerDatePicker\('([a-z]+)'/g) || []).sort();
-  assert.deepStrictEqual(keys, ["registerDatePicker('coaching'", "registerDatePicker('team'"]);
+  // The full instance list is asserted by the stage-4 test below.
 });
 
 test('STAGE 3: the preset buttons are gone from BOTH headers', () => {
@@ -388,4 +386,53 @@ test('the needs-work window label NAMES THE WINDOW, never "last N days"', () => 
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(!/your last ' \+ win \+ ' days/.test(live), 'the trailing-window phrasing must be gone');
   assert.ok(!/try 30 or 90 days/.test(live), 'and must not point at presets that no longer exist');
+});
+
+// ─── STAGE 4: Calls — seeded once from coaching, independent thereafter ────
+
+test('STAGE 4: Calls mounts a THIRD instance with its own key', () => {
+  const rendered = HTML.replace(SRC, '');
+  const keys = (rendered.match(/registerDatePicker\('([a-z]+)'/g) || []).sort();
+  assert.deepStrictEqual(keys,
+    ["registerDatePicker('calls'", "registerDatePicker('coaching'", "registerDatePicker('team'"]);
+  assert.ok(/datePickerHtml\('calls'\)/.test(rendered));
+});
+
+test('SEEDING HAS EXACTLY ONE CALLER — drillCalls, and nowhere else', () => {
+  // "Seeded once" versus "kept in sync" is the coupling that drifts back
+  // together. A second caller is how it happens, so the count is pinned.
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const calls = (live.match(/seedCallsRangeFromCoaching\(\)/g) || []).length;
+  assert.strictEqual(calls, 2, 'one definition + exactly one call site; found ' + calls);
+  const drillAt = HTML.indexOf('function drillCalls');
+  const drill = HTML.slice(drillAt, HTML.indexOf('setView(\'call-library\')', drillAt));
+  assert.ok(drill.length > 0 && drill.length < 1200, 'slice must actually cover drillCalls: ' + drill.length);
+  assert.ok(/seedCallsRangeFromCoaching\(\)/.test(drill), 'the seed must live in drillCalls');
+});
+
+test('CALLS NEVER WRITES BACK TO COACHING', () => {
+  // The direction is one-way by construction: the setter touches only its own field.
+  const setter = HTML.slice(HTML.indexOf('function setCallsRange'), HTML.indexOf('async function fetchCallLibrary'));
+  assert.ok(/state\.callLibraryRange = /.test(setter), 'it writes its own range');
+  assert.ok(!/state\.dateRange\s*=/.test(setter), 'and must never assign coaching\'s');
+  assert.ok(!/state\.teamRange\s*=/.test(setter), "nor team's");
+});
+
+test('DIRECT NAV uses Calls\' own range and does not consult coaching', () => {
+  const nav = HTML.slice(HTML.indexOf('function goCallLibrary'), HTML.indexOf('function drillCalls'));
+  assert.ok(/callsRange\(\)/.test(nav), 'it resolves Calls\' own range');
+  assert.ok(!/state\.dateRange/.test(nav), 'direct entry must not read coaching\'s range');
+  assert.ok(!/seedCallsRangeFromCoaching/.test(nav), 'and must not seed');
+});
+
+test('the three ranges are three distinct state fields', () => {
+  const rendered = HTML.replace(SRC, '');
+  assert.ok(/registerDatePicker\('team',[\s\S]{0,120}teamRange\(\)/.test(rendered));
+  assert.ok(/registerDatePicker\('coaching',[\s\S]{0,120}state\.dateRange/.test(rendered));
+  assert.ok(/registerDatePicker\('calls',[\s\S]{0,120}callsRange\(\)/.test(rendered));
+});
+
+test('the Calls presets are gone from the render path', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/onclick="setCallLibraryRange\(/.test(live));
 });

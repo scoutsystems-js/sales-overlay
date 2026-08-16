@@ -5325,7 +5325,8 @@
   }
 
   function viewToHashPath() {
-    if (state.view === 'call-library')     return 'calls';
+    // Only manager-context has a Calls range control, so only it carries a range.
+    if (state.view === 'call-library')     return 'calls' + (hasManagerContext() ? rangeHashSuffix(state.callLibraryRange) : '');
     if (state.view === 'objections-intel') return 'objections' + coachingRangeHashSuffix();
     if (state.view === 'needs-work')       return 'needs-work' + coachingRangeHashSuffix();
     if (state.view === 'performance')      return 'performance' + coachingRangeHashSuffix();
@@ -5380,7 +5381,12 @@
       state.view = COACHING_HASH[base];
       return;
     }
-    if (h === 'calls') { state.view = 'call-library'; }
+    if (base === 'calls') {
+      state.view = 'call-library';
+      var callsHashed = parseRangeFromHash(h);
+      if (callsHashed && hasManagerContext()) state.callLibraryRange = callsHashed;
+      return;
+    }
     else if (h === 'eod') { state.view = 'eod'; }
     else if (h === 'connect') { state.view = 'account'; state.account = null; pendingConnectFocus = true; }
     else if (h === 'account') { state.view = 'account'; state.account = null; /* fresh on hash entry too */ }
@@ -6665,6 +6671,44 @@
     return { from: from.toISOString(), to: to.toISOString(), days: days };
   }
 
+  // ⚠⚠ SEEDED ONCE, THEN INDEPENDENT — NOT KEPT IN SYNC (Justin's ruling 2026-08-16).
+  // These are two different relationships and they drift back together if the
+  // difference is not written down:
+  //   • SEED (drillCalls only): you clicked a number on coaching and are
+  //     following a thread, so the calls shown must be the ones behind THAT
+  //     number. Coaching's range is COPIED into Calls at that instant.
+  //   • OWN (everything after): changing the range in Calls stays in Calls. It
+  //     must NEVER write back to coaching, and coaching changing later must
+  //     NEVER reach back into Calls. There is exactly one direction, exactly once.
+  // Arriving directly from the nav uses Calls' OWN range and does not consult
+  // coaching at all.
+  // The single copy point. Called from drillCalls and nowhere else — a second
+  // caller is how "seeded once" quietly becomes "kept in sync".
+  function seedCallsRangeFromCoaching() {
+    state.callLibraryRange = state.dateRange
+      ? { from: state.dateRange.from, to: state.dateRange.to }
+      : callLibRangeFor(7);
+  }
+  function callsRange() {
+    if (!state.callLibraryRange) state.callLibraryRange = callLibRangeFor(7);
+    return state.callLibraryRange;
+  }
+  var callsPickerReady = false;
+  function ensureCallsPicker() {
+    if (callsPickerReady) return;
+    callsPickerReady = true;
+    registerDatePicker('calls', function () { return callsRange(); }, setCallsRange);
+  }
+  // The picker's outlet. Writes ONLY state.callLibraryRange.
+  function setCallsRange(from, to) {
+    state.callLibraryRange = { from: from, to: to };
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryError = null;
+    syncHashFromState(true);
+    renderCallLibrary();          // kicks loadCallLibrary(0)
+  }
+
   async function fetchCallLibrary(offset, limit) {
     var params = ['limit=' + (limit || 20), 'offset=' + (offset || 0)];
     var drilling = !!(state.callLibraryFilter || state.callLibrarySort);
@@ -6675,7 +6719,7 @@
     // Everyone else: unchanged — a drill matches its donut's window; a plain
     //   nav entry (no filter) sends no range and shows all calls.
     var range = null;
-    if (hasManagerContext()) { if (!state.callLibraryRange) state.callLibraryRange = callLibRangeFor(7); range = state.callLibraryRange; }
+    if (hasManagerContext()) { range = callsRange(); }
     else if (drilling && state.dateRange) { range = state.dateRange; }
     if (range) {
       params.push('from=' + encodeURIComponent(range.from));
@@ -6697,7 +6741,11 @@
     state.callLibrary = null;
     state.callLibraryOffset = 0;
     state.callLibraryError = null;
-    if (hasManagerContext()) state.callLibraryRange = callLibRangeFor(7);
+    // Arriving directly uses Calls' OWN range. It is no longer reset to 7d on
+    // every entry: team and coaching both persist their ranges, and "Calls owns
+    // it" is meaningless if leaving the view discards it. First-ever entry still
+    // defaults to 7d via callsRange().
+    if (hasManagerContext()) callsRange();
     setView('call-library');
   }
 
@@ -6709,13 +6757,14 @@
     state.callLibrary = null;
     state.callLibraryOffset = 0;
     state.callLibraryError = null;
-    // Manager-context: seed the Calls date control with the donut's window so the
-    // header presets reflect (and can adjust) the drill range.
-    if (hasManagerContext()) state.callLibraryRange = state.dateRange ? { from: state.dateRange.from, to: state.dateRange.to, days: state.dateRange.days } : callLibRangeFor(7);
+    // THE ONE SEED POINT — see seedCallsRangeFromCoaching. You are following a
+    // thread from a number on coaching, so Calls starts on that number's window.
+    // From here Calls owns it; nothing writes back.
+    if (hasManagerContext()) seedCallsRangeFromCoaching();
     setView('call-library');
   }
 
-  // Calls-view date preset (manager-context only). Re-fetches for the new window.
+  /* REMOVED 2026-08-16 — superseded by setCallsRange, the picker's outlet.
   function setCallLibraryRange(days) {
     state.callLibraryRange = callLibRangeFor(days);
     state.callLibrary = null;
@@ -6723,6 +6772,7 @@
     state.callLibraryError = null;
     renderCallLibrary(); // kicks loadCallLibrary(0)
   }
+  */
 
   // Calls-view rep selector (manager-context only). Reuses the ?user= pivot
   // machinery (viewingUserId + isSelf() → /admin/fathom-calls/<id>), but stays on
@@ -7086,10 +7136,14 @@
         }).join('');
         picker = '<select class="user-select" onchange="onCallLibraryPick(this.value)">' + opts + tail + '</select>';
       }
+      ensureCallsPicker();
+      var presets = datePickerHtml('calls');
+      /* REMOVED 2026-08-16 — superseded by the date picker above.
       var range = state.callLibraryRange || callLibRangeFor(7);
       var presets = [[7, '7d'], [30, '30d'], [90, '90d']].map(function (p) {
         return '<button class="date-preset' + (range.days === p[0] ? ' active' : '') + '" onclick="setCallLibraryRange(' + p[0] + ')">' + p[1] + '</button>';
       }).join('');
+      */
       controls = '<div class="controls">' + picker + '<div class="date-presets">' + presets + '</div></div>';
     }
     // When pivoted to another rep, show whose calls these are.
