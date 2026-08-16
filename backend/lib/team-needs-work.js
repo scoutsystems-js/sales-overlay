@@ -187,8 +187,16 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
     };
   }
 
+  // ⚠ NAME THE WINDOW. With a free date picker a manager can select six days and
+  // land under the volume gates; "not enough of your objections yet" then reads
+  // as a verdict on the REP when it is a fact about the WINDOW. opts.windowDays
+  // is optional — the team lane does not pass it and keeps its old wording.
+  var win = (opts && opts.windowDays) ? opts.windowDays : null;
+  var winPhrase = win ? ('in the ' + win + ' day' + (win === 1 ? '' : 's') + ' you selected') : null;
   var insufficientText = subject === 'personal'
-    ? 'Not enough of your objections yet to pinpoint a focus area — keep logging calls.'
+    ? (winPhrase
+        ? 'Not enough of your objections ' + winPhrase + ' to pinpoint a focus area — try a wider range.'
+        : 'Not enough of your objections yet to pinpoint a focus area — keep logging calls.')
     : 'Not enough objection volume this period to pinpoint a focus area.';
   // Overall-volume gate → deterministic insufficient (cacheable, no Claude).
   if (analyzed < minAnalyzed || totalObj === 0) {
@@ -217,7 +225,10 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
 
   if (candidates.length === 0) {
     return { state: 'insufficient', headline: 'What needs work',
-      card_text: subject === 'personal' ? 'No single objection type stands out as a weak spot for you yet.' : 'No single objection type stands out as a weakness this period.',
+      card_text: subject === 'personal'
+        ? (winPhrase ? 'No single objection type stands out as a weak spot ' + winPhrase + '.'
+                     : 'No single objection type stands out as a weak spot for you yet.')
+        : 'No single objection type stands out as a weakness this period.',
       bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
   }
 
@@ -439,10 +450,10 @@ var ANALYSIS_COLS = 'fathom_call_id, analyzed_at, outcome, cash_collected, statu
 // there is exactly ONE entry per user; the analyses-set hash is what refreshes
 // it as the rolling 90d content changes. window_days is echoed for the UI label.
 async function computePersonalNeedsWork(admin, userId, from, to) {
-  var personalOpts = { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED };
+  var windowDays = Math.max(1, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000));
+  var personalOpts = { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, windowDays: windowDays };
   // Range-responsive (2026-07-27): computes on the SELECTED window, labels it,
   // and caches per range. window_days echoed for the UI label.
-  var windowDays = Math.max(1, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000));
   function stamp(r) { r.window_days = windowDays; return r; }
   var w = await loadTeamWindow(admin, [userId], from, to);
   if (w.callIds.length === 0) return Object.assign({ available: true, cached: false }, stamp(computeNeedsWork([], [], {}, personalOpts)));
@@ -495,7 +506,7 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
     return { available: false, reason: mapRes.reason };
   }
 
-  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, injected: injected, bucketClass: mapRes.bucketClass });
+  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, injected: injected, bucketClass: mapRes.bucketClass, windowDays: windowDays });
   await cachePut(admin, userId, 'needs_work', from, to, hash, result);
   return Object.assign({ available: true, cached: false }, stamp(result));
 }

@@ -1216,6 +1216,7 @@
     .review-speaker-badge.closer   { background: rgba(91, 158, 255, 0.14); color: var(--accent); }
     .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text-soft); }
     .rep-graph { height: 300px; margin-top: 12px; }
+    .rep-graph-skeleton { height: 100%; width: 100%; border-radius: var(--radius); }
     /* Date-range picker (stage 1). All text full strength — the no-grey rule. */
     .dp { position: relative; display: inline-block; }
     .dp-label { background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius);
@@ -3282,6 +3283,40 @@
   // ──────────────────────────────────────────────────────────────────
   // Date range / user controls
   // ──────────────────────────────────────────────────────────────────
+  // ⚠ WHOSE RANGE IS state.dateRange? THE COACHING FAMILY'S (stage 3).
+  // Team moved to state.teamRange in stage 2 and Calls owns state.callLibraryRange.
+  // What remains on state.dateRange is coaching AND the surfaces reached FROM it:
+  // needs-work, performance, the section drilldown and objections.
+  //
+  // ⚠ THOSE DRILL-DOWNS INHERIT RATHER THAN OWN, AND THAT IS A DECISION.
+  // Justin's ruling is that every date PICKER is separated — coaching, team and
+  // Calls are peers and must not share one. A drilldown is not a peer, it is a
+  // child: you open it by clicking a number ON coaching. If it owned its own
+  // range it could open showing a different period than the number you clicked,
+  // so the detail would no longer explain the thing it was opened from. The
+  // section view has no range control at all (just "← Back to coaching") and
+  // needs-work renders coaching's own header, so inheriting is also what the
+  // existing UI already promises.
+  var coachingPickerReady = false;
+  function ensureCoachingPicker() {
+    if (coachingPickerReady) return;
+    coachingPickerReady = true;
+    registerDatePicker('coaching', function () { return state.dateRange; }, setCoachingRange);
+  }
+  // The picker's outlet. Does exactly what a preset click used to do, minus the
+  // preset: same refetch, same in-place re-render of range-responsive sub-views.
+  function setCoachingRange(from, to) {
+    state.dateRange = { from: from, to: to };
+    state.needsWork = null;                 // range-responsive — refetch for the new window
+    syncHashFromState(true);                // the range lives in the URL
+    if (state.view === 'needs-work') { renderNeedsWorkView(); return; }
+    if (state.view === 'performance') { state.perfSynthesis = null; renderPerformanceView(); return; }
+    // The drilldown re-queries on the inherited range so the detail keeps
+    // explaining the number that opened it.
+    if (state.view === 'section') { state.sectionData = null; loadSectionBreakdown(state.selectedSection); return; }
+    reloadAll();
+  }
+
   function setDateRange(days, preserveView) {
     var to = new Date();
     var from = days >= 9999
@@ -3424,11 +3459,17 @@
       userPicker = '<select class="user-select" onchange="setUser(this.value)">' + opts + '</select>';
     }
 
+    // Stage 3: the 7d/30d/90d/All presets are replaced by the calendar. "All" is
+    // the Earliest link inside the panel, per the ruling — no presets alongside.
+    ensureCoachingPicker();
+    var presets = datePickerHtml('coaching');
+    /* REMOVED 2026-08-16 — superseded by the date picker above.
     var presets = '';
     [[7, '7d'], [30, '30d'], [90, '90d'], [9999, 'All']].forEach(function(p) {
       var active = state.dateRange.days === p[0] ? ' active' : '';
       presets += '<button class="date-preset' + active + '" onclick="setDateRange(' + p[0] + ')">' + p[1] + '</button>';
     });
+    */
 
     var scopePill = state.viewingUserId !== state.me.user_id ? '<span class="scope-pill">' + escapeHtml(state.me.role || '') + ' view</span>' : '';
 
@@ -3733,6 +3774,17 @@
   function toggleOverviewSection(key) { state.overviewExpanded[key] = !state.overviewExpanded[key]; renderOverview(false); }
   */
 
+  // ⚠ NOT "last N days". That phrasing is only true of a trailing window; with a
+  // free date picker the user can select Jul 1 - Jul 31 and "last 31 days" would
+  // be a different month. Derived from the same range the picker renders, so the
+  // header and the control can never contradict each other — which they did on
+  // the first live render of this stage.
+  function needsWorkWindowLabel() {
+    var r = state.dateRange;
+    if (!r || !r.from || !r.to) return 'your recent calls';
+    return rangeLabelInclusive(r.from, r.to);
+  }
+
   // ── A-2.1: personal "What needs work" (card under the tiles + #needs-work page)
   async function fetchNeedsWork() {
     // Range-responsive: computes on the selected window (default 90d server-side).
@@ -3754,14 +3806,17 @@
   }
   // Compact card under the glance tiles. Mirrors the team needs-work card.
   // Personal needs-work degrades honestly when a short window is too thin.
+  // The server-side degrade text now names the window itself ("in the 6 days you
+  // selected — try a wider range"), so this no longer repeats it, and it must not
+  // point at 30/90-day presets that no longer exist.
   function needsWorkThinHint(d) {
     var win = (d && d.window_days) || 90;
-    return win < 60 ? ' Not enough volume in this window — try 30 or 90 days.' : '';
+    return win < 60 ? ' Widen the date range for a fuller picture.' : '';
   }
   function needsWorkCardHtml() {
     var d = state.needsWork;
-    var win = (d && d.window_days) ? d.window_days : 90;
-    var head = '<div class="section-header"><h2>What Needs Work</h2><div class="meta">your last ' + win + ' days</div></div>';
+    var head = '<div class="section-header"><h2>What Needs Work</h2><div class="meta">'
+      + escapeHtml(needsWorkWindowLabel()) + '</div></div>';
     if (!d) return head + '<div class="skeleton" style="height:70px;"></div>';
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
@@ -3798,7 +3853,7 @@
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
     content.innerHTML = renderHeaderHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
-        + '<div class="meta">your objection-handling focus · last ' + ((state.needsWork && state.needsWork.window_days) || 90) + ' days</div></div>'
+        + '<div class="meta">your objection-handling focus · ' + escapeHtml(needsWorkWindowLabel()) + '</div></div>'
         + '<button class="date-preset" onclick="backToOverview()">← back</button></div>'
         + needsWorkDetailBodyHtml(state.needsWork) + '</div>';
   }
@@ -4121,6 +4176,17 @@
     });
   }
 
+  // While a new range is fetching, a bare 300px canvas is a tall blank box — the
+  // other panels use skeletons, so these do too. The canvas is still emitted so
+  // drawRepSeriesCharts has something to draw into the moment data lands.
+  function repGraphBodyHtml(canvasId) {
+    var loading = state.teamRepSeriesLoading || (!state.teamRepSeries && !state.teamRepSeriesLoading);
+    return '<div class="rep-graph">'
+      + (loading ? '<div class="rep-graph-skeleton skeleton"></div>' : '')
+      + '<canvas id="' + canvasId + '"' + (loading ? ' style="display:none;"' : '') + '></canvas>'
+      + '</div>';
+  }
+
   function repSeriesSectionHtml() {
     var opts = OBJECTION_CATEGORY_OPTIONS.map(function (o) {
       var sel = ((state.teamObjectionCategory || '') === o.key) ? ' selected' : '';
@@ -4129,9 +4195,9 @@
     return '<div class="section fade-in">'
       + '<div class="rep-graph-head"><h2>Objection Handling Over Time</h2>'
         + '<select class="rep-graph-select" onchange="setTeamObjectionCategory(this.value)">' + opts + '</select></div>'
-      + '<div class="rep-graph"><canvas id="repHandleChart"></canvas></div>'
+      + repGraphBodyHtml('repHandleChart')
       + '<h2 style="margin-top:26px;">Closing Rate Over Time</h2>'
-      + '<div class="rep-graph"><canvas id="repCloseChart"></canvas></div>'
+      + repGraphBodyHtml('repCloseChart')
     + '</div>';
   }
 
@@ -5231,11 +5297,14 @@
   //   overview         → (no hash)      call-library     → #calls
   //   objections-intel → #objections    call-review      → #call/<id>
   // (Dormant Live-Sessions drills carry no hash — they're unreachable today.)
-  function teamRangeHashSuffix() {
-    var r = state.teamRange;
+  function rangeHashSuffix(r) {
     if (!r || !r.from || !r.to) return '';
     return '?from=' + ymd(r.from) + '&to=' + ymd(r.to);
   }
+  function teamRangeHashSuffix() { return rangeHashSuffix(state.teamRange); }
+  // The coaching family (overview, needs-work, performance, objections, section)
+  // all read state.dateRange, so they all carry the same suffix.
+  function coachingRangeHashSuffix() { return rangeHashSuffix(state.dateRange); }
   // '#team?from=2026-08-03&to=2026-08-10' → the inclusive window it names.
   // Returns null on anything malformed so a hand-edited URL falls back to the
   // default rather than rendering a window nobody asked for.
@@ -5257,12 +5326,12 @@
 
   function viewToHashPath() {
     if (state.view === 'call-library')     return 'calls';
-    if (state.view === 'objections-intel') return 'objections';
-    if (state.view === 'needs-work')       return 'needs-work';
-    if (state.view === 'performance')      return 'performance';
+    if (state.view === 'objections-intel') return 'objections' + coachingRangeHashSuffix();
+    if (state.view === 'needs-work')       return 'needs-work' + coachingRangeHashSuffix();
+    if (state.view === 'performance')      return 'performance' + coachingRangeHashSuffix();
     if (state.view === 'kb')               return 'kb';
     if (state.view === 'prospects')        return 'prospects';
-    if (state.view === 'section')          return 'section';
+    if (state.view === 'section')          return 'section' + coachingRangeHashSuffix();
     if (state.view === 'eod')              return 'eod';
     if (state.view === 'account')          return 'account';
     // The team range travels in the hash so a refresh keeps it and a manager can
@@ -5273,7 +5342,9 @@
     if (state.view === 'team-needs-work')  return 'team-needs-work';
     if (state.view === 'team-members')     return 'team-members';
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
-    return ''; // overview + dormant drills
+    // Overview has no path of its own, but still carries its range so a
+    // refresh or a shared link lands on the same window.
+    return coachingRangeHashSuffix(); // overview + dormant drills
   }
   // Point the URL at the current view. pushState/replaceState do NOT fire
   // hashchange, so this never re-enters the router below (no navigation loop).
@@ -5298,13 +5369,28 @@
       if (hashed) { state.teamRange = hashed; state.teamRangeInit = true; }  // beat the 7d default
       return;
     }
+    // The coaching family shares one range, so parse it once for all of them.
+    var coachRange = parseRangeFromHash(h);
+    var COACHING_HASH = { '': 'overview', 'needs-work': 'needs-work', 'performance': 'performance',
+                          'objections': 'objections-intel', 'section': 'section' };
+    if (Object.prototype.hasOwnProperty.call(COACHING_HASH, base)) {
+      if (coachRange) state.dateRange = coachRange;
+      // 'section' needs a section already selected; without one it is meaningless.
+      if (base === 'section' && !state.selectedSection) { state.view = 'overview'; return; }
+      state.view = COACHING_HASH[base];
+      return;
+    }
     if (h === 'calls') { state.view = 'call-library'; }
     else if (h === 'eod') { state.view = 'eod'; }
     else if (h === 'connect') { state.view = 'account'; state.account = null; pendingConnectFocus = true; }
     else if (h === 'account') { state.view = 'account'; state.account = null; /* fresh on hash entry too */ }
+    /* REMOVED 2026-08-16 — unreachable: the COACHING_HASH branch above handles
+       objections / needs-work / performance (it must, to parse ?from=&to=) and
+       returns early. Kept in place per the standing convention.
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'needs-work') { state.view = 'needs-work'; }
     else if (h === 'performance') { state.view = 'performance'; }
+    */
     /* REMOVED 2026-08-16 — unreachable: the `base === 'team'` branch above now
        handles team (it must, to parse the ?from=&to= suffix) and returns early. */
     else if (h === 'team-recs') { state.view = 'team-expanded'; }

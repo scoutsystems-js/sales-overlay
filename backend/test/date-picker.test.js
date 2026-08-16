@@ -334,17 +334,58 @@ test('the trigger reports its expanded state and the panel is a labelled dialog'
   assert.strictEqual((open.match(/tabindex="0"/g) || []).length, 1);
 });
 
-test('STAGE 2: the TEAM view mounts the picker; the other views have not yet', () => {
-  const rendered = HTML.replace(SRC, '');           // ignore the definition itself
+test('STAGE 3: team AND coaching each mount their own instance', () => {
+  const rendered = HTML.replace(SRC, '');
   const teamHeader = HTML.slice(HTML.indexOf('function teamHeaderHtml'), HTML.indexOf('function teamAggregateHtml'));
-  assert.ok(/datePickerHtml\('team'\)/.test(teamHeader), 'the team header must render the picker');
-  assert.ok(/ensureTeamPicker\(\)/.test(teamHeader), 'and register it first');
+  assert.ok(/datePickerHtml\('team'\)/.test(teamHeader) && /ensureTeamPicker\(\)/.test(teamHeader));
+  assert.ok(/datePickerHtml\('coaching'\)/.test(rendered) && /ensureCoachingPicker\(\)/.test(rendered));
+  // Two instances, two DIFFERENT keys — a shared key would silently re-couple them.
+  const keys = (rendered.match(/registerDatePicker\('([a-z]+)'/g) || []).sort();
+  assert.deepStrictEqual(keys, ["registerDatePicker('coaching'", "registerDatePicker('team'"]);
+});
 
-  // The coaching header keeps its presets until stage 3.
-  const coachHeader = HTML.slice(HTML.indexOf('var presets = \'\';'), HTML.indexOf('var scopePill'));
-  assert.ok(/setDateRange\(/.test(coachHeader), 'coaching still uses presets in stage 2');
-  assert.ok(!/datePickerHtml/.test(coachHeader), 'coaching must NOT mount the picker yet');
+test('STAGE 3: the preset buttons are gone from BOTH headers', () => {
+  const rendered = HTML.replace(SRC, '');
+  const live = rendered.replace(/\/\*[\s\S]*?\*\//g, '');   // ignore commented-out archives
+  assert.ok(!/onclick="setDateRange\(/.test(live), 'coaching presets must be gone from the render path');
+  assert.ok(!/onclick="setTeamRange\(/.test(live), 'team presets must be gone from the render path');
+  // And the archived originals are kept, per the standing convention.
+  assert.ok(/REMOVED 2026-08-16/.test(rendered));
+});
 
-  // Exactly one instance is registered so far.
-  assert.strictEqual((rendered.match(/registerDatePicker\(/g) || []).length, 1);
+test('THE TWO RANGES ARE SEPARATE FIELDS — the split is finished', () => {
+  const rendered = HTML.replace(SRC, '');
+  assert.ok(/registerDatePicker\('team',[\s\S]{0,120}teamRange\(\)/.test(rendered),
+    'team reads state.teamRange');
+  assert.ok(/registerDatePicker\('coaching',[\s\S]{0,120}state\.dateRange/.test(rendered),
+    'coaching reads state.dateRange');
+});
+
+test("the DRILL-DOWNS inherit coaching's range, and the reason is recorded", () => {
+  // A decision, not an oversight: a drilldown is opened by clicking a number ON
+  // coaching, so owning a separate range would let it show a different period
+  // than the number that opened it.
+  assert.ok(/THOSE DRILL-DOWNS INHERIT RATHER THAN OWN, AND THAT IS A DECISION/.test(HTML));
+  const setter = HTML.slice(HTML.indexOf('function setCoachingRange'), HTML.indexOf('function setDateRange'));
+  ['needs-work', 'performance', 'section'].forEach((v) => {
+    assert.ok(setter.indexOf("'" + v + "'") !== -1, 'the setter must refresh ' + v + ' in place');
+  });
+  assert.ok(/loadSectionBreakdown\(/.test(setter), 'and re-query the drilldown, not just re-render it');
+});
+
+test('the needs-work window label NAMES THE WINDOW, never "last N days"', () => {
+  // Caught on the first live render of stage 3: the picker said "Jul 1 - Jul 31"
+  // while the header said "last 90 days". "Last N days" is only true of a
+  // trailing window, so with a free picker it is simply false.
+  const { api } = sandbox();
+  const src = HTML.slice(HTML.indexOf('function needsWorkWindowLabel'), HTML.indexOf('// ── A-2.1'));
+  const fn = new Function('state', 'rangeLabelInclusive', src + '; return needsWorkWindowLabel();');
+  assert.strictEqual(
+    fn({ dateRange: { from: '2026-07-01T00:00:00.000Z', to: '2026-07-31T23:59:59.999Z' } }, api.rangeLabelInclusive),
+    'Jul 1 - Jul 31');
+  assert.strictEqual(fn({}, api.rangeLabelInclusive), 'your recent calls', 'degrades without inventing a window');
+
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/your last ' \+ win \+ ' days/.test(live), 'the trailing-window phrasing must be gone');
+  assert.ok(!/try 30 or 90 days/.test(live), 'and must not point at presets that no longer exist');
 });
