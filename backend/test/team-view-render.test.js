@@ -262,3 +262,123 @@ test('the default seed is the last 7 days INCLUSIVE, not a bare now-minus-7', ()
   const days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
   assert.strictEqual(days, 7, 'seven inclusive days');
 });
+
+// ─── 10c-2: the rep cards, driven through the real render path ────────────
+
+const REPS = [
+  { user_id: 'u-josh', display_name: 'josh', calls_analyzed: 155,
+    prospect_close_rate: 27, prospect_close_wins: 39, prospect_close_total: 142,
+    obj_handle_rate: 13, obj_handled: 17, obj_total: 132,
+    sections: { intro: 57, discovery: 47, pitch: 65, objection: 64, close: 64 },
+    weakest_section: { section: 'discovery', score: 47 },
+    weakest_objection: { category: 'timing', rate: 7, handled: 3, total: 42,
+                         comparable: false, team_rate: null, is_lowest: null } },
+  { user_id: 'u-ava', display_name: 'demo-ava', calls_analyzed: 5,
+    prospect_close_rate: null, prospect_close_wins: 0, prospect_close_total: 0,
+    obj_handle_rate: 14, obj_handled: 1, obj_total: 7,
+    sections: { intro: 71, discovery: 45, pitch: 67, objection: 56, close: 50 },
+    weakest_section: { section: 'discovery', score: 45 },
+    weakest_objection: null },
+  { user_id: 'u-zed', display_name: 'zed', calls_analyzed: 9,
+    prospect_close_rate: 5, prospect_close_wins: 1, prospect_close_total: 20,
+    obj_handle_rate: null, obj_handled: 0, obj_total: 0,
+    sections: {}, weakest_section: null,
+    weakest_objection: { category: 'partner', rate: 9, handled: 1, total: 11,
+                         comparable: true, team_rate: 24, is_lowest: true } },
+];
+
+function renderCards(reps) {
+  return renderTeam(Object.assign({}, BASE, {
+    teamOverview: { reps: [], per_rep: reps, totals: {} }, teamOverviewLoading: false,
+  }));
+}
+
+test('10c-2: a card renders per rep, SORTED WORST FIRST', () => {
+  const out = renderCards(REPS);
+  const order = ['zed', 'josh', 'demo-ava'].map((n) => out.html.indexOf('>' + n + '<'));
+  order.forEach((i, k) => assert.notStrictEqual(i, -1, 'missing card: ' + ['zed','josh','demo-ava'][k]));
+  assert.ok(order[0] < order[1], 'zed (5%) before josh (27%)');
+  assert.ok(order[1] < order[2], 'the rep with NO prospects sorts last');
+});
+
+test('rates render WITH their raw counts, per the house rule', () => {
+  const out = renderCards(REPS);
+  assert.ok(out.html.indexOf('39 of 142 prospects') !== -1, 'closing counts');
+  assert.ok(out.html.indexOf('17 of 132 handled') !== -1, 'objection counts');
+  assert.ok(out.html.indexOf('3 of 42 handled') !== -1, 'weakest-objection counts');
+});
+
+test('UNMEASURED IS SAID IN WORDS, never a bare dash that reads as zero', () => {
+  const out = renderCards(REPS);
+  assert.ok(out.html.indexOf('No prospects yet') !== -1, 'a rep with no prospects says so');
+  assert.ok(out.html.indexOf('No objections yet') !== -1, 'and one with no objections');
+  // And crucially: NO dash is rendered as the value either. A big "—" where a
+  // percentage goes reads as zero however the line beneath it is worded.
+  const avaCard = out.html.slice(out.html.indexOf('>demo-ava<'), out.html.indexOf('>demo-ava<') + 1400);
+  assert.strictEqual(avaCard.indexOf('rep-stat-val">\u2014'), -1, 'no dash as a stat value');
+  assert.ok(out.html.indexOf('not enough objections yet to judge a category') !== -1);
+  assert.ok(out.html.indexOf('no scored sections yet') !== -1);
+});
+
+test('THE TEAM COMPARISON APPEARS ONLY WHEN IT QUALIFIES', () => {
+  const out = renderCards(REPS);
+  // zed qualifies (comparable true) — josh does not.
+  assert.ok(out.html.indexOf('team 24%') !== -1, 'a qualifying comparison is shown');
+  assert.ok(out.html.indexOf('lowest on the team') !== -1);
+  const joshCard = out.html.slice(out.html.indexOf('>josh<'), out.html.indexOf('>demo-ava<'));
+  assert.ok(joshCard.indexOf('Timing 7%') !== -1, 'josh still gets his own rate');
+  assert.ok(joshCard.indexOf('team ') === -1, 'but NO ranking off n=1');
+  assert.ok(joshCard.indexOf('lowest on the team') === -1);
+});
+
+test('the weakest SECTION renders with its score and a human label', () => {
+  const out = renderCards(REPS);
+  assert.ok(out.html.indexOf('Discovery 47') !== -1);
+  assert.ok(out.html.indexOf('discovery 47') === -1, 'label should be the human form');
+});
+
+test('cards click through via the EXISTING pivot, not a parallel path', () => {
+  const out = renderCards(REPS);
+  assert.ok(/onclick="setUser\('u-josh'\)"/.test(out.html));
+});
+
+test('the 10d WHY slot is present but EMPTY — the prose is not built yet', () => {
+  const out = renderCards(REPS);
+  assert.ok(/10d's slot|WHY slot/.test(HTML), 'the slot must be marked in the source');
+  assert.ok(out.html.indexOf('rep-why') === -1, 'and nothing rendered into it yet');
+});
+
+test('the cards sit between the graphs and What Needs Work', () => {
+  const out = renderCards(REPS);
+  const graphs = out.html.indexOf('repHandleChart');
+  const cards = out.html.indexOf('rep-card-list');
+  const needs = out.html.indexOf('What Needs Work');
+  [graphs, cards, needs].forEach((i) => assert.notStrictEqual(i, -1));
+  assert.ok(graphs < cards && cards < needs, 'graphs → cards → needs work');
+});
+
+test('an empty or still-loading team degrades without throwing', () => {
+  const empty = renderCards([]);
+  assert.ok(empty.html.indexOf('No reps in this team yet') !== -1);
+  const loading = renderTeam(Object.assign({}, BASE, { teamOverview: null, teamOverviewLoading: true }));
+  assert.ok(loading.html.length > 0, 'still renders');
+});
+
+test('MIRROR GUARD: the inline sort matches lib/rep-card-metrics', () => {
+  // The page has no module loader, so the sort is duplicated. This fails if the
+  // two ever disagree — the same pattern as section-breakdown-mirror.
+  const lib = require('../lib/rep-card-metrics').sortRepsWorstFirst;
+  const inline = new Function(
+    HTML.slice(HTML.indexOf('function sortRepsWorstFirst'), HTML.indexOf('function repCardsHtml'))
+    + '; return sortRepsWorstFirst;')();
+  const fixtures = [
+    REPS,
+    [{ display_name: 'a', prospect_close_rate: 0, prospect_close_total: 5 },
+     { display_name: 'b', prospect_close_rate: null, prospect_close_total: 0 }],
+    [], null,
+  ];
+  fixtures.forEach((f) => {
+    assert.deepStrictEqual((inline(f) || []).map((r) => r.display_name),
+                           (lib(f) || []).map((r) => r.display_name), JSON.stringify(f));
+  });
+});

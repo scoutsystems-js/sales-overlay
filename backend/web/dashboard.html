@@ -1216,6 +1216,28 @@
     .review-speaker-badge.closer   { background: rgba(91, 158, 255, 0.14); color: var(--accent); }
     .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text-soft); }
     .rep-graph { height: 300px; margin-top: 12px; }
+    /* 10c-2 rep cards. All text full strength — the no-grey rule. */
+    .rep-card-list { display: grid; gap: 12px; margin-top: 12px; }
+    .rep-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated);
+                padding: 16px; cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease); }
+    .rep-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .rep-card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+    .rep-card-name { font-size: 16px; font-weight: 600; color: var(--text); }
+    .rep-card-calls { font-size: 12px; color: var(--text); }
+    .rep-card-stats { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 10px; }
+    .rep-stat { min-width: 150px; }
+    .rep-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
+    .rep-stat-val { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.2; margin-top: 3px; }
+    .rep-stat-sub { font-size: 12px; color: var(--text); margin-top: 1px; }
+    .rep-weak { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; padding-top: 8px;
+                border-top: 1px solid var(--border); font-size: 13px; color: var(--text); }
+    .rep-weak-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; min-width: 132px; }
+    .rep-weak-val { font-weight: 600; }
+    .rep-weak-sub, .rep-weak-cmp, .rep-weak-none { color: var(--text); }
+    .rep-weak-cmp { margin-left: auto; }
+    /* Unmeasured: the sentence IS the value, so there is no dash to misread. */
+    /* Same vertical slot the big number occupies, so mixed rows stay aligned. */
+    .rep-stat-none-val { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.2; margin-top: 3px; padding: 4px 0; }
     .rep-graph-skeleton { height: 100%; width: 100%; border-radius: var(--radius); }
     /* Date-range picker (stage 1). All text full strength — the no-grey rule. */
     .dp { position: relative; display: inline-block; }
@@ -4249,6 +4271,7 @@
       teamHeaderHtml()
       + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
       + repSeriesSectionHtml()
+      + repCardsHtml()
       + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
@@ -5133,6 +5156,127 @@
   }
 
   function repName(r) { return r.display_name || (r.email ? r.email.split('@')[0] : (r.user_id || '').slice(0, 8)); }
+
+  // ══ 10c-2: THE REP CARDS ═════════════════════════════════════════════════
+  //
+  // One card per rep, WORST FIRST. Every number here is computed in JS
+  // (lib/rep-card-metrics via /team/overview) — nothing on this card is a model
+  // output. The WHY slot is left empty until 10d fills it.
+  //
+  // ⚠ UNMEASURED IS SAID IN WORDS, NEVER A DASH. "—" reads as zero, and a rep
+  // with no prospects has not closed 0% — they have no prospects. The distinction
+  // is the same one the graphs make between an empty bucket and a real zero.
+  var OBJECTION_LABEL = { fear: 'Fear / money', timing: 'Timing', logistical: 'Logistical', partner: 'Partner / spouse' };
+
+  // ⚠ WHEN UNMEASURED, THE WORDS ARE THE VALUE — there is no dash at all. A big
+  // "—" sitting where a percentage goes reads as zero however carefully the line
+  // beneath it is worded, which is the whole point of the ruling.
+  // ⚠ ONE STRUCTURE FOR BOTH STATES: label, then value, then detail. The first
+  // version put the label first only when unmeasured, which left mixed cards
+  // visibly ragged — the big number and the small label sat on different
+  // baselines in the same row.
+  function repCardStat(label, value, sub, unmeasured) {
+    return '<div class="rep-stat' + (unmeasured ? ' rep-stat-none' : '') + '">'
+      + '<div class="rep-stat-label">' + escapeHtml(label) + '</div>'
+      + (unmeasured
+          ? '<div class="rep-stat-none-val">' + escapeHtml(sub) + '</div>'
+          : '<div class="rep-stat-val">' + escapeHtml(value) + '</div>'
+            + '<div class="rep-stat-sub">' + escapeHtml(sub) + '</div>')
+      + '</div>';
+  }
+
+  // The weakest-objection line, including the ruling that a ranking needs a team.
+  function repWeakestObjectionHtml(wo) {
+    if (!wo) {
+      return '<div class="rep-weak"><span class="rep-weak-label">Weakest objection</span>'
+        + '<span class="rep-weak-none">not enough objections yet to judge a category</span></div>';
+    }
+    var name = OBJECTION_LABEL[wo.category] || wo.category;
+    // ⚠ The comparison appears ONLY when it qualifies (≥3 reps with ≥6 in that
+    // category). Off n=1 a ranking reads as a finding and means nothing.
+    var comparison = wo.comparable
+      ? '<span class="rep-weak-cmp">team ' + wo.team_rate + '%'
+          + (wo.is_lowest ? ' · <strong>lowest on the team</strong>' : '') + '</span>'
+      : '';
+    return '<div class="rep-weak"><span class="rep-weak-label">Weakest objection</span>'
+      + '<span class="rep-weak-val">' + escapeHtml(name) + ' ' + wo.rate + '%</span>'
+      + '<span class="rep-weak-sub">' + wo.handled + ' of ' + wo.total + ' handled</span>'
+      + comparison
+      + '</div>';
+  }
+
+  function repWeakestSectionHtml(ws) {
+    if (!ws) {
+      return '<div class="rep-weak"><span class="rep-weak-label">Weakest section</span>'
+        + '<span class="rep-weak-none">no scored sections yet</span></div>';
+    }
+    return '<div class="rep-weak"><span class="rep-weak-label">Weakest section</span>'
+      + '<span class="rep-weak-val">' + escapeHtml(SECTION_LABEL[ws.section] || ws.section) + ' ' + ws.score + '</span></div>';
+  }
+
+  function repCardHtml(r) {
+    var close = closeRateDisplay(r);
+    var closeUnmeasured = !(r.prospect_close_total > 0);
+    var objUnmeasured = !(r.obj_total > 0);
+    var stats = repCardStat('Closing rate',
+          closeUnmeasured ? '' : close.value,
+          closeUnmeasured ? 'No prospects yet' : close.sub,
+          closeUnmeasured)
+      + repCardStat('Objection handling',
+          objUnmeasured ? '' : r.obj_handle_rate + '%',
+          objUnmeasured ? 'No objections yet' : (r.obj_handled + ' of ' + r.obj_total + ' handled'),
+          objUnmeasured);
+
+    // 10d's slot. Deliberately empty — the prose is counted, not written here.
+    var why = '';
+
+    return '<div class="rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')"'
+      + ' title="Open ' + escapeHtml(repName(r)) + '\'s report">'
+      + '<div class="rep-card-head">'
+        + '<div class="rep-card-name">' + escapeHtml(repName(r)) + '</div>'
+        + '<div class="rep-card-calls">' + r.calls_analyzed + ' call' + (r.calls_analyzed === 1 ? '' : 's') + '</div>'
+      + '</div>'
+      + '<div class="rep-card-stats">' + stats + '</div>'
+      + repWeakestSectionHtml(r.weakest_section)
+      + repWeakestObjectionHtml(r.weakest_objection)
+      + why
+      + '</div>';
+  }
+
+  // Mirrors lib/rep-card-metrics.sortRepsWorstFirst. Kept inline because the
+  // page has no module loader; the mirror test forbids the two from drifting.
+  // Closing rate ascending, reps with NO prospects LAST — a genuine 0% is worst,
+  // zero prospects is unmeasured.
+  function sortRepsWorstFirst(reps) {
+    if (!Array.isArray(reps)) return [];
+    return reps.slice().sort(function (a, b) {
+      var am = a.prospect_close_total > 0 && typeof a.prospect_close_rate === 'number';
+      var bm = b.prospect_close_total > 0 && typeof b.prospect_close_rate === 'number';
+      if (am !== bm) return am ? -1 : 1;
+      if (am && a.prospect_close_rate !== b.prospect_close_rate) {
+        return a.prospect_close_rate - b.prospect_close_rate;
+      }
+      return String(a.display_name || '').localeCompare(String(b.display_name || ''));
+    });
+  }
+
+  function repCardsHtml() {
+    var o = state.teamOverview;
+    if (o === null) return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
+      + '<div class="skeleton" style="height:120px;"></div></div>';
+    if (o._forbidden || o._error) return '';
+    var reps = sortRepsWorstFirst(o.per_rep || []);
+    if (!reps.length) {
+      return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
+        + '<div class="empty"><p>No reps in this team yet.</p></div></div>';
+    }
+    return '<div class="section fade-in">'
+      + '<div class="section-header"><h2>Reps</h2>'
+        + '<div class="meta">weakest first · click a rep to open their report</div></div>'
+      + '<div class="rep-card-list">' + reps.map(repCardHtml).join('') + '</div>'
+      + '</div>';
+  }
+
 
   /* RETIRED 2026-07-26 (B-1 redesign) — replaced by the three ranked score lists.
   function teamRepCardsHtml() {
