@@ -3968,14 +3968,20 @@
   // 7d → daily points, longer ranges → weekly. A 7-day window on weekly buckets
   // is a SINGLE point: Chart.js draws a lone dot and no line, which reads as an
   // empty chart (Justin's live look, 2026-08-15).
-  // ⚠ THRESHOLD UNCHANGED AT 7 DAYS. Span-derived bucketing (daily up to ~14
-  // days) is stage 5, kept separate so a bucketing change is never mixed with a
-  // control change. This only stops reading the retired `days` preset field.
+  // ⚠ SPAN-DERIVED BUCKETING (stage 5). Daily up to DAILY_BUCKET_MAX_DAYS,
+  // weekly beyond — so a custom "Aug 1 - Aug 12" gives days and "June through
+  // August" gives weeks, with no thought required from the user.
+  //
+  // Why 14 and not something larger: 14 daily points fit the axis without
+  // rotating, and daily handle rate is already noisy (two objections in a day is
+  // 0% or 50%). Past a fortnight the noise wins and the weekly line is the
+  // readable one. Empty days still BREAK the line rather than plotting 0%.
+  var DAILY_BUCKET_MAX_DAYS = 14;
   function repSeriesBucket() {
     var r = state.teamRange;
     if (!r || !r.from || !r.to) return 'week';
     var days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
-    return days <= 7 ? 'day' : 'week';
+    return days <= DAILY_BUCKET_MAX_DAYS ? 'day' : 'week';
   }
   function teamQP(extra) {
     var r = teamRange();

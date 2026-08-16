@@ -97,22 +97,37 @@ test('the selector uses Scout\'s four categories and offers no "price"', () => {
 
 // ─── range-dependent bucketing (Justin's ruling 2026-08-15) ────────────────
 
-test('the bucket is derived from the TEAM range span; threshold still 7 days', () => {
-  // Stage 2 moved team onto its own range field, so repSeriesBucket no longer
-  // reads the retired `days` preset. The THRESHOLD is deliberately unchanged —
-  // span-derived bucketing (daily up to ~14 days) is stage 5, kept separate so a
-  // bucketing change is never mixed with a control change.
-  const src = HTML.slice(HTML.indexOf('function repSeriesBucket'), HTML.indexOf('function teamQP'));
+test('STAGE 5: bucketing is span-derived — daily up to 14 days, weekly beyond', () => {
+  // "Aug 1 - Aug 12" gives days; "June through August" gives weeks, with no
+  // thought required from the user.
+  const src = HTML.slice(HTML.indexOf('var DAILY_BUCKET_MAX_DAYS'), HTML.indexOf('function teamQP'));
   const fn = new Function('state', src + '; return repSeriesBucket();');
-  const range = (days) => ({ teamRange: {
+  const span = (days) => ({ teamRange: {
     from: '2026-08-01T00:00:00.000Z',
     to: new Date(Date.parse('2026-08-01T00:00:00.000Z') + days * 86400000).toISOString() } });
-  assert.strictEqual(fn(range(7)), 'day');
-  assert.strictEqual(fn(range(6)), 'day');
-  assert.strictEqual(fn(range(8)), 'week', 'still weekly past 7 — stage 5 raises this to 14');
-  assert.strictEqual(fn(range(30)), 'week');
+
+  [1, 5, 7, 10, 13, 14].forEach((d) => assert.strictEqual(fn(span(d)), 'day', d + ' days should be daily'));
+  [15, 21, 30, 90, 400].forEach((d) => assert.strictEqual(fn(span(d)), 'week', d + ' days should be weekly'));
+
   assert.strictEqual(fn({}), 'week', 'no range falls back to weekly, not daily');
   assert.strictEqual(fn({ teamRange: { from: null, to: null } }), 'week');
+});
+
+test('the boundary is in CALENDAR DAYS, on ranges the picker actually produces', () => {
+  // The picker emits an inclusive window: Aug 1 00:00:00.000 → Aug 14 23:59:59.999
+  // is FOURTEEN calendar days and must be daily; adding one more day must not be.
+  // Testing raw millisecond spans instead of picker output is how I got this
+  // boundary wrong the first time.
+  const src = HTML.slice(HTML.indexOf('var DAILY_BUCKET_MAX_DAYS'), HTML.indexOf('function teamQP'));
+  const fn = new Function('state', src + '; return repSeriesBucket();');
+  const picked = (startDay, endDay) => fn({ teamRange: {
+    from: '2026-08-' + String(startDay).padStart(2, '0') + 'T00:00:00.000Z',
+    to:   '2026-08-' + String(endDay).padStart(2, '0') + 'T23:59:59.999Z' } });
+
+  assert.strictEqual(picked(1, 14), 'day',  '14 calendar days inclusive');
+  assert.strictEqual(picked(1, 15), 'week', '15 calendar days inclusive');
+  assert.strictEqual(picked(1, 1),  'day',  'a single day');
+  assert.strictEqual(picked(1, 7),  'day',  'a week');
 });
 
 test('the loader SENDS the derived bucket rather than a hardcoded one', () => {
