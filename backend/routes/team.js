@@ -156,7 +156,12 @@ router.get('/trends', teamGate, async function (req, res) {
 // Zero model cost: buildRepSeries is arithmetic over rows.
 router.get('/rep-series', teamGate, async function (req, res) {
   var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
-  var bucket = req.query.bucket === 'month' ? 'month' : (req.query.bucket === 'quarter' ? 'quarter' : 'week');
+  // 'day' added for the 7-day manager graphs (ruling 2026-08-15): weekly buckets
+  // over 7 days collapse to a single point, which draws as a dot with no line.
+  // Scoped to THIS route — /team/trends keeps week|month|quarter, since a daily
+  // trend bucket is not something that view asks for or renders.
+  var BUCKETS = ['day', 'week', 'month', 'quarter'];
+  var bucket = BUCKETS.indexOf(req.query.bucket) !== -1 ? req.query.bucket : 'week';
   var cat = (OBJECTION_CATEGORIES.indexOf(req.query.objection_category) !== -1) ? req.query.objection_category : null;
   try {
     var admin = getAdmin();

@@ -135,8 +135,8 @@ test('the graphs sit ABOVE "What needs work" and BELOW the glance blocks', () =>
   const out = renderTeam(BASE);
   const glance = out.html.indexOf('team-glance');
   const graphs = out.html.indexOf('repHandleChart');
-  const needsWork = out.html.indexOf('What needs work');
-  const overview = out.html.indexOf('Team overview');
+  const needsWork = out.html.indexOf('What Needs Work');
+  const overview = out.html.indexOf('Team Overview');
 
   // Every anchor asserted present FIRST. A conditional ordering check passes
   // vacuously when its anchor is missing, which is the same class of weak
@@ -148,7 +148,7 @@ test('the graphs sit ABOVE "What needs work" and BELOW the glance blocks', () =>
   assert.notStrictEqual(glance, -1, 'glance blocks missing — anchor is stale');
 
   assert.ok(glance < graphs, 'graphs must come AFTER the glance stat blocks');
-  assert.ok(graphs < needsWork, 'graphs must come BEFORE What needs work');
+  assert.ok(graphs < needsWork, 'graphs must come BEFORE What Needs Work');
   assert.ok(graphs < overview, 'graphs must come BEFORE Team overview');
 });
 

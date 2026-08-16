@@ -213,3 +213,102 @@ test('GUARD: the handle rate does not route through the LLM bucket lane', () => 
   assert.ok(/require\('\.\/team-analytics'\)/.test(CODE), 'bucketing is reused');
   assert.ok(/require\('\.\/prospect-entity'\)/.test(CODE), 'the prospect definition is reused');
 });
+
+// ─── daily bucketing (Justin's ruling 2026-08-15) ──────────────────────────
+//
+// A 7-day range on WEEKLY buckets collapses to a single point, which Chart.js
+// draws as a lone dot with no line — it read as an empty chart. 7d is now DAILY;
+// 30d/90d stay weekly.
+
+const D1 = '2026-08-03T09:00:00Z';   // Mon
+const D2 = '2026-08-04T09:00:00Z';   // Tue
+const D4 = '2026-08-06T09:00:00Z';   // Thu
+
+function buildDaily(over) {
+  return S.buildRepSeries(Object.assign({
+    reps: [{ user_id: 'r1', name: 'Ava' }],
+    calls: [], analyses: [], objections: [],
+    from: '2026-08-03T00:00:00Z', to: '2026-08-06T23:59:59Z', bucket: 'day',
+  }, over));
+}
+
+test('bucket "day" yields ONE BUCKET PER CALENDAR DAY across the range', () => {
+  const out = buildDaily({});
+  assert.strictEqual(out.buckets.length, 4, 'Aug 3,4,5,6');
+  assert.deepStrictEqual(out.buckets.map((b) => b.label), ['Aug 3', 'Aug 4', 'Aug 5', 'Aug 6']);
+});
+
+test('daily handle rate is computed per DAY, not smeared across the week', () => {
+  const out = buildDaily({
+    calls: [{ id: 'c1', user_id: 'r1', call_date: D1 }, { id: 'c2', user_id: 'r1', call_date: D2 }],
+    objections: [
+      { fathom_call_id: 'c1', resolution: 'handled' },
+      { fathom_call_id: 'c1', resolution: 'unhandled' },
+      { fathom_call_id: 'c2', resolution: 'handled' },
+    ],
+  });
+  assert.strictEqual(out.reps[0].handle[0].rate, 50, 'Aug 3: 1 of 2');
+  assert.strictEqual(out.reps[0].handle[1].rate, 100, 'Aug 4: 1 of 1');
+});
+
+test('THE DISTINCTION SURVIVES DAILY: a day with no calls is null, an all-unhandled day is a real 0', () => {
+  // This is the property most at risk in a bucketing change, and the one that
+  // makes the chart readable: a gap means "no calls", a zero means "handled none".
+  const out = buildDaily({
+    calls: [{ id: 'c1', user_id: 'r1', call_date: D1 }, { id: 'c4', user_id: 'r1', call_date: D4 }],
+    objections: [{ fathom_call_id: 'c1', resolution: 'unhandled' }],
+  });
+  assert.strictEqual(out.reps[0].handle[0].rate, 0, 'Aug 3 genuinely handled none');
+  assert.strictEqual(out.reps[0].handle[1].rate, null, 'Aug 4 had no calls at all');
+  assert.strictEqual(out.reps[0].handle[3].total, 0, 'Aug 6 had a call but no objections');
+  assert.strictEqual(out.reps[0].handle[3].rate, null);
+});
+
+test('daily closing rate still counts a prospect once, on their FIRST call', () => {
+  const out = buildDaily({
+    calls: [
+      { id: 'c1', user_id: 'r1', call_date: D1, prospect_id: 'p1' },
+      { id: 'c2', user_id: 'r1', call_date: D2, prospect_id: 'p1' },
+    ],
+    analyses: [{ fathom_call_id: 'c1', outcome: 'follow_up' }, { fathom_call_id: 'c2', outcome: 'closed' }],
+  });
+  assert.strictEqual(out.reps[0].close[0].total, 1);
+  assert.strictEqual(out.reps[0].close[0].closed, 1, 'any close wins the prospect');
+  assert.strictEqual(out.reps[0].close[1].total, 0, 'not re-counted on the follow-up day');
+});
+
+// ─── explicit span labels (ruling 2) ───────────────────────────────────────
+
+test('a WEEKLY bucket is labelled as a SPAN, so a point is never ambiguous', () => {
+  const out = S.buildRepSeries({
+    reps: [{ user_id: 'r1', name: 'Ava' }], calls: [], analyses: [], objections: [],
+    from: '2026-08-03T00:00:00Z', to: '2026-08-16T23:59:59Z', bucket: 'week',
+  });
+  assert.deepStrictEqual(out.buckets.map((b) => b.label), ['Aug 3 - Aug 9', 'Aug 10 - Aug 16']);
+});
+
+test('the span END is INCLUSIVE — consecutive buckets must not share a date', () => {
+  // "Aug 3 - Aug 10" then "Aug 10 - Aug 17" would put Aug 10 in two buckets on
+  // screen. Ambiguity is the exact thing this ruling exists to remove.
+  const out = S.buildRepSeries({
+    reps: [{ user_id: 'r1', name: 'Ava' }], calls: [], analyses: [], objections: [],
+    from: '2026-08-03T00:00:00Z', to: '2026-08-16T23:59:59Z', bucket: 'week',
+  });
+  const ends = out.buckets.map((b) => b.label.split(' - ')[1]);
+  const starts = out.buckets.map((b) => b.label.split(' - ')[0]);
+  ends.forEach((e, i) => { if (starts[i + 1]) assert.notStrictEqual(e, starts[i + 1], 'buckets share a date'); });
+});
+
+test('a PARTIAL final week is labelled to the range end, not a future date', () => {
+  // Mid-week "today": the last bucket covers Aug 10-12, and must not claim Aug 16.
+  const out = S.buildRepSeries({
+    reps: [{ user_id: 'r1', name: 'Ava' }], calls: [], analyses: [], objections: [],
+    from: '2026-08-03T00:00:00Z', to: '2026-08-12T18:00:00Z', bucket: 'week',
+  });
+  assert.strictEqual(out.buckets[out.buckets.length - 1].label, 'Aug 10 - Aug 12');
+});
+
+test('a DAILY bucket is labelled as the single day, with no span', () => {
+  const out = buildDaily({});
+  out.buckets.forEach((b) => assert.ok(b.label.indexOf(' - ') === -1, 'daily label must not be a span: ' + b.label));
+});

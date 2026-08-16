@@ -174,6 +174,9 @@ function bucketStart(d, bucket) {
   var dt = new Date(d);
   if (bucket === 'month') return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1));
   if (bucket === 'quarter') return new Date(Date.UTC(dt.getUTCFullYear(), Math.floor(dt.getUTCMonth() / 3) * 3, 1));
+  // day: midnight UTC. Added for the 7-day manager graphs, where weekly buckets
+  // collapse to a single point and Chart.js draws a lone dot with no line.
+  if (bucket === 'day') return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
   // week: back up to Monday (UTC)
   var day = (dt.getUTCDay() + 6) % 7;
   return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() - day));
@@ -183,6 +186,29 @@ function bucketLabel(start, bucket) {
   if (bucket === 'month') return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
   if (bucket === 'quarter') return 'Q' + (Math.floor(d.getUTCMonth() / 3) + 1) + " '" + String(d.getUTCFullYear()).slice(2);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+// Explicit SPAN label — "Aug 3 - Aug 9" rather than a bare start date, so a point
+// is never ambiguous about the period it covers (Justin's ruling 2026-08-15).
+//
+// ⚠ THE END IS INCLUSIVE, and that is a deliberate departure from the literal
+// example given ("Aug 3 - Aug 10"). An exclusive end makes consecutive buckets
+// share a date on screen — "Aug 3 - Aug 10" beside "Aug 10 - Aug 17" puts Aug 10
+// in two buckets, which is the ambiguity this label exists to remove.
+//
+// `clampToMs` trims a partial final bucket to the range end, so the current week
+// reads "Aug 10 - Aug 12" rather than claiming days that have not happened yet.
+// A separate function from bucketLabel on purpose: computeTeamTrends renders bare
+// start dates and must not change underneath its own view.
+function bucketRangeLabel(start, bucket, clampToMs) {
+  var s = new Date(start);
+  if (bucket === 'day') return bucketLabel(start, 'day');
+  if (bucket === 'month' || bucket === 'quarter') return bucketLabel(start, bucket);
+
+  var endMs = bucketStart(new Date(s.getTime() + 8 * 24 * 3600 * 1000).toISOString(), 'week').getTime() - 24 * 3600 * 1000;
+  if (clampToMs != null && clampToMs < endMs) endMs = bucketStart(new Date(clampToMs).toISOString(), 'day').getTime();
+  if (endMs <= s.getTime()) return bucketLabel(start, 'week');       // single-day span
+  return bucketLabel(start, 'week') + ' - ' + bucketLabel(endMs, 'week');
 }
 
 async function computeTeamTrends(admin, repIds, bucket, from, to) {
@@ -239,4 +265,5 @@ module.exports = {
   // would be a very quiet bug.
   bucketStart: bucketStart,
   bucketLabel: bucketLabel,
+  bucketRangeLabel: bucketRangeLabel,
 };

@@ -33,7 +33,7 @@
  * working as designed, not a gap. Do not invent a parallel vocabulary.
  */
 
-const { bucketStart, bucketLabel } = require('./team-analytics');
+const { bucketStart, bucketRangeLabel } = require('./team-analytics');
 const { prospectOutcome } = require('./prospect-entity');
 
 // The selector vocabulary. Scout's own labels — see the ruling above.
@@ -46,7 +46,9 @@ function bucketKeys(from, to, bucket) {
   var cur = bucketStart(from, bucket).getTime();
   var end = bucketStart(to, bucket).getTime();
   var guard = 0;
-  while (cur <= end && guard++ < 500) {
+  // Raised for daily buckets: 500 truncates ~16 months of days SILENTLY, which
+  // would read as a chart that simply stops rather than as an error.
+  while (cur <= end && guard++ < 1500) {
     keys.push(cur);
     // Step forward a day at a time from the bucket start and re-normalise, so
     // month/quarter boundaries and DST are the existing helper's problem, not
@@ -56,7 +58,7 @@ function bucketKeys(from, to, bucket) {
     do {
       probe = new Date(probe.getTime() + 24 * 3600 * 1000);
       next = bucketStart(probe.toISOString(), bucket).getTime();
-    } while (next === cur && guard++ < 500);
+    } while (next === cur && guard++ < 1500);
     cur = next;
   }
   return keys;
@@ -80,7 +82,10 @@ function buildRepSeries(input) {
   var calls = Array.isArray(d.calls) ? d.calls : [];
   var analyses = Array.isArray(d.analyses) ? d.analyses : [];
   var objections = Array.isArray(d.objections) ? d.objections : [];
-  var bucket = d.bucket || 'week';
+  // 'day' for short ranges (7d), 'week' otherwise. Anything unrecognised falls
+  // back to 'week' rather than producing one giant bucket.
+  var VALID_BUCKETS = ['day', 'week', 'month', 'quarter'];
+  var bucket = VALID_BUCKETS.indexOf(d.bucket) !== -1 ? d.bucket : 'week';
   var cat = (OBJECTION_CATEGORIES.indexOf(d.objectionCategory) !== -1) ? d.objectionCategory : null;
 
   var from = d.from, to = d.to;
@@ -93,7 +98,7 @@ function buildRepSeries(input) {
   var keys = bucketKeys(from, to, bucket);
   var index = {}; keys.forEach(function (k, i) { index[k] = i; });
   var buckets = keys.map(function (k) {
-    return { key: k, from: new Date(k).toISOString(), label: bucketLabel(k, bucket) };
+    return { key: k, from: new Date(k).toISOString(), label: bucketRangeLabel(k, bucket, Date.parse(to)) };
   });
 
   var callById = {};

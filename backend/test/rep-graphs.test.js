@@ -94,3 +94,44 @@ test('the selector uses Scout\'s four categories and offers no "price"', () => {
   assert.ok(!/price/i.test(opts.replace(/\/\/[^\n]*/g, '')), 'no "price" option in the selector itself');
   assert.ok(/money-phrased objections are classified/.test(opts), 'and the reason is recorded beside it');
 });
+
+// ─── range-dependent bucketing (Justin's ruling 2026-08-15) ────────────────
+
+test('7d asks for DAILY buckets; 30d and 90d stay weekly', () => {
+  // A 7-day window on weekly buckets is a SINGLE point — Chart.js draws a lone
+  // dot with no line, which read as an empty chart on Justin's live look.
+  const src = HTML.slice(HTML.indexOf('function repSeriesBucket'), HTML.indexOf('function teamQP'));
+  const fn = new Function('state', src + '; return repSeriesBucket();');
+  assert.strictEqual(fn({ dateRange: { days: 7 } }), 'day');
+  assert.strictEqual(fn({ dateRange: { days: 30 } }), 'week');
+  assert.strictEqual(fn({ dateRange: { days: 90 } }), 'week');
+  assert.strictEqual(fn({ dateRange: { days: 9999 } }), 'week', 'all-time must not be daily');
+  assert.strictEqual(fn({}), 'week', 'missing range falls back to weekly, not daily');
+});
+
+test('the loader SENDS the derived bucket rather than a hardcoded one', () => {
+  // The whole ruling is inert if the query string still says bucket=week.
+  const loader = HTML.slice(HTML.indexOf("repSeries:{ flag:"), HTML.indexOf("repSeries:{ flag:") + 400);
+  assert.ok(/bucket=' \+ repSeriesBucket\(\)/.test(loader), 'loader must call repSeriesBucket(): ' + loader.slice(0, 200));
+  assert.ok(!/bucket=week/.test(loader), 'the hardcoded weekly bucket must be gone');
+});
+
+test('tooltips inherit the SPAN label — no title override strips it', () => {
+  // Ruling 2 covers axis labels AND tooltips. Chart.js defaults the tooltip
+  // title to the axis label, so this holds only while nothing overrides it.
+  const cfg = buildChart(SERIES, (r) => r.handle, 'Handle rate');
+  assert.ok(!cfg.options.plugins.tooltip.callbacks.title,
+    'a title callback would bypass the bucket label and reintroduce ambiguity');
+  assert.deepStrictEqual(cfg.data.labels, ['Aug 3', 'Aug 10'], 'axis reads the bucket labels verbatim');
+});
+
+test('HEADINGS are title case on this view', () => {
+  ['Objection Handling Over Time', 'Closing Rate Over Time', 'What Needs Work',
+   'Team Overview', 'Team Recommendations', 'Manager Daily Digest'].forEach((h) => {
+    assert.ok(HTML.indexOf('>' + h + '<') !== -1, 'missing title-cased heading: ' + h);
+  });
+  ['>Objection handling over time<', '>Closing rate over time<', '>What needs work<',
+   '>Team overview<'].forEach((h) => {
+    assert.strictEqual(HTML.indexOf(h), -1, 'sentence-case heading still present: ' + h);
+  });
+});

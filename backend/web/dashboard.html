@@ -3728,7 +3728,7 @@
   function needsWorkCardHtml() {
     var d = state.needsWork;
     var win = (d && d.window_days) ? d.window_days : 90;
-    var head = '<div class="section-header"><h2>What needs work</h2><div class="meta">your last ' + win + ' days</div></div>';
+    var head = '<div class="section-header"><h2>What Needs Work</h2><div class="meta">your last ' + win + ' days</div></div>';
     if (!d) return head + '<div class="skeleton" style="height:70px;"></div>';
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
@@ -3764,7 +3764,7 @@
     var content = document.getElementById('content');
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
     content.innerHTML = renderHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>What needs work</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
         + '<div class="meta">your objection-handling focus · last ' + ((state.needsWork && state.needsWork.window_days) || 90) + ' days</div></div>'
         + '<button class="date-preset" onclick="backToOverview()">← back</button></div>'
         + needsWorkDetailBodyHtml(state.needsWork) + '</div>';
@@ -3877,6 +3877,13 @@
   // checked server-side; this only renders. Owner gets a team picker.
   // ═══════════════════════════════════════════════════════════════════════════
   function goTeam() { state.teamDetailMetric = null; setView('team'); }
+  // 7d → daily points, longer ranges → weekly. A 7-day window on weekly buckets
+  // is a SINGLE point: Chart.js draws a lone dot and no line, which reads as an
+  // empty chart (Justin's live look, 2026-08-15).
+  function repSeriesBucket() {
+    var days = (state.dateRange && state.dateRange.days) || 30;
+    return days <= 7 ? 'day' : 'week';
+  }
   function teamQP(extra) {
     var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
     if (state.teamSelected) qp += '&team=' + encodeURIComponent(state.teamSelected);
@@ -3926,7 +3933,7 @@
       digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP(state.teamDigestDate ? 'date=' + state.teamDigestDate : '') },
       // 10b: per-rep weekly series for the two line graphs. Deterministic and
       // model-free, so it is cheap to refetch when the selector changes.
-      repSeries:{ flag: 'teamRepSeriesLoading',  set: 'teamRepSeries',  url: '/team/rep-series?' + teamQP('bucket=week' + (state.teamObjectionCategory ? '&objection_category=' + state.teamObjectionCategory : '')) },
+      repSeries:{ flag: 'teamRepSeriesLoading',  set: 'teamRepSeries',  url: '/team/rep-series?' + teamQP('bucket=' + repSeriesBucket() + (state.teamObjectionCategory ? '&objection_category=' + state.teamObjectionCategory : '')) },
     };
     var c = map[which]; if (!c) return;
     if (c.flag && state[c.flag]) return;
@@ -4059,10 +4066,10 @@
       return '<option value="' + o.key + '"' + sel + '>' + escapeHtml(o.label) + '</option>';
     }).join('');
     return '<div class="section fade-in">'
-      + '<div class="rep-graph-head"><h2>Objection handling over time</h2>'
+      + '<div class="rep-graph-head"><h2>Objection Handling Over Time</h2>'
         + '<select class="rep-graph-select" onchange="setTeamObjectionCategory(this.value)">' + opts + '</select></div>'
       + '<div class="rep-graph"><canvas id="repHandleChart"></canvas></div>'
-      + '<h2 style="margin-top:26px;">Closing rate over time</h2>'
+      + '<h2 style="margin-top:26px;">Closing Rate Over Time</h2>'
       + '<div class="rep-graph"><canvas id="repCloseChart"></canvas></div>'
     + '</div>';
   }
@@ -4110,17 +4117,17 @@
       + '<div class="section fade-in">' + teamAggregateHtml() + '</div>'
       + repSeriesSectionHtml()
       + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Team overview</h2>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
         + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Closing</h2>'
         + '<div class="meta">avg Close-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Objection handling</h2>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Objection Handling</h2>'
         + '<div class="meta">avg Objection-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Team recommendations</h2></div>' + teamRecsCompactHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Manager daily digest</h2></div>' + teamDigestHtml() + '</div>';
+      + '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>' + teamRecsCompactHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Manager Daily Digest</h2></div>' + teamDigestHtml() + '</div>';
 
     // Chart.js draws only after the assignment above has put the canvases in
     // the DOM. Keep this AFTER content.innerHTML — a canvas that does not exist
@@ -4148,7 +4155,7 @@
     if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
     content.innerHTML =
       teamHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Team recommendations</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Team Recommendations</h2>'
         + '<div class="meta">grounded in the team\'s calls</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>' + teamRecsHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Call Highlights of the Week</h2></div>' + teamHighlightsHtml() + '</div>';
@@ -4204,7 +4211,7 @@
   function teamNeedsWorkCardHtml() {
     var d = state.teamNeedsWork;
     if (!d) return '<div class="skeleton" style="height:70px;"></div>';
-    var head = '<div class="section-header"><h2>What needs work</h2></div>';
+    var head = '<div class="section-header"><h2>What Needs Work</h2></div>';
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     // insufficient → deterministic message, not clickable (no detail worth opening).
@@ -4232,7 +4239,7 @@
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
     content.innerHTML = teamHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>What needs work</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
         + '<div class="meta">objection-handling focus for this period</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
         + teamNeedsWorkDetailHtml() + '</div>';
@@ -4438,7 +4445,7 @@
     if (state.teamContext === null) loadTeam('context');
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     content.innerHTML = teamHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Manage members</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Manage Members</h2>'
         + '<div class="meta">add, deactivate, move, reset password, or update a rep\'s email</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
         + teamMembersBodyHtml() + '</div>';
