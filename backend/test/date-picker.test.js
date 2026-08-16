@@ -334,9 +334,17 @@ test('the trigger reports its expanded state and the panel is a labelled dialog'
   assert.strictEqual((open.match(/tabindex="0"/g) || []).length, 1);
 });
 
-test('NOTHING RENDERS THE PICKER YET — stage 1 ships the control only', () => {
+test('STAGE 2: the TEAM view mounts the picker; the other views have not yet', () => {
   const rendered = HTML.replace(SRC, '');           // ignore the definition itself
-  assert.strictEqual(/datePickerHtml\(/.test(rendered), false,
-    'no view may mount the picker until its own stage');
-  assert.strictEqual(/registerDatePicker\(/.test(rendered), false);
+  const teamHeader = HTML.slice(HTML.indexOf('function teamHeaderHtml'), HTML.indexOf('function teamAggregateHtml'));
+  assert.ok(/datePickerHtml\('team'\)/.test(teamHeader), 'the team header must render the picker');
+  assert.ok(/ensureTeamPicker\(\)/.test(teamHeader), 'and register it first');
+
+  // The coaching header keeps its presets until stage 3.
+  const coachHeader = HTML.slice(HTML.indexOf('var presets = \'\';'), HTML.indexOf('var scopePill'));
+  assert.ok(/setDateRange\(/.test(coachHeader), 'coaching still uses presets in stage 2');
+  assert.ok(!/datePickerHtml/.test(coachHeader), 'coaching must NOT mount the picker yet');
+
+  // Exactly one instance is registered so far.
+  assert.strictEqual((rendered.match(/registerDatePicker\(/g) || []).length, 1);
 });

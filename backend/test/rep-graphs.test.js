@@ -97,16 +97,22 @@ test('the selector uses Scout\'s four categories and offers no "price"', () => {
 
 // ─── range-dependent bucketing (Justin's ruling 2026-08-15) ────────────────
 
-test('7d asks for DAILY buckets; 30d and 90d stay weekly', () => {
-  // A 7-day window on weekly buckets is a SINGLE point — Chart.js draws a lone
-  // dot with no line, which read as an empty chart on Justin's live look.
+test('the bucket is derived from the TEAM range span; threshold still 7 days', () => {
+  // Stage 2 moved team onto its own range field, so repSeriesBucket no longer
+  // reads the retired `days` preset. The THRESHOLD is deliberately unchanged —
+  // span-derived bucketing (daily up to ~14 days) is stage 5, kept separate so a
+  // bucketing change is never mixed with a control change.
   const src = HTML.slice(HTML.indexOf('function repSeriesBucket'), HTML.indexOf('function teamQP'));
   const fn = new Function('state', src + '; return repSeriesBucket();');
-  assert.strictEqual(fn({ dateRange: { days: 7 } }), 'day');
-  assert.strictEqual(fn({ dateRange: { days: 30 } }), 'week');
-  assert.strictEqual(fn({ dateRange: { days: 90 } }), 'week');
-  assert.strictEqual(fn({ dateRange: { days: 9999 } }), 'week', 'all-time must not be daily');
-  assert.strictEqual(fn({}), 'week', 'missing range falls back to weekly, not daily');
+  const range = (days) => ({ teamRange: {
+    from: '2026-08-01T00:00:00.000Z',
+    to: new Date(Date.parse('2026-08-01T00:00:00.000Z') + days * 86400000).toISOString() } });
+  assert.strictEqual(fn(range(7)), 'day');
+  assert.strictEqual(fn(range(6)), 'day');
+  assert.strictEqual(fn(range(8)), 'week', 'still weekly past 7 — stage 5 raises this to 14');
+  assert.strictEqual(fn(range(30)), 'week');
+  assert.strictEqual(fn({}), 'week', 'no range falls back to weekly, not daily');
+  assert.strictEqual(fn({ teamRange: { from: null, to: null } }), 'week');
 });
 
 test('the loader SENDS the derived bucket rather than a hardcoded one', () => {

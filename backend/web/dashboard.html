@@ -2365,7 +2365,10 @@
     teamHighlights: null,   teamHighlightsLoading: false,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
     teamDetailMetric: null, // glance-box detail drill: null | 'cash' | 'close' | 'objection'
-    teamRangeInit:  false,  // team view forces a 7-day default on first entry, then user presets stick
+    // ⚠ TEAM OWNS ITS OWN RANGE (stage 2). state.dateRange stays COACHING's until
+    // stage 3 splits the rest — every view owning its own range is the ruling.
+    teamRange:      null,   // {from,to} ISO; the team date picker writes only this
+    teamRangeInit:  false,  // team view seeds a 7-day default on first entry
     teamNeedsWork:  null,   teamNeedsWorkLoading: false, // "What needs work" card + detail (B-2)
     // 10b manager board: per-rep weekly series + the objection selector.
     // '' = all objections; otherwise one of Scout's four objection_category values.
@@ -3910,12 +3913,18 @@
   // 7d → daily points, longer ranges → weekly. A 7-day window on weekly buckets
   // is a SINGLE point: Chart.js draws a lone dot and no line, which reads as an
   // empty chart (Justin's live look, 2026-08-15).
+  // ⚠ THRESHOLD UNCHANGED AT 7 DAYS. Span-derived bucketing (daily up to ~14
+  // days) is stage 5, kept separate so a bucketing change is never mixed with a
+  // control change. This only stops reading the retired `days` preset field.
   function repSeriesBucket() {
-    var days = (state.dateRange && state.dateRange.days) || 30;
+    var r = state.teamRange;
+    if (!r || !r.from || !r.to) return 'week';
+    var days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
     return days <= 7 ? 'day' : 'week';
   }
   function teamQP(extra) {
-    var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var r = teamRange();
+    var qp = 'from=' + encodeURIComponent(r.from) + '&to=' + encodeURIComponent(r.to);
     if (state.teamSelected) qp += '&team=' + encodeURIComponent(state.teamSelected);
     if (extra) qp += '&' + extra;
     return qp;
@@ -3945,12 +3954,15 @@
   }
   function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamSurface(); }
   function setTeamTrendBucket(b) { state.teamTrendBucket = b; state.teamTrends = null; loadTeam('trends'); }
+  /* REMOVED 2026-08-16 — the preset setter, superseded by the date picker's
+     own setter registered in ensureTeamPicker(). Kept in place for reference.
   function setTeamRange(days) {
     var to = new Date();
     var from = days >= 9999 ? new Date('2025-01-01T00:00:00Z') : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
     resetTeamData(); renderTeamSurface();
   }
+  */
   // Generic lazy loader for each team panel.
   async function loadTeam(which) {
     var map = {
@@ -3982,8 +3994,27 @@
   function ensureTeamDefaultRange() {
     if (state.teamRangeInit) return;
     state.teamRangeInit = true;
-    var to = new Date(), from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: 7 };
+    // Seeded through the picker's own converter so the default window has the
+    // same inclusive-end shape a hand-picked one does — otherwise the very first
+    // load would quietly cover a few hours less than the label claims.
+    var today = new Date().toISOString().slice(0, 10);
+    var weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+    state.teamRange = rangeToIso(weekAgo, today);   // last 7 days INCLUSIVE
+  }
+  function teamRange() { ensureTeamDefaultRange(); return state.teamRange; }
+
+  // One picker instance for the team view. Registered once; it reads and writes
+  // ONLY state.teamRange, which is what keeps coaching's range independent.
+  var teamPickerReady = false;
+  function ensureTeamPicker() {
+    if (teamPickerReady) return;
+    teamPickerReady = true;
+    registerDatePicker('team', function () { return teamRange(); }, function (from, to) {
+      state.teamRange = { from: from, to: to };
+      resetTeamData();
+      syncHashFromState(true);      // the range lives in the URL — refreshable, shareable
+      renderTeamSurface();
+    });
   }
 
 
@@ -4647,9 +4678,15 @@
       }).join('');
       picker = '<select class="user-select" onchange="pickTeam(this.value)">' + opts + '</select>';
     }
+    // Stage 2: the 7d/30d/90d segmented buttons are replaced by the calendar.
+    // No presets alongside it, per the ruling.
+    ensureTeamPicker();
+    var presets = datePickerHtml('team');
+    /* REMOVED 2026-08-16 — superseded by the date picker above.
     var presets = [7, 30, 90].map(function (d) {
       return '<button class="date-preset' + (state.dateRange.days === d ? ' active' : '') + '" onclick="setTeamRange(' + d + ')">' + d + 'd</button>';
     }).join('');
+    */
     return '<div class="page-header fade-in">'
       + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
         + '<div class="review-meta-row"><span>Manager view</span></div></div>'
@@ -4909,7 +4946,9 @@
     bodyEl.innerHTML = '<div class="load-state" style="padding:16px 4px;"><div class="spinner"></div> Loading calls…</div>';
     modal.classList.remove('hidden');
     if (!surfaces.length) { bodyEl.innerHTML = '<div class="empty"><p>No phrases mapped to this bucket.</p></div>'; return; }
-    var url, body = { surfaces: surfaces, from: state.dateRange.from, to: state.dateRange.to };
+    // Team evidence must window by the TEAM range, personal by coaching's.
+    var evRange = (subject === 'team') ? teamRange() : state.dateRange;
+    var url, body = { surfaces: surfaces, from: evRange.from, to: evRange.to };
     if (subject === 'team') url = '/team/needs-work/bucket?' + teamQP();
     else url = isSelf() ? '/me/needs-work/bucket' : '/admin/needs-work/' + encodeURIComponent(state.viewingUserId) + '/bucket';
     try {
@@ -5192,6 +5231,30 @@
   //   overview         → (no hash)      call-library     → #calls
   //   objections-intel → #objections    call-review      → #call/<id>
   // (Dormant Live-Sessions drills carry no hash — they're unreachable today.)
+  function teamRangeHashSuffix() {
+    var r = state.teamRange;
+    if (!r || !r.from || !r.to) return '';
+    return '?from=' + ymd(r.from) + '&to=' + ymd(r.to);
+  }
+  // '#team?from=2026-08-03&to=2026-08-10' → the inclusive window it names.
+  // Returns null on anything malformed so a hand-edited URL falls back to the
+  // default rather than rendering a window nobody asked for.
+  function parseRangeFromHash(h) {
+    var q = h.indexOf('?');
+    if (q === -1) return null;
+    var params = {};
+    h.slice(q + 1).split('&').forEach(function (kv) {
+      var i = kv.indexOf('='); if (i === -1) return;
+      params[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+    });
+    var re = /^\d{4}-\d{2}-\d{2}$/;
+    if (!re.test(params.from || '') || !re.test(params.to || '')) return null;
+    if (isNaN(Date.parse(params.from)) || isNaN(Date.parse(params.to))) return null;
+    var a = params.from, b = params.to;
+    if (b < a) { var t = a; a = b; b = t; }     // same tolerance as the picker
+    return rangeToIso(a, b);
+  }
+
   function viewToHashPath() {
     if (state.view === 'call-library')     return 'calls';
     if (state.view === 'objections-intel') return 'objections';
@@ -5202,7 +5265,10 @@
     if (state.view === 'section')          return 'section';
     if (state.view === 'eod')              return 'eod';
     if (state.view === 'account')          return 'account';
-    if (state.view === 'team')             return 'team';
+    // The team range travels in the hash so a refresh keeps it and a manager can
+    // share the exact window. Days only (not full ISO) — readable, and
+    // rangeToIso rebuilds the inclusive window on the way back in.
+    if (state.view === 'team')             return 'team' + teamRangeHashSuffix();
     if (state.view === 'team-expanded')    return 'team-recs';
     if (state.view === 'team-needs-work')  return 'team-needs-work';
     if (state.view === 'team-members')     return 'team-members';
@@ -5225,6 +5291,13 @@
   // URL hash → state.view (+ selectedCallId). No render, no history write.
   function applyHashToState() {
     var h = (window.location.hash || '').replace(/^#/, '');
+    var base = h.indexOf('?') === -1 ? h : h.slice(0, h.indexOf('?'));
+    if (base === 'team') {
+      state.view = 'team';
+      var hashed = parseRangeFromHash(h);
+      if (hashed) { state.teamRange = hashed; state.teamRangeInit = true; }  // beat the 7d default
+      return;
+    }
     if (h === 'calls') { state.view = 'call-library'; }
     else if (h === 'eod') { state.view = 'eod'; }
     else if (h === 'connect') { state.view = 'account'; state.account = null; pendingConnectFocus = true; }
@@ -5232,7 +5305,8 @@
     else if (h === 'objections') { state.view = 'objections-intel'; }
     else if (h === 'needs-work') { state.view = 'needs-work'; }
     else if (h === 'performance') { state.view = 'performance'; }
-    else if (h === 'team') { state.view = 'team'; }
+    /* REMOVED 2026-08-16 — unreachable: the `base === 'team'` branch above now
+       handles team (it must, to parse the ?from=&to= suffix) and returns early. */
     else if (h === 'team-recs') { state.view = 'team-expanded'; }
     else if (h === 'team-needs-work') { state.view = 'team-needs-work'; }
     else if (h === 'team-members') { state.view = 'team-members'; }

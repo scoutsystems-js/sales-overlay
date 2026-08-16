@@ -101,7 +101,8 @@ function renderTeam(overrides) {
   };
 
   const runner = new Function('document', 'window', 'Chart', 'localStorage', 'fetch', 'console',
-    SCRIPT + '\n;return { state: state, renderTeamView: renderTeamView, resetTeamData: resetTeamData };');
+    SCRIPT + '\n;return { state: state, renderTeamView: renderTeamView, resetTeamData: resetTeamData,'
+           + ' viewToHashPath: viewToHashPath, parseRangeFromHash: parseRangeFromHash };');
 
   const api = runner(doc, win, Chart, win.localStorage, win.fetch,
     { log() {}, warn() {}, error() {} });
@@ -194,4 +195,70 @@ test('resetTeamData clears the series so a stale team/range cannot linger', () =
   out.api.resetTeamData();
   assert.strictEqual(out.api.state.teamRepSeries, null,
     'switching team or date range must drop the previous lines immediately');
+});
+
+// ─── STAGE 2: the team date picker, driven through the real render path ────
+
+test('renderTeamView renders the PICKER and no preset buttons', () => {
+  const out = renderTeam(Object.assign({}, BASE, {
+    teamRange: { from: '2026-08-03T00:00:00.000Z', to: '2026-08-10T23:59:59.999Z' }, teamRangeInit: true,
+  }));
+  assert.ok(out.html.indexOf('dp-btn-team') !== -1, 'the picker trigger must be in the rendered markup');
+  assert.ok(out.html.indexOf('Aug 3 - Aug 10') !== -1, 'showing the INCLUSIVE label for the custom range');
+  assert.ok(!/onclick="setTeamRange\(/.test(out.html), 'the 7d/30d/90d buttons must be gone');
+});
+
+test('a CUSTOM range reaches the graphs, the picker label and the hash — all agreeing', () => {
+  // The three had to be checked together: a label that says one thing while the
+  // graphs query another is exactly the kind of disagreement nobody notices.
+  const range = { from: '2026-07-20T00:00:00.000Z', to: '2026-08-02T23:59:59.999Z' };
+  const out = renderTeam(Object.assign({}, BASE, { teamRange: range, teamRangeInit: true }));
+  assert.ok(out.html.indexOf('Jul 20 - Aug 2') !== -1, 'label');
+  assert.strictEqual(out.api.state.teamRange.from, range.from, 'the view did not mutate the range');
+  const hash = out.api.viewToHashPath();
+  assert.strictEqual(hash, 'team?from=2026-07-20&to=2026-08-02', 'hash carries the range');
+  assert.strictEqual(out.charts.length, 2, 'both graphs still built');
+});
+
+test('the hash round-trips: parse → state → hash gives back the same window', () => {
+  const out = renderTeam(BASE);
+  const parsed = out.api.parseRangeFromHash('team?from=2026-06-01&to=2026-06-30');
+  assert.deepStrictEqual(parsed, { from: '2026-06-01T00:00:00.000Z', to: '2026-06-30T23:59:59.999Z' });
+  out.api.state.teamRange = parsed;
+  assert.strictEqual(out.api.viewToHashPath(), 'team?from=2026-06-01&to=2026-06-30');
+});
+
+test('a malformed or hand-edited hash falls back rather than rendering a bogus window', () => {
+  const out = renderTeam(BASE);
+  ['team', 'team?from=nonsense&to=2026-06-30', 'team?from=2026-06-01',
+   'team?from=2026-13-45&to=2026-06-30', 'team?from=&to='].forEach((h) => {
+    assert.strictEqual(out.api.parseRangeFromHash(h), null, h);
+  });
+});
+
+test('a reversed hash range is tolerated the same way the picker tolerates it', () => {
+  const out = renderTeam(BASE);
+  assert.deepStrictEqual(out.api.parseRangeFromHash('team?from=2026-06-30&to=2026-06-01'),
+    { from: '2026-06-01T00:00:00.000Z', to: '2026-06-30T23:59:59.999Z' });
+});
+
+test('TEAM AND COACHING NOW HOLD SEPARATE RANGES', () => {
+  // The split starts here. Coaching stays on state.dateRange until stage 3;
+  // nothing the team picker does may touch it.
+  const out = renderTeam(Object.assign({}, BASE, {
+    teamRange: { from: '2026-08-03T00:00:00.000Z', to: '2026-08-10T23:59:59.999Z' }, teamRangeInit: true,
+    dateRange: { from: '2026-01-01T00:00:00.000Z', to: '2026-01-31T23:59:59.999Z', days: 30 },
+  }));
+  assert.ok(out.html.indexOf('Aug 3 - Aug 10') !== -1, 'team renders ITS range');
+  assert.strictEqual(out.api.state.dateRange.from, '2026-01-01T00:00:00.000Z',
+    "coaching's range must be untouched by rendering team");
+});
+
+test('the default seed is the last 7 days INCLUSIVE, not a bare now-minus-7', () => {
+  const out = renderTeam(Object.assign({}, BASE, { teamRange: null, teamRangeInit: false }));
+  const r = out.api.state.teamRange;
+  assert.ok(r && r.from.endsWith('T00:00:00.000Z'), 'starts at midnight: ' + (r && r.from));
+  assert.ok(r && r.to.endsWith('T23:59:59.999Z'), 'covers the whole end day: ' + (r && r.to));
+  const days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
+  assert.strictEqual(days, 7, 'seven inclusive days');
 });
