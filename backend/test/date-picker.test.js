@@ -477,3 +477,51 @@ test('the extracted change path does NOT write a range itself', () => {
   assert.strictEqual(/state\.dateRange = /.test(fn), false,
     'applyCoachingRangeChange must never assign the range');
 });
+
+// ─── the team sub-page hash gap (2026-08-17) ──────────────────────────────
+
+test('EVERY team-family hash carries the range, not just #team', () => {
+  // Only #team did. Landing on or refreshing a sub-page restored nothing and the
+  // range fell back to the 7-day default. The coaching family already did this
+  // correctly — this is the other reader of the same carrier.
+  const at = HTML.indexOf('function viewToHashPath');
+  const fn = HTML.slice(at, HTML.indexOf('function syncHashFromState', at));
+  assert.ok(fn.length > 400 && fn.length < 3000, 'slice must cover the function: ' + fn.length);
+
+  ['team-recs', 'team-needs-work', 'team-members'].forEach((h) => {
+    const line = fn.split('\n').find((l) => l.indexOf("'" + h + "'") !== -1);
+    assert.ok(line, 'no path for ' + h);
+    assert.ok(/teamRangeHashSuffix\(\)/.test(line), h + ' must carry the range: ' + line.trim());
+  });
+  const teamLine = fn.split('\n').find((l) => /=== 'team'\)/.test(l));
+  assert.ok(/teamRangeHashSuffix\(\)/.test(teamLine), '#team still carries it');
+});
+
+test('the router PARSES the range back for the whole team family', () => {
+  // Emitting it without parsing it would look fixed and change nothing.
+  const at = HTML.indexOf('function applyHashToState');
+  const fn = HTML.slice(at, HTML.indexOf('function onRouteChange', at));
+  assert.ok(fn.length > 400 && fn.length < 6000, 'slice: ' + fn.length);   // bound is a sanity check, not a spec
+  assert.ok(/TEAM_HASH/.test(fn), 'a family map, not a single exact match');
+  ['team-recs', 'team-needs-work', 'team-members'].forEach((h) => {
+    assert.ok(new RegExp("'" + h + "'").test(fn), h + ' must be in the map');
+  });
+  assert.ok(/state\.teamRange = hashed/.test(fn) && /teamRangeInit = true/.test(fn),
+    'and it must beat the 7-day default');
+});
+
+test('the superseded exact-match branches are commented, not left live', () => {
+  assert.ok(/REMOVED 2026-08-17/.test(HTML));
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.strictEqual(/else if \(h === 'team-recs'\)/.test(live), false,
+    'the unreachable duplicate must not stay in the render path');
+});
+
+test('the COACHING family already carried the range — no regression there', () => {
+  const at = HTML.indexOf('function viewToHashPath');
+  const fn = HTML.slice(at, HTML.indexOf('function syncHashFromState', at));
+  ['objections', 'needs-work', 'performance', 'section'].forEach((h) => {
+    const line = fn.split('\n').find((l) => l.indexOf("return '" + h + "'") !== -1);
+    assert.ok(line && /coachingRangeHashSuffix\(\)/.test(line), h + ': ' + (line || 'missing'));
+  });
+});

@@ -5694,9 +5694,9 @@
     // share the exact window. Days only (not full ISO) — readable, and
     // rangeToIso rebuilds the inclusive window on the way back in.
     if (state.view === 'team')             return 'team' + teamRangeHashSuffix();
-    if (state.view === 'team-expanded')    return 'team-recs';
-    if (state.view === 'team-needs-work')  return 'team-needs-work';
-    if (state.view === 'team-members')     return 'team-members';
+    if (state.view === 'team-expanded')    return 'team-recs' + teamRangeHashSuffix();
+    if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
+    if (state.view === 'team-members')     return 'team-members' + teamRangeHashSuffix();
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     // Overview has no path of its own, but still carries its range so a
     // refresh or a shared link lands on the same window.
@@ -5719,8 +5719,14 @@
   function applyHashToState() {
     var h = (window.location.hash || '').replace(/^#/, '');
     var base = h.indexOf('?') === -1 ? h : h.slice(0, h.indexOf('?'));
-    if (base === 'team') {
-      state.view = 'team';
+    // ⚠ THE WHOLE TEAM FAMILY, not just #team. Only #team carried the range, so
+    // landing on or refreshing a team sub-page restored nothing and the range
+    // fell back to the 7-day default — the picked window was silently lost.
+    // Same shape as the coaching family below, which already did this correctly.
+    var TEAM_HASH = { 'team': 'team', 'team-recs': 'team-expanded',
+                      'team-needs-work': 'team-needs-work', 'team-members': 'team-members' };
+    if (Object.prototype.hasOwnProperty.call(TEAM_HASH, base)) {
+      state.view = TEAM_HASH[base];
       var hashed = parseRangeFromHash(h);
       if (hashed) { state.teamRange = hashed; state.teamRangeInit = true; }  // beat the 7d default
       return;
@@ -5754,9 +5760,13 @@
     */
     /* REMOVED 2026-08-16 — unreachable: the `base === 'team'` branch above now
        handles team (it must, to parse the ?from=&to= suffix) and returns early. */
+    /* REMOVED 2026-08-17 — unreachable: the TEAM_HASH branch above now handles
+       the whole team family (it must, to parse the ?from=&to= suffix) and
+       returns early. Kept in place per the standing convention.
     else if (h === 'team-recs') { state.view = 'team-expanded'; }
     else if (h === 'team-needs-work') { state.view = 'team-needs-work'; }
     else if (h === 'team-members') { state.view = 'team-members'; }
+    */
     else if (h === 'kb') { state.view = canAccessKb() ? 'kb' : 'overview'; }
     else if (h === 'prospects') { state.view = 'prospects'; }
     else if (h.indexOf('call/') === 0) {
