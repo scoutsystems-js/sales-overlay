@@ -950,6 +950,24 @@ into the next DMG. What's there today: full session persisted to disk
 - **THE RULE: sort, rank, compare and threshold on the exact value; call the rounding function only where the number is written into markup.** If a rounded value must be compared (e.g. against a stored rounded floor), say so explicitly at that line.
 - Caught by a unit test whose expectation was written from the raw data rather than from the implementation — which is the argument for writing the expected value from the source numbers, not from what the code currently returns.
 
+### DEMO SEED DATA — WRITTEN 2026-08-16, AND HOW TO REMOVE IT
+**Fabricated rows live in PRODUCTION on the three demo reps.** They exist because four features could never fire on real data: only one rep had prospects, only one cleared the objection-volume threshold, and only Josh had a coverage map.
+
+**⚠ REMOVAL — one pass, cascades confirmed against the live schema:**
+```sql
+delete from fathom_calls where fathom_call_id like 'seed-2026-08-16-%';
+delete from prospects     where display_name  like 'Seed %';
+```
+`call_analyses`, `call_highlights` and `eod_edits` are all `ON DELETE CASCADE` on `fathom_calls`, so the first statement clears them. `fathom_calls.prospect_id` is `SET NULL`, which is why prospects need the second. Script: `backend/scripts/seed-demo-data-2026-08-16.js` (`--plan` prints and exits; `--insert` writes).
+
+- **WHAT WAS SEEDED:** 72 calls over 6 weeks across demo-ava / demo-ben / demo-cara — 26 prospects, 24 `fear` objections, 16 `what_mattered` rows. **Zero model calls.**
+- **⚠ DIRECT INSERTION WAS CHOSEN FOR CORRECTNESS, NOT PRICE.** The demo reps' existing calls are COPIES OF JOSH'S TRANSCRIPTS, so a real analysis run would have put Josh's words under their names AND left the outcome up to the model — ~140 Claude calls with no guarantee the thresholds fired. Fabricated rows hit them deterministically, which was the entire objective.
+- **Marker prefixes are deliberately DISJOINT:** `demo-%` (33 rows, old copies) and `demo-rv-%` (18 rows, Zoom reviewer) already existed. `seed-2026-08-16-%` matched 0 rows before this ran, so **the removal above cannot sweep the reviewer's data and a future `demo-%` cleanup cannot sweep the seed.**
+- **`prompt_version` is stamped `seed-2026-08-16`**, not a real grader version, so seeded analyses can never be mistaken for graded calls or picked up by an outdated-count sweep.
+- **ZOOM REVIEWER ISOLATION IS STRUCTURAL, verified not assumed:** `reviewer@scoutsystems.io` is role `user` with `managed_by = NULL`, and every cross-user route is `requireRole(['manager','owner'])`. That account 403s on all `/team/*` and `/admin/*` routes, cannot pivot with `?user=`, and sees only its own 20 calls.
+- **JOSH WAS NOT TOUCHED — inserts only, scoped to the three demo user_ids.** Counts before and after: **calls 360 → 360, analyses 360 → 360, prospects 201 → 201.**
+- **⚠ A DRAFT OF THE SCRIPT INVENTED THE REP UUIDs** from the 8-character prefixes visible in earlier query output. The script now fetches the real ids and **verifies every target id exists before writing a row**. Any future data script targeting users must do the same — a plausible-looking UUID is not a UUID.
+
 ### ⚠ A POPUP RENDERING BEHIND THE PAGE IS A STACKING CONTEXT, NOT A z-index VALUE (2026-08-16)
 **"Raise the z-index" is the obvious fix and it does nothing here.** The date picker's panel rendered behind the page content despite `z-index: 60`.
 - **THE NON-OBVIOUS CAUSE: `.fade-in` is `animation: fadeIn … both`, and its keyframes animate `transform`.** With `fill-mode: both` the final `transform: translateY(0)` **persists forever** — measured on a settled page as `matrix(1, 0, 0, 1, 0, 4)`. **Any non-`none` transform creates a stacking context**, so EVERY `.page-header` and EVERY `.section` on this dashboard is its own stacking context at `z-index: auto`. The panel's z-index is therefore scoped INSIDE the header's context and can never rise above a later sibling, at any value.
