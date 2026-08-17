@@ -48,7 +48,14 @@
                         Cyan leads; see the array for the full reasoning.
          --accent-quiet is the old blue's tint role (soft fills), re-tinted. */
       --accent:       #4ade80;
-      --accent-quiet: rgba(74, 222, 128, 0.18);
+      /* ⚠ THE SAME GREEN, AS CHANNELS. Every soft tint on this page is an
+         rgba() of the accent at some alpha, and rgba() cannot read a hex
+         token — so before this existed, all 23 tints were hard-coded
+         copies of the old blue and did NOT move when --accent did. Keep
+         this in step with --accent above; accent-palette.test.js fails if
+         they drift. */
+      --accent-rgb:   74, 222, 128;
+      --accent-quiet: rgba(var(--accent-rgb), 0.18);
       --good:         #4ade80;
       --mid:          #fbbf24;
       --bad:          #f87171;
@@ -223,7 +230,7 @@
     .glance-trend-pct { margin-left: 2px; color: var(--text); font-weight: 500; }
     .glance-skeleton { height: 92px; border-radius: var(--radius); }
     /* FD-4: Get-started onboarding card */
-    .gs-card { position: relative; border-color: var(--accent); background: linear-gradient(180deg, rgba(91,158,255,0.05), var(--bg-elevated)); }
+    .gs-card { position: relative; border-color: var(--accent); background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.05), var(--bg-elevated)); }
     .gs-dismiss { position: absolute; top: 12px; right: 14px; background: none; border: none; color: var(--text); font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
     .gs-dismiss:hover { color: var(--text); background: rgba(255,255,255,0.05); }
     .gs-head h2 { margin: 0; }
@@ -291,7 +298,7 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 0%, rgba(91, 158, 255, 0.04), transparent 70%);
+      background: radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.04), transparent 70%);
       pointer-events: none;
     }
     .donut-card:hover {
@@ -299,7 +306,7 @@
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
     }
-    .donut-card:hover::before { background: radial-gradient(circle at 50% 0%, rgba(91, 158, 255, 0.08), transparent 70%); }
+    .donut-card:hover::before { background: radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.08), transparent 70%); }
 
     .donut-card .donut-label {
       font-size: 12px;
@@ -436,8 +443,8 @@
     .pattern-confidence.low    { background: rgba(139, 139, 139, 0.10); color: var(--text); }
 
     .signal-banner {
-      background: linear-gradient(135deg, rgba(91, 158, 255, 0.06), rgba(91, 158, 255, 0.02));
-      border: 1px solid rgba(91, 158, 255, 0.15);
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06), rgba(var(--accent-rgb), 0.02));
+      border: 1px solid rgba(var(--accent-rgb), 0.15);
       border-radius: var(--radius);
       padding: 12px 16px;
       font-size: 12.5px;
@@ -503,7 +510,7 @@
     .badge-win    { background: rgba(74, 222, 128, 0.12); color: var(--good); }
     .badge-loss   { background: rgba(248, 113, 113, 0.12); color: var(--bad); }
     .badge-fu     { background: rgba(251, 191, 36, 0.12); color: var(--mid); }
-    .badge-live   { background: rgba(91, 158, 255, 0.12); color: var(--accent); }
+    .badge-live   { background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
     .badge-empty  { background: rgba(139, 139, 139, 0.10); color: var(--text); }
 
     .expand-icon {
@@ -554,8 +561,8 @@
     .verdict-conf { font-size: 10px; color: var(--text); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
 
     .coaching-note {
-      background: linear-gradient(135deg, rgba(91, 158, 255, 0.06) 0%, rgba(74, 222, 128, 0.03) 100%);
-      border: 1px solid rgba(91, 158, 255, 0.18);
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06) 0%, rgba(74, 222, 128, 0.03) 100%);
+      border: 1px solid rgba(var(--accent-rgb), 0.18);
       border-radius: var(--radius-sm);
       padding: 16px 18px;
       font-size: 13.5px;
@@ -752,8 +759,8 @@
 
     /* Framework rebuttal reference card (top of per-type drill) */
     .framework-ref {
-      background: linear-gradient(135deg, rgba(91, 158, 255, 0.06), rgba(74, 222, 128, 0.03));
-      border: 1px solid rgba(91, 158, 255, 0.18);
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06), rgba(74, 222, 128, 0.03));
+      border: 1px solid rgba(var(--accent-rgb), 0.18);
       border-radius: var(--radius);
       padding: 18px 22px;
       margin-bottom: 32px;
@@ -896,8 +903,8 @@
 
     /* Disconnected: full CTA card. Larger visual weight to draw attention. */
     .fathom-connect-card {
-      background: linear-gradient(135deg, rgba(91, 158, 255, 0.08), rgba(91, 158, 255, 0.02));
-      border: 1px solid rgba(91, 158, 255, 0.25);
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.02));
+      border: 1px solid rgba(var(--accent-rgb), 0.25);
       border-radius: var(--radius);
       padding: 22px 24px;
       display: flex;
@@ -1081,7 +1088,7 @@
       color: var(--text);
     }
     .library-status-badge.analyzing {
-      background: rgba(91, 158, 255, 0.14);
+      background: rgba(var(--accent-rgb), 0.14);
       color: var(--accent);
     }
     .library-status-badge.done {
@@ -1235,7 +1242,7 @@
       letter-spacing: 0.06em;
       white-space: nowrap;
     }
-    .review-speaker-badge.closer   { background: rgba(91, 158, 255, 0.14); color: var(--accent); }
+    .review-speaker-badge.closer   { background: rgba(var(--accent-rgb), 0.14); color: var(--accent); }
     .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text); }
     .rep-graph { height: 300px; margin-top: 12px; }
     /* 10c-2 rep cards. All text full strength — the no-grey rule. */
@@ -1327,7 +1334,7 @@
     .review-type-badge.strong_moment      { background: rgba(74, 222, 128, 0.12);  color: var(--good); }
     .review-type-badge.objection          { background: rgba(251, 146, 60, 0.14);  color: var(--orange); }
     .review-type-badge.missed_opportunity { background: rgba(251, 191, 36, 0.12);  color: var(--mid); }
-    .review-type-badge.rapport_moment     { background: rgba(91, 158, 255, 0.12);  color: var(--accent); }
+    .review-type-badge.rapport_moment     { background: rgba(var(--accent-rgb), 0.12);  color: var(--accent); }
     .review-type-badge.disqualify_signal  { background: rgba(100, 116, 139, 0.18); color: var(--text); }
     .review-quote {
       font-size: 13.5px;
@@ -1358,8 +1365,8 @@
     /* "One thing to do differently" accent box — footer of the Highlights section. */
     .review-one-thing {
       margin-top: 18px;
-      background: linear-gradient(135deg, rgba(91, 158, 255, 0.08), rgba(91, 158, 255, 0.02));
-      border: 1px solid rgba(91, 158, 255, 0.25);
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.02));
+      border: 1px solid rgba(var(--accent-rgb), 0.25);
       border-radius: var(--radius);
       padding: 16px 20px;
     }
@@ -1600,7 +1607,7 @@
       font-weight: 600;
       padding: 4px 10px;
       border-radius: 4px;
-      background: rgba(91, 158, 255, 0.10);
+      background: rgba(var(--accent-rgb), 0.10);
       color: var(--accent);
       text-transform: uppercase;
       letter-spacing: 0.08em;
@@ -1677,7 +1684,7 @@
     .trend.up { color: var(--good); } .trend.down { color: var(--bad); } .trend.flat { color: var(--text); }
     .trend-chart { display: flex; align-items: flex-end; gap: 10px; height: 140px; padding: 8px 4px 0; }
     .trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 24px; }
-    .trend-bar { width: 60%; max-width: 46px; background: linear-gradient(180deg, var(--accent), rgba(91,158,255,0.35)); border-radius: 4px 4px 0 0; }
+    .trend-bar { width: 60%; max-width: 46px; background: linear-gradient(180deg, var(--accent), rgba(var(--accent-rgb), 0.35)); border-radius: 4px 4px 0 0; }
     .trend-bar-val { font-size: 11px; color: var(--text); margin-bottom: 4px; }
     .trend-bar-label { font-size: 10.5px; color: var(--text); margin-top: 6px; white-space: nowrap; }
     .team-rep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
@@ -1692,7 +1699,7 @@
     .team-insight-claim { font-size: 14px; color: var(--text); line-height: 1.55; }
     .team-insight-data { font-size: 12.5px; color: var(--text); margin-top: 4px; }
     .team-insight-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-    .team-rep-tag { font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(91,158,255,0.10); padding: 2px 8px; border-radius: 10px; text-transform: capitalize; }
+    .team-rep-tag { font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(var(--accent-rgb), 0.10); padding: 2px 8px; border-radius: 10px; text-transform: capitalize; }
     /* B-1: clickable team glance box + Coach-Summary-styled rep rows + glance-box detail */
     .team-glance { cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
     .team-glance:hover { border-color: var(--accent); transform: translateY(-1px); }

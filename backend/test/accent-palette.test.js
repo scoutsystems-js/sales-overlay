@@ -73,9 +73,33 @@ test('seven distinguishable hues — the consumer cycles, so a short list repeat
     'the consumer must cycle — this test asserts 7 BECAUSE it cycles');
 });
 
-test('the retired blue accent is gone from the live path', () => {
+test('the retired blue accent is gone from the live path — HEX **AND** rgba()', () => {
+  // ⚠ THE HEX SCAN ALONE SHIPPED A DEFECT (2026-08-17). The (e) commit checked
+  // for #5b9eff and found none, while the SAME blue survived as its channel
+  // triple in 23 rgba() tints — several of them backgrounds sitting directly
+  // under `color: var(--accent)`, i.e. green text on a blue chip, live in
+  // production. A colour has more than one spelling; check every spelling.
   assert.strictEqual((LIVE.match(/#5b9eff/gi) || []).length, 0,
     '#5b9eff was the old --accent; every use must inherit var(--accent) now');
+  assert.strictEqual((LIVE.match(/91\s*,\s*158\s*,\s*255/g) || []).length, 0,
+    'rgba(91,158,255,…) is the old accent in channel form — use rgba(var(--accent-rgb), …)');
+});
+
+test('--accent-rgb is the SAME colour as --accent, in channels', () => {
+  // rgba() cannot read a hex token, so the tints need the channels separately.
+  // Two spellings of one colour can drift; this is what stops them.
+  const hex = tokenValue('accent');
+  const m = LIVE.match(/--accent-rgb:\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  assert.ok(m, '--accent-rgb must be defined so tints can inherit the accent');
+  const asHex = '#' + [m[1], m[2], m[3]]
+    .map((n) => Number(n).toString(16).padStart(2, '0')).join('');
+  assert.strictEqual(asHex, hex,
+    '--accent-rgb ' + m.slice(1, 4).join(',') + ' is ' + asHex + ' but --accent is ' + hex);
+});
+
+test('every soft tint inherits the accent rather than restating it', () => {
+  const tints = (LIVE.match(/rgba\(\s*var\(--accent-rgb\)/g) || []).length;
+  assert.ok(tints >= 20, 'expected the accent tints to inherit; found ' + tints);
 });
 
 test('⚠ NON-VACUITY — the guard fires when a reserved hue is put back in the ramp', () => {
