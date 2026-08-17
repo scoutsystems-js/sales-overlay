@@ -987,6 +987,20 @@ delete from prospects     where display_name  like 'Seed %';
 - **⚠ `document.elementFromPoint` NAMED THE REAL OCCLUDER IN SECONDS, AND BOTH PRIOR GUESSES WERE WRONG.** The hypothesis on both sides was the Chart.js canvas; the actual occluder was the **glance stat card**. Fixing the canvas would have changed nothing. **When something renders behind something else, ask the browser what is on top — do not reason about it from the CSS.** The same probe doubles as the acceptance test: iterate the popup's own cells and assert `elementFromPoint(centre) === cell`, which tests "readable and clickable" rather than "the CSS looks right".
 - **CHECK EVERY SURFACE THAT MOUNTS THE COMPONENT.** Three views carry a picker; the bug was reported on one. Verified 42 day cells on each of Team, Coaching and Calls, with the panel confirmed to genuinely OVERLAP the graph — otherwise a layout that happens not to overlap passes as a fix.
 
+### ⚠ SLICING SOURCE IN A TEST: PASS `fromIndex`, AND ASSERT THE LENGTH (four instances by 2026-08-16)
+Tests here extract a function from `dashboard.html` by slicing between two markers. **Written the obvious way, the slice silently runs backwards and the test examines an EMPTY STRING** — then passes or fails for reasons unrelated to the code.
+
+**THE MECHANICAL RULE — apply it every time, do not try to remember whether this case is safe:**
+```js
+const at = HTML.indexOf('function theThing');
+const fn = HTML.slice(at, HTML.indexOf('END_MARKER', at));   // ← fromIndex, always
+assert.ok(fn.length > 200 && fn.length < 4000, 'slice must cover the function: ' + fn.length);
+```
+- **`indexOf(end)` without `fromIndex` finds the FIRST occurrence in the whole file**, which is frequently before the function you are slicing. `HTML.slice(bigger, smaller)` returns `''`.
+- **The length assertion is the load-bearing half.** It is what makes a backwards or truncated slice fail loudly instead of quietly testing nothing — a negative assertion (`assert.ok(!/x/.test(fn))`) passes trivially against `''`.
+- **Four occurrences so far**, all found by accident rather than by the tests failing usefully: the `drillCalls` slice (`setCallsRange` defined earlier), the `sortRepsWorstFirst` mirror guard (`repCardsHtml` defined earlier), the `renderSectionView` slice (`var delta` occurs earlier), and one caught in review. **Prefer markers that are unique to the function**, and when the end marker is a common token, `fromIndex` is not optional.
+- Same family as the other rules here: **the thing you are testing may not be the thing that runs.**
+
 ### ⚠ VERIFY AGAINST THE REAL ENTRY POINT AND THE REAL DATA SHAPE (2026-08-16)
 **A test that drives the wrong function, or feeds an invented fixture shape, passes or fails for reasons unrelated to the code under test.** Both faults appeared in one block (10e) and both would have reported success while exercising nothing:
 - **WRONG ENTRY POINT.** The harness drove `renderTeamView` while the feature renders in `renderOverview`. Zero charts were built; the assertion failed, but for a reason that had nothing to do with the feature. Had the assertion been a negative one ("this must NOT appear"), it would have PASSED — vacuously.
