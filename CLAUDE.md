@@ -991,6 +991,46 @@ delete from prospects     where display_name  like 'Seed %';
 - **JOSH WAS NOT TOUCHED — inserts only, scoped to the three demo user_ids.** Counts before and after: **calls 360 → 360, analyses 360 → 360, prospects 201 → 201.**
 - **⚠ A DRAFT OF THE SCRIPT INVENTED THE REP UUIDs** from the 8-character prefixes visible in earlier query output. The script now fetches the real ids and **verifies every target id exists before writing a row**. Any future data script targeting users must do the same — a plausible-looking UUID is not a UUID.
 
+### ⚠⚠ `rgba()` CANNOT READ A HEX TOKEN — SO EVERY TINT WAS A **COPY** OF THE ACCENT, NOT A REFERENCE (2026-08-17)
+**THIS IS THE FINDING. The one-line lesson underneath it is secondary.**
+- **The mechanism:** `--accent` is a hex token. `rgba()` needs channels, so it cannot read it. Every soft tint on the dashboard was therefore written as `rgba(91, 158, 255, 0.14)` — a **hard-coded copy of the accent's value**, which does not move when `--accent` moves. **"Change one variable and all 65 sites follow" was only ever true for the sites using the HEX.** 23 tints were silently outside that story.
+- **What shipped because of it:** (e) changed `--accent` to green, verified by grepping `#5b9eff` (0 hits), and **shipped green text sitting on blue chips to production** — several of those tints are backgrounds under `color: var(--accent)`.
+- **THE ONE-LINE LESSON: a colour has more than one spelling — check every spelling.** Hex, `rgb()`, `rgba()`, and channel triples inside a data-URI SVG are all the same colour to a user and four different strings to a grep.
+- **THE FIX is a second spelling of the same token, pinned to the first:**
+```css
+--accent:       #4ade80;
+--accent-rgb:   74, 222, 128;              /* the same green, as channels */
+--accent-quiet: rgba(var(--accent-rgb), 0.18);
+```
+`test/accent-palette.test.js` converts one to the other and asserts they match, so the two spellings cannot drift.
+- **⚠ THIRD SIGHTING OF "A VALUE THAT LOOKS MAINTAINED AND ISN'T" — count it as the third.** (1) the stale load-bearing comment in `init()` (see its own entry below); (2) `.kb-promote-btn.is-team`, whose comment read `/* --accent #5b9eff at 10% */` beside a hard-coded blue — **the comment named the variable the code did not read**; (3) these 23 tints. **The shared shape: something that a reader scans as "this follows the token" while the machine sees a literal.** A comment pointing at a variable is weaker than a reference to it, and is worse than a bare literal because it stops the reader looking.
+
+### PALETTE — THREE JOBS, AND NONE MAY BORROW ANOTHER'S HUE (rulings 2026-08-17)
+```
+SEMANTIC     --good / --mid / --bad   "this is good / a warning / bad"
+INTERACTIVE  --accent                 "you can click this"
+CATEGORICAL  REP_LINE_COLORS          "this is rep number four"
+```
+- **The categorical ramp borrows NONE of the others.** Amber and rose were dropped first: **a rep rendered in the warning hue reads as a warning**, when all the line means is "rep number four". **Green was then dropped for the same reason in the other direction** — it means "clickable" everywhere else, and a hue cannot do two jobs. Cyan leads.
+- **SEVEN entries, not six.** The consumer is `REP_LINE_COLORS[i % length]`, so a six-colour ramp **draws rep 7 identically to rep 1 on the same chart**. Blue took the freed slot: it stopped meaning "clickable" the moment `--accent` moved off it.
+- **KB category badges (`#93c5fd`) STAY** — a taxonomy palette on the Knowledge Base page, one hue per content category, not an interactive colour.
+- **Also ruled: the `.user-select` chevron icon keeps its grey stroke** (the no-grey rule is about TEXT), and the Team drilldown's "Cash collected" **axis label** stays (it is a label, not a card — (m) removed cards).
+- Guarded by `test/accent-palette.test.js`, which fails if the ramp contains any of the four reserved tokens and proves itself non-vacuous by re-adding the accent.
+
+### ⚠⚠ A `z-index: -1` LAYER PAINTS BEHIND ITS OWN PARENT'S BACKGROUND — AND FAILS AS *ABSENCE*, NOT AS AN ERROR (2026-08-17)
+**The (f) background motifs rendered NOTHING. Not faintly — nothing, at every opacity, including 1.**
+- **The cause:** the layer is `body::before { position: fixed; z-index: -1 }`, and the stylesheet said `html, body { background: var(--bg) }`. **A negative-z-index child paints behind its own parent's background**, so BODY's opaque box covered the motifs. The CSS reads as completely correct and throws nothing.
+- **The fix:** the page background lives on **`<html>` alone**. It propagates to the viewport canvas, so the page is pixel-identical. `test/background-motifs.test.js` fails if a background ever returns to `body`, and says why in the message.
+- **⚠ WHY THIS ONE IS DANGEROUS: the symptom is ABSENCE, which presents as a DESIGN problem rather than a bug.** The natural read is "3.5% is too subtle on a near-black page, raise the opacity" — and the next step is to spend the architect's ruling on the wrong question. **It was caught by setting the opacity to 1 to check the layer painted at all, BEFORE reporting on how faint it was.** When a visual element is invisible, prove it is rendering before you tune it.
+
+### BACKGROUND MOTIFS (f) — SAFETY IS THE LAYOUT, NOT THE OPACITY (2026-08-17)
+Two inline-SVG data URIs (a plotted series with its nodes; the donut as concentric arcs) on a fixed `body[data-view]::before` at **3.5%**, `pointer-events: none`. No asset, no request, no dependency.
+- **The failure mode — competing with the charts — is REMOVED BY THE LAYOUT rather than managed by being faint.** Every `.section` is an **opaque card** and `.page` is a 1200px column, so the layer can only show through the gutters and the gaps between cards. It is *structurally* incapable of sitting behind a chart, a number, or a line of text.
+- Hidden under **1320px** (no gutter to live in) and under **`prefers-contrast: more`**.
+- **Scoped by `body[data-view]`, stamped in `render()`** — the single dispatch point for every view, so the attribute cannot fall out of step with the screen.
+- **⚠ THE ROLLOUT WAS MEASURED ACROSS ALL FIFTEEN VIEWS, NOT ASSUMED FROM THE FIRST.** Thirteen put every element inside an opaque card. **TWO do not** — `prospects` and `section` render a page subtitle and their empty/error states as **card-less full-width blocks** whose boxes reach into the motif's box. Those were **rasterised to a canvas and sampled**: **zero motif pixels** fall under those glyphs, at column widths equivalent to viewports from 1600px down to 1300px. **A bounding-box overlap is not an ink overlap, and the difference is worth measuring rather than reporting either way from geometry.** If either view gains RIGHT-ALIGNED card-less content, re-run that check.
+- **A test DOM stub gained the `dataset` a real `<body>` always has, rather than production gaining `if (document.body)`.** A branch that can never be false in a browser is a worse artefact than an incomplete stub.
+
 ### ⚠ A POPUP RENDERING BEHIND THE PAGE IS A STACKING CONTEXT, NOT A z-index VALUE (2026-08-16)
 **"Raise the z-index" is the obvious fix and it does nothing here.** The date picker's panel rendered behind the page content despite `z-index: 60`.
 - **THE NON-OBVIOUS CAUSE: `.fade-in` is `animation: fadeIn … both`, and its keyframes animate `transform`.** With `fill-mode: both` the final `transform: translateY(0)` **persists forever** — measured on a settled page as `matrix(1, 0, 0, 1, 0, 4)`. **Any non-`none` transform creates a stacking context**, so EVERY `.page-header` and EVERY `.section` on this dashboard is its own stacking context at `z-index: auto`. The panel's z-index is therefore scoped INSIDE the header's context and can never rise above a later sibling, at any value.

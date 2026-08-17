@@ -44,7 +44,7 @@ test('⚠ BODY MUST NOT PAINT A BACKGROUND — it would hide the motif layer', (
 });
 
 test('the layer is decorative and unreachable — never in front of content', () => {
-  const r = rule('body[data-view="overview"]::before');
+  const r = rule('body[data-view]::before');
   assert.ok(/position:\s*fixed/.test(r), 'must be a fixed backdrop, not in the flow');
   assert.ok(/z-index:\s*-1\b/.test(r),
     'z-index MUST be negative — a fixed layer at 0 paints ABOVE static in-flow text');
@@ -56,21 +56,23 @@ test('the layer is decorative and unreachable — never in front of content', ()
 });
 
 test('it is inline SVG — no asset, no request, no dependency', () => {
-  const r = rule('body[data-view="overview"]::before');
+  const r = rule('body[data-view]::before');
   const urls = r.match(/url\("data:image\/svg\+xml,/g) || [];
   assert.strictEqual(urls.length, 2, 'expected the two motifs as inline data URIs');
   assert.ok(!/url\(["']?(https?:)?\/\//.test(r), 'no remote asset may be referenced');
 });
 
-test('ONE VIEW ONLY until judged, and render() is what scopes it', () => {
-  assert.ok(/body\[data-view="overview"\]::before/.test(LIVE),
-    'the motifs must be scoped to a single view by attribute');
-  // Exactly ONE decorative SVG layer exists, and it is the view-scoped one —
-  // "one view first" is the ruling, so a second unscoped layer is a failure.
+test('ONE layer for ALL views, and render() is what gates it', () => {
+  // Rolled out 2026-08-17. The ATTRIBUTE is still required: render() stamps it,
+  // so the layer cannot paint over a page that has not rendered yet.
+  assert.ok(/body\[data-view\]::before/.test(LIVE),
+    'the motif layer must key on the data-view attribute render() stamps');
+  assert.ok(!/body\[data-view="[a-z-]+"\]::before/.test(LIVE),
+    'no per-view motif variant — one layer, one definition');
+  // Exactly ONE decorative SVG layer. A second would mean a view got its own
+  // copy, which is how two definitions start drifting apart.
   const layers = LIVE.match(/[^\n{}]*::before\s*{[^}]*data:image\/svg\+xml/g) || [];
   assert.strictEqual(layers.length, 1, 'expected one motif layer, found: ' + layers.length);
-  assert.ok(/data-view="overview"/.test(layers[0]),
-    'the only motif layer must be the view-scoped one: ' + layers[0].slice(0, 80));
   // render() is the single dispatch point for every view, so the attribute
   // cannot fall out of step with what is on screen.
   const at = LIVE.indexOf('function render()');

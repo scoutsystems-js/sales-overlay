@@ -120,8 +120,19 @@
        the content and above the root background, which is the one slot that
        works. (Same stacking-context family as the date-picker bug.)
 
-       Scoped to ONE view via body[data-view] until judged. */
-    body[data-view="overview"]::before {
+       ROLLED OUT TO EVERY VIEW 2026-08-17, after measuring all fifteen rather
+       than assuming they share the overview's shape. Thirteen put every element
+       inside an opaque card. TWO do not — `prospects` and `section` render a
+       page subtitle and their empty/error states as CARD-LESS full-width blocks
+       whose boxes reach into the motif's box. Those were rasterised and sampled:
+       ZERO motif pixels fall under those glyphs, at column widths equivalent to
+       viewports from 1600px down to 1300px (below 1320px the layer is off). The
+       rollout rests on that measurement, not on inference — so if either view
+       ever gains RIGHT-ALIGNED card-less content, re-run the check first.
+
+       body[data-view] still REQUIRES the attribute, which render() stamps, so
+       the layer cannot paint over a page that has not rendered yet. */
+    body[data-view]::before {
       content: '';
       position: fixed;
       inset: 0;
@@ -136,9 +147,9 @@
     }
     /* Below this width the column eats the gutters, so the layer would paint
        entirely behind opaque cards. Don't render what cannot be seen. */
-    @media (max-width: 1320px) { body[data-view="overview"]::before { display: none; } }
+    @media (max-width: 1320px) { body[data-view]::before { display: none; } }
     /* A decorative layer must not survive a contrast preference. */
-    @media (prefers-contrast: more) { body[data-view="overview"]::before { display: none; } }
+    @media (prefers-contrast: more) { body[data-view]::before { display: none; } }
 
     a { color: inherit; text-decoration: none; }
     button { font-family: inherit; cursor: pointer; }
