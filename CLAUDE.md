@@ -950,10 +950,15 @@ into the next DMG. What's there today: full session persisted to disk
 - **THE RULE: sort, rank, compare and threshold on the exact value; call the rounding function only where the number is written into markup.** If a rounded value must be compared (e.g. against a stored rounded floor), say so explicitly at that line.
 - Caught by a unit test whose expectation was written from the raw data rather than from the implementation — which is the argument for writing the expected value from the source numbers, not from what the code currently returns.
 
-### ⚠⚠ NEVER RECONSTRUCT AN IDENTIFIER FROM A DISPLAY PREFIX — FETCH AND VERIFY BEFORE ANY WRITE (2026-08-16)
+### ⚠⚠ A FABRICATED IDENTIFIER FAILS SILENTLY IN BOTH DIRECTIONS — NEVER RECONSTRUCT ONE FROM A DISPLAY PREFIX (2026-08-16)
+**THIS IS WHY IT IS WORSE THAN AN OUTRIGHT WRONG VALUE: NEITHER DIRECTION RAISES AN ERROR.**
+- **A WRITE scoped to a fabricated id** either inserts rows nobody can see, or **collides with a real row** that happens to match. The first is invisible; the second is corruption wearing a valid-looking id.
+- **A READ or a DELETE scoped to one** simply matches nothing — and **reports success**. `0 rows affected` is indistinguishable from "there was nothing to affect".
+So there is no failure to notice, no exception to catch, and no log line to grep. A wrong-but-real id would at least hit something someone would eventually question.
+
 **A plausible-looking identifier is not an identifier.** Query output is routinely abbreviated for reading — `left(user_id::text,8)`, a truncated call id, a shortened commit hash — and rebuilding a full value from that fragment produces something that LOOKS right and refers to nothing.
 - **The live case:** the demo-seed script was drafted with full UUIDs invented from the 8-character prefixes shown in earlier query results. They were well-formed, correctly shaped, and **completely fictional**. Caught in review before `--insert` ran.
-- **⚠ THE FAILURE IS SILENT IN BOTH DIRECTIONS.** A write scoped to a non-existent id either inserts rows nobody can see (an FK to `auth.users` would reject it, but a nullable or unconstrained column would not), or — far worse — collides with a REAL row that happens to match. Neither announces itself. A `WHERE` clause on a fabricated id simply matches nothing and reports success.
+- **Column constraints are not the safety net.** An FK to `auth.users` would reject a bad `user_id`, but a nullable or unconstrained column accepts it happily — so whether the failure is caught at all depends on which column you happened to target.
 - **THE RULE, and it is the same discipline as destructive ops pinning to verified ids:** resolve the identifier from the source table by a stable natural key (email, `fathom_call_id`, label), **then assert every target exists before writing anything**. `backend/scripts/seed-demo-data-2026-08-16.js` does this — it selects the ids by email, re-queries `user_profiles` for all of them, prints `exists` per target, and **aborts if any is missing**.
 - **This applies to every data script, not just destructive ones.** The existing rule ("a data-op checkpoint pins to VERIFIED IDS, never a fixed count") was written for deletes; inserts need the same guarantee for the same reason. **Print the verification in the run log** so the evidence is visible after the fact rather than assumed.
 
