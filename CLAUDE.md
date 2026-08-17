@@ -991,6 +991,20 @@ delete from prospects     where display_name  like 'Seed %';
 - **JOSH WAS NOT TOUCHED — inserts only, scoped to the three demo user_ids.** Counts before and after: **calls 360 → 360, analyses 360 → 360, prospects 201 → 201.**
 - **⚠ A DRAFT OF THE SCRIPT INVENTED THE REP UUIDs** from the 8-character prefixes visible in earlier query output. The script now fetches the real ids and **verifies every target id exists before writing a row**. Any future data script targeting users must do the same — a plausible-looking UUID is not a UUID.
 
+### ⚠ A GUARD MUST SPLIT THE SAME WAY THE RULE SPLITS — BY QUESTION, NOT BY FILE (2026-08-17)
+**When a rule divides call sites by the QUESTION they ask, a per-file guard is the wrong shape and will be wrong for a real file.**
+- **The live case:** "handled" is read by fifteen places. TEN ask *"what is the rate?"* (credit objections on closed calls); FIVE ask *"was this a good moment?"* (must not). The obvious guard is a list of files. **`lib/team-synthesis.js` is in BOTH lists** — it computes an objection rate for its prompt *and* picks highlight-of-the-week candidates. `lib/objection-synthesis.js` and `lib/session-analytics.js` are the same shape.
+- **`objection-synthesis` needed the split INSIDE A SINGLE LOOP**: it counts with the shared predicate and selects its "handled examples" on the moment's own resolution, because an example is evidence of good handling shown to a closer. A credited-but-unhandled moment held up as the model to copy is exactly backwards.
+- **THE RULE: enforce per CALL SITE.** `test/handled-carrier.test.js` counts hand-rolled `resolution === 'handled'` comparisons per file against an explicit allowance, with the reason for each allowance written beside it. A file-level allowlist would have said "team-synthesis is exempt" and stopped noticing its rate lane entirely.
+
+### ⚠ DO NOT DELETE A TEST BECAUSE ITS SCAFFOLDING WENT — CONVERT IT (2026-08-17)
+**A test's SUBJECT often outlives its VEHICLE, and deleting it with the feature is how a property silently stops being covered.**
+- Removing the What-Needs-Work money math failed 8 tests. Four were genuinely about the removed feature and were archived in place. **Four were converted**, because what they protected still exists:
+  - *"linkage Δ counts TRUE objections only"* measured its property through the linkage — which is gone. The property is not: **logistical barriers and disqualifications must stay out of the math even when they sit in closed calls.** Re-expressed through `detail.objections` and bucket totals.
+  - *"rate_gap when the linkage groups are too small"* → now pins `rate_gap` as the **only** state, since there is no longer a money state to fall back from.
+  - The exports test now asserts the removed constants are **absent**, so reintroducing the money lane trips it rather than passing quietly.
+- **THE TEST TO APPLY: is the assertion about the thing being removed, or about a property that merely used it to get at something?** Only the first should go.
+
 ### ⚠⚠ A ZERO THAT ARRIVES BY CONSTRUCTION IS THE SIGNATURE OF A TAUTOLOGY (2026-08-17)
 **The most valuable measurement of the handled-definition block, and the reason two rulings had to ship in ONE commit.**
 - **The ruling:** an objection counts as handled if `resolution === 'handled'` **OR the call's `outcome === 'closed'`**. Justin: *"objections are just barriers to a close, so if they side-step the barrier and still close, that's a win in my book."* Binary — `partial` scores zero.
