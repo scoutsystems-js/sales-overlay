@@ -11,6 +11,7 @@
 //     quote + clip + why.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { displayNameFromEmail } = require('./display-name');
 const { isHandled } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
@@ -125,7 +126,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     SECTIONS.forEach(function (s) { var v = a[s + '_score']; if (typeof v === 'number') { secSum[s] += v; secN[s]++; } });
     if (typeof a.overall_score === 'number') { if (a.outcome === 'closed') { winSum += a.overall_score; winN++; } else if (a.outcome === 'lost') { lossSum += a.overall_score; lossN++; } }
     if (typeof a.one_thing === 'string' && a.one_thing.trim() && oneThings.length < MAX_ONE_THINGS) {
-      var em = emailMap && emailMap[repOf(a.fathom_call_id)]; oneThings.push((em ? em.split('@')[0] + ': ' : '') + a.one_thing.trim());
+      var em = emailMap && emailMap[repOf(a.fathom_call_id)]; oneThings.push((em ? displayNameFromEmail(em) + ': ' : '') + a.one_thing.trim());
     }
   });
   var sections = {}, strongest = null, weakest = null;

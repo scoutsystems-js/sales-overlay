@@ -1,4 +1,5 @@
 const express = require('express');
+const { normalizeName } = require('../lib/display-name');
 const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
@@ -824,12 +825,14 @@ router.patch('/account', requireAuth, async function(req, res) {
     if (body.first_name !== undefined) {
       var fn = validateNameField(body.first_name);
       if (!fn) return res.status(400).json({ error: 'first_name must be 1-60 characters' });
-      updates.first_name = fn;
+      updates.first_name = normalizeName(fn);   // capitalise on the way in
+
     }
     if (body.last_name !== undefined) {
       var ln = validateNameField(body.last_name);
       if (!ln) return res.status(400).json({ error: 'last_name must be 1-60 characters' });
-      updates.last_name = ln;
+      updates.last_name = normalizeName(ln);
+
     }
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: first_name, last_name)' });
     updates.updated_at = new Date().toISOString();

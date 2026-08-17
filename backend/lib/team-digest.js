@@ -22,6 +22,7 @@
 // uses the real ET day bounds in UTC (04:00Z summer / 05:00Z winter).
 
 const crypto = require('crypto');
+const { displayNameFromEmail } = require('./display-name');
 const Anthropic = require('@anthropic-ai/sdk');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
@@ -161,7 +162,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
 
   // ── Facts (computed in JS — the model narrates, it does not count) ────────
   var repName = function (uid) {
-    return (nameMap && nameMap[uid]) || (emailMap && emailMap[uid] ? emailMap[uid].split('@')[0] : 'rep');
+    return (nameMap && nameMap[uid]) || (emailMap && emailMap[uid] ? displayNameFromEmail(emailMap[uid], 'rep') : 'rep');
   };
   var byOutcome = { closed: 0, follow_up: 0, lost: 0, no_show: 0 };
   var activeReps = {};

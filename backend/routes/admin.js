@@ -467,8 +467,12 @@ router.post('/users', requireAuth, requireRole(['manager', 'owner']), async func
   var email = (typeof body.email === 'string') ? body.email.trim() : '';
   var role = body.role;
   var managedBy = (body.managed_by === null || body.managed_by === undefined || body.managed_by === '') ? null : body.managed_by;
-  var firstName = (typeof body.first_name === 'string') ? body.first_name.trim() : '';
-  var lastName = (typeof body.last_name === 'string') ? body.last_name.trim() : '';
+  // ⚠ NORMALISED ON THE WAY IN (ruling 2026-08-17). "josh" is saved as "Josh", so
+  // every reader — screens, prompts, exports — gets it right from one write
+  // instead of each render fixing it. A name the person capitalised themselves is
+  // left exactly as typed; see lib/display-name.js.
+  var firstName = normalizeName(body.first_name);
+  var lastName = normalizeName(body.last_name);
 
   // A manager may only create their OWN reps: force managed_by=self and role=user
   // (only an owner can mint managers or assign a rep to a different manager).

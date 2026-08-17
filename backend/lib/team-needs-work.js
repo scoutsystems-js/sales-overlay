@@ -18,6 +18,7 @@
 // failure returns available:false and is NOT cached (retries next load).
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { displayNameFromEmail } = require('./display-name');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
@@ -300,7 +301,7 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
       handled: isHandled(r, outcomeByCall[r.fathom_call_id]),
       quote: str(r.quote, 300),
       observation: str(r.observation, 240),
-      rep: (emailMap && emailMap[rid] ? emailMap[rid].split('@')[0] : null),
+      rep: (emailMap && emailMap[rid] ? displayNameFromEmail(emailMap[rid]) : null),
       clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
     };
   });

@@ -8,6 +8,7 @@
 // owner with reps defaults to their own team.
 
 const express = require('express');
+const { resolveDisplayName } = require('../lib/display-name');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
@@ -248,13 +249,14 @@ router.get('/rep-series', teamGate, async function (req, res) {
     var withCalls = {}; calls.forEach(function (c) { withCalls[c.user_id] = true; });
     var em = await emailMap(admin);
     var profs = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', candidates);
-    var nameOf = {};
-    (profs.data || []).forEach(function (p) {
-      var n = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
-      if (n) nameOf[p.user_id] = n;
-    });
+    // Hand the PROFILE ROW to the resolver rather than pre-joining the name here
+    // — the join-and-fallback rules live in lib/display-name.js and nowhere else.
+    var profOf = {};
+    (profs.data || []).forEach(function (p) { profOf[p.user_id] = p; });
     var reps = candidates.filter(function (id) { return withCalls[id]; }).map(function (id) {
-      return { user_id: id, name: nameOf[id] || String(em[id] || id).split('@')[0] };
+      // ⚠ THE GAUGE PANEL AND THE LINE GRAPHS ARE NAMED FROM HERE. This was a
+      // raw local-part, which is why the dials read "josh" and "demo-ava".
+      return { user_id: id, name: resolveDisplayName(profOf[id], em[id] || null, id) };
     });
 
     res.json(buildRepSeries({

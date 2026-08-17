@@ -2370,7 +2370,7 @@
   <div class="kb-modal-overlay" onclick="closeAddMember()"></div>
   <div class="kb-modal-dialog">
     <button class="kb-modal-close" onclick="closeAddMember()" aria-label="Close">✕</button>
-    <h2>Add rep</h2>
+    <h2>Add Rep</h2>
     <div class="kb-form-row"><label class="kb-form-label" for="maEmail">Email</label><input type="email" id="maEmail" placeholder="rep@company.com" autocomplete="off"/></div>
     <div class="kb-form-row"><label class="kb-form-label" for="maFirst">First name</label><input type="text" id="maFirst" autocomplete="off"/></div>
     <div class="kb-form-row"><label class="kb-form-label" for="maLast">Last name</label><input type="text" id="maLast" autocomplete="off"/></div>
@@ -2385,7 +2385,7 @@
   <div class="kb-modal-overlay" onclick="closeBucketEvidence()"></div>
   <div class="kb-modal-dialog">
     <button class="kb-modal-close" onclick="closeBucketEvidence()" aria-label="Close">✕</button>
-    <h2 id="bucketEvidenceTitle">The calls</h2>
+    <h2 id="bucketEvidenceTitle">The Calls</h2>
     <div id="bucketEvidenceBody"></div>
   </div>
 </div>
@@ -3363,7 +3363,7 @@
           + (saving ? ' disabled' : '') + ' />'
         + (saving
             ? '<button class="btn-fathom-primary" type="button" disabled><span class="spinner-tiny"></span> Saving…</button>'
-            : '<button class="btn-fathom-primary" type="button" onclick="saveFathomIdentity()">Save &amp; sync</button>')
+            : '<button class="btn-fathom-primary" type="button" onclick="saveFathomIdentity()">Save &amp; Sync</button>')
       + '</div>'
       + '</div>';
   }
@@ -3385,7 +3385,7 @@
     var lastSync = status.last_sync_at ? formatRelativeTime(status.last_sync_at) : 'never';
     var syncBtn = state.fathomSyncing
       ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Syncing…</button>'
-      : '<button class="btn-fathom-secondary" type="button" onclick="syncFathomNow()">↻ Sync now</button>';
+      : '<button class="btn-fathom-secondary" type="button" onclick="syncFathomNow()">↻ Sync Now</button>';
     // Reanalyze button + "N pending analysis" meta only appear when calls are
     // sitting at sync_status='pending' (newly synced or reset back to the worker).
     var reanalyzeBtn = '';
@@ -3447,7 +3447,7 @@
         + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<button class="btn-fathom-secondary" type="button" onclick="syncFathomNow()"' + (state.fathomSyncing ? ' disabled' : '') + '>↻ Retry sync</button>'
+        + '<button class="btn-fathom-secondary" type="button" onclick="syncFathomNow()"' + (state.fathomSyncing ? ' disabled' : '') + '>↻ Retry Sync</button>'
         + '<button class="btn-fathom-primary" type="button" onclick="connectFathom()">Reconnect</button>'
       + '</div>'
       + '</div>';
@@ -3881,12 +3881,12 @@
       s2 = state.fathomSyncing
         ? stepHtml(false, 'Get your calls graded', 'Syncing your calls now — this usually takes a few minutes. Your grades appear up top as each one finishes.', '')
         : stepHtml(false, 'Get your calls graded', 'Pull in your most recent calls and grade them — one click.',
-            '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="syncFathomNow()">Sync &amp; grade my recent calls</button>');
+            '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="syncFathomNow()">Sync &amp; Grade My Recent Calls</button>');
     } else if (zoomConnected) {
       s2 = state.zoomSyncing
         ? stepHtml(false, 'Get your calls graded', 'Syncing your calls now — this usually takes a few minutes. Your grades appear up top as each one finishes.', '')
         : stepHtml(false, 'Get your calls graded', 'Pull in your most recent Zoom cloud recordings and grade them — one click. (Zoom grades cloud recordings that have transcription turned on.)',
-            '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="syncZoomNow()">Sync &amp; grade my recent calls</button>');
+            '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="syncZoomNow()">Sync &amp; Grade My Recent Calls</button>');
     } else {
       s2 = stepHtml(false, 'Get your calls graded', 'After you connect above, grade your most recent calls in one click.', '');
     }
@@ -3896,7 +3896,7 @@
       var kbDone = gsDismissed('kb');
       s3 = stepHtml(kbDone, 'Add your Knowledge Base <span class="gs-optional">optional</span>',
         'Grading gets measurably more specific when Scout knows how you actually sell — add your offer docs, scripts, and winning calls.',
-        kbDone ? '' : '<div class="gs-actions"><button class="btn-fathom-secondary" type="button" onclick="goKb()">Add to Knowledge Base →</button><button class="btn-fathom-secondary" type="button" onclick="dismissGsKb()">Not now</button></div>');
+        kbDone ? '' : '<div class="gs-actions"><button class="btn-fathom-secondary" type="button" onclick="goKb()">Add to Knowledge Base →</button><button class="btn-fathom-secondary" type="button" onclick="dismissGsKb()">Not Now</button></div>');
     } else {
       // Managed rep: they can't add KB, but they can view what they're graded against.
       s3 = stepHtml(true, 'Your team’s Knowledge Base',
@@ -3906,7 +3906,7 @@
 
     return '<div class="section fade-in gs-card">'
       + '<button class="gs-dismiss" type="button" title="Dismiss" onclick="dismissGetStarted()">×</button>'
-      + '<div class="gs-head"><h2>Get started with Scout</h2><div class="meta">A couple of quick steps to make your grading sharp.</div></div>'
+      + '<div class="gs-head"><h2>Get Started With Scout</h2><div class="meta">A couple of quick steps to make your grading sharp.</div></div>'
       + s1 + s2 + s3
       + '</div>';
   }
@@ -3953,11 +3953,11 @@
       + tiles
       + repOwnGraphHtml()
       + '<div class="section fade-in">' + needsWorkCardHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Coach summary</h2>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Coach Summary</h2>'
         + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
         + renderCoachSummary2(a) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Performance summary</h2></div>' + overviewLinkCardHtml('Your wins and what to improve, drawn from your calls.', 'openPerformance()') + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Recent calls</h2></div>' + overviewLinkCardHtml('Open your Call Library to review recent calls.', 'goCallLibrary()') + '</div>';
+      + '<div class="section fade-in"><div class="section-header"><h2>Performance Summary</h2></div>' + overviewLinkCardHtml('Your wins and what to improve, drawn from your calls.', 'openPerformance()') + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Recent Calls</h2></div>' + overviewLinkCardHtml('Open your Call Library to review recent calls.', 'goCallLibrary()') + '</div>';
 
     // 10e: the canvas exists only after the assignment above.
     drawRepOwnChart();
@@ -3981,9 +3981,9 @@
     var content = document.getElementById('content');
     if (state.perfSynthesis === null && !state.perfSynthesisLoading) loadPerfSynthesis();
     content.innerHTML = renderHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Performance summary</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Performance Summary</h2>'
         + '<div class="meta">win vs loss, grounded in your calls</div></div>'
-        + '<button class="date-preset" onclick="backToOverview()">← back</button></div>'
+        + '<button class="date-preset" onclick="backToOverview()">← Back</button></div>'
         + renderPerfSummary() + '</div>';
   }
   /* A-2.2: accordion machinery RETIRED — Coach summary is inline, Performance and
@@ -4073,7 +4073,7 @@
     content.innerHTML = renderHeaderHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
         + '<div class="meta">your objection-handling focus · ' + escapeHtml(needsWorkWindowLabel()) + '</div></div>'
-        + '<button class="date-preset" onclick="backToOverview()">← back</button></div>'
+        + '<button class="date-preset" onclick="backToOverview()">← Back</button></div>'
         + needsWorkDetailBodyHtml(state.needsWork) + '</div>';
   }
 
@@ -4124,7 +4124,7 @@
   }
   function perfInsightHtml(it, kind) {
     var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ clip</a>' : '';
-    var review = it.call_id ? ' <button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')" style="padding:2px 8px;">call</button>' : '';
+    var review = it.call_id ? ' <button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')" style="padding:2px 8px;">Call</button>' : '';
     var data = it.data ? '<span style="color:var(--text);"> · ' + escapeHtml(it.data) + '</span>' : '';
     var quote = it.quote ? '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--text);">“</span>' + escapeHtml(it.quote) + '<span style="color:var(--text);">”</span></div>' : '';
     var accent = kind === 'working' ? 'var(--good)' : 'var(--mid, #fbbf24)';
@@ -4426,7 +4426,7 @@
       };
     });
 
-    var teamPts = (series.team && (yLabel === 'Handle rate' ? series.team.handle : series.team.close)) || [];
+    var teamPts = (series.team && (yLabel === 'Handle Rate' ? series.team.handle : series.team.close)) || [];
     if (teamPts.some(function (p) { return p && p.rate !== null; })) {
       datasets.push({
         label: 'Team average',
@@ -4543,7 +4543,7 @@
     if (!repOwnGraphVisible()) return;
     var series = repOwnSeries();
     if (!series) return;
-    repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle rate');
+    repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle Rate');
   }
 
   function repSeriesSectionHtml() {
@@ -4641,8 +4641,8 @@
   // state that repSeriesSectionHtml already rendered.
   function drawRepSeriesCharts() {
     if (!state.teamRepSeries || state.teamRepSeries._error) return;
-    repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle rate');
-    repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing rate');
+    repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate');
+    repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate');
   }
 
   // The dedicated (hidden, no-nav-tab) expanded page: full recommendations +
@@ -4659,7 +4659,7 @@
       teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>Team Recommendations</h2>'
         + '<div class="meta">grounded in the team\'s calls</div></div>'
-        + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>' + teamRecsHtml() + '</div>'
+        + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>' + teamRecsHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Call Highlights of the Week</h2></div>' + teamHighlightsHtml() + '</div>';
   }
 
@@ -4744,7 +4744,7 @@
     content.innerHTML = teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
         + '<div class="meta">objection-handling focus for this period</div></div>'
-        + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
+        + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamNeedsWorkDetailHtml() + '</div>';
   }
 
@@ -5343,7 +5343,7 @@
     var metric = state.teamGaugeMetric === 'closing' ? 'closing' : 'objections';
     var d = state.teamGauges;
     var sel = '<div class="gauge-metric-select">'
-      + [['objections', 'Objection handling'], ['closing', 'Closing rate']].map(function (o) {
+      + [['objections', 'Objection Handling'], ['closing', 'Closing Rate']].map(function (o) {
           return '<button class="gauge-metric-btn' + (metric === o[0] ? ' active' : '') + '" type="button" onclick="setGaugeMetric(\'' + o[0] + '\')">' + o[1] + '</button>';
         }).join('')
       + '</div>';
@@ -5436,7 +5436,7 @@
 
   // "Manage members" opens the hidden #team-members page (not on the page itself).
   function manageMembersBtnHtml() {
-    return state.view !== 'team-members' ? '<button class="btn-fathom-secondary" type="button" onclick="openTeamMembers()">Manage members</button>' : '';
+    return state.view !== 'team-members' ? '<button class="btn-fathom-secondary" type="button" onclick="openTeamMembers()">Manage Members</button>' : '';
   }
   function openTeamMembers() { setView('team-members'); }
 
@@ -5449,7 +5449,7 @@
 
   function summaryBtnHtml() {
     // Only render where a summarizable page is active (see currentSummaryPage).
-    return currentSummaryPage() ? '<button class="btn-fathom-secondary summary-btn" type="button" onclick="openPageSummary()">✨ Generate summary</button>' : '';
+    return currentSummaryPage() ? '<button class="btn-fathom-secondary summary-btn" type="button" onclick="openPageSummary()">✨ Generate Summary</button>' : '';
   }
 
   // Which manager-view page is on screen (drives both button visibility + payload).
@@ -5479,7 +5479,7 @@
     if (p.key === 'detail') {
       if (!o || !o.per_rep) return null;
       var m = state.teamDetailMetric;
-      var ml = m === 'cash' ? 'Cash collected' : (m === 'close' ? 'Close rate' : 'Objection handling');
+      var ml = m === 'cash' ? 'Cash collected' : (m === 'close' ? 'Close rate' : 'Objection Handling');
       return { label: _summaryTeamLabel() + ' — ' + ml + ' by rep', data: { metric: ml, reps: (o.per_rep || []).map(_trimRep) } };
     }
     if (p.key === 'needs-work') {
@@ -5550,7 +5550,7 @@
     content.innerHTML = teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>Manage Members</h2>'
         + '<div class="meta">add, deactivate, move, reset password, or update a rep\'s email</div></div>'
-        + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
+        + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamMembersBodyHtml() + '</div>';
   }
   function teamMembersScope() {
@@ -5575,7 +5575,7 @@
     if (!members.length) return head + '<div class="empty"><p>No reps on this team yet. Use “+ Add rep” to invite one.</p></div>';
     var rows = members.map(function (m) {
       var active = m.active !== false;
-      var name = ((m.first_name || '') + ' ' + (m.last_name || '')).trim() || (m.email || '').split('@')[0];
+      var name = personName(m, m.email, m.user_id);
       var moveSel = '<select class="user-select members-move" onchange="moveMember(\'' + m.user_id + '\', this.value)">'
         + managerOpts.map(function (mo) {
           return '<option value="' + escapeHtml(mo.user_id) + '"' + (mo.user_id === m.managed_by ? ' selected' : '') + '>'
@@ -5583,7 +5583,7 @@
         }).join('') + '</select>';
       var acts = '<button class="members-act" onclick="' + (active ? 'deactivateMember' : 'reactivateMember') + '(\'' + m.user_id + '\')">' + (active ? 'Deactivate' : 'Reactivate') + '</button>'
         + '<button class="members-act" onclick="editMemberEmail(\'' + m.user_id + '\', \'' + escapeHtml(m.email || '') + '\')">Email</button>'
-        + '<button class="members-act" onclick="sendMemberReset(\'' + m.user_id + '\')">Reset link</button>'
+        + '<button class="members-act" onclick="sendMemberReset(\'' + m.user_id + '\')">Reset Link</button>'
         + (isOwner ? '<button class="members-act danger" onclick="deleteMember(\'' + m.user_id + '\', \'' + escapeHtml(m.email || '') + '\')">Delete</button>' : '');
       return '<tr class="' + (active ? '' : 'inactive') + '">'
         + '<td><div class="members-name">' + escapeHtml(name) + '</div><div class="members-email">' + escapeHtml(m.email || '') + '</div></td>'
@@ -5704,7 +5704,7 @@
     var date = c.date ? formatNaturalDate(c.date) : '';
     var clip = c.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(c.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
     return '<div class="evidence-row">'
-      + '<div class="evidence-head"><span class="evidence-title">' + escapeHtml(c.title || 'Untitled call') + '</span>'
+      + '<div class="evidence-head"><span class="evidence-title">' + escapeHtml(c.title || 'Untitled Call') + '</span>'
         + '<span class="evidence-date">' + escapeHtml(date) + '</span>'
         + (c.handled ? '<span class="member-badge on">handled</span>' : '<span class="nw-miss">not handled</span>') + '</div>'
       + (c.quote ? '<div class="review-why-quote">“' + escapeHtml(c.quote) + '”</div>' : '')
@@ -5800,7 +5800,30 @@
     return head + '<div class="trend-chart">' + bars + '</div>';
   }
 
-  function repName(r) { return r.display_name || (r.email ? r.email.split('@')[0] : (r.user_id || '').slice(0, 8)); }
+  // ⚠ MIRRORS lib/display-name.js — pinned by display-name-mirror.test.js.
+  // The page has no module system, so the rules exist twice; they must not
+  // diverge, or the same person is named differently on two screens, which is
+  // the exact complaint this replaced.
+  function titleCaseHandle(handle) {
+    return String(handle || '').replace(/[._\-+]+/g, ' ').replace(/\s+/g, ' ').trim()
+      .split(' ').filter(Boolean)
+      // Only the FIRST letter is forced — upper-casing the rest would turn
+      // "McCarthy" into "Mccarthy".
+      .map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+  }
+  function displayNameFromEmail(email, fallback) {
+    if (!email) return fallback || '';
+    var local = email.indexOf('@') !== -1 ? email.split('@')[0] : email;
+    return titleCaseHandle(local) || (fallback || '');
+  }
+  function personName(profile, email, userId) {
+    var first = (profile && typeof profile.first_name === 'string') ? profile.first_name.trim() : '';
+    var last = (profile && typeof profile.last_name === 'string') ? profile.last_name.trim() : '';
+    if (first || last) return (first + ' ' + last).trim();
+    if (email) return displayNameFromEmail(email);
+    return userId ? String(userId).slice(0, 8) : '';
+  }
+  function repName(r) { return r.display_name || personName(r, r.email, r.user_id); }
 
   // ══ 10c-2: THE REP CARDS ═════════════════════════════════════════════════
   //
@@ -5863,11 +5886,11 @@
     var close = closeRateDisplay(r);
     var closeUnmeasured = !(r.prospect_close_total > 0);
     var objUnmeasured = !(r.obj_total > 0);
-    var stats = repCardStat('Closing rate',
+    var stats = repCardStat('Closing Rate',
           closeUnmeasured ? '' : close.value,
           closeUnmeasured ? 'No prospects yet' : close.sub,
           closeUnmeasured)
-      + repCardStat('Objection handling',
+      + repCardStat('Objection Handling',
           objUnmeasured ? '' : r.obj_handle_rate + '%',
           objUnmeasured ? 'No objections yet' : (r.obj_handled + ' of ' + r.obj_total + ' handled'),
           objUnmeasured);
@@ -5971,7 +5994,7 @@
   };
   function teamDetailHtml() {
     var cfg = TEAM_DETAIL[state.teamDetailMetric];
-    var back = '<button class="date-preset" onclick="closeTeamDetail()">← back to team</button>';
+    var back = '<button class="date-preset" onclick="closeTeamDetail()">← Back to Team</button>';
     var o = state.teamOverview;
     if (!cfg) { state.teamDetailMetric = null; return ''; }
     var head = '<div class="section-header"><div><h2>' + escapeHtml(cfg.title) + '</h2><div class="meta">' + escapeHtml(cfg.meta) + '</div></div>' + back + '</div>';
@@ -5995,7 +6018,7 @@
 
   function teamInsightHtml(it, kind) {
     var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
-    var repTag = it.rep ? '<span class="team-rep-tag">' + escapeHtml(String(it.rep).split('@')[0]) + '</span>' : '';
+    var repTag = it.rep ? '<span class="team-rep-tag">' + escapeHtml(displayNameFromEmail(String(it.rep), String(it.rep))) + '</span>' : '';
     return '<div class="team-insight ' + kind + '">'
       + '<div class="team-insight-claim">' + escapeHtml(it.claim || '') + '</div>'
       + (it.data ? '<div class="team-insight-data">' + escapeHtml(it.data) + '</div>' : '')
@@ -6030,7 +6053,7 @@
       var clip = m.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
       return '<div class="team-lane">'
         + '<div class="team-lane-title">' + LANE[k] + '</div>'
-        + '<div class="team-lane-rep">' + escapeHtml(String(m.rep || '').split('@')[0]) + '</div>'
+        + '<div class="team-lane-rep">' + escapeHtml(displayNameFromEmail(String(m.rep || ''), String(m.rep || ''))) + '</div>'
         + '<div class="review-why-quote">“' + escapeHtml(m.quote || '') + '”</div>'
         + (m.why ? '<div class="team-lane-why">' + escapeHtml(m.why) + '</div>' : '')
         + '<div class="team-insight-foot">' + clip + '</div>'
@@ -6250,7 +6273,7 @@
   // CTAs on the overview-adjacent surfaces (Call Library, What-needs-work, EOD).
   function goConnectSource() { state.account = null; pendingConnectFocus = true; setView('account'); }
   function connectSourceCtaHtml() {
-    return '<button class="btn-fathom-primary" type="button" style="margin-top:14px;" onclick="goConnectSource()">Connect a recording source →</button>';
+    return '<button class="btn-fathom-primary" type="button" style="margin-top:14px;" onclick="goConnectSource()">Connect a Recording Source →</button>';
   }
 
   async function loadAccount() {
@@ -6383,7 +6406,7 @@
         acctRow('Current', '<input type="password" class="eod-input" id="pwCurrent" autocomplete="current-password">')
       + acctRow('New', '<input type="password" class="eod-input" id="pwNew" autocomplete="new-password" placeholder="At least 10 characters">')
       + acctRow('Confirm', '<input type="password" class="eod-input" id="pwNew2" autocomplete="new-password">')
-      + '<div class="eod-row"><div class="eod-label"></div><div><button class="btn-fathom-secondary" type="button" onclick="changePassword()">Change password</button><span class="acct-save-note" id="pwChangeNote"></span></div></div>';
+      + '<div class="eod-row"><div class="eod-label"></div><div><button class="btn-fathom-secondary" type="button" onclick="changePassword()">Change Password</button><span class="acct-save-note" id="pwChangeNote"></span></div></div>';
 
     // Offer — link to the KB, never a second editor. FD-4: managed reps can now
     // VIEW their team's KB read-only (their manager manages the contents).
@@ -6561,9 +6584,9 @@
     var dateVal = state.eodDate || (d && d.date) || '';
 
     var toolbar = '<div class="eod-toolbar">'
-      + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(-1)">← Prev day</button>'
+      + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(-1)">← Prev Day</button>'
       + '<input type="date" value="' + escapeHtml(dateVal) + '" onchange="eodSetDate(this.value)">'
-      + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(1)">Next day →</button>'
+      + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(1)">Next Day →</button>'
       + '<button class="btn-fathom-secondary" type="button" onclick="eodToday()">Today</button>'
       + '<button class="btn-fathom-secondary" type="button" onclick="eodCopyForSlack()">📋 Copy for Slack</button>'
       + '<span class="eod-copy-note" id="eodCopyNote"></span>'
@@ -6709,7 +6732,7 @@
       + '</div>'
       + '<div class="merge-body">' + mergeSideHtml(c.a) + '<div class="merge-vs">same person?</div>' + mergeSideHtml(c.b) + '</div>'
       + '<div class="merge-actions">'
-        + '<button class="merge-btn keep" onclick="dismissMerge(' + i + ')">Not the same</button>'
+        + '<button class="merge-btn keep" onclick="dismissMerge(' + i + ')">Not the Same</button>'
         + '<button class="merge-btn do" onclick="applyMerge(\'' + escapeHtml(c.a.id) + '\',\'' + escapeHtml(c.b.id) + '\',' + i + ')">Merge into &ldquo;' + escapeHtml(c.b.display_name) + '&rdquo;</button>'
         + '<button class="merge-btn do" onclick="applyMerge(\'' + escapeHtml(c.b.id) + '\',\'' + escapeHtml(c.a.id) + '\',' + i + ')">Merge into &ldquo;' + escapeHtml(c.a.display_name) + '&rdquo;</button>'
       + '</div>'
@@ -6982,7 +7005,7 @@
     if (hidden > 0) {
       more = '<button class="sec-more" onclick="expandSectionGroup(\'' + key + '\')">Show ' + hidden + ' more</button>';
     } else if (expanded && moments.length > SECTION_MOMENTS_SHOWN) {
-      more = '<button class="sec-more" onclick="expandSectionGroup(\'' + key + '\')">Show fewer</button>';
+      more = '<button class="sec-more" onclick="expandSectionGroup(\'' + key + '\')">Show Fewer</button>';
     }
     return '<div class="sec-group"><h2>' + escapeHtml(title) + ' <span class="sec-count">' + moments.length + '</span></h2>'
       + shown.map(function (m) { return renderMoment(m, canSave); }).join('') + more + '</div>';
@@ -7146,7 +7169,7 @@
       var viewBtn = '';
       var expandPanel = '';
       if (it.category === 'learned_pattern' || it.category === 'call_moment') {
-        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View patterns</button>';
+        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View Patterns</button>';
         expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
       }
       // Promotion affordance (KB Part 2, sub-stage 2a). Manager/owner only — a
@@ -7157,7 +7180,7 @@
       if (kbCanPromote() && it.scope !== 'global') {
         promoteBtn = (it.scope === 'team')
           ? '<button class="kb-promote-btn is-team" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'personal\')" title="Remove from the team knowledge base">Team ✓</button>'
-          : '<button class="kb-promote-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'team\')" title="Share with your whole team">Promote to team</button>';
+          : '<button class="kb-promote-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'team\')" title="Share with your whole team">Promote to Team</button>';
       }
       parts.push(
         '<div class="kb-item">'
@@ -7754,10 +7777,10 @@
         + '<div class="obj-response"><span style="color:var(--text);">Closer: </span>' + escapeHtml(f.closer_response) + '</div></div>'
       : '';
     var clip = f.clip_url ? '<a class="obj-btn" href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener">▶ Watch clip</a>' : '';
-    var review = '<button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(f.fathom_call_id) + '\')">View call review</button>';
+    var review = '<button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(f.fathom_call_id) + '\')">View Call Review</button>';
     return '<div class="pattern-card">'
       + '<div class="obj-card-head">' + surface + catChip + resBadge
-        + '<span class="obj-callmeta">' + escapeHtml(f.title || 'Untitled call') + ' · ' + escapeHtml(formatDate(f.call_date)) + '</span>'
+        + '<span class="obj-callmeta">' + escapeHtml(f.title || 'Untitled Call') + ' · ' + escapeHtml(formatDate(f.call_date)) + '</span>'
       + '</div>'
       + '<div class="obj-quote clamped">' + escapeHtml(f.quote || '') + '</div>' + quoteMore
       + (f.observation ? '<div class="pattern-meta"><span>' + escapeHtml(f.observation) + '</span></div>' : '')
@@ -7771,7 +7794,7 @@
   // synthesis generator is built (credit- + re-analysis-gated).
   function renderObjSynthPanel() {
     var s = state.objectionsSynthesis;
-    var head = '<div class="section-header" style="margin:0 0 6px;"><h2 style="font-size:15px;">Coaching synthesis</h2>'
+    var head = '<div class="section-header" style="margin:0 0 6px;"><h2 style="font-size:15px;">Coaching Synthesis</h2>'
       + '<div class="meta">grounded in your own handled objections</div></div>';
     var body;
     if (s === null) {
@@ -7820,7 +7843,7 @@
     if (state.objectionsIntel === null && !state.objectionsIntelLoading) loadObjectionsIntel();
     if (state.objectionsSynthesis === null && !state.objectionsSynthesisLoading) loadObjectionsSynthesis();
     // Reachable only via the Objections donut — provide an explicit way back.
-    var header = '<button class="back-btn" onclick="backToOverview()" style="margin-bottom:14px;">← Back to dashboard</button>' + renderHeaderHtml();
+    var header = '<button class="back-btn" onclick="backToOverview()" style="margin-bottom:14px;">← Back to Dashboard</button>' + renderHeaderHtml();
     if (state.objectionsIntel === null) {
       content.innerHTML = header + '<div class="section"><div class="skeleton" style="height:90px;"></div></div>';
       return;
@@ -7836,7 +7859,7 @@
       // objections on calls that CLOSED — handled by the ruling of 2026-08-17
       // even where the moment itself was not. Without showing it, a manager
       // adds up handled/partial/unhandled and gets a different rate.
-      + objStatCard('Handle rate', m.handled_rate === null ? '—' : (m.handled_rate + '%'),
+      + objStatCard('Handle Rate', m.handled_rate === null ? '—' : (m.handled_rate + '%'),
           (m.handled + (m.credited || 0) + m.partial + m.unhandled) + ' resolution-tagged')
       + objStatCard('Handled', m.handled + (m.credited || 0),
           (m.credited ? m.credited + ' credited (call closed) · ' : '') + m.partial + ' partial · ' + m.unhandled + ' unhandled')
@@ -7871,9 +7894,9 @@
 
     content.innerHTML = header
       + metricsHtml
-      + '<div class="section fade-in"><div class="section-header"><h2>By category</h2></div>' + catNote + catRows + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>By Category</h2></div>' + catNote + catRows + '</div>'
       + renderObjSynthPanel()
-      + '<div class="section fade-in"><div class="section-header"><h2>Objection moments</h2><div class="meta">' + (d.feed || []).length + ' shown</div></div>' + feedHtml + '</div>';
+      + '<div class="section fade-in"><div class="section-header"><h2>Objection Moments</h2><div class="meta">' + (d.feed || []).length + ' shown</div></div>' + feedHtml + '</div>';
   }
 
   function renderCallLibrary() {
@@ -8040,7 +8063,7 @@
       ? '<span>' + escapeHtml(resolvedName) + '</span>'
       : (c.title && String(c.title).trim())
       ? '<span>' + escapeHtml(c.title) + '</span>'
-      : '<span class="anon">Untitled call</span>';
+      : '<span class="anon">Untitled Call</span>';
     var dateStr = formatNaturalDate(c.call_date);
     var durStr = formatNaturalDuration(c.duration_seconds);
 
@@ -8514,7 +8537,7 @@
     var titleText = callLabel(src) || ((src.title && String(src.title).trim()) ? src.title : null);
     var titleHtml = titleText
       ? '<h1 class="review-title">' + escapeHtml(titleText) + '</h1>'
-      : '<h1 class="review-title anon">Untitled call</h1>';
+      : '<h1 class="review-title anon">Untitled Call</h1>';
 
     var dateStr = formatNaturalDate(src.call_date);
     var durStr = formatNaturalDuration(src.duration_seconds);
@@ -8709,7 +8732,7 @@
     intro:     'Intro',
     discovery: 'Discovery',
     pitch:     'Pitch',
-    objection: 'Objection handling',
+    objection: 'Objection Handling',
     close:     'Close',
   };
 
@@ -8737,7 +8760,7 @@
     }
 
     return '<section class="section">'
-      + '<div class="section-header"><h2>Section grades</h2>' + toggleBtn + '</div>'
+      + '<div class="section-header"><h2>Section Grades</h2>' + toggleBtn + '</div>'
       + '<div class="review-grade-list">' + cards + '</div>'
     + '</section>';
   }
@@ -8841,7 +8864,7 @@
     var feedback = '<span class="review-copy-feedback' + (state.followupCopied ? ' show' : '') + '">Copied!</span>';
 
     return '<section class="section">'
-      + '<div class="section-header"><h2>Follow-up email</h2></div>'
+      + '<div class="section-header"><h2>Follow-up Email</h2></div>'
       + '<div class="review-followup-wrap">'
         + boxHtml
         + '<div class="review-followup-actions">' + copyBtn + feedback + '</div>'

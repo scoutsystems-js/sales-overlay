@@ -35,6 +35,16 @@
  * a row's CONTEXT and not only its own fields, seeding that metric means
  * controlling the context too.
  *
+ * ⚠ THE DEMO ACCOUNTS CARRY REAL-LOOKING NAMES (Ava Mitchell / Ben Kowalski /
+ * Cara Whitfield) because the board gets shown to people and "demo-ava" reads as
+ * debug output. Set by scripts/name-demo-accounts-2026-08-17.js.
+ *
+ * ⚠ BUT BE PRECISE ABOUT REMOVAL: those names live on `user_profiles`, which the
+ * seed marker does NOT sweep. The marker removes the seeded CALLS and PROSPECTS.
+ * The three demo ACCOUNTS pre-date this seed and have their own separate,
+ * already-documented cleanup — so the names are cosmetic and cost nothing
+ * operationally, but they are not removed by the two-line seed removal above.
+ *
  * Usage:  node scripts/seed-demo-recent-2026-08-17.js            (plan only)
  *         node scripts/seed-demo-recent-2026-08-17.js --insert
  */
