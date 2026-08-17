@@ -1782,6 +1782,48 @@
     .nw-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .nw-chip { font-size: 12px; color: var(--text); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
     .nw-chip b { color: var(--text); }
+    /* ── Speedometer panel (2026-08-17) ─────────────────────────────────
+       ⚠ SEMANTIC COLOURS ONLY. --good/--mid/--bad carry the meaning here; the
+       categorical rep ramp is deliberately absent from this panel. The needle is
+       a FIXED red pointer that means nothing on its own — it is the pointer on a
+       car gauge, and the BAND it points at is the message. */
+    .gauge-section { padding-top: 16px; }
+    .gauge-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .gauge-metric-select { display: flex; gap: 6px; }   /* selector on the LEFT, per the spec */
+    .gauge-metric-btn {
+      background: var(--bg-field); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+      font-family: inherit; transition: border-color .15s var(--ease);
+    }
+    .gauge-metric-btn:hover { border-color: var(--border-hover); }
+    .gauge-metric-btn.active { border-color: var(--accent); color: var(--accent); }
+    .gauge-window { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+    .gauge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; }
+    .gauge-card { text-align: center; padding: 6px 4px 10px; }
+    .gauge-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .gauge-svg { width: 100%; max-width: 220px; height: auto; display: block; margin: 0 auto; }
+    .gauge-band { fill: none; stroke-width: 13; stroke-linecap: butt; }
+    .gauge-band-good { stroke: var(--good); }
+    .gauge-band-mid  { stroke: var(--mid); }
+    .gauge-band-bad  { stroke: var(--bad); }
+    .gauge-tick { stroke: var(--text); stroke-width: 1; opacity: .45; }
+    .gauge-tick-major { stroke-width: 2; opacity: .8; }
+    .gauge-tick-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: .85; }
+    .gauge-target { stroke: var(--text); stroke-width: 2; }
+    .gauge-target-label { fill: var(--text); font-size: 8px; font-weight: 700; text-anchor: middle; text-transform: uppercase; letter-spacing: .05em; }
+    /* ⚠ ALWAYS RED. Never bound to the band. */
+    .gauge-needle { stroke: #ef4444; stroke-width: 3.5; stroke-linecap: round; }
+    .gauge-hub { fill: #ef4444; }
+    .gauge-value { font-size: 24px; font-weight: 700; line-height: 1.1; margin-top: 2px; }
+    .gauge-value-good { color: var(--good); }
+    .gauge-value-mid  { color: var(--mid); }
+    .gauge-value-bad  { color: var(--bad); }
+    .gauge-counts { font-size: 12px; }   /* raw counts under every dial (house rule) */
+    .gauge-card-empty { display: flex; flex-direction: column; justify-content: center; min-height: 150px; }
+    .gauge-empty { font-size: 12px; font-weight: 600; }
+    .gauge-empty span { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; opacity: .85; }
+    .team-controls-row { margin-bottom: 28px; justify-content: flex-end; }
+
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
        money math. Kept as a note so a stray class name in a future edit does
        not silently render unstyled. */
@@ -2493,6 +2535,10 @@
     // 10b manager board: per-rep weekly series + the objection selector.
     // '' = all objections; otherwise one of Scout's four objection_category values.
     teamRepSeries:  null,   teamRepSeriesLoading: false, teamObjectionCategory: '',
+    // ⚠ MUST be declared null, not left undefined: the lazy kick tests
+    // `=== null`, so an undeclared key means the lane never loads and the
+    // panel renders a skeleton forever — no error, just a permanent spinner.
+    teamGauges: null, teamGaugesLoading: false, teamGaugeMetric: 'objections',
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     account:        null,   accountLoading: false,   // Account view (#account)
     // Fathom integration (Scout v2.0 Phase 1)
@@ -4222,6 +4268,12 @@
       // model-free, so it is cheap to refetch when the selector changes.
       why:      { flag: 'teamWhyLoading',         set: 'teamWhy',        url: '/team/why-prose?' + teamQP() },
       repSeries:{ flag: 'teamRepSeriesLoading',  set: 'teamRepSeries',  url: '/team/rep-series?' + teamQP('bucket=' + repSeriesBucket() + (state.teamObjectionCategory ? '&objection_category=' + state.teamObjectionCategory : '')) },
+      // ⚠ THE GAUGE LANE DOES NOT USE teamQP(). teamQP injects state.teamRange,
+      // and this panel's entire purpose is a FIXED window the picker cannot move.
+      // Using it here would make the panel silently follow the picker — the same
+      // shared-carrier failure that has already bitten this file twice. Pinned by
+      // test/rep-gauges.test.js.
+      repGauges:{ flag: 'teamGaugesLoading', set: 'teamGauges', url: '/team/rep-series?' + gaugeQP(gaugeWindow()) },
     };
     var c = map[which]; if (!c) return;
     if (c.flag && state[c.flag]) return;
@@ -4233,6 +4285,27 @@
     else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
     else if (state.view === 'team-members') renderTeamMembersView();
+  }
+
+  // ⚠ THE SPEEDOMETER PANEL'S FIXED WINDOW — deliberately independent of the
+  // date picker. It reads NOTHING from state: no teamRange, no dateRange, no
+  // hash. The panel is labelled with this window on screen so it cannot be
+  // misread as following the filter below it.
+  //
+  // Reuses rangeToIso() so "last 7 days inclusive" means exactly what it means
+  // for the picker's own default — two definitions of "7 days" on one page would
+  // be a difference nobody could see and everybody would argue about.
+  function gaugeWindow() {
+    var today = new Date().toISOString().slice(0, 10);
+    return rangeToIso(addDays(today, -6), today);
+  }
+  // The gauge lane's own query builder. Separate from teamQP ON PURPOSE: teamQP
+  // reads state.teamRange, and inheriting it here is the exact bug this panel
+  // must not have. It still carries the team selection, which IS shared.
+  function gaugeQP(win) {
+    var qp = 'from=' + encodeURIComponent(win.from) + '&to=' + encodeURIComponent(win.to) + '&bucket=day';
+    if (state.teamSelected) qp += '&team=' + encodeURIComponent(state.teamSelected);
+    return qp;
   }
 
   // Team view defaults to LAST 7 DAYS (Justin's spec) — set once on first entry,
@@ -4489,6 +4562,7 @@
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
     if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
+    if (state.teamGauges === null && !state.teamGaugesLoading) loadTeam('repGauges');
     // 10d is lazy and separate: it can spend a model call per rep on a changed
     // period, and the board must never wait on it.
     if (state.teamWhy === null && !state.teamWhyLoading) loadTeam('why');
@@ -4496,7 +4570,7 @@
     // Glance-box detail drill: a team-scoped per-rep breakdown of one metric,
     // reached by clicking a clickable glance box. Replaces the normal team body.
     if (state.teamDetailMetric) {
-      content.innerHTML = teamHeaderHtml() + '<div class="section fade-in">' + teamDetailHtml() + '</div>';
+      content.innerHTML = teamHeaderHtml() + teamControlsHtml() + '<div class="section fade-in">' + teamDetailHtml() + '</div>';
       return;
     }
 
@@ -4515,6 +4589,10 @@
     // (Highlights now live on the expanded recommendations page).
     content.innerHTML =
       teamHeaderHtml()
+      // Justin's placement: title → gauges → picker → line graphs. The dials sit
+      // ABOVE the picker because they do not answer to it.
+      + gaugePanelHtml()
+      + teamControlsHtml()
       /* REMOVED 2026-08-16 — Justin asked twice: the glance stat card between the
          picker and the graphs is gone. Its Cash Collected / Close Rate /
          Objection Handle drill-downs went with it; that trade was raised and
@@ -4563,7 +4641,7 @@
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
     content.innerHTML =
-      teamHeaderHtml()
+      teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>Team Recommendations</h2>'
         + '<div class="meta">grounded in the team\'s calls</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>' + teamRecsHtml() + '</div>'
@@ -4648,7 +4726,7 @@
     if (state.teamContext === null) { loadTeam('context'); }
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
-    content.innerHTML = teamHeaderHtml()
+    content.innerHTML = teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
         + '<div class="meta">objection-handling focus for this period</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
@@ -5091,6 +5169,161 @@
   function openTeamDetail(metric) { state.teamDetailMetric = metric; renderTeamView(); }
   function closeTeamDetail() { state.teamDetailMetric = null; renderTeamView(); }
 
+
+  // ── THE SPEEDOMETER PANEL (Justin's spec 2026-08-17) ──────────────────────
+  // One semicircular dial per rep on a FIXED last-7-days window. Mirrors
+  // lib/rep-gauges.js — that module is the definition and this is the render;
+  // rep-gauges-mirror.test.js fails if the two drift.
+  // ⚠ 35 IS A WORKING BAR, NOT A SETTLED STANDARD. Justin ruled it "for now":
+  // it is set where the dial can actually discriminate today, and is meant to be
+  // RAISED once reps cluster at the top. His stated standard is 50 — the bare
+  // minimum a closer should hit — and 50 put every real needle in red (Josh 21.3%
+  // over 30 days, platform best 29.1%, against a red/yellow boundary of 30), which
+  // teaches nothing. Do NOT read 35 as the definition of good handling.
+  var GAUGE_OBJECTION_TARGET_PCT = 35;   // ← the ONE line to change the target
+  var GAUGE_OBJECTION_SCALE_MAX  = 100;
+  var GAUGE_CLOSING_TARGET_PCT   = 25;
+  var GAUGE_CLOSING_SCALE_MAX    = 50;
+  var GAUGE_MID_BAND_FRACTION    = 0.6;
+  var GAUGE_MIN_OBJECTIONS       = 6;    // = MIN_CATEGORY_OBJECTIONS
+  var GAUGE_MIN_PROSPECTS        = 6;
+
+  function gaugeBand(rate, target) {
+    if (typeof rate !== 'number' || !isFinite(rate)) return null;
+    if (rate >= target) return 'good';
+    if (rate >= target * GAUGE_MID_BAND_FRACTION) return 'mid';
+    return 'bad';
+  }
+  function gaugeAngle(value, scale) {
+    var v = (typeof value === 'number' && isFinite(value)) ? value : 0;
+    var s = (scale > 0) ? scale : 100;
+    return -90 + Math.max(0, Math.min(1, v / s)) * 180;
+  }
+  // Polar → cartesian on the dial's arc. 0° is straight up.
+  function gaugePoint(cx, cy, r, deg) {
+    var a = (deg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+  function gaugeArc(cx, cy, r, fromDeg, toDeg) {
+    var p0 = gaugePoint(cx, cy, r, fromDeg), p1 = gaugePoint(cx, cy, r, toDeg);
+    var large = (toDeg - fromDeg) > 180 ? 1 : 0;
+    return 'M ' + p0.x.toFixed(1) + ' ' + p0.y.toFixed(1)
+      + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p1.x.toFixed(1) + ' ' + p1.y.toFixed(1);
+  }
+
+  // ⚠ THE NEEDLE IS A FIXED RED POINTER AND CARRIES NO MEANING (Justin) — it is
+  // the pointer on a car gauge. The BANDED FILL carries the meaning. Colouring
+  // the needle by the band would state the same thing twice and make a red needle
+  // on a green dial read as an error.
+  function gaugeSvg(rate, target, scale) {
+    var W = 200, H = 118, cx = 100, cy = 104, r = 78;
+    var midStart = target * GAUGE_MID_BAND_FRACTION;
+    var bands = [
+      { from: 0, to: midStart, cls: 'bad' },
+      { from: midStart, to: target, cls: 'mid' },
+      { from: target, to: scale, cls: 'good' },
+    ].filter(function (b) { return b.to > b.from; });
+    var arcs = bands.map(function (b) {
+      return '<path class="gauge-band gauge-band-' + b.cls + '" d="'
+        + gaugeArc(cx, cy, r, gaugeAngle(b.from, scale), gaugeAngle(b.to, scale)) + '"/>';
+    }).join('');
+    var tickEls = [];
+    for (var i = 0; i <= 10; i++) {
+      var value = (scale * i) / 10, major = (i % 2 === 0), ang = gaugeAngle(value, scale);
+      var outer = gaugePoint(cx, cy, r - 13, ang), inner = gaugePoint(cx, cy, r - (major ? 24 : 19), ang);
+      tickEls.push('<line class="gauge-tick' + (major ? ' gauge-tick-major' : '') + '" x1="' + outer.x.toFixed(1)
+        + '" y1="' + outer.y.toFixed(1) + '" x2="' + inner.x.toFixed(1) + '" y2="' + inner.y.toFixed(1) + '"/>');
+      if (major) {
+        var lp = gaugePoint(cx, cy, r - 36, ang);
+        tickEls.push('<text class="gauge-tick-label" x="' + lp.x.toFixed(1) + '" y="' + (lp.y + 3).toFixed(1) + '">'
+          + Math.round(value) + '</text>');
+      }
+    }
+    // The target, marked ON the arc.
+    var tA = gaugeAngle(target, scale);
+    var t0 = gaugePoint(cx, cy, r + 9, tA), t1 = gaugePoint(cx, cy, r - 13, tA);
+    var tl = gaugePoint(cx, cy, r + 19, tA);
+    var targetMark = '<line class="gauge-target" x1="' + t0.x.toFixed(1) + '" y1="' + t0.y.toFixed(1)
+      + '" x2="' + t1.x.toFixed(1) + '" y2="' + t1.y.toFixed(1) + '"/>'
+      + '<text class="gauge-target-label" x="' + tl.x.toFixed(1) + '" y="' + tl.y.toFixed(1) + '">target ' + target + '%</text>';
+    var needle = '';
+    if (typeof rate === 'number') {
+      var n = gaugePoint(cx, cy, r - 16, gaugeAngle(rate, scale));
+      needle = '<line class="gauge-needle" x1="' + cx + '" y1="' + cy + '" x2="' + n.x.toFixed(1) + '" y2="' + n.y.toFixed(1) + '"/>'
+        + '<circle class="gauge-hub" cx="' + cx + '" cy="' + cy + '" r="6"/>';
+    }
+    return '<svg class="gauge-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-hidden="true">'
+      + arcs + tickEls.join('') + targetMark + needle + '</svg>';
+  }
+
+  function gaugeCardHtml(rep, metric) {
+    var m = (metric === 'closing')
+      ? { data: rep.prospects, target: GAUGE_CLOSING_TARGET_PCT, scale: GAUGE_CLOSING_SCALE_MAX, unit: 'closed' }
+      : { data: rep.objections, target: GAUGE_OBJECTION_TARGET_PCT, scale: GAUGE_OBJECTION_SCALE_MAX, unit: 'handled' };
+    var d = m.data || {};
+    var name = escapeHtml(rep.name || 'rep');
+    // ⚠ BELOW THRESHOLD: an EMPTY dial with the reason. Never a confident needle
+    // at 0% — "handled nothing" and "too few to judge" are different claims.
+    if (!d.enough) {
+      return '<div class="gauge-card gauge-card-empty">'
+        + '<div class="gauge-name">' + name + '</div>'
+        + '<div class="gauge-empty">Not enough to judge<span>' + escapeHtml(d.reason || '') + '</span></div>'
+        + '</div>';
+    }
+    var band = gaugeBand(d.rate, m.target);
+    return '<div class="gauge-card">'
+      + '<div class="gauge-name">' + name + '</div>'
+      + gaugeSvg(d.rate, m.target, m.scale)
+      + '<div class="gauge-value gauge-value-' + band + '">' + d.rate + '%</div>'
+      + '<div class="gauge-counts">' + d.numerator + ' of ' + d.total + ' ' + m.unit + '</div>'
+      + '</div>';
+  }
+
+  function setGaugeMetric(k) { state.teamGaugeMetric = k; renderTeamView(); }
+
+  function gaugePanelHtml() {
+    var metric = state.teamGaugeMetric === 'closing' ? 'closing' : 'objections';
+    var d = state.teamGauges;
+    var sel = '<div class="gauge-metric-select">'
+      + [['objections', 'Objection handling'], ['closing', 'Closing rate']].map(function (o) {
+          return '<button class="gauge-metric-btn' + (metric === o[0] ? ' active' : '') + '" type="button" onclick="setGaugeMetric(\'' + o[0] + '\')">' + o[1] + '</button>';
+        }).join('')
+      + '</div>';
+    var body;
+    if (d === null) body = '<div class="skeleton" style="height:150px;"></div>';
+    else if (d && d._error) body = '<div class="error">Could not load the dials: ' + escapeHtml(d._error) + '</div>';
+    else {
+      var reps = repGaugeTotals(d);
+      body = reps.length
+        ? '<div class="gauge-grid">' + reps.map(function (r) { return gaugeCardHtml(r, metric); }).join('') + '</div>'
+        : '<div class="empty"><p>No calls from your reps in the last 7 days.</p></div>';
+    }
+    return '<div class="section fade-in gauge-section">'
+      + '<div class="gauge-head">' + sel
+      + '<div class="gauge-window">Last 7 days · fixed — not affected by the date filter below</div></div>'
+      + body + '</div>';
+  }
+
+  // Mirrors lib/rep-gauges.js repGaugeTotals — pinned by rep-gauges-mirror.test.js.
+  function repGaugeTotals(series) {
+    var reps = (series && Array.isArray(series.reps)) ? series.reps : [];
+    return reps.map(function (r) {
+      var h = { handled: 0, total: 0 }, c = { closed: 0, total: 0 };
+      (Array.isArray(r.handle) ? r.handle : []).forEach(function (b) { if (b) { h.handled += b.handled || 0; h.total += b.total || 0; } });
+      (Array.isArray(r.close) ? r.close : []).forEach(function (b) { if (b) { c.closed += b.closed || 0; c.total += b.total || 0; } });
+      return { user_id: r.user_id, name: r.name || null,
+        objections: gaugeMeasure(h.handled, h.total, GAUGE_MIN_OBJECTIONS, 'objection'),
+        prospects: gaugeMeasure(c.closed, c.total, GAUGE_MIN_PROSPECTS, 'prospect') };
+    });
+  }
+  function gaugeMeasure(numerator, total, floor, unit) {
+    var enough = total >= floor;
+    return { numerator: numerator, total: total, enough: enough,
+      rate: enough ? Math.round((numerator / total) * 100) : null,
+      reason: enough ? null : (total === 0 ? ('no ' + unit + 's in the last 7 days')
+        : ('only ' + total + ' ' + unit + (total === 1 ? '' : 's') + ' in the last 7 days')) };
+  }
+
   function teamHeaderHtml() {
     var label = (state.teamOverview && state.teamOverview.team && state.teamOverview.team.label) || 'Team';
     var picker = '';
@@ -5111,13 +5344,38 @@
       return '<button class="date-preset' + (state.dateRange.days === d ? ' active' : '') + '" onclick="setTeamRange(' + d + ')">' + d + 'd</button>';
     }).join('');
     */
-    return '<div class="page-header fade-in">'
+    // ⚠ THE TITLE AND THE CONTROLS ARE NOW TWO ROWS, so the speedometer panel can
+    // sit BETWEEN them (Justin: at the top, above the date picker). Keeping the
+    // title above the panel means the page still says what it is; putting the
+    // panel above the title would push the page's own name halfway down.
+    // The header keeps position:relative + z-index so the date panel still
+    // escapes the stacking contexts below it — see the .page-header note.
+    return '<div class="page-header fade-in" style="margin-bottom:18px;">'
       + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
         + '<div class="review-meta-row"><span>Manager view</span></div></div>'
-      + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + picker
-        + '<div class="date-presets">' + presets + '</div>' + manageMembersBtnHtml() + summaryBtnHtml() + '</div>'
     + '</div>';
   }
+  // The controls row — picker, team select, buttons. Rendered BELOW the gauge
+  // panel so the fixed-window dials read above the filter that does not drive
+  // them.
+  function teamControlsHtml() {
+    var picker2 = '';
+    var ctx2 = state.teamContext;
+    if (ctx2 && ctx2.is_owner && Array.isArray(ctx2.teams) && ctx2.teams.length) {
+      var opts2 = ctx2.teams.map(function (t) {
+        var sel2 = (state.teamSelected === t.key || (!state.teamSelected && t.is_self)) ? ' selected' : '';
+        return '<option value="' + escapeHtml(t.key) + '"' + sel2 + '>' + escapeHtml(t.label) + ' (' + t.rep_count + ')</option>';
+      }).join('');
+      picker2 = '<select class="user-select" onchange="pickTeam(this.value)">' + opts2 + '</select>';
+    }
+    ensureTeamPicker();
+    return '<div class="page-header fade-in team-controls-row">'
+      + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + picker2
+        + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
+        + manageMembersBtnHtml() + summaryBtnHtml() + '</div>'
+    + '</div>';
+  }
+
   // "Manage members" opens the hidden #team-members page (not on the page itself).
   function manageMembersBtnHtml() {
     return state.view !== 'team-members' ? '<button class="btn-fathom-secondary" type="button" onclick="openTeamMembers()">Manage members</button>' : '';
@@ -5231,7 +5489,7 @@
     ensureTeamDefaultRange();
     if (state.teamContext === null) loadTeam('context');
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
-    content.innerHTML = teamHeaderHtml()
+    content.innerHTML = teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>Manage Members</h2>'
         + '<div class="meta">add, deactivate, move, reset password, or update a rep\'s email</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← back to team</button></div>'
