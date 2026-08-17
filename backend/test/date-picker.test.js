@@ -436,3 +436,44 @@ test('the Calls presets are gone from the render path', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(!/onclick="setCallLibraryRange\(/.test(live));
 });
+
+// ─── THE PICKER DIDN'T STICK (2026-08-16) ─────────────────────────────────
+
+test('⚠ BOOT MUST NOT CLOBBER A RANGE RESTORED FROM THE HASH', () => {
+  // The bug: init() called applyHashToState() — which restores the coaching
+  // range from the hash — and then setDateRange(30, true) UNCONDITIONALLY on the
+  // very next line, overwriting it with the last 30 days on EVERY boot. The
+  // comment above it ("the 30-day range applies underneath") was true before
+  // stage 3 put a range in the hash, and silently became false afterwards.
+  //
+  // Team and Calls were unaffected: setDateRange writes only state.dateRange,
+  // so only the COACHING family lost its range.
+  const at = HTML.indexOf('applyHashToState();');
+  const boot = HTML.slice(at, HTML.indexOf('loadCallReview(state.selectedCallId)', at));
+  assert.ok(boot.length > 100 && boot.length < 2500, 'slice must cover the boot tail: ' + boot.length);
+
+  assert.ok(/if \(state\.dateRange && state\.dateRange\.from && state\.dateRange\.to\)/.test(boot),
+    'boot must test whether the hash already supplied a range');
+  assert.ok(/applyCoachingRangeChange\(true/.test(boot),
+    'and honour it rather than overwriting');
+  assert.ok(/else \{\s*setDateRange\(30/.test(boot),
+    'the 30-day default must survive for the NO-hash case');
+});
+
+test('setDateRange still writes a range, and shares the change path', () => {
+  // The tail was extracted so boot can reuse it; setDateRange must still work.
+  const at = HTML.indexOf('function setDateRange');
+  const fn = HTML.slice(at, HTML.indexOf('function setUser', at));
+  assert.ok(fn.length > 100 && fn.length < 1200, 'slice: ' + fn.length);
+  assert.ok(/state\.dateRange = \{ from: from\.toISOString\(\)/.test(fn), 'still writes the range');
+  assert.ok(/applyCoachingRangeChange\(preserveView\)/.test(fn), 'and delegates the follow-up work');
+});
+
+test('the extracted change path does NOT write a range itself', () => {
+  // If it did, boot would clobber the restored range again through the back door.
+  const at = HTML.indexOf('function applyCoachingRangeChange');
+  const fn = HTML.slice(at, HTML.indexOf('function setDateRange', at));
+  assert.ok(fn.length > 100 && fn.length < 1500, 'slice: ' + fn.length);
+  assert.strictEqual(/state\.dateRange = /.test(fn), false,
+    'applyCoachingRangeChange must never assign the range');
+});

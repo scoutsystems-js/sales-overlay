@@ -2590,7 +2590,15 @@
       state.view = 'team';
       syncHashFromState(true); // reflect #team in the URL (replace, no spurious history entry)
     }
-    setDateRange(30, true /* preserveView — keep the hash-restored view */);
+    // ⚠ THE HASH NOW CARRIES A RANGE (stage 3), so this can no longer seed the
+    // default unconditionally — doing so DESTROYED a picked range on every boot.
+    // applyHashToState() above sets state.dateRange only when the hash supplied
+    // one, so its presence is exactly the test for "already restored".
+    if (state.dateRange && state.dateRange.from && state.dateRange.to) {
+      applyCoachingRangeChange(true /* preserveView */);   // honour the restored range
+    } else {
+      setDateRange(30, true /* preserveView — keep the hash-restored view */);
+    }
     if (state.view === 'call-review' && state.selectedCallId) loadCallReview(state.selectedCallId);
     // #prospects has no nav entry any more, so hash entry must kick its own load
     // (applyHashToState sets state.view directly and bypasses setView).
@@ -3360,12 +3368,9 @@
     reloadAll();
   }
 
-  function setDateRange(days, preserveView) {
-    var to = new Date();
-    var from = days >= 9999
-      ? new Date('2025-01-01T00:00:00Z')
-      : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
+  // The work that follows ANY coaching range change — extracted so boot can run
+  // it for a range restored from the hash WITHOUT overwriting that range first.
+  function applyCoachingRangeChange(preserveView) {
     state.needsWork = null; // range-responsive (2026-07-27) — refetch for the new window
     // Range-responsive sub-views update IN PLACE — never bounce back to the
     // coaching overview when the range changes while inside them.
@@ -3375,6 +3380,15 @@
     // hash-restored view (preserveView) so a refresh on #calls stays on Calls.
     if (!preserveView) state.view = 'overview';
     reloadAll();
+  }
+
+  function setDateRange(days, preserveView) {
+    var to = new Date();
+    var from = days >= 9999
+      ? new Date('2025-01-01T00:00:00Z')
+      : new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    state.dateRange = { from: from.toISOString(), to: to.toISOString(), days: days };
+    applyCoachingRangeChange(preserveView);
   }
 
   function setUser(userId) {
