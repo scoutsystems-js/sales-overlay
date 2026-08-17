@@ -1028,6 +1028,21 @@ delete from prospects     where display_name  like 'Seed %';
 - **`objection-synthesis` needed the split INSIDE A SINGLE LOOP**: it counts with the shared predicate and selects its "handled examples" on the moment's own resolution, because an example is evidence of good handling shown to a closer. A credited-but-unhandled moment held up as the model to copy is exactly backwards.
 - **THE RULE: enforce per CALL SITE.** `test/handled-carrier.test.js` counts hand-rolled `resolution === 'handled'` comparisons per file against an explicit allowance, with the reason for each allowance written beside it. A file-level allowlist would have said "team-synthesis is exempt" and stopped noticing its rate lane entirely.
 
+### ⚠⚠ A NON-VACUITY CHECK MUST ASSERT ITS ANCHOR EXISTS — OR A REMOVAL SILENTLY TURNS IT OFF (2026-08-17, twice in one session)
+**The shape:** a guard proves it is not vacuous by breaking a literal and confirming the matcher fires —
+```js
+const broken = LIVE.replace('<h2>Recent Calls<', '<h2>Recent calls<');   // ← the anchor
+```
+**When a later commit DELETES that heading, `replace` matches nothing, returns the string unchanged, and the assertion still passes.** The guard now proves nothing and reports success. Nothing errors; the test count does not move; the only trace is a check that has quietly stopped checking.
+- **It happened TWICE in one session, and BOTH times under a REMOVAL** — the Title Case guard anchored on `Recent Calls` while item (n) removed that card, and two team-view ordering tests anchored on `What Needs Work` while the objection card was retitled. A removal is exactly the change least likely to make anyone re-read a guard in a different file.
+- **THE STANDING SHAPE — assert the anchor before you use it:**
+```js
+assert.ok(LIVE.indexOf('<h2>Coach Summary<') !== -1, 'non-vacuity anchor is stale');
+const broken = LIVE.replace('<h2>Coach Summary<', '<h2>Coach summary<');
+```
+Now a removal fails **loudly, in the guard, naming the reason** — instead of leaving a passing test that verifies nothing.
+- **This generalises past non-vacuity to any test that reaches into another file by string:** ordering anchors, slice boundaries, mirror extractions. **The related rule already recorded — "every ordering anchor is asserted present before it is compared", after a conditional check passed vacuously — is the same failure; this is its non-vacuity twin.** If a test's correctness depends on a literal existing somewhere else, the test must say so.
+
 ### ⚠ DO NOT DELETE A TEST BECAUSE ITS SCAFFOLDING WENT — CONVERT IT (2026-08-17)
 **A test's SUBJECT often outlives its VEHICLE, and deleting it with the feature is how a property silently stops being covered.**
 - Removing the What-Needs-Work money math failed 8 tests. Four were genuinely about the removed feature and were archived in place. **Four were converted**, because what they protected still exists:

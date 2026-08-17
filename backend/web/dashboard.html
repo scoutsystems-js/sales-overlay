@@ -1782,6 +1782,16 @@
     .nw-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .nw-chip { font-size: 12px; color: var(--text); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
     .nw-chip b { color: var(--text); }
+    /* (n) The promoted Performance Summary card. Visual weight only — it is
+       still a link, and the synthesis lane still fires on the page it opens. */
+    .perf-feature .section-header h2 { font-size: 20px; }
+    .perf-feature-card { padding: 20px 22px; }
+    .perf-feature-lead { font-size: 15px; line-height: 1.55; max-width: 62ch; }
+    .perf-feature-points { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-top: 16px; }
+    .perf-feature-point { border-left: 2px solid var(--accent); padding-left: 12px; }
+    .perf-feature-point b { display: block; font-size: 13px; font-weight: 600; }
+    .perf-feature-point span { display: block; font-size: 12px; margin-top: 2px; }
+
     /* ── 12b: the rolling section card (rep page) ──────────────────────
        Semantic colours only; no grey — depth comes from size and weight. */
     .srk-card { position: relative; cursor: pointer; }
@@ -3986,8 +3996,23 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Coach Summary</h2>'
         + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
         + renderCoachSummary2(a) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Performance Summary</h2></div>' + overviewLinkCardHtml('Your wins and what to improve, drawn from your calls.', 'openPerformance()') + '</div>'
+      // (n) 2026-08-17 — Performance Summary PROMOTED, Recent Calls REMOVED.
+      //
+      // ⚠ THIS STAYS A LINK CARD, and that is what keeps it fast. The overview
+      // card does NOT render the panel; the synthesis LLM fires when the
+      // #performance page opens (see the A-1 boot-trim note above). Inlining the
+      // panel here to "make it bigger" would drag a lane whose cache MISS costs
+      // ~35s onto every dashboard boot — the opposite of what the boot trim was
+      // for. Bigger here means more visual weight, not more work.
+      + '<div class="section fade-in perf-feature"><div class="section-header"><h2>Performance Summary</h2>'
+        + '<div class="meta">Your Wins and What to Improve</div></div>'
+        + perfFeatureCardHtml() + '</div>';
+      /* REMOVED 2026-08-17 (Justin's item n) — Recent Calls. The Call Library is
+         one click away in the top nav, and the card was a link to it with no
+         content of its own, so it cost a full section band to duplicate a nav
+         item. Restoring it is re-adding this one line.
       + '<div class="section fade-in"><div class="section-header"><h2>Recent Calls</h2></div>' + overviewLinkCardHtml('Open your Call Library to review recent calls.', 'goCallLibrary()') + '</div>';
+      */
 
     // 10e: the canvas exists only after the assignment above.
     drawRepOwnChart();
@@ -3998,6 +4023,22 @@
     // 10e is lazy and only for a manager viewing someone else's report.
     if (repOwnGraphVisible() && state.repGraph === null && !state.repGraphLoading) loadRepGraph();
     // NOTE: Performance's LLM call fires on the #performance page open, not here.
+  }
+
+  // (n) The promoted Performance Summary card. Still a LINK — see the note at
+  // the call site — but given the visual weight of a feature panel: a bigger
+  // teaser line, and the three things the page will show, so the card earns the
+  // space rather than merely occupying more of it.
+  function perfFeatureCardHtml() {
+    return '<div class="team-recs-card perf-feature-card" onclick="openPerformance()" title="Open your Performance Summary">'
+      + '<div class="perf-feature-lead">What is working, and what to fix — drawn from your own calls and quoted back to you.</div>'
+      + '<div class="perf-feature-points">'
+        + '<div class="perf-feature-point"><b>What\'s Working</b><span>The patterns your won calls share</span></div>'
+        + '<div class="perf-feature-point"><b>What to Improve</b><span>Where the losses repeat</span></div>'
+        + '<div class="perf-feature-point"><b>Evidence</b><span>Every claim tied to a real moment</span></div>'
+      + '</div>'
+      + '<div class="team-recs-expand">click to expand →</div>'
+    + '</div>';
   }
 
   // A-2.2: a link card (teaser + visible "click to expand →") that opens a page.

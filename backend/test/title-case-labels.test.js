@@ -116,13 +116,18 @@ test('CONNECTIVES stay lowercase inside a label, and capitalise as the first wor
 });
 
 test('⚠ NON-VACUITY — the matcher actually catches a lowercase label', () => {
-  const broken = LIVE.replace('<h2>Recent Calls<', '<h2>Recent calls<');
+  // ⚠ ANCHOR: pick a heading that still exists. This originally broke
+  // "Recent Calls", which item (n) removed — the test then proved nothing
+  // because the replace was a no-op. Assert the anchor is present first, so
+  // the next removal fails loudly instead of quietly emptying this check.
+  assert.ok(LIVE.indexOf('<h2>Coach Summary<') !== -1, 'non-vacuity anchor is stale');
+  const broken = LIVE.replace('<h2>Coach Summary<', '<h2>Coach summary<');
   const bad = [...broken.matchAll(/<h[123][^>]*>([^<]{2,60})</g)]
     .map((m) => m[1].trim())
     .filter((t) => !/[{}<>+]/.test(t))
     .filter((t) => !isSentence(t))
     .filter((t) => offendingWords(t).length);
-  assert.ok(bad.indexOf('Recent calls') !== -1,
+  assert.ok(bad.indexOf('Coach summary') !== -1,
     'the matcher must see a reintroduced lowercase heading, or this proves nothing');
 });
 
