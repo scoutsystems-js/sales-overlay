@@ -42,8 +42,10 @@
                         individually and new UI inherits it.
            CATEGORICAL  REP_LINE_COLORS — one hue per rep on a chart. Cannot be
                         three colours: seven reps need seven distinguishable
-                        lines, and red/amber already MEAN bad/warning, so a rep
-                        drawn in red would read as failing. Green leads instead.
+                        lines. It borrows NONE of the three above — red/amber
+                        mean bad/warning, and green means clickable, so a rep in
+                        any of them reads as a status rather than an identity.
+                        Cyan leads; see the array for the full reasoning.
          --accent-quiet is the old blue's tint role (soft fills), re-tinted. */
       --accent:       #4ade80;
       --accent-quiet: rgba(74, 222, 128, 0.18);
@@ -4209,14 +4211,22 @@
   //
   // NO GREY TEXT: axes, ticks, legend and tooltips all use full-strength text.
   var REP_LINE_COLORS = [
-    // ⚠ GREEN LEADS so the first line on every chart is green, per the ruling.
-    // Amber and rose are DROPPED: --mid and --bad already mean warning and bad
-    // everywhere else, and a rep rendered in those reads as failing rather than
-    // as "rep number four". The rest are hues with no semantic load here.
-    '#4ade80',  // green   — matches --accent, so rep 1 ties to the interactive colour
+    // ⚠ NO SEMANTIC HUE MAY APPEAR HERE, and that is the whole rule.
+    //   --bad red and --mid amber are dropped because a rep drawn in the warning
+    //   colour READS as a warning — the line says "this rep is failing" when all
+    //   it means is "this is rep number four".
+    //   --accent GREEN is dropped for the same reason in the other direction: it
+    //   means "you can click this" everywhere else on the page, and a hue cannot
+    //   do two jobs. Green led this ramp for one commit; cyan leads it now.
+    // Blue is HERE, not banned: it stopped being the interactive colour when
+    // --accent moved to green, so it carries no meaning any more and is the most
+    // separable seventh hue available. Seven entries because seven reps need
+    // seven distinguishable lines — the consumer cycles, so a shorter list would
+    // silently draw two reps in the same colour on one chart.
     '#22d3ee',  // cyan
     '#a78bfa',  // violet
     '#f472b6',  // pink
+    '#60a5fa',  // blue    — freed by the accent move; no longer means "clickable"
     '#2dd4bf',  // teal
     '#c4b5fd',  // light violet
     '#67e8f9',  // light cyan
