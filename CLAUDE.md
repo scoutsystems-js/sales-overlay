@@ -991,6 +991,18 @@ delete from prospects     where display_name  like 'Seed %';
 - **JOSH WAS NOT TOUCHED — inserts only, scoped to the three demo user_ids.** Counts before and after: **calls 360 → 360, analyses 360 → 360, prospects 201 → 201.**
 - **⚠ A DRAFT OF THE SCRIPT INVENTED THE REP UUIDs** from the 8-character prefixes visible in earlier query output. The script now fetches the real ids and **verifies every target id exists before writing a row**. Any future data script targeting users must do the same — a plausible-looking UUID is not a UUID.
 
+### ⚠ A "NOT YET LOADED" SENTINEL MUST BE THE VALUE THE LOADER ACTUALLY TESTS FOR (2026-08-17)
+**`undefined` and `null` are both falsy and both mean "nothing here" to a reader. They are NOT interchangeable to a `=== null` guard, and the failure is silent.**
+- **The live case:** the gauge panel's lazy kick is `if (state.teamGauges === null && !state.teamGaugesLoading) loadTeam('repGauges')`. The key was never declared in the state initialiser, so it was `undefined`, the condition was never true, **the lane never fetched, and the panel rendered a skeleton forever.** No error, no failed request, no console warning — just a spinner that never resolves, which reads as "slow" rather than "broken".
+- **THE RULE: declare every lazy-load key with the exact sentinel its guard tests.** This codebase uses `=== null` for "not yet requested" and a separate `*Loading` boolean for "in flight", precisely so those two states are distinguishable. An undeclared key silently becomes a third state that matches neither.
+- **How it was caught: by probing state in the browser after the first render came back empty** — not by reading the code, where the kick line looks perfectly correct. Same family as the dead-call-site rule: the code exists, it just never runs.
+
+### ⚠ SHARED-CARRIER, LAYOUT EDITION — SPLITTING A SHARED CONTAINER REMOVES CONTROLS FROM PAGES THAT HAD NOTHING TO DO WITH THE CHANGE (2026-08-17)
+**Third instance of the shared-carrier failure, and the first where the carrier is a LAYOUT CONTAINER rather than a value.**
+- **The live case:** the speedometer panel had to sit between the page title and the date picker, so `teamHeaderHtml()` was split into a title row and a controls row. That function is rendered by **four** pages. The other three — team recommendations, team needs-work, manage members — carried the picker *inside* the header, so the split **silently removed the date picker from all three**. Nothing failed; those pages simply lost a control, on a change that was about a different page.
+- **THE RULE is the existing one with the scope widened: after changing what a shared carrier CONTAINS, re-derive every other consumer's assumption — and a shared render function is a carrier.** The earlier instances were `state.dateRange` changing meaning and the URL hash gaining a range; the mechanism is identical.
+- **Caught by rendering all four pages and asserting the control is present on each**, which is the layout equivalent of grepping the other readers.
+
 ### ⚠ A GUARD MUST SPLIT THE SAME WAY THE RULE SPLITS — BY QUESTION, NOT BY FILE (2026-08-17)
 **When a rule divides call sites by the QUESTION they ask, a per-file guard is the wrong shape and will be wrong for a real file.**
 - **The live case:** "handled" is read by fifteen places. TEN ask *"what is the rate?"* (credit objections on closed calls); FIVE ask *"was this a good moment?"* (must not). The obvious guard is a list of files. **`lib/team-synthesis.js` is in BOTH lists** — it computes an objection rate for its prompt *and* picks highlight-of-the-week candidates. `lib/objection-synthesis.js` and `lib/session-analytics.js` are the same shape.
