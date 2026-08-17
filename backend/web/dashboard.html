@@ -1254,34 +1254,39 @@
     .rep-graph-skeleton { height: 100%; width: 100%; border-radius: var(--radius); }
     /* Date-range picker (stage 1). All text full strength — the no-grey rule. */
     .dp { position: relative; display: inline-block; }
-    .dp-label { background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius);
-                color: var(--text); padding: 6px 12px; font-size: 13px; cursor: pointer; font-weight: 500; }
+    /* (g) Justin: white box, black text. BOTH the trigger and the panel — a
+       white trigger opening a dark panel reads as two different controls, and
+       the panel is the part you actually read dates from. Colours are local to
+       .dp so the rest of the dark theme is untouched. */
+    .dp { --dp-bg: #ffffff; --dp-fg: #111111; --dp-line: #d6d8dc; --dp-muted: #4a4d52; }
+    .dp-label { background: var(--dp-bg); border: 1px solid var(--dp-line); border-radius: var(--radius);
+                color: var(--dp-fg); padding: 6px 12px; font-size: 13px; cursor: pointer; font-weight: 600; }
     .dp-label:hover { border-color: var(--accent); }
     .dp-cal { font-size: 10px; }
     .dp-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: 268px; padding: 10px;
-                background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius);
+                background: var(--dp-bg); border: 1px solid var(--dp-line); border-radius: var(--radius);
                 box-shadow: 0 10px 30px rgba(0,0,0,.5); }
     .dp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-    .dp-month { color: var(--text); font-size: 13px; font-weight: 600; }
-    .dp-nav { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+    .dp-month { color: var(--dp-fg); font-size: 13px; font-weight: 600; }
+    .dp-nav { background: transparent; border: 1px solid var(--dp-line); border-radius: 6px; color: var(--dp-fg);
               width: 26px; height: 26px; cursor: pointer; font-size: 14px; line-height: 1; }
     .dp-nav:hover { border-color: var(--accent); }
     .dp-dow { display: grid; grid-template-columns: repeat(7, 1fr); }
-    .dp-dow span { text-align: center; font-size: 11px; color: var(--text); opacity: .85; padding: 2px 0; }
+    .dp-dow span { text-align: center; font-size: 11px; color: var(--dp-muted); padding: 2px 0; }
     .dp-row { display: grid; grid-template-columns: repeat(7, 1fr); }
-    .dp-day { background: transparent; border: 0; border-radius: 6px; color: var(--text); font-size: 12px;
+    .dp-day { background: transparent; border: 0; border-radius: 6px; color: var(--dp-fg); font-size: 12px;
               height: 30px; cursor: pointer; }
-    .dp-day:hover { background: var(--bg-field); }
+    .dp-day:hover { background: #eef0f3; }
     .dp-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .dp-out { opacity: .45; }
-    .dp-in { background: rgba(90,150,255,.18); border-radius: 0; }
-    .dp-edge { background: var(--accent); color: #0b0b0b; font-weight: 700; }
+    .dp-in { background: rgba(90,150,255,.20); border-radius: 0; }
+    .dp-edge { background: var(--accent); color: #0b0b0b; font-weight: 700; }   /* accent inherited — see (e) */
     .dp-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px;
-               border-top: 1px solid var(--border); padding-top: 8px; }
-    .dp-earliest { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+               border-top: 1px solid var(--dp-line); padding-top: 8px; }
+    .dp-earliest { background: transparent; border: 1px solid var(--dp-line); border-radius: 6px; color: var(--dp-fg);
                    font-size: 12px; padding: 4px 10px; cursor: pointer; }
     .dp-earliest:hover { border-color: var(--accent); }
-    .dp-hint { font-size: 11px; color: var(--text); opacity: .85; }
+    .dp-hint { font-size: 11px; color: var(--dp-muted); }
     .rep-graph-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
     .rep-graph-select {
       background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong);
@@ -3781,7 +3786,12 @@
       + glanceTileHtml('Calls analyzed', analyzed, 'of ' + a.calls.total_in_range + ' in range', "drillCalls('analyzed',null)")
       + glanceTileHtml('Avg score', avgBig, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
       + glanceTileHtml('Objection handle rate', ohr ? ohr.rate + '%' : '—', ohr ? (ohr.handled + ' of ' + ohr.total + ' handled') : 'true objections', "goObjections()")
-      + glanceTileHtml('Cash collected', fmtCash(a.cash_collected), 'closed-call cash', "drillCalls('analyzed',null)")
+      /* REMOVED 2026-08-17 — Justin: cash comes off the cards. This was the ONLY
+         live "Cash collected" card; the team glance tile went with the glance
+         card on 2026-08-16 and the rep-card row was retired in the B-1 redesign.
+         The DATA is untouched — call_analyses.cash_collected is still extracted
+         and still drives the EOD report and the needs-work money argument.
+      + glanceTileHtml('Cash collected', fmtCash(a.cash_collected), 'closed-call cash', "drillCalls('analyzed',null)") */
       + glanceTileHtml('Close rate', closeRateDisplay(a).value, closeRateDisplay(a).sub, "drillCalls('analyzed',null)")
     + '</div>';
 
