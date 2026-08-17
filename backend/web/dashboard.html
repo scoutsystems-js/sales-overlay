@@ -2386,6 +2386,7 @@
     objectionsSynthesisLoading: false,
     perfSynthesis: null,       // last /me/performance-synthesis ({available,working,improve} | {available:false})
     perfSynthesisLoading: false,
+    perfWaitLong: false,      // true once a load has run past PERF_LONG_WAIT_MS
     // A-1 collapsed overview: sections start collapsed; nothing heavy renders
     // until expanded (Coach summary + Performance summary + Recent calls).
     overviewExpanded: { coach: false, perf: false, recent: false },
@@ -3924,12 +3925,31 @@
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
   }
+  // ⚠ THE LONG-WAIT COPY IS TIME-GATED, NOT ALWAYS-ON. Measured: a cache MISS is
+  // ~35 s and 97% of that is the model generating; a HIT is under a second. The
+  // slow path is irreducible — it IS the model call — so the honest fix is to say
+  // so rather than to pretend it is fast. But showing "this will take a minute"
+  // on a sub-second cached load would be a lie in the other direction, so it only
+  // appears after PERF_LONG_WAIT_MS.
+  var PERF_LONG_WAIT_MS = 2000;
+  var perfWaitTimer = null;
   async function loadPerfSynthesis() {
     if (state.perfSynthesisLoading) return;
     state.perfSynthesisLoading = true;
+    state.perfWaitLong = false;
+    if (perfWaitTimer) clearTimeout(perfWaitTimer);
+    perfWaitTimer = setTimeout(function () {
+      // Only meaningful if we are STILL waiting and still on the page.
+      if (!state.perfSynthesisLoading) return;
+      state.perfWaitLong = true;
+      if (state.view === 'performance') renderPerformanceView();
+      else if (state.view === 'overview') renderOverview(false);
+    }, PERF_LONG_WAIT_MS);
     try { state.perfSynthesis = await fetchPerfSynthesis(); }
     catch (err) { if (err.message === 'unauth') return; state.perfSynthesis = { available: false, reason: err.message || 'unknown' }; }
     state.perfSynthesisLoading = false;
+    state.perfWaitLong = false;
+    if (perfWaitTimer) { clearTimeout(perfWaitTimer); perfWaitTimer = null; }
     if (state.view === 'performance') renderPerformanceView();
     else if (state.view === 'overview') renderOverview(false);
   }
@@ -3947,7 +3967,13 @@
   }
   function renderPerfSummary() {
     var s = state.perfSynthesis;
-    if (s === null) return '<div class="load-state" style="padding:14px 4px;"><div class="spinner"></div> Generating performance summary…</div>';
+    if (s === null) {
+      return '<div class="load-state" style="padding:14px 4px;"><div class="spinner"></div> '
+        + (state.perfWaitLong
+            ? 'This will take a minute — go touch some grass'
+            : 'Generating performance summary…')
+        + '</div>';
+    }
     if (!s.available) return '<div class="empty"><h3>Performance summary unavailable</h3><p>Could not generate it right now' + (s.reason ? ' (' + escapeHtml(s.reason) + ')' : '') + '. Your scores above are unaffected.</p></div>';
     var work = (s.working || []), imp = (s.improve || []);
     if (!work.length && !imp.length) return '<div class="empty"><h3>Not enough data yet</h3><p>Analyze more calls (with win/loss outcomes) to surface a performance summary.</p></div>';

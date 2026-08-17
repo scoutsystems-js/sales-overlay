@@ -962,6 +962,17 @@ So there is no failure to notice, no exception to catch, and no log line to grep
 - **THE RULE, and it is the same discipline as destructive ops pinning to verified ids:** resolve the identifier from the source table by a stable natural key (email, `fathom_call_id`, label), **then assert every target exists before writing anything**. `backend/scripts/seed-demo-data-2026-08-16.js` does this — it selects the ids by email, re-queries `user_profiles` for all of them, prints `exists` per target, and **aborts if any is missing**.
 - **This applies to every data script, not just destructive ones.** The existing rule ("a data-op checkpoint pins to VERIFIED IDS, never a fixed count") was written for deletes; inserts need the same guarantee for the same reason. **Print the verification in the run log** so the evidence is visible after the fact rather than assumed.
 
+### PERFORMANCE SUMMARY IS SLOW BECAUSE IT IS A MODEL CALL — measured 2026-08-16
+```
+cache MISS   35,005 ms      cache HIT (before fix) ~1,196 ms      the model ~33,808 ms = 97% OF A MISS
+```
+- **The miss is irreducible.** 97% of the wall clock is Claude generating ~5,000 characters of JSON (`claude-sonnet-4-6`, `SYNTH_MAX_TOKENS = 2600`). **Do not go looking for slow database work — it is 3% of a miss.**
+- **The practical pattern:** `to` is `new Date()` at click time, snapped to today's UTC midnight, so the cache key changes **once per day**. **First view of a range on a given day ≈ 35 s; every view after ≈ 0.8 s.** That is what "genuinely slow" means here.
+- **THE FIX IS AN HONEST WAITING STATE, TIME-GATED.** Justin's copy — *"This will take a minute — go touch some grass"* — appears only after `PERF_LONG_WAIT_MS` (2 s). **Always-on would be a lie in the other direction** on a sub-second cached load, and would train people to ignore it.
+- **⚠ A FASTER MODEL WAS CONSIDERED AND DECLINED (ruling 2026-08-16).** Haiku would cut the 34 s substantially. **This lane's entire value is the grounded claim/evidence pairing, and every time this project has weakened a synthesis to save latency it has cost more than it saved.** If it is ever wanted it is **a deliberate quality trade, not a performance tweak** — and it should be argued on output quality, with the delta measured, not slipped in as an optimisation.
+- **The one real code defect found: the cache was checked AFTER all the data loading**, so a HIT paid for eleven columns across 154 rows that it then discarded. Now the key columns (`fathom_call_id, analyzed_at`) load first, the cache is checked, and the full select happens only on a miss. Median warm hit **1,196 ms → 824 ms**. ⚠ Both figures are noisy (observed 683–1489 ms) and the "before" was n=2 — **the direction is certain because less data is fetched; treat the magnitude as approximate.**
+- **⚠ THE HIT RATE ON THIS LANE IS NOT YET MEASURABLE.** Only ONE row had been written since key-snapping landed, and **a rate cannot be computed from n=1**. Re-check after a few days of normal use; the number becomes meaningful then, not now.
+
 ### DEMO SEED DATA — WRITTEN 2026-08-16, AND HOW TO REMOVE IT
 **Fabricated rows live in PRODUCTION on the three demo reps.** They exist because four features could never fire on real data: only one rep had prospects, only one cleared the objection-volume threshold, and only Josh had a coverage map.
 

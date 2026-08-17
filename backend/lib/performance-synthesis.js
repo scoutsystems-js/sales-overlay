@@ -124,16 +124,19 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
     return out;
   }
 
-  // 2) done analyses → hash, section avgs, win/loss split, one_thing texts.
-  var analyses = await inChunks('call_analyses',
-    'fathom_call_id, analyzed_at, status, outcome, overall_score, intro_score, discovery_score, pitch_score, objection_score, close_score, one_thing',
+  // 2) done analyses. ⚠ TWO PHASES ON PURPOSE: the cache KEY needs only
+  // fathom_call_id + analyzed_at, but the synthesis needs eleven columns. Loading
+  // all eleven before the cache check meant a HIT paid for data it then threw
+  // away — measured at ~776 ms of a ~1.2 s cached response. The heavy select now
+  // happens only on a miss.
+  var keyRows = await inChunks('call_analyses', 'fathom_call_id, analyzed_at',
     function (q) { return q.eq('status', 'done'); });
-  if (analyses.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
+  if (keyRows.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
 
   // KB-grounded: fetch the closer's selling context (offer/scripts, cap 3000) and
   // fold its hash into the set-hash so a KB upload invalidates the cached synthesis.
   var selling = await fetchSellingContext(admin, userId, 3000, SYNTHESIS_CATEGORIES);
-  var hashInput = analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash;
+  var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash;
   var hash = crypto.createHash('md5').update(hashInput).digest('hex');
 
   // 3) cache check.
@@ -142,6 +145,12 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   var cacheQ = await admin.from('objection_synthesis_cache').select('synthesis')
     .eq('user_id', userId).eq('synthesis_type', 'performance').eq('from_ts', ck.from).eq('to_ts', ck.to).eq('analysis_set_hash', hash).maybeSingle();
   if (!cacheQ.error && cacheQ.data && cacheQ.data.synthesis) return Object.assign({ available: true, cached: true }, cacheQ.data.synthesis);
+
+  // MISS from here on — now pay for the columns the synthesis actually needs.
+  var analyses = await inChunks('call_analyses',
+    'fathom_call_id, analyzed_at, status, outcome, overall_score, intro_score, discovery_score, pitch_score, objection_score, close_score, one_thing',
+    function (q) { return q.eq('status', 'done'); });
+  if (analyses.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
 
   var outcomeByCall = {};
   var secSum = {}, secN = {}; SECTIONS.forEach(function (s) { secSum[s] = 0; secN[s] = 0; });
