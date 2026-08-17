@@ -212,6 +212,11 @@ function buildSectionBreakdown(section, input) {
     if (String(h.type || '').toLowerCase() !== 'objection') return;
     var resp = (typeof h.closer_response === 'string') ? h.closer_response.trim() : '';
     if (!resp) return;                                   // no response is not a withheld response
+    // ⚠ DELIBERATELY NOT the shared isHandled() predicate (ruling 2026-08-17).
+    // This asks "was this a GOOD MOMENT?", not "what is the rate?". A moment
+    // inside a closed call is not automatically a good moment, and crediting it
+    // here would file weak handling under "what worked" — the opposite of
+    // coaching. The rate surfaces credit closed calls; these five do not.
     if (h.resolution !== 'handled') return;              // belongs in "what to fix"
 
     var verdict = (typeof h.closer_response_verified === 'boolean') ? h.closer_response_verified : null;

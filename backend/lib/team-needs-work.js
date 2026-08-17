@@ -22,14 +22,23 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
+const { isHandled, outcomeMap } = require('./objection-handled');
 
 // ── Guardrails (Phase 1, approved) ──────────────────────────────────────────
 const MIN_BUCKET = 6;        // no "needs work" claim off a tiny bucket
 const MIN_GAP_PP = 5;        // rate must be at least this far below baseline
-const MIN_LINK_GROUP = 10;   // handled AND not-handled pools each ≥ this for Δ
-const MIN_CLOSED = 5;        // closed calls needed for a meaningful avg cash
 const MIN_ANALYZED = 10;     // analyzed calls needed to model at all
-const MIN_DEALS_FOR_CASH = 0.5; // below this expected extra deals, suppress $
+/* ⚠ MONEY MATH REMOVED 2026-08-17 (Justin: "I don't want the What Needs Work
+   talking about cash collected or trying to do math"). Archived, not deleted:
+     const MIN_LINK_GROUP = 10;      // handled AND not-handled pools each ≥ this for Δ
+     const MIN_CLOSED = 5;           // closed calls needed for a meaningful avg cash
+     const MIN_DEALS_FOR_CASH = 0.5; // below this expected extra deals, suppress $
+   It had to go in the SAME commit as the handled-includes-closed ruling, not
+   merely alongside it: the counterfactual multiplied by
+   P(closed|handled) − P(closed|not handled), and under the new definition the
+   not-handled group CANNOT contain a closed call, so that second term is 0.0%
+   BY CONSTRUCTION. Measured live: delta 46.6 → 67.6 points, inflating every
+   dollar figure ~45% while still reading as a measurement. */
 
 // Personal (A-2.1) softer floors: one closer has a fraction of a team's
 // objections. The bucket floor drops (still ≥ a handful) and the analyzed floor
@@ -76,6 +85,10 @@ function money100(x) { return Math.round(x / 100) * 100; }
 function pctWhole(n, d) { return d > 0 ? Math.round((100 * n) / d) : null; }
 function round1(x) { return Math.round(x * 10) / 10; }
 
+/* ⚠ ARCHIVED 2026-08-17 with the money math — see the constants note above.
+   Its ONLY surviving job (a call→outcome map) is now lib/objection-handled.js
+   outcomeMap(), which is the same map without the linkage arithmetic.
+
 // Pooled handled→closed linkage + cash facts for a set of objections+analyses.
 // Used both for a group's OWN coefficients and (personal) for the TEAM-BORROWED
 // ones. Pure.
@@ -97,6 +110,8 @@ function computeLinkage(objs, analyses) {
     handledN: hN, notHandledN: nN, pH: pH, pN: pN, delta: (pH != null && pN != null) ? pH - pN : null };
 }
 
+*/
+
 // ── The deterministic core (pure — no DB, no Claude, no I/O) ─────────────────
 // objs:     [{ call_id, surface, handled:boolean, quote, observation, rep, clip_url }]
 // analyses: [{ fathom_call_id, outcome, cash_collected }]  (done rows only)
@@ -105,7 +120,7 @@ function computeLinkage(objs, analyses) {
 //   subject   — 'personal' switches the card copy to "You handled …" + raw counts.
 //   minBucket / minAnalyzed — personal uses softer floors (bucket 4) since one
 //     closer has far fewer objections than a team.
-//   injected  — TEAM-BORROWED money coefficients (from computeLinkage on the
+//   (injected — TEAM-BORROWED money coefficients — REMOVED 2026-08-17.
 //     team) so the personal $ clause is backed by a stable sample. When absent,
 //     the group's OWN linkage powers the money math (team behaviour, unchanged).
 // Returns the card + detail envelope. NEVER throws for content reasons.
@@ -125,7 +140,9 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   function classOf(label) { return bucketClass[label] || 'true_objection'; }
   function labelOf(o) { return mapping[normSurface(o.surface)] || 'Other'; }
 
-  var outcomeByCall = computeLinkage(objs, analyses).outcomeByCall; // over ALL objs, just to scope by parent outcome
+  // Scope to objections whose parent call has a known outcome. This was the
+  // only non-money use of computeLinkage; outcomeMap is that map alone.
+  var outcomeByCall = outcomeMap(analyses);
 
   // Only objections whose parent call has a known (done-analysis) outcome, then
   // split TRUE objections (the math) from context (logistical + DQ).
@@ -140,21 +157,6 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   var totalObj = scoped.length;
   var totalHandled = scoped.filter(function (o) { return o.handled; }).length;
 
-  // Linkage Δ over TRUE objections only (a DQ objection in a closed call must not
-  // inflate the handled→closed marginal). Own coefficients; injected (personal
-  // borrow) coefficients are the caller's responsibility to keep true-only.
-  var link = computeLinkage(scoped, analyses);
-
-  // Money coefficients: TEAM-BORROWED when injected (personal), else OWN.
-  var inj = opts.injected || null;
-  var borrowed = !!inj;
-  var mDelta = borrowed ? inj.delta : link.delta;
-  var mAvgCash = borrowed ? inj.avgCash : link.avgCash;
-  var mHN = borrowed ? inj.handledN : link.handledN;
-  var mNN = borrowed ? inj.notHandledN : link.notHandledN;
-  var mClosed = borrowed ? inj.closedCount : link.closedCount;
-  var mPH = borrowed ? inj.pH : link.pH;
-  var mPN = borrowed ? inj.pN : link.pN;
 
   // Buckets.
   var buckets = {}; // label -> { label, total, handled, surfaces:{}, rows:[] }
@@ -182,8 +184,8 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
     return {
       buckets: list, mapping: mappingOut, quotes: [], subject: subject,
       context: { disqualifications: context.disqualifications, logistical: context.logistical },
-      linkage: { p_closed_handled: mPH, p_closed_nothandled: mPN, delta: mDelta, handled_n: mHN, nothandled_n: mNN, borrowed: borrowed },
-      avg_cash: Math.round(mAvgCash * 100) / 100, closed_calls: mClosed, analyzed_calls: analyzed, objections: totalObj,
+      // linkage / avg_cash / closed_calls removed with the money math 2026-08-17.
+      analyzed_calls: analyzed, objections: totalObj,
     };
   }
 
@@ -204,8 +206,6 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
       bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
   }
 
-  var moneyGatesGlobal = (mDelta != null && mDelta > 0 && mHN >= MIN_LINK_GROUP && mNN >= MIN_LINK_GROUP && mClosed >= MIN_CLOSED && mAvgCash > 0);
-
   // Candidate weak buckets (exclude the 'Other' grab-bag from being the focus).
   var candidates = [];
   Object.keys(buckets).forEach(function (label) {
@@ -218,9 +218,7 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
     var gapPP = (baseline - rate) * 100;
     if (gapPP < MIN_GAP_PP) return; // not a relative weakness
     var addHandled = Math.max(0, Math.min(b.total - b.handled, baseline * b.total - b.handled));
-    var extraDeals = moneyGatesGlobal ? addHandled * mDelta : null;
-    var extraCash = (extraDeals != null) ? extraDeals * mAvgCash : null;
-    candidates.push({ b: b, baseline: baseline, otherTotal: otherTotal, otherHandled: otherHandled, rate: rate, gapPP: gapPP, addHandled: addHandled, extraDeals: extraDeals, extraCash: extraCash });
+    candidates.push({ b: b, baseline: baseline, otherTotal: otherTotal, otherHandled: otherHandled, rate: rate, gapPP: gapPP, addHandled: addHandled });
   });
 
   if (candidates.length === 0) {
@@ -232,11 +230,11 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
       bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
   }
 
-  // Money-eligible candidates need the global gates AND enough expected deals.
-  var moneyCands = candidates.filter(function (c) { return c.extraCash != null && c.extraDeals >= MIN_DEALS_FOR_CASH; });
-  var focus, state;
-  if (moneyCands.length) { moneyCands.sort(function (a, b) { return b.extraCash - a.extraCash; }); focus = moneyCands[0]; state = 'money'; }
-  else { candidates.sort(function (a, b) { return b.gapPP - a.gapPP; }); focus = candidates[0]; state = 'rate_gap'; }
+  // One path since the money math went: the biggest RATE GAP is the focus.
+  // 'money' state and its largest-extra-cash selection are gone; `state` stays in
+  // the payload because the frontend and the cache key both read it.
+  candidates.sort(function (a, b) { return b.gapPP - a.gapPP; });
+  var focus = candidates[0], state = 'rate_gap';
 
   var label = focus.b.label;
   var bH = focus.b.handled, bT = focus.b.total;
@@ -250,24 +248,12 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
     return { text: str(o.quote, 300), observation: str(o.observation, 240), rep: o.rep || null, clip_url: o.clip_url || null, call_id: o.call_id, handled: !!o.handled };
   });
 
-  var extra, card_text;
-  if (state === 'money') {
-    var deals = Math.max(1, Math.round(focus.extraDeals));
-    var cash = money100(focus.extraCash);
-    extra = { additional_handled: round1(focus.addHandled), delta: mDelta, avg_cash: mAvgCash, extra_deals: focus.extraDeals, extra_cash: focus.extraCash, borrowed: borrowed };
-    if (subject === 'personal') {
-      // Raw counts beside every rate (ruling 4); plain team-borrow phrasing (ruling 3).
-      card_text = 'You handled “' + label + '” objections ' + bH + ' of ' + bT + ' times (' + rateW + '%) — your weakest area, vs ' + baseW +
-        '% on your other objections. Closing that gap ≈ ' + deals + ' more ' + (deals === 1 ? 'deal' : 'deals') +
-        ' ≈ $' + cash.toLocaleString('en-US') + ' more collected' + (borrowed ? ', based on your team’s typical deal size.' : '.');
-    } else {
-      card_text = 'Your team handles “' + label + '” objections at ' + rateW + '%, vs ' + baseW +
-        '% on every other objection this period. Closing that gap ≈ ' + round1(focus.addHandled) +
-        ' more handled ≈ ' + deals + ' more ' + (deals === 1 ? 'deal' : 'deals') +
-        ' ≈ $' + cash.toLocaleString('en-US') + ' more collected.';
-    }
-  } else {
-    extra = { additional_handled: round1(focus.addHandled), delta: mDelta, avg_cash: mAvgCash, extra_deals: null, extra_cash: null, borrowed: borrowed };
+  // ⚠ 'money' state removed 2026-08-17 — the card no longer projects deals or
+  // cash. The surviving copy is what the old rate_gap branch already said, which
+  // is why this reads as a deletion rather than a rewrite.
+  var extra = { additional_handled: round1(focus.addHandled) };
+  var card_text;
+  {
     if (subject === 'personal') {
       card_text = 'You handled “' + label + '” objections ' + bH + ' of ' + bT + ' times (' + rateW + '%) — your weakest area, vs ' + baseW +
         '% on your other objections this period.';
@@ -296,12 +282,14 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
     return Object.assign({ available: true, cached: false }, computeNeedsWork([], [], {}));
   }
 
-  var analyses = await w.inChunks('call_analyses', 'fathom_call_id, analyzed_at, outcome, cash_collected, status',
+  var analyses = await w.inChunks('call_analyses', ANALYSIS_COLS,
     function (q) { return q.eq('status', 'done'); });
   var objRows = await w.inChunks('call_highlights',
     'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
 
+  // Ruling 2026-08-17: an objection on a CLOSED call counts as handled.
+  var outcomeByCall = outcomeMap(analyses);
   var repOf = function (cid) { return w.meta[cid] ? w.meta[cid].user_id : null; };
   var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
   var objs = objRows.map(function (r) {
@@ -309,7 +297,7 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
     return {
       call_id: r.fathom_call_id,
       surface: r.objection_surface,
-      handled: r.resolution === 'handled',
+      handled: isHandled(r, outcomeByCall[r.fathom_call_id]),
       quote: str(r.quote, 300),
       observation: str(r.observation, 240),
       rep: (emailMap && emailMap[rid] ? emailMap[rid].split('@')[0] : null),
@@ -417,7 +405,10 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
   // to the objections feed or the team digest — see CLAUDE.md: on those
   // cross-call scanning surfaces the title is a call LABEL and its program
   // prefix carries information a bare name loses.)
-  var nameRows = await w.inChunks('call_analyses', 'fathom_call_id, prospect_name');
+  // `outcome` rides along on a select this lane already makes — the evidence
+  // list sorts NOT-handled first, and a credited moment is not being missed.
+  var nameRows = await w.inChunks('call_analyses', 'fathom_call_id, prospect_name, outcome');
+  var evidenceOutcome = outcomeMap(nameRows);
   var nameByCall = {};
   nameRows.forEach(function (n) { if (n && n.prospect_name) nameByCall[n.fathom_call_id] = n.prospect_name; });
   return rows.filter(function (r) { return want[normSurface(r.objection_surface)]; }).map(function (r) {
@@ -425,21 +416,24 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
     return { call_id: r.fathom_call_id, date: c.call_date || null,
       title: nameByCall[r.fathom_call_id] || c.title || null,
       prospect_name: nameByCall[r.fathom_call_id] || null,
-      surface: r.objection_surface, handled: r.resolution === 'handled',
+      surface: r.objection_surface, handled: isHandled(r, evidenceOutcome[r.fathom_call_id]),
       quote: str(r.quote, 400), closer_response: str(r.closer_response, 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds) };
   }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
 }
 
 // Map raw call_highlights objection rows → the core's obj shape.
-function toObjs(objRows, w) {
+function toObjs(objRows, w, outcomeByCall) {
   var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
   return objRows.map(function (r) {
-    return { call_id: r.fathom_call_id, surface: r.objection_surface, handled: r.resolution === 'handled',
+    return { call_id: r.fathom_call_id, surface: r.objection_surface, handled: isHandled(r, (outcomeByCall || {})[r.fathom_call_id]),
       quote: str(r.quote, 300), observation: str(r.observation, 240), rep: null, clip_url: clip(r.fathom_call_id, r.timestamp_seconds) };
   });
 }
 var OBJ_COLS = 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, resolution, type';
-var ANALYSIS_COLS = 'fathom_call_id, analyzed_at, outcome, cash_collected, status';
+// cash_collected dropped 2026-08-17 with the money math — nothing in this
+// module reads it now. `outcome` STAYS: it is what credits an objection on a
+// closed call under the handled ruling.
+var ANALYSIS_COLS = 'fathom_call_id, analyzed_at, outcome, status';
 
 // ── Personal "What needs work" (A-2.1) ──────────────────────────────────────
 // The closer's OWN objection buckets (self-vs-self rate + gap). The MONEY clause
@@ -460,7 +454,13 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
 
   var analyses = await w.inChunks('call_analyses', ANALYSIS_COLS, function (q) { return q.eq('status', 'done'); });
   var objRows = await w.inChunks('call_highlights', OBJ_COLS, function (q) { return q.eq('type', 'objection'); });
-  var objs = toObjs(objRows, w);
+  var objs = toObjs(objRows, w, outcomeMap(analyses));
+
+  /* ⚠ TEAM-BORROW REMOVED 2026-08-17 with the money math. It existed ONLY to
+     borrow a manager's delta + average deal size so one closer's card could
+     quote a dollar figure off a stable sample. With no dollar figure there is
+     nothing to borrow, and it cost three extra queries per personal card.
+     Archived:
 
   // Team-borrow: resolve the closer's manager, then pool that manager's whole
   // rep set over the SAME window for stable Δ + avg-cash coefficients.
@@ -483,11 +483,17 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
     }
   }
 
+  */
+  var teamKeyForHash = '';
+
   var selling = await fetchSellingContext(admin, userId, 1, SYNTHESIS_CATEGORIES);
   var hash = crypto.createHash('md5').update(
     analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|')
     + '||surf:' + objs.map(function (o) { return normSurface(o.surface); }).sort().join(',')
-    + '||inj:' + (injected ? (injected.delta.toFixed(4) + '/' + Math.round(injected.avgCash)) : 'none')
+    // Money coefficients removed 2026-08-17. The segment stays in the key so
+    // every cached card invalidates exactly ONCE, rather than a stale entry
+    // continuing to serve prose that quotes cash.
+    + '||inj:removed-2026-08-17'
     + '||kb:' + selling.kbHash + '||lane:' + NEEDS_WORK_LANE_VERSION
   ).digest('hex');
 
@@ -506,7 +512,7 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
     return { available: false, reason: mapRes.reason };
   }
 
-  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, injected: injected, bucketClass: mapRes.bucketClass, windowDays: windowDays });
+  var result = computeNeedsWork(objs, analyses, mapRes.mapping, { subject: 'personal', minBucket: PERSONAL_MIN_BUCKET, minAnalyzed: PERSONAL_MIN_ANALYZED, bucketClass: mapRes.bucketClass, windowDays: windowDays });
   await cachePut(admin, userId, 'needs_work', from, to, hash, result);
   return Object.assign({ available: true, cached: false }, stamp(result));
 }
@@ -517,8 +523,12 @@ module.exports = {
   loadBucketEvidence: loadBucketEvidence,
   // pure test surface (underscore = test-only)
   _computeNeedsWork: computeNeedsWork,
-  _computeLinkage: computeLinkage,
-  _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP, _MIN_LINK_GROUP: MIN_LINK_GROUP,
-  _MIN_CLOSED: MIN_CLOSED, _MIN_ANALYZED: MIN_ANALYZED, _MIN_DEALS_FOR_CASH: MIN_DEALS_FOR_CASH,
+  // _computeLinkage, _MIN_LINK_GROUP, _MIN_CLOSED and _MIN_DEALS_FOR_CASH were
+  // removed with the money math 2026-08-17. They were LIVE references to symbols
+  // that no longer exist — exporting them would have thrown at require() time,
+  // taking every needs-work surface down. Left as a note because a stale test
+  // asking for them should fail loudly on a missing export, not on a crash.
+  _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP,
+  _MIN_ANALYZED: MIN_ANALYZED,
   _PERSONAL_MIN_BUCKET: PERSONAL_MIN_BUCKET, _PERSONAL_MIN_ANALYZED: PERSONAL_MIN_ANALYZED,
 };

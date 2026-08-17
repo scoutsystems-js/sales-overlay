@@ -8,6 +8,7 @@
 // (same set-hash invalidation, same credit-tolerant unavailable state).
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { isHandled } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
@@ -177,7 +178,9 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   // 4) objection stats.
   var objRows = await inChunks('call_highlights', 'objection_category, resolution', function (q) { return q.eq('type', 'objection'); });
   var obj = {}; OBJ_CATEGORIES.forEach(function (c) { obj[c] = { total: 0, handled: 0 }; });
-  objRows.forEach(function (r) { var b = obj[r.objection_category]; if (b) { b.total++; if (r.resolution === 'handled') b.handled++; } });
+  // Ruling 2026-08-17 — the SAME definition the UI shows. If this lane counted
+  // differently, the synthesis prose would contradict the number beside it.
+  objRows.forEach(function (r) { var b = obj[r.objection_category]; if (b) { b.total++; if (isHandled(r, outcomeByCall[r.fathom_call_id])) b.handled++; } });
 
   // 5) candidate evidence moments (with real clip links + outcome class).
   var hlRows = await inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, closer_response, type');

@@ -991,6 +991,22 @@ delete from prospects     where display_name  like 'Seed %';
 - **JOSH WAS NOT TOUCHED — inserts only, scoped to the three demo user_ids.** Counts before and after: **calls 360 → 360, analyses 360 → 360, prospects 201 → 201.**
 - **⚠ A DRAFT OF THE SCRIPT INVENTED THE REP UUIDs** from the 8-character prefixes visible in earlier query output. The script now fetches the real ids and **verifies every target id exists before writing a row**. Any future data script targeting users must do the same — a plausible-looking UUID is not a UUID.
 
+### ⚠⚠ A ZERO THAT ARRIVES BY CONSTRUCTION IS THE SIGNATURE OF A TAUTOLOGY (2026-08-17)
+**The most valuable measurement of the handled-definition block, and the reason two rulings had to ship in ONE commit.**
+- **The ruling:** an objection counts as handled if `resolution === 'handled'` **OR the call's `outcome === 'closed'`**. Justin: *"objections are just barriers to a close, so if they side-step the barrier and still close, that's a win in my book."* Binary — `partial` scores zero.
+- **What-Needs-Work's counterfactual multiplied by `P(closed | handled) − P(closed | not handled)`.** Under the new definition the not-handled group **cannot contain a closed call**, so:
+
+| definition | P(closed \| handled) | P(closed \| not handled) | delta |
+|---|---|---|---|
+| old | 56.4% | 9.8% | **46.6 pts** |
+| new | 67.6% | **0.0%** | **67.6 pts** |
+
+- **That 0.0% is not data. It is arithmetic.** The claim degenerates to *"objections we credited BECAUSE the call closed correlate with the call closing."* Every dollar figure would have inflated **~45%** while still reading as a measurement — no error, no failing test, just bigger numbers.
+- **THE GENERAL RULE: when a definition changes, look for a term that becomes exactly 0 or exactly 1 as a RESULT of the change.** A boundary value that arrives by construction rather than by measurement means the two sides of the comparison are no longer independent, and any statistic built on them is circular. **It is invisible in the output** — the number still renders, still looks plausible, and is still wrong.
+- **Consequence:** the money math (counterfactual, `+$X at stake` chip, "How this is estimated" panel, team-borrowed coefficients) was removed **in the same commit** as the definition change. Justin had independently ruled the money out — but had he not, shipping the definition alone would have quietly corrupted it.
+- **Also recorded: "handled" is read by FIFTEEN places and they do not all ask the same question.** TEN ask *"what is the rate?"* and credit closed calls. FIVE ask *"was this a GOOD moment?"* and must not — a moment inside a closed call is not automatically a good moment, and crediting it there files weak handling under "what worked". `lib/team-synthesis.js` is in **both lists**, which is why `test/handled-carrier.test.js` enforces the split **per call site, not per file**.
+- **And a rate must reconcile with the counts printed beside it.** The Objections view shows handled · partial · unhandled, so a fourth **`credited (call closed)`** bucket was added. Without it a manager adds up what is on screen and gets a different number from the rate above it — which is how a page loses trust.
+
 ### ⚠⚠ `rgba()` CANNOT READ A HEX TOKEN — SO EVERY TINT WAS A **COPY** OF THE ACCENT, NOT A REFERENCE (2026-08-17)
 **THIS IS THE FINDING. The one-line lesson underneath it is secondary.**
 - **The mechanism:** `--accent` is a hex token. `rgba()` needs channels, so it cannot read it. Every soft tint on the dashboard was therefore written as `rgba(91, 158, 255, 0.14)` — a **hard-coded copy of the accent's value**, which does not move when `--accent` moves. **"Change one variable and all 65 sites follow" was only ever true for the sites using the HEX.** 23 tints were silently outside that story.

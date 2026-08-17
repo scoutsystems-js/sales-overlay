@@ -9,6 +9,7 @@ var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'clos
 // Reuse the TEAM view's prior-window machinery for the Avg-score tile trend, so
 // "prior period" means the exact same thing everywhere (no second implementation).
 var teamAnalytics = require('./team-analytics');
+const { isCredited } = require('./objection-handled');
 var { fetchProspectCloseRates } = require('./prospect-entity');
 
 // Prior equal-length window's avg score for `userId`, via the reused team
@@ -242,10 +243,14 @@ async function computeObjectionIntel(admin, userId, from, to) {
   for (var i = 0; i < calls.length; i++) { meta[calls[i].id] = calls[i]; callIds.push(calls[i].id); }
 
   var emptyCats = {};
-  OBJECTION_CATEGORIES.concat(['uncategorized']).forEach(function(c) { emptyCats[c] = { total: 0, handled: 0, partial: 0, unhandled: 0 }; });
+  OBJECTION_CATEGORIES.concat(['uncategorized']).forEach(function(c) { emptyCats[c] = { total: 0, handled: 0, partial: 0, unhandled: 0, credited: 0 }; });
   var base = {
     from: from, to: to,
-    metrics: { total: 0, calls_with_objection: 0, handled: 0, partial: 0, unhandled: 0, handled_rate: null },
+    // ⚠ `credited` is a FOURTH bucket, not a reclassification: handled/partial/
+    // unhandled still report the moment's OWN resolution. Without it the four
+    // numbers on screen would not add up to the rate printed beside them,
+    // which is how a manager stops trusting the page.
+    metrics: { total: 0, calls_with_objection: 0, handled: 0, partial: 0, unhandled: 0, credited: 0, handled_rate: null },
     by_category: emptyCats,
     feed: [],
   };
@@ -263,16 +268,30 @@ async function computeObjectionIntel(admin, userId, from, to) {
     rows = rows.concat(hr.data || []);
   }
 
+  // Ruling 2026-08-17: an objection on a CLOSED call counts as handled, so this
+  // lane needs the per-call outcome. It is NOT already in scope here — the
+  // win/loss split lives in computeCallAnalytics, a different function — so this
+  // is one chunked select, matching the pattern directly above.
+  var outcomeByCall = {};
+  for (var oc = 0; oc < callIds.length; oc += 100) {
+    var orq = await admin.from('call_analyses').select('fathom_call_id, outcome')
+      .in('fathom_call_id', callIds.slice(oc, oc + 100)).eq('status', 'done');
+    if (orq.error) throw new Error('call_analyses: ' + orq.error.message);
+    (orq.data || []).forEach(function (a) { outcomeByCall[a.fathom_call_id] = a.outcome || null; });
+  }
   var callsWith = {};
   var feed = [];
   rows.forEach(function(r) {
     callsWith[r.fathom_call_id] = true;
     base.metrics.total += 1;
     var res = (r.resolution === 'handled' || r.resolution === 'partial' || r.resolution === 'unhandled') ? r.resolution : null;
-    if (res) base.metrics[res] += 1;
+    var outcome = outcomeByCall[r.fathom_call_id];
+    var credited = isCredited(r, outcome);
+    if (credited) base.metrics.credited += 1; else if (res) base.metrics[res] += 1;
     var cat = (OBJECTION_CATEGORIES.indexOf(r.objection_category) !== -1) ? r.objection_category : 'uncategorized';
     base.by_category[cat].total += 1;
-    if (res) base.by_category[cat][res] += 1;
+    if (credited) { base.by_category[cat].credited += 1; }
+    else if (res) base.by_category[cat][res] += 1;
 
     var m = meta[r.fathom_call_id] || {};
     var clip = (m.recording_url && typeof r.timestamp_seconds === 'number')
@@ -287,14 +306,18 @@ async function computeObjectionIntel(admin, userId, from, to) {
       surface: r.objection_surface || null,
       category: cat,
       resolution: res,
+      credited: credited,   // 'Credited (call closed)' badge
       quote: r.quote || null,
       observation: r.observation || null,
       closer_response: r.closer_response || null,
     });
   });
   base.metrics.calls_with_objection = Object.keys(callsWith).length;
-  var denom = base.metrics.handled + base.metrics.partial + base.metrics.unhandled;
-  base.metrics.handled_rate = denom > 0 ? Math.round((base.metrics.handled / denom) * 100) : null;
+  // The four buckets sum to the denominator by construction, so the rate always
+  // reconciles with the counts printed next to it.
+  var denom = base.metrics.handled + base.metrics.credited + base.metrics.partial + base.metrics.unhandled;
+  base.metrics.handled_rate = denom > 0
+    ? Math.round(((base.metrics.handled + base.metrics.credited) / denom) * 100) : null;
 
   // Feed newest-call-first, then by timestamp; cap to keep the payload bounded.
   feed.sort(function(a, b) {

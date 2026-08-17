@@ -5,6 +5,11 @@
  * team average. Pure and deterministic: given the rows, the numbers are
  * arithmetic. ZERO model cost.
  *
+ * ⚠ HANDLED INCLUDES CLOSED CALLS (ruling 2026-08-17). An objection on a call
+ * that closed is credited whatever its resolution. `partial` on its own scores
+ * ZERO — the rule is binary. The predicate lives in lib/objection-handled.js and
+ * is shared with the other nine rate surfaces so they cannot disagree.
+ *
  * ⚠ THE HANDLE RATE DOES NOT ROUTE THROUGH THE LLM BUCKET LANE. The dashboard
  * tile sources its handle rate from team-needs-work's Claude-grouped buckets;
  * those exist to GROUP surface phrases for the needs-work card, not to compute
@@ -35,6 +40,7 @@
 
 const { bucketStart, bucketRangeLabel } = require('./team-analytics');
 const { prospectOutcome } = require('./prospect-entity');
+const { isHandled } = require('./objection-handled');
 
 // The selector vocabulary. Scout's own labels — see the ruling above.
 const OBJECTION_CATEGORIES = ['fear', 'timing', 'logistical', 'partner'];
@@ -118,7 +124,10 @@ function buildRepSeries(input) {
     var byUser = hAcc[c.user_id] || (hAcc[c.user_id] = {});
     var cell = byUser[i] || (byUser[i] = { handled: 0, total: 0 });
     cell.total++;
-    if (o.resolution === 'handled') cell.handled++;
+    // Ruling 2026-08-17: an objection on a CLOSED call is credited whatever its
+    // resolution — they side-stepped the barrier and still closed. One shared
+    // predicate; see lib/objection-handled.js for why it is not inlined.
+    if (isHandled(o, outcomeOf[o.fathom_call_id])) cell.handled++;
   });
 
   // ── closing rate: prospects, bucketed by their FIRST call ────────────────

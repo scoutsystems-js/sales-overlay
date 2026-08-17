@@ -30,6 +30,11 @@ function highlightGroup(h) {
   if (!h || typeof h !== 'object') return 'bad';
   var type = (typeof h.type === 'string') ? h.type.toLowerCase() : '';
   if (type === 'objection') {
+    // ⚠ DELIBERATELY NOT the shared isHandled() predicate (ruling 2026-08-17).
+    // This asks "was this a GOOD MOMENT?", not "what is the rate?". A moment
+    // inside a closed call is not automatically a good moment, and crediting it
+    // here would file weak handling under "what worked" — the opposite of
+    // coaching. The rate surfaces credit closed calls; these five do not.
     return (h.resolution === 'handled') ? 'good' : 'bad';
   }
   return (GOOD_TYPES.indexOf(type) !== -1) ? 'good' : 'bad';

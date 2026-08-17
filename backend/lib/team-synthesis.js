@@ -11,6 +11,7 @@
 //     quote + clip + why.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { isHandled } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
@@ -133,7 +134,9 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
 
   var objRows = await w.inChunks('call_highlights', 'objection_category, resolution', function (q) { return q.eq('type', 'objection'); });
   var obj = {}; OBJ_CATEGORIES.forEach(function (c) { obj[c] = { total: 0, handled: 0 }; });
-  objRows.forEach(function (r) { var bk = obj[r.objection_category]; if (bk) { bk.total++; if (r.resolution === 'handled') bk.handled++; } });
+  // Ruling 2026-08-17 — the SAME definition the UI shows, so the prose cannot
+  // contradict the rate rendered next to it.
+  objRows.forEach(function (r) { var bk = obj[r.objection_category]; if (bk) { bk.total++; if (isHandled(r, outcomeByCall[r.fathom_call_id])) bk.handled++; } });
 
   var hlRows = await w.inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, closer_response, type');
   function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
@@ -196,6 +199,11 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap)
   // Candidates: strong_moment + handled objections (the raw material for the 3 lanes).
   var hlRows = await w.inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, type, resolution',
     function (q) { return q.in('type', ['strong_moment', 'objection']); });
+  // ⚠ DELIBERATELY NOT the shared isHandled() predicate (ruling 2026-08-17).
+  // This asks "was this a GOOD MOMENT?", not "what is the rate?". A moment
+  // inside a closed call is not automatically a good moment, and crediting it
+  // here would file weak handling under "what worked" — the opposite of
+  // coaching. The rate surfaces credit closed calls; these five do not.
   var cands = hlRows.filter(function (r) { return r.type === 'strong_moment' || r.resolution === 'handled'; }).map(function (r) {
     var rid = w.meta[r.fathom_call_id] ? w.meta[r.fathom_call_id].user_id : null;
     return { type: r.type, rep: (emailMap && emailMap[rid]) || rid, rep_id: rid,

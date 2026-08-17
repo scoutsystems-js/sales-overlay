@@ -8,6 +8,7 @@
 // objection_synthesis_cache and invalidated by the analysis_set_hash.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { isHandled, outcomeMap } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
@@ -113,7 +114,10 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   }
 
   // 2) done analyses → analysis_set_hash (cache invalidation).
-  var done = await inChunks('call_analyses', 'fathom_call_id, analyzed_at', function(q) { return q.eq('status', 'done'); });
+  // `outcome` added 2026-08-17: an objection on a closed call counts as handled.
+  // Same select, one more column — no extra query.
+  var done = await inChunks('call_analyses', 'fathom_call_id, analyzed_at, outcome', function(q) { return q.eq('status', 'done'); });
+  var outcomeByCall = outcomeMap(done);
   var hashInput = done.map(function(d) { return d.fathom_call_id + ':' + d.analyzed_at; }).sort().join('|');
   var hash = crypto.createHash('md5').update(hashInput || 'empty').digest('hex');
 
@@ -138,8 +142,14 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     var b = byCat[r.objection_category];
     if (!b) return; // null / uncategorized — excluded
     b.count += 1;
+    // ⚠ TWO DIFFERENT QUESTIONS ON ONE ROW, and they get two different answers.
+    // The COUNT is a rate the synthesis quotes, so it follows the 2026-08-17
+    // ruling and credits objections on closed calls. The EXAMPLE is evidence of
+    // GOOD HANDLING shown to a closer — a credited-but-unhandled moment is not
+    // that, and putting it forward would hold up weak handling as the model to
+    // copy. Examples stay on the moment's own resolution.
+    if (isHandled(r, outcomeByCall[r.fathom_call_id])) b.handled += 1;
     if (r.resolution === 'handled') {
-      b.handled += 1;
       if (r.closer_response && b.examples.length < 3) {
         b.examples.push({ quote: str(r.quote, 300), closer_response: str(r.closer_response, 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds) });
       }

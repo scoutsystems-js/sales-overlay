@@ -36,7 +36,7 @@ test('personal exports + softer floors', () => {
   assert.strictEqual(nw._PERSONAL_MIN_ANALYZED, 3);
 });
 
-test('personal rate-gap when own data cannot back a money claim (no borrow)', () => {
+test('personal card: rate gap, personal voice, raw counts, no $', () => {
   var f = personalFixture();
   var r = nw._computeNeedsWork(f.objs, f.analyses, f.mapping, f.opts);
   assert.strictEqual(r.state, 'rate_gap');
@@ -44,11 +44,16 @@ test('personal rate-gap when own data cannot back a money claim (no borrow)', ()
   assert.strictEqual(r.bucket.handled, 1);
   assert.strictEqual(r.bucket.total, 4);
   assert.strictEqual(r.bucket.rate_pct, 25);
-  assert.strictEqual(r.extra.extra_cash, null); // no money without backing
+  assert.strictEqual(r.extra.extra_cash, undefined); // money fields removed 2026-08-17
   assert.match(r.card_text, /You handled/);          // personal voice
   assert.match(r.card_text, /1 of 4 times \(25%\)/);  // raw counts beside the rate (ruling 4)
   assert.ok(!/\$/.test(r.card_text));                 // no money figure
 });
+
+/* ⚠ REMOVED 2026-08-17 with the money math it tested. Archived, not deleted —
+   the team-borrow and the linkage delta were removed with the money math. The
+   delta in particular became a TAUTOLOGY under the handled-includes-closed
+   ruling: P(closed|not handled) is 0.0% by construction.
 
 test('personal MONEY via TEAM-BORROWED coefficients (own data too thin)', () => {
   var f = personalFixture();
@@ -65,6 +70,7 @@ test('personal MONEY via TEAM-BORROWED coefficients (own data too thin)', () => 
   assert.match(r.card_text, /based on your team’s typical deal size/); // plain borrow phrasing (ruling 3)
   assert.match(r.card_text, /\$\d/);
 });
+*/
 
 test('personal MIN_BUCKET=4: a bucket of exactly 4 qualifies (team floor of 6 would reject)', () => {
   var f = personalFixture(); // Think bucket is exactly 4
@@ -86,6 +92,11 @@ test('personal insufficient when no bucket reaches 4', () => {
   assert.match(r.card_text, /weak spot for you yet|Not enough of your objections/);
 });
 
+/* ⚠ REMOVED 2026-08-17 with the money math it tested. Archived, not deleted —
+   the team-borrow and the linkage delta were removed with the money math. The
+   delta in particular became a TAUTOLOGY under the handled-includes-closed
+   ruling: P(closed|not handled) is 0.0% by construction.
+
 test('computeLinkage: delta = P(closed|handled) − P(closed|not-handled)', () => {
   var analyses = [
     { fathom_call_id: 'k1', outcome: 'closed', cash_collected: 1000 },
@@ -101,6 +112,7 @@ test('computeLinkage: delta = P(closed|handled) − P(closed|not-handled)', () =
   assert.strictEqual(lk.delta, 1);
   assert.strictEqual(lk.avgCash, 1000);
 });
+*/
 
 test('team path unchanged: default opts still say "Your team" + no personal floor', () => {
   var f = personalFixture();

@@ -70,14 +70,22 @@ test('baseline uses OTHER true objections only (Trust), not context buckets', ()
   assert.strictEqual(r.bucket.baseline_pct, 83);
 });
 
-test('linkage Δ counts TRUE objections only (context objs in closed calls do not inflate it)', () => {
+test('the MATH counts TRUE objections only — context in closed calls is excluded', () => {
+  // Was "linkage Δ counts TRUE objections only". The linkage went with the money
+  // math (2026-08-17), but the property it protected did NOT: the 4 "card
+  // declined" (logistical, and sitting in CLOSED calls) plus the 3 DQs must stay
+  // out of the numbers entirely. Re-expressed through what survives, so the
+  // coverage is kept rather than dropped with the feature.
   var f = taxonomyFixture();
   var r = nw._computeNeedsWork(f.objs, f.analyses, f.mapping, f.opts);
-  var lk = r.detail.linkage;
-  // true objs = 14 (7 handled: 2 Price + 5 Trust; 7 not). The 4 "card declined"
-  // (unhandled, in closed calls) + 3 DQ are EXCLUDED from the linkage groups.
-  assert.strictEqual(lk.handled_n + lk.nothandled_n, 14);
-  assert.strictEqual(lk.handled_n, 7);
+  assert.strictEqual(r.detail.linkage, undefined, 'linkage was removed with the money math');
+  // true objs = 14 (7 handled: 2 Price + 5 Trust; 7 not).
+  assert.strictEqual(r.detail.objections, 14);
+  var totals = r.detail.buckets.reduce(function (a, b) {
+    return { total: a.total + b.total, handled: a.handled + b.handled };
+  }, { total: 0, handled: 0 });
+  assert.strictEqual(totals.total, 14, 'the 4 logistical + 3 DQ must not appear in any bucket');
+  assert.strictEqual(totals.handled, 7);
 });
 
 test('detail.buckets are the TRUE-objection buckets only (context rendered separately)', () => {

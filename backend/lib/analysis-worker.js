@@ -857,6 +857,11 @@ function sanitizeHighlights(arr, durationSeconds) {
       objCategory = (VALID_OBJECTION_CATEGORIES.indexOf(cat) !== -1) ? cat : null;
       var res = (typeof h.resolution === 'string') ? h.resolution.toLowerCase() : null;
       resolution = (VALID_RESOLUTIONS.indexOf(res) !== -1) ? res : null;
+      // ⚠ DELIBERATELY NOT the shared isHandled() predicate (ruling 2026-08-17).
+      // This asks "was this a GOOD MOMENT?", not "what is the rate?". A moment
+      // inside a closed call is not automatically a good moment, and crediting it
+      // here would file weak handling under "what worked" — the opposite of
+      // coaching. The rate surfaces credit closed calls; these five do not.
       objHandled = (resolution === null) ? null : (resolution === 'handled'); // back-compat with mig 012 column
       closerResponse = (typeof h.closer_response === 'string' && h.closer_response.trim())
         ? h.closer_response.trim().slice(0, 1500) : null;

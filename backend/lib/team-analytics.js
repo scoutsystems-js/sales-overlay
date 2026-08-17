@@ -9,6 +9,7 @@ var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 var { fetchProspectCloseRates, closeRate } = require('./prospect-entity');
 var { weakestSection, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
+var { isHandled } = require('./objection-handled');
 
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 
@@ -32,6 +33,10 @@ async function aggregateWindow(admin, repIds, from, to) {
     if (b.length < PAGE) break; start += PAGE;
   }
   var callRep = {}, callIds = [];
+  // Ruling 2026-08-17: the objection loop needs the CALL's outcome, to credit
+  // objections on calls that closed. `outcome` is already selected below, so
+  // this is a map build and not a new query.
+  var callOutcome = {};
   calls.forEach(function (c) { callRep[c.id] = c.user_id; callIds.push(c.id); });
   if (callIds.length === 0) return { rep: rep, doneCallIds: [] };
 
@@ -42,6 +47,7 @@ async function aggregateWindow(admin, repIds, from, to) {
       .in('fathom_call_id', callIds.slice(i, i + 100)).eq('status', 'done');
     if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
     (aq.data || []).forEach(function (a) {
+      callOutcome[a.fathom_call_id] = a.outcome || null;
       var r = rep[callRep[a.fathom_call_id]]; if (!r) return;
       r.calls_analyzed++;
       doneCallIds.push(a.fathom_call_id + ':' + a.analyzed_at);
@@ -70,7 +76,10 @@ async function aggregateWindow(admin, repIds, from, to) {
     if (hq.error) throw new Error('call_highlights: ' + hq.error.message);
     (hq.data || []).forEach(function (h) {
       var r = rep[callRep[h.fathom_call_id]]; if (!r) return;
-      var handled = h.resolution === 'handled';
+      // Shared predicate. This same rate is quoted IN PROSE by the WHY sentence
+      // and decides which category the rep card names as the rep's weakest, so
+      // it must never become a second local definition.
+      var handled = isHandled(h, callOutcome[h.fathom_call_id]);
       r.obj_total++; if (handled) r.obj_handled++;
       // Per-category, for the card's weakest-objection field. Uncategorised
       // objections still count in the aggregate above but cannot be attributed

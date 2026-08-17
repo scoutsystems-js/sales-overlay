@@ -1782,7 +1782,9 @@
     .nw-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .nw-chip { font-size: 12px; color: var(--text); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
     .nw-chip b { color: var(--text); }
-    .nw-chip-cash { border-color: var(--mid); } .nw-chip-cash b { color: var(--mid); }
+    /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
+       money math. Kept as a note so a stray class name in a future edit does
+       not silently render unstyled. */
     .nw-para { font-size: 15px; line-height: 1.55; color: var(--text); margin-bottom: 20px; }
     .section-subhead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); font-weight: 600; margin: 22px 0 10px; }
     .nw-focus-tag { font-size: 10px; font-weight: 600; color: var(--mid); background: rgba(230,170,60,0.12); padding: 1px 6px; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -3986,7 +3988,8 @@
     var chips = '<div class="nw-chips">'
       + '<span class="nw-chip"><b>' + b.handled + ' of ' + b.total + '</b> · ' + (b.rate_pct == null ? '—' : b.rate_pct + '%') + ' handled</span>'
       + '<span class="nw-chip">your baseline <b>' + (b.baseline_pct == null ? '—' : b.baseline_pct + '%') + '</b></span>'
-      + (d.state === 'money' && d.extra ? '<span class="nw-chip nw-chip-cash"><b>+$' + fmtCashNum(moneyRound(d.extra.extra_cash)) + '</b> at stake</span>' : '')
+      /* +$X at stake chip REMOVED 2026-08-17 — the What-Needs-Work card no
+         longer does money math, and this chip WAS its output. */
       + '</div>';
     return head + '<div class="team-recs-card" onclick="openNeedsWork()" title="See your buckets and the calls behind them">'
       + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>' + chips + nwContextLineHtml(d)
@@ -4628,7 +4631,8 @@
     var chips = '<div class="nw-chips">'
       + '<span class="nw-chip"><b>' + (b.rate_pct == null ? '—' : b.rate_pct + '%') + '</b> ' + escapeHtml(b.label || '') + ' handled</span>'
       + '<span class="nw-chip">team baseline <b>' + (b.baseline_pct == null ? '—' : b.baseline_pct + '%') + '</b></span>'
-      + (d.state === 'money' && d.extra ? '<span class="nw-chip nw-chip-cash"><b>+$' + fmtCashNum(moneyRound(d.extra.extra_cash)) + '</b> at stake</span>' : '')
+      /* +$X at stake chip REMOVED 2026-08-17 — the What-Needs-Work card no
+         longer does money math, and this chip WAS its output. */
       + '</div>';
     return head + '<div class="team-recs-card" onclick="openTeamNeedsWork()" title="See the per-bucket breakdown and the calls behind it">'
       + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>'
@@ -4691,6 +4695,17 @@
       out += '<div class="nw-context">Also this period: <b>' + parts.join('</b> and <b>') + '</b> — not counted as coachable objections.</div>';
     }
 
+    /* ⚠ "HOW THIS IS ESTIMATED" PANEL REMOVED 2026-08-17. Justin: "I don't want
+       the What Needs Work talking about cash collected or trying to do math."
+       The panel existed to disclose a counterfactual that no longer runs, and
+       every number it quoted (delta, p_closed_handled, avg_cash, closed_calls)
+       is gone from the payload — so it would have rendered `undefined`.
+
+       It also could not have survived the handled-includes-closed ruling
+       honestly: its headline statistic was the gap between P(closed|handled) and
+       P(closed|not handled), and under that ruling the second term is 0.0% BY
+       CONSTRUCTION. Archived:
+
     // honesty contract / how this is computed (subject-aware; borrow disclosed)
     var lk = det.linkage || {};
     var deltaPP = (typeof lk.delta === 'number') ? Math.round(lk.delta * 1000) / 10 : null;
@@ -4705,6 +4720,7 @@
       + (borrowed ? ' Your own bucket rate is the signal; the deal economics are borrowed from your team, a larger and steadier sample.' : '') + '</p>'
       + '<p class="nw-caveat">This is a correlation in ' + (personal ? 'your' : 'this period\'s') + ' ' + (det.analyzed_calls || 0) + ' analyzed calls, not a guarantee — figures use “≈”. We refuse a dollar figure below the sample thresholds (bucket ≥ ' + minBucket + ', clear gap' + (personal ? ', with the deal economics from a sample of ≥ 10 objections each side + ≥ 5 closed calls' : ', ≥ 10 objections each side of the link, ≥ 5 closed calls') + ').</p>'
       + '</div>';
+    */
     return out;
   }
 
@@ -5066,8 +5082,10 @@
     datePickerRerender(key);
   }
 
-  function moneyRound(x) { var v = Number(x); if (!isFinite(v)) v = 0; return Math.round(v / 100) * 100; }
-  function fmtCashNum(n) { var v = Number(n); if (!isFinite(v)) v = 0; return Math.round(v).toLocaleString('en-US'); }
+  // Dead since 2026-08-17 — their only callers were the +$X at-stake chips:
+  //   function moneyRound(x)  → rounded to the nearest 100
+  //   function fmtCashNum(n)  → thousands separators
+  // fmtCash() is NOT dead — the EOD cash field still uses it.
 
   // Open/close a glance-box detail (per-rep breakdown of one team metric).
   function openTeamDetail(metric) { state.teamDetailMetric = metric; renderTeamView(); }
@@ -7406,9 +7424,13 @@
       : '<span class="obj-surface" style="color:var(--text);">objection</span>';
     var catChip = (f.category && f.category !== 'uncategorized')
       ? '<span class="scope-pill">' + escapeHtml(f.category) + '</span>' : '';
-    var resBadge = f.resolution === 'handled' ? '<span class="badge badge-win">handled</span>'
+    // The badge reports the MOMENT's own resolution — except where the call
+    // closed, which credits it. Saying so on the row is what stops "unresolved"
+    // sitting under a rate that counted it as handled.
+    var resBadge = f.credited ? '<span class="badge badge-win" title="The call closed, so this objection is credited as handled">credited · call closed</span>'
+      : (f.resolution === 'handled' ? '<span class="badge badge-win">handled</span>'
       : (f.resolution === 'partial' ? '<span class="badge badge-fu">partial</span>'
-      : (f.resolution === 'unhandled' ? '<span class="badge badge-loss">unresolved</span>' : ''));
+      : (f.resolution === 'unhandled' ? '<span class="badge badge-loss">unresolved</span>' : '')));
     var quoteMore = (f.quote && f.quote.length > 120)
       ? ' <span class="obj-toggle" onclick="toggleObjQuote(this)">more</span>' : '';
     var respBlock = f.closer_response
@@ -7494,8 +7516,14 @@
     var d = state.objectionsIntel, m = d.metrics;
     var metricsHtml = '<div class="fade-in" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px;">'
       + objStatCard('Objections', m.total, m.calls_with_objection + ' call' + (m.calls_with_objection === 1 ? '' : 's'))
-      + objStatCard('Handle rate', m.handled_rate === null ? '—' : (m.handled_rate + '%'), (m.handled + m.partial + m.unhandled) + ' resolution-tagged')
-      + objStatCard('Handled', m.handled, m.partial + ' partial · ' + m.unhandled + ' unhandled')
+      // ⚠ THE FOUR COUNTS MUST ADD UP TO THE RATE BESIDE THEM. `credited` is
+      // objections on calls that CLOSED — handled by the ruling of 2026-08-17
+      // even where the moment itself was not. Without showing it, a manager
+      // adds up handled/partial/unhandled and gets a different rate.
+      + objStatCard('Handle rate', m.handled_rate === null ? '—' : (m.handled_rate + '%'),
+          (m.handled + (m.credited || 0) + m.partial + m.unhandled) + ' resolution-tagged')
+      + objStatCard('Handled', m.handled + (m.credited || 0),
+          (m.credited ? m.credited + ' credited (call closed) · ' : '') + m.partial + ' partial · ' + m.unhandled + ' unhandled')
       + '</div>';
 
     var cats = [['fear', 'Fear'], ['logistical', 'Logistical'], ['timing', 'Timing'], ['partner', 'Partner'], ['uncategorized', 'Uncategorized']];

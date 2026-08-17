@@ -28,9 +28,14 @@ test('exports _computeNeedsWork + guardrail constants', function () {
   assert.strictEqual(typeof nw._computeNeedsWork, 'function');
   assert.strictEqual(nw._MIN_BUCKET, 6);
   assert.strictEqual(nw._MIN_GAP_PP, 5);
-  assert.strictEqual(nw._MIN_LINK_GROUP, 10);
-  assert.strictEqual(nw._MIN_CLOSED, 5);
   assert.strictEqual(nw._MIN_ANALYZED, 10);
+  // ⚠ _MIN_LINK_GROUP / _MIN_CLOSED / _MIN_DEALS_FOR_CASH / _computeLinkage were
+  // removed with the money math (2026-08-17). Asserted ABSENT so a future edit
+  // that reintroduces the money lane trips this test rather than passing quietly.
+  assert.strictEqual(nw._MIN_LINK_GROUP, undefined);
+  assert.strictEqual(nw._MIN_CLOSED, undefined);
+  assert.strictEqual(nw._MIN_DEALS_FOR_CASH, undefined);
+  assert.strictEqual(nw._computeLinkage, undefined);
 });
 
 test('insufficient when fewer than MIN_ANALYZED analyzed calls', function () {
@@ -66,6 +71,10 @@ function moneyScenario() {
   };
 }
 
+/* ⚠ REMOVED 2026-08-17 with the money math it tested. Archived, not deleted —
+   these asserted the counterfactual that Justin removed; the feature is gone,
+   so the test goes with it rather than being loosened to keep passing.
+
 test('money state: features the weakest bucket with the largest extra cash', function () {
   var s = moneyScenario();
   var r = nw._computeNeedsWork(s.objs, s.analyses, s.mapping);
@@ -81,6 +90,11 @@ test('money state: features the weakest bucket with the largest extra cash', fun
   assert.ok(/\$\d/.test(r.card_text), 'money card_text must contain a $ figure: ' + r.card_text);
   assert.ok(r.card_text.indexOf('Think about it') !== -1);
 });
+*/
+
+/* ⚠ REMOVED 2026-08-17 with the money math it tested. Archived, not deleted —
+   these asserted the counterfactual that Justin removed; the feature is gone,
+   so the test goes with it rather than being loosened to keep passing.
 
 test('extra_cash = additional_handled × delta × avg_cash (deterministic)', function () {
   var s = moneyScenario();
@@ -90,10 +104,11 @@ test('extra_cash = additional_handled × delta × avg_cash (deterministic)', fun
   // r.extra.extra_cash is the raw (pre-rounding) product; allow tiny fp slack
   assert.ok(Math.abs(recomputed - e.extra_cash) < 1e-6, recomputed + ' vs ' + e.extra_cash);
 });
+*/
 
-test('rate_gap (no money) when the linkage groups are too small', function () {
-  // Only 8 objections total → not-handled/handled groups < MIN_LINK_GROUP,
-  // but a clear weak bucket exists and >= MIN_ANALYZED calls.
+test('rate_gap is now the ONLY state, and the card never contains a $', function () {
+  // Was "rate_gap when the linkage groups are too small". There is no longer a
+  // money state to fall back FROM, so this now pins the single surviving path.
   var analysesMap = {};
   for (var i = 1; i <= 12; i++) analysesMap['c' + i] = { outcome: i <= 5 ? 'closed' : 'follow_up', cash: i <= 5 ? 3000 : 0 };
   var spec = [];
@@ -102,8 +117,8 @@ test('rate_gap (no money) when the linkage groups are too small', function () {
   spec.push({ surface: 'too expensive', call_id: 'c2', handled: true });
   var r = nw._computeNeedsWork(objs(spec), analysesFrom(analysesMap), { 'needs to think': 'Think about it', 'too expensive': 'Price' });
   assert.strictEqual(r.state, 'rate_gap');
-  assert.strictEqual(r.extra.extra_cash, null);
-  assert.ok(!/\$/.test(r.card_text), 'rate_gap card must NOT contain a $: ' + r.card_text);
+  assert.strictEqual(r.extra.extra_cash, undefined, 'money fields are gone, not nulled');
+  assert.ok(!/\$/.test(r.card_text), 'the card must NOT contain a $: ' + r.card_text);
   assert.ok(r.card_text.indexOf('Think about it') !== -1);
 });
 
