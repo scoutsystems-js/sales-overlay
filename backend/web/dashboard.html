@@ -1783,45 +1783,60 @@
     .nw-chip { font-size: 12px; color: var(--text); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
     .nw-chip b { color: var(--text); }
     /* ── Speedometer panel (2026-08-17) ─────────────────────────────────
-       ⚠ SEMANTIC COLOURS ONLY. --good/--mid/--bad carry the meaning here; the
-       categorical rep ramp is deliberately absent from this panel. The needle is
-       a FIXED red pointer that means nothing on its own — it is the pointer on a
-       car gauge, and the BAND it points at is the message. */
+       ⚠ SEMANTIC COLOURS ONLY. --good/--mid/--bad carry the meaning; the
+       categorical rep ramp is deliberately absent. The needle is a FIXED red
+       pointer that means nothing on its own — the ZONES are the message.
+       Rebuilt from a 180° banded arc to a real instrument face: 240° sweep,
+       recessed disc, hairline rim, fine ticks, a THIN zone ring. */
     .gauge-section { padding-top: 16px; }
     .gauge-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-    .gauge-metric-select { display: flex; gap: 6px; }   /* selector on the LEFT, per the spec */
+    .gauge-metric-select { display: flex; gap: 6px; }   /* selector on the LEFT */
     .gauge-metric-btn {
       background: var(--bg-field); border: 1px solid var(--border); color: var(--text);
       padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
-      font-family: inherit; transition: border-color .15s var(--ease);
+      font-family: inherit; transition: border-color 0.15s var(--ease);
     }
     .gauge-metric-btn:hover { border-color: var(--border-hover); }
     .gauge-metric-btn.active { border-color: var(--accent); color: var(--accent); }
-    .gauge-window { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+    .gauge-window { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
     .gauge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; }
-    .gauge-card { text-align: center; padding: 6px 4px 10px; }
-    .gauge-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
-    .gauge-svg { width: 100%; max-width: 220px; height: auto; display: block; margin: 0 auto; }
-    .gauge-band { fill: none; stroke-width: 13; stroke-linecap: butt; }
-    .gauge-band-good { stroke: var(--good); }
-    .gauge-band-mid  { stroke: var(--mid); }
-    .gauge-band-bad  { stroke: var(--bad); }
-    .gauge-tick { stroke: var(--text); stroke-width: 1; opacity: .45; }
-    .gauge-tick-major { stroke-width: 2; opacity: .8; }
-    .gauge-tick-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: .85; }
-    .gauge-target { stroke: var(--text); stroke-width: 2; }
-    .gauge-target-label { fill: var(--text); font-size: 8px; font-weight: 700; text-anchor: middle; text-transform: uppercase; letter-spacing: .05em; }
-    /* ⚠ ALWAYS RED. Never bound to the band. */
-    .gauge-needle { stroke: #ef4444; stroke-width: 3.5; stroke-linecap: round; }
-    .gauge-hub { fill: #ef4444; }
-    .gauge-value { font-size: 24px; font-weight: 700; line-height: 1.1; margin-top: 2px; }
+    .gauge-card { text-align: center; padding: 4px 4px 10px; }
+    .gauge-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+    .gauge-dial { position: relative; }
+    .gauge-svg { width: 100%; max-width: 210px; height: auto; display: block; margin: 0 auto; }
+
+    /* The face: recessed disc + hairline rim. Without these the dial is just an
+       arc floating on the card, which is what read as cartoony. */
+    .gauge-rim { fill: none; stroke: var(--border-strong); stroke-width: 1; }
+
+    /* ⚠ THIN outer ring — 5px, not the old 13px slab. It informs; it must not
+       dominate the face or compete with the needle. */
+    .gauge-zone { fill: none; stroke-width: 5; stroke-linecap: butt; }
+    .gauge-zone-good { stroke: var(--good); }
+    .gauge-zone-mid  { stroke: var(--mid); }
+    .gauge-zone-bad  { stroke: var(--bad); }
+
+    .gauge-tick { stroke: var(--text); stroke-width: 1; opacity: 0.35; }
+    .gauge-tick-major { stroke-width: 1.8; opacity: 0.75; }
+    .gauge-tick-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: 0.8; }
+    .gauge-target { stroke: var(--text); stroke-width: 2.5; }
+
+    /* ⚠ ALWAYS RED, never bound to the zone it points at. */
+    .gauge-needle { fill: #ef4444; }
+    .gauge-hub { fill: #16181c; }
+    .gauge-hub-ring { fill: none; stroke: #ef4444; stroke-width: 2; }
+
+    /* The readout sits INSIDE the dial, in the gap the 240° sweep leaves open. */
+    .gauge-readout { position: absolute; left: 0; right: 0; bottom: 4px; pointer-events: none; }
+    .gauge-value { font-size: 22px; font-weight: 700; line-height: 1.05; }
     .gauge-value-good { color: var(--good); }
     .gauge-value-mid  { color: var(--mid); }
     .gauge-value-bad  { color: var(--bad); }
-    .gauge-counts { font-size: 12px; }   /* raw counts under every dial (house rule) */
-    .gauge-card-empty { display: flex; flex-direction: column; justify-content: center; min-height: 150px; }
+    .gauge-target-cap { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.75; }
+    .gauge-counts { font-size: 12px; margin-top: 2px; }   /* raw counts (house rule) */
+    .gauge-card-empty { display: flex; flex-direction: column; justify-content: center; min-height: 170px; }
     .gauge-empty { font-size: 12px; font-weight: 600; }
-    .gauge-empty span { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; opacity: .85; }
+    .gauge-empty span { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; opacity: 0.85; }
     .team-controls-row { margin-bottom: 28px; justify-content: flex-end; }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
@@ -5185,6 +5200,9 @@
   var GAUGE_CLOSING_TARGET_PCT   = 25;
   var GAUGE_CLOSING_SCALE_MAX    = 50;
   var GAUGE_MID_BAND_FRACTION    = 0.6;
+  var GAUGE_SWEEP_DEG            = 240;   // a real dial, not a half circle
+  var GAUGE_TICK_STEP_PCT        = 2.5;   // fine and frequent
+  var GAUGE_MAJOR_EVERY_PCT      = 20;    // labelled majors
   var GAUGE_MIN_OBJECTIONS       = 6;    // = MIN_CATEGORY_OBJECTIONS
   var GAUGE_MIN_PROSPECTS        = 6;
 
@@ -5197,9 +5215,9 @@
   function gaugeAngle(value, scale) {
     var v = (typeof value === 'number' && isFinite(value)) ? value : 0;
     var s = (scale > 0) ? scale : 100;
-    return -90 + Math.max(0, Math.min(1, v / s)) * 180;
+    return -(GAUGE_SWEEP_DEG / 2) + Math.max(0, Math.min(1, v / s)) * GAUGE_SWEEP_DEG;
   }
-  // Polar → cartesian on the dial's arc. 0° is straight up.
+  // Polar → cartesian on the dial. 0° is straight up.
   function gaugePoint(cx, cy, r, deg) {
     var a = (deg - 90) * Math.PI / 180;
     return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -5208,52 +5226,88 @@
     var p0 = gaugePoint(cx, cy, r, fromDeg), p1 = gaugePoint(cx, cy, r, toDeg);
     var large = (toDeg - fromDeg) > 180 ? 1 : 0;
     return 'M ' + p0.x.toFixed(1) + ' ' + p0.y.toFixed(1)
-      + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p1.x.toFixed(1) + ' ' + p1.y.toFixed(1);
+      + ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 ' + large + ' 1 ' + p1.x.toFixed(1) + ' ' + p1.y.toFixed(1);
   }
 
   // ⚠ THE NEEDLE IS A FIXED RED POINTER AND CARRIES NO MEANING (Justin) — it is
-  // the pointer on a car gauge. The BANDED FILL carries the meaning. Colouring
-  // the needle by the band would state the same thing twice and make a red needle
-  // on a green dial read as an error.
+  // the pointer on a car gauge. The BANDS carry the meaning. Colouring the needle
+  // by the band would say it twice and make a red needle on a green dial read as
+  // a fault.
+  //
+  // ⚠ REBUILT 2026-08-17 as an INSTRUMENT rather than a chart: 240° sweep, a
+  // recessed face with a radial gradient and a hairline rim, fine ticks every
+  // 2.5% with labelled majors INSIDE the ring, colour zones as a THIN OUTER ring
+  // that informs rather than shouts, and a slim tapered needle on a small hub.
+  // The previous version was a thick 180° band with a fat line and a big dot —
+  // Justin: "too cartoony".
+  var _gaugeUid = 0;
   function gaugeSvg(rate, target, scale) {
-    var W = 200, H = 118, cx = 100, cy = 104, r = 78;
+    var W = 200, H = 150, cx = 100, cy = 92;
+    var rFace = 74;          // the recessed disc
+    var rZone = 70;          // thin colour ring, just inside the rim
+    var rTick = 60;          // outer end of the ticks
+    var rLabel = 44;         // numbers INSIDE the tick ring
+    var uid = 'g' + (++_gaugeUid);
+    var a0 = -(GAUGE_SWEEP_DEG / 2), a1 = GAUGE_SWEEP_DEG / 2;
+
+    var defs = '<defs>'
+      + '<radialGradient id="' + uid + 'f" cx="50%" cy="38%" r="72%">'
+        + '<stop offset="0%" stop-color="#22252b"/><stop offset="62%" stop-color="#15171b"/>'
+        + '<stop offset="100%" stop-color="#0c0d10"/></radialGradient>'
+      + '</defs>';
+    var face = '<circle class="gauge-face" cx="' + cx + '" cy="' + cy + '" r="' + rFace + '" fill="url(#' + uid + 'f)"/>'
+      + '<circle class="gauge-rim" cx="' + cx + '" cy="' + cy + '" r="' + rFace + '"/>';
+
+    // Colour zones — a THIN outer ring. Informs, does not shout.
     var midStart = target * GAUGE_MID_BAND_FRACTION;
-    var bands = [
+    var zones = [
       { from: 0, to: midStart, cls: 'bad' },
       { from: midStart, to: target, cls: 'mid' },
       { from: target, to: scale, cls: 'good' },
-    ].filter(function (b) { return b.to > b.from; });
-    var arcs = bands.map(function (b) {
-      return '<path class="gauge-band gauge-band-' + b.cls + '" d="'
-        + gaugeArc(cx, cy, r, gaugeAngle(b.from, scale), gaugeAngle(b.to, scale)) + '"/>';
+    ].filter(function (b) { return b.to > b.from; }).map(function (b) {
+      return '<path class="gauge-zone gauge-zone-' + b.cls + '" d="'
+        + gaugeArc(cx, cy, rZone, gaugeAngle(b.from, scale), gaugeAngle(b.to, scale)) + '"/>';
     }).join('');
+
+    // Fine ticks every 2.5%, labelled majors every 20%, numbers inside the ring.
+    var n = Math.round(100 / GAUGE_TICK_STEP_PCT), majorEvery = Math.round(GAUGE_MAJOR_EVERY_PCT / GAUGE_TICK_STEP_PCT);
     var tickEls = [];
-    for (var i = 0; i <= 10; i++) {
-      var value = (scale * i) / 10, major = (i % 2 === 0), ang = gaugeAngle(value, scale);
-      var outer = gaugePoint(cx, cy, r - 13, ang), inner = gaugePoint(cx, cy, r - (major ? 24 : 19), ang);
-      tickEls.push('<line class="gauge-tick' + (major ? ' gauge-tick-major' : '') + '" x1="' + outer.x.toFixed(1)
-        + '" y1="' + outer.y.toFixed(1) + '" x2="' + inner.x.toFixed(1) + '" y2="' + inner.y.toFixed(1) + '"/>');
+    for (var i = 0; i <= n; i++) {
+      var value = (scale * i) / n, major = (i % majorEvery === 0), ang = gaugeAngle(value, scale);
+      var o = gaugePoint(cx, cy, rTick, ang), inr = gaugePoint(cx, cy, rTick - (major ? 12 : 5), ang);
+      tickEls.push('<line class="gauge-tick' + (major ? ' gauge-tick-major' : '') + '" x1="' + o.x.toFixed(1)
+        + '" y1="' + o.y.toFixed(1) + '" x2="' + inr.x.toFixed(1) + '" y2="' + inr.y.toFixed(1) + '"/>');
       if (major) {
-        var lp = gaugePoint(cx, cy, r - 36, ang);
-        tickEls.push('<text class="gauge-tick-label" x="' + lp.x.toFixed(1) + '" y="' + (lp.y + 3).toFixed(1) + '">'
+        var lp = gaugePoint(cx, cy, rLabel, ang);
+        tickEls.push('<text class="gauge-tick-label" x="' + lp.x.toFixed(1) + '" y="' + (lp.y + 3.2).toFixed(1) + '">'
           + Math.round(value) + '</text>');
       }
     }
-    // The target, marked ON the arc.
+
+    // The target, marked ON the arc (unchanged rule) — now a fine wedge across
+    // the zone ring rather than a bar sticking out of it.
     var tA = gaugeAngle(target, scale);
-    var t0 = gaugePoint(cx, cy, r + 9, tA), t1 = gaugePoint(cx, cy, r - 13, tA);
-    var tl = gaugePoint(cx, cy, r + 19, tA);
+    var t0 = gaugePoint(cx, cy, rZone + 5, tA), t1 = gaugePoint(cx, cy, rZone - 7, tA);
     var targetMark = '<line class="gauge-target" x1="' + t0.x.toFixed(1) + '" y1="' + t0.y.toFixed(1)
-      + '" x2="' + t1.x.toFixed(1) + '" y2="' + t1.y.toFixed(1) + '"/>'
-      + '<text class="gauge-target-label" x="' + tl.x.toFixed(1) + '" y="' + tl.y.toFixed(1) + '">target ' + target + '%</text>';
+      + '" x2="' + t1.x.toFixed(1) + '" y2="' + t1.y.toFixed(1) + '"/>';
+
     var needle = '';
     if (typeof rate === 'number') {
-      var n = gaugePoint(cx, cy, r - 16, gaugeAngle(rate, scale));
-      needle = '<line class="gauge-needle" x1="' + cx + '" y1="' + cy + '" x2="' + n.x.toFixed(1) + '" y2="' + n.y.toFixed(1) + '"/>'
-        + '<circle class="gauge-hub" cx="' + cx + '" cy="' + cy + '" r="6"/>';
+      // Slim TAPERED polygon: wide at the hub, a point at the tip, with a short
+      // counterweight behind — a pointer, not a line.
+      var ang2 = gaugeAngle(rate, scale);
+      var tip = gaugePoint(cx, cy, rTick - 2, ang2);
+      var lft = gaugePoint(cx, cy, 5, ang2 - 90);
+      var rgt = gaugePoint(cx, cy, 5, ang2 + 90);
+      var tail = gaugePoint(cx, cy, 13, ang2 + 180);
+      needle = '<polygon class="gauge-needle" points="'
+        + tip.x.toFixed(1) + ',' + tip.y.toFixed(1) + ' ' + lft.x.toFixed(1) + ',' + lft.y.toFixed(1) + ' '
+        + tail.x.toFixed(1) + ',' + tail.y.toFixed(1) + ' ' + rgt.x.toFixed(1) + ',' + rgt.y.toFixed(1) + '"/>'
+        + '<circle class="gauge-hub" cx="' + cx + '" cy="' + cy + '" r="7"/>'
+        + '<circle class="gauge-hub-ring" cx="' + cx + '" cy="' + cy + '" r="7"/>';
     }
     return '<svg class="gauge-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-hidden="true">'
-      + arcs + tickEls.join('') + targetMark + needle + '</svg>';
+      + defs + face + zones + tickEls.join('') + targetMark + needle + '</svg>';
   }
 
   function gaugeCardHtml(rep, metric) {
@@ -5273,8 +5327,12 @@
     var band = gaugeBand(d.rate, m.target);
     return '<div class="gauge-card">'
       + '<div class="gauge-name">' + name + '</div>'
-      + gaugeSvg(d.rate, m.target, m.scale)
-      + '<div class="gauge-value gauge-value-' + band + '">' + d.rate + '%</div>'
+      + '<div class="gauge-dial">' + gaugeSvg(d.rate, m.target, m.scale)
+        + '<div class="gauge-readout">'
+          + '<div class="gauge-value gauge-value-' + band + '">' + d.rate + '%</div>'
+          + '<div class="gauge-target-cap">target ' + m.target + '%</div>'
+        + '</div>'
+      + '</div>'
       + '<div class="gauge-counts">' + d.numerator + ' of ' + d.total + ' ' + m.unit + '</div>'
       + '</div>';
   }

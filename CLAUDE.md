@@ -991,6 +991,16 @@ delete from prospects     where display_name  like 'Seed %';
 - **JOSH WAS NOT TOUCHED — inserts only, scoped to the three demo user_ids.** Counts before and after: **calls 360 → 360, analyses 360 → 360, prospects 201 → 201.**
 - **⚠ A DRAFT OF THE SCRIPT INVENTED THE REP UUIDs** from the 8-character prefixes visible in earlier query output. The script now fetches the real ids and **verifies every target id exists before writing a row**. Any future data script targeting users must do the same — a plausible-looking UUID is not a UUID.
 
+### ⚠ A MIRROR TEST MUST PIN GEOMETRY, NOT JUST THRESHOLDS (2026-08-17)
+**Where a value is duplicated between a module and an inline render, the pinned set has to cover everything that decides WHAT IS DRAWN — not only the numbers that look like business rules.**
+- **The live case:** the speedometer face was rebuilt from a 180° sweep to 240°, with ticks every 2.5% instead of 10%. Those live in BOTH `lib/rep-gauges.js` and the inline copy in `dashboard.html`. The mirror test pinned the targets and thresholds but not the geometry — so a **240° module against a 180° render** would have placed the needle at an angle where the colour zones mean something different, **with no error, no failed test, and a confident wrong picture.** `SWEEP_DEG`, `TICK_STEP_PCT` and `MAJOR_EVERY_PCT` are now pinned alongside the targets.
+- **The general form: if changing a constant changes the OUTPUT, the mirror pins it.** "It's only styling" is not an exemption — the needle angle is styling and it is also the entire claim the dial makes.
+
+### ⚠ WHEN A METRIC DEPENDS ON A ROW'S CONTEXT, SEEDING IT MEANS CONTROLLING THE CONTEXT (2026-08-17)
+- Under the handled-includes-closed ruling, an objection on a **closed** call counts as handled regardless of its own `resolution`. **The same row, moved to a different call, changes the rate — while the row itself looks identical.**
+- A seed built to demonstrate the red/yellow/green **bands** therefore places its objections only on **non-closed** calls, so `handled == resolution` exactly and the intended band is the band that renders. Placed carelessly it would have demonstrated the wrong band and looked entirely correct doing it.
+- Recorded in `backend/scripts/seed-demo-recent-2026-08-17.js`.
+
 ### ⚠ A "NOT YET LOADED" SENTINEL MUST BE THE VALUE THE LOADER ACTUALLY TESTS FOR (2026-08-17)
 **`undefined` and `null` are both falsy and both mean "nothing here" to a reader. They are NOT interchangeable to a `=== null` guard, and the failure is silent.**
 - **The live case:** the gauge panel's lazy kick is `if (state.teamGauges === null && !state.teamGaugesLoading) loadTeam('repGauges')`. The key was never declared in the state initialiser, so it was `undefined`, the condition was never true, **the lane never fetched, and the panel rendered a skeleton forever.** No error, no failed request, no console warning — just a spinner that never resolves, which reads as "slow" rather than "broken".

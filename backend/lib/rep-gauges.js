@@ -46,6 +46,16 @@ const MIN_PROSPECTS = MIN_CATEGORY_OBJECTIONS;
 // Fraction of target at which yellow begins.
 const MID_BAND_FRACTION = 0.6;
 
+// ⚠ 240°, NOT 180° (Justin, 2026-08-17: the 180° version "looks too cartoony").
+// A real instrument sweeps from lower-left to lower-right, which is why the ends
+// sit BELOW the horizontal — the extra 60° is what makes it read as a dial
+// rather than as a progress bar bent into a semicircle.
+const SWEEP_DEG = 240;
+// Ticks every 2.5% of scale (41 of them) with a labelled major every 20% —
+// fine and frequent, the way an instrument face is.
+const TICK_STEP_PCT = 2.5;
+const MAJOR_EVERY_PCT = 20;
+
 const METRICS = {
   objections: { key: 'objections', label: 'Objection handling', target: OBJECTION_TARGET_PCT, scale: OBJECTION_SCALE_MAX, axis: 'Handle rate' },
   closing: { key: 'closing', label: 'Closing rate', target: CLOSING_TARGET_PCT, scale: CLOSING_SCALE_MAX, axis: 'Closing rate' },
@@ -60,26 +70,28 @@ function band(rate, target) {
   return 'bad';
 }
 
-// -90° at zero, +90° at full scale. CLAMPED: an over-scale value parks at the
-// end stop rather than sweeping past it, which would read as a lower number.
+// Zero at -SWEEP/2, full scale at +SWEEP/2 — so a 240° dial runs -120°..+120°.
+// CLAMPED: an over-scale value parks at the end stop rather than sweeping past
+// it, which would read as a LOWER number than it is.
 function needleAngle(value, scale) {
   var v = (typeof value === 'number' && isFinite(value)) ? value : 0;
   var s = (scale > 0) ? scale : 100;
   var f = Math.max(0, Math.min(1, v / s));
-  return -90 + f * 180;
+  return -(SWEEP_DEG / 2) + f * SWEEP_DEG;
 }
 
-// Every 10% OF SCALE, so both dials carry eleven ticks and read the same way.
-// The 0–50 dial's labels therefore run 0/10/20/30/40/50 — honest about its own
-// scale rather than borrowing the 0–100 dial's numbers.
+// Every TICK_STEP_PCT of scale — 41 fine ticks — with a labelled major every
+// MAJOR_EVERY_PCT. Both dials carry the same tick count so they read alike; the
+// 0–50 dial's labels run 0/10/20/30/40/50, honest about its own scale rather
+// than borrowing the 0–100 dial's numbers.
 function ticks(scale) {
   var s = (scale > 0) ? scale : 100;
+  var n = Math.round(100 / TICK_STEP_PCT);
+  var majorEvery = Math.round(MAJOR_EVERY_PCT / TICK_STEP_PCT);
   var out = [];
-  for (var i = 0; i <= 10; i++) {
-    var value = (s * i) / 10;
-    // Majors every other tick. Quarter points (25/75) do not fall on tenths,
-    // so labelling those would put labels where there is no tick.
-    out.push({ value: value, major: (i % 2 === 0), angle: needleAngle(value, s) });
+  for (var i = 0; i <= n; i++) {
+    var value = (s * i) / n;
+    out.push({ value: value, major: (i % majorEvery === 0), angle: needleAngle(value, s) });
   }
   return out;
 }
@@ -138,6 +150,9 @@ module.exports = {
   MIN_OBJECTIONS: MIN_OBJECTIONS,
   MIN_PROSPECTS: MIN_PROSPECTS,
   MID_BAND_FRACTION: MID_BAND_FRACTION,
+  SWEEP_DEG: SWEEP_DEG,
+  TICK_STEP_PCT: TICK_STEP_PCT,
+  MAJOR_EVERY_PCT: MAJOR_EVERY_PCT,
   METRICS: METRICS,
   band: band,
   needleAngle: needleAngle,

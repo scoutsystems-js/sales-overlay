@@ -32,6 +32,11 @@ test('every ruled number matches the module — one target, not two', () => {
   assert.strictEqual(inlineConst('GAUGE_MID_BAND_FRACTION'), G.MID_BAND_FRACTION);
   assert.strictEqual(inlineConst('GAUGE_MIN_OBJECTIONS'), G.MIN_OBJECTIONS);
   assert.strictEqual(inlineConst('GAUGE_MIN_PROSPECTS'), G.MIN_PROSPECTS);
+  // Geometry is part of the contract too: a 240° module and a 180° render
+  // would put the needle somewhere the zones do not mean what it points at.
+  assert.strictEqual(inlineConst('GAUGE_SWEEP_DEG'), G.SWEEP_DEG);
+  assert.strictEqual(inlineConst('GAUGE_TICK_STEP_PCT'), G.TICK_STEP_PCT);
+  assert.strictEqual(inlineConst('GAUGE_MAJOR_EVERY_PCT'), G.MAJOR_EVERY_PCT);
 });
 
 test('the inline band + totals agree with the module on real shapes', () => {

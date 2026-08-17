@@ -123,24 +123,33 @@ test('malformed input yields an empty list rather than throwing', () => {
 });
 
 // ── gauge geometry ────────────────────────────────────────────────────────
-test('the needle angle maps 0→scale across a half turn, and CLAMPS', () => {
-  assert.strictEqual(G.needleAngle(0, 100), -90);
-  assert.strictEqual(G.needleAngle(50, 100), 0);
-  assert.strictEqual(G.needleAngle(100, 100), 90);
+test('the needle sweeps 240°, symmetric about vertical, and CLAMPS', () => {
+  // ⚠ 240°, not 180° — the ends sit BELOW the horizontal, which is what makes it
+  // read as an instrument rather than a bent progress bar (Justin, 2026-08-17).
+  assert.strictEqual(G.SWEEP_DEG, 240);
+  assert.strictEqual(G.needleAngle(0, 100), -120);
+  assert.strictEqual(G.needleAngle(50, 100), 0, 'mid-scale points straight up');
+  assert.strictEqual(G.needleAngle(100, 100), 120);
   assert.strictEqual(G.needleAngle(25, 50), 0, 'the closing dial is 0–50');
-  assert.strictEqual(G.needleAngle(120, 100), 90, 'over-scale clamps rather than spinning past');
-  assert.strictEqual(G.needleAngle(-5, 100), -90);
+  assert.strictEqual(G.needleAngle(120, 100), 120, 'over-scale parks at the end stop');
+  assert.strictEqual(G.needleAngle(-5, 100), -120);
 });
 
-test('ticks every 10% of scale, with labelled majors', () => {
+test('ticks every 2.5% of scale, labelled majors every 20%', () => {
+  assert.strictEqual(G.TICK_STEP_PCT, 2.5);
+  assert.strictEqual(G.MAJOR_EVERY_PCT, 20);
   const t = G.ticks(100);
-  assert.strictEqual(t.length, 11, '0..100 inclusive');
-  // Majors are every OTHER tick, not every quarter: quarter points do not land
-  // on tenths, and a label with no tick under it is worse than fewer labels.
+  assert.strictEqual(t.length, 41, 'fine and frequent — 41 ticks, not 11');
   assert.deepStrictEqual(t.filter((x) => x.major).map((x) => x.value), [0, 20, 40, 60, 80, 100]);
   const c = G.ticks(50);
-  assert.strictEqual(c.length, 11, 'the 0–50 dial keeps ELEVEN ticks — every 10% OF SCALE');
+  assert.strictEqual(c.length, 41, 'both dials carry the same tick count so they read alike');
+  // The 0–50 dial labels its OWN scale rather than borrowing 0–100's numbers.
   assert.deepStrictEqual(c.filter((x) => x.major).map((x) => x.value), [0, 10, 20, 30, 40, 50]);
+  // Every major lands on a real tick — a label with no tick under it is worse
+  // than fewer labels.
+  t.filter((x) => x.major).forEach(function (m) {
+    assert.ok(t.some((x) => x.value === m.value), 'major ' + m.value + ' must be a tick');
+  });
 });
 
 // ── the independence that is the panel's whole point ──────────────────────
