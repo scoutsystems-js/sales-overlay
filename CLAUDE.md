@@ -1013,6 +1013,15 @@ delete from prospects     where display_name  like 'Seed %';
 - **THE RULE is the existing one with the scope widened: after changing what a shared carrier CONTAINS, re-derive every other consumer's assumption — and a shared render function is a carrier.** The earlier instances were `state.dateRange` changing meaning and the URL hash gaining a range; the mechanism is identical.
 - **Caught by rendering all four pages and asserting the control is present on each**, which is the layout equivalent of grepping the other readers.
 
+### ⚠⚠ A SHARED WORD IS A SHARED CARRIER — TWO MODULES NAMED "rank", MEANING OPPOSITE DIRECTIONS (2026-08-17)
+**Both functions were correct. Both were called `rankSections`. They ranked the OTHER WAY ROUND, and nothing errored.**
+- `lib/section-breakdown.js rankSections` → **1 = STRONGEST** (it drove the section drilldown's *"ranked N of 5 sections"*).
+- `lib/section-ranking.js rankSections` → **1 = WEAKEST**, worst first, because that is the coaching frame for "what needs work".
+- **The consequence: the needs-work card would have read "1 of 5" and the drilldown it opens "5 of 5" — for the SAME section, both labelled "rank".** No exception, no failing test, no log line. A user would reasonably conclude one of the two screens was broken.
+- **THE RULE: when two modules both name a concept, check they mean the same DIRECTION before either is trusted.** The existing shared-carrier rule covers a value changing meaning and a layout container being split; this is the same mechanism where the carrier is **a word**. A name collision reads as harmless duplication right up until both names are rendered on screen at once.
+- **⚠ THE DURABLE HALF OF THE FIX IS NOT THE DEDUPLICATION — IT IS THE LABEL.** The drilldown now renders **"Weakest of 5"** / **"3rd weakest of 5"** / **"Strongest of 5"** instead of a bare `ranked 3 of 5 sections`. **A bare rank number is ambiguous in both directions and always was**, long before a second function existed; collapsing to one definition fixes today's contradiction, but naming the end is what stops the next one being possible.
+- Same discipline as the two `resolution === 'handled'` questions and the two "handled" meanings: **the fix is to make the intent explicit at the point of display, not merely to have fewer implementations.**
+
 ### ⚠ A GUARD MUST SPLIT THE SAME WAY THE RULE SPLITS — BY QUESTION, NOT BY FILE (2026-08-17)
 **When a rule divides call sites by the QUESTION they ask, a per-file guard is the wrong shape and will be wrong for a real file.**
 - **The live case:** "handled" is read by fifteen places. TEN ask *"what is the rate?"* (credit objections on closed calls); FIVE ask *"was this a good moment?"* (must not). The obvious guard is a list of files. **`lib/team-synthesis.js` is in BOTH lists** — it computes an objection rate for its prompt *and* picks highlight-of-the-week candidates. `lib/objection-synthesis.js` and `lib/session-analytics.js` are the same shape.

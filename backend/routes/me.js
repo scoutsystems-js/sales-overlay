@@ -6,7 +6,14 @@ const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
 const { generateCandidates } = require('../lib/prospect-merge');
-const { buildSectionBreakdown, sectionScoreOf, rankSections, SECTIONS } = require('../lib/section-breakdown');
+const { buildSectionBreakdown, sectionScoreOf, SECTIONS } = require('../lib/section-breakdown');
+// ⚠ TWO FUNCTIONS CALLED rankSections EXISTED, MEANING OPPOSITE THINGS:
+// section-breakdown's ranked 1 = STRONGEST; section-ranking's ranks 1 = WEAKEST
+// (worst first, which is the coaching frame). The card and the drilldown it
+// opens would have shown "1 of 5" and "5 of 5" for the SAME section, both
+// labelled "rank". One definition now, and the copy says which end it means.
+const SR = require('../lib/section-ranking');
+const { computeWhyFacts } = require('../lib/why-prose');
 const { quoteHash } = require('../lib/kb-entry');
 const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
@@ -1026,7 +1033,13 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
     var vals = (an.data || []).map(function (a) { return sectionScoreOf(a, sec); }).filter(function (v) { return typeof v === 'number'; });
     averages[sec] = vals.length ? Math.round(vals.reduce(function (x, y) { return x + y; }, 0) / vals.length) : null;
   });
-  out.rank = rankSections(averages)[section];
+  // Worst-first, matching the needs-work card that links here. `rank_label` is
+  // rendered instead of a bare number because "ranked 3 of 5" never said which
+  // end was good.
+  var ranked = SR.rankSections(SR.sectionStatsFromAnalyses(an.data || []));
+  var mine = ranked.filter(function (x) { return x.section === section; })[0] || {};
+  out.rank = mine.rank || null;
+  out.rank_label = mine.rank ? SR.rankLabel(mine.rank, ranked.filter(function (x) { return x.enough; }).length) : null;
   out.section_count = SECTIONS.length;
 
   // Prior-window delta, reusing the team view's window machinery so the trend
@@ -1061,6 +1074,95 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
 
 
 // GET /me/sections/:section?from=&to= — the caller's own section drilldown.
+/**
+ * 12b — "which part of the sales process needs work", for the REP PAGE.
+ *
+ * Five section cards, worst first. Reuses buildSectionBreakdown per section
+ * rather than introducing a second moment-selection rule — the evidence a card
+ * shows must be the same evidence the drilldown shows when you click it.
+ *
+ * ⚠ THE WHY LINE ONLY EXISTS WHERE A COUNTED CAUSE DOES. Today that is discovery
+ * alone, via what_mattered. Justin's ruling: never manufacture a thinner reason
+ * to fill the slot. Card 1 being richer than cards 2-5 is BY DESIGN.
+ */
+async function computeNeedsWorkSections(admin, userId, from, to) {
+  var calls = await admin.from('fathom_calls')
+    .select('id, title, call_date, recording_url').eq('user_id', userId)
+    .gte('call_date', from).lte('call_date', to);
+  if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
+  var callIds = (calls.data || []).map(function (c) { return c.id; });
+  if (!callIds.length) return { sections: SR.rankSections({}), why: null };
+
+  var cols = 'fathom_call_id, prospect_name, what_mattered, intro_score, discovery_score, pitch_score, '
+    + 'objection_score, close_score_earned, intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes';
+  var analyses = [], highlights = [];
+  for (var i = 0; i < callIds.length; i += 100) {
+    var slice = callIds.slice(i, i + 100);
+    var an = await admin.from('call_analyses').select(cols).in('fathom_call_id', slice).eq('status', 'done');
+    if (an.error) throw new Error('call_analyses: ' + an.error.message);
+    analyses = analyses.concat(an.data || []);
+    var hl = await admin.from('call_highlights')
+      .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified')
+      .in('fathom_call_id', slice).not('section', 'is', null);
+    if (hl.error) throw new Error('call_highlights: ' + hl.error.message);
+    highlights = highlights.concat(hl.data || []);
+  }
+
+  var nameBy = {};
+  analyses.forEach(function (a) { if (a.prospect_name) nameBy[a.fathom_call_id] = a.prospect_name; });
+  var meta = {};
+  (calls.data || []).forEach(function (c) {
+    meta[c.id] = { prospect_name: nameBy[c.id] || null, recording_url: c.recording_url || null, call_date: c.call_date || null };
+  });
+
+  var ranked = SR.rankSections(SR.sectionStatsFromAnalyses(analyses));
+  var rankedCount = ranked.filter(function (x) { return x.enough; }).length;
+
+  ranked.forEach(function (entry) {
+    entry.rank_label = entry.rank ? SR.rankLabel(entry.rank, rankedCount) : null;
+    entry.moments = [];
+    if (!entry.enough) return;
+    var secHl = highlights.filter(function (h) { return h && h.section === entry.section; });
+    var bd = buildSectionBreakdown(entry.section, { analyses: analyses, highlights: secHl, callMeta: meta });
+    // "What to fix" moments — the card is about what needs work. Newest first,
+    // capped at three, and only rows carrying an actual quote.
+    entry.moments = (bd.bad || []).filter(function (m) { return m && m.quote; }).slice(0, 3)
+      .map(function (m) {
+        return { quote: m.quote, observation: m.observation || null, call_id: m.fathom_call_id,
+          call_date: m.call_date || null, prospect_name: m.prospect_name || null,
+          clip_url: m.clip_url || null, speaker_verified: m.speaker_verified === true };
+      });
+  });
+
+  // ⚠ The WHY line is COUNTED, never inferred — the same rule as the manager
+  // card. computeWhyFacts returns tier 2 only when one area dominates with
+  // volume; on every other section it returns nothing and the line disappears.
+  var wm = analyses.map(function (a) { return a.what_mattered; }).filter(Boolean);
+  var discovery = ranked.filter(function (x) { return x.section === 'discovery'; })[0];
+  var why = null;
+  if (discovery && discovery.enough) {
+    var facts = computeWhyFacts({ display_name: '', weakest_section: { section: 'discovery', score: discovery.score } }, wm);
+    if (facts && facts.tier === 2 && facts.cause) {
+      why = { section: 'discovery', area: facts.cause.area, count: facts.cause.count,
+              denominator: facts.cause.denominator, share: facts.cause.share };
+    }
+  }
+  return { from: from, to: to, sections: ranked, why: why };
+}
+
+router.get('/needs-work-sections', requireAuth, async function (req, res) {
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  try {
+    return res.json(await computeNeedsWorkSections(getAdminClient(), req.user.id, from, to));
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] needs-work sections error:', err.message);
+    return res.status(500).json({ error: 'Could not load the section ranking' });
+  }
+});
+
 router.get('/sections/:section', requireAuth, async function (req, res) {
   var section = req.params.section;
   if (SECTIONS.indexOf(section) === -1) return res.status(400).json({ error: 'unknown section' });
@@ -1081,4 +1183,5 @@ module.exports = router;
 // pure helpers exported for tests (log.js:_validateLogBatch pattern)
 module.exports._validateNameField = validateNameField;
 module.exports._computeSectionBreakdown = computeSectionBreakdown;
+module.exports._computeNeedsWorkSections = computeNeedsWorkSections;
 module.exports._buildAccountPayload = buildAccountPayload;

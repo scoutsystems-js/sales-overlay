@@ -133,23 +133,26 @@ test('renderTeamView ACTUALLY EMITS the graph section — the regression that sh
     'the closing-rate canvas is absent from the rendered markup');
 });
 
-test('the graphs are the FIRST thing on the team view, above What Needs Work', () => {
+test('the graphs are the FIRST thing on the team view, above the needs-work card', () => {
   // The glance stat card was removed 2026-08-16 (Justin, twice), so the graphs
   // now sit directly under the header — which is what "the first thing he wants
   // to see" asked for in the first place.
   const out = renderTeam(BASE);
   const header = out.html.indexOf('page-header');
   const graphs = out.html.indexOf('repHandleChart');
-  const needsWork = out.html.indexOf('What Needs Work');
+  // Anchor renamed 2026-08-17: the team objection card is now titled
+  // "Objection Handling Focus". The ordering property is unchanged — this is
+  // the anchor moving, not the claim.
+  const needsWork = out.html.indexOf('Objection Handling Focus');
   const overview = out.html.indexOf('Team Overview');
 
   assert.notStrictEqual(graphs, -1, 'graph canvas missing');
-  assert.notStrictEqual(needsWork, -1, 'What Needs Work heading missing — anchor is stale');
+  assert.notStrictEqual(needsWork, -1, 'needs-work heading missing — anchor is stale');
   assert.notStrictEqual(overview, -1, 'Team Overview heading missing — anchor is stale');
   assert.notStrictEqual(header, -1, 'page header missing — anchor is stale');
 
   assert.ok(header < graphs, 'graphs come after the header');
-  assert.ok(graphs < needsWork, 'graphs must come BEFORE What Needs Work');
+  assert.ok(graphs < needsWork, 'graphs must come BEFORE the needs-work card');
   assert.ok(graphs < overview, 'graphs must come BEFORE Team Overview');
   assert.strictEqual(out.html.indexOf('team-glance'), -1, 'the glance card must be gone');
 });
@@ -379,11 +382,11 @@ test('10d loads LAZILY and is cleared when the team or range changes', () => {
   assert.ok(/state\.teamWhy = null/.test(reset), 'stale sentences must not survive a range change');
 });
 
-test('the cards sit between the graphs and What Needs Work', () => {
+test('the cards sit between the graphs and the needs-work card', () => {
   const out = renderCards(REPS);
   const graphs = out.html.indexOf('repHandleChart');
   const cards = out.html.indexOf('rep-card-list');
-  const needs = out.html.indexOf('What Needs Work');
+  const needs = out.html.indexOf('Objection Handling Focus');
   [graphs, cards, needs].forEach((i) => assert.notStrictEqual(i, -1));
   assert.ok(graphs < cards && cards < needs, 'graphs → cards → needs work');
 });

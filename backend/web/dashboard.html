@@ -1782,6 +1782,32 @@
     .nw-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .nw-chip { font-size: 12px; color: var(--text); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
     .nw-chip b { color: var(--text); }
+    /* ── 12b: the rolling section card (rep page) ──────────────────────
+       Semantic colours only; no grey — depth comes from size and weight. */
+    .srk-card { position: relative; cursor: pointer; }
+    .srk-nav { position: absolute; top: 0; right: 0; display: flex; align-items: center; gap: 8px; }
+    .srk-arrow {
+      background: var(--bg-field); border: 1px solid var(--border); color: var(--text);
+      width: 26px; height: 26px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1;
+      font-family: inherit; transition: border-color 0.15s var(--ease);
+    }
+    .srk-arrow:hover { border-color: var(--accent); color: var(--accent); }
+    .srk-count { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+    .srk-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; }
+    .srk-score { font-size: 40px; font-weight: 700; line-height: 1.05; margin-top: 2px; }
+    .srk-of { font-size: 15px; font-weight: 600; opacity: 0.75; }
+    .srk-standing { font-size: 13px; margin-top: 2px; }
+    .srk-level { font-weight: 600; color: var(--mid); }   /* level = a real verdict, not a gap */
+    .srk-n { font-size: 12px; margin-top: 2px; }
+    .srk-why { font-size: 13px; margin-top: 12px; padding: 10px 12px;
+      background: var(--accent-quiet); border-radius: var(--radius-sm); }
+    .srk-moments { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .srk-moment { border-left: 2px solid var(--border-strong); padding-left: 10px; }
+    .srk-quote { font-size: 13px; line-height: 1.5; }
+    .srk-who { font-size: 11px; font-weight: 600; margin-top: 2px; }
+    .srk-thin { font-size: 13px; font-weight: 600; margin-top: 10px; }
+    .srk-thin span { display: block; font-size: 12px; font-weight: 400; margin-top: 3px; }
+
     /* ── Speedometer panel (2026-08-17) ─────────────────────────────────
        ⚠ SEMANTIC COLOURS ONLY. --good/--mid/--bad carry the meaning; the
        categorical rep ramp is deliberately absent. The needle is a FIXED red
@@ -2554,6 +2580,9 @@
     // `=== null`, so an undeclared key means the lane never loads and the
     // panel renders a skeleton forever — no error, just a permanent spinner.
     teamGauges: null, teamGaugesLoading: false, teamGaugeMetric: 'objections',
+    // 12b — the rolling section card. ⚠ null, not undefined: the lazy kick
+    // tests === null (see the sentinel rule).
+    sectionRank: null, sectionRankLoading: false, sectionRankIndex: 0,
     eodData:        null,   eodLoading: false,   eodDate: null,   // EOD Report view
     account:        null,   accountLoading: false,   // Account view (#account)
     // Fathom integration (Scout v2.0 Phase 1)
@@ -3952,6 +3981,7 @@
       + connectSections
       + tiles
       + repOwnGraphHtml()
+      + '<div class="section fade-in">' + sectionRankCardHtml() + '</div>'
       + '<div class="section fade-in">' + needsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Coach Summary</h2>'
         + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
@@ -3964,6 +3994,7 @@
 
     // Personal What-needs-work loads once (cheap: cache hit = no Claude).
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
+    if (state.sectionRank === null && !state.sectionRankLoading) loadSectionRank();
     // 10e is lazy and only for a manager viewing someone else's report.
     if (repOwnGraphVisible() && state.repGraph === null && !state.repGraphLoading) loadRepGraph();
     // NOTE: Performance's LLM call fires on the #performance page open, not here.
@@ -4031,9 +4062,106 @@
     var win = (d && d.window_days) || 90;
     return win < 60 ? ' Widen the date range for a fuller picture.' : '';
   }
+
+  // ── 12b: WHAT PART OF THE SALES PROCESS NEEDS WORK ────────────────────────
+  // Rolling 1 of 5, worst first. REP PAGE ONLY — the team view keeps its
+  // objection-bucket needs-work, which answers a different question and was not
+  // replaced.
+  async function loadSectionRank() {
+    if (state.sectionRankLoading) return;
+    state.sectionRankLoading = true;
+    try {
+      var qs = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+      var res = await fetch('/me/needs-work-sections?' + qs, { headers: authHeader() });
+      state.sectionRank = res.ok ? await res.json() : { _error: 'HTTP ' + res.status };
+    } catch (e) { state.sectionRank = { _error: (e && e.message) || 'unknown' }; }
+    state.sectionRankLoading = false;
+    if (state.view === 'overview') renderOverview(false);
+  }
+  function cycleSectionRank(delta) {
+    var n = (state.sectionRank && state.sectionRank.sections) ? state.sectionRank.sections.length : 0;
+    if (!n) return;
+    state.sectionRankIndex = ((state.sectionRankIndex + delta) % n + n) % n;   // wraps both ways
+    renderOverview(false);
+  }
+  function sectionRankMomentHtml(m) {
+    var when = m.call_date ? dayLabel(String(m.call_date).slice(0, 10)) : null;
+    // Prospect AND date together — a quote with neither cannot be checked by the
+    // person reading it, which is the whole point of showing evidence.
+    var who = [m.prospect_name, when].filter(Boolean).join(' · ');
+    return '<div class="srk-moment">'
+      + '<div class="srk-quote">“' + escapeHtml(m.quote) + '”</div>'
+      + (who ? '<div class="srk-who">' + escapeHtml(who) + '</div>' : '')
+      + '</div>';
+  }
+  function sectionRankCardHtml() {
+    var d = state.sectionRank;
+    var head = '<div class="section-header"><h2>What Needs Work</h2>'
+      + '<div class="meta">Across the Whole Sales Process</div></div>';
+    if (d === null) return head + '<div class="skeleton" style="height:120px;"></div>';
+    if (d._error) return head + '<div class="error">Could not load the section ranking: ' + escapeHtml(d._error) + '</div>';
+    var list = d.sections || [];
+    if (!list.length) return head + '<div class="empty"><p>No graded calls in this range yet.</p></div>';
+
+    var i = Math.min(state.sectionRankIndex, list.length - 1);
+    var s = list[i];
+    var nav = '<div class="srk-nav">'
+      + '<button class="srk-arrow" type="button" onclick="event.stopPropagation();cycleSectionRank(-1)" aria-label="Previous Section">←</button>'
+      + '<span class="srk-count">' + (i + 1) + ' of ' + list.length + '</span>'
+      + '<button class="srk-arrow" type="button" onclick="event.stopPropagation();cycleSectionRank(1)" aria-label="Next Section">→</button>'
+      + '</div>';
+
+    // ⚠ TOO THIN TO RANK is its own state — never a score presented as a verdict.
+    if (!s.enough) {
+      return head + '<div class="srk-card">' + nav
+        + '<div class="srk-title">' + escapeHtml(s.label) + '</div>'
+        + '<div class="srk-thin">Not enough to judge<span>' + escapeHtml(s.reason || '') + '</span></div>'
+        + '</div>';
+    }
+
+    // ⚠ WHERE TWO SECTIONS ARE LEVEL, SAY SO INSTEAD OF RANKING THEM. On Josh's
+    // real data intro and close differ by 0.0 points; a confident ordering there
+    // would flip on the next call analysed.
+    var standing = s.levelWithNext
+      ? '<span class="srk-level">Level with ' + escapeHtml(s.nextLabel) + ' at ' + s.score + '</span>'
+      : (s.gapToNext === null
+          ? '<span class="srk-gap">' + escapeHtml(s.rank_label || '') + '</span>'
+          : '<span class="srk-gap">' + escapeHtml(s.rank_label || '') + ' · '
+            + s.gapToNext + ' points below ' + escapeHtml(s.nextLabel) + '</span>');
+
+    // ⚠ THE WHY LINE APPEARS ONLY WHERE A COUNTED CAUSE EXISTS — discovery only,
+    // today, via what_mattered. On the other four it DISAPPEARS rather than being
+    // filled with a thinner reason. Card 1 richer than cards 2-5 is BY DESIGN.
+    var why = '';
+    if (d.why && d.why.section === s.section) {
+      why = '<div class="srk-why">On <b>' + d.why.count + ' of ' + d.why.denominator
+        + '</b> calls the ground left uncovered was <b>' + escapeHtml(d.why.area) + '</b>.</div>';
+    }
+
+    var moments = (s.moments || []).length
+      ? '<div class="srk-moments">' + s.moments.map(sectionRankMomentHtml).join('') + '</div>'
+      : '';
+
+    return head + '<div class="srk-card" onclick="goSection(\'' + s.section + '\')" title="Open the full breakdown for this section">'
+      + nav
+      + '<div class="srk-title">' + escapeHtml(s.label) + '</div>'
+      + '<div class="srk-score">' + s.score + '<span class="srk-of">/100</span></div>'
+      + '<div class="srk-standing">' + standing + '</div>'
+      + '<div class="srk-n">' + s.n + ' graded call' + (s.n === 1 ? '' : 's') + '</div>'
+      + why + moments
+      + '<div class="team-recs-expand">click to expand →</div>'
+      + '</div>';
+  }
+
+  // ⚠ TITLED "Objection Handling Focus", NOT "What Needs Work" (ruling
+  // 2026-08-17). The section card above it owns that heading now. Both cards
+  // stay: this one breaks objections down BY TYPE, which the section card does
+  // not, so it is not redundant — two identical headings was the whole problem.
+  // The team view's copy carries the same title for the same reason, even though
+  // nothing competes with it there.
   function needsWorkCardHtml() {
     var d = state.needsWork;
-    var head = '<div class="section-header"><h2>What Needs Work</h2><div class="meta">'
+    var head = '<div class="section-header"><h2>Objection Handling Focus</h2><div class="meta">'
       + escapeHtml(needsWorkWindowLabel()) + '</div></div>';
     if (!d) return head + '<div class="skeleton" style="height:70px;"></div>';
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
@@ -4071,7 +4199,7 @@
     var content = document.getElementById('content');
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
     content.innerHTML = renderHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Objection Handling Focus</h2>'
         + '<div class="meta">your objection-handling focus · ' + escapeHtml(needsWorkWindowLabel()) + '</div></div>'
         + '<button class="date-preset" onclick="backToOverview()">← Back</button></div>'
         + needsWorkDetailBodyHtml(state.needsWork) + '</div>';
@@ -4713,7 +4841,7 @@
   function teamNeedsWorkCardHtml() {
     var d = state.teamNeedsWork;
     if (!d) return '<div class="skeleton" style="height:70px;"></div>';
-    var head = '<div class="section-header"><h2>What Needs Work</h2></div>';
+    var head = '<div class="section-header"><h2>Objection Handling Focus</h2></div>';
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     // insufficient → deterministic message, not clickable (no detail worth opening).
@@ -4742,7 +4870,7 @@
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
     content.innerHTML = teamHeaderHtml() + teamControlsHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>What Needs Work</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Objection Handling Focus</h2>'
         + '<div class="meta">objection-handling focus for this period</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamNeedsWorkDetailHtml() + '</div>';

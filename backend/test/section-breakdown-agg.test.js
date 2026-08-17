@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  sectionScoreOf, buildHistogram, rankSections, buildSectionBreakdown, HISTOGRAM_BUCKETS,
+  sectionScoreOf, buildHistogram, buildSectionBreakdown, HISTOGRAM_BUCKETS,
 } = require('../lib/section-breakdown');
 
 // ── The close-score trap (ruling 1) ──────────────────────────────────────
@@ -51,18 +51,38 @@ test('histogram is total on junk', () => {
 });
 
 // ── Rank among the five ──────────────────────────────────────────────────
-test('rank orders sections by average, 1 = strongest', () => {
-  const r = rankSections({ intro: 63, discovery: 55, pitch: 66, objection: 62, close: 60 });
-  assert.strictEqual(r.pitch, 1);
-  assert.strictEqual(r.discovery, 5);
+// ⚠ section-breakdown.rankSections was REMOVED 2026-08-17: it ranked
+// 1 = STRONGEST while the needs-work card ranks worst first, so one section
+// showed "1 of 5" on the card and "5 of 5" on the drilldown it opens.
+//
+// The first test above tested the removed DIRECTION and went with it. The second
+// tested a property that SURVIVES — an unscored section must not be ranked last
+// — so it is converted rather than deleted, against the module that now owns it.
+const SR = require('../lib/section-ranking');
+
+test('⚠ the ranking is WORST FIRST now — the opposite of what this file used to hold', () => {
+  const r = SR.rankSections({
+    intro: { mean: 63, n: 40, sd: 10 }, discovery: { mean: 55, n: 40, sd: 10 },
+    pitch: { mean: 66, n: 40, sd: 10 }, objection: { mean: 62, n: 40, sd: 10 },
+    close: { mean: 60, n: 40, sd: 10 },
+  });
+  assert.strictEqual(r[0].section, 'discovery', 'rank 1 is the WEAKEST');
+  assert.strictEqual(r[0].rank, 1);
+  assert.strictEqual(r[4].section, 'pitch', 'the strongest is last');
+  assert.strictEqual(SR.rankLabel(1, 5), 'Weakest of 5', 'and the copy says which end it means');
 });
 
-test('sections with no score are unranked rather than ranked last', () => {
+test('a section with no score is UNRANKED rather than ranked last', () => {
   // Ranking a null as "worst" would tell a closer their intro is their weakest
-  // section when they simply have no intro data.
-  const r = rankSections({ intro: null, discovery: 55, pitch: 66 });
-  assert.strictEqual(r.intro, null);
-  assert.strictEqual(r.pitch, 1);
+  // section when they simply have no intro data. Same claim, new owner.
+  const r = SR.rankSections({
+    intro: { mean: null, n: 0, sd: null }, discovery: { mean: 55, n: 40, sd: 10 },
+    pitch: { mean: 66, n: 40, sd: 10 },
+  });
+  const intro = r.find((x) => x.section === 'intro');
+  assert.strictEqual(intro.rank, null);
+  assert.strictEqual(intro.enough, false);
+  assert.strictEqual(r[0].section, 'discovery', 'the unscored section does not lead');
 });
 
 // ── The assembled breakdown ──────────────────────────────────────────────

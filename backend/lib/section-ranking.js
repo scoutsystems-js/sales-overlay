@@ -174,8 +174,22 @@ function rankSections(sections) {
   return ranked.concat(unranked);
 }
 
+/**
+ * Human copy for a position, worst-first. "ranked 3 of 5" never told anyone which
+ * end was good — a number alone is ambiguous in both directions, and the old
+ * drilldown rendered exactly that while meaning the OPPOSITE of this module.
+ */
+function rankLabel(rank, total) {
+  if (!rank || !total) return null;
+  if (rank === 1) return 'Weakest of ' + total;
+  if (rank === total) return 'Strongest of ' + total;
+  var ord = rank === 2 ? '2nd' : (rank === 3 ? '3rd' : rank + 'th');
+  return ord + ' weakest of ' + total;
+}
+
 module.exports = {
   SECTION_ORDER: SECTION_ORDER,
+  rankLabel: rankLabel,
   LABELS: LABELS,
   COLUMN: COLUMN,
   MIN_CALLS_TO_RANK: MIN_CALLS_TO_RANK,

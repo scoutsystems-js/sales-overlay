@@ -61,6 +61,16 @@ function buildHistogram(scores) {
   return out;
 }
 
+/* ⚠ ARCHIVED 2026-08-17 — REPLACED BY lib/section-ranking.js, WHICH RANKS THE
+   OTHER WAY ROUND. This ranked 1 = STRONGEST; the needs-work card ranks worst
+   first, so the same section showed "1 of 5" on the card and "5 of 5" on the
+   drilldown the card opens, both labelled "rank". Two functions with the SAME
+   NAME and opposite meanings is worse than two different numbers — nothing
+   errors and the reader assumes one of the screens is broken.
+
+   The replacement also renders a LABEL ("Weakest of 5") rather than a bare
+   number, because "ranked 3 of 5" never said which end was good.
+
 // Rank sections by average, 1 = strongest. A section with NO score is left
 // UNRANKED (null) rather than ranked last — telling a closer their intro is
 // their weakest section when they simply have no intro data would be a lie.
@@ -73,6 +83,8 @@ function rankSections(averages) {
   scored.forEach(function (k, i) { out[k] = i + 1; });
   return out;
 }
+
+*/
 
 function num(v) { return (typeof v === 'number') ? v : null; }
 
@@ -307,6 +319,6 @@ module.exports = {
   HISTOGRAM_BUCKETS: HISTOGRAM_BUCKETS,
   sectionScoreOf: sectionScoreOf,
   buildHistogram: buildHistogram,
-  rankSections: rankSections,
+  // rankSections removed 2026-08-17 — see the archived block above.
   buildSectionBreakdown: buildSectionBreakdown,
 };
