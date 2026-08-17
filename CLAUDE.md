@@ -1012,6 +1012,17 @@ assert.ok(fn.length > 200 && fn.length < 4000, 'slice must cover the function: '
 - **Four occurrences so far**, all found by accident rather than by the tests failing usefully: the `drillCalls` slice (`setCallsRange` defined earlier), the `sortRepsWorstFirst` mirror guard (`repCardsHtml` defined earlier), the `renderSectionView` slice (`var delta` occurs earlier), and one caught in review. **Prefer markers that are unique to the function**, and when the end marker is a common token, `fromIndex` is not optional.
 - Same family as the other rules here: **the thing you are testing may not be the thing that runs.**
 
+### ⚠ WHEN A SHARED CARRIER CHANGES MEANING, THE RISK IS IN ITS *OTHER* READERS (2 instances, 2026-08-16)
+**A "carrier" is anything several places read: a URL/hash, a cache key, a state field, a request payload, a DB column.** When a change alters **what the carrier holds or what it means**, the code that breaks is **not in the file being edited** — it is in every other reader that still assumes the old meaning. Nothing fails; each reader keeps doing exactly what it always did.
+
+**THE RULE: after changing what a carrier holds, grep every OTHER reader of that carrier and re-derive its assumption. The edited file is the one place you can be confident about.**
+
+**Instance 1 — `state.dateRange` changed meaning.** Stage 2 moved Team onto `state.teamRange`, so `state.dateRange` silently stopped meaning "everyone's range" and started meaning "coaching's range". `openBucketEvidence` was not touched and kept windowing **TEAM** bucket evidence by **coaching's** range. It agreed by accident while they shared a field and would have diverged the moment the two ranges differed — with nothing on screen saying so. Caught only because the split forced a re-read.
+
+**Instance 2 — the URL hash gained a range.** Stage 3 put `from`/`to` in the hash. `init()` was not touched, and its `setDateRange(30, true)` kept overwriting whatever `applyHashToState()` had just restored — destroying every picked coaching range on every boot, data included.
+
+**What makes this class expensive:** both were invisible. No exception, no failed test, no log line — the carrier still parsed, the readers still ran, and the output was merely *wrong*. **The edit that causes it and the code that breaks are in different files, so review of the diff cannot find it.**
+
 ### 👁 OBSERVATION, NOT YET A RULE — "STALE LOAD-BEARING COMMENT" (1 instance, 2026-08-16)
 **Logged so a SECOND instance can be recognised as a second instance.** One occurrence is not a pattern and this must not be treated as one — but the shape is specific enough to name now.
 
@@ -1029,7 +1040,7 @@ Correct for months: the hash carried a **view** and no range, so seeding a 30-da
 
 **Why it evades the existing rules.** It is not a dead call site, not a stale marker, not a wrong shape — the code *ran*, and did exactly what it said. **The defect was the assumption, and the assumption lived in prose.**
 
-**IF A SECOND INSTANCE APPEARS**, the candidate rule is: *when a change alters what a shared carrier holds (a URL, a cache key, a state field, a payload), grep for the OTHER readers of that carrier — the risk is not in the file being edited.* **Do not promote this to a rule off one case.** Record instance 2 here first.
+**⚠ THE COMMENT SHAPE AND THE CARRIER RULE ARE DIFFERENT ABSTRACTIONS OVER THE SAME EVENT, AND THEY ARE AT DIFFERENT INSTANCE COUNTS.** The carrier is the MECHANISM; the stale comment is one SYMPTOM of how that mechanism evades review. Counting them together would have hidden that the mechanism already has two instances. **Stale-load-bearing-comment: 1 instance. Shared-carrier: 2 — see the rule directly below, which is promoted on that basis.**
 
 ### ⚠ VERIFY AGAINST THE REAL ENTRY POINT AND THE REAL DATA SHAPE (2026-08-16)
 **A test that drives the wrong function, or feeds an invented fixture shape, passes or fails for reasons unrelated to the code under test.** Both faults appeared in one block (10e) and both would have reported success while exercising nothing:
