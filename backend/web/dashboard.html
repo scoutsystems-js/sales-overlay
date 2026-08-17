@@ -33,7 +33,20 @@
       --border-focus: #3b3b3b;
       --text:         #ededed;
 
-      --accent:       #5b9eff;
+      /* (e) 2026-08-17 — Justin: accents are green/yellow/red only.
+         THREE JOBS, kept separate on purpose:
+           SEMANTIC     --good / --mid / --bad — good, warning, bad. Unchanged.
+           INTERACTIVE  --accent — links, focus rings, buttons, the picker's
+                        range edges. Was #5b9eff blue; now green. Changing this
+                        ONE value moves all ~65 sites, so nothing is edited
+                        individually and new UI inherits it.
+           CATEGORICAL  REP_LINE_COLORS — one hue per rep on a chart. Cannot be
+                        three colours: seven reps need seven distinguishable
+                        lines, and red/amber already MEAN bad/warning, so a rep
+                        drawn in red would read as failing. Green leads instead.
+         --accent-quiet is the old blue's tint role (soft fills), re-tinted. */
+      --accent:       #4ade80;
+      --accent-quiet: rgba(74, 222, 128, 0.18);
       --good:         #4ade80;
       --mid:          #fbbf24;
       --bad:          #f87171;
@@ -1275,7 +1288,7 @@
     .dp-day:hover { background: #eef0f3; }
     .dp-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     .dp-out { opacity: .45; }
-    .dp-in { background: rgba(90,150,255,.20); border-radius: 0; }
+    .dp-in { background: var(--accent-quiet); border-radius: 0; }
     .dp-edge { background: var(--accent); color: #0b0b0b; font-weight: 700; }   /* accent inherited — see (e) */
     .dp-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px;
                border-top: 1px solid var(--dp-line); padding-top: 8px; }
@@ -1953,7 +1966,7 @@
     .kb-promote-btn.is-team {
       color: var(--accent);
       border-color: var(--accent);
-      background: rgba(91,158,255,0.10); /* --accent #5b9eff at 10% */
+      background: var(--accent-quiet);   /* inherits --accent; was a hard-coded blue tint */
     }
     .kb-promote-btn.is-team:hover { color: var(--text); border-color: var(--border-strong); background: none; }
     .kb-promote-btn:disabled { opacity: 0.5; cursor: wait; }
@@ -3567,8 +3580,11 @@
   // Chart drawing — Chart.js with custom dark theme + thin ring
   // ──────────────────────────────────────────────────────────────────
   var COLORS = {
-    win: '#4ade80', loss: '#f87171', follow_up: '#fbbf24', unmarked: '#64748b', live: '#5b9eff',
-    money: '#5b9eff', think: '#fbbf24', spouse: '#c084fc', time: '#fb923c',
+    // win/loss/follow_up stay SEMANTIC (green/red/amber). The rest are
+    // CATEGORICAL — one hue per objection type — and must not reuse --accent's
+    // green, or a category would read as "interactive".
+    win: '#4ade80', loss: '#f87171', follow_up: '#fbbf24', unmarked: '#64748b', live: '#22d3ee',
+    money: '#22d3ee', think: '#fbbf24', spouse: '#c084fc', time: '#fb923c',
     guarantee: '#22d3ee', 'tried-before': '#a78bfa', 'send-info': '#34d399',
     'more-research': '#f472b6', 'not-right-time': '#fb7185', 'proof-it-works': '#94a3b8',
     other: '#64748b',
@@ -4192,7 +4208,19 @@
   // legend entry implying a line that just happens to be off-screen.
   //
   // NO GREY TEXT: axes, ticks, legend and tooltips all use full-strength text.
-  var REP_LINE_COLORS = ['#60a5fa', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#22d3ee', '#fb7185'];
+  var REP_LINE_COLORS = [
+    // ⚠ GREEN LEADS so the first line on every chart is green, per the ruling.
+    // Amber and rose are DROPPED: --mid and --bad already mean warning and bad
+    // everywhere else, and a rep rendered in those reads as failing rather than
+    // as "rep number four". The rest are hues with no semantic load here.
+    '#4ade80',  // green   — matches --accent, so rep 1 ties to the interactive colour
+    '#22d3ee',  // cyan
+    '#a78bfa',  // violet
+    '#f472b6',  // pink
+    '#2dd4bf',  // teal
+    '#c4b5fd',  // light violet
+    '#67e8f9',  // light cyan
+  ];
   var repCharts = {};
 
   // Ruling 2026-08-15: the selector uses Scout's EXISTING labelling — the four
