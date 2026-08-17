@@ -50,7 +50,7 @@
       --accent:       #4ade80;
       /* ⚠ THE SAME GREEN, AS CHANNELS. Every soft tint on this page is an
          rgba() of the accent at some alpha, and rgba() cannot read a hex
-         token — so before this existed, all 23 tints were hard-coded
+         token — so before this existed, all 22 tints were hard-coded
          copies of the old blue and did NOT move when --accent did. Keep
          this in step with --accent above; accent-palette.test.js fails if
          they drift. */
@@ -83,10 +83,17 @@
 
     * { box-sizing: border-box; }
 
+    /* ⚠ THE PAGE BACKGROUND LIVES ON <html>, NOT <body>, AND THAT IS LOAD-BEARING.
+       html's background propagates to the viewport canvas, so this looks
+       identical — but a background set on BODY paints on the body box, and a
+       z-index:-1 child (the (f) motif layer) paints BEHIND its own parent's
+       background. With `html, body { background }` the motifs rendered NOTHING,
+       at any opacity, including 1. Restoring a background here hides them again
+       with no error and no visual clue other than their absence. */
+    html { background: var(--bg); }
     html, body {
       margin: 0;
       padding: 0;
-      background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
       font-size: 14px;
@@ -94,6 +101,44 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
+
+    /* (f) 2026-08-17 — BACKGROUND MOTIFS, one view first (coaching overview).
+       Justin: "transparent background graphics", direction 2 — abstract
+       data-shape motifs. Two shapes drawn from this product's own vocabulary: a
+       plotted series with its nodes, and concentric arcs (the donut). Inline
+       SVG as data URIs — no asset, no request, no dependency.
+
+       ⚠ THE FAILURE MODE IS COMPETING WITH THE CHARTS, and the layout removes
+       it rather than balancing against it. Every .section is an OPAQUE card
+       (--bg-elevated) and .page is a 1200px column, so this layer can only ever
+       show through the gutters and the gaps between cards. It is structurally
+       incapable of sitting behind a chart, a number or a line of text — not
+       "faint enough to get away with", but never in that position at all.
+
+       ⚠ z-index MUST be negative, not 0. A fixed layer at z-index:0 paints in
+       the positioned layer, i.e. ABOVE static in-flow text. -1 puts it under
+       the content and above the root background, which is the one slot that
+       works. (Same stacking-context family as the date-picker bug.)
+
+       Scoped to ONE view via body[data-view] until judged. */
+    body[data-view="overview"]::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.035;
+      background-repeat: no-repeat, no-repeat;
+      background-position: right -70px top 150px, left -180px bottom -130px;
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='560' height='340' viewBox='0 0 560 340' fill='none' stroke='%23ededed' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 268 L100 206 L190 232 L280 128 L370 164 L460 56 L550 96'/%3E%3Ccircle cx='100' cy='206' r='8'/%3E%3Ccircle cx='190' cy='232' r='8'/%3E%3Ccircle cx='280' cy='128' r='8'/%3E%3Ccircle cx='370' cy='164' r='8'/%3E%3Ccircle cx='460' cy='56' r='8'/%3E%3Cpath d='M10 316 L550 316' stroke-dasharray='2 12'/%3E%3C/svg%3E"),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520' viewBox='0 0 520 520' fill='none' stroke='%23ededed' stroke-width='16' stroke-linecap='round'%3E%3Cpath d='M260 44 A216 216 0 0 1 476 260'/%3E%3Cpath d='M260 116 A144 144 0 0 0 116 260'/%3E%3Cpath d='M260 188 A72 72 0 0 1 332 260'/%3E%3C/svg%3E");
+    }
+    /* Below this width the column eats the gutters, so the layer would paint
+       entirely behind opaque cards. Don't render what cannot be seen. */
+    @media (max-width: 1320px) { body[data-view="overview"]::before { display: none; } }
+    /* A decorative layer must not survive a contrast preference. */
+    @media (prefers-contrast: more) { body[data-view="overview"]::before { display: none; } }
 
     a { color: inherit; text-decoration: none; }
     button { font-family: inherit; cursor: pointer; }
@@ -3474,6 +3519,10 @@
   // Top-level render — switches on state.view
   // ──────────────────────────────────────────────────────────────────
   function render() {
+    // (f) The single hook the background motifs key on. render() is the ONE
+    // dispatch point for every view, so this cannot fall out of step with what
+    // is on screen — which is why it lives here and not in each renderer.
+    document.body.dataset.view = state.view;
     if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'call-library') renderCallLibrary();
     else if (state.view === 'call-review') renderCallReview();

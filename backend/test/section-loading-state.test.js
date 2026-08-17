@@ -33,7 +33,7 @@ function sandbox(fetchImpl) {
     getElementById: (id) => (id === 'content' ? contentEl : null),
     querySelector: () => null, querySelectorAll: () => [], addEventListener() {},
     createElement: () => ({ style: {}, classList: { add() {}, remove() {} }, appendChild() {} }),
-    body: { appendChild() {}, classList: { add() {}, remove() {} } }, documentElement: { style: {} },
+    body: { appendChild() {}, classList: { add() {}, remove() {} }, dataset: {} }, documentElement: { style: {} },
   };
   const win = {
     location: { hash: '', search: '', pathname: '/dashboard', replace() {} },

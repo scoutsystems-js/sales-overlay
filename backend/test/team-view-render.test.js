@@ -78,7 +78,7 @@ function renderTeam(overrides) {
     querySelectorAll: () => [],
     addEventListener() {},
     createElement: () => ({ style: {}, classList: { add() {}, remove() {} }, appendChild() {} }),
-    body: { appendChild() {}, classList: { add() {}, remove() {} } },
+    body: { appendChild() {}, classList: { add() {}, remove() {} }, dataset: {} },
     documentElement: { style: {} },
   };
 
