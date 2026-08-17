@@ -4806,10 +4806,26 @@
     if (DP_OUTSIDE_BOUND || typeof document.addEventListener !== 'function') return;
     DP_OUTSIDE_BOUND = true;
     document.addEventListener('mousedown', function (e) {
+      // ⚠ NODE IDENTITY IS NOT TRUSTWORTHY MID-GESTURE. `contains()` on a target
+      // that was detached by a re-render returns false, which this handler used
+      // to read as "outside" — closing the picker on the user's second click and
+      // discarding their half-made selection. The hover fix removes the churn;
+      // this makes the check safe even if some future change reintroduces it.
+      var t = e.target;
+      if (t && t.isConnected === false) return;   // detached ≠ outside
       Object.keys(PICKER_UI).forEach(function (k) {
         if (!PICKER_UI[k].open) return;
         var host = document.getElementById('dp-' + k);
-        if (host && e.target && host.contains && host.contains(e.target)) return;  // click inside
+        if (!host) return;
+        if (t && host.contains && host.contains(t)) return;          // inside, by node
+        // Geometry as the authority: it does not care what happened to the node.
+        var panel = host.querySelector('.dp-panel');
+        if (panel && typeof panel.getBoundingClientRect === 'function'
+            && typeof e.clientX === 'number') {
+          var r = panel.getBoundingClientRect();
+          if (e.clientX >= r.left && e.clientX <= r.right
+              && e.clientY >= r.top && e.clientY <= r.bottom) return;  // inside, by point
+        }
         datePickerClose(k);
       });
     }, true);
@@ -4835,16 +4851,61 @@
     ui.month = m; ui.year = y;
     datePickerRerender(key);
   }
+  // ⚠⚠ HOVER MUST NOT REBUILD THE CONTROL. This used to call
+  // datePickerRerender, which does `host.outerHTML = …` — destroying and
+  // recreating every node on EVERY mouseenter. Moving the mouse from the start
+  // date to the end date therefore replaced the node under the cursor, and the
+  // following mousedown was dispatched against a node the re-render had just
+  // detached. The outside-click handler asked `host.contains(target)`, got false
+  // for a detached node, concluded "outside", and closed the picker — wiping the
+  // half-made selection. The user's second click never reached datePickerPick,
+  // so nothing committed and the URL never changed.
+  //
+  // A control that rebuilds its own DOM mid-gesture makes every assumption about
+  // node identity unsafe. The preview now toggles CLASSES on the cells that are
+  // already there; no node is replaced while the mouse is down or moving.
   function datePickerHover(key, day) {
     var ui = pickerUi(key);
     if (!ui.pending) return;                // only matters mid-selection
+    if (ui.hover === day) return;           // nothing changed — do no work at all
     ui.hover = day;
-    datePickerRerender(key);
+    paintRangePreview(key);
+  }
+
+  // Repaints the edge/in-range classes on the EXISTING cells. Reuses
+  // monthGridCells so the preview logic has exactly one definition — a
+  // hand-rolled copy here would be free to drift from the initial render.
+  function paintRangePreview(key) {
+    var ui = pickerUi(key);
+    var host = document.getElementById('dp-' + key);
+    if (!host || typeof host.querySelectorAll !== 'function') return;   // not mounted
+    if (ui.year == null || ui.month == null) return;
+    var r = pickerRange(key);
+    var rows = monthGridCells(ui.year, ui.month, r ? ymd(r.from) : null, r ? ymd(r.to) : null, ui.pending, ui.hover);
+    var byDay = {};
+    rows.forEach(function (row) { row.forEach(function (c) { byDay[c.day] = c; }); });
+    var cells = host.querySelectorAll('.dp-day');
+    for (var i = 0; i < cells.length; i++) {
+      var c = byDay[cells[i].getAttribute('data-day')];
+      if (!c) continue;
+      var edge = c.isStart || c.isEnd;
+      cells[i].classList.toggle('dp-edge', !!edge);
+      cells[i].classList.toggle('dp-in', !edge && !!c.inRange);
+    }
   }
   function datePickerPick(key, day) {
     var ui = pickerUi(key), inst = DATE_PICKERS[key];
     var res = resolvePick(ui.pending, day);
     ui.pending = res.pending; ui.hover = null; ui.focus = day;
+    // ⚠ The FIRST click keeps the existing DOM too — only the hint line and the
+    // highlight change. Replacing the panel here is what put a freshly-detached
+    // node under the cursor for the very next mousedown.
+    if (!res.range) {
+      paintRangePreview(key);
+      var hint = document.querySelector('#dp-' + key + ' .dp-hint');
+      if (hint) hint.textContent = 'Now pick the end date';
+      return;
+    }
     if (res.range) {
       ui.open = false;
       var iso = rangeToIso(res.range.start, res.range.end);
