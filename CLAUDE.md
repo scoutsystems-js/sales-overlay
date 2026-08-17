@@ -1042,6 +1042,26 @@ Correct for months: the hash carried a **view** and no range, so seeding a 30-da
 
 **⚠ THE COMMENT SHAPE AND THE CARRIER RULE ARE DIFFERENT ABSTRACTIONS OVER THE SAME EVENT, AND THEY ARE AT DIFFERENT INSTANCE COUNTS.** The carrier is the MECHANISM; the stale comment is one SYMPTOM of how that mechanism evades review. Counting them together would have hidden that the mechanism already has two instances. **Stale-load-bearing-comment: 1 instance. Shared-carrier: 2 — see the rule directly below, which is promoted on that basis.**
 
+### ⚠⚠ THE DATE PICKER DIDN'T STICK — A CONTROL THAT REBUILT ITSELF MID-GESTURE (fixed 2026-08-17, `8103f8e`)
+**Symptom:** pick a range, the URL never changes, nothing commits. On both the coaching and Team pages.
+
+**ROOT CAUSE, in order:**
+1. `datePickerHover` re-rendered the ENTIRE control via `host.outerHTML = …` on every `mouseenter` — that was how the range preview followed the cursor.
+2. Moving the mouse from the start date to the end date therefore **replaced the node under the cursor**.
+3. The user's second `mousedown` landed on a node the re-render had just **detached**.
+4. The page-level outside-click handler asked `host.contains(e.target)`, got `false` for a detached node, concluded **"outside"**, and called `datePickerClose` — wiping the half-made selection and shutting the panel.
+5. So the second click never reached `datePickerPick`. Nothing committed; the URL never moved.
+
+**THE FIX:** the preview toggles classes on the cells already in the DOM (`paintRangePreview`, reusing `monthGridCells` so the preview logic keeps one definition), and the first click paints in place instead of re-rendering. Belt and braces: the outside handler ignores targets with `isConnected === false` and uses the panel's bounding rect as a second authority. **A control must not rebuild its own DOM mid-gesture — every assumption about node identity dies the moment it does.**
+
+**⚠⚠ THE LESSON, AND IT INVALIDATED EVERY TEST THIS CONTROL HAD: `element.click()` dispatches a click with NO mousedown, NO mouseup and NO movement. It tests the HANDLER, not the CONTROL.** Every programmatic test passed for months while the control was unusable by a human, because the failure lives entirely in the parts a synthetic click skips. **A control's tests must drive it the way a user does — real events, including movement.**
+
+**⚠ TWO FIXES SHIPPED AGAINST THIS SYMPTOM THAT WERE NOT THIS BUG.** Both were found by reasoning about state, because the harness could not click:
+- **The coaching `init()` clobber** (`7af613e`) — `applyHashToState()` restored the range and the very next line overwrote it with the 30-day default. **Real, worth having, shipped.**
+- **The team sub-page hash gap** — `#team-recs`, `#team-needs-work`, `#team-members` carry no range, so refreshing on one drops to the 7-day default. **Real, reproducible, and still unfixed at the time this was written.**
+
+**HOW IT WAS FINALLY PROVEN:** not by this harness. `backend/scripts/try-picker-fix.js` serves the one patched file locally and proxies everything else to production, so Justin exercised the real gesture with zero deploy and confirmed it. **When a control run is load-bearing and the harness cannot deliver clicks, hand the gesture to a human** — see the input-path constraint directly below.
+
 ### ⚠⚠ SYNTHETIC CLICKS ARE DELIVERED ONLY BRIEFLY AFTER A FRESH NAVIGATION — A STANDING LIMIT (3 investigations corrupted, 2026-08-17)
 **Browser-automation clicks land reliably for a short window after a page loads, then silently stop being delivered.** The tool still reports `Clicked at (x, y)`; the page receives nothing. This is not a Scout problem and **cannot be fixed from here**.
 - **Observed:** runs early in a page's life recorded 1 and 3 `mousedown` events and behaved correctly; a run issued after a later navigation recorded **0 events across 3 clicks** while reporting success. It has now corrupted **three separate investigations** of the date-picker bug.
