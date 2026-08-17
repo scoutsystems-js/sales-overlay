@@ -2447,6 +2447,10 @@
     sectionExpanded: {},       // which moment groups are expanded past the first 5
     sectionData: null,
     sectionLoading: false,
+    // ⚠ "not loaded yet" and "load FAILED" used to be the same condition
+    // (`!sectionData`), so the error copy rendered for the whole duration of a
+    // perfectly normal fetch. They are now separate states.
+    sectionError: null,
     mergeCandidates: [],       // 3d-2: prospect merge proposals awaiting human review
     mergeLoading: false,
     followupCopied:     false, // transient "Copied!" feedback flag (set true, render, then false 2s later)
@@ -3351,7 +3355,7 @@
     if (state.view === 'performance') { state.perfSynthesis = null; renderPerformanceView(); return; }
     // The drilldown re-queries on the inherited range so the detail keeps
     // explaining the number that opened it.
-    if (state.view === 'section') { state.sectionData = null; loadSectionBreakdown(state.selectedSection); return; }
+    if (state.view === 'section') { state.sectionData = null; state.sectionError = null; state.sectionLoading = true; loadSectionBreakdown(state.selectedSection); return; }
     reloadAll();
   }
 
@@ -6276,6 +6280,13 @@
   function goSection(key) {
     state.selectedSection = key;
     state.sectionData = null;
+    state.sectionError = null;
+    // ⚠ SET THE LOADING FLAG BEFORE setView, NOT AFTER. setView renders
+    // immediately; loadSectionBreakdown only sets the flag once it starts, so
+    // the first paint saw sectionLoading=false + sectionData=null and fell into
+    // the FAILURE branch — which then stayed on screen for the entire request,
+    // not for a frame.
+    state.sectionLoading = true;
     state.sectionExpanded = {};
     setView('section');
     loadSectionBreakdown(key);
@@ -6294,7 +6305,8 @@
       var res = await fetch(url, { headers: authHeader() });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
       state.sectionData = res.ok ? await res.json() : null;
-    } catch (err) { state.sectionData = null; }
+      state.sectionError = res.ok ? null : ('HTTP ' + res.status);
+    } catch (err) { state.sectionData = null; state.sectionError = (err && err.message) || 'network error'; }
     state.sectionLoading = false;
     if (state.view === 'section') renderSectionView();
   }
@@ -6434,9 +6446,17 @@
       + '<a class="sec-back" onclick="backFromSection(); return false;">&larr; Back to coaching</a>'
       + '<h1>' + escapeHtml(label) + '</h1></div></div>';
 
-    if (state.sectionLoading) { content.innerHTML = head + '<div class="empty-card"><p>Loading…</p></div>'; return; }
+    // Three states, deliberately distinct. Renaming the failure copy to
+    // "Loading" would have hidden a genuine failure behind a spinner forever;
+    // showing the failure copy while loading told the user something was broken
+    // when nothing was.
+    if (state.sectionLoading) { content.innerHTML = head + '<div class="empty-card"><p>Loading…..</p></div>'; return; }
     var d = state.sectionData;
-    if (!d) { content.innerHTML = head + '<div class="empty-card"><h2>Could not load this section</h2></div>'; return; }
+    if (!d) {
+      var why = state.sectionError ? '<p>' + escapeHtml(state.sectionError) + '</p>' : '';
+      content.innerHTML = head + '<div class="empty-card"><h2>Could not load this section</h2>' + why + '</div>';
+      return;
+    }
 
     var delta = '';
     if (typeof d.average === 'number' && typeof d.prior_average === 'number' && d.prior_average > 0) {
