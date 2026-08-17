@@ -1012,6 +1012,25 @@ assert.ok(fn.length > 200 && fn.length < 4000, 'slice must cover the function: '
 - **Four occurrences so far**, all found by accident rather than by the tests failing usefully: the `drillCalls` slice (`setCallsRange` defined earlier), the `sortRepsWorstFirst` mirror guard (`repCardsHtml` defined earlier), the `renderSectionView` slice (`var delta` occurs earlier), and one caught in review. **Prefer markers that are unique to the function**, and when the end marker is a common token, `fromIndex` is not optional.
 - Same family as the other rules here: **the thing you are testing may not be the thing that runs.**
 
+### 👁 OBSERVATION, NOT YET A RULE — "STALE LOAD-BEARING COMMENT" (1 instance, 2026-08-16)
+**Logged so a SECOND instance can be recognised as a second instance.** One occurrence is not a pattern and this must not be treated as one — but the shape is specific enough to name now.
+
+**THE SHAPE:** a comment that was **accurate when written**, states an assumption the code beside it **depends on**, and is **invalidated by a change in a DIFFERENT file** — so nothing ever prompts a re-read of it.
+
+**The instance.** `init()` in `dashboard.html` read:
+```js
+// Restore the view from the URL hash BEFORE the first load ...
+// the 30-day range applies underneath.
+applyHashToState();
+...
+setDateRange(30, true /* preserveView — keep the hash-restored view */);
+```
+Correct for months: the hash carried a **view** and no range, so seeding a 30-day default underneath was right. Then the date-picker arc (stage 3) put **from/to in the hash** — a change to the picker, the router and the hash helpers, **none of them this file**. From that moment the comment was false and the line silently destroyed every picked coaching range on every boot. Nothing failed, nothing warned, and no test covered the boot sequence.
+
+**Why it evades the existing rules.** It is not a dead call site, not a stale marker, not a wrong shape — the code *ran*, and did exactly what it said. **The defect was the assumption, and the assumption lived in prose.**
+
+**IF A SECOND INSTANCE APPEARS**, the candidate rule is: *when a change alters what a shared carrier holds (a URL, a cache key, a state field, a payload), grep for the OTHER readers of that carrier — the risk is not in the file being edited.* **Do not promote this to a rule off one case.** Record instance 2 here first.
+
 ### ⚠ VERIFY AGAINST THE REAL ENTRY POINT AND THE REAL DATA SHAPE (2026-08-16)
 **A test that drives the wrong function, or feeds an invented fixture shape, passes or fails for reasons unrelated to the code under test.** Both faults appeared in one block (10e) and both would have reported success while exercising nothing:
 - **WRONG ENTRY POINT.** The harness drove `renderTeamView` while the feature renders in `renderOverview`. Zero charts were built; the assertion failed, but for a reason that had nothing to do with the feature. Had the assertion been a negative one ("this must NOT appear"), it would have PASSED — vacuously.
