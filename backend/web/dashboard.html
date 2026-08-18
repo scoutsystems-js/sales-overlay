@@ -3015,6 +3015,24 @@
    * signals completion. Proven by breaking it deliberately — see
    * test/welcome-sequence.test.js.
    *
+   * ⚠⚠ IT DOES NOT WAIT FOR THE DASHBOARD'S DATA, AND THAT IS THE DESIGN — NOT
+   * A COMPROMISE. The overlay runs on a fixed ~3s clock and is never told about
+   * the loads. WAITING FOR THEM IS EXACTLY WHAT WOULD MAKE IT A GATE: a slow
+   * lane, a failed fetch or a hung request would then hold a user behind a
+   * black screen with no way out — the one failure this whole sequence is
+   * built to be incapable of.
+   *
+   * So when a load outlasts the animation, the swipe reveals the dashboard's
+   * OWN SKELETONS. That is the CORRECT outcome, not a rough edge to be fixed:
+   * the skeleton is a state the dashboard already has and already handles, and
+   * it is what any visitor sees on a slow load. The shell, the nav and the
+   * section frames are all up before this function is even called (it is the
+   * LAST line of init()), so the swipe can never reveal a half-built page.
+   *
+   * ⚠ DO NOT "IMPROVE" THIS BY AWAITING THE LOADS or by holding the overlay
+   * until the data lands. That converts a decoration into a dependency, and
+   * every reason it cannot currently lock someone out stops being true.
+   *
    * ⚠ FRESH LOGIN ONLY, and the flow can only just tell. redirectByRole() in
    * login.html is called from three places — once after a password POST and
    * twice for an already-valid session — and all three emit an identical
