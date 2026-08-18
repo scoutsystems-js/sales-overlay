@@ -2264,13 +2264,44 @@
 
     .wel-text { position: absolute; inset: 0; display: flex; flex-direction: column;
                 align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+    /**
+     * ⚠⚠ nowrap + SIZED FROM THE WIDEST TRACKING IN THE ANIMATION, NOT THE
+     * RESTING ONE. Josh: the words start stacked and snap to one line.
+     *
+     * welSettle animates FROM letter-spacing: 0.7em down to --wel-track, so the
+     * WIDEST state is the FIRST frame. letter-spacing adds exactly
+     * tracking x charCount to the advance width, so for "SCOUT SYSTEMS" (13):
+     *
+     *     k(0.06em resting) =  8.98      k(0.7em start) = 17.30
+     *     at 68px:  611px wide resting,  1177px wide at the start
+     *     stage = min(92vw, 92vh) = 828px at 1440x900
+     *
+     * It therefore wrapped to two lines for the first part of the animation and
+     * reflowed to one the instant tracking fell below ~0.31em. That
+     * single-frame reflow IS the "glitch" — nothing was glitching, the text
+     * simply stopped needing two lines.
+     *
+     * ⚠ THE GENERAL RULE: WHEN A PROPERTY IS ANIMATED, THE CONSTRAINT MUST HOLD
+     * AT EVERY VALUE IT PASSES THROUGH, NOT JUST THE ENDPOINTS. Fitting at the
+     * destination is not fitting, and sizing from the resting tracking measures
+     * the one end of the range that cannot fail.
+     *
+     * 92vmin / 17.30 = 5.32vmin is the largest size that fits at the START, so
+     * 5.2vmin ships. The 68px cap only engages above a ~1308px vmin, where
+     * 92vmin already exceeds 68 x 17.30 = 1177px.
+     *
+     * ⚠ Only welSettle animates a layout property — every other keyframe here
+     * animates opacity and/or transform, which are composited and cannot
+     * reflow. Audited, not assumed.
+     */
     .wel-kicker, .wel-title {
+      white-space: nowrap;
       color: var(--accent); opacity: 0;
       text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.55), 0 0 44px rgba(var(--accent-rgb), 0.25);
       animation: welSettle var(--wel-text-in) cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     .wel-kicker { font-size: clamp(11px, 1.5vw, 15px); font-weight: 600; text-transform: uppercase; }
-    .wel-title  { font-size: clamp(26px, 6vw, 68px); font-weight: 800; margin-top: 8px; }
+    .wel-title  { font-size: min(5.2vmin, 68px); font-weight: 800; margin-top: 8px; }
     /* both settle IN from wide tracking as they fade up */
     @keyframes welSettle {
       from { opacity: 0; letter-spacing: 0.7em; }

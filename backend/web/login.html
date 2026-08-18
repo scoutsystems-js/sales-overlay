@@ -664,7 +664,23 @@
       var MIN_H = 140;           // below this the mark is not worth drawing
       function placeMark() {
         try {
-          var el = document.querySelector('.brand-name');
+          /**
+           * ⚠ ANCHORED TO THE NAV, NOT THE WORDMARK (Justin, 2026-08-18: raise
+           * it to the top of the page). Still derived from a real measured
+           * position rather than a chosen offset — the nav's own bottom edge —
+           * so the relationship holds at every size exactly as before.
+           *
+           * ⚠⚠ WHAT "TOP" COSTS: the mark now sits BEHIND THE WORDMARK instead
+           * of under it, so the wordmark becomes an exposed element for the
+           * first time. It is green-on-green, but LARGE and high-contrast
+           * (7.58:1 over a solid stroke at 0.20), so it is not the binding
+           * case — the --muted labels still are, at 4.70:1. Opacity therefore
+           * stays 0.20. See the findings: whether the mark still crosses any
+           * muted text at this position is the one thing not re-measured, and
+           * 0.20 is the SAFE direction to be wrong in, since it was derived
+           * against the stricter case.
+           */
+          var el = document.querySelector('.login-nav');
           if (!el) return;
           var top = Math.round(el.getBoundingClientRect().bottom + GAP);
           var h = Math.round(window.innerHeight - top - GAP);

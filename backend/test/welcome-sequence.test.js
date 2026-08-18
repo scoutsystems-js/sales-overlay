@@ -322,3 +322,78 @@ test('⚠ EVERY path that declines to play still takes the cover down', () => {
     'private-mode return, not-fresh return, the mount handoff and the outer '
     + 'catch must each uncover — otherwise the 8s failsafe becomes the UX');
 });
+
+// ── the animated-constraint rule (Josh's "stacked then snaps", 2026-08-18) ──
+/**
+ * ⚠⚠ WHEN A PROPERTY IS ANIMATED, THE CONSTRAINT MUST HOLD AT EVERY VALUE IT
+ * PASSES THROUGH — NOT JUST THE ENDPOINTS.
+ *
+ * welSettle animates letter-spacing FROM 0.7em down to the resting track, so
+ * the widest state is the FIRST frame. The title was sized for the RESTING
+ * tracking, so it wrapped to two lines at the start and reflowed to one the
+ * instant tracking fell below ~0.31em. That single-frame reflow was the
+ * reported "glitch".
+ *
+ * letter-spacing adds exactly `tracking x charCount` to the advance width, so
+ * this is arithmetic rather than estimation.
+ */
+test('⚠⚠ the overlay wordmark fits at the WIDEST tracking the animation passes through', () => {
+  const kfAt = LIVE.indexOf('@keyframes welSettle');
+  assert.ok(kfAt > 0, 'welSettle anchor is stale');
+  const kf = LIVE.slice(kfAt, LIVE.indexOf('}', LIVE.indexOf('to', kfAt)) + 1);
+  const start = Number((kf.match(/letter-spacing:\s*([\d.]+)em/) || [])[1]);
+  assert.ok(start > 0, 'the animation must still start from a wide tracking');
+
+  // ⚠ END ANCHOR MUST EXIST IN `LIVE`. The first draft ended the slice at a
+  // COMMENT ("/* both settle IN"), which LIVE strips — indexOf returned -1 and
+  // the slice ran to the end of the file (311,030 chars). Anchor on real CSS.
+  const ruleAt = LIVE.indexOf('.wel-kicker, .wel-title {');
+  assert.ok(ruleAt > 0, 'the shared title/kicker rule is missing');
+  const css = LIVE.slice(ruleAt, LIVE.indexOf('.wel-title', ruleAt + 30));
+  assert.ok(css.length > 80 && css.length < 1200, 'slice suspicious: ' + css.length);
+  assert.ok(/white-space:\s*nowrap/.test(css),
+    'without nowrap the title wraps at the wide end of the animation');
+
+  // Stage is min(92vw, 92vh) = 92vmin; the title must fit INSIDE it at `start`.
+  // ⚠ the SIZE lives on `.wel-title`, a different rule from the shared one that
+  // carries nowrap — read each from its own rule rather than one slice.
+  const titleAt = LIVE.indexOf('.wel-title  {');
+  assert.ok(titleAt > 0, 'the .wel-title rule is missing');
+  const titleCss = LIVE.slice(titleAt, LIVE.indexOf('}', titleAt) + 1);
+  assert.ok(titleCss.length > 40 && titleCss.length < 400, 'slice suspicious: ' + titleCss.length);
+  const sizeVmin = Number((titleCss.match(/font-size:\s*min\(([\d.]+)vmin/) || [])[1]);
+  assert.ok(sizeVmin, 'the title must be sized in vmin against the 92vmin stage');
+  const N = 'SCOUT SYSTEMS'.length;            // 13
+  const K_REST = 8.463, T_REST = 0.02;         // measured in-browser, same face
+  const kAtStart = K_REST + (start - T_REST) * N;
+  assert.ok(sizeVmin * kAtStart <= 92,
+    'at the START of the animation the title is ' + (sizeVmin * kAtStart).toFixed(1)
+    + 'vmin wide against a 92vmin stage — it will wrap and then snap. Size from '
+    + 'the WIDEST tracking (' + start + 'em, k=' + kAtStart.toFixed(2) + '), not the resting one');
+});
+
+test('⚠ only welSettle animates a layout property — the others cannot reflow', () => {
+  // ⚠ SCOPE THIS TO THE @keyframes BLOCKS ONLY. The first draft sliced the whole
+  // CSS region between two anchors, which swept up the .wel-title and
+  // .wel-kicker RULES and flagged their static `font-size` as an animated
+  // property. A static declaration is not a reflow mid-flight; only what a
+  // keyframe interpolates is.
+  const blocks = [];
+  const re = /@keyframes\s+wel\w+\s*\{/g;
+  let m;
+  while ((m = re.exec(LIVE))) {
+    let i = m.index + m[0].length, depth = 1;
+    while (i < LIVE.length && depth > 0) { if (LIVE[i] === '{') depth++; else if (LIVE[i] === '}') depth--; i++; }
+    blocks.push(LIVE.slice(m.index, i));
+  }
+  assert.ok(blocks.length >= 6, 'expected the welcome keyframes, found ' + blocks.length);
+  const block = blocks.join('\n');
+  // Anything that changes a box mid-flight is a reflow candidate.
+  const REFLOWING = /(font-size|padding|margin|width|height|letter-spacing|word-spacing)\s*:/g;
+  const found = block.match(REFLOWING) || [];
+  const letterSpacingOnly = found.every((f) => /letter-spacing/.test(f));
+  assert.ok(letterSpacingOnly,
+    'a NEW layout-affecting property is animated in the welcome sequence: '
+    + found.filter((f) => !/letter-spacing/.test(f)).join(', ')
+    + ' — re-check that its constraint holds at every value it passes through');
+});
