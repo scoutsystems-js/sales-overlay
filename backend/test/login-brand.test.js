@@ -235,7 +235,12 @@ test('⚠⚠ the wordmark size is DERIVED from available width — it cannot wra
   // k for this face at the SHIPPED weight + tracking, measured in a browser.
   const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
   const tracking = (css.match(/letter-spacing:\s*([\d.]+em)/) || [])[1];
-  const K = { '500|0.08em': 8.924 };
+  // ⚠ k IS FACE-SPECIFIC — measured per (family, weight, tracking) in a browser.
+  // The value here is the MAX across the faces that can actually render, because
+  // a blocked webfont falls back and the formula must hold either way.
+  //   Montserrat 500 / 0.08em = 9.495   (binds — 6.4% wider than the fallback)
+  //   system     500 / 0.08em = 8.924
+  const K = { '500|0.08em': 9.495 };
   const k = K[weight + '|' + tracking];
   assert.ok(k,
     'k is measured per (weight, tracking) — this pairing is ' + weight + '/' + tracking

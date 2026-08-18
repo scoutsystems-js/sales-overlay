@@ -4,9 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In — Scout Systems</title>
+  <!-- ⚠ MONTSERRAT IS A FEEL TEST ON THIS PAGE ONLY (Justin, 2026-08-18) — the
+       site-wide sweep is a separate item. TWO WEIGHTS ONLY: 300 Light for the
+       page, 500 Medium for the wordmark. display=swap so a slow font can never
+       block the sign-in form from rendering. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
     /* Login-specific layout on top of the shared brand stylesheet. */
+    /* ── MONTSERRAT, LOGIN PAGE ONLY — a feel test (Justin, 2026-08-18) ──
+       LIGHT (300) for the page, MEDIUM (500) for the wordmark. Two weights, no
+       others. The fallback stack is kept so a blocked or slow font degrades to
+       the previous face rather than to a serif. */
+    body, .login-nav, .login-main, .login-footer, input, button, label, h1, p, a {
+      font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
     body {
       min-height: 100vh;
       display: flex;
@@ -111,11 +125,23 @@
      *     textWidth = k x fontSize        (k measured, not guessed)
      *     fontSize_max = availableWidth / k
      *
-     * MEASURED in the browser for this exact face at weight 500 + 0.08em
-     * tracking: k = 8.924. The lockup gets 92vw, so the largest font-size that
-     * can never wrap is 92 / 8.924 = 10.3vw. The px cap (92) only engages above
-     * a ~893px viewport, where 10.3vw already exceeds it — so the cap can never
-     * be the thing that causes a wrap.
+     * ⚠⚠ RE-MEASURED FOR MONTSERRAT — k IS FACE-SPECIFIC AND THE OLD NUMBER
+     * WOULD HAVE WRAPPED. The previous 10.3vw came from k = 8.924, measured on
+     * the SYSTEM face. Montserrat Medium at the same 0.08em tracking measures
+     * k = 9.495 — 6.4% WIDER — so 10.3vw x 9.495 = 97.8vw of text in a 92vw
+     * lockup. Carrying the number across would have reproduced this page's wrap
+     * for the third time.
+     *
+     * The safe k is the MAX across every face that might actually render:
+     * Montserrat 500 = 9.495, system fallback 500 = 8.924. If the webfont is
+     * blocked or slow the fallback draws, and the formula has to hold for
+     * whichever one does — so the WIDER face sets the coefficient.
+     *
+     *     92 / 9.495 = 9.69vw  ->  shipped 9.6vw
+     *
+     * The px cap (92) only engages above a ~958px viewport, where 92vw = 881px
+     * against 92 x 9.495 = 874px of text — so the cap still cannot be the thing
+     * that causes a wrap.
      *
      * ⚠ k DEPENDS ON WEIGHT AND TRACKING. Changing either without re-deriving
      * 10.3vw reintroduces the bug. Measured range: k is 7.88 (300 / 0.02em) to
@@ -123,7 +149,7 @@
      * coefficient. Test asserts the pairing.
      */
     .brand-lockup .brand-name {
-      font-size: min(10.3vw, 92px);
+      font-size: min(9.6vw, 92px);
       /* Justin: BIGGER, NOT BOLD. 800 -> 500, and the extra tracking is what
          keeps a lighter weight from reading thin at this size. */
       font-weight: 500; letter-spacing: 0.08em;
@@ -222,6 +248,38 @@
          and the opacity can go back up for presence — 0.26, still inside the
          0.16-0.30 band, and the strokes are now ~3x finer so it reads as a
          drawn shape rather than a wash. */
+      /**
+       * ⚠⚠ THE CLIPPING AND THE HIDDEN DOTS ARE ACCEPTED — THIS IS A DECISION,
+       * NOT A DEFECT. Justin, 2026-08-18: "it's fine if it's partially off
+       * screen." He was shown both measurements and chose SIZE over dot
+       * visibility. Do not cap the size, and do not move the mark up behind the
+       * title to rescue the dots.
+       *
+       * MEASURED, so the trade is legible rather than remembered:
+       *
+       *   3x = 150vmin EXCEEDS THE VIEWPORT EVERYWHERE. Height binds first (the
+       *   mark is 1.1x as tall as wide), so on any landscape display ~39% is
+       *   off-screen — 1440x900 draws 1350x1485 — rising to 50-55% on a short
+       *   or narrow window. The largest NON-CLIPPING size is 90vmin (1.8x),
+       *   which fits at 0% off-screen everywhere measured. It was offered and
+       *   declined.
+       *
+       *   ⚠ ALL THREE DOTS SIT BELOW THE FOLD, at every viewport tested. They
+       *   are at cy 12/16/19.5 of a 22-unit box, i.e. the lower half of the
+       *   mark, so with it starting under the title they land at y = 904 / 1144
+       *   / 1354 on a 900x800 window. Only the arc sweep is visible. Getting
+       *   even the FIRST dot on screen there needs the mark to start at <=10vh
+       *   — behind the title rather than under it — so at 3x "under the title"
+       *   and "dots visible" are MUTUALLY EXCLUSIVE. The dots are still filled
+       *   rather than outlined because that is what was asked for, and because
+       *   the mark is used elsewhere at sizes where they do show.
+       *
+       * ⚠ THE STROKE IS 0.18, NOT 0.55, AND THAT IS LOAD-BEARING AT THIS SCALE.
+       * Scaling the mark 3x scales its strokes 3x, so 0.55 would render ~29px
+       * lines again and restore exactly the softness the previous round
+       * removed. 0.18 holds the on-screen weight at ~10px. If the SIZE ever
+       * changes, this must be re-derived with it — they are one setting.
+       */
       background-position: center 23vh;
       background-size: 150vmin auto;
       /* ⚠ THE "BUBBLY" FIX (Justin, 2026-08-18) — MEASURED, NOT EYEBALLED.
@@ -394,6 +452,42 @@
     }
     .login-footer a { color: var(--muted); }
     .login-footer a:hover { color: var(--text); }
+
+    /* ══ MONTSERRAT WEIGHT DISCIPLINE — LAST IN THE STYLESHEET ON PURPOSE ══
+       ⚠ THE FIRST ATTEMPT AT THIS BLOCK WAS PLACED NEAR THE TOP AND LOST. The
+       page's own later rules (.card-header h1 600, .field label 600,
+       .submit-btn 700, .nav-logo 600) have equal specificity, so source order
+       decided it and the overrides did nothing. Measured, not assumed: the
+       computed weights came back 600/700.
+
+       ⚠⚠ AND THOSE WEIGHTS ARE NOT LINKED. Only 300 and 500 are loaded, so a
+       rule asking for 600 or 700 makes the browser SYNTHESISE a bold from the
+       500 — faux-bold, which is heavier and cruder than the real face and is
+       exactly what a feel test must not judge Montserrat by.
+
+       Justin's ruling: MEDIUM (500) for the title, LIGHT (300) for everything
+       else. Anything not in the 500 list below is 300 — no third weight.
+
+       ⚠ EXHAUSTIVE, NOT ENUMERATED. A hand-listed selector list left three
+       elements behind — a nav SPAN, an H2 and .launch-btn, all in states that
+       only render after sign-in — still asking for 600/700 and therefore still
+       faux-bolding. Enumerating targets is the INVENTORY failure already on
+       file; a universal selector inside the page's own containers cannot miss
+       one. */
+    body { font-weight: 300; }
+    /* (a) the CATCH-ALL — reaches anything nobody thought to list */
+    .login-nav, .login-nav *, .login-main, .login-main *,
+    .login-footer, .login-footer * { font-weight: 300; }
+    /* (b) the EQUAL-SPECIFICITY overrides. ⚠ BOTH ARE NEEDED, and the reason is
+       specificity, measured not guessed: `.card-header h1` and `.field label`
+       are (0,1,1) and BEAT the (0,1,0) catch-all above, so the universal alone
+       left the card title and every field label back on 600. The catch-all
+       covers the unenumerated; these cover the ones the page names explicitly. */
+    .card-header h1, .card-header p, .field label, .field input,
+    .login-nav .nav-logo, .login-nav .back, .submit-btn, .launch-btn,
+    #forgotRow a, .login-footer a,
+    .login-main h1, .login-main h2, .login-main h3 { font-weight: 300; }
+    .brand-lockup .brand-name { font-weight: 500; }
   </style>
   <script src="/js/scout-auth.js"></script>
 </head>
