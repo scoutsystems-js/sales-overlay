@@ -137,7 +137,8 @@ test('the background mark matches the nav logo rather than being redrawn by eye'
     + 'IDENTITY and must never diverge.');
 
   /**
-   * ⚠⚠ THE DOT RADII DELIBERATELY DIVERGE (Justin, 2026-08-18: half size). This
+   * ⚠⚠ THE DOT RADII DELIBERATELY DIVERGE (Justin, 2026-08-18: halved TWICE —
+   * "half size", then "still a little too big"). This
    * used to assert they matched the nav mark exactly, which was the right pin
    * until the dots became a background-scale decision of their own. It is now
    * pinned as an EXACT RATIO rather than dropped — so the dots cannot drift to
@@ -152,10 +153,12 @@ test('the background mark matches the nav logo rather than being redrawn by eye'
   const navR = nums(nav), bgR = nums(css);
   assert.strictEqual(bgR.length, navR.length, 'same number of dots');
   navR.forEach((r, i) => {
-    assert.ok(Math.abs(bgR[i] / r - 0.5) < 0.001,
-      'dot ' + (i + 1) + ' must be exactly half the nav radius (' + r + ' -> ' + (r / 2)
-      + '), got ' + bgR[i] + '. Halving the RADIUS quarters the AREA; the '
-      + 'half-AREA alternative is r x 0.707 and is a separate decision.');
+    assert.ok(Math.abs(bgR[i] / r - 0.25) < 0.001,
+      'dot ' + (i + 1) + ' must be exactly a QUARTER of the nav radius (' + r
+      + ' -> ' + (r / 4) + '), got ' + bgR[i] + '. Two halvings of the radius = '
+      + '6.25% of the original AREA, because these dots are filled. The ratio is '
+      + 'pinned rather than the value so the dots cannot drift, and so a future '
+      + 'edit restoring them to match the nav has to be deliberate.');
   });
 });
 
