@@ -194,15 +194,28 @@ test('⚠ the background layer follows the motif treatment exactly', () => {
     'it must never intercept a click on the form beneath it');
   assert.ok(/position:\s*fixed/.test(css) && /z-index:\s*0/.test(css), 'behind the content');
   /**
-   * ⚠ 150vmin = 3x the original 50vmin (Justin, 2026-08-18). At this size the
-   * mark EXCEEDS THE VIEWPORT at every normal window — ~39% of it is off-screen
-   * on a landscape display, and all three dots fall below the fold. That is
-   * reported, not silently capped: the largest non-clipping size is 90vmin
-   * (1.8x), which fits at 0% off-screen everywhere measured.
+   * ⚠⚠ THIS ASSERTION USED TO PIN `150vmin` — AND IT PASSED FOR THE WRONG
+   * REASON. The rule had TWO background-position/background-size pairs: the
+   * derived one, and a leftover from the 3x version sitting AFTER it. CSS gives
+   * the later declaration the win, so the page rendered the OLD values while
+   * this guard happily confirmed the old string was present.
+   *
+   * ⚠ A PRESENCE CHECK CANNOT SEE PRECEDENCE. "the value is in the file" and
+   * "the value is what renders" are different claims, and only the second one
+   * matters. So the guard now asserts there is EXACTLY ONE of each — which is
+   * the property that would have caught it.
    */
-  assert.ok(/background-size:\s*150vmin/.test(css), 'Justin asked for at least 3x (150vmin)');
-  assert.ok(/background-position:\s*center/.test(css),
-    'centred under the title, not offset to the side');
+  const posCount = (css.match(/background-position\s*:/g) || []).length;
+  const sizeCount = (css.match(/background-size\s*:/g) || []).length;
+  assert.strictEqual(posCount, 1,
+    'exactly one background-position — ' + posCount + ' means a later duplicate '
+    + 'silently overrides the derived value, which is how the ink floated 207px '
+    + 'down a correctly-placed box');
+  assert.strictEqual(sizeCount, 1, 'exactly one background-size, for the same reason');
+  assert.ok(/background-size:\s*auto 100%/.test(css),
+    'the mark is sized to FILL the derived box, not to a chosen vmin number');
+  assert.ok(/background-position:\s*center top/.test(css),
+    'and anchored to the top of that box, so the first ring touches the page top');
 });
 
 /**
