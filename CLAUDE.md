@@ -1127,6 +1127,25 @@ CATEGORICAL  REP_LINE_COLORS          "this is rep number four"
 - **Also ruled: the `.user-select` chevron icon keeps its grey stroke** (the no-grey rule is about TEXT), and the Team drilldown's "Cash collected" **axis label** stays (it is a label, not a card — (m) removed cards).
 - Guarded by `test/accent-palette.test.js`, which fails if the ramp contains any of the four reserved tokens and proves itself non-vacuous by re-adding the accent.
 
+### ⚠⚠ A PASSING SUITE IS CONSISTENT WITH A CORRECT GUARD AND EQUALLY CONSISTENT WITH A GUARD THAT NEVER FIRES (2026-08-18)
+**Green is not evidence the bound is right. It is evidence that nothing tripped — which includes the case where nothing ever could.**
+- **This is the non-vacuity rule one level up.** Non-vacuity asks *does this test fail against the defect it names?* This asks the same of a THRESHOLD: **does the bound actually sit where I think, relative to the value it governs?**
+- **Two ways a green suite lies about a bound**, and they look identical from the outside:
+  1. the bound is wrong but the value happens to satisfy it (the 0.06 cap: correct-looking, passing, and enforcing an invisible design);
+  2. the bound is unreachable — a one-sided check on a value that only ever errs the other way, or a comparison against a literal that no longer exists.
+- **THE PRACTICE, and it is cheap: READ THE NUMBERS.** When a value changes near a guard, print the value, the floor and the ceiling together and confirm the bracket by eye. Done for the 0.26 bump — `floor 0.16 · shipped 0.26 · ceiling 0.30 · headroom 0.04` — which took one command and answered a question the green suite could not.
+- **Every guard added in this session is deliberately broken once to prove it fails.** That discipline exists for exactly this reason: an assertion that has never been seen to fail is a claim about the code that nothing has tested.
+
+### ⚠⚠ PROVE IT IS DRAWING BEFORE TUNING ANY VISUAL PROPERTY (2026-08-18)
+**ABSENCE IS NEVER EVIDENCE ABOUT A VALUE. It is evidence that you do not yet know whether the value is being applied at all.**
+- **Earned three times in a single block.** Three unrelated defects, one identical presentation — *nothing on screen, no error*:
+  1. **the layer painted behind its own parent's background** — `z-index:-1` under `html, body { background }`. Rendered nothing at ANY opacity, including 1.
+  2. **all four SVGs malformed** — an encoder collapsed newline+indent to the empty string, joining attributes (`fill='none'stroke='#4ade80'`). The browser silently refused to decode every one.
+  3. **rendering correctly but 3–5× fainter than the approved design** — and the guard's own cap was enforcing it.
+- **Each one cost a round of tuning the wrong variable**, because an empty screen invites the question *"how faint is too faint?"* when the real question was *"is this being applied?"* — and the first question is answerable, plausible, and wrong.
+- **THE ORDER OF OPERATIONS: (1) is it in the DOM/CSS at all? (2) does the asset DECODE? (3) set the property to its maximum — if it is still absent, the property is not the problem. Only then tune it.** Set opacity to 1. Decode the data URI. Ask `elementFromPoint` what is actually on top.
+- **⚠ AND A SCREENSHOT WILL NOT SETTLE ANY OF THIS** — see the perception-test rule. A capture faithfully records a difference no human eye resolves, so it can confirm "present" while the honest answer to "visible" is no.
+
 ### ⚠⚠ A ONE-SIDED GUARD SILENTLY ENCODES AN ASSUMPTION ABOUT WHICH WAY THINGS GO WRONG — AND THAT ASSUMPTION OUTLIVES THE DESIGN IT WAS WRITTEN FOR, WITH NOTHING TO ANNOUNCE WHEN IT STOPS BEING TRUE (2026-08-18)
 **A guard with only an upper bound cannot catch "too little". Where a value has a wrong answer in BOTH directions, bound it in both — and when the thing it guards is redesigned, the guard is part of the redesign.**
 - **The live case:** `opacity <= 0.06` on the background layer. Correct for the treatment it was written for — small repeated gutter motifs. The treatment was then replaced by ONE LARGE CROPPED SHAPE per page and the cap did not move. **It held the new design below the threshold of visibility, and PASSED the suite while doing it.** Green tests, invisible feature, and the guard was the thing keeping it invisible.
