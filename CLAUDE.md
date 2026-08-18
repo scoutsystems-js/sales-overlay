@@ -671,6 +671,31 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ NO PRECEDENCE RULE between prospect-intent types and closer-failure types — DECIDED, NOT OVERLOOKED (ruling 2026-08-12).** One type wins per moment and **the model chooses**. Justin's reasoning: *forcing `missed_opportunity` to outrank `buying_signal` would relabel every unanswered question as a closer failure, which is worse than the occasional judgement call.* The types are not mutually exclusive in principle — the extractor proved it can emit both on one call — but no ordering is imposed. **Do not add one "for consistency".**
 - **⚠ SELECTION VARIANCE IS NOT MISLABELLING — never conflate them again.** The extractor emits only **5–8 moments** from a call that may run 66 minutes, so any given example is often **NOT PICKED** at all; across three runs one of Justin's five examples never surfaced. That is pre-existing selection variance, **not** a taxonomy failure. A validation harness must report NOT PICKED separately from MISLABEL — the first harness conflated them and produced four false FAILs.
 
+### ⚠⚠ A BACKFILL AND A DEPLOY OPEN A GAP BETWEEN STORED DATA AND LIVE LOGIC — THE PUSH THAT CLOSES IT IS NOT "JUST SHIPPING A FEATURE" (2026-08-18)
+**Between writing 183 rows under a new rule and pushing the code that contains it, the database was correct and the deployed worker was still scoring new calls under the OLD rule. Every call analysed in that window would have been written by different logic than the 183 beside it.**
+- **⚠ THE HAZARD IS THAT IT LOOKS LIKE NOTHING.** No error, no failed write, no gap in the data — just rows that disagree about what they mean, in one column, indistinguishable by inspection. **It gets rediscovered later as a bug in the metric** rather than as a window in the deployment.
+- **THE RULE: when a data op and a code change encode the same rule, name the ordering and the window explicitly.** Either deploy first and backfill second (the window is then "rows not yet backfilled", which is visible and self-healing), or backfill first and treat the push as **closing a gap** rather than shipping a feature — and say so, so the window is a known event rather than a later mystery.
+- Related, from the other direction: the deploy-race rule (*never push during a drain*) is the same hazard with the two halves swapped — there the CODE moves under running data work; here the DATA moves ahead of the code.
+- **In this instance the order was forced** (the backfill had to prove the rule before the rule was worth pushing), so the window was accepted and stated rather than avoided. **An accepted window that is written down is fine; an unnoticed one is not.**
+
+### ⚠⚠ WRITE THE NULL — AN ABSENT ROW AND A ROW THAT SAYS "NOTHING HERE" ARE IDENTICAL TO A QUERY AND OPPOSITE IN MEANING (2026-08-18)
+```
+absent row  →  "this call has never been evaluated"        → SHOULD be processed
+NULL row    →  "evaluated, and there is no price moment"   → should be LEFT ALONE
+```
+**Both read as `price_stated_at_seconds IS NULL`.** Nothing in the query result distinguishes them, so a re-run cannot tell "not done yet" from "done, found nothing" — it will either redo work forever or skip calls it never touched, and both look like the job completed.
+- **The backfill therefore wrote 183 rows for 119 moments** — 64 explicit nulls, deliberately. **~1 in 3 calls legitimately has no moment here, so the null is the COMMON case, not an edge one.**
+- **Generalises to every derived column that can legitimately be empty:** the emptiness has to be *recorded* rather than *left*, or the column silently loses the difference between "no" and "not yet". If a schema cannot express it (a NOT NULL column, say), that is an argument for a companion `*_evaluated_at`, not for skipping the write.
+
+### ⚠⚠ A TEST MAY PIN A KNOWN DEFECT AS PASSING — DELIBERATELY, AND IT MUST SAY WHY IN THE TEST (2026-08-18)
+**A green test asserting WRONG behaviour reads as a mistake to anyone who finds it cold, and the natural reaction is to "fix" it. So the reason has to live in the test, not in a findings file.**
+- **The live case:** exactly one continuation call in 124 survives the prospect-first rule — the prospect asks for the total *"again"* without naming the figure, so nothing in the transcript marks the price as already known. A time floor would catch it and was **declined**: it removes one call, cannot move a 32.6-minute median, and would discard a hand-verified genuine drop at 11.0 minutes.
+- **Three things such a test buys, and it needs all three to be worth keeping:**
+  1. **the defect is RULED ACCEPTABLE** — the residual is cheaper than the cure, and that judgement is recorded where the behaviour is;
+  2. **it is COUNTED rather than forgotten** — "one call gets through" otherwise lives only in a document nobody re-reads;
+  3. **it FAILS LOUDLY IF THE SHAPE CHANGES** — someone fixing it by accident, or the pattern becoming common, turns the test red and forces the ruling to be re-made instead of absorbed.
+- **⚠ AND IT IS NOT A LICENCE.** The test must state the condition under which the ruling goes stale — here, the shape appearing on a meaningful share of calls — so it cannot be widened quietly to cover new failures.
+
 ### ⚠ DATA-OP CHECKPOINTS PIN TO VERIFIED IDS, NEVER A FIXED COUNT (ruling 2026-08-12)
 **When the target set of a destructive data op can legitimately change between planning and execution, a "stop unless the count is N" checkpoint will halt on the system working correctly.**
 - **What happened:** a cleanup of speaker-anchoring violations was authorised as *"delete the 10, stop if it isn't 10"*. By execution time it was **6** — because the `violatesProspectAnchor` guard had removed 4 on its own as those calls were re-analysed. The script halted and deleted nothing. **The halt was correct behaviour against a flawed checkpoint**, and it cost a round trip.

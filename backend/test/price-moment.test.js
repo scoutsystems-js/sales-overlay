@@ -125,10 +125,31 @@ test('⚠⚠ RULE A — the PROSPECT saying it FIRST means no drop happened here
   assert.strictEqual(P.findPriceMoment([damienStyle[0]], PRICE), null);
 });
 
+/**
+ * ⚠⚠ THIS TEST PINS A KNOWN DEFECT AS PASSING, AND THAT IS DELIBERATE — read
+ * this before "fixing" it, because a green test asserting wrong behaviour reads
+ * as an error to anyone who finds it cold.
+ *
+ * Why it exists:
+ *   1. The defect is RULED ACCEPTABLE. A time floor was proposed and declined
+ *      (see lib/price-moment.js): it would remove exactly one call in 124,
+ *      cannot move a 32.6-minute median, and would discard a hand-verified
+ *      genuine drop at 11.0 minutes. The residual is cheaper than the cure.
+ *   2. It makes the defect COUNTED rather than forgotten. Without it, "one
+ *      continuation call gets through" lives only in a findings file nobody
+ *      re-reads.
+ *   3. It FAILS LOUDLY IF THE SHAPE CHANGES. If someone later fixes this by
+ *      accident, or if the pattern becomes common enough to matter, this test
+ *      goes red and forces the question to be asked again rather than the
+ *      change being absorbed silently.
+ *
+ * ⚠ IT IS NOT A LICENCE. If this shape ever appears on a meaningful share of
+ * calls, the ruling is stale — reopen it rather than widening this test.
+ */
 test('⚠ THE KNOWN RESIDUAL — "again" without the figure still gets through', () => {
-  // Recorded rather than papered over (ruling: no time floor). The prospect asks
-  // for the total "again" but never names it, so nothing in the transcript marks
-  // the price as already known. Exactly one call in 124 has this shape.
+  // The prospect asks for the total "again" but never names it, so nothing in
+  // the transcript marks the price as already known. Exactly one call in 124
+  // has this shape (measured 2026-08-18).
   const residual = [
     turn('PROSPECT', 'And the total amount, again, is?', 72),
     turn('CLOSER', 'To work with us, the one-time investment was $9,800 for everything.', 78),

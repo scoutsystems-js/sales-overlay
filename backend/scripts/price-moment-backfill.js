@@ -75,6 +75,17 @@ async function priceByUser(db) {
         noCloserLabels++; return;
       }
       const m = findPriceMoment(turns, prices[ownerOf[a.fathom_call_id]]);
+      /**
+       * ⚠⚠ A NULL IS WRITTEN EXPLICITLY, NEVER LEFT ABSENT — and the two are not
+       * the same thing however identical they look to a query.
+       *   an ABSENT row  = "this call has never been evaluated"
+       *   a NULL row     = "this call WAS evaluated and there is no price drop"
+       * Both read as `price_stated_at_seconds IS NULL`. They mean opposite
+       * things to the next run: the first should be processed, the second should
+       * be left alone. Writing the null is what lets a re-run tell them apart —
+       * and ~1 in 3 calls legitimately has no moment, so this is the common case,
+       * not an edge one.
+       */
       plan.push({
         fathom_call_id: a.fathom_call_id, outcome: a.outcome,
         seconds: m ? m.seconds : null, quote: m ? m.quote : null,
