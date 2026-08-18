@@ -1381,6 +1381,28 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **⚠ AND SAY SO WHEN THE EARLIER REPORT WAS WRONG.** The previous findings said "it's too faint, here are three levers"; the correct follow-up is *"that was partly a misdiagnosis — a meaningful share of the faintness was the composition defect, not the values."* A trade offered in good faith that turns out to be the wrong trade has to be **withdrawn explicitly**, or the architect spends a decision on a false choice.
 - **Same family as tuning the wrong variable** (*prove it is drawing before tuning any visual property*) and *the fix and the cover-up look identical from outside* — this is that shape at the point of RECOMMENDATION rather than of diagnosis. **When about to offer a knob, ask first whether anything upstream of it is broken.**
 
+### ⚠⚠⚠ A DEPLOY CAN FAIL SILENTLY WHILE EVERY EXISTING CHECK PASSES — `/health` 200 PROVES SOMETHING IS SERVING, NOT THAT **YOUR COMMIT** IS (2026-08-18, TWICE IN ONE BLOCK)
+**THE SHAPE: build SUCCEEDS, image PUSHES, the container dies with EMPTY runtime logs, and Railway keeps serving the PREVIOUS build. Health stays 200. The site works. Live sits one or more commits behind `main`, and nothing anywhere says so.**
+- **Observed twice in a single block, on HTML/CSS-only commits** (`85e7b15`, then `86da890`). Build logs both end `image push`; runtime logs are empty; `latestDeployment.status = FAILED` while `activeDeployments` still holds the older SUCCESS. **One recovered on a single `railway redeploy`; the other did not** — so a retry is worth exactly one attempt before it stops being transient.
+- **⚠⚠ EVERY CHECK THIS PROJECT ALREADY HAD WOULD HAVE PASSED.** `/health` 200 — yes, the OLD container answers it. Page loads — yes, the OLD page. Even a marker grep passes if the marker predates the failed commit. **The ONLY check that catches it is the one this file already mandates: verify the DEPLOYED COMMIT HASH.** This is the incident that proves that rule rather than merely asserting it.
+- **⚠⚠ THE POLLING RULE, AND ITS COROLLARY — THE COROLLARY IS WHAT ALMOST FAILED:**
+  > **A POLL LOOP THAT EXHAUSTS WITHOUT CONFIRMING IS A FAILURE, NOT AN INCONCLUSIVE RESULT.**
+  > **AND YOU MUST ESCALATE *AT* THE LIMIT — not move on and re-check later.**
+  The first time, the loop ran 20 polls without confirming and the work continued to the next task with an intention to re-check at the end. **That intention is what nearly shipped a false "live" report**; the failure was only caught because the block happened to re-check before writing findings. "I'll confirm at the end" is not a plan, it is a hope with a deadline nobody enforces.
+- **THE LOOP SHAPE THAT BEHAVES CORRECTLY** — treat `FAILED` as terminal, and exhaustion as failure, and say so in the same breath:
+```bash
+ok=no
+for i in $(seq 1 $LIMIT); do
+  case "$OUT" in
+    "SUCCESS $TARGET") ok=yes; break;;
+    FAILED*)           echo "DEPLOY FAILED — escalate now"; break;;
+  esac
+done
+[ "$ok" = no ] && echo "⚠ EXHAUSTED WITHOUT CONFIRMING — treat as FAILURE"
+```
+- **AND CONFIRM ON THE ARTEFACT, NOT ONLY THE STATUS.** The served page is the second, independent witness: `curl` the page and grep for a value that only the new commit produces. When the deploy failed, the page still showed the OLD radii — which is how the state was proven rather than inferred.
+- **⚠ A FAILED DEPLOY IS NOT A ROLLBACK, AND THAT IS WHY IT IS DANGEROUS.** Nothing is broken, nobody is paged, the product is up. It is a SILENT DIVERGENCE between the repository and production, and the longer it goes unnoticed the more commits stack behind it — every one of which will be attributed to the wrong build when someone finally looks.
+
 ### ⚠⚠ A PRESENCE CHECK CANNOT SEE PRECEDENCE — "IS IT THERE" AND "IS IT IN EFFECT" ARE DIFFERENT QUESTIONS (2026-08-18)
 **In any language where the last declaration wins, asserting that the right value APPEARS proves nothing about whether it RENDERS. The guard can be green, the value can be in the file, and a duplicate further down can be the thing actually running.**
 - **The live case:** `body::before` on the login page carried **two** `background-position` and **two** `background-size` declarations — the derived pair first, a leftover pair from the 3x version second. **CSS gives the later one the win**, so the page rendered `center 23vh / 150vmin auto` while the intended `center top / auto 100%` sat inert above it. The box's top was correctly 0; the INK floated down **207px**, landing level with the top of the text. **Reported three times before the cause was found.**

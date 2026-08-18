@@ -108,6 +108,19 @@
        be AT LEAST 50% WIDER than the login box — 400px box, so 600px+ of
        wordmark. It cannot live inside a max-width:400px card and be wider than
        it, so it is pulled to the viewport's own width and re-centred. */
+    /* ⚠⚠ THE LOCKUP IS LOGIN-ONLY, AND THE NAV MARK STAYS — A DECISION, NOT
+       AN INCONSISTENCY (Justin, 2026-08-18). The planned "mark replaces the O
+       in SCOUT" lockup keeps the WHOLE mark, arcs AND dots. The trailing dot is
+       7.3% of the mark's height, so it needs a mark >=27px tall merely to reach
+       2px — which as an O on the cap height means a font-size of ~39px minimum.
+       The nav renders at 15px. THE LOCKUP THEREFORE CANNOT GO IN THE NAV, and
+       the plain mark + "Scout" stays there permanently.
+
+       ⚠ DO NOT "UNIFY" THE TWO LATER. Two treatments coexisting is the accepted
+       consequence of keeping the dots; an editor who notices the inconsistency
+       and harmonises them will either shrink the lockup below its resolution
+       floor or enlarge the nav. Both were considered and declined. */
+
     .brand-lockup {
       text-align: center; margin: 0 0 30px;
       width: min(92vw, 900px);
