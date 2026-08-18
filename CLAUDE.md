@@ -1210,7 +1210,9 @@ Same shape for closing: gauge **Closing Rate** · graph **Closing %** · list **
 
 ### ⏳⏳ OPEN DEBT — **FIVE UNCONFIRMED RENDERS ON THE LOGIN PAGE** (logged 2026-08-18, growing)
 **⚠⚠ THE COUNT IS THE POINT. Justin's eyes have caught every real defect on this page — the wrapped wordmark, the mark filling three quarters of its box, the faux-bold — and FIVE CHANGES DEEP IS WHERE THAT STOPS BEING RELIABLE.** One unconfirmed render is a bounded risk; five stacked on top of each other means a defect in change two is now hiding behind changes three, four and five, and whoever looks will see a compound result they cannot attribute.
-**The extension has been down across THREE consecutive blocks.** If it is still down when a block starts, **say so at the TOP of the report** rather than letting the count grow quietly at the bottom.
+**⚠⚠ DIAGNOSED 2026-08-18: `list_connected_browsers` returns `[]` — ZERO browsers registered to the account. This is NOT a stale tab id, not a tab-group problem, and not something `switch_browser` can fix, because that broadcasts to connected extensions and there are none. THERE IS NO TOOL-SIDE RECOVERY; it needs action on the machine (open Chrome, confirm the Claude extension is enabled and signed into the same account, restart Chrome if it is).**
+**⚠ STANDING RULING WHILE IT IS DOWN: DO NOT DO VISUAL WORK ON THIS PAGE.** Reasoning from source has now produced **three wrong causes on this one element** (a stale fallback, letterboxing, and only then the real duplicate declaration), and four blind blocks cost four review rounds on what is a five-minute look. Code-verification is not a substitute here — change 5 shipped code-verified and was still wrong.
+**The extension has been down across FOUR consecutive blocks.** If it is still down when a block starts, **say so at the TOP of the report** rather than letting the count grow quietly at the bottom.
 ```
 UNCONFIRMED, in order shipped:
   1  Montserrat feel test (two weights, faux-bold eliminated)
@@ -1378,6 +1380,19 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **THE ORDER THAT MAKES IT DISCOVERABLE, and it is the whole method: FIX THE ACTUAL CAUSE FIRST, THEN RE-LOOK.** Not "try the cheap knob and see" — the knob works, which is exactly why it teaches you nothing. Only after the composition was corrected was it possible to see that the levers were never needed.
 - **⚠ AND SAY SO WHEN THE EARLIER REPORT WAS WRONG.** The previous findings said "it's too faint, here are three levers"; the correct follow-up is *"that was partly a misdiagnosis — a meaningful share of the faintness was the composition defect, not the values."* A trade offered in good faith that turns out to be the wrong trade has to be **withdrawn explicitly**, or the architect spends a decision on a false choice.
 - **Same family as tuning the wrong variable** (*prove it is drawing before tuning any visual property*) and *the fix and the cover-up look identical from outside* — this is that shape at the point of RECOMMENDATION rather than of diagnosis. **When about to offer a knob, ask first whether anything upstream of it is broken.**
+
+### ⚠⚠ A PRESENCE CHECK CANNOT SEE PRECEDENCE — "IS IT THERE" AND "IS IT IN EFFECT" ARE DIFFERENT QUESTIONS (2026-08-18)
+**In any language where the last declaration wins, asserting that the right value APPEARS proves nothing about whether it RENDERS. The guard can be green, the value can be in the file, and a duplicate further down can be the thing actually running.**
+- **The live case:** `body::before` on the login page carried **two** `background-position` and **two** `background-size` declarations — the derived pair first, a leftover pair from the 3x version second. **CSS gives the later one the win**, so the page rendered `center 23vh / 150vmin auto` while the intended `center top / auto 100%` sat inert above it. The box's top was correctly 0; the INK floated down **207px**, landing level with the top of the text. **Reported three times before the cause was found.**
+- **⚠ AND THE GUARD WAS PINNING THE DEAD DUPLICATE.** It asserted `background-size: 150vmin` was present — which was **true**, of the declaration that was overriding the intended one. So the test passed *because* the bug existed, and would have kept passing forever.
+- **THE FIX IS A SHAPE, NOT A STRING: ASSERT EXACTLY ONE.**
+```js
+assert.strictEqual((css.match(/background-position\s*:/g) || []).length, 1);
+assert.strictEqual((css.match(/background-size\s*:/g) || []).length, 1);
+```
+  Counting is what distinguishes "the value is set" from "the value is set and nothing overrides it". Then assert the value itself.
+- **WHERE ELSE THIS BITES — anywhere last-wins resolution exists:** duplicated CSS declarations in one rule, a later stylesheet or `<style>` block, inline `style` beating both, `!important`, later object spread keys (`{...a, ...b}`), repeated CLI flags, env vars set twice in a shell, duplicate keys in a config file. **In all of them a grep for the desired value returns true while the effective value is something else.**
+- **The generalisation of the generalisation: when a system resolves conflicts by ORDER, a check must assert the RESOLUTION, not the presence.** Same family as *the thing you are testing may not be the thing that runs* — here the thing that runs is a different copy of the same property.
 
 ### ⚠⚠ TEXT MOVED ONTO THE ARTWORK AND THE CONTRAST NUMBER DID NOT MOVE — BECAUSE THEY SHARE A COLOUR (2026-08-18)
 **⚠ THE REASON IS WRITTEN DOWN BECAUSE WITHOUT IT THIS READS AS A MISSED CHECK.** "We put text on the densest part of the mark and the derived opacity came back identical for the fourth time" is exactly what a skipped re-derivation looks like. It was not skipped; the answer is genuinely unchanged, and it is provable rather than measured.
