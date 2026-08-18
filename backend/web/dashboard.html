@@ -2311,7 +2311,26 @@
       animation: welSettle var(--wel-text-in) cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     .wel-kicker { font-size: clamp(11px, 1.5vw, 15px); font-weight: 600; text-transform: uppercase; }
-    .wel-title  { font-size: min(5.2vmin, 68px); font-weight: 800; margin-top: 8px; }
+    /**
+     * ⚠⚠ SIZED FROM k AT THE WIDEST TRACKING, NOT THE RESTING ONE — the rule
+     * this page has broken four times. welSettle starts at letter-spacing 0.7em,
+     * so the FIRST frame is the widest, and the lockup makes the run MIXED:
+     * twelve glyphs plus one SVG occupying the O's advance.
+     *
+     *     k at 0.7em   Montserrat 700  17.829      Archivo Expanded  20.286
+     *     stage = min(92vw, 92vh) = 92vmin
+     *     92 / 20.286 = 4.53vmin  <- the WIDER face governs, so 4.5vmin ships
+     *
+     * The wider of the two candidate faces sets the coefficient, for the same
+     * reason the fallback face does on the login page: whichever renders, it
+     * must fit. Verified with scrollWidth vs clientWidth, because
+     * getBoundingClientRect on a block returns the clamped box and cannot see
+     * overflow at all.
+     */
+    .wel-title  { font-size: min(4.5vmin, 68px); font-weight: 800; margin-top: 8px; }
+    .wel-o { display: inline-block; width: calc(1em * 0.844); height: calc(1em * 0.700);
+             vertical-align: baseline; margin-bottom: calc(-1em * 0.700 * 0.0873); overflow: visible; }
+    .wel-o svg { width: 100%; height: 100%; overflow: visible; display: block; }
     /* both settle IN from wide tracking as they fade up */
     @keyframes welSettle {
       from { opacity: 0; letter-spacing: 0.7em; }
@@ -3319,7 +3338,7 @@
       + '<div class="wel-stage">' + svg
         + '<div class="wel-text">'
           + '<div class="wel-kicker" style="--wel-track:0.42em;animation-delay:' + T.textAt + 'ms">Welcome to</div>'
-          + '<div class="wel-title" style="--wel-track:0.06em;animation-delay:' + T.titleAt + 'ms">SCOUT SYSTEMS</div>'
+          + '<div class="wel-title" style="--wel-track:0.06em;animation-delay:' + T.titleAt + 'ms">SC<span class="wel-o" aria-hidden="true"><svg viewBox="0.4 2.4 19.2 17.9" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.826 18.744 A8.5 8.5 0 1 1 15.174 18.744" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/><path d="M6.652 16.363 A5.5 5.5 0 1 1 13.348 16.363" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/><path d="M8.478 13.983 A2.5 2.5 0 1 1 11.522 13.983" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="12" r="1.6" fill="var(--accent)"/><circle cx="10" cy="16" r="1.2" fill="var(--accent)"/><circle cx="10" cy="19.5" r="0.8" fill="var(--accent)"/></svg></span>UT SYSTEMS</div>'
         + '</div>'
       + '</div></div>';
   }

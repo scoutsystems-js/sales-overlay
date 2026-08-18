@@ -135,10 +135,13 @@ test('the background mark matches the nav logo rather than being redrawn by eye'
   const arcs = (t) => (t.match(/A[\d.]+ [\d.]+ 0 0 1 [\d.]+ [\d.]+/g) || []).join('|');
   const radii = (t) => (t.match(/r='([\d.]+)'|r="([\d.]+)"/g) || []).map((m) => m.replace(/['"]/g, '')).join('|');
   assert.ok(arcs(css).length > 0, 'no arcs found in the background mark');
-  assert.strictEqual(arcs(css), arcs(nav),
-    'same three arcs as the nav mark — a hand-redrawn second version is how two '
-    + 'subtly different logos end up on one product. THE ARCS CARRY THE MARK\'S '
-    + 'IDENTITY and must never diverge.');
+  /**
+   * ⚠ THE ARCS NO LONGER MATCH EXACTLY — note 4 scaled the rings x1.12, the
+   * SECOND approved divergence from the nav mark (the lockup's 285-degree
+   * sweep was the first). Equality was the right pin while the background mark
+   * was meant to be the nav mark at another size; it is now a ratio, checked
+   * below, so the intended difference is pinned rather than the guard dropped.
+   */
 
   /**
    * ⚠⚠ THE DOT RADII DELIBERATELY DIVERGE (Justin, 2026-08-18: halved TWICE —
@@ -152,17 +155,40 @@ test('the background mark matches the nav logo rather than being redrawn by eye'
   // ⚠ the nav mark is HTML (r="1.6"); the background is a data URI (r='1.6').
   // Matching one quote style found zero radii in the nav and the guard failed
   // for the wrong reason.
-  const nums = (t) => (t.match(/r=['"]([\d.]+)['"]/g) || [])
-    .map((m) => parseFloat(m.replace(/r=['"]|['"]/g, '')));
-  const navR = nums(nav), bgR = nums(css);
+  /**
+   * ⚠⚠ THE GUARD IS A RATIO, NOT AN EQUALITY — it pins the APPROVED divergence
+   * rather than being dropped (note 4, 2026-08-18). Two deliberate departures
+   * from the nav mark now exist: the lockup's 285-degree arcs, and this
+   * background mark's larger rings + tighter dots. Both were ruled; neither may
+   * drift, and a future edit "restoring" either has to be deliberate.
+   *
+   *   rings  x1.12   (8.5/5.5/2.5 -> 9.52/6.16/2.8)
+   *   dots   radii x0.25, centre spacing x0.62 from the ring centre
+   */
+  const nums = (t, attr) => (t.match(new RegExp(attr + "=['\"]([\\d.]+)['\"]", 'g')) || [])
+    .map((m) => parseFloat(m.replace(new RegExp(attr + "=['\"]|['\"]", 'g'), '')));
+  const navArc = (nav.match(/A([\d.]+) /g) || []).map((m) => parseFloat(m.slice(1)));
+  const bgArc = (css.match(/A([\d.]+) /g) || []).map((m) => parseFloat(m.slice(1)));
+  assert.strictEqual(bgArc.length, navArc.length, 'same number of arcs');
+  navArc.forEach((r, i) => {
+    assert.ok(Math.abs(bgArc[i] / r - 1.12) < 0.005,
+      'ring ' + (i + 1) + ' must be exactly 1.12x the nav radius (' + r + ' -> '
+      + (r * 1.12).toFixed(2) + '), got ' + bgArc[i]
+      + '. This is the APPROVED divergence, pinned so it cannot drift.');
+  });
+  const navR = nums(nav, 'r'), bgR = nums(css, 'r');
   assert.strictEqual(bgR.length, navR.length, 'same number of dots');
   navR.forEach((r, i) => {
     assert.ok(Math.abs(bgR[i] / r - 0.25) < 0.001,
-      'dot ' + (i + 1) + ' must be exactly a QUARTER of the nav radius (' + r
-      + ' -> ' + (r / 4) + '), got ' + bgR[i] + '. Two halvings of the radius = '
-      + '6.25% of the original AREA, because these dots are filled. The ratio is '
-      + 'pinned rather than the value so the dots cannot drift, and so a future '
-      + 'edit restoring them to match the nav has to be deliberate.');
+      'dot ' + (i + 1) + ' radius must stay a QUARTER of the nav (' + r + ' -> '
+      + (r / 4) + '), got ' + bgR[i]);
+  });
+  const navCy = nums(nav, 'cy'), bgCy = nums(css, 'cy');
+  navCy.forEach((cy, i) => {
+    const expected = 12 + (cy - 12) * 0.62;
+    assert.ok(Math.abs(bgCy[i] - expected) < 0.01,
+      'dot ' + (i + 1) + ' centre must be tightened to x0.62 of its offset ('
+      + cy + ' -> ' + expected.toFixed(2) + '), got ' + bgCy[i]);
   });
 });
 

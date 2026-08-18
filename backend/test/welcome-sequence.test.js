@@ -236,6 +236,15 @@ test('the sequence is about three seconds, drawn, with no dependency', () => {
   assert.ok(/<svg class="wel-svg"/.test(mk), 'inline SVG');
 });
 
+test('⚠ the overlay title carries the LOCKUP — one glyph, in the O slot', () => {
+  const mAt = LIVE.indexOf('function welcomeOverlayHtml');
+  const mk = LIVE.slice(mAt, LIVE.indexOf('function welcomeDismiss'));
+  assert.ok(/class=\\"wel-o\\"/.test(mk) || /wel-o/.test(mk), 'the O slot must exist');
+  assert.strictEqual((mk.match(/wel-o/g) || []).length >= 1, true, 'exactly one lockup glyph');
+  assert.ok(/SC</.test(mk) && /UT SYSTEMS/.test(mk),
+    'the title must still read SCOUT SYSTEMS around the glyph');
+});
+
 test('the overlay contains every element the design called for', () => {
   const mAt = LIVE.indexOf('function welcomeOverlayHtml');
   const mk = LIVE.slice(mAt, LIVE.indexOf('function welcomeDismiss'));
@@ -247,7 +256,9 @@ test('the overlay contains every element the design called for', () => {
   assert.ok(/wel-sweep/.test(mk), 'radar sweep');
   assert.ok((mk.match(/\[170, 170\], \[830, 170\], \[170, 830\], \[830, 830\]/g) || []).length === 1,
     'four satellites, one per corner');
-  assert.ok(/Welcome to/.test(mk) && /SCOUT SYSTEMS/.test(mk), 'the two lines of copy');
+  // ⚠ the title is SPLIT around the lockup glyph now: SC<svg/>UT SYSTEMS
+  assert.ok(/Welcome to/.test(mk) && /SC</.test(mk) && /UT SYSTEMS/.test(mk),
+    'the two lines of copy, with the wordmark split around the O glyph');
 });
 
 // ── the first-paint cover (Josh's "tabs flash", 2026-08-18) ───────────────
@@ -363,9 +374,15 @@ test('⚠⚠ the overlay wordmark fits at the WIDEST tracking the animation pass
   assert.ok(titleCss.length > 40 && titleCss.length < 400, 'slice suspicious: ' + titleCss.length);
   const sizeVmin = Number((titleCss.match(/font-size:\s*min\(([\d.]+)vmin/) || [])[1]);
   assert.ok(sizeVmin, 'the title must be sized in vmin against the 92vmin stage');
-  const N = 'SCOUT SYSTEMS'.length;            // 13
-  const K_REST = 8.463, T_REST = 0.02;         // measured in-browser, same face
-  const kAtStart = K_REST + (start - T_REST) * N;
+  /**
+   * ⚠ THE RUN IS MIXED NOW — the lockup glyph occupies the O's advance, so k is
+   * "sum of the other twelve + the mark's advance + tracking x 13". Measured
+   * from the FONT FILES for both trial faces at the animation's WIDEST tracking:
+   *     Montserrat 700 @0.7em = 17.829     Archivo Expanded @0.7em = 20.286
+   * The WIDER face governs, exactly as the fallback face does on the login page:
+   * whichever one renders, it has to fit.
+   */
+  const kAtStart = 20.286;
   assert.ok(sizeVmin * kAtStart <= 92,
     'at the START of the animation the title is ' + (sizeVmin * kAtStart).toFixed(1)
     + 'vmin wide against a 92vmin stage — it will wrap and then snap. Size from '
