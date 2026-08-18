@@ -271,7 +271,17 @@
          stroke-opacity (0.35-1.0), so a low layer value drops the faintest
          strokes back to where the WHOLE treatment used to sit and the hierarchy
          inside each shape collapses into one flat tone. */
-      opacity: 0.26;
+      /* ⚠ 0.26 -> 0.40 (Justin: brighter). CEILING MEASURED ACROSS ALL 15
+         MOTIF VIEWS: the worst-exposed text here is #ededed, because THE
+         NO-GREY RULE MADE --muted IDENTICAL TO --text on this surface. AA
+         therefore does not bind until 0.535 (4.57:1). 0.40 gives 6.62:1 — a
+         54% brightness increase with real margin instead of sitting on the
+         boundary; 0.53 is available if more is wanted.
+         ⚠ THE LOGIN PAGE CANNOT FOLLOW: css/style.css still uses a real grey
+         (--muted #8a9aaa), so its ceiling is 0.215 and it is already at 0.20.
+         "Site-wide" is not one number — it is each surface at its OWN measured
+         ceiling, and the two differ because their text colours differ. */
+      opacity: 0.40;
       background-repeat: no-repeat;
     }
     body[data-view="overview"]::before { background-image: var(--motif-a); background-position: right -200px top -140px; }

@@ -45,7 +45,8 @@ test('the wordmark is the full name, big, LIGHT and green', () => {
   assert.ok(size >= 28, 'big: ' + size + 'px');
   // ⚠ Justin, 2026-08-18: "BIGGER, NOT BOLD." The previous assertion demanded
   // weight >= 700, which is now the opposite of the requirement.
-  assert.ok(weight <= 600, 'not bold: ' + weight);
+  // Justin reversed this 2026-08-18: the title is now BOLD and one size larger.
+  assert.ok(weight >= 700, 'bold: ' + weight);
   assert.ok(/color:\s*var\(--green\)/.test(css), 'green, from the token');
 });
 
@@ -184,11 +185,11 @@ test('⚠ the small mark is GONE from the lockup — one logo per screen', () =>
 test('the wordmark is bigger again, and >= 50% wider than the login box', () => {
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
   const size = Number((css.match(/font-size:\s*min\([\d.]+vw,\s*(\d+)px\)/) || [])[1]);
-  assert.ok(size >= 84, 'bigger again on Justin 2026-08-18: got ' + size);
+  assert.ok(size >= 100, 'one size larger again (92 -> 104): got ' + size);
   // And at least 50% wider than the 400px login box: 92px x k 8.924 = ~820px.
-  assert.ok(size * 8.924 >= 400 * 1.5,
+  assert.ok(size * 9.769 >= 400 * 1.5,
     'the wordmark must span >= 1.5x the login box (600px); ' + size + 'px gives '
-    + Math.round(size * 8.924) + 'px');
+    + Math.round(size * 9.769) + 'px');
 });
 
 test('⚠ the background layer follows the motif treatment exactly', () => {
@@ -278,7 +279,12 @@ test('⚠⚠ the wordmark size is DERIVED from available width — it cannot wra
   // a blocked webfont falls back and the formula must hold either way.
   //   Montserrat 500 / 0.08em = 9.495   (binds — 6.4% wider than the fallback)
   //   system     500 / 0.08em = 8.924
-  const K = { '500|0.08em': 9.495 };
+  // ⚠ k IS PER (weight, tracking), MEASURED — and for 700 it must come from the
+  // REAL cut. The browser reported 9.597 for "700" while the bold face had not
+  // loaded, i.e. it measured its own FAUX bold and understated by 0.172. These
+  // are from the Montserrat TTFs directly (sum of advances + tracking x 13):
+  //   Montserrat 500 / 0.08em = 9.583        700 / 0.08em = 9.769
+  const K = { '500|0.08em': 9.583, '700|0.08em': 9.769 };
   const k = K[weight + '|' + tracking];
   assert.ok(k,
     'k is measured per (weight, tracking) — this pairing is ' + weight + '/' + tracking

@@ -71,8 +71,28 @@ test('the layer is decorative and unreachable — never in front of content', ()
   // ⚠ STILL NOT THE SAFETY MECHANISM. Where ink lands on text, move the CROP or
   // POSITION — never turn the opacity down. The cap only stops decoration
   // creeping past what was approved.
-  assert.ok(parseFloat(op[1]) <= 0.30,
-    'decoration must not exceed the brightest value ever approved. Found ' + op[1]);
+  /**
+   * ⚠⚠ THE CEILING IS NOW COMPUTED, NOT PINNED (2026-08-18). It used to be 0.30
+   * — "the brightest the approved mocks ever drew" — and that is a fact about a
+   * mock, not about readability. Justin asked for brighter, and a pinned number
+   * cannot answer whether brighter is SAFE.
+   *
+   * The real constraint is contrast on the worst-exposed text. ⚠ On THIS
+   * surface that text is #ededed, because the no-grey rule made --muted
+   * identical to --text — which is why the dashboard tolerates far more than
+   * the login page (whose --muted is a genuine grey and caps at 0.215).
+   */
+  const opacity = parseFloat(op[1]);
+  const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const ratio = (a, b) => { const x = Math.max(lum(a), lum(b)), y = Math.min(lum(a), lum(b)); return (x + 0.05) / (y + 0.05); };
+  const MARK = [9, 224, 70], BG = [10, 10, 10], WORST_TEXT = [237, 237, 237];
+  const backdrop = MARK.map((c, i) => Math.round(opacity * c + (1 - opacity) * BG[i]));
+  const contrast = ratio(WORST_TEXT, backdrop);
+  assert.ok(contrast >= 4.5,
+    'the worst-exposed text (#ededed) must clear 4.5:1 over a solid motif '
+    + 'stroke — got ' + contrast.toFixed(2) + ' at opacity ' + opacity
+    + '. AA binds at 0.535 on this surface; raise the mark, not past that.');
   assert.ok(parseFloat(op[1]) >= 0.16,
     'below the approved band the shape is invisible on a monitor — the bug this '
     + 'replaced. Found ' + op[1]);

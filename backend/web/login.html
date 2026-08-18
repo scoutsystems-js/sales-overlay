@@ -10,7 +10,7 @@
        block the sign-in form from rendering. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
     /* Login-specific layout on top of the shared brand stylesheet. */
@@ -162,10 +162,10 @@
      * coefficient. Test asserts the pairing.
      */
     .brand-lockup .brand-name {
-      font-size: min(9.6vw, 92px);
+      font-size: min(9.4vw, 104px);
       /* Justin: BIGGER, NOT BOLD. 800 -> 500, and the extra tracking is what
          keeps a lighter weight from reading thin at this size. */
-      font-weight: 500; letter-spacing: 0.08em;
+      font-weight: 700; letter-spacing: 0.08em;
       white-space: nowrap;
       color: var(--green); line-height: 1.02;
       text-shadow: 0 0 30px rgba(var(--green-rgb), 0.3);
@@ -745,7 +745,7 @@
     .login-nav .nav-logo, .login-nav .back, .submit-btn, .launch-btn,
     #forgotRow a, .login-footer a,
     .login-main h1, .login-main h2, .login-main h3 { font-weight: 300; }
-    .brand-lockup .brand-name { font-weight: 500; }
+    .brand-lockup .brand-name { font-weight: 700; }
   </style>
   <script src="/js/scout-auth.js"></script>
   <script>
