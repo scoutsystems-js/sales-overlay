@@ -1063,6 +1063,38 @@ delete from prospects     where display_name  like 'Seed %';
 - **⚠ MIRROR A THRESHOLD BY DISTANCE, NOT BY DIVISION.** The obvious mirror of "mid starts at 60% of target" is `C / 0.6` = 100 minutes — **off the 0-90 scale, so `bad` could never render** and a 95-minute average would still read as a warning. Using `1.4C` keeps the band the same width (0.4 × the threshold) on the other side and inside the scale. Same family as the one-sided-guard rule: **a band you cannot reach is not a band.**
 - **The reversal is recorded rather than edited away** — the superseded "0 of 4 is correct" ruling is struck in place with its original text, because a future session reading only the new entry would not know the old one existed to be re-flipped.
 
+### TEAM GRAPHS — (k) RENAME + (k2) LEGEND TOGGLE (2026-08-18)
+**"Objection Handling Over Time" → "Objection Handling %" · "Closing Rate Over Time" → "Closing %".** THREE occurrences, not two: the objection title also heads the **pivoted rep's own graph**, and renaming only the team one would have left two names for the same chart. A guard fails if either retired title returns to the render path.
+
+**(k2) THE LEGEND TOGGLES A REP'S LINE.** Two decisions carry the whole feature:
+
+- **⚠⚠ THE HIDDEN SET IS KEYED BY `user_id`, NEVER BY LEGEND INDEX OR NAME — AND THIS IS THE CODEBASE'S SIGNATURE FAILURE IN A NEW COSTUME.** The dataset ORDER changes with the window: a rep with no points is dropped *before* the datasets are built, so index 2 is a different person on a different range. **An index-keyed hidden set surviving a date change hides the WRONG REP — with no error, no gap, and a perfectly plausible chart.** Nobody checks a legend against a rep list. Proven against a deliberately reordered rep set: the same two people stay hidden.
+  - Generalises past charts: **any collection whose membership or order is derived from a query must be indexed by a STABLE ID, never by position.** Position is a property of the result set, not of the thing.
+- **⚠⚠ THE HANDLER WRITES TO `state` FIRST, THEN THE CHART — because the library's own default writes only to the chart.** Chart.js's default `legend.onClick` toggles dataset visibility on the CHART INSTANCE, and that instance is destroyed on every rebuild (metric switch, category switch, date change, nav away and back). **Taking the default would have produced a toggle that works once and silently forgets — which reads as BROKEN, not as absent.** A library default that mutates only its own object is a persistence bug waiting for the first rebuild.
+- **Hidden reps stay in the legend, STRUCK THROUGH.** Chart.js's default `generateLabels` already does this, which is *why* the default labels were kept rather than replaced: a rep who **disappears** from the legend reads as missing data, and this project has spent several blocks making sure absent and excluded never look alike. Struck-through says *"you did this, and here is how to undo it."*
+- **The team average never toggles** (Justin) — it is the baseline the reps are read against. Marked `_fixed` on the dataset so the reason travels with it, and refused in the handler.
+- **All reps hidden says so IN WORDS.** ⚠ The chart is **not empty** in that state — the baseline is still drawn — so silence would look like missing data rather than a choice. The note names the count, says how to undo it, and explains the line that remains.
+- **One selection, both graphs**, and **opt-in per chart**: the pivoted rep's single-rep graph does not share the set (hiding its only rep would empty it, and a rep hidden on the team board would arrive pre-hidden on their own page).
+
+**"STICKS" MEANS THE SESSION, NOT THE REFRESH (ruled 2026-08-18).** Metric switch, date-range change and nav-away-and-back all stick for free — `state` is module-level and every one of those funnels through a refetch → rebuild → restore. **Refresh deliberately does NOT**, and the reasoning is the record: **persisting a filter that REMOVES PEOPLE is riskiest for the manager who set it a week ago and does not remember.** The struck-through legend mitigates that (visible, self-undoing) but does not remove it, and a refresh is the natural reset. localStorage is ~5 lines if it is ever wanted.
+- **Team switch keeps the hidden set, and that FALLS OUT OF THE KEYING rather than needing code.** Keyed by `user_id`, the keys simply do not match another team's reps — a no-op there, and switching back restores the selection. Correct behaviour for a per-rep preference, obtained for free.
+
+**⚠ VERIFICATION HONESTY: THE GESTURE IS UNPROVEN.** The handler was invoked the way Chart.js invokes it (same arguments, same order) against a Chart.js-shaped stub — 20 checks including persistence across a rebuild and the reordered-window case. **What that proves is that IF a click reaches the handler, everything after it is correct. It does NOT prove Chart.js's legend hit-box delivers the click** in a real browser. A toggle is a GESTURE — the one class reload evidence cannot reach — and per the synthetic-click constraint that step needs a human. **Do not later record this as "verified" on the strength of the handler tests.**
+
+### 👁 OBSERVATION, NOT A TASK — "OBJECTION HANDLING" NAMES THREE DIFFERENT THINGS ON THE TEAM PAGE (2026-08-18)
+**⚠ RECORDED SO IT IS NOT REDISCOVERED. IT IS WITH JUSTIN. DO NOT RENAME ANYTHING ON THE STRENGTH OF THIS ENTRY.**
+| surface | title | what it measures |
+|---|---|---|
+| gauge | **Objection Handling** | pooled handle rate, **fixed 7 days** |
+| graph | **Objection Handling %** | per-rep handle rate, **the picker's range** |
+| score list | **Objection Handling** | avg **Objection-SECTION grade**, 0-100 |
+
+Same shape for closing: gauge **Closing Rate** · graph **Closing %** · list **Closing**.
+- The gauge and the graph are the **same metric over different windows** — defensible, and the `%` helps, but nothing on screen explains why the two numbers differ.
+- The score list is **a different quantity entirely** wearing the same name: a section grade of 64 and a handle rate of 23% are not comparable, and only a small meta line says so.
+- **This PREDATES item (k)** — the rename brought the graph closer to the gauge's name, making it three near-identical labels instead of two, but did not create the collision.
+- Surfaced during (k)'s duplication check, which was looking for *two names for one thing* and found *one name for three*. **Reported, explicitly not acted on** — the architect is putting it to Justin.
+
 ### ⚠⚠ STRIP LINE COMMENTS **BEFORE** BLOCK COMMENTS — `/*` INSIDE A `//` LINE IS A FALSE OPENER (2026-08-18)
 **And a guard can pass for years on the luck of a file having no closing delimiter.**
 - **The live case:** `routes/team.js` begins `// /team/* — v1.4 Manager view…`. That `/*` is inside a LINE comment and is not a comment opener — but `display-name-mirror.test.js` stripped block comments FIRST, so it saw one. The file happened to contain **no closing delimiter at all**, so the lazy regex never matched, nothing was stripped, and the guard passed. **Adding the first JSDoc block to that file swallowed the first 200 lines including the `display-name` import**, and the guard failed insisting the resolver was not imported when it plainly was.
