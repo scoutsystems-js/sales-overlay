@@ -1848,6 +1848,32 @@
     .eod-input, .eod-textarea { flex: 1; background: var(--bg-field); border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--text); padding: 6px 9px; font-size: 13px; font-family: inherit; }
     .eod-textarea { min-height: 60px; resize: vertical; line-height: 1.45; }
     .eod-input.edited, .eod-textarea.edited { border-color: var(--accent); }
+
+    /* ── (u3) EDITABLE MUST LOOK EDITABLE ─────────────────────────────────
+       Every row rendered as a field-shaped box, so it was not visible which
+       ones you can type into — on a page whose entire job is type-then-copy.
+       Read-only rows (Call link, Outcome) now sit flush with no chrome; the
+       editable ones keep the field border and gain a focus ring.
+       ⚠ STYLING ONLY. No behaviour changed, and the Slack copy path is
+       untouched — asserted byte-for-byte in the findings. */
+    .eod-static { flex: 1; font-size: 13px; padding: 6px 0; }
+    .eod-input, .eod-textarea { transition: border-color 0.15s var(--ease); }
+    .eod-input:hover, .eod-textarea:hover { border-color: var(--border-hover); }
+    .eod-input:focus, .eod-textarea:focus { border-color: var(--accent); outline: none; }
+
+    /* ── (u1) OUTCOME CHIP — semantic tokens only ─────────────────────────
+       ⚠ One shared alpha per tone over each band's own channel triple, the
+       same construction the gauges use, so the three cannot drift into three
+       hand-picked shades. The TEXT is the full-strength token: the no-grey
+       rule applies to it, and the tint is a background, not text. */
+    .eod-chip { display: inline-block; padding: 3px 10px; border-radius: 999px;
+                font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+    .eod-chip-good { color: var(--good); background: rgba(var(--good-rgb), 0.12); border-color: rgba(var(--good-rgb), 0.35); }
+    .eod-chip-mid  { color: var(--mid);  background: rgba(var(--mid-rgb),  0.12); border-color: rgba(var(--mid-rgb),  0.35); }
+    .eod-chip-bad  { color: var(--bad);  background: rgba(var(--bad-rgb),  0.12); border-color: rgba(var(--bad-rgb),  0.35); }
+    /* An unrecognised or absent outcome gets NO colour rather than a guessed
+       one — a wrong tone is worse than none, the same rule as everywhere else. */
+    .eod-chip-none { color: var(--text); background: var(--bg-field); border-color: var(--border-strong); }
     .eod-edited-dot { font-size: 10px; color: var(--accent); }
     .eod-copy-note { font-size: 12px; color: var(--good); margin-left: 8px; }
     /* Account view */
@@ -7647,6 +7673,22 @@
   }
   // (EOD Payment row removed by product ruling 2026-07-22 — the outcome
   // prefill now carries the composed "Closed - PIF" style label server-side.)
+  /**
+   * (u1) Outcome → semantic tone. ⚠ The EOD outcome string is COMPOSED
+   * ("Closed - PIF", "Closed - Payment plan") and can be a stored free-text
+   * edit, so this matches on the LEADING WORD rather than an enum — an exact
+   * match would leave every composed outcome uncoloured, and composed is the
+   * common case for closes.
+   */
+  function eodOutcomeTone(outcome) {
+    var t = String(outcome == null ? '' : outcome).trim().toLowerCase();
+    if (!t) return 'none';
+    if (t.indexOf('closed') === 0 || t.indexOf('won') === 0) return 'good';
+    if (t.indexOf('follow') === 0 || t.indexOf('pending') === 0) return 'mid';
+    if (t.indexOf('lost') === 0 || t.indexOf('no-show') === 0 || t.indexOf('no show') === 0) return 'bad';
+    return 'none';
+  }
+
   function eodOutcomeLabel(oc) {
     if (oc === 'closed') return 'Closed';
     if (oc === 'follow_up') return 'Follow-up';
@@ -7754,11 +7796,27 @@
         var pendingNote = (c.analysis_status && c.analysis_status !== 'done')
           ? '<span class="meta"> · analysis ' + escapeHtml(c.analysis_status) + ' — prefills may update</span>' : '';
         return '<div class="eod-call">'
-          + '<div class="eod-row"><div class="eod-label">Call</div><div>' + link + pendingNote + '</div></div>'
+          // (u3) Read-only, so it gets the static treatment, not input chrome.
+          + '<div class="eod-row"><div class="eod-label">Call</div><div class="eod-static">' + link + pendingNote + '</div></div>'
           + row('Prospect', 'prospect_name', f.prospect_name)
           // Outcome is READ-ONLY here now (Thread 1): it's the canonical call tag
           // (set on the Calls page / call review), composed with payment structure.
-          + '<div class="eod-row"><div class="eod-label">Outcome</div><div class="eod-input" style="opacity:0.8;cursor:default;">' + escapeHtml(f.outcome == null ? '—' : String(f.outcome)) + '</div></div>'
+          /**
+           * (u1) THE OUTCOME IS THE ONE THING WORTH COLOURING. It is the most
+           * scannable fact on a daily report, and this page carried NO colour at
+           * all — closed, follow-up and lost rendered identically.
+           *
+           * ⚠ SEMANTIC TOKENS ONLY, mapped to what they already mean elsewhere:
+           * closed → --good, follow-up → --mid, lost/no-show → --bad. No new
+           * hues, and the categorical rep ramp stays out.
+           *
+           * ⚠ IT IS STILL READ-ONLY, so this changes nothing about typing or
+           * copying. The chip replaces a field-shaped box that was never
+           * editable — which also serves (u3).
+           */
+          + '<div class="eod-row"><div class="eod-label">Outcome</div>'
+            + '<div class="eod-static"><span class="eod-chip eod-chip-' + eodOutcomeTone(f.outcome) + '">'
+            + escapeHtml(f.outcome == null ? '—' : String(f.outcome)) + '</span></div></div>'
           + row('Cash ($)', 'cash_collected', f.cash_collected)
           + row('Summary', 'summary', f.summary, true)
           + '</div>';
