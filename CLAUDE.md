@@ -1169,7 +1169,12 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
   - The exports test now asserts the removed constants are **absent**, so reintroducing the money lane trips it rather than passing quietly.
 - **THE TEST TO APPLY: is the assertion about the thing being removed, or about a property that merely used it to get at something?** Only the first should go.
 
-### ⚠⚠ WHEN A CHECK REPORTS A PROBLEM, CONFIRM THE CHECK IS SOUND BEFORE ACTING ON WHAT IT SAYS (2026-08-18)
+### ⚠⚠ A CHECK MUST STATE ITS OWN SCOPE ALONGSIDE ITS VERDICT — EVERY FALSE REPORT HERE WAS THE CHECK'S SCOPE AND THE CLAIM'S SCOPE COMING APART (2026-08-18)
+**THIS IS THE ENTRY. The instances below are evidence for it, not three separate lessons.**
+**A check examines one thing and reports a sentence about another, narrower thing — and the sentence never mentions the difference, so the difference is never examined.** Over-reporting, under-reading and matching outside the subject all look like different bugs and are one: **only the CLAIM was ever stated, never the SCOPE.**
+**THE PRACTICE: make the check name what it looked at, not only what it concluded.** *"24 matches, 0 within `.avg-*`"* can be sanity-checked; *"the old alpha is still present"* cannot. **A bare verdict is unfalsifiable by inspection; a verdict plus its scope is not.** Every instance below was resolved in ONE command once the instrument was asked to name what it had examined.
+**And the corollary, which is the older form of this rule: WHEN A CHECK REPORTS A PROBLEM, CONFIRM THE CHECK IS SOUND BEFORE ACTING ON WHAT IT SAYS.**
+
 **⚠ TWO CONTRADICTORY FACTS IN ONE RESULT IS THE TELL. A wrong count looks entirely plausible; a count that contradicts its own companion cannot be.** Live example: a post-deploy check reported all four SVG styles **MISSING** from the served page while simultaneously reporting **15 per-view assignments present**. Those cannot both be true — the assignments reference the styles. **Believe neither half until you know which one is broken.** It was shell escaping mangling a regex in an inline `node -e`; the page was correct all along. When a result disagrees with itself, that is free evidence the instrument is at fault, and it arrives before any damage is done.
 
 **A measurement error acted on becomes a design decision, and it will look like a considered one.**
@@ -1179,14 +1184,13 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **⚠ IT HAPPENED TWICE IN THE SAME BLOCK** — the probe above, and the self-contradicting post-deploy check at the top of this entry. Two different instruments, one afternoon.
 - Related, and the mirror image: the deploy-marker rule (*a 200 does not mean your code shipped*). There the check was too weak to see a real problem; here it was too crude and invented one. **Both are the same discipline — know what your check is actually measuring.**
 
-- **⚠⚠ THREE TIMES IN ONE ARC, EACH FAILING IN A DIFFERENT DIRECTION — AND THE COMMON SHAPE IS THE USEFUL PART:**
+- **⚠⚠ THE EVIDENCE — THREE TIMES IN ONE ARC, EACH FAILING IN A DIFFERENT DIRECTION, ALL ONE FAILURE:**
   | # | instrument | what went wrong | direction |
   |---|---|---|---|
   | 1 | the ink probe | counted an opaque **gradient** nav bar as transparent | **over-reported** — 20 collisions, only 4 real |
   | 2 | `display-name-mirror`'s comment stripper | treated `/*` inside a `//` line as a real opener and swallowed 200 lines | **under-read** — claimed a missing import that was on line 11 |
   | 3 | a post-deploy `grep` for a raised alpha | matched `0.10)` across the **whole stylesheet** | **matched outside its own subject** — 24 unrelated hits, 0 in the gauge rules |
-  - **THE COMMON SHAPE: the CHECK'S SCOPE and the CLAIM'S SCOPE came apart, and only the claim was ever stated.** Every one of these instruments reported a confident sentence about something narrower than what it had actually examined — *"20 collisions"* (over an area including opaque chrome), *"team.js does not import display-name"* (over a file it had mostly deleted), *"the old alpha is still present"* (over CSS the rule does not govern). **The claim never mentions the scope, so the scope is never checked.**
-  - **THE PRACTICE THAT CATCHES ALL THREE: make the check state its own scope alongside its verdict** — what it examined, not just what it concluded. A count cannot be sanity-checked; *"24 matches, 0 within `.avg-*`"* can, and takes one extra command. Every one of these was resolved in a single command once the instrument was asked to name what it had looked at.
+  - Each reported a confident sentence about something **narrower than what it had actually examined** — *"20 collisions"* over an area including opaque chrome, *"team.js does not import display-name"* over a file it had mostly deleted, *"the old alpha is still present"* over CSS the rule does not govern. **Three directions, one failure: the scope was never stated, so it was never checked.**
 
 ### ⚠⚠ A ZERO THAT ARRIVES BY CONSTRUCTION IS THE SIGNATURE OF A TAUTOLOGY (2026-08-17)
 **The most valuable measurement of the handled-definition block, and the reason two rulings had to ship in ONE commit.**
