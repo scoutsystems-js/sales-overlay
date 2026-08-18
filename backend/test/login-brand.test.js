@@ -305,28 +305,45 @@ test('⚠ the background layer follows the motif treatment exactly', () => {
  * k overflowed it for BOTH faces. A getBoundingClientRect() check could not see
  * it, because on a block that returns the CLAMPED BOX, not the content.
  */
-test('⚠⚠ every trial face fits the lockup box — derived per face, not scaled', () => {
+/**
+ * ⚠⚠ THE AVAILABLE WIDTH IS THE LOCKUP'S OWN CAP, NOT THE VIEWPORT — this is
+ * what let Archivo run off the screen during the trial. The box was
+ * min(92vw, 900px), so 900px bound on any desktop and 104px x k overflowed it.
+ * A getBoundingClientRect() check could not see it: on a block that returns the
+ * CLAMPED BOX, never the content. scrollWidth vs clientWidth is the only pair
+ * that answers the question.
+ *
+ * The trial is over — Archivo Expanded 700 shipped — so this now pins the ONE
+ * face, still derived rather than scaled.
+ */
+test('⚠⚠ the shipped face fits the lockup box — derived, not scaled', () => {
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('.brand-lockup .brand-name'));
   assert.ok(/white-space:\s*nowrap/.test(LOGIN), 'the wordmark must never wrap');
   const boxVw = Number((css.match(/width:\s*min\((\d+)vw/) || [])[1]);
   const boxPx = Number((css.match(/width:\s*min\(\d+vw,\s*(\d+)px\)/) || [])[1]);
   assert.ok(boxVw && boxPx, 'the lockup box must be min(<vw>, <px>)');
 
-  // k per (face, weight, tracking), measured from the FONT FILES — the browser
-  // has twice reported a synthesised face's numbers instead of the real cut.
-  const K = { montserrat: 9.769, archivo: 12.226 };
+  // k for Archivo Expanded 700 @0.08em, measured from the font file — never
+  // from the browser, which has twice reported a synthesised face's numbers.
+  const K = 12.226;
   const cap = Number((LOGIN.match(/--wm-cap:\s*(\d+)px/) || [])[1]);
-  const vws = [...LOGIN.matchAll(/--wm-vw:\s*([\d.]+)vw/g)].map((m) => Number(m[1]));
-  assert.strictEqual(vws.length, 2, 'one coefficient per trial face');
+  const vw = Number((LOGIN.match(/--wm-vw:\s*([\d.]+)vw/) || [])[1]);
+  assert.ok(cap && vw, 'the per-face custom properties must be set');
+  assert.ok(cap * K <= boxPx,
+    'at the ' + cap + 'px cap the wordmark is ' + Math.round(cap * K)
+    + 'px wide and must fit the ' + boxPx + 'px box');
+  assert.ok(vw * K <= boxVw,
+    vw + 'vw x k ' + K + ' = ' + (vw * K).toFixed(1) + 'vw must fit the ' + boxVw + 'vw box');
+});
 
-  Object.entries(K).forEach(([face, k], i) => {
-    assert.ok(cap * k <= boxPx,
-      face + ' at the ' + cap + 'px cap is ' + Math.round(cap * k) + 'px wide, '
-      + 'which must fit the ' + boxPx + 'px lockup box');
-    assert.ok(vws[i] * k <= boxVw,
-      face + ' coefficient ' + vws[i] + 'vw x k ' + k + ' = ' + (vws[i] * k).toFixed(1)
-      + 'vw, which must fit the ' + boxVw + 'vw box');
-  });
+test('⚠ the wordmark face is SELF-HOSTED — no third-party request on the first page', () => {
+  assert.ok(/@font-face/.test(LOGIN) && /archivo-expanded-700\.woff2/.test(LOGIN),
+    'Archivo must be served from /fonts, not fonts.googleapis.com');
+  assert.ok(!/family=Archivo/.test(LOGIN),
+    'no Google request may remain for the wordmark face');
+  assert.ok(/font-display:\s*swap/.test(LOGIN), 'a slow font must never block the form');
+  // the trial is gone
+  assert.ok(!/data-wm/.test(LOGIN), 'the ?font= trial scaffolding must be removed');
 });
 
 test('the form paints ABOVE the mark', () => {

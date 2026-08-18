@@ -10,7 +10,20 @@
        block the sign-in form from rendering. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700&family=Montserrat:wght@300;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500&display=swap" rel="stylesheet">
+  <style>
+    /* ⚠ SELF-HOSTED, NOT LINKED (Justin, 2026-08-18). This is the wordmark on the
+       first page anyone sees, so a render-blocking third-party request is the
+       wrong trade. 5,664 bytes — Google's latin subset, against 112KB for the
+       full TTF. font-display:swap so a slow font can never block the form. */
+    @font-face {
+      font-family: 'Archivo Expanded';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url('/fonts/archivo-expanded-700.woff2') format('woff2');
+    }
+  </style>
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
     /* Login-specific layout on top of the shared brand stylesheet. */
@@ -155,13 +168,14 @@
     /* ── the typeface trial (temporary scaffolding, ?font=archivo) ──────────
        ⚠ Body text stays Montserrat Light either way — Archivo is a display face
        and only the wordmark changes. The loser comes out once Justin picks. */
-    :root { --wm-family: 'Montserrat'; --wm-vw: 9.8vw; --wm-cap: 104px;
-            --cap-em: 0.700; --o-adv-em: 0.844; }
-    html[data-wm="archivo"] {
-      --wm-family: 'Archivo'; --wm-vw: 7.8vw; --wm-cap: 104px;
-      --cap-em: 0.686; --o-adv-em: 1.016;
-    }
-    html[data-wm="archivo"] .brand-name { font-stretch: expanded; }
+    /* ⚠ ARCHIVO EXPANDED 700 IS THE WORDMARK (Justin picked it, 2026-08-18).
+       The ?font= trial is REMOVED — Montserrat is out of the wordmark and stays
+       only as the body face, which is why the link above now carries 300;500
+       and no 700. The glyph metrics are Archivo's own, measured from its file:
+       cap 0.686em, O advance 1.016em, k@0.08em 12.226 (25.2% wider than
+       Montserrat), so the coefficient is 7.8vw against the 96vw lockup box. */
+    :root { --wm-family: 'Archivo Expanded'; --wm-vw: 7.8vw; --wm-cap: 104px;
+            --cap-em: 0.686; --o-adv-em: 1.016; }
 
     /* ⚠⚠ THE LOCKUP IS LOGIN-ONLY, AND THE NAV MARK STAYS — A DECISION, NOT
        AN INCONSISTENCY (Justin, 2026-08-18). The planned "mark replaces the O
@@ -826,15 +840,6 @@
      * throws or never runs, the CSS fallbacks (34vh / 58vh) render a sane mark
      * and the sign-in form is untouched.
      */
-    /* ⚠ TYPEFACE TRIAL SWITCH — ?font=archivo. Temporary scaffolding so Justin
-       can flip between the two live rather than judging from a mock. */
-    (function () {
-      try {
-        var f = new URLSearchParams(location.search).get('font');
-        if (f === 'archivo') document.documentElement.setAttribute('data-wm', 'archivo');
-      } catch (e) {}
-    })();
-
     (function () {
       var GAP = 18;              // breathing room at both ends
       var MIN_H = 140;           // below this the mark is not worth drawing
