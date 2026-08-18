@@ -286,3 +286,47 @@ test('the note is full-strength text — the no-grey rule applies to it too', ()
   assert.ok(/color: var\(--text\)/.test(m[1]), 'must use --text at full strength');
   assert.ok(!/opacity/.test(m[1]), 'no dimming — it states a fact about the user\'s own action');
 });
+
+// ── ⚠⚠ GRAPH PARITY IS PART OF THE SPEC (Justin, 2026-08-18: "don't get lazy") ──
+/**
+ * A NEW GRAPH MATCHES THE EXISTING ONES IN EVERY RESPECT — line colours and
+ * saturation, clickable legend names, the hollow-circle hidden state, the fixed
+ * team average, and the shared hidden set. The three graphs must be
+ * INDISTINGUISHABLE IN BEHAVIOUR.
+ *
+ * ⚠ THE STRUCTURAL GUARANTEE IS THAT ALL THREE GO THROUGH ONE BUILDER. These
+ * assertions exist to stop the cheap shortcut that breaks it: giving one graph
+ * its own chart-construction path "just for this case". A fourth graph added
+ * that way would look right and behave differently, and nothing else would
+ * notice.
+ */
+test('⚠⚠ all three graphs are built by the SAME function — parity by construction', () => {
+  const draws = HTML.match(/repSeriesChart\('rep(Handle|Close|Price)Chart'[^\n]*/g) || [];
+  assert.strictEqual(draws.length, 3, 'expected three repSeriesChart calls, got ' + draws.length);
+  draws.forEach((d) => {
+    assert.ok(/, true\)/.test(d), 'every team graph must be toggleable=true: ' + d.slice(0, 80));
+  });
+  // No graph may construct its own Chart directly — that is how parity dies.
+  const direct = (HTML.match(/new Chart\(/g) || []).length;
+  assert.ok(direct <= 2, 'a graph is building its own Chart instead of using repSeriesChart; found '
+    + direct + ' direct constructions');
+});
+
+test('⚠ every toggle-capable chart shares the hidden set', () => {
+  const m = HTML.match(/var REP_TOGGLE_CHARTS = \[([^\]]*)\]/);
+  assert.ok(m, 'REP_TOGGLE_CHARTS not found');
+  ['repHandleChart', 'repCloseChart', 'repPriceChart'].forEach((id) => {
+    assert.ok(m[1].indexOf(id) !== -1,
+      id + ' is missing from REP_TOGGLE_CHARTS — its legend would desync from the others');
+  });
+});
+
+test('⚠ the MINUTES graph does not inherit the percentage axis', () => {
+  // The one place the three legitimately differ, and it is unit-driven rather
+  // than a parity break. Pinned so a "tidy-up" cannot re-share the axis.
+  assert.ok(/var isMinutes = \/minutes\/i\.test\(yLabel/.test(HTML),
+    'the unit flag must be derived from the axis label, in one place');
+  assert.ok(/max: isMinutes \? undefined : 100/.test(HTML),
+    'a shared 0-100 max would render "38%" for a 38-minute call');
+  assert.ok(/isMinutes \? \(v \+ 'm'\) : \(v \+ '%'\)/.test(HTML), 'ticks must carry the right unit');
+});
