@@ -156,35 +156,29 @@
       z-index: 0;
       pointer-events: none;
       /**
-       * ⚠⚠ THE CRITERION IS CONTRAST, NOT ZERO OVERLAP — AND I REACHED FOR THE
-       * WRONG ONE TWICE BEFORE MEASURING ACROSS WIDTHS.
+       * ⚠⚠ THE OPACITY IS DERIVED FROM THE CONTRAST FLOOR, NOT CHOSEN.
        *
-       * A sweep at ONE viewport found a position with zero ink under every text
-       * element, so zero-overlap looked achievable. Re-measured across widths it
-       * is not: the mark clears all low-contrast text only at >= 1600px.
+       * At 3x and centred the mark sits behind the form and ZERO OVERLAP IS
+       * IMPOSSIBLE — that is accepted, not a defect. The criterion is the one
+       * that holds at every width: the worst-exposed text still clears AA.
        *
-       *   820  cardTitle 436 · cardSub 201 · labels 418
-       *  1100  cardTitle 192 · cardSub 183 · label 115
-       *  1440  label 36
-       *  1600  clean          1920  clean
+       * Measured across EIGHT viewports (900x800 through 1920x1080, plus a
+       * portrait 1200x1600): the highest opacity at which every element
+       * crossing the mark clears 4.5:1 is
        *
-       * ⚠ THAT "CLEAN" POSITION WAS A ONE-WIDTH ARTEFACT — the same mistake as
-       * the wordmark size that wrapped on a narrower window. Overlap is a
-       * RELATIONSHIP between the mark and a layout that moves; it cannot be
-       * settled at a single viewport.
+       *     0.21   set by the --muted LABELS (#8a9aaa), margin 4.58:1
        *
-       * Hiding the mark below 1600px (the dashboard-motif precedent) would blank
-       * it on every normal laptop, which defeats the point of having it. So the
-       * bar is the one that holds at every width: THE WORST EXPOSED TEXT STAYS
-       * READABLE OVER THE MARK. --muted against a solid stroke:
+       * and it is the SAME at every one. That is not luck: once any --muted
+       * text overlaps, the binding case is a COLOUR relationship (muted text on
+       * a solid mark stroke), not a geometric one, so viewport size stops
+       * mattering. Ships at 0.20 — one step below the derived maximum, 4.70:1,
+       * rather than sitting exactly on the boundary.
        *
-       *     0.26 -> 4.25:1   0.22 -> 4.47:1   under AA
-       *     0.20 -> 4.70:1   <- shipped       0.18 -> 4.98:1
-       *
-       * The offset still earns its keep: it cuts the overlap by roughly half at
-       * every width and takes the mark off the thickest part of the wordmark,
-       * which is what note 3 asked for. It just is not a substitute for the
-       * contrast floor.
+       * ⚠ THE SWEEP THAT PRODUCED THIS HAD TO BE REDONE. The first version held
+       * height at 800px and varied only width — but the mark is sized in vmin =
+       * min(vw, vh), so vmin stayed 800 throughout and the mark never changed
+       * size. Varying the wrong axis is the one-width error wearing a sweep's
+       * clothes. Vary vmin (i.e. height too) when checking anything sized in it.
        */
       opacity: 0.20;
       background-repeat: no-repeat;
@@ -228,8 +222,8 @@
          and the opacity can go back up for presence — 0.26, still inside the
          0.16-0.30 band, and the strokes are now ~3x finer so it reads as a
          drawn shape rather than a wash. */
-      background-position: 85% 55%;
-      background-size: 50vmin auto;
+      background-position: center 23vh;
+      background-size: 150vmin auto;
       /* ⚠ THE "BUBBLY" FIX (Justin, 2026-08-18) — MEASURED, NOT EYEBALLED.
          The mark is a 20-unit viewBox drawn at 50vmin, so ONE SVG UNIT IS ~18
          SCREEN PIXELS. stroke-width 1.6 therefore rendered as a 28.9px rounded
@@ -246,7 +240,7 @@
          dot RADII are byte-identical to the nav logo. Only stroke weight and
          fill-vs-outline changed, which are TREATMENT. A test pins the arcs and
          radii against the nav mark so a future edit cannot quietly redraw it. */
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='440' viewBox='0 0 20 22' fill='none'%3E%3Cpath d='M1.5 12 A8.5 8.5 0 0 1 18.5 12' stroke='%2309e046' stroke-width='0.55' stroke-linecap='round'/%3E%3Cpath d='M4.5 12 A5.5 5.5 0 0 1 15.5 12' stroke='%2309e046' stroke-width='0.55' stroke-linecap='round'/%3E%3Cpath d='M7.5 12 A2.5 2.5 0 0 1 12.5 12' stroke='%2309e046' stroke-width='0.55' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='1.6' fill='none' stroke='%2309e046' stroke-width='0.55'/%3E%3Ccircle cx='10' cy='16' r='1.2' fill='none' stroke='%2309e046' stroke-width='0.55'/%3E%3Ccircle cx='10' cy='19.5' r='0.8' fill='none' stroke='%2309e046' stroke-width='0.55'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='440' viewBox='0 0 20 22' fill='none'%3E%3Cpath d='M1.5 12 A8.5 8.5 0 0 1 18.5 12' stroke='%2309e046' stroke-width='0.18' stroke-linecap='round'/%3E%3Cpath d='M4.5 12 A5.5 5.5 0 0 1 15.5 12' stroke='%2309e046' stroke-width='0.18' stroke-linecap='round'/%3E%3Cpath d='M7.5 12 A2.5 2.5 0 0 1 12.5 12' stroke='%2309e046' stroke-width='0.18' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='1.6' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16' r='1.2' fill='%2309e046'/%3E%3Ccircle cx='10' cy='19.5' r='0.8' fill='%2309e046'/%3E%3C/svg%3E");
     }
     /* The form and nav sit above the mark. Without this the shape would paint
        over the fields rather than behind them. */

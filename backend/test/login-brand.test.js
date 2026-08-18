@@ -193,7 +193,16 @@ test('⚠ the background layer follows the motif treatment exactly', () => {
   assert.ok(/pointer-events:\s*none/.test(css),
     'it must never intercept a click on the form beneath it');
   assert.ok(/position:\s*fixed/.test(css) && /z-index:\s*0/.test(css), 'behind the content');
-  assert.ok(/background-size:\s*50vmin/.test(css), 'Justin asked for ~50% of the screen');
+  /**
+   * ⚠ 150vmin = 3x the original 50vmin (Justin, 2026-08-18). At this size the
+   * mark EXCEEDS THE VIEWPORT at every normal window — ~39% of it is off-screen
+   * on a landscape display, and all three dots fall below the fold. That is
+   * reported, not silently capped: the largest non-clipping size is 90vmin
+   * (1.8x), which fits at 0% off-screen everywhere measured.
+   */
+  assert.ok(/background-size:\s*150vmin/.test(css), 'Justin asked for at least 3x (150vmin)');
+  assert.ok(/background-position:\s*center/.test(css),
+    'centred under the title, not offset to the side');
 });
 
 /**
