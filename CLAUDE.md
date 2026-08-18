@@ -1127,12 +1127,24 @@ CATEGORICAL  REP_LINE_COLORS          "this is rep number four"
 - **Also ruled: the `.user-select` chevron icon keeps its grey stroke** (the no-grey rule is about TEXT), and the Team drilldown's "Cash collected" **axis label** stays (it is a label, not a card — (m) removed cards).
 - Guarded by `test/accent-palette.test.js`, which fails if the ramp contains any of the four reserved tokens and proves itself non-vacuous by re-adding the accent.
 
+### ⚠⚠ A GUARD WITH ONLY AN UPPER BOUND CANNOT CATCH "TOO LITTLE" (2026-08-18)
+**And when the thing it guards is redesigned, the guard is part of the redesign.**
+- **The live case:** `opacity <= 0.06` on the background layer. Correct for the treatment it was written for — small repeated gutter motifs. The treatment was then replaced by ONE LARGE CROPPED SHAPE per page and the cap did not move. **It held the new design below the threshold of visibility, and PASSED the suite while doing it.** Green tests, invisible feature, and the guard was the thing keeping it invisible.
+- **THE RULE: where a value has a wrong answer in BOTH directions, bound it in both.** The layer is now capped at **0.30** (the ceiling of the approved band) *and floored at **0.16*** (its bottom), so drifting back under visibility fails.
+- **A one-sided guard silently encodes an assumption about which way things go wrong.** That assumption outlives the design it was made for, and nothing announces when it stops being true.
+- **⚠ THE SECOND HALF MATTERS AS MUCH: A REDESIGN INCLUDES ITS GUARDS.** When what a constant governs changes shape, the constant is not automatically still right — re-derive it from the NEW design rather than working around it. Treating a passing test as evidence the value is still fine is exactly what let this ship.
+
+### ⚠⚠ A SCREENSHOT IS NOT A PERCEPTION TEST (2026-08-18)
+**Every capture of the background graphics "proved" they were working. Nobody could see them on a monitor.**
+- A JPEG faithfully preserves a **12/255** difference. A person looking at a screen does not perceive one. So a screenshot answers *"is it in the output?"* — a completely different question from *"can someone see it?"* — and it answers the first convincingly enough to stop the investigation.
+- **THE RULE: when the question is "can a person see this", MEASURE THE PIXEL DELTA AGAINST THE BACKGROUND.** Composite the element over the real background colour at the real opacity, sample the brightest point, report per-channel deltas. Measured here: `rgb(14,22,16)` on `rgb(10,10,10)` → **+4/+12/+6**, against the approved mocks' **+34 to +64**.
+- **Same failure as the absence family, one step milder** — there the thing did not render at all; here it rendered and could not be seen. **In both, a screenshot is evidence FOR the wrong proposition.**
+
 ### ⚠⚠ "TOO FAINT TO SEE" IS A THIRD KIND OF ABSENCE — AND A PASSING GUARD CAN BE WHAT ENFORCES IT (2026-08-18)
 **The graphics were correct in every structural respect and still invisible. Plumbing right, guard green, nobody could see them.**
 - **Measured, not estimated:** compositing the real SVG over the real page background at the shipped opacity put the shape's BRIGHTEST pixel at `rgb(14,22,16)` against `rgb(10,10,10)` — a green delta of **+12/255**. Enough to survive a screenshot; not enough to see on a monitor. **Every screenshot I had taken "proved" it was working.**
 - **THE GAP WAS AGAINST THE APPROVED DESIGN, AND THAT IS WHAT MADE IT A BUG RATHER THAN A TASTE QUESTION.** The mocks signed off drew their strokes at **16–30% with no additional layer opacity** — an effective alpha of 0.16–0.30, i.e. a green delta of **+34 to +64**. Shipped was **3–5× fainter than the thing that was approved**. Whenever a visual change is approved from a mock, the shipped value has to be compared with the MOCK'S OWN numbers, not merely judged by eye.
-- **⚠ THE GUARD WAS ENFORCING THE BUG.** `opacity <= 0.06` was derived when the treatment was small repeated motifs. The treatment changed to one large cropped shape; the cap did not, so it silently held the new design below visibility and passed while doing it. **When the thing a constant governs changes shape, the constant is not automatically still right — re-derive it from the new design rather than working around it.** It is now capped at the approved band's ceiling (0.30) **and floored at its bottom (0.16)**, so the failure mode that produced this — drifting under the visible threshold — fails the suite.
-- **A guard with only an upper bound cannot catch "too little".** Where a value has a wrong answer in both directions, bound it in both.
+- **The guard was enforcing it and a screenshot was hiding it** — both lifted into their own entries below (*a guard with only an upper bound*, and *a screenshot is not a perception test*).
 - Filed beside the other two absence failures: the `z-index:-1`-under-a-body-background layer, and the malformed SVGs. **Same presentation every time — nothing on screen, no error — and each one cost a round of tuning the wrong variable.**
 
 ### ⚠⚠ FAILURES WHOSE ONLY SYMPTOM IS ABSENCE PRESENT AS DESIGN QUESTIONS — TWO INSTANCES, SAME FAMILY (2026-08-17/18)
