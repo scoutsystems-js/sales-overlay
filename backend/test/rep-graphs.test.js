@@ -218,6 +218,68 @@ test('⚠ ALL REPS HIDDEN SAYS SO IN WORDS — the chart is not empty, the avera
     'the note must sit outside .rep-graph (a fixed 300px box) or it is clipped');
 });
 
+// ── (k2 revised) hollow-circle hidden treatment ───────────────────────────
+test('⚠⚠ NO STRIKETHROUGH — generateLabels forces hidden:false', () => {
+  // Verified against the shipped chart.js@4.4.4 bundle: the legend's text draw
+  // calls renderText(..., { strikethrough: item.hidden }). `hidden` is the ONLY
+  // thing driving the line, so forcing it false is what removes it — and it is
+  // why the hidden state has to be carried entirely by the marker below.
+  const at = HTML.indexOf('generateLabels: function (chart)');
+  assert.ok(at > 0, 'the custom generateLabels is gone — the default strikes through');
+  const fn = HTML.slice(at, HTML.indexOf('\n              },', at));
+  assert.ok(fn.length > 400 && fn.length < 3000, 'slice suspicious: ' + fn.length);
+  assert.ok(/hidden: false,/.test(fn), 'legend items must report hidden:false');
+  assert.ok(!/hidden: !chart\.isDatasetVisible|hidden: !on/.test(fn),
+    'reporting the real hidden state reinstates the strikethrough');
+});
+
+test('⚠ the OFF marker is a hollow, desaturated circle — not a missing entry', () => {
+  const at = HTML.indexOf('generateLabels: function (chart)');
+  const fn = HTML.slice(at, HTML.indexOf('\n              },', at));
+  assert.ok(/fillStyle: on \? ds\.backgroundColor : 'transparent'/.test(fn),
+    'off must be HOLLOW — no fill');
+  assert.ok(/strokeStyle: on \? ds\.borderColor : LEGEND_OFF_MARKER/.test(fn),
+    'off must ring in the desaturated marker colour');
+  assert.ok(/pointStyle: 'circle'/.test(fn), 'the marker is a circle');
+  // The label itself must NOT be dimmed — the ask was the circle, not the text.
+  assert.ok(/fontColor: '#ededed'/.test(fn), 'the label stays full strength either way');
+  assert.ok(!/fontColor: on \?/.test(fn), 'the label must not change with the toggle');
+});
+
+test('⚠ EVERYTHING THE DEFAULT SUPPLIED IS RE-SUPPLIED', () => {
+  // Replacing generateLabels means re-supplying by hand what Chart.js gave for
+  // free. Enumerated from the 4.4.4 source so a dropped field is a failing test
+  // rather than a legend that quietly loses its dashes or its click target.
+  const at = HTML.indexOf('generateLabels: function (chart)');
+  const fn = HTML.slice(at, HTML.indexOf('\n              },', at));
+  ['text:', 'fillStyle:', 'fontColor:', 'hidden:', 'lineCap:', 'lineDash:',
+   'lineDashOffset:', 'lineJoin:', 'lineWidth:', 'strokeStyle:', 'pointStyle:',
+   'rotation:', 'datasetIndex:'].forEach(function (field) {
+    assert.ok(fn.indexOf(field) !== -1, 'generateLabels dropped ' + field
+      + ' — the default supplied it and nothing else will');
+  });
+  // datasetIndex is what the click handler reads; without it every click would
+  // resolve to undefined and the toggle would silently do nothing.
+  assert.ok(/datasetIndex: i,/.test(fn), 'datasetIndex must be the dataset position');
+});
+
+test("the team average's dashed marker survives the replacement", () => {
+  const at = HTML.indexOf('generateLabels: function (chart)');
+  const fn = HTML.slice(at, HTML.indexOf('\n              },', at));
+  assert.ok(/lineDash: ds\.borderDash \|\| \[\]/.test(fn),
+    'borderDash must be carried or the baseline legend circle stops reading as dashed');
+});
+
+test('the OFF marker is a STATE marker, not text — no-grey does not apply', () => {
+  assert.ok(/var LEGEND_OFF_MARKER = 'rgba\(237, 237, 237, 0\.5\)'/.test(HTML),
+    'the off-marker constant is gone or changed shape');
+  // The note beside it must say WHY it is exempt, so a future no-grey sweep is
+  // not pointed at it.
+  const at = HTML.indexOf('var LEGEND_OFF_MARKER');
+  const around = HTML.slice(Math.max(0, at - 600), at);
+  assert.ok(/no-grey/.test(around), 'the exemption must be documented at the constant');
+});
+
 test('the note is full-strength text — the no-grey rule applies to it too', () => {
   const m = HTML.match(/\.rep-graph-note \{([^}]*)\}/);
   assert.ok(m, '.rep-graph-note style not found');

@@ -36,7 +36,21 @@ function sliceRamp(src) {
   return s;
 }
 
-function hexes(s) { return (s.match(/#[0-9a-f]{6}/gi) || []).map((h) => h.toLowerCase()); }
+/**
+ * ⚠⚠ STRIP LINE COMMENTS BEFORE EXTRACTING HEXES — the ramp's comment block
+ * NAMES the reserved tokens ("distinct from --accent #4ade80") to explain why
+ * they are excluded, and a raw scan reads those mentions as RAMP ENTRIES. The
+ * guard then reports the opposite of the truth: that the ramp contains the
+ * accent, when the comment is what keeps the next editor from adding it.
+ *
+ * Same failure the check-scope rule records: the extractor examined the whole
+ * slice and the claim was only ever about the array. Caught 2026-08-18 when the
+ * ramp gained explanatory comments.
+ */
+function hexes(s) {
+  const code = s.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+  return (code.match(/#[0-9a-f]{6}/gi) || []).map((h) => h.toLowerCase());
+}
 
 function tokenValue(name) {
   const m = LIVE.match(new RegExp('--' + name + ':\\s*(#[0-9a-f]{6})', 'i'));
@@ -63,7 +77,8 @@ test('the ramp borrows NO semantic or interactive hue', () => {
 });
 
 test('cyan leads, per the 2026-08-17 ruling', () => {
-  assert.strictEqual(RAMP[0], '#22d3ee', 'first rep line must be cyan, not the accent green');
+  assert.ok(/^#(06b6d4|22d3ee)$/.test(RAMP[0]),
+    'first rep line must be CYAN (the 2026-08-17 order ruling), got ' + RAMP[0]);
 });
 
 test('seven distinguishable hues — the consumer cycles, so a short list repeats a colour', () => {
@@ -103,9 +118,17 @@ test('every soft tint inherits the accent rather than restating it', () => {
 });
 
 test('⚠ NON-VACUITY — the guard fires when a reserved hue is put back in the ramp', () => {
-  const broken = LIVE.replace("'#22d3ee',  // cyan", "'#4ade80',\n    '#22d3ee',  // cyan");
+  // ⚠ ANCHOR DERIVED FROM THE LIVE SOURCE, not hard-coded. This test previously
+  // pinned the literal "'#22d3ee',  // cyan" and went stale the moment the ramp
+  // was made vivid (2026-08-18) — the replace became a no-op and the check would
+  // have proved nothing had it not also asserted a changed lead. Finding the
+  // first entry dynamically means a future ramp edit cannot silently empty it.
+  const ramp = sliceRamp(LIVE);
+  const first = ramp.match(/'(#[0-9a-f]{6})'\s*,/i);
+  assert.ok(first, 'no quoted hex entry found in the ramp — the array shape changed');
+  const broken = LIVE.replace(first[0], "'" + tokenValue('accent') + "'," + first[0]);
   const bad = hexes(sliceRamp(broken));
   assert.ok(bad.indexOf(tokenValue('accent')) !== -1,
     'the accent must be detectable in the ramp once reintroduced, or this suite proves nothing');
-  assert.notStrictEqual(bad[0], '#22d3ee', 'and the leads-with-cyan check must move too');
+  assert.notStrictEqual(bad[0], first[1], 'and the leads-with-cyan check must move too');
 });

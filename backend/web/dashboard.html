@@ -4851,14 +4851,36 @@
     // separable seventh hue available. Seven entries because seven reps need
     // seven distinguishable lines — the consumer cycles, so a shorter list would
     // silently draw two reps in the same colour on one chart.
-    '#22d3ee',  // cyan
-    '#a78bfa',  // violet
-    '#f472b6',  // pink
-    '#60a5fa',  // blue    — freed by the accent move; no longer means "clickable"
-    '#2dd4bf',  // teal
-    '#c4b5fd',  // light violet
-    '#67e8f9',  // light cyan
+    // ⚠ VIVID, NOT PASTEL (Justin, 2026-08-18: "I'm not a fan of the pastel
+    // colors"). The two palest entries — light violet #c4b5fd and light cyan
+    // #67e8f9 — were the actual complaint: at 2px on a dark card they read as
+    // washed-out versions of the lines above them rather than as their own reps.
+    // Every entry below is a saturated mid-tone.
+    //
+    // ⚠⚠ HIS EXAMPLE LIST SAID "green, red, blue, yellow, orange" AND THE HUE
+    // LIST IS NOT THE SPEC — the SATURATION is. Literal red/green/amber lines
+    // would re-break the rule above: a rep drawn in --bad reads as failing and a
+    // rep drawn in --accent reads as clickable. So the three semantic tokens
+    // stay out, and vividness is delivered by hues that carry no meaning.
+    // Orange and lime are the closest honest answers to "red" and "green": both
+    // are visibly distinct from --mid amber and --accent green respectively.
+    // Switching to the literal hues is a one-line change if he wants them.
+    // ⚠ CYAN STILL LEADS — the 2026-08-17 ruling is about ORDER and survives this
+    // change, which is about SATURATION. Nothing in Justin's note asks for a
+    // different first rep, so the lead is left where it was ruled.
+    '#06b6d4',  // cyan     — vivid, replaces the pale #22d3ee
+    '#f97316',  // orange   — his ask; visibly distinct from the warning amber
+    '#a855f7',  // violet
+    '#3b82f6',  // blue     — freed by the accent move; no longer means "clickable"
+    '#84cc16',  // lime     — his "green"; visibly distinct from Scout green
+    '#ec4899',  // magenta
+    '#14b8a6',  // teal
   ];
+  // (k2, revised 2026-08-18) The "off" legend marker: a hollow, desaturated ring.
+  // ⚠ Derived from --text rather than a new grey, so it stays in the same family
+  // as everything else on the card. It is a STATE MARKER, not text — the no-grey
+  // rule governs text and does not apply here (see generateLabels below).
+  var LEGEND_OFF_MARKER = 'rgba(237, 237, 237, 0.5)';
   var repCharts = {};
 
   // Ruling 2026-08-15: the selector uses Scout's EXISTING labelling — the four
@@ -4958,7 +4980,74 @@
            * the next date change and look like a bug in the toggle.
            */
           legend: {
-            labels: { color: '#ededed', usePointStyle: true, boxWidth: 10 },
+            labels: {
+              color: '#ededed', usePointStyle: true, boxWidth: 10,
+              /**
+               * ⚠⚠ REPLACES CHART.JS'S DEFAULT generateLabels — the one that was
+               * deliberately KEPT until now BECAUSE it supplied the strikethrough.
+               * Justin, 2026-08-18: "change the white line through the name to the
+               * legend circle changing from the color to a hollow grey circle, as
+               * if it was left unchecked."
+               *
+               * ⚠ THE STRIKETHROUGH IS DRIVEN BY `legendItem.hidden` AND NOTHING
+               * ELSE. Verified against the shipped chart.js@4.4.4 bundle, not
+               * assumed: the legend's text draw calls
+               *     renderText(ctx, item.text, x, y, font, { strikethrough: item.hidden })
+               * So `hidden: false` is what removes the line — and it means the
+               * hidden STATE now has to be carried entirely by the marker.
+               *
+               * ⚠⚠ EVERYTHING THE DEFAULT SUPPLIED IS RE-SUPPLIED HERE. Listed so
+               * a missing field is a visible omission rather than a silent one.
+               * The default returned, per dataset:
+               *     text · fillStyle · fontColor · hidden · lineCap · lineDash ·
+               *     lineDashOffset · lineJoin · lineWidth · strokeStyle ·
+               *     pointStyle · rotation · textAlign · borderRadius · datasetIndex
+               * `borderRadius` is omitted on purpose: it applies only to the BOX
+               * marker, and usePointStyle is on. `textAlign` is omitted so the
+               * legend's own option keeps deciding it, which is what the default
+               * did when labels.textAlign was unset.
+               *
+               * ⚠ TWO STATED DIFFERENCES FROM THE DEFAULT, both harmless here and
+               * both worth knowing if this chart ever gains fancier styling:
+               *   1. the default maps over _getSortedDatasetMetas() and takes
+               *      datasetIndex from meta.index; this maps over data.datasets in
+               *      order. Identical for a line chart, which never reorders.
+               *   2. the default reads controller.getStyle(), so it resolves
+               *      SCRIPTABLE and per-point style options; this reads the raw
+               *      dataset properties. Every style on these datasets is a plain
+               *      scalar, so they agree — but a scriptable colour added later
+               *      would be read literally by this version.
+               */
+              generateLabels: function (chart) {
+                return chart.data.datasets.map(function (ds, i) {
+                  var on = chart.isDatasetVisible(i);
+                  return {
+                    text: ds.label,
+                    // ⚠ ALWAYS false — this is the line that kills the strikethrough.
+                    // The hidden state lives in fillStyle/strokeStyle below.
+                    hidden: false,
+                    // Hollow when off: no fill, a desaturated ring. Reads as an
+                    // unchecked checkbox rather than as an absent series.
+                    // ⚠ THE NO-GREY RULE IS ABOUT TEXT. This is a STATE MARKER, not
+                    // text — the label beside it stays full-strength --text either
+                    // way. Do not point the no-grey sweep at this value.
+                    fillStyle: on ? ds.backgroundColor : 'transparent',
+                    strokeStyle: on ? ds.borderColor : LEGEND_OFF_MARKER,
+                    lineWidth: on ? (ds.borderWidth || 2) : 2,
+                    // Carried so the team average's marker keeps its dashed ring,
+                    // exactly as the default drew it.
+                    lineDash: ds.borderDash || [],
+                    lineDashOffset: ds.borderDashOffset || 0,
+                    lineCap: ds.borderCapStyle || 'butt',
+                    lineJoin: ds.borderJoinStyle || 'miter',
+                    pointStyle: 'circle',
+                    rotation: 0,
+                    fontColor: '#ededed',
+                    datasetIndex: i,
+                  };
+                });
+              },
+            },
             onClick: function (e, item, legend) {
               var ds = legend.chart.data.datasets[item.datasetIndex];
               if (!ds || ds._fixed) return;          // the baseline is not a rep
@@ -5212,6 +5301,10 @@
          out. The equivalent numbers now live on the rep cards, per rep.
       + '<div class="section fade-in">' + teamAggregateHtml() + '</div>' */
       + repSeriesSectionHtml()
+      // Justin, 2026-08-18: Team Recommendations sits directly UNDER the two
+      // graphs. Layout only — the compact card, its data and its scoping are
+      // untouched, and it still expands to the same dedicated page.
+      + '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>' + teamRecsCompactHtml() + '</div>'
       + repCardsHtml()
       + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
@@ -5223,7 +5316,6 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Objection Handling</h2>'
         + '<div class="meta">avg Objection-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>' + teamRecsCompactHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Manager Daily Digest</h2></div>' + teamDigestHtml() + '</div>';
 
     // Chart.js draws only after the assignment above has put the canvases in
