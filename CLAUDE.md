@@ -1075,6 +1075,16 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
   - The exports test now asserts the removed constants are **absent**, so reintroducing the money lane trips it rather than passing quietly.
 - **THE TEST TO APPLY: is the assertion about the thing being removed, or about a property that merely used it to get at something?** Only the first should go.
 
+### ⚠⚠ WHEN A CHECK REPORTS A PROBLEM, CONFIRM THE CHECK IS SOUND BEFORE ACTING ON WHAT IT SAYS (2026-08-18)
+**⚠ TWO CONTRADICTORY FACTS IN ONE RESULT IS THE TELL. A wrong count looks entirely plausible; a count that contradicts its own companion cannot be.** Live example: a post-deploy check reported all four SVG styles **MISSING** from the served page while simultaneously reporting **15 per-view assignments present**. Those cannot both be true — the assignments reference the styles. **Believe neither half until you know which one is broken.** It was shell escaping mangling a regex in an inline `node -e`; the page was correct all along. When a result disagrees with itself, that is free evidence the instrument is at fault, and it arrives before any damage is done.
+
+**A measurement error acted on becomes a design decision, and it will look like a considered one.**
+- **The live case:** the ink probe for the background graphics reported **20 text collisions across 3 views**. Before moving anything I checked *what* was being hit — **12 of the 20 were the nav bar**, which is painted with an opaque **gradient** and therefore reports `backgroundColor: rgba(0, 0, 0, 0)`. The probe's opacity test read colour only, so it treated a solid bar as see-through. **Only 4 of the 20 were real.**
+- **What acting on it would have cost:** shapes moved away from text that was never at risk, on three pages, permanently — and the result would have read as deliberate composition. Nobody would have gone back to ask whether the number was right.
+- **THE RULE: a failing check has two possible causes — the thing, or the check. Establish which before you change the thing.** Cheapest form: make the check name what it found (the failing element, the matched string, the row id) rather than only a count. A count cannot be sanity-checked; a name can.
+- **⚠ IT HAPPENED TWICE IN THE SAME BLOCK** — the probe above, and the self-contradicting post-deploy check at the top of this entry. Two different instruments, one afternoon.
+- Related, and the mirror image: the deploy-marker rule (*a 200 does not mean your code shipped*). There the check was too weak to see a real problem; here it was too crude and invented one. **Both are the same discipline — know what your check is actually measuring.**
+
 ### ⚠⚠ A ZERO THAT ARRIVES BY CONSTRUCTION IS THE SIGNATURE OF A TAUTOLOGY (2026-08-17)
 **The most valuable measurement of the handled-definition block, and the reason two rulings had to ship in ONE commit.**
 - **The ruling:** an objection counts as handled if `resolution === 'handled'` **OR the call's `outcome === 'closed'`**. Justin: *"objections are just barriers to a close, so if they side-step the barrier and still close, that's a win in my book."* Binary — `partial` scores zero.
@@ -1116,6 +1126,13 @@ CATEGORICAL  REP_LINE_COLORS          "this is rep number four"
 - **KB category badges (`#93c5fd`) STAY** — a taxonomy palette on the Knowledge Base page, one hue per content category, not an interactive colour.
 - **Also ruled: the `.user-select` chevron icon keeps its grey stroke** (the no-grey rule is about TEXT), and the Team drilldown's "Cash collected" **axis label** stays (it is a label, not a card — (m) removed cards).
 - Guarded by `test/accent-palette.test.js`, which fails if the ramp contains any of the four reserved tokens and proves itself non-vacuous by re-adding the accent.
+
+### ⚠⚠ FAILURES WHOSE ONLY SYMPTOM IS ABSENCE PRESENT AS DESIGN QUESTIONS — TWO INSTANCES, SAME FAMILY (2026-08-17/18)
+**"It is too faint" and "it never rendered at all" are indistinguishable from the screen. Both instances below cost a round of tuning the wrong variable before anyone checked whether the thing was drawing.**
+- **Instance 1 — the layer painted behind its own parent's background.** `body::before { z-index: -1 }` under `html, body { background }`. Rendered nothing at ANY opacity, including 1. Fixed by moving the background to `<html>` alone.
+- **Instance 2 — all four background SVGs were malformed.** The generator collapsed newline-plus-indent to the EMPTY STRING, joining attributes: `fill='none'stroke='#4ade80'`. The browser silently refused to decode every style. Fixed by collapsing to a space — and by a guard that **decodes each data URI and fails on a joined attribute, an unclosed root, or a missing brand colour**, proving itself by reintroducing a join.
+- **THE DIAGNOSTIC, in both cases: before tuning a visual property, prove the thing is DRAWING.** Set the opacity to 1; decode the data URI; ask the browser what is actually on top. **If it is still absent at full strength, the problem is not the strength.**
+- **⚠ THE COST OF NOT DOING THAT IS SPENDING A RULING ON THE WRONG QUESTION** — presenting "how faint should this be?" to someone when the honest question was "why does this not render?"
 
 ### ⚠⚠ A `z-index: -1` LAYER PAINTS BEHIND ITS OWN PARENT'S BACKGROUND — AND FAILS AS *ABSENCE*, NOT AS AN ERROR (2026-08-17)
 **The (f) background motifs rendered NOTHING. Not faintly — nothing, at every opacity, including 1.**
