@@ -1319,8 +1319,36 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **How to find the assertion to write: ask what the output CANNOT be.** A duration cannot be negative. A rate cannot exceed 100. A timestamp cannot be after the call ended (that one was already in this generator, and it is why the bug produced a *negative* rather than an absurd *large* number). **Impossibility is cheaper to assert than correctness, and catches the whole class.**
 - Related and distinct: *a check must state its own scope* (below) is about a check that is wrong; this is about **having no check at all** and mistaking the printout for one.
 
+### ⚠⚠ WHEN A CHECK'S ANSWER DEPENDS ON A CONTINUOUS VARIABLE, CHECKING **ONE VALUE** OF IT IS NOT A CHECK (2026-08-18)
+**Justin's form of it, and it is the THIRD way a verdict comes out narrower than its claim — the siblings are SCOPE (what the check looked at) and INVENTORY (which targets it enumerated). This one is RANGE: the check looked at every target, in the right place, at exactly one point on an axis that never stops moving.**
+- **⚠⚠ IT HAPPENED TWICE IN ONE SESSION, TO TWO UNRELATED CHECKS, AND BOTH TIMES PRODUCED A CONFIDENT CLEAN RESULT.**
+  1. **A font size.** `clamp(30px, 7.2vw, 68px)` + `white-space: nowrap` passed every measurement — and **wrapped again on a narrower window**. Any FIXED px value wraps at some width; the browser I happened to have open was not a sample, it was a single point.
+  2. **An ink sweep.** After offsetting the login mark, a sweep found a position with **ZERO ink under every text element**. Measured across widths it holds only at **≥1600px** — at 820 it puts 436 ink pixels under the card title alone. **The "clean" position was an artefact of the viewport it was measured at.**
+- **WHY IT IS SO CONVINCING: the result is not vague or marginal — it is ZERO, or PASS, at the width you looked at.** There is no hint in the output that an axis exists. Compare the scope failure, where the verdict is at least about the right thing; here the verdict is *correct*, and correct about one point of a continuum.
+- **THE VARIABLE IS RARELY CALLED OUT.** Viewport width, row count, transcript length, date range, team size, cache warm-vs-cold — each silently parameterises a check that reads like a yes/no. **Ask what the answer is a FUNCTION OF before recording it.**
+- **THE FIX IS THE SAME BOTH TIMES, AND IT IS NOT "TEST MORE POINTS": DERIVE THE VALUE FROM THE CONSTRAINT so the property holds by construction, then sample the range to confirm.**
+  - the font size became `availableWidth / k` with **k measured** (8.924 at the shipped weight/tracking) — it cannot wrap at any width, and the guard asserts the FORMULA plus the (weight, tracking) pairing rather than a number;
+  - the ink criterion changed from *zero overlap* (unreachable below 1600px) to *the worst exposed text stays readable* — a property that holds at every width, which then sets the opacity.
+- **AND SAMPLE ANYWAY, BY LOOKING.** Three widths — 900 / 1440 / 1920 — because a derived formula can still be derived from a wrong k. The formula makes it right in principle; the three captures make it right in fact.
+- **⚠ A guard that pins a single measured value is the same trap wearing a test's clothes.** "Verified at 1460x812" is a true statement and a weak one; say the width, and say whether anything else was checked.
+
+### ⚠⚠ TURN THE AESTHETIC COMPLAINT INTO A MEASUREMENT BEFORE ACTING ON IT — "BUBBLY" WAS 29px AGAINST 1-3px (2026-08-18)
+**A fact about the mark, not an opinion about it — and that is what made the fix obvious instead of iterative.**
+- **The live case:** Justin said the login logo reads *"bubbly"* — soft and cartoony against a product that is otherwise precise and thin. The tempting response is to nudge a stroke value and ask "better?", which is a loop with no defined end.
+- **Measured instead.** The mark is a **20-unit viewBox drawn at 50vmin**, so **one SVG unit is ~18 SCREEN PIXELS**. `stroke-width: 1.6` was therefore rendering as a **28.9px rounded tube**, with the dots as **filled discs of radius 28.9 / 21.7 / 14.5px** — against **1-3px** line work everywhere else in the product (chart borders 2, team-average line 3, gauge ticks 1.4, section borders 1).
+- **THE NUMBER REFRAMED THE PROBLEM: a 10-29x gap.** Not "a bit heavy" — an order of magnitude. And it located the cause precisely: **the SHAPE was never wrong, the SCALE FACTOR was**, which is why every instinct to redraw the mark would have been wasted effort.
+- **It also made the options concrete and comparable rather than a matter of taste** — 0.9 → 16.3px (still heavy), **0.55 → 9.9px (shipped, outline-only)**, 0.4 → 7.2px (starts to vanish behind text at this opacity). **Three candidates with predicted on-screen weights beat three rounds of "try it and see".**
+- **⚠ AND THE MEASUREMENT PROTECTED THE MARK'S IDENTITY.** Knowing the problem was stroke weight and fill meant the **arc paths and dot radii could stay byte-identical to the nav logo** — treatment changed, identity untouched, pinned by a test. Guessing would very likely have redrawn the artwork to fix a rendering property.
+- **THE GENERAL RULE: when feedback is an adjective, find the quantity behind it.** *Bubbly* → stroke px on screen. *Cluttered* → element count or ink density. *Dim* → contrast ratio or channel delta. **The adjective says where to look; the number says what to change, and by how much.** Same discipline as *state the operation, not the adjective* — applied to design feedback instead of prompts.
+
 ### ⚠⚠ A CHECK MUST STATE ITS OWN SCOPE ALONGSIDE ITS VERDICT — EVERY FALSE REPORT HERE WAS THE CHECK'S SCOPE AND THE CLAIM'S SCOPE COMING APART (2026-08-18)
 **THIS IS THE ENTRY. The instances below are evidence for it, not three separate lessons.**
+**⚠ THERE ARE THREE WAYS A VERDICT COMES OUT NARROWER THAN ITS CLAIM, AND THEY ARE SIBLINGS — CHECK ALL THREE BEFORE BELIEVING ANY RESULT:**
+| | the check | how it lies |
+|---|---|---|
+| **SCOPE** (this entry) | looked at the wrong extent | opaque chrome counted as transparent; a grep over a whole stylesheet reported as a rule |
+| **INVENTORY** | enumerated its own targets, and the list was short | *"zero ink under any text"* having never checked `#cardTitle` or `#cardSub` |
+| **RANGE** (see the one-width entry) | right targets, right place, **one point on a continuous axis** | a font size that fits at the window you had open; a mark position clean only at ≥1600px |
 **A check examines one thing and reports a sentence about another, narrower thing — and the sentence never mentions the difference, so the difference is never examined.** Over-reporting, under-reading and matching outside the subject all look like different bugs and are one: **only the CLAIM was ever stated, never the SCOPE.**
 **THE PRACTICE: make the check name what it looked at, not only what it concluded.** *"24 matches, 0 within `.avg-*`"* can be sanity-checked; *"the old alpha is still present"* cannot. **A bare verdict is unfalsifiable by inspection; a verdict plus its scope is not.** Every instance below was resolved in ONE command once the instrument was asked to name what it had examined.
 **And the corollary, which is the older form of this rule: WHEN A CHECK REPORTS A PROBLEM, CONFIRM THE CHECK IS SOUND BEFORE ACTING ON WHAT IT SAYS.**
