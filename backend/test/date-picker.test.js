@@ -390,12 +390,48 @@ test('the needs-work window label NAMES THE WINDOW, never "last N days"', () => 
 
 // ─── STAGE 4: Calls — seeded once from coaching, independent thereafter ────
 
-test('STAGE 4: Calls mounts a THIRD instance with its own key', () => {
+test('every picker mounts under its OWN key — four surfaces, four instances', () => {
+  // ⚠ Extended for (dd): the EOD page is the FOURTH, and the first in
+  // single-date mode. Each surface owns its own range/day; one shared instance
+  // is the shared-carrier failure this list exists to prevent.
   const rendered = HTML.replace(SRC, '');
   const keys = (rendered.match(/registerDatePicker\('([a-z]+)'/g) || []).sort();
-  assert.deepStrictEqual(keys,
-    ["registerDatePicker('calls'", "registerDatePicker('coaching'", "registerDatePicker('team'"]);
+  assert.deepStrictEqual(keys, [
+    "registerDatePicker('calls'", "registerDatePicker('coaching'",
+    "registerDatePicker('eod'", "registerDatePicker('team'",
+  ]);
   assert.ok(/datePickerHtml\('calls'\)/.test(rendered));
+  assert.ok(/datePickerHtml\('eod'\)/.test(rendered), 'the EOD toolbar must mount the calendar');
+});
+
+test('⚠⚠ SINGLE-DATE IS A MODE, NOT A SECOND COMPONENT', () => {
+  // Ruling 2026-08-18: "prefer a mode — a second component is how two calendars
+  // drift apart." So there must be exactly ONE panel builder and ONE grid.
+  assert.strictEqual((HTML.match(/function datePickerPanelHtml/g) || []).length, 1,
+    'a second panel builder means a second calendar');
+  assert.strictEqual((HTML.match(/function monthGridCells/g) || []).length, 1,
+    'a second grid means the two can render different months');
+  assert.ok(/registerDatePicker\('eod'[\s\S]{0,300}single: true/.test(HTML),
+    'EOD must register with { single: true }');
+});
+
+test('⚠ single mode COMMITS on the first click and drops "Earliest"', () => {
+  const at = HTML.indexOf('function datePickerPick');
+  const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
+  assert.ok(fn.length > 300 && fn.length < 3000, 'slice suspicious: ' + fn.length);
+  assert.ok(/if \(pickerIsSingle\(key\)\)/.test(fn), 'single mode must short-circuit before resolvePick');
+  assert.ok(/inst\.set\(day\)/.test(fn), 'and hand back a DAY, not a span');
+  // "Earliest" means "span everything back to the beginning" — meaningless for
+  // one day, so it is absent rather than replaced.
+  assert.ok(/single \? '' : '<button type="button" class="dp-earliest"/.test(HTML),
+    'the Earliest button must be omitted in single mode');
+});
+
+test('⚠ the single-day label uses the MONDAY-FIRST weekday index', () => {
+  // DOW_SHORT labels the grid columns and starts at Mon; getUTCDay() is Sun-0.
+  // Indexing it directly prints the wrong weekday — silently.
+  assert.ok(/DOW_SHORT\[\(d\.getUTCDay\(\) \+ 6\) % 7\]/.test(HTML),
+    'the weekday index must be remapped, or every label is off by one');
 });
 
 test('SEEDING HAS EXACTLY ONE CALLER — drillCalls, and nowhere else', () => {

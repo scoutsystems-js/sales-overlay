@@ -330,3 +330,52 @@ test('⚠ the MINUTES graph does not inherit the percentage axis', () => {
     'a shared 0-100 max would render "38%" for a 38-minute call');
   assert.ok(/isMinutes \? \(v \+ 'm'\) : \(v \+ '%'\)/.test(HTML), 'ticks must carry the right unit');
 });
+
+// ── (ff) nav separators ───────────────────────────────────────────────────
+/**
+ * ⚠ THE NAV IS HAND-WRITTEN MARKUP, NOT GENERATED FROM A LIST. Every "·" is a
+ * literal <span class="sep"> placed by hand, so nothing adds one automatically
+ * — which is exactly why the Calls / EOD Report separator was missing for
+ * months. The next link added will have the same gap unless whoever adds it
+ * remembers, so this guard remembers for them.
+ *
+ * ⚠ CONDITIONAL LINKS CARRY THEIR OWN SEPARATOR (navTeamSep, navKbSep) with a
+ * matching display:none, so hiding a link hides its dot too. A generated nav
+ * would be the tidier fix, but it is a bigger change than this item asked for
+ * — recorded here rather than done.
+ */
+test('⚠ every adjacent nav link pair has a separator between them', () => {
+  const bar = HTML.slice(HTML.indexOf('<div class="top-bar-left"'), HTML.indexOf('<div class="top-bar-right"'));
+  assert.ok(bar.length > 200 && bar.length < 4000, 'nav slice suspicious: ' + bar.length);
+
+  // Strip comments so an archived link cannot answer for a live one.
+  const live = bar.replace(/<!--[\s\S]*?-->/g, '');
+  const tokens = [...live.matchAll(/<a class="nav-link"[^>]*id="([a-zA-Z]+)"|<span class="sep"/g)]
+    .map((m) => (m[1] ? 'LINK:' + m[1] : 'SEP'));
+
+  for (let i = 1; i < tokens.length; i++) {
+    if (tokens[i].indexOf('LINK:') === 0 && tokens[i - 1].indexOf('LINK:') === 0) {
+      assert.fail('no separator between ' + tokens[i - 1] + ' and ' + tokens[i]
+        + ' — the nav is hand-written, so the dot has to be typed');
+    }
+  }
+  assert.ok(tokens.filter((t) => t.indexOf('LINK:') === 0).length >= 5, 'expected the real nav, got ' + tokens.length);
+});
+
+test('⚠ NON-VACUITY — the nav check catches a removed separator', () => {
+  const bar = HTML.slice(HTML.indexOf('<div class="top-bar-left"'), HTML.indexOf('<div class="top-bar-right"'));
+  const live = bar.replace(/<!--[\s\S]*?-->/g, '');
+  // ⚠ Remove EVERY separator rather than "the first one" — the first sits
+  // between the "Scout" wordmark and the first link, so removing it creates no
+  // adjacent LINK pair and the check would pass while proving nothing. Stripping
+  // all of them cannot go stale as the nav changes.
+  const broken = live.replace(/<span class="sep"[^>]*>[^<]*<\/span>/g, '');
+  assert.notStrictEqual(broken, live, 'non-vacuity anchor is stale — no separators found at all');
+  const tokens = [...broken.matchAll(/<a class="nav-link"[^>]*id="([a-zA-Z]+)"|<span class="sep"/g)]
+    .map((m) => (m[1] ? 'LINK:' + m[1] : 'SEP'));
+  let adjacent = false;
+  for (let i = 1; i < tokens.length; i++) {
+    if (tokens[i].indexOf('LINK:') === 0 && tokens[i - 1].indexOf('LINK:') === 0) adjacent = true;
+  }
+  assert.ok(adjacent, 'the scan must see adjacent links once a separator is removed');
+});

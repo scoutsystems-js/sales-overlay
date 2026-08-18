@@ -1836,7 +1836,12 @@
     .digest-focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 600; margin-bottom: 6px; }
     /* EOD Report */
     .eod-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-    .eod-toolbar input[type="date"] { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 6px 10px; font-size: 13px; }
+    /* REMOVED 2026-08-18 (dd/ee) — the native date input is gone; the toolbar
+       now mounts the real calendar (.dp), which is already white.
+    .eod-toolbar input[type="date"] { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 6px 10px; font-size: 13px; } */
+    /* The picker sits inline in the toolbar rather than right-aligned as it is
+       on the range pages — its panel still anchors to its own button. */
+    .eod-toolbar .dp { position: relative; }
     .eod-call { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 14px 16px; margin-bottom: 12px; }
     .eod-row { display: flex; align-items: baseline; gap: 8px; margin: 6px 0; }
     .eod-label { flex: 0 0 110px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); }
@@ -2606,6 +2611,13 @@
     <a class="nav-link" id="navOverview" onclick="goOwnCoaching(); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
     <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
+    <!-- ⚠ (ff) THIS SEPARATOR WAS SIMPLY NEVER TYPED. The nav is hand-written
+         markup, NOT generated from a list — every "·" is a literal span placed by
+         hand, so nothing adds one automatically and the next link added will have
+         the same gap unless whoever adds it remembers. That is the real finding;
+         the missing dot is the symptom. Guarded by rep-graphs' nav test so the
+         omission fails loudly next time instead of shipping. -->
+    <span class="sep">·</span>
     <a class="nav-link" id="navEod" onclick="goEod(); return false;">EOD Report</a>
     <span class="sep" id="navTeamSep" style="display:none">·</span>
     <a class="nav-link" id="navTeam" onclick="goTeam(); return false;" style="display:none">Team</a>
@@ -5587,6 +5599,22 @@
   // The year appears only when the range CROSSES one: "Earliest" spans 20 months
   // and read "Jan 1 - Aug 16", which says nothing about which January. Within a
   // single year the year is noise, so it stays off.
+  /**
+   * One day, for single mode. Uses the SAME month/day formatting as the range
+   * label so the two read as one family — "Aug 18" beside "Aug 3 - Aug 10".
+   * ⚠ The weekday is included because this page is used daily and "Mon" is the
+   * fastest way to see you are on the right day; the range label omits it
+   * because two weekdays in one button is noise.
+   */
+  function singleDayLabel(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return 'Pick a date';
+    // ⚠ DOW_SHORT is MONDAY-FIRST (it labels the grid's columns) while
+    // getUTCDay() is SUNDAY-0. Indexing it directly prints the WRONG WEEKDAY —
+    // silently, and only visibly wrong to someone who knows what day it is.
+    return DOW_SHORT[(d.getUTCDay() + 6) % 7] + ' ' + MONTH_SHORT[d.getUTCMonth()] + ' ' + d.getUTCDate();
+  }
+
   function rangeLabelInclusive(fromIso, toIso) {
     var a = ymd(fromIso), b = ymd(toIso);
     if (!a || !b) return 'Pick dates';
@@ -5658,14 +5686,41 @@
   var DATE_PICKERS = {};   // key -> { get: () => {from,to}, set: (from,to) => void }
   var PICKER_UI = {};      // key -> { open, year, month, pending, focus, hover }
 
-  function registerDatePicker(key, get, set) {
-    DATE_PICKERS[key] = { get: get, set: set };
+  /**
+   * ⚠⚠ SINGLE-DATE MODE IS A MODE ON THIS COMPONENT, NOT A SECOND COMPONENT
+   * (ruling 2026-08-18). The EOD page picks ONE day, not a span. A thin variant
+   * would be a second calendar, and two calendars drift apart — different
+   * keyboard handling, different month navigation, different fixes applied to
+   * one and not the other. Everything below is shared; `single` changes three
+   * things and nothing else:
+   *   1. the first click COMMITS (there is no end date to wait for)
+   *   2. the label reads one date instead of a span
+   *   3. the "Earliest" button is absent — see the note at the foot
+   *
+   * ⚠ THE SETTER SIGNATURE DIFFERS BY MODE, deliberately and visibly:
+   *   range mode  → set(fromIso, toIso)
+   *   single mode → set('YYYY-MM-DD')
+   * A single-day caller wants a day, not a span it has to collapse; forcing the
+   * range shape on it would make every consumer re-derive the day.
+   */
+  function registerDatePicker(key, get, set, opts) {
+    DATE_PICKERS[key] = { get: get, set: set, single: !!(opts && opts.single) };
     if (!PICKER_UI[key]) PICKER_UI[key] = { open: false, year: null, month: null, pending: null, focus: null, hover: null };
   }
   function pickerRange(key) {
     var inst = DATE_PICKERS[key];
     var r = inst && inst.get ? inst.get() : null;
+    // A single-mode getter returns a plain 'YYYY-MM-DD'. Normalising it to a
+    // zero-width range here is what lets the grid, the keyboard handling and the
+    // highlight code stay completely unaware of the mode.
+    if (inst && inst.single && typeof r === 'string' && r) {
+      return { from: r + 'T00:00:00.000Z', to: r + 'T23:59:59.999Z' };
+    }
     return r && r.from && r.to ? r : null;
+  }
+  function pickerIsSingle(key) {
+    var inst = DATE_PICKERS[key];
+    return !!(inst && inst.single);
   }
   function pickerUi(key) {
     if (!PICKER_UI[key]) PICKER_UI[key] = { open: false, year: null, month: null, pending: null, focus: null, hover: null };
@@ -5677,7 +5732,10 @@
   function datePickerHtml(key) {
     var r = pickerRange(key), ui = pickerUi(key);
     var startDay = r ? ymd(r.from) : null, endDay = r ? ymd(r.to) : null;
-    var label = r ? rangeLabelInclusive(r.from, r.to) : 'Pick dates';
+    var single = pickerIsSingle(key);
+    var label = r
+      ? (single ? singleDayLabel(r.from) : rangeLabelInclusive(r.from, r.to))
+      : (single ? 'Pick a date' : 'Pick dates');
     return '<div class="dp" id="dp-' + escapeHtml(key) + '">'
       + '<button type="button" class="dp-label" id="dp-btn-' + escapeHtml(key) + '"'
         + ' aria-haspopup="dialog" aria-expanded="' + (ui.open ? 'true' : 'false') + '"'
@@ -5712,11 +5770,23 @@
           + ' onclick="datePickerPick(\'' + k + '\',\'' + c.day + '\')">' + c.num + '</button>';
       }).join('') + '</div>';
     }).join('');
+    /**
+     * ⚠ "EARLIEST" IS DROPPED IN SINGLE MODE, NOT REPLACED. It means "span
+     * everything back to the beginning", which is a statement about a RANGE and
+     * has no single-day meaning at all — "the earliest day" would be an empty
+     * report from months ago, which nobody wants.
+     * Nothing takes its place because nothing needs to: the toolbar already has
+     * Today, and Prev/Next Day, which are faster than the calendar for the
+     * common case on a page used daily.
+     */
+    var single = pickerIsSingle(key);
     var foot = '<div class="dp-foot">'
-      + '<button type="button" class="dp-earliest" onclick="datePickerEarliest(\'' + k + '\')">Earliest</button>'
-      + '<span class="dp-hint">' + (ui.pending ? 'Now pick the end date' : 'Pick a start date') + '</span>'
+      + (single ? '' : '<button type="button" class="dp-earliest" onclick="datePickerEarliest(\'' + k + '\')">Earliest</button>')
+      + '<span class="dp-hint">'
+        + (single ? 'Pick a day' : (ui.pending ? 'Now pick the end date' : 'Pick a start date'))
+      + '</span>'
       + '</div>';
-    return '<div class="dp-panel" role="dialog" aria-label="Choose a date range"'
+    return '<div class="dp-panel" role="dialog" aria-label="' + (single ? 'Choose a date' : 'Choose a date range') + '"'
       + ' onkeydown="datePickerKeydown(\'' + k + '\', event)">'
       + head + dow + '<div class="dp-grid">' + grid + '</div>' + foot + '</div>';
   }
@@ -5834,6 +5904,16 @@
   }
   function datePickerPick(key, day) {
     var ui = pickerUi(key), inst = DATE_PICKERS[key];
+
+    // ⚠ SINGLE MODE COMMITS ON THE FIRST CLICK — there is no end date to wait
+    // for, and leaving the panel open for a second click would look broken.
+    if (pickerIsSingle(key)) {
+      ui.open = false; ui.pending = null; ui.hover = null; ui.focus = day;
+      datePickerRerender(key);
+      if (inst && inst.set) inst.set(day);      // a DAY, not a span — see registerDatePicker
+      return;
+    }
+
     var res = resolvePick(ui.pending, day);
     ui.pending = res.pending; ui.hover = null; ui.focus = day;
     // ⚠ The FIRST click keeps the existing DOM too — only the hint line and the
@@ -7512,6 +7592,24 @@
     var next = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]) + deltaDays * 86400000).toISOString().slice(0, 10);
     eodSetDate(next);
   }
+  /**
+   * (dd) Register the EOD calendar once, in SINGLE-DATE mode.
+   *
+   * ⚠ The getter returns a plain 'YYYY-MM-DD' and the setter takes one — the
+   * single-mode contract (see registerDatePicker). It reads the SAME state the
+   * Prev/Next/Today buttons write, so the calendar and those buttons can never
+   * disagree about which day is shown.
+   */
+  var eodPickerReady = false;
+  function ensureEodPicker() {
+    if (eodPickerReady) return;
+    eodPickerReady = true;
+    registerDatePicker('eod',
+      function () { return state.eodDate || (state.eodData && state.eodData.date) || null; },
+      function (day) { eodSetDate(day); },
+      { single: true });
+  }
+
   function eodSetDate(dateStr) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
     state.eodDate = dateStr;
@@ -7589,6 +7687,17 @@
   }
 
   function renderEodView() {
+    /**
+     * ⚠ MUST RUN BEFORE THE TOOLBAR STRING IS BUILT. datePickerHtml('eod') reads
+     * the registration to learn it is single-mode and to find the current day —
+     * unregistered, it renders "Pick dates" (the RANGE placeholder) and looks
+     * like a broken calendar.
+     * This was placed just above content.innerHTML first, with a comment
+     * claiming it ran before the markup. It did not: `toolbar` is assembled
+     * earlier in this function. The comment asserted the ordering instead of
+     * establishing it, and the render probe caught it.
+     */
+    ensureEodPicker();
     var content = document.getElementById('content');
     if (state.eodData === null && !state.eodLoading) loadEod();
     var d = state.eodData;
@@ -7596,7 +7705,17 @@
 
     var toolbar = '<div class="eod-toolbar">'
       + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(-1)">← Prev Day</button>'
-      + '<input type="date" value="' + escapeHtml(dateVal) + '" onchange="eodSetDate(this.value)">'
+      /**
+       * (dd) THE CALENDAR, in single-date mode. Replaces the native
+       * <input type="date">, which the picker rollout deliberately skipped as
+       * "a single day, not a span" — sound then, overruled now.
+       *
+       * ⚠ (ee) COMES FREE WITH IT. The white button was a separate item; the
+       * picker's .dp-label is already #ffffff, so using the real component
+       * rather than restyling the native input satisfies both at once. Styling
+       * the native input white would have been the version that drifts.
+       */
+      + datePickerHtml('eod')
       + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(1)">Next Day →</button>'
       + '<button class="btn-fathom-secondary" type="button" onclick="eodToday()">Today</button>'
       + '<button class="btn-fathom-secondary" type="button" onclick="eodCopyForSlack()">📋 Copy for Slack</button>'
