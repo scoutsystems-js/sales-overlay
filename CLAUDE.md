@@ -1310,6 +1310,47 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **What it does support, and the limit is the whole discipline:** 60 minutes is where the data visibly changes, so as a **chosen bar** it is not arbitrary. That is the entire claim. It is not evidence of causation and it is not a reason to coach anyone toward longer calls.
 - **THE SHARED SHAPE, now seen twice: a statistic whose two sides are not independent will still compute, still render, and still look like a discovery.** The money math's `P(closed | not handled) = 0.0%` arrived by construction; this correlation arrives by consequence. **Neither announces itself — in both cases the number was plausible, the chart was clean, and only asking "could this be true for a reason that makes it useless?" caught it.**
 
+### SCOUT GREEN IS #09e046 — AND THE CHANGE WAS A CORRECTION, NOT A PREFERENCE (2026-08-18)
+**⚠ BOTH the token AND the inline logo had drifted from the real brand colour, in different directions. Decoding `src/assets/icon.png` — the mark Justin sampled — its dominant green is `#00ed45`/`#00eb44`, so `#09e046` is a faithful pick and the two values in the code were simply wrong:**
+```
+--accent / --good / --green    #4ade80   pale, and nothing's brand colour
+inline SVG logo (auth pages)   #22c55e   a hand-drawn redraw of the mark that
+                                         did not match the mark
+the actual asset               #00ed45   ← what both were supposed to be
+```
+- **Say "correction" rather than "restyle" when reporting this.** It changes how a future session treats it: a preference invites re-litigation ("do we still like the green?"), a correction does not.
+- **CORROBORATE A SAMPLED VALUE AGAINST ITS SOURCE BEFORE APPLYING IT.** Decoding the PNG took one script and turned "Justin picked a colour" into "the asset says this and the code disagreed" — which is what makes the change defensible without him in the room.
+- **`--green-dark` (hover) WAS DERIVED, NOT PICKED.** The old pair `#4ade80 → #3aae63` is a flat 0.780 brightness ratio; applying the same ratio to the new green gives **`#07af37`**. **Deriving the relationship rather than choosing a new shade is what survives the NEXT brand change** — the ratio still holds, so only the source colour has to move.
+- **⚠ TWO GREENS ARE NOT BRAND GREENS AND DID NOT MOVE:** `#34d399` (objection category `send-info`) and `#84cc16` (the rep-line lime). They are **categorical palette entries that happen to be greenish**; folding them in would collapse the standing separation between semantic/interactive and categorical colour. **"Every green" never means the categorical ones.**
+- **THE RAMP EXCLUSION WAS RE-DERIVED, NOT ASSUMED.** The rule that no rep line may wear the accent hue was originally derived against `#4ade80`. Measured against `#09e046`: lime `#84cc16` **moved closer, ΔE 39.0 → 30.2**, while teal and cyan moved away. Still comfortably distinct, but **lime is now the nearest entry and the one to re-check on any future ramp or brand edit.**
+
+### ⚠⚠ STATE THE SCOPE OF A SWEEP ALONGSIDE ITS CLAIM — AND MAKE THE CLAIM NO BROADER THAN THE SCOPE (2026-08-18)
+**A value exists in more forms, and in more places, than the one you searched for. The failure is not missing a form — it is CLAIMING completeness over a scope you never searched.**
+- **The live case:** changing Scout green site-wide. The sweep's scope was `web/*.html`; the claim was *"every green on the site"*. Two things fell in the gap:
+  1. **twelve greens URL-ENCODED inside data URIs** — inside a `data:image/svg+xml` the `#` is `%23`, so a replace over `#4ade80` never touches `%234ade80`. The background motifs would have silently kept the old colour while every other surface moved.
+  2. **`web/css/style.css`** — the shared stylesheet behind the auth pages, outside the glob entirely.
+- **⚠ NEITHER WAS FOUND BY THE SWEEP. The login page rendering UNSTYLED is what exposed the second**, and only because a local preview happened not to serve the CSS. That is luck, not process.
+- **THE FORMS OF ONE VALUE, as a checklist — colour is only the example:**
+```
+#09e046                       the literal
+9, 224, 70                    the channel/component form
+rgba(var(--accent-rgb), a)    derived — follows automatically, needs no sweep
+%2309e046                     URL-encoded inside a data URI
+09e046                        bare, in a query string or an asset name
+```
+  Generalises past colour to any value with more than one representation: an id that appears both raw and encoded, a path written with and without a leading slash, a constant duplicated in SQL and JS.
+- **THE RULE, in two halves and the second is the one that bites:**
+  1. enumerate the FORMS before sweeping, and
+  2. **enumerate the FILES too — then say which you searched.** *"No `#4ade80` remains in `web/*.html`"* is a true, checkable statement. *"The site is now green"* is a claim the sweep never tested. **Say the first.**
+- Same family as *a check must state its own scope alongside its verdict* — this is that rule applied to a CHANGE rather than a CHECK, and it fails the same way: the scope is silent, so nobody checks it.
+
+### ⚠⚠ A GUARD THAT PINS A LITERAL GOES STALE ON EXACTLY THE CHANGE IT POLICES — DERIVE IT FROM THE SOURCE OF TRUTH (2026-08-18)
+**And when it fails, it reads as the CHANGE being wrong rather than the guard being dated — which is the expensive part.**
+- **The live case:** `background-motifs.test.js` asserted each motif SVG contains `#4ade80`, to catch a motif being left behind. The brand green moved to `#09e046` and the guard failed — **on the very change it exists to police, and against a sweep that was correct.** For a moment the evidence pointed at the sweep.
+- **THE FIX IS TO DERIVE, NOT TO UPDATE.** The guard now reads `--accent` out of the served page and asserts the motifs contain **that**. It follows the brand automatically and still fails if a motif is left behind — which is the property that was wanted all along.
+- **THE TEST FOR WHETHER A LITERAL BELONGS IN A GUARD: would this value change as part of a normal, correct edit?** A brand colour, a target, a scale, a version — yes, so derive it. A structural marker that only changes when the feature does — a class name, a function name — no, pin it.
+- **⚠ AND RECORD WHY, because a guard that failed on a good change looks like evidence against that change.** Without the note, the next reader finds a red test beside a colour sweep and concludes the sweep broke something.
+
 ### ⚠⚠ `rgba()` CANNOT READ A HEX TOKEN — SO EVERY TINT WAS A **COPY** OF THE ACCENT, NOT A REFERENCE (2026-08-17)
 **THIS IS THE FINDING. The one-line lesson underneath it is secondary.**
 - **The mechanism:** `--accent` is a hex token. `rgba()` needs channels, so it cannot read it. Every soft tint on the dashboard was therefore written as `rgba(91, 158, 255, 0.14)` — a **hard-coded copy of the accent's value**, which does not move when `--accent` moves. **"Change one variable and all 65 sites follow" was only ever true for the sites using the HEX.** 23 tints were silently outside that story.
