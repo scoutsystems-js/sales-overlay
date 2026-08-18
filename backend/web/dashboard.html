@@ -190,7 +190,22 @@
       inset: 0;
       z-index: -1;                 /* ⚠ negative, or it paints OVER static text */
       pointer-events: none;        /* decoration never intercepts a click */
-      opacity: 0.055;
+      /* ⚠ 0.20, NOT 0.055 — MEASURED, NOT ESTIMATED (2026-08-18).
+         Justin could not see the graphics at all on a maximised screen. Sampling
+         the actual composite (#4ade80 over the rgb(10,10,10) page) showed the
+         SHAPE'S BRIGHTEST PIXEL reaching only rgb(14,22,16) — a green delta of
+         +12/255. Enough to survive a screenshot, not enough to see.
+
+         The mocks he APPROVED drew their strokes at 16-30% with no additional
+         layer opacity, i.e. an effective alpha of 0.16-0.30 → a green delta of
+         +34 to +64. The shipped version was 3-5x fainter than the design that
+         was signed off; that gap WAS the bug, not a taste question.
+
+         0.20 sits mid-band (+42/255). Mid rather than the 0.16 floor because
+         these SVGs carry their own internal stroke-opacity (0.35-1.0), so the
+         faintest strokes land near where the WHOLE treatment used to be — the
+         internal hierarchy survives instead of collapsing into invisibility. */
+      opacity: 0.20;
       background-repeat: no-repeat;
     }
     body[data-view="overview"]::before { background-image: var(--motif-a); background-position: right -200px top -140px; }

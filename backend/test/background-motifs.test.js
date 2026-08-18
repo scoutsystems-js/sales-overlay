@@ -51,12 +51,22 @@ test('the layer is decorative and unreachable — never in front of content', ()
   assert.ok(/pointer-events:\s*none/.test(r), 'decoration must never intercept a click');
   const op = r.match(/opacity:\s*([0-9.]+)/);
   assert.ok(op, 'the layer must declare an opacity');
-  // ⚠ A CAP, NOT THE SAFETY MECHANISM. Justin's ruling on the four-style
-  // graphics: where ink lands on text, move the CROP or POSITION — do not turn
-  // the opacity down. The cap exists so decoration cannot creep into content,
-  // not so that faintness can be relied on.
-  assert.ok(parseFloat(op[1]) <= 0.06,
-    'decoration must stay decoration. Found ' + op[1]);
+  // ⚠ THE CAP WAS RE-DERIVED 2026-08-18, because the old one had become the
+  // BLOCKER rather than the safeguard. 0.06 was set when the treatment was small
+  // repeated motifs; a single large cropped shape at that value measured a green
+  // delta of just +12/255 — invisible on a monitor, which is why Justin saw
+  // nothing. The cap now comes from the APPROVED MOCKS' own upper bound: they
+  // drew strokes at 16-30%, so 0.30 is the brightest anything signed off ever
+  // was. Shipping at 0.20 (+42/255), mid-band.
+  //
+  // ⚠ STILL NOT THE SAFETY MECHANISM. Where ink lands on text, move the CROP or
+  // POSITION — never turn the opacity down. The cap only stops decoration
+  // creeping past what was approved.
+  assert.ok(parseFloat(op[1]) <= 0.30,
+    'decoration must not exceed the brightest value ever approved. Found ' + op[1]);
+  assert.ok(parseFloat(op[1]) >= 0.16,
+    'below the approved band the shape is invisible on a monitor — the bug this '
+    + 'replaced. Found ' + op[1]);
 });
 
 test('the four styles are inline SVG — no asset, no request, no dependency', () => {
