@@ -677,6 +677,10 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **THE RULE: when a data op and a code change encode the same rule, name the ordering and the window explicitly.** Either deploy first and backfill second (the window is then "rows not yet backfilled", which is visible and self-healing), or backfill first and treat the push as **closing a gap** rather than shipping a feature — and say so, so the window is a known event rather than a later mystery.
 - Related, from the other direction: the deploy-race rule (*never push during a drain*) is the same hazard with the two halves swapped — there the CODE moves under running data work; here the DATA moves ahead of the code.
 - **In this instance the order was forced** (the backfill had to prove the rule before the rule was worth pushing), so the window was accepted and stated rather than avoided. **An accepted window that is written down is fine; an unnoticed one is not.**
+- **⚠⚠ SECOND INSTANCE, TWO BLOCKS LATER (2026-08-18) — SO THIS IS A PATTERN, NOT AN INCIDENT.** Seeding the demo reps' price moments wrote 102 rows before the code that renders them was pushed. **Both times the data landed first FOR THE SAME REASON: the data had to prove the thing before the thing was worth shipping.** A detector's rule was only worth pushing once a backfill showed it worked; a generator's output was only worth shipping once a dry run showed the numbers were plausible.
+  - **THE HONEST FORM OF THE RULE, revised: "deploy first, backfill second" is not always available.** When a generator or detector must be **validated against real output** before it is worth shipping, the data necessarily moves first and the window is **unavoidable**. Pretending the order can always be inverted just means the window happens anyway and goes unnamed.
+  - **So the discipline is NOT avoidance — it is NAMING the window and CLOSING IT IN THE SAME SESSION.** State the ordering when it happens, say what disagrees with what while it is open, and push before the session ends. A window measured in minutes and written down is a non-event; the same window left open across days is how a metric becomes "wrong" for reasons nobody can reconstruct.
+  - The avoidance advice above still holds **wherever the order IS free** — most schema-plus-code changes qualify. It is the validation-first cases that do not.
 
 ### ⚠⚠ WRITE THE NULL — AN ABSENT ROW AND A ROW THAT SAYS "NOTHING HERE" ARE IDENTICAL TO A QUERY AND OPPOSITE IN MEANING (2026-08-18)
 ```
@@ -1248,6 +1252,14 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
   - *"rate_gap when the linkage groups are too small"* → now pins `rate_gap` as the **only** state, since there is no longer a money state to fall back from.
   - The exports test now asserts the removed constants are **absent**, so reintroducing the money lane trips it rather than passing quietly.
 - **THE TEST TO APPLY: is the assertion about the thing being removed, or about a property that merely used it to get at something?** Only the first should go.
+
+### ⚠⚠ A DEFECT FOUND BY *READING* OUTPUT WAS FOUND BY LUCK — MAKE THE STEP CHECK ITS OWN RESULT (2026-08-18)
+**The fix for "I noticed the number looked wrong" is NOT to read more carefully next time. It is to make the step refuse to emit a result it can prove is impossible.**
+- **The live case:** a seed generator's dry run printed a **p10 of MINUS 2.6 MINUTES** for time-to-price. Cause: `h >> 7` — a **signed** shift on a hash above 2³¹ goes negative, `% 1000` keeps the sign, and the fraction went negative. It was caught because I read the printed distribution. **Had I skimmed it, negative durations would have been written to 68 demo rows and drawn as lines below zero.**
+- **⚠ THE ASYMMETRY THAT MAKES READING A BAD CONTROL: it works exactly once, for whoever happens to be looking, on the run they happen to inspect.** The same script run next month by someone else prints the same numbers to a terminal nobody reads. A printed diagnostic is evidence; it is not a check.
+- **THE RULE: a generator that CAN emit an impossible value should REFUSE to.** The plan step now asserts its own output — every value inside the real measured band, nothing below one minute — and aborts. **The assertion costs four lines and does not depend on anyone being awake.**
+- **How to find the assertion to write: ask what the output CANNOT be.** A duration cannot be negative. A rate cannot exceed 100. A timestamp cannot be after the call ended (that one was already in this generator, and it is why the bug produced a *negative* rather than an absurd *large* number). **Impossibility is cheaper to assert than correctness, and catches the whole class.**
+- Related and distinct: *a check must state its own scope* (below) is about a check that is wrong; this is about **having no check at all** and mistaking the printout for one.
 
 ### ⚠⚠ A CHECK MUST STATE ITS OWN SCOPE ALONGSIDE ITS VERDICT — EVERY FALSE REPORT HERE WAS THE CHECK'S SCOPE AND THE CLAIM'S SCOPE COMING APART (2026-08-18)
 **THIS IS THE ENTRY. The instances below are evidence for it, not three separate lessons.**
