@@ -1208,6 +1208,19 @@ Same shape for closing: gauge **Closing Rate** · graph **Closing %** · list **
 - **`objection-synthesis` needed the split INSIDE A SINGLE LOOP**: it counts with the shared predicate and selects its "handled examples" on the moment's own resolution, because an example is evidence of good handling shown to a closer. A credited-but-unhandled moment held up as the model to copy is exactly backwards.
 - **THE RULE: enforce per CALL SITE.** `test/handled-carrier.test.js` counts hand-rolled `resolution === 'handled'` comparisons per file against an explicit allowance, with the reason for each allowance written beside it. A file-level allowlist would have said "team-synthesis is exempt" and stopped noticing its rate lane entirely.
 
+### ⏳⏳ OPEN DEBT — TWO BROWSER CHECKS OWED ON `8bd06ec` (logged 2026-08-18)
+**⚠ AN UNVERIFIED PUSH IS A DEBT, AND THE WAY IT GOES BAD IS NOBODY REMEMBERING IT WAS ONE. This entry exists so the push cannot be mistaken for closing it.**
+- **TRIGGER: the moment the Chrome extension is connected again.** Not "next time someone touches the login page" — these are owed now and were only deferred by a tool outage.
+- **WHAT IS OWED, and why each matters:**
+  1. **Scrub `getAnimations()` on the welcome sequence and confirm the wordmark is ONE LINE at several points through it** — not only at the end. The whole fix is that it must fit at every value the tracking passes through; checking the resting state is checking the one end that could never fail. **Per the tab-throttling rule, scrub the timeline — do NOT wait on the wall clock**, which in a backgrounded tab advances `setTimeout` but not the compositor.
+  2. **Re-run the ink sweep at the mark's new TOP position** (login page). If the mark no longer crosses any `--muted` text, the binding element becomes the WORDMARK (7.58:1 at 0.20) and **the derived maximum would rise above 0.21 for the first time** — the one case where the shipped 0.20 is leaving presence on the table rather than being conservative.
+- **WHY IT SHIPPED UNVERIFIED — A REASON, NOT AN EXCUSE, recorded so a future session does not read it as carelessness:**
+  - the wrap fix is **arithmetic, not estimation** — `letter-spacing` adds exactly `tracking x charCount`, so k at 0.7em is COMPUTABLE from a k measured at any other tracking, and "does it fit at the widest frame" has an exact answer rather than an estimated one;
+  - the **failure mode is bounded**: if the sizing were still wrong the result is a wrap-and-snap, i.e. **no worse than what is on screen today**, not a broken page or a blocked sign-in;
+  - **opacity was left at the safe value** (0.20, derived against the stricter muted-text case), so being wrong there costs presence, never readability;
+  - and for this feature class **every real defect has been caught by Justin looking, not by the harness** — the wrapped wordmark, the mark occupying three quarters of its box, the faux-bold. The harness has repeatedly returned clean results on visibly wrong pages, which is precisely why the render check is owed rather than optional.
+- **⚠ DO NOT CLOSE THIS BY RE-READING THE CODE OR RE-RUNNING THE SUITE.** Both already pass; that is the state that produced every previous miss. It closes when a browser has actually scrubbed the sequence and sampled the ink.
+
 ### ⏳ TRIGGERED WORK — SIX PROVIDER-BLIND CLIP LABELS (logged 2026-08-17)
 **Deferred deliberately, with the condition that makes it due. Not a someday.**
 - **What:** six surfaces build their clip link INLINE (`recording_url + ?t=`) instead of using the shared `clip_url` field, so the provider-aware label from `lib/clip-link.js` never reaches them. They say **"Clip"** regardless of provider — which on a Zoom call promises a moment and delivers **00:00**.
