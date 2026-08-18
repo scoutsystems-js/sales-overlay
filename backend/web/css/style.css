@@ -2,8 +2,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --green:       #22c55e;
-  --green-dark:  #16a34a;
+  --green:       #09e046;
+  --green-dark:  #07af37;
   --green-dim:   rgba(34,197,94,0.12);
   --green-glow:  rgba(34,197,94,0.25);
   --bg:          #080b0d;

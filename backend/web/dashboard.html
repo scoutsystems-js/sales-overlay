@@ -47,16 +47,16 @@
                         any of them reads as a status rather than an identity.
                         Cyan leads; see the array for the full reasoning.
          --accent-quiet is the old blue's tint role (soft fills), re-tinted. */
-      --accent:       #4ade80;
+      --accent:       #09e046;
       /* ⚠ THE SAME GREEN, AS CHANNELS. Every soft tint on this page is an
          rgba() of the accent at some alpha, and rgba() cannot read a hex
          token — so before this existed, all 22 tints were hard-coded
          copies of the old blue and did NOT move when --accent did. Keep
          this in step with --accent above; accent-palette.test.js fails if
          they drift. */
-      --accent-rgb:   74, 222, 128;
+      --accent-rgb:   9, 224, 70;
       --accent-quiet: rgba(var(--accent-rgb), 0.18);
-      --good:         #4ade80;
+      --good:         #09e046;
       --mid:          #fbbf24;
       --bad:          #f87171;
       /* ⚠ ONE FAMILY, BY CONSTRUCTION — Justin's constraint on the gauges
@@ -69,7 +69,7 @@
          form each dim shade would be a hard-coded copy that stops following
          its token. team-averages-palette.test.js converts each to the other
          and fails if any pair drifts. */
-      --good-rgb:     74, 222, 128;
+      --good-rgb:     9, 224, 70;
       --mid-rgb:      251, 191, 36;
       --bad-rgb:      248, 113, 113;
       --purple:       #c084fc;
@@ -79,8 +79,8 @@
          against admin.html's theme-var names. Without these the KB "+ Add
          resource" button, tab pills, submit and list cards render unstyled
          (undefined vars → transparent). Mapped to dashboard's equivalents. */
-      --green:        #4ade80;
-      --green-dark:   #3aae63;
+      --green:        #09e046;
+      --green-dark:   #07af37;
       --bg2:          #131313;
       --slate:        #64748b;
 
@@ -199,10 +199,18 @@
        move. Worth knowing, and NOT a licence to skip the re-run: the property
        holds only while the sweep samples the raster. */
     :root {
-      --motif-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='620' viewBox='0 0 900 620' fill='none'%3E%3Cg stroke='%234ade80' stroke-opacity='.35' stroke-width='1'%3E%3Cpath d='M0 60 H900'/%3E%3Cpath d='M0 160 H900'/%3E%3Cpath d='M0 260 H900'/%3E%3Cpath d='M0 360 H900'/%3E%3Cpath d='M0 460 H900'/%3E%3Cpath d='M0 560 H900'/%3E%3Cpath d='M60 0 V620'/%3E%3Cpath d='M190 0 V620'/%3E%3Cpath d='M320 0 V620'/%3E%3Cpath d='M450 0 V620'/%3E%3Cpath d='M580 0 V620'/%3E%3Cpath d='M710 0 V620'/%3E%3Cpath d='M840 0 V620'/%3E%3C/g%3E%3Cpath d='M40 500 L190 430 L320 470 L450 300 L580 350 L710 170 L880 240' stroke='%234ade80' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='190' cy='430' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='320' cy='470' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='450' cy='300' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='580' cy='350' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='710' cy='170' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3C/svg%3E");
-      --motif-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='760' viewBox='0 0 760 760' fill='none' stroke='%234ade80' stroke-linecap='butt'%3E%3Ccircle cx='380' cy='380' r='352' stroke-width='2' stroke-opacity='.5'/%3E%3Cg stroke-width='26'%3E%3Cpath d='M380 68 A312 312 0 0 1 692 380'/%3E%3Cpath d='M120 528 A300 300 0 0 1 108 380' stroke-opacity='.7'/%3E%3C/g%3E%3Cg stroke-width='18'%3E%3Cpath d='M380 148 A232 232 0 0 1 544 212' stroke-opacity='.8'/%3E%3Cpath d='M216 544 A232 232 0 0 1 168 340'/%3E%3C/g%3E%3Cg stroke-width='12'%3E%3Cpath d='M380 228 A152 152 0 0 1 532 380' stroke-opacity='.75'/%3E%3C/g%3E%3Cg stroke-width='3' stroke-opacity='.85'%3E%3Cpath d='M380.0 50.0 L380.0 80.0'/%3E%3Cpath d='M437.3 55.0 L434.5 70.8'/%3E%3Cpath d='M492.9 69.9 L487.4 84.9'/%3E%3Cpath d='M545.0 94.2 L530.0 120.2'/%3E%3Cpath d='M592.1 127.2 L581.8 139.5'/%3E%3Cpath d='M632.8 167.9 L620.5 178.2'/%3E%3Cpath d='M665.8 215.0 L639.8 230.0'/%3E%3Cpath d='M690.1 267.1 L675.1 272.6'/%3E%3Cpath d='M705.0 322.7 L689.2 325.5'/%3E%3Cpath d='M710.0 380.0 L680.0 380.0'/%3E%3Cpath d='M705.0 437.3 L689.2 434.5'/%3E%3Cpath d='M690.1 492.9 L675.1 487.4'/%3E%3Cpath d='M665.8 545.0 L639.8 530.0'/%3E%3Cpath d='M632.8 592.1 L620.5 581.8'/%3E%3Cpath d='M592.1 632.8 L581.8 620.5'/%3E%3Cpath d='M545.0 665.8 L530.0 639.8'/%3E%3Cpath d='M492.9 690.1 L487.4 675.1'/%3E%3Cpath d='M437.3 705.0 L434.5 689.2'/%3E%3Cpath d='M380.0 710.0 L380.0 680.0'/%3E%3Cpath d='M322.7 705.0 L325.5 689.2'/%3E%3Cpath d='M267.1 690.1 L272.6 675.1'/%3E%3Cpath d='M215.0 665.8 L230.0 639.8'/%3E%3Cpath d='M167.9 632.8 L178.2 620.5'/%3E%3Cpath d='M127.2 592.1 L139.5 581.8'/%3E%3Cpath d='M94.2 545.0 L120.2 530.0'/%3E%3Cpath d='M69.9 492.9 L84.9 487.4'/%3E%3Cpath d='M55.0 437.3 L70.8 434.5'/%3E%3Cpath d='M50.0 380.0 L80.0 380.0'/%3E%3Cpath d='M55.0 322.7 L70.8 325.5'/%3E%3Cpath d='M69.9 267.1 L84.9 272.6'/%3E%3Cpath d='M94.2 215.0 L120.2 230.0'/%3E%3Cpath d='M127.2 167.9 L139.5 178.2'/%3E%3Cpath d='M167.9 127.2 L178.2 139.5'/%3E%3Cpath d='M215.0 94.2 L230.0 120.2'/%3E%3Cpath d='M267.1 69.9 L272.6 84.9'/%3E%3Cpath d='M322.7 55.0 L325.5 70.8'/%3E%3C/g%3E%3C/svg%3E");
-      --motif-c: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='780' height='780' viewBox='0 0 780 780' fill='none'%3E%3Cg stroke='%234ade80' stroke-opacity='.45' stroke-width='2'%3E%3Cpolygon points='390.0,300.0 467.9,345.0 467.9,435.0 390.0,480.0 312.1,435.0 312.1,345.0'/%3E%3Cpolygon points='390.0,210.0 545.9,300.0 545.9,480.0 390.0,570.0 234.1,480.0 234.1,300.0'/%3E%3Cpolygon points='390.0,120.0 623.8,255.0 623.8,525.0 390.0,660.0 156.2,525.0 156.2,255.0'/%3E%3Cpolygon points='390.0,30.0 701.8,210.0 701.8,570.0 390.0,750.0 78.2,570.0 78.2,210.0'/%3E%3Cpath d='M390 390 L390.0 30.0'/%3E%3Cpath d='M390 390 L701.8 210.0'/%3E%3Cpath d='M390 390 L701.8 570.0'/%3E%3Cpath d='M390 390 L390.0 750.0'/%3E%3Cpath d='M390 390 L78.2 570.0'/%3E%3Cpath d='M390 390 L78.2 210.0'/%3E%3C/g%3E%3Cpolygon points='390.0,90.0 576.2,282.5 675.8,555.0 390.0,530.0 164.8,520.0 225.5,295.0' fill='%234ade80' fill-opacity='.22' stroke='%234ade80' stroke-width='6' stroke-linejoin='round'/%3E%3C/svg%3E");
-      --motif-d: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='980' height='560' viewBox='0 0 980 560' fill='none' stroke='%234ade80' stroke-width='5' stroke-linecap='round'%3E%3Cpath stroke-opacity='1.00' d='M-20 70 C 160 -50, 300 136, 470 34 S 800 130, 1000 -14'/%3E%3Cpath stroke-opacity='0.93' d='M-20 124 C 160 13, 300 185.05, 470 90.7 S 800 179.5, 1000 46.30000000000001'/%3E%3Cpath stroke-opacity='0.86' d='M-20 178 C 160 76, 300 234.1, 470 147.4 S 800 229, 1000 106.60000000000001'/%3E%3Cpath stroke-opacity='0.79' d='M-20 232 C 160 139, 300 283.15, 470 204.1 S 800 278.5, 1000 166.9'/%3E%3Cpath stroke-opacity='0.72' d='M-20 286 C 160 202, 300 332.2, 470 260.8 S 800 328, 1000 227.2'/%3E%3Cpath stroke-opacity='0.65' d='M-20 340 C 160 265, 300 381.25, 470 317.5 S 800 377.5, 1000 287.5'/%3E%3Cpath stroke-opacity='0.58' d='M-20 394 C 160 328, 300 430.3, 470 374.2 S 800 427, 1000 347.8'/%3E%3Cpath stroke-opacity='0.51' d='M-20 448 C 160 391, 300 479.35, 470 430.9 S 800 476.5, 1000 408.1'/%3E%3Cpath stroke-opacity='0.44' d='M-20 502 C 160 454, 300 528.4, 470 487.6 S 800 526, 1000 468.4'/%3E%3C/svg%3E");
+      /* ⚠⚠ THE GREEN IN THESE MOTIFS IS A FIFTH SPELLING — URL-ENCODED.
+         Inside a data: URI the `#` is `%23`, so a search-and-replace over
+         `#4ade80` does not touch `%234ade80` and the motifs silently keep the
+         OLD colour while every other surface moves. Twelve of them survived the
+         2026-08-18 accent change and had to be fixed separately.
+         The spellings of one colour, all of which must move together:
+             #09e046   ·   9, 224, 70   ·   rgba(var(--accent-rgb), a)   ·
+             %2309e046 (data URI)        ·   09e046 (bare, in a query string) */
+      --motif-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='620' viewBox='0 0 900 620' fill='none'%3E%3Cg stroke='%2309e046' stroke-opacity='.35' stroke-width='1'%3E%3Cpath d='M0 60 H900'/%3E%3Cpath d='M0 160 H900'/%3E%3Cpath d='M0 260 H900'/%3E%3Cpath d='M0 360 H900'/%3E%3Cpath d='M0 460 H900'/%3E%3Cpath d='M0 560 H900'/%3E%3Cpath d='M60 0 V620'/%3E%3Cpath d='M190 0 V620'/%3E%3Cpath d='M320 0 V620'/%3E%3Cpath d='M450 0 V620'/%3E%3Cpath d='M580 0 V620'/%3E%3Cpath d='M710 0 V620'/%3E%3Cpath d='M840 0 V620'/%3E%3C/g%3E%3Cpath d='M40 500 L190 430 L320 470 L450 300 L580 350 L710 170 L880 240' stroke='%2309e046' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='190' cy='430' r='17' fill='none' stroke='%2309e046' stroke-width='5'/%3E%3Ccircle cx='320' cy='470' r='17' fill='none' stroke='%2309e046' stroke-width='5'/%3E%3Ccircle cx='450' cy='300' r='17' fill='none' stroke='%2309e046' stroke-width='5'/%3E%3Ccircle cx='580' cy='350' r='17' fill='none' stroke='%2309e046' stroke-width='5'/%3E%3Ccircle cx='710' cy='170' r='17' fill='none' stroke='%2309e046' stroke-width='5'/%3E%3C/svg%3E");
+      --motif-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='760' viewBox='0 0 760 760' fill='none' stroke='%2309e046' stroke-linecap='butt'%3E%3Ccircle cx='380' cy='380' r='352' stroke-width='2' stroke-opacity='.5'/%3E%3Cg stroke-width='26'%3E%3Cpath d='M380 68 A312 312 0 0 1 692 380'/%3E%3Cpath d='M120 528 A300 300 0 0 1 108 380' stroke-opacity='.7'/%3E%3C/g%3E%3Cg stroke-width='18'%3E%3Cpath d='M380 148 A232 232 0 0 1 544 212' stroke-opacity='.8'/%3E%3Cpath d='M216 544 A232 232 0 0 1 168 340'/%3E%3C/g%3E%3Cg stroke-width='12'%3E%3Cpath d='M380 228 A152 152 0 0 1 532 380' stroke-opacity='.75'/%3E%3C/g%3E%3Cg stroke-width='3' stroke-opacity='.85'%3E%3Cpath d='M380.0 50.0 L380.0 80.0'/%3E%3Cpath d='M437.3 55.0 L434.5 70.8'/%3E%3Cpath d='M492.9 69.9 L487.4 84.9'/%3E%3Cpath d='M545.0 94.2 L530.0 120.2'/%3E%3Cpath d='M592.1 127.2 L581.8 139.5'/%3E%3Cpath d='M632.8 167.9 L620.5 178.2'/%3E%3Cpath d='M665.8 215.0 L639.8 230.0'/%3E%3Cpath d='M690.1 267.1 L675.1 272.6'/%3E%3Cpath d='M705.0 322.7 L689.2 325.5'/%3E%3Cpath d='M710.0 380.0 L680.0 380.0'/%3E%3Cpath d='M705.0 437.3 L689.2 434.5'/%3E%3Cpath d='M690.1 492.9 L675.1 487.4'/%3E%3Cpath d='M665.8 545.0 L639.8 530.0'/%3E%3Cpath d='M632.8 592.1 L620.5 581.8'/%3E%3Cpath d='M592.1 632.8 L581.8 620.5'/%3E%3Cpath d='M545.0 665.8 L530.0 639.8'/%3E%3Cpath d='M492.9 690.1 L487.4 675.1'/%3E%3Cpath d='M437.3 705.0 L434.5 689.2'/%3E%3Cpath d='M380.0 710.0 L380.0 680.0'/%3E%3Cpath d='M322.7 705.0 L325.5 689.2'/%3E%3Cpath d='M267.1 690.1 L272.6 675.1'/%3E%3Cpath d='M215.0 665.8 L230.0 639.8'/%3E%3Cpath d='M167.9 632.8 L178.2 620.5'/%3E%3Cpath d='M127.2 592.1 L139.5 581.8'/%3E%3Cpath d='M94.2 545.0 L120.2 530.0'/%3E%3Cpath d='M69.9 492.9 L84.9 487.4'/%3E%3Cpath d='M55.0 437.3 L70.8 434.5'/%3E%3Cpath d='M50.0 380.0 L80.0 380.0'/%3E%3Cpath d='M55.0 322.7 L70.8 325.5'/%3E%3Cpath d='M69.9 267.1 L84.9 272.6'/%3E%3Cpath d='M94.2 215.0 L120.2 230.0'/%3E%3Cpath d='M127.2 167.9 L139.5 178.2'/%3E%3Cpath d='M167.9 127.2 L178.2 139.5'/%3E%3Cpath d='M215.0 94.2 L230.0 120.2'/%3E%3Cpath d='M267.1 69.9 L272.6 84.9'/%3E%3Cpath d='M322.7 55.0 L325.5 70.8'/%3E%3C/g%3E%3C/svg%3E");
+      --motif-c: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='780' height='780' viewBox='0 0 780 780' fill='none'%3E%3Cg stroke='%2309e046' stroke-opacity='.45' stroke-width='2'%3E%3Cpolygon points='390.0,300.0 467.9,345.0 467.9,435.0 390.0,480.0 312.1,435.0 312.1,345.0'/%3E%3Cpolygon points='390.0,210.0 545.9,300.0 545.9,480.0 390.0,570.0 234.1,480.0 234.1,300.0'/%3E%3Cpolygon points='390.0,120.0 623.8,255.0 623.8,525.0 390.0,660.0 156.2,525.0 156.2,255.0'/%3E%3Cpolygon points='390.0,30.0 701.8,210.0 701.8,570.0 390.0,750.0 78.2,570.0 78.2,210.0'/%3E%3Cpath d='M390 390 L390.0 30.0'/%3E%3Cpath d='M390 390 L701.8 210.0'/%3E%3Cpath d='M390 390 L701.8 570.0'/%3E%3Cpath d='M390 390 L390.0 750.0'/%3E%3Cpath d='M390 390 L78.2 570.0'/%3E%3Cpath d='M390 390 L78.2 210.0'/%3E%3C/g%3E%3Cpolygon points='390.0,90.0 576.2,282.5 675.8,555.0 390.0,530.0 164.8,520.0 225.5,295.0' fill='%2309e046' fill-opacity='.22' stroke='%2309e046' stroke-width='6' stroke-linejoin='round'/%3E%3C/svg%3E");
+      --motif-d: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='980' height='560' viewBox='0 0 980 560' fill='none' stroke='%2309e046' stroke-width='5' stroke-linecap='round'%3E%3Cpath stroke-opacity='1.00' d='M-20 70 C 160 -50, 300 136, 470 34 S 800 130, 1000 -14'/%3E%3Cpath stroke-opacity='0.93' d='M-20 124 C 160 13, 300 185.05, 470 90.7 S 800 179.5, 1000 46.30000000000001'/%3E%3Cpath stroke-opacity='0.86' d='M-20 178 C 160 76, 300 234.1, 470 147.4 S 800 229, 1000 106.60000000000001'/%3E%3Cpath stroke-opacity='0.79' d='M-20 232 C 160 139, 300 283.15, 470 204.1 S 800 278.5, 1000 166.9'/%3E%3Cpath stroke-opacity='0.72' d='M-20 286 C 160 202, 300 332.2, 470 260.8 S 800 328, 1000 227.2'/%3E%3Cpath stroke-opacity='0.65' d='M-20 340 C 160 265, 300 381.25, 470 317.5 S 800 377.5, 1000 287.5'/%3E%3Cpath stroke-opacity='0.58' d='M-20 394 C 160 328, 300 430.3, 470 374.2 S 800 427, 1000 347.8'/%3E%3Cpath stroke-opacity='0.51' d='M-20 448 C 160 391, 300 479.35, 470 430.9 S 800 476.5, 1000 408.1'/%3E%3Cpath stroke-opacity='0.44' d='M-20 502 C 160 454, 300 528.4, 470 487.6 S 800 526, 1000 468.4'/%3E%3C/svg%3E");
     }
     body[data-view]::before {
       content: '';
@@ -212,7 +220,7 @@
       pointer-events: none;        /* decoration never intercepts a click */
       /* ⚠ 0.20, NOT 0.055 — MEASURED, NOT ESTIMATED (2026-08-18).
          Justin could not see the graphics at all on a maximised screen. Sampling
-         the actual composite (#4ade80 over the rgb(10,10,10) page) showed the
+         the actual composite (#09e046 over the rgb(10,10,10) page) showed the
          SHAPE'S BRIGHTEST PIXEL reaching only rgb(14,22,16) — a green delta of
          +12/255. Enough to survive a screenshot, not enough to see.
 
@@ -397,7 +405,7 @@
     .gs-step { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
     .gs-step:first-of-type { border-top: none; }
     .gs-check { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border-strong); color: var(--good); display: flex; align-items: center; justify-content: center; font-size: 13px; margin-top: 1px; }
-    .gs-check.done { background: rgba(74,222,128,0.12); border-color: var(--good); }
+    .gs-check.done { background: rgba(9, 224, 70,0.12); border-color: var(--good); }
     .gs-step-body { flex: 1; min-width: 0; }
     .gs-step-title { font-size: 14px; font-weight: 600; color: var(--text); }
     .gs-step-sub { font-size: 13px; color: var(--text); margin-top: 3px; line-height: 1.5; }
@@ -597,7 +605,7 @@
       border-radius: 4px;
       font-weight: 600;
     }
-    .pattern-confidence.high   { background: rgba(74, 222, 128, 0.10); color: var(--good); }
+    .pattern-confidence.high   { background: rgba(9, 224, 70, 0.10); color: var(--good); }
     .pattern-confidence.medium { background: rgba(251, 191, 36, 0.10); color: var(--mid); }
     .pattern-confidence.low    { background: rgba(139, 139, 139, 0.10); color: var(--text); }
 
@@ -666,7 +674,7 @@
       letter-spacing: 0.06em;
       white-space: nowrap;
     }
-    .badge-win    { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+    .badge-win    { background: rgba(9, 224, 70, 0.12); color: var(--good); }
     .badge-loss   { background: rgba(248, 113, 113, 0.12); color: var(--bad); }
     .badge-fu     { background: rgba(251, 191, 36, 0.12); color: var(--mid); }
     .badge-live   { background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
@@ -714,13 +722,13 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
-    .verdict-overcome  { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+    .verdict-overcome  { background: rgba(9, 224, 70, 0.12); color: var(--good); }
     .verdict-not       { background: rgba(248, 113, 113, 0.12); color: var(--bad); }
     .verdict-unknown   { background: rgba(139, 139, 139, 0.10); color: var(--text); }
     .verdict-conf { font-size: 10px; color: var(--text); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
 
     .coaching-note {
-      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06) 0%, rgba(74, 222, 128, 0.03) 100%);
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06) 0%, rgba(9, 224, 70, 0.03) 100%);
       border: 1px solid rgba(var(--accent-rgb), 0.18);
       border-radius: var(--radius-sm);
       padding: 16px 18px;
@@ -918,7 +926,7 @@
 
     /* Framework rebuttal reference card (top of per-type drill) */
     .framework-ref {
-      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06), rgba(74, 222, 128, 0.03));
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06), rgba(9, 224, 70, 0.03));
       border: 1px solid rgba(var(--accent-rgb), 0.18);
       border-radius: var(--radius);
       padding: 18px 22px;
@@ -1045,8 +1053,8 @@
     }
     .fathom-notice-dismiss:hover { opacity: 1; background: rgba(255,255,255,0.05); }
     .fathom-notice.success {
-      background: linear-gradient(135deg, rgba(74, 222, 128, 0.10), rgba(74, 222, 128, 0.04));
-      border: 1px solid rgba(74, 222, 128, 0.25);
+      background: linear-gradient(135deg, rgba(9, 224, 70, 0.10), rgba(9, 224, 70, 0.04));
+      border: 1px solid rgba(9, 224, 70, 0.25);
       color: #b6f0c8;
     }
     .fathom-notice.warn {
@@ -1112,7 +1120,7 @@
       border-radius: 50%;
       flex-shrink: 0;
     }
-    .fathom-strip-icon.ok    { background: var(--good); box-shadow: 0 0 6px rgba(74, 222, 128, 0.5); }
+    .fathom-strip-icon.ok    { background: var(--good); box-shadow: 0 0 6px rgba(9, 224, 70, 0.5); }
     .fathom-strip-icon.warn  { background: var(--mid); }
     .fathom-strip-icon.err   { background: var(--bad); }
     .fathom-strip-text { color: var(--text); }
@@ -1251,7 +1259,7 @@
       color: var(--accent);
     }
     .library-status-badge.done {
-      background: rgba(74, 222, 128, 0.12);
+      background: rgba(9, 224, 70, 0.12);
       color: var(--good);
       letter-spacing: 0.02em;
     }
@@ -1486,14 +1494,14 @@
     .review-handling-badge {
       font-size: 12px; font-weight: 650; padding: 3px 9px; border-radius: 3px; margin-left: 6px;
     }
-    .review-handling-badge.addressed { background: rgba(74,222,128,.12); color: var(--good); }
+    .review-handling-badge.addressed { background: rgba(9, 224, 70,.12); color: var(--good); }
     .review-handling-badge.deflected { background: rgba(220,80,80,.12);  color: var(--bad); }
     .review-handling-badge.ignored   { background: rgba(220,80,80,.12);  color: var(--bad); }
     .review-reply { margin-top: 6px; font-size: 13px; color: var(--text); }
     .review-reply-label { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
                           text-transform: uppercase; color: var(--accent); margin-right: 6px; }
-    .review-type-badge.buying_signal      { background: rgba(74, 222, 128, 0.12);  color: var(--good); }
-    .review-type-badge.strong_moment      { background: rgba(74, 222, 128, 0.12);  color: var(--good); }
+    .review-type-badge.buying_signal      { background: rgba(9, 224, 70, 0.12);  color: var(--good); }
+    .review-type-badge.strong_moment      { background: rgba(9, 224, 70, 0.12);  color: var(--good); }
     .review-type-badge.objection          { background: rgba(251, 146, 60, 0.14);  color: var(--orange); }
     .review-type-badge.missed_opportunity { background: rgba(251, 191, 36, 0.12);  color: var(--mid); }
     .review-type-badge.rapport_moment     { background: rgba(var(--accent-rgb), 0.12);  color: var(--accent); }
@@ -1830,8 +1838,8 @@
     /* /connect landing: pulse the Zoom row so the Connect button is unmissable. */
     .conn-row-focus { animation: connFocusPulse 2.4s ease-in-out; border-radius: var(--radius); }
     @keyframes connFocusPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); background: transparent; }
-      15%, 55% { box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.55); background: rgba(74, 222, 128, 0.06); }
+      0%, 100% { box-shadow: 0 0 0 0 rgba(9, 224, 70, 0); background: transparent; }
+      15%, 55% { box-shadow: 0 0 0 2px rgba(9, 224, 70, 0.55); background: rgba(9, 224, 70, 0.06); }
     }
     .digest-focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 600; margin-bottom: 6px; }
     /* EOD Report */
@@ -1883,7 +1891,7 @@
     .acct-notice { font-size: 13px; color: var(--text); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin: 8px 0; }
     .acct-save-note { font-size: 12px; margin-left: 10px; }
     .badge-billing-trial    { background: rgba(251, 191, 36, 0.12); color: var(--mid); }
-    .badge-billing-active   { background: rgba(74, 222, 128, 0.12); color: var(--good); }
+    .badge-billing-active   { background: rgba(9, 224, 70, 0.12); color: var(--good); }
     .badge-billing-past_due { background: rgba(248, 113, 113, 0.12); color: var(--bad); }
     .badge-billing-canceled { background: rgba(139, 139, 139, 0.10); color: var(--text); }
     .trend { font-size: 13px; }
@@ -4068,7 +4076,7 @@
     // win/loss/follow_up stay SEMANTIC (green/red/amber). The rest are
     // CATEGORICAL — one hue per objection type — and must not reuse --accent's
     // green, or a category would read as "interactive".
-    win: '#4ade80', loss: '#f87171', follow_up: '#fbbf24', unmarked: '#64748b', live: '#22d3ee',
+    win: '#09e046', loss: '#f87171', follow_up: '#fbbf24', unmarked: '#64748b', live: '#22d3ee',
     money: '#22d3ee', think: '#fbbf24', spouse: '#c084fc', time: '#fb923c',
     guarantee: '#22d3ee', 'tried-before': '#a78bfa', 'send-info': '#34d399',
     'more-research': '#f472b6', 'not-right-time': '#fb7185', 'proof-it-works': '#94a3b8',

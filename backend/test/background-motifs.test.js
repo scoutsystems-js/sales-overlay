@@ -20,6 +20,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+
+// ⚠ The brand green, read from the token rather than restated. Every assertion
+// below follows --accent automatically, so a brand change updates the guard
+// instead of breaking it.
+const ACCENT = (function () {
+  const m = HTML.match(/--accent:\s*(#[0-9a-fA-F]{6})/);
+  if (!m) throw new Error('--accent token not found — the motif guard cannot derive the brand green');
+  return m[1];
+})();
 const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/[^\n]*$/gm, '');
 
 // ⚠ fromIndex + a length assertion. Without both, the slice can run backwards
@@ -103,13 +112,19 @@ test('⚠⚠ EVERY STYLE IS VALID SVG — the four shipped MALFORMED once and re
       'motif-' + k + ' has attributes joined without a space — the SVG will not decode');
     assert.ok(svg.trim().startsWith('<svg'), 'motif-' + k + ' must start with <svg');
     assert.ok(svg.trim().endsWith('</svg>'), 'motif-' + k + ' must close its root element');
-    assert.ok(svg.indexOf('#4ade80') !== -1, 'motif-' + k + ' must be Scout green');
+    // ⚠ DERIVED FROM THE TOKEN, NOT HARD-CODED. This assertion pinned #4ade80
+    // and went stale the moment Scout green moved to #09e046 — on the very
+    // change it exists to police. Reading --accent means the guard follows the
+    // brand instead of dating itself, and still fails if a motif is left behind.
+    assert.ok(svg.indexOf(ACCENT) !== -1,
+      'motif-' + k + ' must be Scout green (' + ACCENT + ') — a data URI encodes # as %23, '
+      + 'so a plain hex search-and-replace does NOT reach it');
   });
 });
 
 test('⚠ NON-VACUITY — the validity check catches a joined attribute', () => {
   const m = LIVE.match(/--motif-a: url\("data:image\/svg\+xml,([^"]+)"\)/);
-  const broken = decodeURIComponent(m[1]).replace("' stroke='#4ade80'", "'stroke='#4ade80'");
+  const broken = decodeURIComponent(m[1]).replace("' stroke='" + ACCENT + "'", "'stroke='" + ACCENT + "'");
   const joins = broken.match(/['"][a-zA-Z-]+=/g) || [];
   assert.ok(joins.length > 0,
     'the matcher must see a joined attribute, or this check proves nothing');
