@@ -1060,7 +1060,10 @@ function parseCallListOpts(req) {
   if (limit > 100) limit = 100;
   var offset = parseInt(req.query.offset, 10);
   if (!offset || offset < 0) offset = 0;
-  var filter = (req.query.filter === 'analyzed' || req.query.filter === 'objections') ? req.query.filter : null;
+  // (q) 2026-08-17 — closed / not_closed use the EXISTING outcome. A call is
+  // closed iff call_analyses.outcome = 'closed'; no second predicate is invented.
+  var FILTERS = ['analyzed', 'objections', 'closed', 'not_closed'];
+  var filter = (FILTERS.indexOf(req.query.filter) !== -1) ? req.query.filter : null;
   var sort = (req.query.sort === 'score') ? 'score' : null;
   var from = (req.query.from && !isNaN(Date.parse(req.query.from))) ? req.query.from : null;
   var to = (req.query.to && !isNaN(Date.parse(req.query.to))) ? req.query.to : null;
@@ -1092,6 +1095,19 @@ async function loadCallsList(admin, userId, opts) {
     restrict = await distinctChildCallIds(admin, 'call_highlights', userId, function(q) { return q.eq('type', 'objection'); });
   } else if (opts.filter === 'analyzed') {
     restrict = await distinctChildCallIds(admin, 'call_analyses', userId, function(q) { return q.eq('status', 'done'); });
+  } else if (opts.filter === 'closed') {
+    restrict = await distinctChildCallIds(admin, 'call_analyses', userId, function(q) {
+      return q.eq('status', 'done').eq('outcome', 'closed');
+    });
+  } else if (opts.filter === 'not_closed') {
+    // ⚠ NOT CLOSED MEANS "GRADED, AND THE OUTCOME IS NOT closed" — it does NOT
+    // sweep in calls that have no analysis yet. Measured on live data, 46% of
+    // calls have no outcome at all; folding those into "not closed" would assert
+    // a result for a call nobody has graded. They are excluded from BOTH sides,
+    // and the view says how many that is rather than hiding it.
+    restrict = await distinctChildCallIds(admin, 'call_analyses', userId, function(q) {
+      return q.eq('status', 'done').not('outcome', 'is', null).neq('outcome', 'closed');
+    });
   }
   if (restrict && Object.keys(restrict).length === 0) {
     return { calls: [], limit: opts.limit, offset: opts.offset };
@@ -1142,7 +1158,44 @@ async function loadCallsList(admin, userId, opts) {
     });
   }
   if (needFullSet) enriched = enriched.slice(opts.offset, opts.offset + opts.limit);
-  return { calls: enriched, limit: opts.limit, offset: opts.offset };
+  return {
+    calls: enriched, limit: opts.limit, offset: opts.offset,
+    // (q) Counts across the WHOLE WINDOW, not this page — the control labels are
+    // about the range the user picked, and a per-page count would change as they
+    // paged through. `ungraded` is surfaced deliberately: it is the set that
+    // belongs to NEITHER side, and on live data it is ~46% of calls.
+    outcome_counts: await windowOutcomeCounts(admin, userId, opts),
+  };
+}
+
+// Closed / not-closed / ungraded over the date window. One id sweep + one
+// analyses sweep, mirroring the enrichment above rather than inventing a
+// different way to ask the same question.
+async function windowOutcomeCounts(admin, userId, opts) {
+  var ids = [], PAGE = 1000, start = 0;
+  for (;;) {
+    var q = admin.from('fathom_calls').select('id').eq('user_id', userId);
+    if (opts.from) q = q.gte('call_date', opts.from);
+    if (opts.to) q = q.lte('call_date', opts.to);
+    var r = await q.range(start, start + PAGE - 1);
+    if (r.error) return { closed: null, not_closed: null, ungraded: null, total: null };
+    var b = r.data || [];
+    b.forEach(function (x) { ids.push(x.id); });
+    if (b.length < PAGE) break;
+    start += PAGE;
+  }
+  var closed = 0, notClosed = 0, graded = 0;
+  for (var i = 0; i < ids.length; i += 100) {
+    var ar = await admin.from('call_analyses').select('fathom_call_id, outcome')
+      .in('fathom_call_id', ids.slice(i, i + 100)).eq('status', 'done');
+    if (ar.error) return { closed: null, not_closed: null, ungraded: null, total: ids.length };
+    (ar.data || []).forEach(function (a) {
+      if (a.outcome == null) return;      // graded but no outcome → neither side
+      graded++;
+      if (a.outcome === 'closed') closed++; else notClosed++;
+    });
+  }
+  return { closed: closed, not_closed: notClosed, ungraded: ids.length - graded, total: ids.length };
 }
 
 router.get('/calls', requireAuth, async function(req, res) {

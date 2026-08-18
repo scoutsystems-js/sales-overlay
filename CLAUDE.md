@@ -1028,6 +1028,14 @@ delete from prospects     where display_name  like 'Seed %';
 - **`objection-synthesis` needed the split INSIDE A SINGLE LOOP**: it counts with the shared predicate and selects its "handled examples" on the moment's own resolution, because an example is evidence of good handling shown to a closer. A credited-but-unhandled moment held up as the model to copy is exactly backwards.
 - **THE RULE: enforce per CALL SITE.** `test/handled-carrier.test.js` counts hand-rolled `resolution === 'handled'` comparisons per file against an explicit allowance, with the reason for each allowance written beside it. A file-level allowlist would have said "team-synthesis is exempt" and stopped noticing its rate lane entirely.
 
+### ⚠ A FILTER THAT PARTITIONS ON A NULLABLE FIELD HAS THREE GROUPS, NOT TWO (2026-08-17)
+**And the third has to be visible, or the two that show are lying by omission.**
+- **The live case:** a Closed / Not Closed control on the Calls view, keyed on `call_analyses.outcome`. Measured across 335 calls: **closed 50 · not-closed 132 · NO ANALYSIS ROW AT ALL 153 (46%)**. Two buttons look like they partition the range. They do not — nearly half the calls are in neither.
+- **The tempting resolution is the wrong one.** Folding ungraded calls into "not closed" makes the buttons add up, and **asserts an outcome for a call nobody has graded**. The number would be defensible-looking and false.
+- **THE RULE: exclude the unknown group from BOTH sides and PRINT ITS COUNT** — here, *"153 not graded yet — in neither group"*.
+- **⚠ WHAT MAKES THAT AN ACCOUNTING RATHER THAN A DISCLAIMER: the three numbers reconcile to the total BY CONSTRUCTION** (50 + 132 + 153 = 335). A reader can add up what is on screen and land on the range they selected. A caveat in prose asks to be believed; three numbers that sum ask to be checked.
+- Same family as the `credited (call closed)` fourth bucket on the Objections view: **when a rate or a filter has a group nobody sees, the visible numbers stop reconciling and the page loses trust.** The fix in both cases was to show the missing group, not to explain it.
+
 ### ⚠⚠ A NON-VACUITY CHECK MUST ASSERT ITS ANCHOR EXISTS — OR A REMOVAL SILENTLY TURNS IT OFF (2026-08-17, twice in one session)
 **The shape:** a guard proves it is not vacuous by breaking a literal and confirming the matcher fires —
 ```js

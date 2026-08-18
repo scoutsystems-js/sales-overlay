@@ -1782,6 +1782,25 @@
     .nw-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .nw-chip { font-size: 12px; color: var(--text); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
     .nw-chip b { color: var(--text); }
+    /* (q) Closing / non-closing filter on the Calls view. Semantic colours only;
+       the active state uses the accent because it is a CONTROL, not a verdict. */
+    .calls-outcome { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .calls-outcome-btn {
+      background: var(--bg-field); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+      font-family: inherit; display: inline-flex; align-items: center; gap: 7px;
+      transition: border-color 0.15s var(--ease);
+    }
+    .calls-outcome-btn:hover { border-color: var(--border-hover); }
+    .calls-outcome-btn.active { border-color: var(--accent); color: var(--accent); }
+    .calls-outcome-n { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--accent-quiet); }
+    .calls-outcome-clear {
+      background: transparent; border: 1px solid var(--border); color: var(--text);
+      padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; font-family: inherit;
+    }
+    .calls-outcome-clear:hover { border-color: var(--border-hover); }
+    .calls-outcome-note { font-size: 11px; }
+
     /* (n) The promoted Performance Summary card. Visual weight only — it is
        still a link, and the synthesis lane still fires on the page it opens. */
     .perf-feature .section-header h2 { font-size: 20px; }
@@ -2613,7 +2632,9 @@
     callLibraryLoading: false, // gates "Load more" button while a fetch is in flight
     callLibraryHasMore: false, // true if the last page returned === limit (more might exist)
     callLibraryOffset:  0,     // total rows fetched so far; next "Load more" uses this as offset
-    callLibraryFilter:  null,  // drill filter: 'analyzed' | 'objections' | null (nav = all)
+    callLibraryFilter:  null,  // 'analyzed' | 'objections' | 'closed' | 'not_closed' | null
+    // (q) window-wide outcome counts for the filter labels; null until a load.
+    callLibraryCounts:  null,
     callLibrarySort:    null,  // drill sort: 'score' | null
     callLibraryError:   null,  // last fetch error message; cleared on successful re-fetch
     callLibraryRange:   null,  // manager Calls view date window {from,to,days}; default 7d (non-managers unaffected)
@@ -7767,6 +7788,35 @@
     setView('call-library');
   }
 
+  // (q) The closing / non-closing control.
+  //
+  // ⚠ IT COMBINES WITH THE DATE RANGE, IT DOES NOT REPLACE IT. Picking "Closed"
+  // narrows whatever window is already selected; the dates are untouched.
+  //
+  // ⚠ CLICKING THE ACTIVE ONE TOGGLES IT OFF, so the control can always be
+  // undone without hunting for Clear.
+  function setCallsOutcome(key) {
+    state.callLibraryFilter = (state.callLibraryFilter === key) ? null : key;
+    state.callLibrarySort = null;      // an outcome view is chronological
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryError = null;
+    renderCallLibrary();
+  }
+
+  // ⚠ CLEAR RESETS THE FILTER ONLY — NOT THE DATE RANGE, and not the rep
+  // selection. "Clear" is the word people expect to reset everything, so the
+  // scope is deliberately narrow and stated: it removes the closed/not-closed
+  // (or drill) filter and leaves the window you chose exactly as it was.
+  function clearCallsFilter() {
+    state.callLibraryFilter = null;
+    state.callLibrarySort = null;
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryError = null;
+    renderCallLibrary();
+  }
+
   // Enter the Call Library from a coaching donut — applies a filter/sort so the
   // drill shows only the relevant calls (matching the donut's date window).
   function drillCalls(filter, sort) {
@@ -7838,6 +7888,9 @@
       } else {
         state.callLibrary = (state.callLibrary || []).concat(calls);
       }
+      // Window-wide counts for the filter labels. They describe the RANGE, not
+      // this page, so they must not be recomputed from `calls`.
+      if (data && data.outcome_counts) state.callLibraryCounts = data.outcome_counts;
       state.callLibraryHasMore = calls.length >= requestedLimit;
       state.callLibraryOffset = startedOffset + calls.length;
       state.callLibraryError = null;
@@ -8123,11 +8176,33 @@
       : (count === 0
           ? 'Your synced Fathom calls will appear here.'
           : count + ' call' + (count === 1 ? '' : 's') + ' shown' + (state.callLibraryHasMore ? ' (more available)' : ''));
+    // (q) 2026-08-17 — the closing / non-closing control.
+    var oc = (state.callLibraryCounts || {});
+    var f = state.callLibraryFilter;
+    function outBtn(key, text, n) {
+      return '<button class="calls-outcome-btn' + (f === key ? ' active' : '') + '" type="button"'
+        + ' onclick="setCallsOutcome(\'' + key + '\')">' + text
+        + (typeof n === 'number' ? '<span class="calls-outcome-n">' + n + '</span>' : '') + '</button>';
+    }
+    // ⚠ COUNTS WITH THEIR RAW NUMBERS, and the third number is the honest one:
+    // "ungraded" belongs to NEITHER side. On live data it is ~46% of calls, so
+    // hiding it would make the two buttons look like they partition the range
+    // when they do not.
+    var outcomeControl = '<div class="calls-outcome">'
+      + outBtn('closed', 'Closed', oc.closed)
+      + outBtn('not_closed', 'Not Closed', oc.not_closed)
+      + (f ? '<button class="calls-outcome-clear" type="button" onclick="clearCallsFilter()">Clear</button>' : '')
+      + (typeof oc.ungraded === 'number' && oc.ungraded > 0
+          ? '<span class="calls-outcome-note">' + oc.ungraded + ' not graded yet — in neither group</span>' : '')
+      + '</div>';
+
     // Active drill filter chip (only present when arrived via a donut).
     var chip = '';
-    var label = state.callLibraryFilter === 'objections' ? 'With objections'
-              : (state.callLibrarySort === 'score' ? 'Analyzed · worst score first'
-              : (state.callLibraryFilter === 'analyzed' ? 'Analyzed' : ''));
+    var label = state.callLibraryFilter === 'objections' ? 'With Objections'
+              : (state.callLibrarySort === 'score' ? 'Analyzed · Worst Score First'
+              : (state.callLibraryFilter === 'analyzed' ? 'Analyzed'
+              : (state.callLibraryFilter === 'closed' ? 'Closed Calls'
+              : (state.callLibraryFilter === 'not_closed' ? 'Calls That Did Not Close' : ''))));
     if (label) {
       chip = '<span class="scope-pill" style="margin-left:10px;">' + escapeHtml(label)
         + ' <a onclick="goCallLibrary();return false;" style="cursor:pointer;text-decoration:underline;">clear</a></span>';
@@ -8179,7 +8254,8 @@
       ? '<span class="scope-pill" style="margin-left:10px;">' + escapeHtml((state.me.role || '') + ' view') + '</span>' : '';
     return '<div class="page-header fade-in">'
       + '<div><h1>Call Library' + chip + scopePill + '</h1>'
-      + '<div class="subtitle">' + escapeHtml(sub) + '</div></div>'
+      + '<div class="subtitle">' + escapeHtml(sub) + '</div>'
+      + outcomeControl + '</div>'
       + controls
       + '</div>';
   }
