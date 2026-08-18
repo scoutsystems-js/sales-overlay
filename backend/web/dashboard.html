@@ -1748,6 +1748,16 @@
     }
 
     /* Scope badge */
+    /* Josh's "Back to Teams" — GREEN, and it only exists while pivoted. */
+    .back-to-teams {
+      display: inline-block; margin-bottom: 8px;
+      background: var(--accent-quiet); border: 1px solid var(--accent); color: var(--accent);
+      padding: 5px 12px; border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 600; font-family: inherit;
+      transition: background 0.15s var(--ease);
+    }
+    .back-to-teams:hover { background: rgba(var(--accent-rgb), 0.28); }
+
     .scope-pill {
       font-size: 10.5px;
       font-weight: 600;
@@ -2484,7 +2494,7 @@
   <div class="top-bar-left">
     <span>Scout</span>
     <span class="sep">·</span>
-    <a class="nav-link" id="navOverview" onclick="setView('overview'); return false;">Coaching Dashboard</a>
+    <a class="nav-link" id="navOverview" onclick="goOwnCoaching(); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
     <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
     <a class="nav-link" id="navEod" onclick="goEod(); return false;">EOD Report</a>
@@ -3685,6 +3695,33 @@
     applyCoachingRangeChange(preserveView);
   }
 
+  // ── THE PIVOT, AND HOW IT CLEARS (Josh's note, 2026-08-18) ───────────────
+  //
+  // ⚠ THE PIVOT LIVES IN THE QUERY STRING (?user=<id>), not the hash. That is
+  // why it was sticky in THREE ways, not one: nav clicks only change the hash,
+  // browser back only changes the hash, and a refresh re-reads the param at
+  // boot. Clicking "Coaching Dashboard" therefore kept showing the last rep
+  // indefinitely — the daily annoyance Josh reported.
+  //
+  // Clearing means all three: drop the param, restore the id, and drop the
+  // per-user caches. setUser() already does exactly that, and returns early
+  // when there is nothing to clear, so this is a wrapper rather than a second
+  // implementation — a second one would be a shared-carrier waiting to drift.
+  function pivoted() { return !!state.me && state.viewingUserId !== state.me.user_id; }
+  function clearPivot() { if (pivoted()) setUser(state.me.user_id); }
+
+  // The nav's "Coaching Dashboard" — MY board, not the rep I last opened.
+  function goOwnCoaching() {
+    if (pivoted()) { clearPivot(); return; }   // setUser lands on overview itself
+    setView('overview');
+  }
+
+  // Josh's button: back to Team AND out of the pivot, in one action.
+  function backToTeams() {
+    clearPivot();
+    setView('team');
+  }
+
   function setUser(userId) {
     if (!userId || userId === state.viewingUserId) return;
     var url = new URL(window.location.href);
@@ -3829,8 +3866,12 @@
 
     var scopePill = state.viewingUserId !== state.me.user_id ? '<span class="scope-pill">' + escapeHtml(state.me.role || '') + ' view</span>' : '';
 
+    // ⚠ ABOVE the name, not beside it — the point is to be seen before the
+    // manager reads whose board this is and wonders how to get out.
+    var backToTeam = pivoted()
+      ? '<button class="back-to-teams" type="button" onclick="backToTeams()">← Back to Teams</button>' : '';
     return '<div class="page-header fade-in">'
-         + '<div><h1>' + escapeHtml(heading) + scopePill + '</h1>'
+         + '<div>' + backToTeam + '<h1>' + escapeHtml(heading) + scopePill + '</h1>'
          + '<div class="subtitle">' + escapeHtml(sub) + '</div></div>'
          + '<div class="controls">' + userPicker
          + '<div class="date-presets">' + presets + '</div>' + summaryBtnHtml()
@@ -8362,8 +8403,12 @@
     // When pivoted to another rep, show whose calls these are.
     var scopePill = (hasManagerContext() && state.viewingUserId !== state.me.user_id)
       ? '<span class="scope-pill" style="margin-left:10px;">' + escapeHtml((state.me.role || '') + ' view') + '</span>' : '';
+    // Calls builds its own header, so the button is placed here too — a manager
+    // pivoted on Calls is stuck in exactly the same way.
+    var backToTeamCalls = (typeof pivoted === 'function' && pivoted())
+      ? '<button class="back-to-teams" type="button" onclick="backToTeams()">← Back to Teams</button>' : '';
     return '<div class="page-header fade-in">'
-      + '<div><h1>Call Library' + chip + scopePill + '</h1>'
+      + '<div>' + backToTeamCalls + '<h1>Call Library' + chip + scopePill + '</h1>'
       + '<div class="subtitle">' + escapeHtml(sub) + '</div>'
       + outcomeControl + '</div>'
       + controls

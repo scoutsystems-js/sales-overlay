@@ -463,7 +463,11 @@ test('⚠ BOOT MUST NOT CLOBBER A RANGE RESTORED FROM THE HASH', () => {
 test('setDateRange still writes a range, and shares the change path', () => {
   // The tail was extracted so boot can reuse it; setDateRange must still work.
   const at = HTML.indexOf('function setDateRange');
-  const fn = HTML.slice(at, HTML.indexOf('function setUser', at));
+  // ⚠ END ON THE NEXT DECLARATION, not on a NAMED neighbour. This sliced to
+  // `function setUser`, and the 2026-08-18 pivot helpers were inserted between
+  // the two — the slice swallowed them and the length assertion failed. The
+  // neighbour was never part of the claim; "the next function" is.
+  const fn = HTML.slice(at, HTML.indexOf('\n  function ', at + 10));
   assert.ok(fn.length > 100 && fn.length < 1200, 'slice: ' + fn.length);
   assert.ok(/state\.dateRange = \{ from: from\.toISOString\(\)/.test(fn), 'still writes the range');
   assert.ok(/applyCoachingRangeChange\(preserveView\)/.test(fn), 'and delegates the follow-up work');
