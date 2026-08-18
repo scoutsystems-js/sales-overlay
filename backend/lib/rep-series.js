@@ -154,6 +154,27 @@ function buildRepSeries(input) {
     });
   });
 
+  // ── time to price: MINUTES, not a rate (item j) ──────────────────────────
+  // ⚠ THIS SERIES IS A DURATION, NOT A PERCENTAGE. Its y-axis is minutes and it
+  // must never share an axis with the two rate graphs.
+  // ⚠ A call with a NULL price moment is EXCLUDED, never counted as 0 — the same
+  // rule as an empty week on the rate lines, and for the same reason: ~1 in 5
+  // closed calls genuinely has no price drop (a second call on an agreed deal),
+  // and 0 would read as "priced immediately".
+  var pAcc = {};   // user -> bucketIndex -> {secs, calls}
+  analyses.forEach(function (a) {
+    if (!a) return;
+    var secs = a.price_stated_at_seconds;
+    if (typeof secs !== 'number' || !isFinite(secs)) return;   // NULL is excluded, never zeroed
+    var c = callById[a.fathom_call_id];
+    if (!c || !c.call_date) return;
+    var i = index[bucketStart(c.call_date, bucket).getTime()];
+    if (i === undefined) return;
+    var byUser = pAcc[c.user_id] || (pAcc[c.user_id] = {});
+    var cell = byUser[i] || (byUser[i] = { secs: 0, calls: 0 });
+    cell.secs += secs; cell.calls++;
+  });
+
   var repSeries = reps.map(function (r) {
     var u = r && r.user_id;
     return {
@@ -166,6 +187,16 @@ function buildRepSeries(input) {
       close: keys.map(function (k, i) {
         var cell = (cAcc[u] || {})[i] || { closed: 0, total: 0 };
         return { rate: pct(cell.closed, cell.total), closed: cell.closed, total: cell.total };
+      }),
+      // `rate` here carries MINUTES so the chart code can stay one function.
+      // The unit lives on the axis label, and priceMinutes() is the only place
+      // that knows it — see the axis note in dashboard.html.
+      price: keys.map(function (k, i) {
+        var cell = (pAcc[u] || {})[i] || { secs: 0, calls: 0 };
+        return {
+          rate: cell.calls ? Math.round((cell.secs / cell.calls / 60) * 10) / 10 : null,
+          calls: cell.calls, total: cell.calls,
+        };
       }),
     };
   });
@@ -182,7 +213,9 @@ function buildRepSeries(input) {
         var p = pick(rs)[i];
         if (p.rate === null) return;
         rates.push(p.rate);
-        num += (p.handled !== undefined) ? p.handled : p.closed;
+        num += (p.handled !== undefined) ? p.handled
+             : (p.closed !== undefined) ? p.closed
+             : p.calls;                       // price: the sample, not a numerator
         den += p.total;
       });
       if (!rates.length) return { rate: null, reps_counted: 0, numerator: 0, total: 0 };
@@ -196,7 +229,11 @@ function buildRepSeries(input) {
     objection_category: cat,
     buckets: buckets,
     reps: repSeries,
-    team: { handle: teamLine(function (r) { return r.handle; }), close: teamLine(function (r) { return r.close; }) },
+    team: {
+      handle: teamLine(function (r) { return r.handle; }),
+      close: teamLine(function (r) { return r.close; }),
+      price: teamLine(function (r) { return r.price; }),
+    },
   };
 }
 

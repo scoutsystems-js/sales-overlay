@@ -789,6 +789,8 @@ function validateNameField(v) {
 function buildAccountPayload(prof, email) {
   prof = prof || {};
   return {
+    // (j) the seller's own price — the price-drop lookup reads this.
+    price_pif: (prof.price_pif != null) ? Number(prof.price_pif) : null,
     email: email,
     first_name: prof.first_name || null,
     last_name: prof.last_name || null,
@@ -807,7 +809,7 @@ router.get('/account', requireAuth, async function(req, res) {
   try {
     var admin = getAdminClient();
     var q = await admin.from('user_profiles')
-      .select('first_name, last_name, role, managed_by, billing_status, billing_plan, billing_provider')
+      .select('first_name, last_name, role, managed_by, billing_status, billing_plan, billing_provider, price_pif')
       .eq('user_id', req.user.id).maybeSingle();
     if (q.error) throw new Error('user_profiles: ' + q.error.message);
     res.json(buildAccountPayload(q.data, req.user.email));
@@ -842,13 +844,36 @@ router.patch('/account', requireAuth, async function(req, res) {
       updates.last_name = normalizeName(ln);
 
     }
-    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: first_name, last_name)' });
+    /**
+     * ⚠ PRICE — item (j). The price-drop metric is a LOOKUP on the seller's own
+     * price, so a rep with no stored price gets no measurement at all. It was
+     * only ever captured by the ELECTRON onboarding wizard
+     * (src/renderer/onboarding/onboarding.html), which is dormant — which is
+     * exactly why 1 of 8 profiles had it. This is the web home for it.
+     *
+     * ⚠ price_pif ONLY. price_2pay (the plan figure) must NOT drive the metric:
+     * it is a decoy generator — Josh's is 400 and these calls are full of
+     * "a couple hundred bucks", "$300 to $500 a month", "about $400 max".
+     * It is accepted here for completeness of the profile, and lib/price-moment
+     * never reads it.
+     */
+    ['price_pif', 'price_2pay'].forEach(function (k) {
+      if (body[k] === undefined) return;
+      if (body[k] === null || body[k] === '') { updates[k] = null; return; }
+      var n = Number(body[k]);
+      if (!isFinite(n) || n <= 0 || n > 10000000 || Math.round(n) !== n) {
+        throw Object.assign(new Error(k + ' must be a whole number of dollars'), { status: 400 });
+      }
+      updates[k] = n;
+    });
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: first_name, last_name, price_pif, price_2pay)' });
     updates.updated_at = new Date().toISOString();
     var up = await admin.from('user_profiles').update(updates).eq('user_id', req.user.id);
     if (up.error) throw new Error('update: ' + up.error.message);
     console.log('[me] account updated: user=%s fields=%s', req.user.id, Object.keys(updates).filter(function(k){return k!=='updated_at';}).join(','));
     res.json({ ok: true });
   } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
     console.error('[me] account update:', err.message);
     res.status(500).json({ error: 'Failed to update account' });
   }

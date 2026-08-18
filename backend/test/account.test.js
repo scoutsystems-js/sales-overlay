@@ -28,6 +28,8 @@ test('buildAccountPayload: profile + email → UI shape; managed lock state; bil
     first_name: 'Tasha',
     last_name: 'P',
     role: 'user',
+    // (j) the seller's own price — the price-drop lookup reads it from here.
+    price_pif: null,
     is_managed: true,
     billing: { status: 'trial', plan: null, provider: null },
   });

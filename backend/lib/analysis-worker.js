@@ -48,6 +48,7 @@ const { normalizeTranscript } = require('./transcript-normalizer');
 const { fetchSellingContext } = require('./selling-context');
 const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
 const { resolveProspectName } = require('./prospect-name');
+const { findPriceMoment } = require('./price-moment');
 const { nameKey } = require('./prospect-entity');
 const { effectiveCloseScore } = require('./outcome-tag');
 const fathomRoutes = require('../routes/fathom');
@@ -1198,6 +1199,26 @@ async function analyzeCall(fathomCallId, userId) {
     // Claude call — still exactly two per analysis.
     var selling = await fetchSellingContext(admin, userId);
 
+    /**
+     * ITEM (j) — the price-drop moment. Read the seller's OWN price and find the
+     * first time they stated it as the total. Deterministic; a failure here must
+     * never fail an analysis, so it degrades to null exactly like the KB harvest.
+     *
+     * ⚠ price_pif ONLY — price_2pay is the plan figure and is a decoy generator
+     * ("a couple hundred bucks", "$300 to $500 a month"). lib/price-moment never
+     * sees it.
+     */
+    var priceMoment = null;
+    try {
+      var pp = await admin.from('user_profiles').select('price_pif').eq('user_id', userId).maybeSingle();
+      var sellerPrice = (pp && pp.data) ? Number(pp.data.price_pif) : NaN;
+      if (isFinite(sellerPrice) && sellerPrice > 0) {
+        priceMoment = findPriceMoment(normalized.turns, sellerPrice);
+      }
+    } catch (e) {
+      console.warn('[analysis] price moment skipped: %s', e.message);
+    }
+
     // ─── 7c: the rep's derived coaching areas ────────────────────────────
     // Cached on their material hash, so this is one indexed read on the common
     // path and costs a Claude call only when the material changed. A rep with
@@ -1471,6 +1492,16 @@ async function analyzeCall(fathomCallId, userId) {
       barrier_trace:         barrierTrace,
       role_inverted:         (normalized.speaker_confidence === 'matched') ? roleInv.inverted : null,
       prospect_context:      prospectContextOut,
+      // ── item (j): when the closer stated the price ──────────────────────
+      // ⚠ DETERMINISTIC AND FREE — a lookup of the seller's OWN stored price in
+      // their own transcript. No model call, no token budget, no prompt bump.
+      // That is also why it is backfillable over existing transcripts rather
+      // than being new-calls-only.
+      // ⚠ NULL IS EXPECTED, roughly 1 in 5 closed calls: a second conversation
+      // on an already-agreed deal has no pitch and no price drop. Do not read
+      // the gaps as breakage — see lib/price-moment.js.
+      price_stated_at_seconds: priceMoment ? priceMoment.seconds : null,
+      price_quote:             priceMoment ? priceMoment.quote : null,
       transcript_stored:   { turns: normalized.turns, highlights: normalized.highlights },
       speaker_closer_name: normalized.closer_name,
       // PROSPECT NAMES 3a — resolve WHO this call was with, at write time.

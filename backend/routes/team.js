@@ -387,7 +387,10 @@ router.get('/rep-series', teamGate, async function (req, res) {
     var analyses = [], objections = [];
     for (var i = 0; i < ids.length; i += 100) {
       var slice = ids.slice(i, i + 100);
-      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome').in('fathom_call_id', slice).eq('status', 'done');
+      // price_stated_at_seconds drives the third graph (item j). Selecting it
+      // here is the same class of omission that made the Part-1b section tags
+      // invisible — the component was fine, the SELECT did not fetch the column.
+      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome, price_stated_at_seconds').in('fathom_call_id', slice).eq('status', 'done');
       if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
       analyses = analyses.concat(aq.data || []);
       var oq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')

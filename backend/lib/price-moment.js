@@ -1,0 +1,187 @@
+/**
+ * ITEM (j) — WHEN DID THE CLOSER DROP THE PRICE?
+ *
+ * Pure, deterministic, NO MODEL CALL. Given a call's normalized turns and the
+ * seller's own stored price, returns the first moment the closer stated that
+ * price as the total for the offer — or null.
+ *
+ * ⚠⚠ THIS IS A LOOKUP, NOT A DETECTOR, AND THAT DISTINCTION IS THE WHOLE DESIGN.
+ * A previous attempt tried to RECOGNISE a price from patterns ($n,nnn, "the
+ * price is", …) and failed completely: measured across 170 real calls the
+ * earliest money-shaped closer line landed at a MEDIAN OF 3.8 MINUTES, and four
+ * reasonable detectors disagreed with each other by a median of 11 minutes.
+ * Read by hand, the early matches are market rates per bed, grants a third party
+ * received, students' monthly revenue, and what it cost the SELLER to produce a
+ * document. Every one of them is money-shaped; none is the price.
+ *
+ * The property that separates them is SEMANTIC, not lexical:
+ *     a decoy is a number about someone or something ELSE
+ *     the price is what THIS prospect pays THIS seller for THIS offer
+ * "$30,000 document" and "$9,800 for the whole thing" occur in the SAME SENTENCE
+ * on real calls. No regex can tell them apart. Knowing the seller's own price
+ * collapses the semantic question into an identity check, which is why this
+ * works and why nothing pattern-based ever could.
+ *
+ * ⚠ NEVER `price_2pay`. The plan figure (Josh's is 400) shows up constantly as
+ * "a couple hundred bucks", "$300 to $500 a month", "about $400 max" — it is a
+ * decoy generator. ONLY the pay-in-full total identifies the drop.
+ */
+
+/**
+ * ⚠⚠ THE FREQUENCY HYPOTHESIS WAS TESTED AND DOES NOT HOLD — recorded because
+ * the idea is a natural one and someone will have it again.
+ *
+ * The proposal was: a distinctive price appears once or twice, a ROUND price
+ * appears repeatedly because round numbers are what people use for examples, so
+ * count occurrences and refuse above a threshold. Measured over 139-140 real
+ * calls, occurrences per call when present:
+ *
+ *      9800  (the real price)   mean 1.93   max 7
+ *      5000  (round decoy)      mean 1.78   max 5
+ *     10000  (round decoy)      mean 1.66   max 6
+ *     30000  (the doc, decoy)   mean 2.60   max 6
+ *
+ * The real price occurs MORE often than the round decoys and LESS often than the
+ * document. The distributions overlap almost entirely. **No threshold separates
+ * them, and any number chosen would have looked principled and done nothing.**
+ *
+ * First-occurrence TIMING separates better but still overlaps (real median 31.5
+ * min vs decoys 18-22; decoy p90 reaches 32-40).
+ *
+ * ⚠ WHAT ACTUALLY SEPARATES THEM IS TOTAL-FRAMING LANGUAGE, and it is close to
+ * clean. Share of first closer occurrences whose turn also states a TOTAL:
+ *
+ *      9800  (the real price)   118/139 = 85%
+ *     10000  (round decoy)        1/97  =  1%
+ *      5000  (round decoy)        0/107 =  0%
+ *     30000  (the doc, decoy)     0/140 =  0%
+ *
+ * So the round-price collision is handled by the SAME mechanism as everything
+ * else rather than by a special rule: a round decoy is almost never framed as
+ * the total for the offer, so requiring the framing makes the collision
+ * self-limiting. That is a property of how people speak, not a tuned constant.
+ */
+const PRICE_FRAME_RE = new RegExp(
+  '(' + [
+    'for (the )?(whole|everything|entire)',
+    'the total', 'total price',
+    'one[- ]time',
+    'all (of )?the services',
+    'pay (at )?one time',
+    'the regular price',
+    'the (one[- ]time )?investment',
+  ].join('|') + ')', 'i');
+
+/**
+ * How far ahead to look for the framing when the number lands in its own short
+ * turn. On a real call the closer said "And it was $9,800." and then "So one
+ * time ever, 9,800." — two turns 0.4 SECONDS apart.
+ *
+ * ⚠⚠ BOUNDED IN BOTH TURNS **AND** TIME, and the time bound is not belt-and-
+ * braces — a turn bound alone is wrong. A unit test caught it: with the decoy
+ * "$5,000 in their bank account" at 11:40 and the genuine "$5,000 for
+ * everything, one time" at 35:00, "the next closer turn" reached forward
+ * TWENTY-THREE MINUTES and certified the decoy. Nothing errors; the metric just
+ * reports a price drop at 11 minutes that never happened.
+ * Adjacency in a transcript is a property of TIME, not of array position — the
+ * next element can be an hour later.
+ */
+const FRAME_LOOKAHEAD_TURNS = 1;
+const FRAME_LOOKAHEAD_SECONDS = 30;
+
+/**
+ * ⚠ EXPECTED NULL RATE — RECORD THIS SO GAPS ARE NOT READ AS BREAKAGE.
+ * Roughly **1 in 5 closed calls has no price moment at all**, and that is
+ * correct rather than a miss. Hand-read example: a closed call whose own grader
+ * notes say "No pitch occurred. The program was referenced only in logistical
+ * terms" — a second conversation on a deal already agreed. It contains zero
+ * occurrences of the price, from either speaker.
+ * A chart over this field MUST exclude nulls and say how many it excluded.
+ */
+const EXPECTED_NULL_SHARE_CLOSED = 0.2;
+
+function escapeRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+/**
+ * The spoken/written forms of a price, as ONE regex.
+ * 9800 → /(?<![\d.])\$?9[ ,]?800(?![\d])/
+ *
+ * ⚠ The lookarounds are load-bearing: without them 9800 matches inside 19800 and
+ * 98000, which are different numbers and appear on real calls.
+ * ⚠ STATED LIMIT: written-out forms ("nine thousand eight hundred", "ninety-eight
+ * hundred") are NOT matched. They did not occur in the hand-read sample, and
+ * refusing them yields a null — the safe direction — rather than a wrong minute.
+ */
+function priceRegex(price) {
+  var n = Number(price);
+  if (!isFinite(n) || n <= 0) return null;
+  var digits = String(Math.round(n));
+  var parts = [], s = digits;
+  while (s.length > 3) { parts.unshift(s.slice(-3)); s = s.slice(0, -3); }
+  parts.unshift(s);
+  var body = parts.map(escapeRe).join('[ ,]?');
+  return new RegExp('(?<![\\d.])\\$?' + body + '(?![\\d])');
+}
+
+function isCloser(turn) {
+  return !!turn && String(turn.speaker || '').toUpperCase() === 'CLOSER';
+}
+function textOf(turn) { return (turn && typeof turn.text === 'string') ? turn.text : ''; }
+function secondsOf(turn) {
+  var v = turn && turn.start_seconds;
+  return (typeof v === 'number' && isFinite(v)) ? v : null;
+}
+
+/**
+ * The price-drop moment, or null.
+ *
+ * ⚠ FIRST CLOSER OCCURRENCE, and every part of that phrase earns its place:
+ *   - CLOSER, because the price is stated BY the seller. Prospects echo it
+ *     later ("so 9,800", "it's saying pay total $9,800") and never first.
+ *   - FIRST, because the price recurs: financing follow-ups ("your payments on
+ *     $9,800 is like $100 a month") and possession claims ("you paid $9,800 for
+ *     this") all come after. Measured: 12 occurrences across 5 calls.
+ *   - and it must be FRAMED AS THE TOTAL — see the frequency note above.
+ */
+function findPriceMoment(turns, price) {
+  var list = Array.isArray(turns) ? turns : [];
+  var re = priceRegex(price);
+  if (!re || !list.length) return null;
+
+  for (var i = 0; i < list.length; i++) {
+    var t = list[i];
+    if (!isCloser(t)) continue;
+    var txt = textOf(t);
+    if (!re.test(txt)) continue;
+
+    // Framing in this turn, or in the next closer turn (the number sometimes
+    // lands in a four-word turn of its own).
+    var secs = secondsOf(t);
+    if (secs === null) continue;   // no timestamp → nothing to plot
+
+    var framed = PRICE_FRAME_RE.test(txt);
+    if (!framed) {
+      var looked = 0;
+      for (var j = i + 1; j < list.length && looked < FRAME_LOOKAHEAD_TURNS; j++) {
+        if (!isCloser(list[j])) continue;
+        var ns = secondsOf(list[j]);
+        // ⚠ TIME bound as well as turn bound — see the note on the constants.
+        if (ns === null || ns - secs > FRAME_LOOKAHEAD_SECONDS) break;
+        looked++;
+        if (PRICE_FRAME_RE.test(textOf(list[j]))) { framed = true; break; }
+      }
+    }
+    if (!framed) continue;
+    return { seconds: Math.round(secs), quote: txt.trim().slice(0, 400), turn_index: i };
+  }
+  return null;
+}
+
+module.exports = {
+  PRICE_FRAME_RE: PRICE_FRAME_RE,
+  FRAME_LOOKAHEAD_TURNS: FRAME_LOOKAHEAD_TURNS,
+  FRAME_LOOKAHEAD_SECONDS: FRAME_LOOKAHEAD_SECONDS,
+  EXPECTED_NULL_SHARE_CLOSED: EXPECTED_NULL_SHARE_CLOSED,
+  priceRegex: priceRegex,
+  findPriceMoment: findPriceMoment,
+};

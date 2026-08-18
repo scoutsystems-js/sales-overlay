@@ -4903,17 +4903,26 @@
   // hidden set across surfaces that mean different things is the
   // shared-carrier trap in a new costume.
   function repSeriesChart(canvasId, series, pick, yLabel, toggleable) {
+    // ⚠ One flag, derived from the axis label, so the unit cannot be set in one
+    // place and forgotten in another (the ticks, the tooltip and the max all
+    // need it).
+    var isMinutes = /minutes/i.test(yLabel || '');
     var ctx = document.getElementById(canvasId);
     if (!ctx || !window.Chart || !series) return;
     if (repCharts[canvasId]) { repCharts[canvasId].destroy(); repCharts[canvasId] = null; }
 
     // Drop reps with no point at all in this window.
+    // ⚠ A series the payload does not carry is NO DATA, not a crash. The third
+    // graph (price) is newer than the other two, so a cached or older payload
+    // legitimately has no `price` array — and an older SERVER would serve one.
+    // Throwing here would take the whole team view down over a missing field.
+    var series_of = function (r) { var v = pick(r); return Array.isArray(v) ? v : []; };
     var reps = (series.reps || []).filter(function (r) {
-      return pick(r).some(function (p) { return p && p.rate !== null; });
+      return series_of(r).some(function (p) { return p && p.rate !== null; });
     });
 
     var datasets = reps.map(function (r, i) {
-      var pts = pick(r);
+      var pts = series_of(r);
       return {
         label: r.name,
         data: pts.map(function (p) { return p.rate; }),
@@ -4930,7 +4939,9 @@
       };
     });
 
-    var teamPts = (series.team && (yLabel === 'Handle Rate' ? series.team.handle : series.team.close)) || [];
+    var teamPts = (series.team && (isMinutes ? series.team.price
+                                 : yLabel === 'Handle Rate' ? series.team.handle
+                                 : series.team.close)) || [];
     if (teamPts.some(function (p) { return p && p.rate !== null; })) {
       datasets.push({
         label: 'Team average',
@@ -4955,8 +4966,13 @@
         interaction: { mode: 'nearest', intersect: false },
         scales: {
           y: {
-            beginAtZero: true, max: 100,
-            ticks: { color: '#ededed', callback: function (v) { return v + '%'; } },
+            beginAtZero: true,
+            // ⚠ THE MINUTES CHART IS NOT A PERCENTAGE. A shared 0-100 %-suffixed
+            // axis would render "38%" for a 38-minute call — a number that is
+            // correct and means something else entirely. The unit is decided
+            // here, once, from the series being drawn.
+            max: isMinutes ? undefined : 100,
+            ticks: { color: '#ededed', callback: function (v) { return isMinutes ? (v + 'm') : (v + '%'); } },
             grid: { color: 'rgba(255,255,255,0.08)' },
             title: { display: true, text: yLabel, color: '#ededed' },
           },
@@ -5073,6 +5089,12 @@
               label: function (c) {
                 var raw = (c.dataset._raw || [])[c.dataIndex] || {};
                 if (raw.rate === null || raw.rate === undefined) return c.dataset.label + ': no data';
+                if (isMinutes) {
+                  // House rule still applies — a number renders with its sample.
+                  var nCalls = (raw.calls !== undefined) ? raw.calls : raw.total;
+                  return c.dataset.label + ': ' + raw.rate + ' min  (' + nCalls
+                    + ' call' + (nCalls === 1 ? '' : 's') + ' with a price moment)';
+                }
                 var n = (raw.handled !== undefined) ? raw.handled : raw.closed;
                 var unit = (raw.handled !== undefined) ? 'handled' : 'prospects closed';
                 if (raw.reps_counted !== undefined) {
@@ -5116,7 +5138,7 @@
   // rebuilt, so after navigating away from a view its chart object is still in
   // the map with a canvas no longer in the document. Touching it would throw or,
   // worse, silently succeed against a detached node.
-  var REP_TOGGLE_CHARTS = ['repHandleChart', 'repCloseChart'];
+  var REP_TOGGLE_CHARTS = ['repHandleChart', 'repCloseChart', 'repPriceChart'];
   function eachLiveToggleChart(fn) {
     REP_TOGGLE_CHARTS.forEach(function (id) {
       var ch = repCharts[id];
@@ -5241,6 +5263,12 @@
       + repGraphBodyHtml('repHandleChart')
       + '<h2 style="margin-top:26px;">Closing %</h2>'
       + repGraphBodyHtml('repCloseChart')
+      // (j) The third graph. ⚠ MINUTES, not a percentage — it does not belong on
+      // the same axis as the two above and does not share their y-scale.
+      + '<h2 style="margin-top:26px;">Time to Price</h2>'
+      + '<div class="meta">minutes from call start until the closer states the total. '
+        + 'Calls with no price moment are excluded — about 1 in 5 closed calls has none.</div>'
+      + repGraphBodyHtml('repPriceChart')
     + '</div>';
   }
 
@@ -5330,6 +5358,7 @@
     if (!state.teamRepSeries || state.teamRepSeries._error) return;
     repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate', true);
     repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate', true);
+    repSeriesChart('repPriceChart', state.teamRepSeries, function (r) { return r.price; }, 'Minutes to Price', true);
     // (k2) A restored selection can already be all-hidden on first paint, so the
     // note has to be evaluated after a REBUILD, not only after a click.
     updateRepGraphAllHiddenNotes();
@@ -7295,6 +7324,61 @@
       + '<div class="meta" style="margin-top:8px;">Disconnecting keeps your synced calls, grades, and clips — it only stops new calls from coming in.</div>';
   }
 
+  /**
+   * (j) YOUR PRICE. The price-drop graph is a LOOKUP on this number — a rep who
+   * has not entered it gets no measurement at all, which is why 1 profile in 8
+   * had one before this field existed.
+   *
+   * ⚠ IT WAS ONLY EVER CAPTURED BY THE ELECTRON ONBOARDING WIZARD
+   * (src/renderer/onboarding/onboarding.html), which is dormant — so "add it to
+   * the wizard" could not have reached anyone. This is the web home for it.
+   *
+   * ⚠ The pay-in-full TOTAL, not the plan figure. Only the total identifies the
+   * moment; the monthly figure collides with "a couple hundred bucks" and
+   * "$300 to $500 a month", which these calls are full of.
+   */
+  function priceFieldHtml(a) {
+    if (a && a.is_managed) return '';        // same lock as the rest of Offer
+    var v = (a && a.price_pif != null) ? String(a.price_pif) : '';
+    return '<div class="acct-row" style="margin-top:14px;">'
+      + '<div class="acct-label">Your price</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
+      + '<span>$</span><input id="acctPricePif" type="number" min="1" step="1" value="' + escapeHtml(v) + '"'
+      + ' placeholder="9800" style="width:130px;">'
+      + '<button class="btn-fathom-secondary" type="button" onclick="saveAccountPrice()">Save</button>'
+      + '<span id="acctPriceMsg"></span></div>'
+      + '<div class="acct-hint">The full price you charge, paid in full. Scout uses it to find the moment you quote '
+      + 'the price on a call — it is not shown to anyone else.</div></div>';
+  }
+
+  async function saveAccountPrice() {
+    var el = document.getElementById('acctPricePif');
+    var msg = document.getElementById('acctPriceMsg');
+    if (!el) return;
+    var raw = String(el.value || '').trim();
+    var body = { price_pif: raw === '' ? null : Number(raw) };
+    if (raw !== '' && (!isFinite(body.price_pif) || body.price_pif <= 0)) {
+      if (msg) msg.textContent = 'Enter a whole number of dollars.';
+      return;
+    }
+    if (msg) msg.textContent = 'Saving…';
+    try {
+      var res = await fetch('/me/account', {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify(body),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) {
+        var e; try { e = await res.json(); } catch (x) { e = {}; }
+        if (msg) msg.textContent = e.error || 'Could not save.';
+        return;
+      }
+      if (msg) msg.textContent = 'Saved.';
+      state.account = null;
+    } catch (err) { if (msg) msg.textContent = 'Could not reach the server.'; }
+  }
+
   function renderAccountView() {
     var content = document.getElementById('content');
     if (state.account === null && !state.accountLoading) loadAccount();
@@ -7361,7 +7445,8 @@
         '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
       + '<div class="section fade-in" id="connectionsSection"><div class="section-header"><h2>Connections</h2><div class="meta">your call recording sources</div></div>' + renderConnectionsSectionHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody
+        + priceFieldHtml(a) + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>';
 
     // Arrived via /connect → bring the Connections section (Zoom Connect button)

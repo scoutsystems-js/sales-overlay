@@ -170,8 +170,12 @@ test('the charts are built AFTER the canvases are in the DOM', () => {
   // The stub returns a canvas only when the assigned markup contains it, so a
   // chart existing here is proof of ordering, not an assumption about it.
   const out = renderTeam(BASE);
-  assert.strictEqual(out.charts.length, 2, 'both charts must be built; got ' + out.charts.length);
-  assert.deepStrictEqual(out.charts.map((c) => c.canvas), ['repHandleChart', 'repCloseChart']);
+  // ⚠ NAMED AND IN BUILD ORDER. A bare count went stale the moment item (j)
+  // added the third graph, and a count would also pass if the WRONG three were
+  // built. This assertion already did it right — only the list needed extending.
+  assert.deepStrictEqual(out.charts.map((c) => c.canvas),
+    ['repHandleChart', 'repCloseChart', 'repPriceChart'],
+    'all three graphs, in order; got ' + JSON.stringify(out.charts.map((c) => c.canvas)));
   const firstAssign = out.events.indexOf('assign');
   const firstChart = out.events.findIndex((e) => e.indexOf('chart:') === 0);
   assert.ok(firstAssign !== -1 && firstChart > firstAssign, 'drawing must follow the innerHTML assignment');
@@ -230,7 +234,7 @@ test('a CUSTOM range reaches the graphs, the picker label and the hash — all a
   assert.strictEqual(out.api.state.teamRange.from, range.from, 'the view did not mutate the range');
   const hash = out.api.viewToHashPath();
   assert.strictEqual(hash, 'team?from=2026-07-20&to=2026-08-02', 'hash carries the range');
-  assert.strictEqual(out.charts.length, 2, 'both graphs still built');
+  assert.strictEqual(out.charts.length, 3, 'all three graphs still built');
 });
 
 test('the hash round-trips: parse → state → hash gives back the same window', () => {
