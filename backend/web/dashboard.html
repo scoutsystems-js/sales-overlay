@@ -5,6 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Coaching Dashboard — Scout Systems</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
+  <script>
+    /**
+     * ⚠⚠ RUNS BEFORE ANY MARKUP EXISTS, AND THAT IS THE ENTIRE POINT.
+     *
+     * Fixes Josh's "tabs flash before the animation starts" (2026-08-18). The
+     * flash was never a timing nicety — <nav class="top-bar"> is static markup
+     * that paints at parse time, while the overlay is script-built only after
+     * init() has awaited two or three network round-trips. "Add a delay" would
+     * have made it strictly worse: the chrome is already on screen, so waiting
+     * longer shows it for longer.
+     *
+     * This is synchronous, inline, and above every element it needs to cover,
+     * so the cover is up before the first pixel of dashboard chrome.
+     *
+     * ⚠ IT ONLY READS THE MARKER — it must NOT clear it. playWelcomeIfFresh()
+     * is the single place that reads-and-clears, and if this stole the value
+     * the sequence would never play.
+     *
+     * ⚠⚠ THE FAILSAFE IS ARMED HERE, IN THE SAME BLOCK, BEFORE ANYTHING ELSE
+     * CAN RUN OR THROW. If the main script fails to parse, if init() dies, if
+     * the welcome code is removed entirely — the cover still comes off. A
+     * decoration must never be able to lock someone out, and that guarantee
+     * has to hold for the cover exactly as it does for the overlay.
+     */
+    (function () {
+      try {
+        if (!sessionStorage.getItem('scout_welcome_v1')) return;   // read, never clear
+        var el = document.documentElement;
+        el.setAttribute('data-welcoming', '1');
+        setTimeout(function () { el.removeAttribute('data-welcoming'); }, 8000);
+      } catch (e) { /* private mode → no marker, no cover, no harm */ }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     /* ──────────────────────────────────────────────────────────────────
@@ -2153,6 +2186,39 @@
 
        ⚠ EVERY DURATION IS A CUSTOM PROPERTY ON .wel, set from ONE object in
        JS (WELCOME_TIMING). Tuning the sequence is one edit, not twelve. */
+    /* ⚠⚠ THE FIRST-PAINT COVER — why the overlay alone was not enough.
+       Josh, 2026-08-18: the nav tabs FLASH before the sequence starts.
+
+       The cause is an ordering nobody chose: <nav class="top-bar"> is STATIC
+       markup near the top of this document, so it paints the moment the HTML
+       parses. The script that builds the overlay does not start until ~line
+       2839, and init() then awaits two or three NETWORK round-trips
+       (refreshSessionIfNeeded, fetchMe, loadUsers) before it could mount
+       anything. So the gap is not a frame — it is a network gap, and the
+       dashboard chrome sits there in plain view for all of it.
+
+       This cover is painted by CSS from an attribute set by a SYNCHRONOUS
+       script in <head>, so it exists at first paint with no JS-built DOM and
+       no request to wait on. It is plain black — the same #050505 the overlay
+       uses — so the handoff from cover to overlay is invisible.
+
+       ⚠ z-index 9998, one BELOW the overlay, so the overlay always paints on
+       top of it rather than fighting it.
+
+       ⚠ html::before, NOT body::before — the background motifs already own
+       body[data-view]::before, and this must not disturb them. Positive
+       z-index, so it is not the negative-z-index-under-a-parent-background
+       trap recorded above; it paints over content, which is the whole point.
+
+       ⚠⚠ IT SELF-DESTRUCTS. The <head> script arms its own removal timer
+       before anything else can run, so a JS failure anywhere after that point
+       cannot leave a user staring at a black screen. The cover obeys the same
+       rule as the overlay it precedes: it must never become a gate. */
+    html[data-welcoming]::before {
+      content: ''; position: fixed; inset: 0; z-index: 9998;
+      background: #050505; pointer-events: none;
+    }
+
     .wel {
       position: fixed; inset: 0; z-index: 9999;
       background: #050505;
@@ -3015,23 +3081,35 @@
    * signals completion. Proven by breaking it deliberately — see
    * test/welcome-sequence.test.js.
    *
-   * ⚠⚠ IT DOES NOT WAIT FOR THE DASHBOARD'S DATA, AND THAT IS THE DESIGN — NOT
-   * A COMPROMISE. The overlay runs on a fixed ~3s clock and is never told about
-   * the loads. WAITING FOR THEM IS EXACTLY WHAT WOULD MAKE IT A GATE: a slow
-   * lane, a failed fetch or a hung request would then hold a user behind a
-   * black screen with no way out — the one failure this whole sequence is
-   * built to be incapable of.
+   * ⚠⚠ IT NEVER *DEPENDS* ON THE DASHBOARD'S DATA — AND SINCE 2026-08-18 IT
+   * MAY BRIEFLY *WAIT* FOR IT, UP TO A HARD CAP. READ BOTH HALVES: the
+   * prohibition still stands, and the cap is HOW it stands.
    *
-   * So when a load outlasts the animation, the swipe reveals the dashboard's
-   * OWN SKELETONS. That is the CORRECT outcome, not a rough edge to be fixed:
-   * the skeleton is a state the dashboard already has and already handles, and
-   * it is what any visitor sees on a slow load. The shell, the nav and the
-   * section frames are all up before this function is even called (it is the
-   * LAST line of init()), so the swipe can never reveal a half-built page.
+   * THE PROHIBITION. Awaiting the loads is unbounded. A slow lane, a failed
+   * fetch or a hung request would hold a user behind a black screen with no way
+   * out — the one failure this whole sequence is built to be incapable of. Four
+   * of the team page's lanes are Claude syntheses that take TENS OF SECONDS on
+   * a cache miss, so "wait until everything is ready" is not a long wait, it is
+   * an open-ended one.
    *
-   * ⚠ DO NOT "IMPROVE" THIS BY AWAITING THE LOADS or by holding the overlay
-   * until the data lands. That converts a decoration into a dependency, and
-   * every reason it cannot currently lock someone out stops being true.
+   * THE CAP (Justin's ruling). After the sequence ends, hold until the
+   * dashboard signals ready OR until T.holdCap, WHICHEVER COMES FIRST, then
+   * swipe regardless. Bounded by construction: it polls a plain flag and gives
+   * up on a timer, so the worst case is runFor + holdCap and nothing can extend
+   * it. A slow day makes the animation longer; it can never make it infinite.
+   * Readiness means the COACHING boot's own Promise.all — the page this
+   * actually reveals — never the model-backed lanes.
+   *
+   * So when a load outlasts even the cap, the swipe reveals the dashboard's OWN
+   * SKELETONS. That is the CORRECT outcome, not a rough edge to be fixed: the
+   * skeleton is a state the dashboard already has and already handles, and it
+   * is what any visitor sees on a slow load.
+   *
+   * ⚠ DO NOT "IMPROVE" THIS BY AWAITING THE LOADS, by removing the cap, or by
+   * widening readiness to include the synthesis lanes. Each of those converts a
+   * decoration into a dependency, and every reason it cannot lock someone out
+   * stops being true. If the cap needs to move, move the NUMBER — never the
+   * shape.
    *
    * ⚠ FRESH LOGIN ONLY, and the flow can only just tell. redirectByRole() in
    * login.html is called from three places — once after a password POST and
@@ -3064,8 +3142,42 @@
     spinSlow:  38000,   // tick ring, one direction
     spinBack:  26000,   // segmented ring, the other
     sweep:      2600,   // radar line
+    /**
+     * ⚠⚠ THE CEILING ON WAITING FOR THE DASHBOARD — THIS IS HOW THE "NEVER
+     * WAIT" PROHIBITION STANDS, NOT AN EXCEPTION TO IT.
+     *
+     * Justin's ruling (2026-08-18): hold until the dashboard is ready OR until
+     * a ceiling, whichever comes FIRST, then swipe regardless. That absorbs a
+     * normal load without ever becoming a dependency — a slow day makes the
+     * animation longer, never infinite.
+     *
+     * DERIVED FROM MEASUREMENT, not chosen. Measured against production:
+     * network+container floor 150-410ms per request; the /dashboard document
+     * 210-690ms; and the coaching boot fires its three lanes through ONE
+     * Promise.all, so boot is the SLOWEST lane, not their sum. Against a base
+     * sequence of 2380ms the data almost always lands before the swipe, so
+     * this cap should rarely engage at all — it exists for the slow day.
+     * 1200ms keeps the worst case at ~3.6s, which is still an intro rather
+     * than a wait.
+     *
+     * ⚠ THE CAP IS NOT A TARGET. Reaching it means the hold EXPIRED and we
+     * swiped onto an unfinished page — which is the correct outcome, not a
+     * failure. The watchdog (6000) still outlasts base + cap by a clear
+     * margin, so the ultimate backstop is untouched.
+     */
+    holdCap:    1200,
+    holdPoll:    100,   // how often the hold re-checks readiness
     watchdog:   6000,   // ⚠ hard removal, whatever else happens
   };
+
+  /**
+   * ⚠ SET ONCE, BY THE COACHING BOOT, WHEN THE BOARD IS ACTUALLY POPULATED.
+   * Read only by the welcome hold. A plain flag rather than a promise so that
+   * nothing can ever `await` it — the hold POLLS this and gives up on a timer,
+   * which is what makes an unset flag harmless.
+   */
+  var welcomeDashboardReady = false;
+  function markDashboardReady() { welcomeDashboardReady = true; }
 
   function welPoint(cx, cy, r, deg) {
     var a = (deg - 90) * Math.PI / 180;
@@ -3182,6 +3294,15 @@
     }
   }
 
+  /**
+   * Takes down the first-paint cover (see the <head> script). Every path that
+   * ends the ceremony — declined, failed, or finished — must call this, or the
+   * cover's 8s failsafe becomes the user's experience rather than a backstop.
+   */
+  function welUncover() {
+    try { document.documentElement.removeAttribute('data-welcoming'); } catch (e) {}
+  }
+
   function playWelcomeIfFresh() {
     var node = null;
     try {
@@ -3192,8 +3313,8 @@
         // replay the sequence, and a crash mid-animation must not leave it
         // armed forever.
         sessionStorage.removeItem(WELCOME_KEY);
-      } catch (e) { return; }              // private mode → no marker, no ceremony
-      if (!fresh) return;
+      } catch (e) { welUncover(); return; }   // private mode → no marker, no ceremony
+      if (!fresh) { welUncover(); return; }   // resumed session → uncover at once
 
       var T = WELCOME_TIMING;
       var host = document.createElement('div');
@@ -3211,6 +3332,10 @@
       node.style.setProperty('--wel-sweep', T.sweep + 'ms');
 
       document.body.appendChild(node);
+      // ⚠ HANDOFF, NOT REMOVAL-THEN-MOUNT. The overlay is in the DOM and sits
+      // one z-index above the cover, so dropping the cover now cannot expose
+      // the chrome for even a frame — the overlay is already covering it.
+      welUncover();
 
       // CLICK OR KEYPRESS SKIPS — immediately, not "skips to the swipe".
       var skip = function () { welcomeDismiss(node, true); cleanup(); };
@@ -3230,7 +3355,36 @@
       var runFor = reduced
         ? T.hold
         : (T.titleAt + T.textIn + T.hold);
-      setTimeout(function () { welcomeDismiss(node); cleanup(); }, runFor);
+
+      /**
+       * ⚠⚠ THE HOLD — AND IT IS A CAP, NOT AN EXCEPTION TO THE NO-WAIT RULE.
+       *
+       * When the sequence finishes, give the dashboard a LITTLE longer to
+       * finish populating so the swipe reveals a board rather than skeletons —
+       * but only up to T.holdCap, then swipe whatever has happened.
+       *
+       * ⚠ WHY THIS IS NOT THE THING THE DOC BLOCK PROHIBITS. "Await the loads"
+       * is unbounded: a hung fetch holds the user forever. This is bounded by
+       * construction — it polls a plain flag and gives up on a timer, so the
+       * absolute worst case is runFor + holdCap and nothing else can extend
+       * it. The dependency the prohibition guards against cannot form, because
+       * failure to become ready is indistinguishable here from being slow, and
+       * both end the same way: we swipe.
+       *
+       * ⚠ IT NEVER WAITS ON THE MODEL-BACKED LANES, AND MUST NOT BE "IMPROVED"
+       * TO. Four team lanes are Claude syntheses that take tens of seconds on a
+       * cache miss; readiness deliberately means the COACHING boot's own
+       * Promise.all, which is the page this reveals.
+       */
+      var waitedFrom = null;
+      var tick = function () {
+        if (node._welGone) return;                     // already skipped or dismissed
+        if (waitedFrom === null) waitedFrom = Date.now();
+        var expired = (Date.now() - waitedFrom) >= T.holdCap;
+        if (welcomeDashboardReady || expired) { welcomeDismiss(node); cleanup(); return; }
+        setTimeout(tick, T.holdPoll);
+      };
+      setTimeout(tick, runFor);
 
       // ⚠ THE WATCHDOG. If a timer never fires, a class never applies, or an
       // animation event is missed, this removes the overlay anyway. The user
@@ -3240,6 +3394,7 @@
       // ⚠ ANY failure at all → no ceremony, and the dashboard is already there.
       try { console.warn('[welcome] skipped:', e && e.message); } catch (e2) {}
       welcomeDismiss(node, true);
+      welUncover();                       // a failed ceremony must not leave a black screen
     }
   }
 
@@ -3302,6 +3457,29 @@
       var _bootSignal = localStorage.getItem(OAUTH_SIGNAL_KEY);
       if (_bootSignal) consumeStoredOauthSignal(_bootSignal);
     } catch (e) {}
+
+    /**
+     * ⚠⚠ MOVED HERE FROM THE LAST LINE OF init() (Josh's flash, 2026-08-18) —
+     * AND THE OLD POSITION'S REASONING WAS SOUND BUT ITS CONCLUSION WAS WRONG.
+     *
+     * The rule that matters is "the overlay must never BLOCK the dashboard from
+     * rendering or loading". Mounting it LAST was one way to get that, and it
+     * quietly bought a second property nobody wanted: everything below runs
+     * first, including two or three awaited network round-trips, so the chrome
+     * was on screen for hundreds of milliseconds before the ceremony began.
+     *
+     * Mounting it HERE does not block anything. The overlay is a fixed-position
+     * layer; the dashboard renders and loads underneath it exactly as before,
+     * and every no-gate guarantee is unchanged — the marker is still read and
+     * cleared before the overlay is built, dismissal is still idempotent, and
+     * the watchdog still fires. Nothing below this line waits on it.
+     *
+     * ⚠ IT MUST STAY BELOW THE POPUP EARLY-RETURNS ABOVE. An OAuth popup lands
+     * on /dashboard, signals its opener and closes itself — playing a three
+     * second ceremony inside a window that is about to vanish would be absurd,
+     * and those paths `return` before reaching this line.
+     */
+    try { playWelcomeIfFresh(); } catch (e) { /* never a gate */ }
 
     pdiag('page-init-start', { snapshot: (window.ScoutAuth && ScoutAuth.diag) ? ScoutAuth.diag.snapshot() : null });
     var s = getSession();
@@ -3387,19 +3565,14 @@
     // (applyHashToState sets state.view directly and bypasses setView).
     if (state.view === 'prospects' && !state.mergeLoading) loadMergeCandidates();
 
-    /**
-     * ⚠ LAST LINE OF init(), AND DELIBERATELY SO. Everything above has already
-     * rendered the dashboard and kicked off its data loads, so the overlay is
-     * decoration ON TOP of a working page rather than something standing in
-     * front of one. If this line never ran, nothing else would notice.
-     *
-     * ⚠ IT DOES NOT WAIT FOR DATA, AND THAT IS THE POINT. The loads above are
-     * async and several take seconds. Holding the overlay until they finish
-     * would make a decoration into a loading gate — the exact thing it must not
-     * be. If the data outlasts the animation the overlay swipes off to reveal
-     * the dashboard's own skeletons, which is its normal loading state.
+    /* ⚠ THE WELCOME SEQUENCE USED TO BE MOUNTED HERE, AS THE LAST LINE. It now
+     * runs near the TOP of init() so it covers the static chrome instead of
+     * appearing after it — see the comment at that call site for why the old
+     * reasoning was sound but its conclusion was wrong. Left as a marker so a
+     * future reader looking for it at the end of init() finds this note rather
+     * than concluding it was dropped.
+     *   try { playWelcomeIfFresh(); } catch (e) { }
      */
-    try { playWelcomeIfFresh(); } catch (e) { /* never a gate */ }
   }
 
   // Converts a popup-result kind into a notice + triggers a status refresh.
@@ -4265,6 +4438,11 @@
       state.analytics2   = results[1];
       state.zoomStatus   = results[2];
       render();
+      // ⚠ THE READINESS SIGNAL THE WELCOME HOLD POLLS. Set AFTER render(), so
+      // "ready" means the board is actually painted, not merely fetched. It is
+      // only ever read by a capped poll that gives up on its own — nothing
+      // awaits it, so forgetting to set it can only shorten the ceremony.
+      markDashboardReady();
     } catch (err) {
       if (err.message === 'unauth') return;
       document.getElementById('content').innerHTML = '<div class="error">Could not load dashboard data: ' + escapeHtml(err.message || 'unknown') + '</div>';
@@ -5135,10 +5313,65 @@
     try { state[c.set] = await fetchTeamJSON(c.url); }
     catch (err) { if (err.message === 'unauth') return; state[c.set] = { _error: err.message || 'unknown' }; }
     if (c.flag) state[c.flag] = false;
-    if (state.view === 'team') renderTeamView();
-    else if (state.view === 'team-expanded') renderTeamExpanded();
-    else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
-    else if (state.view === 'team-members') renderTeamMembersView();
+    scheduleTeamRender();
+  }
+
+  /**
+   * ⚠⚠ WHY THE TEAM PAGE BLINKED 4-5 TIMES (Josh, 2026-08-18) — MEASURED, NOT
+   * GUESSED, AND IT WAS NEVER ONE LOAD.
+   *
+   * renderTeamView() kicks EIGHT independent lanes (context, overview,
+   * needsWork, recs, digest, repSeries, teamAverages, why). Each one resolved
+   * on its own schedule and called renderTeamView() again, and that function
+   * assigns content.innerHTML — a FULL DOM replacement. Measured against the
+   * real document with genuine Chart.js: ONE visit produced NINE full renders
+   * and created NINETY-NINE `.fade-in` sections.
+   *
+   * The blink is that `.fade-in` entrance replaying — `animation: fadeIn 0.4s`
+   * from opacity 0 — on every section, on every render. Renders landing in the
+   * same frame read as one flash, which is why nine renders looked like about
+   * five: the measured arrivals clustered at 305/306/307, then 1305/1333, then
+   * 2305/2321. That grouping is exactly Josh's "4-5 times".
+   *
+   * ⚠ COVERING THIS WITH A LONGER ANIMATION WOULD HAVE HIDDEN IT, NOT FIXED
+   * IT — and it could not even have hidden it: four of these lanes are Claude
+   * syntheses that take tens of seconds on a cache miss, so they land long
+   * after any sane overlay has gone. The fix has to be here.
+   *
+   * TWO PARTS, and both are needed:
+   *   1. COALESCE — lanes resolving in the same frame produce ONE render
+   *      instead of one each.
+   *   2. NO ENTRANCE REPLAY — a render caused by DATA ARRIVING is an update to
+   *      a page the user is already looking at, not an entrance. Stripping the
+   *      class synchronously, before the frame paints, means the animation
+   *      never starts. The FIRST render of a view (navigation) still animates,
+   *      because that genuinely is an entrance.
+   */
+  var teamRenderQueued = false;
+  function scheduleTeamRender() {
+    if (teamRenderQueued) return;
+    teamRenderQueued = true;
+    var run = function () {
+      teamRenderQueued = false;
+      if (state.view === 'team') renderTeamView();
+      else if (state.view === 'team-expanded') renderTeamExpanded();
+      else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+      else if (state.view === 'team-members') renderTeamMembersView();
+      else return;
+      // ⚠ SYNCHRONOUS, in the same task as the innerHTML that created these
+      // nodes. A CSS `animation: none` toggled around the render would re-arm
+      // the entrance the moment it was removed; removing the class before the
+      // browser ever computes style for these nodes means it cannot start.
+      try {
+        var c = document.getElementById('content');
+        if (c) {
+          var f = c.querySelectorAll('.fade-in');
+          for (var i = 0; i < f.length; i++) f[i].classList.remove('fade-in');
+        }
+      } catch (e) { /* cosmetic only — never worth failing a render over */ }
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    else setTimeout(run, 16);
   }
 
   // ⚠ THE SPEEDOMETER PANEL'S FIXED WINDOW — deliberately independent of the

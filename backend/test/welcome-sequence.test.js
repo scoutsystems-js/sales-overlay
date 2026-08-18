@@ -78,23 +78,92 @@ test('⚠⚠ A THROW ANYWHERE STILL LEAVES THE USER ON THE DASHBOARD', () => {
 test('⚠ the call site itself is ALSO wrapped — belt and braces at the boundary', () => {
   assert.ok(/try \{ playWelcomeIfFresh\(\); \} catch \(e\) \{[^}]*\}/.test(LIVE),
     'init() must guard the call as well as the function guarding itself');
-  // and it must be the LAST thing init does, after the dashboard has rendered
+});
+
+/**
+ * ⚠⚠ THIS ASSERTION IS THE REVERSE OF THE ONE IT REPLACES, DELIBERATELY.
+ *
+ * It used to require the call be the LAST line of init(). That produced Josh's
+ * "tabs flash before the animation starts" (2026-08-18): the static top-bar
+ * markup paints at parse time, and everything above the old call site includes
+ * two or three AWAITED network round-trips, so the chrome sat visible for a
+ * network gap before the overlay appeared.
+ *
+ * Mounting early does not reintroduce the gate the old position was protecting
+ * against — the overlay is a fixed layer, the dashboard renders underneath it,
+ * and nothing below awaits it. Kept as a test rather than a comment so nobody
+ * "restores" the old ordering on the strength of the old reasoning.
+ */
+test('⚠ the welcome mounts BEFORE init() awaits the network — that is the flash fix', () => {
   const initAt = LIVE.indexOf('  async function init()');
+  assert.ok(initAt > 0, 'init() not found — anchor is stale');
   const callAt = LIVE.indexOf('playWelcomeIfFresh();', initAt);
-  const initEnd = LIVE.indexOf('\n  }', callAt);
-  assert.ok(callAt > initAt && initEnd - callAt < 200,
-    'the welcome must be the last line of init(), so the page is already up');
+  const firstAwait = LIVE.indexOf('await refreshSessionIfNeeded()', initAt);
+  const fetchMeAt = LIVE.indexOf('await fetchMe()', initAt);
+  assert.ok(callAt > initAt, 'init() must still call playWelcomeIfFresh()');
+  assert.ok(firstAwait > 0 && fetchMeAt > 0, 'await anchors are stale — re-derive this test');
+  assert.ok(callAt < firstAwait && callAt < fetchMeAt,
+    'the overlay must mount BEFORE init() awaits the network, or the static '
+    + 'top-bar chrome is on screen for the whole round-trip (Josh: tabs flash)');
+
+  // ...but still AFTER the popup early-returns, which close the window.
+  const popupClose = LIVE.indexOf('window.close();', initAt);
+  assert.ok(popupClose > 0 && popupClose < callAt,
+    'an OAuth popup lands on /dashboard and closes itself — it must never play');
 });
 
 test('⚠ a WATCHDOG removes the overlay even if every other path fails', () => {
   const at = LIVE.indexOf('WELCOME_TIMING = {');
   const cfg = LIVE.slice(at, LIVE.indexOf('};', at));
+  assert.ok(cfg.length > 200 && cfg.length < 6000, 'slice suspicious: ' + cfg.length);
   assert.ok(/watchdog:\s*\d+/.test(cfg), 'a hard watchdog timeout must exist');
-  const wd = Number(cfg.match(/watchdog:\s*(\d+)/)[1]);
-  const total = Number(cfg.match(/titleAt:\s*(\d+)/)[1]) + Number(cfg.match(/textIn:\s*(\d+)/)[1])
-    + Number(cfg.match(/hold:\s*(\d+)/)[1]) + Number(cfg.match(/swipe:\s*(\d+)/)[1]);
-  assert.ok(wd > total, 'the watchdog (' + wd + 'ms) must outlast the sequence (' + total + 'ms)');
+  const n = (k) => Number(cfg.match(new RegExp(k + ':\\s*(\\d+)'))[1]);
+  const wd = n('watchdog');
+  // ⚠ THE CAP COUNTS TOWARD THE TOTAL. The readiness hold extends the sequence
+  // by up to holdCap, so a watchdog that only outlasted the BASE sequence could
+  // fire during a legitimate hold and cut the ceremony short.
+  const total = n('titleAt') + n('textIn') + n('hold') + n('swipe') + n('holdCap');
+  assert.ok(wd > total,
+    'the watchdog (' + wd + 'ms) must outlast the sequence INCLUDING the hold cap (' + total + 'ms)');
   assert.ok(wd < 10000, 'but must not itself be a long wait: ' + wd);
+});
+
+/**
+ * ⚠⚠ THE HOLD IS A CAP, NOT AN EXCEPTION TO THE NO-WAIT RULE. These assertions
+ * exist so that "hold until the dashboard is ready" can never quietly become
+ * "wait for the dashboard", which is the unbounded version.
+ */
+test('⚠⚠ the readiness hold is BOUNDED — it can never wait forever', () => {
+  const at = LIVE.indexOf('var waitedFrom = null;');
+  assert.ok(at > 0, 'the hold is missing');
+  const fn = LIVE.slice(at, LIVE.indexOf('setTimeout(tick, runFor);', at) + 30);
+  assert.ok(fn.length > 200 && fn.length < 2000, 'slice suspicious: ' + fn.length);
+
+  assert.ok(/expired/.test(fn) && /holdCap/.test(fn),
+    'the hold must give up on a cap');
+  assert.ok(/welcomeDashboardReady \|\| expired/.test(fn),
+    'EITHER readiness OR expiry must end the hold — an AND would make the cap '
+    + 'useless whenever readiness never arrives');
+  // The dependency the prohibition guards against is an await. There must be none.
+  assert.ok(!/await/.test(fn),
+    'the hold must POLL a flag, never await a promise — an awaited promise that '
+    + 'never resolves is exactly the gate this cannot become');
+});
+
+test('⚠ readiness is set by the COACHING boot, never by the model-backed lanes', () => {
+  assert.ok(/function markDashboardReady\(\)/.test(LIVE), 'the signal must exist');
+  // It must be set after render() in reloadAll — the page the swipe reveals.
+  const rl = LIVE.indexOf('async function reloadAll()');
+  assert.ok(rl > 0, 'reloadAll anchor is stale');
+  const body = LIVE.slice(rl, LIVE.indexOf('\n  }', LIVE.indexOf('markDashboardReady();', rl)));
+  assert.ok(body.indexOf('markDashboardReady();') > body.indexOf('render();'),
+    'ready must mean PAINTED, so the signal follows render()');
+  // and nothing in the team lanes may set it
+  const lt = LIVE.indexOf('async function loadTeam(');
+  const ltBody = LIVE.slice(lt, LIVE.indexOf('\n  }', lt));
+  assert.ok(ltBody.indexOf('markDashboardReady') === -1,
+    'four team lanes are Claude syntheses taking tens of seconds on a cache '
+    + 'miss — readiness must never depend on them');
 });
 
 test('dismissal is IDEMPOTENT — click, key, timer and watchdog may all fire', () => {
@@ -179,4 +248,77 @@ test('the overlay contains every element the design called for', () => {
   assert.ok((mk.match(/\[170, 170\], \[830, 170\], \[170, 830\], \[830, 830\]/g) || []).length === 1,
     'four satellites, one per corner');
   assert.ok(/Welcome to/.test(mk) && /SCOUT SYSTEMS/.test(mk), 'the two lines of copy');
+});
+
+// ── the first-paint cover (Josh's "tabs flash", 2026-08-18) ───────────────
+/**
+ * ⚠ THESE READ THE RAW HTML, NOT `LIVE`. The cover is declared in a <head>
+ * script that must run before any markup exists, and `LIVE` has comments
+ * stripped — but more importantly the ORDER of these elements in the file is
+ * the property under test, and stripping changes offsets.
+ */
+test('⚠⚠ the cover is painted by a SYNCHRONOUS head script, above all chrome', () => {
+  const scriptAt = HTML.indexOf("sessionStorage.getItem('scout_welcome_v1')");
+  const bodyAt = HTML.indexOf('<body>');
+  /**
+   * ⚠⚠ SEARCHED FROM <body>, AND THE FIRST DRAFT OF THIS LINE WAS NOT — it hit
+   * the phrase `<nav class="top-bar">` inside the cover script's OWN COMMENT
+   * (which explains that the nav is static markup) at offset 468, rather than
+   * the real element at 111088. The test then failed claiming the cover was
+   * mounted after the chrome, which was the exact opposite of the truth.
+   *
+   * The tempting fix was to delete the sentence the matcher tripped on — i.e.
+   * to remove the explanation of the rule in order to satisfy the check on it.
+   * Anchoring past <body> is the actual fix.
+   */
+  const navAt = HTML.indexOf('<nav class="top-bar">', bodyAt);
+  const mainScript = HTML.indexOf('<script>\n', bodyAt);
+  assert.ok(scriptAt > 0, 'the head cover script is missing');
+  assert.ok(bodyAt > 0 && navAt > 0, 'top-bar anchor is stale — re-derive this test');
+  assert.ok(scriptAt < navAt,
+    'the cover must be set BEFORE the static top-bar markup, or the chrome '
+    + 'paints first and the flash is back');
+  assert.ok(scriptAt < mainScript || mainScript === -1,
+    'and before the main script, which does not run until after parse');
+  assert.ok(!/async|defer/.test(HTML.slice(HTML.lastIndexOf('<script', scriptAt), scriptAt)),
+    'the cover script must be synchronous — async/defer would let the chrome paint');
+});
+
+test('⚠⚠ the head script READS the marker but must never CLEAR it', () => {
+  const at = HTML.indexOf("sessionStorage.getItem('scout_welcome_v1')");
+  const block = HTML.slice(at - 400, HTML.indexOf('</script>', at));
+  assert.ok(block.length > 100, 'slice suspicious: ' + block.length);
+  assert.ok(!/removeItem|setItem/.test(block),
+    'playWelcomeIfFresh is the one place that reads-and-clears; if the head '
+    + 'script consumed the marker the sequence would never play at all');
+});
+
+test('⚠⚠ the cover ARMS ITS OWN REMOVAL — it cannot outlive a broken page', () => {
+  const at = HTML.indexOf("sessionStorage.getItem('scout_welcome_v1')");
+  const block = HTML.slice(at, HTML.indexOf('</script>', at));
+  assert.ok(/setTimeout\(/.test(block) && /removeAttribute\('data-welcoming'\)/.test(block),
+    'the failsafe must be armed in the SAME synchronous block, so a later '
+    + 'parse error or a dead init() still cannot leave a black screen');
+  const ms = Number((block.match(/\}, (\d+)\);/) || [])[1]);
+  assert.ok(ms > 0 && ms <= 10000, 'failsafe must be bounded and short: ' + ms);
+});
+
+test('⚠ the cover sits BELOW the overlay, so the handoff cannot flicker', () => {
+  const cover = LIVE.slice(LIVE.indexOf('html[data-welcoming]::before'), LIVE.indexOf('.wel {'));
+  const wel = LIVE.slice(LIVE.indexOf('.wel {'), LIVE.indexOf('.wel-stage'));
+  const z = (s) => Number((s.match(/z-index:\s*(\d+)/) || [])[1]);
+  assert.ok(z(cover) < z(wel), 'cover ' + z(cover) + ' must be under overlay ' + z(wel));
+  // ⚠ html::before, not body — body[data-view]::before is the motif layer.
+  assert.ok(/html\[data-welcoming\]::before/.test(LIVE),
+    'must be on <html> — body::before already carries the background motifs');
+});
+
+test('⚠ EVERY path that declines to play still takes the cover down', () => {
+  const at = LIVE.indexOf('function playWelcomeIfFresh');
+  const fn = LIVE.slice(at, LIVE.indexOf('\n  }', LIVE.indexOf('watchdog', at)) + 4);
+  assert.ok(fn.length > 600 && fn.length < 5000, 'slice suspicious: ' + fn.length);
+  // private mode, resumed session, mounted, and total failure
+  assert.ok((fn.match(/welUncover\(\)/g) || []).length >= 4,
+    'private-mode return, not-fresh return, the mount handoff and the outer '
+    + 'catch must each uncover — otherwise the 8s failsafe becomes the UX');
 });

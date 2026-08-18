@@ -4,8 +4,16 @@
 :root {
   --green:       #09e046;
   --green-dark:  #07af37;
-  --green-dim:   rgba(34,197,94,0.12);
-  --green-glow:  rgba(34,197,94,0.25);
+  /* ⚠ THE CHANNEL SPELLING OF THE SAME GREEN. rgba() cannot read a hex token,
+     so every soft tint below had to be written as a hard-coded COPY of the
+     brand colour — and copies do not move when the token moves. The 2026-08-18
+     sweep updated --green and --green-dark and left these two on the OLD green
+     (#22c55e = 34,197,94), which is precisely the "a colour has more than one
+     spelling" failure already recorded for the dashboard's 23 tints. Same fix
+     as --accent-rgb there: one token, two spellings, pinned to each other. */
+  --green-rgb:   9, 224, 70;
+  --green-dim:   rgba(var(--green-rgb), 0.12);
+  --green-glow:  rgba(var(--green-rgb), 0.25);
   --bg:          #080b0d;
   --bg2:         #0f1417;
   --bg3:         #161d22;

@@ -41,6 +41,36 @@
       padding: 40px 20px;
     }
     .card { width: 100%; max-width: 400px; }
+
+    /* ── THE BRAND LOCKUP above the sign-in form (Josh, 2026-08-18) ────────
+       ⚠ THE MARK IS THE INLINE SVG, NOT src/assets/icon.png, AND THAT IS A
+       REPORTED DEVIATION — see the findings. icon.png is an APP ICON: 1024²,
+       colour type 2 (NO ALPHA, so it carries a solid black plate rather than a
+       transparent mark), the word "SCOUT" already baked into the artwork, a
+       generator watermark in the corner, and 720KB for a ~76px render. Placed
+       above a "SCOUT SYSTEMS" wordmark it would print the word twice and sit
+       in a visible black square.
+
+       This SVG is the same mark — concentric arcs over descending dots — as a
+       vector, in the brand green, with no plate, no duplicate word, no
+       watermark and no request. It scales crisply at any size.
+
+       ⚠ THE TOKEN HERE IS --green, NOT --accent. The auth pages are styled by
+       /css/style.css, which has no --accent at all; the dashboard's token set
+       is a different document. Written as var(--accent) this would silently
+       fall back to inherited colour and render the wordmark in plain white —
+       correct-looking CSS, wrong page. */
+    .brand-lockup { text-align: center; margin: 0 0 26px; }
+    .brand-lockup svg { display: block; margin: 0 auto 14px; }
+    .brand-lockup .brand-name {
+      font-size: 34px; font-weight: 800; letter-spacing: 0.06em;
+      color: var(--green); line-height: 1.05;
+      text-shadow: 0 0 24px rgba(var(--green-rgb), 0.35);
+    }
+    @media (max-width: 420px) {
+      .brand-lockup .brand-name { font-size: 27px; }
+    }
+
     .card-header { text-align: center; margin-bottom: 28px; }
     .card-header h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
     .card-header p { font-size: 14px; color: var(--muted); }
@@ -210,6 +240,23 @@
 
 <main class="login-main">
   <div class="card">
+    <!-- The brand lockup. Same mark as the nav logo above, drawn large: three
+         concentric arcs over descending dots. Stroke widths and radii are
+         scaled from the 20×22 nav version so the proportions match rather than
+         being redrawn by eye. aria-hidden because the name is right beneath it
+         as real text — a screen reader should not hear it twice. -->
+    <div class="brand-lockup">
+      <svg width="76" height="84" viewBox="0 0 20 22" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="var(--green)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="var(--green)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="var(--green)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <circle cx="10" cy="12" r="1.6" fill="var(--green)"/>
+        <circle cx="10" cy="16" r="1.2" fill="var(--green)"/>
+        <circle cx="10" cy="19.5" r="0.8" fill="var(--green)"/>
+      </svg>
+      <div class="brand-name">SCOUT SYSTEMS</div>
+    </div>
+
     <div class="card-header">
       <h1 id="cardTitle">Welcome back</h1>
       <p id="cardSub">Sign in to your Scout dashboard</p>
