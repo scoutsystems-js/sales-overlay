@@ -2143,6 +2143,77 @@
     .avg-card-empty { display: flex; flex-direction: column; justify-content: center; min-height: 180px; }
     .avg-empty { font-size: 12px; font-weight: 600; }
     .avg-empty span { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; opacity: 0.85; }
+    /* ══ WELCOME SEQUENCE ═══════════════════════════════════════════════
+       Plays once after a FRESH sign-in (see scout_welcome_v1 in login.html).
+       All drawn — inline SVG, no images, no library, no new dependency.
+
+       ⚠ THE GREEN COMES FROM --accent, NEVER A LITERAL. It moved once
+       (#4ade80 → #09e046) and will again; a literal here would be the only
+       thing left behind.
+
+       ⚠ EVERY DURATION IS A CUSTOM PROPERTY ON .wel, set from ONE object in
+       JS (WELCOME_TIMING). Tuning the sequence is one edit, not twelve. */
+    .wel {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #050505;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; cursor: pointer;
+      will-change: transform, opacity;
+    }
+    .wel-out { animation: welSwipe var(--wel-swipe) cubic-bezier(0.7, 0, 0.84, 0) forwards; }
+    @keyframes welSwipe {
+      to { transform: translateX(115%) rotate(4deg); opacity: 0.85; }
+    }
+    .wel-stage { position: relative; width: min(92vw, 92vh); height: min(92vw, 92vh); }
+    .wel-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+    .wel-ink   { stroke: var(--accent); fill: none; }
+    .wel-fill  { fill: var(--accent); }
+
+    /* the two rings turn in OPPOSITE directions — the counter-rotation is what
+       makes it read as an instrument rather than a spinner */
+    .wel-ticks { animation: welSpin var(--wel-spin-slow) linear infinite; transform-origin: 500px 500px; }
+    .wel-segs  { animation: welSpin var(--wel-spin-back) linear infinite reverse; transform-origin: 500px 500px; }
+    @keyframes welSpin { to { transform: rotate(360deg); } }
+
+    .wel-sweep { animation: welSpin var(--wel-sweep) linear infinite; transform-origin: 500px 500px; }
+
+    .wel-seg { opacity: 0; animation: welSegOn var(--wel-seg-on) ease-out forwards; }
+    @keyframes welSegOn { to { opacity: 1; } }
+
+    .wel-core { opacity: 0; animation: welFadeIn var(--wel-core-in) ease-out forwards; }
+    @keyframes welFadeIn { to { opacity: 1; } }
+
+    /* satellites pop in with a slight OVERSHOOT, staggered */
+    .wel-sat { opacity: 0; transform: scale(0.4); transform-box: fill-box; transform-origin: center;
+               animation: welPop var(--wel-sat-in) cubic-bezier(0.34, 1.8, 0.64, 1) forwards; }
+    @keyframes welPop { to { opacity: 1; transform: scale(1); } }
+
+    .wel-text { position: absolute; inset: 0; display: flex; flex-direction: column;
+                align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+    .wel-kicker, .wel-title {
+      color: var(--accent); opacity: 0;
+      text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.55), 0 0 44px rgba(var(--accent-rgb), 0.25);
+      animation: welSettle var(--wel-text-in) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .wel-kicker { font-size: clamp(11px, 1.5vw, 15px); font-weight: 600; text-transform: uppercase; }
+    .wel-title  { font-size: clamp(26px, 6vw, 68px); font-weight: 800; margin-top: 8px; }
+    /* both settle IN from wide tracking as they fade up */
+    @keyframes welSettle {
+      from { opacity: 0; letter-spacing: 0.7em; }
+      to   { opacity: 1; letter-spacing: var(--wel-track); }
+    }
+
+    /* ⚠ REDUCED MOTION GETS A PLAIN FADE, NOT A FASTER SEQUENCE. Nothing spins,
+       nothing pops, nothing sweeps — the ring is simply drawn and the whole
+       thing fades away. */
+    @media (prefers-reduced-motion: reduce) {
+      .wel-ticks, .wel-segs, .wel-sweep { animation: none; }
+      .wel-seg, .wel-core, .wel-sat { opacity: 1; animation: none; transform: none; }
+      .wel-kicker, .wel-title { opacity: 1; animation: none; letter-spacing: var(--wel-track); }
+      .wel-out { animation: welFadeOut var(--wel-swipe) ease-out forwards; }
+      @keyframes welFadeOut { to { opacity: 0; } }
+    }
     .team-controls-row { margin-bottom: 28px; justify-content: flex-end; }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
@@ -2932,6 +3003,228 @@
   // ──────────────────────────────────────────────────────────────────
   // Init
   // ──────────────────────────────────────────────────────────────────
+  // ══ WELCOME SEQUENCE ═══════════════════════════════════════════════════
+  /**
+   * Plays once after a FRESH sign-in. Drawn entirely in inline SVG — no image,
+   * no library, no new dependency.
+   *
+   * ⚠⚠ IT MUST NEVER BECOME A GATE. The dashboard renders FIRST and this runs
+   * on top of an already-working page; every entry point is wrapped so that a
+   * throw anywhere leaves the user on the dashboard rather than on a black
+   * screen. A hard watchdog removes the overlay even if the animation never
+   * signals completion. Proven by breaking it deliberately — see
+   * test/welcome-sequence.test.js.
+   *
+   * ⚠ FRESH LOGIN ONLY, and the flow can only just tell. redirectByRole() in
+   * login.html is called from three places — once after a password POST and
+   * twice for an already-valid session — and all three emit an identical
+   * location.replace('/dashboard'). Nothing in the URL, the storage key or the
+   * session shape distinguishes them. So login.html sets a one-shot
+   * sessionStorage marker at the ONE call site that knows, and this reads it
+   * once and clears it. Josh signs in daily but his session persists, so a
+   * password entry is rare — which is the right frequency for a ceremony.
+   */
+  var WELCOME_KEY = 'scout_welcome_v1';
+
+  /**
+   * ⚠ EVERY DURATION AND DELAY, IN ONE PLACE. Tuning the sequence is one edit.
+   * These are pushed onto the overlay as CSS custom properties, so the
+   * stylesheet holds no timing numbers of its own.
+   */
+  var WELCOME_TIMING = {
+    coreIn:      420,   // the central dial fades up
+    segStep:      26,   // gap between one arc block lighting and the next
+    segOn:       200,   // how long a single block takes to light
+    satFirst:    340,   // first satellite starts
+    satStagger:  110,   // and each one after it
+    satIn:       520,   // satellite pop, with overshoot
+    textAt:      900,   // "WELCOME TO" begins settling in
+    titleAt:    1120,   // "SCOUT SYSTEMS" follows
+    textIn:      760,   // how long the letter-spacing settles
+    hold:        500,   // beat after everything has arrived
+    swipe:       620,   // the overlay leaves
+    spinSlow:  38000,   // tick ring, one direction
+    spinBack:  26000,   // segmented ring, the other
+    sweep:      2600,   // radar line
+    watchdog:   6000,   // ⚠ hard removal, whatever else happens
+  };
+
+  function welPoint(cx, cy, r, deg) {
+    var a = (deg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+  function welArc(cx, cy, r, from, to) {
+    var p0 = welPoint(cx, cy, r, from), p1 = welPoint(cx, cy, r, to);
+    var large = (to - from) > 180 ? 1 : 0;
+    return 'M ' + p0.x.toFixed(1) + ' ' + p0.y.toFixed(1)
+      + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p1.x.toFixed(1) + ' ' + p1.y.toFixed(1);
+  }
+
+  // A partial segmented arc — used by the satellites and, at full sweep, by the
+  // central dial.
+  function welSegments(cx, cy, r, count, sweepDeg, startDeg, cls, delayBase, step) {
+    var out = '', seg = sweepDeg / count;
+    for (var i = 0; i < count; i++) {
+      var a = startDeg + i * seg;
+      out += '<path class="' + cls + '" d="' + welArc(cx, cy, r, a, a + seg * 0.62) + '"'
+        + ' style="animation-delay:' + (delayBase + i * step) + 'ms"/>';
+    }
+    return out;
+  }
+
+  function welcomeOverlayHtml() {
+    var T = WELCOME_TIMING;
+    var C = 500;
+
+    // fine tick ring — 96 ticks, every 6th longer
+    var ticks = '';
+    for (var i = 0; i < 96; i++) {
+      var deg = i * (360 / 96);
+      var long = (i % 6 === 0);
+      var p0 = welPoint(C, C, long ? 392 : 400, deg);
+      var p1 = welPoint(C, C, 412, deg);
+      ticks += '<line x1="' + p0.x.toFixed(1) + '" y1="' + p0.y.toFixed(1)
+        + '" x2="' + p1.x.toFixed(1) + '" y2="' + p1.y.toFixed(1)
+        + '" stroke-width="' + (long ? 3 : 1.4) + '" opacity="' + (long ? 0.85 : 0.4) + '"/>';
+    }
+
+    // radial spokes
+    var spokes = '';
+    for (var s = 0; s < 12; s++) {
+      var sd = s * 30;
+      var a0 = welPoint(C, C, 150, sd), a1 = welPoint(C, C, 300, sd);
+      spokes += '<line x1="' + a0.x.toFixed(1) + '" y1="' + a0.y.toFixed(1)
+        + '" x2="' + a1.x.toFixed(1) + '" y2="' + a1.y.toFixed(1)
+        + '" stroke-width="1.2" opacity="0.28"/>';
+    }
+
+    // the radar sweep: a wedge that fades along its length
+    var sweepEnd = welPoint(C, C, 360, 0);
+    var sweep = '<g class="wel-sweep">'
+      + '<line x1="' + C + '" y1="' + C + '" x2="' + sweepEnd.x.toFixed(1) + '" y2="' + sweepEnd.y.toFixed(1)
+      + '" stroke="url(#welSweepGrad)" stroke-width="3"/>'
+      + '<path d="' + welArc(C, C, 360, -26, 0) + ' L ' + C + ' ' + C + ' Z" fill="url(#welSweepFan)" stroke="none"/>'
+      + '</g>';
+
+    var svg = '<svg class="wel-svg" viewBox="0 0 1000 1000" aria-hidden="true">'
+      + '<defs>'
+      + '<linearGradient id="welSweepGrad" x1="0" y1="1" x2="0" y2="0">'
+        + '<stop offset="0" stop-color="var(--accent)" stop-opacity="0"/>'
+        + '<stop offset="1" stop-color="var(--accent)" stop-opacity="0.95"/></linearGradient>'
+      + '<radialGradient id="welSweepFan">'
+        + '<stop offset="0" stop-color="var(--accent)" stop-opacity="0.22"/>'
+        + '<stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></radialGradient>'
+      + '</defs>'
+      + '<g class="wel-core wel-ink" style="animation-delay:0ms">'
+        + '<g class="wel-ticks">' + ticks + '</g>'
+        + '<g>' + spokes + '</g>'
+        + '<circle cx="' + C + '" cy="' + C + '" r="300" stroke-width="1.5" opacity="0.5"/>'
+        + '<circle cx="' + C + '" cy="' + C + '" r="150" stroke-width="1.5" opacity="0.7"/>'
+        + sweep
+      + '</g>'
+      // the segmented arc, lighting block by block, turning the other way
+      + '<g class="wel-segs wel-ink" stroke-width="14" stroke-linecap="butt">'
+        + welSegments(C, C, 348, 40, 360, 0, 'wel-seg', T.coreIn, T.segStep)
+      + '</g>'
+      // four satellites, partial arcs, staggered pops
+      + [[170, 170], [830, 170], [170, 830], [830, 830]].map(function (p, i) {
+          return '<g class="wel-sat wel-ink" stroke-width="7" style="animation-delay:'
+            + (T.satFirst + i * T.satStagger) + 'ms">'
+            + welSegments(p[0], p[1], 84, 11, 260, 40 + i * 25, 'wel-satseg', 0, 0)
+            + '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="26" stroke-width="2" opacity="0.65"/>'
+            + '<circle class="wel-fill" cx="' + p[0] + '" cy="' + p[1] + '" r="5" stroke="none"/>'
+            + '</g>';
+        }).join('')
+      + '</svg>';
+
+    return '<div class="wel" id="welcomeOverlay" role="presentation">'
+      + '<div class="wel-stage">' + svg
+        + '<div class="wel-text">'
+          + '<div class="wel-kicker" style="--wel-track:0.42em;animation-delay:' + T.textAt + 'ms">Welcome to</div>'
+          + '<div class="wel-title" style="--wel-track:0.06em;animation-delay:' + T.titleAt + 'ms">SCOUT SYSTEMS</div>'
+        + '</div>'
+      + '</div></div>';
+  }
+
+  /**
+   * ⚠ THE ONLY WAY THE OVERLAY IS EVER REMOVED. Idempotent, and safe to call
+   * from the click handler, the key handler, the timer and the watchdog at once.
+   */
+  function welcomeDismiss(node, immediate) {
+    try {
+      if (!node || node._welGone) return;
+      node._welGone = true;
+      if (immediate) { if (node.parentNode) node.parentNode.removeChild(node); return; }
+      node.classList.add('wel-out');
+      setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); },
+        WELCOME_TIMING.swipe + 60);
+    } catch (e) {
+      // Last resort: if even removal throws, hide it so the page is usable.
+      try { node.style.display = 'none'; } catch (e2) {}
+    }
+  }
+
+  function playWelcomeIfFresh() {
+    var node = null;
+    try {
+      var fresh = null;
+      try {
+        fresh = sessionStorage.getItem(WELCOME_KEY);
+        // ⚠ CLEARED IMMEDIATELY, before anything can throw. A refresh must not
+        // replay the sequence, and a crash mid-animation must not leave it
+        // armed forever.
+        sessionStorage.removeItem(WELCOME_KEY);
+      } catch (e) { return; }              // private mode → no marker, no ceremony
+      if (!fresh) return;
+
+      var T = WELCOME_TIMING;
+      var host = document.createElement('div');
+      host.innerHTML = welcomeOverlayHtml();
+      node = host.firstChild;
+
+      // Every timing value reaches CSS from the one object above.
+      node.style.setProperty('--wel-core-in', T.coreIn + 'ms');
+      node.style.setProperty('--wel-seg-on', T.segOn + 'ms');
+      node.style.setProperty('--wel-sat-in', T.satIn + 'ms');
+      node.style.setProperty('--wel-text-in', T.textIn + 'ms');
+      node.style.setProperty('--wel-swipe', T.swipe + 'ms');
+      node.style.setProperty('--wel-spin-slow', T.spinSlow + 'ms');
+      node.style.setProperty('--wel-spin-back', T.spinBack + 'ms');
+      node.style.setProperty('--wel-sweep', T.sweep + 'ms');
+
+      document.body.appendChild(node);
+
+      // CLICK OR KEYPRESS SKIPS — immediately, not "skips to the swipe".
+      var skip = function () { welcomeDismiss(node, true); cleanup(); };
+      var onKey = function () { skip(); };
+      function cleanup() {
+        try {
+          node.removeEventListener('click', skip);
+          window.removeEventListener('keydown', onKey);
+        } catch (e) {}
+      }
+      node.addEventListener('click', skip);
+      window.addEventListener('keydown', onKey);
+
+      var reduced = false;
+      try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+      var runFor = reduced
+        ? T.hold
+        : (T.titleAt + T.textIn + T.hold);
+      setTimeout(function () { welcomeDismiss(node); cleanup(); }, runFor);
+
+      // ⚠ THE WATCHDOG. If a timer never fires, a class never applies, or an
+      // animation event is missed, this removes the overlay anyway. The user
+      // must never be trapped behind a decoration.
+      setTimeout(function () { welcomeDismiss(node, true); cleanup(); }, T.watchdog);
+    } catch (e) {
+      // ⚠ ANY failure at all → no ceremony, and the dashboard is already there.
+      try { console.warn('[welcome] skipped:', e && e.message); } catch (e2) {}
+      welcomeDismiss(node, true);
+    }
+  }
+
   async function init() {
     // ─── Fathom OAuth popup handoff (must run BEFORE any auth/render so the
     // popup closes quickly without flashing the dashboard inside it). ───
@@ -3075,6 +3368,20 @@
     // #prospects has no nav entry any more, so hash entry must kick its own load
     // (applyHashToState sets state.view directly and bypasses setView).
     if (state.view === 'prospects' && !state.mergeLoading) loadMergeCandidates();
+
+    /**
+     * ⚠ LAST LINE OF init(), AND DELIBERATELY SO. Everything above has already
+     * rendered the dashboard and kicked off its data loads, so the overlay is
+     * decoration ON TOP of a working page rather than something standing in
+     * front of one. If this line never ran, nothing else would notice.
+     *
+     * ⚠ IT DOES NOT WAIT FOR DATA, AND THAT IS THE POINT. The loads above are
+     * async and several take seconds. Holding the overlay until they finish
+     * would make a decoration into a loading gate — the exact thing it must not
+     * be. If the data outlasts the animation the overlay swipes off to reveal
+     * the dashboard's own skeletons, which is its normal loading state.
+     */
+    try { playWelcomeIfFresh(); } catch (e) { /* never a gate */ }
   }
 
   // Converts a popup-result kind into a notice + triggers a status refresh.

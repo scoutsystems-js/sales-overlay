@@ -533,6 +533,25 @@
         email: (data.user && data.user.email) || email,
       });
 
+      /**
+       * ⚠ THE ONLY PLACE A FRESH SIGN-IN IS DISTINGUISHABLE FROM A RESUMED ONE.
+       *
+       * redirectByRole() is called from THREE places — here after a password
+       * POST, and twice inside checkExistingSession() when an existing session
+       * is valid or refreshable. All three produce an identical
+       * `location.replace('/dashboard')`, so the dashboard receives no signal
+       * telling them apart: same URL, same localStorage key, same session shape.
+       *
+       * The distinction exists ONLY at this call site, so the marker is set
+       * here — NOT inside redirectByRole(), which both paths share.
+       *
+       * sessionStorage rather than a query param: it is per-tab, dies with the
+       * tab, cannot be shared or bookmarked into someone else's browser, and
+       * keeps the URL clean. The dashboard reads it once and clears it, so a
+       * refresh does not replay the sequence.
+       */
+      try { sessionStorage.setItem('scout_welcome_v1', '1'); } catch (e) { /* private mode — no ceremony, no harm */ }
+
       // Redirect to the role-appropriate surface. On failure fall back to
       // the signed-in card so the "Open Scout App" deep link stays reachable.
       var redirected = await redirectByRole();
