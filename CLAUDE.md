@@ -1210,6 +1210,8 @@ Same shape for closing: gauge **Closing Rate** · graph **Closing %** · list **
 
 ### ⏳⏳ OPEN DEBT — TWO BROWSER CHECKS OWED ON `8bd06ec` (logged 2026-08-18)
 **⚠ AN UNVERIFIED PUSH IS A DEBT, AND THE WAY IT GOES BAD IS NOBODY REMEMBERING IT WAS ONE. This entry exists so the push cannot be mistaken for closing it.**
+- **✅ CHECK 1 IS DISCHARGED BY THE ONLY THING THAT COULD DISCHARGE IT — JUSTIN LOOKED (2026-08-18). The animation glitch is GONE; the words stay side by side throughout.** The wrap fix is confirmed. **⚠ THE SCRUB IS NARROWED, NOT CANCELLED:** it no longer needs to answer *"did the reflow stop"* — only whether anything ELSE in the sequence misbehaves mid-flight.
+- **❌ CHECK 2, THE INK SWEEP, IS STILL FULLY OUTSTANDING** — and the mark has since been raised so its first ring touches the top of the page, which puts the wordmark ON the artwork. See the analytic result below before assuming that changes the answer.
 - **TRIGGER: the moment the Chrome extension is connected again.** Not "next time someone touches the login page" — these are owed now and were only deferred by a tool outage.
 - **WHAT IS OWED, and why each matters:**
   1. **Scrub `getAnimations()` on the welcome sequence and confirm the wordmark is ONE LINE at several points through it** — not only at the end. The whole fix is that it must fit at every value the tracking passes through; checking the resting state is checking the one end that could never fail. **Per the tab-throttling rule, scrub the timeline — do NOT wait on the wall clock**, which in a backgrounded tab advances `setTimeout` but not the compositor.
@@ -1219,6 +1221,16 @@ Same shape for closing: gauge **Closing Rate** · graph **Closing %** · list **
   - the **failure mode is bounded**: if the sizing were still wrong the result is a wrap-and-snap, i.e. **no worse than what is on screen today**, not a broken page or a blocked sign-in;
   - **opacity was left at the safe value** (0.20, derived against the stricter muted-text case), so being wrong there costs presence, never readability;
   - and for this feature class **every real defect has been caught by Justin looking, not by the harness** — the wrapped wordmark, the mark occupying three quarters of its box, the faux-bold. The harness has repeatedly returned clean results on visibly wrong pages, which is precisely why the render check is owed rather than optional.
+- **⚠⚠ ONE SUB-QUESTION IS ALREADY ANSWERED EXACTLY, AND IT NARROWS THE SWEEP: THE WORDMARK CANNOT BECOME THE BINDING ELEMENT.** It is `var(--green)` — the SAME colour as the mark — so the intuition that text sitting on the densest artwork must become the worst-exposed case is simply wrong here. Computed from the two known colours:
+```
+opacity   wordmark   muted     binding
+0.20        7.58      4.70     muted
+0.30        5.78      3.58     muted
+0.50        3.28      2.03     muted
+the wordmark only overtakes muted text above opacity 0.885 — far outside the 0.16-0.30 band
+muted text itself falls below 4.5:1 above opacity 0.219
+```
+  **So the sweep's remaining job is narrow: does the mark still cross ANY `--muted` text?** If yes — almost certain, since the mark now spans the full viewport height and the 400px card sits inside its horizontal span — the answer is **0.21 for a fourth time** and nothing moves. **The number can only move if muted text is crossed NOWHERE**, which ink-vs-box makes a real question rather than a formality.
 - **⚠ DO NOT CLOSE THIS BY RE-READING THE CODE OR RE-RUNNING THE SUITE.** Both already pass; that is the state that produced every previous miss. It closes when a browser has actually scrubbed the sequence and sampled the ink.
 
 ### ⏳ TRIGGERED WORK — SIX PROVIDER-BLIND CLIP LABELS (logged 2026-08-17)
