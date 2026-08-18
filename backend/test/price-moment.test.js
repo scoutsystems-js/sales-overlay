@@ -95,14 +95,47 @@ test('⚠ FIRST closer occurrence — later re-references and prospect echoes lo
   assert.strictEqual(m.seconds, 2568);
 });
 
-test('⚠ a PROSPECT stating the price is never the moment', () => {
-  const turns = [
-    turn('PROSPECT', 'My friend said it was $9,800 for the whole thing', 500),
-    turn('CLOSER', NATE, 2568),
+test('⚠⚠ RULE A — the PROSPECT saying it FIRST means no drop happened here', () => {
+  // Ruled 2026-08-18. If the prospect states the figure before the closer, the
+  // closer is ANSWERING A QUESTION on a continuation call, not dropping a price.
+  // Both fixtures are verbatim from hand-verified failures.
+  const damienStyle = [
+    turn('PROSPECT', "What is the total amount that way I know what I'm working It was the $9,800.", 234),
+    turn('CLOSER', 'The $9,800.', 240),
+    turn('CLOSER', 'For all of the services, lifetime, for the documentation, everything, one time.', 246),
   ];
-  assert.strictEqual(P.findPriceMoment(turns, PRICE).seconds, 2568);
-  // prospect alone → nothing
-  assert.strictEqual(P.findPriceMoment([turns[0]], PRICE), null);
+  assert.strictEqual(P.findPriceMoment(damienStyle, PRICE), null,
+    'the closer confirming a price the prospect already named is not a drop');
+
+  const guessStyle = [
+    turn('PROSPECT', "I think it's $9,800 or $10,000, I think you guys charge?", 336),
+    turn('CLOSER', "It's $9,800 for all our services, but it's one time.", 342),
+  ];
+  assert.strictEqual(P.findPriceMoment(guessStyle, PRICE), null);
+
+  // ⚠ AND IT MUST NOT OVER-FIRE: a prospect echoing the price AFTER the drop is
+  // the normal case and must leave the moment intact.
+  const normal = [
+    turn('CLOSER', NATE, 2568),
+    turn('PROSPECT', 'So $9,800, and when is that due?', 2600),
+  ];
+  assert.strictEqual(P.findPriceMoment(normal, PRICE).seconds, 2568);
+
+  // a prospect alone is nothing at all
+  assert.strictEqual(P.findPriceMoment([damienStyle[0]], PRICE), null);
+});
+
+test('⚠ THE KNOWN RESIDUAL — "again" without the figure still gets through', () => {
+  // Recorded rather than papered over (ruling: no time floor). The prospect asks
+  // for the total "again" but never names it, so nothing in the transcript marks
+  // the price as already known. Exactly one call in 124 has this shape.
+  const residual = [
+    turn('PROSPECT', 'And the total amount, again, is?', 72),
+    turn('CLOSER', 'To work with us, the one-time investment was $9,800 for everything.', 78),
+  ];
+  const m = P.findPriceMoment(residual, PRICE);
+  assert.ok(m, 'this one is NOT caught — the rule keys on the figure, not on "again"');
+  assert.strictEqual(m.seconds, 78);
 });
 
 test('⚠⚠ ROUND-PRICE COLLISION is handled by the framing requirement', () => {

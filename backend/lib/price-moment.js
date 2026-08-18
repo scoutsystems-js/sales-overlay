@@ -97,6 +97,22 @@ const FRAME_LOOKAHEAD_SECONDS = 30;
  * terms" — a second conversation on a deal already agreed. It contains zero
  * occurrences of the price, from either speaker.
  * A chart over this field MUST exclude nulls and say how many it excluded.
+ *
+ * ⚠⚠ A TIME FLOOR WAS PROPOSED AND DECLINED (ruling 2026-08-18) — the reasoning
+ * matters more than the verdict, because the idea will come back:
+ *   - Rule A does the work. The residual is ONE bad call in 124, which cannot
+ *     move a 32.4-minute median.
+ *   - A threshold that removes exactly one call does not earn its maintenance.
+ *   - EARLY IS NOT WRONG. A hand-verified genuine drop sits at 11.0 minutes, on
+ *     a call where the prospect pushed for price early and the closer gave the
+ *     whole value case first. A floor set anywhere useful would have discarded
+ *     it, and the next customer may legitimately price early too.
+ *
+ * ⚠ THE KNOWN RESIDUAL, RECORDED RATHER THAN PAPERED OVER: exactly one
+ * continuation call survives Rule A — the prospect asks for the total "again"
+ * without naming the figure, so nothing in the transcript marks the price as
+ * already known, and the closer restates it at 1.3 minutes. We know it is there
+ * and we know it is one.
  */
 const EXPECTED_NULL_SHARE_CLOSED = 0.2;
 
@@ -172,6 +188,34 @@ function findPriceMoment(turns, price) {
       }
     }
     if (!framed) continue;
+
+    /**
+     * ⚠⚠ RULE A — PROSPECT-FIRST EXCLUSION (ruled 2026-08-18). If the PROSPECT
+     * stated the figure before the closer did, the closer is ANSWERING A
+     * QUESTION, not dropping a price. That is a continuation call — the price
+     * was already on the table.
+     *
+     * Hand-verified failures this removes, verbatim from real transcripts:
+     *   PROSPECT "What is the total amount that way I know what I'm working
+     *             It was the $9,800."      -> CLOSER 6s later: "The $9,800."
+     *   PROSPECT "I think it's $9,800 or $10,000, I think you guys charge?"
+     *             -> CLOSER 6s later: "It's $9,800 for all our services..."
+     *
+     * ⚠ IT IS A PROPERTY, NOT A THRESHOLD — nothing to tune, nothing to
+     * maintain. The detector was never matching a decoy on these calls; it
+     * correctly found the closer saying the price and could not see that the
+     * price was already known.
+     */
+    var priorProspect = false;
+    for (var k = 0; k < i; k++) {
+      var pt = list[k];
+      if (!pt || String(pt.speaker || '').toUpperCase() !== 'PROSPECT') continue;
+      var ps = secondsOf(pt);
+      if (ps === null || ps >= secs) continue;
+      if (re.test(textOf(pt))) { priorProspect = true; break; }
+    }
+    if (priorProspect) return null;   // continuation call — no drop happened here
+
     return { seconds: Math.round(secs), quote: txt.trim().slice(0, 400), turn_index: i };
   }
   return null;
