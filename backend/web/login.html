@@ -43,17 +43,33 @@
     .card { width: 100%; max-width: 400px; }
 
     /* ── THE BRAND LOCKUP above the sign-in form (Josh, 2026-08-18) ────────
-       ⚠ THE MARK IS THE INLINE SVG, NOT src/assets/icon.png, AND THAT IS A
-       REPORTED DEVIATION — see the findings. icon.png is an APP ICON: 1024²,
-       colour type 2 (NO ALPHA, so it carries a solid black plate rather than a
-       transparent mark), the word "SCOUT" already baked into the artwork, a
-       generator watermark in the corner, and 720KB for a ~76px render. Placed
-       above a "SCOUT SYSTEMS" wordmark it would print the word twice and sit
-       in a visible black square.
+       ⚠⚠ THE MARK IS THE INLINE SVG, NOT src/assets/icon.png — AND THIS IS A
+       RULING, NOT AN OVERSIGHT. The instruction was to use the real logo asset;
+       decoding it is what argued against it, and Justin APPROVED the
+       substitution on 2026-08-18 with the reason that settles it:
+
+           AN ASSET WITH THE WORDMARK BAKED IN CANNOT SIT ABOVE THE WORDMARK.
+
+       ⚠ DO NOT "FIX" THIS BACK TO icon.png. Decoded, that file is an APP ICON,
+       not a logo:
+         1024x1024, PNG colour type 2 → NO ALPHA CHANNEL, so it carries a solid
+                                        near-black plate and renders as a square
+         the word "SCOUT" baked in    → prints the word TWICE above SCOUT SYSTEMS
+         a generator watermark        → shipped to every visitor
+         720KB for a ~76px render     → on a page that loads no other images
+       Only the first of those is fixable by resizing; the other three are
+       properties of the artwork.
+
+       IF the raster is ever genuinely wanted here, it needs a NEW export: alpha
+       channel, no baked-in wordmark, no watermark, downscaled. That is an asset
+       task, not a code change — swapping this <svg> for an <img> would
+       reintroduce all four problems at once.
 
        This SVG is the same mark — concentric arcs over descending dots — as a
        vector, in the brand green, with no plate, no duplicate word, no
-       watermark and no request. It scales crisply at any size.
+       watermark and no request. It scales crisply at any size, and a test pins
+       its geometry to the nav mark so the product cannot drift into carrying
+       two subtly different logos.
 
        ⚠ THE TOKEN HERE IS --green, NOT --accent. The auth pages are styled by
        /css/style.css, which has no --accent at all; the dashboard's token set

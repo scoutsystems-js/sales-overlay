@@ -76,6 +76,23 @@ test('⚠ the soft tints DERIVE from the brand green rather than copying it', ()
   const noComments = STYLE.replace(/\/\*[\s\S]*?\*\//g, '');
   const root = noComments.slice(noComments.indexOf(':root'), noComments.indexOf('}', noComments.indexOf(':root')));
   assert.ok(root.length > 100 && root.length < 2000, 'slice suspicious: ' + root.length);
+
+  /**
+   * ⚠⚠ SCOPED TO THE WHOLE FILE, AND THE FIRST VERSION WAS SCOPED TO :root —
+   * which is how EIGHT more stale tints shipped past it. The guard checked the
+   * token block; the claim was "the tints derive from the brand green". Those
+   * are different scopes, and the eight that were neither in :root nor caught
+   * by it (.feature, .badge-win, .hero-badge, .overlay-mockup and others) were
+   * still painting the OLD green on the live landing and coaching pages.
+   *
+   * Found by grepping the SERVED stylesheet after deploy, not by this test.
+   * State the scope of a check alongside its claim, and make the claim no
+   * broader than the scope.
+   */
+  assert.strictEqual((noComments.match(/34,\s*197,\s*94/g) || []).length, 0,
+    'the OLD green must not survive in channel form ANYWHERE in the live CSS — '
+    + 'not only in :root. rgba() cannot read a hex token, so every tint is a '
+    + 'COPY unless it is written as rgba(var(--green-rgb), a)');
   assert.ok(/--green-rgb:\s*9,\s*224,\s*70/.test(root),
     'the channel spelling must match #09e046');
   assert.ok(/--green-dim:\s*rgba\(var\(--green-rgb\)/.test(root), '--green-dim must derive');
