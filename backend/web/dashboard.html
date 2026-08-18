@@ -1834,6 +1834,8 @@
     .srk-moment { border-left: 2px solid var(--border-strong); padding-left: 10px; }
     .srk-quote { font-size: 13px; line-height: 1.5; }
     .srk-who { font-size: 11px; font-weight: 600; margin-top: 2px; }
+    .srk-clip { font-size: 11px; font-weight: 600; color: var(--accent); margin-left: 8px; white-space: nowrap; }
+    .srk-clip:hover { text-decoration: underline; }
     .srk-thin { font-size: 13px; font-weight: 600; margin-top: 10px; }
     .srk-thin span { display: block; font-size: 12px; font-weight: 400; margin-top: 3px; }
 
@@ -4146,6 +4148,24 @@
     state.sectionRankIndex = ((state.sectionRankIndex + delta) % n + n) % n;   // wraps both ways
     renderOverview(false);
   }
+  // (p) 2026-08-17 — the clip button. MIRRORS lib/clip-link.js; pinned by
+  // clip-link-mirror.test.js.
+  //
+  // ⚠ THE LABEL DEPENDS ON THE PROVIDER. Fathom's ?t= seeks, so it is a "Clip".
+  // Zoom share links carry no timestamp, so the link opens at 00:00 and is
+  // labelled "Open Recording" — promising a moment and delivering the start is
+  // worse than saying plainly what the button does.
+  //
+  // ⚠ NO LINK → NO BUTTON, not a disabled one. "This call has no recording URL"
+  // is information about our sync, not something a user can act on.
+  function clipLabelFor(source) {
+    return String(source || '').toLowerCase() === 'fathom' ? 'Clip' : 'Open Recording';
+  }
+  function clipLinkHtml(m) {
+    if (!m.clip_url) return '';
+    return ' <a class="srk-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener"'
+      + ' onclick="event.stopPropagation();">▶ ' + escapeHtml(clipLabelFor(m.source)) + '</a>';
+  }
   function sectionRankMomentHtml(m) {
     var when = m.call_date ? dayLabel(String(m.call_date).slice(0, 10)) : null;
     // Prospect AND date together — a quote with neither cannot be checked by the
@@ -4153,7 +4173,7 @@
     var who = [m.prospect_name, when].filter(Boolean).join(' · ');
     return '<div class="srk-moment">'
       + '<div class="srk-quote">“' + escapeHtml(m.quote) + '”</div>'
-      + (who ? '<div class="srk-who">' + escapeHtml(who) + '</div>' : '')
+      + '<div class="srk-who">' + (who ? escapeHtml(who) : '') + clipLinkHtml(m) + '</div>'
       + '</div>';
   }
   function sectionRankCardHtml() {
@@ -4313,7 +4333,7 @@
     else if (state.view === 'overview') renderOverview(false);
   }
   function perfInsightHtml(it, kind) {
-    var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ clip</a>' : '';
+    var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ Clip</a>' : '';
     var review = it.call_id ? ' <button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')" style="padding:2px 8px;">Call</button>' : '';
     var data = it.data ? '<span style="color:var(--text);"> · ' + escapeHtml(it.data) + '</span>' : '';
     var quote = it.quote ? '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--text);">“</span>' + escapeHtml(it.quote) + '<span style="color:var(--text);">”</span></div>' : '';
@@ -5892,7 +5912,7 @@
   }
   function evidenceRowHtml(c) {
     var date = c.date ? formatNaturalDate(c.date) : '';
-    var clip = c.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(c.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
+    var clip = c.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(c.clip_url) + '" target="_blank" rel="noopener">▶ Clip</a>' : '';
     return '<div class="evidence-row">'
       + '<div class="evidence-head"><span class="evidence-title">' + escapeHtml(c.title || 'Untitled Call') + '</span>'
         + '<span class="evidence-date">' + escapeHtml(date) + '</span>'
@@ -6207,7 +6227,7 @@
   }
 
   function teamInsightHtml(it, kind) {
-    var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
+    var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ Clip</a>' : '';
     var repTag = it.rep ? '<span class="team-rep-tag">' + escapeHtml(displayNameFromEmail(String(it.rep), String(it.rep))) + '</span>' : '';
     return '<div class="team-insight ' + kind + '">'
       + '<div class="team-insight-claim">' + escapeHtml(it.claim || '') + '</div>'
@@ -6240,7 +6260,7 @@
     if (!keys.length) return '<div class="empty"><p>No standout team moments this week yet.</p></div>';
     return '<div class="team-lane-row">' + keys.map(function (k) {
       var m = lanes[k];
-      var clip = m.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">▶ clip</a>' : '';
+      var clip = m.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">▶ Clip</a>' : '';
       return '<div class="team-lane">'
         + '<div class="team-lane-title">' + LANE[k] + '</div>'
         + '<div class="team-lane-rep">' + escapeHtml(displayNameFromEmail(String(m.rep || ''), String(m.rep || ''))) + '</div>'
@@ -7998,7 +8018,7 @@
       ? '<div style="margin-top:8px;"><span class="obj-toggle" onclick="toggleObjResponse(this)">Show response</span>'
         + '<div class="obj-response"><span style="color:var(--text);">Closer: </span>' + escapeHtml(f.closer_response) + '</div></div>'
       : '';
-    var clip = f.clip_url ? '<a class="obj-btn" href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener">▶ Watch clip</a>' : '';
+    var clip = f.clip_url ? '<a class="obj-btn" href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener">▶ Watch Clip</a>' : '';
     var review = '<button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(f.fathom_call_id) + '\')">View Call Review</button>';
     return '<div class="pattern-card">'
       + '<div class="obj-card-head">' + surface + catChip + resBadge
@@ -8046,7 +8066,7 @@
     if (c.grounded && c.evidence && c.evidence.length) {
       evidence = '<div style="margin-top:10px;font-size:12px;color:var(--text);">Your handled example' + (c.evidence.length > 1 ? 's' : '') + ':</div>'
         + c.evidence.map(function(e) {
-            var clip = e.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(e.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ clip</a>' : '';
+            var clip = e.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(e.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ Clip</a>' : '';
             return '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--text);">Closer: </span>' + escapeHtml(e.closer_response || e.quote || '') + clip + '</div>';
           }).join('');
     }

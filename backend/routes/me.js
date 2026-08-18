@@ -1087,7 +1087,9 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
  */
 async function computeNeedsWorkSections(admin, userId, from, to) {
   var calls = await admin.from('fathom_calls')
-    .select('id, title, call_date, recording_url').eq('user_id', userId)
+    // `source` rides along so the clip button can be labelled per provider:
+    // Fathom's ?t= seeks, Zoom's does not. See lib/clip-link.js.
+    .select('id, title, call_date, recording_url, source').eq('user_id', userId)
     .gte('call_date', from).lte('call_date', to);
   if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
   var callIds = (calls.data || []).map(function (c) { return c.id; });
@@ -1112,7 +1114,8 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
   analyses.forEach(function (a) { if (a.prospect_name) nameBy[a.fathom_call_id] = a.prospect_name; });
   var meta = {};
   (calls.data || []).forEach(function (c) {
-    meta[c.id] = { prospect_name: nameBy[c.id] || null, recording_url: c.recording_url || null, call_date: c.call_date || null };
+    meta[c.id] = { prospect_name: nameBy[c.id] || null, recording_url: c.recording_url || null,
+                   call_date: c.call_date || null, source: c.source || null };
   });
 
   var ranked = SR.rankSections(SR.sectionStatsFromAnalyses(analyses));
@@ -1130,7 +1133,9 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
       .map(function (m) {
         return { quote: m.quote, observation: m.observation || null, call_id: m.fathom_call_id,
           call_date: m.call_date || null, prospect_name: m.prospect_name || null,
-          clip_url: m.clip_url || null, speaker_verified: m.speaker_verified === true };
+          clip_url: m.clip_url || null, speaker_verified: m.speaker_verified === true,
+          // ⚠ The LABEL depends on the provider, not just on having a link.
+          source: (meta[m.fathom_call_id] || {}).source || null };
       });
   });
 
