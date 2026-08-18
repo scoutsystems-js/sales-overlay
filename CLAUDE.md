@@ -1332,6 +1332,31 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **AND SAMPLE ANYWAY, BY LOOKING.** Three widths — 900 / 1440 / 1920 — because a derived formula can still be derived from a wrong k. The formula makes it right in principle; the three captures make it right in fact.
 - **⚠ A guard that pins a single measured value is the same trap wearing a test's clothes.** "Verified at 1460x812" is a true statement and a weak one; say the width, and say whether anything else was checked.
 
+### ⚠⚠ OFFERING A LEVER FOR A SYMPTOM WHOSE CAUSE IS ELSEWHERE — PULLING IT WOULD HAVE "WORKED" AND LEFT THE VALUE PERMANENTLY WRONG (2026-08-18)
+**The dangerous part is not that the lever fails. It is that it SUCCEEDS — the symptom goes away, the real defect stays, and the value you moved is now wrong forever for a reason nobody will reconstruct.**
+- **The live case:** the login mark looked nearly invisible. I reported it honestly as a trade and offered two levers — **raise the stroke past the site's 1-3px line work, or raise the opacity until muted text drops under AA** — each with its cost, for the architect to spend. **Both would have visibly fixed it.** Neither was the cause.
+- **The actual cause was composition:** the mark's ink fills only **76.5% of its viewBox height**, with **15.7% empty above the arcs**, so a correctly-derived box put 71px of nothing between the title and the first stroke and pushed the artwork toward the footer. Fitting the ink to the box **restored the presence at the SAME opacity that had looked invisible.**
+- **⚠ HAD EITHER LEVER BEEN PULLED FIRST, IT WOULD HAVE LOOKED SOLVED** — and the page would have shipped with a permanently over-weight stroke or sub-AA text, *plus* the composition defect still there, *plus* two constants now justified by a screenshot rather than by the constraints that set them. **Every future reader would inherit values with no derivable reason.**
+- **THE ORDER THAT MAKES IT DISCOVERABLE, and it is the whole method: FIX THE ACTUAL CAUSE FIRST, THEN RE-LOOK.** Not "try the cheap knob and see" — the knob works, which is exactly why it teaches you nothing. Only after the composition was corrected was it possible to see that the levers were never needed.
+- **⚠ AND SAY SO WHEN THE EARLIER REPORT WAS WRONG.** The previous findings said "it's too faint, here are three levers"; the correct follow-up is *"that was partly a misdiagnosis — a meaningful share of the faintness was the composition defect, not the values."* A trade offered in good faith that turns out to be the wrong trade has to be **withdrawn explicitly**, or the architect spends a decision on a false choice.
+- **Same family as tuning the wrong variable** (*prove it is drawing before tuning any visual property*) and *the fix and the cover-up look identical from outside* — this is that shape at the point of RECOMMENDATION rather than of diagnosis. **When about to offer a knob, ask first whether anything upstream of it is broken.**
+
+### ⚠ A CONSTANT DERIVED FROM A TARGET MUST BE RE-DERIVED ON EVERY SCALE CHANGE — THE CONSTRAINT IS THE TARGET, NOT THE VALUE THAT SATISFIED IT LAST TIME (2026-08-18)
+**Recorded because the same constant has now moved THREE times, correctly, and each time keeping it would have looked like stability.**
+- **The live case:** the mark's `stroke-width` is expressed in viewBox units, so it scales with the artwork. The target never changed — **the product's own line work: section borders 1px, gauge ticks 1.4, chart lines 2-3.** The value satisfying it did, every single time the box moved:
+```
+0.55   at 50vmin      -> ~10px      correct then
+0.55   at 150vmin     -> ~29px      the "bubbly" complaint
+0.18   at 150vmin     -> ~10px      correct then
+0.18   at the derived box -> 3.7-7.3px
+0.075  at that box    -> 1.5-3.0px  correct then
+0.075  after the viewBox crop -> 2.0-4.0px   (one unit grew 1.31x)
+0.055  after the crop -> 1.5-2.9px  correct now
+```
+- **⚠ THE TELL IS THE UNIT, NOT THE NUMBER: any value expressed in units that scale with the thing it decorates is NOT a constant — it is a function of the size**, and it belongs beside the size as one setting. Stroke widths in a viewBox, `em` paddings, percentage offsets, anything in `vmin`.
+- **Keeping the number through a scale change is the failure that looks like discipline.** It reads as "not fiddling with values", and it silently violates the constraint the value existed to satisfy.
+- **Write the TARGET in the comment, not just the value** — the code now records the 1-3px band and the measured unit range, so the next person re-derives instead of guessing whether the number is sacred.
+
 ### ⚠⚠ A FEEL TEST ON A SYNTHESISED FACE JUDGES THE SYNTHESIS (2026-08-18)
 **The browser fakes a weight it was never given, silently, and the fake LOOKS like the font — so the decision gets made against something that would never ship.**
 - **The live case:** Montserrat was linked on the login page as a feel test before any site-wide commitment, with **two weights only — 300 and 500**. But the page's own rules still asked for **600 and 700** (`.card-header h1`, `.field label`, `.submit-btn`, `.nav-logo`). Those weights do not exist in the loaded face, so the browser **SYNTHESISED** them by smearing the 500. Synthetic bold is heavier and cruder than a real cut — **Justin would have been judging Montserrat by a weight Montserrat does not contain.**
