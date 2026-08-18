@@ -133,8 +133,30 @@ test('the background mark matches the nav logo rather than being redrawn by eye'
   assert.ok(arcs(css).length > 0, 'no arcs found in the background mark');
   assert.strictEqual(arcs(css), arcs(nav),
     'same three arcs as the nav mark — a hand-redrawn second version is how two '
-    + 'subtly different logos end up on one product');
-  assert.strictEqual(radii(css), radii(nav), 'same three dot radii');
+    + 'subtly different logos end up on one product. THE ARCS CARRY THE MARK\'S '
+    + 'IDENTITY and must never diverge.');
+
+  /**
+   * ⚠⚠ THE DOT RADII DELIBERATELY DIVERGE (Justin, 2026-08-18: half size). This
+   * used to assert they matched the nav mark exactly, which was the right pin
+   * until the dots became a background-scale decision of their own. It is now
+   * pinned as an EXACT RATIO rather than dropped — so the dots cannot drift to
+   * an arbitrary value, and a future edit that "restores" them to match the nav
+   * has to do so deliberately.
+   */
+  // ⚠ the nav mark is HTML (r="1.6"); the background is a data URI (r='1.6').
+  // Matching one quote style found zero radii in the nav and the guard failed
+  // for the wrong reason.
+  const nums = (t) => (t.match(/r=['"]([\d.]+)['"]/g) || [])
+    .map((m) => parseFloat(m.replace(/r=['"]|['"]/g, '')));
+  const navR = nums(nav), bgR = nums(css);
+  assert.strictEqual(bgR.length, navR.length, 'same number of dots');
+  navR.forEach((r, i) => {
+    assert.ok(Math.abs(bgR[i] / r - 0.5) < 0.001,
+      'dot ' + (i + 1) + ' must be exactly half the nav radius (' + r + ' -> ' + (r / 2)
+      + '), got ' + bgR[i] + '. Halving the RADIUS quarters the AREA; the '
+      + 'half-AREA alternative is r x 0.707 and is a separate decision.');
+  });
 });
 
 // ── the mark as a BACKGROUND (Justin, 2026-08-18) ──────────────────────────
