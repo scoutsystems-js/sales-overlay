@@ -2033,27 +2033,47 @@
     .avg-title { font-size: 15px; font-weight: 600; }
     .avg-window { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
     .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
-    .avg-card { text-align: center; padding: 4px 4px 12px; }
+    .avg-card { text-align: center; padding: 4px 4px 12px; border-radius: var(--radius-md); }
+    /* Only the gauge with a real destination is clickable, and it says so —
+       a card that looks interactive and is not is worse than a plain one. */
+    .avg-card-link { cursor: pointer; transition: background 0.15s var(--ease); }
+    .avg-card-link:hover { background: var(--bg-field); }
     .avg-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
     .avg-dial { position: relative; }
     .avg-svg { width: 100%; max-width: 230px; height: auto; display: block; margin: 0 auto; }
 
-    /* The unlit blocks: the band's OWN hue, heavily dimmed, so the empty part of
-       the arc belongs to the same instrument rather than reading as grey chrome. */
+    /* ⚠ LEVELS RAISED 2026-08-18 — Justin: "not quite as sharp and bright as
+       Scout green." MEASURED BEFORE CHANGING ANYTHING, and the measurement moved
+       the fix: composited over the .section surface rgb(19,19,19), the LIT
+       segment was already rgb(74,222,128) — 100% of Scout green, delta +55/+203/
+       +109, nothing to brighten. What read as dim was everything AROUND it: the
+       unlit ring at 10% (delta +6/+20/+11) is most of the dial's area, and the
+       echo sat at 28%. So the level that was wrong was not the one the complaint
+       pointed at — same shape as the background-opacity episode, where the
+       mechanism was right and the level was wrong.
+       Unlit 0.10 → 0.22 · echo 0.28 → 0.52 · plus a glow the flat fill lacked.
+
+       ⚠ THE STRUCTURAL CONSTRAINT IS UNCHANGED: one shared alpha per shade role
+       across all three bands, each over its own --<band>-rgb. Raising a level
+       means raising it for all three together, which is what stops them drifting
+       into three hand-picked shades. team-averages-palette.test.js enforces it. */
     .avg-seg { stroke-linecap: butt; stroke-width: 12; fill: none; }
-    .avg-seg-off-good { stroke: rgba(var(--good-rgb), 0.10); }
-    .avg-seg-off-mid  { stroke: rgba(var(--mid-rgb),  0.10); }
-    .avg-seg-off-bad  { stroke: rgba(var(--bad-rgb),  0.10); }
-    .avg-seg-on-good  { stroke: var(--good); }
-    .avg-seg-on-mid   { stroke: var(--mid); }
-    .avg-seg-on-bad   { stroke: var(--bad); }
+    .avg-seg-off-good { stroke: rgba(var(--good-rgb), 0.22); }
+    .avg-seg-off-mid  { stroke: rgba(var(--mid-rgb),  0.22); }
+    .avg-seg-off-bad  { stroke: rgba(var(--bad-rgb),  0.22); }
+    /* Lit blocks are the token itself at full strength, with a bloom of the same
+       hue. The bloom is what "sharp" means here — a flat fill on a dark surface
+       reads softer than the same colour with a halo, even at identical RGB. */
+    .avg-seg-on-good  { stroke: var(--good); filter: drop-shadow(0 0 5px rgba(var(--good-rgb), 0.60)); }
+    .avg-seg-on-mid   { stroke: var(--mid);  filter: drop-shadow(0 0 5px rgba(var(--mid-rgb),  0.60)); }
+    .avg-seg-on-bad   { stroke: var(--bad);  filter: drop-shadow(0 0 5px rgba(var(--bad-rgb),  0.60)); }
 
     /* Inner echo — the same lit arc repeated smaller and dimmer. Depth, not
        information: it carries no value the outer ring does not. */
     .avg-echo { fill: none; stroke-width: 3; stroke-linecap: butt; }
-    .avg-echo-good { stroke: rgba(var(--good-rgb), 0.28); }
-    .avg-echo-mid  { stroke: rgba(var(--mid-rgb),  0.28); }
-    .avg-echo-bad  { stroke: rgba(var(--bad-rgb),  0.28); }
+    .avg-echo-good { stroke: rgba(var(--good-rgb), 0.52); }
+    .avg-echo-mid  { stroke: rgba(var(--mid-rgb),  0.52); }
+    .avg-echo-bad  { stroke: rgba(var(--bad-rgb),  0.52); }
 
     .avg-spoke { stroke: var(--text); stroke-width: 1; opacity: 0.22; }
     /* The target notch is deliberately WHITE and not a band colour — it marks
@@ -5880,9 +5900,19 @@
     var n = Math.round(avgFraction(value, scale) * AVG_SEGMENT_COUNT);
     return Math.max(1, Math.min(AVG_SEGMENT_COUNT, n));
   }
-  // Mirrors lib/team-averages.js band.
-  function avgBand(value, target) {
+  // ⚠⚠ Mirrors lib/team-averages.js band — INCLUDING THE DIRECTION. Two metrics
+  // want the number UP; avg call time wants it DOWN (60 minutes is a CEILING,
+  // Justin 2026-08-18). The direction arrives from the server ON the metric, so
+  // this never guesses it from the value. The first build hard-coded `>=` here
+  // and told a manager the team was failing at a 46-minute average.
+  var AVG_LOWER_IS_BETTER = 'lower_is_better';
+  function avgBand(value, target, direction) {
     if (typeof value !== 'number' || !isFinite(value)) return null;
+    if (direction === AVG_LOWER_IS_BETTER) {
+      if (value <= target) return 'good';
+      if (value <= target * 1.4) return 'mid';   // mirror of 0.6 on the other side
+      return 'bad';
+    }
     if (value >= target) return 'good';
     if (value >= target * 0.6) return 'mid';
     return 'bad';
@@ -5949,8 +5979,13 @@
 
   function avgCardHtml(m) {
     if (!m) return '';
-    var band = avgBand(m.value, m.target);
-    var targetCap = 'Target ' + m.target + (m.unit === 'min' ? ' min' : '%');
+    var band = avgBand(m.value, m.target, m.direction);
+    // ⚠ THE CAPTION COMES FROM THE SERVER, because it has to say which WAY the
+    // number should go: "Max 60 min" on the ceiling metric, "Target 25%" on the
+    // rates. Rebuilding it here from m.target alone is what produced "Target 60
+    // min" on a metric where 60 is the limit — a caption that survives a
+    // screenshot and reads as the opposite of the rule.
+    var targetCap = m.target_caption || ('Target ' + m.target + (m.unit === 'min' ? ' min' : '%'));
 
     if (m.value === null || m.value === undefined) {
       // ⚠ WITHHELD, NOT ZEROED. A dial reading 0 claims the team achieved
@@ -5971,7 +6006,15 @@
       ? ('across ' + m.total + ' call' + (m.total === 1 ? '' : 's'))
       : (m.numerator + ' of ' + m.total + ' ' + m.unit_name + (m.total === 1 ? '' : 's') + ' ' + m.numerator_name);
 
-    return '<div class="avg-card">'
+    // ⚠ ONLY objection handling drills through, and only because a TEAM-SCOPED
+    // destination exists for it. The other two are static by ruling, not by
+    // oversight — see openAvgObjections for what the click has to carry.
+    var clickable = (m.key === 'objections');
+    var open = clickable
+      ? ' onclick="openAvgObjections()" title="See the per-type breakdown for these 7 days"'
+      : '';
+
+    return '<div class="avg-card' + (clickable ? ' avg-card-link' : '') + '"' + open + '>'
       + '<div class="avg-name">' + escapeHtml(m.label) + '</div>'
       + '<div class="avg-dial">' + avgGaugeSvg(m.value, m.target, m.scale, band)
       + '<div class="avg-readout"><div class="avg-value avg-value-' + band + '">' + valueText + '</div>'
@@ -5982,19 +6025,33 @@
   }
 
   /**
-   * ⚠ CLICK-THROUGH IS DEFERRED, NOT DECLINED — AND IT HAS A NAMED TRIGGER.
-   * All three gauges are deliberately static today. Objection handling was ruled
-   * to open the existing Objections page, but that page is SINGLE-USER
-   * (/me/objections-intel, or /admin/objections-intel/:user_id for one pivoted
-   * rep) and reads state.dateRange — so clicking a TEAM gauge on a FIXED 7-day
-   * window would land on the manager's OWN numbers over a DIFFERENT window. A
-   * click that silently changes both the scope and the range is worse than none.
+   * ⚠⚠ THE CLICK CARRIES ITS WINDOW. This is the whole reason the drill-through
+   * was deferred until now: the gauge is a FIXED last-7-days figure and the
+   * destination follows the team date picker, so landing without setting the
+   * range would show a DIFFERENT number from the one just clicked — the worst
+   * kind of wrong, because both numbers are correct and the user has no way to
+   * see why they disagree.
    *
-   * ⚠ TRIGGER: Justin has ruled the TEAM OBJECTIONS VIEW gets built, and it is
-   * the block immediately after this one. When it exists, wire objection
-   * handling to it and revisit the other two. This is a dependency with a date,
-   * not a someday.
+   * ⚠ IT OVERWRITES THE MANAGER'S TEAM RANGE, AND THAT IS THE ACCEPTED TRADE
+   * (Justin, 2026-08-18): numbers agreeing on arrival beats preserving a picker
+   * setting, and it is not a silent side effect — the picker sits on that page
+   * showing the new range. Do not "fix" this by restoring the old range on the
+   * way back; that would recreate the mismatch it exists to remove.
+   *
+   * ⚠ THE DESTINATION IS THE TEAM view (#team-needs-work), never the personal
+   * Objections page. That page is single-user, so a team gauge would land on the
+   * manager's OWN numbers — which is what kept this deferred.
    */
+  function openAvgObjections() {
+    // Same 7 days the gauge was computed over. rangeToIso is the picker's own
+    // converter, so the window the destination shows is the window the server
+    // used, not a second definition of "7 days" that differs by a few hours.
+    var today = new Date().toISOString().slice(0, 10);
+    state.teamRange = rangeToIso(addDays(today, -6), today);
+    state.teamRangeInit = true;          // do not let the default seeder re-widen it
+    state.teamNeedsWork = null;          // force a refetch on the new range
+    setView('team-needs-work');
+  }
   function avgPanelHtml() {
     var d = state.teamAverages;
     var body;

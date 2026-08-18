@@ -14,6 +14,10 @@
  * number — p90 of individual real calls is 89.7 min, so full scale is exactly
  * where the top decile begins.
  *
+ * ⚠⚠ CALL TIME'S 60 IS A CEILING, NOT A TARGET — its band direction is INVERTED
+ * and declared on the metric. See the direction block below; the first build had
+ * it backwards and was approved as correct.
+ *
  * ⚠ "N of M" EXCLUDES UNMEASURED REPS AND SAYS SO (ruling 3, same shape as the
  * closed/not-closed filter): "8 of 20 at or above target · 2 not enough calls".
  * A rep with 2 calls is UNMEASURED, not failing — counting them as below target
@@ -46,15 +50,76 @@ test('⚠ the call-time scale keeps the LIVE rep-week band inside the readable a
     'the target must sit INSIDE the scale or the needle can never exceed it');
 });
 
-// ── bands: semantic only ──────────────────────────────────────────────────
-test('band is good at/above target, mid from 60% of target, bad below', () => {
-  assert.strictEqual(A.band(25, 25), 'good');
-  assert.strictEqual(A.band(30, 25), 'good');
-  assert.strictEqual(A.band(15, 25), 'mid');   // 0.6 * 25
-  assert.strictEqual(A.band(24.9, 25), 'mid');
-  assert.strictEqual(A.band(14.9, 25), 'bad');
-  assert.strictEqual(A.band(0, 25), 'bad');
-  assert.strictEqual(A.band(null, 25), null, 'no value is not a band');
+// ── ⚠⚠ DIRECTION IS A PROPERTY OF THE METRIC ─────────────────────────────
+/**
+ * ⚠⚠ 60 MINUTES IS A CEILING, NOT A TARGET (Justin, 2026-08-18):
+ * "60min is the max, anything less than that is good, especially if it closed.
+ *  On average sales calls are 30-60min; over that and you either have a long
+ *  onboarding or the reps talk too much."
+ *
+ * ⚠ THE FIRST BUILD HAD THIS BACKWARDS AND THE LINE WAS REVIEWED AND APPROVED AS
+ * CORRECT. The gauge climbed toward 60 and the caption read "0 of 4 reps at or
+ * above target" — telling a manager the team was FAILING at 46 minutes when 46
+ * is good. Nothing errored; the number was right and its meaning was inverted.
+ * A future session reading the earlier "ships at 0 of 4" ruling must not re-flip
+ * this: that ruling was made under the wrong sense and is superseded here.
+ *
+ * ⚠ SO DIRECTION IS AN EXPLICIT PROPERTY OF EACH METRIC, never a comparison
+ * written inline at a call site. A fourth metric added by copying a neighbour
+ * inherits a DECLARED direction it can see, not a `>=` it cannot.
+ */
+test('⚠⚠ every metric DECLARES its direction — none is implied by position', () => {
+  assert.strictEqual(A.METRICS.closing.direction, A.HIGHER_IS_BETTER);
+  assert.strictEqual(A.METRICS.objections.direction, A.HIGHER_IS_BETTER);
+  assert.strictEqual(A.METRICS.calltime.direction, A.LOWER_IS_BETTER,
+    '60 minutes is a CEILING — under it is good');
+  A.METRIC_ORDER.forEach(function (k) {
+    assert.ok(A.METRICS[k].direction, k + ' has no declared direction');
+  });
+});
+
+test('higher-is-better: good at/above target, mid from 60% of it, bad below', () => {
+  const D = A.HIGHER_IS_BETTER;
+  assert.strictEqual(A.band(25, 25, D), 'good');
+  assert.strictEqual(A.band(30, 25, D), 'good');
+  assert.strictEqual(A.band(15, 25, D), 'mid');   // 0.6 * 25
+  assert.strictEqual(A.band(24.9, 25, D), 'mid');
+  assert.strictEqual(A.band(14.9, 25, D), 'bad');
+  assert.strictEqual(A.band(0, 25, D), 'bad');
+  assert.strictEqual(A.band(null, 25, D), null, 'no value is not a band');
+});
+
+test('⚠ lower-is-better INVERTS: good at/below the ceiling, bad well over it', () => {
+  const D = A.LOWER_IS_BETTER;
+  assert.strictEqual(A.band(46, 60, D), 'good', '46 min is GOOD — this is the live case');
+  assert.strictEqual(A.band(60, 60, D), 'good', 'at the ceiling still clears it');
+  assert.strictEqual(A.band(30, 60, D), 'good');
+  assert.strictEqual(A.band(0.5, 60, D), 'good');
+  assert.strictEqual(A.band(61, 60, D), 'mid', 'just over the ceiling is a warning, not a failure');
+  assert.strictEqual(A.band(84, 60, D), 'mid');
+  assert.strictEqual(A.band(85, 60, D), 'bad', 'well over — 1.4x the ceiling');
+});
+
+test('the two directions are MIRROR IMAGES — the mid band is the same width either way', () => {
+  // higher: mid spans [0.6T, T)  → a band 0.4T wide BELOW target
+  // lower:  mid spans (C, 1.4C]  → a band 0.4C wide ABOVE the ceiling
+  // Stated as a property so neither side can be tuned in isolation.
+  const T = 50;
+  assert.strictEqual(A.band(T * 0.6, T, A.HIGHER_IS_BETTER), 'mid');
+  assert.strictEqual(A.band(T * 0.6 - 0.1, T, A.HIGHER_IS_BETTER), 'bad');
+  assert.strictEqual(A.band(T * 1.4, T, A.LOWER_IS_BETTER), 'mid');
+  assert.strictEqual(A.band(T * 1.4 + 0.1, T, A.LOWER_IS_BETTER), 'bad');
+});
+
+test('⚠ the ceiling metric\'s BAD band is reachable on its own scale', () => {
+  // A mid band defined multiplicatively (C / 0.6 = 100) would put "bad" beyond
+  // the 0-90 scale entirely, so a 95-minute team average would still render mid.
+  const m = A.METRICS.calltime;
+  assert.ok(m.target * 1.4 < m.scale,
+    'bad must start inside the scale: 1.4 x ' + m.target + ' = ' + (m.target * 1.4)
+    + ' against scale ' + m.scale);
+  assert.strictEqual(A.band(m.scale, m.target, m.direction), 'bad',
+    'a value at full scale must read as bad on a ceiling metric');
 });
 
 // ── the segmented arc ─────────────────────────────────────────────────────
@@ -147,7 +212,7 @@ test('⚠⚠ "N of M" EXCLUDES unmeasured reps — three groups, and they reconc
     { closing: { numerator: 0, total: 0 } },     // no prospects → UNMEASURED
   ];
   const c = A.repCounts(reps, 'closing');
-  assert.strictEqual(c.at_or_above, 2);
+  assert.strictEqual(c.meeting, 2);
   assert.strictEqual(c.measured, 3);
   assert.strictEqual(c.unmeasured, 2);
   assert.strictEqual(c.total, 5);
@@ -158,25 +223,35 @@ test('⚠⚠ "N of M" EXCLUDES unmeasured reps — three groups, and they reconc
 
 test('the count SENTENCE names the unmeasured group in words', () => {
   assert.strictEqual(
-    A.countSentence({ at_or_above: 8, measured: 18, unmeasured: 2, total: 20 }),
+    A.countSentence({ meeting: 8, measured: 18, unmeasured: 2, total: 20 }, 'closing'),
     '8 of 18 reps at or above target · 2 not enough calls');
   // no unmeasured reps → no dangling clause
   assert.strictEqual(
-    A.countSentence({ at_or_above: 3, measured: 4, unmeasured: 0, total: 4 }),
+    A.countSentence({ meeting: 3, measured: 4, unmeasured: 0, total: 4 }, 'closing'),
     '3 of 4 reps at or above target');
   // singular reads correctly
   assert.strictEqual(
-    A.countSentence({ at_or_above: 1, measured: 1, unmeasured: 1, total: 2 }),
+    A.countSentence({ meeting: 1, measured: 1, unmeasured: 1, total: 2 }, 'closing'),
     '1 of 1 rep at or above target · 1 not enough calls');
   // nobody measurable at all
   assert.strictEqual(
-    A.countSentence({ at_or_above: 0, measured: 0, unmeasured: 3, total: 3 }),
+    A.countSentence({ meeting: 0, measured: 0, unmeasured: 3, total: 3 }, 'closing'),
     'no reps with enough calls to measure yet');
 });
 
-test('⚠ SHIPS AT "0 of 4" — that is correct, not a bug (ruling 3)', () => {
-  // Only one rep-week in the entire live corpus has ever averaged >= 60 minutes.
-  // A future session must not read this as a broken gauge and "fix" it.
+test('⚠⚠ the CEILING metric says "at or BELOW 60 min", not "at or above target"', () => {
+  assert.strictEqual(
+    A.countSentence({ meeting: 4, measured: 4, unmeasured: 1, total: 5 }, 'calltime'),
+    '4 of 4 reps at or below 60 min · 1 not enough calls');
+  // The wording is a property of the metric, so it cannot drift from the maths.
+  assert.strictEqual(A.METRICS.calltime.thresholdPhrase, 'at or below 60 min');
+  assert.strictEqual(A.METRICS.closing.thresholdPhrase, 'at or above target');
+});
+
+test('⚠⚠ THE LIVE CASE — 46 min is GOOD, and all four reps CLEAR the ceiling', () => {
+  // The exact numbers that shipped reading "0 of 4 reps at or above target" —
+  // a manager being told the team was failing at 46 minutes. Under the ceiling
+  // they all clear it, which is what the data actually says.
   const reps = [
     { calltime: { seconds: 49.4 * 60 * 44, calls: 44 } },
     { calltime: { seconds: 39.4 * 60 * 12, calls: 12 } },
@@ -184,9 +259,22 @@ test('⚠ SHIPS AT "0 of 4" — that is correct, not a bug (ruling 3)', () => {
     { calltime: { seconds: 43.1 * 60 * 11, calls: 11 } },
   ];
   const c = A.repCounts(reps, 'calltime');
-  assert.strictEqual(c.at_or_above, 0);
+  assert.strictEqual(c.meeting, 4, 'every rep averages under 60 minutes');
   assert.strictEqual(c.measured, 4);
-  assert.strictEqual(A.countSentence(c), '0 of 4 reps at or above target');
+  assert.strictEqual(A.countSentence(c, 'calltime'), '4 of 4 reps at or below 60 min');
+  const pooled = A.poolDuration(reps);
+  assert.strictEqual(A.band(pooled.value, 60, A.LOWER_IS_BETTER), 'good',
+    'the team average of ~46 min renders GREEN');
+});
+
+test('a rep OVER the ceiling does not count toward the meeting group', () => {
+  const reps = [
+    { calltime: { seconds: 46 * 60 * 20, calls: 20 } },   // under → counts
+    { calltime: { seconds: 75 * 60 * 20, calls: 20 } },   // over  → does not
+  ];
+  const c = A.repCounts(reps, 'calltime');
+  assert.strictEqual(c.meeting, 1);
+  assert.strictEqual(c.measured, 2);
 });
 
 // ── the window is the SERVER's, not the caller's ──────────────────────────

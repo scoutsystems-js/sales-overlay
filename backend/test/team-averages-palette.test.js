@@ -56,6 +56,9 @@ test('⚠⚠ all three bands get the SAME treatment at the SAME alpha', () => {
   [
     { role: 'unlit segment', re: /\.avg-seg-off-([a-z]+)\s*\{\s*stroke:\s*rgba\(var\(--\1-rgb\),\s*([\d.]+)\)/g },
     { role: 'inner echo',    re: /\.avg-echo-([a-z]+)\s*\{\s*stroke:\s*rgba\(var\(--\1-rgb\),\s*([\d.]+)\)/g },
+    // The glow added when the levels were raised — it is a shade role like any
+    // other and must not become "just the green gets a halo".
+    { role: 'lit glow',      re: /\.avg-seg-on-([a-z]+)\s*\{[^}]*drop-shadow\(0 0 5px rgba\(var\(--\1-rgb\),\s*([\d.]+)\)\)/g },
   ].forEach(function (shade) {
     const found = {};
     let m;
@@ -91,9 +94,13 @@ test('⚠ the gauges use SEMANTIC colours only — the categorical ramp stays ou
 });
 
 test('⚠ NON-VACUITY — the family check catches a hand-tuned single band', () => {
-  const broken = LIVE.replace('.avg-echo-mid  { stroke: rgba(var(--mid-rgb),  0.28); }',
-                              '.avg-echo-mid  { stroke: rgba(var(--mid-rgb),  0.44); }');
-  assert.notStrictEqual(broken, LIVE, 'non-vacuity anchor is stale — the echo rule was renamed');
+  // ⚠ ANCHOR: derived from the LIVE value rather than hard-coded, so raising the
+  // shared alpha (0.28 → 0.52 on 2026-08-18) cannot silently empty this check.
+  // A literal here is exactly the stale-anchor trap recorded three times over.
+  const cur = LIVE.match(/\.avg-echo-mid\s*\{\s*stroke:\s*rgba\(var\(--mid-rgb\),\s*([\d.]+)\)/);
+  assert.ok(cur, 'non-vacuity anchor is stale — the .avg-echo-mid rule was renamed');
+  const broken = LIVE.replace(cur[0], cur[0].replace(cur[1], String(Number(cur[1]) + 0.16)));
+  assert.notStrictEqual(broken, LIVE, 'the replace must actually change something');
   const re = /\.avg-echo-([a-z]+)\s*\{\s*stroke:\s*rgba\(var\(--\1-rgb\),\s*([\d.]+)\)/g;
   const found = {}; let m;
   while ((m = re.exec(broken)) !== null) found[m[1]] = m[2];

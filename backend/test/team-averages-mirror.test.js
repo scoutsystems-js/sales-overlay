@@ -56,13 +56,37 @@ test('the render reads targets and scales from the SERVER, not from a second cop
   assert.strictEqual(A.METRICS.calltime.scale, 90);
 });
 
-test('the inline band split matches the module', () => {
-  // avgBand hard-codes 0.6; if MID_BAND_FRACTION ever moves, this catches it.
+test('⚠⚠ the inline band split matches the module IN BOTH DIRECTIONS', () => {
   assert.strictEqual(A.MID_BAND_FRACTION, 0.6);
-  const m = LIVE.match(/function avgBand\([\s\S]{0,320}?\n  \}/);
-  assert.ok(m, 'avgBand not found in the live source');
-  assert.ok(m[0].indexOf('target * 0.6') !== -1,
-    'inline avgBand no longer uses 0.6 — it must match MID_BAND_FRACTION');
+  const at = LIVE.indexOf('function avgBand');
+  assert.ok(at > 0, 'avgBand not found in the live source');
+  const end = LIVE.indexOf('\n  }', at);
+  const src = LIVE.slice(at, end + 4);
+  assert.ok(src.length > 250 && src.length < 1200, 'slice suspicious: ' + src.length);
+  assert.ok(src.indexOf('target * 0.6') !== -1, 'the higher-is-better mid edge must match MID_BAND_FRACTION');
+  assert.ok(src.indexOf('target * 1.4') !== -1, 'the ceiling mid edge must mirror it (2 - 0.6)');
+
+  // Rebuild the inline function and compare it to the module across both
+  // directions — including the CEILING metric, where a stale `>=` would light
+  // the dial green at 90 minutes and red at 30.
+  const inline = new Function('AVG_LOWER_IS_BETTER', src + '\nreturn avgBand;')(A.LOWER_IS_BETTER);
+  [
+    { d: A.HIGHER_IS_BETTER, t: 25 }, { d: A.HIGHER_IS_BETTER, t: 35 },
+    { d: A.LOWER_IS_BETTER, t: 60 },
+  ].forEach(function (c) {
+    for (let v = 0; v <= 120; v += 0.5) {
+      assert.strictEqual(inline(v, c.t, c.d), A.band(v, c.t, c.d),
+        'band drift at value ' + v + ' target ' + c.t + ' direction ' + c.d);
+    }
+    assert.strictEqual(inline(null, c.t, c.d), A.band(null, c.t, c.d));
+  });
+});
+
+test('⚠ NON-VACUITY — the band comparison catches a render stuck on the old sense', () => {
+  // The exact defect that shipped: a ceiling metric evaluated with `>=`.
+  const wrong = (v, t) => (v >= t ? 'good' : (v >= t * 0.6 ? 'mid' : 'bad'));
+  assert.notStrictEqual(wrong(46, 60), A.band(46, 60, A.LOWER_IS_BETTER),
+    'the comparison must be able to see the inversion — 46 min is good, not mid');
 });
 
 test('the inline lit-count matches the module across the whole scale', () => {

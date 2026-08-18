@@ -321,8 +321,11 @@ router.get('/averages', teamGate, async function (req, res) {
         value: pooled.value, numerator: pooled.numerator, total: pooled.total,
         enough: pooled.enough, reason: pooled.reason,
         unit_name: m.unitName, numerator_name: m.numeratorName,
-        band: TA.band(pooled.value, m.target),
-        counts: counts, count_sentence: TA.countSentence(counts),
+        // Direction travels WITH the metric to the browser, so the render can
+        // never re-derive it from a comparison of its own.
+        direction: m.direction, target_caption: m.targetCaption,
+        band: TA.band(pooled.value, m.target, m.direction),
+        counts: counts, count_sentence: TA.countSentence(counts, key),
       };
     });
 
@@ -339,12 +342,13 @@ function emptyMetrics() {
   var out = {};
   TA.METRIC_ORDER.forEach(function (key) {
     var m = TA.METRICS[key];
-    var counts = { at_or_above: 0, measured: 0, unmeasured: 0, total: 0 };
+    var counts = { meeting: 0, measured: 0, unmeasured: 0, total: 0 };
     out[key] = {
       key: key, label: m.label, target: m.target, scale: m.scale, unit: m.unit,
       value: null, numerator: 0, total: 0, enough: false,
       reason: 'no reps on this team', unit_name: m.unitName, numerator_name: m.numeratorName,
-      band: null, counts: counts, count_sentence: TA.countSentence(counts),
+      direction: m.direction, target_caption: m.targetCaption,
+      band: null, counts: counts, count_sentence: TA.countSentence(counts, key),
     };
   });
   return out;

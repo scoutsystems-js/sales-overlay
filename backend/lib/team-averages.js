@@ -32,7 +32,26 @@ const CLOSING_SCALE_MAX = 50;
 const OBJECTION_TARGET_PCT = 35;
 const OBJECTION_SCALE_MAX = 100;
 
-// ⚠ 60 MINUTES IS JUSTIN'S TARGET. 90 IS THE SCALE, AND IT WAS DERIVED — see
+/**
+ * ⚠⚠ DIRECTION IS A DECLARED PROPERTY OF EACH METRIC, NEVER A COMPARISON WRITTEN
+ * INLINE. Two of these three want a number to go UP; the third wants it to stay
+ * DOWN. Writing `value >= target` at each call site means a fourth metric added
+ * by copying its neighbour silently inherits the wrong sense — and an inverted
+ * band throws nothing, renders cleanly, and states the opposite of the truth.
+ *
+ * ⚠ THAT IS NOT HYPOTHETICAL. The first build of this panel treated 60 minutes
+ * as a floor: the dial climbed toward it and the caption read "0 of 4 reps at or
+ * above target", telling a manager the team was FAILING at a 46-minute average
+ * when 46 minutes is good. It was reviewed and approved as correct, because the
+ * NUMBER was right — only its meaning was upside down. Corrected 2026-08-18.
+ */
+const HIGHER_IS_BETTER = 'higher_is_better';
+const LOWER_IS_BETTER = 'lower_is_better';
+
+// ⚠ 60 MINUTES IS A CEILING, NOT A TARGET (Justin, 2026-08-18): "60min is the
+// max, anything less than that is good, especially if it closed. On average
+// sales calls are 30-60min; over that and you either have a long onboarding or
+// the reps talk too much." 90 IS THE SCALE, AND IT WAS DERIVED — see
 // test/team-averages.test.js for the measurement. Short version: a TEAM AVERAGE
 // is far tighter than the calls it averages (live rep-weeks span 40.4-64.0 min),
 // so the scale must be chosen against the average's range, not the call spread.
@@ -62,16 +81,28 @@ const METRICS = {
     key: 'closing', label: 'Closing Rate',
     target: CLOSING_TARGET_PCT, scale: CLOSING_SCALE_MAX,
     unit: '%', unitName: 'prospect', numeratorName: 'closed',
+    direction: HIGHER_IS_BETTER,
+    targetCaption: 'Target ' + CLOSING_TARGET_PCT + '%',
+    thresholdPhrase: 'at or above target',
   },
   objections: {
     key: 'objections', label: 'Objection Handling',
     target: OBJECTION_TARGET_PCT, scale: OBJECTION_SCALE_MAX,
     unit: '%', unitName: 'objection', numeratorName: 'handled',
+    direction: HIGHER_IS_BETTER,
+    targetCaption: 'Target ' + OBJECTION_TARGET_PCT + '%',
+    thresholdPhrase: 'at or above target',
   },
   calltime: {
     key: 'calltime', label: 'Avg Call Time',
     target: CALLTIME_TARGET_MIN, scale: CALLTIME_SCALE_MAX,
     unit: 'min', unitName: 'call', numeratorName: null,
+    // ⚠ THE INVERTED ONE. Under 60 is good.
+    direction: LOWER_IS_BETTER,
+    // "Max", not "Target" — the caption has to say which way it points, or the
+    // dial is the only thing carrying that and a screenshot loses it.
+    targetCaption: 'Max ' + CALLTIME_TARGET_MIN + ' min',
+    thresholdPhrase: 'at or below ' + CALLTIME_TARGET_MIN + ' min',
   },
 };
 
@@ -91,14 +122,41 @@ function fixedWindow(now) {
   return { from: from.toISOString(), to: to.toISOString(), days: WINDOW_DAYS };
 }
 
-// Semantic only. The categorical rep ramp is deliberately absent from this
-// panel and accent-palette.test.js fails if the two ever mix.
-function band(value, target) {
+/**
+ * Semantic only. The categorical rep ramp is deliberately absent from this panel
+ * and accent-palette.test.js fails if the two ever mix.
+ *
+ * ⚠ THE TWO DIRECTIONS ARE MIRROR IMAGES, and stating it that way is what keeps
+ * them from being tuned apart:
+ *   higher-is-better  good >= T   ·  mid [0.6T, T)   ·  bad < 0.6T
+ *   lower-is-better   good <= C   ·  mid (C, 1.4C]   ·  bad > 1.4C
+ * The mid band is 0.4 x the threshold wide in both cases — just on the other
+ * side of it.
+ *
+ * ⚠ WHY 1.4C AND NOT C / 0.6. The obvious mirror of "60% of target" is
+ * C / 0.6 = 100 minutes, which is OFF THE 0-90 SCALE — so "bad" could never
+ * render and a 95-minute team average would still read as a warning. An
+ * unreachable band is the same defect as a one-sided guard.
+ */
+function band(value, target, direction) {
   var v = num(value);
   if (v === null) return null;
+  if (direction === LOWER_IS_BETTER) {
+    if (v <= target) return 'good';
+    if (v <= target * (2 - MID_BAND_FRACTION)) return 'mid';
+    return 'bad';
+  }
   if (v >= target) return 'good';
   if (v >= target * MID_BAND_FRACTION) return 'mid';
   return 'bad';
+}
+
+// Does one value clear its metric's bar? The ONLY place the comparison is
+// written, so "clearing the bar" cannot mean two different things on one page.
+function meetsThreshold(value, target, direction) {
+  var v = num(value);
+  if (v === null) return false;
+  return (direction === LOWER_IS_BETTER) ? (v <= target) : (v >= target);
 }
 
 // Where a value sits on its own scale, 0..1. CLAMPED: an over-scale value parks
@@ -215,28 +273,43 @@ function repValue(rep, metricKey) {
  */
 function repCounts(reps, metricKey) {
   var list = Array.isArray(reps) ? reps : [];
-  var target = (METRICS[metricKey] || METRICS.closing).target;
+  var m = METRICS[metricKey] || METRICS.closing;
   var at = 0, measured = 0;
   list.forEach(function (r) {
     var v = repValue(r, metricKey);
     if (v === null) return;
     measured++;
-    if (v >= target) at++;
+    // ⚠ Direction comes from the METRIC, not from a `>=` written here. On a
+    // ceiling metric this counts reps who stay UNDER the bar.
+    if (meetsThreshold(v, m.target, m.direction)) at++;
   });
-  return { at_or_above: at, measured: measured, unmeasured: list.length - measured, total: list.length };
+  // `meeting` — deliberately NOT `at_or_above`, which was the old name and was
+  // a lie on a ceiling metric. A field name that states one direction cannot
+  // hold both, and renaming it is what forces every reader to be re-checked.
+  return { meeting: at, measured: measured, unmeasured: list.length - measured, total: list.length };
 }
 
-// The sentence that makes the panel scale past 20 reps. Says the unmeasured
-// group IN WORDS rather than quietly dropping it from the denominator.
-function countSentence(c) {
+/**
+ * The sentence that makes the panel scale past 20 reps. Says the unmeasured
+ * group IN WORDS rather than quietly dropping it from the denominator.
+ *
+ * ⚠ THE PHRASE COMES FROM THE METRIC. "at or above target" on a ceiling metric
+ * reads as a failure when the team is doing well — which is exactly what shipped
+ * and was approved before the direction was corrected.
+ */
+function countSentence(c, metricKey) {
+  var m = METRICS[metricKey] || METRICS.closing;
   if (!c || !c.total) return 'no reps in the last ' + WINDOW_DAYS + ' days';
   if (!c.measured) return 'no reps with enough calls to measure yet';
-  var s = c.at_or_above + ' of ' + c.measured + ' rep' + (c.measured === 1 ? '' : 's') + ' at or above target';
+  var s = c.meeting + ' of ' + c.measured + ' rep' + (c.measured === 1 ? '' : 's') + ' ' + m.thresholdPhrase;
   if (c.unmeasured > 0) s += ' · ' + c.unmeasured + ' not enough calls';
   return s;
 }
 
 module.exports = {
+  HIGHER_IS_BETTER: HIGHER_IS_BETTER,
+  LOWER_IS_BETTER: LOWER_IS_BETTER,
+  meetsThreshold: meetsThreshold,
   MIN_SAMPLE: MIN_SAMPLE,
   WINDOW_DAYS: WINDOW_DAYS,
   SWEEP_DEG: SWEEP_DEG,
