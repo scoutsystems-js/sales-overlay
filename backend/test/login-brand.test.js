@@ -32,18 +32,20 @@ test('the lockup sits ABOVE the sign-in form, not below it', () => {
   assert.ok(lockup < email && lockup < pw, 'the lockup must come before the fields');
 });
 
-test('the wordmark is the full name, big, bold and green', () => {
+test('the wordmark is the full name, big, LIGHT and green', () => {
   assert.ok(/class="brand-name">SCOUT SYSTEMS</.test(LOGIN),
     'the wordmark must read SCOUT SYSTEMS');
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
   assert.ok(css.length > 60 && css.length < 900, 'slice suspicious: ' + css.length);
-  // ⚠ THE SIZE IS A clamp() NOW — read its MAX, which is the shipped size. A
-  // naive /font-size:\s*(\d+)px/ picks up the clamp's MINIMUM (30px) and would
-  // report the wordmark as tiny while it renders at 68.
-  const size = Number((css.match(/font-size:\s*clamp\([^,]+,[^,]+,\s*(\d+)px\)/) || css.match(/font-size:\s*(\d+)px/) || [])[1]);
+  // ⚠ THE SIZE IS min(<vw>, <px>) — read the px cap, which is the shipped size
+  // on any normal desktop. A naive /font-size:\s*(\d+)px/ would pick up nothing
+  // useful, and the earlier clamp() form hid the real size behind its MINIMUM.
+  const size = Number((css.match(/font-size:\s*min\([\d.]+vw,\s*(\d+)px\)/) || [])[1]);
   const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
   assert.ok(size >= 28, 'big: ' + size + 'px');
-  assert.ok(weight >= 700, 'bold: ' + weight);
+  // ⚠ Justin, 2026-08-18: "BIGGER, NOT BOLD." The previous assertion demanded
+  // weight >= 700, which is now the opposite of the requirement.
+  assert.ok(weight <= 600, 'not bold: ' + weight);
   assert.ok(/color:\s*var\(--green\)/.test(css), 'green, from the token');
 });
 
@@ -154,10 +156,14 @@ test('⚠ the small mark is GONE from the lockup — one logo per screen', () =>
   assert.ok(/SCOUT SYSTEMS/.test(lockup), 'the wordmark stays');
 });
 
-test('the wordmark roughly doubled', () => {
+test('the wordmark is bigger again, and >= 50% wider than the login box', () => {
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
-  const size = Number((css.match(/font-size:\s*clamp\([^,]+,[^,]+,\s*(\d+)px\)/) || [])[1]);
-  assert.ok(size >= 60 && size <= 76, 'about 2x the original 34px, got ' + size);
+  const size = Number((css.match(/font-size:\s*min\([\d.]+vw,\s*(\d+)px\)/) || [])[1]);
+  assert.ok(size >= 84, 'bigger again on Justin 2026-08-18: got ' + size);
+  // And at least 50% wider than the 400px login box: 92px x k 8.924 = ~820px.
+  assert.ok(size * 8.924 >= 400 * 1.5,
+    'the wordmark must span >= 1.5x the login box (600px); ' + size + 'px gives '
+    + Math.round(size * 8.924) + 'px');
 });
 
 test('⚠ the background layer follows the motif treatment exactly', () => {
@@ -197,14 +203,46 @@ test('⚠ the background layer follows the motif treatment exactly', () => {
  * fine, because none of them asked whether it FIT; it was caught by looking at
  * the deployed page.
  */
-test('⚠ the wordmark cannot wrap — nowrap, and a lockup wider than the card', () => {
+/**
+ * ⚠⚠ THE NO-WRAP IS STRUCTURAL — AND THE PREVIOUS VERSION OF THIS GUARD WAS NOT
+ * ENOUGH. It asserted `nowrap` + a `clamp()`, both of which were present when
+ * the wordmark WRAPPED AGAIN on a narrower window: `clamp(30px, 7.2vw, 68px)`
+ * fits at the width it was verified at, and any fixed px value wraps somewhere.
+ *
+ * "It fits" is a RELATIONSHIP: textWidth = k x fontSize, so the safe size is
+ * availableWidth / k. This asserts the FORMULA holds — that the vw coefficient
+ * is small enough for the measured k at the shipped weight and tracking.
+ */
+test('⚠⚠ the wordmark size is DERIVED from available width — it cannot wrap at any viewport', () => {
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
-  assert.ok(css.length > 100 && css.length < 1600, 'slice suspicious: ' + css.length);
+  assert.ok(css.length > 200 && css.length < 3000, 'slice suspicious: ' + css.length);
   assert.ok(/white-space:\s*nowrap/.test(css), 'a wordmark that wraps reads as a mistake');
-  assert.ok(/font-size:\s*clamp\(/.test(css),
-    'with nowrap it must scale DOWN on a narrow screen rather than overflow');
-  assert.ok(/width:\s*min\(/.test(css),
-    'the lockup is wider than the 400px card on purpose — 68px needs ~520px');
+
+  const availVw = Number((css.match(/width:\s*min\((\d+)vw/) || [])[1]);
+  const sizeVw = Number((css.match(/font-size:\s*min\(([\d.]+)vw/) || [])[1]);
+  const capPx = Number((css.match(/font-size:\s*min\([\d.]+vw,\s*(\d+)px\)/) || [])[1]);
+  assert.ok(availVw && sizeVw && capPx, 'the size must be min(<vw>, <px>) against a min(<vw>, <px>) lockup');
+
+  // k for this face at the SHIPPED weight + tracking, measured in a browser.
+  const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
+  const tracking = (css.match(/letter-spacing:\s*([\d.]+em)/) || [])[1];
+  const K = { '500|0.08em': 8.924 };
+  const k = K[weight + '|' + tracking];
+  assert.ok(k,
+    'k is measured per (weight, tracking) — this pairing is ' + weight + '/' + tracking
+    + ' and has no measured k. Re-measure in a browser and re-derive the vw '
+    + 'coefficient before changing either: heavier or wider needs a SMALLER one.');
+
+  assert.ok(sizeVw * k <= availVw,
+    'font-size ' + sizeVw + 'vw x k ' + k + ' = ' + (sizeVw * k).toFixed(1)
+    + 'vw of text, which must fit the ' + availVw + 'vw lockup — otherwise it '
+    + 'wraps at every viewport, not just narrow ones');
+
+  // The px cap must only engage where the vw rule already exceeds it, so the
+  // cap can never be the thing that causes a wrap.
+  const capEngagesAtVw = capPx / (sizeVw / 100);
+  assert.ok(capEngagesAtVw * (availVw / 100) >= capPx * k * 0.99,
+    'the px cap must not exceed what fits at the width where it starts to apply');
 });
 
 test('the form paints ABOVE the mark', () => {

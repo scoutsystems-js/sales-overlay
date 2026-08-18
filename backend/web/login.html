@@ -90,20 +90,46 @@
        two-line block is what drove the wordmark down into the background mark.
        Caught by looking at the deployed page; every measurement I had taken
        said the type was fine, because none of them asked whether it fit. */
+    /* ⚠⚠ THE LOCKUP BREAKS OUT OF THE CARD ON PURPOSE. Justin: the wordmark must
+       be AT LEAST 50% WIDER than the login box — 400px box, so 600px+ of
+       wordmark. It cannot live inside a max-width:400px card and be wider than
+       it, so it is pulled to the viewport's own width and re-centred. */
     .brand-lockup {
-      text-align: center; margin: 0 0 26px;
-      width: min(92vw, 640px);
+      text-align: center; margin: 0 0 30px;
+      width: min(92vw, 900px);
       margin-left: 50%; transform: translateX(-50%);
     }
-    /* Justin, 2026-08-18: roughly 2x, 34 -> 68.
-       ⚠ nowrap + clamp, so it scales DOWN on a narrow screen rather than
-       breaking across two lines. A wordmark that wraps reads as a mistake. */
+
+    /**
+     * ⚠⚠ THE NO-WRAP IS STRUCTURAL, NOT A CHOSEN NUMBER — AND THE PREVIOUS
+     * VERSION WAS THE OPPOSITE, WHICH IS WHY IT WRAPPED AGAIN ON JUSTIN'S
+     * NARROWER WINDOW. `clamp(30px, 7.2vw, 68px)` fits at the ONE width it was
+     * verified at; any fixed px value wraps at some viewport.
+     *
+     * "It fits" is a RELATIONSHIP, not a property:
+     *
+     *     textWidth = k x fontSize        (k measured, not guessed)
+     *     fontSize_max = availableWidth / k
+     *
+     * MEASURED in the browser for this exact face at weight 500 + 0.08em
+     * tracking: k = 8.924. The lockup gets 92vw, so the largest font-size that
+     * can never wrap is 92 / 8.924 = 10.3vw. The px cap (92) only engages above
+     * a ~893px viewport, where 10.3vw already exceeds it — so the cap can never
+     * be the thing that causes a wrap.
+     *
+     * ⚠ k DEPENDS ON WEIGHT AND TRACKING. Changing either without re-deriving
+     * 10.3vw reintroduces the bug. Measured range: k is 7.88 (300 / 0.02em) to
+     * 9.76 (800 / 0.12em), so a heavier or wider setting NEEDS A SMALLER vw
+     * coefficient. Test asserts the pairing.
+     */
     .brand-lockup .brand-name {
-      font-size: clamp(30px, 7.2vw, 68px);
-      font-weight: 800; letter-spacing: 0.04em;
+      font-size: min(10.3vw, 92px);
+      /* Justin: BIGGER, NOT BOLD. 800 -> 500, and the extra tracking is what
+         keeps a lighter weight from reading thin at this size. */
+      font-weight: 500; letter-spacing: 0.08em;
       white-space: nowrap;
       color: var(--green); line-height: 1.02;
-      text-shadow: 0 0 28px rgba(var(--green-rgb), 0.35);
+      text-shadow: 0 0 30px rgba(var(--green-rgb), 0.3);
     }
 
     /* ── THE MARK AS A BACKGROUND (Justin, 2026-08-18) ────────────────────
@@ -113,7 +139,7 @@
 
        Same rules as those motifs, deliberately rather than by coincidence:
          • the brand green
-         • opacity inside the established 0.16-0.30 band (0.22)
+         • opacity inside the established 0.16-0.30 band (0.20)
          • pointer-events: none, so it can never intercept a click on the form
          • an ink check before shipping, because this is text over a large shape
            — the exact collision case that sweep exists for
@@ -129,26 +155,38 @@
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      /* ⚠⚠ 0.18, AND THE CRITERION CHANGED FROM "ZERO OVERLAP" TO "CONTRAST".
-         The first sweep chased a position with ZERO ink under any text and
-         found one — but only because its element inventory was SHORT: it never
-         checked #cardTitle or #cardSub, which sit squarely over the mark (428
-         and 224 ink pixels). With the full inventory, zero ink is not
-         achievable at half-screen size and never was; the earlier "clean"
-         result was an artefact of not looking.
-
-         So the bar is the right one for a background: the worst exposed text
-         must stay readable OVER the mark. Worst case is --muted (labels,
-         sub-heading, forgot link, footer) against a solid stroke:
-
-             0.22 -> 4.47:1   under the 4.5:1 AA line
-             0.20 -> 4.70:1
-             0.18 -> 4.98:1   <- shipped, comfortable margin, still in band
-             0.16 -> 5.21:1
-
-         Body text sits at 12.99:1 and the wordmark at 8.05:1, so the muted
-         family is the binding constraint. */
-      opacity: 0.18;
+      /**
+       * ⚠⚠ THE CRITERION IS CONTRAST, NOT ZERO OVERLAP — AND I REACHED FOR THE
+       * WRONG ONE TWICE BEFORE MEASURING ACROSS WIDTHS.
+       *
+       * A sweep at ONE viewport found a position with zero ink under every text
+       * element, so zero-overlap looked achievable. Re-measured across widths it
+       * is not: the mark clears all low-contrast text only at >= 1600px.
+       *
+       *   820  cardTitle 436 · cardSub 201 · labels 418
+       *  1100  cardTitle 192 · cardSub 183 · label 115
+       *  1440  label 36
+       *  1600  clean          1920  clean
+       *
+       * ⚠ THAT "CLEAN" POSITION WAS A ONE-WIDTH ARTEFACT — the same mistake as
+       * the wordmark size that wrapped on a narrower window. Overlap is a
+       * RELATIONSHIP between the mark and a layout that moves; it cannot be
+       * settled at a single viewport.
+       *
+       * Hiding the mark below 1600px (the dashboard-motif precedent) would blank
+       * it on every normal laptop, which defeats the point of having it. So the
+       * bar is the one that holds at every width: THE WORST EXPOSED TEXT STAYS
+       * READABLE OVER THE MARK. --muted against a solid stroke:
+       *
+       *     0.26 -> 4.25:1   0.22 -> 4.47:1   under AA
+       *     0.20 -> 4.70:1   <- shipped       0.18 -> 4.98:1
+       *
+       * The offset still earns its keep: it cuts the overlap by roughly half at
+       * every width and takes the mark off the thickest part of the wordmark,
+       * which is what note 3 asked for. It just is not a substitute for the
+       * contrast floor.
+       */
+      opacity: 0.20;
       background-repeat: no-repeat;
       /* ⚠ POSITION SET BY THE INK CHECK, NOT BY EYE. At `center 44%` the mark's
          strokes crossed the FIELD LABELS — measured, 86 ink pixels under the
@@ -175,9 +213,40 @@
 
          Verified at 1460x812. The clearance is a LAYOUT relationship, so it
          should be re-checked if the form's spacing changes. */
-      background-position: center 18%;
+      /* ⚠ OFFSET, NOT CENTRED (Justin's note 3: the mark sat right on the text).
+         Re-swept with the COMPLETE inventory this time — nine exposed elements
+         gathered from the DOM, including #cardTitle and #cardSub, which the
+         previous sweep never checked.
+
+         EVERY CENTRED POSITION COLLIDES: 0.50/0.18 -> 765 ink px under text,
+         0.50/0.34 -> 1420, 0.50/0.50 -> 1540, 0.50/0.62 -> 1465. Offsetting is
+         not a nicety here, it is the only thing that makes zero overlap
+         reachable: 0.85/0.55 and 0.15/0.55 both measure ZERO ink under all nine
+         AND zero under the wordmark, which is what note 3 asked for.
+
+         Because nothing overlaps any more, the AA contrast floor stops binding
+         and the opacity can go back up for presence — 0.26, still inside the
+         0.16-0.30 band, and the strokes are now ~3x finer so it reads as a
+         drawn shape rather than a wash. */
+      background-position: 85% 55%;
       background-size: 50vmin auto;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='440' viewBox='0 0 20 22' fill='none'%3E%3Cpath d='M1.5 12 A8.5 8.5 0 0 1 18.5 12' stroke='%2309e046' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M4.5 12 A5.5 5.5 0 0 1 15.5 12' stroke='%2309e046' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M7.5 12 A2.5 2.5 0 0 1 12.5 12' stroke='%2309e046' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='1.6' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16' r='1.2' fill='%2309e046'/%3E%3Ccircle cx='10' cy='19.5' r='0.8' fill='%2309e046'/%3E%3C/svg%3E");
+      /* ⚠ THE "BUBBLY" FIX (Justin, 2026-08-18) — MEASURED, NOT EYEBALLED.
+         The mark is a 20-unit viewBox drawn at 50vmin, so ONE SVG UNIT IS ~18
+         SCREEN PIXELS. stroke-width 1.6 therefore rendered as a 28.9px rounded
+         tube, and the dots as filled discs of radius 28.9 / 21.7 / 14.5px —
+         against 1-3px line work everywhere else on this product. That 10-29x
+         gap IS the softness; it was never the shape.
+
+         Three options were measured (see the findings). Shipped: OUTLINE-ONLY
+         at stroke-width 0.55 -> ~9.9px, with the dots as RINGS rather than
+         discs. The alternatives were 0.9 (16.3px, still heavy) and 0.4 (7.2px,
+         which starts to disappear at 0.18 opacity behind text).
+
+         ⚠ THE MARK'S IDENTITY IS UNTOUCHED: the three arc paths and the three
+         dot RADII are byte-identical to the nav logo. Only stroke weight and
+         fill-vs-outline changed, which are TREATMENT. A test pins the arcs and
+         radii against the nav mark so a future edit cannot quietly redraw it. */
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='440' viewBox='0 0 20 22' fill='none'%3E%3Cpath d='M1.5 12 A8.5 8.5 0 0 1 18.5 12' stroke='%2309e046' stroke-width='0.55' stroke-linecap='round'/%3E%3Cpath d='M4.5 12 A5.5 5.5 0 0 1 15.5 12' stroke='%2309e046' stroke-width='0.55' stroke-linecap='round'/%3E%3Cpath d='M7.5 12 A2.5 2.5 0 0 1 12.5 12' stroke='%2309e046' stroke-width='0.55' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='1.6' fill='none' stroke='%2309e046' stroke-width='0.55'/%3E%3Ccircle cx='10' cy='16' r='1.2' fill='none' stroke='%2309e046' stroke-width='0.55'/%3E%3Ccircle cx='10' cy='19.5' r='0.8' fill='none' stroke='%2309e046' stroke-width='0.55'/%3E%3C/svg%3E");
     }
     /* The form and nav sit above the mark. Without this the shape would paint
        over the fields rather than behind them. */

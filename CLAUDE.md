@@ -1284,6 +1284,16 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - It was found the moment a screenshot succeeded. **Not by a better measurement — by looking.**
 - **THE RULE: measurements answer questions you thought to ask. A capture answers the one you didn't.** Use both, and treat "I could not capture it" as a real gap in verification rather than a formality — **say so plainly**, because a page nobody has seen is unverified in a way no table of numbers repairs.
 - Practical follow-through: `white-space: nowrap` + a `clamp()` font-size so the wordmark scales down instead of breaking, and a guard asserting it cannot wrap. **⚠ The guard also had to learn to read a `clamp()`** — a naive `font-size:\s*(\d+)px` picks up the clamp's MINIMUM and would report a 68px wordmark as 30px.
+- **⚠⚠ AND THAT FIX WAS ITSELF WRONG, WHICH IS THE REAL LESSON: "IT FITS" IS A RELATIONSHIP, NOT A PROPERTY — SO IT CANNOT BE SETTLED AT ONE VIEWPORT (2026-08-18).** `clamp(30px, 7.2vw, 68px)` + `nowrap` passed every check and **wrapped again on a narrower window**. Any FIXED px value wraps at some width; verifying at the one window you happen to have open proves nothing about the others.
+  - **THE FIX IS TO DERIVE THE VALUE FROM THE CONSTRAINT, NOT TO PICK A BETTER NUMBER:**
+    ```
+    textWidth = k x fontSize          k measured in a browser, not guessed
+    fontSize  = availableWidth / k
+    ```
+    Measured for this face: **k = 8.924** at weight 500 / 0.08em tracking (range **7.88** at 300/0.02em to **9.76** at 800/0.12em). Lockup gets 92vw, so `font-size: min(10.3vw, 92px)` **cannot** wrap at any width — and the px cap only engages where the vw rule already exceeds it, so the cap can never be the cause either.
+  - **⚠ k DEPENDS ON WEIGHT AND TRACKING, so the guard asserts the PAIRING** — it holds a measured k per (weight, tracking) and fails if either changes without re-deriving the coefficient. Proven by setting 800/0.12em and watching it go red. **A heavier or wider setting needs a SMALLER vw coefficient**, which is exactly the kind of coupling a hand-picked number loses.
+  - **⚠⚠ THE SAME ONE-WIDTH ERROR THEN REPEATED IN THE INK CHECK, IN THE SAME SESSION.** A sweep at one viewport found a mark position with **zero ink under every text element**, so zero-overlap looked achievable. Measured across widths it holds only at **≥1600px** (820: cardTitle 436 · cardSub 201 · labels 418 → 1440: label 36 → 1600: clean). **The "clean" position was a one-width artefact exactly like the font size.** Resolution: stop using zero-overlap as the criterion and use the one that holds everywhere — **the worst exposed text stays readable over the mark** (`--muted` ≥ 4.5:1, which sets opacity 0.20).
+  - **THE GENERAL RULE: when a property depends on a layout that MOVES, verify across the range it moves through — and prefer a derived formula to a value that merely passes today.** Assert the relationship in a test; confirm the composition by LOOKING at three widths.
 
 ### ⚠⚠ A FIX AND A COVER-UP LOOK IDENTICAL FROM OUTSIDE — WHICH IS WHY THE DIAGNOSIS HAS TO COME FIRST (2026-08-18)
 **Justin's framing, and it is the general form: "the fix and the cover-up would have looked identical from outside, and only one of them makes the page fast."**
