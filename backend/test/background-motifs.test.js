@@ -51,28 +51,80 @@ test('the layer is decorative and unreachable — never in front of content', ()
   assert.ok(/pointer-events:\s*none/.test(r), 'decoration must never intercept a click');
   const op = r.match(/opacity:\s*([0-9.]+)/);
   assert.ok(op, 'the layer must declare an opacity');
-  assert.ok(parseFloat(op[1]) <= 0.04,
-    'ruling 2026-08-17: under ~4%. Found ' + op[1]);
+  // ⚠ A CAP, NOT THE SAFETY MECHANISM. Justin's ruling on the four-style
+  // graphics: where ink lands on text, move the CROP or POSITION — do not turn
+  // the opacity down. The cap exists so decoration cannot creep into content,
+  // not so that faintness can be relied on.
+  assert.ok(parseFloat(op[1]) <= 0.06,
+    'decoration must stay decoration. Found ' + op[1]);
 });
 
-test('it is inline SVG — no asset, no request, no dependency', () => {
-  const r = rule('body[data-view]::before');
-  const urls = r.match(/url\("data:image\/svg\+xml,/g) || [];
-  assert.strictEqual(urls.length, 2, 'expected the two motifs as inline data URIs');
-  assert.ok(!/url\(["']?(https?:)?\/\//.test(r), 'no remote asset may be referenced');
+test('the four styles are inline SVG — no asset, no request, no dependency', () => {
+  // ⚠ ANCHOR ON SOMETHING UNIQUE. There are TWO `:root {` blocks — the colour
+  // tokens and this one — and slicing on the first gave a block with no motifs
+  // in it, so the test failed for a reason unrelated to the code. Anchor on the
+  // declaration that only exists here.
+  const at = LIVE.indexOf('--motif-a:');
+  assert.ok(at !== -1, '--motif-a must be declared');
+  const root = LIVE.slice(LIVE.lastIndexOf(':root {', at), LIVE.indexOf('}', at));
+  assert.ok(root.length > 200 && root.length < 20000, 'slice must cover the styles: ' + root.length);
+  const urls = root.match(/url\("data:image\/svg\+xml,/g) || [];
+  assert.strictEqual(urls.length, 4, 'expected FOUR styles as inline data URIs');
+  ['--motif-a', '--motif-b', '--motif-c', '--motif-d'].forEach(function (v) {
+    assert.ok(root.indexOf(v) !== -1, 'missing style ' + v);
+  });
+  assert.ok(!/url\(["']?(https?:)?\/\//.test(root), 'no remote asset may be referenced');
+  assert.ok(!/url\(["']?(https?:)?\/\//.test(LIVE.slice(LIVE.indexOf('body[data-view]::before'),
+    LIVE.indexOf('@media (max-width: 1320px)'))), 'nor by any per-view rule');
 });
 
-test('ONE layer for ALL views, and render() is what gates it', () => {
-  // Rolled out 2026-08-17. The ATTRIBUTE is still required: render() stamps it,
-  // so the layer cannot paint over a page that has not rendered yet.
-  assert.ok(/body\[data-view\]::before/.test(LIVE),
-    'the motif layer must key on the data-view attribute render() stamps');
-  assert.ok(!/body\[data-view="[a-z-]+"\]::before/.test(LIVE),
-    'no per-view motif variant — one layer, one definition');
-  // Exactly ONE decorative SVG layer. A second would mean a view got its own
-  // copy, which is how two definitions start drifting apart.
-  const layers = LIVE.match(/[^\n{}]*::before\s*{[^}]*data:image\/svg\+xml/g) || [];
-  assert.strictEqual(layers.length, 1, 'expected one motif layer, found: ' + layers.length);
+test('⚠⚠ EVERY STYLE IS VALID SVG — the four shipped MALFORMED once and rendered NOTHING', () => {
+  // The generator collapsed "\n\s*" to nothing, joining an attribute to the one
+  // before it — fill='none'stroke='#4ade80'. All four were invalid, the browser
+  // refused to decode them, and the page looked exactly like a treatment that
+  // was simply too faint. Caught by LOOKING AT THE RENDERED PAGE, not the CSS.
+  ['a', 'b', 'c', 'd'].forEach(function (k) {
+    const m = LIVE.match(new RegExp('--motif-' + k + ': url\\("data:image/svg\\+xml,([^"]+)"\\)'));
+    assert.ok(m, '--motif-' + k + ' must be declared');
+    const svg = decodeURIComponent(m[1]);
+    // An attribute must never begin immediately after a closing quote.
+    const joins = svg.match(/['"][a-zA-Z-]+=/g) || [];
+    assert.deepStrictEqual(joins, [],
+      'motif-' + k + ' has attributes joined without a space — the SVG will not decode');
+    assert.ok(svg.trim().startsWith('<svg'), 'motif-' + k + ' must start with <svg');
+    assert.ok(svg.trim().endsWith('</svg>'), 'motif-' + k + ' must close its root element');
+    assert.ok(svg.indexOf('#4ade80') !== -1, 'motif-' + k + ' must be Scout green');
+  });
+});
+
+test('⚠ NON-VACUITY — the validity check catches a joined attribute', () => {
+  const m = LIVE.match(/--motif-a: url\("data:image\/svg\+xml,([^"]+)"\)/);
+  const broken = decodeURIComponent(m[1]).replace("' stroke='#4ade80'", "'stroke='#4ade80'");
+  const joins = broken.match(/['"][a-zA-Z-]+=/g) || [];
+  assert.ok(joins.length > 0,
+    'the matcher must see a joined attribute, or this check proves nothing');
+});
+
+test('ONE layer, per-view ASSIGNMENT, and render() is what gates it', () => {
+  // The ATTRIBUTE is still required: render() stamps it, so the layer cannot
+  // paint over a page that has not rendered yet.
+  assert.ok(/body\[data-view\]::before\s*{/.test(LIVE),
+    'the shared layer must key on the data-view attribute render() stamps');
+  // ⚠ Per-view rules now EXIST on purpose — a different style in a different
+  // place on every page — but they may only set the image and its position.
+  // Anything else re-declared per view is a second definition waiting to drift.
+  const perView = [...LIVE.matchAll(/body\[data-view="[a-z-]+"\]::before\s*{([^}]*)}/g)];
+  assert.ok(perView.length >= 12, 'expected the per-view assignment, found ' + perView.length);
+  perView.forEach(function (m) {
+    const props = m[1].split(';').map((x) => x.split(':')[0].trim()).filter(Boolean);
+    props.forEach(function (prop) {
+      assert.ok(prop === 'background-image' || prop === 'background-position',
+        'a per-view rule may only assign the style and its position, got: ' + prop);
+    });
+  });
+  // No view may declare its own image inline — they all reference a :root style.
+  assert.strictEqual((LIVE.match(/body\[data-view="[a-z-]+"\]::before\s*{[^}]*data:image/g) || []).length, 0,
+    'per-view rules must reference var(--motif-*), not re-embed an SVG');
   // render() is the single dispatch point for every view, so the attribute
   // cannot fall out of step with what is on screen.
   const at = LIVE.indexOf('function render()');

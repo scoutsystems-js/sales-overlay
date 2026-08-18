@@ -102,6 +102,10 @@
       -moz-osx-font-smoothing: grayscale;
     }
 
+    /* ⚠ SUPERSEDED 2026-08-17 by the four-style background graphics below.
+       The two small gutter motifs were replaced, not tuned: Justin ruled a
+       different style in a different location on every page. Archived:
+
     /* (f) 2026-08-17 — BACKGROUND MOTIFS, one view first (coaching overview).
        Justin: "transparent background graphics", direction 2 — abstract
        data-shape motifs. Two shapes drawn from this product's own vocabulary: a
@@ -131,7 +135,7 @@
        ever gains RIGHT-ALIGNED card-less content, re-run the check first.
 
        body[data-view] still REQUIRES the attribute, which render() stamps, so
-       the layer cannot paint over a page that has not rendered yet. */
+       the layer cannot paint over a page that has not rendered yet. * /
     body[data-view]::before {
       content: '';
       position: fixed;
@@ -146,7 +150,66 @@
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520' viewBox='0 0 520 520' fill='none' stroke='%23ededed' stroke-width='16' stroke-linecap='round'%3E%3Cpath d='M260 44 A216 216 0 0 1 476 260'/%3E%3Cpath d='M260 116 A144 144 0 0 0 116 260'/%3E%3Cpath d='M260 188 A72 72 0 0 1 332 260'/%3E%3C/svg%3E");
     }
     /* Below this width the column eats the gutters, so the layer would paint
-       entirely behind opaque cards. Don't render what cannot be seen. */
+       entirely behind opaque cards. Don't render what cannot be seen. * /
+    @media (max-width: 1320px) { body[data-view]::before { display: none; } }
+    /* A decorative layer must not survive a contrast preference. * /
+    @media (prefers-contrast: more) { body[data-view]::before { display: none; } }
+    */
+
+    /* ── BACKGROUND GRAPHICS (2026-08-17, Justin's ruling) ──────────────
+       FOUR STYLES, A DIFFERENT ONE IN A DIFFERENT PLACE ON EVERY PAGE.
+       Justin: "the graph or design doesn't have to actually mean anything,
+       just want it for the design" — so these are STATIC and DECORATIVE.
+       No fetch, no series, nothing behind them. One big Scout-green shape per
+       page, cropped by a screen edge.
+
+         A · plotted series      B · concentric instrument
+         C · radar grid          D · contour field
+
+       ⚠⚠ THE LAYER LIVES ON <html>, NOT <body>, AND THAT IS LOAD-BEARING.
+       A z-index:-1 child paints BEHIND ITS OWN PARENT'S BACKGROUND, so a
+       background on body hides this completely — at EVERY opacity, including 1.
+       It throws nothing; the only symptom is absence, which reads as "too
+       subtle" rather than "broken". background-motifs.test.js fails if a
+       background returns to body. (Learned the hard way, 2026-08-17.)
+
+       ⚠ THE SAFETY IS THE CROP AND THE POSITION, NOT THE OPACITY. One large
+       shape is far likelier to sit behind text than the small gutter motifs
+       this replaces, so every view was RASTERISED and its alpha SAMPLED under
+       the actual glyph boxes at 1600/1440/1300px. Where ink met text the shape
+       was moved or cropped further — faintness is not a safety mechanism. */
+    :root {
+      --motif-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='620' viewBox='0 0 900 620' fill='none'%3E%3Cg stroke='%234ade80' stroke-opacity='.35' stroke-width='1'%3E%3Cpath d='M0 60 H900'/%3E%3Cpath d='M0 160 H900'/%3E%3Cpath d='M0 260 H900'/%3E%3Cpath d='M0 360 H900'/%3E%3Cpath d='M0 460 H900'/%3E%3Cpath d='M0 560 H900'/%3E%3Cpath d='M60 0 V620'/%3E%3Cpath d='M190 0 V620'/%3E%3Cpath d='M320 0 V620'/%3E%3Cpath d='M450 0 V620'/%3E%3Cpath d='M580 0 V620'/%3E%3Cpath d='M710 0 V620'/%3E%3Cpath d='M840 0 V620'/%3E%3C/g%3E%3Cpath d='M40 500 L190 430 L320 470 L450 300 L580 350 L710 170 L880 240' stroke='%234ade80' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='190' cy='430' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='320' cy='470' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='450' cy='300' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='580' cy='350' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3Ccircle cx='710' cy='170' r='17' fill='none' stroke='%234ade80' stroke-width='5'/%3E%3C/svg%3E");
+      --motif-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='760' viewBox='0 0 760 760' fill='none' stroke='%234ade80' stroke-linecap='butt'%3E%3Ccircle cx='380' cy='380' r='352' stroke-width='2' stroke-opacity='.5'/%3E%3Cg stroke-width='26'%3E%3Cpath d='M380 68 A312 312 0 0 1 692 380'/%3E%3Cpath d='M120 528 A300 300 0 0 1 108 380' stroke-opacity='.7'/%3E%3C/g%3E%3Cg stroke-width='18'%3E%3Cpath d='M380 148 A232 232 0 0 1 544 212' stroke-opacity='.8'/%3E%3Cpath d='M216 544 A232 232 0 0 1 168 340'/%3E%3C/g%3E%3Cg stroke-width='12'%3E%3Cpath d='M380 228 A152 152 0 0 1 532 380' stroke-opacity='.75'/%3E%3C/g%3E%3Cg stroke-width='3' stroke-opacity='.85'%3E%3Cpath d='M380.0 50.0 L380.0 80.0'/%3E%3Cpath d='M437.3 55.0 L434.5 70.8'/%3E%3Cpath d='M492.9 69.9 L487.4 84.9'/%3E%3Cpath d='M545.0 94.2 L530.0 120.2'/%3E%3Cpath d='M592.1 127.2 L581.8 139.5'/%3E%3Cpath d='M632.8 167.9 L620.5 178.2'/%3E%3Cpath d='M665.8 215.0 L639.8 230.0'/%3E%3Cpath d='M690.1 267.1 L675.1 272.6'/%3E%3Cpath d='M705.0 322.7 L689.2 325.5'/%3E%3Cpath d='M710.0 380.0 L680.0 380.0'/%3E%3Cpath d='M705.0 437.3 L689.2 434.5'/%3E%3Cpath d='M690.1 492.9 L675.1 487.4'/%3E%3Cpath d='M665.8 545.0 L639.8 530.0'/%3E%3Cpath d='M632.8 592.1 L620.5 581.8'/%3E%3Cpath d='M592.1 632.8 L581.8 620.5'/%3E%3Cpath d='M545.0 665.8 L530.0 639.8'/%3E%3Cpath d='M492.9 690.1 L487.4 675.1'/%3E%3Cpath d='M437.3 705.0 L434.5 689.2'/%3E%3Cpath d='M380.0 710.0 L380.0 680.0'/%3E%3Cpath d='M322.7 705.0 L325.5 689.2'/%3E%3Cpath d='M267.1 690.1 L272.6 675.1'/%3E%3Cpath d='M215.0 665.8 L230.0 639.8'/%3E%3Cpath d='M167.9 632.8 L178.2 620.5'/%3E%3Cpath d='M127.2 592.1 L139.5 581.8'/%3E%3Cpath d='M94.2 545.0 L120.2 530.0'/%3E%3Cpath d='M69.9 492.9 L84.9 487.4'/%3E%3Cpath d='M55.0 437.3 L70.8 434.5'/%3E%3Cpath d='M50.0 380.0 L80.0 380.0'/%3E%3Cpath d='M55.0 322.7 L70.8 325.5'/%3E%3Cpath d='M69.9 267.1 L84.9 272.6'/%3E%3Cpath d='M94.2 215.0 L120.2 230.0'/%3E%3Cpath d='M127.2 167.9 L139.5 178.2'/%3E%3Cpath d='M167.9 127.2 L178.2 139.5'/%3E%3Cpath d='M215.0 94.2 L230.0 120.2'/%3E%3Cpath d='M267.1 69.9 L272.6 84.9'/%3E%3Cpath d='M322.7 55.0 L325.5 70.8'/%3E%3C/g%3E%3C/svg%3E");
+      --motif-c: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='780' height='780' viewBox='0 0 780 780' fill='none'%3E%3Cg stroke='%234ade80' stroke-opacity='.45' stroke-width='2'%3E%3Cpolygon points='390.0,300.0 467.9,345.0 467.9,435.0 390.0,480.0 312.1,435.0 312.1,345.0'/%3E%3Cpolygon points='390.0,210.0 545.9,300.0 545.9,480.0 390.0,570.0 234.1,480.0 234.1,300.0'/%3E%3Cpolygon points='390.0,120.0 623.8,255.0 623.8,525.0 390.0,660.0 156.2,525.0 156.2,255.0'/%3E%3Cpolygon points='390.0,30.0 701.8,210.0 701.8,570.0 390.0,750.0 78.2,570.0 78.2,210.0'/%3E%3Cpath d='M390 390 L390.0 30.0'/%3E%3Cpath d='M390 390 L701.8 210.0'/%3E%3Cpath d='M390 390 L701.8 570.0'/%3E%3Cpath d='M390 390 L390.0 750.0'/%3E%3Cpath d='M390 390 L78.2 570.0'/%3E%3Cpath d='M390 390 L78.2 210.0'/%3E%3C/g%3E%3Cpolygon points='390.0,90.0 576.2,282.5 675.8,555.0 390.0,530.0 164.8,520.0 225.5,295.0' fill='%234ade80' fill-opacity='.22' stroke='%234ade80' stroke-width='6' stroke-linejoin='round'/%3E%3C/svg%3E");
+      --motif-d: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='980' height='560' viewBox='0 0 980 560' fill='none' stroke='%234ade80' stroke-width='5' stroke-linecap='round'%3E%3Cpath stroke-opacity='1.00' d='M-20 70 C 160 -50, 300 136, 470 34 S 800 130, 1000 -14'/%3E%3Cpath stroke-opacity='0.93' d='M-20 124 C 160 13, 300 185.05, 470 90.7 S 800 179.5, 1000 46.30000000000001'/%3E%3Cpath stroke-opacity='0.86' d='M-20 178 C 160 76, 300 234.1, 470 147.4 S 800 229, 1000 106.60000000000001'/%3E%3Cpath stroke-opacity='0.79' d='M-20 232 C 160 139, 300 283.15, 470 204.1 S 800 278.5, 1000 166.9'/%3E%3Cpath stroke-opacity='0.72' d='M-20 286 C 160 202, 300 332.2, 470 260.8 S 800 328, 1000 227.2'/%3E%3Cpath stroke-opacity='0.65' d='M-20 340 C 160 265, 300 381.25, 470 317.5 S 800 377.5, 1000 287.5'/%3E%3Cpath stroke-opacity='0.58' d='M-20 394 C 160 328, 300 430.3, 470 374.2 S 800 427, 1000 347.8'/%3E%3Cpath stroke-opacity='0.51' d='M-20 448 C 160 391, 300 479.35, 470 430.9 S 800 476.5, 1000 408.1'/%3E%3Cpath stroke-opacity='0.44' d='M-20 502 C 160 454, 300 528.4, 470 487.6 S 800 526, 1000 468.4'/%3E%3C/svg%3E");
+    }
+    body[data-view]::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: -1;                 /* ⚠ negative, or it paints OVER static text */
+      pointer-events: none;        /* decoration never intercepts a click */
+      opacity: 0.055;
+      background-repeat: no-repeat;
+    }
+    body[data-view="overview"]::before { background-image: var(--motif-a); background-position: right -200px top -140px; }
+    body[data-view="call-library"]::before { background-image: var(--motif-b); background-position: left -180px bottom -160px; }
+    body[data-view="call-review"]::before { background-image: var(--motif-d); background-position: right -240px center; }
+    body[data-view="eod"]::before { background-image: var(--motif-c); background-position: left -300px top 250px; }
+    body[data-view="team"]::before { background-image: var(--motif-b); background-position: right -200px top -140px; }
+    body[data-view="team-expanded"]::before { background-image: var(--motif-d); background-position: left -180px bottom -160px; }
+    body[data-view="team-needs-work"]::before { background-image: var(--motif-a); background-position: right -240px center; }
+    body[data-view="team-members"]::before { background-image: var(--motif-c); background-position: right -200px top -140px; }
+    body[data-view="kb"]::before { background-image: var(--motif-d); background-position: left -300px top 250px; }
+    body[data-view="account"]::before { background-image: var(--motif-a); background-position: left -180px bottom -160px; }
+    body[data-view="objections-intel"]::before { background-image: var(--motif-c); background-position: right -240px center; }
+    body[data-view="needs-work"]::before { background-image: var(--motif-b); background-position: left -300px top 250px; }
+    body[data-view="performance"]::before { background-image: var(--motif-d); background-position: right -200px top -140px; }
+    body[data-view="section"]::before { background-image: var(--motif-a); background-position: left -300px top 250px; }
+    body[data-view="prospects"]::before { background-image: var(--motif-b); background-position: right -240px center; }
+    /* Below this width the column eats the gutters and the shape would sit
+       almost entirely behind opaque cards. Don't render what cannot be seen. */
     @media (max-width: 1320px) { body[data-view]::before { display: none; } }
     /* A decorative layer must not survive a contrast preference. */
     @media (prefers-contrast: more) { body[data-view]::before { display: none; } }
