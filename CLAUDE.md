@@ -1013,6 +1013,17 @@ delete from prospects     where display_name  like 'Seed %';
 - **THE RULE is the existing one with the scope widened: after changing what a shared carrier CONTAINS, re-derive every other consumer's assumption — and a shared render function is a carrier.** The earlier instances were `state.dateRange` changing meaning and the URL hash gaining a range; the mechanism is identical.
 - **Caught by rendering all four pages and asserting the control is present on each**, which is the layout equivalent of grepping the other readers.
 
+### ⚠⚠ WHERE A VALUE LIVES DETERMINES WHAT CAN CLEAR IT — AND "it lives where everything else does" IS AN INHERITED ASSUMPTION (2026-08-18)
+**Fourth member of the shared-carrier family, and the one that decides whether a fix is complete or merely looks complete.**
+- **The live case:** the manager pivot. Josh reported that clicking "Coaching Dashboard" after opening a rep from a Team card kept showing that rep. Every navigable thing in this app is in the **hash** — views, ranges, drill filters — so the natural assumption was that the pivot is too, and that the fix is one nav handler.
+- **It is in the QUERY STRING** (`?user=<id>`, written with `history.replaceState`, re-read at boot). That single fact changes the shape of the bug: it was sticky in **THREE** ways, not one.
+  1. **nav clicks** change only the hash — the param rides along untouched
+  2. **browser back** changes only the hash — same
+  3. **a refresh** re-reads the param at boot and restores the pivot
+- **⚠ A NAV-HANDLER FIX WOULD HAVE SHIPPED LOOKING COMPLETE while two routes back to stuck remained** — and the one that survives a refresh is the one a user hits by accident tomorrow.
+- **THE RULE: before deciding what should clear a value, find out WHERE IT IS STORED.** Hash, query string, `localStorage`, `sessionStorage`, a cookie, module state — each has a *different* set of actions that survive it, and "what clears X" is a question about the storage, not about the feature.
+- **THE ASSUMPTION IS THE FAILURE, not the storage choice.** The query string is the right home here: a pivoted URL is shareable and survives a refresh deliberately. What cost the time was inheriting "it must be in the hash, because everything else here is" — the same inherited-assumption shape the rest of this family warns about, applied to LOCATION rather than to meaning.
+
 ### ⚠⚠ A SHARED WORD IS A SHARED CARRIER — TWO MODULES NAMED "rank", MEANING OPPOSITE DIRECTIONS (2026-08-17)
 **Both functions were correct. Both were called `rankSections`. They ranked the OTHER WAY ROUND, and nothing errored.**
 - `lib/section-breakdown.js rankSections` → **1 = STRONGEST** (it drove the section drilldown's *"ranked N of 5 sections"*).
