@@ -33,14 +33,17 @@ test('the lockup sits ABOVE the sign-in form, not below it', () => {
 });
 
 test('the wordmark is the full name, big, LIGHT and green', () => {
-  assert.ok(/class="brand-name">SCOUT SYSTEMS</.test(LOGIN),
-    'the wordmark must read SCOUT SYSTEMS');
+  // ⚠ the word is SPLIT around the glyph now: SC<svg/>UT SYSTEMS
+  assert.ok(/class="brand-name">SC</.test(LOGIN) && /UT SYSTEMS</.test(LOGIN),
+    'the wordmark must still read SCOUT SYSTEMS around the O glyph');
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
   assert.ok(css.length > 60 && css.length < 900, 'slice suspicious: ' + css.length);
   // ⚠ THE SIZE IS min(<vw>, <px>) — read the px cap, which is the shipped size
   // on any normal desktop. A naive /font-size:\s*(\d+)px/ would pick up nothing
   // useful, and the earlier clamp() form hid the real size behind its MINIMUM.
-  const size = Number((css.match(/font-size:\s*min\([\d.]+vw,\s*(\d+)px\)/) || [])[1]);
+  // ⚠ the size is now per-face: min(var(--wm-vw), var(--wm-cap)). Read the cap
+  // from :root rather than the rule, since the trial switches both per face.
+  const size = Number((LOGIN.match(/--wm-cap:\s*(\d+)px/) || [])[1]);
   const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
   assert.ok(size >= 28, 'big: ' + size + 'px');
   // ⚠ Justin, 2026-08-18: "BIGGER, NOT BOLD." The previous assertion demanded
@@ -173,18 +176,26 @@ test('the background mark matches the nav logo rather than being redrawn by eye'
 const LOGIN_LIVE = LOGIN.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
   .replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
-test('⚠ the small mark is GONE from the lockup — one logo per screen', () => {
+/**
+ * ⚠⚠ REVERSED 2026-08-18. This asserted the mark was ABSENT from the lockup,
+ * which was right while the mark was only a background. Justin then approved
+ * the mark AS THE "O" IN SCOUT, so an SVG inside the wordmark is now the
+ * intended state. The property worth keeping is that there is exactly ONE mark
+ * in the lockup — it is a letter, not a decoration beside the word.
+ */
+test('⚠ the lockup contains EXACTLY ONE mark, and it is the O', () => {
   const lockup = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="brand-lockup"'),
                                   LOGIN_LIVE.indexOf('class="card-header"'));
-  assert.ok(lockup.length > 20 && lockup.length < 600, 'slice suspicious: ' + lockup.length);
-  assert.ok(!/<svg/.test(lockup),
-    'the background mark plus a small mark above it is the same logo twice');
-  assert.ok(/SCOUT SYSTEMS/.test(lockup), 'the wordmark stays');
+  assert.ok(lockup.length > 200 && lockup.length < 4000, 'slice suspicious: ' + lockup.length);
+  assert.strictEqual((lockup.match(/<svg/g) || []).length, 1, 'exactly one glyph');
+  assert.ok(/class="brand-o"/.test(lockup), 'and it is the O slot');
+  assert.ok(/>SC</.test(lockup) && /UT SYSTEMS</.test(lockup),
+    'the word must still read SCOUT SYSTEMS around the glyph');
 });
 
 test('the wordmark is bigger again, and >= 50% wider than the login box', () => {
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
-  const size = Number((css.match(/font-size:\s*min\([\d.]+vw,\s*(\d+)px\)/) || [])[1]);
+  const size = Number((LOGIN.match(/--wm-cap:\s*(\d+)px/) || [])[1]);
   assert.ok(size >= 100, 'one size larger again (92 -> 104): got ' + size);
   // And at least 50% wider than the 400px login box: 92px x k 8.924 = ~820px.
   assert.ok(size * 9.769 >= 400 * 1.5,
@@ -261,46 +272,35 @@ test('⚠ the background layer follows the motif treatment exactly', () => {
  * availableWidth / k. This asserts the FORMULA holds — that the vw coefficient
  * is small enough for the measured k at the shipped weight and tracking.
  */
-test('⚠⚠ the wordmark size is DERIVED from available width — it cannot wrap at any viewport', () => {
-  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
-  assert.ok(css.length > 200 && css.length < 3000, 'slice suspicious: ' + css.length);
-  assert.ok(/white-space:\s*nowrap/.test(css), 'a wordmark that wraps reads as a mistake');
+/**
+ * ⚠⚠ THE AVAILABLE WIDTH IS THE LOCKUP'S OWN CAP, NOT THE VIEWPORT — and this
+ * is exactly what let Archivo run off the screen once. The box was
+ * min(92vw, 900px), so 900px was the binding number on any desktop, and 104px x
+ * k overflowed it for BOTH faces. A getBoundingClientRect() check could not see
+ * it, because on a block that returns the CLAMPED BOX, not the content.
+ */
+test('⚠⚠ every trial face fits the lockup box — derived per face, not scaled', () => {
+  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('.brand-lockup .brand-name'));
+  assert.ok(/white-space:\s*nowrap/.test(LOGIN), 'the wordmark must never wrap');
+  const boxVw = Number((css.match(/width:\s*min\((\d+)vw/) || [])[1]);
+  const boxPx = Number((css.match(/width:\s*min\(\d+vw,\s*(\d+)px\)/) || [])[1]);
+  assert.ok(boxVw && boxPx, 'the lockup box must be min(<vw>, <px>)');
 
-  const availVw = Number((css.match(/width:\s*min\((\d+)vw/) || [])[1]);
-  const sizeVw = Number((css.match(/font-size:\s*min\(([\d.]+)vw/) || [])[1]);
-  const capPx = Number((css.match(/font-size:\s*min\([\d.]+vw,\s*(\d+)px\)/) || [])[1]);
-  assert.ok(availVw && sizeVw && capPx, 'the size must be min(<vw>, <px>) against a min(<vw>, <px>) lockup');
+  // k per (face, weight, tracking), measured from the FONT FILES — the browser
+  // has twice reported a synthesised face's numbers instead of the real cut.
+  const K = { montserrat: 9.769, archivo: 12.226 };
+  const cap = Number((LOGIN.match(/--wm-cap:\s*(\d+)px/) || [])[1]);
+  const vws = [...LOGIN.matchAll(/--wm-vw:\s*([\d.]+)vw/g)].map((m) => Number(m[1]));
+  assert.strictEqual(vws.length, 2, 'one coefficient per trial face');
 
-  // k for this face at the SHIPPED weight + tracking, measured in a browser.
-  const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
-  const tracking = (css.match(/letter-spacing:\s*([\d.]+em)/) || [])[1];
-  // ⚠ k IS FACE-SPECIFIC — measured per (family, weight, tracking) in a browser.
-  // The value here is the MAX across the faces that can actually render, because
-  // a blocked webfont falls back and the formula must hold either way.
-  //   Montserrat 500 / 0.08em = 9.495   (binds — 6.4% wider than the fallback)
-  //   system     500 / 0.08em = 8.924
-  // ⚠ k IS PER (weight, tracking), MEASURED — and for 700 it must come from the
-  // REAL cut. The browser reported 9.597 for "700" while the bold face had not
-  // loaded, i.e. it measured its own FAUX bold and understated by 0.172. These
-  // are from the Montserrat TTFs directly (sum of advances + tracking x 13):
-  //   Montserrat 500 / 0.08em = 9.583        700 / 0.08em = 9.769
-  const K = { '500|0.08em': 9.583, '700|0.08em': 9.769 };
-  const k = K[weight + '|' + tracking];
-  assert.ok(k,
-    'k is measured per (weight, tracking) — this pairing is ' + weight + '/' + tracking
-    + ' and has no measured k. Re-measure in a browser and re-derive the vw '
-    + 'coefficient before changing either: heavier or wider needs a SMALLER one.');
-
-  assert.ok(sizeVw * k <= availVw,
-    'font-size ' + sizeVw + 'vw x k ' + k + ' = ' + (sizeVw * k).toFixed(1)
-    + 'vw of text, which must fit the ' + availVw + 'vw lockup — otherwise it '
-    + 'wraps at every viewport, not just narrow ones');
-
-  // The px cap must only engage where the vw rule already exceeds it, so the
-  // cap can never be the thing that causes a wrap.
-  const capEngagesAtVw = capPx / (sizeVw / 100);
-  assert.ok(capEngagesAtVw * (availVw / 100) >= capPx * k * 0.99,
-    'the px cap must not exceed what fits at the width where it starts to apply');
+  Object.entries(K).forEach(([face, k], i) => {
+    assert.ok(cap * k <= boxPx,
+      face + ' at the ' + cap + 'px cap is ' + Math.round(cap * k) + 'px wide, '
+      + 'which must fit the ' + boxPx + 'px lockup box');
+    assert.ok(vws[i] * k <= boxVw,
+      face + ' coefficient ' + vws[i] + 'vw x k ' + k + ' = ' + (vws[i] * k).toFixed(1)
+      + 'vw, which must fit the ' + boxVw + 'vw box');
+  });
 });
 
 test('the form paints ABOVE the mark', () => {

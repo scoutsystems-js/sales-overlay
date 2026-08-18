@@ -10,7 +10,7 @@
        block the sign-in form from rendering. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700&family=Montserrat:wght@300;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
     /* Login-specific layout on top of the shared brand stylesheet. */
@@ -108,6 +108,61 @@
        be AT LEAST 50% WIDER than the login box — 400px box, so 600px+ of
        wordmark. It cannot live inside a max-width:400px card and be wider than
        it, so it is pulled to the viewport's own width and re-centred. */
+
+    /* ══ THE LOCKUP — the mark replaces the O in SCOUT (Justin, 2026-08-18) ══
+       ⚠⚠ THESE ARCS ARE DELIBERATELY **NOT** THE BACKGROUND MARK'S. The
+       background mark keeps 180-degree semicircles; this lockup REDRAWS them to
+       a 285-degree sweep (a 75-degree gap at the bottom) so the ring reads as an
+       O rather than as a wifi arc. That is a deliberate design divergence, ruled
+       2026-08-18 — the "byte-identical" rule existed to stop the BACKGROUND mark
+       drifting by accident, never to forbid an approved new lockup.
+
+       ⚠ THE RING'S BOTTOM IS THE BASELINE, which is what makes the whole thing
+       work: at a 285-degree sweep the ring spans 15.244 units and IS the cap
+       height, so the dots keep their mocked positions (1 and 2 inside the ring,
+       3 on the opening) and still descend only 7.4px at a 104px font — against
+       a 21.8px descender. No tightening needed, and ZERO line-height cost.
+
+       ⚠⚠ THE AVAILABLE WIDTH IS THE LOCKUP'S OWN CAP, NOT 92vw — and getting
+       that wrong is what made Archivo run off the screen. The box was
+       min(92vw, 900px), so on any desktop the binding number is 900px, not the
+       viewport. 104px x k = 1016px (Montserrat) and 1272px (Archivo): BOTH
+       overflowed a 900px box, and "one size larger" was impossible inside it.
+       The box is now min(96vw, 1300px) and the coefficients are derived against
+       96vw. ⚠ A no-wrap check that reads getBoundingClientRect() on the BLOCK
+       measures the BOX and returns the clamped width — it cannot see overflow.
+       Check scrollWidth vs clientWidth.
+
+       ⚠ PER-FACE METRICS, MEASURED FROM THE FONT FILES (not the browser, which
+       has twice reported a synthesised face's numbers):
+                              cap      O advance   k@0.08em   max vw
+         Montserrat 700       0.700em  0.844em     9.769      9.42
+         Archivo Expanded 700 0.686em  1.016em    12.226      7.52
+       Archivo is 25.2% WIDER, so it needs a much smaller coefficient. The glyph
+       is sized from --cap-em and --o-adv-em so it re-fits per face rather than
+       being scaled by eye. */
+    .brand-o {
+      display: inline-block;
+      width: calc(1em * var(--o-adv-em));
+      height: calc(1em * var(--cap-em));
+      /* the glyph's baseline sits 91.3% down its viewBox */
+      vertical-align: baseline;
+      margin-bottom: calc(-1em * var(--cap-em) * 0.0873);
+      overflow: visible;
+    }
+    .brand-o svg { width: 100%; height: 100%; overflow: visible; display: block; }
+
+    /* ── the typeface trial (temporary scaffolding, ?font=archivo) ──────────
+       ⚠ Body text stays Montserrat Light either way — Archivo is a display face
+       and only the wordmark changes. The loser comes out once Justin picks. */
+    :root { --wm-family: 'Montserrat'; --wm-vw: 9.8vw; --wm-cap: 104px;
+            --cap-em: 0.700; --o-adv-em: 0.844; }
+    html[data-wm="archivo"] {
+      --wm-family: 'Archivo'; --wm-vw: 7.8vw; --wm-cap: 104px;
+      --cap-em: 0.686; --o-adv-em: 1.016;
+    }
+    html[data-wm="archivo"] .brand-name { font-stretch: expanded; }
+
     /* ⚠⚠ THE LOCKUP IS LOGIN-ONLY, AND THE NAV MARK STAYS — A DECISION, NOT
        AN INCONSISTENCY (Justin, 2026-08-18). The planned "mark replaces the O
        in SCOUT" lockup keeps the WHOLE mark, arcs AND dots. The trailing dot is
@@ -123,7 +178,7 @@
 
     .brand-lockup {
       text-align: center; margin: 0 0 30px;
-      width: min(92vw, 900px);
+      width: min(96vw, 1300px);
       margin-left: 50%; transform: translateX(-50%);
     }
 
@@ -162,7 +217,8 @@
      * coefficient. Test asserts the pairing.
      */
     .brand-lockup .brand-name {
-      font-size: min(9.4vw, 104px);
+      font-size: min(var(--wm-vw), var(--wm-cap));
+      font-family: var(--wm-family), 'Montserrat', -apple-system, sans-serif;
       /* Justin: BIGGER, NOT BOLD. 800 -> 500, and the extra tracking is what
          keeps a lighter weight from reading thin at this size. */
       font-weight: 700; letter-spacing: 0.08em;
@@ -761,6 +817,15 @@
      * throws or never runs, the CSS fallbacks (34vh / 58vh) render a sane mark
      * and the sign-in form is untouched.
      */
+    /* ⚠ TYPEFACE TRIAL SWITCH — ?font=archivo. Temporary scaffolding so Justin
+       can flip between the two live rather than judging from a mock. */
+    (function () {
+      try {
+        var f = new URLSearchParams(location.search).get('font');
+        if (f === 'archivo') document.documentElement.setAttribute('data-wm', 'archivo');
+      } catch (e) {}
+    })();
+
     (function () {
       var GAP = 18;              // breathing room at both ends
       var MIN_H = 140;           // below this the mark is not worth drawing
@@ -845,7 +910,7 @@
          Do not re-add it above the wordmark — the background mark and a small
          mark stacked over it is the same logo twice on one screen. -->
     <div class="brand-lockup">
-      <div class="brand-name">SCOUT SYSTEMS</div>
+      <div class="brand-name">SC<span class="brand-o" aria-hidden="true"><svg viewBox="0.4 2.4 19.2 17.9" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.826 18.744 A8.5 8.5 0 1 1 15.174 18.744" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"/><path d="M6.652 16.363 A5.5 5.5 0 1 1 13.348 16.363" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"/><path d="M8.478 13.983 A2.5 2.5 0 1 1 11.522 13.983" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="12" r="1.6" fill="var(--green)"/><circle cx="10" cy="16" r="1.2" fill="var(--green)"/><circle cx="10" cy="19.5" r="0.8" fill="var(--green)"/></svg></span>UT SYSTEMS</div>
     </div>
 
     <div class="card-header">
