@@ -147,12 +147,80 @@ test('tooltips inherit the SPAN label — no title override strips it', () => {
 });
 
 test('HEADINGS are title case on this view', () => {
-  ['Objection Handling Over Time', 'Closing Rate Over Time', 'What Needs Work',
+  // ⚠ ANCHORS RE-POINTED 2026-08-18 for item (k): "Over Time" was dropped from
+  // both graph titles. The old anchors would have gone on passing as absent-case
+  // checks while the present-case checks failed — which is what caught it here.
+  ['Objection Handling %', 'Closing %', 'What Needs Work',
    'Team Overview', 'Team Recommendations', 'Manager Daily Digest'].forEach((h) => {
     assert.ok(HTML.indexOf('>' + h + '<') !== -1, 'missing title-cased heading: ' + h);
   });
-  ['>Objection handling over time<', '>Closing rate over time<', '>What needs work<',
+  ['>Objection handling %<', '>Closing %<'.toLowerCase(), '>What needs work<',
    '>Team overview<'].forEach((h) => {
     assert.strictEqual(HTML.indexOf(h), -1, 'sentence-case heading still present: ' + h);
   });
+  // The retired names must be gone from the render path entirely, or the page
+  // would carry two names for one graph — the thing (k) exists to remove.
+  const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
+    .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  ['Objection Handling Over Time', 'Closing Rate Over Time'].forEach((h) => {
+    assert.strictEqual(LIVE.indexOf(h), -1, 'the retired graph title is still live: ' + h);
+  });
+});
+
+// ── (k2) the legend toggle ────────────────────────────────────────────────
+test('⚠⚠ the hidden set is keyed by user_id, NEVER by legend index', () => {
+  // The dataset ORDER changes with the window: a rep with no points is dropped
+  // before datasets are built, so index 2 is a different person on a different
+  // range. An index-keyed hidden set hides the WRONG rep after a date change —
+  // silently, and with a perfectly plausible chart.
+  const at = HTML.indexOf('function repSeriesChart');
+  const fn = HTML.slice(at, HTML.indexOf('\n  }', HTML.indexOf('legend:', at)));
+  // Bound generously: the point of this assertion is to catch a BACKWARDS or
+  // truncated slice (which yields '' or a few characters), not to pin the
+  // function's length — a legend block that grows is not a defect.
+  assert.ok(fn.length > 800 && fn.length < 12000, 'slice suspicious: ' + fn.length);
+  assert.ok(fn.indexOf('function repSeriesChart') === 0, 'slice must start at the function');
+  assert.ok(/_userId: toggleable \? r\.user_id : null/.test(fn), 'the dataset must carry user_id');
+  assert.ok(/state\.repLineHidden\[r\.user_id\]/.test(fn), 'restore must look up BY user_id');
+  assert.ok(!/repLineHidden\[i\]|repLineHidden\[datasetIndex\]/.test(HTML),
+    'the hidden set must never be keyed by an index');
+});
+
+test('⚠ THE TEAM AVERAGE NEVER TOGGLES — it is the baseline, not a rep', () => {
+  const at = HTML.indexOf("label: 'Team average'");
+  assert.ok(at > 0, 'the team-average dataset is gone');
+  const ds = HTML.slice(at, at + 900);
+  assert.ok(/_fixed: true/.test(ds), 'the baseline dataset must be marked _fixed');
+  const onClick = HTML.slice(HTML.indexOf('onClick: function (e, item, legend)'), HTML.indexOf('syncRepLineVisibility(canvasId)'));
+  assert.ok(/if \(!ds \|\| ds\._fixed\) return;/.test(onClick),
+    'the legend handler must refuse to toggle the baseline');
+});
+
+test('the toggle is OPT-IN — the single-rep graph does not share the hidden set', () => {
+  assert.ok(/repSeriesChart\('repOwnChart',[^\n]*, false\)/.test(HTML),
+    "the pivoted rep's own graph must pass toggleable=false");
+  assert.ok(/repSeriesChart\('repHandleChart',[^\n]*, true\)/.test(HTML)
+    && /repSeriesChart\('repCloseChart',[^\n]*, true\)/.test(HTML),
+    'both team graphs must pass toggleable=true');
+});
+
+test('⚠ ALL REPS HIDDEN SAYS SO IN WORDS — the chart is not empty, the average remains', () => {
+  const at = HTML.indexOf('function updateRepGraphAllHiddenNotes');
+  const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
+  assert.ok(fn.length > 300 && fn.length < 2000, 'slice suspicious: ' + fn.length);
+  assert.ok(/reps > 0 && visible === 0/.test(fn), 'the all-hidden condition must be explicit');
+  assert.ok(/hidden — click a name in the legend/.test(fn), 'and it must say how to undo it');
+  assert.ok(/dashed line is the team average/.test(fn),
+    'it must explain the line that is still drawn, or the chart looks broken');
+  // The note is a SIBLING of the fixed-height chart box, never a child.
+  assert.ok(/<\/div>'\s*\n\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*\+ '<div class="rep-graph-note"/.test(HTML)
+    || /\+ '<\/div>'[\s\S]{0,600}?\+ '<div class="rep-graph-note"/.test(HTML),
+    'the note must sit outside .rep-graph (a fixed 300px box) or it is clipped');
+});
+
+test('the note is full-strength text — the no-grey rule applies to it too', () => {
+  const m = HTML.match(/\.rep-graph-note \{([^}]*)\}/);
+  assert.ok(m, '.rep-graph-note style not found');
+  assert.ok(/color: var\(--text\)/.test(m[1]), 'must use --text at full strength');
+  assert.ok(!/opacity/.test(m[1]), 'no dimming — it states a fact about the user\'s own action');
 });

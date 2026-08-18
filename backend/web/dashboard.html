@@ -1404,6 +1404,9 @@
     .review-speaker-badge.closer   { background: rgba(var(--accent-rgb), 0.14); color: var(--accent); }
     .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text); }
     .rep-graph { height: 300px; margin-top: 12px; }
+    /* (k2) The all-hidden note. Full-strength text, not a muted hint — it is a
+       statement about the user's own action, and the no-grey rule applies. */
+    .rep-graph-note { display: none; font-size: 13px; font-weight: 600; color: var(--text); margin-top: 10px; }
     /* 10c-2 rep cards. All text full strength — the no-grey rule. */
     .rep-card-list { display: grid; gap: 12px; margin-top: 12px; }
     .rep-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated);
@@ -2820,6 +2823,13 @@
     // ↑ REMOVED 2026-08-18 with the per-rep dials. ↓ its replacement, declared
     // with the SAME `null` sentinel for exactly the reason above.
     teamAverages: null, teamAveragesLoading: false,
+    // (k2) Legend toggle. ⚠ KEYED BY user_id, NEVER by legend index or name —
+    // the dataset ORDER changes whenever the window changes (a rep with no data
+    // in the new range is dropped before the datasets are built), so an
+    // index-keyed hidden set would hide a DIFFERENT rep after a date change,
+    // silently and plausibly. `{}` not null: this is a user preference with a
+    // meaningful empty value, not a lazy-load lane awaiting its first fetch.
+    repLineHidden: {},
     // 12b — the rolling section card. ⚠ null, not undefined: the lazy kick
     // tests === null (see the sentinel rule).
     sectionRank: null, sectionRankLoading: false, sectionRankIndex: 0,
@@ -4864,7 +4874,13 @@
     { key: 'partner', label: 'Partner / spouse' },
   ];
 
-  function repSeriesChart(canvasId, series, pick, yLabel) {
+  // ⚠ TOGGLEABLE IS OPT-IN. The two TEAM graphs get the legend toggle; the
+  // pivoted rep's OWN graph (repOwnChart) does not — it plots exactly one rep,
+  // so "hide this rep" would empty it, and worse, a rep hidden on the team
+  // board would arrive already hidden on their own coaching page. One shared
+  // hidden set across surfaces that mean different things is the
+  // shared-carrier trap in a new costume.
+  function repSeriesChart(canvasId, series, pick, yLabel, toggleable) {
     var ctx = document.getElementById(canvasId);
     if (!ctx || !window.Chart || !series) return;
     if (repCharts[canvasId]) { repCharts[canvasId].destroy(); repCharts[canvasId] = null; }
@@ -4880,6 +4896,12 @@
         label: r.name,
         data: pts.map(function (p) { return p.rate; }),
         _raw: pts,
+        // (k2) The toggle's identity. Carried on the dataset so the legend
+        // handler never has to map a click position back to a rep.
+        _userId: toggleable ? r.user_id : null,
+        // Restored from state, so a selection survives every rebuild of this
+        // chart — metric switch, category switch, date change, nav away and back.
+        hidden: !!(toggleable && state.repLineHidden && state.repLineHidden[r.user_id]),
         borderColor: REP_LINE_COLORS[i % REP_LINE_COLORS.length],
         backgroundColor: REP_LINE_COLORS[i % REP_LINE_COLORS.length],
         borderWidth: 2, pointRadius: 3, tension: 0.25, spanGaps: false,
@@ -4892,6 +4914,12 @@
         label: 'Team average',
         data: teamPts.map(function (p) { return p.rate; }),
         _raw: teamPts,
+        // ⚠ THE BASELINE NEVER TOGGLES (Justin's ruling). It is what the reps are
+        // being read AGAINST, not one of the things being compared — hiding it
+        // would leave the remaining lines with nothing to mean anything against.
+        // Enforced in the legend handler AND marked here, so the reason travels
+        // with the dataset rather than living only in the click code.
+        _fixed: true,
         borderColor: '#ffffff', backgroundColor: '#ffffff',
         borderWidth: 3, borderDash: [6, 4], pointRadius: 0, tension: 0.25, spanGaps: false,
       });
@@ -4913,7 +4941,43 @@
           x: { ticks: { color: '#ededed' }, grid: { color: 'rgba(255,255,255,0.05)' } },
         },
         plugins: {
-          legend: { labels: { color: '#ededed', usePointStyle: true, boxWidth: 10 } },
+          /**
+           * (k2) THE LEGEND IS A TOGGLE — click a rep's name to show or hide
+           * that line (Justin: "so he can look at only the reps he cares about").
+           *
+           * ⚠ HIDDEN REPS STAY IN THE LEGEND, STRUCK THROUGH. Chart.js's default
+           * generateLabels already does this and it is why the default is kept
+           * rather than replaced: a rep who DISAPPEARS from the legend reads as
+           * missing data, and this project has spent several blocks making sure
+           * absent and excluded never look alike. Struck-through says "you did
+           * this, and here is how to undo it".
+           *
+           * ⚠ THE HANDLER WRITES TO state FIRST, then the chart. Chart.js's own
+           * default onClick mutates only the chart instance, which is destroyed
+           * on every rebuild — so the default alone would lose the selection on
+           * the next date change and look like a bug in the toggle.
+           */
+          legend: {
+            labels: { color: '#ededed', usePointStyle: true, boxWidth: 10 },
+            onClick: function (e, item, legend) {
+              var ds = legend.chart.data.datasets[item.datasetIndex];
+              if (!ds || ds._fixed) return;          // the baseline is not a rep
+              if (!ds._userId) return;
+              if (!state.repLineHidden) state.repLineHidden = {};
+              var nowHidden = !legend.chart.isDatasetVisible(item.datasetIndex);
+              // Toggle: currently hidden → show (delete the key, so an untouched
+              // rep and a re-shown rep are the same state rather than two).
+              if (nowHidden) delete state.repLineHidden[ds._userId];
+              else state.repLineHidden[ds._userId] = true;
+              legend.chart.setDatasetVisibility(item.datasetIndex, nowHidden);
+              legend.chart.update();
+              // Both charts read one selection, so hiding a rep on one hides
+              // them on the other — otherwise the two graphs on this page would
+              // be showing different sets of people under one legend gesture.
+              syncRepLineVisibility(canvasId);
+              updateRepGraphAllHiddenNotes();
+            },
+          },
           tooltip: {
             callbacks: {
               // House rule: a rate never renders without its raw counts.
@@ -4943,7 +5007,78 @@
     return '<div class="rep-graph">'
       + (loading ? '<div class="rep-graph-skeleton skeleton"></div>' : '')
       + '<canvas id="' + canvasId + '"' + (loading ? ' style="display:none;"' : '') + '></canvas>'
-      + '</div>';
+      + '</div>'
+      // (k2) The all-hidden note. ⚠ A SIBLING of .rep-graph, not a child —
+      // .rep-graph is a FIXED 300px box that Chart.js sizes its canvas against,
+      // so a child would be clipped or would fight the canvas for the space.
+      // Rendered empty and filled by updateRepGraphAllHiddenNotes, because it
+      // changes on a legend click with no re-render of the surrounding markup.
+      + '<div class="rep-graph-note" id="' + canvasId + 'Note"></div>';
+  }
+
+  /**
+   * (k2) One selection, both charts. A legend click on either graph hides that
+   * rep on both — the two graphs sit under one heading block and show the same
+   * people, so letting them diverge would make the legend mean different things
+   * a few hundred pixels apart.
+   */
+  // ⚠ Iterates the TEAM chart ids explicitly rather than every key in repCharts.
+  // repCharts keeps an entry per canvas id and only destroys the one being
+  // rebuilt, so after navigating away from a view its chart object is still in
+  // the map with a canvas no longer in the document. Touching it would throw or,
+  // worse, silently succeed against a detached node.
+  var REP_TOGGLE_CHARTS = ['repHandleChart', 'repCloseChart'];
+  function eachLiveToggleChart(fn) {
+    REP_TOGGLE_CHARTS.forEach(function (id) {
+      var ch = repCharts[id];
+      if (!ch || !ch.canvas || !ch.canvas.isConnected) return;
+      fn(ch, id);
+    });
+  }
+
+  function syncRepLineVisibility(exceptCanvasId) {
+    eachLiveToggleChart(function (ch, id) {
+      if (id === exceptCanvasId) return;
+      var changed = false;
+      ch.data.datasets.forEach(function (ds, i) {
+        if (ds._fixed || !ds._userId) return;
+        var shouldHide = !!state.repLineHidden[ds._userId];
+        if (ch.isDatasetVisible(i) === shouldHide) { ch.setDatasetVisibility(i, !shouldHide); changed = true; }
+      });
+      if (changed) ch.update();
+    });
+  }
+
+  /**
+   * ⚠ IF EVERY REP IS TOGGLED OFF, SAY SO IN WORDS (Justin's ruling). The chart
+   * is NOT empty in that state — the team average is still drawn, because it
+   * never toggles — so a manager sees one white dashed line and no explanation.
+   * "You have hidden every rep" is a fact about their own action; silence would
+   * read as missing data, which is the failure this project keeps designing
+   * against.
+   */
+  function updateRepGraphAllHiddenNotes() {
+    eachLiveToggleChart(function (ch, id) {
+      var el = document.getElementById(id + 'Note');
+      if (!el) return;
+      // Count over the dataset INDEX, because visibility is asked for by index —
+      // filtering to a sub-array first and then looking each one back up is how
+      // an off-by-one gets in.
+      var reps = 0, visible = 0;
+      ch.data.datasets.forEach(function (ds, i) {
+        if (ds._fixed || !ds._userId) return;
+        reps++;
+        if (ch.isDatasetVisible(i)) visible++;
+      });
+      if (reps > 0 && visible === 0) {
+        el.textContent = 'All ' + reps + ' rep' + (reps === 1 ? '' : 's')
+          + ' hidden — click a name in the legend to bring one back. The dashed line is the team average.';
+        el.style.display = '';
+      } else {
+        el.textContent = '';
+        el.style.display = 'none';
+      }
+    });
   }
 
   // ══ 10e: the pivoted rep's own objection graph ═══════════════════════════
@@ -4995,7 +5130,7 @@
           ? '<div class="rep-graph"><canvas id="repOwnChart"></canvas></div>'
           : '<div class="empty"><p>No objection data for this rep in the selected range.</p></div>');
     return '<div class="section fade-in">'
-      + '<div class="section-header"><h2>Objection Handling Over Time</h2>'
+      + '<div class="section-header"><h2>Objection Handling %</h2>'
         + '<div class="meta">this rep, against the team average</div></div>'
       + body + '</div>';
   }
@@ -5003,7 +5138,7 @@
     if (!repOwnGraphVisible()) return;
     var series = repOwnSeries();
     if (!series) return;
-    repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle Rate');
+    repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle Rate', false);
   }
 
   function repSeriesSectionHtml() {
@@ -5012,10 +5147,10 @@
       return '<option value="' + o.key + '"' + sel + '>' + escapeHtml(o.label) + '</option>';
     }).join('');
     return '<div class="section fade-in">'
-      + '<div class="rep-graph-head"><h2>Objection Handling Over Time</h2>'
+      + '<div class="rep-graph-head"><h2>Objection Handling %</h2>'
         + '<select class="rep-graph-select" onchange="setTeamObjectionCategory(this.value)">' + opts + '</select></div>'
       + repGraphBodyHtml('repHandleChart')
-      + '<h2 style="margin-top:26px;">Closing Rate Over Time</h2>'
+      + '<h2 style="margin-top:26px;">Closing %</h2>'
       + repGraphBodyHtml('repCloseChart')
     + '</div>';
   }
@@ -5101,8 +5236,11 @@
   // state that repSeriesSectionHtml already rendered.
   function drawRepSeriesCharts() {
     if (!state.teamRepSeries || state.teamRepSeries._error) return;
-    repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate');
-    repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate');
+    repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate', true);
+    repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate', true);
+    // (k2) A restored selection can already be all-hidden on first paint, so the
+    // note has to be evaluated after a REBUILD, not only after a click.
+    updateRepGraphAllHiddenNotes();
   }
 
   // The dedicated (hidden, no-nav-tab) expanded page: full recommendations +
