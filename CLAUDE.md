@@ -1426,6 +1426,17 @@ assert.ok(fn.length > 200 && fn.length < 4000, 'slice must cover the function: '
 
 **What makes this class expensive:** both were invisible. No exception, no failed test, no log line — the carrier still parsed, the readers still ran, and the output was merely *wrong*. **The edit that causes it and the code that breaks are in different files, so review of the diff cannot find it.**
 
+### ⚠⚠ A COMMENT THAT ASSERTS AN ORDERING THE CODE DOES NOT ENFORCE IS WORSE THAN NO COMMENT — AND THIS ONE WAS FALSE WHEN WRITTEN (2026-08-18)
+**Same family as the stale load-bearing comment below, with a twist that makes it worse: that one was TRUE when written and invalidated later, by a change in another file. This one was FALSE IN THE SAME COMMIT.**
+- **The live case:** `ensureEodPicker()` was placed just above `content.innerHTML` with the comment *"Registered BEFORE the markup is built — datePickerHtml reads the registration…"*. **It was not.** The `toolbar` string — which calls `datePickerHtml('eod')` — is assembled earlier in the same function. The calendar therefore rendered **"Pick dates"**, the RANGE placeholder, on a single-date control.
+- **⚠ THE COMMENT IS WHAT MAKES IT DANGEROUS, NOT THE BUG.** A reader who checks the ordering finds the answer already written and stops looking. **It stopped me** — I wrote the claim and then read it back as verification. **A comment describing a property the reader would otherwise verify is an invitation not to verify it.**
+- **THE RULE: where an ordering matters, ESTABLISH it — do not describe it.** Three ways, in preference order:
+  1. **Structure** — put the call where the ordering is forced (top of the function, before anything that consumes it), so there is no ordering to get wrong.
+  2. **An assertion** — fail loudly if the precondition is not met.
+  3. **A test** that exercises the real path, which is what caught this one.
+  A comment may then explain *why* the ordering matters. It must never be the only thing asserting *that* it holds.
+- **Generalises past ordering to any comment stating a property of the code around it** — "this is always non-null", "callers guarantee X", "this runs after Y". If the property is worth stating, it is worth enforcing; if it is not enforceable, say **"assumed"** rather than stating it as fact.
+
 ### 👁 OBSERVATION, NOT YET A RULE — "STALE LOAD-BEARING COMMENT" (1 instance, 2026-08-16)
 **Logged so a SECOND instance can be recognised as a second instance.** One occurrence is not a pattern and this must not be treated as one — but the shape is specific enough to name now.
 
