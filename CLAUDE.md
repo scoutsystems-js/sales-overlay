@@ -1208,7 +1208,20 @@ Same shape for closing: gauge **Closing Rate** · graph **Closing %** · list **
 - **`objection-synthesis` needed the split INSIDE A SINGLE LOOP**: it counts with the shared predicate and selects its "handled examples" on the moment's own resolution, because an example is evidence of good handling shown to a closer. A credited-but-unhandled moment held up as the model to copy is exactly backwards.
 - **THE RULE: enforce per CALL SITE.** `test/handled-carrier.test.js` counts hand-rolled `resolution === 'handled'` comparisons per file against an explicit allowance, with the reason for each allowance written beside it. A file-level allowlist would have said "team-synthesis is exempt" and stopped noticing its rate lane entirely.
 
-### ⏳⏳ OPEN DEBT — TWO BROWSER CHECKS OWED ON `8bd06ec` (logged 2026-08-18)
+### ⏳⏳ OPEN DEBT — **FIVE UNCONFIRMED RENDERS ON THE LOGIN PAGE** (logged 2026-08-18, growing)
+**⚠⚠ THE COUNT IS THE POINT. Justin's eyes have caught every real defect on this page — the wrapped wordmark, the mark filling three quarters of its box, the faux-bold — and FIVE CHANGES DEEP IS WHERE THAT STOPS BEING RELIABLE.** One unconfirmed render is a bounded risk; five stacked on top of each other means a defect in change two is now hiding behind changes three, four and five, and whoever looks will see a compound result they cannot attribute.
+**The extension has been down across THREE consecutive blocks.** If it is still down when a block starts, **say so at the TOP of the report** rather than letting the count grow quietly at the bottom.
+```
+UNCONFIRMED, in order shipped:
+  1  Montserrat feel test (two weights, faux-bold eliminated)
+  2  mark box derived from title -> viewport bottom
+  3  ink fitted (viewBox cropped to ink bounds)
+  4  overlay wordmark nowrap + sized from widest tracking   ✅ CONFIRMED by Justin looking
+  5  mark's first ring raised to the top of the page
+```
+**Only #4 has been seen.** The wrap fix is confirmed; the other four are code-verified and render-unverified.
+
+### ⏳⏳ THE TWO BROWSER CHECKS OWED ON `8bd06ec` (logged 2026-08-18)
 **⚠ AN UNVERIFIED PUSH IS A DEBT, AND THE WAY IT GOES BAD IS NOBODY REMEMBERING IT WAS ONE. This entry exists so the push cannot be mistaken for closing it.**
 - **✅ CHECK 1 IS DISCHARGED BY THE ONLY THING THAT COULD DISCHARGE IT — JUSTIN LOOKED (2026-08-18). The animation glitch is GONE; the words stay side by side throughout.** The wrap fix is confirmed. **⚠ THE SCRUB IS NARROWED, NOT CANCELLED:** it no longer needs to answer *"did the reflow stop"* — only whether anything ELSE in the sequence misbehaves mid-flight.
 - **❌ CHECK 2, THE INK SWEEP, IS STILL FULLY OUTSTANDING** — and the mark has since been raised so its first ring touches the top of the page, which puts the wordmark ON the artwork. See the analytic result below before assuming that changes the answer.
@@ -1366,6 +1379,22 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **⚠ AND SAY SO WHEN THE EARLIER REPORT WAS WRONG.** The previous findings said "it's too faint, here are three levers"; the correct follow-up is *"that was partly a misdiagnosis — a meaningful share of the faintness was the composition defect, not the values."* A trade offered in good faith that turns out to be the wrong trade has to be **withdrawn explicitly**, or the architect spends a decision on a false choice.
 - **Same family as tuning the wrong variable** (*prove it is drawing before tuning any visual property*) and *the fix and the cover-up look identical from outside* — this is that shape at the point of RECOMMENDATION rather than of diagnosis. **When about to offer a knob, ask first whether anything upstream of it is broken.**
 
+### ⚠⚠ TEXT MOVED ONTO THE ARTWORK AND THE CONTRAST NUMBER DID NOT MOVE — BECAUSE THEY SHARE A COLOUR (2026-08-18)
+**⚠ THE REASON IS WRITTEN DOWN BECAUSE WITHOUT IT THIS READS AS A MISSED CHECK.** "We put text on the densest part of the mark and the derived opacity came back identical for the fourth time" is exactly what a skipped re-derivation looks like. It was not skipped; the answer is genuinely unchanged, and it is provable rather than measured.
+- **The live case:** the login mark was raised so its first ring touches the top of the page, which puts the WORDMARK on the busiest part of the artwork. The expectation — mine and the architect's — was that the wordmark would become the worst-exposed element for the first time and force a real trade between readability and presence.
+- **IT CANNOT, AND THE REASON IS THAT THE WORDMARK IS `var(--green)` — THE SAME COLOUR AS THE MARK.** As the mark's opacity rises, the backdrop under that text moves TOWARD the text's own colour, so contrast falls; but it starts from a very high base and falls slowly, while `--muted` text (a mid-grey) starts far lower. Computed from the two known colours, no sampling required:
+```
+opacity   wordmark   muted    body     binding
+0.20        7.58      4.70    12.24    muted
+0.30        5.78      3.58     9.33    muted
+0.50        3.28      2.03     5.29    muted
+the wordmark overtakes muted only above opacity 0.885 — far outside the 0.16-0.30 band
+muted itself falls below 4.5:1 above 0.219, which is why the answer is 0.21
+```
+- **THE GENERAL RESULT, and it is the transferable part: TEXT SITTING ON ARTWORK OF ITS OWN COLOUR IS NOT AUTOMATICALLY THE WORST-EXPOSED ELEMENT.** Sharing a hue means the backdrop converges on the text rather than contrasting against it — the contrast is high at low opacity and degrades gently. **A mid-grey on the same artwork is far worse off at every usable opacity.** The intuition "the text over the densest part must be the binding case" is about POSITION; the binding case is about COLOUR DISTANCE.
+- **⚠ SO A LAYOUT CHANGE THAT PUTS TEXT ON ARTWORK DOES NOT NECESSARILY REQUIRE A NEW OPACITY** — but you only know that by computing the colour pair, not by assuming either way. **The cheap move is to compute the candidate against the incumbent before running any sweep**; here it collapsed the remaining question from "re-derive everything" to "does the mark still cross any muted text at all".
+- Same family as *turn the aesthetic complaint into a measurement*: the question sounded like it needed a sweep and turned out to need arithmetic.
+
 ### ⚠ A CONSTANT DERIVED FROM A TARGET MUST BE RE-DERIVED ON EVERY SCALE CHANGE — THE CONSTRAINT IS THE TARGET, NOT THE VALUE THAT SATISFIED IT LAST TIME (2026-08-18)
 **Recorded because the same constant has now moved THREE times, correctly, and each time keeping it would have looked like stability.**
 - **The live case:** the mark's `stroke-width` is expressed in viewBox units, so it scales with the artwork. The target never changed — **the product's own line work: section borders 1px, gauge ticks 1.4, chart lines 2-3.** The value satisfying it did, every single time the box moved:
@@ -1376,8 +1405,13 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 0.18   at the derived box -> 3.7-7.3px
 0.075  at that box    -> 1.5-3.0px  correct then
 0.075  after the viewBox crop -> 2.0-4.0px   (one unit grew 1.31x)
-0.055  after the crop -> 1.5-2.9px  correct now
+0.055  after the crop -> 1.5-2.9px  correct then
+0.055  after the top was raised -> 2.3-5.2px   (the box grew again)
+0.032  after the raise -> 1.3-3.0px  correct now
 ```
+- **⚠⚠ FOURTH INSTANCE, AND THE DIAGNOSIS IS THE FIX: IT IS IN viewBox UNITS, SO IT IS A FUNCTION OF THE BOX, NOT A CONSTANT.** Every one of those moves was the same event — the box changed and the value that expressed the target had to change with it. Treating it as a number to carry forward is what made it wrong four times.
+- **THE RULE, stated for anything of this shape: A VALUE EXPRESSED IN UNITS THAT SCALE WITH WHAT IT DECORATES BELONGS BESIDE THE SIZE AS ONE SETTING — never stored as a number someone can carry forward.** viewBox stroke widths, `em` paddings inside a scaled component, percentage insets, anything in `vmin`. If the two can be edited independently, they eventually will be, and the failure is silent because the value still *looks* deliberate.
+- **The practical test: can you change the size without being forced to look at this value?** If yes, they are not yet one setting — put the target and the derivation in the same comment so the next edit cannot miss it.
 - **⚠ THE TELL IS THE UNIT, NOT THE NUMBER: any value expressed in units that scale with the thing it decorates is NOT a constant — it is a function of the size**, and it belongs beside the size as one setting. Stroke widths in a viewBox, `em` paddings, percentage offsets, anything in `vmin`.
 - **Keeping the number through a scale change is the failure that looks like discipline.** It reads as "not fiddling with values", and it silently violates the constraint the value existed to satisfy.
 - **Write the TARGET in the comment, not just the value** — the code now records the 1-3px band and the measured unit range, so the next person re-derives instead of guessing whether the number is sacred.
