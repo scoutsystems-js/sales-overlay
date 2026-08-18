@@ -159,7 +159,8 @@ function buildSectionBreakdown(section, input) {
       prospect_name: m.prospect_name || null,
       // Null rather than a half-built href when there is no recording.
       clip_url: (rec && ts !== null) ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null,
-      saved_to_kb: false, // set by the route from knowledge_base.source_quote_hash
+      /* saved_to_kb: false, */ // REMOVED 2026-08-18 — the route stopped filling
+      // it and no surface renders it, since the Add-to-KB buttons are gone
       // 6a/6d: true = speaker proven from the transcript, false = assessed but
       // not provable (model's guess), null = never assessed. Carried through so
       // the closer view can require proof; the good/bad groups ignore it.
@@ -252,7 +253,7 @@ function buildSectionBreakdown(section, input) {
       call_date: m.call_date || null,
       prospect_name: m.prospect_name || null,
       clip_url: (rec && ts !== null) ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null,
-      saved_to_kb: false,
+      /* saved_to_kb: false, */ // REMOVED 2026-08-18 — see above
       // EXACT context, not a nearest-preceding guess: the objection this reply
       // answers is on the same row.
       context: { quote: h.quote || null, speaker: 'PROSPECT', timestamp_seconds: ts, verified: (typeof h.speaker_verified === 'boolean') ? h.speaker_verified : null },

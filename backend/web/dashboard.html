@@ -2186,9 +2186,10 @@
     .sec-clip.disabled { color: var(--text); }
     .sec-who { font-size: 13px; font-weight: 600; }
     .sec-when { font-size: 12px; color: var(--text); }
+    /* REMOVED 2026-08-18 with the Add-to-KB buttons (see addSectionMomentToKb).
     .sec-saved { margin-left: auto; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 1px 6px; }
     .sec-kb-btn { margin-left: auto; font-size: 12px; font-family: inherit; background: none; border: 1px solid var(--border-strong); color: var(--text); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
-    .sec-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+    .sec-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); } */
     .sec-quote { font-size: 14px; }
     .sec-obs { font-size: 13px; color: var(--text); margin-top: 3px; }
     /* 6d — the rep's own proven moments. The accent marks "this is you", so it
@@ -2251,8 +2252,9 @@
     }
     .kb-promote-btn.is-team:hover { color: var(--text); border-color: var(--border-strong); background: none; }
     .kb-promote-btn:disabled { opacity: 0.5; cursor: wait; }
-    /* Add-to-KB on a section-breakdown moment row (Part 2b). Sits with the
-       speaker/type badges, pushed right so it never crowds the quote. */
+    /* REMOVED 2026-08-18 with the Add-to-KB buttons (see addSectionMomentToKb).
+       Add-to-KB on a section-breakdown moment row (Part 2b). Sits with the
+       speaker/type badges, pushed right so it never crowds the quote.
     .review-kb-btn {
       margin-left: auto;
       flex-shrink: 0;
@@ -2269,7 +2271,7 @@
     }
     .review-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
     .review-kb-btn.is-saved { color: var(--accent); border-color: var(--accent); opacity: 1; cursor: default; }
-    .review-kb-btn:disabled:not(.is-saved) { opacity: 0.5; cursor: wait; }
+    .review-kb-btn:disabled:not(.is-saved) { opacity: 0.5; cursor: wait; } */
     .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
     .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
 
@@ -2747,7 +2749,7 @@
     callReviewLoading:  false, // gates retry click while a fetch is in flight
     callReviewError:    null,  // last fetch error message; cleared on successful re-fetch
     expandedGradeCards: {},    // map of section key ('intro'|'discovery'|...) → true when expanded
-    savedMomentIds: {},        // Part 2b: highlight id → true when already in the caller's KB
+    /* savedMomentIds: {}, */  // REMOVED 2026-08-18 with the Add-to-KB buttons
     selectedSection: null,     // 4a: which section the drilldown is showing
     sectionExpanded: {},       // which moment groups are expanded past the first 5
     sectionData: null,
@@ -7231,22 +7233,23 @@
     if (state.view === 'section') renderSectionView();
   }
 
-  function sectionMomentHtml(m, canSave) {
+  function sectionMomentHtml(m) {
     var when = m.call_date ? formatDate(m.call_date) : '';
     var who = m.prospect_name ? escapeHtml(m.prospect_name) : 'Unknown prospect';
     var time = (m.clip_url && typeof m.timestamp_seconds === 'number')
       ? '<a class="sec-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">' + escapeHtml(formatTimestampDisplay(m.timestamp_seconds)) + '</a>'
       : '<span class="sec-clip disabled">—</span>';
-    // 4b: harvested moments carry a "saved" badge; unsaved rows get the
-    // Add-to-KB button, reusing POST /kb/from-highlight unchanged (it takes ids
-    // and re-reads the row server-side).
-    var kb = m.saved_to_kb
+    // REMOVED 2026-08-18 — the manual Add-to-KB control. Auto-harvest already
+    // files the good moments (313 auto vs 0 manual over two weeks), so the button
+    // was doing nothing a closer relied on. See addSectionMomentToKb below for the
+    // full archive and the manager→team consequence.
+    /* var kb = m.saved_to_kb
       ? '<span class="sec-saved">saved</span>'
       : (canSave && m.highlight_id
           ? '<button class="sec-kb-btn" data-hid="' + escapeHtml(String(m.highlight_id)) + '" data-cid="' + escapeHtml(String(m.fathom_call_id)) + '" onclick="addSectionMomentToKb(this)">+ Save</button>'
-          : '');
+          : ''); */
     return '<div class="sec-moment">'
-      + '<div class="sec-moment-top">' + time + '<span class="sec-who">' + who + '</span><span class="sec-when">' + escapeHtml(when) + '</span>' + kb + '</div>'
+      + '<div class="sec-moment-top">' + time + '<span class="sec-who">' + who + '</span><span class="sec-when">' + escapeHtml(when) + '</span>' + '</div>'
       + '<div class="sec-quote">' + escapeHtml(m.quote || '') + '</div>'
       + (m.observation ? '<div class="sec-obs">' + escapeHtml(m.observation) + '</div>' : '')
     + '</div>';
@@ -7298,24 +7301,25 @@
   // prospect's preceding line beneath it as context. Only PROVEN moments reach
   // here (the server filters on speaker_verified), so this is the one surface
   // that may say "you" about a quote.
-  function closerMomentHtml(m, canSave) {
+  function closerMomentHtml(m) {
     var when = m.call_date ? formatDate(m.call_date) : '';
     var who = m.prospect_name ? escapeHtml(m.prospect_name) : 'Unknown prospect';
     var time = (m.clip_url && typeof m.timestamp_seconds === 'number')
       ? '<a class="sec-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">' + escapeHtml(formatTimestampDisplay(m.timestamp_seconds)) + '</a>'
       : '<span class="sec-clip disabled">—</span>';
-    var kb = m.saved_to_kb
+    // REMOVED 2026-08-18 — the manual Add-to-KB control (see sectionMomentHtml).
+    /* var kb = m.saved_to_kb
       ? '<span class="sec-saved">saved</span>'
       : (canSave && m.highlight_id
           ? '<button class="sec-kb-btn" data-hid="' + escapeHtml(String(m.highlight_id)) + '" data-cid="' + escapeHtml(String(m.fathom_call_id)) + '" onclick="addSectionMomentToKb(this)">+ Save</button>'
-          : '');
+          : ''); */
     // Context is explicitly attributed to the prospect and never to the rep.
     var ctx = (m.context && m.context.quote)
       ? '<div class="sec-ctx"><span class="sec-ctx-label">' + who + ' had just said</span>'
         + '<span class="sec-ctx-q">' + escapeHtml(m.context.quote) + '</span></div>'
       : '';
     return '<div class="sec-moment sec-moment-closer">'
-      + '<div class="sec-moment-top">' + time + '<span class="sec-who">' + who + '</span><span class="sec-when">' + escapeHtml(when) + '</span>' + kb + '</div>'
+      + '<div class="sec-moment-top">' + time + '<span class="sec-who">' + who + '</span><span class="sec-when">' + escapeHtml(when) + '</span>' + '</div>'
       + '<div class="sec-quote sec-quote-you"><span class="sec-you-label">You said</span>' + escapeHtml(m.quote || '') + '</div>'
       + ctx
       + (m.observation ? '<div class="sec-obs">' + escapeHtml(m.observation) + '</div>' : '')
@@ -7337,7 +7341,12 @@
   }
 
   var SECTION_MOMENTS_SHOWN = 5;
-  function sectionGroupHtml(key, title, moments, canSave, renderer) {
+  // ⚠ ARITY CHANGED 2026-08-18 — the `canSave` parameter went with the Add-to-KB
+  // button. It sat BETWEEN moments and renderer, so a stale 5-arg call site would
+  // pass the renderer into a slot that no longer exists and silently fall back to
+  // sectionMomentHtml — losing the 6d "You said" framing with no error. Both call
+  // sites below were updated together.
+  function sectionGroupHtml(key, title, moments, renderer) {
     var renderMoment = renderer || sectionMomentHtml;
     var expanded = !!(state.sectionExpanded && state.sectionExpanded[key]);
     var shown = expanded ? moments : moments.slice(0, SECTION_MOMENTS_SHOWN);
@@ -7349,7 +7358,7 @@
       more = '<button class="sec-more" onclick="expandSectionGroup(\'' + key + '\')">Show Fewer</button>';
     }
     return '<div class="sec-group"><h2>' + escapeHtml(title) + ' <span class="sec-count">' + moments.length + '</span></h2>'
-      + shown.map(function (m) { return renderMoment(m, canSave); }).join('') + more + '</div>';
+      + shown.map(function (m) { return renderMoment(m); }).join('') + more + '</div>';
   }
   function expandSectionGroup(key) {
     if (!state.sectionExpanded) state.sectionExpanded = {};
@@ -7397,7 +7406,10 @@
       + (d.bad_outnumber_good ? ' · <strong class="sec-warn">more went wrong than right in this section</strong>' : '')
     + '</div>';
 
-    var canSave = !state.viewingUserId; // saving into someone else's KB is not this screen's job
+    // REMOVED 2026-08-18 with the Add-to-KB button. Kept as a record of the
+    // defect it carried: viewingUserId is never null after boot, so canSave was
+    // always FALSE and this screen's button never rendered for anyone.
+    /* var canSave = !state.viewingUserId; // saving into someone else's KB is not this screen's job */
     // Show 5, hide the rest behind an expander. 48 good discovery moments as a
     // single wall is unreadable; the first few are the point and the rest are
     // there when wanted.
@@ -7407,7 +7419,7 @@
     var closer = d.closer_moments || [];
     var groups = '';
     if (closer.length) {
-      groups += sectionGroupHtml('good', 'What worked', closer, canSave, closerMomentHtml);
+      groups += sectionGroupHtml('good', 'What worked', closer, closerMomentHtml);
       groups += closerHiddenNoteHtml(d.closer_counts);
     } else if (d.good.length) {
       // Moments exist, but none are provably the rep's. Say that, rather than
@@ -7417,7 +7429,7 @@
         + 'so none are shown here as yours.</p></div>'
         + closerHiddenNoteHtml(d.closer_counts);
     }
-    if (d.bad.length)  groups += sectionGroupHtml('bad', 'What to fix', d.bad, canSave);
+    if (d.bad.length)  groups += sectionGroupHtml('bad', 'What to fix', d.bad);
     if (!d.good.length && !d.bad.length) {
       groups = '<div class="empty-card"><h2>No tagged moments for ' + escapeHtml(label) + ' in this range</h2>'
         + '<p>Section moments come from calls analysed recently. Widen the date range or analyse more calls.</p></div>';
@@ -7437,22 +7449,61 @@
       + sectionHistogramHtml(d.histogram || [], d.uses_earned_close_score, d.average, label, d.min_score, d.max_score) + groups + examples;
   }
 
-  async function addSectionMomentToKb(btn) {
-    var hid = btn.getAttribute('data-hid'), cid = btn.getAttribute('data-cid');
-    if (!hid || !cid) return;
-    btn.disabled = true; btn.textContent = 'Saving…';
-    var res;
-    try {
-      res = await fetch('/kb/from-highlight', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ fathom_call_id: cid, highlight_id: hid }),
-      });
-    } catch (err) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not reach server: ' + err.message); return; }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not save that moment'); return; }
-    btn.outerHTML = '<span class="sec-saved">saved</span>';
-  }
+  /*
+   * ══════════════════════════════════════════════════════════════════════════
+   * REMOVED 2026-08-18 — BOTH manual Add-to-KB controls, by Justin's ruling:
+   * "Even kill the live one if it does so automatically."
+   *
+   * This one (the section drilldown "+ Save") had never rendered for anyone —
+   * its canSave guard was always false. The other (addMomentToKb, the call-review
+   * section-card "+ Add to KB") was live and working.
+   *
+   * THE EVIDENCE FOR THE RULING, measured on production 2026-08-18:
+   *   knowledge_base WHERE metadata->>'category' = 'call_moment'
+   *     auto_closed_call · personal   313    2026-08-03 → 2026-08-17
+   *     manual_add                      0
+   * Two weeks live on the review page, not one click. lib/kb-harvest.js Phase 7b
+   * files the good moments automatically, which is what made these redundant.
+   *
+   * ⚠⚠ THE CONSEQUENCE — THERE IS NOW NO PATH FROM A REP'S CALL MOMENT INTO THE
+   * TEAM KB. Written here so it is FOUND rather than rediscovered:
+   *   • auto-harvest always writes scope 'personal', uploaded_by = the rep
+   *   • the visibility rule (lib/kb-scope.js) is
+   *         scope = 'personal' AND uploaded_by = p_user_id
+   *     so a MANAGER CANNOT SEE a rep's harvested rows in /kb/list at all
+   *   • therefore PATCH /kb/:source_label/scope can never reach them — you
+   *     cannot re-scope a row you cannot see
+   * The removed review-card button WAS that path (KB ruling 5: "the button IS
+   * the promotion path, no separate curation queue"). Zero rows ever took it, so
+   * nothing is lost today — but the CAPABILITY is gone. Reopening it means either
+   * harvesting to team scope for managed reps, or giving managers read visibility
+   * of their reps' personal call moments. Both are RULINGS, not tidy-ups.
+   * Asserted, not just described, in test/add-to-kb-removed.test.js.
+   *
+   * ⚠ POST /kb/from-highlight AND GET /kb/saved-moments STAY MOUNTED ON PURPOSE.
+   * from-highlight is a thin wrapper over buildMomentRow + insertMoment — the
+   * same insert auto-harvest calls — and its tests are what pin KB ruling 1
+   * (harvested material stays out of the grader). Deleting the route to tidy up
+   * would delete the enforcement of a ruling. Justin, 2026-08-18.
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * async function addSectionMomentToKb(btn) {
+   *   var hid = btn.getAttribute('data-hid'), cid = btn.getAttribute('data-cid');
+   *   if (!hid || !cid) return;
+   *   btn.disabled = true; btn.textContent = 'Saving…';
+   *   var res;
+   *   try {
+   *     res = await fetch('/kb/from-highlight', {
+   *       method: 'POST',
+   *       headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+   *       body: JSON.stringify({ fathom_call_id: cid, highlight_id: hid }),
+   *     });
+   *   } catch (err) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not reach server: ' + err.message); return; }
+   *   if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+   *   if (!res.ok) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not save that moment'); return; }
+   *   btn.outerHTML = '<span class="sec-saved">saved</span>';
+   * }
+   */
 
   function renderKbList(items) {
     var container = document.getElementById('kbContainer');
@@ -8563,62 +8614,77 @@
     }
     state.callReviewLoading = false;
     if (state.view === 'call-review') renderCallReview();
-    // Which moments are already in this caller's KB (Part 2b). Fire-and-forget and
-    // fully degradable: on any failure every row just renders as unsaved, and
-    // adding again is idempotent server-side anyway.
-    loadSavedMoments(callId);
   }
 
-  // Server computes the saved set (it owns the quote-normalization), so the
-  // browser never needs a copy of normalizeQuote — that would be exactly the
-  // mirrored-predicate duplication 2a spent its budget retiring.
-  async function loadSavedMoments(callId) {
-    try {
-      var res = await fetch('/kb/saved-moments/' + encodeURIComponent(callId), { headers: authHeader() });
-      if (!res.ok) return;
-      var data = await res.json();
-      if (state.selectedCallId !== callId) return; // navigated away
-      var map = {};
-      ((data && data.saved_highlight_ids) || []).forEach(function(id) { map[id] = true; });
-      state.savedMomentIds = map;
-      if (state.view === 'call-review') renderCallReview();
-    } catch (err) { /* degrade silently — unsaved is the safe default */ }
-  }
-
-  // Add-to-KB click. Sends IDS ONLY. A duplicate is reported as success, because
-  // the user's intent ("this moment should be in my KB") is already satisfied —
-  // that is what makes the button idempotent with 2d's auto-population.
-  async function addMomentToKb(highlightId, btn) {
-    if (!highlightId || !state.selectedCallId) return;
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-    var res;
-    try {
-      res = await fetch('/kb/from-highlight', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ fathom_call_id: state.selectedCallId, highlight_id: highlightId }),
-      });
-    } catch (err) {
-      if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
-      window.alert('Could not reach server: ' + err.message);
-      return;
-    }
-    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-    if (!res.ok) {
-      var e;
-      try { e = await res.json(); } catch (x) { e = { error: 'HTTP ' + res.status }; }
-      if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
-      window.alert('Could not add to knowledge base: ' + (e.error || 'unknown error'));
-      return;
-    }
-    if (!state.savedMomentIds) state.savedMomentIds = {};
-    state.savedMomentIds[highlightId] = true;
-    if (btn) {
-      btn.textContent = 'In KB ✓';
-      btn.classList.add('is-saved');
-      btn.disabled = true;
-    }
-  }
+  /*
+   * REMOVED 2026-08-18 — the LIVE manual Add-to-KB control and its saved-set
+   * lookup, by the same ruling that removed addSectionMomentToKb above. The full
+   * reasoning, the 313-vs-0 measurement, and the manager→team consequence are
+   * recorded there; this block is the archive.
+   *
+   * The fetch of the saved set went with the button: nothing renders an "In KB ✓"
+   * state any more, so asking the server which moments are saved is a request
+   * whose answer has no consumer.
+   *
+   * GET /kb/saved-moments and POST /kb/from-highlight both STAY MOUNTED — see the
+   * note on addSectionMomentToKb for why removing them would be the worse trade.
+   *
+   * // Which moments are already in this caller's KB (Part 2b). Fire-and-forget and
+   * // fully degradable: on any failure every row just renders as unsaved, and
+   * // adding again is idempotent server-side anyway.
+   * loadSavedMoments(callId);
+   *
+   * // Server computes the saved set (it owns the quote-normalization), so the
+   * // browser never needs a copy of normalizeQuote — that would be exactly the
+   * // mirrored-predicate duplication 2a spent its budget retiring.
+   * async function loadSavedMoments(callId) {
+   *   try {
+   *     var res = await fetch('/kb/saved-moments/' + encodeURIComponent(callId), { headers: authHeader() });
+   *     if (!res.ok) return;
+   *     var data = await res.json();
+   *     if (state.selectedCallId !== callId) return; // navigated away
+   *     var map = {};
+   *     ((data && data.saved_highlight_ids) || []).forEach(function(id) { map[id] = true; });
+   *     state.savedMomentIds = map;
+   *     if (state.view === 'call-review') renderCallReview();
+   *   } catch (err) { }
+   * }
+   *
+   * // Add-to-KB click. Sends IDS ONLY. A duplicate is reported as success, because
+   * // the user's intent ("this moment should be in my KB") is already satisfied —
+   * // that is what makes the button idempotent with 2d's auto-population.
+   * async function addMomentToKb(highlightId, btn) {
+   *   if (!highlightId || !state.selectedCallId) return;
+   *   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+   *   var res;
+   *   try {
+   *     res = await fetch('/kb/from-highlight', {
+   *       method: 'POST',
+   *       headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+   *       body: JSON.stringify({ fathom_call_id: state.selectedCallId, highlight_id: highlightId }),
+   *     });
+   *   } catch (err) {
+   *     if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
+   *     window.alert('Could not reach server: ' + err.message);
+   *     return;
+   *   }
+   *   if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+   *   if (!res.ok) {
+   *     var e;
+   *     try { e = await res.json(); } catch (x) { e = { error: 'HTTP ' + res.status }; }
+   *     if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
+   *     window.alert('Could not add to knowledge base: ' + (e.error || 'unknown error'));
+   *     return;
+   *   }
+   *   if (!state.savedMomentIds) state.savedMomentIds = {};
+   *   state.savedMomentIds[highlightId] = true;
+   *   if (btn) {
+   *     btn.textContent = 'In KB ✓';
+   *     btn.classList.add('is-saved');
+   *     btn.disabled = true;
+   *   }
+   * }
+   */
 
   function renderCallReview() {
     var content = document.getElementById('content');
@@ -9015,14 +9081,13 @@
     + '</section>';
   }
 
-  // opts.addToKb — render the Part 2b "Add to Knowledge Base" button on this row.
-  // Only the SECTION BREAKDOWN passes it; the main highlights timeline does not,
-  // so the button appears exactly where the spec put the slot (Part 1b left it).
+  // The third `opts` argument carried the Part 2b Add-to-KB switch and nothing
+  // else, so it went with the button — both call sites now pass two arguments.
   // The three types a closer response bears on. One definition, so the row and
   // any future consumer cannot disagree about which moments earn a badge.
   var HANDLING_TYPES = ['risk_signal', 'barrier', 'objection'];
 
-  function highlightEntryHtml(h, recordingUrl, opts) {
+  function highlightEntryHtml(h, recordingUrl) {
     var seconds = (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null;
     var label = (seconds != null) ? formatTimestampDisplay(seconds) : '—';
     var timeHtml;
@@ -9044,17 +9109,21 @@
     var quote = (typeof h.quote === 'string') ? h.quote : '';
     var observation = (typeof h.observation === 'string') ? h.observation : '';
 
-    // Add-to-KB (Part 2b). Needs the highlight id — the button sends IDS ONLY and
-    // the server re-reads the row, so nothing rendered here is trusted on write.
-    var kbBtn = '';
-    if (opts && opts.addToKb && h.id) {
-      var alreadySaved = !!(state.savedMomentIds && state.savedMomentIds[h.id]);
-      kbBtn = alreadySaved
-        ? '<button class="review-kb-btn is-saved" disabled title="Already in your knowledge base">In KB ✓</button>'
-        : '<button class="review-kb-btn" data-hid="' + escapeHtml(String(h.id)) + '"'
-          + ' onclick="addMomentToKb(this.getAttribute(\'data-hid\'), this)"'
-          + ' title="Save this moment to your knowledge base">+ Add to KB</button>';
-    }
+    /* REMOVED 2026-08-18 — the live Add-to-KB button. See addSectionMomentToKb
+     * for the ruling, the 313-vs-0 measurement, and the manager→team consequence.
+     *
+     * // Add-to-KB (Part 2b). Needs the highlight id — the button sends IDS ONLY and
+     * // the server re-reads the row, so nothing rendered here is trusted on write.
+     * var kbBtn = '';
+     * if (opts && opts.addToKb && h.id) {
+     *   var alreadySaved = !!(state.savedMomentIds && state.savedMomentIds[h.id]);
+     *   kbBtn = alreadySaved
+     *     ? '<button class="review-kb-btn is-saved" disabled title="Already in your knowledge base">In KB ✓</button>'
+     *     : '<button class="review-kb-btn" data-hid="' + escapeHtml(String(h.id)) + '"'
+     *       + ' onclick="addMomentToKb(this.getAttribute(\'data-hid\'), this)"'
+     *       + ' title="Save this moment to your knowledge base">+ Add to KB</button>';
+     * }
+     */
 
     // Handling badge, INLINE with the type chip, so one line carries both what
     // happened and whether the closer dealt with it.
@@ -9080,7 +9149,7 @@
     return '<div class="review-highlight">'
       + timeHtml
       + '<div class="review-highlight-body">'
-        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + handlingBadge + kbBtn + '</div>'
+        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + handlingBadge + '</div>'
         + '<div class="review-quote">' + escapeHtml(quote) + '</div>'
         + replyHtml
         + '<div class="review-observation">' + escapeHtml(observation) + '</div>'
@@ -9196,11 +9265,11 @@
         var groups = '';
         if (breakdown.good.length) {
           groups += '<div class="review-section-group good"><div class="review-section-group-label">What worked</div>'
-            + '<div class="review-highlight-list">' + breakdown.good.map(function(h) { return highlightEntryHtml(h, recordingUrl, { addToKb: true }); }).join('') + '</div></div>';
+            + '<div class="review-highlight-list">' + breakdown.good.map(function(h) { return highlightEntryHtml(h, recordingUrl); }).join('') + '</div></div>';
         }
         if (breakdown.bad.length) {
           groups += '<div class="review-section-group bad"><div class="review-section-group-label">What to fix</div>'
-            + '<div class="review-highlight-list">' + breakdown.bad.map(function(h) { return highlightEntryHtml(h, recordingUrl, { addToKb: true }); }).join('') + '</div></div>';
+            + '<div class="review-highlight-list">' + breakdown.bad.map(function(h) { return highlightEntryHtml(h, recordingUrl); }).join('') + '</div></div>';
         }
         bodyInner = summary + groups;
       } else {

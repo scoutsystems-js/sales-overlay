@@ -14,7 +14,8 @@ const { buildSectionBreakdown, sectionScoreOf, SECTIONS } = require('../lib/sect
 // labelled "rank". One definition now, and the copy says which end it means.
 const SR = require('../lib/section-ranking');
 const { computeWhyFacts } = require('../lib/why-prose');
-const { quoteHash } = require('../lib/kb-entry');
+/* const { quoteHash } = require('../lib/kb-entry'); */ // only reader was the
+// saved-to-KB badge, removed 2026-08-18 with the Add-to-KB buttons
 const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome } = require('../lib/outcome-tag');
@@ -1056,18 +1057,26 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
     } else out.prior_average = null;
   } catch (e) { out.prior_average = null; }
 
-  // 4b: mark moments already saved to the closer's KB. Exact match on
-  // source_section + quote hash — NO similarity search, which is why the
-  // queued /kb/upload embedding issue is not load-bearing here.
-  try {
-    var saved = await admin.from('knowledge_base')
-      .select('source_quote_hash').eq('uploaded_by', userId).eq('source_section', section)
-      .not('source_quote_hash', 'is', null);
-    var have = {};
-    ((saved && saved.data) || []).forEach(function (r) { have[r.source_quote_hash] = true; });
-    var mark = function (m) { m.saved_to_kb = !!have[quoteHash(m.quote)]; };
-    out.good.forEach(mark); out.bad.forEach(mark);
-  } catch (e) { /* unsaved is the safe default */ }
+  /* REMOVED 2026-08-18 — the saved-to-KB badge went with the Add-to-KB buttons
+   * (Justin's ruling; see dashboard.html addSectionMomentToKb for the reasoning,
+   * the 313-manual-vs-0 measurement, and the manager→team consequence).
+   * Nothing renders saved_to_kb any more, so this is a per-request query whose
+   * answer has no consumer — a row a rep auto-harvested still gets harvested,
+   * they just don't see a badge saying so.
+   *
+   * // 4b: mark moments already saved to the closer's KB. Exact match on
+   * // source_section + quote hash — NO similarity search, which is why the
+   * // queued /kb/upload embedding issue is not load-bearing here.
+   * try {
+   *   var saved = await admin.from('knowledge_base')
+   *     .select('source_quote_hash').eq('uploaded_by', userId).eq('source_section', section)
+   *     .not('source_quote_hash', 'is', null);
+   *   var have = {};
+   *   ((saved && saved.data) || []).forEach(function (r) { have[r.source_quote_hash] = true; });
+   *   var mark = function (m) { m.saved_to_kb = !!have[quoteHash(m.quote)]; };
+   *   out.good.forEach(mark); out.bad.forEach(mark);
+   * } catch (e) { }
+   */
 
   return out;
 }
