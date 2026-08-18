@@ -178,7 +178,7 @@
     body::before {
       content: '';
       position: fixed;
-      inset: 0;
+      left: 0; right: 0;
       z-index: 0;
       pointer-events: none;
       /**
@@ -188,17 +188,21 @@
        * IMPOSSIBLE — that is accepted, not a defect. The criterion is the one
        * that holds at every width: the worst-exposed text still clears AA.
        *
-       * Measured across EIGHT viewports (900x800 through 1920x1080, plus a
-       * portrait 1200x1600): the highest opacity at which every element
-       * crossing the mark clears 4.5:1 is
+       * RE-DERIVED for the smaller box, across BOTH AXES (width 1024-2560 AND
+       * height 720-1600). Six viewports, and the answer is unchanged:
        *
-       *     0.21   set by the --muted LABELS (#8a9aaa), margin 4.58:1
+       *     0.21   set by --muted text (#8a9aaa), margin 4.58:1
        *
-       * and it is the SAME at every one. That is not luck: once any --muted
-       * text overlaps, the binding case is a COLOUR relationship (muted text on
-       * a solid mark stroke), not a geometric one, so viewport size stops
-       * mattering. Ships at 0.20 — one step below the derived maximum, 4.70:1,
-       * rather than sitting exactly on the boundary.
+       * ⚠ IT HAS NOW COME BACK 0.21 THREE TIMES — across a font change, an
+       * offset, and a 3x size change — and that is EXPLAINABLE rather than a
+       * stale measurement: the binding case is a COLOUR relationship, muted
+       * text against a solid mark stroke. Geometry and typography move WHICH
+       * elements overlap and by how much; they cannot move a contrast ratio
+       * between two fixed colours. What did change is the VOLUME: overlap fell
+       * from hundreds of ink pixels per element to 12-140, because the mark is
+       * a fraction of its former size.
+       *
+       * Ships at 0.20 (4.70:1), one step below the derived maximum.
        *
        * ⚠ THE SWEEP THAT PRODUCED THIS HAD TO BE REDONE. The first version held
        * height at 800px and varied only width — but the mark is sized in vmin =
@@ -274,11 +278,127 @@
        *   rather than outlined because that is what was asked for, and because
        *   the mark is used elsewhere at sizes where they do show.
        *
-       * ⚠ THE STROKE IS 0.18, NOT 0.55, AND THAT IS LOAD-BEARING AT THIS SCALE.
-       * Scaling the mark 3x scales its strokes 3x, so 0.55 would render ~29px
-       * lines again and restore exactly the softness the previous round
-       * removed. 0.18 holds the on-screen weight at ~10px. If the SIZE ever
-       * changes, this must be re-derived with it — they are one setting.
+       * ⚠⚠ THE STROKE IS DERIVED FROM THE SIZE — THEY ARE ONE SETTING. Stroke
+       * width is in viewBox units, so it scales with the mark: the same value
+       * draws a hairline at one size and a tube at another. The target is the
+       * product's own line work (section borders 1px, gauge ticks 1.4, chart
+       * lines 2-3), not a number.
+       *
+       *   one viewBox unit measures 20.55px (1280x720) to 40.55px (1200x1600)
+       *   at the derived box, so:
+       *
+       *     0.18  -> 3.7 - 7.3px    (correct for the old 3x mark, far too heavy now)
+       *     0.10  -> 2.1 - 4.1px
+       *     0.075 -> 1.5 - 3.0px    <- shipped, inside the 1-3px band end to end
+       *
+       * ⚠ RE-DERIVE THIS WHENEVER THE BOX CHANGES. It has now been wrong twice
+       * for exactly this reason: 0.55 was right at 50vmin and rendered a 29px
+       * tube at 150vmin; 0.18 was right at 150vmin and renders 7px here.
+       */
+      /**
+       * ⚠⚠ THE BOX IS DERIVED FROM THE TITLE AND THE VIEWPORT, NOT CHOSEN.
+       * Justin, 2026-08-18: "you were right, it's way too big" — the mark now
+       * sits JUST BELOW the wordmark and stretches to roughly the bottom of the
+       * visible screen.
+       *
+       * A picked vmin number is what produced 3x, and 1.8x before it. So the
+       * geometry is stated as the relationship it actually is:
+       *
+       *     top    = wordmark bottom + GAP
+       *     height = viewport bottom - top - GAP
+       *
+       * --mark-top / --mark-h are written by placeMark() from the wordmark's
+       * measured rect, on load and on resize. The CSS fallbacks below are what
+       * renders if that script never runs, so the mark degrades to a sane box
+       * rather than to nothing.
+       */
+      top: var(--mark-top, 34vh);
+      height: var(--mark-h, 58vh);
+      background-position: center top;
+      background-size: auto 100%;
+      background-repeat: no-repeat;
+      /* ⚠ POSITION SET BY THE INK CHECK, NOT BY EYE. At `center 44%` the mark's
+         strokes crossed the FIELD LABELS — measured, 86 ink pixels under the
+         Email label — and the labels are --muted, the lowest-contrast text on
+         the page. Worst-case contrast there was 4.47:1 against a solid stroke,
+         i.e. marginally UNDER the 4.5:1 AA line, and 3.58:1 at the top of the
+         opacity band.
+
+         Raising it puts the dense part of the mark behind the WORDMARK, which
+         measures 7.21:1 over the same backdrop and is large bold text besides.
+         The fields and the button shield themselves — they paint their own
+         opaque backgrounds above this layer — so the only exposed text is the
+         labels, the forgot link and the wordmark.
+
+         ⚠ 18% WAS CHOSEN BY SWEEPING POSITION x SIZE AND MEASURING, NOT BY
+         NUDGING UNTIL IT LOOKED RIGHT. Raising it to 26% made the collision
+         WORSE (86 -> 148 ink pixels) because the mark's descending dots hang
+         below its centre — the opposite of what "move it up" predicts, which is
+         exactly why this is measured rather than reasoned. Of the twelve
+         combinations tried, 50vmin @ 18% is the only one that keeps the full
+         half-screen size AND puts ZERO ink under any low-contrast text, while
+         giving the most coverage behind the wordmark (which is large, bold and
+         measures 7.21:1 over the mark, so overlap there is fine).
+
+         Verified at 1460x812. The clearance is a LAYOUT relationship, so it
+         should be re-checked if the form's spacing changes. */
+      /* ⚠ OFFSET, NOT CENTRED (Justin's note 3: the mark sat right on the text).
+         Re-swept with the COMPLETE inventory this time — nine exposed elements
+         gathered from the DOM, including #cardTitle and #cardSub, which the
+         previous sweep never checked.
+
+         EVERY CENTRED POSITION COLLIDES: 0.50/0.18 -> 765 ink px under text,
+         0.50/0.34 -> 1420, 0.50/0.50 -> 1540, 0.50/0.62 -> 1465. Offsetting is
+         not a nicety here, it is the only thing that makes zero overlap
+         reachable: 0.85/0.55 and 0.15/0.55 both measure ZERO ink under all nine
+         AND zero under the wordmark, which is what note 3 asked for.
+
+         Because nothing overlaps any more, the AA contrast floor stops binding
+         and the opacity can go back up for presence — 0.26, still inside the
+         0.16-0.30 band, and the strokes are now ~3x finer so it reads as a
+         drawn shape rather than a wash. */
+      /**
+       * ⚠⚠ THE CLIPPING AND THE HIDDEN DOTS ARE ACCEPTED — THIS IS A DECISION,
+       * NOT A DEFECT. Justin, 2026-08-18: "it's fine if it's partially off
+       * screen." He was shown both measurements and chose SIZE over dot
+       * visibility. Do not cap the size, and do not move the mark up behind the
+       * title to rescue the dots.
+       *
+       * MEASURED, so the trade is legible rather than remembered:
+       *
+       *   3x = 150vmin EXCEEDS THE VIEWPORT EVERYWHERE. Height binds first (the
+       *   mark is 1.1x as tall as wide), so on any landscape display ~39% is
+       *   off-screen — 1440x900 draws 1350x1485 — rising to 50-55% on a short
+       *   or narrow window. The largest NON-CLIPPING size is 90vmin (1.8x),
+       *   which fits at 0% off-screen everywhere measured. It was offered and
+       *   declined.
+       *
+       *   ⚠ ALL THREE DOTS SIT BELOW THE FOLD, at every viewport tested. They
+       *   are at cy 12/16/19.5 of a 22-unit box, i.e. the lower half of the
+       *   mark, so with it starting under the title they land at y = 904 / 1144
+       *   / 1354 on a 900x800 window. Only the arc sweep is visible. Getting
+       *   even the FIRST dot on screen there needs the mark to start at <=10vh
+       *   — behind the title rather than under it — so at 3x "under the title"
+       *   and "dots visible" are MUTUALLY EXCLUSIVE. The dots are still filled
+       *   rather than outlined because that is what was asked for, and because
+       *   the mark is used elsewhere at sizes where they do show.
+       *
+       * ⚠⚠ THE STROKE IS DERIVED FROM THE SIZE — THEY ARE ONE SETTING. Stroke
+       * width is in viewBox units, so it scales with the mark: the same value
+       * draws a hairline at one size and a tube at another. The target is the
+       * product's own line work (section borders 1px, gauge ticks 1.4, chart
+       * lines 2-3), not a number.
+       *
+       *   one viewBox unit measures 20.55px (1280x720) to 40.55px (1200x1600)
+       *   at the derived box, so:
+       *
+       *     0.18  -> 3.7 - 7.3px    (correct for the old 3x mark, far too heavy now)
+       *     0.10  -> 2.1 - 4.1px
+       *     0.075 -> 1.5 - 3.0px    <- shipped, inside the 1-3px band end to end
+       *
+       * ⚠ RE-DERIVE THIS WHENEVER THE BOX CHANGES. It has now been wrong twice
+       * for exactly this reason: 0.55 was right at 50vmin and rendered a 29px
+       * tube at 150vmin; 0.18 was right at 150vmin and renders 7px here.
        */
       background-position: center 23vh;
       background-size: 150vmin auto;
@@ -298,7 +418,7 @@
          dot RADII are byte-identical to the nav logo. Only stroke weight and
          fill-vs-outline changed, which are TREATMENT. A test pins the arcs and
          radii against the nav mark so a future edit cannot quietly redraw it. */
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='440' viewBox='0 0 20 22' fill='none'%3E%3Cpath d='M1.5 12 A8.5 8.5 0 0 1 18.5 12' stroke='%2309e046' stroke-width='0.18' stroke-linecap='round'/%3E%3Cpath d='M4.5 12 A5.5 5.5 0 0 1 15.5 12' stroke='%2309e046' stroke-width='0.18' stroke-linecap='round'/%3E%3Cpath d='M7.5 12 A2.5 2.5 0 0 1 12.5 12' stroke='%2309e046' stroke-width='0.18' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='1.6' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16' r='1.2' fill='%2309e046'/%3E%3Ccircle cx='10' cy='19.5' r='0.8' fill='%2309e046'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='440' viewBox='0 0 20 22' fill='none'%3E%3Cpath d='M1.5 12 A8.5 8.5 0 0 1 18.5 12' stroke='%2309e046' stroke-width='0.075' stroke-linecap='round'/%3E%3Cpath d='M4.5 12 A5.5 5.5 0 0 1 15.5 12' stroke='%2309e046' stroke-width='0.075' stroke-linecap='round'/%3E%3Cpath d='M7.5 12 A2.5 2.5 0 0 1 12.5 12' stroke='%2309e046' stroke-width='0.075' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='1.6' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16' r='1.2' fill='%2309e046'/%3E%3Ccircle cx='10' cy='19.5' r='0.8' fill='%2309e046'/%3E%3C/svg%3E");
     }
     /* The form and nav sit above the mark. Without this the shape would paint
        over the fields rather than behind them. */
@@ -490,6 +610,42 @@
     .brand-lockup .brand-name { font-weight: 500; }
   </style>
   <script src="/js/scout-auth.js"></script>
+  <script>
+    /**
+     * ⚠ THE MARK'S BOX, MEASURED FROM THE TITLE — see body::before for why this
+     * is derived rather than a chosen vmin value.
+     *
+     *   top    = wordmark bottom + GAP
+     *   height = viewport bottom - top - GAP
+     *
+     * Runs on load and on resize, so the relationship holds at every size
+     * instead of only at the one it was checked at. Decoration only: if it
+     * throws or never runs, the CSS fallbacks (34vh / 58vh) render a sane mark
+     * and the sign-in form is untouched.
+     */
+    (function () {
+      var GAP = 18;              // breathing room at both ends
+      var MIN_H = 140;           // below this the mark is not worth drawing
+      function placeMark() {
+        try {
+          var el = document.querySelector('.brand-name');
+          if (!el) return;
+          var top = Math.round(el.getBoundingClientRect().bottom + GAP);
+          var h = Math.round(window.innerHeight - top - GAP);
+          var root = document.documentElement;
+          if (h < MIN_H) { root.style.setProperty('--mark-h', '0px'); return; }
+          root.style.setProperty('--mark-top', top + 'px');
+          root.style.setProperty('--mark-h', h + 'px');
+        } catch (e) { /* decoration only — never a gate */ }
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', placeMark);
+      } else { placeMark(); }
+      window.addEventListener('resize', placeMark);
+      // The webfont swap changes the title's height, so re-place once it lands.
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeMark).catch(function () {});
+    })();
+  </script>
 </head>
 <body>
 

@@ -1332,6 +1332,30 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **AND SAMPLE ANYWAY, BY LOOKING.** Three widths — 900 / 1440 / 1920 — because a derived formula can still be derived from a wrong k. The formula makes it right in principle; the three captures make it right in fact.
 - **⚠ A guard that pins a single measured value is the same trap wearing a test's clothes.** "Verified at 1460x812" is a true statement and a weak one; say the width, and say whether anything else was checked.
 
+### ⚠⚠ A FEEL TEST ON A SYNTHESISED FACE JUDGES THE SYNTHESIS (2026-08-18)
+**The browser fakes a weight it was never given, silently, and the fake LOOKS like the font — so the decision gets made against something that would never ship.**
+- **The live case:** Montserrat was linked on the login page as a feel test before any site-wide commitment, with **two weights only — 300 and 500**. But the page's own rules still asked for **600 and 700** (`.card-header h1`, `.field label`, `.submit-btn`, `.nav-logo`). Those weights do not exist in the loaded face, so the browser **SYNTHESISED** them by smearing the 500. Synthetic bold is heavier and cruder than a real cut — **Justin would have been judging Montserrat by a weight Montserrat does not contain.**
+- **⚠⚠ THE PRACTICAL HALF: MEASURE `getComputedStyle(el).fontWeight` — DO NOT LOOK.** Looking is precisely what cannot tell a real 600 from a smeared 500; that is what synthesis is FOR. The check is one line and it is unambiguous: **assert every text element resolves to a weight you actually loaded.**
+```js
+document.querySelectorAll('.container *').forEach(el => {
+  const fw = getComputedStyle(el).fontWeight;
+  if (fw !== '300' && fw !== '500') report(el, fw);   // an unlinked weight = faux-bold
+});
+```
+- **⚠ IT TOOK THREE PASSES, AND EACH FAILURE WAS A DIFFERENT CSS MECHANISM — all three found by measuring, none visible by eye:**
+  1. **SOURCE ORDER.** The first override block sat near the top of the stylesheet; the page's own equal-specificity rules came later and won. Computed weights came back 600/700 with the override "applied".
+  2. **SPECIFICITY.** A universal catch-all inside the page containers (`.login-main *`, `(0,1,0)`) **lost to `.card-header h1` and `.field label`, which are `(0,1,1)`** — so the card title and every field label went straight back to 600.
+  3. **INCOMPLETE ENUMERATION.** A hand-listed selector list missed a nav `SPAN`, an `H2` and `.launch-btn`, all in signed-in states nobody was looking at. **⚠ THIS IS THE INVENTORY FAILURE A THIRD TIME** — see the scope/inventory/range table; enumerating your own targets is the step least likely to be re-read.
+- **THE FIX KEEPS BOTH LAYERS**: a catch-all for what nobody listed, PLUS equal-specificity overrides for the selectors the page names explicitly. Either alone leaves elements behind, and which ones is not guessable — it is a function of the existing stylesheet.
+- **GENERALISES BEYOND FONTS: whenever a browser can SUBSTITUTE for something you did not supply, a visual check cannot detect the substitution.** Faux-bold, faux-italic (oblique from an upright), a fallback font metric-matching a missing one, an image `srcset` silently serving the wrong density. **Ask the platform what it actually resolved, rather than asking your eyes what it looks like.**
+
+### ⚠ DERIVE A CONSTANT FROM THE **WORST FACE THAT CAN ACTUALLY RENDER**, NOT THE ONE YOU INTENDED (2026-08-18)
+**A rule that only holds when the network cooperates is not a rule.**
+- **The live case:** the wordmark's no-wrap formula is `fontSize = availableWidth / k`, and k is face-specific. Montserrat Medium measures **k = 9.495**; the system fallback measures **8.924**. The webfont is linked with `display=swap` and a fallback stack, **so on a blocked, slow or offline load the FALLBACK draws** — and a coefficient derived from only one of them is wrong for the other half of the time.
+- **THE RULE: take the MAX k across every face that can actually appear.** Here Montserrat is wider, so it binds and the fallback is safe underneath it. Had the fallback been wider, IT would have set the coefficient even though it is the face nobody intends to see.
+- **⚠ AND IT MUST BE RE-MEASURED PER FACE, NEVER CARRIED.** Reusing 8.924 for Montserrat would have produced `10.3vw × 9.495 = 97.8vw` of text in a **92vw** lockup — a wrap, on a page that had already wrapped twice for exactly this reason. **6.4% of width difference is enough.**
+- Generalises to any constant derived by measuring one variant of something the platform may swap: font metrics, device pixel ratios, locale-dependent string widths.
+
 ### ⚠⚠ TURN THE AESTHETIC COMPLAINT INTO A MEASUREMENT BEFORE ACTING ON IT — "BUBBLY" WAS 29px AGAINST 1-3px (2026-08-18)
 **A fact about the mark, not an opinion about it — and that is what made the fix obvious instead of iterative.**
 - **The live case:** Justin said the login logo reads *"bubbly"* — soft and cartoony against a product that is otherwise precise and thin. The tempting response is to nudge a stroke value and ask "better?", which is a loop with no defined end.
