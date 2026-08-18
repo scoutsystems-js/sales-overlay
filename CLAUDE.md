@@ -1127,11 +1127,11 @@ CATEGORICAL  REP_LINE_COLORS          "this is rep number four"
 - **Also ruled: the `.user-select` chevron icon keeps its grey stroke** (the no-grey rule is about TEXT), and the Team drilldown's "Cash collected" **axis label** stays (it is a label, not a card — (m) removed cards).
 - Guarded by `test/accent-palette.test.js`, which fails if the ramp contains any of the four reserved tokens and proves itself non-vacuous by re-adding the accent.
 
-### ⚠⚠ A GUARD WITH ONLY AN UPPER BOUND CANNOT CATCH "TOO LITTLE" (2026-08-18)
-**And when the thing it guards is redesigned, the guard is part of the redesign.**
+### ⚠⚠ A ONE-SIDED GUARD SILENTLY ENCODES AN ASSUMPTION ABOUT WHICH WAY THINGS GO WRONG — AND THAT ASSUMPTION OUTLIVES THE DESIGN IT WAS WRITTEN FOR, WITH NOTHING TO ANNOUNCE WHEN IT STOPS BEING TRUE (2026-08-18)
+**A guard with only an upper bound cannot catch "too little". Where a value has a wrong answer in BOTH directions, bound it in both — and when the thing it guards is redesigned, the guard is part of the redesign.**
 - **The live case:** `opacity <= 0.06` on the background layer. Correct for the treatment it was written for — small repeated gutter motifs. The treatment was then replaced by ONE LARGE CROPPED SHAPE per page and the cap did not move. **It held the new design below the threshold of visibility, and PASSED the suite while doing it.** Green tests, invisible feature, and the guard was the thing keeping it invisible.
 - **THE RULE: where a value has a wrong answer in BOTH directions, bound it in both.** The layer is now capped at **0.30** (the ceiling of the approved band) *and floored at **0.16*** (its bottom), so drifting back under visibility fails.
-- **A one-sided guard silently encodes an assumption about which way things go wrong.** That assumption outlives the design it was made for, and nothing announces when it stops being true.
+- **The title of this entry is the rule; the opacity cap is only where it was noticed.** Anywhere a bound exists, ask what the UNBOUNDED direction would look like if it went wrong — and whether anything at all would catch it.
 - **⚠ THE SECOND HALF MATTERS AS MUCH: A REDESIGN INCLUDES ITS GUARDS.** When what a constant governs changes shape, the constant is not automatically still right — re-derive it from the NEW design rather than working around it. Treating a passing test as evidence the value is still fine is exactly what let this ship.
 
 ### ⚠⚠ A SCREENSHOT IS NOT A PERCEPTION TEST (2026-08-18)

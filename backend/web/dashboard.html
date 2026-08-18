@@ -208,11 +208,16 @@
          +34 to +64. The shipped version was 3-5x fainter than the design that
          was signed off; that gap WAS the bug, not a taste question.
 
-         0.20 sits mid-band (+42/255). Mid rather than the 0.16 floor because
-         these SVGs carry their own internal stroke-opacity (0.35-1.0), so the
-         faintest strokes land near where the WHOLE treatment used to be — the
-         internal hierarchy survives instead of collapsing into invisibility. */
-      opacity: 0.20;
+         0.26 — Justin on the 0.20 build: "love it, just make it a bit
+         brighter." Upper-middle of the approved band, deliberately SHORT of the
+         0.30 ceiling so there is headroom for another nudge; going straight to
+         the ceiling would leave none.
+
+         Not the 0.16 floor, and never was: these SVGs carry their own internal
+         stroke-opacity (0.35-1.0), so a low layer value drops the faintest
+         strokes back to where the WHOLE treatment used to sit and the hierarchy
+         inside each shape collapses into one flat tone. */
+      opacity: 0.26;
       background-repeat: no-repeat;
     }
     body[data-view="overview"]::before { background-image: var(--motif-a); background-position: right -200px top -140px; }
