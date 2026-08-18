@@ -1856,6 +1856,9 @@
        editable ones keep the field border and gain a focus ring.
        ⚠ STYLING ONLY. No behaviour changed, and the Slack copy path is
        untouched — asserted byte-for-byte in the findings. */
+    /* (u2) The day summary. Full-strength text — it is a statement of fact about
+       the day, not a hint, so the no-grey rule applies. */
+    .eod-summary { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
     .eod-static { flex: 1; font-size: 13px; padding: 6px 0; }
     .eod-input, .eod-textarea { transition: border-color 0.15s var(--ease); }
     .eod-input:hover, .eod-textarea:hover { border-color: var(--border-hover); }
@@ -7680,6 +7683,35 @@
    * match would leave every composed outcome uncoloured, and composed is the
    * common case for closes.
    */
+  /**
+   * (u2) THE DAY SUMMARY — COUNTS ONLY. Ruled 2026-08-18.
+   *
+   * ⚠⚠ THE CASH FIGURE IS DELIBERATELY ABSENT, AND THIS IS THE WHOLE RULING.
+   * Drafted against three real days it produced "3 calls · 2 closed · $0
+   * collected" — correct arithmetic (a payment-plan close records only what was
+   * collected ON the call, so a plan close with nothing due at signing is
+   * genuinely zero) that reads in a team Slack channel as a rep claiming closes
+   * with no money. TWO of the three real days sampled had that shape. A
+   * credibility problem is not fixed by the arithmetic being right.
+   *
+   * ⚠ AND CASH WAS ALREADY REMOVED FROM EVERY CARD BY AN EARLIER RULING
+   * (2026-08-16, the team glance card). Adding it here would have reintroduced
+   * it through a SIDE DOOR — a number ruled off the surface reappearing in the
+   * summary of that same surface. Do not add it back without reopening both.
+   *
+   * ⚠ Counts, not rates — the house rule is that a rate renders with its raw
+   * counts, and here there is no rate at all, just the counts.
+   */
+  function eodDaySummary(calls) {
+    var list = Array.isArray(calls) ? calls : [];
+    var n = list.length;
+    var closed = list.filter(function (c) {
+      return eodOutcomeTone(c && c.fields && c.fields.outcome) === 'good';
+    }).length;
+    if (!n) return null;
+    return n + ' call' + (n === 1 ? '' : 's') + ' · ' + closed + ' closed';
+  }
+
   function eodOutcomeTone(outcome) {
     var t = String(outcome == null ? '' : outcome).trim().toLowerCase();
     if (!t) return 'none';
@@ -7702,7 +7734,13 @@
   function eodSlackText() {
     var d = state.eodData;
     if (!d || !Array.isArray(d.calls)) return '';
-    var lines = ['EOD Report — ' + d.date, ''];
+    // (u2) The summary sits directly under the date, so the first thing a Slack
+    // reader sees is the shape of the day. Built from the SAME helper the panel
+    // uses — one definition, so the paste and the page cannot disagree.
+    var summary = eodDaySummary(d.calls);
+    var lines = ['EOD Report — ' + d.date];
+    if (summary) lines.push(summary);
+    lines.push('');
     if (d.calls.length === 0) lines.push('No calls today.');
     d.calls.forEach(function (c, i) {
       var f = c.fields;
@@ -7745,6 +7783,7 @@
     var d = state.eodData;
     var dateVal = state.eodDate || (d && d.date) || '';
 
+    var daySummary = (d && d.calls) ? eodDaySummary(d.calls) : null;
     var toolbar = '<div class="eod-toolbar">'
       + '<button class="btn-fathom-secondary" type="button" onclick="eodShiftDay(-1)">← Prev Day</button>'
       /**
@@ -7826,6 +7865,8 @@
     content.innerHTML = '<div class="section fade-in">'
       + '<div class="section-header"><h2>EOD Report</h2>'
       + '<div class="meta">your calls for the day — edit inline, then copy for Slack</div></div>'
+      // (u2) On the page as well as in the paste, from the one helper.
+      + (daySummary ? '<div class="eod-summary">' + escapeHtml(daySummary) + '</div>' : '')
       + toolbar + body + '</div>';
   }
 

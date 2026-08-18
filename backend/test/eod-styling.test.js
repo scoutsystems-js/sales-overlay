@@ -75,3 +75,38 @@ test('⚠⚠ THE COPY PATH IS UNTOUCHED — the deliverable is the paste', () =>
     'the Slack text must be built from state, never scraped from the DOM');
   assert.ok(!/eod-chip|eod-static/.test(fn), 'and must not know about display classes');
 });
+
+// ── (u2) the day summary ──────────────────────────────────────────────────
+test('⚠⚠ THE DAY SUMMARY IS COUNTS ONLY — no cash, by ruling', () => {
+  const at = LIVE.indexOf('function eodDaySummary');
+  assert.ok(at > 0, 'eodDaySummary is gone');
+  const fn = LIVE.slice(at, LIVE.indexOf('\n  }', at) + 4);
+  assert.ok(fn.length > 150 && fn.length < 1200, 'slice suspicious: ' + fn.length);
+
+  const tone = new Function(LIVE.slice(LIVE.indexOf('function eodOutcomeTone'),
+    LIVE.indexOf('\n  }', LIVE.indexOf('function eodOutcomeTone')) + 4) + '; return eodOutcomeTone;')();
+  const summary = new Function('eodOutcomeTone', fn + '; return eodDaySummary;')(tone);
+
+  const call = (o) => ({ fields: { outcome: o } });
+  assert.strictEqual(summary([call('Closed - PIF'), call('Follow up'), call('Lost')]), '3 calls · 1 closed');
+  assert.strictEqual(summary([call('Closed - PIF')]), '1 call · 1 closed', 'singular reads correctly');
+  assert.strictEqual(summary([]), null, 'no calls → no line, not "0 calls"');
+
+  // ⚠ THE RULING. A real day produced "3 calls · 2 closed · $0 collected" —
+  // correct arithmetic (a payment-plan close records only what was collected ON
+  // the call) that reads in Slack as closes with no money. Two of three real
+  // days sampled had that shape. Cash was ALSO removed from every card by an
+  // earlier ruling, so adding it here would reintroduce it through a side door.
+  assert.ok(!/cash|\$/i.test(fn), 'no cash figure may appear in the day summary');
+  assert.strictEqual(summary([call('Closed - Payment plan'), call('Closed - PIF'), call('Lost')]),
+    '3 calls · 2 closed', 'the two-closes-no-cash day now reads cleanly');
+});
+
+test('the summary is built ONCE and shared by the page and the paste', () => {
+  // Two implementations would let the page and the Slack text disagree about
+  // the same day — the shared-carrier failure in miniature.
+  assert.strictEqual((LIVE.match(/function eodDaySummary/g) || []).length, 1);
+  assert.ok(/lines\.push\(summary\)|if \(summary\) lines\.push\(summary\)/.test(LIVE),
+    'the paste must use the helper');
+  assert.ok(/eod-summary">' \+ escapeHtml\(daySummary\)/.test(LIVE), 'the page must use the same value');
+});
