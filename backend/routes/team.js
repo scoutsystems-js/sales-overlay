@@ -13,6 +13,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
 const { buildRepSeries, OBJECTION_CATEGORIES } = require('../lib/rep-series');
+const TA = require('../lib/team-averages');
+const { isHandled, outcomeMap } = require('../lib/objection-handled');
 const { computeWhyProse } = require('../lib/why-prose');
 const Anthropic = require('@anthropic-ai/sdk');
 const { CLAUDE_MODEL } = require('../config');
@@ -201,6 +203,152 @@ router.get('/why-prose', teamGate, async function (req, res) {
     res.status(500).json({ error: 'Failed to load rep summaries' });
   }
 });
+
+/**
+ * GET /team/averages — the three team-average gauges (2026-08-18).
+ *
+ * ⚠⚠ THE WINDOW IS COMPUTED SERVER-SIDE AND THIS ROUTE ACCEPTS NO from/to.
+ * That is the entire reason it exists rather than widening /team/rep-series:
+ * "the date picker does not drive this panel" becomes a STRUCTURAL property of
+ * the endpoint instead of a convention the browser is trusted to keep. The old
+ * per-rep dials rode rep-series with a second hand-built query string
+ * (`gaugeQP` beside `teamQP`) precisely because the windows differ — one route
+ * serving two windows is the shared-carrier shape that has cost this project
+ * four separate times. There is deliberately no `days` parameter to pass.
+ *
+ * ⚠ rep-series does NOT carry duration_seconds and must not be made to. It is
+ * shaped for time-bucketed per-rep series driven by the picker; this is a
+ * single-window team aggregate. They are different questions.
+ */
+router.get('/averages', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var win = TA.fixedWindow(new Date());
+
+    // Ruling 1 (carried from the dials): the board owner counts as a rep.
+    var candidates = team.repIds.slice();
+    if (team.keyId && candidates.indexOf(team.keyId) === -1) candidates.push(team.keyId);
+    if (candidates.length === 0) {
+      return res.json({ window: win, metrics: emptyMetrics(), reps: { total: 0 } });
+    }
+
+    var calls = [], start = 0;
+    for (;;) {
+      var cq = await admin.from('fathom_calls')
+        .select('id, user_id, prospect_id, duration_seconds')
+        .in('user_id', candidates).gte('call_date', win.from).lte('call_date', win.to)
+        .range(start, start + 999);
+      if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+      calls = calls.concat(cq.data || []);
+      if (!cq.data || cq.data.length < 1000) break;
+      start += 1000;
+    }
+
+    var ids = calls.map(function (c) { return c.id; });
+    var analyses = [], objections = [];
+    for (var i = 0; i < ids.length; i += 100) {
+      var slice = ids.slice(i, i + 100);
+      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome')
+        .in('fathom_call_id', slice).eq('status', 'done');
+      if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
+      analyses = analyses.concat(aq.data || []);
+      var oq = await admin.from('call_highlights').select('fathom_call_id, resolution')
+        .in('fathom_call_id', slice).eq('type', 'objection');
+      if (oq.error) throw new Error('call_highlights: ' + oq.error.message);
+      objections = objections.concat(oq.data || []);
+    }
+
+    // ⚠ "handled" is the SHARED definition (resolution 'handled' OR the call
+    // closed). This is a RATE surface, so it credits closed calls — see
+    // lib/objection-handled.js and the per-call-site guard in
+    // test/handled-carrier.test.js. Do not hand-roll the comparison here.
+    var outcomeByCall = outcomeMap(analyses);
+    var callOwner = {}, callDuration = {};
+    calls.forEach(function (c) { callOwner[c.id] = c.user_id; callDuration[c.id] = c.duration_seconds; });
+
+    var per = {};
+    function slot(uid) {
+      if (!per[uid]) {
+        per[uid] = {
+          user_id: uid,
+          closing: { numerator: 0, total: 0 },
+          objections: { numerator: 0, total: 0 },
+          calltime: { seconds: 0, calls: 0 },
+        };
+      }
+      return per[uid];
+    }
+    candidates.forEach(slot);
+
+    // A prospect is counted ONCE for its owner, and closed if ANY of their calls
+    // closed — the standing close-rate ruling, not a per-call rate.
+    var prospectClosed = {}, prospectOwner = {};
+    calls.forEach(function (c) {
+      var s = slot(c.user_id);
+      // ⚠ duration is nullable (1 of 368 real calls). A missing duration is
+      // EXCLUDED from the average, never counted as a zero-length call.
+      if (typeof c.duration_seconds === 'number' && isFinite(c.duration_seconds)) {
+        s.calltime.seconds += c.duration_seconds;
+        s.calltime.calls += 1;
+      }
+      if (c.prospect_id) {
+        prospectOwner[c.prospect_id] = c.user_id;
+        if (outcomeByCall[c.id] === 'closed') prospectClosed[c.prospect_id] = true;
+      }
+    });
+    Object.keys(prospectOwner).forEach(function (pid) {
+      var s = slot(prospectOwner[pid]);
+      s.closing.total += 1;
+      if (prospectClosed[pid]) s.closing.numerator += 1;
+    });
+    objections.forEach(function (o) {
+      var uid = callOwner[o.fathom_call_id];
+      if (!uid) return;
+      var s = slot(uid);
+      s.objections.total += 1;
+      if (isHandled(o, outcomeByCall[o.fathom_call_id])) s.objections.numerator += 1;
+    });
+
+    var reps = Object.keys(per).map(function (k) { return per[k]; });
+    var metrics = {};
+    TA.METRIC_ORDER.forEach(function (key) {
+      var m = TA.METRICS[key];
+      var pooled = (key === 'calltime') ? TA.poolDuration(reps) : TA.poolRate(reps, key);
+      var counts = TA.repCounts(reps, key);
+      metrics[key] = {
+        key: key, label: m.label, target: m.target, scale: m.scale, unit: m.unit,
+        value: pooled.value, numerator: pooled.numerator, total: pooled.total,
+        enough: pooled.enough, reason: pooled.reason,
+        unit_name: m.unitName, numerator_name: m.numeratorName,
+        band: TA.band(pooled.value, m.target),
+        counts: counts, count_sentence: TA.countSentence(counts),
+      };
+    });
+
+    res.json({ window: win, metrics: metrics, reps: { total: reps.length }, team: { label: team.label } });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[team] averages:', err.message);
+    res.status(500).json({ error: 'Failed to load team averages' });
+  }
+});
+
+function emptyMetrics() {
+  var out = {};
+  TA.METRIC_ORDER.forEach(function (key) {
+    var m = TA.METRICS[key];
+    var counts = { at_or_above: 0, measured: 0, unmeasured: 0, total: 0 };
+    out[key] = {
+      key: key, label: m.label, target: m.target, scale: m.scale, unit: m.unit,
+      value: null, numerator: 0, total: 0, enough: false,
+      reason: 'no reps on this team', unit_name: m.unitName, numerator_name: m.numeratorName,
+      band: null, counts: counts, count_sentence: TA.countSentence(counts),
+    };
+  });
+  return out;
+}
 
 router.get('/rep-series', teamGate, async function (req, res) {
   var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });

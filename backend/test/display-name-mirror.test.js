@@ -14,8 +14,29 @@ const path = require('node:path');
 const D = require('../lib/display-name');
 
 const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
-const strip = (raw) => raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-  .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+/**
+ * ⚠⚠ LINE COMMENTS ARE STRIPPED **FIRST**, AND THE ORDER IS LOAD-BEARING.
+ * Stripping block comments first treats a `/*` that appears INSIDE a `//` line
+ * as a real comment opener. routes/team.js begins:
+ *
+ *     // /team/* — v1.4 Manager view. Gated to manager+owner...
+ *                      ^^ this is not a comment opener, but a block-first
+ *                         stripper reads it as one
+ *
+ * That file contained NO closing delimiter at all, so the lazy regex never
+ * matched and this test passed — by luck, not by correctness. The first closing
+ * delimiter added to team.js (a JSDoc block, 2026-08-18) instantly swallowed the
+ * first 200 lines INCLUDING the display-name import, and this guard failed
+ * claiming the resolver was not imported when it plainly was.
+ *
+ * (Writing this note also broke the file once, by quoting a closing delimiter
+ * inside the block comment explaining closing delimiters. Hence the words.)
+ *
+ * Line-comments-first is correct in both orders of appearance and costs nothing.
+ */
+const strip = (raw) => raw.split('\n')
+  .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
 const HTML = strip(read('web/dashboard.html'));
 
 test('precedence: stored name → Title-Cased local-part → id stub', () => {

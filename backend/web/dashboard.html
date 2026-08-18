@@ -59,6 +59,19 @@
       --good:         #4ade80;
       --mid:          #fbbf24;
       --bad:          #f87171;
+      /* ⚠ ONE FAMILY, BY CONSTRUCTION — Justin's constraint on the gauges
+         (2026-08-18): "whatever treatment the green gets, the yellow and red
+         get the SAME one", which is why the old dials read cartoony. Every
+         gauge shade is an rgba() of one of these triples at a shared alpha, so
+         the three bands cannot drift apart by someone hand-picking a dim
+         yellow. Same reason --accent-rgb exists, and the same failure it was
+         created for: rgba() cannot read a hex token, so without the channel
+         form each dim shade would be a hard-coded copy that stops following
+         its token. team-averages-palette.test.js converts each to the other
+         and fails if any pair drifts. */
+      --good-rgb:     74, 222, 128;
+      --mid-rgb:      251, 191, 36;
+      --bad-rgb:      248, 113, 113;
       --purple:       #c084fc;
       --orange:       #fb923c;
       --cyan:         #22d3ee;
@@ -1939,15 +1952,20 @@
     .srk-thin { font-size: 13px; font-weight: 600; margin-top: 10px; }
     .srk-thin span { display: block; font-size: 12px; font-weight: 400; margin-top: 3px; }
 
-    /* ── Speedometer panel (2026-08-17) ─────────────────────────────────
+    /* ══════════════════════════════════════════════════════════════════
+       REMOVED 2026-08-18 — the PER-REP speedometer panel. Josh: a dial per rep
+       does not work at 20+ reps. Replaced by the TEAM AVERAGES panel below.
+       Archived rather than deleted, per convention. Inner comment delimiters
+       are rewritten as (* *) so this block can nest.
+    (* ── Speedometer panel (2026-08-17) ─────────────────────────────────
        ⚠ SEMANTIC COLOURS ONLY. --good/--mid/--bad carry the meaning; the
        categorical rep ramp is deliberately absent. The needle is a FIXED red
        pointer that means nothing on its own — the ZONES are the message.
        Rebuilt from a 180° banded arc to a real instrument face: 240° sweep,
-       recessed disc, hairline rim, fine ticks, a THIN zone ring. */
+       recessed disc, hairline rim, fine ticks, a THIN zone ring. *)
     .gauge-section { padding-top: 16px; }
     .gauge-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-    .gauge-metric-select { display: flex; gap: 6px; }   /* selector on the LEFT */
+    .gauge-metric-select { display: flex; gap: 6px; }   (* selector on the LEFT *)
     .gauge-metric-btn {
       background: var(--bg-field); border: 1px solid var(--border); color: var(--text);
       padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
@@ -1962,12 +1980,12 @@
     .gauge-dial { position: relative; }
     .gauge-svg { width: 100%; max-width: 210px; height: auto; display: block; margin: 0 auto; }
 
-    /* The face: recessed disc + hairline rim. Without these the dial is just an
-       arc floating on the card, which is what read as cartoony. */
+    (* The face: recessed disc + hairline rim. Without these the dial is just an
+       arc floating on the card, which is what read as cartoony. *)
     .gauge-rim { fill: none; stroke: var(--border-strong); stroke-width: 1; }
 
-    /* ⚠ THIN outer ring — 5px, not the old 13px slab. It informs; it must not
-       dominate the face or compete with the needle. */
+    (* ⚠ THIN outer ring — 5px, not the old 13px slab. It informs; it must not
+       dominate the face or compete with the needle. *)
     .gauge-zone { fill: none; stroke-width: 5; stroke-linecap: butt; }
     .gauge-zone-good { stroke: var(--good); }
     .gauge-zone-mid  { stroke: var(--mid); }
@@ -1978,22 +1996,88 @@
     .gauge-tick-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: 0.8; }
     .gauge-target { stroke: var(--text); stroke-width: 2.5; }
 
-    /* ⚠ ALWAYS RED, never bound to the zone it points at. */
+    (* ⚠ ALWAYS RED, never bound to the zone it points at. *)
     .gauge-needle { fill: #ef4444; }
     .gauge-hub { fill: #16181c; }
     .gauge-hub-ring { fill: none; stroke: #ef4444; stroke-width: 2; }
 
-    /* The readout sits INSIDE the dial, in the gap the 240° sweep leaves open. */
+    (* The readout sits INSIDE the dial, in the gap the 240° sweep leaves open. *)
     .gauge-readout { position: absolute; left: 0; right: 0; bottom: 4px; pointer-events: none; }
     .gauge-value { font-size: 22px; font-weight: 700; line-height: 1.05; }
     .gauge-value-good { color: var(--good); }
     .gauge-value-mid  { color: var(--mid); }
     .gauge-value-bad  { color: var(--bad); }
     .gauge-target-cap { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.75; }
-    .gauge-counts { font-size: 12px; margin-top: 2px; }   /* raw counts (house rule) */
+    .gauge-counts { font-size: 12px; margin-top: 2px; }   (* raw counts (house rule) *)
     .gauge-card-empty { display: flex; flex-direction: column; justify-content: center; min-height: 170px; }
     .gauge-empty { font-size: 12px; font-weight: 600; }
     .gauge-empty span { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; opacity: 0.85; }
+    */
+
+    /* ── Team averages panel (2026-08-18) ───────────────────────────────
+       Justin's chosen design: a SEGMENTED 240° arc — ~40 discrete blocks that
+       light as the value climbs — with a dimmer inner echo ring, radial spokes,
+       the target as a white notch, and the numeral inside.
+
+       ⚠ SEGMENTS, NOT A SMOOTH ARC. That is what reads as instrumentation; a
+       continuous sweep reads as a progress bar bent into a curve, which is what
+       made the previous dials "cartoony".
+
+       ⚠ SEMANTIC COLOURS ONLY, AND ALL THREE GET THE SAME TREATMENT. Every
+       shade below is rgba(var(--<band>-rgb), α) at a SHARED alpha, so green,
+       yellow and red are one family by construction rather than by three
+       separate colour choices that drift. The categorical rep ramp is
+       deliberately absent — accent-palette.test.js fails if they ever mix. */
+    .avg-section { padding-top: 16px; }
+    .avg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .avg-title { font-size: 15px; font-weight: 600; }
+    .avg-window { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+    .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
+    .avg-card { text-align: center; padding: 4px 4px 12px; }
+    .avg-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .avg-dial { position: relative; }
+    .avg-svg { width: 100%; max-width: 230px; height: auto; display: block; margin: 0 auto; }
+
+    /* The unlit blocks: the band's OWN hue, heavily dimmed, so the empty part of
+       the arc belongs to the same instrument rather than reading as grey chrome. */
+    .avg-seg { stroke-linecap: butt; stroke-width: 12; fill: none; }
+    .avg-seg-off-good { stroke: rgba(var(--good-rgb), 0.10); }
+    .avg-seg-off-mid  { stroke: rgba(var(--mid-rgb),  0.10); }
+    .avg-seg-off-bad  { stroke: rgba(var(--bad-rgb),  0.10); }
+    .avg-seg-on-good  { stroke: var(--good); }
+    .avg-seg-on-mid   { stroke: var(--mid); }
+    .avg-seg-on-bad   { stroke: var(--bad); }
+
+    /* Inner echo — the same lit arc repeated smaller and dimmer. Depth, not
+       information: it carries no value the outer ring does not. */
+    .avg-echo { fill: none; stroke-width: 3; stroke-linecap: butt; }
+    .avg-echo-good { stroke: rgba(var(--good-rgb), 0.28); }
+    .avg-echo-mid  { stroke: rgba(var(--mid-rgb),  0.28); }
+    .avg-echo-bad  { stroke: rgba(var(--bad-rgb),  0.28); }
+
+    .avg-spoke { stroke: var(--text); stroke-width: 1; opacity: 0.22; }
+    /* The target notch is deliberately WHITE and not a band colour — it marks
+       where the bar is, which is a different kind of statement from how the
+       team is doing, and colouring it would blend the two. */
+    .avg-notch { stroke: #ffffff; stroke-width: 2.5; stroke-linecap: round; }
+    .avg-scale-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: 0.55; }
+
+    .avg-readout { position: absolute; left: 0; right: 0; bottom: 6px; pointer-events: none; }
+    .avg-value { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+    .avg-value-good { color: var(--good); }
+    .avg-value-mid  { color: var(--mid); }
+    .avg-value-bad  { color: var(--bad); }
+    .avg-value-unit { font-size: 15px; font-weight: 600; margin-left: 1px; }
+    .avg-target-cap { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; margin-top: 3px; }
+    /* Raw counts under every rate — house rule. */
+    .avg-counts { font-size: 12px; margin-top: 6px; }
+    /* ⚠ The three-group count sentence. This is the part that makes the panel
+       work at 20+ reps, and it is why the unmeasured group is named in words
+       rather than folded into the denominator. */
+    .avg-reps { font-size: 12px; font-weight: 600; margin-top: 2px; }
+    .avg-card-empty { display: flex; flex-direction: column; justify-content: center; min-height: 180px; }
+    .avg-empty { font-size: 12px; font-weight: 600; }
+    .avg-empty span { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; opacity: 0.85; }
     .team-controls-row { margin-bottom: 28px; justify-content: flex-end; }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
@@ -2712,7 +2796,10 @@
     // ⚠ MUST be declared null, not left undefined: the lazy kick tests
     // `=== null`, so an undeclared key means the lane never loads and the
     // panel renders a skeleton forever — no error, just a permanent spinner.
-    teamGauges: null, teamGaugesLoading: false, teamGaugeMetric: 'objections',
+    /* teamGauges: null, teamGaugesLoading: false, teamGaugeMetric: 'objections', */
+    // ↑ REMOVED 2026-08-18 with the per-rep dials. ↓ its replacement, declared
+    // with the SAME `null` sentinel for exactly the reason above.
+    teamAverages: null, teamAveragesLoading: false,
     // 12b — the rolling section card. ⚠ null, not undefined: the lazy kick
     // tests === null (see the sentinel rule).
     sectionRank: null, sectionRankLoading: false, sectionRankIndex: 0,
@@ -4626,12 +4713,17 @@
       // model-free, so it is cheap to refetch when the selector changes.
       why:      { flag: 'teamWhyLoading',         set: 'teamWhy',        url: '/team/why-prose?' + teamQP() },
       repSeries:{ flag: 'teamRepSeriesLoading',  set: 'teamRepSeries',  url: '/team/rep-series?' + teamQP('bucket=' + repSeriesBucket() + (state.teamObjectionCategory ? '&objection_category=' + state.teamObjectionCategory : '')) },
-      // ⚠ THE GAUGE LANE DOES NOT USE teamQP(). teamQP injects state.teamRange,
-      // and this panel's entire purpose is a FIXED window the picker cannot move.
-      // Using it here would make the panel silently follow the picker — the same
-      // shared-carrier failure that has already bitten this file twice. Pinned by
-      // test/rep-gauges.test.js.
-      repGauges:{ flag: 'teamGaugesLoading', set: 'teamGauges', url: '/team/rep-series?' + gaugeQP(gaugeWindow()) },
+      /* repGauges:{ flag: 'teamGaugesLoading', set: 'teamGauges', url: '/team/rep-series?' + gaugeQP(gaugeWindow()) }, */
+      // ⚠⚠ THE FIXED WINDOW IS NOW THE SERVER'S, NOT A CLIENT CONVENTION.
+      // The old lane above carried a hand-built query string (gaugeQP beside
+      // teamQP) so the picker's range could not leak in — correct, but it relied
+      // on every future editor knowing not to "simplify" it to teamQP(). The
+      // replacement calls a route that accepts NO from/to at all and computes
+      // the 7 days itself, so the panel cannot follow the picker even if this
+      // line is rewritten carelessly. Structural, not conventional.
+      // Team selection IS still shared, and is the only thing passed.
+      teamAverages:{ flag: 'teamAveragesLoading', set: 'teamAverages',
+                     url: '/team/averages' + (state.teamSelected ? '?team=' + encodeURIComponent(state.teamSelected) : '') },
     };
     var c = map[which]; if (!c) return;
     if (c.flag && state[c.flag]) return;
@@ -4653,18 +4745,23 @@
   // Reuses rangeToIso() so "last 7 days inclusive" means exactly what it means
   // for the picker's own default — two definitions of "7 days" on one page would
   // be a difference nobody could see and everybody would argue about.
-  function gaugeWindow() {
-    var today = new Date().toISOString().slice(0, 10);
-    return rangeToIso(addDays(today, -6), today);
-  }
-  // The gauge lane's own query builder. Separate from teamQP ON PURPOSE: teamQP
-  // reads state.teamRange, and inheriting it here is the exact bug this panel
-  // must not have. It still carries the team selection, which IS shared.
-  function gaugeQP(win) {
-    var qp = 'from=' + encodeURIComponent(win.from) + '&to=' + encodeURIComponent(win.to) + '&bucket=day';
-    if (state.teamSelected) qp += '&team=' + encodeURIComponent(state.teamSelected);
-    return qp;
-  }
+  /* REMOVED 2026-08-18 — the per-rep dials' window helpers. Their job (keeping
+   * the picker out of this panel) is now done by GET /team/averages computing
+   * the window SERVER-SIDE, which a careless client edit cannot undo.
+   *
+   * function gaugeWindow() {
+   *   var today = new Date().toISOString().slice(0, 10);
+   *   return rangeToIso(addDays(today, -6), today);
+   * }
+   * // The gauge lane's own query builder. Separate from teamQP ON PURPOSE: teamQP
+   * // reads state.teamRange, and inheriting it here is the exact bug this panel
+   * // must not have. It still carries the team selection, which IS shared.
+   * function gaugeQP(win) {
+   *   var qp = 'from=' + encodeURIComponent(win.from) + '&to=' + encodeURIComponent(win.to) + '&bucket=day';
+   *   if (state.teamSelected) qp += '&team=' + encodeURIComponent(state.teamSelected);
+   *   return qp;
+   * }
+   */
 
   // Team view defaults to LAST 7 DAYS (Justin's spec) — set once on first entry,
   // then the manager's own preset choices stick.
@@ -4920,7 +5017,7 @@
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
     if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
-    if (state.teamGauges === null && !state.teamGaugesLoading) loadTeam('repGauges');
+    if (state.teamAverages === null && !state.teamAveragesLoading) loadTeam('teamAverages');
     // 10d is lazy and separate: it can spend a model call per rep on a changed
     // period, and the board must never wait on it.
     if (state.teamWhy === null && !state.teamWhyLoading) loadTeam('why');
@@ -4949,7 +5046,7 @@
       teamHeaderHtml()
       // Justin's placement: title → gauges → picker → line graphs. The dials sit
       // ABOVE the picker because they do not answer to it.
-      + gaugePanelHtml()
+      + avgPanelHtml()
       + teamControlsHtml()
       /* REMOVED 2026-08-16 — Justin asked twice: the glance stat card between the
          picker and the graphs is gone. Its Cash Collected / Close Rate /
@@ -5528,6 +5625,17 @@
   function closeTeamDetail() { state.teamDetailMetric = null; renderTeamView(); }
 
 
+  /* ══════════════════════════════════════════════════════════════════════════
+   * REMOVED 2026-08-18 — the PER-REP SPEEDOMETER PANEL, replaced by the team
+   * averages panel below. Josh: a dial per rep does not work at 20+ reps, which
+   * is right — at that size the useful question is how many reps clear the bar,
+   * not what each one scores.
+   *
+   * lib/rep-gauges.js and its two test files went with it. The SEEDED rows are
+   * deliberately left in place: they still feed the rep line graphs.
+   *
+   * Archived rather than deleted, per convention.
+   * ══════════════════════════════════════════════════════════════════════════
   // ── THE SPEEDOMETER PANEL (Justin's spec 2026-08-17) ──────────────────────
   // One semicircular dial per rep on a FIXED last-7-days window. Mirrors
   // lib/rep-gauges.js — that module is the definition and this is the render;
@@ -5723,6 +5831,187 @@
       rate: enough ? Math.round((numerator / total) * 100) : null,
       reason: enough ? null : (total === 0 ? ('no ' + unit + 's in the last 7 days')
         : ('only ' + total + ' ' + unit + (total === 1 ? '' : 's') + ' in the last 7 days')) };
+  }
+   */
+
+  // ── THE TEAM AVERAGES PANEL (2026-08-18) ──────────────────────────────────
+  // THREE gauges, TEAM-WIDE, on a FIXED last-7-days window. Replaces the per-rep
+  // speedometers: Josh ruled a dial per rep does not work at 20+ reps, and he is
+  // right — at that size the manager's question is "how many are clearing the
+  // bar", which is what the count sentence under each dial answers.
+  //
+  // Mirrors lib/team-averages.js — that module is the definition and this is the
+  // render; team-averages-mirror.test.js fails if the two drift.
+  //
+  // ⚠ THE NUMBERS ARE NOT COMPUTED HERE. Every value, band and count arrives
+  // from GET /team/averages already pooled, so the browser cannot disagree with
+  // the server about what the team average is. Only GEOMETRY lives in this file.
+  var AVG_SWEEP_DEG     = 240;   // a real instrument, not a half circle
+  var AVG_SEGMENT_COUNT = 40;    // discrete blocks — this is what reads as an instrument
+  var AVG_SEGMENT_GAP   = 1.4;   // the dark hairline between blocks
+
+  // Polar → cartesian. 0° is straight up, so -120°..+120° puts both end stops
+  // BELOW the horizontal — which is what makes it a dial rather than an arc.
+  function avgPoint(cx, cy, r, deg) {
+    var a = (deg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+  function avgArc(cx, cy, r, fromDeg, toDeg) {
+    var p0 = avgPoint(cx, cy, r, fromDeg), p1 = avgPoint(cx, cy, r, toDeg);
+    var large = (toDeg - fromDeg) > 180 ? 1 : 0;
+    return 'M ' + p0.x.toFixed(1) + ' ' + p0.y.toFixed(1)
+      + ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 ' + large + ' 1 ' + p1.x.toFixed(1) + ' ' + p1.y.toFixed(1);
+  }
+  // Mirrors lib/team-averages.js valueFraction — CLAMPED, so an over-scale value
+  // parks at the end stop instead of wrapping round to read LOWER than it is.
+  function avgFraction(value, scale) {
+    var v = (typeof value === 'number' && isFinite(value)) ? value : 0;
+    var s = (scale > 0) ? scale : 100;
+    return Math.max(0, Math.min(1, v / s));
+  }
+  function avgAngle(value, scale) {
+    return -(AVG_SWEEP_DEG / 2) + avgFraction(value, scale) * AVG_SWEEP_DEG;
+  }
+  // Mirrors lib/team-averages.js litCount. ⚠ ANY value above zero lights at
+  // least one block: rounding a small non-zero value down to an empty dial is
+  // indistinguishable from having no data.
+  function avgLitCount(value, scale) {
+    if (typeof value !== 'number' || !isFinite(value) || value <= 0) return 0;
+    var n = Math.round(avgFraction(value, scale) * AVG_SEGMENT_COUNT);
+    return Math.max(1, Math.min(AVG_SEGMENT_COUNT, n));
+  }
+  // Mirrors lib/team-averages.js band.
+  function avgBand(value, target) {
+    if (typeof value !== 'number' || !isFinite(value)) return null;
+    if (value >= target) return 'good';
+    if (value >= target * 0.6) return 'mid';
+    return 'bad';
+  }
+
+  /**
+   * The segmented arc. Built as AVG_SEGMENT_COUNT separate <path> strokes rather
+   * than one arc with a dash pattern — a dash array would tie block size to the
+   * radius and drift between the outer ring and the inner echo.
+   */
+  function avgGaugeSvg(value, target, scale, band) {
+    var W = 230, H = 168, cx = 115, cy = 108;
+    var rOuter = 84, rEcho = 62, rSpokeIn = 40, rSpokeOut = 47;
+    var lit = avgLitCount(value, scale);
+    var step = AVG_SWEEP_DEG / AVG_SEGMENT_COUNT;
+    var b = band || 'bad';
+
+    var segs = '';
+    for (var i = 0; i < AVG_SEGMENT_COUNT; i++) {
+      var from = -(AVG_SWEEP_DEG / 2) + i * step;
+      var to = from + step - AVG_SEGMENT_GAP;
+      if (i === AVG_SEGMENT_COUNT - 1) to = AVG_SWEEP_DEG / 2;
+      var on = i < lit;
+      segs += '<path class="avg-seg ' + (on ? 'avg-seg-on-' + b : 'avg-seg-off-' + b) + '" d="'
+        + avgArc(cx, cy, rOuter, from, to) + '"/>';
+    }
+
+    // Inner echo — the lit span repeated smaller and dimmer. Depth only; it
+    // carries nothing the outer ring does not already say.
+    var echo = '';
+    if (lit > 0) {
+      var echoTo = -(AVG_SWEEP_DEG / 2) + lit * step - AVG_SEGMENT_GAP;
+      echo = '<path class="avg-echo avg-echo-' + b + '" d="'
+        + avgArc(cx, cy, rEcho, -(AVG_SWEEP_DEG / 2), echoTo) + '"/>';
+    }
+
+    // Radial spokes at each 20% of scale — the instrument's fixed furniture,
+    // independent of the value.
+    var spokes = '';
+    for (var s = 0; s <= 5; s++) {
+      var sa = -(AVG_SWEEP_DEG / 2) + (s / 5) * AVG_SWEEP_DEG;
+      var p0 = avgPoint(cx, cy, rSpokeIn, sa), p1 = avgPoint(cx, cy, rSpokeOut, sa);
+      spokes += '<line class="avg-spoke" x1="' + p0.x.toFixed(1) + '" y1="' + p0.y.toFixed(1)
+        + '" x2="' + p1.x.toFixed(1) + '" y2="' + p1.y.toFixed(1) + '"/>';
+    }
+
+    // The scale end labels, so the dial is honest about its own range — the
+    // three gauges have DIFFERENT scales and must not be read against each other.
+    var lo = avgPoint(cx, cy, rOuter + 13, -(AVG_SWEEP_DEG / 2));
+    var hi = avgPoint(cx, cy, rOuter + 13, AVG_SWEEP_DEG / 2);
+    var ends = '<text class="avg-scale-label" x="' + lo.x.toFixed(1) + '" y="' + (lo.y + 3).toFixed(1) + '">0</text>'
+      + '<text class="avg-scale-label" x="' + hi.x.toFixed(1) + '" y="' + (hi.y + 3).toFixed(1) + '">' + scale + '</text>';
+
+    // The target notch, crossing the ring. White on purpose: it marks where the
+    // BAR is, which is a different statement from how the team is doing.
+    var ta = avgAngle(target, scale);
+    var t0 = avgPoint(cx, cy, rOuter - 10, ta), t1 = avgPoint(cx, cy, rOuter + 9, ta);
+    var notch = '<line class="avg-notch" x1="' + t0.x.toFixed(1) + '" y1="' + t0.y.toFixed(1)
+      + '" x2="' + t1.x.toFixed(1) + '" y2="' + t1.y.toFixed(1) + '"/>';
+
+    return '<svg class="avg-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-hidden="true">'
+      + segs + echo + spokes + ends + notch + '</svg>';
+  }
+
+  function avgCardHtml(m) {
+    if (!m) return '';
+    var band = avgBand(m.value, m.target);
+    var targetCap = 'Target ' + m.target + (m.unit === 'min' ? ' min' : '%');
+
+    if (m.value === null || m.value === undefined) {
+      // ⚠ WITHHELD, NOT ZEROED. A dial reading 0 claims the team achieved
+      // nothing; "only 2 prospects" says the window is too thin to judge.
+      return '<div class="avg-card avg-card-empty">'
+        + '<div class="avg-name">' + escapeHtml(m.label) + '</div>'
+        + '<div class="avg-empty">Not enough to measure<span>' + escapeHtml(m.reason || '') + '</span></div>'
+        + '<div class="avg-target-cap">' + targetCap + '</div></div>';
+    }
+
+    var valueText = (m.unit === 'min')
+      ? m.value + '<span class="avg-value-unit">min</span>'
+      : m.value + '<span class="avg-value-unit">%</span>';
+
+    // Raw counts under every rate — house rule. Call time has no numerator, so
+    // it states the sample it averaged instead of inventing a ratio.
+    var counts = (m.unit === 'min')
+      ? ('across ' + m.total + ' call' + (m.total === 1 ? '' : 's'))
+      : (m.numerator + ' of ' + m.total + ' ' + m.unit_name + (m.total === 1 ? '' : 's') + ' ' + m.numerator_name);
+
+    return '<div class="avg-card">'
+      + '<div class="avg-name">' + escapeHtml(m.label) + '</div>'
+      + '<div class="avg-dial">' + avgGaugeSvg(m.value, m.target, m.scale, band)
+      + '<div class="avg-readout"><div class="avg-value avg-value-' + band + '">' + valueText + '</div>'
+      + '<div class="avg-target-cap">' + targetCap + '</div></div></div>'
+      + '<div class="avg-counts">' + escapeHtml(counts) + '</div>'
+      + '<div class="avg-reps">' + escapeHtml(m.count_sentence || '') + '</div>'
+      + '</div>';
+  }
+
+  /**
+   * ⚠ CLICK-THROUGH IS DEFERRED, NOT DECLINED — AND IT HAS A NAMED TRIGGER.
+   * All three gauges are deliberately static today. Objection handling was ruled
+   * to open the existing Objections page, but that page is SINGLE-USER
+   * (/me/objections-intel, or /admin/objections-intel/:user_id for one pivoted
+   * rep) and reads state.dateRange — so clicking a TEAM gauge on a FIXED 7-day
+   * window would land on the manager's OWN numbers over a DIFFERENT window. A
+   * click that silently changes both the scope and the range is worse than none.
+   *
+   * ⚠ TRIGGER: Justin has ruled the TEAM OBJECTIONS VIEW gets built, and it is
+   * the block immediately after this one. When it exists, wire objection
+   * handling to it and revisit the other two. This is a dependency with a date,
+   * not a someday.
+   */
+  function avgPanelHtml() {
+    var d = state.teamAverages;
+    var body;
+    if (d === null) body = '<div class="skeleton" style="height:180px;"></div>';
+    else if (d && d._error) body = '<div class="error">Could not load team averages: ' + escapeHtml(d._error) + '</div>';
+    else {
+      var m = (d && d.metrics) || {};
+      var order = ['closing', 'objections', 'calltime'];
+      var cards = order.map(function (k) { return avgCardHtml(m[k]); }).join('');
+      body = cards
+        ? '<div class="avg-grid">' + cards + '</div>'
+        : '<div class="empty"><p>No calls from your reps in the last 7 days.</p></div>';
+    }
+    return '<div class="section fade-in avg-section">'
+      + '<div class="avg-head"><div class="avg-title">Team Averages</div>'
+      + '<div class="avg-window">Last 7 days · fixed — not affected by the date filter below</div></div>'
+      + body + '</div>';
   }
 
   function teamHeaderHtml() {

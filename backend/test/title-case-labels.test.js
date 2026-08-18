@@ -136,10 +136,20 @@ test('⚠⚠ THE COUNT-CAPTION EXCEPTION STILL EXISTS — do not "fix" these', (
   // If a future sweep title-cases these, this fails and says why. "2 Of 14
   // Handled" is worse than "2 of 14 handled"; the caption is evidence under a
   // number, not a label on a control.
-  assert.ok(/' of ' \+ d\.total \+ ' ' \+ m\.unit/.test(LIVE),
-    'the gauge raw-count caption must stay lowercase');
-  assert.ok(/'handled'/.test(LIVE) && /'closed'/.test(LIVE),
-    'the caption units must stay lowercase');
+  // ⚠ ANCHOR RE-POINTED 2026-08-18. This read the per-rep gauge caption
+  // (' of ' + d.total + ' ' + m.unit), which went with that panel — the third
+  // time in this file a removal has quietly emptied an anchor. The team-averages
+  // caption is the same kind of text and carries the exception forward.
+  assert.ok(/' of ' \+ m\.total \+ ' ' \+ m\.unit_name/.test(LIVE),
+    'the team-averages raw-count caption must stay lowercase');
+  assert.ok(/'across ' \+ m\.total \+ ' call'/.test(LIVE),
+    'the call-time sample caption must stay lowercase');
+  // ⚠ The rep-count sentence is composed SERVER-SIDE (lib/team-averages.js
+  // countSentence) and reaches the page as data, so it is not in this HTML and
+  // asserting on LIVE here would pass vacuously forever. Checked at its source.
+  const TA = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-averages.js'), 'utf8');
+  assert.ok(/at or above target/.test(TA) && /not enough calls/.test(TA),
+    'the rep-count sentence is a caption, not a label — it stays lowercase');
 });
 
 test('CONNECTIVES stay lowercase inside a label, and capitalise as the first word', () => {
