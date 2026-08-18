@@ -64,20 +64,42 @@ function renderTeam(overrides) {
     insertAdjacentHTML(_pos, v) { assigned += String(v); events.push('insert'); },
   };
 
+  // ⚠⚠ THE CANVAS NOW ARRIVES BY MOUNT, NOT BY MARKUP (2026-08-18). It used to
+  // be emitted inside the innerHTML string, and this stub's load-bearing trick
+  // was to hand back a canvas ONLY if that id appeared in the assigned markup —
+  // so a chart being built PROVED the canvas existed at draw time.
+  //
+  // The graph-flash fix moved the canvas out of the markup: the string now
+  // carries a SLOT, and mountRepGraphHosts() appends a preserved canvas node
+  // into it. Left as it was, this stub would return null forever and the probe
+  // would silently prove nothing.
+  //
+  // So the stub MODELS THE MOUNT instead, and the property is preserved rather
+  // than weakened: a canvas is returned only if its slot was in the assigned
+  // markup AND the mount step actually ran. Draw-before-assign, and
+  // draw-without-mount, both still yield no chart.
+  const mounted = {};
   const doc = {
     getElementById(id) {
       if (id === 'content') return contentEl;
-      // The load-bearing part: a canvas exists only if the assigned markup
-      // actually contains it. Draw-before-assign therefore yields no chart.
-      if (assigned.indexOf('id="' + id + '"') === -1) return null;
+      if (!mounted[id]) return null;
       // The context carries the id so the test can tell the two charts apart
       // (repSeriesChart passes getContext('2d'), never the element itself).
       return { id: id, getContext: () => ({ __canvasId: id }) };
     },
     querySelector: () => null,
-    querySelectorAll: () => [],
+    querySelectorAll(sel) {
+      if (sel !== '.rep-graph-slot') return [];
+      // Slots exist only where the assigned markup declares them.
+      const ids = (assigned.match(/data-canvas="([^"]+)"/g) || [])
+        .map((m) => m.replace(/.*data-canvas="([^"]+)".*/, '$1'));
+      return ids.map((id) => ({
+        getAttribute: (a) => (a === 'data-canvas' ? id : null),
+        appendChild() { mounted[id] = true; events.push('mount:' + id); },
+      }));
+    },
     addEventListener() {},
-    createElement: () => ({ style: {}, classList: { add() {}, remove() {} }, appendChild() {} }),
+    createElement: () => ({ style: {}, className: '', classList: { add() {}, remove() {} }, appendChild() {} }),
     body: { appendChild() {}, classList: { add() {}, remove() {} }, dataset: {} },
     documentElement: { style: {} },
   };

@@ -120,3 +120,100 @@ test('a view the coalescer does not own is left alone', () => {
   assert.strictEqual(h.calls.fadeStripped, 0,
     'and its entrance animation must not be stripped as a side effect');
 });
+
+// ── the GRAPHS had their own repeat underneath the section renders ─────────
+/**
+ * ⚠⚠ MEASURED BEFORE THE FIX, against the real document with genuine Chart.js:
+ * one visit destroyed and rebuilt each of the three graphs FOUR times —
+ * 15 Chart constructions and 12 destructions across the five lane-arrival
+ * groups. After: 3 constructions, 0 destructions, 12 in-place updates.
+ *
+ * ⚠ THE REBUILD WAS FORCED, NOT CHOSEN. Chart.js binds to a canvas NODE, and
+ * the canvas used to be emitted inside the innerHTML string — so every render
+ * replaced it and orphaned the instance. destroy-and-recreate was the only
+ * thing that COULD work. Preserving the node is what makes update() reachable.
+ */
+test('⚠⚠ the canvas is NOT part of the innerHTML string — that is what forced the rebuild', () => {
+  const at = LIVE.indexOf('function repGraphBodyHtml');
+  const fn = LIVE.slice(at, LIVE.indexOf('\n  }', at) + 4);
+  assert.ok(fn.length > 150 && fn.length < 2000, 'slice suspicious: ' + fn.length);
+  assert.ok(!/<canvas/.test(fn),
+    'emitting <canvas> in the markup means every render replaces the node and '
+    + 'orphans the Chart instance — the flash follows by construction');
+  assert.ok(/rep-graph-slot/.test(fn) && /data-canvas="/.test(fn),
+    'the markup must emit a slot the preserved host is mounted into');
+});
+
+test('the canvas host is preserved across renders, and created once per id', () => {
+  assert.ok(/var repGraphHosts = \{\};/.test(LIVE), 'the host registry must exist');
+  const at = LIVE.indexOf('function repGraphHostFor');
+  const fn = LIVE.slice(at, LIVE.indexOf('\n  }', at) + 4);
+  assert.ok(fn.length > 150 && fn.length < 1500, 'slice suspicious: ' + fn.length);
+  assert.ok(/if \(!repGraphHosts\[canvasId\]\)/.test(fn), 'created once, then reused');
+  assert.ok(/createElement\('canvas'\)/.test(fn), 'the canvas is a real node, not markup');
+});
+
+test('⚠ MOUNT RUNS BEFORE DRAW at BOTH call sites — ordering established, not described', () => {
+  ['drawRepSeriesCharts();', 'function drawRepOwnChart()'].forEach((anchor) => {
+    const at = LIVE.indexOf(anchor);
+    assert.ok(at > 0, 'anchor is stale: ' + anchor);
+  });
+  // team view
+  const teamDraw = LIVE.indexOf('drawRepSeriesCharts();');
+  const teamMount = LIVE.lastIndexOf('mountRepGraphHosts();', teamDraw);
+  assert.ok(teamMount > 0 && teamDraw - teamMount < 400,
+    'the team view must mount its hosts immediately before drawing');
+  // pivoted rep's own graph — parity
+  const ownAt = LIVE.indexOf('function drawRepOwnChart()');
+  const ownBody = LIVE.slice(ownAt, LIVE.indexOf('\n  }', ownAt) + 4);
+  assert.ok(/mountRepGraphHosts\(\)/.test(ownBody),
+    'PARITY: the pivoted rep graph is preserved too, or one graph still flashes '
+    + 'and it reads as an intermittent bug rather than a missed call site');
+
+  /**
+   * ⚠⚠ AND IT MUST HAVE A SLOT TO MOUNT INTO. The line above PASSED VACUOUSLY
+   * on first write: drawRepOwnChart called mountRepGraphHosts(), but
+   * repOwnGraphHtml still emitted its own inline <canvas> with no
+   * .rep-graph-slot anywhere — so the mount was a no-op and that graph kept
+   * being destroyed and rebuilt while the other three no longer were. The
+   * assertion described parity that did not exist. Caught by the render probe,
+   * not by reading the code.
+   */
+  const ownHtmlAt = LIVE.indexOf('function repOwnGraphHtml');
+  const ownHtml = LIVE.slice(ownHtmlAt, LIVE.indexOf('\n  }', ownHtmlAt) + 4);
+  assert.ok(ownHtml.length > 200 && ownHtml.length < 2500, 'slice suspicious: ' + ownHtml.length);
+  assert.ok(!/<canvas/.test(ownHtml),
+    'the rep-own graph must emit a SLOT, not a canvas — an inline canvas is '
+    + 'replaced on every render and the mount call above becomes decorative');
+  assert.ok(/data-canvas="repOwnChart"/.test(ownHtml), 'and the slot must name its canvas');
+});
+
+test('⚠⚠ an existing chart is UPDATED, not destroyed — and without animation', () => {
+  const at = LIVE.indexOf('var existing = repCharts[canvasId];');
+  assert.ok(at > 0, 'the update path is missing');
+  const fn = LIVE.slice(at, LIVE.indexOf('repCharts[canvasId] = new Chart', at));
+  assert.ok(fn.length > 150 && fn.length < 1500, 'slice suspicious: ' + fn.length);
+  assert.ok(/existing\.canvas === ctx/.test(fn),
+    'guard on canvas identity — never update a chart bound to a dead canvas');
+  assert.ok(/existing\.update\('none'\)/.test(fn),
+    "update('none') — the default ANIMATES the transition, which is just a "
+    + 'slower version of the flash');
+  assert.ok(/data\.datasets = datasets/.test(fn), 'new data must reach the instance');
+});
+
+/**
+ * ⚠ THE PARITY RULE, ASSERTED: a graph that stops flashing but drops the hidden
+ * set on every data arrival is a WORSE bug than the one being fixed.
+ */
+test('⚠ the hidden set and the fixed average survive an update by construction', () => {
+  const at = LIVE.indexOf('function repSeriesChart');
+  const fn = LIVE.slice(at, LIVE.indexOf('repCharts[canvasId] = new Chart', at));
+  assert.ok(fn.length > 1000 && fn.length < 8000, 'slice suspicious: ' + fn.length);
+  // datasets are rebuilt from state on every pass, so the update carries them
+  assert.ok(/hidden: !!\(toggleable && state\.repLineHidden/.test(fn),
+    'hidden must be derived from state, keyed by user_id — not read off the '
+    + 'old chart, which the update replaces');
+  assert.ok(/_fixed: true/.test(fn), 'the team average must stay non-toggleable');
+  assert.ok(/_userId: toggleable \? r\.user_id : null/.test(fn),
+    'the toggle identity travels on the dataset, so an update cannot lose it');
+});

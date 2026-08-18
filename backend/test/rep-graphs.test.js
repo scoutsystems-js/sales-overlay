@@ -178,7 +178,10 @@ test('⚠⚠ the hidden set is keyed by user_id, NEVER by legend index', () => {
   // Bound generously: the point of this assertion is to catch a BACKWARDS or
   // truncated slice (which yields '' or a few characters), not to pin the
   // function's length — a legend block that grows is not a defect.
-  assert.ok(fn.length > 800 && fn.length < 12000, 'slice suspicious: ' + fn.length);
+  // Widened 12000 -> 16000 on 2026-08-18: repSeriesChart gained the
+  // update-in-place path (the graph-flash fix) and its explanation, which is a
+  // legitimate growth of exactly the kind this bound is documented not to pin.
+  assert.ok(fn.length > 800 && fn.length < 16000, 'slice suspicious: ' + fn.length);
   assert.ok(fn.indexOf('function repSeriesChart') === 0, 'slice must start at the function');
   assert.ok(/_userId: toggleable \? r\.user_id : null/.test(fn), 'the dataset must carry user_id');
   assert.ok(/state\.repLineHidden\[r\.user_id\]/.test(fn), 'restore must look up BY user_id');

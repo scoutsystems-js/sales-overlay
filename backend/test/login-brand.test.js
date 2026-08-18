@@ -35,7 +35,7 @@ test('the lockup sits ABOVE the sign-in form, not below it', () => {
 test('the wordmark is the full name, big, bold and green', () => {
   assert.ok(/class="brand-name">SCOUT SYSTEMS</.test(LOGIN),
     'the wordmark must read SCOUT SYSTEMS');
-  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('.card-header {'));
+  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('@media (max-width: 560px)'));
   assert.ok(css.length > 60 && css.length < 900, 'slice suspicious: ' + css.length);
   const size = Number((css.match(/font-size:\s*(\d+)px/) || [])[1]);
   const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
@@ -101,22 +101,101 @@ test('⚠ the soft tints DERIVE from the brand green rather than copying it', ()
     'the OLD green (#22c55e) must not survive in channel form anywhere in :root');
 });
 
+/**
+ * ⚠ CONVERTED, NOT DELETED (2026-08-18). These two tests were written against
+ * the small lockup mark, which the background ruling superseded. Their SUBJECT
+ * survives — the mark must still be DRAWN rather than fetched, and must still
+ * match the nav geometry rather than being redrawn by eye — so they now assert
+ * it of the background layer. Deleting them with the lockup would have quietly
+ * dropped both properties.
+ */
 test('the mark is drawn, not fetched — no asset request on the login page', () => {
-  const lockup = LOGIN.slice(LOGIN.indexOf('class="brand-lockup"'), LOGIN.indexOf('class="card-header"'));
-  assert.ok(lockup.length > 200 && lockup.length < 3000, 'slice suspicious: ' + lockup.length);
-  assert.ok(/<svg/.test(lockup), 'inline SVG');
-  assert.ok(!/<img|icon\.png|url\(/.test(lockup),
-    'no image request — and specifically not icon.png, which is an app icon '
-    + 'with no alpha, a baked-in wordmark and a watermark');
-  assert.ok(/aria-hidden="true"/.test(lockup),
-    'the name is real text right beneath it; a reader must not hear it twice');
+  const at = LOGIN_LIVE.indexOf('body::before');
+  const css = LOGIN_LIVE.slice(at, LOGIN_LIVE.indexOf('}', at));
+  assert.ok(css.length > 200 && css.length < 4000, 'slice suspicious: ' + css.length);
+  assert.ok(/url\("data:image\/svg\+xml,/.test(css), 'inline SVG data URI, not a file');
+  assert.ok(!/<img|icon\.png|\.jpg|\.webp/.test(LOGIN_LIVE),
+    'no image request anywhere on this page — and specifically not icon.png, '
+    + 'which is an app icon with no alpha, a baked-in wordmark and a watermark');
 });
 
-test('the mark matches the nav logo rather than being redrawn by eye', () => {
-  const lockup = LOGIN.slice(LOGIN.indexOf('class="brand-lockup"'), LOGIN.indexOf('class="card-header"'));
-  const nav = LOGIN.slice(LOGIN.indexOf('class="nav-logo"'), LOGIN.indexOf('class="back"'));
-  const geom = (s) => (s.match(/A[\d.]+ [\d.]+ 0 0 1|r="[\d.]+"/g) || []).join('|');
-  assert.strictEqual(geom(lockup), geom(nav),
-    'same arcs and radii as the nav mark — a hand-redrawn second version is how '
-    + 'two subtly different logos end up on one product');
+test('the background mark matches the nav logo rather than being redrawn by eye', () => {
+  const at = LOGIN_LIVE.indexOf('body::before');
+  const css = LOGIN_LIVE.slice(at, LOGIN_LIVE.indexOf('}', at));
+  const nav = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="nav-logo"'), LOGIN_LIVE.indexOf('class="back"'));
+  const arcs = (t) => (t.match(/A[\d.]+ [\d.]+ 0 0 1 [\d.]+ [\d.]+/g) || []).join('|');
+  const radii = (t) => (t.match(/r='([\d.]+)'|r="([\d.]+)"/g) || []).map((m) => m.replace(/['"]/g, '')).join('|');
+  assert.ok(arcs(css).length > 0, 'no arcs found in the background mark');
+  assert.strictEqual(arcs(css), arcs(nav),
+    'same three arcs as the nav mark — a hand-redrawn second version is how two '
+    + 'subtly different logos end up on one product');
+  assert.strictEqual(radii(css), radii(nav), 'same three dot radii');
+});
+
+// ── the mark as a BACKGROUND (Justin, 2026-08-18) ──────────────────────────
+/**
+ * ⚠ SUPERSEDES the small-mark-above-the-wordmark lockup. The mark is now a
+ * large shape behind the form, using the same treatment as the dashboard's
+ * page motifs. The ARTWORK ruling is unchanged — still the vector, never
+ * icon.png; only the placement moved.
+ */
+const LOGIN_LIVE = LOGIN.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  .replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+test('⚠ the small mark is GONE from the lockup — one logo per screen', () => {
+  const lockup = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="brand-lockup"'),
+                                  LOGIN_LIVE.indexOf('class="card-header"'));
+  assert.ok(lockup.length > 20 && lockup.length < 600, 'slice suspicious: ' + lockup.length);
+  assert.ok(!/<svg/.test(lockup),
+    'the background mark plus a small mark above it is the same logo twice');
+  assert.ok(/SCOUT SYSTEMS/.test(lockup), 'the wordmark stays');
+});
+
+test('the wordmark roughly doubled', () => {
+  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
+  const size = Number((css.match(/font-size:\s*(\d+)px/) || [])[1]);
+  assert.ok(size >= 60 && size <= 76, 'about 2x the original 34px, got ' + size);
+});
+
+test('⚠ the background layer follows the motif treatment exactly', () => {
+  const at = LOGIN_LIVE.indexOf('body::before');
+  assert.ok(at > 0, 'the background layer is missing');
+  const css = LOGIN_LIVE.slice(at, LOGIN_LIVE.indexOf('}', at));
+  assert.ok(css.length > 200 && css.length < 4000, 'slice suspicious: ' + css.length);
+
+  const op = Number((css.match(/opacity:\s*([\d.]+)/) || [])[1]);
+  assert.ok(op >= 0.16 && op <= 0.30, 'opacity must sit in the established band: ' + op);
+  assert.ok(/pointer-events:\s*none/.test(css),
+    'it must never intercept a click on the form beneath it');
+  assert.ok(/position:\s*fixed/.test(css) && /z-index:\s*0/.test(css), 'behind the content');
+  assert.ok(/background-size:\s*50vmin/.test(css), 'Justin asked for ~50% of the screen');
+});
+
+test('the form paints ABOVE the mark', () => {
+  assert.ok(/\.login-nav, \.login-main, \.login-footer \{ position: relative; z-index: 1; \}/.test(LOGIN_LIVE),
+    'without this the shape paints over the fields rather than behind them');
+});
+
+/**
+ * ⚠⚠ A DATA URI IS AN OPAQUE STRING TO CSS — var() DOES NOT RESOLVE INSIDE IT,
+ * and the `#` must be percent-encoded. So the brand green is necessarily
+ * hard-coded here in its URL-ENCODED SPELLING, which a sweep over `#09e046`
+ * will not match. This test is the pin that keeps the two from drifting.
+ */
+test('⚠⚠ the URL-encoded green in the data URI matches the token', () => {
+  const at = LOGIN_LIVE.indexOf('body::before');
+  const css = LOGIN_LIVE.slice(at, LOGIN_LIVE.indexOf('}', at));
+  const token = (STYLE.match(/--green:\s*#([0-9a-fA-F]{6})/) || [])[1];
+  assert.ok(token, '--green not found in the auth stylesheet');
+  const encoded = '%23' + token;
+  assert.ok(css.indexOf(encoded) !== -1,
+    'the data URI must carry the CURRENT brand green as ' + encoded
+    + ' — it cannot use var(--green), so this pin is the only thing keeping '
+    + 'the background in step with the token');
+  assert.ok(!/%2334d399|%234ade80|%2322c55e/.test(css), 'no retired green may survive here');
+});
+
+test('reduced-contrast users lose the shape entirely, as the motifs do', () => {
+  assert.ok(/@media \(prefers-contrast: more\) \{ body::before \{ display: none; \} \}/.test(LOGIN_LIVE),
+    'the dashboard motifs hide under prefers-contrast: more and so must this');
 });

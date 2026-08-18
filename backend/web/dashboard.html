@@ -1444,7 +1444,14 @@
     }
     .review-speaker-badge.closer   { background: rgba(var(--accent-rgb), 0.14); color: var(--accent); }
     .review-speaker-badge.prospect { background: rgba(100, 116, 139, 0.18); color: var(--text); }
-    .rep-graph { height: 300px; margin-top: 12px; }
+    /* ⚠ THE 300px BOX MOVED FROM .rep-graph TO .rep-graph-slot. The canvas host
+       is appended into the slot at render time rather than being part of the
+       markup, and the loading skeleton is a direct child of the SLOT — it is
+       `height: 100%`, so leaving the height on the inner host would have
+       collapsed the skeleton to zero and shown a 0px gap while the series
+       loaded. The slot owns the box; the host fills it. */
+    .rep-graph-slot { height: 300px; margin-top: 12px; }
+    .rep-graph { height: 100%; }
     /* (k2) The all-hidden note. Full-strength text, not a muted hint — it is a
        statement about the user's own action, and the no-grey rule applies. */
     .rep-graph-note { display: none; font-size: 13px; font-weight: 600; color: var(--text); margin-top: 10px; }
@@ -5509,6 +5516,47 @@
   // board would arrive already hidden on their own coaching page. One shared
   // hidden set across surfaces that mean different things is the
   // shared-carrier trap in a new costume.
+  /**
+   * The preserved canvas hosts, one per graph id. Created once and re-appended
+   * into their slot after every render, so the Chart instance bound to each
+   * canvas survives a full innerHTML replacement.
+   *
+   * ⚠ PARITY: all three team graphs go through here, and so does the pivoted
+   * rep's own graph. A canvas preserved for two of them and rebuilt for the
+   * third would leave one graph still flashing and look like an intermittent
+   * bug rather than a missed call site.
+   */
+  var repGraphHosts = {};
+  function repGraphHostFor(canvasId) {
+    if (!repGraphHosts[canvasId]) {
+      var host = document.createElement('div');
+      host.className = 'rep-graph';
+      var c = document.createElement('canvas');
+      c.id = canvasId;
+      host.appendChild(c);
+      repGraphHosts[canvasId] = host;
+    }
+    return repGraphHosts[canvasId];
+  }
+
+  /**
+   * ⚠ MUST RUN AFTER content.innerHTML AND BEFORE drawRepSeriesCharts(). The
+   * ordering is ESTABLISHED by call position rather than described — the draw
+   * step looks the canvas up by id, so a host that has not been mounted yet
+   * simply produces no chart, silently. Both callers do render → mount → draw.
+   */
+  function mountRepGraphHosts() {
+    var slots = document.querySelectorAll('.rep-graph-slot');
+    for (var i = 0; i < slots.length; i++) {
+      var id = slots[i].getAttribute('data-canvas');
+      if (!id) continue;
+      var host = repGraphHostFor(id);
+      // While the series is loading the skeleton occupies the slot instead.
+      host.style.display = slots[i].getAttribute('data-loading') ? 'none' : '';
+      slots[i].appendChild(host);
+    }
+  }
+
   function repSeriesChart(canvasId, series, pick, yLabel, toggleable) {
     // ⚠ One flag, derived from the axis label, so the unit cannot be set in one
     // place and forgotten in another (the ticks, the tooltip and the max all
@@ -5516,7 +5564,6 @@
     var isMinutes = /minutes/i.test(yLabel || '');
     var ctx = document.getElementById(canvasId);
     if (!ctx || !window.Chart || !series) return;
-    if (repCharts[canvasId]) { repCharts[canvasId].destroy(); repCharts[canvasId] = null; }
 
     // Drop reps with no point at all in this window.
     // ⚠ A series the payload does not carry is NO DATA, not a crash. The third
@@ -5565,9 +5612,40 @@
       });
     }
 
+    var labels = (series.buckets || []).map(function (b) { return b.label; });
+
+    /**
+     * ⚠⚠ UPDATE IN PLACE WHEN THE CHART IS ALREADY THERE — this is what stops
+     * the blink. Destroy-and-recreate blanks the canvas and redraws from
+     * nothing, which is a visible FLASH; update() re-draws the same instance.
+     *
+     * `update('none')` — the 'none' matters. The default animates the
+     * transition, and an animated re-draw on every unrelated lane arrival is
+     * just a slower version of the flash.
+     *
+     * ⚠ THE HIDDEN SET AND THE FIXED AVERAGE SURVIVE BY CONSTRUCTION, and that
+     * is deliberate rather than lucky: `datasets` above is rebuilt from
+     * state.repLineHidden keyed by user_id, and the baseline is re-marked
+     * _fixed. So replacing data.datasets carries the legend selection with it —
+     * a graph that stopped flashing but dropped the hidden set on every data
+     * arrival would be a worse bug than the one being fixed.
+     *
+     * The canvas identity check is the guard: after a nav away and back the
+     * host is the same node, but if anything ever replaces it we fall through
+     * to a clean rebuild rather than updating a chart bound to a dead canvas.
+     */
+    var existing = repCharts[canvasId];
+    if (existing && existing.canvas === ctx) {
+      existing.data.labels = labels;
+      existing.data.datasets = datasets;
+      existing.update('none');
+      return;
+    }
+    if (existing) { existing.destroy(); repCharts[canvasId] = null; }
+
     repCharts[canvasId] = new Chart(ctx.getContext('2d'), {
       type: 'line',
-      data: { labels: (series.buckets || []).map(function (b) { return b.label; }), datasets: datasets },
+      data: { labels: labels, datasets: datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'nearest', intersect: false },
@@ -5720,11 +5798,30 @@
   // While a new range is fetching, a bare 300px canvas is a tall blank box — the
   // other panels use skeletons, so these do too. The canvas is still emitted so
   // drawRepSeriesCharts has something to draw into the moment data lands.
+  /**
+   * ⚠⚠ THE CANVAS IS NO LONGER PART OF THE innerHTML STRING, AND THAT IS THE
+   * WHOLE FIX FOR THE GRAPH FLASH (Josh, 2026-08-18).
+   *
+   * MEASURED: one visit to the team page destroyed and rebuilt each of the
+   * three graphs FOUR times — 15 Chart constructions and 12 destructions across
+   * the five lane-arrival groups. The section coalescing fixed the markup
+   * flashing; the charts had their own repeat underneath it.
+   *
+   * ⚠ AND THE REBUILD WAS FORCED, NOT CHOSEN. Chart.js binds to a canvas NODE.
+   * Emitting `<canvas>` inside the innerHTML string meant every render replaced
+   * that node and orphaned the instance, so destroy-and-recreate was the only
+   * thing that COULD work — `update()` was not an option that had been passed
+   * over, it was unreachable. Preserving the node is what makes update()
+   * possible at all.
+   *
+   * So the markup emits a SLOT, and the real canvas lives in a host element
+   * kept outside the render cycle and re-appended after each assignment.
+   */
   function repGraphBodyHtml(canvasId) {
     var loading = state.teamRepSeriesLoading || (!state.teamRepSeries && !state.teamRepSeriesLoading);
-    return '<div class="rep-graph">'
+    return '<div class="rep-graph-slot" data-canvas="' + canvasId + '"'
+      + (loading ? ' data-loading="1"' : '') + '>'
       + (loading ? '<div class="rep-graph-skeleton skeleton"></div>' : '')
-      + '<canvas id="' + canvasId + '"' + (loading ? ' style="display:none;"' : '') + '></canvas>'
       + '</div>'
       // (k2) The all-hidden note. ⚠ A SIBLING of .rep-graph, not a child —
       // .rep-graph is a FIXED 300px box that Chart.js sizes its canvas against,
@@ -5842,10 +5939,16 @@
     if (!repOwnGraphVisible()) return '';
     var series = repOwnSeries();
     var loading = state.repGraphLoading || state.repGraph === null;
+    // ⚠ PARITY: a SLOT, exactly like the three team graphs. This graph emitted
+    // its own <canvas> inline, so it kept being destroyed and rebuilt on every
+    // re-render while the others no longer were — and the mountRepGraphHosts()
+    // call in drawRepOwnChart had nothing to mount into, which made the parity
+    // assertion pass while the parity itself was absent. Caught by the render
+    // probe, not by reading the code.
     var body = loading
-      ? '<div class="rep-graph"><div class="rep-graph-skeleton skeleton"></div></div>'
+      ? '<div class="rep-graph-slot" data-loading="1"><div class="rep-graph-skeleton skeleton"></div></div>'
       : (series
-          ? '<div class="rep-graph"><canvas id="repOwnChart"></canvas></div>'
+          ? '<div class="rep-graph-slot" data-canvas="repOwnChart"></div>'
           : '<div class="empty"><p>No objection data for this rep in the selected range.</p></div>');
     return '<div class="section fade-in">'
       + '<div class="section-header"><h2>Objection Handling %</h2>'
@@ -5854,6 +5957,7 @@
   }
   function drawRepOwnChart() {
     if (!repOwnGraphVisible()) return;
+    mountRepGraphHosts();   // parity: this graph's canvas is preserved too
     var series = repOwnSeries();
     if (!series) return;
     repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle Rate', false);
@@ -5956,6 +6060,10 @@
     // Chart.js draws only after the assignment above has put the canvases in
     // the DOM. Keep this AFTER content.innerHTML — a canvas that does not exist
     // yet silently produces no chart.
+    // ⚠ MOUNT BEFORE DRAW. The canvases are preserved nodes now, not markup, so
+    // they have to be re-appended into their slots before the draw step can
+    // find them by id. Ordering ESTABLISHED here rather than described.
+    mountRepGraphHosts();
     drawRepSeriesCharts();
   }
 

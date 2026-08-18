@@ -65,11 +65,19 @@
        task, not a code change — swapping this <svg> for an <img> would
        reintroduce all four problems at once.
 
-       This SVG is the same mark — concentric arcs over descending dots — as a
-       vector, in the brand green, with no plate, no duplicate word, no
-       watermark and no request. It scales crisply at any size, and a test pins
-       its geometry to the nav mark so the product cannot drift into carrying
-       two subtly different logos.
+       The vector is the same mark — concentric arcs over descending dots — in
+       the brand green, with no plate, no duplicate word, no watermark and no
+       request. It scales crisply at any size.
+
+       ⚠⚠ AMENDED 2026-08-18, SAME DAY: the mark is no longer a small lockup
+       above the wordmark. Justin ruled it becomes a LARGE BACKGROUND SHAPE
+       behind the form (body::before below), and the wordmark roughly doubled.
+       THE RULING ABOVE IS UNCHANGED IN SUBSTANCE — it is about WHICH ARTWORK
+       may represent the mark, and the answer is still "the vector, never
+       icon.png". This amendment only changes WHERE that vector is drawn.
+       Both notes are kept together deliberately: a superseded placement and a
+       standing artwork ruling in two separate places would read as two rulings
+       that disagree.
 
        ⚠ THE TOKEN HERE IS --green, NOT --accent. The auth pages are styled by
        /css/style.css, which has no --accent at all; the dashboard's token set
@@ -77,15 +85,74 @@
        fall back to inherited colour and render the wordmark in plain white —
        correct-looking CSS, wrong page. */
     .brand-lockup { text-align: center; margin: 0 0 26px; }
-    .brand-lockup svg { display: block; margin: 0 auto 14px; }
+    /* Justin, 2026-08-18: roughly 2x. 34 -> 68, and the mobile step with it. */
     .brand-lockup .brand-name {
-      font-size: 34px; font-weight: 800; letter-spacing: 0.06em;
-      color: var(--green); line-height: 1.05;
-      text-shadow: 0 0 24px rgba(var(--green-rgb), 0.35);
+      font-size: 68px; font-weight: 800; letter-spacing: 0.04em;
+      color: var(--green); line-height: 1.02;
+      text-shadow: 0 0 28px rgba(var(--green-rgb), 0.35);
     }
-    @media (max-width: 420px) {
-      .brand-lockup .brand-name { font-size: 27px; }
+    @media (max-width: 560px) {
+      .brand-lockup .brand-name { font-size: 44px; letter-spacing: 0.02em; }
     }
+
+    /* ── THE MARK AS A BACKGROUND (Justin, 2026-08-18) ────────────────────
+       ⚠ THIS SUPERSEDES THE SMALL MARK ABOVE THE WORDMARK. The lockup is now
+       the WORDMARK ALONE; the logo is a large shape behind the form, using the
+       same treatment as the dashboard's page motifs.
+
+       Same rules as those motifs, deliberately rather than by coincidence:
+         • the brand green
+         • opacity inside the established 0.16-0.30 band (0.22)
+         • pointer-events: none, so it can never intercept a click on the form
+         • an ink check before shipping, because this is text over a large shape
+           — the exact collision case that sweep exists for
+
+       ⚠ THE GREEN IS HARD-CODED AS %2309e046 AND CANNOT BE A TOKEN. A data URI
+       is an opaque string to CSS: var() does not resolve inside it, and the `#`
+       must be percent-encoded. That is the URL-ENCODED SPELLING already
+       recorded here — a sweep over `#09e046` will not match it. A test pins
+       this value to --green so the two cannot drift silently. */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.22;
+      background-repeat: no-repeat;
+      /* ⚠ POSITION SET BY THE INK CHECK, NOT BY EYE. At `center 44%` the mark's
+         strokes crossed the FIELD LABELS — measured, 86 ink pixels under the
+         Email label — and the labels are --muted, the lowest-contrast text on
+         the page. Worst-case contrast there was 4.47:1 against a solid stroke,
+         i.e. marginally UNDER the 4.5:1 AA line, and 3.58:1 at the top of the
+         opacity band.
+
+         Raising it puts the dense part of the mark behind the WORDMARK, which
+         measures 7.21:1 over the same backdrop and is large bold text besides.
+         The fields and the button shield themselves — they paint their own
+         opaque backgrounds above this layer — so the only exposed text is the
+         labels, the forgot link and the wordmark.
+
+         ⚠ 18% WAS CHOSEN BY SWEEPING POSITION x SIZE AND MEASURING, NOT BY
+         NUDGING UNTIL IT LOOKED RIGHT. Raising it to 26% made the collision
+         WORSE (86 -> 148 ink pixels) because the mark's descending dots hang
+         below its centre — the opposite of what "move it up" predicts, which is
+         exactly why this is measured rather than reasoned. Of the twelve
+         combinations tried, 50vmin @ 18% is the only one that keeps the full
+         half-screen size AND puts ZERO ink under any low-contrast text, while
+         giving the most coverage behind the wordmark (which is large, bold and
+         measures 7.21:1 over the mark, so overlap there is fine).
+
+         Verified at 1460x812. The clearance is a LAYOUT relationship, so it
+         should be re-checked if the form's spacing changes. */
+      background-position: center 18%;
+      background-size: 50vmin auto;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='440' viewBox='0 0 20 22' fill='none'%3E%3Cpath d='M1.5 12 A8.5 8.5 0 0 1 18.5 12' stroke='%2309e046' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M4.5 12 A5.5 5.5 0 0 1 15.5 12' stroke='%2309e046' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M7.5 12 A2.5 2.5 0 0 1 12.5 12' stroke='%2309e046' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='1.6' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16' r='1.2' fill='%2309e046'/%3E%3Ccircle cx='10' cy='19.5' r='0.8' fill='%2309e046'/%3E%3C/svg%3E");
+    }
+    /* The form and nav sit above the mark. Without this the shape would paint
+       over the fields rather than behind them. */
+    .login-nav, .login-main, .login-footer { position: relative; z-index: 1; }
+    @media (prefers-contrast: more) { body::before { display: none; } }
 
     .card-header { text-align: center; margin-bottom: 28px; }
     .card-header h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
@@ -256,20 +323,17 @@
 
 <main class="login-main">
   <div class="card">
-    <!-- The brand lockup. Same mark as the nav logo above, drawn large: three
-         concentric arcs over descending dots. Stroke widths and radii are
-         scaled from the 20×22 nav version so the proportions match rather than
-         being redrawn by eye. aria-hidden because the name is right beneath it
-         as real text — a screen reader should not hear it twice. -->
+    <!-- ⚠ THE MARK IS NO LONGER HERE — SUPERSEDED 2026-08-18. It was a small
+         vector above the wordmark; Justin ruled it becomes a large background
+         shape behind the form instead (see body::before in the CSS above).
+         The lockup is the WORDMARK ALONE, at roughly 2x its first size.
+         Archived rather than deleted, per convention:
+           <svg width="76" height="84" viewBox="0 0 20 22" aria-hidden="true">
+             ...three arcs + three descending dots, stroke var(--green)...
+           </svg>
+         Do not re-add it above the wordmark — the background mark and a small
+         mark stacked over it is the same logo twice on one screen. -->
     <div class="brand-lockup">
-      <svg width="76" height="84" viewBox="0 0 20 22" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-        <path d="M1.5 12 A8.5 8.5 0 0 1 18.5 12" stroke="var(--green)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-        <path d="M4.5 12 A5.5 5.5 0 0 1 15.5 12" stroke="var(--green)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-        <path d="M7.5 12 A2.5 2.5 0 0 1 12.5 12" stroke="var(--green)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
-        <circle cx="10" cy="12" r="1.6" fill="var(--green)"/>
-        <circle cx="10" cy="16" r="1.2" fill="var(--green)"/>
-        <circle cx="10" cy="19.5" r="0.8" fill="var(--green)"/>
-      </svg>
       <div class="brand-name">SCOUT SYSTEMS</div>
     </div>
 
