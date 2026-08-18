@@ -84,15 +84,26 @@
        is a different document. Written as var(--accent) this would silently
        fall back to inherited colour and render the wordmark in plain white —
        correct-looking CSS, wrong page. */
-    .brand-lockup { text-align: center; margin: 0 0 26px; }
-    /* Justin, 2026-08-18: roughly 2x. 34 -> 68, and the mobile step with it. */
+    /* ⚠ THE LOCKUP IS WIDER THAN THE CARD, DELIBERATELY. The card is
+       max-width:400px and "SCOUT SYSTEMS" at 68px needs ~520px, so inside the
+       card it WRAPPED to two lines — which was not asked for, and the taller
+       two-line block is what drove the wordmark down into the background mark.
+       Caught by looking at the deployed page; every measurement I had taken
+       said the type was fine, because none of them asked whether it fit. */
+    .brand-lockup {
+      text-align: center; margin: 0 0 26px;
+      width: min(92vw, 640px);
+      margin-left: 50%; transform: translateX(-50%);
+    }
+    /* Justin, 2026-08-18: roughly 2x, 34 -> 68.
+       ⚠ nowrap + clamp, so it scales DOWN on a narrow screen rather than
+       breaking across two lines. A wordmark that wraps reads as a mistake. */
     .brand-lockup .brand-name {
-      font-size: 68px; font-weight: 800; letter-spacing: 0.04em;
+      font-size: clamp(30px, 7.2vw, 68px);
+      font-weight: 800; letter-spacing: 0.04em;
+      white-space: nowrap;
       color: var(--green); line-height: 1.02;
       text-shadow: 0 0 28px rgba(var(--green-rgb), 0.35);
-    }
-    @media (max-width: 560px) {
-      .brand-lockup .brand-name { font-size: 44px; letter-spacing: 0.02em; }
     }
 
     /* ── THE MARK AS A BACKGROUND (Justin, 2026-08-18) ────────────────────
@@ -118,7 +129,26 @@
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      opacity: 0.22;
+      /* ⚠⚠ 0.18, AND THE CRITERION CHANGED FROM "ZERO OVERLAP" TO "CONTRAST".
+         The first sweep chased a position with ZERO ink under any text and
+         found one — but only because its element inventory was SHORT: it never
+         checked #cardTitle or #cardSub, which sit squarely over the mark (428
+         and 224 ink pixels). With the full inventory, zero ink is not
+         achievable at half-screen size and never was; the earlier "clean"
+         result was an artefact of not looking.
+
+         So the bar is the right one for a background: the worst exposed text
+         must stay readable OVER the mark. Worst case is --muted (labels,
+         sub-heading, forgot link, footer) against a solid stroke:
+
+             0.22 -> 4.47:1   under the 4.5:1 AA line
+             0.20 -> 4.70:1
+             0.18 -> 4.98:1   <- shipped, comfortable margin, still in band
+             0.16 -> 5.21:1
+
+         Body text sits at 12.99:1 and the wordmark at 8.05:1, so the muted
+         family is the binding constraint. */
+      opacity: 0.18;
       background-repeat: no-repeat;
       /* ⚠ POSITION SET BY THE INK CHECK, NOT BY EYE. At `center 44%` the mark's
          strokes crossed the FIELD LABELS — measured, 86 ink pixels under the

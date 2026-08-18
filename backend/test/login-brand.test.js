@@ -35,9 +35,12 @@ test('the lockup sits ABOVE the sign-in form, not below it', () => {
 test('the wordmark is the full name, big, bold and green', () => {
   assert.ok(/class="brand-name">SCOUT SYSTEMS</.test(LOGIN),
     'the wordmark must read SCOUT SYSTEMS');
-  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('@media (max-width: 560px)'));
+  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
   assert.ok(css.length > 60 && css.length < 900, 'slice suspicious: ' + css.length);
-  const size = Number((css.match(/font-size:\s*(\d+)px/) || [])[1]);
+  // ⚠ THE SIZE IS A clamp() NOW — read its MAX, which is the shipped size. A
+  // naive /font-size:\s*(\d+)px/ picks up the clamp's MINIMUM (30px) and would
+  // report the wordmark as tiny while it renders at 68.
+  const size = Number((css.match(/font-size:\s*clamp\([^,]+,[^,]+,\s*(\d+)px\)/) || css.match(/font-size:\s*(\d+)px/) || [])[1]);
   const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
   assert.ok(size >= 28, 'big: ' + size + 'px');
   assert.ok(weight >= 700, 'bold: ' + weight);
@@ -153,7 +156,7 @@ test('⚠ the small mark is GONE from the lockup — one logo per screen', () =>
 
 test('the wordmark roughly doubled', () => {
   const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
-  const size = Number((css.match(/font-size:\s*(\d+)px/) || [])[1]);
+  const size = Number((css.match(/font-size:\s*clamp\([^,]+,[^,]+,\s*(\d+)px\)/) || [])[1]);
   assert.ok(size >= 60 && size <= 76, 'about 2x the original 34px, got ' + size);
 });
 
@@ -165,10 +168,43 @@ test('⚠ the background layer follows the motif treatment exactly', () => {
 
   const op = Number((css.match(/opacity:\s*([\d.]+)/) || [])[1]);
   assert.ok(op >= 0.16 && op <= 0.30, 'opacity must sit in the established band: ' + op);
+  /**
+   * ⚠⚠ AND IT MUST KEEP THE WORST EXPOSED TEXT ABOVE 4.5:1. The band alone is
+   * not enough — 0.22 sits inside it and puts --muted text at 4.47:1, under the
+   * AA line. This computes the contrast rather than trusting the band, because
+   * "in the band" was true of the value that failed.
+   */
+  const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const ratio = (a, b) => { const L1 = Math.max(lum(a), lum(b)), L2 = Math.min(lum(a), lum(b)); return (L1 + 0.05) / (L2 + 0.05); };
+  const pageBg = [8, 11, 13], mark = [9, 224, 70], muted = [138, 154, 170];
+  const backdrop = mark.map((c, i) => Math.round(op * c + (1 - op) * pageBg[i]));
+  const worst = ratio(muted, backdrop);
+  assert.ok(worst >= 4.5,
+    'the worst exposed text (--muted: labels, sub-heading, forgot link, footer) '
+    + 'must clear 4.5:1 over a solid stroke of the mark — got ' + worst.toFixed(2)
+    + ' at opacity ' + op);
   assert.ok(/pointer-events:\s*none/.test(css),
     'it must never intercept a click on the form beneath it');
   assert.ok(/position:\s*fixed/.test(css) && /z-index:\s*0/.test(css), 'behind the content');
   assert.ok(/background-size:\s*50vmin/.test(css), 'Justin asked for ~50% of the screen');
+});
+
+/**
+ * ⚠⚠ THE WORDMARK MUST NOT WRAP. At 68px inside a 400px card "SCOUT SYSTEMS"
+ * broke across two lines — not asked for, and the taller block is what drove it
+ * down into the mark. Every measurement taken at the time said the type was
+ * fine, because none of them asked whether it FIT; it was caught by looking at
+ * the deployed page.
+ */
+test('⚠ the wordmark cannot wrap — nowrap, and a lockup wider than the card', () => {
+  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
+  assert.ok(css.length > 100 && css.length < 1600, 'slice suspicious: ' + css.length);
+  assert.ok(/white-space:\s*nowrap/.test(css), 'a wordmark that wraps reads as a mistake');
+  assert.ok(/font-size:\s*clamp\(/.test(css),
+    'with nowrap it must scale DOWN on a narrow screen rather than overflow');
+  assert.ok(/width:\s*min\(/.test(css),
+    'the lockup is wider than the 400px card on purpose — 68px needs ~520px');
 });
 
 test('the form paints ABOVE the mark', () => {
