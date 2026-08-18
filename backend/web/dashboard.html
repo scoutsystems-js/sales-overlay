@@ -6304,7 +6304,7 @@
     var notable = (d.notable || []).map(function (n) {
       var attribution = [n.rep ? escapeHtml(n.rep) : null, n.call_title ? '\u201C' + escapeHtml(n.call_title) + '\u201D' : null]
         .filter(Boolean).join(' \u00B7 ');
-      var clip = n.clip ? ' <a class="review-why-clip" href="' + escapeHtml(n.clip) + '" target="_blank" rel="noopener">\u25B6 Play clip</a>' : '';
+      var clip = n.clip ? ' <a class="review-why-clip" href="' + escapeHtml(n.clip) + '" target="_blank" rel="noopener">\u25B6 Play Clip</a>' : '';
       return '<div class="digest-notable"><div>' + escapeHtml(n.text || '') + '</div>'
         + (attribution || clip ? '<div class="meta">' + attribution + clip + '</div>' : '') + '</div>';
     }).join('');
@@ -6639,7 +6639,7 @@
     // audience-aware copy only (not the managed lock).
     var billingAction;
     if (b.provider) {
-      billingAction = '<a class="btn-fathom-secondary" href="#" onclick="return false;">Manage billing</a>';
+      billingAction = '<a class="btn-fathom-secondary" href="#" onclick="return false;">Manage Billing</a>';
     } else if (a.is_managed) {
       billingAction = '<span class="meta">Billing is handled by your admin</span>';
     } else {
@@ -8578,7 +8578,7 @@
     if (typeof seconds !== 'number' || !recordingUrl || typeof recordingUrl !== 'string') return '';
     var href = recordingUrl + (recordingUrl.indexOf('?') !== -1 ? '&' : '?') + 't=' + Math.floor(seconds);
     return '<a class="review-why-clip" href="' + escapeHtml(href)
-      + '" target="_blank" rel="noopener">▶ ' + escapeHtml(label || 'Play clip')
+      + '" target="_blank" rel="noopener">▶ ' + escapeHtml(label || 'Play Clip')
       + ' (' + escapeHtml(formatTimestampDisplay(Math.floor(seconds))) + ')</a>';
   }
 

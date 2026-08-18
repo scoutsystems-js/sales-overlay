@@ -81,6 +81,47 @@ test('BUTTON labels are Title Case', () => {
   assert.deepStrictEqual(bad, [], 'lowercase words in buttons: ' + JSON.stringify(bad));
 });
 
+// ⚠ ANCHORS STYLED AS BUTTONS. Added 2026-08-17 after the (p) audit found
+// lowercase labels this guard STRUCTURALLY COULD NOT SEE: it inspected <h2> and
+// <button> only, and Scout renders several controls as <a> with a button class.
+// A guard whose scope is narrower than the rule reports success over the part it
+// never looked at.
+const BUTTON_CLASSES = /class="[^"]*\b(obj-btn|review-why-clip|sec-clip|srk-clip|btn-fathom-primary|btn-fathom-secondary|date-preset)\b[^"]*"/;
+
+function anchorButtonLabels() {
+  return [...LIVE.matchAll(/<a\s[^>]*>([^<]{2,60})</g)]
+    .filter((m) => BUTTON_CLASSES.test(m[0]))
+    .map((m) => m[1].trim())
+    // Interpolated labels are decided at runtime — their source is checked
+    // where the value is produced (see clip-link-mirror.test.js), not here.
+    .filter((t) => !/[{}<>+()]|escapeHtml/.test(t))
+    // Strip leading glyphs AND the escaped-unicode form of them.
+    .map((t) => t.replace(/\\u[0-9A-Fa-f]{4}/g, '').replace(/^[^\p{L}\p{N}]+/u, '').trim())
+    .filter(Boolean);
+}
+
+test('ANCHORS styled as buttons are Title Case too', () => {
+  const labels = anchorButtonLabels();
+  assert.ok(labels.length >= 3, 'expected to actually find anchor-buttons, got ' + labels.length);
+  const bad = labels.filter((t) => !isSentence(t)).filter((t) => offendingWords(t).length);
+  assert.deepStrictEqual(bad, [], 'lowercase words in anchor-buttons: ' + JSON.stringify(bad));
+});
+
+test('⚠ NON-VACUITY — the WIDENED matcher catches a lowercase anchor-button', () => {
+  // Same discipline as the heading check: assert the anchor exists first, so a
+  // future removal fails loudly instead of turning this into a no-op.
+  assert.ok(LIVE.indexOf('>Manage Billing</a>') !== -1, 'non-vacuity anchor is stale');
+  const broken = LIVE.replace('>Manage Billing</a>', '>Manage billing</a>');
+  const found = [...broken.matchAll(/<a\s[^>]*>([^<]{2,60})</g)]
+    .filter((m) => BUTTON_CLASSES.test(m[0]))
+    .map((m) => m[1].trim())
+    .filter((t) => !/[{}<>+()]|escapeHtml/.test(t))
+    .filter((t) => !isSentence(t))
+    .filter((t) => offendingWords(t).length);
+  assert.ok(found.indexOf('Manage billing') !== -1,
+    'the widened matcher must see a reintroduced lowercase anchor-button, or it proves nothing');
+});
+
 test('the gauge panel metric names and axis titles are Title Case', () => {
   ['Objection Handling', 'Closing Rate', 'Handle Rate'].forEach(function (label) {
     assert.ok(LIVE.indexOf(label) !== -1, 'expected the Title-Cased label: ' + label);
