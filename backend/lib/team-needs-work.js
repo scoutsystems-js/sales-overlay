@@ -25,6 +25,7 @@ const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context
 const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
 const { isHandled, outcomeMap } = require('./objection-handled');
 
+const { clipHref } = require('./clip-link');
 // ── Guardrails (Phase 1, approved) ──────────────────────────────────────────
 const MIN_BUCKET = 6;        // no "needs work" claim off a tiny bucket
 const MIN_GAP_PP = 5;        // rate must be at least this far below baseline
@@ -246,7 +247,7 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   // being missed), capped at 2, only rows that actually carry a quote.
   var qcands = focus.b.rows.slice().sort(function (a, b) { return (a.handled ? 1 : 0) - (b.handled ? 1 : 0); });
   detail.quotes = qcands.filter(function (o) { return str(o.quote, 300); }).slice(0, 2).map(function (o) {
-    return { text: str(o.quote, 300), observation: str(o.observation, 240), rep: o.rep || null, clip_url: o.clip_url || null, call_id: o.call_id, handled: !!o.handled };
+    return { text: str(o.quote, 300), observation: str(o.observation, 240), rep: o.rep || null, clip_url: o.clip_url || null, source: o.source || null, call_id: o.call_id, handled: !!o.handled };
   });
 
   // ⚠ 'money' state removed 2026-08-17 — the card no longer projects deals or
@@ -292,7 +293,9 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
   // Ruling 2026-08-17: an objection on a CLOSED call counts as handled.
   var outcomeByCall = outcomeMap(analyses);
   var repOf = function (cid) { return w.meta[cid] ? w.meta[cid].user_id : null; };
-  var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
+  var clip = function (cid, ts) { return clipHref(w.meta[cid] && w.meta[cid].recording_url, ts); };
+  // the provider travels WITH the link — a label cannot be derived from a URL
+  var srcOf = function (cid) { return (w.meta[cid] && w.meta[cid].source) || null; };
   var objs = objRows.map(function (r) {
     var rid = repOf(r.fathom_call_id);
     return {
@@ -303,6 +306,7 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
       observation: str(r.observation, 240),
       rep: (emailMap && emailMap[rid] ? displayNameFromEmail(emailMap[rid]) : null),
       clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
+      source: srcOf(r.fathom_call_id),
     };
   });
 
@@ -399,7 +403,9 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
   var rows = await w.inChunks('call_highlights',
     'fathom_call_id, timestamp_seconds, quote, closer_response, objection_surface, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
-  var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
+  var clip = function (cid, ts) { return clipHref(w.meta[cid] && w.meta[cid].recording_url, ts); };
+  // the provider travels WITH the link — a label cannot be derived from a URL
+  var srcOf = function (cid) { return (w.meta[cid] && w.meta[cid].source) || null; };
   // PROSPECT NAMES 3a — this evidence view is meant to read "July 12th Call with
   // Jim Stone", so it shows the resolved PROSPECT NAME, falling back to the raw
   // meeting title when the name could not be resolved. (Deliberately NOT applied
@@ -418,16 +424,19 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
       title: nameByCall[r.fathom_call_id] || c.title || null,
       prospect_name: nameByCall[r.fathom_call_id] || null,
       surface: r.objection_surface, handled: isHandled(r, evidenceOutcome[r.fathom_call_id]),
-      quote: str(r.quote, 400), closer_response: str(r.closer_response, 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds) };
+      quote: str(r.quote, 400), closer_response: str(r.closer_response, 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
+      source: srcOf(r.fathom_call_id) };
   }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
 }
 
 // Map raw call_highlights objection rows → the core's obj shape.
 function toObjs(objRows, w, outcomeByCall) {
-  var clip = function (cid, ts) { var rec = w.meta[cid] && w.meta[cid].recording_url; return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; };
+  var clip = function (cid, ts) { return clipHref(w.meta[cid] && w.meta[cid].recording_url, ts); };
+  // the provider travels WITH the link — a label cannot be derived from a URL
+  var srcOf = function (cid) { return (w.meta[cid] && w.meta[cid].source) || null; };
   return objRows.map(function (r) {
     return { call_id: r.fathom_call_id, surface: r.objection_surface, handled: isHandled(r, (outcomeByCall || {})[r.fathom_call_id]),
-      quote: str(r.quote, 300), observation: str(r.observation, 240), rep: null, clip_url: clip(r.fathom_call_id, r.timestamp_seconds) };
+      quote: str(r.quote, 300), observation: str(r.observation, 240), rep: null, clip_url: clip(r.fathom_call_id, r.timestamp_seconds), source: srcOf(r.fathom_call_id) };
   });
 }
 var OBJ_COLS = 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, resolution, type';

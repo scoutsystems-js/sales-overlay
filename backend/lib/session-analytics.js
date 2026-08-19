@@ -12,6 +12,7 @@ var teamAnalytics = require('./team-analytics');
 const { isCredited } = require('./objection-handled');
 var { fetchProspectCloseRates } = require('./prospect-entity');
 
+const { clipHref } = require('./clip-link');
 // Prior equal-length window's avg score for `userId`, via the reused team
 // aggregator. Returns a rounded mean, or null when there are no graded calls in
 // the prior window (new user / window predates their first call) → tile shows no
@@ -226,7 +227,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
   while (true) {
     var cq = await admin
       .from('fathom_calls')
-      .select('id, title, call_date, recording_url')
+      .select('id, title, call_date, recording_url, source')
       .eq('user_id', userId)
       .gte('call_date', from)
       .lte('call_date', to)
@@ -294,15 +295,14 @@ async function computeObjectionIntel(admin, userId, from, to) {
     else if (res) base.by_category[cat][res] += 1;
 
     var m = meta[r.fathom_call_id] || {};
-    var clip = (m.recording_url && typeof r.timestamp_seconds === 'number')
-      ? m.recording_url + (m.recording_url.indexOf('?') === -1 ? '?' : '&') + 't=' + r.timestamp_seconds
-      : null;
+    var clip = clipHref(m.recording_url, r.timestamp_seconds);
     feed.push({
       fathom_call_id: r.fathom_call_id,
       title: m.title || null,
       call_date: m.call_date || null,
       timestamp_seconds: (typeof r.timestamp_seconds === 'number') ? r.timestamp_seconds : null,
       clip_url: clip,
+      source: m.source || null,
       surface: r.objection_surface || null,
       category: cat,
       resolution: res,

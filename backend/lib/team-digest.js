@@ -28,6 +28,7 @@ const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
 
+const { clipHref } = require('./clip-link');
 const DIGEST_MAX_TOKENS = 1200;
 
 var _anthropic = null;
@@ -97,7 +98,10 @@ function digestSetHash(analyses, kbHash, callIds) {
 }
 
 function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().slice(0, cap || 500) : null; }
-function clipUrl(rec, ts) { return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; }
+// ⚠ delegates to lib/clip-link.js — the ONE place a deep link is built.
+// Building it here would mean labelling it here, and this module does not
+// know the provider. Pinned by test/clip-link-single-source.test.js.
+function clipUrl(rec, ts) { return clipHref(rec, ts); }
 function extractJson(text) {
   if (!text) return null;
   var cleaned = String(text).replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();

@@ -1026,7 +1026,7 @@ router.post('/prospects/unmerge', requireAuth, async function (req, res) {
 // Close reads close_score_earned throughout — see lib/section-breakdown.js.
 async function computeSectionBreakdown(admin, userId, section, from, to) {
   var calls = await admin.from('fathom_calls')
-    .select('id, title, call_date, recording_url, prospect_id')
+    .select('id, title, call_date, recording_url, prospect_id, source')
     .eq('user_id', userId).gte('call_date', from).lte('call_date', to);
   if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
   var callIds = (calls.data || []).map(function (c) { return c.id; });

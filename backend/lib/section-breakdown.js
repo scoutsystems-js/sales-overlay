@@ -24,6 +24,7 @@
 
 var { highlightGroup } = require('./highlight-section');
 
+const { clipHref } = require('./clip-link');
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 var HISTOGRAM_BUCKETS = [
@@ -158,7 +159,8 @@ function buildSectionBreakdown(section, input) {
       call_date: m.call_date || null,
       prospect_name: m.prospect_name || null,
       // Null rather than a half-built href when there is no recording.
-      clip_url: (rec && ts !== null) ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null,
+      clip_url: clipHref(rec, ts),
+      source: m.source || null,
       /* saved_to_kb: false, */ // REMOVED 2026-08-18 — the route stopped filling
       // it and no surface renders it, since the Add-to-KB buttons are gone
       // 6a/6d: true = speaker proven from the transcript, false = assessed but
@@ -252,7 +254,8 @@ function buildSectionBreakdown(section, input) {
       timestamp_seconds: ts,
       call_date: m.call_date || null,
       prospect_name: m.prospect_name || null,
-      clip_url: (rec && ts !== null) ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null,
+      clip_url: clipHref(rec, ts),
+      source: m.source || null,
       /* saved_to_kb: false, */ // REMOVED 2026-08-18 — see above
       // EXACT context, not a nearest-preceding guess: the objection this reply
       // answers is on the same row.

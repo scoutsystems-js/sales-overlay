@@ -76,7 +76,26 @@ test('the route sends the provider with each moment', () => {
     'and source has to be selected in the first place');
 });
 
+/* ⚠ CONVERTED 2026-08-19, NOT DELETED. This counted the hard-coded literal
+   "▶ Clip<" as EVIDENCE that five surfaces still render a clip link. Those
+   labels are now derived per provider (clipLabelFor(<row>.source)), because a
+   hard-coded "Clip" on a Zoom moment promises a seek and delivers 00:00 — so
+   the literal is gone and counting it would pin the defect.
+
+   Both properties it actually protected still hold and are asserted here: the
+   surfaces keep their links, and the labels are Title Case. The Title Case
+   check moved to the label RULE itself, which is where the strings now live —
+   the page no longer contains a label literal at all. */
 test('clip labels are Title Case, per the standing rule', () => {
+  const { clipLabel } = require('../lib/clip-link');
+  ['fathom', 'zoom', undefined].forEach((src) => {
+    const l = clipLabel(src);
+    assert.ok(/^[A-Z]/.test(l) && !/\b[a-z]+\b(?= [A-Z])/.test(l),
+      'label for ' + src + ' must be Title Case, got ' + JSON.stringify(l));
+  });
   assert.strictEqual((LIVE.match(/▶ clip</g) || []).length, 0, 'lowercase "clip" labels remain');
-  assert.ok((LIVE.match(/▶ Clip</g) || []).length >= 5, 'the existing surfaces keep their links');
+  assert.strictEqual((LIVE.match(/▶ Clip</g) || []).length, 0,
+    'a hard-coded label is back — it cannot differ by provider');
+  assert.ok((LIVE.match(/escapeHtml\(clipLabelFor\(/g) || []).length >= 6,
+    'the existing surfaces must keep their links, now labelled per provider');
 });

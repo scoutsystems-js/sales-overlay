@@ -13,6 +13,7 @@ const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 
+const { clipHref } = require('./clip-link');
 const OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const SYNTH_MAX_TOKENS = 2500;
 
@@ -46,9 +47,12 @@ function extractJson(text) {
 
 function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().slice(0, cap || 600) : null; }
 
+// ⚠ delegates to lib/clip-link.js — the ONE place a deep link is built.
+// Building it here would mean labelling it here, and this module does not
+// know the provider. Pinned by test/clip-link-single-source.test.js.
 function clipUrl(meta, ts) {
-  if (!meta || !meta.recording_url || typeof ts !== 'number') return null;
-  return meta.recording_url + (meta.recording_url.indexOf('?') === -1 ? '?' : '&') + 't=' + ts;
+  if (!meta) return null;
+  return clipHref(meta.recording_url, ts);
 }
 
 function buildSynthPrompt(present, byCat) {
@@ -87,7 +91,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
     var cq = await admin.from('fathom_calls')
-      .select('id, recording_url, call_date')
+      .select('id, recording_url, call_date, source')
       .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
       .order('call_date', { ascending: false, nullsFirst: false })
       .range(start, start + PAGE - 1);
@@ -151,7 +155,8 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     if (isHandled(r, outcomeByCall[r.fathom_call_id])) b.handled += 1;
     if (r.resolution === 'handled') {
       if (r.closer_response && b.examples.length < 3) {
-        b.examples.push({ quote: str(r.quote, 300), closer_response: str(r.closer_response, 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds) });
+        b.examples.push({ quote: str(r.quote, 300), closer_response: str(r.closer_response, 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
+          source: (meta[r.fathom_call_id] || {}).source || null });
       }
     }
   });

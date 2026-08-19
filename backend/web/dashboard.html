@@ -5202,7 +5202,7 @@
     else if (state.view === 'overview') renderOverview(false);
   }
   function perfInsightHtml(it, kind) {
-    var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ Clip</a>' : '';
+    var clip = it.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ ' + escapeHtml(clipLabelFor(it.source)) + '</a>' : '';
     var review = it.call_id ? ' <button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')" style="padding:2px 8px;">Call</button>' : '';
     var data = it.data ? '<span style="color:var(--text);"> · ' + escapeHtml(it.data) + '</span>' : '';
     var quote = it.quote ? '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--text);">“</span>' + escapeHtml(it.quote) + '<span style="color:var(--text);">”</span></div>' : '';
@@ -7493,7 +7493,7 @@
   }
   function evidenceRowHtml(c) {
     var date = c.date ? formatNaturalDate(c.date) : '';
-    var clip = c.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(c.clip_url) + '" target="_blank" rel="noopener">▶ Clip</a>' : '';
+    var clip = c.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(c.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(c.source)) + '</a>' : '';
     return '<div class="evidence-row">'
       + '<div class="evidence-head"><span class="evidence-title">' + escapeHtml(c.title || 'Untitled Call') + '</span>'
         + '<span class="evidence-date">' + escapeHtml(date) + '</span>'
@@ -7808,7 +7808,7 @@
   }
 
   function teamInsightHtml(it, kind) {
-    var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ Clip</a>' : '';
+    var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(it.source)) + '</a>' : '';
     var repTag = it.rep ? '<span class="team-rep-tag">' + escapeHtml(displayNameFromEmail(String(it.rep), String(it.rep))) + '</span>' : '';
     return '<div class="team-insight ' + kind + '">'
       + '<div class="team-insight-claim">' + escapeHtml(it.claim || '') + '</div>'
@@ -7841,7 +7841,7 @@
     if (!keys.length) return '<div class="empty"><p>No standout team moments this week yet.</p></div>';
     return '<div class="team-lane-row">' + keys.map(function (k) {
       var m = lanes[k];
-      var clip = m.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">▶ Clip</a>' : '';
+      var clip = m.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(m.source)) + '</a>' : '';
       return '<div class="team-lane">'
         + '<div class="team-lane-title">' + LANE[k] + '</div>'
         + '<div class="team-lane-rep">' + escapeHtml(displayNameFromEmail(String(m.rep || ''), String(m.rep || ''))) + '</div>'
@@ -9868,7 +9868,7 @@
     if (c.grounded && c.evidence && c.evidence.length) {
       evidence = '<div style="margin-top:10px;font-size:12px;color:var(--text);">Your handled example' + (c.evidence.length > 1 ? 's' : '') + ':</div>'
         + c.evidence.map(function(e) {
-            var clip = e.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(e.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ Clip</a>' : '';
+            var clip = e.clip_url ? ' <a class="obj-btn" href="' + escapeHtml(e.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ ' + escapeHtml(clipLabelFor(e.source)) + '</a>' : '';
             return '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--text);">Closer: </span>' + escapeHtml(e.closer_response || e.quote || '') + clip + '</div>';
           }).join('');
     }

@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 
+const { clipHref } = require('./clip-link');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const MAX_CANDIDATES = 20;
@@ -49,7 +50,10 @@ function extractJson(text) {
   return null;
 }
 function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().slice(0, cap || 500) : null; }
-function clipUrl(rec, ts) { return (rec && typeof ts === 'number') ? rec + (rec.indexOf('?') === -1 ? '?' : '&') + 't=' + ts : null; }
+// ⚠ delegates to lib/clip-link.js — the ONE place a deep link is built.
+// Building it here would mean labelling it here, and this module does not
+// know the provider. Pinned by test/clip-link-single-source.test.js.
+function clipUrl(rec, ts) { return clipHref(rec, ts); }
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 function apiFail(e) { return { available: false, reason: 'Anthropic API failure' + ((e && e.status) ? ' (HTTP ' + e.status + ')' : '') + ': ' + ((e && e.message) || 'unknown') }; }
 
@@ -58,7 +62,7 @@ function apiFail(e) { return { available: false, reason: 'Anthropic API failure'
 async function loadTeamWindow(admin, repIds, from, to) {
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
-    var cq = await admin.from('fathom_calls').select('id, user_id, recording_url, call_date, title')
+    var cq = await admin.from('fathom_calls').select('id, user_id, recording_url, call_date, title, source')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .order('call_date', { ascending: false }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
@@ -146,6 +150,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     return { cls: c, type: r.type, rep: (emailMap && emailMap[rid]) || rid,
       quote: str(r.closer_response, 200) || str(r.quote, 200) || '',
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
+      source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
       call_id: r.fathom_call_id,
       _s: (c === 'win' && (r.type === 'strong_moment' || r.type === 'buying_signal')) ? 5 : (c === 'loss' && (r.type === 'objection' || r.type === 'missed_opportunity')) ? 4 : (r.type === 'strong_moment') ? 3 : 1 };
   }).filter(function (c) { return c.quote; }).sort(function (a, b) { return b._s - a._s; }).slice(0, MAX_CANDIDATES);
@@ -182,7 +187,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   function resolve(arr) {
     return arr.slice(0, 3).map(function (it) {
       var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
-      return { claim: str(it && it.claim, 400), data: str(it && it.data, 200), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, clip_url: ev ? ev.clip_url : null, call_id: ev ? ev.call_id : null };
+      return { claim: str(it && it.claim, 400), data: str(it && it.data, 200), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null };
     }).filter(function (it) { return it.claim; });
   }
   var synthesis = { working: resolve(parsed.working), improve: resolve(parsed.improve), generated_at: new Date().toISOString() };
@@ -209,7 +214,9 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap)
     var rid = w.meta[r.fathom_call_id] ? w.meta[r.fathom_call_id].user_id : null;
     return { type: r.type, rep: (emailMap && emailMap[rid]) || rid, rep_id: rid,
       quote: str(r.closer_response, 220) || str(r.quote, 220) || '', observation: str(r.observation, 200) || '',
-      clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds), call_id: r.fathom_call_id };
+      clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
+      source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
+      call_id: r.fathom_call_id };
   }).filter(function (c) { return c.quote; }).slice(0, 30);
   if (cands.length === 0) return { available: true, lanes: {}, generated_at: new Date().toISOString() };
   cands.forEach(function (c, i) { c.id = 'h' + (i + 1); });
@@ -240,7 +247,7 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap)
   var lanes = {};
   LANES.forEach(function (lane) {
     var pick = parsed[lane]; var ev = (pick && pick.id && byId[pick.id]) || null;
-    if (ev) lanes[lane] = { rep: ev.rep, quote: ev.quote, clip_url: ev.clip_url, call_id: ev.call_id, why: str(pick.why, 200) };
+    if (ev) lanes[lane] = { rep: ev.rep, quote: ev.quote, clip_url: ev.clip_url, source: ev.source || null, call_id: ev.call_id, why: str(pick.why, 200) };
   });
   var synthesis = { lanes: lanes, generated_at: new Date().toISOString() };
   await cachePut(admin, keyId, 'highlights', from, to, hash, synthesis);

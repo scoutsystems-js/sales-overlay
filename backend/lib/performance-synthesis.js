@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 
+const { clipHref } = require('./clip-link');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const SYNTH_MAX_TOKENS = 2600;
@@ -48,9 +49,12 @@ function extractJson(text) {
 }
 
 function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().slice(0, cap || 500) : null; }
+// ⚠ delegates to lib/clip-link.js — the ONE place a deep link is built.
+// Building it here would mean labelling it here, and this module does not
+// know the provider. Pinned by test/clip-link-single-source.test.js.
 function clipUrl(meta, ts) {
-  if (!meta || !meta.recording_url || typeof ts !== 'number') return null;
-  return meta.recording_url + (meta.recording_url.indexOf('?') === -1 ? '?' : '&') + 't=' + ts;
+  if (!meta) return null;
+  return clipHref(meta.recording_url, ts);
 }
 function outcomeClass(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
@@ -102,7 +106,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   // 1) calls in window.
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
-    var cq = await admin.from('fathom_calls').select('id, recording_url, call_date, title')
+    var cq = await admin.from('fathom_calls').select('id, recording_url, call_date, title, source')
       .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
       .order('call_date', { ascending: false, nullsFirst: false }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
@@ -190,6 +194,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
       cls: cls, type: r.type,
       quote: str(r.closer_response, 220) || str(r.quote, 220) || '',
       clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
+      source: (meta[r.fathom_call_id] || {}).source || null,
       call_id: r.fathom_call_id,
       _score: candidateScore(r.type, cls),
     };
@@ -227,6 +232,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
         data: str(it && it.data, 200),
         quote: ev ? ev.quote : null,
         clip_url: ev ? ev.clip_url : null,
+        source: ev ? ev.source : null,
         call_id: ev ? ev.call_id : null,
       };
     }).filter(function (it) { return it.claim; });
