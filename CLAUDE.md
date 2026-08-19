@@ -309,9 +309,20 @@ Real-time AI sales coaching teleprompter for high-ticket closers. Electron deskt
 - **Outbound SMTP (25/465/587/2525) is BLOCKED on this plan tier** — email must go over HTTPS (Resend). A "hanging" outbound integration that times out in exactly 2 minutes is the signature of a blocked port + a default transport timeout.
 - **Service public URL:** https://sales-overlay-production.up.railway.app
 - **Custom domain:** www.scoutsystems.io is the canonical live URL — CNAME `www` in Namecheap → `vdy3qiy5.up.railway.app` (Railway provisioned a new endpoint when `www` was added as a custom domain; the old `ujcd5dfv` target is no longer used). Bare `scoutsystems.io` uses a Namecheap **URL Redirect Record** → `https://www.scoutsystems.io` (permanent 301). Known limitation: Namecheap URL Redirects don't serve HTTPS, so `https://scoutsystems.io` times out (HTTP 000) — users typing the bare domain with HTTPS-first browsers hit an SSL error. Permanent fix requires migrating DNS to Cloudflare for CNAME flattening + edge SSL at the apex.
-- **Builder:** NIXPACKS (configured via `railway.json`)
-- **Build command:** `cd backend && npm install`
-- **Start command:** `cd backend && node index.js` (same in `Procfile`)
+- **⚠⚠ BUILDER: A DOCKERFILE AT `backend/Dockerfile` — *NOT* NIXPACKS, and there is NO `railway.json` AND NO `Procfile`.** This entry described all three for months and every one was wrong; corrected 2026-08-19.
+  ```
+  FROM node:20-alpine · WORKDIR /app · COPY package*.json ./
+  RUN npm install --omit=dev · COPY . . · CMD ["node", "index.js"]
+  ```
+  The Dockerfile's own comment explains why it exists: Railpack kept detecting the service as a static site and deploying Caddy, so an explicit Dockerfile forces it aside. **The build logs match it exactly** (`[3/5] COPY package*.json`, `[4/5] RUN npm install --omit=dev`, `[5/5] COPY . .`) — which is how the correction was confirmed rather than guessed.
+- **⚠ HOW THE DRIFT WAS FOUND, and it is the transferable part: BY GOING TO LOOK FOR A FILE THAT WAS SUPPOSED TO BE THERE.** Nothing failed, nothing errored — a deploy investigation needed the healthcheck config, this entry said it lived in `railway.json`, and the file simply did not exist. **DOCUMENTATION THAT DESCRIBES A PLAUSIBLE SETUP IS WORSE THAN NO DOCUMENTATION, because it ANSWERS the question wrongly instead of prompting a look.** No-documentation makes you check; wrong-documentation makes you confident. Same family as the stale load-bearing comment — prose asserting a property nothing enforces.
+- **⚠ HEALTHCHECK PATH AND TIMEOUT ARE RAILWAY DASHBOARD SETTINGS, not repo config** — they cannot be read from here, so a deploy investigation can establish OUR side of the margin but never their configured deadline.
+- **⚠⚠ OUR SIDE OF THAT MARGIN, MEASURED 2026-08-19 — RECORD IT SO THE NEXT HEALTHCHECK TIMEOUT DOES NOT REOPEN THIS:**
+  ```
+  app.listen is SYNCHRONOUS — no await, no DB connect, no external call gates the bind
+  cold bind + accept, three runs:   378ms · 117ms · 117ms
+  ```
+  The 378ms is a cold module cache; steady state is ~117ms. **Against even a conservative 30s deadline that is a ~250x margin** (~2500x against Railway's usual 300s). **A "Failed to connect before the deadline" with that much headroom is not our configuration — it is the platform**, and the 2026-08-18/19 incident (degraded deployments, task-queue backlog) confirmed it. **This measurement is what makes the platform verdict defensible rather than assumed.**
 - **Node version:** `>=20.0.0` (per `backend/package.json` engines)
 - **Health check:** `GET /health` returns `{"status":"ok","service":"Scout Systems Backend"}`
 - **Routes served by backend:**

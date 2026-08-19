@@ -612,6 +612,15 @@
          discs. The alternatives were 0.9 (16.3px, still heavy) and 0.4 (7.2px,
          which starts to disappear at 0.18 opacity behind text).
 
+         ⚠⚠ ARCS CLOSED TO 285 DEGREES (2026-08-19) — the same 75-degree gap as
+         the lockup, replacing the 180-degree dome. The ring now spans y 2.48 ->
+         19.55 instead of stopping at the centre line, so the viewBox is
+         re-cropped to the new ink (0.464 2.464 19.072 17.105) and the intrinsic
+         height follows the new aspect (400x359).
+         ⚠ STROKE RE-CHECKED AND LEFT ALONE: at the new box one unit measures
+         41.0-92.5px, so 0.032 draws 1.31-2.96px — still inside the 1-3px target.
+         Measured before adjusting; no change was needed.
+
          ⚠⚠ NOTE 4 (2026-08-18): RINGS x1.12, DOT SPACING x0.62 — the SECOND
          deliberate divergence from the nav mark, approved for the same reason as
          the lockup's. Radii 8.5/5.5/2.5 -> 9.52/6.16/2.8; dot centres
@@ -641,7 +650,7 @@
          decides where the lockup can be used. At 1280x720 the smallest is 11px
          across; below roughly 6-8px a filled dot stops reading as a deliberate
          element and starts looking like an artifact. */
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='314' viewBox='0.464 2.464 19.072 14.986' fill='none'%3E%3Cpath d='M0.4800000000000004 12 A9.52 9.52 0 0 1 19.52 12' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M3.84 12 A6.16 6.16 0 0 1 16.16 12' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M7.2 12 A2.8 2.8 0 0 1 12.8 12' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='0.4' fill='%2309e046'/%3E%3Ccircle cx='10' cy='14.48' r='0.3' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16.65' r='0.2' fill='%2309e046'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='359' viewBox='0.464 2.464 19.072 17.105' fill='none'%3E%3Cpath d='M4.205 19.553 A9.52 9.52 0 1 1 15.795 19.553' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M6.25 16.887 A6.16 6.16 0 1 1 13.75 16.887' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M8.295 14.221 A2.8 2.8 0 1 1 11.705 14.221' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='0.4' fill='%2309e046'/%3E%3Ccircle cx='10' cy='14.48' r='0.3' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16.65' r='0.2' fill='%2309e046'/%3E%3C/svg%3E");
     }
     /* The form and nav sit above the mark. Without this the shape would paint
        over the fields rather than behind them. */

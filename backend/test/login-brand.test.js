@@ -128,68 +128,83 @@ test('the mark is drawn, not fetched — no asset request on the login page', ()
     + 'which is an app icon with no alpha, a baked-in wordmark and a watermark');
 });
 
-test('the background mark matches the nav logo rather than being redrawn by eye', () => {
-  const at = LOGIN_LIVE.indexOf('body::before');
-  const css = LOGIN_LIVE.slice(at, LOGIN_LIVE.indexOf('}', at));
+/**
+ * ══ THE DIVERGENCE MAP ═══════════════════════════════════════════════════
+ * ⚠⚠ RE-DERIVED 2026-08-19, NOT PATCHED. The old guard pinned the background
+ * mark TO the nav with the lockup bolted on as an exception — which, after the
+ * background arcs closed to 285 degrees, would have described the wrong
+ * relationship entirely. A guard that still states the old arrangement with an
+ * exception attached is how the next person misreads WHICH difference was
+ * intended.
+ *
+ *                      arcs     rings        dots
+ *   lockup             285deg   nav size     nav size, mocked positions
+ *   background mark    285deg   x1.12        radii x0.25, offsets x0.62
+ *   nav                180deg   nav size     nav size
+ *
+ * READ IT AS: the LOCKUP and the BACKGROUND MARK now SHARE the 285-degree
+ * sweep; the NAV is the lone 180-degree holdout. Every difference below was
+ * ruled deliberately — none may drift, and restoring any of them has to be a
+ * decision rather than a tidy-up.
+ */
+test('⚠⚠ THE MAP: lockup and background share 285deg; the nav is the lone 180deg holdout', () => {
+  const bg = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('body::before'), LOGIN_LIVE.indexOf('}', LOGIN_LIVE.indexOf('background-image')));
   const nav = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="nav-logo"'), LOGIN_LIVE.indexOf('class="back"'));
-  const arcs = (t) => (t.match(/A[\d.]+ [\d.]+ 0 0 1 [\d.]+ [\d.]+/g) || []).join('|');
-  const radii = (t) => (t.match(/r='([\d.]+)'|r="([\d.]+)"/g) || []).map((m) => m.replace(/['"]/g, '')).join('|');
-  assert.ok(arcs(css).length > 0, 'no arcs found in the background mark');
-  /**
-   * ⚠ THE ARCS NO LONGER MATCH EXACTLY — note 4 scaled the rings x1.12, the
-   * SECOND approved divergence from the nav mark (the lockup's 285-degree
-   * sweep was the first). Equality was the right pin while the background mark
-   * was meant to be the nav mark at another size; it is now a ratio, checked
-   * below, so the intended difference is pinned rather than the guard dropped.
-   */
+  const lock = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="brand-o"'), LOGIN_LIVE.indexOf('UT SYSTEMS'));
 
-  /**
-   * ⚠⚠ THE DOT RADII DELIBERATELY DIVERGE (Justin, 2026-08-18: halved TWICE —
-   * "half size", then "still a little too big"). This
-   * used to assert they matched the nav mark exactly, which was the right pin
-   * until the dots became a background-scale decision of their own. It is now
-   * pinned as an EXACT RATIO rather than dropped — so the dots cannot drift to
-   * an arbitrary value, and a future edit that "restores" them to match the nav
-   * has to do so deliberately.
-   */
-  // ⚠ the nav mark is HTML (r="1.6"); the background is a data URI (r='1.6').
-  // Matching one quote style found zero radii in the nav and the guard failed
-  // for the wrong reason.
-  /**
-   * ⚠⚠ THE GUARD IS A RATIO, NOT AN EQUALITY — it pins the APPROVED divergence
-   * rather than being dropped (note 4, 2026-08-18). Two deliberate departures
-   * from the nav mark now exist: the lockup's 285-degree arcs, and this
-   * background mark's larger rings + tighter dots. Both were ruled; neither may
-   * drift, and a future edit "restoring" either has to be deliberate.
-   *
-   *   rings  x1.12   (8.5/5.5/2.5 -> 9.52/6.16/2.8)
-   *   dots   radii x0.25, centre spacing x0.62 from the ring centre
-   */
-  const nums = (t, attr) => (t.match(new RegExp(attr + "=['\"]([\\d.]+)['\"]", 'g')) || [])
-    .map((m) => parseFloat(m.replace(new RegExp(attr + "=['\"]|['\"]", 'g'), '')));
-  const navArc = (nav.match(/A([\d.]+) /g) || []).map((m) => parseFloat(m.slice(1)));
-  const bgArc = (css.match(/A([\d.]+) /g) || []).map((m) => parseFloat(m.slice(1)));
-  assert.strictEqual(bgArc.length, navArc.length, 'same number of arcs');
+  // the sweep is carried by the large-arc flag: "0 0 1" = 180deg, "0 1 1" = 285deg
+  const sweep = (t) => /A[\d.]+ [\d.]+ 0 1 1/.test(t) ? 285 : (/A[\d.]+ [\d.]+ 0 0 1/.test(t) ? 180 : null);
+  assert.strictEqual(sweep(lock), 285, 'the lockup ring must stay closed to 285deg');
+  assert.strictEqual(sweep(bg), 285, 'the background mark now shares that sweep');
+  assert.strictEqual(sweep(nav), 180, 'the NAV is the deliberate 180deg holdout — do not close it');
+
+  const radii = (t, attr) => (t.match(new RegExp(attr + "=['\"]([\\d.]+)['\"]", 'g')) || [])
+    .map((m) => parseFloat(m.replace(/[^\d.]/g, '')));
+  const arcR = (t) => (t.match(/A([\d.]+) /g) || []).map((m) => parseFloat(m.slice(1)));
+
+  // rings: background x1.12 of nav; lockup the SAME size as nav
+  const navArc = arcR(nav), bgArc = arcR(bg), lockArc = arcR(lock);
+  assert.strictEqual(bgArc.length, navArc.length, 'same ring count');
   navArc.forEach((r, i) => {
     assert.ok(Math.abs(bgArc[i] / r - 1.12) < 0.005,
-      'ring ' + (i + 1) + ' must be exactly 1.12x the nav radius (' + r + ' -> '
-      + (r * 1.12).toFixed(2) + '), got ' + bgArc[i]
-      + '. This is the APPROVED divergence, pinned so it cannot drift.');
+      'background ring ' + (i + 1) + ' must be x1.12 of the nav (' + r + ' -> '
+      + (r * 1.12).toFixed(2) + '), got ' + bgArc[i]);
+    assert.ok(Math.abs(lockArc[i] / r - 1) < 0.005,
+      'lockup ring ' + (i + 1) + ' must match the nav SIZE (' + r + '), got ' + lockArc[i]
+      + ' — only the SWEEP diverges there, not the scale');
   });
-  const navR = nums(nav, 'r'), bgR = nums(css, 'r');
-  assert.strictEqual(bgR.length, navR.length, 'same number of dots');
+
+  // dots: background radii x0.25 and centres tightened x0.62; lockup unchanged
+  const navR = radii(nav, 'r'), bgR = radii(bg, 'r'), lockR = radii(lock, 'r');
   navR.forEach((r, i) => {
     assert.ok(Math.abs(bgR[i] / r - 0.25) < 0.001,
-      'dot ' + (i + 1) + ' radius must stay a QUARTER of the nav (' + r + ' -> '
-      + (r / 4) + '), got ' + bgR[i]);
+      'background dot ' + (i + 1) + ' radius must be a QUARTER of the nav');
+    assert.ok(Math.abs(lockR[i] / r - 1) < 0.001,
+      'lockup dot ' + (i + 1) + ' keeps the nav radius — the mocked arrangement');
   });
-  const navCy = nums(nav, 'cy'), bgCy = nums(css, 'cy');
+  const navCy = radii(nav, 'cy'), bgCy = radii(bg, 'cy'), lockCy = radii(lock, 'cy');
   navCy.forEach((cy, i) => {
-    const expected = 12 + (cy - 12) * 0.62;
-    assert.ok(Math.abs(bgCy[i] - expected) < 0.01,
-      'dot ' + (i + 1) + ' centre must be tightened to x0.62 of its offset ('
-      + cy + ' -> ' + expected.toFixed(2) + '), got ' + bgCy[i]);
+    assert.ok(Math.abs(bgCy[i] - (12 + (cy - 12) * 0.62)) < 0.01,
+      'background dot ' + (i + 1) + ' centre must be tightened x0.62');
+    assert.ok(Math.abs(lockCy[i] - cy) < 0.01,
+      'lockup dot ' + (i + 1) + ' keeps the nav position');
   });
+});
+
+test('⚠ the landing page carries the SAME mark and INHERITS login\'s closed ceiling', () => {
+  const idx = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
+  const live = idx.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(/body::before/.test(live), 'the landing page must carry the mark');
+  const op = Number((live.match(/body::before\s*\{[^}]*opacity:\s*([\d.]+)/) || [])[1]);
+  assert.ok(op && op <= 0.215,
+    'the landing page shares css/style.css and its genuine grey, so it shares '
+    + "login's 0.215 ceiling — ONE ruling covering two pages. Got " + op);
+  assert.ok(/A[\d.]+ [\d.]+ 0 1 1/.test(live), 'and the same 285deg sweep');
+  // page-scoped: nine pages share the stylesheet and must NOT inherit this
+  const shared = fs.readFileSync(path.join(__dirname, '..', 'web', 'css', 'style.css'), 'utf8');
+  assert.ok(!/body::before/.test(shared),
+    'the mark must stay page-scoped — in the shared stylesheet it would paint on '
+    + 'set-password, terms, privacy, docs, support, connect and download too');
 });
 
 // ── the mark as a BACKGROUND (Justin, 2026-08-18) ──────────────────────────

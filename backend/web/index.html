@@ -11,6 +11,45 @@
   <meta property="og:url" content="https://www.scoutsystems.io/"/>
   <meta name="twitter:card" content="summary"/>
   <style>
+    /* ══ THE BACKGROUND MARK ON THE LANDING PAGE (Justin, 2026-08-19) ══════
+       Same artwork as the login page's: rings closed to a 285-degree sweep
+       (75-degree gap), rings x1.12 of the nav mark, dot radii x0.25 with their
+       centre offsets tightened x0.62.
+
+       ⚠⚠ THIS PAGE INHERITS LOGIN'S CLOSED BRIGHTNESS RULING, AND THAT IS ONE
+       DECISION COVERING TWO PAGES RATHER THAN A COINCIDENCE. Both are styled by
+       css/style.css, both therefore keep the genuine grey --muted #8a9aaa, and
+       both have the SAME measured AA ceiling of 0.215 — so the mark ships at
+       0.20 here exactly as it does there, and for the same reason. A future
+       "make the landing mark brighter" has the same known answer: not without
+       reopening the greys, which was put to Justin on the login page and
+       declined. ⚠ 12 muted-text sites on this page would be affected.
+
+       ⚠ NOT the dashboard's 0.40 — that surface reaches 0.535 only because the
+       no-grey sweep repointed --muted to --text there. A criterion is not a
+       constant, and this is the case it was written for.
+
+       ⚠ PAGE-SCOPED ON PURPOSE: nine pages share css/style.css, so putting this
+       in the shared file would paint the mark on set-password, terms, privacy,
+       docs, support, connect and download as a side effect. */
+    body::before {
+      content: '';
+      position: fixed;
+      left: 0; right: 0;
+      top: var(--mark-top, 0px);
+      height: var(--mark-h, 82vh);
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.20;
+      background-repeat: no-repeat;
+      background-position: center top;
+      background-size: auto 100%;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='359' viewBox='0.464 2.464 19.072 17.105' fill='none'%3E%3Cpath d='M4.205 19.553 A9.52 9.52 0 1 1 15.795 19.553' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M6.25 16.887 A6.16 6.16 0 1 1 13.75 16.887' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M8.295 14.221 A2.8 2.8 0 1 1 11.705 14.221' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='0.4' fill='%2309e046'/%3E%3Ccircle cx='10' cy='14.48' r='0.3' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16.65' r='0.2' fill='%2309e046'/%3E%3C/svg%3E");
+    }
+    /* the page must paint above the mark */
+    .nav, .hero, .section, .footer { position: relative; z-index: 1; }
+    @media (prefers-contrast: more) { body::before { display: none; } }
+
     /* Self-contained — inlines the PRODUCT token block (dashboard.html) so a
        visitor who becomes a user sees zero visual seam. Does NOT load the
        legacy /css/style.css (green marketing theme). */
