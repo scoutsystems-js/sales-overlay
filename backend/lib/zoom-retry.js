@@ -19,8 +19,24 @@
  * never exist" — only AGE does. Without the window this is an unbounded loop.
  */
 
-// 24h = 12 attempts at the 2-hour sync cadence. Zoom transcripts land within
-// minutes, so anything still absent after a day is not coming.
+/**
+ * 24h = 12 attempts at the 2-hour sync cadence. Zoom transcripts land within
+ * minutes, so anything still absent after a day is not coming.
+ *
+ * ⚠⚠ DO NOT RAISE THIS TO "BE SAFE". IT IS NOT A TIMEOUT, IT IS THE ONLY THING
+ * SEPARATING TWO CASES THAT ARE TEXTUALLY IDENTICAL.
+ *   transcript still processing  → zoom_no_transcript / 3301 → resolves in minutes
+ *   transcription was never ON   → zoom_no_transcript        → NEVER resolves
+ * The messages are the same string. Nothing in the payload distinguishes them.
+ * So this bound is not "how long to be patient" — it is the entire mechanism by
+ * which a retry worth making is told apart from an infinite one.
+ *
+ * Raising it does not buy safety; it buys a longer silent loop on calls whose
+ * transcript does not exist, each one re-fetching on every sweep forever-ish and
+ * showing the user "still analysing" the whole time. If a real transcript is
+ * ever observed arriving later than 24h, RAISE IT FOR THAT EVIDENCE and say so
+ * here — not on the intuition that a bigger number is more forgiving.
+ */
 const ZOOM_TRANSCRIPT_RETRY_HOURS = 24;
 
 // A future call_date is normal clock skew up to a point; beyond it the row is
