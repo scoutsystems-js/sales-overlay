@@ -15,6 +15,9 @@ const pickNewestForAnalysis  = fathomRoutes._pickNewestForAnalysis;
 const callIdsToAnalyze       = fathomRoutes._callIdsToAnalyze; // FIRST-SYNC-ONLY cap (shared)
 
 const MAX_ZOOM_PAGES = 12; // next_page_token safety cap for the recordings list
+const { ZOOM_TRANSCRIPT_RETRY_HOURS } = require('../lib/zoom-retry');
+// how many requeued calls one sync may re-dispatch — a ceiling, never a sweep
+const REQUEUE_DISPATCH_CAP = 10;
 
 const router = express.Router();
 
@@ -157,17 +160,48 @@ async function syncZoomCalls(admin, userId, conn) {
   // FD-4 cap — FIRST SYNC ONLY (shared with Fathom): cap the connect backlog to the
   // newest N; on steady-state syncs analyze every new call so a busy day isn't
   // silently truncated. The rest of a first-sync backlog stay pending for backfill.
+  /**
+   * ⚠⚠ PICK UP CALLS REQUEUED BECAUSE THEIR TRANSCRIPT WASN'T READY YET.
+   * Without this the requeue only half-works: the row sits at 'pending' and
+   * NOTHING re-dispatches it, because this sync only ever analyses rows it just
+   * inserted. That is arguably worse than the error it replaced — an error card
+   * at least tells the user something is wrong, whereas a permanently pending
+   * row reads as "still analysing" forever.
+   *
+   * Bounded three ways so it can never become a backlog sweep: only Zoom rows,
+   * only ones inside the retry window (lib/zoom-retry.js), and capped.
+   * Retries are free — the transcript fetch precedes any Claude call.
+   */
+  var requeuedIds = [];
+  try {
+    var since = new Date(Date.now() - ZOOM_TRANSCRIPT_RETRY_HOURS * 3600 * 1000).toISOString();
+    var rq = await admin.from('fathom_calls').select('id')
+      .eq('user_id', userId).eq('source', 'zoom').eq('sync_status', 'pending')
+      .gte('call_date', since)
+      .order('call_date', { ascending: false }).limit(REQUEUE_DISPATCH_CAP);
+    if (!rq.error) requeuedIds = (rq.data || []).map(function (r) { return r.id; });
+  } catch (rqErr) {
+    console.error('[zoom] requeue lookup failed for user ' + userId + ': ' + (rqErr.message || 'unknown'));
+  }
+
   var newCallIds = callIdsToAnalyze(newRows, conn && conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
   if (newRows.length > newCallIds.length) {
     console.log('[zoom] sync: first-sync backlog — capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
   }
-  if (newCallIds.length > 0) {
+  var newSet = {};
+  newCallIds.forEach(function (id) { newSet[id] = true; });
+  var retryIds = requeuedIds.filter(function (id) { return !newSet[id]; });
+  var dispatchIds = newCallIds.concat(retryIds);
+  if (retryIds.length > 0) {
+    console.log('[zoom] sync: re-dispatching ' + retryIds.length + ' call(s) whose transcript was not ready last time (user=' + userId + ')');
+  }
+  if (dispatchIds.length > 0) {
     (async function() {
       try {
         var analyzeCall = require('../lib/analysis-worker').analyzeCall; // lazy — dodge require cycle
-        for (var i = 0; i < newCallIds.length; i++) {
-          try { await analyzeCall(newCallIds[i], userId); }
-          catch (innerErr) { console.error('[zoom] analyzeCall failed for call ' + newCallIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown')); }
+        for (var i = 0; i < dispatchIds.length; i++) {
+          try { await analyzeCall(dispatchIds[i], userId); }
+          catch (innerErr) { console.error('[zoom] analyzeCall failed for call ' + dispatchIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown')); }
         }
       } catch (outerErr) {
         console.error('[zoom] background analysis loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));

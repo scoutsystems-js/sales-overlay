@@ -58,6 +58,7 @@ const fathomRoutes = require('../routes/fathom');
 const callConnections = require('./call-connections');
 const zoomClient = require('./zoom-client');
 const { parseVttToTranscript } = require('./vtt-adapter');
+const zoomRetry = require('./zoom-retry');
 // Section tagging for highlights (Call Review Context, Part 1a).
 const { sanitizeSectionValue } = require('./highlight-section');
 // 6a: independent quote→speaker attribution (refuses rather than guesses).
@@ -1093,6 +1094,34 @@ async function analyzeCall(fathomCallId, userId) {
       return { status: 'error', reason: reason };
     }
 
+    /**
+     * ⚠⚠ A ZOOM TRANSCRIPT THAT ISN'T READY YET IS NOT A FAILED CALL.
+     * Zoom produces the recording first and the transcript minutes later, so a
+     * sweep landing in that window used to error the call PERMANENTLY — the
+     * sync upserts with ignoreDuplicates and no route moves 'error' back to
+     * 'pending', so nothing and nobody could retry it.
+     *
+     * Requeueing leaves BOTH statuses at 'pending', which is the state the
+     * dashboard's reanalyze path already dispatches — so the call is genuinely
+     * recoverable rather than merely differently stuck. The reason is still
+     * written to overall_summary so the state is legible in the DB.
+     * Bounded by call age in lib/zoom-retry.js: the "not ready" and "was never
+     * recorded with transcription" cases are textually identical, and age is
+     * the only thing that separates them.
+     */
+    async function requeueTranscript(reason) {
+      await setAnalysisStatus(admin, fathomCallId, userId, 'pending', {
+        overall_summary: reason,
+        analyzed_at:     new Date().toISOString(),
+      });
+      var rq = await admin.from('fathom_calls').update({ sync_status: 'pending' })
+        .eq('id', fathomCallId).eq('user_id', userId);
+      if (rq.error) console.error('[analysis] requeue failed for call ' + fathomCallId + ': ' + rq.error.message);
+      console.warn('[analysis] REQUEUED (transcript not ready) ' + reason
+        + ' (call=' + fathomCallId + ' user=' + userId + ')');
+      return { status: 'requeued', reason: reason };
+    }
+
     var transcript;
     if (transcriptSourceFor(callRow) === 'zoom') {
       // ── Zoom ── token via call_connections (serialized single-flight refresh —
@@ -1108,7 +1137,12 @@ async function analyzeCall(fathomCallId, userId) {
         var vtt = await zoomClient.fetchTranscriptVtt(zoomToken, callRow.fathom_call_id);
         transcript = parseVttToTranscript(vtt);
       } catch (zErr) {
-        return await failTranscript('Zoom transcript fetch failed for meeting ' + callRow.fathom_call_id + ': ' + ((zErr && zErr.message) || 'unknown'));
+        var zReason = 'Zoom transcript fetch failed for meeting ' + callRow.fathom_call_id
+          + ': ' + ((zErr && zErr.message) || 'unknown');
+        // not-ready-yet → requeue (free: this is before any Claude call).
+        // Anything else — bad token, missing scope — is a real failure.
+        if (zoomRetry.shouldRequeue(zReason, callRow.call_date)) return await requeueTranscript(zReason);
+        return await failTranscript(zReason);
       }
     } else {
       // ── Fathom (unchanged) ── fathom_connections token + /recordings/{id}/transcript.
