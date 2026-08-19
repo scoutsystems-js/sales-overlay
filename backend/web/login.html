@@ -154,16 +154,44 @@
        Archivo is 25.2% WIDER, so it needs a much smaller coefficient. The glyph
        is sized from --cap-em and --o-adv-em so it re-fits per face rather than
        being scaled by eye. */
+    /* ⚠⚠ THE GLYPH IS SIZED FROM THE RING'S **INK**, NOT FROM ITS BOX, AND NOT
+       FROM THE viewBox. It read short and low for THREE compounding reasons —
+       see test/lockup-glyph.test.js, which recomputes every number below:
+         1  --cap-em was 0.686 (font file). The face RENDERS 0.7197.
+         2  the viewBox is cropped to the full ink, dots included, so sizing the
+            BOX to the cap height left the RING at 91.3% of it.
+         3  the baseline was pinned to the arc's path end (18.744) rather than
+            to where it PAINTS (18.744 + half a stroke).
+
+       ⚠ NOTHING HERE IS A PICKED NUMBER. A value in viewBox units is a
+       FUNCTION OF THE BOX — this stroke has been wrong four times for exactly
+       that reason — so the derivation lives in the calc chain. Change
+       --mark-stroke-px or --cap-em and the box, the drop and the dots follow.
+
+       THE RING (outer arc): centre (10,12) r 8.5 swept 285deg, so the PATH runs
+       y 3.5 -> 18.744. Round-capped it PAINTS half a stroke past each end:
+         ink top    = 3.5    - s/2      <- the CAP LINE
+         ink bottom = 18.744 + s/2      <- the BASELINE
+       The stroke is on both sides of the ask (it thickens the ring it is
+       measured against), so 6px is a solve, not a division:
+         (15.244 + s) * pxPerUnit = cap   AND   s * pxPerUnit = 6
+         s = 6 x 15.244 / (104 x 0.7197 - 6) = 1.3285 units = 6.00px at 104px */
     .brand-o {
       display: inline-block;
       width: calc(1em * var(--o-adv-em));
-      height: calc(1em * var(--cap-em));
-      /* the glyph's baseline sits 91.3% down its viewBox */
+      height: calc(1em * var(--o-box-em));
       vertical-align: baseline;
-      margin-bottom: calc(-1em * var(--cap-em) * 0.0873);
+      /* the dots hang below the baseline; the box drops by exactly that much */
+      margin-bottom: calc(-1em * var(--o-drop-em));
       overflow: visible;
     }
     .brand-o svg { width: 100%; height: 100%; overflow: visible; display: block; }
+    /* ⚠ the attributes on the elements carry the same derived values as an
+       inert fallback; CSS wins wherever it is supported. They must agree. */
+    .brand-o svg path { stroke-width: calc(var(--mark-stroke) * 1px); }
+    .brand-o svg circle:nth-of-type(1) { r: calc(var(--mark-stroke) * var(--dot-1) * 1px); }
+    .brand-o svg circle:nth-of-type(2) { r: calc(var(--mark-stroke) * var(--dot-2) * 1px); }
+    .brand-o svg circle:nth-of-type(3) { r: calc(var(--mark-stroke) * var(--dot-3) * 1px); }
 
     /* ── the typeface trial (temporary scaffolding, ?font=archivo) ──────────
        ⚠ Body text stays Montserrat Light either way — Archivo is a display face
@@ -174,8 +202,35 @@
        and no 700. The glyph metrics are Archivo's own, measured from its file:
        cap 0.686em, O advance 1.016em, k@0.08em 12.226 (25.2% wider than
        Montserrat), so the coefficient is 7.8vw against the 96vw lockup box. */
-    :root { --wm-family: 'Archivo Expanded'; --wm-vw: 7.8vw; --wm-cap: 104px;
-            --cap-em: 0.686; --o-adv-em: 1.016; }
+    /* ⚠⚠ --cap-em IS MEASURED FROM WHAT THE FACE RENDERS, NOT READ FROM THE
+       FONT FILE. It carried 0.686 (the file's metric) while all SEVEN flat-
+       topped caps — T U E H I M Y — render at 0.7197em, so the glyph box
+       started 4.7% short of the letters beside it.
+       ⚠ DO NOT RE-MEASURE THIS WITH "S". The round caps deliberately OVERSHOOT
+       the cap line for optical correction — S 0.7407, C 0.7334, O 0.7417,
+       G 0.7383, ~2.9% over — and measuring one is how a wrong cap height gets
+       derived. Use a flat-topped cap. */
+    :root { --wm-family: 'Archivo Expanded'; --wm-vw: 7.8vw;
+            --wm-cap-n: 104; --wm-cap: 104px;
+            --cap-em: 0.7197; --o-adv-em: 1.016;
+
+            /* the ask: 6px rings at the full title size */
+            --mark-stroke-px: 6;
+            /* the outer arc's PATH span, y 3.5 (circle top) -> 18.744 (285deg ends) */
+            --ring-path-span: 15.244;
+            /* dot radii as a ratio of the stroke, from the approved mark
+               (r 1.6/1.2/0.8 on a 2.2 stroke) — they thin WITH the rings */
+            --dot-1: 0.7272727; --dot-2: 0.5454545; --dot-3: 0.3636364;
+
+            --mark-stroke: calc(var(--mark-stroke-px) * var(--ring-path-span)
+                                / (var(--wm-cap-n) * var(--cap-em) - var(--mark-stroke-px)));
+            /* the ring's PAINTED span — this is the piece that must equal the cap */
+            --ring-ink-span: calc(var(--ring-path-span) + var(--mark-stroke));
+            /* the whole viewBox is taller: it also holds the descending dots */
+            --vb-height: calc(16 + var(--mark-stroke) * (var(--dot-3) + 0.5));
+            --vb-drop:   calc(0.756 + var(--mark-stroke) * (var(--dot-3) - 0.5));
+            --o-box-em:  calc(var(--cap-em) * var(--vb-height) / var(--ring-ink-span));
+            --o-drop-em: calc(var(--cap-em) * var(--vb-drop)   / var(--ring-ink-span)); }
 
     /* ⚠⚠ THE GREYS STAY ON THIS PAGE — A DELIBERATE EXCEPTION TO THE NO-GREY
        SWEEP, CLOSED NOT DEFERRED (Justin, 2026-08-18: "it looks perfect").
@@ -951,7 +1006,7 @@
          Do not re-add it above the wordmark — the background mark and a small
          mark stacked over it is the same logo twice on one screen. -->
     <div class="brand-lockup">
-      <div class="brand-name">SC<span class="brand-o" aria-hidden="true"><svg viewBox="0.4 2.4 19.2 17.9" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.826 18.744 A8.5 8.5 0 1 1 15.174 18.744" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"/><path d="M6.652 16.363 A5.5 5.5 0 1 1 13.348 16.363" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"/><path d="M8.478 13.983 A2.5 2.5 0 1 1 11.522 13.983" stroke="var(--green)" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="12" r="1.6" fill="var(--green)"/><circle cx="10" cy="16" r="1.2" fill="var(--green)"/><circle cx="10" cy="19.5" r="0.8" fill="var(--green)"/></svg></span>UT SYSTEMS</div>
+      <div class="brand-name">SC<span class="brand-o" aria-hidden="true"><svg viewBox="0.8357 2.8357 18.3285 17.1474" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.826 18.744 A8.5 8.5 0 1 1 15.174 18.744" stroke="var(--green)" stroke-width="1.3285" stroke-linecap="round"/><path d="M6.652 16.363 A5.5 5.5 0 1 1 13.348 16.363" stroke="var(--green)" stroke-width="1.3285" stroke-linecap="round"/><path d="M8.478 13.983 A2.5 2.5 0 1 1 11.522 13.983" stroke="var(--green)" stroke-width="1.3285" stroke-linecap="round"/><circle cx="10" cy="12" r="0.9662" fill="var(--green)"/><circle cx="10" cy="16" r="0.7246" fill="var(--green)"/><circle cx="10" cy="19.5" r="0.4831" fill="var(--green)"/></svg></span>UT SYSTEMS</div>
     </div>
 
     <div class="card-header">

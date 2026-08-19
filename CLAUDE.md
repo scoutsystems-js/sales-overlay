@@ -1510,6 +1510,27 @@ document.querySelectorAll('.container *').forEach(el => {
 - **⚠ AND IT MUST BE RE-MEASURED PER FACE, NEVER CARRIED.** Reusing 8.924 for Montserrat would have produced `10.3vw × 9.495 = 97.8vw` of text in a **92vw** lockup — a wrap, on a page that had already wrapped twice for exactly this reason. **6.4% of width difference is enough.**
 - Generalises to any constant derived by measuring one variant of something the platform may swap: font metrics, device pixel ratios, locale-dependent string widths.
 
+### ⚠⚠ MEASURE CAP HEIGHT ON A **FLAT-TOPPED** CAP — ROUND LETTERS OVERSHOOT ON PURPOSE, AND THE FONT FILE CAN DISAGREE WITH WHAT RENDERS (2026-08-19)
+**Two ways to get a cap height wrong, and the login glyph had one of them shipped for weeks.**
+- **The live case:** `--cap-em` carried **0.686**, read from the Archivo file, while the face RENDERS **0.7197** — every one of SEVEN flat-topped caps (T U E H I M Y) reports exactly `0.7197em`. The glyph box was therefore **4.7% shorter than the letters beside it** from the moment it was written, and no amount of nudging the glyph would have fixed a constant that was wrong at the source.
+- **⚠ AND THE OBVIOUS RE-MEASUREMENT IS ALSO WRONG. `measureText('S').actualBoundingBoxAscent` returns 0.7407em** — because round caps **deliberately overshoot** the cap line for optical correction: S 0.7407, C 0.7334, O 0.7417, G 0.7383, all ~2.9% over. **The first probe here used "S" and produced a cap height 2.9% too large**, which would have made the glyph overshoot instead of undershoot. Same defect, opposite sign, equally confident.
+- **THE RULE: read cap height off a flat-topped cap, and cross-check several.** Seven letters agreeing to the pixel is what makes the number trustworthy; one letter is a sample of one, and the letter most people reach for (`S`, or the wordmark's own first character) is the one guaranteed to be wrong.
+- **⚠ THE FONT FILE IS NOT THE AUTHORITY — WHAT RENDERS IS.** A metric parsed out of a TTF/OTF can disagree with what the browser draws (different table, different weight/width instance, unitsPerEm assumption). The existing rule *"measure from the font files, never the browser"* was written to defeat **faux-bold**, where the browser reports a synthesised face's numbers — it is about not measuring a face you did not load, **not** about preferring file metrics over rendered ones. **Once the real face is confirmed loaded (`document.fonts.check`, and a computed `font-weight` you actually linked), the browser's measurement of THAT face is the authority.**
+- Same family as the k-per-face rule above: **a typographic constant is a property of the rendered face, so it is measured per face and never carried.**
+
+### ⚠⚠ A GLYPH'S BOX AND THE PART OF IT THAT MUST ALIGN ARE DIFFERENT SPANS — SIZING THE BOX TO THE TARGET MAKES THE CONTENT SHORT (2026-08-19)
+**Ink-vs-box, in the one place it inverts: here the BOX was correct and the thing inside it was wrong, so every check aimed at the box passed.**
+- **The live case:** the mark replacing the "O" in SCOUT read short and sat low. Its viewBox is cropped to the **full ink — including the dots that hang below the baseline** — while `.brand-o`'s height was set to the **cap height**. So the RING could only ever occupy **91.3%** of the box it was scaled into. The box measured exactly right at every viewport.
+- **THE RULE: size the box so the ALIGNING SUB-SPAN equals the target, not so the whole box does.** `boxHeight = capHeight x (viewBoxSpan / ringSpan)` — the box comes out *taller* than the cap, deliberately, and the overhang becomes the descender drop.
+- **⚠ AND THE ALIGNING SPAN IS THE PAINTED ONE, NOT THE PATH.** The baseline had been pinned to the arc's path end (`y 18.744`); round-capped, it **paints half a stroke lower**. Third cause of the same complaint. **Any span used for optical alignment must be measured on ink: `pathSpan + strokeWidth`, not `pathSpan`.**
+- **⚠⚠ THE STROKE IS ON BOTH SIDES OF THE ASK, SO A STROKE TARGET IS A SOLVE, NOT A DIVISION.** "6px rings, and the ring spans the cap height" — but the stroke **thickens the very span it is measured against**. Dividing gives a value that is wrong once applied:
+```
+(pathSpan + s) * pxPerUnit = cap        s * pxPerUnit = strokePx
+  =>  s = strokePx * pathSpan / (cap - strokePx)
+```
+  Live: `s = 6 x 15.244 / (104 x 0.7197 - 6) = 1.3285` units, measured back at **6.00px** across every ring. Naively dividing gives 1.375 and paints ~5.9px — small, but wrong for a reason that would never be found by eye.
+- **THE DERIVATION CAN LIVE IN CSS — verified, not assumed.** Chrome resolves `calc()` division by a var-bearing sub-expression, so `--mark-stroke`, the box height, the baseline drop and the dot radii are all one chain from `--cap-em` and `--mark-stroke-px`. **Tested in the browser before committing to it**, because the fallback (a pinned literal plus a test that recomputes it) is meaningfully worse: it goes stale silently, which is exactly how this stroke has been wrong four times.
+
 ### ⚠⚠ TURN THE AESTHETIC COMPLAINT INTO A MEASUREMENT BEFORE ACTING ON IT — "BUBBLY" WAS 29px AGAINST 1-3px (2026-08-18)
 **A fact about the mark, not an opinion about it — and that is what made the fix obvious instead of iterative.**
 - **The live case:** Justin said the login logo reads *"bubbly"* — soft and cartoony against a product that is otherwise precise and thin. The tempting response is to nudge a stroke value and ask "better?", which is a loop with no defined end.

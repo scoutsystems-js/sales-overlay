@@ -174,13 +174,24 @@ test('⚠⚠ THE MAP: lockup and background share 285deg; the nav is the lone 18
       + ' — only the SWEEP diverges there, not the scale');
   });
 
-  // dots: background radii x0.25 and centres tightened x0.62; lockup unchanged
+  // dots: background radii x0.25 and centres tightened x0.62
   const navR = radii(nav, 'r'), bgR = radii(bg, 'r'), lockR = radii(lock, 'r');
   navR.forEach((r, i) => {
     assert.ok(Math.abs(bgR[i] / r - 0.25) < 0.001,
       'background dot ' + (i + 1) + ' radius must be a QUARTER of the nav');
-    assert.ok(Math.abs(lockR[i] / r - 1) < 0.001,
-      'lockup dot ' + (i + 1) + ' keeps the nav radius — the mocked arrangement');
+  });
+  /* ⚠ CONVERTED 2026-08-19, NOT DELETED. This asserted the lockup dots matched
+     the nav's RADII outright. Justin then ruled that the dots scale WITH the
+     stroke ("proportional rather than heavy dots on hairline rings"), so as the
+     rings thinned to 6px the radii had to thin with them — that assertion is
+     superseded and the absolute radii are now derived in test/lockup-glyph.js.
+     The property that SURVIVES is the mocked arrangement: the three dots keep
+     their sizes RELATIVE to each other, so the mark still reads as the approved
+     descending stack rather than three equal dots. */
+  navR.slice(1).forEach((r, i) => {
+    assert.ok(Math.abs((lockR[i] / lockR[i + 1]) / (navR[i] / r) - 1) < 0.002,
+      'lockup dots ' + (i + 1) + ':' + (i + 2) + ' must keep the nav PROPORTION ('
+      + (navR[i] / r).toFixed(4) + '), got ' + (lockR[i] / lockR[i + 1]).toFixed(4));
   });
   const navCy = radii(nav, 'cy'), bgCy = radii(bg, 'cy'), lockCy = radii(lock, 'cy');
   navCy.forEach((cy, i) => {
