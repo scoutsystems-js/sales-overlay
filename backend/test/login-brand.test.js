@@ -229,6 +229,27 @@ test('the wordmark is bigger again, and >= 50% wider than the login box', () => 
     + Math.round(size * 9.769) + 'px');
 });
 
+/**
+ * ⚠⚠ THE GREYS ARE A CLOSED EXCEPTION (Justin, 2026-08-18). This page keeps
+ * --muted #8a9aaa where the dashboard eliminated it, which caps this surface at
+ * 0.215 and therefore caps the mark at 0.20 — where it already is. A future
+ * "make it brighter" has a known answer: not without reopening the greys.
+ */
+test('⚠ the login page keeps its genuine grey, and the mark sits at that ceiling', () => {
+  assert.ok(/--muted:\s*#8a9aaa/.test(STYLE),
+    'the login/landing stylesheet keeps the real grey — the no-grey sweep '
+    + 'deliberately does NOT apply here');
+  // ⚠ strip comments first — several of them mention `body::before` by name,
+  // and matching prose instead of the rule is the trap this file documents.
+  const live = LOGIN.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = live.indexOf('body::before');
+  const css = live.slice(at, live.indexOf('}', at));
+  const op = Number((css.match(/opacity:\s*([\d.]+)/) || [])[1]);
+  assert.ok(op && op <= 0.215,
+    'with the greys kept, 0.215 is this surface\'s AA ceiling — got ' + op);
+  assert.ok(op >= 0.19, 'and it should sit AT that ceiling, not below: ' + op);
+});
+
 test('⚠ the background layer follows the motif treatment exactly', () => {
   const at = LOGIN_LIVE.indexOf('body::before');
   assert.ok(at > 0, 'the background layer is missing');

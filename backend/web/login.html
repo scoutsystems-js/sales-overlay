@@ -177,6 +177,24 @@
     :root { --wm-family: 'Archivo Expanded'; --wm-vw: 7.8vw; --wm-cap: 104px;
             --cap-em: 0.686; --o-adv-em: 1.016; }
 
+    /* ⚠⚠ THE GREYS STAY ON THIS PAGE — A DELIBERATE EXCEPTION TO THE NO-GREY
+       SWEEP, CLOSED NOT DEFERRED (Justin, 2026-08-18: "it looks perfect").
+
+       The dashboard's no-grey rule repointed --muted to --text there; this page
+       keeps its genuine grey (#8a9aaa) on 11 elements — the field labels, the
+       card subtitle, "Back to site", "Forgot password?", "Sign out" and the
+       footer links. That is what keeps the form quiet beneath the wordmark.
+
+       ⚠ THE CONSEQUENCE, RECORDED SO A FUTURE "MAKE IT BRIGHTER" HAS AN ANSWER
+       RATHER THAN A FRESH INVESTIGATION: the grey sets this surface's contrast
+       ceiling at 0.215, so the background mark is capped at 0.20 and IS ALREADY
+       THERE. It cannot be brightened while the greys stay — the lever is the
+       grey, not the mark. Raising one means reopening the other, and that trade
+       was put to Justin and declined.
+
+       The DASHBOARD's 0.40 is unaffected: different surface, different tokens,
+       its own measured ceiling of 0.535. A criterion is not a constant. */
+
     /* ⚠⚠ THE LOCKUP IS LOGIN-ONLY, AND THE NAV MARK STAYS — A DECISION, NOT
        AN INCONSISTENCY (Justin, 2026-08-18). The planned "mark replaces the O
        in SCOUT" lockup keeps the WHOLE mark, arcs AND dots. The trailing dot is
