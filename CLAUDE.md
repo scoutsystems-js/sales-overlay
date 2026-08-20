@@ -1415,7 +1415,14 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 
 ### ⚠⚠⚠ A GATE THAT FAILS OPEN IS WORSE THAN NO GATE — AND YOU ONLY FIND ONE BY RUNNING IT OVER CASES IT SHOULD **FAIL** (2026-08-20)
 **THE METHOD IS THE FILING: verifying a check against cases it should PASS tells you nothing about whether it can fail at all.** A green result is equally consistent with "the input was good" and "this check can no longer fail".
-- **The live case:** `countBodyEmDashes` exempts the greeting line, because `"Hey Teesha —"` spends an em-dash before the body starts. The strip matched `[^\n]*` — everything up to the first newline. **Every pre-v26 draft is ONE paragraph**, so it stripped the entire email and the gate **reported ZERO body em-dashes for a 175-word draft containing FOUR**. It returned PASS on the worst input available.
+- **The live case:** `countBodyEmDashes` exempts the greeting line, because `"Hey Teesha —"` spends an em-dash before the body starts. The strip matched `[^\n]*` — everything up to the first newline. **It therefore swallowed EVERY em-dash on the first line.** ⚠ **CORRECTED 2026-08-20 — the original filing of this lesson over-generalised and the correction matters more than the example.** It said *"every pre-v26 draft is ONE paragraph"*. **Counted, only ONE of the three old drafts is** — the other two have five paragraphs each and pass the paragraph-breaks gate. The accurate statement is about the LINE, not the draft:
+```
+old regex = strip everything to the first newline
+  1-paragraph draft: first line IS the email  -> 4 raw em-dashes counted as 0  (TOTAL loss)
+  5-paragraph draft: first line only          -> 4 raw counted as 2  (PARTIAL loss)
+  5-paragraph draft: greeting alone on line 1 -> 6 raw counted as 5  (no loss)
+```
+So the fail-open was **worst on single-paragraph drafts and present on any draft whose first line carried an em-dash beyond the greeting** — a broader class than "one paragraph" and a narrower claim than the one filed. ⚠ **A lesson filed with a wrong generalisation is worse than one filed narrowly**: the example stays verifiable while the rule quietly misleads, and nobody re-checks a rule.
 - **⚠ IT WAS INVISIBLE BECAUSE I ONLY EVER RAN THE GATES ON THE THREE NEW DRAFTS — the ones I expected to pass.** They pass legitimately (they have paragraph breaks), so the bug could not show. Running the same gates over the **OLD** drafts, which I expected to FAIL, is what exposed it: a draft with four em-dashes scoring zero is not a pass, it is a broken instrument.
 - **⚠⚠ WHY FAIL-OPEN IS THE WORSE DIRECTION: a false FAIL gets investigated, a false PASS gets filed.** A gate that wrongly rejects something is noticed within minutes because someone is blocked. A gate that wrongly accepts reports success, the artefact ships, and nobody returns to it — the failure is indistinguishable from the feature working.
 - **THE PRACTICE: for every gate, keep a fixture that MUST fail, and assert that it does.** Not as non-vacuity theatre — as the only evidence the check has any teeth. Here: a single-paragraph email with four em-dashes, pinned at 3 after the greeting.

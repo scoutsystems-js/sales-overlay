@@ -198,9 +198,12 @@ test('⚠ the block now states BOTH fixed rules to the model', () => {
 
 test('⚠⚠ bodyOf FAILED OPEN on single-paragraph email — the gate passed anything', () => {
   /* The first version matched `[^\n]*`, i.e. everything up to the first
-     newline. Every pre-v26 draft is ONE paragraph, so it stripped the whole
-     email and countBodyEmDashes returned 0 for a 175-word draft with FOUR
-     em-dashes. A gate that fails OPEN is worse than no gate: it reports PASS,
+     newline, so it swallowed EVERY em-dash on that line.
+     ⚠ CORRECTED 2026-08-20: this comment used to say "every pre-v26 draft is
+     ONE paragraph". Counted, only ONE of the three old drafts is; the other two
+     have five paragraphs each. The accurate statement is about the LINE:
+     a 1-paragraph draft loses everything (4 raw -> 0), a 5-paragraph draft
+     loses only its first line (4 raw -> 2). A gate that fails OPEN is worse than no gate: it reports PASS,
      so nobody looks again.
      ⚠ Found only by running the gates over the OLD drafts as well as the new
      ones. Checking only the drafts you expect to pass cannot reveal a check

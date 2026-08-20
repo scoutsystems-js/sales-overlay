@@ -175,7 +175,7 @@ function bodyOf(text) {
   var t = String(text || '');
   /* ⚠⚠ STRIP THE SALUTATION, NOT THE LINE — THE FIRST VERSION FAILED OPEN.
      It matched `[^\n]*`, i.e. everything up to the first newline. On a
-     SINGLE-PARAGRAPH email — which every pre-v26 draft is — the whole email is
+     SINGLE-PARAGRAPH email the whole email is
      one line, so it stripped the ENTIRE email and countBodyEmDashes returned 0
      for a 175-word draft containing FOUR em-dashes. The gate passed anything.
      ⚠ A GATE THAT FAILS OPEN IS WORSE THAN NO GATE: it reports PASS, so nobody
