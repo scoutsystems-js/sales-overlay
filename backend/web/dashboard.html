@@ -329,12 +329,32 @@
          mid-band, and it roughly halves the per-glyph impact of a treatment
          that now touches far more text than a cropped shape did. Brighter is
          not the same as approved. */
-      opacity: 0.25;
+      opacity: var(--motif-alpha, 0.25);
       background-image: var(--motif-mesh);
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
     }
+    /* ══ MESH BRIGHTNESS TRIAL — TEMPORARY SCAFFOLDING (2026-08-20) ══════════
+       Justin wants to SEE it bright on the real page before deciding. Flip with
+       ?mesh=bright on any dashboard URL; anything else is the shipped value.
+
+       ⚠⚠ STATED ONCE, PLAINLY: AT FULL STRENGTH THIS FAILS AA. The mesh touches
+       97.1% of text boxes, so the worst case is UNIVERSAL rather than
+       occasional. Measured over a solid mesh stroke (AA floor 4.5):
+           alpha   body    accent
+           0.25    10.19    6.68     shipped — 48% margin on accent
+           0.40     6.62    4.34     accent already fails
+           0.60     3.83    2.51     BOTH fail
+           1.00     1.52    1.00     accent is INVISIBLE (1.00 = identical)
+       This is a LOOK-AT-IT EXPERIMENT, not a ship decision. The variant comes
+       out once he picks.
+
+       ⚠ THE GUARD IS SCOPED, NOT WEAKENED. background-motifs.test.js still
+       asserts the DEFAULT clears AA; the bright path is a named exception it
+       knows about, because a guard deleted for a trial never comes back. */
+    html[data-mesh="bright"] { --motif-alpha: 1; }
+
     /* Below this width the column eats the gutters and the shape would sit
        almost entirely behind opaque cards. Don't render what cannot be seen. */
     @media (max-width: 1320px) { body[data-view]::before { display: none; } }
@@ -4753,6 +4773,15 @@
   // ──────────────────────────────────────────────────────────────────
   // Top-level render — switches on state.view
   // ──────────────────────────────────────────────────────────────────
+  /* ⚠ read BEFORE first paint so the trial never flashes the shipped value
+     first. Same shape as the welcome overlay's synchronous cover. */
+  (function meshTrial() {
+    try {
+      var v = new URLSearchParams(location.search).get('mesh');
+      if (v === 'bright') document.documentElement.setAttribute('data-mesh', 'bright');
+    } catch (e) { /* a trial must never break the page */ }
+  })();
+
   function render() {
     // (f) The single hook the background motifs key on. render() is the ONE
     // dispatch point for every view, so this cannot fall out of step with what

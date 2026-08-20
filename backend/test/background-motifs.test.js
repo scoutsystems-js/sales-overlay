@@ -58,8 +58,15 @@ test('the layer is decorative and unreachable — never in front of content', ()
   assert.ok(/z-index:\s*-1\b/.test(r),
     'z-index MUST be negative — a fixed layer at 0 paints ABOVE static in-flow text');
   assert.ok(/pointer-events:\s*none/.test(r), 'decoration must never intercept a click');
-  const op = r.match(/opacity:\s*([0-9.]+)/);
-  assert.ok(op, 'the layer must declare an opacity');
+  /* ⚠ THE OPACITY IS NOW A var() WITH A FALLBACK, because of the brightness
+     TRIAL (?mesh=bright). This guard reads the FALLBACK — the shipped default —
+     deliberately: the trial is a named exception, not a reason to stop checking.
+     ⚠ A guard loosened for a trial never tightens again, so this one is SCOPED
+     instead: the default must still clear AA, and the bright path is asserted
+     separately as opt-in-only below. */
+  const op = r.match(/opacity:\s*var\(--motif-alpha,\s*([0-9.]+)\)/)
+          || r.match(/opacity:\s*([0-9.]+)/);
+  assert.ok(op, 'the layer must declare an opacity (literal or var with a fallback)');
   // ⚠ THE CAP WAS RE-DERIVED 2026-08-18, because the old one had become the
   // BLOCKER rather than the safeguard. 0.06 was set when the treatment was small
   // repeated motifs; a single large cropped shape at that value measured a green
@@ -191,4 +198,61 @@ test('⚠⚠ ONE artwork, ONE layer — per-page variation is retired', () => {
     'exactly one layer draws the mesh');
   assert.ok(!/body\[data-view="[a-z-]+"\]::before \{ background-image/.test(live),
     'per-view artwork assignment is retired — one full-bleed mesh covers everything');
+});
+
+/**
+ * ⚠⚠ EXACTLY ONE LIVE MOTIF RULE — the check that would have caught the
+ * two-rules mistake and did not exist.
+ *
+ * `body[data-view]::before` was defined TWICE: a dead 0.035 version and the
+ * governing one below it. Every guard passed, because each read whichever rule
+ * it found and both assertions were true of it. A guard that checks the VALUE
+ * it finds cannot notice that a SECOND definition exists.
+ *
+ * This is the "exactly one" shape already used for background-position and
+ * background-size after the 207px incident — the lesson had been learned for
+ * DECLARATIONS and never extended to SELECTORS. One level up, same failure.
+ */
+test('⚠⚠ exactly ONE live body[data-view]::before rule (excluding media queries)', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  // media-query copies are display:none only and are not the painting rule
+  const painting = live.replace(/@media[^{]*\{[^}]*\{[^}]*\}\s*\}/g, '');
+  const n = (painting.match(/body\[data-view\]::before\s*\{/g) || []).length;
+  assert.strictEqual(n, 1,
+    'found ' + n + ' painting rules. A second definition SILENTLY SUPERSEDES the '
+    + 'first, and every search finds the dead one first — position vs precedence.');
+});
+
+/**
+ * ⚠⚠ THE BRIGHTNESS TRIAL IS OPT-IN ONLY, AND THAT IS WHAT MAKES IT SAFE.
+ * At full strength the mesh fails AA for BOTH body and accent text — measured
+ * 2.16 and 1.41 against a 4.5 floor — because it touches 97.1% of text boxes,
+ * so the worst case is universal rather than occasional.
+ *
+ * The guard above still holds the DEFAULT to the AA ceiling. This one holds the
+ * trial to being unreachable without an explicit query parameter, so a bright
+ * mesh can never become the shipped state by accident.
+ */
+test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const bright = live.match(/html\[data-mesh="bright"\]\s*\{[^}]*\}/);
+  assert.ok(bright, 'the trial variant must be attribute-scoped');
+  assert.ok(/--motif-alpha:\s*1/.test(bright[0]), 'bright means full strength');
+
+  // it can only be reached by an explicit parameter
+  assert.ok(/mesh'\)/.test(live) && /=== 'bright'/.test(live),
+    'the attribute must be set only from an explicit ?mesh=bright');
+  /* ⚠ this check was wrong first: it stripped the `if (...)` and then asserted
+     the call was not at end of line — which is true of a correctly guarded call
+     too. Assert the PROPERTY instead: every setAttribute for data-mesh sits on a
+     line that also carries its guard. */
+  const setLines = live.split('\n').filter((l) => /setAttribute\('data-mesh'/.test(l));
+  assert.ok(setLines.length >= 1, 'the trial must set the attribute somewhere');
+  setLines.forEach((l) => assert.ok(/if \(/.test(l),
+    'data-mesh must never be set unconditionally: ' + l.trim()));
+
+  // and the default is still the measured value, not the trial one
+  const layer = live.slice(live.indexOf('body[data-view]::before {'));
+  assert.ok(/--motif-alpha,\s*0\.25\)/.test(layer),
+    'the fallback — what everyone without the parameter sees — stays 0.25');
 });
