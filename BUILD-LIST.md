@@ -24,7 +24,8 @@ Shipped, deployed, and verified on production.
 | Prospects + close rate | Prospect entity, merge/unmerge, closed-prospects ÷ total | |
 | Date-range picker | Calendar picker; every view owns its own range | |
 | Welcome sequence | One-shot dial animation after fresh login | never a gate; 6s watchdog |
-| Site-wide background | Team raster on every view, `cover`, `50% 50%`, **opacity 1** | shipped `9d297a8` |
+| Site-wide background | Team raster on every view, `cover`, `50% 50%`, **opacity 1**, top 38% masked to black fading in by 72% | shipped `9d297a8`, faded `6adb774` |
+| Sync Now in Connections | Manual sync for both providers in #account, verified by clicking | shipped `6adb774`; healthy dashboard cards removed with it |
 | Week labels in Scout green | Weekly team-graph axis labels `#09e046` | shipped `864bd49` |
 | Legend toggle on team graphs | Click a rep to hide/show their line; keyed by `user_id` | ⚠ the click GESTURE is unverified — harness cannot deliver clicks |
 | Zoom OAuth + deauthorization | Connect/disconnect, deauth endpoint live | |
@@ -44,7 +45,7 @@ Built or scoped, waiting on a decision — not on work.
 
 | item | one line | what is needed |
 |---|---|---|
-| Connection cards / Sync Now | Removing the Fathom/Zoom cards from the Coaching Dashboard | Sync Now exists only on those cards + `getStartedCardHtml`; Justin must pick where it goes |
+
 | Objection-handling name collision | "Objection Handling" names 3 different metrics on the team page | observation filed 2026-08-18, with Justin |
 | EOD divergence | Parked deliberately | do not touch without a ruling |
 
