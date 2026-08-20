@@ -273,7 +273,14 @@ test('⚠⚠ every motif view has its OWN window — none shares another\'s', ()
      viewport width leaves a bare band at another, because the rendered size
      follows the viewport — that is what left the account view 95% empty. */
   const rules = [...live.matchAll(/body\[data-view="([a-z-]+)"\]::before \{ background-position: (\d+)% (\d+)%; \}/g)];
-  assert.ok(rules.length >= 15, 'expected a window per motif view, got ' + rules.length);
+  /* ⚠ 14, NOT 15, SINCE 2026-08-20 — and this is a CORRECTION, not a
+       weakening. The `team` view no longer uses the mesh at all: it carries a
+       raster background (see the team rule in dashboard.html), so it has no
+       mesh window to own. Every REMAINING motif view must still have its own.
+       If a future view is added to the mesh, raise this number with it. */
+    assert.ok(rules.length >= 14, 'expected a window per mesh-backed view, got ' + rules.length);
+    assert.ok(!/body\[data-view="team"\]::before \{ background-position: \d+% \d+%; \}/.test(live),
+      'team must NOT have a single-line mesh window — it is raster-backed now');
   const seen = {};
   rules.forEach((m) => {
     const key = m[2] + ',' + m[3];
@@ -376,7 +383,14 @@ test('⚠⚠ the field renders LARGER than the viewport, so any window still cov
 test('⚠ window offsets stay within 0-100% — beyond that is off the image', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = [...live.matchAll(/body\[data-view="[a-z-]+"\]::before \{ background-position: (\d+)% (\d+)%; \}/g)];
-  assert.ok(rules.length >= 15, 'expected a window per motif view, got ' + rules.length);
+  /* ⚠ 14, NOT 15, SINCE 2026-08-20 — and this is a CORRECTION, not a
+       weakening. The `team` view no longer uses the mesh at all: it carries a
+       raster background (see the team rule in dashboard.html), so it has no
+       mesh window to own. Every REMAINING motif view must still have its own.
+       If a future view is added to the mesh, raise this number with it. */
+    assert.ok(rules.length >= 14, 'expected a window per mesh-backed view, got ' + rules.length);
+    assert.ok(!/body\[data-view="team"\]::before \{ background-position: \d+% \d+%; \}/.test(live),
+      'team must NOT have a single-line mesh window — it is raster-backed now');
   rules.forEach((m) => {
     assert.ok(Number(m[1]) >= 0 && Number(m[1]) <= 100, 'x out of range: ' + m[1]);
     assert.ok(Number(m[2]) >= 0 && Number(m[2]) <= 100, 'y out of range: ' + m[2]);

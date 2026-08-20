@@ -56,7 +56,10 @@ test('⚠⚠ the layer COVERS the element at every view — computed in the scre
   assert.ok(/background-repeat:\s*no-repeat/.test(rule),
     'this guard assumes no-repeat — with repeat, coverage is trivially true and '
     + 'the check must be rewritten rather than silently passing');
-  assert.ok(VIEW_POS.length >= 15, 'expected a window per motif view, got ' + VIEW_POS.length);
+  /* ⚠ 14, NOT 15, SINCE 2026-08-20 — a CORRECTION, not a weakening. The `team`
+   view is raster-backed now and has no mesh window to own; every remaining
+   mesh view must still have its own. Raise this if a view is added. */
+  assert.ok(VIEW_POS.length >= 14, 'expected a window per mesh-backed view, got ' + VIEW_POS.length);
 
   VIEW_POS.forEach((m) => {
     const [, view, xs, ys] = m;

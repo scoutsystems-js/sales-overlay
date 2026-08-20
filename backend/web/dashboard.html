@@ -371,7 +371,43 @@
     body[data-view="performance"]::before { background-position: 100% 33%; }
     body[data-view="prospects"]::before { background-position: 25% 0%; }
     body[data-view="section"]::before { background-position: 75% 100%; }
-    body[data-view="team"]::before { background-position: 0% 67%; }
+    body[data-view="team"]::before { background-position: 0% 67%;
+      /* ⚠⚠ THE RASTER REPLACES THE MESH ON THIS ONE VIEW — and it EXTENDS this
+         existing per-view rule rather than adding a competing one. That is the
+         whole point: body[data-view] and body[data-view="team"] have IDENTICAL
+         specificity (0,1,1), so nothing can win on specificity and order alone
+         decides. An earlier attempt added a THIRD rule and relied on it landing
+         last; the per-view mesh rule then silently overrode its position. Adding
+         to the rule that already exists leaves exactly ONE team rule setting a
+         background-image, which is the property that matters.
+
+         ⚠ background-size is COVER, deliberately NOT the base rule's 200% 200%.
+         That value exists because the mesh is one large field windowed per view;
+         inheriting it here would zoom into a quarter of a photograph. Measured,
+         cover DOWNSCALES this asset at every width we support (0.450 at 1440,
+         0.600 at 1920) with only 10-11% vertical crop — because the source is
+         3200x2000, ratio 1.60, close to real viewport ratios. Nothing upscales.
+
+         ⚠ POSITION center: the bright clusters sit at the LEFT AND RIGHT EDGES
+         of this image (measured: row2 = 123.9 left, 87.6 right, 27.2 centre),
+         and .page is a centred 1200px opaque column — so centring keeps the
+         bright material in the visible gutters and the dark centre under the
+         cards, which is exactly where each belongs.
+
+         ⚠⚠ OPACITY 0.40, CEILING 0.50, AND THE BINDING CASE IS 1440 NOT 1920.
+         Measured on the SHIPPING WEBP inside the real header text box
+         (x215-500, y112-176) against #ededed:
+             1440   brightest 194.0   0.50 -> 4.70 ok   0.60 -> 3.61 FAIL
+             1920   brightest  12.9   0.60 -> 16.71 ok
+         At 1920 the crop puts near-black under the header; at 1440 a bright
+         cluster lands there. The worst case is a REGION, and the crop chooses
+         it — so this was derived at both widths, not one. */
+      background-image: url('/team-background.webp');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.40;
+    }
     body[data-view="team-expanded"]::before { background-position: 50% 33%; }
     body[data-view="team-members"]::before { background-position: 100% 0%; }
     body[data-view="team-needs-work"]::before { background-position: 25% 100%; }
