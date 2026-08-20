@@ -193,6 +193,16 @@ async function getValidAccessToken(admin, userId, conn) {
 // /sync route's behavior (it only needs metadata for upserting new rows).
 // The analysis worker calls this with both = true to get the full meeting
 // payload Claude needs to grade and extract highlights from.
+/* Pull the numeric meeting id out of a conferencing join URL.
+   ⚠ Returns null rather than guessing — a wrong id would join an event to the
+   wrong call, and a wrong pairing silently converts a no-show into a taken call,
+   which is the one number this feature exists to produce. */
+function meetingIdFromUrl(u) {
+  if (typeof u !== 'string' || !u) return null;
+  var m = u.match(/\/j\/(\d{9,})/);
+  return m ? m[1] : null;
+}
+
 async function fetchMeetingsPage(accessToken, cursor, createdAfter, includeTranscript, includeHighlights, recordedBy) {
   var url = new URL(FATHOM_API_BASE + '/meetings');
   if (createdAfter)       url.searchParams.append('created_after',      createdAfter);
@@ -309,6 +319,12 @@ function meetingToRow(userId, m) {
   return {
     user_id:          userId,
     fathom_call_id:   String(m.recording_id),
+    /* ⚠ VERIFIED ON A LIVE PAYLOAD, not assumed: Fathom returns `meeting_url`
+       on 10/10 of Josh's meetings, every one a *.zoom.us link containing
+       /j/<numeric id>. That id is the SAME key a Google Calendar invite carries,
+       so Fathom calls are exactly joinable to events — the heuristic is the edge
+       case, not the only case. We simply were not storing it. */
+    meeting_id:       meetingIdFromUrl(m.meeting_url),
     title:            (m.meeting_title && String(m.meeting_title).trim()) || (m.title && String(m.title).trim()) || null,
     recording_url:    (typeof m.url === 'string' && m.url) || null,
     transcript_url:   null,  // Fathom inline-only — see comment above

@@ -89,6 +89,13 @@ function zoomRecordingToRow(userId, m) {
   return {
     user_id:          userId,
     fathom_call_id:   String(m.uuid),   // Zoom instance UUID (double-encoded when re-fetched)
+    /* ⚠ THE NUMERIC MEETING ID, kept ALONGSIDE the uuid — they are different
+       identifiers and both are needed. The uuid is per-INSTANCE and is what the
+       recordings API is re-queried by; the numeric id is what a CALENDAR INVITE's
+       join URL contains, so it is the only thing an event can be joined on.
+       ⚠ It is REUSED across a recurring series and across every use of a personal
+       meeting room, so any join must key on meeting_id + DATE, never id alone. */
+    meeting_id:       (m.id === 0 || m.id) ? String(m.id) : null,
     source:           'zoom',
     title:            (m.topic && String(m.topic).trim()) || null,
     recording_url:    (typeof m.share_url === 'string' && m.share_url)
