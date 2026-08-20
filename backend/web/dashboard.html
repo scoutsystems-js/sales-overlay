@@ -1966,7 +1966,13 @@
       border-radius: var(--radius);
       padding: 18px 22px;
       font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
-      font-size: 13px;
+      /* ⚠ 15px, NOT 13 (Justin, 2026-08-20). This is LEGIBILITY, not preference:
+         a monospace face reads visually smaller than a proportional one at the
+         same nominal size, so 13px mono sits well under the 13px the rest of
+         the page uses for body copy. The box is pre-wrap in a fixed column, so
+         a larger size RE-WRAPS the email — the shape on screen changes, which
+         is expected rather than a defect. */
+      font-size: 15px;
       color: var(--text);
       line-height: 1.65;
       white-space: pre-wrap;
