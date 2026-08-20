@@ -45,7 +45,6 @@ Built or scoped, waiting on a decision — not on work.
 
 | item | one line | what is needed |
 |---|---|---|
-
 | Objection-handling name collision | "Objection Handling" names 3 different metrics on the team page | observation filed 2026-08-18, with Justin |
 | EOD divergence | Parked deliberately | do not touch without a ruling |
 
