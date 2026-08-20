@@ -100,12 +100,47 @@ function build({ seed, n, link, minSep }) {
     if (pts.some(p => Math.hypot(p.x - x, p.y - y) < sep)) continue;
     pts.push({ x: Math.round(x), y: Math.round(y), depth: dep });
   }
-  const edges = [];
+  /* ⚠⚠ PER-NODE CONNECTION CAP — not a smaller radius, and the distinction is
+     the whole point. Shrinking `link` thins EVERYTHING, including the open
+     regions that already read correctly; the problem was only ever the dense
+     CORES closing into triangles. A cap leaves a sparse node's links untouched
+     (it has fewer than the cap anyway) and only trims where the field is thick.
+     Each node keeps its NEAREST connections, so what is removed is the long
+     cross-links that fill a cluster in — exactly the ones that triangulate. */
+  /* ⚠ 4, CHOSEN ON THE ASYMMETRY, NOT ON THE SMALLEST GAP. The brief was that
+     the OPEN REGIONS STAY AS THEY ARE and only the cores thin:
+                       cores   open
+       uncapped         6.18   3.17    <- gap 3.01: THIS is the triangulation
+       cap 4            3.78   2.88    <- cores -39%, open -9% (essentially
+                                          untouched) — the wanted asymmetry
+       cap 3            2.86   2.44    <- smaller gap, but open -23%: it thins
+                                          the parts that already read correctly
+     A smaller RADIUS would have done the same damage everywhere; the cap is
+     what makes the change local to where the problem is. */
+  var MAX_LINKS_PER_NODE = 4;
+  var cand = [];
   for (let i = 0; i < pts.length; i++)
     for (let j = i + 1; j < pts.length; j++) {
       const d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
-      if (d < link) edges.push([i, j, d]);
+      if (d < link) cand.push([i, j, d]);
     }
+  // shortest first, so a node's nearest neighbours win its budget
+  cand.sort(function (a, b) { return a[2] - b[2]; });
+  var deg = new Array(pts.length).fill(0);
+  const edges = [];
+  cand.forEach(function (e) {
+    if (deg[e[0]] >= MAX_LINKS_PER_NODE || deg[e[1]] >= MAX_LINKS_PER_NODE) return;
+    deg[e[0]]++; deg[e[1]]++;
+    edges.push(e);
+  });
+  /* ⚠ THE NUMBER THAT MATTERS IS THE GAP BETWEEN CORES AND OPEN AREAS, not the
+     average — the average was already 2.6 while the cores were triangulating. */
+  var coreDeg = [], openDeg = [];
+  pts.forEach(function (p, i) { (p.depth > 0.5 ? coreDeg : openDeg).push(deg[i]); });
+  const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  module.exports = module.exports || {};
+  build.lastDegrees = { core: +mean(coreDeg).toFixed(2), open: +mean(openDeg).toFixed(2),
+                        coreN: coreDeg.length, openN: openDeg.length };
   const lines = edges.map(([i, j, d]) => {
     const near = (pts[i].depth + pts[j].depth) / 2;
     /* ⚠⚠ EDGES ARE THE SUBJECT. Justin: it read as "green stars" — scattered
@@ -232,6 +267,9 @@ out.forEach(r => console.log(
   (r.accent >= 4.5 ? ' pass' : ' FAIL')));
 
 console.log('\nONE field:', FIELD.pts.length, 'nodes /', FIELD.edges.length, 'edges');
+const dg = build.lastDegrees || {};
+console.log('edges per node — CORES (depth>0.5):', dg.core, '(' + dg.coreN + ' nodes)   OPEN:', dg.open, '(' + dg.openN + ' nodes)');
+console.log('⚠ the GAP between those two is what the cap exists to close');
 console.log('payload  raw', Buffer.byteLength(FIELD.uri), ' gzip', zlib.gzipSync(Buffer.from(FIELD.uri)).length);
 const failing = out.filter(r => r.accent < 4.5);
 console.log('variants failing AA:', failing.length);
