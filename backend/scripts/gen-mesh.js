@@ -70,11 +70,35 @@ function paramsFor(i) {
 function build({ seed, n, link, minSep }) {
   let s = seed;
   const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  /* ⚠⚠ DEPTH IS SPATIAL, NOT PER-NODE RANDOM. Random depth AVERAGES TO FLAT at
+     any real density — every neighbourhood ends up with the same mix of near and
+     far, which is why the previous field read uniform corner to corner and
+     nothing "fell away". Depth now comes from a few smooth CENTRES of interest:
+     near a centre the field is dense and bright, away from one it thins and
+     dims. That is what makes it a space rather than a texture. */
+  const CENTRES = [];
+  for (let c = 0; c < 5; c++) CENTRES.push({ x: rnd() * FW, y: rnd() * FH, r: FW * (0.18 + rnd() * 0.22) });
+  const depthAt = (x, y) => {
+    let best = 0;
+    for (const c of CENTRES) {
+      const d = Math.hypot(x - c.x, y - c.y) / c.r;
+      const v = Math.max(0, 1 - d * d);          // smooth falloff, 1 at centre
+      if (v > best) best = v;
+    }
+    return best;
+  };
   const pts = [];
-  for (let tries = 0; pts.length < n && tries < n * 80; tries++) {
+  for (let tries = 0; pts.length < n && tries < n * 120; tries++) {
     const x = rnd() * FW, y = rnd() * FH;
-    if (pts.some(p => Math.hypot(p.x - x, p.y - y) < minSep)) continue;
-    pts.push({ x: Math.round(x), y: Math.round(y), depth: rnd() });
+    const dep = depthAt(x, y);
+    // ⚠ DENSITY follows depth too — rejecting some candidates in the thin
+    // regions is what makes the clustering visible as SPACE, not just as
+    // brightness. Without this the layout stays even and only the tone varies.
+    if (rnd() > 0.18 + dep * 0.82) continue;
+    // spacing also opens up away from the centres
+    const sep = minSep * (1.55 - dep * 0.55);
+    if (pts.some(p => Math.hypot(p.x - x, p.y - y) < sep)) continue;
+    pts.push({ x: Math.round(x), y: Math.round(y), depth: dep });
   }
   const edges = [];
   for (let i = 0; i < pts.length; i++)
@@ -97,8 +121,8 @@ function build({ seed, n, link, minSep }) {
   /* nodes recede: radius 1.1-4.3 -> 0.8-2.0, opacity 0.28-0.90 -> 0.30-0.62.
      They mark where edges MEET rather than being the thing you see. */
   const nodes = pts.map(p =>
-    `<circle cx='${p.x}' cy='${p.y}' r='${(2.6 + p.depth * 4.0).toFixed(1)}'`
-    + ` fill='%2309e046' opacity='${(0.30 + p.depth * 0.32).toFixed(2)}'/>`).join('');
+    `<circle cx='${p.x}' cy='${p.y}' r='${(2.4 + p.depth * 6.4).toFixed(1)}'`
+    + ` fill='%2309e046' opacity='${(0.26 + p.depth * 0.70).toFixed(2)}'/>`).join('');
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${FW} ${FH}'`
     + ` preserveAspectRatio='xMidYMid slice'>${lines}${nodes}</svg>`;
   return { svg, uri: 'data:image/svg+xml;utf8,' + svg, pts, edges };
@@ -125,7 +149,7 @@ function sweep({ pts, edges }, link, win) {
     }
   });
   pts.forEach(p => {
-    const r = 2.6 + p.depth * 4.0, op = 0.30 + p.depth * 0.32;
+    const r = 2.4 + p.depth * 6.4, op = 0.26 + p.depth * 0.70;
     for (let dy = -r; dy <= r; dy += 0.5)
       for (let dx = -r; dx <= r; dx += 0.5) if (dx * dx + dy * dy <= r * r) stamp(p.x + dx, p.y + dy, op);
   });
@@ -177,7 +201,20 @@ function contrastAt(peakAlpha) {
    overlap less even when each is heavier.
    Edges stay dominant over nodes — that ratio fixed "green stars" and holds at
    any weight. */
-const FIELD_PARAMS = { seed: 20260820, n: Math.round(150 * (FW * FH) / (W * H)), link: 190, minSep: 70 };
+/* ⚠⚠ APPROACH CHANGE, NOT A TUNING PASS (Justin approved 2026-08-20). Three
+   passes went into WEIGHT, which was never the problem. The field read as a
+   triangulated lattice because it was OVER-CONNECTED, its nodes were invisible,
+   and its depth was flat.
+     link  190 -> 120   edges per node 4.5 -> 2.6: traceable strands with GAPS,
+                        not a triangle mesh nobody can follow
+     nodes r 2.6-6.6 -> 2.4-8.8, opacity 0.30-0.62 -> 0.26-0.96. The brief says
+                        "some points brighter" and I had removed exactly that
+                        while overshooting the fix for "green stars"
+     depth  per-node random -> SPATIAL: five smooth centres driving DENSITY and
+                        brightness together. Random depth averages to flat at any
+                        real density, which is why it read uniform corner to
+                        corner and nothing fell away. */
+const FIELD_PARAMS = { seed: 20260820, n: Math.round(340 * (FW * FH) / (W * H)), link: 120, minSep: 52 };
 const FIELD = build(FIELD_PARAMS);
 const out = [];
 VIEWS.forEach((view, i) => {
