@@ -2062,6 +2062,39 @@ Two inline-SVG data URIs (a plotted series with its nodes; the donut as concentr
 - **⚠ THE ROLLOUT WAS MEASURED ACROSS ALL FIFTEEN VIEWS, NOT ASSUMED FROM THE FIRST.** Thirteen put every element inside an opaque card. **TWO do not** — `prospects` and `section` render a page subtitle and their empty/error states as **card-less full-width blocks** whose boxes reach into the motif's box. Those were **rasterised to a canvas and sampled**: **zero motif pixels** fall under those glyphs, at column widths equivalent to viewports from 1600px down to 1300px. **A bounding-box overlap is not an ink overlap, and the difference is worth measuring rather than reporting either way from geometry.** If either view gains RIGHT-ALIGNED card-less content, re-run that check.
 - **A test DOM stub gained the `dataset` a real `<body>` always has, rather than production gaining `if (document.body)`.** A branch that can never be false in a browser is a worse artefact than an incomplete stub.
 
+### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
+**⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
+- Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
+- **⚠ ANYTHING UNVERIFIED IS MARKED `UNKNOWN` RATHER THAN RECONSTRUCTED.** An invented entry is worse than a gap: **a gap gets asked about, an invention gets built.**
+- **⚠⚠ STANDING PROCEDURE: update BUILD-LIST.md after EVERY push, alongside CLAUDE.md.** Not at session end.
+- Two items added by ruling 2026-08-20: **"mark a call not-a-sales-call" — CLOSER OR MANAGER may set it** (extends the earlier closer-only spec; ~17 consumers, both halves in ONE commit); and **Customize View** on the team page.
+
+### ⚠ INERT IS A TAG CHOICE, NOT A STYLE CHOICE — THE COMING-SOON PATTERN IS A `<span>` (2026-08-20)
+**A `<span>` has no href, so it cannot navigate, is not in the tab order, gets no link semantics from a screen reader, and has no `:hover` affordance unless one is written. Styling an `<a>` — or a `<button>` — to LOOK disabled leaves every one of those behaviours intact: it still focuses, still announces itself as interactive, still fires on Enter.** Verified in the render, not the source: `tagName SPAN · href null · tabIndex -1 · aria-disabled true · opacity 0.45 · cursor default`.
+- **⚠ PLACEMENT IS A PROMISE ABOUT A LOCATION.** "Customize View" sits at the END of the team controls row beside Manage Members and Generate Summary, because that is the row such a control acts on. **A marker parked where it fitted would have to MOVE when the feature lands**, which defeats the point.
+- **⚠ SEPARATORS ARE HAND-PLACED IN THE NAV AND NOWHERE ELSE.** The nav is dot-delimited and each coming-soon tab carries its own `<span class="sep">·</span>`; the team controls row is a **flex row with a gap** and has never had one. **Checked in the rendered result** — the tag's previous sibling is the Generate Summary button, not a separator.
+- **`.nav-soon` was UNSCOPED from `.top-bar-left`** so the pattern works outside the nav. Specificity drops (0,2,0)→(0,1,0); nothing competes. **A stale non-vacuity anchor in `nav-coming-soon.test.js` failed loudly with "stale anchor" the moment it was unscoped — which is exactly what that shape exists to do.**
+
+### ⚠⚠ PROVE "ZERO READERS" BY CAPABILITY, NOT BY GREPPING THE NAME — `--motif-mesh` REMOVED (2026-08-20)
+**61,081 bytes, 8.9% of the served page, read by nothing.** A search built from the hypothesis cannot disconfirm it — that is how six clip builders turned out to be ten. **What can consume a CSS custom property is a SHORT, ENUMERABLE LIST, and all of it was checked:**
+```
+var(--motif-mesh) in CSS       0 across backend/, website/, src/
+JS reading a custom property   ONE generic reader exists — cssToken(name) — and
+                               its ONLY call site passes '--accent'
+JS writing custom properties   setProperty sites are --mark-* / --wel-* only
+another document               custom properties are DOCUMENT-SCOPED, so nothing
+                               outside dashboard.html could read it in principle
+```
+**⚠ THE GENERIC READER IS THE POINT: `cssToken(name)` takes the property name as a PARAMETER, so a name-grep would never have found it.** Enumerating the capability found it; enumerating the name would not have.
+- **⚠⚠ AND THE STATED REASON FOR KEEPING IT WAS FALSE.** It had been retained on the grounds that login uses it. **`login.html` carries its OWN inline `body::before` with its own SVG mark, references `--motif-mesh` nowhere, and `css/style.css` has no motif rules at all.** Login is excluded from the raster **by construction** — a separate document that never loads dashboard.html's CSS — which is also why that exclusion needs no list and cannot be forgotten. **Confirmed still rendering after removal.**
+- **`scripts/gen-mesh.js` is KEPT but marked DEAD at its header.** Its only output was that one declaration; nothing imports or runs it. **A SCRIPT cannot be hit by the last-wins trap that made archiving a CSS selector dangerous**, so retaining a measured 330-line generator costs nothing. **⚠ Reviving the mesh takes TWO steps: run the generator AND add a reader — the generator alone paints nothing, and the cardinality guard will fail a second `background-image` rather than let it silently supersede.**
+
+### ⚠⚠ THE EXPOSURE SWEEP IS UNGUARDED, AND THE COST OF GUARDING IT IS THE REASON (2026-08-20)
+**A new view whose text sits outside an opaque container would land on a full-brightness photograph with no test catching it.** The four carded classes (`.page-header`, `.review-page-header`, `.synth-panel`, `objStatCard`) are pinned statically — **that covers today's containers and cannot cover a class that does not exist yet.**
+- **WHY IT WAS NOT BUILT: a faithful sweep needs COMPUTED STYLES across fifteen RENDERED views**, i.e. a headless-browser devDependency this repo does not have (`node --test` only), plus a harness that boots the dashboard and drives all 15. That is a block, not a bolt-on.
+- **⚠ A CHEAP HEURISTIC WAS CONSIDERED AND REJECTED: "a border with no background".** That is exactly what `.synth-panel` was — but it also describes badges, buttons and inputs that are legitimately inside carded parents, so it would fire constantly and be silenced.
+- **Recorded in `BUILD-LIST.md` under OPEN, not in a comment**, so it is a tracked gap rather than a note someone finds later.
+
 ### ⚠⚠⚠ INVERT THE SWEEP: ASK WHAT IS EXPOSED, NOT HOW BRIGHT IT MAY BE — A CEILING CAN BE THE ANSWER TO A QUESTION THE LAYOUT ALREADY CLOSED (2026-08-20, shipped `9d297a8`)
 **Four separate opacity ceilings were derived for this layer over three weeks — 0.30, 0.535, 0.50, each measured carefully and each CORRECT for the question asked. The question was wrong. Not one of them was needed.**
 - **THE RULINGS (Justin):** mesh OFF on the dashboard, the Team raster on **every** view, **FULL BRIGHTNESS**, one image one position, NOT login and NOT welcome.

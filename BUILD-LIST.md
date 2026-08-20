@@ -37,7 +37,7 @@ Started this session.
 
 | item | one line | state |
 |---|---|---|
-| **Customize View (team page)** | `soon` tag in the team controls row, where the real control will live | **tag shipping this block; the feature itself is not started** |
+| **Customize View (team page)** | `soon` tag in the team controls row, where the real control will live | **tag SHIPPED `4d6d9e6`** and verified in the render (SPAN, tabIndex -1, dimmed). The feature itself is not started — see AGREED, NOT STARTED |
 
 ## BLOCKED ON JUSTIN
 Built or scoped, waiting on a decision — not on work.
@@ -45,7 +45,7 @@ Built or scoped, waiting on a decision — not on work.
 | item | one line | what is needed |
 |---|---|---|
 | Connection cards / Sync Now | Removing the Fathom/Zoom cards from the Coaching Dashboard | Sync Now exists only on those cards + `getStartedCardHtml`; Justin must pick where it goes |
-| `--motif-mesh` removal | **DONE this block** — kept only pending his view, now removed | resolved |
+
 | Objection-handling name collision | "Objection Handling" names 3 different metrics on the team page | observation filed 2026-08-18, with Justin |
 | EOD divergence | Parked deliberately | do not touch without a ruling |
 
