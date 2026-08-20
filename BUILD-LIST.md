@@ -27,7 +27,7 @@ Shipped, deployed, and verified on production.
 | Site-wide background | Team raster on every view, `cover`, `50% 50%`, **opacity 1**, top 38% masked to black fading in by 72% | shipped `9d297a8`, faded `6adb774` |
 | Sync Now in Connections | Manual sync for both providers in #account, verified by clicking | shipped `6adb774`; healthy dashboard cards removed with it |
 | Week labels in Scout green | Weekly team-graph axis labels `#09e046` | shipped `864bd49` |
-| Legend toggle on team graphs | Click a rep to hide/show their line; keyed by `user_id` | ⚠ the click GESTURE is unverified — harness cannot deliver clicks |
+| Rep filter dropdown | Custom multi-select listbox: stays open across picks, colour swatches, keyboard + focus | shipped `9265131`, capture-phase fix `0fbde98`; **verified by clicking** — 3 reps toggled without reopening, persistence across reload |
 | Zoom OAuth + deauthorization | Connect/disconnect, deauth endpoint live | |
 | Zoom speaker identity | Byte-identical display-name match, collision detector | `lib/zoom-identity.js` |
 | Welcome emails / set-password | Invite flow via Resend | |
