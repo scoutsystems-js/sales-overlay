@@ -1780,6 +1780,27 @@ CATEGORICAL  REP_LINE_COLORS          "this is rep number four"
 - **THE ORDER OF OPERATIONS: (1) is it in the DOM/CSS at all? (2) does the asset DECODE? (3) set the property to its maximum — if it is still absent, the property is not the problem. Only then tune it.** Set opacity to 1. Decode the data URI. Ask `elementFromPoint` what is actually on top.
 - **⚠ AND A SCREENSHOT WILL NOT SETTLE ANY OF THIS** — see the perception-test rule. A capture faithfully records a difference no human eye resolves, so it can confirm "present" while the honest answer to "visible" is no.
 
+### ⚠⚠ A DERIVED LIMIT IS WHERE THE THING BREAKS, NOT WHERE IT SHOULD SIT — SHIPPING AT A BOUNDARY LEAVES NO MARGIN (2026-08-20)
+**A ceiling is computed as the value at which a constraint is EXACTLY met. That makes it the FAILURE POINT, and shipping there means the first rounding error, token nudge or browser difference lands on the wrong side of it.**
+- **The live case:** accent-coloured text clears 4.5:1 over the motif at **0.390**. That is not "safe up to 0.390" — it is "fails at 0.390 and above, by the width of a floating-point comparison". Shipped **0.38** (4.42 on accent), which is inside the band with room to move.
+- **⚠ THE TELL IS THE WORD "REACHES".** Whenever a limit is derived by solving *"where does this hit the threshold"*, the answer is the edge of the cliff, not a resting place. The same applies to a minimum: a floor derived as "where it becomes visible" is where it becomes INvisible.
+- **AND THE MARGIN HAS TO BE STATED, not just taken.** Say what the ceiling is, what shipped, and how much room that leaves — otherwise the next person reads the shipped value as the derived one and moves it back to the edge in good faith.
+- Related from the other direction: *compare the underlying value, round only to render*. Both are about a comparison happening at a precision the decision cannot support.
+
+### ⚠⚠ A CHECK THAT CAN PASS BY FINDING NOTHING NEEDS A MINIMUM, NOT JUST A MAXIMUM — AN EMPTY PAGE HAS NO TEXT TO FIND INK UNDER AND THEREFORE LOOKS PERFECT (2026-08-20)
+**THIS IS THE MECHANISM BEHIND THE FOURTH INVENTORY MISS, and it is the sibling of the one-sided-guard rule below: that one is about a bound that cannot catch "too little", this is about a SAMPLE that cannot catch "nothing".**
+- **The live case:** the ink sweep measured painted pixels under text elements and reported zero overlaps. It had sampled the view's **empty state** — a page with a subtitle and a "Loading…" card and nothing else. **Zero text elements means zero overlaps means a clean result**, indistinguishable from a genuinely safe page. The populated view had motif ink under 8 of 11 elements.
+- **⚠ THE FAILURE IS SILENT AND SELF-CONFIRMING: the less the check finds, the better the news it reports.** Any sweep, sample or coverage check with that shape will eventually be run against an empty input and pass loudest exactly when it is measuring least.
+- **THE FIX IS A FLOOR ON WHAT WAS SAMPLED, ASSERTED BEFORE MEASURING:**
+```
+populated markers PRESENT     — content the real page must contain
+empty markers ABSENT          — no "Loading", no empty-card
+elements enumerated FROM THE DOM, never from a hand list
+count >= a floor              — "nothing to measure" becomes a FAILURE, not a pass
+```
+- **The floor is the load-bearing line.** The other three make the sample honest; the floor is what makes *an absent sample* fail instead of passing perfectly.
+- **Generalises past ink sweeps:** a test that iterates a query result, a guard that scans matched files, a validation loop over rows. **If the body of the loop never runs, what does your check report?** If the answer is "success", it needs a minimum.
+
 ### ⚠⚠ A ONE-SIDED GUARD SILENTLY ENCODES AN ASSUMPTION ABOUT WHICH WAY THINGS GO WRONG — AND THAT ASSUMPTION OUTLIVES THE DESIGN IT WAS WRITTEN FOR, WITH NOTHING TO ANNOUNCE WHEN IT STOPS BEING TRUE (2026-08-18)
 **A guard with only an upper bound cannot catch "too little". Where a value has a wrong answer in BOTH directions, bound it in both — and when the thing it guards is redesigned, the guard is part of the redesign.**
 - **The live case:** `opacity <= 0.06` on the background layer. Correct for the treatment it was written for — small repeated gutter motifs. The treatment was then replaced by ONE LARGE CROPPED SHAPE per page and the cap did not move. **It held the new design below the threshold of visibility, and PASSED the suite while doing it.** Green tests, invisible feature, and the guard was the thing keeping it invisible.

@@ -120,7 +120,7 @@ test('the selector uses Scout\'s four categories and offers no "price"', () => {
 
 // ─── range-dependent bucketing (Justin's ruling 2026-08-15) ────────────────
 
-test('STAGE 5: bucketing is span-derived — daily up to 14 days, weekly beyond', () => {
+test('STAGE 5: bucketing is span-derived — daily up to a quarter, weekly beyond', () => {
   // "Aug 1 - Aug 12" gives days; "June through August" gives weeks, with no
   // thought required from the user.
   const src = HTML.slice(HTML.indexOf('var DAILY_BUCKET_MAX_DAYS'), HTML.indexOf('function teamQP'));
@@ -129,8 +129,15 @@ test('STAGE 5: bucketing is span-derived — daily up to 14 days, weekly beyond'
     from: '2026-08-01T00:00:00.000Z',
     to: new Date(Date.parse('2026-08-01T00:00:00.000Z') + days * 86400000).toISOString() } });
 
-  [1, 5, 7, 10, 13, 14].forEach((d) => assert.strictEqual(fn(span(d)), 'day', d + ' days should be daily'));
-  [15, 21, 30, 90, 400].forEach((d) => assert.strictEqual(fn(span(d)), 'week', d + ' days should be weekly'));
+  /* ⚠ CONVERTED 2026-08-20: the boundary moved 14 -> 92. Weekly bucketing is
+     RETIRED for month-and-longer ranges — Josh asked to see daily movement on a
+     monthly view, and the answer is real daily points, not daily gridlines
+     under weekly buckets. A month and a full quarter are now daily; a year
+     still falls back to weekly, because ~400 points on a ~1100px plot is not a
+     chart. The PROPERTY pinned here is unchanged: the bucket is derived from
+     the span, with no thought required from the user. */
+  [1, 5, 7, 14, 21, 30, 60, 92].forEach((d) => assert.strictEqual(fn(span(d)), 'day', d + ' days should be daily'));
+  [93, 120, 180, 400].forEach((d) => assert.strictEqual(fn(span(d)), 'week', d + ' days should be weekly'));
 
   assert.strictEqual(fn({}), 'week', 'no range falls back to weekly, not daily');
   assert.strictEqual(fn({ teamRange: { from: null, to: null } }), 'week');
@@ -143,14 +150,19 @@ test('the boundary is in CALENDAR DAYS, on ranges the picker actually produces',
   // boundary wrong the first time.
   const src = HTML.slice(HTML.indexOf('var DAILY_BUCKET_MAX_DAYS'), HTML.indexOf('function teamQP'));
   const fn = new Function('state', src + '; return repSeriesBucket();');
-  const picked = (startDay, endDay) => fn({ teamRange: {
-    from: '2026-08-' + String(startDay).padStart(2, '0') + 'T00:00:00.000Z',
-    to:   '2026-08-' + String(endDay).padStart(2, '0') + 'T23:59:59.999Z' } });
+  // ⚠ the boundary moved to 92, so it is exercised across MONTHS now — but the
+  // property is the same one: inclusive picker output, counted in calendar days.
+  const picked = (fromIso, toIso) => fn({ teamRange: { from: fromIso, to: toIso } });
+  const d = (m, day) => '2026-' + String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
 
-  assert.strictEqual(picked(1, 14), 'day',  '14 calendar days inclusive');
-  assert.strictEqual(picked(1, 15), 'week', '15 calendar days inclusive');
-  assert.strictEqual(picked(1, 1),  'day',  'a single day');
-  assert.strictEqual(picked(1, 7),  'day',  'a week');
+  assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(8,1) + 'T23:59:59.999Z'), 'day', 'a single day');
+  assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(8,7) + 'T23:59:59.999Z'), 'day', 'a week');
+  assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(8,31) + 'T23:59:59.999Z'), 'day',
+    'a full calendar month is DAILY now — this is the change Josh asked for');
+  assert.strictEqual(picked(d(6,1) + 'T00:00:00.000Z', d(8,31) + 'T23:59:59.999Z'), 'day',
+    '92 calendar days inclusive — a full quarter still gets daily points');
+  assert.strictEqual(picked(d(6,1) + 'T00:00:00.000Z', d(9,1) + 'T23:59:59.999Z'), 'week',
+    '93 days falls back to weekly — beyond this the points are under 3px wide');
 });
 
 test('the loader SENDS the derived bucket rather than a hardcoded one', () => {
@@ -201,10 +213,14 @@ test('⚠⚠ the hidden set is keyed by user_id, NEVER by legend index', () => {
   // Bound generously: the point of this assertion is to catch a BACKWARDS or
   // truncated slice (which yields '' or a few characters), not to pin the
   // function's length — a legend block that grows is not a defect.
+  // Widened 16000 -> 20000 on 2026-08-20: the daily-bucket work added the
+  // explicit label-thinning block and its rationale (autoSkip drops labels
+  // SILENTLY). Third widening, all three for added explanation rather than
+  // added behaviour — which is exactly what this bound says it does not pin.
   // Widened 12000 -> 16000 on 2026-08-18: repSeriesChart gained the
   // update-in-place path (the graph-flash fix) and its explanation, which is a
   // legitimate growth of exactly the kind this bound is documented not to pin.
-  assert.ok(fn.length > 800 && fn.length < 16000, 'slice suspicious: ' + fn.length);
+  assert.ok(fn.length > 800 && fn.length < 20000, 'slice suspicious: ' + fn.length);
   assert.ok(fn.indexOf('function repSeriesChart') === 0, 'slice must start at the function');
   assert.ok(/_userId: toggleable \? r\.user_id : null/.test(fn), 'the dataset must carry user_id');
   assert.ok(/state\.repLineHidden\[r\.user_id\]/.test(fn), 'restore must look up BY user_id');
@@ -217,9 +233,15 @@ test('⚠ THE TEAM AVERAGE NEVER TOGGLES — it is the baseline, not a rep', () 
   assert.ok(at > 0, 'the team-average dataset is gone');
   const ds = HTML.slice(at, at + 900);
   assert.ok(/_fixed: true/.test(ds), 'the baseline dataset must be marked _fixed');
-  const onClick = HTML.slice(HTML.indexOf('onClick: function (e, item, legend)'), HTML.indexOf('syncRepLineVisibility(canvasId)'));
-  assert.ok(/if \(!ds \|\| ds\._fixed\) return;/.test(onClick),
-    'the legend handler must refuse to toggle the baseline');
+  /* ⚠ CONVERTED 2026-08-20: the legend onClick is retired — the rep-filter
+     dropdown is the control. The PROPERTY is unchanged and is now enforced in
+     the roster builder instead: a _fixed dataset never becomes a filter option,
+     so the baseline cannot be turned off because it is never offered. */
+  const roster = HTML.slice(HTML.indexOf('function repFilterRoster'), HTML.indexOf('function repFilterToggle'));
+  assert.ok(roster.length > 150 && roster.length < 1200, 'slice suspicious: ' + roster.length);
+  assert.ok(/ds\._fixed \|\| !ds\._userId/.test(roster),
+    'the baseline must be excluded from the filter roster — it cannot be hidden '
+    + 'because it is never offered as an option');
 });
 
 test('the toggle is OPT-IN — the single-rep graph does not share the hidden set', () => {
@@ -235,8 +257,8 @@ test('⚠ ALL REPS HIDDEN SAYS SO IN WORDS — the chart is not empty, the avera
   const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
   assert.ok(fn.length > 300 && fn.length < 2000, 'slice suspicious: ' + fn.length);
   assert.ok(/reps > 0 && visible === 0/.test(fn), 'the all-hidden condition must be explicit');
-  assert.ok(/hidden — click a name in the legend/.test(fn), 'and it must say how to undo it');
-  assert.ok(/dashed line is the team average/.test(fn),
+  assert.ok(/hidden — use the rep filter above/.test(fn), 'and it must say how to undo it');
+  assert.ok(/green line is the team average/.test(fn),
     'it must explain the line that is still drawn, or the chart looks broken');
   // The note is a SIBLING of the fixed-height chart box, never a child.
   assert.ok(/<\/div>'\s*\n\s*\/\/[^\n]*\n(\s*\/\/[^\n]*\n)*\s*\+ '<div class="rep-graph-note"/.test(HTML)
@@ -404,4 +426,99 @@ test('⚠ NON-VACUITY — the nav check catches a removed separator', () => {
     if (tokens[i].indexOf('LINK:') === 0 && tokens[i - 1].indexOf('LINK:') === 0) adjacent = true;
   }
   assert.ok(adjacent, 'the scan must see adjacent links once a separator is removed');
+});
+
+/* ══ THE REP FILTER DROPDOWN — what replaces the legend toggle ═══════════════ */
+
+test('⚠⚠ the control ALWAYS STATES THE FILTER — a filtered board cannot read as full', () => {
+  const at = HTML.indexOf('function repFilterHtml');
+  const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
+  assert.ok(fn.length > 400 && fn.length < 3000, 'slice suspicious: ' + fn.length);
+  assert.ok(/of ' \+ roster\.length \+ ' reps shown/.test(fn),
+    'when filtered it must name both numbers, like "3 of 5 reps shown"');
+  assert.ok(/All ' \+ roster\.length/.test(fn),
+    'when nothing is hidden it reads "All N reps" — "5 of 5" every day is noise, '
+    + 'and a label that never changes stops being read on the day it does');
+  assert.ok(/rep-filter-on/.test(fn),
+    'quiet is not invisible: the filtered state needs a VISUAL mark too, or it '
+    + 'looks like a normal board to anyone not reading the label');
+});
+
+test('⚠ a hidden rep STAYS IN THE LIST — absent and excluded must not look alike', () => {
+  const at = HTML.indexOf('function repFilterHtml');
+  const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
+  assert.ok(/roster\.map/.test(fn), 'every rep is rendered, hidden or not');
+  assert.ok(/hidden\[r\.id\] \? /.test(fn), 'hidden state is shown as a marker, not by removal');
+});
+
+test('⚠⚠ PARITY MOVED, NOT LOST — one hidden set drives EVERY live chart', () => {
+  const at = HTML.indexOf('function applyRepFilter');
+  const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
+  assert.ok(fn.length > 200 && fn.length < 1500, 'slice suspicious: ' + fn.length);
+  assert.ok(/eachLiveToggleChart/.test(fn),
+    'the filter must walk every chart — otherwise two graphs under one control '
+    + 'can show different sets of people');
+  assert.ok(/setDatasetVisibility/.test(fn) && /ds\._userId/.test(fn),
+    'visibility is resolved through the user id, never the dataset position');
+});
+
+test('⚠ the selection PERSISTS and is keyed PER TEAM, by user id', () => {
+  assert.ok(/localStorage\.setItem\(repFilterStoreKey/.test(HTML), 'must persist across refresh');
+  const key = HTML.slice(HTML.indexOf('function repFilterStoreKey'), HTML.indexOf('function loadRepFilter'));
+  assert.ok(/state\.teamSelected/.test(key),
+    'keyed per team — one team\'s hidden set must not apply to another\'s reps');
+  assert.ok(!/datasetIndex|\bindexOf\(/.test(key), 'never keyed by index');
+});
+
+test('⚠ a blocked or full localStorage must never break the chart', () => {
+  const save = HTML.slice(HTML.indexOf('function saveRepFilter'), HTML.indexOf('function repFilterRoster'));
+  assert.ok(/try \{/.test(save) && /catch/.test(save), 'storage failure is swallowed, not thrown');
+  const load = HTML.slice(HTML.indexOf('function loadRepFilter'), HTML.indexOf('function saveRepFilter'));
+  assert.ok(/catch/.test(load), 'a corrupt stored value must degrade to "nothing hidden"');
+});
+
+/* ══ DAILY BUCKETS — gaps, labels, and the tooltip against a missing day ═════ */
+
+test('⚠⚠ a day with NO CALLS is a GAP, never a zero', () => {
+  const cfg = buildChart({
+    buckets: [{ label: 'Aug 3' }, { label: 'Aug 4' }, { label: 'Aug 5' }],
+    reps: [{ user_id: 'a', name: 'Ava',
+      handle: [{ rate: 50, handled: 1, total: 2 }, { rate: null, handled: 0, total: 0 }, { rate: 80, handled: 4, total: 5 }],
+      close:  [{ rate: null, closed: 0, total: 0 }, { rate: null, closed: 0, total: 0 }, { rate: null, closed: 0, total: 0 }] }],
+    team: { handle: [{ rate: 50 }, { rate: null }, { rate: 80 }], close: [] },
+  }, (r) => r.handle, 'Handle rate');
+  const ava = cfg.data.datasets.find((d) => d.label === 'Ava');
+  assert.strictEqual(ava.data[1], null,
+    'ZERO IS A MEASUREMENT, ABSENCE IS NOT. 0% means objections arrived and none '
+    + 'were handled — a real bad day. No calls means nothing happened. Plotting '
+    + 'the second as the first invents bad days AND drags every average down.');
+  assert.strictEqual(ava.spanGaps, false, 'the line must BREAK, not bridge the gap');
+});
+
+test('⚠⚠ the tooltip cannot report a neighbour on an empty day', () => {
+  const cfg = buildChart({
+    buckets: [{ label: 'Aug 3' }, { label: 'Aug 4' }],
+    reps: [{ user_id: 'a', name: 'Ava',
+      handle: [{ rate: 50, handled: 1, total: 2 }, { rate: null, handled: 0, total: 0 }],
+      close:  [{ rate: null, closed: 0, total: 0 }, { rate: null, closed: 0, total: 0 }] }],
+    team: { handle: [], close: [] },
+  }, (r) => r.handle, 'Handle rate');
+  // 1. structurally: with intersect:true there is no point to hit on a null day
+  assert.strictEqual(cfg.options.interaction.intersect, true,
+    'with intersect:false Chart.js resolves to the NEAREST point — on a mostly-gap '
+    + 'daily series that means hovering an empty day reports another day\'s value');
+  // 2. behaviourally: even if one were shown, it must not carry a number
+  const ava = cfg.data.datasets.find((d) => d.label === 'Ava');
+  const line = cfg.options.plugins.tooltip.callbacks.label({ dataset: ava, dataIndex: 1 });
+  assert.ok(/no data/.test(line) && !/\d+%/.test(line),
+    'an empty bucket must say "no data" and carry NO rate: ' + line);
+});
+
+test('⚠ daily labels are thinned EXPLICITLY — autoSkip drops them silently', () => {
+  const cfg = buildChart(SERIES, (r) => r.handle, 'Handle rate');
+  const ticks = cfg.options.scales.x.ticks;
+  assert.strictEqual(ticks.autoSkip, false,
+    'autoSkip removes labels with no announcement — the axis looks tidy while '
+    + 'hiding which day you are reading');
+  assert.strictEqual(typeof ticks.callback, 'function', 'thinning must be explicit');
 });

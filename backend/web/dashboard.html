@@ -345,6 +345,11 @@
        low-contrast BODY TEXT; opacity as a depth cue is explicitly allowed
        (same ruling as the date picker's out-of-month days). A grey hex here
        would be the banned thing wearing a different name. */
+    .rep-graph-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    /* ⚠ THE FILTERED STATE IS MARKED VISUALLY, NOT ONLY IN WORDS. "All 5 reps"
+       and "3 of 5 reps shown" are both quiet labels to a glancing eye; the accent
+       border is what stops a filtered board reading as a normal one. */
+    .rep-filter.rep-filter-on { border-color: var(--accent); color: var(--accent); }
     .top-bar-left .nav-soon {
       opacity: 0.45; cursor: default; user-select: none;
     }
@@ -2596,6 +2601,19 @@
                 background: none; border: 1px dashed var(--border-strong); color: var(--text); border-radius: 8px; cursor: pointer; }
     .sec-more:hover { color: var(--accent); border-color: var(--accent); }
     .sec-note { font-size: 12px; color: var(--text); margin-bottom: 18px; font-style: italic; }
+    /* ⚠ TWO TREATMENTS WERE BUILT AND COMPARED ON SCREEN before this shipped.
+       Filling EVERY container shielded correctly but stacked three boxes before
+       any content and nested a filled card inside a filled card. This version —
+       the GROUP is the card, moments stay outlined rows inside it, and the two
+       summary blocks join into one panel — shields identically and reads better.
+
+       THE DESIGN FINDING, not a rationalisation: this page previously had NO
+       visual grouping at all. The summary, the coverage line and the moments
+       were loose text on the page background — which is WHY it had no opaque
+       ancestor to begin with. It now speaks the same language as every other view.
+
+       ⚠ IF THIS IS EVER DISAGREED WITH, THE LEVER IS THIS RULE ALONE. Drop the
+       fill and the page returns to loose text — and the motif returns to the H2. */
     .sec-group { margin-top: 22px; background: var(--bg-elevated); border: 1px solid var(--border-strong);
                  border-radius: var(--radius-lg); padding: 16px 18px; }
     .sec-group h2 { font-size: 15px; margin-bottom: 10px; }
@@ -5445,7 +5463,18 @@
   // rotating, and daily handle rate is already noisy (two objections in a day is
   // 0% or 50%). Past a fortnight the noise wins and the weekly line is the
   // readable one. Empty days still BREAK the line rather than plotting 0%.
-  var DAILY_BUCKET_MAX_DAYS = 14;
+  /* ⚠⚠ 92, NOT 14 — WEEKLY BUCKETING IS RETIRED FOR MONTH-AND-LONGER RANGES
+     (Justin, 2026-08-20). Josh asked to see daily movement on a monthly view,
+     and the answer is REAL DAILY POINTS, not cosmetic daily gridlines under
+     weekly buckets: a gridline where no value exists invites a reading the data
+     cannot support.
+
+     ⚠ 92 IS A JUDGEMENT CALL, NOT THE RULING. "Month and longer" carried no
+     upper bound, and a year at daily is ~400 points on a ~1100px plot — under
+     3px each, which is not a chart. 92 covers a month and a full quarter; a
+     year still falls back to weekly. Move it if yearly dailies are wanted, but
+     know that is the cost. */
+  var DAILY_BUCKET_MAX_DAYS = 92;
   function bucketForRange(r) {
     if (!r || !r.from || !r.to) return 'week';
     var days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
@@ -5467,6 +5496,9 @@
     return await res.json();
   }
   function resetTeamData() {
+    // ⚠ the hidden set is PER TEAM — reload it here, or one team's filter
+    // silently applies to another team's reps.
+    loadRepFilter();
     state.teamOverview = null; state.teamTrends = null; state.teamRecs = null;
     state.teamHighlights = null; state.teamDigest = null; state.teamDigestDate = null;
     state.teamNeedsWork = null;
@@ -5780,6 +5812,9 @@
     // place and forgotten in another (the ticks, the tooltip and the max all
     // need it).
     var isMinutes = /minutes/i.test(yLabel || '');
+    /* Daily buckets change what the axis and the highlight mean, so both read
+       one flag rather than each re-deriving it. */
+    var isDailyBuckets = (typeof repSeriesBucket === 'function') ? repSeriesBucket() === 'day' : false;
     var ctx = document.getElementById(canvasId);
     if (!ctx || !window.Chart || !series) return;
 
@@ -5894,7 +5929,29 @@
             grid: { color: 'rgba(255,255,255,0.08)' },
             title: { display: true, text: yLabel, color: '#ededed' },
           },
-          x: { ticks: { color: '#ededed' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          x: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: {
+              color: '#ededed',
+              maxRotation: 0,
+              /* ⚠⚠ autoSkip:false — CHART.JS DROPS LABELS SILENTLY, AND THAT IS
+                 THE DEFECT, NOT THE CROWDING. A month of daily buckets is ~30
+                 labels across ~1100px (~36px each) against date labels needing
+                 ~48px, so the default quietly removes some: the axis still looks
+                 tidy and correct while you can no longer tell WHICH DAY you are
+                 reading. A chart that hides which day it shows is worse than a
+                 crowded one, because nothing announces the loss.
+                 Thinning is therefore EXPLICIT — Mondays carry the label, every
+                 other day still gets a tick, so the weekly rhythm stays legible
+                 while the POINTS carry the daily movement Josh asked for. */
+              autoSkip: false,
+              callback: function (val, i) {
+                var lab = this.getLabelForValue(val);
+                if (!isDailyBuckets) return lab;
+                return isMondayLabel(lab, i) ? lab : '';
+              },
+            },
+          },
         },
         plugins: {
           /**
@@ -5982,7 +6039,18 @@
                 });
               },
             },
-            onClick: function (e, item, legend) {
+            /* ⚠⚠ THE LEGEND IS NO LONGER THE CONTROL (2026-08-20) — the rep-filter
+               dropdown is. It stays visible as a KEY (which colour is which rep)
+               but no longer toggles, so there is exactly one way to change the
+               selection instead of two that can disagree.
+
+               ⚠ THE PARITY REQUIREMENT DID NOT GO AWAY — IT MOVED. applyRepFilter()
+               walks EVERY live chart, so all three graphs still share one hidden
+               set; it is now enforced in one place rather than re-derived on each
+               legend gesture. The datasetIndex lesson moved with it: the dropdown's
+               option value is the USER_ID, never the dataset position. */
+            onClick: null,
+            _retiredLegendOnClick: function (e, item, legend) {
               var ds = legend.chart.data.datasets[item.datasetIndex];
               if (!ds || ds._fixed) return;          // the baseline is not a rep
               if (!ds._userId) return;
@@ -6105,6 +6173,123 @@
    * read as missing data, which is the failure this project keeps designing
    * against.
    */
+
+  /* ══ REP FILTER DROPDOWN (Justin, 2026-08-20) ══════════════════════════════
+     Replaces the legend toggle. Same control language as the objections
+     dropdown (.user-select, pick-then-reset), reps individually selectable,
+     plus "Show all" / "Remove all".
+
+     ⚠⚠ THE LABEL ALWAYS STATES THE FILTER — "3 of 5 reps shown" — so a filtered
+     board can never pass as a full one. Same principle as making Other legible:
+     a group nobody can see has to be named, or the visible numbers quietly stop
+     reconciling.
+
+     ⚠ WHEN NOTHING IS HIDDEN IT READS "All 5 reps", NOT "5 of 5". "5 of 5"
+     every day is noise, and a label that never changes stops being read — which
+     defeats it on the day it DOES change. But quiet is not invisible: the
+     filtered state also carries .rep-filter-on, which colours the control, so
+     it is distinguishable AT A GLANCE and not only by reading.
+
+     ⚠ PERSISTS ACROSS REFRESH (deliberate reversal of the session-only ruling),
+     keyed PER TEAM — a manager with two teams must not carry one team's hidden
+     set into the other — and keyed by USER_ID, never dataset index, which
+     changes with the window as reps drop out of it. */
+  var REP_FILTER_KEY = 'scout_repsel_v1';
+  function repFilterStoreKey() {
+    return REP_FILTER_KEY + ':' + (state.teamSelected || (state.me && state.me.user_id) || 'self');
+  }
+  function loadRepFilter() {
+    try { var raw = localStorage.getItem(repFilterStoreKey());
+          state.repLineHidden = raw ? (JSON.parse(raw) || {}) : {}; }
+    catch (e) { state.repLineHidden = {}; }
+    return state.repLineHidden;
+  }
+  function saveRepFilter() {
+    try {
+      var h = state.repLineHidden || {};
+      if (Object.keys(h).length === 0) localStorage.removeItem(repFilterStoreKey());
+      else localStorage.setItem(repFilterStoreKey(), JSON.stringify(h));
+    } catch (e) { /* a full or blocked store must never break the chart */ }
+  }
+  function repFilterRoster() {
+    var seen = {}, out = [];
+    eachLiveToggleChart(function (ch) {
+      ch.data.datasets.forEach(function (ds) {
+        if (ds._fixed || !ds._userId || seen[ds._userId]) return;
+        seen[ds._userId] = true;
+        out.push({ id: ds._userId, name: ds.label, color: ds.borderColor });
+      });
+    });
+    return out;
+  }
+  function repFilterToggle(id) {
+    if (!state.repLineHidden) state.repLineHidden = {};
+    if (state.repLineHidden[id]) delete state.repLineHidden[id];
+    else state.repLineHidden[id] = true;
+    saveRepFilter(); applyRepFilter();
+  }
+  function repFilterAll(show) {
+    state.repLineHidden = {};
+    if (!show) repFilterRoster().forEach(function (r) { state.repLineHidden[r.id] = true; });
+    saveRepFilter(); applyRepFilter();
+  }
+  function applyRepFilter() {
+    if (!state.repLineHidden) loadRepFilter();
+    var hidden = state.repLineHidden || {};
+    eachLiveToggleChart(function (ch) {
+      ch.data.datasets.forEach(function (ds, i) {
+        if (ds._fixed || !ds._userId) return;
+        ch.setDatasetVisibility(i, !hidden[ds._userId]);
+      });
+      ch.update('none');
+    });
+    renderRepFilterControls();
+    updateRepGraphAllHiddenNotes();
+  }
+  function repFilterHtml() {
+    var roster = repFilterRoster();
+    if (!roster.length) return '';
+    var hidden = state.repLineHidden || {};
+    var shown = roster.filter(function (r) { return !hidden[r.id]; }).length;
+    var filtered = shown !== roster.length;
+    var label = filtered ? (shown + ' of ' + roster.length + ' reps shown')
+                         : ('All ' + roster.length + ' rep' + (roster.length === 1 ? '' : 's'));
+    var opts = '<option value="">' + escapeHtml(label) + '</option>'
+      + roster.map(function (r) {
+          /* ⚠ REPLACES THE HOLLOW-CIRCLE MARKER. The legend struck hidden reps
+             through with a hollow ring; the state is now the check box, and a
+             hidden rep STAYS IN THE LIST — removing it would make absent and
+             excluded look alike. */
+          return '<option value="' + escapeHtml(r.id) + '">'
+            + (hidden[r.id] ? '\u2610 ' : '\u2611 ') + escapeHtml(r.name) + '</option>';
+        }).join('')
+      + '<option value="__all">Show all</option>'
+      + '<option value="__none">Remove all</option>';
+    return '<select class="user-select rep-filter' + (filtered ? ' rep-filter-on' : '') + '"'
+      + ' aria-label="Filter reps shown on the graphs"'
+      + ' onchange="onRepFilterPick(this.value); this.selectedIndex=0;">' + opts + '</select>';
+  }
+  function onRepFilterPick(v) {
+    if (!v) return;
+    if (v === '__all') return repFilterAll(true);
+    if (v === '__none') return repFilterAll(false);
+    repFilterToggle(v);
+  }
+  function renderRepFilterControls() {
+    var host = document.getElementById('repFilterHost');
+    if (host) host.innerHTML = repFilterHtml();
+  }
+
+  /* Daily-bucket label thinning. ⚠ Falls back to every 7th bucket if the label
+     shape ever changes — a regular-but-approximate axis beats one that silently
+     drops to nothing. */
+  function isMondayLabel(label, i) {
+    var d = Date.parse(label + ' 2026');
+    if (!isFinite(d)) d = Date.parse(label);
+    if (isFinite(d)) return new Date(d).getUTCDay() === 1;
+    return (i % 7) === 0;
+  }
+
   function updateRepGraphAllHiddenNotes() {
     eachLiveToggleChart(function (ch, id) {
       var el = document.getElementById(id + 'Note');
@@ -6120,7 +6305,7 @@
       });
       if (reps > 0 && visible === 0) {
         el.textContent = 'All ' + reps + ' rep' + (reps === 1 ? '' : 's')
-          + ' hidden — click a name in the legend to bring one back. The dashed line is the team average.';
+          + ' hidden — use the rep filter above to bring one back. The green line is the team average.';
         el.style.display = '';
       } else {
         el.textContent = '';
@@ -6203,7 +6388,13 @@
     }).join('');
     return '<div class="section fade-in">'
       + '<div class="rep-graph-head"><h2>Objection Handling %</h2>'
-        + '<select class="rep-graph-select" onchange="setTeamObjectionCategory(this.value)">' + opts + '</select></div>'
+        + '<div class="rep-graph-controls">'
+          // ⚠ rendered into a HOST, not inline: the filter re-renders on every
+          // toggle, and rebuilding the section would destroy the canvases the
+          // charts are bound to (the preserved-node rule).
+          + '<span id="repFilterHost"></span>'
+          + '<select class="rep-graph-select" onchange="setTeamObjectionCategory(this.value)">' + opts + '</select>'
+        + '</div></div>'
       + repGraphBodyHtml('repHandleChart')
       + '<h2 style="margin-top:26px;">Closing %</h2>'
       + repGraphBodyHtml('repCloseChart')
