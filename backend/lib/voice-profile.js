@@ -140,7 +140,25 @@ function formConstraintsFor(outcome) {
   return OUTCOME_FORM[outcome] || OUTCOME_FORM.follow_up;
 }
 
-/** Render the profile + form rules as a prompt block. Null when unavailable. */
+/**
+ * Render the profile + form rules as a prompt block. Null when unavailable.
+ *
+ * ⚠⚠ ALL FOUR CEILINGS ARE GIVEN, AND THE MODEL PICKS — A CONSTRAINT DISCOVERED
+ * BY WIRING THIS, NOT BY DESIGNING IT. The form rules are a function of HOW THE
+ * CALL ENDED, and the thing that determines how it ended is THIS SAME GRADER
+ * CALL. So the outcome is not knowable when the prompt is built.
+ * Three ways out, and only one is honest:
+ *   (a) use the PREVIOUSLY stored outcome — stale, and null on a first analysis
+ *   (b) hand over all four ceilings and have the model apply the one matching
+ *       the outcome it assigns in the same JSON  <- chosen
+ *   (c) run two passes — doubles the spend to learn something the model
+ *       already knows by the time it writes the email
+ * (b) costs a few tokens and is self-consistent BY CONSTRUCTION: the ceiling
+ * and the outcome come out of one decision, so they can never disagree.
+ * ⚠ The server-side gate still uses formConstraintsFor(actualOutcome) — that
+ * runs AFTER the response, where the outcome IS known, so the check does not
+ * depend on the model having obeyed.
+ */
 function voiceProfileBlock(profile, outcome) {
   if (!profile) return null;
   const f = formConstraintsFor(outcome);
@@ -170,11 +188,18 @@ function voiceProfileBlock(profile, outcome) {
              : profile.question_rate >= 0.1 ? 'asks a question occasionally — at most one'
                                             : 'rarely asks questions — prefer statements'),
     '',
-    'FORM — this call ended as ' + String(outcome || 'follow_up').toUpperCase() + ':',
-    '  • HARD CEILING ' + f.maxWords + ' WORDS. Shorter is better.',
-    '  • ' + f.allow,
+    'FORM — APPLY THE ROW MATCHING THE `outcome` YOU ASSIGN ABOVE:',
+    '  closed    -> HARD CEILING ' + OUTCOME_FORM.closed.maxWords    + ' words. ' + OUTCOME_FORM.closed.allow,
+    '  follow_up -> HARD CEILING ' + OUTCOME_FORM.follow_up.maxWords + ' words. ' + OUTCOME_FORM.follow_up.allow,
+    '  lost      -> HARD CEILING ' + OUTCOME_FORM.lost.maxWords      + ' words. ' + OUTCOME_FORM.lost.allow,
+    '  no_show   -> HARD CEILING ' + OUTCOME_FORM.no_show.maxWords   + ' words. ' + OUTCOME_FORM.no_show.allow,
+    '',
+    '⚠ EFFORT MUST MATCH THE OUTCOME. Nobody types 180 careful words to a',
+    'prospect who just said no. A long, helpful, well-organised email after a',
+    'LOST call is the single clearest sign it was not written by a person.',
     '  • Do NOT summarise what was discussed. They were on the call.',
     '  • At most ONE em-dash in the whole email.',
+    '  • No "I hope this finds you well", no "don\'t hesitate to reach out".',
   ].join('\n');
 }
 

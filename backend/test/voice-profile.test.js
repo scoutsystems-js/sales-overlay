@@ -92,13 +92,33 @@ test('⚠ the block bans a call summary and caps em-dashes, on every outcome', (
   const many = [];
   while (many.length < vp.MIN_LINES + 5) many.push(...REAL);
   const p = vp.deriveVoiceProfile(many);
+  const b = vp.voiceProfileBlock(p, null);
+  assert.match(b, /Do NOT summarise what was discussed/);
+  assert.match(b, /ONE em-dash/);
+
+  /* ⚠⚠ THE BLOCK CARRIES ALL FOUR CEILINGS AND THE MODEL PICKS — a design
+     constraint found by WIRING this, not by planning it. The form rules are a
+     function of how the call ended, and the grader is what DETERMINES how it
+     ended, in the same call. So the outcome is not knowable when the prompt is
+     built. Handing over all four and having the model apply the row matching
+     the outcome it assigns in the same JSON is self-consistent BY
+     CONSTRUCTION: ceiling and outcome come out of one decision.
+     ⚠ This test previously asserted the block NAMES ONE OUTCOME. That was
+     correct for the old shape and is now wrong — updated deliberately rather
+     than deleted, because the property it protects (every outcome has a
+     stated ceiling) still matters. */
   ['closed', 'follow_up', 'lost', 'no_show'].forEach(o => {
-    const b = vp.voiceProfileBlock(p, o);
-    assert.match(b, /Do NOT summarise what was discussed/, o);
-    assert.match(b, /ONE em-dash/, o);
-    assert.match(b, /HARD CEILING \d+ WORDS/, o);
-    assert.ok(b.indexOf(String(o).toUpperCase()) !== -1, 'names the outcome: ' + o);
+    assert.ok(b.indexOf(o) !== -1, 'every outcome must carry a ceiling: ' + o);
+    assert.ok(new RegExp(o + '\\s*->\\s*HARD CEILING \\d+ words').test(b),
+      o + ' must state its own hard ceiling');
   });
+  assert.match(b, /APPLY THE ROW MATCHING THE `outcome` YOU ASSIGN ABOVE/,
+    'the model must be told to select by its own verdict — otherwise four '
+    + 'ceilings are four suggestions');
+  // and the ordering that makes the whole feature work
+  assert.ok(b.indexOf('lost      -> HARD CEILING 40') !== -1
+         && b.indexOf('closed    -> HARD CEILING 120') !== -1,
+    'lost must be the shortest and closed the longest');
 });
 
 test('no profile -> no block (silence, never a guessed voice)', () => {
