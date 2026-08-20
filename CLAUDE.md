@@ -1379,6 +1379,21 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **THE CONSEQUENCE WAS A CHANGE OF CRITERION, NOT A NUDGE: zero overlap was never achievable at half-screen size.** Once the inventory was complete, the honest bar for a BACKGROUND is *"the worst exposed text stays readable over it"*, not *"nothing overlaps"*. Solved for opacity instead: `--muted` over a solid stroke gives 4.47:1 at 0.22 and **4.98:1 at 0.18**, so 0.18 ships. A test now computes that contrast rather than trusting the 0.16-0.30 band — **because "in the band" was true of the value that failed.**
 - **BUILD THE ELEMENT INVENTORY FROM THE DOM, NOT FROM MEMORY.** The sampling was never the weak part; the **list** was.
 
+### ⚠⚠⚠ A CHECK CAN ONLY FAIL IN THE SPACE IT MEASURES — ASK WHAT SPACE THE DEFECT WOULD LIVE IN BEFORE CHOOSING WHAT TO SAMPLE (2026-08-20)
+**THE RULE THAT TIES THREE DISTINCT MEASUREMENT FAILURES TOGETHER, all found in one arc on one feature, all of which passed cleanly while the defect sat in plain sight:**
+| # | failure | what was wrong |
+|---|---|---|
+| 1 | **a MISSING metric** | the brief was a likeness ("reads as a network") and nothing measured it — an unmeasured requirement shows up as *nothing*, not as a bad number |
+| 2 | **a PRESENT but WRONG statistic** | edges-per-node averaged 2.6 while cores ran 6.18 against 3.17 open — a mean over a bimodal field describes neither mode |
+| 3 | **the RIGHT measurement in the WRONG SPACE** | the sweep sampled FIELD coordinates; the defect lived in the transform between field and screen |
+- **They are not the same lesson and no single habit prevents all three.** What they share is the shape: **the check was sound, ran correctly, and reported success about something other than the thing that was broken.**
+- **THE HABIT: before choosing what to sample, ask where the defect could live.** In the requirement? In the distribution? In a transform between the artifact and the user? **Whichever spaces you cannot name are the ones your check cannot fail in.**
+
+### ⚠⚠⚠ LOOKING IS NOT VERIFICATION IF YOU LOOK AT THE DEFAULT CASE (2026-08-20)
+**The visual check passed because the screenshot happened to be of the ONE view whose offset was `0,0` — the only fully covered one of fifteen.** Fourteen others rendered mostly bare, one of them ~95% empty. **Looking was the right instinct and it still produced a false pass**, because the instance was chosen for convenience: `overview` is the default view, the one already on screen.
+- **⚠ THE FIX IS ADVERSARIAL SELECTION, NOT MORE LOOKING.** When behaviour varies by instance — per view, per width, per tenant, per locale, per role — **the instance you check has to be the one most likely to be broken**, and you have to be able to say WHY it is the worst before you look at it. The re-check that settled this was the **account** view at window `100% 100%`: the far corner, the largest offset, the known-worst case. That is why the second look is trustworthy and the first was not.
+- **The general form: a spot check inherits the representativeness of its sample.** One instance proves one instance. If you cannot argue that the instance you chose is the hardest, you have measured the easiest — because the default case is almost always the one that was built first and works.
+
 ### ⚠⚠⚠ A SWEEP THAT SAMPLES THE SOURCE INSTEAD OF THE RENDER MEASURES A SPACE THE USER NEVER SEES (2026-08-20)
 **Fifteen windows were swept individually, every one passing, while FOURTEEN OF THEM RENDERED MOSTLY BARE.** The account view was ~95% empty with the mesh in one corner — and the sweep called it 100% covered.
 - **The mechanism, and it is pure CSS:** `background-size: cover` scales a 3200x2000 field to **exactly** the viewport, so the per-view `background-position: -1200px -667px` pushed it off-screen and `background-repeat: no-repeat` left the vacated area **bare**. Only the one view at `0px 0px` covered — **and that is the view I screenshotted**, so the visual check passed by sampling accident.
