@@ -48,12 +48,35 @@ test('empty weeks BREAK the line — never plotted as 0', () => {
   assert.ok(cfg.data.datasets.every((d) => d.spanGaps === false), 'gaps must not be bridged');
 });
 
-test('the team average is a BOLD DOTTED line', () => {
+/* ⚠ CONVERTED 2026-08-20, NOT DELETED. This pinned the team average as WHITE
+   DOTTED. Justin ruled it becomes SOLID SCOUT GREEN, so the dash assertion is
+   superseded — keeping it would pin the old design.
+
+   The properties that SURVIVE are the ones that actually mattered: the baseline
+   is present, it is BOLD (it is what the reps are read against), and it is
+   visually distinct from every rep line. A new one is added because the change
+   created a new way to be wrong: at pointRadius 0 the line is un-hoverable
+   unless it carries an explicit hit radius. */
+test('the team average is BOLD, SCOUT GREEN, and still hoverable at pointRadius 0', () => {
   const cfg = buildChart(SERIES, (r) => r.handle, 'Handle rate');
   const team = cfg.data.datasets.find((d) => d.label === 'Team average');
   assert.ok(team, 'the team line must be present');
-  assert.ok(Array.isArray(team.borderDash) && team.borderDash.length, 'dotted');
-  assert.ok(team.borderWidth > 2, 'bold');
+  assert.ok(team.borderWidth > 2, 'bold — it is the baseline the reps are read against');
+  assert.ok(!(Array.isArray(team.borderDash) && team.borderDash.length),
+    'the dash is retired: the line is solid Scout green now');
+  assert.strictEqual(team.pointRadius, 0, 'the baseline draws no dots');
+  assert.ok(team.pointHitRadius > 0,
+    'with interaction.intersect=true a pointRadius-0 line can never be hovered '
+    + 'without an explicit hit radius — the baseline would go silently unhoverable');
+  const reps = cfg.data.datasets.filter((d) => d.label !== 'Team average');
+  reps.forEach((r) => assert.notStrictEqual(r.borderColor, team.borderColor,
+    'no rep line may share the baseline colour'));
+});
+
+test('⚠ the tooltip only fires on an actual point', () => {
+  const cfg = buildChart(SERIES, (r) => r.handle, 'Handle rate');
+  assert.strictEqual(cfg.options.interaction.intersect, true,
+    'intersect:false showed the nearest point from anywhere in the plot area');
 });
 
 test('tooltips carry RAW COUNTS, per the house rule', () => {

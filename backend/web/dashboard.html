@@ -281,7 +281,7 @@
          (--muted #8a9aaa), so its ceiling is 0.215 and it is already at 0.20.
          "Site-wide" is not one number — it is each surface at its OWN measured
          ceiling, and the two differ because their text colours differ. */
-      opacity: 0.40;
+      opacity: 0.38;
       background-repeat: no-repeat;
     }
     body[data-view="overview"]::before { background-image: var(--motif-a); background-position: right -200px top -140px; }
@@ -2576,11 +2576,15 @@
     .coach-section-row:hover { background: rgba(255,255,255,0.03); }
     .sec-back { display: inline-block; font-size: 13px; color: var(--text); cursor: pointer; margin-bottom: 6px; }
     .sec-back:hover { color: var(--accent); }
-    .sec-headline { display: flex; align-items: center; gap: 20px; margin: 8px 0 6px; }
+    .sec-headline { display: flex; align-items: center; gap: 20px; margin: 8px 0 0;
+                    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+                    border-bottom: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 16px 18px; }
     .sec-avg { font-size: 46px; font-weight: 600; line-height: 1; }
     .sec-meta { font-size: 13px; color: var(--text); display: flex; flex-direction: column; gap: 2px; }
     .sec-delta.up { color: #6ee7a8; } .sec-delta.down { color: #fca5a5; }
-    .sec-coverage { font-size: 13px; color: var(--text); margin-bottom: 14px; }
+    .sec-coverage { font-size: 13px; color: var(--text); margin-bottom: 14px;
+                     background: var(--bg-elevated); border: 1px solid var(--border-strong);
+                     border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 10px 18px; }
     .sec-warn { color: #f6c177; font-weight: 600; }
     .sec-hist { display: flex; align-items: flex-end; gap: 10px; height: 110px; margin: 4px 0 6px; }
     .sec-hbar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
@@ -2592,9 +2596,19 @@
                 background: none; border: 1px dashed var(--border-strong); color: var(--text); border-radius: 8px; cursor: pointer; }
     .sec-more:hover { color: var(--accent); border-color: var(--accent); }
     .sec-note { font-size: 12px; color: var(--text); margin-bottom: 18px; font-style: italic; }
-    .sec-group { margin-top: 22px; }
+    .sec-group { margin-top: 22px; background: var(--bg-elevated); border: 1px solid var(--border-strong);
+                 border-radius: var(--radius-lg); padding: 16px 18px; }
     .sec-group h2 { font-size: 15px; margin-bottom: 10px; }
     .sec-count { font-size: 12px; color: var(--text); font-weight: 400; margin-left: 6px; }
+    /* ⚠⚠ THESE FILLS ARE THE SAFETY MECHANISM, NOT DECORATION (2026-08-20).
+       The background motif is kept off text by LAYOUT — opaque cards over a
+       1200px column — never by being faint. This view was built with OUTLINED
+       cards (border, no fill), so it had no mechanism at all: measured live,
+       11 of 11 text elements had NO opaque ancestor and 8 had motif ink under
+       their glyph boxes, which is what Justin saw drawing through the moment
+       cards. Dimming the motif would have hidden that while leaving the next
+       outlined-card view exposed.
+       ⚠ If you add a container to this page, give it a background. */
     .sec-moment { border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; margin-bottom: 9px; }
     .sec-moment-top { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; flex-wrap: wrap; }
     .sec-clip { font-size: 12px; color: var(--accent); text-decoration: none; }
@@ -5682,6 +5696,18 @@
     '#ec4899',  // magenta
     '#14b8a6',  // teal
   ];
+
+  /* ⚠⚠ CANVAS CANNOT READ A CSS VARIABLE. Chart.js paints to a 2D context, so
+     borderColor:'var(--accent)' silently draws nothing usable. Resolve the token
+     once at runtime instead of hard-coding a second copy of the hex — a pinned
+     duplicate is the same trap that left 23 rgba() tints stranded when the brand
+     green moved. */
+  function cssToken(name, fallback) {
+    try {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    } catch (e) { return fallback; }
+  }
   // (k2, revised 2026-08-18) The "off" legend marker: a hollow, desaturated ring.
   // ⚠ Derived from --text rather than a new grey, so it stays in the same family
   // as everything else on the card. It is a STATE MARKER, not text — the no-grey
@@ -5799,8 +5825,12 @@
         // Enforced in the legend handler AND marked here, so the reason travels
         // with the dataset rather than living only in the click code.
         _fixed: true,
-        borderColor: '#ffffff', backgroundColor: '#ffffff',
-        borderWidth: 3, borderDash: [6, 4], pointRadius: 0, tension: 0.25, spanGaps: false,
+        // ⚠ SCOUT GREEN, SOLID (Justin 2026-08-20) — was #ffffff dashed. Colour
+        // on this chart means WHICH SERIES; the current-period band means WHICH
+        // REGION. Different channels, so a green line and a neutral band cannot
+        // compete for the same meaning. That is why the BAND yields, not the line.
+        borderColor: cssToken('--accent', '#09e046'), backgroundColor: cssToken('--accent', '#09e046'),
+        borderWidth: 3, pointRadius: 0, pointHitRadius: 12, tension: 0.25, spanGaps: false,
       });
     }
 
@@ -5840,7 +5870,18 @@
       data: { labels: labels, datasets: datasets },
       options: {
         responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'nearest', intersect: false },
+        /* ⚠⚠ intersect:true — THE TOOLTIP MUST ONLY FIRE ON AN ACTUAL POINT.
+           With intersect:false Chart.js shows the NEAREST point from anywhere in
+           the plot area, so the tooltip followed the cursor across empty space
+           and reported a value the user was not pointing at.
+
+           ⚠ AND intersect:true ALONE WOULD SILENCE THE TEAM AVERAGE. That line
+           is drawn pointRadius:0, and a line with no rendered points can never
+           be "intersected" — the baseline would become permanently un-hoverable,
+           which is a worse defect than the one being fixed. pointHitRadius gives
+           it an invisible hit target, so it stays reachable without drawing
+           dots. The two changes are one fix; neither works alone. */
+        interaction: { mode: 'nearest', intersect: true },
         scales: {
           y: {
             beginAtZero: true,
