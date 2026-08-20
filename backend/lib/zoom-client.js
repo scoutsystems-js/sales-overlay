@@ -187,6 +187,28 @@ async function downloadFile(accessToken, downloadUrl) {
 // Throws 'zoom_no_transcript' when the meeting has no transcript file yet (e.g.
 // transcript_completed hasn't fired, or the account/plan produced none) — a
 // recoverable state the worker surfaces as an error the user can retry.
+/* ⚠⚠ RETURNS THE MEETING'S FRESH METADATA ALONGSIDE THE VTT, because a call
+   that was REQUEUED was first synced while the recording was still processing —
+   and at that moment Zoom reports duration 0. The requeue re-runs the ANALYSIS
+   but never re-syncs the row, so that 0 was frozen permanently.
+   Measured on the first real call: transcript spans 6073s (101.2 min), stored
+   duration 0. Not the VTT adapter and not the call type — stale sync metadata.
+   ⚠ This will bite EVERY requeued call, and the 3301 race makes requeues normal
+   rather than rare. The fix is nearly free: getMeetingRecordings is a call we
+   already make to find the transcript, and the duration is in that response. */
+async function fetchTranscriptWithMeta(accessToken, meetingUuid) {
+  var rec = await getMeetingRecordings(accessToken, meetingUuid);
+  var file = pickTranscriptFile(rec && rec.recording_files);
+  if (!file || !file.download_url) throw new Error('zoom_no_transcript: no transcript file for meeting ' + meetingUuid);
+  var vtt = await downloadFile(accessToken, file.download_url);
+  var durationSeconds = null;
+  if (rec && typeof rec.duration === 'number' && rec.duration > 0) {
+    var secs = Math.floor(rec.duration * 60);
+    if (secs <= DURATION_SANITY_SECONDS) durationSeconds = secs;
+  }
+  return { vtt: vtt, duration_seconds: durationSeconds, meeting_id: (rec && (rec.id === 0 || rec.id)) ? String(rec.id) : null };
+}
+
 async function fetchTranscriptVtt(accessToken, meetingUuid) {
   var rec = await getMeetingRecordings(accessToken, meetingUuid);
   var file = pickTranscriptFile(rec && rec.recording_files);
@@ -207,6 +229,7 @@ module.exports = {
   encodeMeetingUuid: encodeMeetingUuid,
   listRecordings: listRecordings,
   getMeetingRecordings: getMeetingRecordings,
+  fetchTranscriptWithMeta: fetchTranscriptWithMeta,
   downloadFile: downloadFile,
   fetchTranscriptVtt: fetchTranscriptVtt,
   // test surface

@@ -1134,8 +1134,22 @@ async function analyzeCall(fathomCallId, userId) {
         return await failTranscript('Zoom token unavailable for user ' + userId + ': ' + ((zTokErr && zTokErr.message) || 'unknown'));
       }
       try {
-        var vtt = await zoomClient.fetchTranscriptVtt(zoomToken, callRow.fathom_call_id);
-        transcript = parseVttToTranscript(vtt);
+        var zres = await zoomClient.fetchTranscriptWithMeta(zoomToken, callRow.fathom_call_id);
+        transcript = parseVttToTranscript(zres.vtt);
+        /* ⚠ REFRESH THE STALE SYNC METADATA. A requeued call was first synced
+           while the recording was still processing, when Zoom reports duration 0
+           — and nothing else ever re-reads it. Best-effort: a metadata refresh
+           must never fail an analysis that has a transcript in hand. */
+        try {
+          var patch = {};
+          if (zres.duration_seconds && !callRow.duration_seconds) patch.duration_seconds = zres.duration_seconds;
+          if (zres.meeting_id && !callRow.meeting_id) patch.meeting_id = zres.meeting_id;
+          if (Object.keys(patch).length) {
+            await admin.from('fathom_calls').update(patch).eq('id', fathomCallId).eq('user_id', userId);
+          }
+        } catch (mErr) {
+          console.warn('[analysis] zoom metadata refresh failed for ' + fathomCallId + ': ' + ((mErr && mErr.message) || 'unknown'));
+        }
       } catch (zErr) {
         var zReason = 'Zoom transcript fetch failed for meeting ' + callRow.fathom_call_id
           + ': ' + ((zErr && zErr.message) || 'unknown');
