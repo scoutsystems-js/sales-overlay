@@ -58,6 +58,11 @@
  * vocabulary.
  */
 
+// Zoom speaker identity: byte-identical display-name match + the two-person
+// collision detector. Kept in its own module because the reasoning for why it
+// is NOT the refused fuzzy name match belongs beside the rule, not here.
+var zoomIdentity = require('./zoom-identity');
+
 /**
  * Convert a duration-style timestamp string to integer seconds.
  *
@@ -261,8 +266,24 @@ function normalizeTranscript(meeting) {
     }
   }
 
+  // ZOOM: byte-identical display-name match against the connected account's
+  // own Zoom profile name, guarded by the two-person collision detector.
+  // ⚠ THIS IS AN EQUALITY TEST, NOT A RESEMBLANCE TEST — see lib/zoom-identity
+  // for why that distinction is the whole feature, and why it must never be
+  // relaxed into normalisation. A Zoom VTT carries display names ONLY (no
+  // emails, no <v> tags, no ids — measured on a real 1012-turn call), so the
+  // email branch above can never fire on a Zoom call.
+  var zoomCloser = { closerName: null, reason: 'not_zoom' };
+  if (!emailCloserName && typeof meeting.closer_display_name === 'string') {
+    zoomCloser = zoomIdentity.resolveZoomCloser(meeting.closer_display_name, displayNamesSeen);
+  }
+
   // LEGACY (unwired): recorded_by-name fuzzy match. The Fathom and Zoom paths
   // both pass recorded_by:null — see the RULING in the header before wiring it.
+  // ⚠ DO NOT read the Zoom branch above as this rule being revived: that one
+  // asks "does this LOOK LIKE the name?" against an open world and recorded the
+  // CLOSER as the PROSPECT on 6 of 83 real calls. This asks "is this the SAME
+  // BYTES as the name Zoom itself has on file?" inside a closed set.
   var recordedByName = (meeting.recorded_by && typeof meeting.recorded_by.name === 'string')
     ? meeting.recorded_by.name
     : null;
@@ -272,7 +293,21 @@ function normalizeTranscript(meeting) {
   var closerName;
   var speakerConfidence;
 
-  if (emailCloserName) {
+  if (!emailCloserName && zoomCloser.closerName) {
+    // Label by the matched display name. Same shape as the email branch, but
+    // the identity came from Zoom's account profile rather than a per-turn
+    // invitee email.
+    turns = preTurns.map(function(p) {
+      return {
+        speaker:       (p.display_name === zoomCloser.closerName) ? 'CLOSER' : 'PROSPECT',
+        display_name:  p.display_name,
+        text:          p.text,
+        start_seconds: p.start_seconds,
+      };
+    });
+    closerName = zoomCloser.closerName;
+    speakerConfidence = 'matched';
+  } else if (emailCloserName) {
     // Label by EMAIL, not by the matched display name — Fathom sometimes splits
     // one speaker across two display names, and the email survives that.
     turns = preTurns.map(function(p) {

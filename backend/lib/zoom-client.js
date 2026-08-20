@@ -216,7 +216,34 @@ async function fetchTranscriptVtt(accessToken, meetingUuid) {
   return await downloadFile(accessToken, file.download_url);
 }
 
+/**
+ * The connected account's own Zoom display name — the closer-side half of the
+ * byte-identical speaker match (see lib/zoom-identity).
+ *
+ * ⚠ USES `user:read:user`, A SCOPE SCOUT ALREADY HOLDS. No scope change, no
+ * Marketplace re-review, no re-consent. That is the entire reason this route
+ * exists ahead of the participants scope.
+ *
+ * ⚠ PREFERS `display_name` OVER first+last, AND THE DIFFERENCE IS REAL: on the
+ * live account display_name is "Josh" while first/last are "Joshua"/"Pinner".
+ * The VTT label is generated from the PROFILE display name, so display_name is
+ * the field that can actually match. Composing first+last would never match.
+ *
+ * Returns null on any failure — an identity we could not fetch must degrade to
+ * silence, never to a guess.
+ */
+async function getMyDisplayName(accessToken) {
+  try {
+    var me = await apiGet(accessToken, 'https://api.zoom.us/v2/users/me');
+    if (me && typeof me.display_name === 'string' && me.display_name) return me.display_name;
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
 module.exports = {
+  getMyDisplayName: getMyDisplayName,
   isConfigured: isConfigured,
   buildAuthorizeUrl: buildAuthorizeUrl,
   exchangeCode: exchangeCode,

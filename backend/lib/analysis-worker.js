@@ -1164,6 +1164,10 @@ async function analyzeCall(fathomCallId, userId) {
     }
 
     var transcript;
+    // Zoom's own display name for the connected account — the closer-side half
+    // of the byte-identical match. Stays null for Fathom, where the per-turn
+    // invitee email is a strictly better identity and fires first.
+    var zoomDisplayName = null;
     if (transcriptSourceFor(callRow) === 'zoom') {
       // ── Zoom ── token via call_connections (serialized single-flight refresh —
       // Zoom's single-use rotating refresh tokens make this mandatory), transcript
@@ -1177,6 +1181,12 @@ async function analyzeCall(fathomCallId, userId) {
       try {
         var zres = await zoomClient.fetchTranscriptWithMeta(zoomToken, callRow.fathom_call_id);
         transcript = parseVttToTranscript(zres.vtt);
+        /* ⚠ BEST-EFFORT, AND DELIBERATELY NOT AWAITED INTO THE FAILURE PATH:
+           a display name we cannot fetch means speaker identity degrades to
+           silence, exactly as it does today. It must never fail an analysis
+           that already has a transcript in hand — same rule the metadata
+           refresh below follows. */
+        zoomDisplayName = await zoomClient.getMyDisplayName(zoomToken);
         /* ⚠ REFRESH THE STALE SYNC METADATA. A requeued call was first synced
            while the recording was still processing, when Zoom reports duration 0
            — and nothing else ever re-reads it. Best-effort: a metadata refresh
@@ -1260,6 +1270,9 @@ async function analyzeCall(fathomCallId, userId) {
       // not wired (it returned the CLOSER as the prospect on 6 of 83 calls).
       recorded_by:   null,
       closer_email:  closerEmail,  // 6a: exact-equality speaker labelling
+      // Zoom only. A VTT carries display names ONLY, so closer_email can never
+      // match there; this is the byte-identical fallback, collision-guarded.
+      closer_display_name: zoomDisplayName,
     };
 
     // ─── Phase 5: normalize ──────────────────────────────────────────────
