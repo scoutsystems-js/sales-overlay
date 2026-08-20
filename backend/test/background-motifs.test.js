@@ -1,4 +1,46 @@
 /**
+ * ⚠⚠ RETIREMENTS, 2026-08-20 — SIX TESTS RETIRED WHEN THE RASTER REPLACED THE
+ * MESH AS THE BASE LAYER. Each is commented in place below rather than deleted.
+ * What each protected, and what protects it now:
+ *
+ *  1. "decorative and unreachable" — computed text contrast OVER a motif stroke
+ *     and capped opacity so it cleared AA (accent ~0.390, body ~0.538).
+ *     ⚠⚠ IT RETIRED BECAUSE ITS PREMISE IS FALSE, NOT BECAUSE THE RULE RELAXED.
+ *     It assumed text sits ON the layer. Measured across all 15 views on the
+ *     live page, ZERO text leaves have the layer as their backdrop — every one
+ *     resolves to an opaque painted ancestor. At opacity 1 it computed 1.52:1
+ *     for a composite that never renders.
+ *     NOW PROTECTED BY: the carding pins in team-background.test.js
+ *     (.page-header, .review-page-header, .synth-panel, objStatCard). Readability
+ *     is bought by opaque containers, not by an alpha.
+ *     ⚠ AND THE HONEST GAP: nothing re-runs the exposure sweep automatically. A
+ *     NEW view whose text is not inside an opaque container would sit on a
+ *     full-brightness photograph and no test here would catch it. The four pins
+ *     cover today's containers only. This is the one property that got weaker.
+ *
+ *  2. "ONE artwork, ONE layer" and 4. "every view has its OWN window" — asserted
+ *     fifteen distinct per-view windows existed. Justin ruled one image, one
+ *     position; the fifteen rules are deleted. NOW PROTECTED BY the inverse
+ *     assertion in team-background.test.js: ZERO per-view rules, proven
+ *     non-vacuous by injecting one.
+ *
+ *  3. "the bright mesh is OPT-IN ONLY" — pinned the --motif-alpha fallback at
+ *     0.25. The variable is gone (a var with a fallback made the rendered value
+ *     unreadable from source: source said 0.25, render said 0.40). NOW PROTECTED
+ *     BY a direct `opacity: 1` assertion with a cardinality check.
+ *
+ *  5. "the field renders LARGER than the viewport" and 6. "offsets stay within
+ *     0-100%" — the 200%-plus-offset arithmetic that bought coverage for the
+ *     mesh. Under `cover` with no offset, coverage is guaranteed by definition.
+ *     NOW PROTECTED BY motif-coverage.test.js, which pins cover + 50% 50% and
+ *     fails on any px offset. ⚠ NOT protected: the offset BUDGET, because there
+ *     is no offset. Reintroducing per-view positions under `cover` alone is the
+ *     original bare-area bug and needs that arithmetic back with it.
+ *
+ * ⚠ THE MESH ITSELF IS NOT RETIRED — `--motif-mesh` and scripts/gen-mesh.js
+ * stay (Justin's ruling). The tests below still guard that it is inline, valid
+ * SVG, and has real depth.
+ *
  * (f) — the transparent background motifs.
  *
  * ⚠⚠ THE DEFECT THIS EXISTS FOR RENDERED NOTHING AT ANY OPACITY, INCLUDING 1.
@@ -52,6 +94,9 @@ test('⚠ BODY MUST NOT PAINT A BACKGROUND — it would hide the motif layer', (
     'the page background must live on <html>, which propagates to the canvas');
 });
 
+/* ⚠⚠ RETIRED 2026-08-20 — see the RETIREMENTS note in the header.
+   Kept as a record of what was protected, not deleted:
+
 test('the layer is decorative and unreachable — never in front of content', () => {
   const r = rule('body[data-view]::before');
   assert.ok(/position:\s*fixed/.test(r), 'must be a fixed backdrop, not in the flow');
@@ -63,7 +108,7 @@ test('the layer is decorative and unreachable — never in front of content', ()
      deliberately: the trial is a named exception, not a reason to stop checking.
      ⚠ A guard loosened for a trial never tightens again, so this one is SCOPED
      instead: the default must still clear AA, and the bright path is asserted
-     separately as opt-in-only below. */
+     separately as opt-in-only below. * /
   const op = r.match(/opacity:\s*var\(--motif-alpha,\s*([0-9.]+)\)/)
           || r.match(/opacity:\s*([0-9.]+)/);
   assert.ok(op, 'the layer must declare an opacity (literal or var with a fallback)');
@@ -88,7 +133,7 @@ test('the layer is decorative and unreachable — never in front of content', ()
    * surface that text is #ededed, because the no-grey rule made --muted
    * identical to --text — which is why the dashboard tolerates far more than
    * the login page (whose --muted is a genuine grey and caps at 0.215).
-   */
+   * /
   const opacity = parseFloat(op[1]);
   const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
     return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
@@ -108,7 +153,7 @@ test('the layer is decorative and unreachable — never in front of content', ()
    * ⚠ THE WORST-EXPOSED TEXT IS NOT ALWAYS THE DIMMEST-LOOKING ONE. It is
    * whichever colour is closest to the decoration. Enumerate the text colours
    * that actually render, and take the LOWEST ceiling of them all.
-   */
+   * /
   const MARK = [9, 224, 70], BG = [10, 10, 10];
   const TEXT_COLOURS = {
     body:   [237, 237, 237],   // --text (== --muted here, per the no-grey rule)
@@ -127,6 +172,8 @@ test('the layer is decorative and unreachable — never in front of content', ()
     'below the approved band the shape is invisible on a monitor — the bug this '
     + 'replaced. Found ' + op[1]);
 });
+*/
+
 
 
 
@@ -191,6 +238,9 @@ test('⚠ depth is real — nodes and edges vary in size and opacity', () => {
   assert.ok(opac.length > 20, 'and in opacity, or it reads flat: ' + opac.length);
 });
 
+/* ⚠⚠ RETIRED 2026-08-20 — see the RETIREMENTS note in the header.
+   Kept as a record of what was protected, not deleted:
+
 test('⚠⚠ ONE artwork, ONE layer — per-page variation is retired', () => {
   const live = LIVE_CSS;
   assert.ok(!/--motif-[abcd]\s*:/.test(live), 'the four styles must be gone');
@@ -199,6 +249,8 @@ test('⚠⚠ ONE artwork, ONE layer — per-page variation is retired', () => {
   assert.ok(!/body\[data-view="[a-z-]+"\]::before \{ background-image/.test(live),
     'per-view artwork assignment is retired — one full-bleed mesh covers everything');
 });
+*/
+
 
 /**
  * ⚠⚠ EXACTLY ONE LIVE MOTIF RULE — the check that would have caught the
@@ -233,6 +285,9 @@ test('⚠⚠ exactly ONE live body[data-view]::before rule (excluding media quer
  * trial to being unreachable without an explicit query parameter, so a bright
  * mesh can never become the shipped state by accident.
  */
+/* ⚠⚠ RETIRED 2026-08-20 — see the RETIREMENTS note in the header.
+   Kept as a record of what was protected, not deleted:
+
 test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   const bright = live.match(/html\[data-mesh="bright"\]\s*\{[^}]*\}/);
@@ -245,7 +300,7 @@ test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
   /* ⚠ this check was wrong first: it stripped the `if (...)` and then asserted
      the call was not at end of line — which is true of a correctly guarded call
      too. Assert the PROPERTY instead: every setAttribute for data-mesh sits on a
-     line that also carries its guard. */
+     line that also carries its guard. * /
   const setLines = live.split('\n').filter((l) => /setAttribute\('data-mesh'/.test(l));
   assert.ok(setLines.length >= 1, 'the trial must set the attribute somewhere');
   setLines.forEach((l) => assert.ok(/if \(/.test(l),
@@ -256,6 +311,8 @@ test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
   assert.ok(/--motif-alpha,\s*0\.25\)/.test(layer),
     'the fallback — what everyone without the parameter sees — stays 0.25');
 });
+*/
+
 
 /**
  * ⚠⚠ PER-VIEW VARIATION IS BACK (Josh, 2026-08-20) — and it is only safe because
@@ -267,17 +324,20 @@ test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
  * separate artworks measured 162KB gzipped — 1.8x the whole page. One
  * 3200x2000 field with a per-view background-position is 48.5KB for all of them.
  */
+/* ⚠⚠ RETIRED 2026-08-20 — see the RETIREMENTS note in the header.
+   Kept as a record of what was protected, not deleted:
+
 test('⚠⚠ every motif view has its OWN window — none shares another\'s', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   /* ⚠ PERCENTAGES, NOT PIXELS (2026-08-20). A px offset that covers at one
      viewport width leaves a bare band at another, because the rendered size
-     follows the viewport — that is what left the account view 95% empty. */
+     follows the viewport — that is what left the account view 95% empty. * /
   const rules = [...live.matchAll(/body\[data-view="([a-z-]+)"\]::before \{ background-position: (\d+)% (\d+)%; \}/g)];
   /* ⚠ 14, NOT 15, SINCE 2026-08-20 — and this is a CORRECTION, not a
        weakening. The `team` view no longer uses the mesh at all: it carries a
        raster background (see the team rule in dashboard.html), so it has no
        mesh window to own. Every REMAINING motif view must still have its own.
-       If a future view is added to the mesh, raise this number with it. */
+       If a future view is added to the mesh, raise this number with it. * /
     assert.ok(rules.length >= 14, 'expected a window per mesh-backed view, got ' + rules.length);
     assert.ok(!/body\[data-view="team"\]::before \{ background-position: \d+% \d+%; \}/.test(live),
       'team must NOT have a single-line mesh window — it is raster-backed now');
@@ -290,6 +350,8 @@ test('⚠⚠ every motif view has its OWN window — none shares another\'s', ()
     seen[key] = m[1];
   });
 });
+*/
+
 
 test('⚠ ONE field powers them all — fifteen artworks was 1.8x the page', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -365,6 +427,9 @@ test('⚠ edges stay DOMINANT over nodes at any weight — that ratio fixed "gre
  * what the artwork contains in a region — not what the browser PAINTS after
  * size + position + repeat. It measured the wrong space.
  */
+/* ⚠⚠ RETIRED 2026-08-20 — see the RETIREMENTS note in the header.
+   Kept as a record of what was protected, not deleted:
+
 test('⚠⚠ the field renders LARGER than the viewport, so any window still covers', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   const at = live.indexOf('body[data-view]::before {');
@@ -379,6 +444,11 @@ test('⚠⚠ the field renders LARGER than the viewport, so any window still cov
     'the field must render at >=200% of the element, or an offset cannot stay '
     + 'covered. Got: ' + size[1]);
 });
+*/
+
+
+/* ⚠⚠ RETIRED 2026-08-20 — see the RETIREMENTS note in the header.
+   Kept as a record of what was protected, not deleted:
 
 test('⚠ window offsets stay within 0-100% — beyond that is off the image', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -387,7 +457,7 @@ test('⚠ window offsets stay within 0-100% — beyond that is off the image', (
        weakening. The `team` view no longer uses the mesh at all: it carries a
        raster background (see the team rule in dashboard.html), so it has no
        mesh window to own. Every REMAINING motif view must still have its own.
-       If a future view is added to the mesh, raise this number with it. */
+       If a future view is added to the mesh, raise this number with it. * /
     assert.ok(rules.length >= 14, 'expected a window per mesh-backed view, got ' + rules.length);
     assert.ok(!/body\[data-view="team"\]::before \{ background-position: \d+% \d+%; \}/.test(live),
       'team must NOT have a single-line mesh window — it is raster-backed now');
@@ -396,3 +466,5 @@ test('⚠ window offsets stay within 0-100% — beyond that is off the image', (
     assert.ok(Number(m[2]) >= 0 && Number(m[2]) <= 100, 'y out of range: ' + m[2]);
   });
 });
+*/
+
