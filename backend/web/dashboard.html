@@ -6812,6 +6812,20 @@
     repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate', true);
     repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate', true);
     repSeriesChart('repPriceChart', state.teamRepSeries, function (r) { return r.price; }, 'Minutes to Price', true);
+    /* ⚠⚠ THE FILTER RENDERS HERE, AND THE PLACE IS THE WHOLE FIX.
+       renderRepFilterControls() had exactly ONE call site — inside the
+       toggle-apply path — so the control that lets you change the filter only
+       appeared AFTER you changed the filter, which you could not do because it
+       was not on screen. A closed loop. Observed live: roster 4 reps,
+       repFilterHtml() 570 chars, host in the DOM, host innerHTML EMPTY; one
+       manual call rendered it perfectly.
+       ⚠ AND IT IS NOT "FIRST PAINT". The roster is derived from LIVE CHART
+       DATASETS (eachLiveToggleChart -> _userId), so at first paint it is empty
+       and repFilterHtml() returns ''. Rendering there would still show nothing.
+       Here, immediately after the three charts are built, the roster is
+       guaranteed to exist — which also couples the control's presence to the
+       charts' presence, so there can never be coloured lines with no key. */
+    renderRepFilterControls();
     // (k2) A restored selection can already be all-hidden on first paint, so the
     // note has to be evaluated after a REBUILD, not only after a click.
     updateRepGraphAllHiddenNotes();
