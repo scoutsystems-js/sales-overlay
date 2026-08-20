@@ -3091,6 +3091,14 @@
       border-bottom-color: var(--green);
     }
 
+    .kb-counter-card { text-align: center; padding: 22px; }
+    .kb-counter-card .kbc-num { font-size: 42px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+    .kb-counter-card .kbc-head { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 4px; }
+    .kb-counter-card .kbc-sub { font-size: 13px; color: var(--text); margin-top: 6px; }
+    .kb-counter-card .kbc-note { font-size: 12px; color: var(--text); opacity: .85; margin-top: 10px; }
+    /* ⚠ SEMANTIC, not decorative: an unexplained zero is not good news. */
+    .kb-counter-card.kbc-attn { border-color: var(--mid); }
+    .kb-counter-card.kbc-attn .kbc-num { color: var(--mid); }
     .kb-tab-panel { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
     .kb-tab-panel.hidden { display: none; }
     .kb-tab-panel input[type="text"],
@@ -3368,6 +3376,8 @@
   // ──────────────────────────────────────────────────────────────────
   var state = {
     me:              null,    // { user_id, email, role }
+    kbCounter:       null,    // GET /kb/counter shape | 'error'
+    kbCounterLoading: false,
     users:           [],      // populated for admin/owner
     viewingUserId:   null,    // whose data we're showing
     dateRange:      { from: null, to: null, days: 30 },
@@ -9414,6 +9424,50 @@
     await loadMergeCandidates();
   }
 
+  /* ⚠⚠ "DATA POINTS COLLECTED TODAY". Four states, because a bare "0" reads
+     identically whether nothing was harvested or the harvester is broken.
+     ⚠ needsAttention drives a SEMANTIC colour, not decoration. */
+  function kbCounterCardHtml() {
+    var c = state.kbCounter;
+    if (c === null) return '<div class="section kb-counter-card"><div class="kbc-head">Data Points Collected Today</div><div class="kbc-sub">Loading\u2026</div></div>';
+    if (c === 'error') return '';
+    return '<div class="section kb-counter-card' + (c.needsAttention ? ' kbc-attn' : '') + '">'
+      + '<div class="kbc-num">' + escapeHtml(c.headline) + '</div>'
+      + '<div class="kbc-head">' + escapeHtml(c.label) + '</div>'
+      + '<div class="kbc-sub">' + escapeHtml(c.detail) + '</div>'
+      + '<div class="kbc-note">Counts moments Scout kept from calls that CLOSED \u2014 it does not collect from calls still open.</div></div>';
+  }
+  async function loadKbCounter() {
+    if (state.kbCounterLoading) return;
+    state.kbCounterLoading = true;
+    try {
+      var res = await fetch('/kb/counter', { headers: authHeader() });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      state.kbCounter = kbBuildCounter(await res.json());
+    } catch (e) { state.kbCounter = 'error'; }
+    state.kbCounterLoading = false;
+    if (state.view === 'kb') renderKbView();
+  }
+  /* ⚠ MIRROR of lib/kb-counter buildCounter — the browser cannot require it.
+     test/kb-counter-mirror.test.js drives BOTH with identical inputs. */
+  function kbBuildCounter(d) {
+    var analysed = Math.max(0, Number(d.analysedToday || 0));
+    var closed = Math.max(0, Number(d.closedToday || 0));
+    var harvested = Math.max(0, Number(d.harvested || 0));
+    if (harvested > 0) return { state: 'collected', headline: String(harvested),
+      label: harvested === 1 ? 'Data Point Collected Today' : 'Data Points Collected Today',
+      detail: 'From ' + closed + ' closed ' + (closed === 1 ? 'call' : 'calls') + ' of ' + analysed + ' analysed today.',
+      needsAttention: false };
+    if (analysed === 0) return { state: 'no_calls', headline: '\u2014', label: 'No Calls Analysed Today',
+      detail: 'Scout collects from calls as they are analysed. Nothing has come in yet today.', needsAttention: false };
+    if (closed === 0) return { state: 'none_eligible', headline: '0', label: 'Data Points Collected Today',
+      detail: analysed + ' ' + (analysed === 1 ? 'call' : 'calls') + ' analysed, none closed yet \u2014 Scout only collects from calls that close.',
+      needsAttention: false };
+    return { state: 'unexplained_zero', headline: '\u2014', label: 'Nothing Collected Today',
+      detail: closed + ' closed ' + (closed === 1 ? 'call' : 'calls') + ' analysed but nothing was collected. This could not be confirmed either way \u2014 worth a check.',
+      needsAttention: true };
+  }
+
   function renderKbView() {
     var content = document.getElementById('content');
     var canManage = kbCanManage();
@@ -9421,7 +9475,9 @@
       ? 'Offer docs &amp; scripts that ground coaching'
       : 'Your team’s offer docs &amp; scripts — what Scout grades your calls against (view only)';
     var addBtn = canManage ? '<div class="page-header-side"><button class="kb-add-btn" onclick="openKbModal()">+ Add resource</button></div>' : '';
+    if (state.kbCounter === null && !state.kbCounterLoading) loadKbCounter();
     content.innerHTML =
+      kbCounterCardHtml() +
       '<div class="page-header fade-in"><div class="page-header-main"><h1>Knowledge Base</h1>'
         + '<div class="review-meta-row"><span>' + sub + '</span></div></div>'
         + addBtn

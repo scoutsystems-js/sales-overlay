@@ -1,4 +1,5 @@
 const express = require('express');
+const kbCounter = require('../lib/kb-counter');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
@@ -597,6 +598,59 @@ router.post('/store-patterns', protect, async function(req, res) {
 // uploader-id-set visibility unchanged; a managed rep instead gets a team-scoped
 // READ view via kbReadRowVisible (global + own-team + own-personal). Writes
 // (/upload, /delete) stay on `manage` and still 403 managed reps.
+/**
+ * GET /kb/counter — "data points collected today", PER USER.
+ *
+ * ⚠⚠ WHAT THIS COUNTS, EXACTLY (Justin's wording, 2026-08-20): "a count of how
+ * many times Scout used its AI to add something useful to the knowledge base
+ * based off a moment in a call." That is AUTO-HARVESTED CALL MOMENTS ONLY —
+ * not user uploads (collected by the person, not by Scout), not seeded
+ * frameworks (never collected), not the dead auto_extracted path.
+ *
+ * ⚠ AND THE NARROWING THE SURFACE HAS TO ADMIT: harvest gates on
+ * outcome='closed' (KB ruling 4), so a genuinely useful moment on a call that
+ * did NOT close is never collected. The number is therefore "useful moments
+ * Scout kept FROM CALLS THAT CLOSED", which is narrower than "useful moments".
+ * The card says so. The gate is NOT changed here — that is a product decision
+ * Justin has not made.
+ *
+ * Returns the three raw inputs; lib/kb-counter turns them into one of four
+ * states so a bare zero can never hide a broken harvester.
+ */
+router.get('/counter', protect, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    // ⚠ the DIGEST's ET day, re-exported — never a second definition
+    var today = kbCounter.etDateOf(new Date());
+    var bounds = kbCounter.dayBoundsUtc(today);
+
+    var an = await admin.from('call_analyses')
+      .select('outcome')
+      .eq('user_id', req.user.id).eq('status', 'done')
+      .gte('analyzed_at', bounds.fromIso).lt('analyzed_at', bounds.toIso);
+    if (an.error) throw new Error('call_analyses: ' + an.error.message);
+    var rows = an.data || [];
+
+    var hv = await admin.from('knowledge_base')
+      .select('id', { count: 'exact', head: true })
+      .eq('uploaded_by', req.user.id)
+      .eq('category', kbCounter.HARVEST_MATCH.category)
+      .eq('metadata->>source', kbCounter.HARVEST_MATCH.metaSource)
+      .gte('created_at', bounds.fromIso).lt('created_at', bounds.toIso);
+    if (hv.error) throw new Error('knowledge_base: ' + hv.error.message);
+
+    return res.json({
+      date: today,
+      analysedToday: rows.length,
+      closedToday: rows.filter(function (r) { return r.outcome === 'closed'; }).length,
+      harvested: hv.count || 0,
+    });
+  } catch (err) {
+    console.error('[kb] counter failed: ' + err.message);
+    return res.status(500).json({ error: 'Could not load the counter.' });
+  }
+});
+
 router.get('/list', protect, async function(req, res) {
   try {
     var admin = getAdminClient();
