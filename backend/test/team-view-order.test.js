@@ -63,7 +63,8 @@ test('⚠⚠ the digest sits ABOVE the date picker, with the gauges — a fixed 
 test('⚠ the digest is no longer last — it precedes the score lists', () => {
   const body = renderBody();
   const digest = body.indexOf('Manager Daily Digest');
-  ['Team Overview', 'Closing', 'Objection Handling'].forEach((h) => {
+  // ⚠ renamed 2026-08-20: the ranked lists gained the word "Score".
+  ['Team Overview', 'Closing Score', 'Objection Handling Score'].forEach((h) => {
     const at = body.indexOf('<h2>' + h + '</h2>');
     assert.ok(at !== -1, 'stale anchor — the "' + h + '" score list is gone');
     assert.ok(digest < at, 'the digest must now come before the ' + h + ' list');

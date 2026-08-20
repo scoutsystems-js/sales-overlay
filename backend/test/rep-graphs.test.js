@@ -62,8 +62,12 @@ test('the team average is BOLD, SCOUT GREEN, and still hoverable at pointRadius 
   const team = cfg.data.datasets.find((d) => d.label === 'Team average');
   assert.ok(team, 'the team line must be present');
   assert.ok(team.borderWidth > 2, 'bold — it is the baseline the reps are read against');
-  assert.ok(!(Array.isArray(team.borderDash) && team.borderDash.length),
-    'the dash is retired: the line is solid Scout green now');
+  /* ⚠ REVERSED 2026-08-20, two days after I asserted the opposite. Justin ruled
+     the baseline stays DASHED. The dash is a SECOND channel on top of colour: it
+     separates the baseline from the rep lines even when a rep is a similar hue,
+     and it survives the green being reassigned. */
+  assert.ok(Array.isArray(team.borderDash) && team.borderDash.length,
+    'the baseline is dashed — colour says which series, the dash says "reference"');
   assert.strictEqual(team.pointRadius, 0, 'the baseline draws no dots');
   assert.ok(team.pointHitRadius > 0,
     'with interaction.intersect=true a pointRadius-0 line can never be hovered '
@@ -97,13 +101,24 @@ test('the closing graph names prospects in its tooltip, not objections', () => {
 
 test('NO GREY TEXT — axes, ticks, legend and titles are full strength', () => {
   const cfg = buildChart(SERIES, (r) => r.handle, 'Handle rate');
+  /* ⚠ x.ticks.color is a FUNCTION now (weekly buckets carry the contested week
+     -label colour, daily dates do not), so resolve it rather than comparing the
+     callback to a string. The PROPERTY is unchanged: whatever it returns must be
+     full strength. Resolving is what keeps this a real check instead of one that
+     silently starts comparing a function to a hex and fails for the wrong reason. */
+  const resolve = (c) => (typeof c === 'function' ? c({}) : c);
   const colours = [
-    cfg.options.scales.y.ticks.color,
-    cfg.options.scales.x.ticks.color,
-    cfg.options.scales.y.title.color,
-    cfg.options.plugins.legend.labels.color,
+    resolve(cfg.options.scales.y.ticks.color),
+    resolve(cfg.options.scales.x.ticks.color),
+    resolve(cfg.options.scales.y.title.color),
+    resolve(cfg.options.plugins.legend.labels.color),
   ];
   colours.forEach((c) => assert.strictEqual(c, '#ededed', 'Justin has raised low-contrast grey twice'));
+  // and the week-label lever itself must never become a grey
+  const lever = HTML.match(/var WEEK_LABEL_COLOR = '([^']+)'/);
+  assert.ok(lever, 'the week-label colour must stay a single named lever');
+  assert.ok(lever[1] === '#ededed' || /accent/.test(lever[1]),
+    'the week labels are either full-strength text or Scout green — never a grey');
 });
 
 test('the selector uses Scout\'s four categories and offers no "price"', () => {
@@ -120,7 +135,7 @@ test('the selector uses Scout\'s four categories and offers no "price"', () => {
 
 // ─── range-dependent bucketing (Justin's ruling 2026-08-15) ────────────────
 
-test('STAGE 5: bucketing is span-derived — daily up to a quarter, weekly beyond', () => {
+test('STAGE 5: bucketing is span-derived — daily up to a month, weekly beyond', () => {
   // "Aug 1 - Aug 12" gives days; "June through August" gives weeks, with no
   // thought required from the user.
   const src = HTML.slice(HTML.indexOf('var DAILY_BUCKET_MAX_DAYS'), HTML.indexOf('function teamQP'));
@@ -136,8 +151,13 @@ test('STAGE 5: bucketing is span-derived — daily up to a quarter, weekly beyon
      still falls back to weekly, because ~400 points on a ~1100px plot is not a
      chart. The PROPERTY pinned here is unchanged: the bucket is derived from
      the span, with no thought required from the user. */
-  [1, 5, 7, 14, 21, 30, 60, 92].forEach((d) => assert.strictEqual(fn(span(d)), 'day', d + ' days should be daily'));
-  [93, 120, 180, 400].forEach((d) => assert.strictEqual(fn(span(d)), 'week', d + ' days should be weekly'));
+  /* ⚠⚠ JUSTIN'S RULING 2026-08-20 REPLACED MY 92: daily for 1-30 days, weekly
+     beyond ~32. A product decision, not a correction — a quarter of dailies is
+     legible, he does not want it. 31 is the resolution of "about 32", because it
+     makes EVERY calendar month daily (months are 28-31 days) while "about 32"
+     has no calendar meaning. */
+  [1, 5, 7, 14, 21, 28, 30, 31].forEach((d) => assert.strictEqual(fn(span(d)), 'day', d + ' days should be daily'));
+  [32, 45, 60, 92, 180, 400].forEach((d) => assert.strictEqual(fn(span(d)), 'week', d + ' days should be weekly'));
 
   assert.strictEqual(fn({}), 'week', 'no range falls back to weekly, not daily');
   assert.strictEqual(fn({ teamRange: { from: null, to: null } }), 'week');
@@ -158,11 +178,13 @@ test('the boundary is in CALENDAR DAYS, on ranges the picker actually produces',
   assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(8,1) + 'T23:59:59.999Z'), 'day', 'a single day');
   assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(8,7) + 'T23:59:59.999Z'), 'day', 'a week');
   assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(8,31) + 'T23:59:59.999Z'), 'day',
-    'a full calendar month is DAILY now — this is the change Josh asked for');
-  assert.strictEqual(picked(d(6,1) + 'T00:00:00.000Z', d(8,31) + 'T23:59:59.999Z'), 'day',
-    '92 calendar days inclusive — a full quarter still gets daily points');
-  assert.strictEqual(picked(d(6,1) + 'T00:00:00.000Z', d(9,1) + 'T23:59:59.999Z'), 'week',
-    '93 days falls back to weekly — beyond this the points are under 3px wide');
+    'a full 31-day calendar month is DAILY — this is what Josh asked for');
+  assert.strictEqual(picked(d(9,1) + 'T00:00:00.000Z', d(9,30) + 'T23:59:59.999Z'), 'day',
+    'and a 30-day month, so no two adjacent months bucket differently');
+  assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(9,1) + 'T23:59:59.999Z'), 'week',
+    '32 days is over the line — week-to-week, per the ruling');
+  assert.strictEqual(picked(d(6,1) + 'T00:00:00.000Z', d(8,31) + 'T23:59:59.999Z'), 'week',
+    'a quarter is weekly: my 92-day call was overridden, deliberately');
 });
 
 test('the loader SENDS the derived bucket rather than a hardcoded one', () => {

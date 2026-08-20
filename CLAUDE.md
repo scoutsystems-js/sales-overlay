@@ -1780,6 +1780,23 @@ CATEGORICAL  REP_LINE_COLORS          "this is rep number four"
 - **THE ORDER OF OPERATIONS: (1) is it in the DOM/CSS at all? (2) does the asset DECODE? (3) set the property to its maximum — if it is still absent, the property is not the problem. Only then tune it.** Set opacity to 1. Decode the data URI. Ask `elementFromPoint` what is actually on top.
 - **⚠ AND A SCREENSHOT WILL NOT SETTLE ANY OF THIS** — see the perception-test rule. A capture faithfully records a difference no human eye resolves, so it can confirm "present" while the honest answer to "visible" is no.
 
+### ⚠⚠⚠ A CORRUPTED ARTEFACT CAN BE WELL-FORMED — STRUCTURAL VALIDITY IS NOT INTEGRITY (2026-08-20)
+**I truncated `web/dashboard.html` from 11,217 lines to 5,454 — dropping ~6,000 lines, more than half the file — and EVERY CHECK THAT PARSES RATHER THAN MEASURES REPORTED SUCCESS.**
+- **What happened:** a scripted edit built `s[:x] + new if False else s[x:]`. Python parses that as **one conditional expression**, not as a concatenation with a trailing guard, so the whole right-hand side evaluated to `s[x:]` and the assignment replaced the file with its own tail.
+- **⚠⚠ THE FILE REMAINED SYNTACTICALLY VALID.** It began mid-object-literal, but as a whole it still parsed: `node -e` was happy, and a syntax check is exactly the reflex after a scripted edit. **The only signal was the LINE COUNT** — noticed because a subsequent `grep -n` reported a function at line 430 and an x-scale at line 1, numbers that could not be true of the real file.
+- **THE GENERAL FORM, and it is the transferable part: a check that asks "does this PARSE / does this RESPOND / does this RETURN 200" answers a question about FORM. Integrity is a question about CONTENT, and half a file has perfectly good form.** Same family as *a 200 does not mean your code shipped* and *a screenshot is not a perception test* — each is a check whose subject is narrower than the confidence it produces.
+- **THE FIX IS THE SHAPE, NOT THE VIGILANCE: assert the artefact did not SHRINK before writing it.**
+```python
+def edit(fn, label):
+    s = open(p).read(); before = len(s.split('\n'))
+    s2 = fn(s);         after  = len(s2.split('\n'))
+    assert after >= before, '%s SHRANK %d -> %d — refusing' % (label, before, after)
+    open(p, 'w').write(s2)
+```
+  Every edit in that block then printed `11242 -> 11359`, so a truncation could not reach the disk. **The assertion is one line and it is the difference between a caught mistake and a lost afternoon.**
+- **⚠ IT IS THE MINIMUM-SAMPLE RULE APPLIED TO WRITES.** That rule says a check which can pass by finding NOTHING needs a floor; this says a write which can succeed by keeping ALMOST NOTHING needs one too. Both directions of "less is silently fine".
+- **What saved it: the work was in git and the other edits were in SEPARATE FILES.** `CLAUDE.md` and the tests were untouched, so recovery cost one `git checkout` and a redo. **A single-file blast radius is a reason to keep edits split across files, not merely a tidiness preference.**
+
 ### ⚠⚠ A DERIVED LIMIT IS WHERE THE THING BREAKS, NOT WHERE IT SHOULD SIT — SHIPPING AT A BOUNDARY LEAVES NO MARGIN (2026-08-20)
 **A ceiling is computed as the value at which a constraint is EXACTLY met. That makes it the FAILURE POINT, and shipping there means the first rounding error, token nudge or browser difference lands on the wrong side of it.**
 - **The live case:** accent-coloured text clears 4.5:1 over the motif at **0.390**. That is not "safe up to 0.390" — it is "fails at 0.390 and above, by the width of a floating-point comparison". Shipped **0.38** (4.42 on accent), which is inside the band with room to move.

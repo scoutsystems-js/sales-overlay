@@ -5469,12 +5469,20 @@
      weekly buckets: a gridline where no value exists invites a reading the data
      cannot support.
 
-     ⚠ 92 IS A JUDGEMENT CALL, NOT THE RULING. "Month and longer" carried no
-     upper bound, and a year at daily is ~400 points on a ~1100px plot — under
-     3px each, which is not a chart. 92 covers a month and a full quarter; a
-     year still falls back to weekly. Move it if yearly dailies are wanted, but
-     know that is the cost. */
-  var DAILY_BUCKET_MAX_DAYS = 92;
+     ⚠⚠ 31 IS JUSTIN'S RULING AND IT REPLACED MY 92 (2026-08-20). I had set 92
+     to cover a month AND a full quarter; he ruled DAILY for 1-30 days and
+     week-to-week beyond about 32. That is a PRODUCT DECISION, not a correction
+     of the readability reasoning — a quarter of dailies is legible, he simply
+     does not want it. Recorded so the next reader does not "restore" 92 on the
+     strength of the argument above.
+
+     ⚠ THE EDGE: the boundary lands ON month length, and months are 28-31 days.
+     At 31 a 31-day month is daily and a 30-day month plus one is not, so two
+     adjacent "a month" ranges can bucket differently — and February is never
+     near it. 31 is the value that makes EVERY calendar month daily, which is
+     what "1-30 days" means in practice; "about 32" has no calendar meaning, so
+     nothing is lost by resolving it this way. */
+  var DAILY_BUCKET_MAX_DAYS = 31;
   function bucketForRange(r) {
     if (!r || !r.from || !r.to) return 'week';
     var days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
@@ -5812,6 +5820,21 @@
     // place and forgotten in another (the ticks, the tooltip and the max all
     // need it).
     var isMinutes = /minutes/i.test(yLabel || '');
+    /* ⚠⚠ GREEN IS CONTESTED — THIS IS THE LEVER, AND IT IS ONE LINE.
+       Justin asked for Scout green on the team-average line, the current-period
+       marker AND the week labels. That is three jobs for one colour, and when
+       everything is green, green distinguishes nothing — the same argument that
+       made the period marker yield in the first place.
+
+       SHIPPED: the TEAM AVERAGE keeps Scout green, because it is DATA and colour
+       on a chart means WHICH SERIES. Week labels are axis CHROME — there are 4-6
+       of them across the bottom against one line — so giving them the brand's
+       most loaded colour makes furniture compete with the series for attention.
+       They take full-strength --text, which is NOT grey and so does not touch
+       the no-grey rule; they read as deliberate without shouting.
+
+       ⚠ IF JUSTIN OVERRULES, CHANGE THIS CONSTANT ONLY. Nothing else keys on it. */
+    var WEEK_LABEL_COLOR = '#ededed';   // ← the one lever
     /* Daily buckets change what the axis and the highlight mean, so both read
        one flag rather than each re-deriving it. */
     var isDailyBuckets = (typeof repSeriesBucket === 'function') ? repSeriesBucket() === 'day' : false;
@@ -5865,7 +5888,13 @@
         // REGION. Different channels, so a green line and a neutral band cannot
         // compete for the same meaning. That is why the BAND yields, not the line.
         borderColor: cssToken('--accent', '#09e046'), backgroundColor: cssToken('--accent', '#09e046'),
-        borderWidth: 3, pointRadius: 0, pointHitRadius: 12, tension: 0.25, spanGaps: false,
+        // ⚠ DASHED, NOT SOLID (Justin, 2026-08-20). The dash is a SECOND channel
+        // on top of colour: it separates the baseline from the rep lines even
+        // when a rep is drawn in a similar hue, and it survives the green being
+        // reassigned. Colour says which series; the dash says "this is the
+        // reference, not one of the things being compared".
+        borderWidth: 3, borderDash: [6, 4], pointRadius: 0, pointHitRadius: 12,
+        tension: 0.25, spanGaps: false,
       });
     }
 
@@ -5932,7 +5961,10 @@
           x: {
             grid: { color: 'rgba(255,255,255,0.05)' },
             ticks: {
-              color: '#ededed',
+              color: function (c) {
+                // weekly buckets carry the contested colour; daily dates do not
+                return (!isDailyBuckets) ? WEEK_LABEL_COLOR : '#ededed';
+              },
               maxRotation: 0,
               /* ⚠⚠ autoSkip:false — CHART.JS DROPS LABELS SILENTLY, AND THAT IS
                  THE DEFECT, NOT THE CROWDING. A month of daily buckets is ~30
@@ -5947,7 +5979,12 @@
               autoSkip: false,
               callback: function (val, i) {
                 var lab = this.getLabelForValue(val);
-                if (!isDailyBuckets) return lab;
+                // ⚠ WEEKLY BUCKETS ARE LABELLED "Week 1, Week 2…" (Justin,
+                // 2026-08-20). Each bucket IS a week once the range clears the
+                // daily threshold, so a date reads as a point in time when what
+                // it marks is a SPAN. Weeks start Monday, which is what the
+                // server's bucket boundary already uses.
+                if (!isDailyBuckets) return 'Week ' + (i + 1);
                 return isMondayLabel(lab, i) ? lab : '';
               },
             },
@@ -6486,10 +6523,10 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
         + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Closing</h2>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Closing Score</h2>'
         + '<div class="meta">avg Close-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Objection Handling</h2>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Objection Handling Score</h2>'
         + '<div class="meta">avg Objection-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>';
       // (Manager Daily Digest was here; moved to the top — see above.)
