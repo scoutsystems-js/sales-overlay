@@ -6098,7 +6098,27 @@
        the no-grey rule; they read as deliberate without shouting.
 
        ⚠ IF JUSTIN OVERRULES, CHANGE THIS CONSTANT ONLY. Nothing else keys on it. */
-    var WEEK_LABEL_COLOR = '#ededed';   // ← the one lever
+    /* ⚠⚠ OVERRULED BY JUSTIN, 2026-08-20 — GREEN. The reasoning below is kept
+       because its CONTENT still holds, it just lost: green does more than one job
+       on this chart, and a future reader should know that is DELIBERATE rather
+       than an oversight nobody noticed.
+       ⚠ What the argument got wrong was its standing — it was a PRODUCT decision
+       presented as a design consequence. Recorded, not deleted.
+
+       ⚠⚠ AND MEASURED 2026-08-20 — IT IS TWO JOBS, NOT THREE. Both the argument
+       above and the retirement note originally said "the team-average line, the
+       CURRENT-PERIOD MARKER, and these labels". There IS NO current-period marker
+       on this chart. Measured on the live page, not inferred: no annotation
+       plugin, `config.plugins` empty, only Chart.js built-ins registered, grid
+       colour a flat rgba string, no per-point radius/colour array on any dataset,
+       and no afterDraw/beforeDraw/fillRect anywhere in this file. So the overload
+       is the GREEN DASHED BASELINE plus these labels — a series and its axis
+       chrome, which is a far weaker collision than three competing elements.
+       ⚠ THE CORRECTION MATTERS BECAUSE THE OVERSTATED VERSION MADE THE ARGUMENT
+       LOOK STRONGER THAN IT WAS, and a comment asserting an element that does not
+       exist is the stale-load-bearing-comment failure: the next reader goes
+       looking for a marker to reconcile against and finds nothing. */
+    var WEEK_LABEL_COLOR = '#09e046';   // ← the one lever (Scout green)
     /* Daily buckets change what the axis and the highlight mean, so both read
        one flag rather than each re-deriving it. */
     var isDailyBuckets = (typeof repSeriesBucket === 'function') ? repSeriesBucket() === 'day' : false;
@@ -6147,10 +6167,14 @@
         // Enforced in the legend handler AND marked here, so the reason travels
         // with the dataset rather than living only in the click code.
         _fixed: true,
-        // ⚠ SCOUT GREEN, SOLID (Justin 2026-08-20) — was #ffffff dashed. Colour
-        // on this chart means WHICH SERIES; the current-period band means WHICH
-        // REGION. Different channels, so a green line and a neutral band cannot
-        // compete for the same meaning. That is why the BAND yields, not the line.
+        // ⚠ SCOUT GREEN (Justin 2026-08-20) — was #ffffff. Colour on this chart
+        // means WHICH SERIES.
+        // ⚠⚠ THE ORIGINAL NOTE HERE ARGUED THAT "the current-period BAND yields,
+        // not the line" — ASSUMING A BAND THAT DOES NOT EXIST. Measured on the
+        // live chart 2026-08-20: no annotation plugin, no custom draw hook, flat
+        // gridline colour. There is no band to yield. The line is green because
+        // Justin asked for it, and nothing on this chart competes with it for the
+        // "which region" channel, because nothing marks a region at all.
         borderColor: cssToken('--accent', '#09e046'), backgroundColor: cssToken('--accent', '#09e046'),
         // ⚠ DASHED, NOT SOLID (Justin, 2026-08-20). The dash is a SECOND channel
         // on top of colour: it separates the baseline from the rep lines even

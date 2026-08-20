@@ -113,11 +113,21 @@ test('NO GREY TEXT — axes, ticks, legend and titles are full strength', () => 
     resolve(cfg.options.scales.y.title.color),
     resolve(cfg.options.plugins.legend.labels.color),
   ];
-  colours.forEach((c) => assert.strictEqual(c, '#ededed', 'Justin has raised low-contrast grey twice'));
+  /* ⚠⚠ AN ALLOWLIST, NOT AN EQUALITY — CORRECTED 2026-08-20 when Justin ruled the
+     week labels green. The RULE is "no low-contrast grey"; `=== '#ededed'` is a
+     PROXY for that rule, not the rule, so a correct change failed it. MEASURED on
+     the card background rgb(19,19,19): Scout green #09e046 = 10.41:1, --text
+     #ededed = 15.87:1, and the grey this guard exists to exclude (#8a9aaa) =
+     6.44:1 — green does not merely pass, it OUT-CONTRASTS the banned value. Any
+     new entry must clear AA on the card and be a deliberate brand colour. */
+  const ALLOWED = ['#ededed', '#09e046'];
+  colours.forEach((c) => assert.ok(ALLOWED.indexOf(c) !== -1,
+    'axis/legend colour ' + c + ' is neither --text nor Scout green — '
+    + 'Justin has raised low-contrast grey twice'));
   // and the week-label lever itself must never become a grey
   const lever = HTML.match(/var WEEK_LABEL_COLOR = '([^']+)'/);
   assert.ok(lever, 'the week-label colour must stay a single named lever');
-  assert.ok(lever[1] === '#ededed' || /accent/.test(lever[1]),
+  assert.ok(lever[1] === '#ededed' || lever[1] === '#09e046' || /accent/.test(lever[1]),
     'the week labels are either full-strength text or Scout green — never a grey');
 });
 
