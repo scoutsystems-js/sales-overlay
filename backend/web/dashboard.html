@@ -3204,8 +3204,6 @@
          viewer will not be allowed to open. -->
     <span class="sep nav-mgr-soon" id="navMktSep" style="display:none">·</span>
     <span class="nav-link nav-soon nav-mgr-soon" id="navMkt" style="display:none" aria-disabled="true">Marketing Insights<span class="nav-soon-tag">soon</span></span>
-    <span class="sep nav-mgr-soon" id="navRepsSep" style="display:none">·</span>
-    <span class="nav-link nav-soon nav-mgr-soon" id="navReps" style="display:none" aria-disabled="true">Reps<span class="nav-soon-tag">soon</span></span>
   </div>
   <div class="top-bar-right">
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
@@ -3908,7 +3906,10 @@
       document.getElementById('navTeam').style.display = '';
       document.getElementById('navTeamSep').style.display = '';
       // the manager-only coming-soon tabs ride the SAME gate as Team
-      ['navMkt', 'navMktSep', 'navReps', 'navRepsSep'].forEach(function (id) {
+      /* ⚠ Reps removed 2026-08-20 (Justin's call). Marketing Insights shares this
+         gate and is deliberately untouched — its tab and its hand-placed
+         separator both remain, and the nav test asserts that. */
+      ['navMkt', 'navMktSep'].forEach(function (id) {
         var el = document.getElementById(id); if (el) el.style.display = '';
       });
       await loadUsers();

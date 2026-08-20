@@ -18,7 +18,11 @@ const PAGE = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html')
 const LIVE = PAGE.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
   .replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
-const LABELS = ['Follow Up Strategy', 'Scout AI', 'Marketing Insights', 'Reps'];
+/* ⚠ REPS REMOVED 2026-08-20 (Justin's call). Marketing Insights shares the same
+   manager-only gate and MUST survive — the assertions below check both that Reps
+   is gone AND that Marketing Insights still works, so removing the tab cannot
+   silently take its neighbour with it. */
+const LABELS = ['Follow Up Strategy', 'Scout AI', 'Marketing Insights'];
 
 function navBlock() {
   const at = LIVE.indexOf('<div class="top-bar-left">');
@@ -60,7 +64,7 @@ test('⚠ no route exists for any of them — a tab must not become reachable by
 
 test('⚠⚠ the manager-only tabs ride the SAME gate as Team, and start hidden', () => {
   const nav = navBlock();
-  ['navMkt', 'navReps', 'navMktSep', 'navRepsSep'].forEach((id) => {
+  ['navMkt', 'navMktSep'].forEach((id) => {
     const at = nav.indexOf('id="' + id + '"');
     assert.ok(at !== -1, 'missing element: ' + id);
     const tag = nav.slice(nav.lastIndexOf('<', at), nav.indexOf('>', at));
@@ -71,7 +75,7 @@ test('⚠⚠ the manager-only tabs ride the SAME gate as Team, and start hidden'
   const gate = LIVE.indexOf("state.me.role === 'manager' || state.me.role === 'owner'");
   assert.ok(gate !== -1, 'stale anchor — the manager gate moved');
   const branch = LIVE.slice(gate, gate + 900);
-  ['navMkt', 'navMktSep', 'navReps', 'navRepsSep'].forEach((id) => {
+  ['navMkt', 'navMktSep'].forEach((id) => {
     assert.ok(branch.indexOf(id) !== -1, id + ' must be revealed by the manager gate');
   });
 });
@@ -104,4 +108,32 @@ test('⚠ dimming is by OPACITY, never a grey colour', () => {
     'a grey hex here is the no-grey rule wearing a different name — opacity as a '
     + 'depth cue is allowed, a low-contrast text colour is not');
   assert.ok(/cursor:\s*default/.test(rule), 'must not present a clickable cursor');
+});
+
+/* ── REPS REMOVAL (2026-08-20) ──────────────────────────────────────────────
+   ⚠ THE SEPARATORS ARE HAND-PLACED, NOT GENERATED. Removing a tab without its
+   separator leaves a stray "·" in the nav — so both are asserted, and the
+   neighbour that shares the same gate is asserted to survive. */
+test('⚠⚠ the Reps tab AND its hand-placed separator are both gone', () => {
+  ['navReps', 'navRepsSep'].forEach((id) => {
+    assert.ok(LIVE.indexOf('id="' + id + '"') === -1,
+      id + ' must be removed — a tab without its separator leaves a stray dot');
+  });
+  // and no leftover wiring referencing them
+  assert.ok(LIVE.indexOf("'navReps'") === -1, 'the reveal wiring must drop navReps');
+  assert.ok(LIVE.indexOf("'navRepsSep'") === -1, 'the reveal wiring must drop navRepsSep');
+});
+
+test('⚠ Marketing Insights is UNDISTURBED — same gate, must still work', () => {
+  assert.ok(LIVE.indexOf('id="navMkt"') !== -1, 'the Marketing Insights tab must survive');
+  assert.ok(LIVE.indexOf('id="navMktSep"') !== -1, 'and so must its separator');
+  // still manager-gated: hidden by default, revealed by the same wiring
+  /* ⚠ SLICE THE WHOLE TAG, NOT FORWARD FROM THE id. The class attribute sits
+     BEFORE the id (`class="... nav-mgr-soon" id="navMkt"`), so slicing forward
+     from the id misses it and the assertion failed against correct markup. */
+  const idAt = LIVE.indexOf('id="navMkt"');
+  const tab = LIVE.slice(LIVE.lastIndexOf('<span', idAt), LIVE.indexOf('>', idAt) + 1);
+  assert.ok(/display:none/.test(tab), 'must still be hidden by default (rep sees nothing)');
+  assert.ok(/nav-mgr-soon/.test(tab), 'must still carry the manager-only class');
+  assert.ok(LIVE.indexOf("'navMkt'") !== -1, 'and must still be in the reveal wiring');
 });
