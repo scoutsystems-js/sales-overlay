@@ -140,8 +140,14 @@ function voicePromptBlock(lines) {
  * Fathom, which recorded the closer as the prospect on 6 of 83 calls.
  *
  * So a Zoom-sourced closer has ZERO verified lines and will keep having zero
- * until the `dashboard_meetings:read:admin` participants scope lands — a
- * Marketplace re-review, not a code change.
+ * ⚠ SUPERSEDED 2026-08-20 — no longer true. The byte-identical
+ * display-name match (lib/zoom-identity) gives Zoom a matched closer, so
+ * Zoom-sourced closers DO accumulate verified lines now.
+ * ⚠ AND `dashboard_meetings:read:admin` WAS THE WRONG SCOPE ANYWAY: it is
+ * Business-plan-only with no user-level variant, and the participants
+ * endpoint cannot improve attribution regardless (a VTT carries display
+ * names only, so both sides of the join are names). It buys a participant
+ * COUNT for collision detection.
  *
  * ⚠ AND NEVER SUBSTITUTE UNVERIFIED LINES TO FILL THE GAP. On an unmatched
  * transcript they are as likely to be the PROSPECT's words as the closer's, so
