@@ -269,7 +269,10 @@ test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
  */
 test('⚠⚠ every motif view has its OWN window — none shares another\'s', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
-  const rules = [...live.matchAll(/body\[data-view="([a-z-]+)"\]::before \{ background-position: (-?\d+)px (-?\d+)px; \}/g)];
+  /* ⚠ PERCENTAGES, NOT PIXELS (2026-08-20). A px offset that covers at one
+     viewport width leaves a bare band at another, because the rendered size
+     follows the viewport — that is what left the account view 95% empty. */
+  const rules = [...live.matchAll(/body\[data-view="([a-z-]+)"\]::before \{ background-position: (\d+)% (\d+)%; \}/g)];
   assert.ok(rules.length >= 15, 'expected a window per motif view, got ' + rules.length);
   const seen = {};
   rules.forEach((m) => {
@@ -341,4 +344,41 @@ test('⚠ edges stay DOMINANT over nodes at any weight — that ratio fixed "gre
   assert.ok(edgeMax > nodeMax,
     'edges must out-weigh nodes (edge ' + edgeMax + ' vs node ' + nodeMax + ') — '
     + 'when nodes win it reads as scattered green stars, not a network');
+});
+
+/**
+ * ⚠⚠ THE LAYER MUST COVER THE VIEWPORT AT EVERY WINDOW.
+ *
+ * `background-size: cover` scaled the 3200x2000 field to EXACTLY the viewport,
+ * so the per-view offsets pushed it off-screen and no-repeat left the rest BARE
+ * — the account view rendered ~95% empty with the mesh in one corner. That is
+ * what "not covering the entire background" was; it was never the depth.
+ *
+ * ⚠ The sweep never caught it because the sweep samples FIELD coordinates —
+ * what the artwork contains in a region — not what the browser PAINTS after
+ * size + position + repeat. It measured the wrong space.
+ */
+test('⚠⚠ the field renders LARGER than the viewport, so any window still covers', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = live.indexOf('body[data-view]::before {');
+  const rule = live.slice(at, live.indexOf('\n    }', at));
+  const size = rule.match(/background-size:\s*([^;]+);/);
+  assert.ok(size, 'the layer must declare a background-size');
+  assert.ok(!/cover/.test(size[1]),
+    '`cover` renders the field at exactly the viewport, so ANY offset leaves a '
+    + 'bare band with no-repeat. Got: ' + size[1]);
+  const pct = size[1].match(/(\d+)%/);
+  assert.ok(pct && Number(pct[1]) >= 200,
+    'the field must render at >=200% of the element, or an offset cannot stay '
+    + 'covered. Got: ' + size[1]);
+});
+
+test('⚠ window offsets stay within 0-100% — beyond that is off the image', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...live.matchAll(/body\[data-view="[a-z-]+"\]::before \{ background-position: (\d+)% (\d+)%; \}/g)];
+  assert.ok(rules.length >= 15, 'expected a window per motif view, got ' + rules.length);
+  rules.forEach((m) => {
+    assert.ok(Number(m[1]) >= 0 && Number(m[1]) <= 100, 'x out of range: ' + m[1]);
+    assert.ok(Number(m[2]) >= 0 && Number(m[2]) <= 100, 'y out of range: ' + m[2]);
+  });
 });
