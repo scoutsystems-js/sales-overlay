@@ -6535,7 +6535,9 @@
     saveRepFilter(); applyRepFilter();
   }
   function applyRepFilter() {
-    if (!state.repLineHidden) loadRepFilter();
+    // ⚠ the old `if (!state.repLineHidden) loadRepFilter()` is gone — {} is TRUTHY,
+    // so it could never fire. The load now happens in drawRepSeriesCharts.
+    if (!state.repLineHidden) state.repLineHidden = {};
     var hidden = state.repLineHidden || {};
     eachLiveToggleChart(function (ch) {
       ch.data.datasets.forEach(function (ds, i) {
@@ -6809,6 +6811,18 @@
   // state that repSeriesSectionHtml already rendered.
   function drawRepSeriesCharts() {
     if (!state.teamRepSeries || state.teamRepSeries._error) return;
+    /* ⚠⚠ THE SAVED SELECTION IS READ HERE, AND BOTH HALVES OF THE BUG WERE REAL.
+       (1) loadRepFilter() had ONE call site — inside resetTeamData(), which fires on
+           a TEAM SWITCH or a RANGE CHANGE. It never ran on boot, so a refresh started
+           with an empty hidden set and the selection was silently lost.
+       (2) The fallback `if (!state.repLineHidden) loadRepFilter()` COULD NEVER FIRE,
+           because repLineHidden initialises to {} and {} IS TRUTHY. A guard meaning
+           "not loaded yet" was testing a value that is never falsy after init.
+       ⚠ IT MUST RUN HERE SPECIFICALLY: AFTER renderTeamView has set the team (the
+       store key includes state.teamSelected, so anything earlier reads the wrong
+       key), and BEFORE repSeriesChart builds datasets (it reads
+       state.repLineHidden[user_id] while constructing them). */
+    loadRepFilter();
     repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate', true);
     repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate', true);
     repSeriesChart('repPriceChart', state.teamRepSeries, function (r) { return r.price; }, 'Minutes to Price', true);
