@@ -1379,6 +1379,20 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **THE CONSEQUENCE WAS A CHANGE OF CRITERION, NOT A NUDGE: zero overlap was never achievable at half-screen size.** Once the inventory was complete, the honest bar for a BACKGROUND is *"the worst exposed text stays readable over it"*, not *"nothing overlaps"*. Solved for opacity instead: `--muted` over a solid stroke gives 4.47:1 at 0.22 and **4.98:1 at 0.18**, so 0.18 ships. A test now computes that contrast rather than trusting the 0.16-0.30 band — **because "in the band" was true of the value that failed.**
 - **BUILD THE ELEMENT INVENTORY FROM THE DOM, NOT FROM MEMORY.** The sampling was never the weak part; the **list** was.
 
+### ⚠⚠⚠ WHEN A FIELD HAS REGIONS, THE AVERAGE IS THE ONE NUMBER THAT CANNOT SEE THEM (2026-08-20)
+**PAIRS WITH THE ENTRY BELOW BUT IS A DIFFERENT FAILURE. That one is a MISSING metric; this is a PRESENT one, correct, that answers a question nobody asked.**
+- **The live case:** the mesh's edges-per-node read **2.6** and stayed at 2.6 across every pass. It was true, it was the right quantity, and it was **blind to the defect** — because the field is not uniform:
+```
+              cores   open    gap
+uncapped       6.18   3.17   3.01     <- the dense cores were triangulating
+average                2.6            <- describes NEITHER region
+```
+  **A mean over a bimodal field describes neither mode.** The cores were closing into a lattice at more than double the open regions' connectivity, and the single number sat placidly in between the whole time.
+- **⚠ THE AVERAGE MOVED IN THE RIGHT DIRECTION FOR THE WRONG REASON, which is what made it convincing.** Reducing the link radius lowered it, so each pass "improved" — while the RATIO between regions barely changed, because a global lever scales both regions together and cannot alter their relationship.
+- **THE RULE: if a quantity varies across a field — spatially, by cohort, by time bucket — report the SPREAD or report each region. Never the mean alone.** min/max, a ratio between the extremes, or per-segment figures; anything that can distinguish "uniformly fine" from "fine on average".
+- **⚠ AND THE FIX FOLLOWS THE STATISTIC.** Once the gap was the number, the lever became obvious: a **per-node cap** (local — trims only where the field is thick) rather than a **smaller radius** (global — thins everything, including the regions that already worked). **A global lever cannot fix a regional problem, and the mean is precisely the statistic that hides which kind you have.**
+- Same family as the rounding rule (*compare the underlying value, round only to render*) — both are a summarising step destroying the distinction the decision depends on.
+
 ### ⚠⚠⚠ A COMPLETE SET OF MEASUREMENTS CAN BE SILENT ON THE ACTUAL REQUIREMENT (2026-08-20)
 **THE SHARPEST LESSON OF THE SESSION. Every number was true. None of them was the question. Three passes went into the one lever that was never the problem.**
 - **The live case:** a background mesh was measured at every step — ink coverage per glyph, per-view accent and body contrast across fifteen windows, payload gzipped, edges per node, peak composite alpha. **All correct, all reported, all passing.** Then it was looked at, and it read as a **triangulated lattice — a texture, not a network** — which is not what the brief asked for. **No measurement in the set asked "does this look like the reference".**

@@ -115,8 +115,15 @@ function build({ seed, n, link, minSep }) {
                                           untouched) — the wanted asymmetry
        cap 3            2.86   2.44    <- smaller gap, but open -23%: it thins
                                           the parts that already read correctly
-     A smaller RADIUS would have done the same damage everywhere; the cap is
-     what makes the change local to where the problem is. */
+     ⚠ THE NUMBER TO OPTIMISE WAS DAMAGE TO THE OPEN REGIONS, NOT GAP SIZE. The
+     brief was that the open regions STAY AS THEY ARE, so cap 3 closing the gap
+     further is not a better answer — it buys uniformity by thinning the parts
+     that already read correctly.
+     ⚠ AND THE SENTENCE THAT MAKES IT OBVIOUS IN HINDSIGHT: A CAP IS LOCAL WHERE
+     A RADIUS IS NOT. A sparse node has fewer links than the cap anyway, so it is
+     never touched; a dense one is trimmed to its NEAREST few, which removes
+     exactly the long cross-links that fill a cluster in. A radius change cannot
+     tell the two apart because it is one global number. */
   var MAX_LINKS_PER_NODE = 4;
   var cand = [];
   for (let i = 0; i < pts.length; i++)
