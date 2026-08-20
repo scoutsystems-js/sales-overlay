@@ -263,7 +263,60 @@ function voiceProfileBlock(profile, outcome) {
   ].join('\n');
 }
 
+
+/**
+ * ⚠⚠ WHICH GATES MAY BLOCK, AND WHY THE WORD COUNT MAY NOT.
+ *
+ * THE CIRCULARITY THAT FORCED THIS: the lost-call ceiling was set at 40, a
+ * draft came in at 58, I loosened it to 50, and the next draft came in at 62.
+ * Three real lost drafts have now measured 58 / 44 / 62. I could keep raising
+ * the number until nothing fails — at which point the gate asserts nothing and
+ * merely describes whatever the model last did. A THRESHOLD TUNED UNTIL THE
+ * OUTPUT PASSES IS NOT A GATE.
+ *
+ * ⚠ THE ROOT CAUSE IS THAT THE NUMBER HAS NO SOURCE. Every blocking gate below
+ * is STRUCTURAL — it checks a property that is true or false regardless of what
+ * anyone thinks a good email looks like. The word ceiling is the only one that
+ * needs an opinion about length, and the corpus that would settle it does not
+ * exist (Justin ruled out supplying sent emails, deliberately).
+ *
+ * SO: the ceiling still reaches the MODEL, where it usefully applies pressure
+ * toward brevity, and the drafts did get dramatically shorter (175 -> 62).
+ * But it does NOT block, because blocking on an invented number would either
+ * reject good drafts or get tuned away to nothing. It is reported as an
+ * observation instead, with the relative ordering — which IS grounded — pinned
+ * by tests.
+ *
+ * ⚠ IF A CORPUS OF REAL SENT EMAILS EVER EXISTS, this becomes derivable and
+ * can be promoted to a blocking gate. Until then, promoting it would be
+ * asserting a measurement we do not have.
+ */
+const BLOCKING_GATES = Object.freeze([
+  'sign_off',        // a pinned element vanished silently — the reason gates exist
+  'body_em_dashes',  // greeting-exempt, so the bound is reachable
+  'paragraph_breaks',
+  'banned_openers',
+]);
+const ADVISORY_GATES = Object.freeze(['word_count']);
+
+function evaluateGates(text, outcome, closerFirstName) {
+  const f = formConstraintsFor(outcome);
+  const words = (String(text).match(/[A-Za-z0-9'\u2019-]+/g) || []).length;
+  const results = {
+    sign_off:         { pass: hasSignOff(text, closerFirstName) },
+    body_em_dashes:   { pass: countBodyEmDashes(text) <= 1, value: countBodyEmDashes(text) },
+    paragraph_breaks: { pass: /\n\s*\n/.test(String(text).trim()) },
+    banned_openers:   { pass: !/I hope this (email )?finds you well|don't hesitate to reach out/i.test(String(text)) },
+    word_count:       { pass: words <= f.maxWords, value: words, ceiling: f.maxWords },
+  };
+  const blocked = BLOCKING_GATES.filter(k => !results[k].pass);
+  return { results, blocked, fitToRead: blocked.length === 0 };
+}
+
 module.exports = {
+  BLOCKING_GATES,
+  ADVISORY_GATES,
+  evaluateGates,
   MIN_LINES,
   CEILINGS_ARE_A_JUDGEMENT,
   bodyOf,
