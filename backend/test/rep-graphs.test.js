@@ -242,7 +242,10 @@ test('⚠⚠ the hidden set is keyed by user_id, NEVER by legend index', () => {
   // Widened 12000 -> 16000 on 2026-08-18: repSeriesChart gained the
   // update-in-place path (the graph-flash fix) and its explanation, which is a
   // legitimate growth of exactly the kind this bound is documented not to pin.
-  assert.ok(fn.length > 800 && fn.length < 20000, 'slice suspicious: ' + fn.length);
+  /* ⚠ BOUND RAISED 2026-08-20 — generateLabels grew when the legend became
+     selected-reps-only + capped + overflow-named. The bound exists to catch a
+     RUNAWAY slice, not to encode how long the function may be. */
+  assert.ok(fn.length > 800 && fn.length < 26000, 'slice suspicious: ' + fn.length);
   assert.ok(fn.indexOf('function repSeriesChart') === 0, 'slice must start at the function');
   assert.ok(/_userId: toggleable \? r\.user_id : null/.test(fn), 'the dataset must carry user_id');
   assert.ok(/state\.repLineHidden\[r\.user_id\]/.test(fn), 'restore must look up BY user_id');
@@ -297,7 +300,10 @@ test('⚠⚠ NO STRIKETHROUGH — generateLabels forces hidden:false', () => {
   const at = HTML.indexOf('generateLabels: function (chart)');
   assert.ok(at > 0, 'the custom generateLabels is gone — the default strikes through');
   const fn = HTML.slice(at, HTML.indexOf('\n              },', at));
-  assert.ok(fn.length > 400 && fn.length < 3000, 'slice suspicious: ' + fn.length);
+  /* ⚠ BOUND RAISED 2026-08-20 — generateLabels grew when the legend became
+     selected-reps-only + capped + overflow-named. The bound exists to catch a
+     RUNAWAY slice, not to encode how long the function may be. */
+  assert.ok(fn.length > 400 && fn.length < 5000, 'slice suspicious: ' + fn.length);
   assert.ok(/hidden: false,/.test(fn), 'legend items must report hidden:false');
   assert.ok(!/hidden: !chart\.isDatasetVisible|hidden: !on/.test(fn),
     'reporting the real hidden state reinstates the strikethrough');

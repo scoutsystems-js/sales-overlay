@@ -6311,7 +6311,27 @@
                *      would be read literally by this version.
                */
               generateLabels: function (chart) {
-                return chart.data.datasets.map(function (ds, i) {
+                /* ⚠⚠ SELECTED REPS ONLY, CAPPED, OVERFLOW NAMED (Justin, 2026-08-20).
+                   The legend is the COLOUR KEY — the only place a reader learns which
+                   line is whose — so it lists exactly the lines on the chart.
+                   ⚠ ALPHABETICAL, NOT DATASET ORDER. Dataset order follows whichever
+                   reps have data in the window, so it moves with the date range; an
+                   index-based cut would show a DIFFERENT ten on every range change.
+                   ⚠⚠ THE OVERFLOW IS STATED, NEVER SILENT. A FILTERED VIEW MUST NEVER
+                   PASS AS A FULL ONE.
+                   ⚠ The FIXED baseline is never capped out — it is what reps are read
+                   against. */
+                var vis = chart.data.datasets
+                  .map(function (ds, i) { return { ds: ds, i: i }; })
+                  .filter(function (o) { return chart.isDatasetVisible(o.i); });
+                var fixed = vis.filter(function (o) { return o.ds._fixed; });
+                var reps = vis.filter(function (o) { return !o.ds._fixed; })
+                  .sort(function (a, b) {
+                    return String(a.ds.label || '').localeCompare(String(b.ds.label || ''));
+                  });
+                var overflow = Math.max(0, reps.length - REP_LEGEND_MAX);
+                var out = fixed.concat(reps.slice(0, REP_LEGEND_MAX)).map(function (o) {
+                  var ds = o.ds, i = o.i;
                   var on = chart.isDatasetVisible(i);
                   return {
                     text: ds.label,
@@ -6338,6 +6358,17 @@
                     datasetIndex: i,
                   };
                 });
+                if (overflow > 0) {
+                  /* ⚠ A LABEL, NOT A SERIES. datasetIndex -1 so a stray click can never
+                     resolve to a dataset; no marker, because it stands for several
+                     colours rather than one. */
+                  out.push({ text: '+' + overflow + ' more', hidden: false,
+                    fillStyle: 'transparent', strokeStyle: 'transparent', lineWidth: 0,
+                    lineDash: [], lineDashOffset: 0, lineCap: 'butt', lineJoin: 'miter',
+                    pointStyle: 'circle', rotation: 0, fontColor: '#ededed',
+                    datasetIndex: -1 });
+                }
+                return out;
               },
             },
             /* ⚠⚠ THE LEGEND IS NO LONGER THE CONTROL (2026-08-20) — the rep-filter
@@ -6350,7 +6381,23 @@
                set; it is now enforced in one place rather than re-derived on each
                legend gesture. The datasetIndex lesson moved with it: the dropdown's
                option value is the USER_ID, never the dataset position. */
-            onClick: null,
+              /* ⚠⚠ CORRECTED 2026-08-20 — AND THE CORRECTION IS THE POINT.
+                 An earlier note here claimed `onClick: null` does NOT disable the
+                 legend, because "Chart.js merges its defaults over null and the
+                 built-in toggle comes back". THAT WAS WRONG, and it was wrong
+                 because of a bug in MY OWN PROBE: it printed the string
+                 "DEFAULT (Chart.js built-in toggle)" whenever `lg.onClick` was
+                 FALSY — so a null read back as "the default is active", which is
+                 the opposite of the truth.
+                 ⚠ MEASURED PROPERLY on the deployed chart: typeof onClick is
+                 "object" (i.e. null), and invoking the handler the way Chart.js
+                 does leaves dataset visibility UNCHANGED. Chart.js guards with
+                 `if (opts.onClick)`, so null genuinely means no handler.
+                 A no-op function is kept anyway: it is explicit, it cannot be
+                 misread as "someone forgot to set this", and it survives a future
+                 Chart.js version that might treat null differently. Either value
+                 works today — this one says what it means. */
+              onClick: function () { /* display-only — the dropdown is the control */ },
             _retiredLegendOnClick: function (e, item, legend) {
               var ds = legend.chart.data.datasets[item.datasetIndex];
               if (!ds || ds._fixed) return;          // the baseline is not a rep
@@ -6444,6 +6491,9 @@
   // rebuilt, so after navigating away from a view its chart object is still in
   // the map with a canvas no longer in the document. Touching it would throw or,
   // worse, silently succeed against a detached node.
+  /* ⚠ LEGEND DISPLAY CAP (Justin, 2026-08-20). A DISPLAY limit only — the
+     dropdown still lists and selects every rep. Ten fits one legend row at 1200px. */
+  var REP_LEGEND_MAX = 10;
   var REP_TOGGLE_CHARTS = ['repHandleChart', 'repCloseChart', 'repPriceChart'];
   function eachLiveToggleChart(fn) {
     REP_TOGGLE_CHARTS.forEach(function (id) {
