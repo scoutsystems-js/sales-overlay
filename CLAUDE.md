@@ -2099,6 +2099,33 @@ Justin: the rep dropdown closes on every pick. **Established rather than assumed
 - **⚠⚠ `tabular-nums` IS REQUIRED ON EVERY NUMERIC SURFACE** — gauges, tiles, tables, chart labels — or digits change width as values change and a gauge visibly jitters between renders.
 - **⚠ EVERY LESSON ALREADY RECORDED ABOUT MONTSERRAT STILL APPLIES TO SAIRA, because they are about FACES, not about that face:** `k` is per-face and must be re-measured (the wordmark has wrapped four times); the MAX `k` across every face that can actually render is what binds, including the fallback; and a weight the file does not contain will be **synthesised** rather than reported as missing.
 
+### ⚠⚠⚠ A LINEAR ALPHA RAMP BANDS BECAUSE ITS *SLOPE* JUMPS — ADDING STOPS DOES NOT FIX IT (2026-08-20, `9f5d2d9`)
+**Justin saw a hard line on the live site. The ramp was numerically smooth — a clean 3-stop linear blend across 34% — and it banded anyway. His eye beat the measurement, and that gap IS the defect.**
+- **THE MECHANISM: alpha rose LINEARLY, so the RATE of change jumped from 0 to constant at 38% and back to 0 at 72%.** The value is continuous at those points; **its first derivative is not**, and **Mach banding makes exactly that discontinuity visible as an edge.**
+- **⚠⚠ SO MORE STOPS ALONE WOULD NOT HAVE HELPED — THE CORNER IS AT THE ENDS, NOT IN THE MIDDLE.** That is the non-obvious part, and it is why "widen it and add stops" is only half an instruction.
+- **THE FIX IS THE DISTRIBUTION:** eleven stops tracing **smoothstep (3t² − 2t³)**, whose slope is **zero at both ends**, so the ramp starts and finishes with no corner to catch. Span 22%→96% (74% of the viewport, up from 34%).
+- **It still reads as "top ~40% black"**: the easing keeps alpha at 0.10 by 37%, so the top is still visually black — it simply stops *arriving* there abruptly.
+- **Looked at 1440 and 1920 after shipping: no line at either.**
+- **GENERALISES to any alpha/colour ramp, fade, or animation easing.** Whenever a blend shows a seam, suspect the **slope at the endpoints**, not the number of stops.
+
+### ⚠⚠ ONE STATE MEANING THREE THINGS — SPLIT IT, AND EXPECT THE SPLIT TO EXPOSE A FALSE TEST (2026-08-20)
+`team-needs-work` returned `state:'insufficient'` for **three genuinely different situations**, which is the failure this file already names: the panel could not tell *"no weakness"* from *"nothing could be classified"*.
+```
+no_volume         not enough calls / zero objections — the ONLY case that may say
+                  nothing can be determined, and it must read as a fact about the
+                  WINDOW, never a verdict on the rep
+thin_types        enough calls, no ONE type big enough to compare. NOT "nothing
+                  stands out" — nothing was ever COMPARED, so claiming even
+                  performance would assert something about unexamined data
+even_performance  plenty of data, compared, and handling is LEVEL. A FINDING.
+                  "even across types" states what it measures; "no single type
+                  stands out" reads as an absence
+```
+- **⚠⚠ MEASURING FIRST MOVED THE DIAGNOSIS.** Josh is **not** hitting `insufficient` on any window — 7/14/30/90 all return `rate_gap`. What he hits is **`candidates[0]` dropping the rest**: on 90d, gapPP **10.4 shown and 9.7 DISCARDED**. **A 0.7pp near-tie presented as "your weakest area"** — the rounding lesson again: taking [0] of a near-tie and reporting it as a winner. **The copy was never the defect.**
+- **THE FIX IS THE RANKING, NOT THE BAR.** `focus_set` (capped at 3 — a focus panel stops being one if unbounded) plus `detail.ranking` carrying every sizeable bucket and its gap. **MIN_GAP_PP and both bucket floors are untouched and test-pinned.** A threshold moved until the output looks better is not a threshold.
+- **⚠ SHARED-CARRIER, AGAIN: two frontend readers branched on `state === 'insufficient'` from a different file.** They would have **silently stopped matching** and fallen through to the rate-gap path with `bucket:null` — a broken card, not an error. Both now read one `NON_CLICKABLE_NW_STATES` list.
+- **⚠⚠ AND THE SPLIT EXPOSED A TEST THAT PASSED FOR A FALSE REASON.** One asserted the team path rejects a 4-sized bucket, *"proving the team floor intact"*. **It never did:** the fixture has 8 analyses against team `MIN_ANALYZED` 10, so the **volume gate fires first** and the bucket check is never reached. **A single shared state let a true-looking assertion stand on a false mechanism** — which is the strongest argument for splitting states that mean different things.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

@@ -24,7 +24,8 @@ Shipped, deployed, and verified on production.
 | Prospects + close rate | Prospect entity, merge/unmerge, closed-prospects ÷ total | |
 | Date-range picker | Calendar picker; every view owns its own range | |
 | Welcome sequence | One-shot dial animation after fresh login | never a gate; 6s watchdog |
-| Site-wide background | Team raster on every view, `cover`, `50% 50%`, **opacity 1**, top 38% masked to black fading in by 72% | shipped `9d297a8`, faded `6adb774` |
+| Site-wide background | Team raster on every view, `cover`, `50% 50%`, **opacity 1**; eased smoothstep ramp 22%→96% | shipped `9d297a8`, faded `6adb774`, **banding fixed `9f5d2d9`** — no line visible at 1440 or 1920 |
+| Objection focus states | `insufficient` split into no_volume / thin_types / even_performance; focus_set + full ranking | shipped `9f5d2d9`; thresholds untouched |
 | Sync Now in Connections | Manual sync for both providers in #account, verified by clicking | shipped `6adb774`; healthy dashboard cards removed with it |
 | Week labels in Scout green | Weekly team-graph axis labels `#09e046` | shipped `864bd49` |
 | Rep filter dropdown | Custom multi-select listbox: stays open across picks, colour swatches, keyboard + focus | shipped `9265131`, capture-phase fix `0fbde98`; **verified by clicking** — 3 reps toggled without reopening, persistence across reload |
