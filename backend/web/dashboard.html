@@ -6858,7 +6858,25 @@
     var b = document.getElementById('repFilterBtn');
     if (b) b.focus();
   }
-  function repFilterOutsideClick() { repFilterClose(); }
+  /**
+   * ⚠⚠ CONTAINMENT, NOT PROPAGATION — AND THE FIRST VERSION SHIPPED WRONG.
+   * This was registered with capture=true and relied on the row's own
+   * `event.stopPropagation()` to protect it. THE CAPTURE PHASE RUNS FIRST, so
+   * the menu closed before the row's handler ever ran: verified by clicking on
+   * the deployed page, three reps requested and the panel shut after ONE —
+   * exactly the defect this control was built to remove, reintroduced by the
+   * listener that closes it.
+   * ⚠ THE MARKUP LOOKED CORRECT THE WHOLE TIME. stopPropagation() was present
+   * on every row, so reading the source said "handled". Only a real click
+   * showed the ordering.
+   * ⚠ ASKING WHERE THE CLICK LANDED does not care about phase or ordering, so
+   * it cannot be defeated by either.
+   */
+  function repFilterOutsideClick(e) {
+    var t = e && e.target;
+    if (t && t.closest && t.closest('.rep-filter-wrap')) return;  // inside: ignore
+    repFilterClose();
+  }
 
   /**
    * \u26a0\u26a0 RE-IMPLEMENTS WHAT THE NATIVE TAG GAVE FREE. Enter and Space activate,

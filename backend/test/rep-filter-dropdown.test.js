@@ -106,6 +106,25 @@ test('⚠ OUTSIDE CLICK CLOSES IT, and the listener is not stacked', () => {
     'and removed on close — otherwise every open stacks another listener');
 });
 
+test('⚠⚠ THE OUTSIDE HANDLER TESTS CONTAINMENT, NOT PROPAGATION', () => {
+  /* ⚠⚠ THIS SHIPPED WRONG AND THE SUITE WAS GREEN. The listener was registered
+     with capture=true and relied on each row's `event.stopPropagation()`. THE
+     CAPTURE PHASE RUNS FIRST, so the menu closed before the row's handler ever
+     ran — three reps requested, panel shut after ONE, which is the exact defect
+     this control exists to remove.
+     ⚠ THE MARKUP LOOKED RIGHT: stopPropagation() was on every row, so reading
+     the source said "handled". Only a real click exposed the ordering, and only
+     a containment check is immune to it. */
+  const out = fnBody('repFilterOutsideClick', 60, 1500);
+  assert.ok(/closest\(/.test(out),
+    'the handler must ask WHERE the click landed; stopPropagation cannot be ' +
+    'relied on against a capture-phase listener');
+  assert.ok(/rep-filter-wrap/.test(out), 'and ignore clicks inside the control');
+  // ⚠ non-vacuity: a handler that closes unconditionally must fail this
+  const naive = 'function repFilterOutsideClick() { repFilterClose(); }';
+  assert.ok(!/closest\(/.test(naive), 'the matcher must reject the unconditional form');
+});
+
 test('⚠⚠ NON-VACUITY — the select assertions fail if the tag comes back', () => {
   const broken = fnBody('repFilterHtml', 300, 8000) + "\n  var x = '<select class=\"user-select\">';";
   assert.ok(/<select/.test(broken), 'the matcher must detect a reintroduced select');
