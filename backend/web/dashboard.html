@@ -4829,7 +4829,20 @@
     // NOTE: state.needsWork is deliberately NOT reset here — it's a fixed 90-day
     // window, independent of the range picker. It resets only on a user pivot
     // (setUser), so changing the tile range never refetches it.
-    renderOverview(true /* loading */);
+    /* ⚠⚠ GUARDED BY THE ACTIVE VIEW — THIS RUNS AT BOOT FOR EVERY VIEW.
+       Unguarded, it painted the Coaching Review skeleton on top of whatever
+       view was already correctly set. Measured on the real page, #team:
+           t=2038ms  applyHashToState -> state.view ALREADY 'team'
+           t=2038ms  renderOverview   CALLED WITH state.view='team'
+           t=5050ms  render()         -> Team finally paints
+       A ~3 SECOND wrong-page flash — and NOT a view-resolution race:
+       state.view is never wrong. A renderer was invoked outside the
+       render() dispatch. Same on #eod, so it was general to EVERY
+       deep-linked view, not a team bug.
+       ⚠ The overview's OWN skeleton is unaffected — when the view IS
+       'overview' this still fires, so this does not trade a wrong-page
+       flash for a blank page. Verified by probe, not assumed. */
+    if (state.view === 'overview') renderOverview(true /* loading */);
     try {
       // Fathom status fetch is wrapped in a .catch so a stale token or
       // misconfigured FATHOM_* env vars don't break the whole dashboard
