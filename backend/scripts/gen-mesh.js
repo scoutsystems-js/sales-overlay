@@ -92,12 +92,12 @@ function build({ seed, n, link, minSep }) {
        and width 0.5-1.2 -> 0.8-1.9; nodes drop the other way below. */
     const o = (0.42 + near * 0.58) * (1 - d / link * 0.42);
     return `<line x1='${pts[i].x}' y1='${pts[i].y}' x2='${pts[j].x}' y2='${pts[j].y}'`
-      + ` stroke='%2309e046' stroke-width='${(0.8 + near * 1.1).toFixed(1)}' opacity='${o.toFixed(2)}'/>`;
+      + ` stroke='%2309e046' stroke-width='${(2.2 + near * 2.6).toFixed(1)}' opacity='${o.toFixed(2)}'/>`;
   }).join('');
   /* nodes recede: radius 1.1-4.3 -> 0.8-2.0, opacity 0.28-0.90 -> 0.30-0.62.
      They mark where edges MEET rather than being the thing you see. */
   const nodes = pts.map(p =>
-    `<circle cx='${p.x}' cy='${p.y}' r='${(0.8 + p.depth * 1.2).toFixed(1)}'`
+    `<circle cx='${p.x}' cy='${p.y}' r='${(2.6 + p.depth * 4.0).toFixed(1)}'`
     + ` fill='%2309e046' opacity='${(0.30 + p.depth * 0.32).toFixed(2)}'/>`).join('');
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${FW} ${FH}'`
     + ` preserveAspectRatio='xMidYMid slice'>${lines}${nodes}</svg>`;
@@ -115,7 +115,7 @@ function sweep({ pts, edges }, link, win) {
   edges.forEach(([i, j, d]) => {
     const near = (pts[i].depth + pts[j].depth) / 2;
     const op = (0.42 + near * 0.58) * (1 - d / link * 0.42);
-    const sw = 0.8 + near * 1.1, half = Math.max(0.5, sw / 2);
+    const sw = 2.2 + near * 2.6, half = Math.max(0.5, sw / 2);
     const steps = Math.ceil(d);
     for (let k = 0; k <= steps; k++) {
       const t = k / steps;
@@ -125,7 +125,7 @@ function sweep({ pts, edges }, link, win) {
     }
   });
   pts.forEach(p => {
-    const r = 0.8 + p.depth * 1.2, op = 0.30 + p.depth * 0.32;
+    const r = 2.6 + p.depth * 4.0, op = 0.30 + p.depth * 0.32;
     for (let dy = -r; dy <= r; dy += 0.5)
       for (let dx = -r; dx <= r; dx += 0.5) if (dx * dx + dy * dy <= r * r) stamp(p.x + dx, p.y + dy, op);
   });
@@ -164,7 +164,20 @@ function contrastAt(peakAlpha) {
    — nearly double the ~70KB costed, and 47% ink under glyphs. n 285 / link 142
    lands at 66KB with 5,704 edges: 5.0 edges per node against 3.8 before, which is
    the number that makes it read as a web rather than as stars. */
-const FIELD_PARAMS = { seed: 20260820, n: Math.round(285 * (FW * FH) / (W * H)), link: 142, minSep: 40 };
+/* ⚠⚠ THICKER AND SPARSER (Justin, 2026-08-20) — the OPPOSITE lever from the
+   fine-web pass, and closer to his reference images. Not a reversal: a
+   different target.
+   strokes 0.8-1.9 -> 2.2-4.8   nodes r 0.8-2.0 -> 2.6-6.6   n 285 -> 150
+   ⚠ THE NET WAS MEASURED, NOT ASSUMED, because the two levers run OPPOSITE
+   ways: thicker strokes RAISE ink per glyph, lower density LOWERS it. Result:
+   ink 20.6% -> 26.8% (thickness wins) while elements fall 5704 -> 2674 and
+   payload HALVES, 66KB -> 32KB.
+   ⚠ And accent contrast IMPROVED, 7.58 -> 7.85, which is counter-intuitive
+   until you see why: peak composite is driven by OVERLAP, and fewer elements
+   overlap less even when each is heavier.
+   Edges stay dominant over nodes — that ratio fixed "green stars" and holds at
+   any weight. */
+const FIELD_PARAMS = { seed: 20260820, n: Math.round(150 * (FW * FH) / (W * H)), link: 190, minSep: 70 };
 const FIELD = build(FIELD_PARAMS);
 const out = [];
 VIEWS.forEach((view, i) => {

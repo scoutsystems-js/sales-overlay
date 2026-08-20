@@ -302,3 +302,43 @@ test('⚠⚠ the generator REFUSES to write when any variant fails AA', () => {
   assert.ok(/REFUSING — file shrank/.test(gen),
     'and it must refuse a truncating write — the shrink assertion');
 });
+
+/**
+ * ⚠⚠ THE LAYER MUST NOT BE HIDDEN ON ORDINARY SCREENS.
+ *
+ * Justin reported the background "isn't showing on all screens". The cause was
+ * `@media (max-width: 1320px) { display: none }` — so a 1280px laptop, a smaller
+ * monitor, or a non-maximised window got NOTHING AT ALL.
+ *
+ * That rule was CORRECT for the treatment it was written for: one cropped shape
+ * living in the gutters, where below 1320px the column ate the gutters and there
+ * was genuinely nothing to see. A FULL-BLEED MESH IS NOT IN THE GUTTERS — it
+ * covers the viewport — so the premise is gone.
+ *
+ * ⚠ A REDESIGN INCLUDES ITS GUARDS. The treatment changed and the constraint
+ * written for the old one survived invisibly, exactly like the one-sided opacity
+ * cap that once held the motif below visibility. This test is the tripwire.
+ */
+test('⚠⚠ the mesh is not display:none on ordinary laptop widths', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const m = live.match(/@media \(max-width: (\d+)px\) \{ body\[data-view\]::before \{ display: none/);
+  assert.ok(m, 'stale anchor — the width media query moved');
+  const px = Number(m[1]);
+  assert.ok(px <= 1000,
+    'the layer is hidden below ' + px + 'px. A full-bleed mesh covers the whole '
+    + 'viewport, so there is plenty to see at 1280px — this threshold belongs to '
+    + 'the retired cropped-shape treatment and hides the background on ordinary '
+    + 'laptops.');
+});
+
+test('⚠ edges stay DOMINANT over nodes at any weight — that ratio fixed "green stars"', () => {
+  const gen = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'gen-mesh.js'), 'utf8');
+  const edgeOp = gen.match(/const o = \(([\d.]+) \+ near \* ([\d.]+)\)/);
+  const nodeOp = gen.match(/opacity='\$\{\(([\d.]+) \+ p\.depth \* ([\d.]+)\)/);
+  assert.ok(edgeOp && nodeOp, 'stale anchors — the weight expressions moved');
+  const edgeMax = Number(edgeOp[1]) + Number(edgeOp[2]);
+  const nodeMax = Number(nodeOp[1]) + Number(nodeOp[2]);
+  assert.ok(edgeMax > nodeMax,
+    'edges must out-weigh nodes (edge ' + edgeMax + ' vs node ' + nodeMax + ') — '
+    + 'when nodes win it reads as scattered green stars, not a network');
+});
