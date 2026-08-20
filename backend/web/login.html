@@ -331,6 +331,33 @@
        must be percent-encoded. That is the URL-ENCODED SPELLING already
        recorded here — a sweep over `#09e046` will not match it. A test pins
        this value to --green so the two cannot drift silently. */
+    /* ⚠⚠ THE DISCS CARRY THEIR OWN ALPHA, AND THE REASON IS A RULE, NOT A
+       TASTE CALL (2026-08-20). Justin: the mark's filled dots read as UI
+       CONTROLS — one sits between the password field and "Forgot password?",
+       another under the Log In button, and a user reasonably takes them for a
+       status dot or a radio.
+       ⚠ THE CAUSE WAS THAT THE LAYER OPACITY WAS DERIVED AGAINST THE WRONG
+       PART OF THE ARTWORK. Every contrast solve here was for text sitting on a
+       1-3px STROKE. The dots are solid `fill`. Measured at 845px tall: the
+       stroke renders 1.58px (correctly inside the product's 1-3px line work)
+       while disc 1 is 39.5px across — 25x the stroke width, and fully filled.
+       Same alpha, 25x the ink, a completely different perceptual object.
+       ⚠ SO IT IS NOT A CONTRAST PROBLEM AND MUST NOT BE SOLVED WITH THE LAYER
+       OPACITY. Contrast already clears AA at 4.58:1; dropping the layer would
+       dim the strokes (which are correct) to fix the discs (which are not).
+       fill-opacity 0.3 takes the discs to an effective alpha of 0.063 — a green
+       delta of +13/255, at the visibility threshold — so they read as texture
+       while the rings keep their weight.
+       ⚠⚠ WHY NOT MOVE THE MARK INSTEAD: that was considered and REJECTED. "No
+       disc lands on an interactive element" is a RELATIONSHIP between two
+       things that both move — the form shifts with viewport height and grows
+       when an error message appears — so it can only ever be verified at the
+       one viewport you checked. It is the same unreachable zero-overlap
+       criterion that already failed the ink sweep below 1600px. Disc-specific
+       alpha is viewport-independent and needs no re-verification when the form
+       changes.
+       ⚠ THE FOREGROUND LOCKUP MARK KEEPS SOLID DOTS — it IS the brand mark and
+       is meant to read as an object. Only this background layer is dimmed. */
     body::before {
       content: '';
       position: fixed;
@@ -705,7 +732,7 @@
          decides where the lockup can be used. At 1280x720 the smallest is 11px
          across; below roughly 6-8px a filled dot stops reading as a deliberate
          element and starts looking like an artifact. */
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='359' viewBox='0.464 2.464 19.072 17.105' fill='none'%3E%3Cpath d='M4.205 19.553 A9.52 9.52 0 1 1 15.795 19.553' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M6.25 16.887 A6.16 6.16 0 1 1 13.75 16.887' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M8.295 14.221 A2.8 2.8 0 1 1 11.705 14.221' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='0.4' fill='%2309e046'/%3E%3Ccircle cx='10' cy='14.48' r='0.3' fill='%2309e046'/%3E%3Ccircle cx='10' cy='16.65' r='0.2' fill='%2309e046'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='359' viewBox='0.464 2.464 19.072 17.105' fill='none'%3E%3Cpath d='M4.205 19.553 A9.52 9.52 0 1 1 15.795 19.553' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M6.25 16.887 A6.16 6.16 0 1 1 13.75 16.887' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Cpath d='M8.295 14.221 A2.8 2.8 0 1 1 11.705 14.221' stroke='%2309e046' stroke-width='0.032' stroke-linecap='round'/%3E%3Ccircle cx='10' cy='12' r='0.4' fill='%2309e046' fill-opacity='0.3'/%3E%3Ccircle cx='10' cy='14.48' r='0.3' fill='%2309e046' fill-opacity='0.3'/%3E%3Ccircle cx='10' cy='16.65' r='0.2' fill='%2309e046' fill-opacity='0.3'/%3E%3C/svg%3E");
     }
     /* The form and nav sit above the mark. Without this the shape would paint
        over the fields rather than behind them. */
