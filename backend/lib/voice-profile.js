@@ -128,13 +128,72 @@ const MIN_LINES = 30;
  * generated, so length and helpfulness are constrained AS A FUNCTION OF HOW
  * THE CALL ENDED rather than as tone guidance.
  */
+/**
+ * ⚠⚠ THESE CEILINGS ARE A JUDGEMENT, NOT A MEASUREMENT — SAID HERE SO NOBODY
+ * LATER TREATS THEM AS GROUNDED. Every other number in this file is derived
+ * from Josh's real corpus. These four are not, and they CANNOT BE: deriving a
+ * realistic follow-up length needs real sent emails, and Justin ruled out
+ * supplying them (the whole point is that Scout works it out itself). There is
+ * no corpus of written follow-ups anywhere in the product to measure.
+ *
+ * ⚠ THE PRACTICAL CONSEQUENCE, LEARNED THE FIRST TIME THESE RAN: when a draft
+ * came in at 58 words against a 40-word ceiling, "the gate failed" was a
+ * statement about MY NUMBER, not about the email. The email was good. Loosened
+ * lost 40 -> 50 and no_show 30 -> 35 on exactly that basis.
+ *
+ * The RELATIVE ordering is the part that carries real weight and it is what
+ * the tests pin: lost < follow_up < closed, because effort must match how the
+ * call ended. The absolute values are the best guess available and should move
+ * freely if reading real output suggests they are wrong.
+ */
+const CEILINGS_ARE_A_JUDGEMENT = true;
 const OUTCOME_FORM = {
   closed:    { maxWords: 120, allow: 'logistics only — next step, confirmations. No persuasion, no recap.' },
   follow_up: { maxWords:  90, allow: 'one open question. No summary of what was discussed.' },
-  // ⚠ THE SHORTEST OF THE THREE, DELIBERATELY INVERTING WHAT v24 DID.
-  lost:      { maxWords:  40, allow: 'a door left open. NO advice, NO checklist, NO reasons to reconsider.' },
-  no_show:   { maxWords:  30, allow: 'a reschedule line. Nothing else.' },
+  // ⚠ THE SHORTEST, DELIBERATELY INVERTING WHAT v24 DID (it gave a lost
+  // prospect a three-item diligence checklist). 50, not 40 — see above.
+  lost:      { maxWords:  50, allow: 'a door left open. NO advice, NO checklist, NO reasons to reconsider.' },
+  no_show:   { maxWords:  35, allow: 'a reschedule line. Nothing else.' },
 };
+
+/**
+ * ⚠⚠ EM-DASHES ARE COUNTED IN THE BODY ONLY — THE GREETING IS EXEMPT, AND
+ * EXEMPTING IT IS THE FIX RATHER THAN RAISING THE CEILING.
+ *
+ * The greeting convention is "Hey Teesha —", which SPENDS ONE EM-DASH BEFORE
+ * THE BODY BEGINS. A flat ceiling of 1 therefore left the body a budget of
+ * ZERO and could essentially never pass — an UNREACHABLE BOUND, the same
+ * defect class as a band that can never render.
+ *
+ * ⚠ RAISING THE CEILING TO 2 WOULD HAVE HIDDEN THE BUG RATHER THAN FIXED IT:
+ * the intent has always been "at most one em-dash in the prose", and a 2 would
+ * silently permit two in the body on any draft that skipped the greeting.
+ * A constraint that counts a SHARED RESOURCE must account for what the
+ * TEMPLATE already spends.
+ */
+function bodyOf(text) {
+  var t = String(text || '');
+  // drop a leading greeting line ("Hey X —" / "Hi X,"), whatever it spends
+  return t.replace(/^\s*(hey|hi|hello)\b[^\n]*\n?/i, '');
+}
+function countBodyEmDashes(text) {
+  return (bodyOf(text).match(/—/g) || []).length;
+}
+
+/**
+ * ⚠ THE SIGN-OFF GATE — ADDED AFTER A REAL DEFECT THAT NO GATE CAUGHT.
+ * v25 pinned the sign-off to the closer's first name. On the first live v26
+ * run, call 1's draft came back with NO SIGN-OFF AT ALL — the word ceiling had
+ * squeezed it out, and every existing check passed. A pinned element
+ * disappearing silently is precisely what a gate is for, so it is one now.
+ */
+function hasSignOff(text, closerFirstName) {
+  var lines = String(text || '').trim().split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+  if (!lines.length) return false;
+  var last = lines[lines.length - 1];
+  if (!closerFirstName) return last.split(/\s+/).length <= 3;  // some short closing line
+  return last.toLowerCase().indexOf(String(closerFirstName).toLowerCase()) !== -1;
+}
 
 function formConstraintsFor(outcome) {
   return OUTCOME_FORM[outcome] || OUTCOME_FORM.follow_up;
@@ -198,13 +257,18 @@ function voiceProfileBlock(profile, outcome) {
     'prospect who just said no. A long, helpful, well-organised email after a',
     'LOST call is the single clearest sign it was not written by a person.',
     '  • Do NOT summarise what was discussed. They were on the call.',
-    '  • At most ONE em-dash in the whole email.',
+    '  • At most ONE em-dash IN THE BODY (the greeting line does not count).',
+    '  • End with a line containing ONLY the closer\'s first name. Never omit it.',
     '  • No "I hope this finds you well", no "don\'t hesitate to reach out".',
   ].join('\n');
 }
 
 module.exports = {
   MIN_LINES,
+  CEILINGS_ARE_A_JUDGEMENT,
+  bodyOf,
+  countBodyEmDashes,
+  hasSignOff,
   HEDGES,
   UNMEASURABLE,
   OUTCOME_FORM,

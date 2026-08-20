@@ -115,10 +115,18 @@ test('⚠ the block bans a call summary and caps em-dashes, on every outcome', (
   assert.match(b, /APPLY THE ROW MATCHING THE `outcome` YOU ASSIGN ABOVE/,
     'the model must be told to select by its own verdict — otherwise four '
     + 'ceilings are four suggestions');
-  // and the ordering that makes the whole feature work
-  assert.ok(b.indexOf('lost      -> HARD CEILING 40') !== -1
-         && b.indexOf('closed    -> HARD CEILING 120') !== -1,
-    'lost must be the shortest and closed the longest');
+  /* ⚠⚠ DERIVED FROM OUTCOME_FORM, NOT PINNED TO LITERALS — and this line
+     previously did the opposite, which is the reason it is called out. It read
+     `'lost      -> HARD CEILING 40'` while the comment three lines above said
+     the test pins the RELATIONSHIP and not the values. It then went red the
+     moment the ceiling moved 40 -> 50 for a documented reason, against a
+     correct change. Third instance this session of a guard pinning a literal
+     that a normal, correct edit is expected to move. */
+  Object.keys(vp.OUTCOME_FORM).forEach(o => {
+    assert.ok(b.indexOf(o + ' ') !== -1 || b.indexOf(o + '\t') !== -1, o + ' present');
+    assert.ok(b.indexOf('HARD CEILING ' + vp.OUTCOME_FORM[o].maxWords + ' words') !== -1,
+      o + ' must render the ceiling the module actually defines');
+  });
 });
 
 test('no profile -> no block (silence, never a guessed voice)', () => {
@@ -132,4 +140,58 @@ test('⚠ the block instructs WRITTEN register explicitly — the whole point', 
   assert.match(b, /WRITTEN register/);
   assert.match(b, /Do NOT imitate spoken grammar/,
     'lines invite imitation of SPOKEN register — that is what v24 did wrong');
+});
+
+/* ── THE THREE GATE FIXES (2026-08-20) ─────────────────────────────────────
+   All three came from RUNNING the gates on real output, not from review. */
+
+test('⚠⚠ UNREACHABLE BOUND: the greeting spends an em-dash, so the body is counted', () => {
+  // "Hey Teesha —" IS one em-dash. A flat ceiling of 1 left the body a budget
+  // of ZERO and could essentially never pass — the same defect class as a band
+  // that can never render.
+  // ⚠ FIXED BY EXEMPTING THE GREETING, NOT BY RAISING THE CEILING TO 2:
+  // raising it would silently permit two in the body of any draft that skipped
+  // the greeting, hiding the bug rather than fixing it.
+  const greeted = 'Hey Teesha —\n\nAsk them how many members — actively — they have.\n\nJoshua';
+  assert.strictEqual((greeted.match(/—/g) || []).length, 3, 'three em-dashes raw');
+  assert.strictEqual(vp.countBodyEmDashes(greeted), 2, 'but two in the BODY');
+
+  const ok = 'Hey Teesha —\n\nAsk them how many members — actively — they have.'.replace(' — actively —', ' actively');
+  assert.strictEqual(vp.countBodyEmDashes(ok), 0,
+    'a greeting alone must cost the body nothing');
+
+  // and it must still FAIL when the body genuinely overspends
+  assert.ok(vp.countBodyEmDashes('One thing — really — matters.') > 1,
+    'the gate must still catch real overspend');
+});
+
+test('⚠⚠ SIGN-OFF GATE: a pinned element disappearing silently is what gates are for', () => {
+  // v25 pinned the sign-off. On the first live v26 run, call 1 came back with
+  // NO sign-off at all — the word ceiling squeezed it out and every existing
+  // check passed. That is the defect this gate exists for.
+  assert.strictEqual(vp.hasSignOff('Hey T —\n\nBody here.\n\nJoshua', 'Joshua'), true);
+  assert.strictEqual(
+    vp.hasSignOff('Hey Teesha —\n\nWhat would you need to feel solid about?', 'Joshua'), false,
+    'the exact live defect must be caught');
+  assert.strictEqual(vp.hasSignOff('', 'Joshua'), false);
+});
+
+test('⚠ the ceilings are declared a JUDGEMENT, and only the ORDERING is pinned', () => {
+  // The absolute numbers cannot be derived — there is no corpus of real sent
+  // emails, because Justin ruled out supplying one. So the test pins the
+  // relationship, which IS grounded, and not the values, which are not.
+  assert.strictEqual(vp.CEILINGS_ARE_A_JUDGEMENT, true,
+    'the flag exists so nobody later treats these numbers as measured');
+  assert.ok(vp.OUTCOME_FORM.lost.maxWords < vp.OUTCOME_FORM.follow_up.maxWords);
+  assert.ok(vp.OUTCOME_FORM.follow_up.maxWords < vp.OUTCOME_FORM.closed.maxWords);
+  assert.ok(vp.OUTCOME_FORM.no_show.maxWords < vp.OUTCOME_FORM.follow_up.maxWords);
+});
+
+test('⚠ the block now states BOTH fixed rules to the model', () => {
+  const many = [];
+  while (many.length < vp.MIN_LINES + 5) many.push(...REAL);
+  const b = vp.voiceProfileBlock(vp.deriveVoiceProfile(many), null);
+  assert.match(b, /ONE em-dash IN THE BODY/, 'the greeting exemption must reach the model');
+  assert.match(b, /End with a line containing ONLY the closer's first name/,
+    'the sign-off must be instructed, not just gated');
 });
