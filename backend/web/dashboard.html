@@ -1958,21 +1958,47 @@
     }
     .review-grade-card.skeleton-card:hover { border-color: var(--border); }
 
-    /* Section 3: Follow-up Email — monospace box + copy button. */
+    /* Section 3: Follow-up Email — SITE FONT + copy button. */
     .review-followup-wrap { display: flex; flex-direction: column; gap: 12px; }
     .review-followup-box {
       background: var(--bg-deep);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 18px 22px;
-      font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
-      /* ⚠ 15px, NOT 13 (Justin, 2026-08-20). This is LEGIBILITY, not preference:
-         a monospace face reads visually smaller than a proportional one at the
-         same nominal size, so 13px mono sits well under the 13px the rest of
-         the page uses for body copy. The box is pre-wrap in a fixed column, so
-         a larger size RE-WRAPS the email — the shape on screen changes, which
-         is expected rather than a defect. */
+      /* ⚠⚠ THE FACE IS PART OF THE TONE PROBLEM, NOT JUST A STYLE CHOICE
+         (Justin, 2026-08-20). A monospace box is the visual grammar of
+         MACHINE OUTPUT — terminal text, a code block, a generated artifact.
+         An email a human wrote is proportional. Setting the face to the site
+         stack makes the box read as a DRAFT MESSAGE rather than as program
+         output, and it does that before a single word of the copy changes.
+         `inherit` rather than a repeated stack, so it can never drift from
+         the body font — the .placeholder rule below already did this. */
+      font-family: inherit;
+      /* ⚠ 15px SURVIVES THE FACE CHANGE, BUT ITS JUSTIFICATION DOES NOT — and
+         the difference matters if anyone revisits it. The old reasoning was a
+         CORRECTION: monospace reads visually smaller at the same nominal size,
+         so 15px mono was chosen to land near the 14px body copy. Proportional
+         at 15px is therefore a REAL increase over body for the first time,
+         which is what Justin asked for when he asked for a bigger font — the
+         mono version had only restored parity. (The old comment also said the
+         page body is 13px; it is 14px — see `body` above.)
+         The box is pre-wrap in a fixed column, so changing the face RE-WRAPS
+         every email: a proportional face fits MORE characters per line, so
+         lines get longer and the box gets shorter. Expected, not a defect. */
       font-size: 15px;
+      /* ⚠⚠ THE FACE CHANGE ALONE MAKES THE MEASURE WORSE, SO THE TWO SHIP
+         TOGETHER. Measured on the real page at 778px of content width: the
+         proportional face is 20% narrower per character than the mono one
+         (7.34px vs 9.03px), so the SAME box goes from 86 characters per line
+         to 106. Optimal measure is 45-75; mono was already over and this
+         pushes it further. Solved rather than picked — 70 chars x 7.34px +
+         44px padding = 558, so 560px lands at exactly 70 (verified by
+         rendering: 70 chars, 15 lines, 383px, still inside the 460px clamp).
+         ⚠ AND IT IS A TONE FIX TOO, which is why it belongs in this pass: a
+         778px-wide slab of text reads as a REPORT. A narrow column reads as
+         an EMAIL. Same reasoning as the face itself — the shape of the thing
+         signals what it is before any word is read. */
+      max-width: 560px;
       color: var(--text);
       line-height: 1.65;
       white-space: pre-wrap;

@@ -75,9 +75,20 @@ test('⚠⚠ the prompt change ships WITH its version bump, in this commit', () 
   const w = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
   const v = w.match(/const ANALYSIS_PROMPT_VERSION = '([^']+)'/);
   assert.ok(v, 'version constant missing');
-  assert.ok(/^v24-/.test(v[1]),
-    'a prompt edit and its version bump are ONE atomic change — a lagging version '
-    + 'makes every downstream system lie coherently. Got ' + v[1]);
+  /* ⚠⚠ THIS ASSERTS A FLOOR, NOT AN EQUALITY — deliberately changed at v25.
+     It was written as /^v24-/, which is the "a guard that pins a literal goes
+     stale on exactly the change it polices" trap: it went red on the very next
+     bump, against a bump that was correct, and the failure READ AS the bump
+     being wrong rather than the guard being dated.
+     ⚠ AND TWO TRIPWIRES ON ONE CONSTANT IS ONE TOO MANY. `grader-v11.test.js`
+     owns the strict equality pin on purpose — its whole job is to force every
+     bump to consciously touch one line. This test's SUBJECT is different: that
+     voice grounding never shipped WITHOUT a bump. A floor says exactly that and
+     survives every later bump, which is what a guard should do. */
+  const major = parseInt(String(v[1]).replace(/^v/, ''), 10);
+  assert.ok(Number.isFinite(major) && major >= 24,
+    'voice grounding landed at v24, so the version can never be below it — a '
+    + 'prompt edit and its bump are ONE atomic change. Got ' + v[1]);
   assert.ok(/voiceBlock/.test(w), 'and the block must actually reach the prompt');
   assert.ok(/shouldGroundVoice\(normalized\.speaker_confidence\)/.test(w),
     'gated on a MATCHED speaker, not on source');

@@ -12,18 +12,55 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
 
-/* ⚠ v23 -> v24 (2026-08-20): the follow_up_email is now grounded on the
-   closer's own verified lines. A prompt edit and its version bump are ONE
-   atomic change — a lagging version makes the DB stamp, the outdated count
-   and the update button all agree with each other and all be wrong. */
-test('ANALYSIS_PROMPT_VERSION is the current shipped version (v24)', () => {
+/* ⚠ v24 -> v25 (2026-08-20): three follow_up_email DEFECT fixes — a
+   no-prospect branch, mandatory paragraph breaks, and a pinned sign-off.
+   A prompt edit and its version bump are ONE atomic change — a lagging
+   version makes the DB stamp, the outdated count and the update button all
+   agree with each other and all be wrong. */
+test('ANALYSIS_PROMPT_VERSION is the current shipped version (v25)', () => {
   // House rule: a prompt change and its version bump are ONE atomic change. If
   // the constant lags the prompt, every downstream system lies coherently.
   //
   // This pin is a deliberate TRIPWIRE, kept strict on purpose: every bump must
   // consciously touch this line. v14 = verbatim quoting for every quoted field
   // the extractor emits. (v13 = 6a deterministic speaker labelling.)
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v24-2026-08-20'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v25-2026-08-20'/);
+});
+
+/* ⚠⚠ v25's three fixes, asserted on the BUILT PROMPT STRING rather than on the
+   source file — per the note below, a comment that merely DISCUSSES a rule must
+   not be able to satisfy the check. This file has a large v25 comment block
+   naming all three, so a source scan would pass with the rules absent. */
+test('⚠⚠ v25: the NO-PROSPECT branch reaches the model, with its exact string', () => {
+  assert.ok(/NO-PROSPECT CASE/.test(GRADER_PROMPT),
+    'the no-prospect branch is missing — the model is left to improvise, which '
+    + 'is exactly how v24 put a greeting on a call with nobody to greet');
+  // ⚠ THE EXACT STRING IS LOAD-BEARING, not decorative: item 3 (non-sales-call
+  // tagging) needs a value a downstream reader can RECOGNISE. A paraphrase
+  // that varies per run is unusable as a signal.
+  assert.ok(GRADER_PROMPT.indexOf('No follow-up email — this recording has no prospect in it.') !== -1,
+    'the fixed refusal string must be given verbatim, or it cannot be detected downstream');
+  assert.ok(/no sign-off/i.test(GRADER_PROMPT) && /No greeting/.test(GRADER_PROMPT),
+    'the branch must forbid a greeting AND a sign-off — the v24 defect was a greeting');
+});
+
+test('⚠ v25: paragraph breaks and the sign-off are stated as OPERATIONS', () => {
+  // Mechanical ("a BLANK LINE"), never "well formatted" — the adjective-vs-
+  // operation lesson, now proven four times in this prompt (v14, v17, v18, v25).
+  assert.ok(/BLANK LINE/.test(GRADER_PROMPT),
+    'paragraph separation must name the operation, not describe good formatting');
+  assert.ok(/one unbroken block/.test(GRADER_PROMPT), 'the failure mode must be named');
+  assert.ok(/SIGN-OFF/.test(GRADER_PROMPT) && /ONLY the closer's first name/.test(GRADER_PROMPT),
+    'the sign-off must be pinned to one form — three live samples of the same '
+    + 'closer signed "Joshua", "Josh" and "— Joshua"');
+});
+
+test('⚠ v25: the no-prospect branch did NOT displace the greeting rule', () => {
+  // The two rules cover DIFFERENT cases (no name established vs no prospect at
+  // all) and both must survive. Conflating them is what caused the defect.
+  assert.ok(/Greeting rule: greet the prospect ONLY by the name/.test(GRADER_PROMPT),
+    'the v7 greeting contract must still be present — v25 adds a branch beside '
+    + 'it, it does not replace it');
 });
 
 // v14 assertions run against the BUILT PROMPT STRINGS, not the source file.
