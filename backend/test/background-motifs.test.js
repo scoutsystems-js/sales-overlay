@@ -121,87 +121,13 @@ test('the layer is decorative and unreachable — never in front of content', ()
     + 'replaced. Found ' + op[1]);
 });
 
-test('the four styles are inline SVG — no asset, no request, no dependency', () => {
-  // ⚠ ANCHOR ON SOMETHING UNIQUE. There are TWO `:root {` blocks — the colour
-  // tokens and this one — and slicing on the first gave a block with no motifs
-  // in it, so the test failed for a reason unrelated to the code. Anchor on the
-  // declaration that only exists here.
-  const at = LIVE.indexOf('--motif-a:');
-  assert.ok(at !== -1, '--motif-a must be declared');
-  const root = LIVE.slice(LIVE.lastIndexOf(':root {', at), LIVE.indexOf('}', at));
-  assert.ok(root.length > 200 && root.length < 20000, 'slice must cover the styles: ' + root.length);
-  const urls = root.match(/url\("data:image\/svg\+xml,/g) || [];
-  assert.strictEqual(urls.length, 4, 'expected FOUR styles as inline data URIs');
-  ['--motif-a', '--motif-b', '--motif-c', '--motif-d'].forEach(function (v) {
-    assert.ok(root.indexOf(v) !== -1, 'missing style ' + v);
-  });
-  assert.ok(!/url\(["']?(https?:)?\/\//.test(root), 'no remote asset may be referenced');
-  assert.ok(!/url\(["']?(https?:)?\/\//.test(LIVE.slice(LIVE.indexOf('body[data-view]::before'),
-    LIVE.indexOf('@media (max-width: 1320px)'))), 'nor by any per-view rule');
-});
 
-test('⚠⚠ EVERY STYLE IS VALID SVG — the four shipped MALFORMED once and rendered NOTHING', () => {
-  // The generator collapsed "\n\s*" to nothing, joining an attribute to the one
-  // before it — fill='none'stroke='#4ade80'. All four were invalid, the browser
-  // refused to decode them, and the page looked exactly like a treatment that
-  // was simply too faint. Caught by LOOKING AT THE RENDERED PAGE, not the CSS.
-  ['a', 'b', 'c', 'd'].forEach(function (k) {
-    const m = LIVE.match(new RegExp('--motif-' + k + ': url\\("data:image/svg\\+xml,([^"]+)"\\)'));
-    assert.ok(m, '--motif-' + k + ' must be declared');
-    const svg = decodeURIComponent(m[1]);
-    // An attribute must never begin immediately after a closing quote.
-    const joins = svg.match(/['"][a-zA-Z-]+=/g) || [];
-    assert.deepStrictEqual(joins, [],
-      'motif-' + k + ' has attributes joined without a space — the SVG will not decode');
-    assert.ok(svg.trim().startsWith('<svg'), 'motif-' + k + ' must start with <svg');
-    assert.ok(svg.trim().endsWith('</svg>'), 'motif-' + k + ' must close its root element');
-    // ⚠ DERIVED FROM THE TOKEN, NOT HARD-CODED. This assertion pinned #4ade80
-    // and went stale the moment Scout green moved to #09e046 — on the very
-    // change it exists to police. Reading --accent means the guard follows the
-    // brand instead of dating itself, and still fails if a motif is left behind.
-    assert.ok(svg.indexOf(ACCENT) !== -1,
-      'motif-' + k + ' must be Scout green (' + ACCENT + ') — a data URI encodes # as %23, '
-      + 'so a plain hex search-and-replace does NOT reach it');
-  });
-});
 
-test('⚠ NON-VACUITY — the validity check catches a joined attribute', () => {
-  const m = LIVE.match(/--motif-a: url\("data:image\/svg\+xml,([^"]+)"\)/);
-  const broken = decodeURIComponent(m[1]).replace("' stroke='" + ACCENT + "'", "'stroke='" + ACCENT + "'");
-  const joins = broken.match(/['"][a-zA-Z-]+=/g) || [];
-  assert.ok(joins.length > 0,
-    'the matcher must see a joined attribute, or this check proves nothing');
-});
 
-test('ONE layer, per-view ASSIGNMENT, and render() is what gates it', () => {
-  // The ATTRIBUTE is still required: render() stamps it, so the layer cannot
-  // paint over a page that has not rendered yet.
-  assert.ok(/body\[data-view\]::before\s*{/.test(LIVE),
-    'the shared layer must key on the data-view attribute render() stamps');
-  // ⚠ Per-view rules now EXIST on purpose — a different style in a different
-  // place on every page — but they may only set the image and its position.
-  // Anything else re-declared per view is a second definition waiting to drift.
-  const perView = [...LIVE.matchAll(/body\[data-view="[a-z-]+"\]::before\s*{([^}]*)}/g)];
-  assert.ok(perView.length >= 12, 'expected the per-view assignment, found ' + perView.length);
-  perView.forEach(function (m) {
-    const props = m[1].split(';').map((x) => x.split(':')[0].trim()).filter(Boolean);
-    props.forEach(function (prop) {
-      assert.ok(prop === 'background-image' || prop === 'background-position',
-        'a per-view rule may only assign the style and its position, got: ' + prop);
-    });
-  });
-  // No view may declare its own image inline — they all reference a :root style.
-  assert.strictEqual((LIVE.match(/body\[data-view="[a-z-]+"\]::before\s*{[^}]*data:image/g) || []).length, 0,
-    'per-view rules must reference var(--motif-*), not re-embed an SVG');
-  // render() is the single dispatch point for every view, so the attribute
-  // cannot fall out of step with what is on screen.
-  const at = LIVE.indexOf('function render()');
-  assert.ok(at !== -1, 'render() must exist');
-  const body = LIVE.slice(at, LIVE.indexOf('updateNavActiveStates();', at));
-  assert.ok(body.length > 100 && body.length < 3000, 'slice must cover render(): ' + body.length);
-  assert.ok(/document\.body\.dataset\.view\s*=\s*state\.view/.test(body),
-    'render() must stamp the view onto <body> — otherwise the scope never matches');
-});
+
+
+
+
 
 test('⚠ NON-VACUITY — the body-background guard fires when the background returns', () => {
   const broken = LIVE.replace('html, body {', 'html, body {\n      background: var(--bg);');
@@ -209,4 +135,60 @@ test('⚠ NON-VACUITY — the body-background guard fires when the background re
   const shared = broken.slice(at, broken.indexOf('}', at));
   assert.ok(/background\s*:/.test(shared),
     'the matcher must detect a background on the shared rule, or this suite proves nothing');
+});
+
+/* ══ THE FULL-BLEED MESH (Josh, 2026-08-20) — replaces the four cropped shapes ══
+   "Connecting data to infrastructures": nodes joined by fine lines, nearer nodes
+   brighter and larger, depth falling away.
+
+   ⚠ THE FOUR-STYLE TESTS ABOVE WERE CONVERTED, NOT DELETED. Every property they
+   protected still matters and is re-asserted here — inline (no request), VALID
+   (the four shipped malformed once and rendered nothing), and ONE layer. What
+   changed is that there is now one artwork instead of four, and per-page
+   variation is retired: each offset would change which text sits over which
+   node, so every variant would need its own ink sweep. */
+
+// live CSS only: the superseded 0.035 rule is archived in a comment block and
+// a raw scan would read it as if it still governed (presence vs precedence).
+const LIVE_CSS = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+
+test('⚠ the mesh is INLINE — no asset, no request, no dependency', () => {
+  const m = HTML.match(/--motif-mesh:\s*url\("([^"]+)"\)/);
+  assert.ok(m, 'the mesh must be a single custom property');
+  assert.ok(/^data:image\/svg\+xml/.test(m[1]), 'inline data URI, never a fetched asset');
+  /* ⚠ the SVG xmlns is a NAMESPACE URI, not a fetch — a naive https?:// test
+     flags it and the check would then be about the wrong thing entirely. What
+     must be absent is a resource REFERENCE: href, src, or url(). */
+  const body = m[1].replace(/xmlns='[^']*'/g, '').replace(/xmlns="[^"]*"/g, '');
+  assert.ok(!/(href|src)\s*=|url\(/i.test(body),
+    'no external reference — the mesh must fetch nothing at render time');
+});
+
+test('⚠⚠ THE MESH IS VALID SVG — the old motifs shipped MALFORMED and drew nothing', () => {
+  const m = HTML.match(/--motif-mesh:\s*url\("([^"]+)"\)/);
+  const svg = decodeURIComponent(m[1].replace(/^data:image\/svg\+xml;utf8,/, ''));
+  assert.ok(/^<svg[\s>]/.test(svg) && /<\/svg>$/.test(svg), 'must be a complete svg element');
+  assert.ok(!/['"][a-zA-Z-]+=/.test(svg.replace(/" /g, '" ')),
+    'joined attributes (fill="none"stroke=…) make the browser refuse the whole image');
+  assert.ok(/<line /.test(svg) && /<circle /.test(svg), 'a NETWORK: edges and nodes, not one shape');
+  assert.ok(svg.indexOf('%2309e046') !== -1 || svg.indexOf('#09e046') !== -1,
+    'drawn in the brand green');
+});
+
+test('⚠ depth is real — nodes and edges vary in size and opacity', () => {
+  const m = HTML.match(/--motif-mesh:\s*url\("([^"]+)"\)/);
+  const svg = decodeURIComponent(m[1].replace(/^data:image\/svg\+xml;utf8,/, ''));
+  const radii = [...new Set((svg.match(/circle[^>]*r='([\d.]+)'/g) || []))];
+  const opac  = [...new Set((svg.match(/opacity='([\d.]+)'/g) || []))];
+  assert.ok(radii.length > 5, 'nodes must vary in size — depth falling away');
+  assert.ok(opac.length > 20, 'and in opacity, or it reads flat: ' + opac.length);
+});
+
+test('⚠⚠ ONE artwork, ONE layer — per-page variation is retired', () => {
+  const live = LIVE_CSS;
+  assert.ok(!/--motif-[abcd]\s*:/.test(live), 'the four styles must be gone');
+  assert.strictEqual((live.match(/background-image: var\(--motif-mesh\)/g) || []).length, 1,
+    'exactly one layer draws the mesh');
+  assert.ok(!/body\[data-view="[a-z-]+"\]::before \{ background-image/.test(live),
+    'per-view artwork assignment is retired — one full-bleed mesh covers everything');
 });
