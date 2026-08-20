@@ -195,3 +195,47 @@ test('⚠ the block now states BOTH fixed rules to the model', () => {
   assert.match(b, /End with a line containing ONLY the closer's first name/,
     'the sign-off must be instructed, not just gated');
 });
+
+test('⚠⚠ bodyOf FAILED OPEN on single-paragraph email — the gate passed anything', () => {
+  /* The first version matched `[^\n]*`, i.e. everything up to the first
+     newline. Every pre-v26 draft is ONE paragraph, so it stripped the whole
+     email and countBodyEmDashes returned 0 for a 175-word draft with FOUR
+     em-dashes. A gate that fails OPEN is worse than no gate: it reports PASS,
+     so nobody looks again.
+     ⚠ Found only by running the gates over the OLD drafts as well as the new
+     ones. Checking only the drafts you expect to pass cannot reveal a check
+     that can no longer fail. */
+  const oneParagraph =
+    'Hey Teesha — wanted to follow up. I know the price landed — and I get it '
+    + '— you came in to learn — not to be hit.';
+  assert.strictEqual((oneParagraph.match(/—/g) || []).length, 4, 'four raw');
+  assert.strictEqual(vp.countBodyEmDashes(oneParagraph), 3,
+    'the greeting costs one; the other THREE must still be counted');
+});
+
+test('⚠ the salutation strip is BOUNDED — it must not eat a body em-dash', () => {
+  // An intermediate version allowed any 40 chars before the punctuation, so
+  // "Hey Dan I have — one dash." lost its BODY dash to the greeting strip.
+  assert.strictEqual(vp.countBodyEmDashes('Hey Dan I have — one dash.'), 1,
+    'no salutation punctuation => strip nothing, count everything');
+  assert.strictEqual(vp.countBodyEmDashes('Hey Dan —\n\nNo dashes here.'), 0);
+  assert.strictEqual(vp.countBodyEmDashes('Hi Dan,\n\nOne — dash.'), 1);
+  // a two-word name is still a salutation
+  assert.strictEqual(vp.countBodyEmDashes('Hello Mary Jane — one — two.'), 1);
+  // no greeting at all => nothing stripped
+  assert.strictEqual(vp.countBodyEmDashes('One — dash — here.'), 2);
+});
+
+test('⚠ short_sentence is ADVISORY — measured, never blocking', () => {
+  // It was in the key table and in NEITHER gate list, rendering as a bare "no"
+  // that read as a failure. "Contains a sentence under six words" is checkable,
+  // but a good email can legitimately have none, so blocking would reject
+  // valid drafts.
+  assert.ok(vp.ADVISORY_GATES.includes('short_sentence'));
+  assert.ok(!vp.BLOCKING_GATES.includes('short_sentence'));
+  const noShort = 'Hey Dan —\n\nThis sentence is quite deliberately longer than six words indeed.\n\nJoshua';
+  const g = vp.evaluateGates(noShort, 'closed', 'Joshua');
+  assert.strictEqual(g.results.short_sentence.pass, false, 'measured as false');
+  assert.ok(!g.blocked.includes('short_sentence'), 'but must NOT block');
+  assert.strictEqual(g.fitToRead, true, 'and the draft stays fit to read');
+});

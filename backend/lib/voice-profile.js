@@ -173,8 +173,27 @@ const OUTCOME_FORM = {
  */
 function bodyOf(text) {
   var t = String(text || '');
-  // drop a leading greeting line ("Hey X —" / "Hi X,"), whatever it spends
-  return t.replace(/^\s*(hey|hi|hello)\b[^\n]*\n?/i, '');
+  /* ⚠⚠ STRIP THE SALUTATION, NOT THE LINE — THE FIRST VERSION FAILED OPEN.
+     It matched `[^\n]*`, i.e. everything up to the first newline. On a
+     SINGLE-PARAGRAPH email — which every pre-v26 draft is — the whole email is
+     one line, so it stripped the ENTIRE email and countBodyEmDashes returned 0
+     for a 175-word draft containing FOUR em-dashes. The gate passed anything.
+     ⚠ A GATE THAT FAILS OPEN IS WORSE THAN NO GATE: it reports PASS, so nobody
+     looks again. Found only by running the gates over the OLD drafts as well as
+     the new ones — checking just the drafts you expect to pass cannot reveal a
+     check that can no longer fail.
+     Now anchored to the salutation itself: "Hey <name>" plus its dash or comma,
+     and nothing beyond it. */
+  // lazy up to the salutation's OWN dash/comma, which is REQUIRED. If there
+  // is none within 40 chars, nothing is stripped — the gate then counts the
+  // greeting's punctuation too, i.e. it fails CLOSED (stricter), never open.
+  // A salutation is the greeting word, AT MOST TWO capitalised name tokens,
+  // and its own dash or comma. Bounded that tightly on purpose: an earlier
+  // version allowed any 40 characters before the punctuation, so
+  // "Hey Dan I have — one dash." had its BODY dash stripped as if it were
+  // part of the greeting. No `i` flag — names are capitalised, and case
+  // folding would let ordinary lowercase words pass as a name.
+  return t.replace(/^\s*([Hh]ey|[Hh]i|[Hh]ello)\b(\s+[A-Z][\w'\u2019-]*){0,2}\s*[\u2014,][^\S\n]*/, '');
 }
 function countBodyEmDashes(text) {
   return (bodyOf(text).match(/—/g) || []).length;
@@ -297,7 +316,37 @@ const BLOCKING_GATES = Object.freeze([
   'paragraph_breaks',
   'banned_openers',
 ]);
-const ADVISORY_GATES = Object.freeze(['word_count']);
+/* ⚠ short_sentence WAS MEASURED AND ENFORCED NOWHERE — it appeared in the key
+   table as a bare "no", which reads as a FAILURE, while sitting in neither gate
+   list. Classified here as ADVISORY, deliberately: "contains a sentence under
+   six words" is checkable, but a good email can legitimately have none, so
+   BLOCKING on it would reject valid drafts. The prompt still asks for one. */
+const ADVISORY_GATES = Object.freeze(['word_count', 'short_sentence']);
+
+/**
+ * ⚠⚠ MEASURED ON THE BODY, WITH THE SIGN-OFF REMOVED — AND THAT IS THE WHOLE
+ * POINT OF THE FUNCTION. Measured naively over the raw email, the one-word
+ * sign-off ("Joshua") splits out as its own "sentence" of length 1, so
+ * "contains a sentence under six words" is TRUE for every email that has a
+ * sign-off — which is every email, because v25 pins one. The check would be
+ * VACUOUS: always passing, measuring nothing, and reported as if it meant
+ * something.
+ * ⚠ SAME SHAPE AS THE EM-DASH BUDGET: a TEMPLATE element silently satisfies
+ * the constraint, so the constraint stops describing the prose. Whenever a
+ * fixed part of the format can satisfy a rule on its own, the rule has to
+ * exclude that part or it is not a rule.
+ */
+function sentenceLengths(text) {
+  var lines = bodyOf(String(text)).trim().split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+  // drop a trailing sign-off line (<= 3 words, no sentence-ending punctuation)
+  if (lines.length > 1) {
+    var last = lines[lines.length - 1];
+    if (!/[.!?]$/.test(last) && last.split(/\s+/).length <= 3) lines.pop();
+  }
+  return lines.join(' ').split(/(?<=[.!?])\s+/).filter(Boolean)
+    .map(function (x) { return (x.match(/[A-Za-z0-9'\u2019-]+/g) || []).length; })
+    .filter(function (n) { return n > 0; });
+}
 
 function evaluateGates(text, outcome, closerFirstName) {
   const f = formConstraintsFor(outcome);
@@ -308,6 +357,7 @@ function evaluateGates(text, outcome, closerFirstName) {
     paragraph_breaks: { pass: /\n\s*\n/.test(String(text).trim()) },
     banned_openers:   { pass: !/I hope this (email )?finds you well|don't hesitate to reach out/i.test(String(text)) },
     word_count:       { pass: words <= f.maxWords, value: words, ceiling: f.maxWords },
+    short_sentence:   { pass: sentenceLengths(text).some(function (n) { return n < 6; }) },
   };
   const blocked = BLOCKING_GATES.filter(k => !results[k].pass);
   return { results, blocked, fitToRead: blocked.length === 0 };
@@ -317,6 +367,7 @@ module.exports = {
   BLOCKING_GATES,
   ADVISORY_GATES,
   evaluateGates,
+  sentenceLengths,
   MIN_LINES,
   CEILINGS_ARE_A_JUDGEMENT,
   bodyOf,
