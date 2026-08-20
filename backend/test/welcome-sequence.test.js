@@ -414,3 +414,53 @@ test('⚠ only welSettle animates a layout property — the others cannot reflow
     + found.filter((f) => !/letter-spacing/.test(f)).join(', ')
     + ' — re-check that its constraint holds at every value it passes through');
 });
+
+/**
+ * ⚠⚠ THE WELCOME LOCKUP MUST MATCH THE LOGIN LOCKUP (Justin, 2026-08-19).
+ * The overlay got the lockup early and login has been refined twice since, so
+ * the overlay was still carrying MONTSERRAT's metrics (0.844 / 0.700 / 0.0873)
+ * in a SYSTEM font at weight 800 — a face it does not load, at a weight that
+ * does not exist, sized for a font it does not render.
+ *
+ * ⚠ THE VALUES ARE COMPARED AGAINST login.html ITSELF, never pinned as
+ * literals here. Pinning would go stale on exactly the next refinement — which
+ * is the drift this test exists to catch.
+ */
+const LOGIN_PAGE = fs.readFileSync(path.join(__dirname, '..', 'web', 'login.html'), 'utf8');
+
+function constOf(src, name) {
+  const m = src.match(new RegExp('--' + name + ':\\s*([\\d.]+)'));
+  assert.ok(m, 'stale anchor — --' + name + ' not found');
+  return m[1];
+}
+
+test('⚠⚠ the overlay glyph uses the SAME derived constants as login', () => {
+  ['cap-em', 'o-adv-em', 'mark-stroke-px', 'ring-path-span', 'dot-1', 'dot-2', 'dot-3']
+    .forEach((n) => {
+      assert.strictEqual(constOf(HTML, n), constOf(LOGIN_PAGE, n),
+        '--' + n + ' must match login.html — the overlay drifted from the lockup once already');
+    });
+});
+
+test('⚠⚠ the overlay glyph geometry matches the login glyph exactly', () => {
+  const vb = /viewBox=\\?"([\d. ]+)\\?"/;
+  const wel = HTML.slice(HTML.indexOf('class="wel-title"'), HTML.indexOf('</svg></span>', HTML.indexOf('class="wel-title"')));
+  const login = LOGIN_PAGE.slice(LOGIN_PAGE.indexOf('class="brand-o"'), LOGIN_PAGE.indexOf('</svg></span>', LOGIN_PAGE.indexOf('class="brand-o"')));
+  assert.ok(wel.length > 200 && login.length > 200, 'slice suspicious');
+  assert.strictEqual((wel.match(vb) || [])[1], (login.match(vb) || [])[1],
+    'the viewBox must be the same ink-cropped box as the login lockup');
+  const radii = (t) => (t.match(/\br=\\?"([\d.]+)/g) || []).map((x) => x.replace(/[^\d.]/g, ''));
+  assert.deepStrictEqual(radii(wel), radii(login), 'dot radii must match the lockup');
+});
+
+test('⚠ the overlay renders Archivo 700 — NOT a synthesised 800', () => {
+  const at = HTML.indexOf('.wel-title  {');
+  assert.ok(at !== -1, 'stale anchor — .wel-title');
+  const rule = HTML.slice(at, HTML.indexOf('}', at));
+  assert.ok(/font-weight:\s*700/.test(rule),
+    'only weight 700 exists in the woff2; 800 makes the browser synthesise, '
+    + 'which renders wider and invalidates the k that keeps this on one line');
+  assert.ok(/Archivo Expanded/.test(rule), 'the lockup face must be Archivo Expanded');
+  assert.ok(/@font-face/.test(HTML) && /archivo-expanded-700\.woff2/.test(HTML),
+    'the dashboard must self-host the face it asks for');
+});

@@ -1259,12 +1259,61 @@ muted text itself falls below 4.5:1 above opacity 0.219
   **So the sweep's remaining job is narrow: does the mark still cross ANY `--muted` text?** If yes — almost certain, since the mark now spans the full viewport height and the 400px card sits inside its horizontal span — the answer is **0.21 for a fourth time** and nothing moves. **The number can only move if muted text is crossed NOWHERE**, which ink-vs-box makes a real question rather than a formality.
 - **⚠ DO NOT CLOSE THIS BY RE-READING THE CODE OR RE-RUNNING THE SUITE.** Both already pass; that is the state that produced every previous miss. It closes when a browser has actually scrubbed the sequence and sampled the ink.
 
-### ⏳ TRIGGERED WORK — SIX PROVIDER-BLIND CLIP LABELS (logged 2026-08-17)
+### ✅ DISCHARGED 2026-08-19 (`b6f6264`) — TRIGGERED WORK: PROVIDER-BLIND CLIP LABELS
+**Done. Kept because the COUNT was wrong and that is the transferable part: it was TEN builders across SEVEN files, not six across four — see the hypothesis-shaped-search entry. All now delegate to `lib/clip-link.js`; `source` rides with `clip_url` at every emission, guarded by `test/clip-link-single-source.test.js`.**
+*(original entry below, kept for the reasoning)*
 **Deferred deliberately, with the condition that makes it due. Not a someday.**
 - **What:** six surfaces build their clip link INLINE (`recording_url + ?t=`) instead of using the shared `clip_url` field, so the provider-aware label from `lib/clip-link.js` never reaches them. They say **"Clip"** regardless of provider — which on a Zoom call promises a moment and delivers **00:00**.
 - **Why it was left:** measured 2026-08-17 there are **2 Zoom calls and ZERO analysed Zoom moments**, so no wrong label can currently render. Threading `source` through six payloads — review page, objections feed, digest, team lanes — to fix a case that cannot yet occur is work spent early.
 - **⚠ THE TRIGGER: when Zoom Marketplace approval lands and real Zoom traffic starts being analysed, thread `source` through those six payloads.** The moment a Zoom call produces an analysed highlight, the labels are wrong on screen.
 - **The reason this is written as a trigger and not a backlog line (Justin, 2026-08-17): "a logged item with a trigger gets done; one without gets rediscovered."**
+
+### ⏸⏸ ZOOM — PINNED AT JUSTIN'S CALL 2026-08-19. THE HANDOFF: WHAT IS PROVEN, WHAT IS NOT, AND THE TRAP A FRESH SESSION WILL WALK INTO
+**Josh's Zoom settings are now correct — automatic recording ON, TO THE CLOUD, with "Create audio transcript" and "Save closed caption as a VTT" both ticked. Nothing further happens until he records a call under those settings. Do NOT start Zoom work before that call exists; there is nothing to act on.**
+
+**✅ PROVEN 2026-08-19 — and this is the thing that had never been proven before that day: THE INSTALL PATH WORKS FOR A REAL THIRD PARTY.** Every earlier Zoom run was the developer's own account or a reviewer's.
+```
+OAuth + token refresh on a non-developer account   ok      (josh@scoutsystems.io)
+listRecordings against that account                ok      returned an empty list
+the honest no_recordings degrade                   ok      no error, no junk row
+sync-all across 3 users                            3 ok, 0 errors
+the 3301 requeue                                   LIVE, bounded at 24h (a40b65b)
+```
+
+**❌ NOT PROVEN — SAY THIS PLAINLY RATHER THAN INFERRING FROM THE ROWS THAT EXIST:**
+- the **VTT adapter on a real-length call**. Everything it has ever parsed is ≤120 seconds.
+- the **3301 requeue actually FIRING**. No transcript has ever been fetched under a race, so the branch is unit-tested and real-row-replayed but never live-exercised.
+- **speaker labels on a genuine two-person sales call.**
+
+**⚠⚠ THE TRAP, AND IT HAS ALREADY CAUGHT TWO RECONS: EVERY ZOOM ROW THAT HAS EVER EXISTED BELONGS TO THE SECURITY REVIEWER AND IS A 2-MINUTE TEST MEETING.** `reviewer@scoutsystems.io` owns **all 6**; Justin owns **0**; Josh owns **0**.
+- **Recon 1 over-claimed** that "steps 1-2 of the choreography are already done because a third party OAuth'd in" — the reviewer has access *by virtue of reviewing*, which is not evidence the install path works. The app had in fact **never been activated**, and Josh got "Application not found".
+- **Recon 2 over-claimed** that the 6 calls proved the pipeline on real data. They prove it on 2-minute test meetings recorded by a security reviewer probing the app (one title is literally an injection payload, `Flowlu_ZoomSecRev_..."&gt;.gif` — escaping verified, both title render sites).
+- **THE RULE FOR THE NEXT SESSION: before drawing any conclusion from a Zoom row, check WHOSE it is and HOW LONG it is.** `select u.email, f.duration_seconds from fathom_calls f join auth.users u on u.id=f.user_id where f.source='zoom'`. Rows that look like evidence of a working pipeline are test artefacts.
+
+**⚠ THE SPEAKER-IDENTITY GAP — STRUCTURAL, NOT A BUG TO FIX.** A Zoom VTT carries **display names only**; WebVTT has no identity field. Fathom attribution works by EXACT EQUALITY on per-turn `matched_calendar_invitee_email`, and **no Zoom turn has one**, so `meeting.closer_email` is passed but the match loop can never fire → `speaker_confidence='unknown'`, `speaker_closer_name` NULL on all 6.
+- **CONSEQUENCE: every closer-side feature is SILENTLY ABSENT on Zoom calls** — the 6d "What worked" lane, 6e objection responses, KB-harvest attribution. They require `speaker_verified = true`; Zoom highlights are NULL, which the three-valued convention correctly reads as *never assessed*. **Nothing breaks. Things just don't appear**, which is the harder failure to notice.
+- **A NAME-BASED FALLBACK STAYS REFUSED.** It returned the CLOSER as the prospect on 6 of 83 Fathom calls. Do not revive it for Zoom.
+- The only possible source of Zoom identity is **outside the VTT** (recording/participants metadata). That is its own recon and no adapter work can answer it.
+
+**⚠⚠ THE SETTINGS LESSON — "CLOUD RECORDING IS ALLOWED" AND "RECORDINGS ACTUALLY GO TO THE CLOUD" ARE DIFFERENT SETTINGS, AND ONLY THE SECOND PRODUCES ANYTHING SCOUT CAN READ.** Josh had Zoom connected, a real paid-plan account, and had just recorded a call — and `listRecordings` returned **empty**, because his recordings were not going to the cloud. **The failure is a silent empty sync that looks EXACTLY like Scout being broken**: status `ok`, no error, zero calls, and a user who watched himself record a meeting.
+- Local recording, automatic-recording-off, and cloud-recording-disabled all produce the identical empty result.
+- The full working set is FOUR toggles: **paid plan → automatic recording ON → record TO THE CLOUD → create audio transcript (+ save VTT)**. Missing any one yields nothing, with no diagnostic.
+- **THIS BELONGS IN THE CONNECT-FLOW DESIGN.** After a connect that returns zero recordings, the UI must say which setting to check rather than showing an empty state — otherwise the first impression of the integration is "it doesn't work". Same family as *absent and excluded must never look alike*.
+
+**⚠ THE RULING — ONE ACTIVE SOURCE PER USER (Justin, 2026-08-19).** With both providers connected, one conversation arrives twice under two provider ids. **The dedupe key is `UNIQUE (user_id, fathom_call_id)` holding the PROVIDER'S OWN id, and NOTHING anywhere compares across providers** — it is not a gap in the logic, it is the wrong key for the question.
+- **Prevent NEW dual connections; do NOT force-disconnect.** Josh's existing pair is a **knowing exception during the trial** — he keeps Fathom until Zoom proves equal quality and will clean up duplicates himself.
+- Provide a deliberate **Switch provider** action (one step, not disconnect-then-reconnect, which strands a user if the second OAuth fails). Say plainly that existing calls stay — disconnect deletes only the connection row.
+- **⚠ THE TRAP: if enforcement keeps the FIRST source active, the incumbent always wins and the newcomer can never generate the evidence it is being asked for.** For Josh the active source must be **ZOOM** (377 Fathom calls vs 0 Zoom).
+- **The inconsistency that caused this:** `dashboard.html` hides the second connect card once any source is connected (`anySourceConnected()`), while **#account → Connections shows both and connects both**. Josh walked straight through that gap.
+- **Currently INERT in practice, and know why:** Josh's "Impromptu Zoom Meeting" was captured by **Fathom's bot**, which records on Fathom's side and creates **no Zoom cloud recording**. Nothing to duplicate — until cloud recording is on. **This buys time, not a reprieve.**
+
+**⛔ HOLDS, BOTH STILL STANDING:** **no reviewer-data cleanup** and **no Fathom→`call_connections` cutover** while a security reviewer is mid-assessment. `reviewer@scoutsystems.io` connected 2026-08-19 and is actively probing.
+
+### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
+**The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
+- **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
+- **⚠ AND A STALLED WATCHER IS NOT EVIDENCE OF A BROKEN CRON.** Forty polls returning "never" were briefly reported as "the cron did not run"; the workflow history showed 8 consecutive successes. **The discriminator is the run history and the OTHER users' `last_sync_at`, not the one row you are waiting on.**
+- Generalises: anything time-boxed against a periodic job derives its window from **observed run history**, and states the observed spread rather than the nominal period.
 
 ### CLIPS — WHAT THEY ARE TODAY, AND A NAME THAT NEVER EXISTED (2026-08-17)
 - **A "clip" in Scout is a TIMESTAMPED DEEP LINK, not a video file:** `recording_url + ?t=<seconds>`, opening the provider's own player. Nothing is cut, stored or hosted by us. Built in six lib modules and rendered on twelve surfaces; the shared rule now lives in **`lib/clip-link.js`**.
