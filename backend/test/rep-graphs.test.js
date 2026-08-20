@@ -471,7 +471,11 @@ test('⚠ NON-VACUITY — the nav check catches a removed separator', () => {
 test('⚠⚠ the control ALWAYS STATES THE FILTER — a filtered board cannot read as full', () => {
   const at = HTML.indexOf('function repFilterHtml');
   const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
-  assert.ok(fn.length > 400 && fn.length < 3000, 'slice suspicious: ' + fn.length);
+  /* ⚠ CEILING RAISED 3000 -> 6000 (2026-08-20) with the reason stated, per the
+     standing rule about slice bounds going stale on the change they police: the
+     control became a CUSTOM LISTBOX (button + rows + actions + aria) because a
+     native <select> closes its popup on every pick. More markup, same job. */
+  assert.ok(fn.length > 400 && fn.length < 6000, 'slice suspicious: ' + fn.length);
   assert.ok(/of ' \+ roster\.length \+ ' reps shown/.test(fn),
     'when filtered it must name both numbers, like "3 of 5 reps shown"');
   assert.ok(/All ' \+ roster\.length/.test(fn),
@@ -486,7 +490,15 @@ test('⚠ a hidden rep STAYS IN THE LIST — absent and excluded must not look a
   const at = HTML.indexOf('function repFilterHtml');
   const fn = HTML.slice(at, HTML.indexOf('\n  }', at) + 4);
   assert.ok(/roster\.map/.test(fn), 'every rep is rendered, hidden or not');
-  assert.ok(/hidden\[r\.id\] \? /.test(fn), 'hidden state is shown as a marker, not by removal');
+  /* ⚠ RE-POINTED, NOT RELAXED (2026-08-20). The old assertion keyed on the
+     inline `hidden[r.id] ? ` ternary; the custom listbox hoists that into
+     `var isHidden = !!hidden[r.id]` and uses it four times (checkbox glyph,
+     aria-selected, swatch opacity). The PROPERTY is unchanged — a hidden rep is
+     marked, never removed — so the assertion follows the property. */
+  assert.ok(/var isHidden = !!hidden\[r\.id\]/.test(fn),
+    'the row must derive its hidden state per rep');
+  assert.ok(/isHidden \? /.test(fn), 'hidden state is shown as a marker, not by removal');
+  assert.ok(/aria-selected/.test(fn), 'and reported to assistive tech, not only drawn');
 });
 
 test('⚠⚠ PARITY MOVED, NOT LOST — one hidden set drives EVERY live chart', () => {

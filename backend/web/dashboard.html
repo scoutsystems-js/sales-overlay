@@ -588,6 +588,34 @@
        and "3 of 5 reps shown" are both quiet labels to a glancing eye; the accent
        border is what stops a filtered board reading as a normal one. */
     .rep-filter.rep-filter-on { border-color: var(--accent); color: var(--accent); }
+    /* ⚠ THE PANEL IS ABSOLUTE INSIDE A RELATIVE WRAP, so it overlays the charts
+       instead of reflowing the controls row every time it opens. */
+    .rep-filter-wrap { position: relative; display: inline-block; }
+    .rep-filter-caret { margin-left: 6px; font-size: 10px; opacity: 0.7; }
+    .rep-filter-menu {
+      position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+      min-width: 220px; max-height: 320px; overflow-y: auto;
+      /* ⚠ OPAQUE. Every panel on this page must be, or it sits on the
+         full-brightness raster — the exposure sweep's whole premise. */
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong); border-radius: var(--radius);
+      padding: 6px; box-shadow: 0 10px 28px rgba(0,0,0,0.55);
+    }
+    .rep-filter-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 9px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; color: var(--text); white-space: nowrap;
+    }
+    .rep-filter-row:hover { background: rgba(var(--accent-rgb), 0.10); }
+    /* ⚠ A VISIBLE FOCUS RING IS NOT DECORATION HERE. The native select drew its
+       own; a div draws nothing, so a keyboard user would have no idea which row
+       they are on. */
+    .rep-filter-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .rep-filter-check { width: 14px; }
+    .rep-filter-swatch { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+    .rep-filter-name { overflow: hidden; text-overflow: ellipsis; }
+    .rep-filter-actions { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 6px; }
+    .rep-filter-action { font-weight: 600; }
     /* ⚠ UNSCOPED FROM .top-bar-left 2026-08-20 — the coming-soon pattern is now
        used OUTSIDE the nav too (Customize View, in the team controls row). It
        was scoped only because the nav was its only consumer, not because the
@@ -6748,26 +6776,104 @@
     var filtered = shown !== roster.length;
     var label = filtered ? (shown + ' of ' + roster.length + ' reps shown')
                          : ('All ' + roster.length + ' rep' + (roster.length === 1 ? '' : 's'));
-    var opts = '<option value="">' + escapeHtml(label) + '</option>'
-      + roster.map(function (r) {
-          /* ⚠ REPLACES THE HOLLOW-CIRCLE MARKER. The legend struck hidden reps
-             through with a hollow ring; the state is now the check box, and a
-             hidden rep STAYS IN THE LIST — removing it would make absent and
-             excluded look alike. */
-          return '<option value="' + escapeHtml(r.id) + '">'
-            + (hidden[r.id] ? '\u2610 ' : '\u2611 ') + escapeHtml(r.name) + '</option>';
-        }).join('')
-      + '<option value="__all">Show all</option>'
-      + '<option value="__none">Remove all</option>';
-    return '<select class="user-select rep-filter' + (filtered ? ' rep-filter-on' : '') + '"'
-      + ' aria-label="Filter reps shown on the graphs"'
-      + ' onchange="onRepFilterPick(this.value); this.selectedIndex=0;">' + opts + '</select>';
+    /* \u26a0\u26a0 A CUSTOM LISTBOX, NOT A NATIVE <select> \u2014 AND THE TAG WAS THE CAUSE.
+       A native select's popup is drawn by the OS, not the page: picking an
+       option fires `change` and the popup CLOSES, and nothing in HTML or CSS can
+       prevent it (`change` is not cancelable, and the close has already happened
+       by the time it fires). The old code leaned into that, resetting
+       selectedIndex to 0 after every pick. So hiding three reps cost three
+       open-pick-close cycles \u2014 which is Justin's complaint, and it is a property
+       of the TAG, not of the styling. Hence a div.
+       \u26a0 ROWS STAY IN THE LIST WHEN HIDDEN. Removing a hidden rep would make
+       absent and excluded look alike, which this project keeps paying for. */
+    var rows = roster.map(function (r) {
+        var isHidden = !!hidden[r.id];
+        /* \u26a0 THE SWATCH COSTS NOTHING \u2014 repFilterRoster() already collected
+           ds.borderColor and threw it away. It matters because THE LEGEND IS
+           CAPPED AT 10: for an 11th rep this dropdown is the only place their
+           line colour appears at all. Dimmed when hidden, so the row reads as
+           off without the colour vanishing. */
+        return '<div class="rep-filter-row" role="option" tabindex="0"'
+          + ' aria-selected="' + (isHidden ? 'false' : 'true') + '"'
+          + ' data-rep="' + escapeHtml(r.id) + '"'
+          + ' onclick="event.stopPropagation(); repFilterToggle(\'' + escapeHtml(r.id) + '\');"'
+          + ' onkeydown="repFilterKeydown(event, \'' + escapeHtml(r.id) + '\');">'
+          + '<span class="rep-filter-check">' + (isHidden ? '\u2610' : '\u2611') + '</span>'
+          + '<span class="rep-filter-swatch" style="background:' + escapeHtml(r.color || 'transparent')
+            + ';opacity:' + (isHidden ? '0.35' : '1') + ';"></span>'
+          + '<span class="rep-filter-name">' + escapeHtml(r.name) + '</span>'
+        + '</div>';
+      }).join('');
+    var actions = '<div class="rep-filter-actions">'
+      + '<div class="rep-filter-row rep-filter-action" role="option" tabindex="0" aria-selected="false"'
+        + ' onclick="event.stopPropagation(); repFilterAll(true);"'
+        + ' onkeydown="repFilterKeydown(event, \'__all\');">Show all</div>'
+      + '<div class="rep-filter-row rep-filter-action" role="option" tabindex="0" aria-selected="false"'
+        + ' onclick="event.stopPropagation(); repFilterAll(false);"'
+        + ' onkeydown="repFilterKeydown(event, \'__none\');">Remove all</div>'
+    + '</div>';
+    var open = !!state.repFilterOpen;
+    return '<div class="rep-filter-wrap">'
+      + '<button type="button" id="repFilterBtn"'
+        + ' class="user-select rep-filter' + (filtered ? ' rep-filter-on' : '') + '"'
+        + ' aria-haspopup="listbox" aria-expanded="' + (open ? 'true' : 'false') + '"'
+        + ' aria-label="Filter reps shown on the graphs"'
+        + ' onclick="event.stopPropagation(); repFilterMenuToggle();"'
+        + ' onkeydown="repFilterKeydown(event, null);">'
+        + escapeHtml(label) + '<span class="rep-filter-caret">\u25be</span></button>'
+      + (open
+        ? '<div class="rep-filter-menu" role="listbox" aria-multiselectable="true"'
+          + ' onclick="event.stopPropagation();">' + rows + actions + '</div>'
+        : '')
+    + '</div>';
   }
-  function onRepFilterPick(v) {
-    if (!v) return;
-    if (v === '__all') return repFilterAll(true);
-    if (v === '__none') return repFilterAll(false);
-    repFilterToggle(v);
+
+  /* \u26a0\u26a0 THE OPEN STATE LIVES IN `state`, NOT IN THE DOM \u2014 because every toggle
+     runs applyRepFilter() -> renderRepFilterControls(), which reassigns the
+     host's innerHTML and DESTROYS the panel. A DOM-held open flag would be
+     wiped on the first pick and the menu would shut after one rep: the exact
+     bug this control exists to fix, reintroduced one layer down. Same shape as
+     the Chart.js legend handler having to write to `state` before the chart. */
+  function repFilterMenuToggle() {
+    if (state.repFilterOpen) repFilterClose(); else repFilterOpen();
+  }
+  function repFilterOpen() {
+    state.repFilterOpen = true;
+    renderRepFilterControls();
+    /* \u26a0 ARMED ON OPEN, REMOVED ON CLOSE. Armed once at boot it would run for a
+       control that is usually shut; armed per open without removal it would
+       stack one listener per open. Named, so it can be removed. */
+    document.addEventListener('click', repFilterOutsideClick, true);
+    var m = document.querySelector('.rep-filter-menu');
+    if (m) { var first = m.querySelector('.rep-filter-row'); if (first) first.focus(); }
+  }
+  function repFilterClose() {
+    if (!state.repFilterOpen) return;
+    state.repFilterOpen = false;
+    document.removeEventListener('click', repFilterOutsideClick, true);
+    renderRepFilterControls();
+    /* \u26a0 FOCUS RETURNS TO THE BUTTON. The native select did this for free; a div
+       does not, and without it a keyboard user is left on a node that no longer
+       exists \u2014 focus falls to <body> and Tab restarts from the top of the page. */
+    var b = document.getElementById('repFilterBtn');
+    if (b) b.focus();
+  }
+  function repFilterOutsideClick() { repFilterClose(); }
+
+  /**
+   * \u26a0\u26a0 RE-IMPLEMENTS WHAT THE NATIVE TAG GAVE FREE. Enter and Space activate,
+   * Escape closes and hands focus back. Space is preventDefault()ed or it
+   * scrolls the page underneath the open menu.
+   */
+  function repFilterKeydown(e, id) {
+    var k = e.key;
+    if (k === 'Escape') { e.preventDefault(); repFilterClose(); return; }
+    if (k !== 'Enter' && k !== ' ') return;
+    e.preventDefault();
+    if (id === null) { repFilterMenuToggle(); return; }
+    if (id === '__all') { repFilterAll(true); return; }
+    if (id === '__none') { repFilterAll(false); return; }
+    repFilterToggle(id);
   }
   function renderRepFilterControls() {
     var host = document.getElementById('repFilterHost');
