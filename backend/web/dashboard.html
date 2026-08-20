@@ -345,6 +345,21 @@
        low-contrast BODY TEXT; opacity as a depth cue is explicitly allowed
        (same ruling as the date picker's out-of-month days). A grey hex here
        would be the banned thing wearing a different name. */
+    /* ⚠⚠ SCOPED TO THIS MODAL — NEVER WIDEN .kb-modal-dialog. That class is
+       shared by FOUR modals (bucketEvidenceModal, kbModal, memberAddModal,
+       summaryModal); widening it would stretch the KB upload form and the
+       add-member form to the full page, where a form is WORSE than at 520px
+       (line length, field width). The damage would be invisible until someone
+       opened an unrelated form — the shared-carrier trap, in a layout container.
+
+       ⚠ THIS IS THE CHEAP FIX, AND IT IS NOT THE ASK. Justin's word was
+       "expand", which implies a PAGE — no dimming, a URL, a back button. This
+       is a WIDE MODAL: still fixed, still dimmed, still no history entry. The
+       real view is reported separately so he can choose it deliberately rather
+       than get this and forget the ask. */
+    #bucketEvidenceModal .kb-modal-dialog { max-width: min(1200px, 94vw); }
+    #bucketEvidenceModal { padding: 24px 16px; }
+
     .rep-graph-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     /* ⚠ THE FILTERED STATE IS MARKED VISUALLY, NOT ONLY IN WORDS. "All 5 reps"
        and "3 of 5 reps shown" are both quiet labels to a glancing eye; the accent
@@ -5482,6 +5497,13 @@
      near it. 31 is the value that makes EVERY calendar month daily, which is
      what "1-30 days" means in practice; "about 32" has no calendar meaning, so
      nothing is lost by resolving it this way. */
+  /* ⚠ 31 IS DERIVED, NOT PICKED. Justin ruled "daily 1-30, weekly beyond about
+     32". "About 32" has no calendar meaning, and the boundary lands exactly ON
+     month length — months are 28, 29, 30 or 31 days. At 31 EVERY calendar month
+     buckets daily; at 30, a 31-day month would bucket weekly while the 30-day
+     month beside it bucketed daily, and no one could explain why August behaved
+     differently from September. The number is whatever makes "a month" mean one
+     thing. February is never near the line. */
   var DAILY_BUCKET_MAX_DAYS = 31;
   function bucketForRange(r) {
     if (!r || !r.from || !r.to) return 'week';

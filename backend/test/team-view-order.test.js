@@ -87,3 +87,46 @@ test('⚠⚠ GET /team/digest really is picker-independent — the premise of th
     'the digest must NOT read from/to — if it ever does, it answers to the '
     + 'picker and belongs BELOW it (see team-view order)');
 });
+
+/**
+ * ⚠⚠ THE FOUR-MODAL TRAP. `.kb-modal-dialog` is shared by bucketEvidenceModal,
+ * kbModal, memberAddModal and summaryModal. Widening the CLASS to give the
+ * objection drilldown full width would stretch the KB upload form and the
+ * add-member form too — where a form is WORSE wide than at 520px — and the
+ * damage would be invisible until someone opened an unrelated form.
+ */
+test('⚠⚠ the drilldown width is SCOPED — the shared modal class is untouched', () => {
+  /* ⚠ anchor on the UNSCOPED rule: '#bucketEvidenceModal .kb-modal-dialog {'
+     CONTAINS '.kb-modal-dialog {', so a naive indexOf finds the scoped rule I
+     just added and measures that instead. The check would then assert the
+     shared class is 520px by reading a completely different rule. */
+  const sharedAt = LIVE.search(/\n\s*\.kb-modal-dialog \{/);
+  assert.ok(sharedAt !== -1, 'stale anchor — the shared dialog rule');
+  const shared = LIVE.slice(sharedAt, LIVE.indexOf('}', sharedAt));
+  assert.ok(shared.length > 60 && shared.length < 600, 'slice suspicious: ' + shared.length);
+  assert.ok(/max-width:\s*520px/.test(shared),
+    'the SHARED dialog must stay 520px — four modals use it, and two are forms');
+
+  const scoped = LIVE.match(/#bucketEvidenceModal \.kb-modal-dialog \{[^}]*\}/);
+  assert.ok(scoped, 'the drilldown needs its own scoped width rule');
+  assert.ok(/max-width:\s*min\(/.test(scoped[0]), 'scoped rule must set a wide max-width');
+
+  // and it really is only that one modal being widened
+  const others = ['kbModal', 'memberAddModal', 'summaryModal'];
+  others.forEach((id) => {
+    assert.ok(!new RegExp('#' + id + '[^{]*\\.kb-modal-dialog').test(LIVE),
+      id + ' must not have been widened');
+  });
+});
+
+test('⚠ the 31-day boundary reads as DERIVED, not chosen', () => {
+  const at = LIVE.indexOf('var DAILY_BUCKET_MAX_DAYS');
+  assert.ok(at !== -1, 'stale anchor');
+  // the comment lives above the constant; take the block before it
+  const ctx = PAGE.slice(Math.max(0, PAGE.indexOf('var DAILY_BUCKET_MAX_DAYS') - 900),
+                        PAGE.indexOf('var DAILY_BUCKET_MAX_DAYS') + 60);
+  assert.ok(/calendar month/.test(ctx),
+    'the number must be justified by calendar months, or a future reader reads '
+    + '31 as an arbitrary pick and "tidies" it to 30');
+  assert.strictEqual(Number((ctx.match(/DAILY_BUCKET_MAX_DAYS = (\d+)/) || [])[1]), 31);
+});
