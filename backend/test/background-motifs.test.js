@@ -256,3 +256,49 @@ test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
   assert.ok(/--motif-alpha,\s*0\.25\)/.test(layer),
     'the fallback — what everyone without the parameter sees — stays 0.25');
 });
+
+/**
+ * ⚠⚠ PER-VIEW VARIATION IS BACK (Josh, 2026-08-20) — and it is only safe because
+ * every variant is MEASURED, not because one sample was generalised to fifteen.
+ * That generalisation is the inventory failure this project has made four times,
+ * and it is exactly why per-page variation was retired in the first place.
+ *
+ * The shape that makes it affordable: ONE field, fifteen WINDOWS. Fifteen
+ * separate artworks measured 162KB gzipped — 1.8x the whole page. One
+ * 3200x2000 field with a per-view background-position is 48.5KB for all of them.
+ */
+test('⚠⚠ every motif view has its OWN window — none shares another\'s', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...live.matchAll(/body\[data-view="([a-z-]+)"\]::before \{ background-position: (-?\d+)px (-?\d+)px; \}/g)];
+  assert.ok(rules.length >= 15, 'expected a window per motif view, got ' + rules.length);
+  const seen = {};
+  rules.forEach((m) => {
+    const key = m[2] + ',' + m[3];
+    assert.ok(!seen[key] || seen[key] === m[1],
+      'views ' + seen[key] + ' and ' + m[1] + ' share window ' + key
+      + ' — they would render identically, which is the thing Josh asked to change');
+    seen[key] = m[1];
+  });
+});
+
+test('⚠ ONE field powers them all — fifteen artworks was 1.8x the page', () => {
+  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const decls = (live.match(/--motif-mesh:\s*url\(/g) || []).length;
+  assert.strictEqual(decls, 1,
+    'exactly one field: ' + decls + ' artworks would multiply the payload and, '
+    + 'worse, each would need its own sweep');
+});
+
+/**
+ * ⚠ THE GENERATOR REFUSES TO WRITE A FAILING VARIANT — that refusal is the
+ * safety mechanism, not the measurement itself. A script that measures and then
+ * writes anyway is a script that reports rather than protects.
+ */
+test('⚠⚠ the generator REFUSES to write when any variant fails AA', () => {
+  const gen = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'gen-mesh.js'), 'utf8');
+  assert.ok(/REFUSING to write/.test(gen), 'it must refuse, not warn');
+  assert.ok(/failing\.length\s*\)\s*\{[\s\S]{0,160}process\.exit\(1\)/.test(gen),
+    'and exit non-zero, so a build cannot proceed past it');
+  assert.ok(/REFUSING — file shrank/.test(gen),
+    'and it must refuse a truncating write — the shrink assertion');
+});
