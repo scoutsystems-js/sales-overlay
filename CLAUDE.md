@@ -2092,6 +2092,13 @@ Justin: the rep dropdown closes on every pick. **Established rather than assumed
 - **THE SWATCH COST NOTHING:** `repFilterRoster()` already collected `ds.borderColor` and discarded it. It matters because **the legend is capped at 10** — for an 11th rep the dropdown is the only place their colour appears at all.
 - **The outside-click listener is armed on open and REMOVED on close.** Armed at boot it runs for a control that is usually shut; armed per open without removal it **stacks one listener per open**.
 
+### ⚠⚠⚠ FONT: THE RULING IS **SAIRA** (2026-08-20) — AND IT SUPERSEDES ARCHIVO EXPANDED *AND* MONTSERRAT
+**Both earlier rulings are DEAD. Do not act on either.** Three live font rulings in one file is how the wrong one gets built, so this entry exists to make the other two unreachable rather than merely older.
+- **SELF-HOSTED, not the Google CDN.** Page weight is to be reported before any sweep.
+- **⚠ SAIRA HAS A WIDTH AXIS** — the cut choice is part of the ruling, not an implementation detail: wider for headings and the wordmark so they echo the logo, normal for body and numerals.
+- **⚠⚠ `tabular-nums` IS REQUIRED ON EVERY NUMERIC SURFACE** — gauges, tiles, tables, chart labels — or digits change width as values change and a gauge visibly jitters between renders.
+- **⚠ EVERY LESSON ALREADY RECORDED ABOUT MONTSERRAT STILL APPLIES TO SAIRA, because they are about FACES, not about that face:** `k` is per-face and must be re-measured (the wordmark has wrapped four times); the MAX `k` across every face that can actually render is what binds, including the fallback; and a weight the file does not contain will be **synthesised** rather than reported as missing.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

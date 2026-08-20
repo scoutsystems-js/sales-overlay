@@ -38,11 +38,11 @@ test('exports _computeNeedsWork + guardrail constants', function () {
   assert.strictEqual(nw._computeLinkage, undefined);
 });
 
-test('insufficient when fewer than MIN_ANALYZED analyzed calls', function () {
+test('no_volume when fewer than MIN_ANALYZED analyzed calls', function () {
   var o = objs([{ surface: 'too expensive', call_id: 'c1', handled: false }]);
   var a = analysesFrom({ c1: { outcome: 'lost', cash: 0 } });
   var r = nw._computeNeedsWork(o, a, { 'too expensive': 'Price' });
-  assert.strictEqual(r.state, 'insufficient');
+  assert.strictEqual(r.state, 'no_volume');
 });
 
 // A full money-path scenario mirroring the approved worked example shape.
@@ -122,7 +122,7 @@ test('rate_gap is now the ONLY state, and the card never contains a $', function
   assert.ok(r.card_text.indexOf('Think about it') !== -1);
 });
 
-test('insufficient when no bucket clears MIN_BUCKET', function () {
+test('thin_types when no bucket clears MIN_BUCKET', function () {
   var analysesMap = {};
   for (var i = 1; i <= 15; i++) analysesMap['c' + i] = { outcome: 'closed', cash: 1000 };
   // 3 tiny buckets, none >= 6
@@ -131,7 +131,7 @@ test('insufficient when no bucket clears MIN_BUCKET', function () {
     { surface: 'b', call_id: 'c3', handled: false }, { surface: 'c', call_id: 'c4', handled: true },
   ];
   var r = nw._computeNeedsWork(objs(spec), analysesFrom(analysesMap), { a: 'A', b: 'B', c: 'C' });
-  assert.strictEqual(r.state, 'insufficient');
+  assert.strictEqual(r.state, 'thin_types');
 });
 
 test('detail carries per-bucket rates, the surface→bucket mapping, and grounding quotes', function () {

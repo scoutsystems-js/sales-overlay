@@ -15,7 +15,10 @@ const personal = (over) => Object.assign(
 
 test('the volume degrade names the selected window, and points at the fix', () => {
   const r = _computeNeedsWork([], [], {}, personal({ windowDays: 6 }));
-  assert.strictEqual(r.state, 'insufficient');
+  /* ⚠ RE-POINTED 2026-08-20: 'insufficient' was split into no_volume /
+     thin_types / even_performance, because one state meant three different
+     things. Naming the case is STRONGER than the old assertion, not weaker. */
+  assert.strictEqual(r.state, 'no_volume');
   assert.ok(/in the 6 days you selected/.test(r.card_text), r.card_text);
   assert.ok(/wider range/.test(r.card_text), 'it must say what to do about it');
 });
@@ -42,7 +45,7 @@ test('the "nothing stands out" degrade names the window too', () => {
   const objs = Array.from({ length: 10 }, (_, i) => ({ surface: 'price', handled: true, call_id: 'c' + i }));
   const analyses = Array.from({ length: 5 }, (_, i) => ({ fathom_call_id: 'c' + i, outcome: 'closed', cash_collected: 0 }));
   const r = _computeNeedsWork(objs, analyses, {}, personal({ windowDays: 9 }));
-  if (r.state === 'insufficient' && /stands out/.test(r.card_text)) {
+  if (r.state === 'even_performance' && /even/.test(r.card_text)) {
     assert.ok(/in the 9 days you selected/.test(r.card_text), r.card_text);
   }
 });

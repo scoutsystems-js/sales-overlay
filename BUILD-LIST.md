@@ -38,6 +38,7 @@ Started this session.
 
 | item | one line | state |
 |---|---|---|
+| **Site-wide font → SAIRA** | Self-hosted, not the Google CDN; width axis available | ⚠⚠ **SUPERSEDES BOTH EARLIER FONT RULINGS — Archivo Expanded and Montserrat are DEAD.** Three live font rulings is how the wrong one gets built. Measurement only so far; **no sweep** |
 | **Customize View (team page)** | `soon` tag in the team controls row, where the real control will live | **tag SHIPPED `4d6d9e6`** and verified in the render (SPAN, tabIndex -1, dimmed). The feature itself is not started — see AGREED, NOT STARTED |
 
 ## BLOCKED ON JUSTIN
@@ -55,6 +56,8 @@ Ruled on, nobody has begun.
 |---|---|---|
 | **Mark a call "not a sales call"** | Excludes it from counting; **closer OR manager can set it** (Justin 2026-08-20, extends the earlier closer-only spec) | ~17 consumers; both halves (upstream filter + downstream exclusion) must ship in ONE commit |
 | Customize View — the real feature | Let a manager choose what the team page shows | per-user, not per-org (no org entity needed) |
+| **Harvest gate — capture from almost every call** | Justin 2026-08-20: *"there's always a coaching moment you can take from a call"* | ⚠⚠ **SUPERSEDES KB RULING 4**, which gates auto-harvest on `outcome='closed'` ALONE. ⚠ OPEN: extra model calls per call? ⚠⚠ OPEN: **what stops a weak moment being kept once the closed filter goes** — if that filter was the de facto quality gate, removing it needs a replacement, not just a wider net. ⚠ The KB counter card copy ("Scout only collects from calls that close") becomes FALSE and must change in the same commit |
+| **New Scout Systems logo** | Bold square wordmark, ring-and-dot mark replacing the O | ⚠ **SHIPS AS SVG, not text in a font** — removes the identification and licensing questions entirely. ⚠ The **"5." in the source image is a SLIDE NUMBER**, not part of the logo. ⚠⚠ **SMALL-SIZE VARIANT NEEDED FIRST**: the Logo sweep ruling records that at nav size concentric rings vanish and a dot renders under a pixel — **this mark has exactly that construction**. ⚠ Also fixes the **missing favicon**: measured 2026-08-20, `rel="icon"` appears in ZERO of the served pages |
 
 ## QUEUED
 Agreed direction, no date, no owner.
@@ -73,6 +76,7 @@ Agreed direction, no date, no owner.
 | CRM integration (GHL, Close.io) | Read then write, diff-then-confirm on writes | after call analysis is proven |
 | Account/org entity | Real billing needs it (seats, one invoice) | ⚠ per-user customisation does NOT wait on this — ruled 2026-08-20 |
 | Modals for user-management confirms | Email-change + delete still use `prompt()` | polish |
+| Settings toggle — turn the background off | Per-user; plain black instead of the raster | ⚠ per-user by the 2026-08-20 ruling that customisation needs no org entity |
 | Cash tile → EOD | Retarget once EOD accepts a pivoted user | EOD is self-only today |
 | Delete orphan auth accounts | 6 abandoned public-signup rows | accepted as-is; needs an explicit go |
 | DMG notarization gap | Every release needs manual DMG sign+notarize+staple | electron-builder config |

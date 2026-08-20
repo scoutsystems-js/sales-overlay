@@ -29,6 +29,7 @@ const { clipHref } = require('./clip-link');
 // ── Guardrails (Phase 1, approved) ──────────────────────────────────────────
 const MIN_BUCKET = 6;        // no "needs work" claim off a tiny bucket
 const MIN_GAP_PP = 5;        // rate must be at least this far below baseline
+const MAX_FOCUS  = 3;        // a FOCUS panel stops being one if unbounded
 const MIN_ANALYZED = 10;     // analyzed calls needed to model at all
 /* ⚠ MONEY MATH REMOVED 2026-08-17 (Justin: "I don't want the What Needs Work
    talking about cash collected or trying to do math"). Archived, not deleted:
@@ -203,39 +204,88 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
         : 'Not enough of your objections yet to pinpoint a focus area — keep logging calls.')
     : 'Not enough objection volume this period to pinpoint a focus area.';
   // Overall-volume gate → deterministic insufficient (cacheable, no Claude).
+  /* ⚠⚠ (a) NO VOLUME — THE ONLY CASE THAT MAY SAY NOTHING CAN BE DETERMINED,
+     and it must read as a fact about the WINDOW rather than a verdict on the
+     rep. Previously this shared `state:'insufficient'` with two other,
+     genuinely different situations. */
   if (analyzed < minAnalyzed || totalObj === 0) {
-    return { state: 'insufficient', headline: 'What needs work', card_text: insufficientText,
+    return { state: 'no_volume', headline: 'What needs work', card_text: insufficientText,
       bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
   }
 
-  // Candidate weak buckets (exclude the 'Other' grab-bag from being the focus).
-  var candidates = [];
+  /* ⚠⚠ THE RANKING IS BUILT FOR EVERY SIZEABLE BUCKET, NOT ONLY FOR WINNERS.
+     Justin: "even if there's multiple things that rank as bad ... I still want
+     to see what needs work and why." So the gap is computed for every bucket
+     that clears minBucket, and the ranking survives into the payload whether or
+     not anything clears MIN_GAP_PP. `candidates` is then just the subset that
+     does — the bar is unchanged, only what we SHOW below it. */
+  var ranked = [], candidates = [], sizeable = 0;
   Object.keys(buckets).forEach(function (label) {
-    if (label === 'Other') return;
+    if (label === 'Other') return;   // the grab-bag can never be the focus
     var b = buckets[label];
     if (b.total < minBucket) return;
+    sizeable++;
     var otherTotal = totalObj - b.total, otherHandled = totalHandled - b.handled;
     var baseline = otherTotal > 0 ? otherHandled / otherTotal : 0;
     var rate = b.total > 0 ? b.handled / b.total : 0;
     var gapPP = (baseline - rate) * 100;
-    if (gapPP < MIN_GAP_PP) return; // not a relative weakness
     var addHandled = Math.max(0, Math.min(b.total - b.handled, baseline * b.total - b.handled));
-    candidates.push({ b: b, baseline: baseline, otherTotal: otherTotal, otherHandled: otherHandled, rate: rate, gapPP: gapPP, addHandled: addHandled });
+    var row = { b: b, baseline: baseline, otherTotal: otherTotal, otherHandled: otherHandled,
+                rate: rate, gapPP: gapPP, addHandled: addHandled };
+    ranked.push(row);
+    if (gapPP >= MIN_GAP_PP) candidates.push(row);   // ⚠ THRESHOLD UNTOUCHED
   });
+  ranked.sort(function (a, b) { return b.gapPP - a.gapPP; });
+  candidates.sort(function (a, b) { return b.gapPP - a.gapPP; });
 
-  if (candidates.length === 0) {
-    return { state: 'insufficient', headline: 'What needs work',
-      card_text: subject === 'personal'
-        ? (winPhrase ? 'No single objection type stands out as a weak spot ' + winPhrase + '.'
-                     : 'No single objection type stands out as a weak spot for you yet.')
-        : 'No single objection type stands out as a weakness this period.',
-      bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
+  /** The ranking as it goes to the client — label, counts, rate, and the gap. */
+  function rankingRows() {
+    return ranked.map(function (r) {
+      return { label: r.b.label, total: r.b.total, handled: r.b.handled,
+               rate_pct: pctWhole(r.b.handled, r.b.total),
+               gapPP: Math.round(r.gapPP * 10) / 10 };
+    });
   }
 
-  // One path since the money math went: the biggest RATE GAP is the focus.
-  // 'money' state and its largest-extra-cash selection are gone; `state` stays in
-  // the payload because the frontend and the cache key both read it.
-  candidates.sort(function (a, b) { return b.gapPP - a.gapPP; });
+  /* ⚠⚠ (c) THIN TYPES — enough calls and objections overall, but no ONE type is
+     big enough to compare. This is NOT "nothing stands out": nothing was ever
+     compared, so claiming even performance would be an assertion about data
+     that was never examined. It is also not (a) — there IS volume, it is just
+     spread too thin across types. */
+  if (sizeable === 0) {
+    var thinDetail = baseDetail(null); thinDetail.ranking = [];
+    return { state: 'thin_types', headline: 'What needs work',
+      card_text: subject === 'personal'
+        ? ('Your objections are spread across too many types to compare yet'
+           + (winPhrase ? ' ' + winPhrase : '') + ' — no single type has enough volume to rank.')
+        : 'Objections are spread across too many types to compare this period.',
+      bucket: null, extra: null, detail: thinDetail, generated_at: new Date().toISOString() };
+  }
+
+  /* ⚠⚠ (b) EVEN PERFORMANCE — A FINDING, NOT A SHORTAGE. There is plenty of
+     data and it was compared; the answer is that handling is level across
+     types. Wording states what it MEASURES: "even across types" is a result,
+     where "no single type stands out" reads like an absence.
+     ⚠ AND THE RANKING IS STILL SHOWN — a near-tie is a finding, and Justin
+     wants the worst types either way. */
+  if (candidates.length === 0) {
+    var evenDetail = baseDetail(null); evenDetail.ranking = rankingRows();
+    var worst = ranked[0];
+    return { state: 'even_performance', headline: 'What needs work',
+      card_text: subject === 'personal'
+        ? ('Your objection handling is even across types'
+           + (winPhrase ? ' ' + winPhrase : '') + ' — no type is more than '
+           + MIN_GAP_PP + ' points below your average. '
+           + (worst ? 'Closest to it: ' + worst.b.label + ' at '
+              + pctWhole(worst.b.handled, worst.b.total) + '%.' : ''))
+        : 'Objection handling is even across types this period — no type is more than '
+          + MIN_GAP_PP + ' points below the baseline.',
+      bucket: null, extra: null, detail: evenDetail, generated_at: new Date().toISOString() };
+  }
+
+  // The biggest RATE GAP leads. 'money' state and its largest-extra-cash
+  // selection are gone; `state` stays in the payload because the frontend and
+  // the cache key both read it.
   var focus = candidates[0], state = 'rate_gap';
 
   var label = focus.b.label;
@@ -243,6 +293,24 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   var rateW = pctWhole(bH, bT);
   var baseW = Math.round(focus.baseline * 100);
   var detail = baseDetail(label);
+  /* ⚠⚠ A FOCUS *SET*, NOT candidates[0]. Taking the top one dropped genuine
+     weaknesses that were statistically indistinguishable from it. Measured on
+     Josh's live 90-day window: "Needs time / not ready" gapPP 10.4 was shown
+     and "Spouse / partner approval" gapPP 9.7 was DISCARDED — 0.7 points apart.
+     Same family as the rounding lesson: taking [0] of a near-tie and presenting
+     it as a winner.
+     ⚠ CAPPED AT 3, and the number is a judgement worth stating: the panel is a
+     FOCUS, so an unbounded list stops being one. Three is enough to show a
+     near-tie and a runner-up without turning the card into the full ranking —
+     which is separately available as detail.ranking, so nothing is hidden. */
+  detail.focus_set = candidates.slice(0, MAX_FOCUS).map(function (r) {
+    return { label: r.b.label, total: r.b.total, handled: r.b.handled,
+             rate_pct: pctWhole(r.b.handled, r.b.total),
+             baseline_pct: Math.round(r.baseline * 100),
+             gapPP: Math.round(r.gapPP * 10) / 10 };
+  });
+  detail.focus_dropped = Math.max(0, candidates.length - MAX_FOCUS);
+  detail.ranking = rankingRows();
   // Grounding quotes: not-handled examples from the focus bucket first (what's
   // being missed), capped at 2, only rows that actually carry a quote.
   var qcands = focus.b.rows.slice().sort(function (a, b) { return (a.handled ? 1 : 0) - (b.handled ? 1 : 0); });
@@ -538,7 +606,7 @@ module.exports = {
   // that no longer exist — exporting them would have thrown at require() time,
   // taking every needs-work surface down. Left as a note because a stale test
   // asking for them should fail loudly on a missing export, not on a crash.
-  _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP,
+  _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP, _MAX_FOCUS: MAX_FOCUS,
   _MIN_ANALYZED: MIN_ANALYZED,
   _PERSONAL_MIN_BUCKET: PERSONAL_MIN_BUCKET, _PERSONAL_MIN_ANALYZED: PERSONAL_MIN_ANALYZED,
 };

@@ -75,12 +75,18 @@ test('personal MONEY via TEAM-BORROWED coefficients (own data too thin)', () => 
 test('personal MIN_BUCKET=4: a bucket of exactly 4 qualifies (team floor of 6 would reject)', () => {
   var f = personalFixture(); // Think bucket is exactly 4
   var personal = nw._computeNeedsWork(f.objs, f.analyses, f.mapping, f.opts);
-  assert.notStrictEqual(personal.state, 'insufficient'); // 4 clears personal floor
+  assert.notStrictEqual(personal.state, 'thin_types'); // 4 clears personal floor
   var team = nw._computeNeedsWork(f.objs, f.analyses, f.mapping, {}); // default team floor 6
-  assert.strictEqual(team.state, 'insufficient');        // 4 < 6 → team rejects
+  /* CORRECTED 2026-08-20, and the state split is what exposed it. This line
+     read `insufficient` with the comment "4 < 6 -> team rejects", i.e. it
+     claimed to prove the TEAM BUCKET FLOOR. It never did: the fixture has 8
+     analyses against team MIN_ANALYZED=10, so the VOLUME GATE fires first and
+     the bucket check is never reached. One shared state made a true-looking
+     assertion for a reason that was false. */
+  assert.strictEqual(team.state, 'no_volume'); // volume gate fires BEFORE any bucket check
 });
 
-test('personal insufficient when no bucket reaches 4', () => {
+test('personal thin_types when no bucket reaches 4', () => {
   var analyses = [];
   for (var i = 1; i <= 6; i++) analyses.push({ fathom_call_id: 'c' + i, status: 'done', outcome: 'follow_up', cash_collected: 0 });
   var objs = [
@@ -88,8 +94,12 @@ test('personal insufficient when no bucket reaches 4', () => {
     { call_id: 'c4', surface: 'b', handled: false }, { call_id: 'c5', surface: 'b', handled: true },
   ];
   var r = nw._computeNeedsWork(objs, analyses, { a: 'A', b: 'B' }, { subject: 'personal', minBucket: 4, minAnalyzed: 3 });
-  assert.strictEqual(r.state, 'insufficient');
-  assert.match(r.card_text, /weak spot for you yet|Not enough of your objections/);
+  assert.strictEqual(r.state, 'thin_types');
+  /* WORDING FOLLOWS THE STATE. thin_types no longer borrows the volume-gate
+     sentence: "not enough of your objections" was FALSE here -- there IS volume,
+     it is spread too thin across types to rank. The assertion checks that
+     property rather than the old string. */
+  assert.match(r.card_text, /spread across too many types|no single type has enough volume/);
 });
 
 /* ⚠ REMOVED 2026-08-17 with the money math it tested. Archived, not deleted —
@@ -117,7 +127,9 @@ test('computeLinkage: delta = P(closed|handled) − P(closed|not-handled)', () =
 test('team path unchanged: default opts still say "Your team" + no personal floor', () => {
   var f = personalFixture();
   var r = nw._computeNeedsWork(f.objs, f.analyses, f.mapping, {}); // team defaults
-  // Think(4) < team MIN_BUCKET(6) → insufficient (proves team floor intact)
-  assert.strictEqual(r.state, 'insufficient');
+  // The team path rejects on ANALYSED COUNT (8 < MIN_ANALYZED 10), not on the
+  // bucket floor -- see the correction above. What this still proves is that
+  // team defaults do NOT inherit the personal floors.
+  assert.strictEqual(r.state, 'no_volume');
   assert.match(r.card_text, /objection volume this period/); // team copy, not personal
 });
