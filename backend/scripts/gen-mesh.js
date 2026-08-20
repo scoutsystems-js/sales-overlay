@@ -1,4 +1,29 @@
 /**
+ * ⚠⚠⚠ DEAD AS OF 2026-08-20 — THIS SCRIPT'S OUTPUT IS NO LONGER CONSUMED.
+ *
+ * Justin ruled the Team raster onto every view at full brightness, so the base
+ * layer is `url('/team-background.webp')` and `--motif-mesh` — the ONLY thing
+ * this script writes — was removed from dashboard.html (62,858 bytes, 8.9% of
+ * the served page, zero readers).
+ *
+ * ⚠ IT IS KEPT DELIBERATELY, AND THE DISTINCTION MATTERS: the fifteen per-view
+ * CSS rules were DELETED because an archived `body[data-view]::before` selector
+ * is the first thing a search finds and collects stray edits. A SCRIPT cannot be
+ * hit by that last-wins trap, so retaining a 330-line measured generator costs
+ * nothing and preserves the ability to revive the mesh.
+ *
+ * ⚠⚠ REVIVING IT TAKES TWO STEPS, NOT ONE. Running this with --write restores
+ * the declaration; it does NOT restore a reader. `background-image` on
+ * body[data-view]::before currently points at the raster, and the cardinality
+ * guard in test/team-background.test.js asserts exactly ONE background-image
+ * declaration — so a second one will fail rather than silently supersede.
+ * ⚠ AND THE AA REFUSAL BELOW WOULD HAVE TO BE RE-READ IN CONTEXT: it assumes
+ * text sits ON the artwork. Under the current layout no text does, which is why
+ * opacity 1 is safe at all.
+ *
+ * ⚠ THE NOTE BELOW IS HISTORICAL — per-page variation was retired again by
+ * ruling (one image, one position, every view). Do not read it as current.
+ *
  * MESH GENERATOR — one function, one seed per view, and its OWN ink sweep.
  *
  * ⚠⚠ THIS SCRIPT IS WHY PER-PAGE VARIATION IS AFFORDABLE AGAIN. It was retired

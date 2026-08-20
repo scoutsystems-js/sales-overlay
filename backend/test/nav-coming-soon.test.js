@@ -100,7 +100,13 @@ test('⚠ every new tab carries its own separator — nothing generates them', (
 });
 
 test('⚠ dimming is by OPACITY, never a grey colour', () => {
-  const at = LIVE.indexOf('.top-bar-left .nav-soon {');
+  /* ⚠ ANCHOR UPDATED 2026-08-20: the rule was unscoped from `.top-bar-left
+     .nav-soon` to `.nav-soon` when the coming-soon pattern gained a second
+     consumer outside the nav (Customize View, in the team controls row).
+     ⚠⚠ THE ANCHOR ASSERTION BELOW IS WHY THAT WAS SAFE — it failed loudly with
+     "stale anchor" instead of silently slicing an empty string and passing over
+     nothing, which is exactly what this shape exists to prevent. */
+  const at = LIVE.indexOf('.nav-soon {');
   assert.ok(at !== -1, 'stale anchor — .nav-soon rule');
   const rule = LIVE.slice(at, LIVE.indexOf('}', at));
   assert.ok(/opacity:/.test(rule), 'must dim with opacity');

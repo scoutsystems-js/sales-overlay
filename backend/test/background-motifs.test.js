@@ -37,9 +37,30 @@
  *     is no offset. Reintroducing per-view positions under `cover` alone is the
  *     original bare-area bug and needs that arithmetic back with it.
  *
- * ⚠ THE MESH ITSELF IS NOT RETIRED — `--motif-mesh` and scripts/gen-mesh.js
- * stay (Justin's ruling). The tests below still guard that it is inline, valid
- * SVG, and has real depth.
+ * ⚠⚠ SUPERSEDED THE SAME DAY — `--motif-mesh` IS NOW REMOVED. This note used to
+ * read "the mesh itself is not retired; the tests below still guard that it is
+ * inline, valid SVG, and has real depth." That was true for a few hours and is
+ * now false, so it is corrected rather than left to mislead.
+ *
+ * FOUR MORE TESTS RETIRED (inline / valid SVG / depth / one-field-powers-them-all):
+ * each asserted a property OF THE DECLARATION, and the declaration is gone —
+ * 62,858 bytes, 8.9% of the served page, with zero readers.
+ * ⚠ ZERO READERS WAS PROVEN BY CAPABILITY, NOT BY NAME: no `var(--motif-mesh)`
+ * anywhere; the single generic CSSOM reader `cssToken(name)` has exactly one
+ * call site, passing '--accent'; `setProperty` sites are --mark-* / --wel-*
+ * only; and custom properties are document-scoped so nothing outside this file
+ * could read it even in principle.
+ * ⚠ NOTHING PROTECTS THOSE PROPERTIES NOW, AND NOTHING NEEDS TO — they were
+ * properties of an artwork that is no longer painted. If the mesh is ever
+ * revived, revive these four with it; scripts/gen-mesh.js still contains the
+ * generator and its own AA refusal.
+ *
+ * ⚠ scripts/gen-mesh.js IS KEPT BUT DEAD. Its only output was that one
+ * declaration written into dashboard.html; nothing imports or runs it. It is
+ * retained as a tool rather than a rule — a script cannot be hit by the
+ * last-wins trap that made archiving a CSS selector dangerous — but reviving
+ * the mesh needs the generator RUN *and* a reader added. The generator alone
+ * paints nothing.
  *
  * (f) — the transparent background motifs.
  *
@@ -206,17 +227,25 @@ test('⚠ NON-VACUITY — the body-background guard fires when the background re
 // a raw scan would read it as if it still governed (presence vs precedence).
 const LIVE_CSS = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
 
+/* ⚠⚠ RETIRED 2026-08-20 — the --motif-mesh VARIABLE ITSELF IS GONE, so this
+   asserts a property of a declaration that no longer exists. Kept, not deleted:
+
 test('⚠ the mesh is INLINE — no asset, no request, no dependency', () => {
   const m = HTML.match(/--motif-mesh:\s*url\("([^"]+)"\)/);
   assert.ok(m, 'the mesh must be a single custom property');
   assert.ok(/^data:image\/svg\+xml/.test(m[1]), 'inline data URI, never a fetched asset');
   /* ⚠ the SVG xmlns is a NAMESPACE URI, not a fetch — a naive https?:// test
      flags it and the check would then be about the wrong thing entirely. What
-     must be absent is a resource REFERENCE: href, src, or url(). */
+     must be absent is a resource REFERENCE: href, src, or url(). * /
   const body = m[1].replace(/xmlns='[^']*'/g, '').replace(/xmlns="[^"]*"/g, '');
   assert.ok(!/(href|src)\s*=|url\(/i.test(body),
     'no external reference — the mesh must fetch nothing at render time');
 });
+*/
+
+
+/* ⚠⚠ RETIRED 2026-08-20 — the --motif-mesh VARIABLE ITSELF IS GONE, so this
+   asserts a property of a declaration that no longer exists. Kept, not deleted:
 
 test('⚠⚠ THE MESH IS VALID SVG — the old motifs shipped MALFORMED and drew nothing', () => {
   const m = HTML.match(/--motif-mesh:\s*url\("([^"]+)"\)/);
@@ -228,6 +257,11 @@ test('⚠⚠ THE MESH IS VALID SVG — the old motifs shipped MALFORMED and drew
   assert.ok(svg.indexOf('%2309e046') !== -1 || svg.indexOf('#09e046') !== -1,
     'drawn in the brand green');
 });
+*/
+
+
+/* ⚠⚠ RETIRED 2026-08-20 — the --motif-mesh VARIABLE ITSELF IS GONE, so this
+   asserts a property of a declaration that no longer exists. Kept, not deleted:
 
 test('⚠ depth is real — nodes and edges vary in size and opacity', () => {
   const m = HTML.match(/--motif-mesh:\s*url\("([^"]+)"\)/);
@@ -237,6 +271,8 @@ test('⚠ depth is real — nodes and edges vary in size and opacity', () => {
   assert.ok(radii.length > 5, 'nodes must vary in size — depth falling away');
   assert.ok(opac.length > 20, 'and in opacity, or it reads flat: ' + opac.length);
 });
+*/
+
 
 /* ⚠⚠ RETIRED 2026-08-20 — see the RETIREMENTS note in the header.
    Kept as a record of what was protected, not deleted:
@@ -353,6 +389,9 @@ test('⚠⚠ every motif view has its OWN window — none shares another\'s', ()
 */
 
 
+/* ⚠⚠ RETIRED 2026-08-20 — the --motif-mesh VARIABLE ITSELF IS GONE, so this
+   asserts a property of a declaration that no longer exists. Kept, not deleted:
+
 test('⚠ ONE field powers them all — fifteen artworks was 1.8x the page', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   const decls = (live.match(/--motif-mesh:\s*url\(/g) || []).length;
@@ -360,6 +399,8 @@ test('⚠ ONE field powers them all — fifteen artworks was 1.8x the page', () 
     'exactly one field: ' + decls + ' artworks would multiply the payload and, '
     + 'worse, each would need its own sweep');
 });
+*/
+
 
 /**
  * ⚠ THE GENERATOR REFUSES TO WRITE A FAILING VARIANT — that refusal is the
