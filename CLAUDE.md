@@ -1386,6 +1386,31 @@ Now a removal fails **loudly, in the guard, naming the reason** — instead of l
 - **⚠ AND NAME THE RATE YOU WOULD BE ACCEPTING, NOT THE SCENARIO.** The risk here was first described as *"occasionally wrong on an unusual setup"* — a manager hosting, a prospect starting the meeting. **That understated it by an order of magnitude:** what was actually on offer was the measured **7% name-collision rate**, with the failure mode being *the closer recorded as the prospect*. **"Host is always the closer" is a second assumption stacked on top; on its own it would be a fine trade, and on a 7%-wrong join it is not.**
 - **The general form: when a proposal replaces a heuristic, check whether it removes the heuristic or merely relocates it.** Here it moved the guess from "infer the closer from conversational cues" to "assume the host's name matches this transcript label" — a different sentence, the same class of error.
 
+### ⚠⚠⚠ A FILTER TESTED ON SYNTHETIC INPUT MEASURES YOUR IMAGINATION, NOT THE DATA (2026-08-20)
+**Justin's form of it, and it is exact: invented test material would have passed the loose filter, BECAUSE YOU WOULD HAVE INVENTED CLEAN LINES.** The fixture and the filter come from the same head, so they agree by construction — and the agreement reads as validation.
+- **The live case:** `lib/closer-voice.js` filter 1 selects the closer's own clean lines to ground the follow-up email. My first draft passed **62%** of Josh's 413 real verified lines, and two of the accepted ones were noise — a self-repair the duplicate-word test missed (*"that's like, you can, that's what you can"*) and a lowercase mid-sentence fragment. Tightened against the real corpus to **30% (~124 lines)**.
+- **⚠ NO INVENTED EXAMPLE WOULD HAVE CAUGHT EITHER.** Asked to write a "messy spoken line", you produce `"um, so like, I think maybe"` — the disfluencies you already thought to filter. **Real speech fails in ways you did not think of**, which is the entire reason the filter is hard: `"that's not the, the real estate's not the hard part"` is a stammer, and `"I mean, do you have, do you have room on like a credit card by chance?"` is a self-repair, and neither looks like the caricature.
+- **THE RULE: a filter, a classifier, or a validator is calibrated against the REAL POPULATION IT WILL SEE, and the pass rate is reported.** A synthetic suite is fine for pinning *behaviour you have already decided on*; it cannot tell you where the threshold belongs.
+- **AND THE PASS RATE IS THE DIAGNOSTIC.** 62% on a corpus of spoken transcript lines should have been implausible on its face — real speech is not two-thirds clean. **A suspiciously generous pass rate is evidence the filter is measuring the fixture.**
+- Same family as *measurement is not a composition test* and the minimum-sample rule: **a check that can pass by being shown easy input will be, and it will report success.**
+
+### ⚠⚠ A CLEANER MUST REJECT, NEVER REPAIR — A CLEANED LINE IS EVIDENCE OF HOW THE *FUNCTION* REWRITES, NOT OF HOW THE PERSON TALKS (2026-08-20)
+**And repairing would have quietly reintroduced the exact pastiche the feature exists to remove.**
+- **The live case:** the whole point of grounding the follow-up email in the closer's verified lines is to give the model something REAL to imitate, because the prompt had said *"sound like a real person"* since v7 and produced pastiche anyway. **A repair step would hand the model a line that no longer came from the closer** — it came from a regex's idea of what he meant — and the output would be imitating the cleaner. The feature would appear to work and would be reproducing the defect one layer down, invisibly.
+- **THE RULE: where a filter's output is used as EVIDENCE of how something really is, it may only SELECT, never EDIT.** Rejection is lossy and honest; repair is lossless and fabricated.
+- **This is affordable precisely because rejection is cheap when the corpus is large.** 413 lines means a 30% pass rate still yields ~124, and only 15 reach the prompt. **Where you can afford to be picky, be picky rather than clever** — the same reasoning as the quote-locator refusing rather than guessing, and prospect names resolving to NULL rather than a plausible-looking form.
+
+### ⚠⚠ `node -e "1"` CHECKS NOTHING — IT RUNS THE LITERAL `1` (2026-08-20)
+**Used as a syntax check across an entire session, on 21 commits. `node -c <file>` is the check; `node -e` EVALUATES a program you supply, and the program supplied was the number 1.** Using `node -c` correctly, once, immediately exposed a broken `.concat` splice that would otherwise have been committed.
+- **⚠ THE AUDIT MATTERED MORE THAN THE FIX, AND THE ANSWER WAS "NOTHING BROKE" — PARTLY BY LUCK.** All 69 backend files parse; the surviving safety came from the 1052-test suite exercising most of the JS, not from the check.
+- **⚠⚠ AND THE PRESCRIBED CHECK HAS THE SAME BLIND SPOT: `node -c` CANNOT SEE THE INLINE `<script>` IN `dashboard.html` — 461,022 CHARACTERS, the largest body of JS in the project.** The suite reads that file as TEXT, so a syntax error outside the few regions extracted via `new Function()` ships silently. The extraction that closes it:
+```bash
+node -e "const h=require('fs').readFileSync('web/dashboard.html','utf8');
+[...h.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+  .forEach((m,i)=>{try{new Function(m[1])}catch(e){console.log('block '+i+': '+e.message)}})"
+```
+- **THE TRANSFERABLE PART IS NOT "USE THE RIGHT FLAG" — IT IS THAT A CHECK YOU NEVER SAW FAIL IS NOT A CHECK.** `node -e "1"` exits 0 on a deleted file, an empty file, a directory. **Any command used as a gate should be run once against known-bad input to confirm it can fail** — the same non-vacuity discipline already applied to tests, applied to tooling.
+
 ### ⚠⚠⚠ A CHECK CAN ONLY FAIL IN THE SPACE IT MEASURES — ASK WHAT SPACE THE DEFECT WOULD LIVE IN BEFORE CHOOSING WHAT TO SAMPLE (2026-08-20)
 **THE RULE THAT TIES THREE DISTINCT MEASUREMENT FAILURES TOGETHER, all found in one arc on one feature, all of which passed cleanly while the defect sat in plain sight:**
 | # | failure | what was wrong |
