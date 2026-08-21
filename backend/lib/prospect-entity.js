@@ -126,9 +126,29 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
     var ids = Array.isArray(userIds) ? userIds : [userIds];
     if (!ids.length) return {};
 
+    /* ⚠⚠ THE EXCLUSION IS ALSO THE "DETACH", AND NOTHING IS DESTROYED.
+       Josh's venting call created a real prospect named after two colleagues,
+       and it sits in this denominator now. The obvious fix — null the call's
+       prospect_id on marking — is the WRONG one twice over: it loses the
+       attachment so un-marking cannot restore it, and it would have to reason
+       about whether the prospect has other calls before deciding to orphan it.
+
+       ⚠ Filtering HERE achieves the same result reversibly and with no data
+       change. rollupProspects groups calls BY prospect and skips any call that
+       has none, so a prospect whose ONLY call is marked contributes zero calls
+       and disappears from both numerator and denominator on its own. A prospect
+       with OTHER calls keeps every one of them — only the marked call leaves,
+       which is exactly the "must not orphan the rest" requirement, satisfied by
+       construction rather than by a rule someone has to remember.
+       ⚠ Un-marking puts the row straight back. No stored prior-attachment
+       column, nothing to keep in sync.
+
+       ⚠ `.not(col,'is',true)`, never `.eq(col,false)` — nullable column; see
+       test/not-a-sales-call.test.js. */
     var cq = admin.from('fathom_calls')
       .select('id, user_id, prospect_id, call_date')
       .in('user_id', ids)
+      .not('not_a_sales_call', 'is', true)
       .not('prospect_id', 'is', null);
     if (fromIso) cq = cq.gte('call_date', fromIso);
     if (toIso) cq = cq.lte('call_date', toIso);

@@ -107,7 +107,20 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
     var cq = await admin.from('fathom_calls').select('id, recording_url, call_date, title, source')
+      /* ⚠⚠ NOT-A-SALES-CALL EXCLUSION — AND THIS IS ALSO THE CACHE FIX.
+         The set_hash for this lane is computed over the ROWS THIS QUERY YIELDS
+         (fathom_call_id + ':' + analyzed_at). Filtering here removes a marked
+         call from that set, so the hash CHANGES and the cached synthesis
+         invalidates automatically — in BOTH directions, because unmarking puts
+         the row back and the hash returns to its previous value.
+         ⚠ That is why the tag is NOT folded into the hash separately: a second
+         mechanism would be redundant with this one and could drift out of step
+         with it.
+         ⚠ `.not(col,'is',true)`, NEVER `.eq(col,false)` — the column is nullable
+         and `= false` is NULL for an unassessed row, which would silently drop
+         almost the entire corpus. Pinned by test/not-a-sales-call.test.js. */
       .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
+      .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: false, nullsFirst: false }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var cb = cq.data || []; calls = calls.concat(cb);

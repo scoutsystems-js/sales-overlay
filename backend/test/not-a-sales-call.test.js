@@ -109,3 +109,38 @@ test('⚠ THE MIGRATION DECLARES THREE STATES — nullable, no default', () => {
   assert.ok(/check \(not_sales_marked_role is null or not_sales_marked_role in \('closer','manager'\)\)/i.test(sql),
     'the role is constrained to the two that can mark');
 });
+
+/* ── THE PROSPECT "DETACH" IS A FILTER, AND THAT IS WHY IT REVERSES ────────── */
+const pe = require('../lib/prospect-entity');
+
+test('⚠⚠ a prospect whose ONLY call is marked leaves the denominator by itself', () => {
+  /* No destructive detach: rollupProspects groups BY prospect and skips calls
+     with none, so excluding the call at the query removes the prospect from
+     both numerator and denominator. Un-marking puts it straight back, with no
+     stored prior-attachment column to keep in sync. */
+  const withFake = pe.rollupProspects([
+    { id: 'c1', user_id: 'u', prospect_id: 'real',  outcome: 'closed' },
+    { id: 'c2', user_id: 'u', prospect_id: 'fake',  outcome: 'lost'   },
+  ], {});
+  const withoutFake = pe.rollupProspects([
+    { id: 'c1', user_id: 'u', prospect_id: 'real',  outcome: 'closed' },
+  ], {});
+  assert.strictEqual(withFake.u.total, 2, 'the fake prospect is in the denominator today');
+  assert.strictEqual(withoutFake.u.total, 1, 'filtering the call removes the prospect entirely');
+  assert.strictEqual(withoutFake.u.closed, 1);
+  assert.strictEqual(withoutFake.u.pct, 100, 'and the rate moves: 50% -> 100%');
+});
+
+test('⚠⚠ a prospect with OTHER calls KEEPS them — marking one must not orphan the rest', () => {
+  // two calls on the same prospect; one gets marked
+  const before = pe.rollupProspects([
+    { id: 'c1', user_id: 'u', prospect_id: 'p', outcome: 'lost'   },
+    { id: 'c2', user_id: 'u', prospect_id: 'p', outcome: 'closed' },
+  ], {});
+  const after = pe.rollupProspects([
+    { id: 'c2', user_id: 'u', prospect_id: 'p', outcome: 'closed' },
+  ], {});
+  assert.strictEqual(before.u.total, 1, 'follow-ups collapse into ONE prospect');
+  assert.strictEqual(after.u.total, 1, 'the prospect SURVIVES — it still has a call');
+  assert.strictEqual(after.u.closed, 1, 'and keeps its outcome');
+});
