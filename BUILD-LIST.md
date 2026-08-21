@@ -33,7 +33,7 @@ Shipped, deployed, and verified on production.
 | Zoom speaker identity | Byte-identical display-name match, collision detector | `lib/zoom-identity.js` |
 | Welcome emails / set-password | Invite flow via Resend | |
 | Account page | Profile, password, billing badge, Connections | |
-| **Mark a call "not a sales call"** | Closer on their own call, manager on a team call; excluded from every metric, stays visible and flagged | shipped `6129fed`, library rows `ae19d22`. Verified by clicking on BOTH surfaces: mark from a row in place, opens, un-mark from either side, no row overflow at 1440/1920. ⚠ **OPEN: the 403 over HTTP needs a forged-actor integration test (every available session is an `owner`), and the un-mark cache direction served one stale read** |
+| **Mark a call "not a sales call"** | Closer on their own call, manager on a team call; excluded from every metric, stays visible and flagged | shipped `6129fed`, library rows `ae19d22`. Verified by clicking on BOTH surfaces: mark from a row in place, opens, un-mark from either side, no row overflow at 1440/1920. 403 boundary CLOSED over HTTP with a forged actor (`cdd6d07`). ⚠ **OPEN: one stale cache read on un-mark — marking recomputes correctly, un-marking served a marked-era value once** |
 | **Site-wide font: Saira** | Self-hosted variable woff2 (96.4 KB), dashboard + login, body 450, tabular numerals | shipped `284cfdb`/`39faa05`. Verified on the live site: face loads on both pages (registered count + proven control), weight 650 renders natively, no overflow, no login wrap, no nav collision at 1920 |
 
 ## IN FLIGHT
