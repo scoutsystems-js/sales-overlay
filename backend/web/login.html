@@ -8,9 +8,18 @@
        site-wide sweep is a separate item. TWO WEIGHTS ONLY: 300 Light for the
        page, 500 Medium for the wordmark. display=swap so a slow font can never
        block the sign-in form from rendering. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500&display=swap" rel="stylesheet">
+  <!-- ⚠⚠ THE MONTSERRAT CDN LINK AND BOTH PRECONNECTS WERE DELETED HERE
+       (2026-08-20). THEY HAD NEVER WORKED. index.js sets
+       `style-src 'self' 'unsafe-inline'` and `font-src 'self' data:`, so
+       fonts.googleapis.com was blocked from serving the stylesheet AND
+       fonts.gstatic.com was blocked from serving the file — two independent
+       blocks. This page has been rendering the SYSTEM FALLBACK, not Montserrat,
+       for its entire life, and the only cost of the markup was three dead
+       requests on every login.
+       ⚠ Proven, not inferred: registered face count 0 for Montserrat while
+       'Archivo Expanded' (self-hosted, same page) loaded fine, with a
+       real-vs-bogus width control shown to move first.
+       Saira is self-hosted below for exactly this reason. -->
   <style>
     /* ⚠ SELF-HOSTED, NOT LINKED (Justin, 2026-08-18). This is the wordmark on the
        first page anyone sees, so a render-blocking third-party request is the
@@ -32,9 +41,21 @@
        others. The fallback stack is kept so a blocked or slow font degrades to
        the previous face rather than to a serif. */
     body, .login-nav, .login-main, .login-footer, input, button, label, h1, p, a {
-      font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'Saira', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    /* ⚠ Self-hosted, same file the dashboard uses — one download, cached across
+       both pages. See the deletion note above for why a CDN link cannot work. */
+    @font-face {
+      font-family: 'Saira';
+      font-style: normal;
+      font-weight: 100 900;
+      font-stretch: 50% 125%;
+      font-display: swap;
+      src: url('/fonts/saira-variable-latin.woff2') format('woff2-variations');
     }
     body {
+      /* 450, matching the dashboard -- see the note there. */
+      font-weight: 450;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
