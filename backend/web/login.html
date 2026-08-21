@@ -25,6 +25,35 @@
        first page anyone sees, so a render-blocking third-party request is the
        wrong trade. 5,664 bytes — Google's latin subset, against 112KB for the
        full TTF. font-display:swap so a slow font can never block the form. */
+    /* ⚠⚠⚠ THIS FILE CANNOT DRAW THE WORDMARK, AND HAS NEVER DRAWN IT. Its cmap
+       covers exactly TWO printable characters: SPACE and "A". "SCOUT SYSTEMS"
+       contains no "A", so EVERY VISIBLE LETTER of the lockup below falls back to
+       the system face — and has done since this file shipped on 2026-08-18.
+       The same file, and the same defect, is in dashboard.html's welcome overlay.
+
+       ⚠ MEASURED THREE INDEPENDENT WAYS on 2026-08-20, because one instrument
+       reporting this would not have been believable:
+         canvas advance per glyph   every capital = the monospace advance exactly
+         DOM scrollWidth            rendered wordmark k = 9.79, not Archivo's 12.226
+         cmap parsed from the file  printable coverage is the two-character string " A"
+       and then confirmed by LOOKING at the deployed page: the wordmark is a
+       normal-width grotesque, not an expanded face.
+
+       ⚠⚠ WHY NOTHING CAUGHT IT — every check that existed was a check on the
+       REQUEST or on the BYTES, never on the GLYPHS:
+         document.fonts        -> status 'loaded'        (the FILE arrived)
+         getComputedStyle      -> 'Archivo Expanded'     (the REQUEST was made)
+         the network           -> 200, font/woff2        (the BYTES are there)
+       All three are true of a font with no letters in it. Guarded now by
+       test/font-coverage.test.js + lib/woff2-coverage.js.
+
+       ⚠ DO NOT "FIX" THIS BY EDITING CSS. The declaration is correct; the FILE is
+       wrong. The three options (repair the file / the filed Saira-wide item /
+       accept the fallback and delete this) are a ruling, reported 2026-08-20 and
+       not yet made. Whichever is chosen, --wm-vw and the lockup k must be
+       re-derived for whichever face ACTUALLY renders — the current 7.8vw was
+       derived for Archivo's k = 12.226 and is only safe today by accident, since
+       the face that really draws is ~25% narrower. */
     @font-face {
       font-family: 'Archivo Expanded';
       font-style: normal;
@@ -36,10 +65,12 @@
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
     /* Login-specific layout on top of the shared brand stylesheet. */
-    /* ── MONTSERRAT, LOGIN PAGE ONLY — a feel test (Justin, 2026-08-18) ──
-       LIGHT (300) for the page, MEDIUM (500) for the wordmark. Two weights, no
-       others. The fallback stack is kept so a blocked or slow font degrades to
-       the previous face rather than to a serif. */
+    /* ── THE PAGE FACE IS SAIRA — the Montserrat feel test is OVER and the CDN
+       link it needed is deleted (see the note above the <head> styles).
+       ⚠ THIS COMMENT USED TO SAY "MONTSERRAT, LOGIN PAGE ONLY — a feel test",
+       which stopped being true when Saira shipped site-wide on 2026-08-20 and
+       was corrected on 2026-08-20. The fallback stack is kept so a blocked or
+       slow font degrades to the system face rather than to a serif. */
     body, .login-nav, .login-main, .login-footer, input, button, label, h1, p, a {
       font-family: 'Saira', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
@@ -416,7 +447,25 @@
        * from hundreds of ink pixels per element to 12-140, because the mark is
        * a fraction of its former size.
        *
-       * Ships at 0.20 (4.70:1), one step below the derived maximum.
+       * ⚠⚠ THE LIVE VALUE IS 0.21. This comment block said "ships at 0.20" and a
+       * LATER block in the same rule said "0.26, still inside the 0.16-0.30
+       * band" — three numbers in prose for one declaration, none of them the one
+       * that renders. Corrected 2026-08-20 by reading the computed style rather
+       * than the comments. Documentation that answers the question wrongly is
+       * worse than none, because it stops the next reader looking.
+       *
+       * ⚠ 0.21 IS RE-CONFIRMED, FOURTH TIME, and it is now confirmed at the
+       * mark's RAISED position (--mark-top resolves to 0) rather than predicted:
+       * swept across EIGHT viewports (1024x768 through 1920x1080, plus 1280x1024
+       * and a 1100x1400 portrait), the worst-exposed text is --muted at
+       * 4.58:1 EVERY TIME — cardSub or the Password label, 6,263-12,367 ink
+       * pixels under text. AA holds with 0.08 to spare; above 0.219 it fails.
+       *
+       * ⚠ THE WORDMARK CANNOT BECOME THE BINDING ELEMENT, so raising the mark
+       * behind it changes nothing here. It is var(--green) — the SAME colour as
+       * the mark — so its contrast starts high and decays slowly, and it only
+       * overtakes --muted above opacity 0.885, far outside this band. Measured
+       * 7.40:1 at 0.21 with 4,615 ink pixels under it.
        *
        * ⚠ THE SWEEP THAT PRODUCED THIS HAD TO BE REDONE. The first version held
        * height at 800px and varied only width — but the mark is sized in vmin =
@@ -449,8 +498,28 @@
          giving the most coverage behind the wordmark (which is large, bold and
          measures 7.21:1 over the mark, so overlap there is fine).
 
-         Verified at 1460x812. The clearance is a LAYOUT relationship, so it
-         should be re-checked if the form's spacing changes. */
+         ⚠⚠ THE `center 44%` / `50vmin @ 18%` GEOMETRY ABOVE IS HISTORY, NOT THE
+         LIVE RULE — kept because the REASONING is what stops the next person
+         nudging the mark by eye, but the numbers no longer describe this file.
+         The mark is now boxed by placeMark() (--mark-top/--mark-h) and painted
+         at `center top`; --mark-top resolves to 0, i.e. the first ring touches
+         the top of the page.
+
+         ⚠ RE-SWEPT AT THAT RAISED POSITION 2026-08-20 — this is the check that
+         was owed on 8bd06ec, and the answer did not move. EIGHT viewports
+         (1024x768 / 1280x720 / 1366x768 / 1440x900 / 1600x900 / 1920x1080 /
+         1280x1024 / 1100x1400): eleven exposed elements enumerated FROM THE DOM
+         every time, 6,263-12,367 ink pixels under text, worst case 4.58:1 on
+         --muted at EVERY size. AA holds. The mark still crosses muted text, so
+         muted text is still the binding element and 0.21 still stands.
+
+         ⚠ THE SWEEP'S OWN FLOOR CHECK CAUGHT AN INSTRUMENT FAULT FIRST, which is
+         the only reason the zero it reported would have been worth anything: the
+         first version walked ancestors up to <html> looking for an opaque
+         background, found BODY's, and marked all 11 elements "shielded" —
+         reporting a flawless ZERO EXPOSED while looking at nothing. body's
+         background paints BELOW body::before, so it shields nothing. Stop the
+         walk at body. */
       /* ⚠ OFFSET, NOT CENTRED (Justin's note 3: the mark sat right on the text).
          Re-swept with the COMPLETE inventory this time — nine exposed elements
          gathered from the DOM, including #cardTitle and #cardSub, which the
@@ -583,32 +652,19 @@
       height: var(--mark-h, 58vh);
       background-position: center top;
       background-size: auto 100%;
-      background-repeat: no-repeat;
-      /* ⚠ POSITION SET BY THE INK CHECK, NOT BY EYE. At `center 44%` the mark's
-         strokes crossed the FIELD LABELS — measured, 86 ink pixels under the
-         Email label — and the labels are --muted, the lowest-contrast text on
-         the page. Worst-case contrast there was 4.47:1 against a solid stroke,
-         i.e. marginally UNDER the 4.5:1 AA line, and 3.58:1 at the top of the
-         opacity band.
-
-         Raising it puts the dense part of the mark behind the WORDMARK, which
-         measures 7.21:1 over the same backdrop and is large bold text besides.
-         The fields and the button shield themselves — they paint their own
-         opaque backgrounds above this layer — so the only exposed text is the
-         labels, the forgot link and the wordmark.
-
-         ⚠ 18% WAS CHOSEN BY SWEEPING POSITION x SIZE AND MEASURING, NOT BY
-         NUDGING UNTIL IT LOOKED RIGHT. Raising it to 26% made the collision
-         WORSE (86 -> 148 ink pixels) because the mark's descending dots hang
-         below its centre — the opposite of what "move it up" predicts, which is
-         exactly why this is measured rather than reasoned. Of the twelve
-         combinations tried, 50vmin @ 18% is the only one that keeps the full
-         half-screen size AND puts ZERO ink under any low-contrast text, while
-         giving the most coverage behind the wordmark (which is large, bold and
-         measures 7.21:1 over the mark, so overlap there is fine).
-
-         Verified at 1460x812. The clearance is a LAYOUT relationship, so it
-         should be re-checked if the form's spacing changes. */
+      /* ⚠ THE DUPLICATE "POSITION SET BY THE INK CHECK" BLOCK THAT SAT HERE IS
+         GONE (2026-08-20). It was a VERBATIM SECOND COPY of the block further up
+         this same rule — and both copies described a geometry the rule no longer
+         has (`center 44%`, `50vmin @ 18%`), because the mark is now positioned by
+         placeMark() via --mark-top/--mark-h and painted at `center top`.
+         ⚠ TWO IDENTICAL COMMENTS ARE WORSE THAN ONE STALE COMMENT: an editor who
+         corrects the copy they happen to find leaves the other one contradicting
+         it, and a search returns the wrong one first. The surviving copy above is
+         the one that carries the current numbers.
+         A duplicate `background-repeat: no-repeat` was removed with it — same
+         value as the one above, so it changed nothing, but a repeated declaration
+         is exactly the shape that hides a last-wins override. Cardinality is now
+         one each for opacity / position / size / image / repeat. */
       /* ⚠ OFFSET, NOT CENTRED (Justin's note 3: the mark sat right on the text).
          Re-swept with the COMPLETE inventory this time — nine exposed elements
          gathered from the DOM, including #cardTitle and #cardSub, which the
@@ -930,7 +986,21 @@
     .login-footer a { color: var(--muted); }
     .login-footer a:hover { color: var(--text); }
 
-    /* ══ MONTSERRAT WEIGHT DISCIPLINE — LAST IN THE STYLESHEET ON PURPOSE ══
+    /* ══ WEIGHT DISCIPLINE — LAST IN THE STYLESHEET ON PURPOSE ══
+       ⚠ THE HEADING SAID "MONTSERRAT" UNTIL 2026-08-20. The face is Saira now,
+       and the correction matters more than it looks: the block's ORIGINAL reason
+       for existing was that ONLY 300 AND 500 WERE LOADED, so any other weight
+       would be SYNTHESISED. Saira ships a 100-900 variable axis, so that reason
+       is GONE — nothing here is faux-bold any more (verified: every element on
+       this page computes to 300, a weight the axis really has).
+       ⚠⚠ SO THE 300 IS NOW A FREE CHOICE NOBODY HAS MADE, not a constraint. The
+       site body is 450. Measured 2026-08-20: 300 -> 450 is +30.6% ink mass with
+       the advance essentially unchanged (+0.4px on "Welcome back"), i.e. it
+       reads as weight, not as width, and nothing can reflow. REPORTED WITH A
+       RECOMMENDATION, DELIBERATELY NOT DECIDED — see scout-findings 2026-08-20.
+       The block itself must stay whichever way that goes: its two-layer shape
+       (catch-all + equal-specificity overrides) is what keeps the card title and
+       the field labels from escaping back to 600.
        ⚠ THE FIRST ATTEMPT AT THIS BLOCK WAS PLACED NEAR THE TOP AND LOST. The
        page's own later rules (.card-header h1 600, .field label 600,
        .submit-btn 700, .nav-logo 600) have equal specificity, so source order
