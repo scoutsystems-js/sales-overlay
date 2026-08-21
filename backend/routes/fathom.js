@@ -1284,7 +1284,11 @@ router.get('/calls/:id', requireAuth, async function(req, res) {
     //    "belongs to another user" to avoid leaking ID validity.
     var callResult = await admin
       .from('fathom_calls')
-      .select('id, user_id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status')
+      /* ⚠ not_a_sales_call SELECTED: the review page renders the mark/un-mark button
+       from it. Omit the column and it is undefined, the button always reads
+       "unmarked", and a marked call can never be un-marked -- the missing-column
+       bug this codebase has now shipped four times. */
+    .select('id, user_id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call')
       .eq('id', callId)
       .maybeSingle();
     if (callResult.error) {
@@ -1328,6 +1332,10 @@ router.get('/calls/:id', requireAuth, async function(req, res) {
       duration_seconds: call.duration_seconds,
       recording_url:    call.recording_url,
       sync_status:      call.sync_status,
+      // ⚠ SELECTED *AND* EMITTED. The review page renders the mark/un-mark
+      // button from this; selected-but-not-emitted is the same bug as
+      // emitted-but-not-selected, from the other end.
+      not_a_sales_call: call.not_a_sales_call === true,
       analysis:         analysis,
       highlights:       highlights,
     });

@@ -1696,6 +1696,18 @@
     /* ─── Call Review page (Scout v2.0 Phase 2 Step 4) ────────────────────── */
 
     /* Header strip — back link + title row + meta row + score badge + Fathom link */
+
+    /* ⚠ The flag is a LABEL, not a hiding mechanism: a marked call stays in the
+       library and still opens, because a call that cannot be opened cannot be
+       un-marked. */
+    .not-sales-flag {
+      display: inline-block; margin-left: 8px; padding: 2px 7px;
+      border: 1px solid var(--border-strong); border-radius: 5px;
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text); background: var(--bg-elevated); opacity: 0.75;
+      vertical-align: 1px;
+    }
+    .not-sales-btn.is-marked { border-color: var(--accent); color: var(--accent); }
     .review-page-header {
       display: flex;
       flex-direction: column;
@@ -11874,11 +11886,62 @@
         + '</div>'
         + '<div class="review-title-side">'
           + (status === 'done' ? outcomeTagHtml((src.id || (review && review.id) || ''), (review && review.analysis ? review.analysis.outcome : src.outcome), (review && review.analysis ? review.analysis.outcome_source : src.outcome_source), false) : '')
+          + notSalesBtnHtml((src.id || (review && review.id) || ''), src.not_a_sales_call === true)
           + badge
           + fathomLink
         + '</div>'
       + '</div>'
     + '</div>';
+  }
+
+
+  /**
+   * ⚠⚠ "NOT A SALES CALL" — the control over work already done. The endpoint is
+   * permission-enforced server-side (403); this button does not decide anything,
+   * it only asks.
+   *
+   * ⚠ IT SHOWS IT IS WORKING. Marking fires a re-analysis, and this session has
+   * already shipped a Sync Now that refreshed the wrong page and a dropdown that
+   * closed on the first pick — both with a green suite. So the button disables,
+   * says "Marking…", and only then re-renders from the server's answer.
+   */
+  function notSalesBtnHtml(callId, isMarked) {
+    if (!callId) return '';
+    return '<button class="btn-fathom-secondary not-sales-btn' + (isMarked ? ' is-marked' : '') + '"'
+      + ' type="button" id="notSalesBtn"'
+      + ' onclick="toggleNotSalesCall(\'' + escapeHtml(callId) + '\', ' + (isMarked ? 'false' : 'true') + ')">'
+      + (isMarked ? '↩ Count this call' : 'Not a sales call')
+      + '</button>';
+  }
+
+  async function toggleNotSalesCall(callId, next) {
+    var btn = document.getElementById('notSalesBtn');
+    if (btn) { btn.disabled = true; btn.textContent = next ? 'Marking…' : 'Restoring…'; }
+    try {
+      var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/not-a-sales-call', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ not_a_sales_call: next }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (res.status === 403) {
+        /* ⚠ THE SERVER IS THE BOUNDARY. This branch exists because the API can
+           refuse even when the button rendered — hiding a control is not a
+           permission check. */
+        if (btn) { btn.disabled = false; btn.textContent = next ? 'Not a sales call' : '↩ Count this call'; }
+        alert('You are not allowed to mark this call.');
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      /* Re-analysis is fire-and-forget server-side; the mark itself is already
+         durable, so reload the review from the server rather than guessing. */
+      state.callReview = null;
+      if (state.selectedCallId) loadCallReview(state.selectedCallId);
+      state.calls = null;
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = next ? 'Not a sales call' : '↩ Count this call'; }
+      alert('Could not update this call: ' + (e && e.message ? e.message : 'unknown'));
+    }
   }
 
   // ─── Section 1: Highlights ────────────────────────────────────────────
