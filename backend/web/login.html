@@ -987,44 +987,47 @@
     .login-footer a:hover { color: var(--text); }
 
     /* ══ WEIGHT DISCIPLINE — LAST IN THE STYLESHEET ON PURPOSE ══
-       ⚠ THE HEADING SAID "MONTSERRAT" UNTIL 2026-08-20. The face is Saira now,
-       and the correction matters more than it looks: the block's ORIGINAL reason
-       for existing was that ONLY 300 AND 500 WERE LOADED, so any other weight
-       would be SYNTHESISED. Saira ships a 100-900 variable axis, so that reason
-       is GONE — nothing here is faux-bold any more (verified: every element on
-       this page computes to 300, a weight the axis really has).
-       ⚠⚠ SO THE 300 IS NOW A FREE CHOICE NOBODY HAS MADE, not a constraint. The
-       site body is 450. Measured 2026-08-20: 300 -> 450 is +30.6% ink mass with
-       the advance essentially unchanged (+0.4px on "Welcome back"), i.e. it
-       reads as weight, not as width, and nothing can reflow. REPORTED WITH A
-       RECOMMENDATION, DELIBERATELY NOT DECIDED — see scout-findings 2026-08-20.
-       The block itself must stay whichever way that goes: its two-layer shape
-       (catch-all + equal-specificity overrides) is what keeps the card title and
-       the field labels from escaping back to 600.
-       ⚠ THE FIRST ATTEMPT AT THIS BLOCK WAS PLACED NEAR THE TOP AND LOST. The
-       page's own later rules (.card-header h1 600, .field label 600,
-       .submit-btn 700, .nav-logo 600) have equal specificity, so source order
-       decided it and the overrides did nothing. Measured, not assumed: the
-       computed weights came back 600/700.
+       THE PAGE IS 450, MATCHING THE REST OF THE SITE (Justin, 2026-08-20).
 
-       ⚠⚠ AND THOSE WEIGHTS ARE NOT LINKED. Only 300 and 500 are loaded, so a
-       rule asking for 600 or 700 makes the browser SYNTHESISE a bold from the
-       500 — faux-bold, which is heavier and cruder than the real face and is
-       exactly what a feel test must not judge Montserrat by.
+       ⚠⚠ THE VALUE WAS EDITED IN PLACE, 300 -> 450 — NOT OVERRIDDEN BY A LATER
+       BLOCK. An override would have left two rules in this file disagreeing
+       about the same declaration, and last-wins would decide which one a reader
+       is actually looking at. This file has already produced two stale
+       contradictions (an opacity claimed as 0.20 AND 0.26 while rendering 0.21,
+       and a verbatim duplicated ink-check block); a third was not worth the
+       convenience. There is now exactly one weight declaration per selector.
 
-       Justin's ruling: MEDIUM (500) for the title, LIGHT (300) for everything
-       else. Anything not in the 500 list below is 300 — no third weight.
+       ⚠ WHY 300 WAS HERE, AND WHY THAT REASON IS GONE. The block's ORIGINAL
+       purpose was faux-bold avoidance: only Montserrat 300 and 500 were thought
+       to be loaded, so any other weight would be SYNTHESISED by the browser.
+       Saira ships a real 100-900 variable axis, so the constraint evaporated and
+       the 300 became a free choice nobody had made. Measured before the change:
+       300 -> 450 is +30.6% INK MASS with the ADVANCE ESSENTIALLY UNCHANGED
+       (+0.4px across "Welcome back"), i.e. it reads as weight, not as width —
+       which is why nothing on this page can reflow as a result of it and the
+       wordmark's no-wrap derivation is untouched.
+
+       ⚠⚠ THE TWO-LAYER SHAPE IS LOAD-BEARING — DO NOT COLLAPSE IT TO ONE RULE.
+       (a) alone loses the card title and every field label; (b) alone loses
+       everything nobody thought to enumerate. Both are needed, and the reason is
+       specificity, measured rather than guessed:
+         .card-header h1 / .field label   are (0,1,1)
+         the catch-all below              is (0,1,0)  <- loses to them
+       ⚠ AND THIS BLOCK MUST STAY LAST IN THE FILE. The first attempt sat near
+       the top; the page's own rules (.card-header h1 600, .field label 600,
+       .submit-btn 700, .nav-logo 600) have EQUAL specificity, so source order
+       decided it and the overrides did nothing at all. The computed weights came
+       back 600/700 — measured, not assumed.
 
        ⚠ EXHAUSTIVE, NOT ENUMERATED. A hand-listed selector list left three
        elements behind — a nav SPAN, an H2 and .launch-btn, all in states that
-       only render after sign-in — still asking for 600/700 and therefore still
-       faux-bolding. Enumerating targets is the INVENTORY failure already on
-       file; a universal selector inside the page's own containers cannot miss
-       one. */
-    body { font-weight: 300; }
+       only render after sign-in. Enumerating targets is the INVENTORY failure
+       already on file; a universal selector inside the page's own containers
+       cannot miss one. */
+    body { font-weight: 450; }
     /* (a) the CATCH-ALL — reaches anything nobody thought to list */
     .login-nav, .login-nav *, .login-main, .login-main *,
-    .login-footer, .login-footer * { font-weight: 300; }
+    .login-footer, .login-footer * { font-weight: 450; }
     /* (b) the EQUAL-SPECIFICITY overrides. ⚠ BOTH ARE NEEDED, and the reason is
        specificity, measured not guessed: `.card-header h1` and `.field label`
        are (0,1,1) and BEAT the (0,1,0) catch-all above, so the universal alone
@@ -1033,8 +1036,19 @@
     .card-header h1, .card-header p, .field label, .field input,
     .login-nav .nav-logo, .login-nav .back, .submit-btn, .launch-btn,
     #forgotRow a, .login-footer a,
-    .login-main h1, .login-main h2, .login-main h3 { font-weight: 300; }
-    .brand-lockup .brand-name { font-weight: 700; }
+    .login-main h1, .login-main h2, .login-main h3 { font-weight: 450; }
+    /* ⚠ THE WORDMARK IS DELIBERATELY NOT RE-DECLARED HERE, and that is not an
+       omission. It keeps its 700 from its own rule further up by SPECIFICITY,
+       not by source order: `.brand-lockup .brand-name` is (0,2,0) and the
+       catch-all above is (0,1,0), so the catch-all cannot reach it whatever the
+       order. Restating 700 here would add a SECOND font-weight declaration for
+       one selector — the exact shape that hides a last-wins override, and the
+       reason a duplicate `background-repeat` was removed from this file on the
+       same day. Verified in the browser after the change: the wordmark computes
+       700 with no rule here at all.
+       ⚠ AND IT MUST NEVER JOIN THE 450 LIST. Its 700 pairs with a MEASURED k
+       that keeps it on one line; changing the weight changes k and reintroduces
+       the wrap this page has already had three times. */
   </style>
   <script src="/js/scout-auth.js"></script>
   <script>
