@@ -1310,3 +1310,13 @@ module.exports._validateNameField = validateNameField;
 module.exports._computeSectionBreakdown = computeSectionBreakdown;
 module.exports._computeNeedsWorkSections = computeNeedsWorkSections;
 module.exports._buildAccountPayload = buildAccountPayload;
+/* ⚠ TEST-ONLY INJECTION POINT. The permission boundary has to be exercised
+   OVER HTTP through the real handler -- a predicate proven in isolation is not
+   an API boundary -- and every session available to this project belongs to an
+   owner, so a plain-user token cannot be obtained without entering a password.
+   Forging req.user ahead of the router plus swapping the admin client is the
+   correct substitute: it exercises every line of the handler except the token
+   decode, which is requireAuth's job and is covered elsewhere.
+   ⚠ Sets the module-local _admin, so production behaviour is untouched. */
+module.exports._setAdminClientForTests = function (factory) { _admin = factory(); };
+

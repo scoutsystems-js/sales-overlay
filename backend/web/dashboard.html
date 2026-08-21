@@ -1635,7 +1635,7 @@
     .library-card-side {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 8px;
       flex-shrink: 0;
     }
 
@@ -1723,13 +1723,28 @@
       font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
       color: var(--text); white-space: nowrap;
     }
+    /* ⚠⚠ RED, BUT OUTLINED — NOT A FILLED RED BOX, AND THE REASON IS SEMANTIC.
+       --bad (#f87171) is this product's ERROR colour, used in 31 places for
+       failing connections and bad bands. A SOLID red box on every healthy row
+       would render a 20-row library as twenty errors. An outlined red reads as
+       "a destructive-ish action is available here", which is what it is, while
+       a filled red reads as "something is wrong with this row", which is false.
+       ⚠ THE BUTTON IS THE ACTION; the dimming, strikethrough and NOT A SALES
+       CALL badge carry the STATE. Once marked the button stops being red and
+       becomes the neutral restore action, because at that point the destructive
+       direction is the one already taken. */
     .lib-ns-btn {
-      background: transparent; border: 1px solid var(--border);
-      color: var(--text); border-radius: 6px; cursor: pointer;
-      font-size: 13px; line-height: 1; padding: 4px 7px; flex: 0 0 auto;
+      background: transparent; border: 1px solid var(--bad);
+      color: var(--bad); border-radius: 6px; cursor: pointer;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+      line-height: 1; padding: 5px 8px; flex: 0 0 auto; white-space: nowrap;
     }
-    .lib-ns-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .lib-ns-btn.is-marked { border-color: var(--accent); color: var(--accent); }
+    .lib-ns-btn:hover { background: rgba(var(--bad-rgb), 0.12); }
+    /* already marked → the red has done its job; this is now "put it back" */
+    .lib-ns-btn.is-marked { border-color: var(--border-strong); color: var(--text); }
+    .lib-ns-btn.is-marked:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+    /* ⚠ the Fathom/Zoom link is now an icon — give it a hit area */
+    .library-recording-link.is-icon { padding: 2px 6px; font-size: 14px; text-decoration: none; }
     .review-page-header {
       display: flex;
       flex-direction: column;
@@ -11404,8 +11419,14 @@
     if (c.recording_url && typeof c.recording_url === 'string') {
       // event.stopPropagation prevents the card's onclick from firing when
       // the user wanted to open the Fathom link directly.
-      recordingLink = '<a class="library-recording-link" href="' + escapeHtml(c.recording_url)
-        + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">View in Fathom →</a>';
+      /* ⚠ COLLAPSED TO AN ICON to make room for Justin's labelled button. This is
+         the least load-bearing item in the row: it duplicates what opening the
+         call gives you. aria-label AND title, because an icon whose meaning needs
+         a hover is not accessible. */
+      var recLabel = 'View in ' + (c.source === 'zoom' ? 'Zoom' : 'Fathom');
+      recordingLink = '<a class="library-recording-link is-icon" href="' + escapeHtml(c.recording_url)
+        + '" target="_blank" rel="noopener" aria-label="' + recLabel + '" title="' + recLabel + '"'
+        + ' onclick="event.stopPropagation()">↗</a>';
     }
 
     var cardId = escapeHtml(String(c.id || ''));
@@ -12334,12 +12355,13 @@
   function libRowNotSalesHtml(callId, isMarked) {
     if (!callId) return '';
     var label = isMarked ? 'Count this call again' : 'Mark as not a sales call';
+    var text  = isMarked ? 'COUNT THIS CALL' : 'NON SALES CALL';
     return '<button class="lib-ns-btn' + (isMarked ? ' is-marked' : '') + '"'
       + ' type="button" id="libns-' + callId + '"'
       + ' aria-label="' + label + '" title="' + label + '"'
       + ' onclick="event.stopPropagation(); toggleNotSalesFromRow(\'' + callId + '\', '
       + (isMarked ? 'false' : 'true') + ');">'
-      + (isMarked ? '↩' : '⊘')
+      + text
       + '</button>';
   }
 
@@ -12365,7 +12387,7 @@
       if (card) card.classList.toggle('is-not-sales', marked);
       if (btn) {
         var lab = marked ? 'Count this call again' : 'Mark as not a sales call';
-        btn.disabled = false; btn.textContent = marked ? '↩' : '⊘';
+        btn.disabled = false; btn.textContent = marked ? 'COUNT THIS CALL' : 'NON SALES CALL';
         btn.setAttribute('aria-label', lab); btn.setAttribute('title', lab);
         btn.classList.toggle('is-marked', marked);
         btn.setAttribute('onclick', "event.stopPropagation(); toggleNotSalesFromRow('" + callId + "', " + (marked ? 'false' : 'true') + ");");
@@ -12381,7 +12403,7 @@
       }
       state.calls = null;   // the next library load comes from the server
     } catch (e) {
-      if (btn) { btn.disabled = false; btn.textContent = next ? '⊘' : '↩'; }
+      if (btn) { btn.disabled = false; btn.textContent = next ? 'NON SALES CALL' : 'COUNT THIS CALL'; }
       alert('Could not update this call: ' + (e && e.message ? e.message : 'unknown'));
     }
   }
