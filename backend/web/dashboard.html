@@ -1723,27 +1723,29 @@
       font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
       color: var(--text); white-space: nowrap;
     }
-    /* ⚠⚠ RED, BUT OUTLINED — NOT A FILLED RED BOX, AND THE REASON IS SEMANTIC.
-       --bad (#f87171) is this product's ERROR colour, used in 31 places for
-       failing connections and bad bands. A SOLID red box on every healthy row
-       would render a 20-row library as twenty errors. An outlined red reads as
-       "a destructive-ish action is available here", which is what it is, while
-       a filled red reads as "something is wrong with this row", which is false.
-       ⚠ THE BUTTON IS THE ACTION; the dimming, strikethrough and NOT A SALES
-       CALL badge carry the STATE. Once marked the button stops being red and
-       becomes the neutral restore action, because at that point the destructive
-       direction is the one already taken. */
+    /* ⚠⚠ NEUTRAL WHEN UNMARKED, RED WHEN MARKED — INVERTED 2026-08-20 (Justin).
+       RED NOW INDICATES A STATE, NOT AN AVAILABLE ACTION, and that is the right
+       way round for this product: --bad already means "error" in 31 places, so a
+       red button on a HEALTHY row was a warning about nothing, and twenty of them
+       down a library was loud. A red MARKED row is a genuine deviation from
+       normal, which is exactly what red is for here.
+       ⚠ NEUTRAL MUST STILL READ AS PRESSABLE. It sits beside a select and a score
+       badge, so it takes --border-strong and full --text rather than a hairline:
+       a control that looks inert gets ignored, which is worse than one that is
+       merely quiet. */
     .lib-ns-btn {
-      background: transparent; border: 1px solid var(--bad);
-      color: var(--bad); border-radius: 6px; cursor: pointer;
+      background: var(--bg-elevated); border: 1px solid var(--border-strong);
+      color: var(--text); border-radius: 6px; cursor: pointer;
       font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
       line-height: 1; padding: 5px 8px; flex: 0 0 auto; white-space: nowrap;
     }
-    .lib-ns-btn:hover { background: rgba(var(--bad-rgb), 0.12); }
-    /* already marked → the red has done its job; this is now "put it back" */
-    .lib-ns-btn.is-marked { border-color: var(--border-strong); color: var(--text); }
-    .lib-ns-btn.is-marked:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
-    /* ⚠ the Fathom/Zoom link is now an icon — give it a hit area */
+    .lib-ns-btn:hover { border-color: var(--accent); color: var(--accent); }
+    /* marked → the row IS the deviation, and the button says how to undo it */
+    .lib-ns-btn.is-marked {
+      border-color: var(--bad); color: var(--bad); background: transparent;
+    }
+    .lib-ns-btn.is-marked:hover { background: rgba(var(--bad-rgb), 0.12); }
+    /* ⚠ the Fathom/Zoom link is an icon — give it a hit area */
     .library-recording-link.is-icon { padding: 2px 6px; font-size: 14px; text-decoration: none; }
     .review-page-header {
       display: flex;
