@@ -1708,6 +1708,28 @@
       vertical-align: 1px;
     }
     .not-sales-btn.is-marked { border-color: var(--accent); color: var(--accent); }
+
+    /* ⚠⚠ DIMMED **AND** BADGED, and both are needed. Dimming alone reads as
+       "loading" or "disabled"; a badge alone is easy to miss while scanning a
+       long list. Together they say EXCLUDED at a glance without a click — the
+       standing failure here is an excluded item that looks identical to a
+       counted one. The row still opens: a call that cannot be opened cannot be
+       un-marked from the review page either. */
+    .library-card.is-not-sales { opacity: 0.55; }
+    .library-card.is-not-sales .library-card-title { text-decoration: line-through; }
+    .not-sales-badge {
+      display: inline-block; padding: 2px 7px; border-radius: 5px;
+      border: 1px solid var(--border-strong); background: var(--bg-elevated);
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text); white-space: nowrap;
+    }
+    .lib-ns-btn {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; cursor: pointer;
+      font-size: 13px; line-height: 1; padding: 4px 7px; flex: 0 0 auto;
+    }
+    .lib-ns-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .lib-ns-btn.is-marked { border-color: var(--accent); color: var(--accent); }
     .review-page-header {
       display: flex;
       flex-direction: column;
@@ -11387,15 +11409,19 @@
     }
 
     var cardId = escapeHtml(String(c.id || ''));
-    return '<div class="library-card" onclick="openCallReview(\'' + cardId + '\')">'
+    var isNS = c.not_a_sales_call === true;
+    return '<div class="library-card' + (isNS ? ' is-not-sales' : '') + '" id="libcard-' + cardId + '"'
+      + ' onclick="openCallReview(\'' + cardId + '\')">'
       + '<div class="library-card-main">'
         + '<div class="library-card-title' + (c.title ? '' : ' anon') + '">' + title + '</div>'
         + '<div class="library-card-meta">' + meta + '</div>'
       + '</div>'
       + '<div class="library-card-side">'
+        + (isNS ? '<span class="not-sales-badge">Not a sales call</span>' : '')
         + (c.analysis_status === 'done' ? outcomeTagHtml(c.id, c.outcome, c.outcome_source, true) : '')
         + badge
         + recordingLink
+        + libRowNotSalesHtml(cardId, isNS)
       + '</div>'
     + '</div>';
   }
@@ -12296,6 +12322,70 @@
   // Real navigator. Replaces the Phase 2 Step 3 placeholder that only
   // surfaced a flash notice. Opens the call review page, kicks off the
   // detailed fetch in the background, and scrolls to top.
+
+  /**
+   * ⚠ AN ICON, NOT A BUTTON — the row already carries an outcome dropdown, a
+   * score badge and "View in Fathom", and a full-width label pushed it to wrap.
+   * ⚠ An icon needs BOTH aria-label and title, and its MEANING must not depend
+   * on hovering — which is why a marked row also gets a written badge and is
+   * dimmed. The icon is the action; the badge is the state.
+   * ⚠ stopPropagation, or the click opens the review page instead of marking.
+   */
+  function libRowNotSalesHtml(callId, isMarked) {
+    if (!callId) return '';
+    var label = isMarked ? 'Count this call again' : 'Mark as not a sales call';
+    return '<button class="lib-ns-btn' + (isMarked ? ' is-marked' : '') + '"'
+      + ' type="button" id="libns-' + callId + '"'
+      + ' aria-label="' + label + '" title="' + label + '"'
+      + ' onclick="event.stopPropagation(); toggleNotSalesFromRow(\'' + callId + '\', '
+      + (isMarked ? 'false' : 'true') + ');">'
+      + (isMarked ? '↩' : '⊘')
+      + '</button>';
+  }
+
+  /**
+   * ⚠⚠ UPDATES THE ROW IN PLACE FROM THE SERVER'S ANSWER — not a page reload,
+   * and NOT an optimistic local flip. An optimistic flip lies whenever the
+   * request fails, and this endpoint can legitimately answer 403.
+   */
+  async function toggleNotSalesFromRow(callId, next) {
+    var btn = document.getElementById('libns-' + callId);
+    var card = document.getElementById('libcard-' + callId);
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+      var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/not-a-sales-call', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ not_a_sales_call: next }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) throw new Error(res.status === 403 ? 'You are not allowed to mark this call.' : ('HTTP ' + res.status));
+      var body = await res.json();
+      var marked = body.not_a_sales_call === true;   // ⚠ the SERVER's answer, not the requested value
+      if (card) card.classList.toggle('is-not-sales', marked);
+      if (btn) {
+        var lab = marked ? 'Count this call again' : 'Mark as not a sales call';
+        btn.disabled = false; btn.textContent = marked ? '↩' : '⊘';
+        btn.setAttribute('aria-label', lab); btn.setAttribute('title', lab);
+        btn.classList.toggle('is-marked', marked);
+        btn.setAttribute('onclick', "event.stopPropagation(); toggleNotSalesFromRow('" + callId + "', " + (marked ? 'false' : 'true') + ");");
+      }
+      var side = card ? card.querySelector('.library-card-side') : null;
+      if (side) {
+        var existing = side.querySelector('.not-sales-badge');
+        if (marked && !existing) {
+          var sp = document.createElement('span');
+          sp.className = 'not-sales-badge'; sp.textContent = 'Not a sales call';
+          side.insertBefore(sp, side.firstChild);
+        } else if (!marked && existing) { existing.remove(); }
+      }
+      state.calls = null;   // the next library load comes from the server
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = next ? '⊘' : '↩'; }
+      alert('Could not update this call: ' + (e && e.message ? e.message : 'unknown'));
+    }
+  }
+
   function openCallReview(callId) {
     state.selectedCallId = callId;
     state.callReview = null;
