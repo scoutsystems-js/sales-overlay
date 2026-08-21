@@ -264,14 +264,37 @@
        and no 700. The glyph metrics are Archivo's own, measured from its file:
        cap 0.686em, O advance 1.016em, k@0.08em 12.226 (25.2% wider than
        Montserrat), so the coefficient is 7.8vw against the 96vw lockup box. */
-    /* ⚠⚠ --cap-em IS MEASURED FROM WHAT THE FACE RENDERS, NOT READ FROM THE
-       FONT FILE. It carried 0.686 (the file's metric) while all SEVEN flat-
-       topped caps — T U E H I M Y — render at 0.7197em, so the glyph box
-       started 4.7% short of the letters beside it.
-       ⚠ DO NOT RE-MEASURE THIS WITH "S". The round caps deliberately OVERSHOOT
-       the cap line for optical correction — S 0.7407, C 0.7334, O 0.7417,
-       G 0.7383, ~2.9% over — and measuring one is how a wrong cap height gets
-       derived. Use a flat-topped cap. */
+    /* ⚠⚠⚠ 0.7197 IS THE **FALLBACK'S** CAP HEIGHT, NOT ARCHIVO'S — corrected
+       2026-08-20, and the correction is only bookkeeping until the font ruling
+       lands, because the fallback is what actually draws here today.
+
+       This comment used to say: "--cap-em IS MEASURED FROM WHAT THE FACE
+       RENDERS, NOT READ FROM THE FONT FILE. It carried 0.686 (the file's
+       metric) while all SEVEN flat-topped caps render at 0.7197em." Measured
+       against a REAL Archivo Expanded (wdth 125 / 700):
+
+         Archivo, from the file      0.686   <- called "wrong"
+         Archivo, RENDERED           0.687   <- the file was right all along
+         what is declared below      0.7197  <- the SYSTEM FALLBACK
+
+       ⚠⚠ EVERY STEP OF THAT MEASUREMENT WAS CORRECT AND IT STILL PRODUCED A
+       NUMBER FOR THE WRONG TYPEFACE, because the declared face has never drawn
+       a letter on this page (see the @font-face note at the top). "Measure what
+       renders" silently becomes "measure whatever happens to render" the moment
+       a font fails to supply a glyph. And the seven-letter agreement did not
+       protect it: all seven agreed to four decimals BECAUSE they were all the
+       same fallback face. Internal consistency is evidence about precision,
+       never about identity.
+
+       ⚠ SO IT IS CORRECT AS SHIPPED, FOR THE WRONG REASON. Leave it at 0.7197
+       while the fallback draws. IF THE FONT RULING PICKS ARCHIVO, this becomes
+       0.687 and the whole derived chain below follows on its own — verified in
+       a browser with a real Archivo loaded: the ring's painted span measures
+       71.7px against a 71.4px cap, 100.4%.
+
+       ⚠ DO NOT RE-MEASURE THIS WITH "S". Round caps deliberately OVERSHOOT the
+       cap line for optical correction — S 0.7407, C 0.7334, O 0.7417, G 0.7383,
+       ~2.9% over. Use a flat-topped cap (T U E H I M Y), and more than one. */
     :root { --wm-family: 'Archivo Expanded'; --wm-vw: 7.8vw;
             --wm-cap-n: 104; --wm-cap: 104px;
             --cap-em: 0.7197; --o-adv-em: 1.016;
