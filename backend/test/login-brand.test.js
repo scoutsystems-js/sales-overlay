@@ -32,25 +32,21 @@ test('the lockup sits ABOVE the sign-in form, not below it', () => {
   assert.ok(lockup < email && lockup < pw, 'the lockup must come before the fields');
 });
 
-test('the wordmark is the full name, big, LIGHT and green', () => {
-  // ⚠ the word is SPLIT around the glyph now: SC<svg/>UT SYSTEMS
-  assert.ok(/class="brand-name">SC</.test(LOGIN) && /UT SYSTEMS</.test(LOGIN),
-    'the wordmark must still read SCOUT SYSTEMS around the O glyph');
-  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
-  assert.ok(css.length > 60 && css.length < 900, 'slice suspicious: ' + css.length);
-  // ⚠ THE SIZE IS min(<vw>, <px>) — read the px cap, which is the shipped size
-  // on any normal desktop. A naive /font-size:\s*(\d+)px/ would pick up nothing
-  // useful, and the earlier clamp() form hid the real size behind its MINIMUM.
-  // ⚠ the size is now per-face: min(var(--wm-vw), var(--wm-cap)). Read the cap
-  // from :root rather than the rule, since the trial switches both per face.
-  const size = Number((LOGIN.match(/--wm-cap:\s*(\d+)px/) || [])[1]);
-  const weight = Number((css.match(/font-weight:\s*(\d+)/) || [])[1]);
-  assert.ok(size >= 28, 'big: ' + size + 'px');
-  // ⚠ Justin, 2026-08-18: "BIGGER, NOT BOLD." The previous assertion demanded
-  // weight >= 700, which is now the opposite of the requirement.
-  // Justin reversed this 2026-08-18: the title is now BOLD and one size larger.
-  assert.ok(weight >= 700, 'bold: ' + weight);
-  assert.ok(/color:\s*var\(--green\)/.test(css), 'green, from the token');
+test('the wordmark is the full name — now carried by the IMAGE and its alt text', () => {
+  // ⚠⚠ CONVERTED 2026-08-21, NOT DELETED. The property this always protected is
+  // "the wordmark reads SCOUT SYSTEMS and is big". That survives; only the
+  // mechanism changed, from text to Justin's logo image. Colour and weight are
+  // no longer CSS at all — they are pixels in the artwork — so asserting them
+  // here would be asserting something this file can no longer see.
+  const lockup = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="brand-lockup"'),
+                                  LOGIN_LIVE.indexOf('class="card-header"'));
+  assert.ok(lockup.length > 80 && lockup.length < 1200, 'slice suspicious: ' + lockup.length);
+  assert.ok(/src="\/scout-wordmark\.png"/.test(lockup), 'the lockup must load the logo image');
+  assert.ok(/alt="Scout Systems"/.test(lockup),
+    'the wordmark must still READ "Scout Systems" — for a screen reader that alt '
+    + 'text is now the only wordmark on the page');
+  assert.ok(!/SCOUT SYSTEMS<|UT SYSTEMS</.test(lockup),
+    'the retired TEXT lockup must not come back alongside the image');
 });
 
 /**
@@ -118,14 +114,29 @@ test('⚠ the soft tints DERIVE from the brand green rather than copying it', ()
  * it of the background layer. Deleting them with the lockup would have quietly
  * dropped both properties.
  */
-test('the mark is drawn, not fetched — no asset request on the login page', () => {
+test('⚠⚠ the BACKGROUND mark is still drawn, and the only fetched image is the wordmark', () => {
+  // ⚠⚠ THIS ASSERTION WAS INVERTED BY A RULING, AND THE REASON IS RECORDED SO
+  // NOBODY "RESTORES" IT. It used to demand NO image request anywhere on this
+  // page. Justin ruled on 2026-08-21 that the wordmark IS his logo image — the
+  // mark replaces the O, so no typeface can draw it — which makes exactly one
+  // image request correct rather than forbidden.
+  //
+  // ⚠ WHAT THE ORIGINAL WAS REALLY PROTECTING SURVIVES INTACT, and it is two
+  // separate things:
+  //   1  the BACKGROUND mark stays an inline data URI, not a file
+  //   2  icon.png specifically stays out — it is an app icon with no alpha, a
+  //      baked-in wordmark and a generator watermark, and swapping it in here
+  //      would reintroduce all three at once
   const at = LOGIN_LIVE.indexOf('body::before');
   const css = LOGIN_LIVE.slice(at, LOGIN_LIVE.indexOf('}', at));
   assert.ok(css.length > 200 && css.length < 4000, 'slice suspicious: ' + css.length);
-  assert.ok(/url\("data:image\/svg\+xml,/.test(css), 'inline SVG data URI, not a file');
-  assert.ok(!/<img|icon\.png|\.jpg|\.webp/.test(LOGIN_LIVE),
-    'no image request anywhere on this page — and specifically not icon.png, '
-    + 'which is an app icon with no alpha, a baked-in wordmark and a watermark');
+  assert.ok(/url\("data:image\/svg\+xml,/.test(css),
+    'the background mark must stay an inline SVG data URI, not a file request');
+
+  assert.ok(!/icon\.png/.test(LOGIN_LIVE), 'icon.png must never be used as the logo here');
+  const imgs = LOGIN_LIVE.match(/<img[^>]*>/g) || [];
+  assert.strictEqual(imgs.length, 1, 'exactly one image on this page, got ' + imgs.length);
+  assert.ok(/scout-wordmark\.png/.test(imgs[0]), 'and it is the wordmark: ' + imgs[0]);
 });
 
 /**
@@ -147,59 +158,22 @@ test('the mark is drawn, not fetched — no asset request on the login page', ()
  * ruled deliberately — none may drift, and restoring any of them has to be a
  * decision rather than a tidy-up.
  */
-test('⚠⚠ THE MAP: lockup and background share 285deg; the nav is the lone 180deg holdout', () => {
-  const bg = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('body::before'), LOGIN_LIVE.indexOf('}', LOGIN_LIVE.indexOf('background-image')));
-  const nav = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="nav-logo"'), LOGIN_LIVE.indexOf('class="back"'));
-  const lock = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="brand-o"'), LOGIN_LIVE.indexOf('UT SYSTEMS'));
-
+test('⚠⚠ THE MAP: the background mark is 285deg; the nav is the lone 180deg holdout', () => {
+  // ⚠ THE MAP HAS TWO ENTRIES NOW, NOT THREE. The lockup ring was the third,
+  // and it is gone with the text lockup — the wordmark's mark now lives inside
+  // the raster, where no test can read its sweep. Re-derived rather than
+  // patched: a guard that still names a third party and excuses it is how the
+  // next reader misreads which difference was deliberate.
+  const bg = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('body::before'),
+                              LOGIN_LIVE.indexOf('}', LOGIN_LIVE.indexOf('background-image')));
+  const nav = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="nav-logo"'),
+                               LOGIN_LIVE.indexOf('class="back"'));
   // the sweep is carried by the large-arc flag: "0 0 1" = 180deg, "0 1 1" = 285deg
   const sweep = (t) => /A[\d.]+ [\d.]+ 0 1 1/.test(t) ? 285 : (/A[\d.]+ [\d.]+ 0 0 1/.test(t) ? 180 : null);
-  assert.strictEqual(sweep(lock), 285, 'the lockup ring must stay closed to 285deg');
-  assert.strictEqual(sweep(bg), 285, 'the background mark now shares that sweep');
+  assert.strictEqual(sweep(bg), 285, 'the background mark must stay closed to 285deg');
   assert.strictEqual(sweep(nav), 180, 'the NAV is the deliberate 180deg holdout — do not close it');
-
-  const radii = (t, attr) => (t.match(new RegExp(attr + "=['\"]([\\d.]+)['\"]", 'g')) || [])
-    .map((m) => parseFloat(m.replace(/[^\d.]/g, '')));
-  const arcR = (t) => (t.match(/A([\d.]+) /g) || []).map((m) => parseFloat(m.slice(1)));
-
-  // rings: background x1.12 of nav; lockup the SAME size as nav
-  const navArc = arcR(nav), bgArc = arcR(bg), lockArc = arcR(lock);
-  assert.strictEqual(bgArc.length, navArc.length, 'same ring count');
-  navArc.forEach((r, i) => {
-    assert.ok(Math.abs(bgArc[i] / r - 1.12) < 0.005,
-      'background ring ' + (i + 1) + ' must be x1.12 of the nav (' + r + ' -> '
-      + (r * 1.12).toFixed(2) + '), got ' + bgArc[i]);
-    assert.ok(Math.abs(lockArc[i] / r - 1) < 0.005,
-      'lockup ring ' + (i + 1) + ' must match the nav SIZE (' + r + '), got ' + lockArc[i]
-      + ' — only the SWEEP diverges there, not the scale');
-  });
-
-  // dots: background radii x0.25 and centres tightened x0.62
-  const navR = radii(nav, 'r'), bgR = radii(bg, 'r'), lockR = radii(lock, 'r');
-  navR.forEach((r, i) => {
-    assert.ok(Math.abs(bgR[i] / r - 0.25) < 0.001,
-      'background dot ' + (i + 1) + ' radius must be a QUARTER of the nav');
-  });
-  /* ⚠ CONVERTED 2026-08-19, NOT DELETED. This asserted the lockup dots matched
-     the nav's RADII outright. Justin then ruled that the dots scale WITH the
-     stroke ("proportional rather than heavy dots on hairline rings"), so as the
-     rings thinned to 6px the radii had to thin with them — that assertion is
-     superseded and the absolute radii are now derived in test/lockup-glyph.js.
-     The property that SURVIVES is the mocked arrangement: the three dots keep
-     their sizes RELATIVE to each other, so the mark still reads as the approved
-     descending stack rather than three equal dots. */
-  navR.slice(1).forEach((r, i) => {
-    assert.ok(Math.abs((lockR[i] / lockR[i + 1]) / (navR[i] / r) - 1) < 0.002,
-      'lockup dots ' + (i + 1) + ':' + (i + 2) + ' must keep the nav PROPORTION ('
-      + (navR[i] / r).toFixed(4) + '), got ' + (lockR[i] / lockR[i + 1]).toFixed(4));
-  });
-  const navCy = radii(nav, 'cy'), bgCy = radii(bg, 'cy'), lockCy = radii(lock, 'cy');
-  navCy.forEach((cy, i) => {
-    assert.ok(Math.abs(bgCy[i] - (12 + (cy - 12) * 0.62)) < 0.01,
-      'background dot ' + (i + 1) + ' centre must be tightened x0.62');
-    assert.ok(Math.abs(lockCy[i] - cy) < 0.01,
-      'lockup dot ' + (i + 1) + ' keeps the nav position');
-  });
+  assert.ok(!/class="brand-o"/.test(LOGIN_LIVE),
+    'the lockup glyph is retired; if it returns, this map needs its third entry back');
 });
 
 test('⚠ the landing page carries the SAME mark and INHERITS login\'s closed ceiling', () => {
@@ -235,24 +209,28 @@ const LOGIN_LIVE = LOGIN.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n
  * intended state. The property worth keeping is that there is exactly ONE mark
  * in the lockup — it is a letter, not a decoration beside the word.
  */
-test('⚠ the lockup contains EXACTLY ONE mark, and it is the O', () => {
+test('⚠ the lockup shows the logo ONCE — never the image and an inline mark together', () => {
+  // ⚠ THE HAZARD IS UNCHANGED AND STILL WORTH GUARDING: the same logo twice on
+  // one screen. It used to be "exactly one <svg>, in the O slot"; it is now
+  // "exactly one <img>, and no <svg> beside it".
   const lockup = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="brand-lockup"'),
                                   LOGIN_LIVE.indexOf('class="card-header"'));
-  assert.ok(lockup.length > 200 && lockup.length < 4000, 'slice suspicious: ' + lockup.length);
-  assert.strictEqual((lockup.match(/<svg/g) || []).length, 1, 'exactly one glyph');
-  assert.ok(/class="brand-o"/.test(lockup), 'and it is the O slot');
-  assert.ok(/>SC</.test(lockup) && /UT SYSTEMS</.test(lockup),
-    'the word must still read SCOUT SYSTEMS around the glyph');
+  assert.ok(lockup.length > 80 && lockup.length < 1200, 'slice suspicious: ' + lockup.length);
+  assert.strictEqual((lockup.match(/<img/g) || []).length, 1, 'exactly one wordmark image');
+  assert.strictEqual((lockup.match(/<svg/g) || []).length, 0,
+    'no inline mark inside the lockup — the image already contains it');
 });
 
-test('the wordmark is bigger again, and >= 50% wider than the login box', () => {
-  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup .brand-name'), LOGIN.indexOf('/* ── THE MARK AS A BACKGROUND'));
-  const size = Number((LOGIN.match(/--wm-cap:\s*(\d+)px/) || [])[1]);
-  assert.ok(size >= 100, 'one size larger again (92 -> 104): got ' + size);
-  // And at least 50% wider than the 400px login box: 92px x k 8.924 = ~820px.
-  assert.ok(size * 9.769 >= 400 * 1.5,
-    'the wordmark must span >= 1.5x the login box (600px); ' + size + 'px gives '
-    + Math.round(size * 9.769) + 'px');
+test('the wordmark is still >= 50% wider than the login box', () => {
+  // ⚠ JUSTIN'S RULE SURVIVES THE MECHANISM CHANGE: the wordmark must be at
+  // least 50% wider than the 400px card, i.e. >= 600px. It used to be derived
+  // from font-size x k; it is now simply the image's width cap.
+  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('.brand-lockup .brand-img'));
+  assert.ok(css.length > 40 && css.length < 800, 'slice suspicious: ' + css.length);
+  const boxPx = Number((css.match(/width:\s*min\(\d+vw,\s*(\d+)px\)/) || [])[1]);
+  assert.ok(boxPx, 'the lockup box must be min(<vw>, <px>)');
+  assert.ok(boxPx >= 400 * 1.5,
+    'the wordmark must span >= 1.5x the 400px login box (600px); got ' + boxPx + 'px');
 });
 
 /**
@@ -261,6 +239,19 @@ test('the wordmark is bigger again, and >= 50% wider than the login box', () => 
  * 0.215 and therefore caps the mark at 0.20 — where it already is. A future
  * "make it brighter" has a known answer: not without reopening the greys.
  */
+test('⚠ NOTHING ELSE MOVED — the background mark kept its own geometry', () => {
+  // ⚠⚠ CONVERTED FROM test/lockup-glyph.test.js, which was archived when the
+  // text lockup was retired. Five of its six tests were about the inline SVG "O"
+  // and died with it; THIS one is about a property that survives and was
+  // precisely the thing at risk in that commit — deleting the lockup's derived
+  // chain must not disturb the SEPARATE background mark, whose stroke is a
+  // function of a DIFFERENT box and is written into its data URI.
+  assert.ok(/0\.464 2\.464 19\.072 17\.105/.test(LOGIN),
+    'the background mark viewBox must be untouched');
+  assert.ok(/stroke-width='0\.032'/.test(LOGIN) || /stroke-width=%270\.032%27/.test(LOGIN),
+    'the background mark stroke must be untouched');
+});
+
 test('⚠ the login page keeps its genuine grey, and the mark sits at that ceiling', () => {
   assert.ok(/--muted:\s*#8a9aaa/.test(STYLE),
     'the login/landing stylesheet keeps the real grey — the no-grey sweep '
@@ -363,24 +354,31 @@ test('⚠ the background layer follows the motif treatment exactly', () => {
  * The trial is over — Archivo Expanded 700 shipped — so this now pins the ONE
  * face, still derived rather than scaled.
  */
-test('⚠⚠ the shipped face fits the lockup box — derived, not scaled', () => {
-  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('.brand-lockup .brand-name'));
-  assert.ok(/white-space:\s*nowrap/.test(LOGIN), 'the wordmark must never wrap');
+test('⚠⚠ the image cap is the ASSET\'S NATIVE WIDTH — the new failure mode is upscaling', () => {
+  // ⚠⚠ THE FAILURE MODE CHANGED WITH THE MECHANISM, WHICH IS THE WHOLE POINT OF
+  // CONVERTING THIS TEST RATHER THAN DELETING IT. Text WRAPS when it does not
+  // fit, so the old guard derived a font-size from a measured k. An image
+  // cannot wrap — it OVERFLOWS or it SCALES — so the thing to pin is different:
+  //   the vw cap  keeps it inside the viewport   (overflow)
+  //   the px cap  keeps it at or below native    (upscaling)
+  const css = LOGIN.slice(LOGIN.indexOf('.brand-lockup {'), LOGIN.indexOf('.brand-lockup .brand-img'));
   const boxVw = Number((css.match(/width:\s*min\((\d+)vw/) || [])[1]);
   const boxPx = Number((css.match(/width:\s*min\(\d+vw,\s*(\d+)px\)/) || [])[1]);
   assert.ok(boxVw && boxPx, 'the lockup box must be min(<vw>, <px>)');
+  assert.ok(boxVw <= 100, 'the vw cap must keep the image inside the viewport: ' + boxVw);
 
-  // k for Archivo Expanded 700 @0.08em, measured from the font file — never
-  // from the browser, which has twice reported a synthesised face's numbers.
-  const K = 12.226;
-  const cap = Number((LOGIN.match(/--wm-cap:\s*(\d+)px/) || [])[1]);
-  const vw = Number((LOGIN.match(/--wm-vw:\s*([\d.]+)vw/) || [])[1]);
-  assert.ok(cap && vw, 'the per-face custom properties must be set');
-  assert.ok(cap * K <= boxPx,
-    'at the ' + cap + 'px cap the wordmark is ' + Math.round(cap * K)
-    + 'px wide and must fit the ' + boxPx + 'px box');
-  assert.ok(vw * K <= boxVw,
-    vw + 'vw x k ' + K + ' = ' + (vw * K).toFixed(1) + 'vw must fit the ' + boxVw + 'vw box');
+  // ⚠ READ THE ASSET'S REAL WIDTH — do not hard-code it. A number copied from a
+  // comment goes stale the moment the artwork is re-exported.
+  const png = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-wordmark.png'));
+  assert.strictEqual(png.toString('latin1', 12, 16), 'IHDR', 'not a PNG');
+  const nativeW = png.readUInt32BE(16);
+  const nativeH = png.readUInt32BE(20);
+  assert.ok(boxPx <= nativeW,
+    'the px cap (' + boxPx + ') must not exceed the asset\'s native width ('
+    + nativeW + '), or the logo is upscaled on every desktop');
+  // and the markup's intrinsic size must match the file, or the page reflows on load
+  assert.ok(new RegExp('width="' + nativeW + '" height="' + nativeH + '"').test(LOGIN),
+    'the <img> width/height must match the asset (' + nativeW + 'x' + nativeH + ')');
 });
 
 test('⚠ the wordmark face is SELF-HOSTED — no third-party request on the first page', () => {

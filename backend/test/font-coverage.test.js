@@ -29,8 +29,23 @@ const SAIRA = path.join(FONT_DIR, 'saira-variable-latin.woff2');
 const ARCHIVO = path.join(FONT_DIR, 'archivo-expanded-700.woff2');
 
 // The strings each face is actually asked to draw.
-const WORDMARK = 'SCOUT SYSTEMS';                                  // login lockup + welcome title
+const WORDMARK = 'SCOUT SYSTEMS';                                  // now an image; kept as the alt text
 const SITE_TEXT = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;!?%$()-—·';
+
+/** ⚠ Strip comments before matching — this codebase archives removed code in
+ *  place, so a raw grep reports a shipped removal as un-shipped. Line comments
+ *  FIRST: a `/*` inside a `//` line is a false opener. */
+function live(src) {
+  return src.replace(/<!--[\s\S]*?-->/g, '')
+            .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+            .replace(/\/\*[\s\S]*?\*\//g, '');
+}
+function pages() {
+  return [
+    ['login', fs.readFileSync(path.join(__dirname, '..', 'web', 'login.html'), 'utf8')],
+    ['dashboard', fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8')],
+  ];
+}
 
 test('⚠ NON-VACUITY: the parser can find characters at all', () => {
   // A parser that silently returns an empty set would make every "missing"
@@ -54,66 +69,56 @@ test('Saira covers the wordmark too — so it is a viable wordmark face', () => 
 });
 
 /**
- * ⚠⚠ THIS ASSERTION PINS A KNOWN DEFECT AS PASSING, DELIBERATELY, AND IT IS NOT
- * A LICENCE. It is here so the defect is COUNTED rather than forgotten, and so
- * that ANY change to the file turns this red and forces the ruling to be made
- * rather than absorbed.
+ * ⚠⚠ THE PINNED DEFECT IS RESOLVED — BY REMOVAL, NOT BY REPAIR (2026-08-21).
  *
- * THE RULING IT IS WAITING ON (reported 2026-08-20, not yet made):
- *   A  repair the file      — ship an Archivo Expanded 700 subset that contains
- *                             the wordmark. The lockup's k = 12.226 is already
- *                             derived FOR Archivo, so the geometry is correct
- *                             and would finally be describing the real face.
- *   B  the filed Saira item — "wordmark → Saira wide (wdth 125)", k = 10.321.
- *                             One fewer font file, and the axis is already
- *                             shipped and loading.
- *   C  keep what renders    — then DELETE the file and the @font-face, and
- *                             re-derive k for the system face. ⚠ Note this
- *                             leaves the wordmark rendering a DIFFERENT face on
- *                             every OS, which is why it is not the free option.
+ * This file used to pin, deliberately, the fact that `archivo-expanded-700.woff2`
+ * could not draw "SCOUT SYSTEMS", with the three options it was waiting on
+ * written into the test. Justin's ruling retired the question entirely: the
+ * wordmark is his LOGO IMAGE — the mark replaces the O, so no typeface can draw
+ * it — and the font, its @font-face and the whole text lockup are gone.
  *
- * ⚠ WHEN THE RULING LANDS, REPLACE THIS TEST — do not delete it. The rule at the
- * top of the file is the thing worth keeping; only the exemption is temporary.
+ * ⚠ THE EXEMPTION IS REPLACED, NOT DELETED, exactly as the old note required.
+ * The RULE at the top of this file is the durable part and still has a subject
+ * (Saira); what changed is that the offending file no longer exists, so the
+ * assertion inverts from "this is how it is broken" to "it is gone, and nothing
+ * still asks for it".
  */
-test('⚠ KNOWN DEFECT, PINNED: the Archivo file cannot draw the wordmark', () => {
-  const missing = missingFrom(ARCHIVO, WORDMARK);
-  assert.deepStrictEqual(
-    missing.join(''), 'SCOUTYEM',
-    'The Archivo coverage changed. If the file was repaired, this test has done its job — '
-    + 'remove the exemption and assert full coverage. Missing now: ' + JSON.stringify(missing)
-  );
+test('⚠ the dead Archivo file is GONE, and no page still asks for it', () => {
+  assert.ok(!fs.existsSync(ARCHIVO),
+    'archivo-expanded-700.woff2 is back. It maps only SPACE and "A" and can draw '
+    + 'no letter of the wordmark — if a real Archivo subset is ever wanted, give it '
+    + 'a different filename and assert its coverage rather than reviving this one.');
 
-  // The positive form of the same fact, so a reader sees the scale of it.
-  assert.strictEqual(printableAscii(ARCHIVO), ' A',
-    'Archivo printable coverage is expected to be exactly space and "A"');
-});
-
-test('the wordmark string is the one the pages actually render', () => {
-  // ⚠ A coverage guard aimed at the wrong string proves nothing. Anchor it to
-  // the real markup — both surfaces build "SCOUT SYSTEMS" with the O replaced by
-  // an inline SVG, so the LETTERS in the DOM are "SC" + "UT SYSTEMS".
-  const login = fs.readFileSync(path.join(__dirname, '..', 'web', 'login.html'), 'utf8');
-  const dash = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-  assert.ok(login.includes('>SC<span class="brand-o"'), 'login lockup markup changed');
-  assert.ok(login.includes('UT SYSTEMS</div>'), 'login lockup tail changed');
-  assert.ok(dash.includes('UT SYSTEMS</div>'), 'welcome title tail changed');
-
-  // every letter the markup contains must be in the string this test checks
-  for (const ch of 'SCUTSYSTEMS') {
-    assert.ok(WORDMARK.includes(ch), 'wordmark test string is missing ' + ch);
+  for (const [name, src] of pages()) {
+    assert.ok(!/archivo-expanded-700\.woff2/.test(live(src)),
+      name + ' still requests the deleted font file');
+    assert.ok(!/font-family:\s*'Archivo Expanded'/.test(live(src)),
+      name + ' still declares an @font-face for a file that does not exist');
   }
 });
 
-test('both self-hosted faces are declared by BOTH pages that use them', () => {
-  // ⚠ The welcome overlay carries its own @font-face because it is a different
-  // document from login.html. If one page drops a declaration the other keeps
-  // working, so this cannot be caught by looking at either page alone.
-  const login = fs.readFileSync(path.join(__dirname, '..', 'web', 'login.html'), 'utf8');
-  const dash = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-  for (const [name, src] of [['login', login], ['dashboard', dash]]) {
+test('⚠ the wordmark is an IMAGE on both surfaces — so no face has to cover it', () => {
+  // ⚠ ANCHORED TO THE REAL MARKUP. A coverage guard aimed at a string nothing
+  // renders proves nothing, and that is doubly true now the string is gone: the
+  // pages carry an <img> whose alt text is the wordmark.
+  for (const [name, src] of pages()) {
+    const l = live(src);
+    assert.ok(/src="\/scout-wordmark\.png"/.test(l), name + ' does not load the wordmark image');
+    assert.ok(/alt="Scout Systems"/.test(l), name + ' wordmark image has no/!wrong alt text');
+  }
+  // and the text lockup must not creep back alongside it — one logo per screen
+  const [, login] = pages()[0];
+  assert.ok(!/UT SYSTEMS<\/div>/.test(live(login)), 'the text lockup is back on login');
+  const [, dash] = pages()[1];
+  assert.ok(!/UT SYSTEMS<\/div>/.test(live(dash)), 'the text lockup is back in the overlay');
+});
+
+test('Saira is still declared and served by BOTH pages', () => {
+  // ⚠ Each page carries its OWN @font-face — they are separate documents — so a
+  // page dropping the declaration cannot be caught by looking at the other one.
+  for (const [name, src] of pages()) {
     assert.ok(src.includes("font-family: 'Saira'"), name + ' lost its Saira @font-face');
-    assert.ok(src.includes("font-family: 'Archivo Expanded'"), name + ' lost its Archivo @font-face');
     assert.ok(src.includes('/fonts/saira-variable-latin.woff2'), name + ' lost the Saira file');
-    assert.ok(src.includes('/fonts/archivo-expanded-700.woff2'), name + ' lost the Archivo file');
   }
+  assert.ok(fs.existsSync(SAIRA), 'the Saira file itself is missing');
 });

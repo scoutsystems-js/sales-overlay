@@ -54,13 +54,14 @@
        re-derived for whichever face ACTUALLY renders — the current 7.8vw was
        derived for Archivo's k = 12.226 and is only safe today by accident, since
        the face that really draws is ~25% narrower. */
-    @font-face {
-      font-family: 'Archivo Expanded';
-      font-style: normal;
-      font-weight: 700;
-      font-display: swap;
-      src: url('/fonts/archivo-expanded-700.woff2') format('woff2');
-    }
+    /* ⚠⚠ THE ARCHIVO @font-face AND ITS FILE ARE DELETED (2026-08-21).
+       archivo-expanded-700.woff2 mapped exactly two printable characters, SPACE
+       and "A", so it had NEVER drawn a letter of "SCOUT SYSTEMS" — every glyph
+       fell back to the system face from the day it shipped. With the wordmark
+       now an image there is nothing for it to draw at all.
+       ⚠ Leaving it would leave the next reader inheriting constants that
+       describe a face which does not exist. Guarded: test/font-coverage.test.js
+       now asserts the file is ABSENT and that no page declares it. */
   </style>
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
@@ -238,22 +239,8 @@
        measured against), so 6px is a solve, not a division:
          (15.244 + s) * pxPerUnit = cap   AND   s * pxPerUnit = 6
          s = 6 x 15.244 / (104 x 0.7197 - 6) = 1.3285 units = 6.00px at 104px */
-    .brand-o {
-      display: inline-block;
-      width: calc(1em * var(--o-adv-em));
-      height: calc(1em * var(--o-box-em));
-      vertical-align: baseline;
-      /* the dots hang below the baseline; the box drops by exactly that much */
-      margin-bottom: calc(-1em * var(--o-drop-em));
-      overflow: visible;
-    }
-    .brand-o svg { width: 100%; height: 100%; overflow: visible; display: block; }
-    /* ⚠ the attributes on the elements carry the same derived values as an
-       inert fallback; CSS wins wherever it is supported. They must agree. */
-    .brand-o svg path { stroke-width: calc(var(--mark-stroke) * 1px); }
-    .brand-o svg circle:nth-of-type(1) { r: calc(var(--mark-stroke) * var(--dot-1) * 1px); }
-    .brand-o svg circle:nth-of-type(2) { r: calc(var(--mark-stroke) * var(--dot-2) * 1px); }
-    .brand-o svg circle:nth-of-type(3) { r: calc(var(--mark-stroke) * var(--dot-3) * 1px); }
+    /* ⚠ .brand-o IS GONE (2026-08-21) — it sized the inline SVG "O" inside the
+       text lockup. The wordmark is now one image with the mark already in it. */
 
     /* ── the typeface trial (temporary scaffolding, ?font=archivo) ──────────
        ⚠ Body text stays Montserrat Light either way — Archivo is a display face
@@ -295,27 +282,23 @@
        ⚠ DO NOT RE-MEASURE THIS WITH "S". Round caps deliberately OVERSHOOT the
        cap line for optical correction — S 0.7407, C 0.7334, O 0.7417, G 0.7383,
        ~2.9% over. Use a flat-topped cap (T U E H I M Y), and more than one. */
-    :root { --wm-family: 'Archivo Expanded'; --wm-vw: 7.8vw;
-            --wm-cap-n: 104; --wm-cap: 104px;
-            --cap-em: 0.7197; --o-adv-em: 1.016;
+    /* ⚠⚠ THE LOCKUP GLYPH CHAIN IS RETIRED (2026-08-21) — --wm-family, --wm-vw,
+       --wm-cap, --wm-cap-n, --cap-em, --o-adv-em, --mark-stroke(-px),
+       --ring-path-span, --ring-ink-span, --vb-height, --vb-drop, --o-box-em,
+       --o-drop-em and --dot-1/2/3 are all DELETED rather than left pointing at
+       nothing. Every one of them existed to size the inline SVG "O" inside a
+       TEXT lockup, and both the text and the O are gone.
 
-            /* the ask: 6px rings at the full title size */
-            --mark-stroke-px: 6;
-            /* the outer arc's PATH span, y 3.5 (circle top) -> 18.744 (285deg ends) */
-            --ring-path-span: 15.244;
-            /* dot radii as a ratio of the stroke, from the approved mark
-               (r 1.6/1.2/0.8 on a 2.2 stroke) — they thin WITH the rings */
-            --dot-1: 0.7272727; --dot-2: 0.5454545; --dot-3: 0.3636364;
+       ⚠ DELETED, NOT COMMENTED OUT WITH VALUES, DELIBERATELY. A live-looking
+       chain of custom properties that nothing reads is the "value that looks
+       maintained and isn't" failure this project has hit three times; and
+       --cap-em in particular carried a number measured on the WRONG FACE, so
+       preserving it would preserve a wrong answer to a question nobody is
+       asking any more.
 
-            --mark-stroke: calc(var(--mark-stroke-px) * var(--ring-path-span)
-                                / (var(--wm-cap-n) * var(--cap-em) - var(--mark-stroke-px)));
-            /* the ring's PAINTED span — this is the piece that must equal the cap */
-            --ring-ink-span: calc(var(--ring-path-span) + var(--mark-stroke));
-            /* the whole viewBox is taller: it also holds the descending dots */
-            --vb-height: calc(16 + var(--mark-stroke) * (var(--dot-3) + 0.5));
-            --vb-drop:   calc(0.756 + var(--mark-stroke) * (var(--dot-3) - 0.5));
-            --o-box-em:  calc(var(--cap-em) * var(--vb-height) / var(--ring-ink-span));
-            --o-drop-em: calc(var(--cap-em) * var(--vb-drop)   / var(--ring-ink-span)); }
+       ⚠ THE BACKGROUND MARK (body::before) IS UNAFFECTED — its stroke width is
+       written into the SVG data URI, not derived from these. Verified: zero
+       remaining var() reads of any of the above in this file. */
 
     /* ⚠⚠ THE GREYS STAY ON THIS PAGE — A DELIBERATE EXCEPTION TO THE NO-GREY
        SWEEP, CLOSED NOT DEFERRED (Justin, 2026-08-18: "it looks perfect").
@@ -348,56 +331,56 @@
        and harmonises them will either shrink the lockup below its resolution
        floor or enlarge the nav. Both were considered and declined. */
 
+    /* ══ THE WORDMARK IS JUSTIN'S LOGO IMAGE (ruling, 2026-08-21) ══════════
+       No typeface can draw it — the mark replaces the O — so the typeface
+       question (Archivo / Saira wide / the fallback) is RETIRED, not deferred.
+
+       ⚠⚠ AN IMAGE CANNOT WRAP, SO THE OLD FAILURE MODE IS GONE AND A NEW ONE
+       REPLACES IT: it OVERFLOWS or it SCALES. That is why the width is capped in
+       BOTH units. `min(96vw, 1038px)`:
+         96vw    keeps it inside the viewport at every width, as before
+         1038px  is the asset's NATIVE width — above it the browser upscales
+       ⚠ SO THE CAP IS NOT A ROUND NUMBER, IT IS THE ASSET. Change the asset and
+       this number moves with it.
+
+       ⚠ IT IS STILL WIDER THAN THE CARD, WHICH WAS JUSTIN'S ORIGINAL ASK: the
+       card is max-width 400px and this is up to 1038px — 2.6x, comfortably past
+       the "at least 50% wider" rule. It is pulled to the viewport's own width
+       and re-centred for exactly that reason.
+
+       ⚠ RESOLUTION, STATED HONESTLY: the source is 1038px wide, so at the cap
+       this renders 1:1 on a standard display and is 2x-upscaled on a retina one.
+       Glow artwork upscales gracefully — the soft edges are soft by design — but
+       the LETTER edges do soften. A 2x export is the fix if that ever matters;
+       it is not something a CSS change can solve. */
     .brand-lockup {
       text-align: center; margin: 0 0 30px;
-      width: min(96vw, 1300px);
+      width: min(96vw, 1038px);
       margin-left: 50%; transform: translateX(-50%);
     }
-
-    /**
-     * ⚠⚠ THE NO-WRAP IS STRUCTURAL, NOT A CHOSEN NUMBER — AND THE PREVIOUS
-     * VERSION WAS THE OPPOSITE, WHICH IS WHY IT WRAPPED AGAIN ON JUSTIN'S
-     * NARROWER WINDOW. `clamp(30px, 7.2vw, 68px)` fits at the ONE width it was
-     * verified at; any fixed px value wraps at some viewport.
-     *
-     * "It fits" is a RELATIONSHIP, not a property:
-     *
-     *     textWidth = k x fontSize        (k measured, not guessed)
-     *     fontSize_max = availableWidth / k
-     *
-     * ⚠⚠ RE-MEASURED FOR MONTSERRAT — k IS FACE-SPECIFIC AND THE OLD NUMBER
-     * WOULD HAVE WRAPPED. The previous 10.3vw came from k = 8.924, measured on
-     * the SYSTEM face. Montserrat Medium at the same 0.08em tracking measures
-     * k = 9.495 — 6.4% WIDER — so 10.3vw x 9.495 = 97.8vw of text in a 92vw
-     * lockup. Carrying the number across would have reproduced this page's wrap
-     * for the third time.
-     *
-     * The safe k is the MAX across every face that might actually render:
-     * Montserrat 500 = 9.495, system fallback 500 = 8.924. If the webfont is
-     * blocked or slow the fallback draws, and the formula has to hold for
-     * whichever one does — so the WIDER face sets the coefficient.
-     *
-     *     92 / 9.495 = 9.69vw  ->  shipped 9.6vw
-     *
-     * The px cap (92) only engages above a ~958px viewport, where 92vw = 881px
-     * against 92 x 9.495 = 874px of text — so the cap still cannot be the thing
-     * that causes a wrap.
-     *
-     * ⚠ k DEPENDS ON WEIGHT AND TRACKING. Changing either without re-deriving
-     * 10.3vw reintroduces the bug. Measured range: k is 7.88 (300 / 0.02em) to
-     * 9.76 (800 / 0.12em), so a heavier or wider setting NEEDS A SMALLER vw
-     * coefficient. Test asserts the pairing.
-     */
-    .brand-lockup .brand-name {
-      font-size: min(var(--wm-vw), var(--wm-cap));
-      font-family: var(--wm-family), 'Montserrat', -apple-system, sans-serif;
-      /* Justin: BIGGER, NOT BOLD. 800 -> 500, and the extra tracking is what
-         keeps a lighter weight from reading thin at this size. */
-      font-weight: 700; letter-spacing: 0.08em;
-      white-space: nowrap;
-      color: var(--green); line-height: 1.02;
-      text-shadow: 0 0 30px rgba(var(--green-rgb), 0.3);
+    .brand-lockup .brand-img {
+      display: block;
+      width: 100%;
+      height: auto;
+      /* ⚠ NO text-shadow / filter GLOW HERE. The glow is IN the artwork — it was
+         drawn with it — and adding a CSS one would double it. */
     }
+
+    /* ⚠⚠ THE TEXT LOCKUP AND ITS ENTIRE DERIVATION ARE RETIRED (2026-08-21).
+       The wordmark is an image; there is no font-size, no letter-spacing and no
+       k, so nothing here can wrap and nothing needs deriving.
+
+       WHAT WAS HERE, AND WHY IT IS WORTH ONE PARAGRAPH RATHER THAN SILENCE: a
+       formula, fontSize_max = availableWidth / k, with k MEASURED PER FACE at
+       the shipped weight and tracking. It existed because a fixed px font-size
+       fits at exactly one viewport and wraps at some other one — this page
+       wrapped three times before that was understood. The rule generalises and
+       still applies to any TEXT that must stay on one line; it simply has no
+       subject on this page any more.
+
+       ⚠ THE k VALUES ARE PRESERVED IN CLAUDE.md, not here, because they are
+       properties of the FACES and outlived this element: Archivo 12.146,
+       Saira wdth125 10.321, the system fallback 9.632, all @0.08em. */
 
     /* ── THE MARK AS A BACKGROUND (Justin, 2026-08-18) ────────────────────
        ⚠ THIS SUPERSEDES THE SMALL MARK ABOVE THE WORDMARK. The lockup is now
@@ -1171,7 +1154,8 @@
          Do not re-add it above the wordmark — the background mark and a small
          mark stacked over it is the same logo twice on one screen. -->
     <div class="brand-lockup">
-      <div class="brand-name">SC<span class="brand-o" aria-hidden="true"><svg viewBox="0.8357 2.8357 18.3285 17.1474" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.826 18.744 A8.5 8.5 0 1 1 15.174 18.744" stroke="var(--green)" stroke-width="1.3285" stroke-linecap="round"/><path d="M6.652 16.363 A5.5 5.5 0 1 1 13.348 16.363" stroke="var(--green)" stroke-width="1.3285" stroke-linecap="round"/><path d="M8.478 13.983 A2.5 2.5 0 1 1 11.522 13.983" stroke="var(--green)" stroke-width="1.3285" stroke-linecap="round"/><circle cx="10" cy="12" r="0.9662" fill="var(--green)"/><circle cx="10" cy="16" r="0.7246" fill="var(--green)"/><circle cx="10" cy="19.5" r="0.4831" fill="var(--green)"/></svg></span>UT SYSTEMS</div>
+      <img class="brand-img" src="/scout-wordmark.png"
+           alt="Scout Systems" width="1038" height="138" fetchpriority="high">
     </div>
 
     <div class="card-header">

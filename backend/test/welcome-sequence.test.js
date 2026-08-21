@@ -218,31 +218,46 @@ test('⚠ EVERY duration lives in ONE object', () => {
     'a duration is hard-coded in CSS instead of coming from WELCOME_TIMING: ' + JSON.stringify(hardCoded));
 });
 
-test('the sequence is about three seconds, drawn, with no dependency', () => {
+test('the sequence is about three seconds, with no external dependency', () => {
   const at = LIVE.indexOf('WELCOME_TIMING = {');
   const cfg = LIVE.slice(at, LIVE.indexOf('};', at));
   const n = (k) => Number(cfg.match(new RegExp(k + ':\\s*(\\d+)'))[1]);
   const total = n('titleAt') + n('textIn') + n('hold') + n('swipe');
   assert.ok(total > 2400 && total < 3600, 'end to end should be ~3s, got ' + total + 'ms');
-  // drawn, not fetched
+
   const mAt = LIVE.indexOf('function welcomeOverlayHtml');
   const mk = LIVE.slice(mAt, LIVE.indexOf('function welcomeDismiss'));
   // ⚠ `url(#welSweepGrad)` is a SAME-DOCUMENT fragment reference to an inline
-  // <linearGradient>, not a network request — the first version of this check
-  // flagged it and was wrong. Only an EXTERNAL url() is a dependency.
-  const external = (mk.match(/url\(\s*['"]?(?!#)/g) || []);
-  assert.deepStrictEqual(external, [], 'an external url() would be a dependency');
-  assert.ok(!/<img|fetch\(|import |require\(/.test(mk), 'no image, no request, no library');
-  assert.ok(/<svg class="wel-svg"/.test(mk), 'inline SVG');
+  // <linearGradient>, not a network request. Only an EXTERNAL url() is a
+  // dependency — the first version of this check flagged the fragment and was wrong.
+  assert.deepStrictEqual((mk.match(/url\(\s*['"]?(?!#)/g) || []), [],
+    'an external url() would be a dependency');
+  assert.ok(!/fetch\(|import |require\(/.test(mk), 'no request, no library');
+
+  // ⚠⚠ "NO <img>" WAS REMOVED FROM THIS ASSERTION BY A RULING (2026-08-21), NOT
+  // BY DRIFT. The title is now Justin's logo image, so exactly ONE <img> is
+  // correct here. What the original protected — that the DIAL is drawn rather
+  // than shipped as artwork — survives and is asserted below.
+  const imgs = mk.match(/<img[^>]*>/g) || [];
+  assert.strictEqual(imgs.length, 1, 'exactly one image in the overlay, got ' + imgs.length);
+  assert.ok(/scout-wordmark\.png/.test(imgs[0]), 'and it is the wordmark: ' + imgs[0]);
+  assert.ok(/<circle|<path/.test(mk), 'the dial itself must still be DRAWN, not an asset');
 });
 
-test('⚠ the overlay title carries the LOCKUP — one glyph, in the O slot', () => {
+test('⚠ the overlay title IS the logo image, and the dial is not doubled', () => {
+  // ⚠ CONVERTED 2026-08-21. It used to assert the title was text split around an
+  // inline SVG "O". Justin ruled the wordmark is his logo image — no typeface can
+  // draw a mark-for-O — so the glyph slot is gone. The surviving property is that
+  // the title READS "Scout Systems" and appears exactly once.
   const mAt = LIVE.indexOf('function welcomeOverlayHtml');
   const mk = LIVE.slice(mAt, LIVE.indexOf('function welcomeDismiss'));
-  assert.ok(/class=\\"wel-o\\"/.test(mk) || /wel-o/.test(mk), 'the O slot must exist');
-  assert.strictEqual((mk.match(/wel-o/g) || []).length >= 1, true, 'exactly one lockup glyph');
-  assert.ok(/SC</.test(mk) && /UT SYSTEMS/.test(mk),
-    'the title must still read SCOUT SYSTEMS around the glyph');
+  assert.ok(mk.length > 500, 'slice suspicious: ' + mk.length);
+  assert.ok(/class="wel-title"/.test(mk), 'the title element must keep its class');
+  assert.ok(/src="\/scout-wordmark\.png"/.test(mk), 'the title must be the wordmark image');
+  assert.ok(/alt="Scout Systems"/.test(mk),
+    'alt text is now the only wordmark a screen reader gets');
+  assert.ok(!/wel-o/.test(mk), 'the retired O slot must not come back');
+  assert.ok(!/UT SYSTEMS/.test(mk), 'the retired TEXT title must not come back beside the image');
 });
 
 test('the overlay contains every element the design called for', () => {
@@ -256,9 +271,9 @@ test('the overlay contains every element the design called for', () => {
   assert.ok(/wel-sweep/.test(mk), 'radar sweep');
   assert.ok((mk.match(/\[170, 170\], \[830, 170\], \[170, 830\], \[830, 830\]/g) || []).length === 1,
     'four satellites, one per corner');
-  // ⚠ the title is SPLIT around the lockup glyph now: SC<svg/>UT SYSTEMS
-  assert.ok(/Welcome to/.test(mk) && /SC</.test(mk) && /UT SYSTEMS/.test(mk),
-    'the two lines of copy, with the wordmark split around the O glyph');
+  // ⚠ the title is an IMAGE now; the kicker is still text
+  assert.ok(/Welcome to/.test(mk), 'the kicker line');
+  assert.ok(/alt="Scout Systems"/.test(mk), 'and the wordmark, as the image title');
 });
 
 // ── the first-paint cover (Josh's "tabs flash", 2026-08-18) ───────────────
@@ -348,45 +363,36 @@ test('⚠ EVERY path that declines to play still takes the cover down', () => {
  * letter-spacing adds exactly `tracking x charCount` to the advance width, so
  * this is arithmetic rather than estimation.
  */
-test('⚠⚠ the overlay wordmark fits at the WIDEST tracking the animation passes through', () => {
-  const kfAt = LIVE.indexOf('@keyframes welSettle');
-  assert.ok(kfAt > 0, 'welSettle anchor is stale');
-  const kf = LIVE.slice(kfAt, LIVE.indexOf('}', LIVE.indexOf('to', kfAt)) + 1);
-  const start = Number((kf.match(/letter-spacing:\s*([\d.]+)em/) || [])[1]);
-  assert.ok(start > 0, 'the animation must still start from a wide tracking');
+test('⚠⚠ the overlay wordmark CANNOT overflow the stage — an image does not track', () => {
+  // ⚠⚠ THE FAILURE MODE CHANGED, WHICH IS WHY THIS IS CONVERTED RATHER THAN
+  // DELETED. The TEXT title animated letter-spacing from 0.7em down, so its
+  // WIDEST moment was the FIRST frame and the guard had to derive a font-size
+  // from k at that tracking — a 1.2% margin at worst. An image has no tracking:
+  // its width is a constant, so the fit is structural.
+  //
+  //     stage  = min(92vw, 92vh) = 92vmin
+  //     title  = min(42vmin, 637px)
+  //     42vmin < 92vmin at EVERY viewport, and the px cap only engages where
+  //     92vmin already exceeds it.
+  const ruleAt = LIVE.indexOf('.wel-title  {');
+  assert.ok(ruleAt > 0, 'stale anchor — .wel-title rule');
+  const rule = LIVE.slice(ruleAt, LIVE.indexOf('}', ruleAt) + 1);
+  assert.ok(rule.length > 40 && rule.length < 400, 'slice suspicious: ' + rule.length);
 
-  // ⚠ END ANCHOR MUST EXIST IN `LIVE`. The first draft ended the slice at a
-  // COMMENT ("/* both settle IN"), which LIVE strips — indexOf returned -1 and
-  // the slice ran to the end of the file (311,030 chars). Anchor on real CSS.
-  const ruleAt = LIVE.indexOf('.wel-kicker, .wel-title {');
-  assert.ok(ruleAt > 0, 'the shared title/kicker rule is missing');
-  const css = LIVE.slice(ruleAt, LIVE.indexOf('.wel-title', ruleAt + 30));
-  assert.ok(css.length > 80 && css.length < 1200, 'slice suspicious: ' + css.length);
-  assert.ok(/white-space:\s*nowrap/.test(css),
-    'without nowrap the title wraps at the wide end of the animation');
+  const tVmin = Number((rule.match(/width:\s*min\(([\d.]+)vmin/) || [])[1]);
+  const tPx = Number((rule.match(/width:\s*min\([\d.]+vmin,\s*(\d+)px\)/) || [])[1]);
+  assert.ok(tVmin && tPx, 'the title width must be min(<vmin>, <px>)');
 
-  // Stage is min(92vw, 92vh) = 92vmin; the title must fit INSIDE it at `start`.
-  // ⚠ the SIZE lives on `.wel-title`, a different rule from the shared one that
-  // carries nowrap — read each from its own rule rather than one slice.
-  const titleAt = LIVE.indexOf('.wel-title  {');
-  assert.ok(titleAt > 0, 'the .wel-title rule is missing');
-  const titleCss = LIVE.slice(titleAt, LIVE.indexOf('}', titleAt) + 1);
-  assert.ok(titleCss.length > 40 && titleCss.length < 400, 'slice suspicious: ' + titleCss.length);
-  const sizeVmin = Number((titleCss.match(/font-size:\s*min\(([\d.]+)vmin/) || [])[1]);
-  assert.ok(sizeVmin, 'the title must be sized in vmin against the 92vmin stage');
-  /**
-   * ⚠ THE RUN IS MIXED NOW — the lockup glyph occupies the O's advance, so k is
-   * "sum of the other twelve + the mark's advance + tracking x 13". Measured
-   * from the FONT FILES for both trial faces at the animation's WIDEST tracking:
-   *     Montserrat 700 @0.7em = 17.829     Archivo Expanded @0.7em = 20.286
-   * The WIDER face governs, exactly as the fallback face does on the login page:
-   * whichever one renders, it has to fit.
-   */
-  const kAtStart = 20.286;
-  assert.ok(sizeVmin * kAtStart <= 92,
-    'at the START of the animation the title is ' + (sizeVmin * kAtStart).toFixed(1)
-    + 'vmin wide against a 92vmin stage — it will wrap and then snap. Size from '
-    + 'the WIDEST tracking (' + start + 'em, k=' + kAtStart.toFixed(2) + '), not the resting one');
+  const stageAt = LIVE.indexOf('.wel-stage {');
+  const stage = LIVE.slice(stageAt, LIVE.indexOf('}', stageAt) + 1);
+  const sVmin = Number((stage.match(/width:\s*min\((\d+)vw/) || [])[1]);
+  assert.ok(sVmin, 'the stage must be min(<vw>, <vh>)');
+
+  assert.ok(tVmin < sVmin,
+    'the title (' + tVmin + 'vmin) must be narrower than the stage (' + sVmin + 'vmin)');
+  // where the px cap binds, the stage is already wider than it
+  assert.ok(tPx / (sVmin / 100) * (tVmin / 100) <= tPx, 'sanity');
+  assert.ok(tPx <= 1038, 'the title cap must not exceed the asset native width');
 });
 
 test('⚠ only welSettle animates a layout property — the others cannot reflow', () => {
@@ -434,33 +440,58 @@ function constOf(src, name) {
   return m[1];
 }
 
-test('⚠⚠ the overlay glyph uses the SAME derived constants as login', () => {
+test('⚠ the retired glyph chain is gone from BOTH pages, not just one', () => {
+  // ⚠⚠ CONVERTED, AND THIS IS THE VERSION THAT MATTERS. The original asserted
+  // the overlay's glyph constants MATCHED login's, because the two had drifted
+  // apart once before. The constants are retired on both — so the same drift
+  // hazard now takes the opposite form: one page cleaned up and the other not.
+  //
+  // ⚠ constOf() CANNOT EXPRESS THIS. It asserts its own anchor exists, so asking
+  // it for a retired constant fails inside the helper rather than reporting the
+  // absence. Absence has to be checked against the source directly.
+  const strip = (src) => src
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const pages = [['dashboard.html', strip(HTML)], ['login.html', strip(LOGIN_PAGE)]];
   ['cap-em', 'o-adv-em', 'mark-stroke-px', 'ring-path-span', 'dot-1', 'dot-2', 'dot-3']
     .forEach((n) => {
-      assert.strictEqual(constOf(HTML, n), constOf(LOGIN_PAGE, n),
-        '--' + n + ' must match login.html — the overlay drifted from the lockup once already');
+      pages.forEach(([name, src]) => {
+        assert.ok(!new RegExp('--' + n + '\\s*:').test(src),
+          '--' + n + ' is retired but still DEFINED in ' + name);
+        assert.ok(!new RegExp('var\\(--' + n + '[,)]').test(src),
+          '--' + n + ' is retired but still READ in ' + name);
+      });
     });
 });
 
-test('⚠⚠ the overlay glyph geometry matches the login glyph exactly', () => {
-  const vb = /viewBox=\\?"([\d. ]+)\\?"/;
-  const wel = HTML.slice(HTML.indexOf('class="wel-title"'), HTML.indexOf('</svg></span>', HTML.indexOf('class="wel-title"')));
-  const login = LOGIN_PAGE.slice(LOGIN_PAGE.indexOf('class="brand-o"'), LOGIN_PAGE.indexOf('</svg></span>', LOGIN_PAGE.indexOf('class="brand-o"')));
-  assert.ok(wel.length > 200 && login.length > 200, 'slice suspicious');
-  assert.strictEqual((wel.match(vb) || [])[1], (login.match(vb) || [])[1],
-    'the viewBox must be the same ink-cropped box as the login lockup');
-  const radii = (t) => (t.match(/\br=\\?"([\d.]+)/g) || []).map((x) => x.replace(/[^\d.]/g, ''));
-  assert.deepStrictEqual(radii(wel), radii(login), 'dot radii must match the lockup');
+test('⚠ both surfaces load the SAME wordmark asset — one logo, one file', () => {
+  // ⚠ CONVERTED. The original pinned the overlay's inline glyph to login's,
+  // byte for byte, because they had drifted. With both now using an image the
+  // equivalent guarantee is simply that it is the SAME image — which is also
+  // what keeps it a single cached request across the login -> dashboard hop.
+  assert.ok(/src="\/scout-wordmark\.png"/.test(HTML), 'the overlay must use the shared asset');
+  assert.ok(/src="\/scout-wordmark\.png"/.test(LOGIN_PAGE), 'login must use the shared asset');
+  const dims = /width="(\d+)" height="(\d+)"/;
+  const a = HTML.slice(HTML.indexOf('scout-wordmark.png') - 200, HTML.indexOf('scout-wordmark.png') + 200).match(dims);
+  const b = LOGIN_PAGE.slice(LOGIN_PAGE.indexOf('scout-wordmark.png') - 200, LOGIN_PAGE.indexOf('scout-wordmark.png') + 200).match(dims);
+  assert.ok(a && b, 'both <img> tags must declare intrinsic width/height');
+  assert.deepStrictEqual([a[1], a[2]], [b[1], b[2]], 'the declared intrinsic size must match');
 });
 
-test('⚠ the overlay renders Archivo 700 — NOT a synthesised 800', () => {
+test('⚠⚠ the overlay title depends on NO font at all any more', () => {
+  // ⚠⚠ THIS TEST IS THE INVERSE OF WHAT IT WAS, AND THE INVERSION IS THE POINT.
+  // It used to assert the title asked for Archivo 700 and that the page
+  // self-hosted it. Archivo could never draw a letter of "SCOUT SYSTEMS" — it
+  // mapped only SPACE and "A" — and the ruling replaced the text with an image,
+  // so the font, the @font-face and the file are all deleted.
   const at = HTML.indexOf('.wel-title  {');
   assert.ok(at !== -1, 'stale anchor — .wel-title');
   const rule = HTML.slice(at, HTML.indexOf('}', at));
-  assert.ok(/font-weight:\s*700/.test(rule),
-    'only weight 700 exists in the woff2; 800 makes the browser synthesise, '
-    + 'which renders wider and invalidates the k that keeps this on one line');
-  assert.ok(/Archivo Expanded/.test(rule), 'the lockup face must be Archivo Expanded');
-  assert.ok(/@font-face/.test(HTML) && /archivo-expanded-700\.woff2/.test(HTML),
-    'the dashboard must self-host the face it asks for');
+  assert.ok(!/font-family/.test(rule), 'the title must not name a face; it is an image');
+  assert.ok(!/font-size/.test(rule), 'and it must not carry a font-size');
+  assert.ok(!/archivo-expanded-700\.woff2/.test(HTML),
+    'the dashboard still requests the deleted font file');
+  assert.ok(!/font-family:\s*'Archivo Expanded'/.test(HTML),
+    'the dashboard still declares an @font-face for a file that does not exist');
 });

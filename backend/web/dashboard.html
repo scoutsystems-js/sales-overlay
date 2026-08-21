@@ -2798,13 +2798,10 @@
        did) makes the browser SYNTHESISE a heavier face, and a synthesised
        weight measures differently from the real one — the faux-bold trap that
        has produced wrong metrics twice on this project. */
-    @font-face {
-      font-family: 'Archivo Expanded';
-      font-style: normal;
-      font-weight: 700;
-      font-display: swap;
-      src: url('/fonts/archivo-expanded-700.woff2') format('woff2');
-    }
+    /* ⚠⚠ THE ARCHIVO @font-face AND ITS FILE ARE DELETED (2026-08-21). The
+       file mapped only SPACE and "A", so this overlay's title had never drawn a
+       single letter in it — every glyph fell back to the system face. With the
+       title now an image there is nothing left for it to draw. */
     /**
      * ⚠⚠ SAIRA — SELF-HOSTED, AND SELF-HOSTING IS REQUIRED RATHER THAN PREFERRED.
      * index.js sets `style-src 'self' 'unsafe-inline'` and `font-src 'self' data:`,
@@ -2884,13 +2881,24 @@
      * getBoundingClientRect on a block returns the clamped box and cannot see
      * overflow at all.
      */
-    .wel-title  { font-size: min(4.5vmin, 68px); margin-top: 8px;
-                  font-family: 'Archivo Expanded', -apple-system, BlinkMacSystemFont, sans-serif;
-                  /* ⚠ 700, NOT 800 — see the @font-face note. k = 20.286 was
-                     measured on Archivo Expanded 700; at 800 the browser
-                     synthesises, renders wider, and the 4.5vmin coefficient
-                     that keeps this on one line stops being the right number. */
-                  font-weight: 700; }
+    /* ══ THE TITLE IS JUSTIN'S LOGO IMAGE (ruling, 2026-08-21) ═════════════
+       ⚠⚠ SIZED TO REPRODUCE THE OLD RESTING WIDTH, NOT PICKED. The text title
+       rendered `min(4.5vmin,68px)` at 0.06em tracking, which measured k=9.372
+       wide on the face that actually drew — 328px at a 779px vmin. So:
+
+           9.372 x min(4.5vmin, 68px)  =  min(42vmin, 637px)
+
+       The overlay therefore looks the same size as the one Justin approved; the
+       coefficient is the measured k, not a number chosen to taste.
+
+       ⚠⚠ AND THE OLD TIGHT-FIT RISK IS STRUCTURALLY GONE, not merely improved.
+       The text was 620px at its WIDEST animation frame against a 92vmin stage —
+       a 13.5% margin, and only 1.2% had the declared font ever drawn. An image
+       does not track, so its width is a constant 42vmin against a 92vmin stage:
+       it cannot overflow at any viewport, by construction rather than by
+       measurement. (Measured anyway — see the findings.) */
+    .wel-title  { margin-top: 8px; width: min(42vmin, 637px); height: auto;
+                  display: block; }
     /* ⚠⚠ THE SAME DERIVED CHAIN AS THE LOGIN LOCKUP, COPIED VERBATIM — not
        re-derived by eye. The old values here (0.844 / 0.700 / 0.0873) were
        MONTSERRAT's, kept from before the face changed, so the glyph was sized
@@ -2901,27 +2909,12 @@
        104px title. Here: min(4.5vmin, 68px), so ~2.3px at 1440x900 and 3.9px at
        the 68px cap. Same 5.8% of the title either way. Matching the SPEC means
        matching the ratio, not copying the pixel count into a smaller box. */
-    .wel-o {
-      --cap-em: 0.7197; --o-adv-em: 1.016;
-      --mark-stroke-px: 6; --ring-path-span: 15.244;
-      --dot-1: 0.7272727; --dot-2: 0.5454545; --dot-3: 0.3636364;
-      --mark-stroke: calc(var(--mark-stroke-px) * var(--ring-path-span)
-                          / (104 * var(--cap-em) - var(--mark-stroke-px)));
-      --ring-ink-span: calc(var(--ring-path-span) + var(--mark-stroke));
-      --vb-height: calc(16 + var(--mark-stroke) * (var(--dot-3) + 0.5));
-      --vb-drop:   calc(0.756 + var(--mark-stroke) * (var(--dot-3) - 0.5));
-      --o-box-em:  calc(var(--cap-em) * var(--vb-height) / var(--ring-ink-span));
-      --o-drop-em: calc(var(--cap-em) * var(--vb-drop)   / var(--ring-ink-span));
-      display: inline-block;
-      width: calc(1em * var(--o-adv-em)); height: calc(1em * var(--o-box-em));
-      vertical-align: baseline; margin-bottom: calc(-1em * var(--o-drop-em));
-      overflow: visible;
-    }
-    .wel-o svg path { stroke-width: calc(var(--mark-stroke) * 1px); }
-    .wel-o svg circle:nth-of-type(1) { r: calc(var(--mark-stroke) * var(--dot-1) * 1px); }
-    .wel-o svg circle:nth-of-type(2) { r: calc(var(--mark-stroke) * var(--dot-2) * 1px); }
-    .wel-o svg circle:nth-of-type(3) { r: calc(var(--mark-stroke) * var(--dot-3) * 1px); }
-    .wel-o svg { width: 100%; height: 100%; overflow: visible; display: block; }
+    /* ⚠ .wel-o AND ITS WHOLE DERIVED CHAIN ARE GONE (2026-08-21) — --cap-em,
+       --o-adv-em, --mark-stroke(-px), --ring-path-span, --ring-ink-span,
+       --vb-height, --vb-drop, --o-box-em, --o-drop-em, --dot-1/2/3. They sized
+       an inline SVG "O" inside a TEXT title; the title is now one image with
+       the mark already in it. Deleted rather than left pointing at nothing —
+       and --cap-em in particular held a value measured on the WRONG FACE. */
     /* both settle IN from wide tracking as they fade up */
     @keyframes welSettle {
       from { opacity: 0; letter-spacing: 0.7em; }
@@ -3984,7 +3977,7 @@
       + '<div class="wel-stage">' + svg
         + '<div class="wel-text">'
           + '<div class="wel-kicker" style="--wel-track:0.42em;animation-delay:' + T.textAt + 'ms">Welcome to</div>'
-          + '<div class="wel-title" style="--wel-track:0.06em;animation-delay:' + T.titleAt + 'ms">SC<span class="wel-o" aria-hidden="true"><svg viewBox="0.8357 2.8357 18.3285 17.1474" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4.826 18.744 A8.5 8.5 0 1 1 15.174 18.744" stroke="var(--accent)" stroke-width="1.3285" stroke-linecap="round"/><path d="M6.652 16.363 A5.5 5.5 0 1 1 13.348 16.363" stroke="var(--accent)" stroke-width="1.3285" stroke-linecap="round"/><path d="M8.478 13.983 A2.5 2.5 0 1 1 11.522 13.983" stroke="var(--accent)" stroke-width="1.3285" stroke-linecap="round"/><circle cx="10" cy="12" r="0.9662" fill="var(--accent)"/><circle cx="10" cy="16" r="0.7246" fill="var(--accent)"/><circle cx="10" cy="19.5" r="0.4831" fill="var(--accent)"/></svg></span>UT SYSTEMS</div>'
+          + '<img class="wel-title" src="/scout-wordmark.png" alt="Scout Systems" width="1038" height="138" style="animation-delay:' + T.titleAt + 'ms">'
         + '</div>'
       + '</div></div>';
   }
