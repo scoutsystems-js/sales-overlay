@@ -54,8 +54,18 @@
       src: url('/fonts/saira-variable-latin.woff2') format('woff2-variations');
     }
     body {
-      /* 450, matching the dashboard -- see the note there. */
-      font-weight: 450;
+      /* ⚠⚠ LOGIN STAYS AT 300 — IT IS NOT IN SCOPE FOR THE 400 -> 450 RULING.
+         That ruling targets body copy set at 400; this page deliberately runs
+         LIGHT (300) as its own treatment, enforced by the catch-all block near
+         the bottom of this file. A 450 declared here would be dead anyway —
+         `body { font-weight: 300 }` appears later and CSS is last-wins — so it
+         was removed rather than left looking effective.
+         ⚠ THE OLD RATIONALE FOR THAT BLOCK IS NOW STALE, THOUGH THE DESIGN IS
+         NOT: it forces 300/500 because only two Montserrat weights were thought
+         to be loaded, and a weight outside them would have been SYNTHESISED.
+         Saira ships the full 100–900 range, so the synthesis risk is gone and
+         the 300 is now a free choice rather than a constraint. Changing it is a
+         design decision nobody has made. */
       min-height: 100vh;
       display: flex;
       flex-direction: column;
