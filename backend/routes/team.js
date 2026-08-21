@@ -238,6 +238,7 @@ router.get('/averages', teamGate, async function (req, res) {
       var cq = await admin.from('fathom_calls')
         .select('id, user_id, prospect_id, duration_seconds')
         .in('user_id', candidates).gte('call_date', win.from).lte('call_date', win.to)
+        .not('not_a_sales_call', 'is', true)
         .range(start, start + 999);
       if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
       calls = calls.concat(cq.data || []);
@@ -376,6 +377,7 @@ router.get('/rep-series', teamGate, async function (req, res) {
     for (;;) {
       var cq = await admin.from('fathom_calls').select('id, user_id, call_date, prospect_id')
         .in('user_id', candidates).gte('call_date', range.from).lte('call_date', range.to)
+        .not('not_a_sales_call', 'is', true)
         .range(start, start + 999);
       if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
       calls = calls.concat(cq.data || []);

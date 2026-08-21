@@ -69,6 +69,11 @@ async function countManagedReps(admin, userId) {
   return r.error ? 0 : (r.count || 0);
 }
 // Total recorded calls for the zero-history delete gate (fathom + sessions).
+/* ⚠⚠ DELIBERATELY NOT FILTERED FOR not_a_sales_call. This is a SAFETY CHECK,
+   not a metric: it feeds the zero-history rule that decides whether a user may be
+   DELETED. If every one of a user's calls were marked, a filtered count would
+   report NO history and permit a delete that destroys real data. Counting a
+   marked call here is correct — the call still exists. */
 async function countUserHistory(admin, userId) {
   var fc = await admin.from('fathom_calls').select('id', { count: 'exact', head: true }).eq('user_id', userId);
   var cs = await admin.from('call_sessions').select('id', { count: 'exact', head: true }).eq('user_id', userId);

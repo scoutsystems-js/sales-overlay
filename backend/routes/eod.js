@@ -120,6 +120,7 @@ router.get('/', requireAuth, async function (req, res) {
       .select('id, title, call_date, recording_url')
       .eq('user_id', userId)
       .gte('call_date', bounds.fromIso).lt('call_date', bounds.toIso)
+      .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: true });
     if (callsQ.error) throw new Error('fathom_calls: ' + callsQ.error.message);
     var calls = callsQ.data || [];

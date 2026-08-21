@@ -27,6 +27,7 @@ async function aggregateWindow(admin, repIds, from, to) {
   while (true) {
     var cq = await admin.from('fathom_calls').select('id, user_id, call_date')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
+      .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: false }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var b = cq.data || []; calls = calls.concat(b);
@@ -272,6 +273,7 @@ async function computeTeamTrends(admin, repIds, bucket, from, to) {
   while (true) {
     var cq = await admin.from('fathom_calls').select('id, call_date')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
+      .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: true }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var b = cq.data || []; calls = calls.concat(b);
