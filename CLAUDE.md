@@ -2192,6 +2192,36 @@ Justin asked for a red "NON SALES CALL" button on every library row. **`--bad` (
 - **A SOLID red box on every healthy row would render a 20-row library as twenty errors.** An **outlined** red reads as *a destructive-ish action is available here*, which is true; a **filled** red reads as *something is wrong with this row*, which is false.
 - **⚠ ONCE MARKED THE BUTTON STOPS BEING RED** and becomes a neutral `COUNT THIS CALL`: at that point the destructive direction is the one already taken, and the state is carried by the dimming, the strikethrough and the badge. **The button is the ACTION; those three are the STATE.**
 - **⚠ TO FIT A LABEL, SOMETHING ELSE GAVE.** A labelled button had previously been measured as overflowing. *View in Fathom* collapsed to an icon — **the least load-bearing item, since it duplicates what opening the call gives you** — plus a tighter row gap. **Nothing of the requested label was abbreviated to make it fit**, which was the explicit constraint.
+### ⚠⚠ A CONTROL THAT CANNOT MOVE IS NOT A CONTROL — AND A VACUOUS RUN LOOKS LIKE A FINDING (2026-08-20)
+Diagnosing whether marking a call changes the analysis-set hash, my first run picked an arbitrary call, got **203 analyses in all three states**, and reported *"the hash does not change on mark"* — which reads as a real and alarming finding. **The call simply was not in the analysed set, so nothing could have moved.**
+- **THE FIX IS TO PROVE THE CONTROL MOVES BEFORE TRUSTING THE COMPARISON.** Re-run against a call provably carrying a `done` analysis in-window: `203 -> 202` on mark, hash changed, hash **returned exactly** on un-mark.
+- **⚠ THE TELL IS AN UNCHANGED VALUE ACROSS A CHANGE YOU KNOW YOU MADE.** Before concluding the mechanism is broken, confirm the input you altered is actually inside the set being measured.
+- Same family as the minimum-sample rule (*a check that can pass by finding nothing needs a floor*): here the check passed by finding **no difference**, for the same reason — the sample did not contain the thing under test.
+
+### ⚠⚠ A STATIC `pending` ROW IS NOT A DRAIN — AND HOLDING ON ONE IS THE MIRROR OF PUSHING THROUGH ONE (2026-08-20)
+The never-push-during-a-drain rule warns that a serial batch has gaps where nothing is `processing`. **That is true, and it makes the opposite error easy: treating any non-zero `pending` as an active drain and holding forever.**
+- **The live case:** the drain check read `pending: 1, processing: 0`. I stopped. Ten polls over four minutes showed it **completely static** — pending never fell.
+- **THE DISCRIMINATOR IS MOVEMENT, NOT PRESENCE. Pending only decreases while a loop runs**, so a running drain shows `processing > 0` *or* a falling count. Neither was true: the row was awaiting dispatch, which in this system is a resting state (pending rows are not auto-dispatched — they wait for a sync or a reanalyze click).
+- **THE RULE: poll until you can say which it is.** `processing > 0` -> a drain, wait. `processing = 0` and `pending` **falling** -> a drain between calls, wait. `processing = 0` and `pending` **static across several polls** -> not a drain, safe to push.
+- **⚠ BOTH ERRORS ARE SILENT AND ONLY ONE IS EXPENSIVE**, which is why the conservative reading is right by default — but a rule that can never be exited stops being a gate and becomes a block.
+
+### ⚠ THE 1200px CONTENT COLUMN MAKES EVERY DESKTOP WIDTH THE SAME MEASUREMENT (2026-08-20)
+`.page` is `max-width: 1200px`. **Above a 1200px viewport the row width is CONSTANT at 1134px**, so a check "at 1440 and at 1920" is not two samples — it is one measurement taken twice.
+- **CONSEQUENCE, and it resolves the one-width rule rather than violating it: for anything inside `.page`, sweep the COLUMN, not the viewport.** Constraining `page.style.maxWidth` across 1200/1160/1040/900/820 gave zero row and side-cluster overflow at every width (worst 0px) — **strictly stronger than the two desktop points, because it covers where it would actually break.**
+- **⚠ SAY WHEN THE INSTRUMENT FAILED.** `resize_window` reported success and `innerWidth` stayed 1609 on every attempt. Reporting "verified at 1440 and 1920" would have been false. **Substituting a better check is fine; presenting it as the check that was asked for is not.**
+
+### ⚠ NOT-A-SALES-CALL: RED MOVED FROM THE ACTION TO THE STATE (ruling 2026-08-20, `eceb31c`)
+**Justin, after seeing twenty red outlines down a library: the button is NEUTRAL when unmarked, RED when marked.** Red indicates a STATE, not an available action — `--bad` already means "error" in 31 places, so a red button on a HEALTHY row warned about nothing.
+- **Neutral must still read as PRESSABLE**: `--bg-elevated` fill, `--border-strong`, full `--text`. **A control that looks inert gets ignored, which is worse than one that is merely quiet.**
+- **⚠ THE BADGE AND THE BUTTON ARE NOT REDUNDANT — the `NOT A SALES CALL` badge renders NEUTRAL, not red.** Dimming + strikethrough + grey badge carry the STATE; the red button is the ACTION that undoes it.
+- **⚠ THE ACTUAL COLLISION IS THE `Lost` OUTCOME SELECT, which is red-outlined on the same page.** Red therefore means two unrelated things at once — *"this call was lost"* and *"un-mark this call"*. **Flagged, not acted on.** If one ever gives it should be the button: the state is already unambiguous without it, whereas `Lost` red is the only marker of that outcome.
+
+### ⚠⚠ THE NOT-A-SALES-CALL CACHE QUESTION — CLOSED, AND ENTRIES **ACCUMULATE** (2026-08-20)
+The one open item on the feature. **`objection_synthesis_cache` INSERTS PER HASH RATHER THAN REPLACING** — three different hashes were found alive simultaneously for the same `from_ts`. **So a pre-mark entry is neither EVICTED nor OVERWRITTEN: it persists and stays reachable, and un-marking lands back on it.**
+- Proven by round-trip: hash changes on mark and **returns exactly** on un-mark. **The cache is keyed correctly and self-corrects; the fault was never structural.**
+- **The observed "stale read" was a cached response misread as an unchanged value** — 203 computed while marked (`cached:false`) sat beside 203 served from cache after un-marking (`cached:true`). **Two identical numbers, one right and one stale.** The underlying filter moves 204 <-> 203 in both directions at the source.
+- **⚠ NOT CLAIMED: the stale read was not reproduced.** What is established is that it is not structural — which is what determines whether cache behaviour may be touched. **Nothing was changed.**
+- **⚠ THE COLUMN IS `analysis_set_hash`, NOT `set_hash`.** A query for the latter fails; the real columns are `id, user_id, from_ts, to_ts, analysis_set_hash, synthesis, generated_at, synthesis_type`.
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
