@@ -2150,6 +2150,27 @@ even_performance  plenty of data, compared, and handling is LEVEL. A FINDING.
 - **⚠⚠ AND THIS IS WHY IT IS IN THIS FILE AND NOT ONLY IN A COMMENT.** The next session will see an unfiltered aggregate sitting beside a dozen filtered ones and reasonably conclude it was missed — then "fix" it. **The comment at the function may be read; CLAUDE.md will be.**
 - Same family as the write-the-null rule: **a deliberate absence and an oversight are indistinguishable unless the deliberateness is recorded.**
 
+### ⚠⚠ THE "MISSING" EXCLUSION WAS A CACHE READ, NOT A FILTER GAP — AND THE MISREADING IS THE LESSON (2026-08-20)
+**Marking a call left `/me/needs-work` reporting `analyzed_calls: 203` both marked and un-marked, which looked like an eighteenth unfiltered consumer.** It was not.
+```
+UNMARKED   callIds 344 · analyses 204 · the call IS in analyses
+MARKED     callIds 343 · analyses 203 · the call correctly absent
+```
+**The filter works. `analyzed_calls` counts done analyses over the FILTERED call set and moves 204 -> 203.**
+- **⚠⚠ WHAT I ACTUALLY SAW: the 203 WHILE MARKED was correct (`cached:false`, freshly computed WITH the filter). The 203 AFTER UN-MARKING was `cached:true` — a STALE entry that should have read 204.** Two identical numbers, one right and one wrong, and reading them as a pair said "nothing moved".
+- **THE GENERAL FORM: when a before/after pair shows NO CHANGE, check whether either side was SERVED FROM CACHE before concluding the mechanism failed.** A cached value and a computed value are indistinguishable in the output; only the `cached` flag separates them, and it was in the response the whole time.
+- **⚠ RESIDUAL, NOT CLOSED: the un-mark direction served a stale entry.** The hash is built from the analyses set, so un-marking should restore the pre-mark hash and hit the pre-mark entry. Why it returned the marked-era value is not established. **The forward direction is proven; the reverse is not.**
+
+### ⚠⚠ `canMarkNotSalesCall` AND `canTagOutcome` LOOK LIKE ONE RULE AND DELIBERATELY DIFFER — DO NOT UNIFY THEM
+Both read "closer on their own, manager on their reps'". **`canTagOutcome` REFUSES A MANAGED REP ON THEIR OWN CALL; `canMarkNotSalesCall` ALLOWS IT.**
+- **Setting an outcome is INFLATABLE** — a rep could tag everything `closed` and lift their own close rate. **Marking a call not-a-sales-call REMOVES it from the rep's own numbers, so it cannot flatter them**, and Justin ruled a closer may mark their own.
+- **⚠ Josh IS a managed rep and the venting call is his**, so reusing `canTagOutcome` would have blocked the exact case the feature exists for — while looking like sensible reuse. A test asserts the two disagree on that case **on purpose**.
+
+### ⚠⚠ "VERIFY BEFORE PUSH" AND "CLICK THE DEPLOYED SITE" CANNOT BOTH HOLD FOR A SERVER-SIDE CONTROL (2026-08-20)
+**A button whose behaviour lives in a route handler cannot be click-verified before the handler is deployed.** The endpoint 404s until it ships, so the only available orders are *push then verify* or *never verify*.
+- **The resolution is not to pretend otherwise: push, verify immediately, revert on failure.** State the tension rather than resolving it silently — a report claiming "verified before push" for this shape of work is false.
+- **What keeps it safe is that the feature is INERT until used.** Nothing was marked, so live behaviour was identical to before the push for every existing row.
+- **⚠ AND ONE CHECK STAYED UNPROVEN BECAUSE OF A HARD LINE, NOT A LIMITATION:** the 403 needs a non-owner session, every available token is an `owner`, and getting one means entering a password. **The correct closure is a server-side integration test with a forged actor, not a browser session.**
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

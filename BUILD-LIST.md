@@ -33,6 +33,7 @@ Shipped, deployed, and verified on production.
 | Zoom speaker identity | Byte-identical display-name match, collision detector | `lib/zoom-identity.js` |
 | Welcome emails / set-password | Invite flow via Resend | |
 | Account page | Profile, password, billing badge, Connections | |
+| **Mark a call "not a sales call"** | Closer on their own call, manager on a team call; excluded from every metric, stays visible and flagged | shipped `6129fed`. Verified by clicking: mark, flag, still-opens, un-mark. ⚠ **OPEN: the 403 over HTTP needs a forged-actor integration test (every available session is an `owner`), and the un-mark cache direction served one stale read** |
 | **Site-wide font: Saira** | Self-hosted variable woff2 (96.4 KB), dashboard + login, body 450, tabular numerals | shipped `284cfdb`/`39faa05`. Verified on the live site: face loads on both pages (registered count + proven control), weight 650 renders natively, no overflow, no login wrap, no nav collision at 1920 |
 
 ## IN FLIGHT
@@ -56,7 +57,6 @@ Ruled on, nobody has begun.
 
 | item | one line | depends on |
 |---|---|---|
-| **Mark a call "not a sales call"** | Excludes it from counting; **closer OR manager can set it** (Justin 2026-08-20, extends the earlier closer-only spec) | ~17 consumers; both halves (upstream filter + downstream exclusion) must ship in ONE commit |
 | Customize View — the real feature | Let a manager choose what the team page shows | per-user, not per-org (no org entity needed) |
 | **Login page + post-login animation — bring in line with the site** | Neither matches the swept product yet | ⚠ **Confirm Saira is actually rendering on BOTH**, using registered-face-count + a real-vs-bogus width control — **NOT `document.fonts.check`**, which returns true for a face that never loaded (it did exactly that for Montserrat here for months). ⚠ **Login body is still weight 300 while the site is 450** — the 300-forcing rule exists for a limitation that no longer applies (only two Montserrat weights were thought loaded; Saira ships 100–900), so it is now a **free choice nobody has made**. ⚠ The post-login animation's typography and motion were never checked against the swept site. |
 | **Nav shows the wordmark, not just "Scout"** | The nav renders the text "Scout"; it should carry the logo lockup | ⚠⚠ **DEPENDS ON the small-size logo variant — see "New Scout Systems logo" above, which records that at nav size concentric rings vanish and a dot renders under a pixel, and the new mark has exactly that construction. Do not attempt the nav lockup before that variant exists.** |
