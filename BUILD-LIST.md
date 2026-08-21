@@ -33,13 +33,14 @@ Shipped, deployed, and verified on production.
 | Zoom speaker identity | Byte-identical display-name match, collision detector | `lib/zoom-identity.js` |
 | Welcome emails / set-password | Invite flow via Resend | |
 | Account page | Profile, password, billing badge, Connections | |
+| **Site-wide font: Saira** | Self-hosted variable woff2 (96.4 KB), dashboard + login, body 450, tabular numerals | shipped `284cfdb`/`39faa05`. Verified on the live site: face loads on both pages (registered count + proven control), weight 650 renders natively, no overflow, no login wrap, no nav collision at 1920 |
 
 ## IN FLIGHT
 Started this session.
 
 | item | one line | state |
 |---|---|---|
-| **Site-wide font → SAIRA** | Self-hosted, not the Google CDN; width axis available | ⚠⚠ **SUPERSEDES BOTH EARLIER FONT RULINGS — Archivo Expanded and Montserrat are DEAD.** Three live font rulings is how the wrong one gets built. Measurement only so far; **no sweep** |
+
 | **Customize View (team page)** | `soon` tag in the team controls row, where the real control will live | **tag SHIPPED `4d6d9e6`** and verified in the render (SPAN, tabIndex -1, dimmed). The feature itself is not started — see AGREED, NOT STARTED |
 
 ## BLOCKED ON JUSTIN
@@ -57,6 +58,7 @@ Ruled on, nobody has begun.
 |---|---|---|
 | **Mark a call "not a sales call"** | Excludes it from counting; **closer OR manager can set it** (Justin 2026-08-20, extends the earlier closer-only spec) | ~17 consumers; both halves (upstream filter + downstream exclusion) must ship in ONE commit |
 | Customize View — the real feature | Let a manager choose what the team page shows | per-user, not per-org (no org entity needed) |
+| **Wordmark → Saira wide (`wdth 125`)** | Replace Archivo Expanded on the lockup so it echoes the new logo | ⚠ Needs **k re-derived to 10.321** (above every face the lockup has been sized for) and the lockup guard's weight/tracking/k pairing updated. The login capture shows what normal width costs in presence — Archivo is genuinely EXPANDED and Saira at `wdth 100` visibly shrinks the lockup. **FILED, NOT BUILT** |
 | **Harvest gate — capture from almost every call** | Justin 2026-08-20: *"there's always a coaching moment you can take from a call"* | ⚠⚠ **SUPERSEDES KB RULING 4**, which gates auto-harvest on `outcome='closed'` ALONE. ⚠ OPEN: extra model calls per call? ⚠⚠ OPEN: **what stops a weak moment being kept once the closed filter goes** — if that filter was the de facto quality gate, removing it needs a replacement, not just a wider net. ⚠ The KB counter card copy ("Scout only collects from calls that close") becomes FALSE and must change in the same commit |
 | **New Scout Systems logo** | Bold square wordmark, ring-and-dot mark replacing the O | ⚠ **SHIPS AS SVG, not text in a font** — removes the identification and licensing questions entirely. ⚠ The **"5." in the source image is a SLIDE NUMBER**, not part of the logo. ⚠⚠ **SMALL-SIZE VARIANT NEEDED FIRST**: the Logo sweep ruling records that at nav size concentric rings vanish and a dot renders under a pixel — **this mark has exactly that construction**. ⚠ Also fixes the **missing favicon**: measured 2026-08-20, `rel="icon"` appears in ZERO of the served pages |
 
