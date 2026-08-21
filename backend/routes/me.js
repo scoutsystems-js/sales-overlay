@@ -18,7 +18,8 @@ const { computeWhyFacts } = require('../lib/why-prose');
 // saved-to-KB badge, removed 2026-08-18 with the Add-to-KB buttons
 const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
-const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome } = require('../lib/outcome-tag');
+const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome,
+        canMarkNotSalesCall, markRoleFor } = require('../lib/outcome-tag');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 
@@ -952,6 +953,82 @@ router.get('/prospects/merge-candidates', requireAuth, async function (req, res)
 // POST /me/prospects/merge {from_id, into_id} — apply a confirmed merge.
 // Reversible and audited: the losing row is POINTED via merged_into, never
 // rewritten or deleted, so an incorrect merge can always be undone.
+/**
+ * ⚠⚠ MARK / UN-MARK A CALL AS "NOT A SALES CALL" (Justin's ruling 2026-08-20).
+ *
+ * ⚠ THE PERMISSION IS ENFORCED HERE, SERVER-SIDE. Hiding a button is not a
+ * permission check — a closer must be REFUSED BY THE API when they attempt a
+ * call that is not theirs, not merely unable to find the control.
+ *
+ * ⚠ canMarkNotSalesCall, NOT canTagOutcome. The latter refuses a MANAGED REP on
+ * their own call because setting an outcome is inflatable; marking a call
+ * not-a-sales-call REMOVES it from the rep's own numbers and cannot flatter
+ * them, and Justin ruled a closer may mark their own. Reusing canTagOutcome
+ * would have blocked the exact case this feature exists for.
+ *
+ * ⚠ THE BODY CARRIES true OR false, NEVER null-to-unset. Un-marking writes
+ * FALSE ("assessed, and it IS a sales call"), which is a different state from
+ * NULL ("never assessed"). Collapsing them would lose the record that a human
+ * looked at this call and said it counts.
+ */
+router.post('/calls/:id/not-a-sales-call', requireAuth, async function (req, res) {
+  var callId = req.params.id;
+  var marked = req.body && req.body.not_a_sales_call;
+  if (marked !== true && marked !== false) {
+    return res.status(400).json({ error: 'not_a_sales_call must be true or false' });
+  }
+  try {
+    var admin = getAdminClient();
+    var cq = await admin.from('fathom_calls')
+      .select('id, user_id, not_a_sales_call')
+      .eq('id', callId).maybeSingle();
+    if (cq.error) throw new Error('call lookup: ' + cq.error.message);
+    if (!cq.data) return res.status(404).json({ error: 'Call not found' });
+
+    var ownerId = cq.data.user_id;
+    var profs = await admin.from('user_profiles')
+      .select('user_id, role, managed_by').in('user_id', [ownerId, req.user.id]);
+    var rows = (profs.data || []);
+    var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0]
+      || { user_id: ownerId, managed_by: null };
+    var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
+    var actorRole = (actorRow && actorRow.role) || req.userProfileRole || 'user';
+    var actor = { id: req.user.id, role: actorRole };
+
+    if (!canMarkNotSalesCall(actor, ownerProfile)) {
+      console.warn('[me] not-a-sales-call denied: actor=%s call=%s owner=%s', req.user.id, callId, ownerId);
+      return res.status(403).json({ error: 'You are not allowed to mark this call' });
+    }
+
+    var up = await admin.from('fathom_calls').update({
+      not_a_sales_call:      marked,
+      not_sales_marked_by:   req.user.id,
+      not_sales_marked_at:   new Date().toISOString(),
+      not_sales_marked_role: markRoleFor(actor, ownerProfile),
+    }).eq('id', callId).select('id, not_a_sales_call, not_sales_marked_role').single();
+    if (up.error) throw new Error('update: ' + up.error.message);
+
+    /* ⚠ RE-ANALYSIS ON TOGGLE is fire-and-forget and MUST NOT gate the response.
+       The mark itself is already durable; making the user wait on a Claude run
+       would make a working button look dead, and a failed re-analysis must never
+       roll back a successful mark. */
+    try {
+      var worker = require('../lib/analysis-worker');
+      if (worker && typeof worker.analyzeCall === 'function') {
+        Promise.resolve(worker.analyzeCall(callId, ownerId)).catch(function (e) {
+          console.warn('[me] not-a-sales-call re-analysis failed (non-fatal):', e && e.message);
+        });
+      }
+    } catch (e) { /* never block the mark */ }
+
+    return res.json({ ok: true, not_a_sales_call: up.data.not_a_sales_call,
+                      marked_role: up.data.not_sales_marked_role });
+  } catch (err) {
+    console.error('[me] not-a-sales-call error:', err && err.message);
+    return res.status(500).json({ error: 'Could not update the call' });
+  }
+});
+
 router.post('/prospects/merge', requireAuth, async function (req, res) {
   var fromId = req.body && req.body.from_id;
   var intoId = req.body && req.body.into_id;

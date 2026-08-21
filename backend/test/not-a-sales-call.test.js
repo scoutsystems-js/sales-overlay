@@ -171,3 +171,46 @@ test('⚠ the review-page fetch is NOT filtered — a marked call must still ope
   assert.ok(!/not\('not_a_sales_call'/.test(probe),
     'single-call fetch by id must never be filtered, or the call cannot be opened');
 });
+
+/* ── THE PERMISSION BOUNDARY ───────────────────────────────────────────────── */
+const ot = require('../lib/outcome-tag');
+
+test('⚠⚠ a CLOSER may mark their OWN call — even a MANAGED one', () => {
+  /* This is where reusing canTagOutcome would have broken the feature: it
+     refuses a managed rep on their own call (outcomes are inflatable). Marking
+     not-a-sales-call REMOVES a call from the rep's own numbers, so it cannot
+     flatter them, and Josh — the whole reason this exists — is a managed rep. */
+  const josh = { user_id: 'josh', managed_by: 'mgr' };
+  assert.strictEqual(ot.canMarkNotSalesCall({ id: 'josh', role: 'user' }, josh), true);
+  assert.strictEqual(ot.canTagOutcome({ id: 'josh', role: 'user' }, josh), false,
+    'the two rules genuinely differ — this asserts the difference is intentional');
+});
+
+test('⚠⚠ THE FORBIDDEN CASE — a closer may NOT mark someone else\'s call', () => {
+  const josh = { user_id: 'josh', managed_by: 'mgr' };
+  assert.strictEqual(ot.canMarkNotSalesCall({ id: 'someone-else', role: 'user' }, josh), false);
+  // and an unmanaged user is still confined to their own
+  assert.strictEqual(ot.canMarkNotSalesCall({ id: 'x', role: 'user' }, { user_id: 'y', managed_by: null }), false);
+});
+
+test('⚠ a MANAGER may mark a call belonging to their team, and not another team\'s', () => {
+  assert.strictEqual(ot.canMarkNotSalesCall({ id: 'mgr', role: 'manager' }, { user_id: 'josh', managed_by: 'mgr' }), true);
+  assert.strictEqual(ot.canMarkNotSalesCall({ id: 'mgr', role: 'manager' }, { user_id: 'other', managed_by: 'mgr2' }), false);
+});
+
+test('⚠ the recorded ROLE reflects who acted, because either may', () => {
+  const josh = { user_id: 'josh', managed_by: 'mgr' };
+  assert.strictEqual(ot.markRoleFor({ id: 'josh' }, josh), 'closer');
+  assert.strictEqual(ot.markRoleFor({ id: 'mgr' }, josh), 'manager');
+});
+
+test('⚠⚠ THE ENDPOINT ENFORCES SERVER-SIDE — not by hiding a button', () => {
+  const s = live(fs.readFileSync(path.join(ROOT, 'routes', 'me.js'), 'utf8'));
+  const at = s.indexOf("router.post('/calls/:id/not-a-sales-call'");
+  assert.ok(at > -1, 'the endpoint exists');
+  const body = s.slice(at, at + 3200);
+  assert.ok(/canMarkNotSalesCall\(/.test(body), 'it calls the predicate');
+  assert.ok(/status\(403\)/.test(body), 'and REFUSES with 403 — the API is the boundary');
+  assert.ok(/not_sales_marked_role: markRoleFor\(/.test(body), 'records which role acted');
+  assert.ok(!/canTagOutcome\(/.test(body), 'must NOT use the outcome rule — it blocks managed reps');
+});

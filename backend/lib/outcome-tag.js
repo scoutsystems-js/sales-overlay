@@ -28,8 +28,44 @@ function canTagOutcome(actor, ownerProfile) {
   return ownerId === actor.id && !ownerProfile.managed_by;
 }
 
+
+/**
+ * ⚠⚠ WHO MAY MARK A CALL "NOT A SALES CALL" — A SEPARATE RULE FROM canTagOutcome,
+ * AND THE DIFFERENCE IS DELIBERATE.
+ *
+ * canTagOutcome refuses a MANAGED REP on their own call, because setting an
+ * outcome is INFLATABLE: a rep could tag everything "closed" and lift their own
+ * close rate. Marking a call not-a-sales-call is the opposite shape — it REMOVES
+ * a call from the rep's own numbers, so it cannot be used to flatter them, and
+ * Justin ruled explicitly that a CLOSER may mark their own call.
+ *
+ * ⚠ Reusing canTagOutcome here would have blocked the exact use case this feature
+ * was built for: Josh is a managed rep, and the venting call is his own.
+ *
+ *   owner          -> any call
+ *   manager        -> their own calls + calls whose owner they manage
+ *   any closer     -> their OWN call, managed or not
+ *
+ * actor: { id, role }. ownerProfile: { user_id, managed_by } of the CALL's owner.
+ */
+function canMarkNotSalesCall(actor, ownerProfile) {
+  if (!actor || !ownerProfile) return false;
+  var ownerId = ownerProfile.user_id;
+  if (actor.role === 'owner') return true;
+  if (actor.role === 'manager') return ownerId === actor.id || ownerProfile.managed_by === actor.id;
+  return ownerId === actor.id;          // a closer may always mark their OWN call
+}
+
+/** Which role string to record, given who acted and whose call it is. */
+function markRoleFor(actor, ownerProfile) {
+  if (!actor || !ownerProfile) return null;
+  return (ownerProfile.user_id === actor.id) ? 'closer' : 'manager';
+}
+
 module.exports = {
   VALID_OUTCOMES: VALID_OUTCOMES,
   effectiveCloseScore: effectiveCloseScore,
   canTagOutcome: canTagOutcome,
+  canMarkNotSalesCall: canMarkNotSalesCall,
+  markRoleFor: markRoleFor,
 };
