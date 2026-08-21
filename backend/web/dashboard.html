@@ -1717,11 +1717,17 @@
        un-marked from the review page either. */
     .library-card.is-not-sales { opacity: 0.55; }
     .library-card.is-not-sales .library-card-title { text-decoration: line-through; }
+    /* ⚠⚠ RED BADGE = THE STATE. Recoloured 2026-08-20 (Justin), and the FORM
+       changed with it: the border is GONE and a red tint fill takes its place,
+       which is the EXACT form of .library-status-badge.done (tint fill, no
+       border, coloured text). That is deliberate — a badge should look like the
+       other badge on the row and differ only in hue, so red vs green reads as
+       "excluded vs scored" rather than as two unrelated objects. */
     .not-sales-badge {
       display: inline-block; padding: 2px 7px; border-radius: 5px;
-      border: 1px solid var(--border-strong); background: var(--bg-elevated);
+      border: none; background: rgba(var(--bad-rgb), 0.14);
       font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--text); white-space: nowrap;
+      font-weight: 600; color: var(--bad); white-space: nowrap;
     }
     /* ⚠⚠ NEUTRAL WHEN UNMARKED, RED WHEN MARKED — INVERTED 2026-08-20 (Justin).
        RED NOW INDICATES A STATE, NOT AN AVAILABLE ACTION, and that is the right
@@ -1740,11 +1746,26 @@
       line-height: 1; padding: 5px 8px; flex: 0 0 auto; white-space: nowrap;
     }
     .lib-ns-btn:hover { border-color: var(--accent); color: var(--accent); }
-    /* marked → the row IS the deviation, and the button says how to undo it */
+    /* ⚠⚠ GREEN BUTTON = THE ACTION THAT UNDOES THE STATE (Justin, 2026-08-20).
+       Red marks the row; green offers the way back. This also removes the
+       collision flagged last block — the un-mark button no longer competes with
+       the red "Lost" outcome select sitting inches away on the same row.
+
+       ⚠ IT IS THE SAME HEX AS THE SCORE BADGE (--accent, --good and --green are
+       ALL #09e046), so hue CANNOT be the discriminator. FORM is:
+         score badge   tint fill, NO border, 11px   → reads as a badge
+         this button   dark fill, SOLID border, 10px, cursor:pointer → a control
+       ⚠⚠ SO IT MUST NOT TAKE A GREEN TINT FILL. rgba(--accent-rgb, 0.12) is
+       byte-identical to .library-status-badge.done's background — a green-tinted
+       button would BE the score badge with a border. The --bg-elevated fill is
+       load-bearing, not incidental. Green tint is reserved for :hover, where a
+       momentary convergence is a normal affordance rather than a mistaken
+       identity. Border stays 1px to match the unmarked button, so marking a call
+       changes the button's COLOUR and never its weight or position. */
     .lib-ns-btn.is-marked {
-      border-color: var(--bad); color: var(--bad); background: transparent;
+      border-color: var(--accent); color: var(--accent); background: var(--bg-elevated);
     }
-    .lib-ns-btn.is-marked:hover { background: rgba(var(--bad-rgb), 0.12); }
+    .lib-ns-btn.is-marked:hover { background: rgba(var(--accent-rgb), 0.12); }
     /* ⚠ the Fathom/Zoom link is an icon — give it a hit area */
     .library-recording-link.is-icon { padding: 2px 6px; font-size: 14px; text-decoration: none; }
     .review-page-header {
