@@ -966,7 +966,27 @@ async function outdatedCallIds(admin, userId, currentVersion) {
       .range(offset, offset + PAGE - 1);
     if (q.error) throw new Error('call_analyses: ' + q.error.message);
     var rows = q.data || [];
+    /* ⚠⚠ MARKED CALLS ARE EXCLUDED FROM THE OUTDATED COUNT — DECIDED, NOT
+       OVERLOOKED. This count drives the "Update analyses (N outdated)" button,
+       i.e. a BULK re-grade that spends two Claude calls per row. Re-grading a
+       call that is excluded from every metric buys nothing: the output feeds
+       nothing and the spend is real.
+       ⚠ THE TEST IS CONSISTENCY: if a marked call should never be re-analysed,
+       it must not be COUNTED as pending re-analysis either — otherwise the
+       button offers work it should not do, and the number never reaches zero.
+       ⚠ This does NOT touch re-analysis ON TOGGLE, which is a targeted re-run
+       triggered by the mark/un-mark itself. Different path, different purpose:
+       un-marking a call genuinely does need its analysis back. */
+    var markedOut = {};
+    var ids0 = rows.map(function (r) { return r.fathom_call_id; }).filter(Boolean);
+    for (var mi = 0; mi < ids0.length; mi += 100) {
+      var mq = await admin.from('fathom_calls').select('id')
+        .in('id', ids0.slice(mi, mi + 100))
+        .eq('not_a_sales_call', true);
+      (mq.data || []).forEach(function (c) { markedOut[c.id] = true; });
+    }
     for (var i = 0; i < rows.length; i++) {
+      if (markedOut[rows[i].fathom_call_id]) continue;
       if (rows[i].prompt_version !== currentVersion) out.push(rows[i].fathom_call_id);
     }
     if (rows.length < PAGE) break;
@@ -988,7 +1008,8 @@ router.get('/status', requireAuth, async function(req, res) {
     var countPromise = admin
       .from('fathom_calls')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .not('not_a_sales_call', 'is', true);
     // Pending-call count drives the dashboard's "Reanalyze" button visibility —
     // the button only shows when there are calls sitting at sync_status='pending'
     // waiting for the analysis worker (e.g. rows reset after the transcript fix).
@@ -996,6 +1017,7 @@ router.get('/status', requireAuth, async function(req, res) {
       .from('fathom_calls')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
+      .not('not_a_sales_call', 'is', true)
       .eq('sync_status', 'pending');
 
     var connResult = await connPromise;
@@ -1134,7 +1156,15 @@ async function loadCallsList(admin, userId, opts) {
   var needFullSet = !!restrict || opts.sort === 'score';
   var q = admin
     .from('fathom_calls')
-    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status')
+    /* ⚠⚠ not_a_sales_call IS SELECTED AND DELIBERATELY NOT FILTERED. This is the
+       CALL LIBRARY: a marked call must STAY VISIBLE, flagged, because if it
+       vanishes it cannot be re-opened and therefore cannot be UN-marked -- data
+       loss wearing a filter's clothes.
+       ⚠ SELECTED *AND* USED. Selecting a column and forgetting to use it, and
+       using one you forgot to select, are the same bug from opposite ends; this
+       codebase has shipped the second four times. The flag is emitted in the
+       mapped payload below and asserted in test/not-a-sales-call.test.js. */
+    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call')
     .eq('user_id', userId)
     .order('call_date', { ascending: false, nullsFirst: false });
   if (opts.from) q = q.gte('call_date', opts.from);
@@ -1161,6 +1191,9 @@ async function loadCallsList(admin, userId, opts) {
     return {
       id: cc.id, fathom_call_id: cc.fathom_call_id, title: cc.title, call_date: cc.call_date,
       duration_seconds: cc.duration_seconds, recording_url: cc.recording_url, sync_status: cc.sync_status,
+      // ⚠ THE FLAG. Selected above and USED here — a marked call renders flagged
+      // in the library rather than disappearing from it.
+      not_a_sales_call: cc.not_a_sales_call === true,
       analysis_status: a ? a.status : null, overall_score: a ? a.overall_score : null, overall_summary: a ? a.overall_summary : null,
       outcome: a ? a.outcome : null, outcome_source: a ? a.outcome_source : null,
     };
@@ -1190,7 +1223,8 @@ async function loadCallsList(admin, userId, opts) {
 async function windowOutcomeCounts(admin, userId, opts) {
   var ids = [], PAGE = 1000, start = 0;
   for (;;) {
-    var q = admin.from('fathom_calls').select('id').eq('user_id', userId);
+    var q = admin.from('fathom_calls').select('id').eq('user_id', userId)
+    .not('not_a_sales_call', 'is', true);
     if (opts.from) q = q.gte('call_date', opts.from);
     if (opts.to) q = q.lte('call_date', opts.to);
     var r = await q.range(start, start + PAGE - 1);

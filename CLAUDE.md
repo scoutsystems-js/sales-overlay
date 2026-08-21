@@ -2143,6 +2143,13 @@ even_performance  plenty of data, compared, and handling is LEVEL. A FINDING.
 - **⚠ LOGIN STAYS AT 300 — it was never in scope for a 400→450 ruling.** A 450 there was **dead code**: `body { font-weight: 300 }` appears later in the same file and CSS is last-wins. **The 300-forcing block's RATIONALE is now stale though its design is not** — it exists because only two Montserrat weights were thought to be loaded and anything outside them would be synthesised. Saira ships 100–900, so that risk is gone and the 300 is now a free choice.
 - **WORDMARK UNTOUCHED** — `--wm-family` stays `'Archivo Expanded'`, whose glyph constants are measured against the face that actually renders.
 
+### ⚠⚠ A DELIBERATELY UNFILTERED AGGREGATE LOOKS EXACTLY LIKE A MISSED ONE — `countUserHistory` IS NOT A METRIC (ruling 2026-08-20)
+**`routes/admin.js` `countUserHistory` counts a user's calls and sessions, and it is DELIBERATELY NOT filtered for `not_a_sales_call`. I filtered it during the sweep and a syntax error is the only reason it was caught.**
+- **IT IS A SAFETY CHECK, NOT A METRIC.** It feeds the zero-history rule that decides whether an account may be **DELETED**. **If every one of a user's calls were marked not-a-sales-call, a filtered count would report NO history and permit a delete that destroys real data.** A marked call still exists; it is excluded from *measurement*, not from *existence*.
+- **⚠ THE GENERAL RULE: before excluding rows from a count, ask what the count AUTHORISES.** A count that drives a number on a dashboard and a count that gates a destructive action are different objects wearing the same shape. Exclusion is safe in the first and dangerous in the second.
+- **⚠⚠ AND THIS IS WHY IT IS IN THIS FILE AND NOT ONLY IN A COMMENT.** The next session will see an unfiltered aggregate sitting beside a dozen filtered ones and reasonably conclude it was missed — then "fix" it. **The comment at the function may be read; CLAUDE.md will be.**
+- Same family as the write-the-null rule: **a deliberate absence and an oversight are indistinguishable unless the deliberateness is recorded.**
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

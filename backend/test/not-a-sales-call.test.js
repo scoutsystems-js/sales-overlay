@@ -144,3 +144,30 @@ test('⚠⚠ a prospect with OTHER calls KEEPS them — marking one must not orp
   assert.strictEqual(after.u.total, 1, 'the prospect SURVIVES — it still has a call');
   assert.strictEqual(after.u.closed, 1, 'and keeps its outcome');
 });
+
+/* ── THE LIBRARY KEEPS MARKED CALLS, FLAGGED ───────────────────────────────── */
+test('⚠⚠ the call library SELECTS the tag AND EMITS it — both ends of the bug', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'routes', 'fathom.js'), 'utf8');
+  const s = live(src);
+  // selected...
+  assert.ok(/sync_status, not_a_sales_call'\)/.test(s),
+    'the library select must include the tag, or the flag is always undefined');
+  // ...AND used. Selecting a column you forget to use, and using one you forgot
+  // to select, are the same bug from opposite ends; this codebase has shipped
+  // the second four times.
+  assert.ok(/not_a_sales_call: cc\.not_a_sales_call === true/.test(s),
+    'the library payload must EMIT the flag');
+  // and it must NOT be filtered out of the list
+  const at = s.indexOf("sync_status, not_a_sales_call')");
+  const window = s.slice(Math.max(0, at - 400), at + 600);
+  assert.ok(!/not\('not_a_sales_call', 'is', true\)/.test(window),
+    'the LIBRARY must not filter — a marked call that vanishes cannot be un-marked');
+});
+
+test('⚠ the review-page fetch is NOT filtered — a marked call must still open', () => {
+  const s = live(fs.readFileSync(path.join(ROOT, 'routes', 'fathom.js'), 'utf8'));
+  const at = s.indexOf(".eq('id', callRowId)");
+  const probe = at > -1 ? s.slice(Math.max(0, at - 500), at + 200) : '';
+  assert.ok(!/not\('not_a_sales_call'/.test(probe),
+    'single-call fetch by id must never be filtered, or the call cannot be opened');
+});

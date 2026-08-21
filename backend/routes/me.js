@@ -908,7 +908,10 @@ router.get('/prospects/merge-candidates', requireAuth, async function (req, res)
 
     var cq = await admin.from('fathom_calls')
       .select('id, prospect_id, title, call_date, recording_url')
-      .eq('user_id', userId).not('prospect_id', 'is', null);
+      .eq('user_id', userId).not('prospect_id', 'is', null)
+      // ⚠ not-a-sales-call excluded (aggregate). `.not(col,'is',true)`, never
+      // `.eq(col,false)` — nullable column; see test/not-a-sales-call.test.js.
+      .not('not_a_sales_call', 'is', true);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var callIds = (cq.data || []).map(function (c) { return c.id; });
 
@@ -1027,7 +1030,8 @@ router.post('/prospects/unmerge', requireAuth, async function (req, res) {
 async function computeSectionBreakdown(admin, userId, section, from, to) {
   var calls = await admin.from('fathom_calls')
     .select('id, title, call_date, recording_url, prospect_id, source')
-    .eq('user_id', userId).gte('call_date', from).lte('call_date', to);
+    .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
+    .not('not_a_sales_call', 'is', true);
   if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
   var callIds = (calls.data || []).map(function (c) { return c.id; });
   if (!callIds.length) return buildSectionBreakdown(section, { analyses: [], highlights: [], callMeta: {} });
@@ -1073,7 +1077,8 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
   try {
     var span = new Date(to).getTime() - new Date(from).getTime();
     var prevFrom = new Date(new Date(from).getTime() - span).toISOString();
-    var prev = await admin.from('fathom_calls').select('id').eq('user_id', userId).gte('call_date', prevFrom).lt('call_date', from);
+    var prev = await admin.from('fathom_calls').select('id').eq('user_id', userId).gte('call_date', prevFrom).lt('call_date', from)
+      .not('not_a_sales_call', 'is', true);
     var prevIds = (prev.data || []).map(function (c) { return c.id; });
     if (prevIds.length) {
       var pa = await admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds).eq('status', 'done');
@@ -1124,7 +1129,11 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
     // `source` rides along so the clip button can be labelled per provider:
     // Fathom's ?t= seeks, Zoom's does not. See lib/clip-link.js.
     .select('id, title, call_date, recording_url, source').eq('user_id', userId)
-    .gte('call_date', from).lte('call_date', to);
+    .gte('call_date', from).lte('call_date', to)
+    // ⚠ not-a-sales-call excluded. RECLASSIFIED: this is computeNeedsWorkSections,
+    // a window AGGREGATE -- an earlier pass listed it as a call LIST and would have
+    // left it unfiltered.
+    .not('not_a_sales_call', 'is', true);
   if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
   var callIds = (calls.data || []).map(function (c) { return c.id; });
   if (!callIds.length) return { sections: SR.rankSections({}), why: null };

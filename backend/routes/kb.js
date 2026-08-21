@@ -624,12 +624,52 @@ router.get('/counter', protect, async function(req, res) {
     var today = kbCounter.etDateOf(new Date());
     var bounds = kbCounter.dayBoundsUtc(today);
 
+    /* ⚠⚠ THE NOT-A-SALES-CALL EXCLUSION HERE NEEDED A MECHANISM, NOT A FILTER.
+       This query reads call_analyses by user + analyzed_at and NEVER TOUCHES
+       fathom_calls — and the tag lives on fathom_calls. There was no column to
+       filter on.
+
+       THREE OPTIONS, AND WHY THIS ONE:
+         (a) an embedded join (`fathom_calls!inner(not_a_sales_call)`) — one
+             query, server-side, scales fine, but it makes THIS surface compute
+             its exclusion by a mechanism no other surface uses.
+         (b) fetch every marked id and `.not(...,'in',(…))` — REJECTED on scale:
+             that list grows with the corpus forever and would be shipped on
+             every counter request.
+         (c) resolve the day's analyses to their calls and exclude there — what
+             is implemented.
+
+       ⚠ (c) WINS ON THE REQUIREMENT, NOT ON PERFORMANCE. Every other surface
+       derives its analyses from a filtered fathom_calls set. Doing the same here
+       means the counter agrees with them BY CONSTRUCTION rather than by two
+       different mechanisms happening to produce the same number — and "two
+       screens disagreeing about how many calls happened today" is the exact
+       failure this feature exists to prevent.
+
+       ⚠ THE WINDOW IS analyzed_at, NOT call_date, so the id set cannot be taken
+       from a date range on fathom_calls: a call recorded last week but analysed
+       today belongs in this count. The ids therefore come FROM the day's
+       analyses, which bounds the second query to one user-day. */
     var an = await admin.from('call_analyses')
-      .select('outcome')
+      .select('fathom_call_id, outcome')
       .eq('user_id', req.user.id).eq('status', 'done')
       .gte('analyzed_at', bounds.fromIso).lt('analyzed_at', bounds.toIso);
     if (an.error) throw new Error('call_analyses: ' + an.error.message);
     var rows = an.data || [];
+
+    if (rows.length) {
+      var dayIds = rows.map(function (r) { return r.fathom_call_id; }).filter(Boolean);
+      var keep = {};
+      for (var ki = 0; ki < dayIds.length; ki += 100) {
+        var kq = await admin.from('fathom_calls')
+          .select('id')
+          .in('id', dayIds.slice(ki, ki + 100))
+          .not('not_a_sales_call', 'is', true);
+        if (kq.error) throw new Error('fathom_calls: ' + kq.error.message);
+        (kq.data || []).forEach(function (c) { keep[c.id] = true; });
+      }
+      rows = rows.filter(function (r) { return keep[r.fathom_call_id]; });
+    }
 
     var hv = await admin.from('knowledge_base')
       .select('id', { count: 'exact', head: true })
