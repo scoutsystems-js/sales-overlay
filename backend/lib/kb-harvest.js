@@ -43,7 +43,26 @@ var HARVEST_SECTION_CAP = 2;
 
 // The gate. Takes ONLY the outcome — see RULING 4 above for why cash is absent.
 // Pass the manual-override-aware effectiveOutcome, never the raw grader value.
-function shouldHarvest(outcome) {
+/**
+ * ⚠⚠ SECOND ARGUMENT ADDED 2026-08-20: the not-a-sales-call tag. A private or
+ * internal call that happens to carry outcome='closed' would otherwise be
+ * harvested and its moments filed as coaching lessons in the rep's KB. Josh's
+ * Zoom auto-records every meeting into his Personal Meeting Room, so this is a
+ * live shape, not a hypothetical.
+ *
+ * ⚠ THE ARITY WAS DELIBERATELY PINNED AT 1 AND THE PIN IS BEING WIDENED ON
+ * PURPOSE, NOT BROKEN. It existed to keep CASH out of the gate: the grader
+ * records cash by payment structure, so a payment-plan close legitimately shows
+ * zero and `cash > 0` would systematically drop real wins. An EXCLUSION TAG is
+ * a different kind of input from a quality proxy — it says "this is not a sales
+ * call at all", not "this sale was too small to learn from". The pin moves to 2
+ * and its comment still forbids cash.
+ *
+ * ⚠ `notASalesCall === true`, not truthiness: the column is NULL for a call
+ * nobody has assessed, and NULL must NOT block a harvest.
+ */
+function shouldHarvest(outcome, notASalesCall) {
+  if (notASalesCall === true) return false;
   return outcome === 'closed';
 }
 

@@ -1110,7 +1110,13 @@ async function analyzeCall(fathomCallId, userId) {
     // ─── Phase 2: load the fathom_calls row ───────────────────────────────
     var callQ = await admin
       .from('fathom_calls')
-      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url, source')
+      /* ⚠⚠ not_a_sales_call IS IN THIS SELECT DELIBERATELY. The harvest gate
+         reads callRow.not_a_sales_call; omit the column and it is `undefined`,
+         `undefined === true` is false, and THE GATE SILENTLY NEVER FIRES — the
+         component is correct and the thing that reaches it is broken. That exact
+         missing-column bug has shipped here three times (the review page's
+         `section`/`resolution`, and `id` on the highlights select). */
+      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url, source, not_a_sales_call')
       .eq('id', fathomCallId)
       .maybeSingle();
     if (callQ.error) throw new Error('fathom_calls fetch: ' + callQ.error.message);
@@ -1745,7 +1751,8 @@ async function analyzeCall(fathomCallId, userId) {
     // degrade rule fetchSellingContext follows). Idempotent with the manual
     // Add-to-KB button by construction — identical dedupe key, so whichever runs
     // second is a no-op.
-    if (shouldHarvest(effectiveOutcome)) {
+    // notASalesCall rides from the fathom_calls row; NULL (unassessed) must not block.
+    if (shouldHarvest(effectiveOutcome, callRow && callRow.not_a_sales_call)) {
       harvestClosedCall(admin, {
         fathomCallId: fathomCallId,
         userId:       userId,

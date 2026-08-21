@@ -62,8 +62,20 @@ function apiFail(e) { return { available: false, reason: 'Anthropic API failure'
 async function loadTeamWindow(admin, repIds, from, to) {
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
+    /* ⚠⚠ THE NOT-A-SALES-CALL EXCLUSION, AND THIS IS THE CHOKEPOINT: team-digest,
+       team-needs-work and team-synthesis ALL load their window through here, so
+       one filter covers three lanes. Do not add a second filter downstream of
+       this — it would be redundant and would drift.
+
+       ⚠⚠ `.not(col,'is',true)`, NEVER `.eq(col,false)`. The column is nullable
+       with three states (NULL never assessed / false confirmed / true excluded).
+       `= false` is NULL for an unassessed row and NULL is not true, so it would
+       SILENTLY EXCLUDE almost the entire corpus. Two silent-null bugs of this
+       exact shape have already shipped here. test/not-a-sales-call.test.js scans
+       every consumer and fails on the wrong form. */
     var cq = await admin.from('fathom_calls').select('id, user_id, recording_url, call_date, title, source')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
+      .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: false }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var b = cq.data || []; calls = calls.concat(b);

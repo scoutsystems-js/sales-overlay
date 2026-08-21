@@ -31,7 +31,12 @@ test('RULING 4: the gate does not consider cash — a zero-cash close still harv
   // A payment-plan close collects nothing at signing. Gating on cash would drop
   // exactly the wins a coaching KB most wants. shouldHarvest takes ONLY outcome,
   // so cash cannot leak into the decision by a later edit.
-  assert.strictEqual(shouldHarvest.length, 1);
+  /* ARITY PIN WIDENED 1 -> 2 (2026-08-20), deliberately, not broken. It exists
+     to keep CASH out of the gate: the grader records cash by payment structure,
+     so a payment-plan close legitimately shows zero and cash > 0 would drop real
+     wins. The second argument is the NOT-A-SALES-CALL tag -- an exclusion flag,
+     not a quality proxy. Cash is still forbidden. */
+  assert.strictEqual(shouldHarvest.length, 2);
   assert.strictEqual(shouldHarvest('closed'), true);
 });
 
