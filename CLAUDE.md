@@ -2222,6 +2222,29 @@ The one open item on the feature. **`objection_synthesis_cache` INSERTS PER HASH
 - **The observed "stale read" was a cached response misread as an unchanged value** — 203 computed while marked (`cached:false`) sat beside 203 served from cache after un-marking (`cached:true`). **Two identical numbers, one right and one stale.** The underlying filter moves 204 <-> 203 in both directions at the source.
 - **⚠ NOT CLAIMED: the stale read was not reproduced.** What is established is that it is not structural — which is what determines whether cache behaviour may be touched. **Nothing was changed.**
 - **⚠ THE COLUMN IS `analysis_set_hash`, NOT `set_hash`.** A query for the latter fails; the real columns are `id, user_id, from_ts, to_ts, analysis_set_hash, synthesis, generated_at, synthesis_type`.
+### ⚠⚠ WHEN TWO ELEMENTS SHARE A HEX, FORM IS THE ONLY DISCRIMINATOR LEFT — AND THE TEMPTING STYLE IS THE ONE THAT COLLAPSES THEM (2026-08-20, `87383ab`)
+Justin ruled the marked row: **RED badge = the STATE, GREEN button = the ACTION that undoes it.** It also resolves the collision flagged the block before — the un-mark button no longer competes with the red `Lost` outcome select on the same row.
+- **⚠ `--accent`, `--good` AND `--green` ARE ALL `#09e046`.** The score badge sitting inches from the new green button is the SAME COLOUR. **Hue cannot separate them, so form must:**
+```
+score badge   rgba(9,224,70,0.12) fill · NO border · 11px · radius 4  -> a BADGE
+the button    #131313 fill · SOLID 1px border · 10px · radius 6       -> a CONTROL
+```
+- **⚠⚠ THE DECISION THAT MATTERS IS THE STYLE NOT APPLIED. A green tint fill is the obvious way to make a green button feel green — and `rgba(var(--accent-rgb), 0.12)` is BYTE-IDENTICAL to `.library-status-badge.done`'s background.** That button would not resemble the score badge, it would **be** the score badge with a border. **The `--bg-elevated` fill is load-bearing, not incidental.** Green tint is reserved for `:hover`, where converging for a moment is an affordance rather than mistaken identity.
+- **THE BADGE MOVED THE OTHER WAY ON PURPOSE: it DROPPED its border for a tint fill**, adopting the exact form of the score badge. **Two badges that differ only in hue read as "excluded vs scored"; two badges with different shapes read as unrelated objects.** Form encodes ROLE (badge vs control), hue encodes MEANING.
+- **THE GENERAL RULE: before separating two elements by colour, check they do not already share it.** In a palette with semantic/interactive/categorical splits, several tokens routinely hold the SAME hex — the split is about meaning, not appearance. **Same meaning-token, same pixels.**
+
+### ⚠⚠ A ROW-LEVEL `opacity` SILENTLY OVERRIDES EVERY COLOUR DECISION INSIDE IT — INCLUDING ONES MADE AFTERWARDS (2026-08-20)
+`.library-card.is-not-sales { opacity: 0.55 }` predates the recolour and applies to the WHOLE subtree, so the two colours Justin had just specified **are not the colours that render**:
+```
+                as specified   as RENDERED at 0.55    contrast vs row bg
+red badge       #f87171    ->  rgb(141,67,67)          7.16 -> 2.84   under AA
+green button    #09e046    ->  rgb(9,128,43)          11.09 -> 3.90   under AA
+row title       #ededed    ->  (unchanged rule)       16.91 -> 5.51   passes
+```
+- **⚠ NOTHING WARNS YOU.** The CSS says `var(--bad)`, the computed style says `rgb(248,113,113)` — **`getComputedStyle` reports the DECLARED colour, not the composited one.** Only compositing the value against the background at the ancestor's alpha reveals it. **A computed-style check will confirm a colour that never reaches the screen.**
+- **THE VISIBLE CONSEQUENCE WAS BACKWARDS AND ONLY A SCREENSHOT SHOWED IT:** the `NOT A SALES CALL` badge on the EXCLUDED row rendered **less assertive than the routine `Lost` pill on an ordinary row beneath it.** The dim was muting precisely the thing meant to shout.
+- **THE RULE: when adding colour inside a container that carries opacity, composite before believing the value** — and treat an inherited ancestor alpha as part of the colour decision, not as a separate concern. Same family as the derived-value rule: **the number is correct for the case it was derived in, and an ancestor alpha is a different case.**
+- **⚠ REPORTED, NOT ACTED ON.** Removing the dim was NOT done unilaterally — three options went to Justin (leave it; exempt badge+button from the dim so strikethrough still carries "excluded"; drop it entirely). **A pre-existing rule defeating a new ruling is a decision for the person who made the ruling.**
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
