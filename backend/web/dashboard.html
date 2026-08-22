@@ -6223,8 +6223,28 @@
   }
   // Re-render whichever team surface is active (main view or the expanded page).
   function renderTeamSurface() {
+    /* ⚠⚠ THE TEAM "OBJECTION HANDLING FOCUS" PAGE IS ARCHIVED (2026-08-22).
+       It is REDIRECTED, not deleted, because a bookmark is a link too: anyone
+       holding #team-needs-work lands on the drilldown rather than on a page
+       that has quietly stopped being maintained.
+
+       ⚠ IT WAS ONLY SAFE TO ARCHIVE ONCE THE DRILLDOWN HAD EVERYTHING IT HAD:
+       the strict standard (true objections only), the disqualification /
+       logistical exclusion line, AND rates per sales-language bucket — the last
+       of which was added in this same commit for exactly this reason. Before
+       that it still held something, and archiving would have lost it.
+
+       ⚠ AND THE DRILLDOWN'S VERSION IS COMPUTED ON CLEAN DATA. This page's
+       numbers come through loadTeamWindow, which has no synthetic-row filter —
+       measured at 38% demo/seed on Josh's board. That is a separate filed item
+       affecting the digest and recommendations too; it is not fixed here.
+
+       ⚠ setView, NOT a direct render call: renderTeamObjectionsView and the rep
+       filter both branch on state.view === 'team-objections', so rendering the
+       drilldown while state still said 'team-needs-work' would give a page
+       whose controls silently do nothing. */
+    if (state.view === 'team-needs-work') { setView('team-objections'); return; }
     if (state.view === 'team-expanded') renderTeamExpanded();
-    else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
     else renderTeamView();
@@ -7952,11 +7972,53 @@
         + 'is unavailable right now, so this is not the usual standard.</div>'
       : '';
 
+    /* ⚠⚠ HANDLE RATE BY OBJECTION TYPE — in sales language, and the last thing
+       the old Objection Handling Focus panel had that this one did not.
+
+       The stored categories make good COLUMNS because they are stable; these
+       labels make a good LIST because they are the words a closer would use
+       ("Spouse / partner approval" rather than "partner", and the stored `fear`
+       lumps price, trust and skepticism into one). Both, each where it fits.
+
+       ⚠ POOLED OVER THE VISIBLE CLOSERS, like the average row — the server
+       sends per-closer counts precisely so the rep filter applies here too
+       rather than this list quietly describing people who are filtered out. */
+    var bucketRows = '';
+    var brs = (d.bucket_rates || []).map(function (b) {
+      var acc = { total: 0, handled: 0, credited: 0 };
+      grid.forEach(function (g) {
+        var c = (b.by_closer || {})[g.user_id]; if (!c) return;
+        acc.total += c.total || 0; acc.handled += c.handled || 0; acc.credited += c.credited || 0;
+      });
+      acc.label = b.label;
+      acc.rate = acc.total ? Math.round(((acc.handled + acc.credited) / acc.total) * 100) : null;
+      return acc;
+    }).filter(function (b) { return b.total > 0; });
+    if (brs.length) {
+      // weakest first, on the exact ratio — rounding first collapses distinct
+      // rates into ties and the tie-break then picks a stable wrong winner.
+      brs.sort(function (a, b) {
+        var ea = (a.handled + a.credited) / a.total, eb = (b.handled + b.credited) / b.total;
+        return ea === eb ? b.total - a.total : ea - eb;
+      });
+      bucketRows = '<div class="section-subhead obj-bucket-head">Handle rate by objection type</div>'
+        + '<div class="team-detail-list">' + brs.map(function (b) {
+          var pct = b.rate == null ? 0 : Math.max(0, Math.min(100, b.rate));
+          return '<div class="team-detail-row">'
+            + '<div class="team-detail-name">' + escapeHtml(b.label) + '</div>'
+            + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;"></div></div>'
+            + '<div class="team-detail-val">' + (b.rate == null ? '—' : b.rate + '%')
+            + '<span class="team-detail-sub">' + (b.handled + b.credited) + '/' + b.total + ' handled</span></div>'
+          + '</div>';
+        }).join('') + '</div>';
+    }
+
     return '<div class="meta obj-grid-note">' + escapeHtml(note)
       + ' Weakest first. Rates count an objection on a closed call as handled.'
       + escapeHtml(avgNote) + '</div>'
       + notStrict
       + '<div class="team-detail-list obj-grid">' + head + rows + avgRow + '</div>'
+      + bucketRows
       + exLine;
   }
 

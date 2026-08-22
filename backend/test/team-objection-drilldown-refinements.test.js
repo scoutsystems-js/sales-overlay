@@ -298,3 +298,46 @@ test('⚠ the moment card prefers the sales-language label over the stored categ
   assert.ok(card.indexOf('f.category') !== -1,
     'with the stored category as a fallback, so the chip never disappears');
 });
+
+/* ── the old panel, archived ───────────────────────────────────────────────── */
+
+test('⚠⚠ #team-needs-work REDIRECTS to the drilldown — archived, not deleted', () => {
+  const surf = slice('function renderTeamSurface', '\n  }');
+  assert.ok(/state\.view === 'team-needs-work'.*setView\('team-objections'\)/s.test(surf),
+    'a bookmark is a link too — it must land on the drilldown, not on an unmaintained page');
+  assert.strictEqual(/renderTeamNeedsWorkView\(\)/.test(surf), false,
+    'the team surface must no longer render the archived page');
+
+  /* ⚠ setView, NOT a direct render: renderTeamObjectionsView and the rep filter
+     both branch on state.view === 'team-objections'. Rendering the drilldown
+     while state still said 'team-needs-work' would produce a page whose
+     controls silently do nothing. */
+  assert.ok(surf.indexOf("setView('team-objections')") !== -1, 'via setView so state agrees with the page');
+});
+
+test('⚠⚠ IT WAS ONLY SAFE TO ARCHIVE BECAUSE THE DRILLDOWN GAINED THE LAST MISSING PIECE', () => {
+  /* Rates per SALES-LANGUAGE bucket — "Spouse / partner approval", "Needs time
+     / think it over" — were the one thing the old panel had and this one did
+     not. Archiving before adding them would have lost them. */
+  const grid = slice('function teamObjGridHtml', '\n  }');
+  assert.ok(grid.indexOf('Handle rate by objection type') !== -1, 'the bucket list must render');
+  assert.ok(grid.indexOf('d.bucket_rates') !== -1, 'from the server, not tallied from the capped feed');
+
+  /* ⚠ AND POOLED OVER THE VISIBLE CLOSERS — the server sends per-closer counts
+     precisely so the rep filter reaches this list too, rather than it quietly
+     describing people who are filtered out. */
+  assert.ok(/b\.by_closer/.test(grid), 'pooled per visible closer');
+
+  // weakest first on the EXACT ratio — rounding first makes a stable wrong winner
+  assert.ok(/ea === eb \?/.test(grid), 'sorted on the exact ratio, not the rounded rate');
+});
+
+test('⚠ the PERSONAL needs-work view is untouched — it shares the detail renderer', () => {
+  /* needsWorkDetailBodyHtml is used by BOTH the archived team page and the
+     personal one. Removing the team view must not take the shared renderer with
+     it, or a closer's own What-needs-work page dies for a change about the team. */
+  assert.ok(LIVE.indexOf('function needsWorkDetailBodyHtml') > -1, 'the shared renderer must survive');
+  assert.ok(LIVE.indexOf('onclick="openNeedsWork()"') > -1, 'and the personal entry point');
+  assert.ok(/state\.view === 'needs-work'/.test(LIVE) || LIVE.indexOf('renderNeedsWorkView') > -1,
+    'the personal view must still be routable');
+});

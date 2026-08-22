@@ -91,6 +91,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     category: wantCategory, instances: [], grid: [], closers: [],
     totals: emptyCounts(), instance_count: 0, truncated: false,
     strict: true, strict_reason: null, excluded: { disqualifications: 0, logistical: 0 },
+    bucket_rates: [],
     board_size: boardSize, analysis_fingerprint: EMPTY_FINGERPRINT,
     category_totals: (function () {
       var out = {}; ALL_CATEGORIES.forEach(function (c) { out[c] = Object.assign(emptyCounts(), { rate: null }); }); return out;
@@ -258,6 +259,17 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
      needing its own. */
   var catTotals = {};
   ALL_CATEGORIES.forEach(function (c) { catTotals[c] = emptyCounts(); });
+  /* ⚠ RATES PER SALES-LANGUAGE BUCKET — "Spouse / partner approval",
+     "Needs time / think it over", "Price / too expensive". The one thing the
+     old Objection Handling Focus panel had that this one did not, which is why
+     that panel could not be archived until now.
+
+     ⚠ ACCUMULATED HERE, NOT DERIVED FROM `instances` ON THE CLIENT: the
+     instance list is capped (FEED_CAP), so a client-side tally would quietly
+     compute these rates over a truncated sample as soon as a board got busy —
+     a wrong number with nothing on screen to suggest it. Keyed per closer as
+     well, so the rep filter can pool over the visible ones. */
+  var bucketTotals = {};
 
   rows.forEach(function (r) {
     var m = meta[r.fathom_call_id];
@@ -282,7 +294,14 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     var cell = byCloser[m.user_id] || (byCloser[m.user_id] = { user_id: m.user_id, by_category: {}, total: emptyCounts() });
     ALL_CATEGORIES.forEach(function (c) { if (!cell.by_category[c]) cell.by_category[c] = emptyCounts(); });
 
-    [cell.by_category[cat], cell.total, totals, catTotals[cat]].forEach(function (bucket) {
+    var bLabel = (bucketOf[normSurface(r.objection_surface)] || {}).label || null;
+    var bAcc = null;
+    if (bLabel) {
+      var bRow = bucketTotals[bLabel] || (bucketTotals[bLabel] = { label: bLabel, by_closer: {} });
+      bAcc = bRow.by_closer[m.user_id] || (bRow.by_closer[m.user_id] = emptyCounts());
+    }
+
+    [cell.by_category[cat], cell.total, totals, catTotals[cat]].concat(bAcc ? [bAcc] : []).forEach(function (bucket) {
       bucket.total += 1;
       if (credited) bucket.credited += 1;
       else if (res) bucket[res] += 1;
@@ -379,6 +398,9 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     strict: strict,
     strict_reason: strictReason,
     excluded: excluded,
+    /* Per-closer so the rep filter can pool over the visible ones — the client
+       sums the closers it is showing, exactly as it does for the average row. */
+    bucket_rates: Object.keys(bucketTotals).map(function (k) { return bucketTotals[k]; }),
     /* The team-average row. Same shape as a grid row's by_category so the
        renderer can reuse one cell function — a second cell renderer for the
        average is how the two would drift into showing different roundings. */
