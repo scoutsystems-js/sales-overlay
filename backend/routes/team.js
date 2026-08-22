@@ -29,6 +29,7 @@ function getAnthropic() {
 const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/team-synthesis');
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
+const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
 
 const router = express.Router();
 const teamGate = [requireAuth, requireRole(['manager', 'owner'])];
@@ -579,6 +580,39 @@ router.post('/digest/run', requireAuth, requireRole(['owner']), async function (
     var summary = await generateDailyDigests(admin, opts);
     res.json(summary);
   } catch (err) { if (handleConfigError(err, res)) return; console.error('[team] digest/run:', err.message); res.status(500).json({ error: 'Digest generation failed' }); }
+});
+
+/**
+ * GET /team/objections?category=&from=&to=  — the objection drilldown (2026-08-22).
+ *
+ * MANAGER VIEW ONLY (Justin's ruling): closers keep their existing per-user
+ * objection surfaces at /me/objections*. This is gated by `teamGate`
+ * SERVER-SIDE — hiding the nav link is not access control, and the forbidden
+ * case is exercised over HTTP with a forged closer in team-objections.test.js.
+ *
+ * ⚠ The date range is the caller's, in the same ISO format every other team
+ * surface uses, so the existing picker drives it with no new component and no
+ * new default.
+ */
+router.get('/objections', teamGate, async function (req, res) {
+  var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
+  var category = (OBJ_DRILL_CATEGORIES.indexOf(req.query.category) !== -1) ? req.query.category : null;
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var em = await emailMap(admin);
+    var profOf = {};
+    if (team.memberIds.length > 0) {
+      var pr = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', team.memberIds);
+      if (!pr.error) (pr.data || []).forEach(function (x) { profOf[x.user_id] = x; });
+    }
+    var nameMap = {};
+    team.memberIds.forEach(function (id) { nameMap[id] = resolveDisplayName(profOf[id], em[id] || null, id); });
+
+    var data = await computeTeamObjections(admin, team.memberIds, range.from, range.to,
+      { category: category, emailMap: em, nameMap: nameMap });
+    res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode } }, data));
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] objections:', err.message); res.status(500).json({ error: 'Failed to load team objections' }); }
 });
 
 // ⚠ Pure-ish helpers exported for test, per the log.js `_validateLogBatch`

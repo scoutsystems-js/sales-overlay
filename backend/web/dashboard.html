@@ -2931,6 +2931,18 @@
       .wel-out { animation: welFadeOut var(--wel-swipe) ease-out forwards; }
       @keyframes welFadeOut { to { opacity: 0; } }
     }
+
+    /* ── the objection drilldown grid ────────────────────────────────────── */
+    .obj-grid-note { margin-bottom: 10px; }
+    .obj-grid-head { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text); opacity: .8; }
+    .obj-grid-row, .obj-grid-head { display: flex; align-items: center; gap: 8px; }
+    .obj-grid-name { flex: 1 1 150px; min-width: 110px; font-weight: 600; }
+    .obj-grid-cell { flex: 0 0 84px; text-align: center; display: flex; flex-direction: column; gap: 1px; }
+    .obj-grid-sub { font-size: 11px; opacity: .75; }
+    .obj-grid-empty { opacity: .45; }
+    .obj-grid-click { cursor: pointer; border-radius: var(--radius-sm); padding: 3px 0; }
+    .obj-grid-click:hover { background: rgba(var(--accent-rgb), 0.12); }
+    .obj-closer-chip { background: rgba(var(--accent-rgb), 0.14); }
     .team-controls-row { margin-bottom: 28px; justify-content: flex-end; }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
@@ -3708,6 +3720,9 @@
     // 10b manager board: per-rep weekly series + the objection selector.
     // '' = all objections; otherwise one of Scout's four objection_category values.
     teamRepSeries:  null,   teamRepSeriesLoading: false, teamObjectionCategory: '',
+    teamObjections: null,   teamObjectionsLoading: false,
+    teamObjDrillCategory: '',   // the drilldown's OWN category filter, separate
+                                // from teamObjectionCategory (the graph's)
     // ⚠ MUST be declared null, not left undefined: the lazy kick tests
     // `=== null`, so an undeclared key means the lane never loads and the
     // panel renders a skeleton forever — no error, just a permanent spinner.
@@ -5284,6 +5299,7 @@
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+    else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
     else if (state.view === 'kb') renderKbView();
     else if (state.view === 'prospects') renderProspectsView();
@@ -5312,7 +5328,7 @@
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel' || state.view === 'needs-work' || state.view === 'performance');
     }
     var navTeam = document.getElementById('navTeam');
-    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-members');
+    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-objections' || state.view === 'team-members');
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
     if (navCallLibrary) {
@@ -6124,6 +6140,7 @@
   function renderTeamSurface() {
     if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+    else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
     else renderTeamView();
   }
@@ -6161,6 +6178,8 @@
       // the 7 days itself, so the panel cannot follow the picker even if this
       // line is rewritten carelessly. Structural, not conventional.
       // Team selection IS still shared, and is the only thing passed.
+      objections:{ flag: 'teamObjectionsLoading', set: 'teamObjections',
+                   url: '/team/objections?' + teamQP(state.teamObjDrillCategory ? 'category=' + encodeURIComponent(state.teamObjDrillCategory) : '') },
       teamAverages:{ flag: 'teamAveragesLoading', set: 'teamAverages',
                      url: '/team/averages' + (state.teamSelected ? '?team=' + encodeURIComponent(state.teamSelected) : '') },
     };
@@ -6213,6 +6232,7 @@
       if (state.view === 'team') renderTeamView();
       else if (state.view === 'team-expanded') renderTeamExpanded();
       else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
+      else if (state.view === 'team-objections') renderTeamObjectionsView();
       else if (state.view === 'team-members') renderTeamMembersView();
       else return;
       // ⚠ SYNCHRONOUS, in the same task as the innerHTML that created these
@@ -7451,6 +7471,127 @@
   }
 
   function openTeamNeedsWork() { setView('team-needs-work'); }
+
+  /* ══ THE TEAM OBJECTION DRILLDOWN (Justin, 2026-08-22) ═══════════════════
+     MANAGER VIEW ONLY — closers keep their own objection surfaces. The gate is
+     server-side; this view merely reflects it.
+
+     ⚠ USES THE EXISTING TEAM CONTROLS, so the date picker is the same component
+     and the same range every other team surface uses. No new picker, no new
+     default. */
+  function openTeamObjections(category) {
+    state.teamObjDrillCategory = category || '';
+    state.teamObjections = null;
+    setView('team-objections');
+  }
+  function setObjDrillCategory(cat) {
+    if (state.teamObjDrillCategory === cat) return;
+    state.teamObjDrillCategory = cat || '';
+    state.teamObjections = null;
+    loadTeam('objections');
+    renderTeamObjectionsView();
+  }
+
+  var OBJ_DRILL_LABELS = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing',
+                           partner: 'Partner / spouse', uncategorized: 'Uncategorised' };
+  var OBJ_DRILL_ORDER = ['fear', 'logistical', 'timing', 'partner', 'uncategorized'];
+
+  function renderTeamObjectionsView() {
+    var content = document.getElementById('content');
+    ensureTeamDefaultRange();
+    if (state.teamContext === null) loadTeam('context');
+    if (state.teamObjections === null && !state.teamObjectionsLoading) loadTeam('objections');
+
+    content.innerHTML = teamHeaderHtml() + teamControlsHtml()
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Per-Closer Objection Handling</h2>'
+        + '<div class="meta">how each closer is dealing with each objection</div></div>'
+        + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
+        + teamObjGridHtml() + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Objection Moments</h2>'
+        + '<div class="meta">' + escapeHtml(teamObjFeedMeta()) + '</div></div>'
+        + teamObjCategoryChipsHtml() + '</div>'
+        + teamObjFeedHtml() + '</div>';
+  }
+
+  function teamObjFeedMeta() {
+    var d = state.teamObjections;
+    if (!d || d._error || !d.instances) return 'loading';
+    var n = d.instance_count || 0;
+    // ⚠ NO SILENT CAPS — if the list is trimmed, say so.
+    return d.truncated ? (d.instances.length + ' of ' + n + ' shown') : (n + (n === 1 ? ' moment' : ' moments'));
+  }
+
+  function teamObjCategoryChipsHtml() {
+    var cur = state.teamObjDrillCategory || '';
+    var chip = function (val, label) {
+      return '<button class="date-preset' + (cur === val ? ' active' : '') + '"'
+        + ' onclick="setObjDrillCategory(\'' + val + '\')">' + escapeHtml(label) + '</button>';
+    };
+    return '<div class="date-presets">' + chip('', 'All')
+      + OBJ_DRILL_ORDER.map(function (k) { return chip(k, OBJ_DRILL_LABELS[k]); }).join('') + '</div>';
+  }
+
+  /* The per-closer x per-category grid. Clicking a cell filters the feed. */
+  function teamObjGridHtml() {
+    var d = state.teamObjections;
+    if (!d) return '<div class="skeleton" style="height:150px;"></div>';
+    if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    var grid = d.grid || [];
+    if (!grid.length) {
+      return '<div class="empty"><h3>No objections in this range</h3>'
+        + '<p>Nobody on this team has an analysed objection moment in the selected dates. Widen the range, or wait for new analysed calls.</p></div>';
+    }
+
+    /* ⚠⚠ ONE ROW IS AN HONEST STATE, NOT AN EMPTY ONE, AND IT MUST SAY SO.
+       All the real objection data belongs to one closer today; the demo reps
+       carry COPIES of his calls and are excluded server-side. A one-row grid
+       that looked like a whole team would be the standing "a filtered view must
+       never pass as a full one" failure. So the count is always stated. */
+    var teamSize = (state.teamOverview && state.teamOverview.totals && state.teamOverview.totals.reps) || null;
+    var note = grid.length === 1
+      ? 'One closer has objection data in this range' + (teamSize ? ' — the team has ' + teamSize + '.' : '.')
+      : grid.length + ' closers with objection data in this range'
+        + (teamSize && teamSize > grid.length ? ' — the team has ' + teamSize + '.' : '.');
+
+    var head = '<div class="team-detail-row obj-grid-head"><span class="obj-grid-name">Closer</span>'
+      + OBJ_DRILL_ORDER.map(function (k) { return '<span class="obj-grid-cell">' + escapeHtml(OBJ_DRILL_LABELS[k]) + '</span>'; }).join('')
+      + '<span class="obj-grid-cell">All</span></div>';
+
+    var rows = grid.map(function (g) {
+      var cells = OBJ_DRILL_ORDER.map(function (k) {
+        var c = g.by_category[k] || { total: 0, rate: null };
+        if (!c.total) return '<span class="obj-grid-cell obj-grid-empty">—</span>';
+        var handled = (c.handled || 0) + (c.credited || 0);
+        return '<span class="obj-grid-cell obj-grid-click" onclick="setObjDrillCategory(\'' + k + '\')"'
+          + ' title="' + handled + ' of ' + c.total + ' handled — click to see them">'
+          + '<strong>' + (c.rate == null ? '—' : c.rate + '%') + '</strong>'
+          + '<span class="obj-grid-sub">' + handled + '/' + c.total + '</span></span>';
+      }).join('');
+      var t = g.total;
+      var tHandled = (t.handled || 0) + (t.credited || 0);
+      return '<div class="team-detail-row obj-grid-row"><span class="obj-grid-name">' + escapeHtml(g.name) + '</span>'
+        + cells
+        + '<span class="obj-grid-cell"><strong>' + (t.rate == null ? '—' : t.rate + '%') + '</strong>'
+        + '<span class="obj-grid-sub">' + tHandled + '/' + t.total + '</span></span></div>';
+    }).join('');
+
+    return '<div class="meta obj-grid-note">' + escapeHtml(note) + ' Weakest first. Rates count an objection on a closed call as handled.</div>'
+      + '<div class="team-detail-list obj-grid">' + head + rows + '</div>';
+  }
+
+  /* The instance list — the SAME row the personal objections feed uses. */
+  function teamObjFeedHtml() {
+    var d = state.teamObjections;
+    if (!d) return '<div class="skeleton" style="height:200px;"></div>';
+    if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    var list = d.instances || [];
+    if (!list.length) {
+      return '<div class="empty"><h3>No objection moments' + (d.category ? ' in ' + escapeHtml(OBJ_DRILL_LABELS[d.category] || d.category) : '') + '</h3>'
+        + '<p>Try another category, or widen the date range.</p></div>';
+    }
+    return list.map(objFeedCard).join('');
+  }
+
   function renderTeamNeedsWorkView() {
     var content = document.getElementById('content');
     ensureTeamDefaultRange();
@@ -8429,6 +8570,14 @@
   // The controls row — picker, team select, buttons. Rendered BELOW the gauge
   // panel so the fixed-window dials read above the filter that does not drive
   // them.
+  /* ⚠ The drilldown's entry point. It sits in the team controls row beside
+     Manage Members, because that row is where actions ON the team live — and
+     because a control parked wherever it fitted would have to move later. */
+  function objectionsDrillBtnHtml() {
+    if (state.view === 'team-objections') return '';
+    return '<button class="date-preset" onclick="openTeamObjections()">Objection Handling</button>';
+  }
+
   function teamControlsHtml() {
     var picker2 = '';
     var ctx2 = state.teamContext;
@@ -8443,7 +8592,7 @@
     return '<div class="page-header fade-in team-controls-row">'
       + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + picker2
         + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
-        + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewSoonHtml() + '</div>'
+        + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewSoonHtml() + '</div>'
     + '</div>';
   }
 
@@ -9203,6 +9352,7 @@
     if (state.view === 'team')             return 'team' + teamRangeHashSuffix();
     if (state.view === 'team-expanded')    return 'team-recs' + teamRangeHashSuffix();
     if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
+    if (state.view === 'team-objections')  return 'team-objections' + teamRangeHashSuffix();
     if (state.view === 'team-members')     return 'team-members' + teamRangeHashSuffix();
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     // Overview has no path of its own, but still carries its range so a
@@ -9231,7 +9381,8 @@
     // fell back to the 7-day default — the picked window was silently lost.
     // Same shape as the coaching family below, which already did this correctly.
     var TEAM_HASH = { 'team': 'team', 'team-recs': 'team-expanded',
-                      'team-needs-work': 'team-needs-work', 'team-members': 'team-members' };
+                      'team-needs-work': 'team-needs-work', 'team-members': 'team-members',
+                      'team-objections': 'team-objections' };
     if (Object.prototype.hasOwnProperty.call(TEAM_HASH, base)) {
       state.view = TEAM_HASH[base];
       var hashed = parseRangeFromHash(h);
@@ -11144,10 +11295,20 @@
       ? '<div style="margin-top:8px;"><span class="obj-toggle" onclick="toggleObjResponse(this)">Show response</span>'
         + '<div class="obj-response"><span style="color:var(--text);">Closer: </span>' + escapeHtml(f.closer_response) + '</div></div>'
       : '';
-    var clip = f.clip_url ? '<a class="obj-btn" href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener">▶ Watch Clip</a>' : '';
+    // ⚠ THE LAST HARD-CODED CLIP LABEL IN THE FILE. It said "Watch Clip"
+    // regardless of provider, which on a Zoom instance promises a moment and
+    // delivers 00:00. Six other call sites already use clipLabelFor(); this one
+    // was missed, and it matters now because the team drilldown reuses this row
+    // and Zoom instances appear in it.
+    var clip = f.clip_url ? '<a class="obj-btn" href="' + escapeHtml(f.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(f.source)) + '</a>' : '';
     var review = '<button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(f.fathom_call_id) + '\')">View Call Review</button>';
+    // ⚠ ADDITIVE, AND THE SINGLE-USER FEED IS UNCHANGED BY CONSTRUCTION:
+    // /me/objections-intel emits no `closer`, so this renders nothing there. The
+    // team feed needs it because no row otherwise says whose call it is.
+    var closerChip = (f.closer && f.closer.name)
+      ? '<span class="scope-pill obj-closer-chip">' + escapeHtml(f.closer.name) + '</span>' : '';
     return '<div class="pattern-card">'
-      + '<div class="obj-card-head">' + surface + catChip + resBadge
+      + '<div class="obj-card-head">' + closerChip + surface + catChip + resBadge
         + '<span class="obj-callmeta">' + escapeHtml(f.title || 'Untitled Call') + ' · ' + escapeHtml(formatDate(f.call_date)) + '</span>'
       + '</div>'
       + '<div class="obj-quote clamped">' + escapeHtml(f.quote || '') + '</div>' + quoteMore
