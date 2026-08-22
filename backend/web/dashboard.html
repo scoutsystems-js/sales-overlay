@@ -2946,6 +2946,10 @@
        non-bold name. Its cells are deliberately NOT clickable: the category
        filter is per-moment, and clicking an aggregate would silently apply
        somebody else's filter. */
+    /* ⚠ The "not the usual standard" notice. Deliberately the WARNING colour,
+       not a quiet grey: the number it sits under reads HIGHER than the truth,
+       so it must not look like a footnote. */
+    .obj-grid-loose { color: var(--mid); border-left: 2px solid var(--mid); padding-left: 10px; margin-bottom: 10px; }
     .obj-grid-avg { border-top: 1px solid var(--border-strong); margin-top: 4px; }
     .obj-grid-avg .obj-grid-name { font-weight: 400; opacity: .9; }
     /* The coaching summary. One card per closer — never a team paragraph. */
@@ -3788,6 +3792,12 @@
        An undeclared key is `undefined`, the kick never fires, and the panel
        shows a skeleton forever — which reads as "slow", not "broken". */
     teamObjSummary: null,   teamObjSummaryLoading: false,   teamObjSummaryWaitLong: false,
+    /* ⚠ THE STORE KEY WE LAST READ THE REP FILTER FOR — an explicit marker, not
+       a truthiness test on repLineHidden. That initialises to {}, which IS
+       truthy, so `if (!state.repLineHidden) load()` can never fire; that exact
+       guard already shipped once and silently lost the selection on every
+       refresh. null means "not read yet for any team". */
+    repFilterLoadedKey: null,
     teamObjDrillCategory: '',   // the drilldown's OWN category filter, separate
                                 // from teamObjectionCategory (the graph's)
     // ⚠ MUST be declared null, not left undefined: the lazy kick tests
@@ -7021,6 +7031,27 @@
       else localStorage.setItem(repFilterStoreKey(), JSON.stringify(h));
     } catch (e) { /* a full or blocked store must never break the chart */ }
   }
+  /**
+   * ⚠⚠ THE ROSTER HAS TWO SOURCES BECAUSE THE CONTROL SERVES TWO SURFACES.
+   *
+   * This started as a chart-legend control: its roster came from live Chart.js
+   * datasets and applying it toggled dataset visibility. Neither exists on the
+   * objection drilldown — no charts means `repFilterRoster()` returned [] and
+   * `repFilterHtml()` returned '', so the control would simply not appear.
+   *
+   * So the CONTROL is reused whole (menu, checkboxes, persistence, keyboard,
+   * a11y, the state-held open flag) and only its two chart-coupled ends are
+   * parameterised. Copying it instead would have given the two pages separate
+   * hidden sets and separate bugs — the drift a stranded duplicate of the team
+   * selector already demonstrated one block ago.
+   *
+   * ⚠ NO SWATCH ON THE DRILLDOWN, DELIBERATELY. The swatch exists because the
+   * graph legend is capped at 10, so for an 11th rep the menu is the only place
+   * their LINE COLOUR appears. The drilldown has no lines. Worse, the ramp is
+   * assigned by position in the rep-series payload, and this grid is ordered
+   * weakest-first — so a colour derived here could disagree with the same rep's
+   * line on the team page. A missing swatch is honest; a wrong one is not.
+   */
   function repFilterRoster() {
     var seen = {}, out = [];
     eachLiveToggleChart(function (ch) {
@@ -7030,7 +7061,15 @@
         out.push({ id: ds._userId, name: ds.label, color: ds.borderColor });
       });
     });
-    return out;
+    if (out.length) return out;
+    return objDrillRoster();
+  }
+
+  /** The drilldown's reps: every closer the server put on the board. */
+  function objDrillRoster() {
+    var d = state.teamObjections;
+    if (state.view !== 'team-objections' || !d || d._error || !Array.isArray(d.closers)) return [];
+    return d.closers.map(function (c) { return { id: c.user_id, name: c.name, color: null }; });
   }
   function repFilterToggle(id) {
     if (!state.repLineHidden) state.repLineHidden = {};
@@ -7057,6 +7096,12 @@
     });
     renderRepFilterControls();
     updateRepGraphAllHiddenNotes();
+    /* ⚠ THE DRILLDOWN HAS NO CHARTS, so the dataset loop above is a no-op there
+       and nothing would change on screen. Its grid and feed are markup, so the
+       apply step for that surface is a re-render. Kept here rather than in a
+       second "apply" function — one entry point means a future surface cannot
+       be filtered by a path that forgets to redraw it. */
+    if (state.view === 'team-objections') renderTeamObjectionsView();
   }
   function repFilterHtml() {
     var roster = repFilterRoster();
@@ -7598,6 +7643,18 @@
     if (state.teamObjections === null && !state.teamObjectionsLoading) loadTeam('objections');
     if (state.teamObjSummary === null && !state.teamObjSummaryLoading) loadTeamObjSummary();
 
+    /* ⚠⚠ READ THE SAVED REP FILTER HERE — this is the drilldown's equivalent of
+       the read inside drawRepSeriesCharts, and it is required for the same
+       reason: loadRepFilter() otherwise only runs on a team switch or a range
+       change, so a REFRESH straight onto this page would start with an empty
+       hidden set and silently lose the selection.
+       ⚠ AFTER the team is known (repFilterStoreKey() includes state.teamSelected,
+       so reading earlier reads the wrong key) and BEFORE the grid renders.
+       ⚠ Guarded by an explicit key marker, never by a truthiness test — see the
+       note on repFilterLoadedKey. */
+    var rfKey = repFilterStoreKey();
+    if (state.repFilterLoadedKey !== rfKey) { loadRepFilter(); state.repFilterLoadedKey = rfKey; }
+
     /* ⚠ NO teamControlsHtml() HERE — the controls moved INTO the card below.
        That also removes Manage Members and Customize View from this page, which
        is deliberate: they act on the team, not on this breakdown. */
@@ -7746,10 +7803,24 @@
     var d = state.teamObjections;
     if (!d) return '<div class="skeleton" style="height:150px;"></div>';
     if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
-    var grid = d.grid || [];
-    if (!grid.length) {
+    var all = d.grid || [];
+    if (!all.length) {
       return '<div class="empty"><h3>No objections in this range</h3>'
         + '<p>Nobody on this team has an analysed objection moment in the selected dates. Widen the range, or wait for new analysed calls.</p></div>';
+    }
+    /* The rep filter — the SAME hidden set the team graphs use, keyed per team. */
+    var hiddenReps = state.repLineHidden || {};
+    var grid = all.filter(function (g) { return !hiddenReps[g.user_id]; });
+    if (!grid.length) {
+      /* ⚠ HIDING EVERYONE IS A CHOICE, NOT AN EMPTY RANGE, and it must not
+         borrow the "no objections in this range" wording — that would send a
+         manager looking for missing data they themselves filtered out. */
+      /* ⚠ Phrased to the house empty-state convention ("Nothing…"/"No…") rather
+         than widening the Title Case guard to admit a new shape. Changing a
+         guard so it accepts the string you just wrote is the wrong way round. */
+      return '<div class="empty"><h3>Nothing to show — all closers hidden</h3>'
+        + '<p>You have hidden all ' + all.length + ' closer' + (all.length === 1 ? '' : 's')
+        + ' on this board. Use the rep filter above to show them again.</p></div>';
     }
 
     /* ⚠⚠ ONE ROW IS AN HONEST STATE, NOT AN EMPTY ONE, AND IT MUST SAY SO.
@@ -7814,19 +7885,65 @@
        mean-of-rates would disagree with them. */
     var avgRow = '', avgNote = '';
     if (grid.length >= MIN_CLOSERS_FOR_TEAM_AVG) {
-      var ct = d.category_totals || {};
-      var avgCells = OBJ_DRILL_ORDER.map(function (k) { return cellHtml(ct[k], false, k); }).join('');
+      /* ⚠⚠ POOLED FROM THE VISIBLE ROWS, NOT FROM THE SERVER'S BOARD TOTALS.
+         Once a rep can be hidden, a server-side average is an average of people
+         who are not on screen — the reader adds up the rows, gets a different
+         number, and the table stops being trustworthy. Pooling here means the
+         average is always an accounting of exactly the rows above it. Pooled,
+         never a mean of per-closer rates, per the house rule. */
+      var pool = function (pick) {
+        var acc = { total: 0, handled: 0, credited: 0, partial: 0, unhandled: 0 };
+        grid.forEach(function (g) {
+          var c = pick(g) || {};
+          acc.total += c.total || 0; acc.handled += c.handled || 0;
+          acc.credited += c.credited || 0; acc.partial += c.partial || 0; acc.unhandled += c.unhandled || 0;
+        });
+        acc.rate = acc.total ? Math.round(((acc.handled + acc.credited) / acc.total) * 100) : null;
+        return acc;
+      };
+      var avgCells = OBJ_DRILL_ORDER.map(function (k) {
+        return cellHtml(pool(function (g) { return g.by_category[k]; }), false, k);
+      }).join('');
       avgRow = '<div class="team-detail-row obj-grid-row obj-grid-avg">'
         + '<span class="obj-grid-name">Team average</span>' + avgCells
-        + cellHtml(d.totals, false, null) + '</div>';
+        + cellHtml(pool(function (g) { return g.total; }), false, null) + '</div>';
     } else if (grid.length === 1) {
-      avgNote = ' A team average needs at least two closers with data — with one, it would just repeat the row above.';
+      avgNote = (all.length > 1)
+        ? ' Showing 1 of ' + all.length + ' closers — a team average needs at least two visible.'
+        : ' A team average needs at least two closers with data — with one, it would just repeat the row above.';
     }
+
+    /* ⚠⚠ THE STRICT STANDARD, STATED (Justin: "the strict guidelines for
+       objection handling is the standard"). Disqualifications and payment /
+       logistical barriers are not coachable objections and do not count toward
+       any rate — and the panel SAYS how many it left out, in the old panel's
+       words. A denominator that quietly shrinks is how a rate becomes something
+       nobody can reconcile against the moments below it. */
+    var ex = d.excluded || {};
+    var exParts = [];
+    if (ex.disqualifications > 0) exParts.push(ex.disqualifications + ' disqualification' + (ex.disqualifications === 1 ? '' : 's'));
+    if (ex.logistical > 0) exParts.push(ex.logistical + ' payment/logistical barrier' + (ex.logistical === 1 ? '' : 's'));
+    var exLine = exParts.length
+      ? '<div class="meta obj-grid-note nw-context">Also this period: <b>' + exParts.join('</b> and <b>')
+        + '</b> — not counted as coachable objections.</div>'
+      : '';
+
+    /* ⚠⚠ AND WHEN THE CLASSIFIER IS UNAVAILABLE, SAY SO RATHER THAN PASSING THE
+       LOOSER NUMBER OFF AS THE STANDARD. Without the exclusion the rate reads
+       HIGHER than the truth — the direction that flatters, and the one nobody
+       questions. */
+    var notStrict = (d.strict === false)
+      ? '<div class="meta obj-grid-note obj-grid-loose">These rates include every objection moment. '
+        + 'The strict classification (which removes disqualifications and payment barriers) '
+        + 'is unavailable right now, so this is not the usual standard.</div>'
+      : '';
 
     return '<div class="meta obj-grid-note">' + escapeHtml(note)
       + ' Weakest first. Rates count an objection on a closed call as handled.'
       + escapeHtml(avgNote) + '</div>'
-      + '<div class="team-detail-list obj-grid">' + head + rows + avgRow + '</div>';
+      + notStrict
+      + '<div class="team-detail-list obj-grid">' + head + rows + avgRow + '</div>'
+      + exLine;
   }
 
   /* The instance list — the SAME row the personal objections feed uses. */
@@ -7834,10 +7951,20 @@
     var d = state.teamObjections;
     if (!d) return '<div class="skeleton" style="height:200px;"></div>';
     if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
-    var list = d.instances || [];
+    /* ⚠ THE REP FILTER APPLIES HERE TOO. Filtering the grid but not the moments
+       would leave a manager reading a hidden rep's calls under a table that
+       does not contain them — two halves of one screen disagreeing about who is
+       on it. Same hidden set, same key, one source. */
+    var hiddenReps = state.repLineHidden || {};
+    var list = (d.instances || []).filter(function (i) {
+      return !(i.closer && hiddenReps[i.closer.user_id]);
+    });
     if (!list.length) {
+      var anyHidden = (d.instances || []).length > 0;
       return '<div class="empty"><h3>No objection moments' + (d.category ? ' in ' + escapeHtml(OBJ_DRILL_LABELS[d.category] || d.category) : '') + '</h3>'
-        + '<p>Try another category, or widen the date range.</p></div>';
+        + '<p>' + (anyHidden
+            ? 'Every moment here belongs to a closer you have hidden. Use the rep filter to show them again.'
+            : 'Try another category, or widen the date range.') + '</p></div>';
     }
     return list.map(objFeedCard).join('');
   }
@@ -8884,7 +9011,17 @@
    */
   function objDrillControlsHtml() {
     ensureTeamPicker();
+    /* ⚠ THE REP FILTER IS THE SAME CONTROL THE TEAM GRAPHS USE — same function,
+       same hidden set, same per-team localStorage key. Justin: the drilldown got
+       the team selector and not this one.
+
+       ⚠ EMITTED ALREADY-FILLED, unlike the team page. There the host starts
+       empty because the roster comes from charts that do not exist until after
+       the render; here the roster comes from state that is already loaded, so
+       an empty host would leave the control missing until something happened to
+       re-render it. Same host id — only one of these surfaces is ever mounted. */
     return '<div class="objdrill-controls">' + teamSelectHtml()
+      + '<span id="repFilterHost">' + repFilterHtml() + '</span>'
       + '<div class="date-presets">' + datePickerHtml('team') + '</div></div>';
   }
 
@@ -11572,8 +11709,14 @@
     var surface = f.surface
       ? '<span class="obj-surface">' + escapeHtml(f.surface) + '</span>'
       : '<span class="obj-surface" style="color:var(--text);">objection</span>';
-    var catChip = (f.category && f.category !== 'uncategorized')
-      ? '<span class="scope-pill">' + escapeHtml(f.category) + '</span>' : '';
+    /* ⚠ PREFER THE CLASSIFIER'S SALES-LANGUAGE LABEL over the stored category.
+       "Spouse / partner approval" tells a manager what the objection WAS;
+       "partner" is a storage bucket, and the stored `fear` lumps price, trust
+       and skepticism together. Falls back to the stored category when the
+       classification is unavailable, so the row never loses its chip — the
+       single-user feed emits no bucket_label at all and is unchanged. */
+    var chipText = f.bucket_label || ((f.category && f.category !== 'uncategorized') ? f.category : '');
+    var catChip = chipText ? '<span class="scope-pill">' + escapeHtml(chipText) + '</span>' : '';
     // The badge reports the MOMENT's own resolution — except where the call
     // closed, which credits it. Saying so on the row is what stops "unresolved"
     // sitting under a rate that counted it as handled.

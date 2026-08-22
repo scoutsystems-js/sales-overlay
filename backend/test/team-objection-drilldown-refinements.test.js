@@ -152,19 +152,35 @@ test('⚠⚠ THE TEAM AVERAGE NEEDS TWO CLOSERS, AND SAYS SO WHEN IT HAS ONE', (
   assert.ok(/at least two closers/i.test(grid),
     'the one-closer branch must state why the average is absent');
 
-  // pooled, from the same filtered rows as the grid — never a mean of rates
-  assert.ok(grid.indexOf('d.category_totals') !== -1,
-    'the average must come from the server\'s pooled per-category totals');
+  /* ⚠ POOLED CLIENT-SIDE FROM THE VISIBLE ROWS, NOT from the server's board
+     totals. It used to read d.category_totals; once a rep can be hidden that is
+     an average of people who are not on screen, so a reader adding up the rows
+     would get a different number. Pooling here keeps the average an accounting
+     of exactly the rows above it. */
+  assert.ok(/var pool = function/.test(grid), 'the average must be pooled from the visible rows');
+  assert.strictEqual(grid.indexOf('d.category_totals'), -1,
+    'the server board totals must not drive a row that sits above a FILTERED grid');
+  /* ⚠ NOT asserting the explanatory comment — LIVE strips comments, so a check
+     on prose can never pass. Assert the ARITHMETIC instead: pooling sums the
+     numerators and denominators, a mean of rates would divide per row. */
+  assert.ok(/acc\.total \+= /.test(grid) && /acc\.handled \+= /.test(grid),
+    'the average must SUM counts (pooled), not average per-closer rates');
 });
 
 test('⚠ the average row is not clickable, and shares the grid\'s cell renderer', () => {
   const grid = slice('function teamObjGridHtml', '\n  }');
   assert.ok(grid.indexOf('function cellHtml') !== -1,
     'one cell renderer for both, or the roundings drift while sitting in the same column');
-  // the average passes clickable=false
-  assert.ok(/cellHtml\(ct\[k\], false, k\)/.test(grid),
-    'average cells must not carry the category filter — clicking an aggregate would apply '
-    + 'somebody else\'s filter');
+  // the average passes clickable=false at every call site
+  /* ⚠ `[^)]*` cannot span the nested parens in cellHtml(pool(function(g){...}), false, k)
+     — it matched 1 of 3 and reported a real property as broken. Match the
+     argument itself. */
+  var avgCalls = grid.match(/,\s*false\s*,/g) || [];
+  assert.ok(avgCalls.length >= 2,
+    'the average row must build its cells with clickable=false — clicking an aggregate '
+    + 'would apply somebody else\'s filter. Found ' + avgCalls.length + ' non-clickable cell calls.');
+  assert.ok(/cellHtml\(g\.by_category\[k\], true, k\)/.test(grid),
+    'and the CLOSER rows must still be clickable, or this passes by making nothing clickable');
 });
 
 /* ── 7 · the labels lose their boxes, keep their words and colour ──────────── */
@@ -190,4 +206,88 @@ test('⚠⚠ MOMENT-CARD LABELS HAVE NO FILL, AND THE RULE IS SCOPED TO THAT CAR
   assert.ok(/\.badge-fu\s*\{[^}]*color:\s*var\(--mid\)/.test(LIVE), 'PARTIAL keeps its amber');
   assert.ok(/\.badge\s*\{[\s\S]*?text-transform:\s*uppercase/.test(LIVE),
     'uppercase + spacing are what keep them scannable once the box is gone');
+});
+
+/* ── the rep filter, reused on the drilldown ───────────────────────────────── */
+
+test('⚠⚠ THE REP FILTER IS THE SAME CONTROL — one definition, two surfaces', () => {
+  /* It began as a chart-legend control: the roster came from live Chart.js
+     datasets and applying it toggled dataset visibility. The drilldown has no
+     charts, so a straight lift would have rendered NOTHING (empty roster ->
+     repFilterHtml returns ''). The control is reused whole and only its two
+     chart-coupled ends are parameterised. */
+  const defs = (LIVE.match(/function repFilterHtml\b/g) || []).length;
+  assert.strictEqual(defs, 1, 'exactly one rep-filter implementation; found ' + defs);
+
+  const roster = slice('function repFilterRoster', '\n  }');
+  assert.ok(roster.indexOf('objDrillRoster()') !== -1,
+    'the roster must fall back to the drilldown when no charts are live');
+  assert.ok(roster.indexOf('eachLiveToggleChart') !== -1,
+    'and must still read the charts on the team page — otherwise the graphs lose their filter');
+
+  const ctrl = slice('function objDrillControlsHtml', '\n  }');
+  assert.ok(ctrl.indexOf('repFilterHtml()') !== -1, 'the drilldown must mount the control');
+  assert.ok(ctrl.indexOf('repFilterHost') !== -1, 'into the same host the renderer writes to');
+});
+
+test('⚠⚠ FILTERING HIDES THE REP FROM THE GRID *AND* THE MOMENTS', () => {
+  /* Filtering one and not the other leaves a manager reading a hidden rep's
+     calls under a table that does not contain them — two halves of one screen
+     disagreeing about who is on it. */
+  const grid = slice('function teamObjGridHtml', '\n  }');
+  assert.ok(/hiddenReps\[g\.user_id\]/.test(grid), 'the grid must drop hidden closers');
+  const feed = slice('function teamObjFeedHtml', '\n  }');
+  assert.ok(/hiddenReps\[i\.closer\.user_id\]/.test(feed), 'the feed must drop their moments too');
+
+  // ⚠ and hiding EVERYONE must not borrow the empty-range wording — that sends
+  // a manager looking for missing data they filtered out themselves.
+  assert.ok(/all closers hidden/i.test(grid), 'the all-hidden state must say it is a filter');
+  assert.ok(/rep filter/i.test(feed), 'and the feed must point at the control that caused it');
+});
+
+test('⚠⚠ THE SELECTION SURVIVES A REFRESH — read AFTER the team is known', () => {
+  const view = slice('function renderTeamObjectionsView', '\n  }');
+  assert.ok(view.indexOf('loadRepFilter()') !== -1,
+    'a refresh straight onto this page must read the saved selection — loadRepFilter '
+    + 'otherwise only runs on a team switch or a range change');
+  assert.ok(view.indexOf('repFilterStoreKey()') !== -1,
+    'and it must be keyed per team, so one team\'s hidden set cannot leak into another');
+
+  /* ⚠ THE GUARD MUST NOT BE A TRUTHINESS TEST. repLineHidden initialises to {},
+     which is TRUTHY, so `if (!state.repLineHidden) load()` can never fire —
+     that exact guard already shipped once and silently lost the selection on
+     every refresh. */
+  assert.ok(/state\.repFilterLoadedKey !== rfKey/.test(view),
+    'the load must be guarded by an explicit key marker, never by !repLineHidden');
+  assert.strictEqual(/if \(!state\.repLineHidden\)\s*loadRepFilter/.test(view), false,
+    'the truthiness guard must not come back');
+});
+
+test('⚠ applying the filter RE-RENDERS the drilldown — its grid is markup, not a chart', () => {
+  const apply = slice('function applyRepFilter', '\n  }');
+  assert.ok(apply.indexOf('renderTeamObjectionsView()') !== -1,
+    'the chart loop is a no-op with no charts, so nothing would change on screen');
+  assert.ok(apply.indexOf('eachLiveToggleChart') !== -1, 'and the chart path must survive');
+});
+
+/* ── the strict standard, as rendered ──────────────────────────────────────── */
+
+test('⚠⚠ THE EXCLUSION LINE RENDERS, AND A MISSING CLASSIFIER IS SAID OUT LOUD', () => {
+  const grid = slice('function teamObjGridHtml', '\n  }');
+  assert.ok(/not counted as coachable objections/.test(grid),
+    'the drilldown must print the exclusion line in the old panel\'s words');
+  assert.ok(/d\.excluded/.test(grid), 'from the server\'s counts');
+
+  /* ⚠ WITHOUT THE EXCLUSION THE RATE READS *HIGHER* THAN THE TRUTH — the
+     direction that flatters, and the one nobody questions. So an unavailable
+     classifier must be stated, never silently served as the standard. */
+  assert.ok(/d\.strict === false/.test(grid), 'the loose case must be detected');
+  assert.ok(/not the usual standard/i.test(grid), 'and labelled on screen');
+});
+
+test('⚠ the moment card prefers the sales-language label over the stored category', () => {
+  const card = slice('var chipText', ';');
+  assert.ok(card.indexOf('f.bucket_label') !== -1, 'the classifier label leads');
+  assert.ok(card.indexOf('f.category') !== -1,
+    'with the stored category as a fallback, so the chip never disappears');
 });

@@ -30,9 +30,9 @@ const CALLS = [
   { id: 'c5', user_id: AVA,  fathom_call_id: 'seed-2026-08-16-x', title: 'Seeded', call_date: '2026-08-10T00:00:00Z', recording_url: null, source: 'fathom', not_a_sales_call: null },
 ];
 const HIGHLIGHTS = [
-  { id: 'h1', fathom_call_id: 'c1', type: 'objection', objection_category: 'partner', resolution: 'unhandled', quote: 'my wife', observation: 'obs', closer_response: 'resp', timestamp_seconds: 600, objection_surface: 's', speaker_verified: true, closer_response_verified: true },
-  { id: 'h2', fathom_call_id: 'c1', type: 'objection', objection_category: 'fear',    resolution: 'handled',   quote: 'scared',  observation: 'obs', closer_response: 'resp', timestamp_seconds: 900, objection_surface: 's', speaker_verified: true, closer_response_verified: true },
-  { id: 'h3', fathom_call_id: 'c2', type: 'objection', objection_category: 'timing',  resolution: 'unhandled', quote: 'later',   observation: 'obs', closer_response: null,   timestamp_seconds: 120, objection_surface: 's', speaker_verified: true, closer_response_verified: false },
+  { id: 'h1', fathom_call_id: 'c1', type: 'objection', objection_category: 'partner', resolution: 'unhandled', quote: 'my wife', observation: 'obs', closer_response: 'resp', timestamp_seconds: 600, objection_surface: 'my wife has to approve', speaker_verified: true, closer_response_verified: true },
+  { id: 'h2', fathom_call_id: 'c1', type: 'objection', objection_category: 'fear',    resolution: 'handled',   quote: 'scared',  observation: 'obs', closer_response: 'resp', timestamp_seconds: 900, objection_surface: 'cant afford it', speaker_verified: true, closer_response_verified: true },
+  { id: 'h3', fathom_call_id: 'c2', type: 'objection', objection_category: 'timing',  resolution: 'unhandled', quote: 'later',   observation: 'obs', closer_response: null,   timestamp_seconds: 120, objection_surface: 'need to think about it', speaker_verified: true, closer_response_verified: false },
   { id: 'h4', fathom_call_id: 'c3', type: 'objection', objection_category: 'fear',    resolution: 'unhandled', quote: 'marked',  observation: 'obs', closer_response: null,   timestamp_seconds: 10,  objection_surface: 's', speaker_verified: true, closer_response_verified: false },
   { id: 'h5', fathom_call_id: 'c4', type: 'objection', objection_category: 'partner', resolution: 'unhandled', quote: 'my wife', observation: 'obs', closer_response: 'resp', timestamp_seconds: 600, objection_surface: 's', speaker_verified: true, closer_response_verified: true },
   { id: 'h6', fathom_call_id: 'c5', type: 'objection', objection_category: 'fear',    resolution: 'handled',   quote: 'seeded',  observation: 'obs', closer_response: null,   timestamp_seconds: 30,  objection_surface: 's', speaker_verified: true, closer_response_verified: false },
@@ -50,6 +50,9 @@ function fakeAdmin() {
       order() { return api; },
       not(col, op, val) { state.not.push([col, op, val]); return api; },
       range() { return finish(); },
+      // the strict-standard path reads/writes objection_synthesis_cache
+      maybeSingle() { return Promise.resolve({ data: null, error: null }); },
+      upsert() { return Promise.resolve({ error: null }); },
       then(res, rej) { return Promise.resolve(finish()).then(res, rej); },
     };
     function finish() {
@@ -77,7 +80,14 @@ function fakeAdmin() {
   };
 }
 
-const OPTS = { emailMap: { josh: 'josh@x.io', ava: 'ava@demo' }, nameMap: { josh: 'Josh', ava: 'Ava' } };
+/* ⚠ `strict: false` HERE IS DELIBERATE AND NARROW. These tests predate the
+   strict standard and assert orthogonal properties — synthetic exclusion, the
+   not_a_sales_call predicate, clip labels, bucket reconciliation. Running them
+   through the classifier would make every one of them depend on a Claude call.
+   The strict path has its own tests below, and a separate test asserts the ROUTE
+   never passes this flag, so the escape hatch cannot reach production. */
+const OPTS = { keyId: 'josh', strict: false,
+  emailMap: { josh: 'josh@x.io', ava: 'ava@demo' }, nameMap: { josh: 'Josh', ava: 'Ava' } };
 const FROM = '2026-08-01T00:00:00Z', TO = '2026-08-31T00:00:00Z';
 
 /* ── the predicate ───────────────────────────────────────────────────────── */
@@ -189,7 +199,13 @@ test('⚠ the grid note reads its OWN payload, never state.teamOverview', () => 
   const at = html.indexOf('function teamObjGridHtml');
   assert.ok(at > -1, 'stale anchor: teamObjGridHtml not found');
   const src = html.slice(at, html.indexOf('\n  }', at) + 4);
-  assert.ok(src.length > 800 && src.length < 6000, 'slice must cover the function: ' + src.length);
+  /* ⚠ The bound is a RUNAWAY-SLICE guard, not a size budget — it exists so a
+     mis-anchored slice that swallowed half the file cannot pass. Raised
+     2026-08-22 when the function legitimately grew (the strict-standard notice,
+     the rep filter, client-side pooling of the average). Keep an upper bound:
+     without one, a slice running to the end of the document would satisfy every
+     assertion below by containing everything. */
+  assert.ok(src.length > 800 && src.length < 12000, 'slice must cover the function: ' + src.length);
 
   // strip comments — this file archives removed code in place and explains its
   // own rules in prose, so a raw match reports the explanation as a violation.
@@ -254,4 +270,148 @@ test('⚠⚠ A CLOSER IS REFUSED /team/objections SERVER-SIDE', async () => {
     require.cache[authPath].exports = saved;
     delete require.cache[require.resolve('../routes/team')];
   }
+});
+
+/* ── THE STRICT STANDARD (Justin's ruling, 2026-08-22) ─────────────────────── */
+
+/**
+ * Run computeTeamObjections with the surface classifier stubbed.
+ *
+ * ⚠ The classifier is a Claude call living in team-needs-work. Stubbing it at
+ * the require boundary is what lets these tests assert the RULE — which moments
+ * count — without asserting anything about the model.
+ */
+function withClassifier(result, opts) {
+  const nwPath = require.resolve('../lib/team-needs-work');
+  const real = require(nwPath);
+  const saved = require.cache[nwPath].exports;
+  let calls = 0;
+  require.cache[nwPath].exports = Object.assign({}, real, {
+    getBucketMapping: async () => { calls++; return result; },
+  });
+  delete require.cache[require.resolve('../lib/team-objections')];
+  const mod = require('../lib/team-objections');
+  return {
+    run: (admin, ids, o) => mod.computeTeamObjections(admin || fakeAdmin(), ids || [JOSH, AVA], FROM, TO,
+      Object.assign({ keyId: 'josh', emailMap: OPTS.emailMap, nameMap: OPTS.nameMap }, o)),
+    calls: () => calls,
+    restore: () => {
+      require.cache[nwPath].exports = saved;
+      delete require.cache[require.resolve('../lib/team-objections')];
+    },
+  };
+}
+
+// "spouse pressure" is a real objection; the other two are not coachable.
+/* ⚠⚠ THE POINT OF THIS FIXTURE: h2 is stored as category `fear`, and its PHRASE
+   is "cant afford it" — which the classifier calls a DISQUALIFICATION, not an
+   objection. No stored column can make that call: `objection_category` has no
+   disqualification value, and `fear` is exactly where a money phrase lands.
+   That is why the strict standard needs the classifier and cannot be derived. */
+const MAPPING_OK = {
+  ok: true,
+  mapping: {
+    'my wife has to approve': 'Spouse / partner approval',
+    'need to think about it': 'Needs time / think it over',
+    'cant afford it': 'Cannot afford it',
+  },
+  bucketClass: {
+    'Spouse / partner approval': 'true_objection',
+    'Needs time / think it over': 'true_objection',
+    'Cannot afford it': 'disqualification',
+  },
+};
+
+test('⚠⚠ A NON-COACHABLE MOMENT LEAVES THE GRID, THE TOTALS AND THE FEED — AND IS COUNTED', async () => {
+  const h = withClassifier(MAPPING_OK);
+  try {
+    const out = await h.run();
+    assert.strictEqual(out.strict, true, 'the strict standard must be in force');
+
+    // the fixture's logistical moments are classified as a payment failure
+    // stored as `fear`, classified as a disqualification -> out of the grid
+    assert.strictEqual(out.grid[0].by_category.fear.total, 0,
+      'a disqualification must not sit in the grid, whatever its stored category');
+    assert.strictEqual(out.excluded.disqualifications, 1, 'and it must be counted so the panel can say so');
+    assert.strictEqual(out.excluded.logistical, 0);
+
+    // ⚠ and out of the FEED too — the feed is the evidence for the rate, so a
+    // moment that does not count must not appear as though it does
+    const inFeed = out.instances.filter((i) => i.category === 'fear').length;
+    assert.strictEqual(inFeed, 0, 'the excluded moment must not appear in the moment list');
+
+    // ⚠ FLOOR: the true objections must still be there, or this passes by
+    // excluding everything.
+    assert.ok(out.totals.total >= 2, 'true objections must survive; got ' + out.totals.total);
+  } finally { h.restore(); }
+});
+
+test('⚠⚠ THE RATE ACTUALLY MOVES — strict vs loose on identical rows', async () => {
+  const strictRun = withClassifier(MAPPING_OK);
+  let strictOut, looseOut;
+  try { strictOut = await strictRun.run(); } finally { strictRun.restore(); }
+  const looseRun = withClassifier(MAPPING_OK);
+  try { looseOut = await looseRun.run(null, null, { strict: false }); } finally { looseRun.restore(); }
+
+  assert.ok(looseOut.totals.total > strictOut.totals.total,
+    'the loose denominator must be larger — otherwise nothing was excluded and this '
+    + 'test proves nothing. loose ' + looseOut.totals.total + ' vs strict ' + strictOut.totals.total);
+  assert.strictEqual(looseOut.strict, false, 'and the loose run must SAY it is not the standard');
+});
+
+test('⚠⚠ AN UNCLASSIFIED PHRASE COUNTS — never a silent shrink of the denominator', async () => {
+  // a mapping that knows nothing about the fixture's phrases
+  const h = withClassifier({ ok: true, mapping: {}, bucketClass: {} });
+  try {
+    const out = await h.run();
+    assert.strictEqual(out.excluded.disqualifications + out.excluded.logistical, 0,
+      'nothing may be excluded on the strength of a phrase the classifier never saw');
+    assert.ok(out.totals.total > 0, 'and every moment must still count');
+  } finally { h.restore(); }
+});
+
+test('⚠⚠ A CLASSIFIER FAILURE REPORTS strict:false — it does NOT serve loose numbers as strict', async () => {
+  /* This is the direction that flatters: without the exclusion the rate reads
+     HIGHER than the truth. Presenting that as "the strict standard" would be a
+     data problem rendering as good news. */
+  const h = withClassifier({ ok: false, reason: 'Anthropic API failure (HTTP 529)' });
+  try {
+    const out = await h.run();
+    assert.strictEqual(out.strict, false, 'the payload must admit the standard was not applied');
+    assert.ok(/529|failure/i.test(out.strict_reason || ''), 'and say why: ' + out.strict_reason);
+    assert.ok(out.totals.total > 0, 'the panel still shows data — it just does not claim to be strict');
+  } finally { h.restore(); }
+});
+
+test('⚠ the classification is CACHED — a second identical load must not re-classify', async () => {
+  const store = [];
+  const admin = fakeAdmin();
+  const realFrom = admin.from.bind(admin);
+  admin.from = function (table) {
+    if (table !== 'objection_synthesis_cache') return realFrom(table);
+    return {
+      select() { return this; }, eq() { return this; },
+      maybeSingle() { return Promise.resolve({ data: store[0] || null, error: null }); },
+      upsert(row) { store.push({ synthesis: row.synthesis }); return Promise.resolve({ error: null }); },
+    };
+  };
+  const h = withClassifier(MAPPING_OK);
+  try {
+    await h.run(admin);
+    assert.strictEqual(h.calls(), 1, 'the first load classifies');
+    await h.run(admin);
+    assert.strictEqual(h.calls(), 1, 'the second must read the cache, not spend another call');
+  } finally { h.restore(); }
+});
+
+test('⚠⚠ THE ROUTE NEVER OPTS OUT OF THE STANDARD', () => {
+  /* `strict:false` exists so tests of orthogonal properties need not depend on a
+     Claude call. If it ever reached the route, the panel would quietly go back
+     to the looser definition Justin just ruled against — and the numbers would
+     read higher, which nobody questions. */
+  const fs = require('fs'), path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8')
+    .replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.strictEqual(/strict\s*:\s*false/.test(src), false,
+    'routes/team.js must not disable the strict objection standard');
 });

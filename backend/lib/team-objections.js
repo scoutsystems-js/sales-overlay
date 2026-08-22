@@ -25,6 +25,15 @@ const { realCallsOnly } = require('./real-calls');
 // which surfaces as two different handle rates on one screen. This module
 // would have been the eleventh copy.
 const { outcomeMap, isCredited } = require('./objection-handled');
+/* ⚠⚠ THE STRICT STANDARD (Justin's ruling, 2026-08-22): "the strict guidelines
+   for objection handling is the standard." Disqualifications and payment /
+   logistical barriers are NOT coachable objections and must not count toward
+   any rate. That distinction is NOT derivable from the stored columns —
+   `objection_category` has a `logistical` value, but it means a logistical
+   OBJECTION, and there is no disqualification concept stored at all. It comes
+   from the same classifier the old panel used, imported rather than rebuilt. */
+const { getBucketMapping, normSurface } = require('./team-needs-work');
+const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 
 /* The fingerprint of an empty analysis set. Written as the same md5 the loaded
@@ -81,6 +90,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   var empty = {
     category: wantCategory, instances: [], grid: [], closers: [],
     totals: emptyCounts(), instance_count: 0, truncated: false,
+    strict: true, strict_reason: null, excluded: { disqualifications: 0, logistical: 0 },
     board_size: boardSize, analysis_fingerprint: EMPTY_FINGERPRINT,
     category_totals: (function () {
       var out = {}; ALL_CATEGORIES.forEach(function (c) { out[c] = Object.assign(emptyCounts(), { rate: null }); }); return out;
@@ -160,6 +170,84 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     function (q) { return q.eq('type', 'objection'); }
   );
 
+  /* ── 3b) THE STRICT STANDARD ────────────────────────────────────────────
+     Classify the distinct surface phrases into true_objection /
+     logistical_barrier / disqualification, and drop everything that is not a
+     true objection from the grid, the totals AND the feed — counting what was
+     dropped so the panel can say so out loud.
+
+     ⚠ CACHED under its own synthesis_type on the SAME fingerprint the rest of
+     this module uses, so it invalidates when the analysis set does — including
+     when a call is marked not-a-sales-call.
+
+     ⚠⚠ IF THE CLASSIFIER IS UNAVAILABLE WE DO NOT SILENTLY FALL BACK TO THE
+     LOOSE RATE. Loose numbers presented as if they were the strict standard
+     would be a data problem rendering as good news, and the rate would read
+     HIGHER than the truth — the direction that flatters. `strict:false` travels
+     with the payload so the view labels what it is actually showing. */
+  var strict = true, strictReason = null;
+  var excluded = { disqualifications: 0, logistical: 0 };
+  var bucketOf = {};   // normalised surface → { label, cls }
+  if (opts.strict !== false) {
+    var surfaces = {};
+    rows.forEach(function (r) {
+      var s = String(r.objection_surface == null ? '' : r.objection_surface).trim();
+      if (s) surfaces[s] = (surfaces[s] || 0) + 1;
+    });
+    var distinct = Object.keys(surfaces);
+    if (distinct.length === 0) {
+      strict = false; strictReason = 'no objection phrases to classify';
+    } else {
+      var ck0 = snapCacheWindow(from, to);
+      var bucketKey = crypto.createHash('md5')
+        .update(fingerprint + '|buckets|' + distinct.slice().sort().join('|')).digest('hex');
+      var cached = null;
+      var cq0 = await admin.from('objection_synthesis_cache').select('synthesis')
+        .eq('user_id', opts.keyId || memberIds[0]).eq('synthesis_type', 'objection_buckets')
+        .eq('from_ts', ck0.from).eq('to_ts', ck0.to).eq('analysis_set_hash', bucketKey).maybeSingle();
+      if (!cq0.error && cq0.data && cq0.data.synthesis) cached = cq0.data.synthesis;
+
+      var map = cached;
+      if (!map) {
+        var got = await getBucketMapping(rows.map(function (r) { return { surface: r.objection_surface }; }));
+        if (got.ok) {
+          map = { mapping: got.mapping, bucketClass: got.bucketClass, generated_at: new Date().toISOString() };
+          // best effort — a cache write failure must not fail the panel
+          var up0 = await admin.from('objection_synthesis_cache').upsert({
+            user_id: opts.keyId || memberIds[0], synthesis_type: 'objection_buckets',
+            from_ts: ck0.from, to_ts: ck0.to, analysis_set_hash: bucketKey,
+            synthesis: map, generated_at: map.generated_at,
+          }, { onConflict: 'user_id,synthesis_type,from_ts,to_ts,analysis_set_hash' });
+          if (up0.error) console.error('[team-objections] bucket cache write failed: ' + up0.error.message);
+        } else {
+          strict = false;
+          strictReason = got.empty ? 'no objection phrases to classify' : (got.reason || 'classification unavailable');
+        }
+      }
+      if (map) {
+        rows.forEach(function (r) {
+          var k = normSurface(r.objection_surface);
+          var label = k ? map.mapping[k] : null;
+          if (label) bucketOf[k] = { label: label, cls: map.bucketClass[label] || 'true_objection' };
+        });
+      }
+    }
+  } else {
+    strict = false; strictReason = 'strict classification not requested';
+  }
+
+  /** true when this moment counts toward a rate under the strict standard. */
+  function isCoachable(r) {
+    if (!strict) return true;
+    var b = bucketOf[normSurface(r.objection_surface)];
+    /* ⚠ AN UNCLASSIFIED PHRASE COUNTS. Dropping it would silently shrink the
+       denominator on data the classifier simply never saw — an exclusion the
+       manager was never told about, which is the opposite of the exclusion line
+       this feature exists to show. Measured on the live board: 0 of 177. */
+    if (!b) return true;
+    return b.cls === 'true_objection';
+  }
+
   // ── 4) fold into instances + the per-closer x per-category grid ──
   var byCloser = {}, totals = emptyCounts(), instances = [];
   /* ⚠ POOLED, NEVER THE MEAN OF PER-CLOSER RATES — the same house rule the
@@ -174,6 +262,18 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   rows.forEach(function (r) {
     var m = meta[r.fathom_call_id];
     if (!m) return;                                  // call filtered out above
+
+    /* ⚠ NOT COACHABLE → OUT OF THE GRID, THE TOTALS AND THE FEED, but COUNTED.
+       The old panel's behaviour exactly: the math never sees them and a line
+       underneath says how many there were. Silently dropping them would make
+       the rate move for a reason nobody could see. */
+    if (!isCoachable(r)) {
+      var b0 = bucketOf[normSurface(r.objection_surface)];
+      if (b0 && b0.cls === 'disqualification') excluded.disqualifications += 1;
+      else if (b0 && b0.cls === 'logistical_barrier') excluded.logistical += 1;
+      return;
+    }
+
     var cat = (OBJECTION_CATEGORIES.indexOf(r.objection_category) !== -1) ? r.objection_category : UNCATEGORIZED;
 
     var res = (r.resolution === 'handled' || r.resolution === 'partial' || r.resolution === 'unhandled') ? r.resolution : null;
@@ -206,6 +306,17 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
       clip_url: clipHref(m.recording_url, r.timestamp_seconds),
       source: m.source || null,
       category: cat,
+      /* ⚠ THE CLASSIFIER'S SALES-LANGUAGE LABEL — "Spouse / partner approval",
+         "Needs time / think it over", "Price / too expensive". Free here: the
+         same mapping that decides what counts also names it.
+
+         ⚠ IT DOES NOT DRIVE THE GRID'S COLUMNS, DELIBERATELY. These labels are
+         model-generated and window-dependent (4-8 of them, different phrasing
+         each period), and a comparison table whose columns change when you
+         widen the date range is one a manager cannot trust. The columns stay
+         the four stored categories; the sales language rides on the moment,
+         where varying wording costs nothing. */
+      bucket_label: (bucketOf[normSurface(r.objection_surface)] || {}).label || null,
       surface: r.objection_surface || null,
       resolution: res,
       credited: credited,
@@ -261,6 +372,13 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     truncated: instances.length > cap,
     analysis_fingerprint: fingerprint,
     grid: grid,
+    /* ⚠ THE DEFINITION TRAVELS WITH THE NUMBERS. A rate is meaningless without
+       knowing what it counted, and this panel's denominator now depends on a
+       classifier that can be unavailable. `strict` says which definition
+       produced these figures; `excluded` is what the panel prints underneath. */
+    strict: strict,
+    strict_reason: strictReason,
+    excluded: excluded,
     /* The team-average row. Same shape as a grid row's by_category so the
        renderer can reuse one cell function — a second cell renderer for the
        average is how the two would drift into showing different roundings. */

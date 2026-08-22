@@ -599,6 +599,21 @@ module.exports = {
   computeTeamNeedsWork: computeTeamNeedsWork,
   computePersonalNeedsWork: computePersonalNeedsWork,
   loadBucketEvidence: loadBucketEvidence,
+  /* ⚠⚠ EXPORTED 2026-08-22 SO THE DRILLDOWN CAN ADOPT THE STRICT STANDARD
+     (Justin: "the strict guidelines for objection handling is the standard").
+
+     This is the ONLY thing in the codebase that knows a declined payment is a
+     logistical barrier and "can't afford it" is a disqualification rather than
+     an objection. It is NOT derivable from the stored columns: `objection_category`
+     has a `logistical` VALUE but that means a logistical OBJECTION, and there is
+     no disqualification concept stored at all.
+
+     Exported rather than reimplemented — a second classifier would give the two
+     panels different ideas of what counts, which is precisely the divergence
+     this ruling exists to end. */
+  getBucketMapping: getBucketMapping,
+  normSurface: normSurface,
+  BUCKET_CLASSES: BUCKET_CLASSES,
   // pure test surface (underscore = test-only)
   _computeNeedsWork: computeNeedsWork,
   // _computeLinkage, _MIN_LINK_GROUP, _MIN_CLOSED and _MIN_DEALS_FOR_CASH were
