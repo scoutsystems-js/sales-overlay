@@ -2442,6 +2442,35 @@ one screenshot                               ->  currentTime advanced  2520 ms
 - **THE HABIT: prove the failure mode can OCCUR in the container you are actually testing, not merely that the assertion is the right one in general.** Both tests here were re-run with a deliberately impossible value first, and only the numbers that came after that were used.
 - **⚠ THIS PARTLY CORRECTS A CLAIM I MADE THE DAY BEFORE.** "No wrap at any frame of the settle" was reported from `scrollWidth vs clientWidth` on the welcome title — an inert test. **The conclusion happens to be right** (measured properly, C fits with 13.5% to spare) **but the evidence cited for it proved nothing.**
 
+### ⚠⚠⚠ A RULE IMPLEMENTED AT THE CALL SITE IS A RULE THAT MOST CALL SITES DO NOT HAVE (2026-08-21)
+**Josh's own data was missing from "My Team". Josh IS the manager. `repIdsFor` reads `managed_by = keyId`, which BY DEFINITION cannot contain the manager — so every consumer had to add him back, and only TWO OF TEN ever did.**
+```
+  /averages, /rep-series                     had a private 3-line copy of the rule
+  /overview, /trends, /why-prose,
+  /recommendations, /needs-work,
+  /needs-work/bucket, /highlights, /digest   had nothing
+```
+- **⚠⚠ THE PER-SURFACE SPLIT IS WHAT MADE IT DIAGNOSABLE, AND IT IS THE THING TO ASK FOR FIRST.** "Josh is missing" is unfalsifiable; **"Josh is on the gauges and the graphs but not the cards or the totals"** points straight at two endpoints doing something eight others do not. One observation eliminated three of the four leads.
+- **THE SCALE WAS INVISIBLE UNTIL IT WAS FIXED** — the board was showing 4 demo reps and hiding the only real producer:
+```
+                    before      after
+  per_rep              4          5      Josh, avg 51
+  calls_analyzed       6         60      10x
+  cash_collected   7,500     66,300      8.8x
+  prospects            6         47
+```
+- **⚠ THE RULING WAS NEVER WRITTEN DOWN — IT LIVED IN TWO CODE COMMENTS.** Searched this file for six phrasings of "the manager counts as a team member": absent. So there was nothing for the other eight to be checked against, and the brief that reported the bug asserted CLAUDE.md recorded it as shipped — **it did not.** A rule that exists only at the sites that implement it cannot be audited.
+- **THE FIX IS THE RENAME, NOT THE PUSH.** `resolveTeam` now returns **`memberIds`**, not `repIds`. The meaning changed while the type did not, so a stale reader would keep working and **silently drop the manager again** — renaming makes every missed call site fail loudly. A guard asserts no endpoint hand-rolls the rule and that `team.repIds` appears nowhere.
+- **⚠ THE PRE-EXISTING ODDITY IN `all` MODE WAS PRESERVED, NOT QUIETLY CHANGED:** `allReps` excludes owners while the viewing owner is added back, so "All users" contains exactly one owner — the viewer. That is what the two working endpoints already did. **Unifying a rule is not licence to change its behaviour under cover of a bug fix.** Flagged for a ruling.
+- **⚠ MY OWN FIX SCRIPT HIT THE COMMENT-AS-CODE TRAP.** The comment I wrote explaining the removal QUOTED the removed line, and the assertion that the line was gone then failed on my own prose. **Fifth instance. Do not quote the removed syntax in the prose that explains removing it** — and strip comments before asserting absence.
+
+### ⚠⚠ THE PUBLISHED PRIVACY POLICY DESCRIBES ZOOM CLIP HANDLING THAT DOES NOT EXIST (found 2026-08-21)
+**`web/privacy.html` states, as present-tense fact: *"When you connect Zoom, Scout downloads a call's cloud recording once, extracts short coaching clips at analysis-identified moments, and permanently deletes the full recording in the same process."* It also lists *"short video clips of call moments"* among data Scout creates, and *"the short clips ... served only to authorized users via short-lived links"* among what it retains.**
+- **NONE OF IT IS BUILT.** Verified by capability, not by grep: `pickTranscriptFile` selects **only** `file_type='TRANSCRIPT'`, `downloadFile` is called only on that transcript's URL, and there is **no ffmpeg, no `.mp4`, no `createWriteStream`, no `os.tmpdir`** anywhere in the backend. The only `writeFileSync` is the dead mesh generator. **Scout downloads a VTT text file and never touches the video.**
+- **⚠ SO THE "THE DOWNLOAD STEP EXISTS, ONLY THE CUTTING IS MISSING" FRAMING IS WRONG — NEITHER EXISTS.** Worth stating plainly because it changes the cost of Zoom clip extraction from "add ffmpeg" to "add the download AND the cutting AND the storage".
+- **THE DIRECTION OF THE ERROR IS THE SAFER ONE — Scout does LESS with recordings than it claims — but it is still a false published statement**, and Zoom Marketplace review reads that document.
+- **⚠⚠ THIS IS THE `PUBLISHED CLAIM ABOUT UNBUILT BEHAVIOUR` ENTRY COMING TRUE, in the same feature area it was written about.** That entry predicted the failure mode exactly: *"it stays open until someone happens to re-read a published document against an implementation, which is to say indefinitely."* It took a corrected scoping brief to trigger the re-read. **The fix is Justin's call: either build it or correct the policy — but the policy cannot stay as it is.**
+
 ### ⚠ A POPUP RENDERING BEHIND THE PAGE IS A STACKING CONTEXT, NOT A z-index VALUE (2026-08-16)
 **"Raise the z-index" is the obvious fix and it does nothing here.** The date picker's panel rendered behind the page content despite `z-index: 60`.
 - **THE NON-OBVIOUS CAUSE: `.fade-in` is `animation: fadeIn … both`, and its keyframes animate `transform`.** With `fill-mode: both` the final `transform: translateY(0)` **persists forever** — measured on a settled page as `matrix(1, 0, 0, 1, 0, 4)`. **Any non-`none` transform creates a stacking context**, so EVERY `.page-header` and EVERY `.section` on this dashboard is its own stacking context at `z-index: auto`. The panel's z-index is therefore scoped INSIDE the header's context and can never rise above a later sibling, at any value.
