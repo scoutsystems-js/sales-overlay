@@ -53,9 +53,21 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   var emailMap = opts.emailMap || {};
   var nameMap = opts.nameMap || {};
 
+  /**
+   * ⚠ `board_size` IS RETURNED SO THE VIEW NEVER HAS TO ASK ANOTHER LANE.
+   * The note under the grid states "N of M closers on this board", and M is
+   * exactly `memberIds` — the set this function enumerates. Reading it from
+   * `state.teamOverview` instead made the denominator appear only when the
+   * user happened to arrive via the Team page and vanish on a deep link or a
+   * refresh, which is the standing shared-carrier failure: a value one lane
+   * populates and another quietly depends on.
+   */
+  var boardSize = memberIds ? memberIds.length : 0;
+
   var empty = {
     category: wantCategory, instances: [], grid: [], closers: [],
     totals: emptyCounts(), instance_count: 0, truncated: false,
+    board_size: boardSize,
   };
   if (!memberIds || memberIds.length === 0) return empty;
 
@@ -205,6 +217,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     // ⚠ NO SILENT CAPS. If the list is trimmed the view must be able to say so.
     truncated: instances.length > FEED_CAP,
     grid: grid,
+    board_size: boardSize,
     closers: grid.map(function (g) { return { user_id: g.user_id, name: g.name }; }),
     totals: Object.assign({}, totals, { rate: rateOf(totals) }),
   };

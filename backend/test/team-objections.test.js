@@ -163,6 +163,42 @@ test('⚠ an empty team returns the empty shape, never a throw', async () => {
   assert.strictEqual(out.instance_count, 0);
 });
 
+/* ── the denominator travels with the payload ────────────────────────────── */
+
+test('⚠⚠ board_size RIDES IN THE PAYLOAD — the note must not need another lane', async () => {
+  /* The grid's note reads "N of M closers on this board". M was read from
+     state.teamOverview, so it appeared only when the user had passed through
+     the Team page first and DISAPPEARED on a deep link or a refresh — a count
+     documented as "always stated" that silently was not. Observed live on
+     #team-objections?from=…: "1 closer has objection data in this range."   */
+  const two = await computeTeamObjections(fakeAdmin(), [JOSH, AVA], FROM, TO, OPTS);
+  assert.strictEqual(two.board_size, 2, 'board_size is exactly the set enumerated');
+  assert.strictEqual(two.grid.length, 1, 'and it is NOT the grid length — Ava is all copies');
+
+  // present on every exit path, including the two early returns
+  const none = await computeTeamObjections(fakeAdmin(), [], FROM, TO, OPTS);
+  assert.strictEqual(none.board_size, 0, 'empty team still reports its size');
+  const noReal = await computeTeamObjections(fakeAdmin(), [AVA], FROM, TO, OPTS);
+  assert.strictEqual(noReal.grid.length, 0, 'Ava has only synthetic calls');
+  assert.strictEqual(noReal.board_size, 1, 'the all-synthetic early return reports it too');
+});
+
+test('⚠ the grid note reads its OWN payload, never state.teamOverview', () => {
+  const fs = require('fs'), path = require('path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  const at = html.indexOf('function teamObjGridHtml');
+  assert.ok(at > -1, 'stale anchor: teamObjGridHtml not found');
+  const src = html.slice(at, html.indexOf('\n  }', at) + 4);
+  assert.ok(src.length > 800 && src.length < 6000, 'slice must cover the function: ' + src.length);
+
+  // strip comments — this file archives removed code in place and explains its
+  // own rules in prose, so a raw match reports the explanation as a violation.
+  const live = src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(live.indexOf('board_size') !== -1, 'the note must read d.board_size');
+  assert.strictEqual(live.indexOf('teamOverview'), -1,
+    'the drilldown must not depend on a value the overview lane happens to have loaded');
+});
+
 /* ── the gate, over HTTP, with a forged closer ───────────────────────────── */
 
 test('⚠⚠ A CLOSER IS REFUSED /team/objections SERVER-SIDE', async () => {

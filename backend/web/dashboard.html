@@ -7553,8 +7553,13 @@
        manager too (5). Two numbers on one screen both labelled "the team" is
        the standing reconcile failure: a manager adds them up and they disagree
        with no way to see why. Naming the set the GRID enumerates makes the
-       denominator checkable against the rows directly above it. */
-    var boardSize = (state.teamOverview && state.teamOverview.totals && state.teamOverview.totals.reps) || null;
+       denominator checkable against the rows directly above it.
+
+       ⚠ THE SIZE COMES FROM THIS VIEW'S OWN PAYLOAD, NOT `state.teamOverview`.
+       It used to read the overview lane, so the denominator appeared only if
+       the user had passed through the Team page first and VANISHED on a deep
+       link or a refresh — a count promised as "always stated" that was not. */
+    var boardSize = (typeof d.board_size === 'number' && d.board_size > 0) ? d.board_size : null;
     var scope = boardSize ? ' of ' + boardSize + ' closers on this board' : ' closer' + (grid.length === 1 ? '' : 's');
     var note = grid.length + scope + ' ' + (grid.length === 1 ? 'has' : 'have')
       + ' objection data in this range.';
