@@ -198,8 +198,18 @@ router.get('/trends', teamGate, async function (req, res) {
 router.get('/why-prose', teamGate, async function (req, res) {
   var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
   try {
-    var admin = getAdminClient();
-    var team = await resolveTeam(req, admin);
+    // ⚠⚠ THESE TWO LINES HAD BOTH BEEN WRONG SINCE THE ROUTE WAS WRITTEN, and
+    // this was the only one of the ten team routes with either. It called
+    // `getAdminClient()` — defined in auth.js, admin.js, fathom.js and me.js but
+    // NOT here, and not imported — so it threw a ReferenceError on the first
+    // line of the try block, every single request. And it passed
+    // `resolveTeam(req, admin)` with the arguments reversed, a second fault that
+    // could only surface once the first was fixed.
+    // ⚠ `getAdmin()` is team.js's OWN helper, used by the other nine routes.
+    // me.js does not export its version, and a second name for the same thing
+    // inside one file is how this started.
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
     var analytics = await computeTeamAnalytics(admin, team.memberIds, range.from, range.to, em);
     var ask = async function (prompt) {
