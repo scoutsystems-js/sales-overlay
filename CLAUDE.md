@@ -2471,6 +2471,34 @@ one screenshot                               ->  currentTime advanced  2520 ms
 - **THE DIRECTION OF THE ERROR IS THE SAFER ONE — Scout does LESS with recordings than it claims — but it is still a false published statement**, and Zoom Marketplace review reads that document.
 - **⚠⚠ THIS IS THE `PUBLISHED CLAIM ABOUT UNBUILT BEHAVIOUR` ENTRY COMING TRUE, in the same feature area it was written about.** That entry predicted the failure mode exactly: *"it stays open until someone happens to re-read a published document against an implementation, which is to say indefinitely."* It took a corrected scoping brief to trigger the re-read. **The fix is Justin's call: either build it or correct the policy — but the policy cannot stay as it is.**
 
+### ⚠⚠ ANY COUNT OVER "ALL ROWS" DOUBLE-COUNTS JOSH — THE DEMO REPS CARRY COPIES OF HIS CALLS (2026-08-22)
+**Recorded as a COUNTING HAZARD, because the fact is already on file as something else entirely.** That the demo reps' calls are copies of Josh's transcripts is noted above only as the *rationale for inserting seed rows directly*. Nobody reading it while writing a query would take it as a warning — **and it caught me.**
+- **I reported "223 of 229 real objection instances (97.4% Fathom)". The real figure is 177.** The gap is **52 demo copies** of Josh's own calls, counted a second time under three demo names, plus 87 seeded rows.
+```
+objection instances, by row class
+  REAL   fathom 171 · zoom 6   = 177     <- the only ones that mean anything
+  demo copies                     52     <- Josh's calls again, under other names
+  seeded                          87
+```
+- **⚠ THE SHAPE THAT MAKES THIS DANGEROUS: the duplicates are not obviously duplicates.** They carry different `user_id`s, different `fathom_call_id`s and different names, so they survive a `DISTINCT`, a `GROUP BY user_id`, and every per-rep aggregate. **Only the `demo-%` / `seed-%` prefix on `fathom_call_id` distinguishes them.**
+- **THE RULE: any corpus count intended to describe REALITY must exclude `fathom_call_id LIKE 'seed-%'` AND `LIKE 'demo-%'`.** Excluding one and not the other is the failure I made — I filtered `seed-` and reported the result as real.
+- **⚠ AND IT INFLATES PER-REP COMPARISONS SILENTLY.** The demo reps look like three closers with a couple of calls each; they are three copies of one closer. Any statement of the form "reps differ on X" is comparing Josh with himself.
+
+### ⚠⚠ A GENERIC CATCH TURNS A PROGRAMMER ERROR INTO AN OPERATIONAL ONE, AND NOBODY LOOKS AGAIN (2026-08-22)
+**`/team/why-prose` had NEVER worked. It called `getAdminClient()` — defined in `auth.js`, `admin.js`, `fathom.js` and `me.js` but not `team.js`, and not imported — so it threw a `ReferenceError` on the first line of its try block on every request since it was written. It also passed `resolveTeam(req, admin)` with the arguments reversed, a second fault that could only surface once the first was fixed.**
+- **⚠ THE TWO-LINE BUG IS NOT THE INTERESTING PART. THE REASON IT SAT THERE IS.** The catch is the SAME SHAPE on all thirteen blocks in the file:
+```js
+if (handleConfigError(err, res)) return;            // 503, actionable
+if (err.status) return res.status(err.status)...    // explicit HTTP, fine
+console.error('[team] why-prose:', err.message);    // logged — but see below
+res.status(500).json({ error: 'Failed to load rep summaries' });
+```
+- **⚠⚠ IT DID LOG. "Silently swallowed" would be the wrong description and the wrong lesson.** `ReferenceError: getAdminClient is not defined` went to the Railway logs on every single call. What failed is that **nobody reads logs for a panel that renders its own error state** — the UI showed `{_error}` and the board has a dozen other panels.
+- **TWO THINGS THE SHAPE CANNOT DO, and both matter:** it **cannot distinguish a PROGRAMMER error from an OPERATIONAL one** — a `ReferenceError` and a database timeout produce the identical 500 and the identical client message — and it logs `err.message` **without the stack**, so the one line that did reach the logs never said WHERE.
+- **⚠ THE GENERIC CLIENT MESSAGE IS CORRECT AND SHOULD STAY.** Leaking `getAdminClient is not defined` to a browser is worse. The fix is not to say more to the client; it is to make a programmer error **loud on the server** — log the stack, and consider treating a `ReferenceError`/`TypeError` as a different class from an operational failure.
+- **NOT REWRITTEN THIS BLOCK — deliberately.** Thirteen catch blocks is a change with its own blast radius, and the brief was to fix the one route. **Filed on BUILD-LIST.**
+- Same family as the standing lesson that *a defensive default converts a crash into a silent behaviour change*: here it converted a permanently-broken endpoint into a panel that merely looked empty.
+
 ### ⚠ A POPUP RENDERING BEHIND THE PAGE IS A STACKING CONTEXT, NOT A z-index VALUE (2026-08-16)
 **"Raise the z-index" is the obvious fix and it does nothing here.** The date picker's panel rendered behind the page content despite `z-index: 60`.
 - **THE NON-OBVIOUS CAUSE: `.fade-in` is `animation: fadeIn … both`, and its keyframes animate `transform`.** With `fill-mode: both` the final `transform: translateY(0)` **persists forever** — measured on a settled page as `matrix(1, 0, 0, 1, 0, 4)`. **Any non-`none` transform creates a stacking context**, so EVERY `.page-header` and EVERY `.section` on this dashboard is its own stacking context at `z-index: auto`. The panel's z-index is therefore scoped INSIDE the header's context and can never rise above a later sibling, at any value.
