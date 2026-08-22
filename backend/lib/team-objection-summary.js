@@ -45,6 +45,27 @@ const MAX_WORKED_EVIDENCE = 2;
 /** The whole board in ONE call — never fan out per closer or per category. */
 const MAX_CLOSERS_IN_PROMPT = 24;
 
+/**
+ * ⚠⚠ THE OUTPUT BUDGET IS THE BINDING CONSTRAINT, AND IT IS MEASURED, NOT
+ * GUESSED. A truncated response is not a shorter summary — the JSON fails to
+ * parse and the ENTIRE panel returns "unavailable", for every closer at once.
+ *
+ * MEASURED on the real board (2026-08-22): one closer's answer is why 494 +
+ * what_to_do 330 chars ≈ 230 tokens, ~270 with the JSON wrapper. So the ceiling
+ * has to clear MAX_CLOSERS_IN_PROMPT × 270 ≈ 6,500.
+ *
+ * ⚠ A FIRST DRAFT CAPPED THIS AT 4,096 AND WOULD HAVE TRUNCATED FROM ABOUT
+ * FIFTEEN CLOSERS UP — invisible on today's one-closer board and a total
+ * failure on a real team. Found by measuring how the prompt scales rather than
+ * by testing the size we happen to have. Pinned by a test.
+ */
+const OUT_TOKENS_PER_CLOSER = 350;
+const OUT_TOKENS_MIN = 1200;
+const OUT_TOKENS_MAX = 8000;
+function outputBudget(n) {
+  return Math.min(OUT_TOKENS_MAX, Math.max(OUT_TOKENS_MIN, OUT_TOKENS_PER_CLOSER * n));
+}
+
 const CATEGORY_LABELS = {
   fear: 'fear', logistical: 'logistical', timing: 'timing', partner: 'partner / spouse',
 };
@@ -342,7 +363,7 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
   try {
     resp = await getAnthropic().messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: Math.min(4096, Math.max(1200, 300 * subjects.length)),
+      max_tokens: outputBudget(subjects.length),
       messages: [{ role: 'user', content: buildPrompt(subjects) }],
     });
   } catch (apiErr) {
@@ -420,4 +441,6 @@ module.exports = {
   _buildPrompt: buildPrompt,
   _MIN_BUCKET: MIN_BUCKET,
   _MIN_GAP_PP: MIN_GAP_PP,
+  _outputBudget: outputBudget,
+  _MAX_CLOSERS_IN_PROMPT: MAX_CLOSERS_IN_PROMPT,
 };

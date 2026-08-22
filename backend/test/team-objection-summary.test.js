@@ -426,3 +426,34 @@ test('⚠⚠ A CLOSER IS REFUSED /team/objections/summary SERVER-SIDE', async ()
     delete require.cache[require.resolve('../routes/team')];
   }
 });
+
+/* ── the output budget, which is the binding constraint ───────────────────── */
+
+test('⚠⚠ THE OUTPUT BUDGET CLEARS A FULL BOARD — a truncated JSON fails EVERY closer', () => {
+  const { _outputBudget, _MAX_CLOSERS_IN_PROMPT } = require('../lib/team-objection-summary');
+
+  /* MEASURED on the live board 2026-08-22: one closer's answer is why 494 +
+     what_to_do 330 chars ≈ 230 tokens, ~270 with the JSON wrapper. The failure
+     this pins is not a shorter summary — the response stops mid-JSON, the parse
+     fails, and the whole panel returns "unavailable" for everyone at once. It
+     is invisible on a one-closer board and total on a real team, which is
+     exactly why it is asserted rather than eyeballed. */
+  const MEASURED_TOKENS_PER_CLOSER = 270;
+  const need = _MAX_CLOSERS_IN_PROMPT * MEASURED_TOKENS_PER_CLOSER;
+  assert.ok(_outputBudget(_MAX_CLOSERS_IN_PROMPT) >= need,
+    'a full board needs ~' + need + ' output tokens; the budget allows only '
+    + _outputBudget(_MAX_CLOSERS_IN_PROMPT) + '. Either raise the ceiling or lower '
+    + 'MAX_CLOSERS_IN_PROMPT — do not leave them inconsistent.');
+
+  // headroom at every size in between, not just at the ends
+  for (let n = 1; n <= _MAX_CLOSERS_IN_PROMPT; n++) {
+    assert.ok(_outputBudget(n) >= n * MEASURED_TOKENS_PER_CLOSER,
+      n + ' closers: budget ' + _outputBudget(n) + ' < needed ' + n * MEASURED_TOKENS_PER_CLOSER);
+  }
+
+  // ⚠ NON-VACUITY: the assertion must be capable of failing. The 4096 ceiling a
+  // first draft used does NOT clear a full board — that is the defect this pins.
+  const oldBudget = (n) => Math.min(4096, Math.max(1200, 300 * n));
+  assert.ok(oldBudget(_MAX_CLOSERS_IN_PROMPT) < need,
+    'the superseded 4096 ceiling should fail this check — if it passes, the check is toothless');
+});
