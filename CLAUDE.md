@@ -2318,6 +2318,41 @@ demo      33     33 (100%)      v4 / v5 / v8        (genuine, COPIED)
 - **⚠ IT WAS FOUND BY CLICKING, NOT BY THE SUITE — and the suite could not have found it**, because every test constructed the state the view needed. The guard written afterwards asserts the *structural* property instead: the grid function must reference `d.board_size` and must **not** contain `teamOverview`. **Both new guards were proven non-vacuous by stashing the fix and watching them fail.**
 - **⚠ A SECOND INSTANCE OF THE SAME SHAPE IS STILL LIVE AND WAS FILED, NOT FIXED:** the team `<h1>` reads *"Team"* on a deep link and *"My team"* via the Team page, for exactly the same reason. Pre-existing; in `BUILD-LIST.md` under OPEN.
 
+### ⚠⚠ A CACHE KEYED ON THE DATA CANNOT SKIP READING THE DATA — SO A "CACHED" LANE IS ONLY AS FAST AS ITS QUERY (measured 2026-08-22)
+**Measured on the coaching summary, same window, three lanes:**
+```
+cache MISS                 10,645 ms
+cache HIT                   1,840 ms
+the grid alone (no model)   1,820 ms   <- the floor, and the hit is sitting on it
+  => the model call is ~8.8s; the data fetch is ~1.8s and is paid EVERY TIME
+```
+- **THE CACHE SAVES THE MODEL CALL AND NOTHING ELSE**, and that is structural rather than a missed optimisation: the key is a fingerprint of the analysis set, so **the data must be read before the key can be computed**. `objection-synthesis` has the identical property.
+- **THE CONSEQUENCE FOR ANY FUTURE "why is the cached path still slow" INVESTIGATION: the floor is the query, not the cache.** Do not go looking for a cache defect — measure the equivalent model-free lane first and see whether the hit is already sitting on it.
+- **⚠ AND IT SETS WHERE OPTIMISATION WOULD HAVE TO HAPPEN.** Making a hit meaningfully faster means changing what the key is computed from (e.g. a stored per-window fingerprint maintained on write), which is a design change with its own invalidation risk — not a tweak.
+- **⚠ A FIRST TIMING OF THE MISS READ 2,273 ms AND WAS WRONG.** The timer was armed *after* the page had already kicked the lane, so it measured the tail of a request that had mostly finished. The honest number came from a **fresh cache key** timed end to end. *A measurement whose scope you cannot state must not be used* — here the scope was "part of a request", reported as "a request".
+
+### ⚠⚠⚠ MEASURE HOW A COST *SCALES*, NOT THE SIZE YOU HAPPEN TO HAVE — THE ONE-ROW BOARD CANNOT SHOW THE FAILURE (2026-08-22)
+**The coaching summary shipped with `max_tokens` capped at 4,096 and `MAX_CLOSERS_IN_PROMPT = 24`. Measured per-closer output is ~270 tokens, so from about FIFTEEN closers up the response stops mid-JSON, the parse fails, and the panel returns "unavailable" FOR EVERY CLOSER AT ONCE.**
+- **⚠ INVISIBLE ON THE BOARD IT WAS BUILT AGAINST.** There is one closer with data today, needing ~270 of 4,096 — a 15× margin. Every test passed, the live panel was correct, and nothing about the working system hinted at it.
+- **IT WAS FOUND BY BUILDING THE PROMPT AT 0/1/2/5/10/24 CLOSERS AND READING THE CURVE**, not by testing the size that exists:
+```
+ 0 closers   1,437 chars    fixed header
+ 1 closers   4,890 chars    ~1,360 input tokens
+24 closers  84,323 chars   ~23,400 input tokens   (~960 tokens per closer)
+```
+- **THE INPUT SCALES WITH CLOSERS, NOT WITH MOMENTS** — 55 timing objections existed in the window and 5 reach the prompt, so volume growth is free and headcount growth is not. **Know which axis your cost actually rides on.**
+- **THE RULE: when a limit and a fan-out constant live in the same module, assert the RELATIONSHIP between them, not each value.** The guard now checks headroom at every n from 1 to the cap and proves itself non-vacuous against the superseded 4,096. Two independently reasonable constants that have never been multiplied together is a defect waiting for a customer to grow into it.
+- Same family as the grader token-budget rule (*re-measure on the longest calls before adding a field*) — with the axis being **team size** instead of transcript length.
+
+### THE COACHING SUMMARY — step 3, shipped 2026-08-22 (`991b597`, `966d963`)
+**Per-closer, named, mechanism-not-rate.** `lib/team-objection-summary.js`, `GET /team/objections/summary`.
+- **⚠ JUSTIN'S WORDING RULING IS STRUCTURAL, NOT A PROMPT LINE: there is no board-level paragraph to generate.** The output is a list of per-closer findings, so *"closers are struggling with…"* is unreachable rather than discouraged. With one closer it reads *"Josh is struggling with…"* because that is the only shape the renderer has.
+- **IT READS THROUGH `computeTeamObjections`, AND THAT ONE DECISION INHERITS THREE REQUIREMENTS RATHER THAN REBUILDING THEM:** `not_a_sales_call` is already out of the call list the fingerprint is computed over (so marking a call genuinely invalidates); demo/seed rows are already gone; and the grid a manager reads and the paragraph beneath it come from **one fetch**, so they cannot disagree on the same screen.
+- **THE MODEL IS FED THE EXCHANGES AND *WHERE IN THE CALL* EACH LANDED — never the counts.** Position is what makes *"it always lands after the price and he never isolates it"* an available answer rather than a guess. **`positionPct` returns NULL when duration is unknown, never 0** — "0% through the call" would tell the model every objection arrived in the opening seconds, a fabricated mechanism stated confidently from absent data.
+- **STATE MODEL TAKEN FROM `team-needs-work`:** `no_volume` / `thin_types` / `even_performance` / `rate_gap`, and **only `rate_gap` gets generated prose**. A data problem must never render as good news; a render test asserts the three quiet states produce three different sentences.
+- **THE MODEL SUPPLIES PROSE AND NOTHING ELSE.** Names, categories, counts and every quote are re-attached from the fetched rows by name; **a model-supplied name matching no closer is DROPPED**, because a plausible name for someone not on the board reads as a finding about a real rep.
+- **PROVEN END TO END ON PRODUCTION, BOTH DIRECTIONS:** marking a call → `cached:false`, denominator 55→**53**, text regenerated; un-marking → `cached:true`, **55 back and the original 494-character text returned byte-identical**. Consistent with the recorded finding that cache entries accumulate rather than being overwritten.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
