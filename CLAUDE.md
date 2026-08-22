@@ -2380,8 +2380,46 @@ the network                  200, font/woff2, 5,664B  the BYTES are there
 - **⚠ THE FAILURE MODE CHANGED, AND THAT IS WHAT THE GUARDS HAD TO FOLLOW: TEXT WRAPS, AN IMAGE OVERFLOWS OR SCALES.** So the caps are `min(96vw, 1038px)` on login and `min(42vmin, 637px)` in the overlay — **the px cap is the ASSET'S NATIVE WIDTH**, above which the browser upscales, and the test reads it out of the PNG header rather than trusting a number in a comment.
 - **THE OVERLAY'S TIGHT CASE IS GONE BY CONSTRUCTION.** The text was 620px at its widest animation frame against a 92vmin stage (13.5% margin, and **1.2%** had the declared font ever drawn). An image does not track: measured across **eight viewports from 420x720 to 1920x1080 the margin is 54.3% every single time**, because stage and title both scale with vmin.
 - **⚠ RESOLUTION, STATED RATHER THAN GLOSSED:** the source is 1038px wide, so at the login cap it renders 1:1 on a standard display and **2x-upscaled on a retina one**. Glow artwork upscales gracefully; the letter edges do soften. **A 2x export is the fix; no CSS change can be.**
+- **✅ REDUCED MOTION EXERCISED 2026-08-21 — the logo arrives and nothing depends on an animation that never plays.** Run through the REAL entry point (`playWelcomeIfFresh`) with the media query forced on by rewriting it to `@media all`, so the exact shipped CSS block was under test rather than a reconstruction: title **opacity 1, `animation-name: none`**, image loaded, kicker at its resting 6.3px tracking, ticks/sweep `none`, segments and satellites at opacity 1 — a composed static frame. **The cover comes off (`data-welcoming` removed) and the overlay still dismisses**, which is structural rather than lucky: `welcomeDismiss` is **timer-driven with no `animationend` listener anywhere in the welcome code**, so a branch where nothing animates cannot strand it.
 - **⚠ JUSTIN'S ">=50% WIDER THAN THE CARD" RULE HOLDS DOWN TO ~640px VIEWPORT, NOT EVERYWHERE** — 2.6x at desktop, 1.44x at 600px, 1.06x at 420px. **Not a regression: the old text lockup was 1.13x at 600px, so the image is strictly better.** Measured, because claiming the rule holds at every width would have been false.
 - **⚠⚠ ONE CONSEQUENCE REPORTED RATHER THAN WORKED AROUND: THE TITLE NO LONGER SETTLES ITS TRACKING.** `welSettle` animates opacity AND `letter-spacing`; on an `<img>` the second is inert. **Timing, easing, delay and overshoot are untouched — the element type changed, nothing else** — but the title now fades where it used to settle, while the kicker beside it still settles. Mimicking the settle with a scale/width animation would have been redesigning the animation, which was explicitly forbidden.
+  - **✅ ANSWERED 2026-08-21, AND THE ANSWER IS "ON PAPER, NOT ON SCREEN" — the two motions barely coexist.** Measured across the text window at 30x slow motion:
+```
+    real ms   kicker width   kicker settle done   title opacity
+      900        202 px            0%                 0.00
+     1120        165 px           88%                 0.00     <- title still invisible
+     1200        162 px           95%                 0.51
+     1660        160 px          100%                 1.00
+```
+    **The kicker completes 37 of its 42px of travel BEFORE the wordmark is visible at all**, because `cubic-bezier(0.16,1,0.3,1)` is expo-out and front-loads the settle. From the moment the title is legible the kicker has **2px** left to move. So it reads as a **sequential reveal** — kicker settles, then the wordmark fades up beneath it — not as one element moving beside a dead one.
+  - **⚠ AND THE TITLE DOES NOT REFLOW ANYTHING:** its top stays at a constant 357px and its width at a constant 304px through the whole sequence, so the kicker's contraction cannot shift it.
+  - **⚠ THIS WAS ANSWERED FROM THE CURVES, NOT BY WATCHING** — continuous motion is not observable in this environment (see the hidden-tab clock entry). The numbers are exact; the flow between frames is still NOT SEEN.
+
+### ⚠⚠ THE WORDMARK CANNOT BE EXPORTED AT 2x FROM WHAT WE HAVE — THE SOURCE IS A SCREENSHOT (measured 2026-08-21)
+**A 2x was asked for and NOT shipped. The file that would have been produced weighs 196.6 KB and carries LESS detail per pixel than the 1x, not more.**
+- **THE SOURCE IS A macOS SCREENSHOT, AND IT SAYS SO ITSELF** — `exif:UserComment = "Screenshot"`, `pHYs` **144 DPI** (exactly 2x of 72). So 1038x138 is a 2x capture of a **519pt** element, and there is no higher-resolution original inside that file.
+- **⚠ THE FIRST SHARPNESS MEASUREMENT WAS WRONG AND WOULD HAVE BEEN ALARMING.** A 10%→90% alpha transition across a letter edge came back at **13-17px** — which reads as catastrophically soft. It was measuring the **GLOW HALO**, not the edge. The letter edge is the STEEP part: **50%→90% is 2px**, and the steepest per-pixel step is **140/255**. *Ask what the measurement is crossing before believing the number.*
+- **THE UPSCALE WAS BUILT AND MEASURED RATHER THAN ARGUED ABOUT**, which is what turned "it probably won't help" into a decision:
+```
+        bytes        steepest step/px    letter edge 50->90%
+  1x    71.8 KB          144                  2 px
+  2x   196.6 KB           84                  3 px      2.7x the bytes, measurably SOFTER
+```
+  **An upscale spreads the same information over more pixels — it halves the step and widens the edge.** The browser already does that interpolation for free at render time, so shipping it would be paying 2.7x the bytes to pre-compute a worse result.
+- **WHAT A REAL FIX NEEDS, and it is Justin's to produce, not ours:** an export **from the original artwork** (not a screen capture) at **>=2076px wide**, ideally 3x for headroom. Transparent background if his tool can; a flat known background is fine — the greenness-ratio key handles it.
+- **THE TRANSFERABLE PART: "export it at 2x" is only meaningful if the SOURCE holds 2x of detail.** Check the provenance metadata and the edge sharpness first; a screenshot has exactly as much detail as the screen it came from, and no amount of resampling adds any.
+
+### ⚠⚠⚠ A HIDDEN TAB FREEZES THE ANIMATION **CLOCK**, NOT JUST THE PAINTING — AND A SCREENSHOT ADVANCES IT IN A BURST (2026-08-21)
+**This sharpens the existing tab-throttling rule, and the sharpening matters: the old note says a backgrounded tab advances `setTimeout` but not the compositor. It is stronger than that — `Animation.currentTime` does not move either, so the animation is not merely unpainted, it is NOT RUNNING.**
+```
+2s of wall time, tab hidden, no screenshot   ->  currentTime advanced   0 ms
+one screenshot                               ->  currentTime advanced  2520 ms
+                                                 (playState reported "running" throughout)
+```
+- **⚠⚠ THE CONSEQUENCE THAT COSTS TIME: SCREENSHOTTING A RUNNING ANIMATION IS SELF-DEFEATING.** The capture foregrounds the tab, the clock jumps ~2.5s, and the frame you get is from AFTER the moment you aimed at. I seeked to a chosen point, captured, and got a frame well past it — twice.
+- **THE FIX IS ONE LINE: `PAUSE BEFORE CAPTURING`.** A paused animation does not advance when the tab is foregrounded, so `pause(); currentTime = t; screenshot` yields exactly the frame you asked for. **`playState` is NOT the check** — it read `"running"` while the clock sat at 0 for two seconds.
+- **⚠ AND I BELIEVED THE OPPOSITE FOR A FEW MINUTES, ON EVIDENCE.** An early probe showed the clock moving 0 → 933ms across an 800ms wait and I concluded "the clock runs while hidden". It moved because **a screenshot had just foregrounded the tab** — the burst, not the wait. **A single before/after pair cannot distinguish "it advanced during the wait" from "it advanced at the boundary"; only a run with NO capture in it can.**
+- **WHAT THIS MEANS FOR "WATCH IT PLAY": CONTINUOUS MOTION CANNOT BE OBSERVED FROM HERE AT ALL.** Frames are exact and trustworthy; the flow between them is not available, and no amount of care changes that. **Say NOT SEEN for motion, and answer motion questions from the CURVES instead** — sampling computed styles across seeked positions gives the real shape of an animation without needing to see it move.
 
 ### THE THREE WORDMARK OPTIONS — ALL METRICS MEASURED 2026-08-20 (⚠ HISTORY: SUPERSEDED BY THE IMAGE RULING ABOVE)
 **Rendered side by side at the same size in one image and put to Justin. The choice is his and is INTERIM either way — the new Scout Systems logo is filed to ship as an SVG lockup and replace every text wordmark.**
