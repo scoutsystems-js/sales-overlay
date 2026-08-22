@@ -69,7 +69,30 @@ async function profilesByRole(admin) {
   return { owners: owners, roleOf: roleOf };
 }
 
-// Returns { keyId, repIds, label, mode } enforcing permission. Throws {status,msg}.
+// Returns { keyId, memberIds, label, mode } enforcing permission. Throws {status,msg}.
+//
+// ⚠⚠ THE MANAGER IS PART OF THEIR OWN BOARD, AND THIS IS THE ONLY PLACE THAT
+// SAYS SO. `repIdsFor` reads `managed_by = keyId`, which BY DEFINITION cannot
+// contain the manager — so every consumer had to add the manager back, and only
+// two of the ten ever did, each carrying a private three-line copy of the same
+// rule. Josh's own data was missing from eight team surfaces for exactly that
+// reason. One rule, one home.
+//
+// ⚠ THE FIELD IS `memberIds`, NOT `repIds`, DELIBERATELY. The meaning changed
+// but the type did not — a stale reader would keep working and silently drop
+// the manager again, which is how this survived. Renaming makes any missed call
+// site fail loudly instead of quietly returning the old answer.
+//
+// ⚠ 'all' MODE KEEPS ITS PRE-EXISTING ODDITY RATHER THAN QUIETLY ACQUIRING A
+// NEW ONE: `allReps` excludes owners, yet the viewing owner is added by the rule
+// below, so "All users" contains exactly one owner — the viewer. That is what
+// /averages and /rep-series already did; unifying preserves it rather than
+// inventing new behaviour under cover of a bug fix. Flagged, not changed.
+function withBoardOwner(keyId, repIds) {
+  var out = (repIds || []).slice();
+  if (keyId && out.indexOf(keyId) === -1) out.push(keyId);
+  return out;
+}
 async function resolveTeam(admin, req) {
   var me = req.user.id;
   var role = req.user.role;
@@ -77,7 +100,8 @@ async function resolveTeam(admin, req) {
 
   if (role !== 'owner') {
     // manager: always own reps, param ignored.
-    return { keyId: me, repIds: await repIdsFor(admin, me), label: 'My team', mode: 'own' };
+    var mine = await repIdsFor(admin, me);
+    return { keyId: me, memberIds: withBoardOwner(me, mine), label: 'My team', mode: 'own' };
   }
 
   // owner
@@ -88,22 +112,22 @@ async function resolveTeam(admin, req) {
     }
     var reps = await repIdsFor(admin, teamParam);
     var em = await emailMap(admin);
-    return { keyId: teamParam, repIds: reps, label: ((em[teamParam] || 'manager') + "'s team"), mode: 'pick' };
+    return { keyId: teamParam, memberIds: withBoardOwner(teamParam, reps), label: ((em[teamParam] || 'manager') + "'s team"), mode: 'pick' };
   }
 
   if (teamParam === 'all') {
     var pr2 = await profilesByRole(admin);
     var em2 = await emailMap(admin);
     var allReps = Object.keys(em2).filter(function (id) { return !pr2.owners[id]; });
-    return { keyId: me, repIds: allReps, label: 'All users', mode: 'all' };
+    return { keyId: me, memberIds: withBoardOwner(me, allReps), label: 'All users', mode: 'all' };
   }
 
   // default: own team if the owner has reps, else all users.
   var own = await repIdsFor(admin, me);
-  if (own.length > 0) return { keyId: me, repIds: own, label: 'My team', mode: 'own' };
+  if (own.length > 0) return { keyId: me, memberIds: withBoardOwner(me, own), label: 'My team', mode: 'own' };
   var pr3 = await profilesByRole(admin);
   var em3 = await emailMap(admin);
-  return { keyId: me, repIds: Object.keys(em3).filter(function (id) { return !pr3.owners[id]; }), label: 'All users', mode: 'all' };
+  return { keyId: me, memberIds: withBoardOwner(me, Object.keys(em3).filter(function (id) { return !pr3.owners[id]; })), label: 'All users', mode: 'all' };
 }
 
 // GET /team/context — what the manager-view chrome needs: role, whether the
@@ -136,7 +160,7 @@ router.get('/overview', teamGate, async function (req, res) {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
-    var data = await computeTeamAnalytics(admin, team.repIds, range.from, range.to, em);
+    var data = await computeTeamAnalytics(admin, team.memberIds, range.from, range.to, em);
     res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode } }, data));
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] overview:', err.message); res.status(500).json({ error: 'Failed to load team overview' }); }
 });
@@ -147,7 +171,7 @@ router.get('/trends', teamGate, async function (req, res) {
   try {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
-    var data = await computeTeamTrends(admin, team.repIds, bucket, range.from, range.to);
+    var data = await computeTeamTrends(admin, team.memberIds, bucket, range.from, range.to);
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] trends:', err.message); res.status(500).json({ error: 'Failed to load team trends' }); }
 });
@@ -177,7 +201,7 @@ router.get('/why-prose', teamGate, async function (req, res) {
     var admin = getAdminClient();
     var team = await resolveTeam(req, admin);
     var em = await emailMap(admin);
-    var analytics = await computeTeamAnalytics(admin, team.repIds, range.from, range.to, em);
+    var analytics = await computeTeamAnalytics(admin, team.memberIds, range.from, range.to, em);
     var ask = async function (prompt) {
       var r = await getAnthropic().messages.create({
         model: CLAUDE_MODEL, max_tokens: 300, messages: [{ role: 'user', content: prompt }],
@@ -226,9 +250,9 @@ router.get('/averages', teamGate, async function (req, res) {
     var team = await resolveTeam(admin, req);
     var win = TA.fixedWindow(new Date());
 
-    // Ruling 1 (carried from the dials): the board owner counts as a rep.
-    var candidates = team.repIds.slice();
-    if (team.keyId && candidates.indexOf(team.keyId) === -1) candidates.push(team.keyId);
+    // ⚠ the board owner is already in memberIds — resolveTeam owns that rule
+    // now, so this endpoint no longer carries its own copy of it.
+    var candidates = team.memberIds.slice();
     if (candidates.length === 0) {
       return res.json({ window: win, metrics: emptyMetrics(), reps: { total: 0 } });
     }
@@ -368,9 +392,9 @@ router.get('/rep-series', teamGate, async function (req, res) {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
 
-    // Ruling 1: include the board owner themselves as a candidate rep.
-    var candidates = team.repIds.slice();
-    if (team.keyId && candidates.indexOf(team.keyId) === -1) candidates.push(team.keyId);
+    // ⚠ the board owner is already in memberIds — resolveTeam owns that rule
+    // now, so this endpoint no longer carries its own copy of it.
+    var candidates = team.memberIds.slice();
     if (candidates.length === 0) return res.json({ bucket: bucket, buckets: [], reps: [], team: { handle: [], close: [] } });
 
     var calls = [], start = 0;
@@ -434,7 +458,7 @@ router.get('/recommendations', teamGate, async function (req, res) {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
-    var data = await computeTeamRecommendations(admin, team.keyId, team.repIds, range.from, range.to, em);
+    var data = await computeTeamRecommendations(admin, team.keyId, team.memberIds, range.from, range.to, em);
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] recommendations:', err.message); res.status(500).json({ error: 'Failed to load team recommendations' }); }
 });
@@ -468,7 +492,7 @@ router.post('/needs-work/bucket', teamGate, async function (req, res) {
   try {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
-    var rows = await loadBucketEvidence(admin, team.repIds, surfaces, from, to);
+    var rows = await loadBucketEvidence(admin, team.memberIds, surfaces, from, to);
     res.json({ calls: rows });
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] needs-work bucket:', err.message); res.status(500).json({ error: 'Failed to load bucket evidence' }); }
 });
@@ -481,7 +505,7 @@ router.get('/needs-work', teamGate, async function (req, res) {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
-    var data = await computeTeamNeedsWork(admin, team.keyId, team.repIds, range.from, range.to, em);
+    var data = await computeTeamNeedsWork(admin, team.keyId, team.memberIds, range.from, range.to, em);
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] needs-work:', err.message); res.status(500).json({ error: 'Failed to load what-needs-work' }); }
 });
@@ -496,7 +520,7 @@ router.get('/highlights', teamGate, async function (req, res) {
     if (req.query.week && !isNaN(Date.parse(req.query.week))) { weekFrom = new Date(req.query.week); }
     else { var now = new Date(); var day = (now.getUTCDay() + 6) % 7; weekFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day)); }
     weekTo = new Date(weekFrom.getTime() + 7 * 24 * 60 * 60 * 1000);
-    var data = await computeWeeklyHighlights(admin, team.keyId, team.repIds, weekFrom.toISOString(), weekTo.toISOString(), em);
+    var data = await computeWeeklyHighlights(admin, team.keyId, team.memberIds, weekFrom.toISOString(), weekTo.toISOString(), em);
     res.json(Object.assign({ week_from: weekFrom.toISOString(), week_to: weekTo.toISOString() }, data));
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] highlights:', err.message); res.status(500).json({ error: 'Failed to load highlights' }); }
 });
@@ -546,5 +570,11 @@ router.post('/digest/run', requireAuth, requireRole(['owner']), async function (
     res.json(summary);
   } catch (err) { if (handleConfigError(err, res)) return; console.error('[team] digest/run:', err.message); res.status(500).json({ error: 'Digest generation failed' }); }
 });
+
+// ⚠ Pure-ish helpers exported for test, per the log.js `_validateLogBatch`
+// pattern. resolveTeam is the ONE place that decides who is on a board, so it
+// is the one place worth pinning — see team-membership.test.js.
+router._resolveTeam = resolveTeam;
+router._repIdsFor = repIdsFor;
 
 module.exports = router;
