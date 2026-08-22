@@ -7546,12 +7546,18 @@
        All the real objection data belongs to one closer today; the demo reps
        carry COPIES of his calls and are excluded server-side. A one-row grid
        that looked like a whole team would be the standing "a filtered view must
-       never pass as a full one" failure. So the count is always stated. */
-    var teamSize = (state.teamOverview && state.teamOverview.totals && state.teamOverview.totals.reps) || null;
-    var note = grid.length === 1
-      ? 'One closer has objection data in this range' + (teamSize ? ' — the team has ' + teamSize + '.' : '.')
-      : grid.length + ' closers with objection data in this range'
-        + (teamSize && teamSize > grid.length ? ' — the team has ' + teamSize + '.' : '.');
+       never pass as a full one" failure. So the count is always stated.
+
+       ⚠ "CLOSERS ON THIS BOARD", NOT "THE TEAM" — the picker beside this panel
+       reads "My team (4)" and counts REPS ONLY, while this grid can show the
+       manager too (5). Two numbers on one screen both labelled "the team" is
+       the standing reconcile failure: a manager adds them up and they disagree
+       with no way to see why. Naming the set the GRID enumerates makes the
+       denominator checkable against the rows directly above it. */
+    var boardSize = (state.teamOverview && state.teamOverview.totals && state.teamOverview.totals.reps) || null;
+    var scope = boardSize ? ' of ' + boardSize + ' closers on this board' : ' closer' + (grid.length === 1 ? '' : 's');
+    var note = grid.length + scope + ' ' + (grid.length === 1 ? 'has' : 'have')
+      + ' objection data in this range.';
 
     var head = '<div class="team-detail-row obj-grid-head"><span class="obj-grid-name">Closer</span>'
       + OBJ_DRILL_ORDER.map(function (k) { return '<span class="obj-grid-cell">' + escapeHtml(OBJ_DRILL_LABELS[k]) + '</span>'; }).join('')
