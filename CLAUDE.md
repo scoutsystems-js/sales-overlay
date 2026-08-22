@@ -2385,6 +2385,45 @@ red  (--bad)     5.75:1        →       6.72:1
 - **Found while making a THIRD surface reuse the picker instead of copying it**, which is the habit that catches this class: *before writing a control next to new markup, look for whether the app already has one — and then check it does not already have two.*
 - Removed; a guard now asserts exactly one team selector exists in the page.
 
+### ⚠⚠⚠ THE STRICT OBJECTION STANDARD IS THE STANDARD — AND IT IS NOT DERIVABLE FROM ANY STORED COLUMN (Justin's ruling, 2026-08-22)
+**His words: *"It was decided when that was built that the strict guidelines for objection handling is the standard."*** Disqualifications and payment/logistical barriers are **not coachable objections** and must not count toward any rate. The drilldown now applies it.
+- **⚠⚠ IT CANNOT BE DERIVED FROM `objection_category`, AND THE NEAR-MISS IS THE TRAP: that column HAS a `logistical` value — but it means a logistical OBJECTION, not a payment barrier — and it has NO disqualification value at all.** The real discriminator is the classifier in `lib/team-needs-work.js` (`getBucketMapping`), a Claude call over the DISTINCT `objection_surface` phrases that both groups them into sales language and classifies each group. **Exported rather than reimplemented** — a second classifier would give two panels different ideas of what counts, which is the divergence this ruling exists to end.
+- **THE FIXTURE THAT MAKES IT LEGIBLE, and it is the real-world case:** a moment stored as category `fear` whose phrase is *"cant afford it"* — which the classifier calls a **disqualification**. `fear` is exactly where a money phrase lands, so no stored column could ever make that call.
+- **MEASURED ON JOSH'S BOARD (90 days), and the numbers moved:**
+```
+                 LOOSE (before)      STRICT (the standard)
+fear             26%  17/65          23%  13/57
+logistical       43%  10/23          56%   5/9     <- biggest move
+timing            7%   4/55           7%   4/55
+partner          12%   4/34          12%   4/34
+ALL              20%  35/177         17%  26/155
+excluded: 13 disqualifications + 9 payment/logistical barriers = 22;  177 - 22 = 155 ✓
+```
+- **⚠ A CLASSIFIER FAILURE MUST NOT SERVE THE LOOSE NUMBER AS THE STANDARD.** Without the exclusion the rate reads **HIGHER** than the truth — the direction that flatters and that nobody questions. The payload carries `strict:false` + a reason and the panel says on screen that these are not the usual standard.
+- **⚠ AN UNCLASSIFIED PHRASE COUNTS.** Dropping it would shrink the denominator on data the classifier never saw — an exclusion nobody was told about, which is the opposite of the exclusion line the feature exists to show. (Measured: 0 of 177 unclassified.)
+- **⚠⚠ THE CLASSIFICATION IS NON-DETERMINISTIC ACROSS COLD RUNS.** Two concurrent cold requests for the same window returned **15 disq / 8 logistical** and **13 / 9**. Once cached it is stable (3 identical runs). **The magnitude (~22 of 177 excluded) is reliable; the exact split is not** — do not quote the split as a fixed figure. Cost: **cold ~20s, cached ~2s.**
+- **⚠ THE SALES-LANGUAGE LABELS DO NOT DRIVE THE GRID'S COLUMNS, DELIBERATELY.** They are model-generated and window-dependent (4-8, different phrasing each period); a comparison table whose **columns change when you widen the date range** is one a manager cannot trust. The stable stored categories stay as columns; the sales language rides on each **moment** and on a separate **"Handle rate by objection type"** list, where varying wording costs nothing.
+
+### ⚠⚠ ARCHIVING A VIEW: NORMALISE THE NAME WHERE THE VIEW IS *SET*, NOT IN A RENDERER (2026-08-22)
+**The first redirect went into `renderTeamSurface()`. It looked right, the suite passed, and production kept serving the archived page.**
+- **`team-needs-work` was dispatched from THREE places** — `render()`, `renderTeamSurface()` and `scheduleTeamRender()` — **and boot goes through `render()`.** Patching one renderer is a fix that is correct and unreachable.
+- **⚠ AND THE GUARD PASSED THE WHOLE TIME**, because it sliced `renderTeamSurface` alone: **scope narrower than claim**, reporting success over the two dispatchers it never looked at. Caught by loading the URL, not by the suite.
+- **THE FIX IS ONE NORMALISATION AT EACH ENTRY POINT**: an `ARCHIVED_VIEWS` map applied in `setView`, **plus the hash map** — because the hash path assigns `state.view` DIRECTLY rather than through `setView`, so normalising in `setView` alone still leaves a refresh or a pasted URL opening the archived page. **Two entry points, both normalised; then no dispatcher can ever see the old name.**
+- **⚠ REDIRECT, DO NOT DELETE — a bookmark is a link too.** "Nothing links to it" is a statement about the app's markup, not about what people have saved.
+- **⚠ AND `setView`, NOT A DIRECT RENDER CALL:** the drilldown and the rep filter both branch on `state.view === 'team-objections'`, so rendering it while state still said `team-needs-work` gives a page whose controls silently do nothing.
+
+### ⚠⚠ A CONTROL BUILT FOR ONE SURFACE HAS SURFACE-SPECIFIC ENDS — PARAMETERISE THOSE, REUSE THE REST (2026-08-22)
+**The rep filter looked like a general control and was a CHART-LEGEND control.** Its roster came from live Chart.js datasets and applying it toggled dataset visibility. On the objection drilldown — no charts — `repFilterRoster()` returned `[]`, `repFilterHtml()` returned `''`, and the control would simply **not appear**. A straight lift renders nothing; a copy gives the two pages separate hidden sets and separate bugs.
+- **THE SHAPE: keep the control whole** (menu, checkboxes, persistence, keyboard, a11y, the state-held open flag) **and parameterise only the two ends** — where the roster comes from, and what "apply" means (chart visibility vs a re-render).
+- **⚠ FILTERING MUST REACH EVERY SURFACE ON THE SCREEN, AND THERE WERE THREE, NOT TWO.** The grid and the moments were filtered; the **Why summary was not**, so a refreshed page said *"all closers hidden"* while coaching about that closer directly underneath. **Found by looking at the reloaded page, not by a test.**
+- **⚠ NO COLOUR SWATCH ON THE DRILLDOWN, DELIBERATELY.** The swatch exists because the graph legend caps at 10, so for an 11th rep the menu is the only place their line colour appears — and the drilldown has no lines. Worse, the ramp is assigned by position in the rep-series payload while this grid is ordered weakest-first, so a colour derived here could **disagree with the same rep's line on the team page**. A missing swatch is honest; a wrong one is not.
+- **⚠ THE SAVED SELECTION MUST BE READ AFTER THE TEAM IS KNOWN AND GUARDED BY AN EXPLICIT MARKER.** `repLineHidden` initialises to `{}`, which is **truthy**, so `if (!state.repLineHidden) load()` can never fire — that exact guard already shipped once and silently lost the selection on every refresh. The drilldown uses `state.repFilterLoadedKey !== repFilterStoreKey()`.
+
+### ⚠ BACKTICKS IN A DOUBLE-QUOTED SHELL STRING EXECUTE — USE `git commit -F -` WITH A QUOTED HEREDOC (2026-08-22)
+**A commit message containing `` `logistical` `` ran it as a command.** zsh reported `command not found: logistical`, the commit succeeded, and the word was **replaced by an empty string** in the message — a silent gap in the record, discovered only by reading the commit back.
+- **The fix is the mechanism, not care:** `git commit -F - <<'MSG' … MSG`. A **quoted** heredoc delimiter suppresses every form of interpretation — backticks, `$`, history expansion.
+- **⚠ AND DO NOT FORCE-PUSH TO REPAIR A COMMIT MESSAGE.** This project has already lost five commits to a force-push. A cosmetic gap in a message is not worth that risk; note it and move on.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
