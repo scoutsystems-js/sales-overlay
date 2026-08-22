@@ -2353,6 +2353,38 @@ the grid alone (no model)   1,820 ms   <- the floor, and the hit is sitting on i
 - **THE MODEL SUPPLIES PROSE AND NOTHING ELSE.** Names, categories, counts and every quote are re-attached from the fetched rows by name; **a model-supplied name matching no closer is DROPPED**, because a plausible name for someone not on the board reads as a finding about a real rep.
 - **PROVEN END TO END ON PRODUCTION, BOTH DIRECTIONS:** marking a call → `cached:false`, denominator 55→**53**, text regenerated; un-marking → `cached:true`, **55 back and the original 494-character text returned byte-identical**. Consistent with the recorded finding that cache entries accumulate rather than being overwritten.
 
+### ⚠⚠ REMOVING A TINT OF THE TEXT'S OWN COLOUR *RAISES* CONTRAST — THE FILL WAS THE PROBLEM, NOT THE PROTECTION (2026-08-22)
+**The instruction warned that the amber `PARTIAL` label "was carrying contrast from its fill". Measured, it was the exact opposite: the fill was COSTING it contrast.**
+```
+label            on its 12% fill      on the bare card (#131313)
+accent / good    8.40:1        →      10.41:1
+amber (--mid)    8.77:1        →      11.13:1     ← the one flagged as at risk
+red  (--bad)     5.75:1        →       6.72:1
+```
+- **THE MECHANISM: each badge fill was `rgba(<the label's own colour>, 0.12)`.** A tint of the text's own hue moves the backdrop **toward** the text, so it reduces separation. Stripping it exposes the label against the darker card and contrast goes **up on every one**.
+- **This is the third instance of the shared-hue family** (after the green wordmark on the green mark, and the score badge beside the green button). **The general rule: when a background is derived from the foreground colour, adding it lowers contrast and removing it raises contrast — the intuition runs the other way and is wrong every time.**
+- **⚠ SO THE REAL RISK WAS NEVER LEGIBILITY — IT WAS SCANNABILITY.** The pills were doing the *chunking*, not the contrast. What had to survive was uppercase + 600 weight + letter-spacing + a wider row gap, and whether that is enough is a **perception** question a ratio cannot answer. Looked at on production: it reads clean.
+- **⚠ SCOPE THE UN-FILL.** `.badge` and `.scope-pill` are used app-wide (call-library status, billing, KB scope). The rule is scoped to `.obj-card-head`, and the scoping was **proven on a different page** — 2 badges outside the moment card, both still filled. A page with no such badges cannot prove it, and the drilldown is one of those pages.
+
+### ⚠⚠⚠ TWO PANELS THAT LOOK LIKE THE SAME FEATURE CAN HAVE DIFFERENT DENOMINATORS — CHECK BEFORE ARCHIVING EITHER (2026-08-22)
+**The team objection drilldown was assumed to supersede the older "Objection Handling Focus" panel. Measured on the same window, they disagree about almost everything, and the older one is NOT redundant.**
+| | old `team-needs-work` | new drilldown |
+|---|---|---|
+| buckets by | an **LLM surface-label** classification — *"Spouse / partner approval"*, *"Needs time / think it over"*, *"Price / too expensive"*, *"Trust / proof / skepticism"* | the **stored `objection_category`** column — 4 values |
+| denominator | **TRUE objections only** — disqualifications and logistical barriers removed | **every** objection-typed moment |
+| says what it excluded | **yes** — *"Also this period: 12 disqualifications and 6 payment/logistical barriers — not counted as coachable objections"* | nothing |
+| bucket → the calls | **clickable** | no |
+- **THE LESSON: "the new page does the same thing better" is a claim about the DENOMINATOR, and it has to be measured, not assumed.** Here the new page is broader in coverage and *weaker* in definition — it counts as objections things the old panel deliberately rules out as not coachable.
+- **RESOLUTION: routing moved, the panel stayed.** Every team-view entry point opens the drilldown (the product ruling), the old view still exists and still works if reached directly, and the card that carries the context line stays on the team page. **Nothing is lost and nothing is orphaned-but-linked.**
+- **⚠⚠ AND THE COMPARISON EXPOSED A LIVE DEFECT IN THE OLD PANEL: IT COUNTS SYNTHETIC ROWS.** `loadTeamWindow` (the chokepoint for team-needs-work, team-digest and team-synthesis) filters `not_a_sales_call` but has no `realCallsOnly`. Measured on Josh's board over 90 days: **177 real objection moments, 87 seeded, 20 demo — 38% of that panel's input is fabricated**, and the demo share is Josh's own calls counted again under other names. **Filed, not fixed: the filter belongs at that chokepoint, which means it lands on three lanes at once and is its own change.**
+- **⚠ A per-file grep for the filter said team-needs-work had neither exclusion. It has one — upstream, at `loadTeamWindow`.** Scope-vs-claim again: the file was the scope, the *lane* was the claim.
+
+### ⚠ A DEAD SECOND COPY OF A CONTROL IS THE STATE JUST BEFORE THE TWO DRIFT (2026-08-22)
+**`teamHeaderHtml()` built a byte-identical duplicate of the team selector — options, handler, selected-state — and then returned neither it nor the date picker it also built.** Stranded when the header was split into a title row and a controls row.
+- **Nothing looked wrong, because nothing rendered.** It was simply a second definition sitting one function away from the real one, waiting for someone to edit whichever they found first — and a search returns the earlier one.
+- **Found while making a THIRD surface reuse the picker instead of copying it**, which is the habit that catches this class: *before writing a control next to new markup, look for whether the app already has one — and then check it does not already have two.*
+- Removed; a guard now asserts exactly one team selector exists in the page.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
