@@ -7775,8 +7775,22 @@
     if (s.state === 'no_volume') {
       return '<div class="empty"><h3>Nothing to summarise yet</h3><p>' + escapeHtml(s.card_text || '') + '</p></div>';
     }
-    var cards = (s.closers || []).map(objSummaryCloserHtml).join('');
-    if (!cards) return '<div class="empty"><h3>Nothing to summarise yet</h3><p>No closers on this board have objection data in this range.</p></div>';
+    /* ⚠⚠ THE REP FILTER APPLIES HERE TOO — caught by looking, not by a test.
+       After a refresh with the only closer hidden, the grid said "all closers
+       hidden" and this panel went on coaching about him directly underneath.
+       Three surfaces on one screen, and one of them disagreeing about who is on
+       the board is the same failure as filtering the grid but not the feed. */
+    var hiddenReps = state.repLineHidden || {};
+    var visible = (s.closers || []).filter(function (c) { return !hiddenReps[c.user_id]; });
+    var cards = visible.map(objSummaryCloserHtml).join('');
+    if (!cards) {
+      var anyHidden = (s.closers || []).length > 0;
+      return '<div class="empty"><h3>Nothing to summarise yet</h3><p>'
+        + (anyHidden
+            ? 'Every closer here is hidden. Use the rep filter above to show them again.'
+            : 'No closers on this board have objection data in this range.')
+        + '</p></div>';
+    }
     return cards;
   }
 

@@ -239,6 +239,13 @@ test('⚠⚠ FILTERING HIDES THE REP FROM THE GRID *AND* THE MOMENTS', () => {
   const feed = slice('function teamObjFeedHtml', '\n  }');
   assert.ok(/hiddenReps\[i\.closer\.user_id\]/.test(feed), 'the feed must drop their moments too');
 
+  /* ⚠ AND THE SUMMARY — there are THREE surfaces on this screen, not two. Found
+     by looking at a refreshed page: the grid said "all closers hidden" and the
+     Why panel went on coaching about him directly underneath. */
+  const summary = slice('function teamObjSummaryHtml', '\n  }');
+  assert.ok(/hiddenReps\[c\.user_id\]/.test(summary), 'the coaching summary must drop hidden closers');
+  assert.ok(/rep filter/i.test(summary), 'and say why when everyone is hidden');
+
   // ⚠ and hiding EVERYONE must not borrow the empty-range wording — that sends
   // a manager looking for missing data they filtered out themselves.
   assert.ok(/all closers hidden/i.test(grid), 'the all-hidden state must say it is a filter');
