@@ -8,6 +8,25 @@
 
 ---
 
+## 🚨 TOP OF THE LIST — ZOOM CALLS PRODUCE NO USABLE DATA (filed 2026-08-22)
+
+**⚠⚠ FILED, NOT INVESTIGATED. Justin's ruling: recon happens AFTER this session, and Zoom stays PINNED until he lifts it. Do not measure, diagnose or fix any part of this from the entry below — it is a report of what he observed, not a set of findings.**
+
+> **⚠ JUSTIN'S REQUIREMENT, and it is why this sits above everything else:**
+> **"Zoom HAS TO work as good or better than Fathom, because not every closer is going to use Fathom."**
+
+Since Josh connected Zoom, Zoom calls appear in the call library **alongside** Fathom ones, and three things are wrong at once:
+
+| # | observed | note |
+|---|---|---|
+| **a** | **No prospect name.** Zoom rows are titled *"Josh's Zoom Meeting"* / *"Josh's Personal Meeting Room"* where Fathom rows carry the prospect's name. | ⚠ Cross-reference the **PMR title finding**: a Personal Meeting Room gives *every* call an identical, non-distinguishing title — which is very likely why no prospect name is resolved. The prospect-name resolver's precedence is grader → diarized → cleaned title → NULL, and a PMR title carries no candidate. |
+| **b** | **No analysis.** A **57-minute call marked Closed** shows *"No highlights were extracted for this call"*, a section grade of **F on Intro**, and coaching text reading **"This recording contains no sales conversation to coach against."** | ⚠ Open: **is the transcript parsing at all, or arriving empty?** A grader returning "no sales conversation" on a real 57-minute sales call is being handed nothing — that reads as an ingestion or adapter failure, not a grading one. ⚠ Open: **does a re-analyse trigger fix existing rows, or is the ingestion itself broken?** |
+| **c** | **BOTH sources are ingesting the same meetings.** | ⚠ This is exactly the duplicate exposure the **ONE ACTIVE SOURCE PER USER** ruling was written for — and that ruling was **never built**. See it in `CLAUDE.md`: prevent new dual connections, do not force-disconnect, provide a deliberate *Switch provider* action, and **if enforcement keeps the FIRST source active the incumbent always wins and the newcomer can never generate the evidence it is being asked for** — for Josh the active source must be **Zoom**. |
+
+**⚠ Known-relevant context already on file, so recon does not rediscover it:** the VTT adapter has **never been exercised on a real-length call** (everything it has parsed is ≤120 seconds); the 3301 requeue has **never fired live**; and every Zoom row that existed before Josh connected belonged to the **security reviewer** and was a 2-minute test meeting. Check **whose** a Zoom row is and **how long** it is before drawing any conclusion from it.
+
+---
+
 ## LIVE
 Shipped, deployed, and verified on production.
 

@@ -82,6 +82,9 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     category: wantCategory, instances: [], grid: [], closers: [],
     totals: emptyCounts(), instance_count: 0, truncated: false,
     board_size: boardSize, analysis_fingerprint: EMPTY_FINGERPRINT,
+    category_totals: (function () {
+      var out = {}; ALL_CATEGORIES.forEach(function (c) { out[c] = Object.assign(emptyCounts(), { rate: null }); }); return out;
+    })(),
   };
   if (!memberIds || memberIds.length === 0) return empty;
 
@@ -159,6 +162,14 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
 
   // ── 4) fold into instances + the per-closer x per-category grid ──
   var byCloser = {}, totals = emptyCounts(), instances = [];
+  /* ⚠ POOLED, NEVER THE MEAN OF PER-CLOSER RATES — the same house rule the
+     team-averages gauges follow. The raw counts are printed beside the rate, so
+     a mean-of-rates would put a different number on screen from the counts
+     underneath it. Accumulated from the SAME filtered rows as the grid, so the
+     average inherits the not_a_sales_call and synthetic exclusions rather than
+     needing its own. */
+  var catTotals = {};
+  ALL_CATEGORIES.forEach(function (c) { catTotals[c] = emptyCounts(); });
 
   rows.forEach(function (r) {
     var m = meta[r.fathom_call_id];
@@ -171,7 +182,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     var cell = byCloser[m.user_id] || (byCloser[m.user_id] = { user_id: m.user_id, by_category: {}, total: emptyCounts() });
     ALL_CATEGORIES.forEach(function (c) { if (!cell.by_category[c]) cell.by_category[c] = emptyCounts(); });
 
-    [cell.by_category[cat], cell.total, totals].forEach(function (bucket) {
+    [cell.by_category[cat], cell.total, totals, catTotals[cat]].forEach(function (bucket) {
       bucket.total += 1;
       if (credited) bucket.credited += 1;
       else if (res) bucket[res] += 1;
@@ -250,6 +261,14 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     truncated: instances.length > cap,
     analysis_fingerprint: fingerprint,
     grid: grid,
+    /* The team-average row. Same shape as a grid row's by_category so the
+       renderer can reuse one cell function — a second cell renderer for the
+       average is how the two would drift into showing different roundings. */
+    category_totals: (function () {
+      var out = {};
+      ALL_CATEGORIES.forEach(function (c) { out[c] = Object.assign({}, catTotals[c], { rate: rateOf(catTotals[c]) }); });
+      return out;
+    })(),
     board_size: boardSize,
     closers: grid.map(function (g) { return { user_id: g.user_id, name: g.name }; }),
     totals: Object.assign({}, totals, { rate: rateOf(totals) }),

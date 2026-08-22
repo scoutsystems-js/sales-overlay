@@ -2933,7 +2933,21 @@
     }
 
     /* ── the objection drilldown grid ────────────────────────────────────── */
+    /* The drilldown's controls, inside the card rather than in a strip above it. */
+    .objdrill-controls {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+      margin: 0 0 14px; padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
     .obj-grid-note { margin-bottom: 10px; }
+    /* ⚠ THE TEAM AVERAGE MUST NOT READ AS ANOTHER CLOSER. It is the same row
+       shape by design (one cell renderer, so the roundings cannot drift), so the
+       only thing separating it is this treatment — a rule above it and a
+       non-bold name. Its cells are deliberately NOT clickable: the category
+       filter is per-moment, and clicking an aggregate would silently apply
+       somebody else's filter. */
+    .obj-grid-avg { border-top: 1px solid var(--border-strong); margin-top: 4px; }
+    .obj-grid-avg .obj-grid-name { font-weight: 400; opacity: .9; }
     /* The coaching summary. One card per closer — never a team paragraph. */
     .objsum-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; background: var(--bg-elevated); }
     .objsum-card:last-child { margin-bottom: 0; }
@@ -2961,6 +2975,37 @@
     .obj-grid-click { cursor: pointer; border-radius: var(--radius-sm); padding: 3px 0; }
     .obj-grid-click:hover { background: rgba(var(--accent-rgb), 0.12); }
     .obj-closer-chip { background: rgba(var(--accent-rgb), 0.14); }
+
+    /* ⚠⚠ MOMENT-CARD LABELS: WORDS AND COLOUR, NO BOXES (Justin, 2026-08-22 —
+       "all the boxes look very 'built by Claude'. Remove the green and yellow
+       boxes, keep the words and the font colours.").
+
+       ⚠ SCOPED TO `.obj-card-head`, DELIBERATELY. `.badge` and `.scope-pill` are
+       used across the whole app — call-library status, billing status, KB scope
+       — and stripping their fill globally would turn a note about one feed into
+       a site-wide restyle nobody asked for.
+
+       ⚠ THE CONTRAST WENT UP, NOT DOWN, AND THAT IS THE OPPOSITE OF THE OBVIOUS
+       WORRY. Each fill was a 12% tint OF THE LABEL'S OWN COLOUR, so it pulled
+       the backdrop TOWARD the text. Measured against the #131313 card:
+           accent/good  8.40 → 10.41:1
+           amber        8.77 → 11.13:1     ← the one flagged as at risk
+           red          5.75 →  6.72:1
+       Same shape as the wordmark-on-its-own-colour finding: shared hue means
+       the background converges on the text rather than contrasting with it.
+
+       ⚠ SO THE REAL RISK IS SCANNABILITY, NOT LEGIBILITY — the pills were doing
+       the chunking. Uppercase, 600 weight and the letter-spacing stay, and the
+       row gap goes up, because those are what survive losing the box. That is a
+       perception question a contrast number cannot answer: LOOK AT IT. */
+    .obj-card-head { gap: 14px; }
+    .obj-card-head .badge,
+    .obj-card-head .scope-pill,
+    .obj-card-head .obj-closer-chip {
+      background: none;
+      padding: 0;
+      margin-left: 0;
+    }
     .team-controls-row { margin-bottom: 28px; justify-content: flex-end; }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
@@ -7493,14 +7538,27 @@
       /* +$X at stake chip REMOVED 2026-08-17 — the What-Needs-Work card no
          longer does money math, and this chip WAS its output. */
       + '</div>';
-    return head + '<div class="team-recs-card" onclick="openTeamNeedsWork()" title="See the per-bucket breakdown and the calls behind it">'
+    /* ⚠ THE CARD STAYS, ITS DESTINATION MOVED. The click now opens the
+       drilldown (Justin's routing ruling), but the card itself is the only
+       place on the team view carrying the TRUE-objection focus and the
+       disqualification / logistical context line below it — neither of which
+       the drilldown has. Removing it would lose them; retargeting it does not.
+       The copy no longer says "expand", because it no longer expands. */
+    return head + '<div class="team-recs-card" onclick="openTeamNeedsWork()" title="Open the per-closer objection breakdown">'
       + '<div class="team-recs-teaser">' + escapeHtml(d.card_text || '') + '</div>'
       + chips + nwContextLineHtml(d)
-      + '<div class="team-recs-expand">click to expand →</div>'
+      + '<div class="team-recs-expand">see the per-closer breakdown →</div>'
     + '</div>';
   }
 
-  function openTeamNeedsWork() { setView('team-needs-work'); }
+  /* ⚠ RETARGETED 2026-08-22 — every objection entry point on the team view now
+     lands on the drilldown (Justin's ruling). The `team-needs-work` VIEW still
+     exists and still works if reached directly; nothing links to it any more.
+     It is NOT archived, deliberately — see the report: it carries three things
+     the drilldown does not (an LLM surface-label taxonomy, the true-objection
+     split with its disqualification/logistical context line, and clickable
+     bucket → per-call evidence). */
+  function openTeamNeedsWork() { openTeamObjections(); }
 
   /* ══ THE TEAM OBJECTION DRILLDOWN (Justin, 2026-08-22) ═══════════════════
      MANAGER VIEW ONLY — closers keep their own objection surfaces. The gate is
@@ -7526,6 +7584,9 @@
     renderTeamObjectionsView();
   }
 
+  /* Below this, "the team average" is one person's own row copied — see the
+     note where it is used. */
+  var MIN_CLOSERS_FOR_TEAM_AVG = 2;
   var OBJ_DRILL_LABELS = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing',
                            partner: 'Partner / spouse', uncategorized: 'Uncategorised' };
   var OBJ_DRILL_ORDER = ['fear', 'logistical', 'timing', 'partner', 'uncategorized'];
@@ -7537,10 +7598,14 @@
     if (state.teamObjections === null && !state.teamObjectionsLoading) loadTeam('objections');
     if (state.teamObjSummary === null && !state.teamObjSummaryLoading) loadTeamObjSummary();
 
-    content.innerHTML = teamHeaderHtml() + teamControlsHtml()
+    /* ⚠ NO teamControlsHtml() HERE — the controls moved INTO the card below.
+       That also removes Manage Members and Customize View from this page, which
+       is deliberate: they act on the team, not on this breakdown. */
+    content.innerHTML = teamHeaderHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>Per-Closer Objection Handling</h2>'
         + '<div class="meta">how each closer is dealing with each objection</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
+        + objDrillControlsHtml()
         + teamObjGridHtml() + '</div>'
       /* ⚠ THE SUMMARY SITS BETWEEN THE GRID AND THE MOMENTS DELIBERATELY. It
          explains the grid directly above it and is evidenced by the moments
@@ -7713,26 +7778,55 @@
       + OBJ_DRILL_ORDER.map(function (k) { return '<span class="obj-grid-cell">' + escapeHtml(OBJ_DRILL_LABELS[k]) + '</span>'; }).join('')
       + '<span class="obj-grid-cell">All</span></div>';
 
+    /* One cell renderer, used by BOTH the closer rows and the team-average row.
+       A second one for the average is how the two drift into disagreeing about
+       rounding while sitting in the same column. */
+    function cellHtml(c, clickable, key) {
+      c = c || { total: 0, rate: null };
+      if (!c.total) return '<span class="obj-grid-cell obj-grid-empty">—</span>';
+      var handled = (c.handled || 0) + (c.credited || 0);
+      var click = clickable ? ' obj-grid-click" onclick="setObjDrillCategory(\'' + key + '\')"' : '"';
+      return '<span class="obj-grid-cell' + click
+        + ' title="' + handled + ' of ' + c.total + ' handled' + (clickable ? ' — click to see them' : '') + '">'
+        + '<strong>' + (c.rate == null ? '—' : c.rate + '%') + '</strong>'
+        + '<span class="obj-grid-sub">' + handled + '/' + c.total + '</span></span>';
+    }
+
     var rows = grid.map(function (g) {
-      var cells = OBJ_DRILL_ORDER.map(function (k) {
-        var c = g.by_category[k] || { total: 0, rate: null };
-        if (!c.total) return '<span class="obj-grid-cell obj-grid-empty">—</span>';
-        var handled = (c.handled || 0) + (c.credited || 0);
-        return '<span class="obj-grid-cell obj-grid-click" onclick="setObjDrillCategory(\'' + k + '\')"'
-          + ' title="' + handled + ' of ' + c.total + ' handled — click to see them">'
-          + '<strong>' + (c.rate == null ? '—' : c.rate + '%') + '</strong>'
-          + '<span class="obj-grid-sub">' + handled + '/' + c.total + '</span></span>';
-      }).join('');
-      var t = g.total;
-      var tHandled = (t.handled || 0) + (t.credited || 0);
+      var cells = OBJ_DRILL_ORDER.map(function (k) { return cellHtml(g.by_category[k], true, k); }).join('');
       return '<div class="team-detail-row obj-grid-row"><span class="obj-grid-name">' + escapeHtml(g.name) + '</span>'
-        + cells
-        + '<span class="obj-grid-cell"><strong>' + (t.rate == null ? '—' : t.rate + '%') + '</strong>'
-        + '<span class="obj-grid-sub">' + tHandled + '/' + t.total + '</span></span></div>';
+        + cells + cellHtml(g.total, false, null) + '</div>';
     }).join('');
 
-    return '<div class="meta obj-grid-note">' + escapeHtml(note) + ' Weakest first. Rates count an objection on a closed call as handled.</div>'
-      + '<div class="team-detail-list obj-grid">' + head + rows + '</div>';
+    /* ⚠⚠ THE TEAM AVERAGE NEEDS AT LEAST TWO CLOSERS, AND BELOW THAT IT IS
+       OMITTED WITH A REASON RATHER THAN RENDERED.
+
+       With one closer the average is that closer's own row, digit for digit.
+       Showing it would imply a comparison that does not exist — the manager
+       reads two rows and infers a benchmark, when the second row is the first
+       one copied. Justin's own framing for this feature was seeing a closer
+       "against the team rather than against nothing", and with a board of one
+       there is still nothing to see them against.
+
+       Omitting silently would be the other failure: an absent row and a broken
+       row look identical. So the note says why. Pooled counts, never a mean of
+       per-closer rates — the raw counts print beside the rate, and a
+       mean-of-rates would disagree with them. */
+    var avgRow = '', avgNote = '';
+    if (grid.length >= MIN_CLOSERS_FOR_TEAM_AVG) {
+      var ct = d.category_totals || {};
+      var avgCells = OBJ_DRILL_ORDER.map(function (k) { return cellHtml(ct[k], false, k); }).join('');
+      avgRow = '<div class="team-detail-row obj-grid-row obj-grid-avg">'
+        + '<span class="obj-grid-name">Team average</span>' + avgCells
+        + cellHtml(d.totals, false, null) + '</div>';
+    } else if (grid.length === 1) {
+      avgNote = ' A team average needs at least two closers with data — with one, it would just repeat the row above.';
+    }
+
+    return '<div class="meta obj-grid-note">' + escapeHtml(note)
+      + ' Weakest first. Rates count an objection on a closed call as handled.'
+      + escapeHtml(avgNote) + '</div>'
+      + '<div class="team-detail-list obj-grid">' + head + rows + avgRow + '</div>';
   }
 
   /* The instance list — the SAME row the personal objections feed uses. */
@@ -8670,8 +8764,16 @@
     var today = new Date().toISOString().slice(0, 10);
     state.teamRange = rangeToIso(addDays(today, -6), today);
     state.teamRangeInit = true;          // do not let the default seeder re-widen it
-    state.teamNeedsWork = null;          // force a refetch on the new range
-    setView('team-needs-work');
+    /* ⚠ RETARGETED 2026-08-22 (Justin: "when you are in Team view and you click
+       on anything objection-handling related it should go to this page").
+       ⚠ THE LANES CLEARED HERE MUST MATCH THE DESTINATION. This cleared
+       teamNeedsWork because that was where it landed; pointing it at the
+       drilldown without changing them would have shown the PREVIOUS range's
+       grid under a freshly narrowed 7-day window — the destination silently
+       disagreeing with the click that opened it. */
+    state.teamObjections = null;
+    state.teamObjSummary = null;
+    setView('team-objections');
   }
   function avgPanelHtml() {
     var d = state.teamAverages;
@@ -8694,19 +8796,22 @@
 
   function teamHeaderHtml() {
     var label = (state.teamOverview && state.teamOverview.team && state.teamOverview.team.label) || 'Team';
-    var picker = '';
-    var ctx = state.teamContext;
-    if (ctx && ctx.is_owner && Array.isArray(ctx.teams) && ctx.teams.length) {
-      var opts = ctx.teams.map(function (t) {
-        var sel = (state.teamSelected === t.key || (!state.teamSelected && t.is_self)) ? ' selected' : '';
-        return '<option value="' + escapeHtml(t.key) + '"' + sel + '>' + escapeHtml(t.label) + ' (' + t.rep_count + ')</option>';
-      }).join('');
-      picker = '<select class="user-select" onchange="pickTeam(this.value)">' + opts + '</select>';
-    }
-    // Stage 2: the 7d/30d/90d segmented buttons are replaced by the calendar.
-    // No presets alongside it, per the ruling.
+    /* ⚠⚠ A DEAD SECOND COPY OF THE TEAM PICKER LIVED HERE AND WAS REMOVED
+       2026-08-22. This function built `picker` (a byte-identical duplicate of
+       the select in teamSelectHtml) and `presets`, and then RETURNED NEITHER —
+       stranded when the header was split into a title row and a controls row.
+
+       It never rendered, so nothing looked wrong; it was simply a second
+       definition of a control sitting one function away from the real one,
+       waiting for someone to edit the wrong one. Found while making the
+       drilldown reuse the picker rather than copy it — which is the same
+       hazard, caught before it became a third copy.
+
+       ⚠ ensureTeamPicker() STAYS. It registers the date picker's getter/setter
+       and is idempotent; every team surface reaches it through here or through
+       a controls row, and dropping it would be a silent regression on any
+       future view that renders only the header. */
     ensureTeamPicker();
-    var presets = datePickerHtml('team');
     /* REMOVED 2026-08-16 — superseded by the date picker above.
     var presets = [7, 30, 90].map(function (d) {
       return '<button class="date-preset' + (state.dateRange.days === d ? ' active' : '') + '" onclick="setTeamRange(' + d + ')">' + d + 'd</button>';
@@ -8734,22 +8839,53 @@
     return '<button class="date-preset" onclick="openTeamObjections()">Objection Handling</button>';
   }
 
-  function teamControlsHtml() {
-    var picker2 = '';
+  /**
+   * The team selector — ONE definition, two callers.
+   *
+   * ⚠⚠ EXTRACTED RATHER THAN COPIED (Justin: "Same component, same behaviour,
+   * same persistence. Not a lookalike."). The drilldown needs this control
+   * inside its own card, and the obvious way to get it there is to write the
+   * `<select>` again next to the new markup. A second copy is how the two drift
+   * — a different option label, a different handler, a selection that persists
+   * on one page and not the other — and nothing would report it, because both
+   * would render a perfectly good dropdown.
+   *
+   * Persistence comes from `state.teamSelected` and `pickTeam`, which are
+   * global, so reusing this function means reusing the persistence too.
+   */
+  function teamSelectHtml() {
     var ctx2 = state.teamContext;
-    if (ctx2 && ctx2.is_owner && Array.isArray(ctx2.teams) && ctx2.teams.length) {
-      var opts2 = ctx2.teams.map(function (t) {
-        var sel2 = (state.teamSelected === t.key || (!state.teamSelected && t.is_self)) ? ' selected' : '';
-        return '<option value="' + escapeHtml(t.key) + '"' + sel2 + '>' + escapeHtml(t.label) + ' (' + t.rep_count + ')</option>';
-      }).join('');
-      picker2 = '<select class="user-select" onchange="pickTeam(this.value)">' + opts2 + '</select>';
-    }
+    if (!(ctx2 && ctx2.is_owner && Array.isArray(ctx2.teams) && ctx2.teams.length)) return '';
+    var opts2 = ctx2.teams.map(function (t) {
+      var sel2 = (state.teamSelected === t.key || (!state.teamSelected && t.is_self)) ? ' selected' : '';
+      return '<option value="' + escapeHtml(t.key) + '"' + sel2 + '>' + escapeHtml(t.label) + ' (' + t.rep_count + ')</option>';
+    }).join('');
+    return '<select class="user-select" onchange="pickTeam(this.value)">' + opts2 + '</select>';
+  }
+
+  function teamControlsHtml() {
     ensureTeamPicker();
     return '<div class="page-header fade-in team-controls-row">'
-      + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + picker2
+      + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + teamSelectHtml()
         + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
         + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewSoonHtml() + '</div>'
     + '</div>';
+  }
+
+  /**
+   * The drilldown's controls, INSIDE its card (Justin: the strip above the card
+   * "reads cramped").
+   *
+   * ⚠ MANAGE MEMBERS AND CUSTOMIZE VIEW ARE DELIBERATELY ABSENT — they act on
+   * the team, not on this breakdown, and they live on the main team page.
+   * ⚠ THE SELECTOR AND THE DATE PICKER ARE THE SAME COMPONENTS the team page
+   * uses, called here rather than rebuilt. `ensureTeamPicker()` is idempotent,
+   * so registering from either surface is safe.
+   */
+  function objDrillControlsHtml() {
+    ensureTeamPicker();
+    return '<div class="objdrill-controls">' + teamSelectHtml()
+      + '<div class="date-presets">' + datePickerHtml('team') + '</div></div>';
   }
 
   /**
