@@ -1262,6 +1262,10 @@ muted text itself falls below 4.5:1 above opacity 0.219
 
 ### ✅ DISCHARGED 2026-08-19 (`b6f6264`) — TRIGGERED WORK: PROVIDER-BLIND CLIP LABELS
 **Done. Kept because the COUNT was wrong and that is the transferable part: it was TEN builders across SEVEN files, not six across four — see the hypothesis-shaped-search entry. All now delegate to `lib/clip-link.js`; `source` rides with `clip_url` at every emission, guarded by `test/clip-link-single-source.test.js`.**
+
+**⚠⚠ CORRECTION 2026-08-22 — THE SWEEP WAS A BUILDER SWEEP, AND ONE RENDERER STILL HARDCODED THE LABEL.** `b6f6264` fixed every place that BUILT an href and left `objFeedCard` — the objections feed row — emitting a literal `▶ Watch Clip`. It received a correct provider-aware `clip_url` and then **printed the wrong word over it.** Found only when the team drilldown reused that row and a real Zoom moment rendered through it; now `clipLabelFor(f.source)`, and it was **the last hardcoded clip label in the file.**
+- **THE LESSON IS THE SCOPE-VS-CLAIM ONE AGAIN, in its inventory form: the sweep enumerated URL BUILDERS; the claim was about LABELS.** Six other render sites already used the helper, which is exactly what made the seventh invisible — a spot check would have landed on a correct one.
+- **⚠ AND IT COULD NOT HAVE RENDERED WRONG AT THE TIME**, because there were zero analysed Zoom moments. **A defect that cannot yet manifest also cannot be caught by looking** — which is the argument for a guard over an inspection whenever a trigger-deferred item is finally discharged.
 *(original entry below, kept for the reasoning)*
 **Deferred deliberately, with the condition that makes it due. Not a someday.**
 - **What:** six surfaces build their clip link INLINE (`recording_url + ?t=`) instead of using the shared `clip_url` field, so the provider-aware label from `lib/clip-link.js` never reaches them. They say **"Clip"** regardless of provider — which on a Zoom call promises a moment and delivers **00:00**.
@@ -2283,6 +2287,37 @@ Chrome returns `color-mix()` results in modern `color(srgb r g b)` notation with
 `NON SALES CALL` hovers **RED**, not green — clicking marks the call EXCLUDED, and red is the excluded state. **The old green hover previewed the opposite outcome.** `COUNT THIS CALL` hovers a **brighter** green via `color-mix(in srgb, var(--accent) 75%, #fff)`: luminance +12.1%, `#09e046` still the only green declared.
 - **⚠ THIS MAKES THE UNMARKED BUTTON ON HOVER RESEMBLE THE MARKED BADGE. That is the point, not a collision** — a preview should wear the colour of the thing it is previewing.
 - **⚠⚠ THE HOVER RULE MUST RESTATE `color` AND `border-color`, NOT JUST `background`.** `.lib-ns-btn:hover` and `.lib-ns-btn.is-marked` are **equal specificity (0,2,0)**, so without restating them the marked button stays green only because `.is-marked` happens to sit later in the file. At `(0,3,0)` the rule wins outright and source order stops mattering — the last-wins trap, pre-empted rather than survived.
+### ⚠⚠⚠ A PER-ENTITY VIEW BUILT NAIVELY SHOWS ONE PERSON FOUR TIMES, PRESENTED AS A TEAM — AND EVERY ROW IS INDIVIDUALLY REAL (2026-08-22, `23dc454`)
+**The three demo reps carry BYTE-LEVEL COPIES of Josh's calls under different `user_id`s and different `fathom_call_id`s. They survive `DISTINCT`, `GROUP BY user_id`, and every per-rep aggregate ever written.** On a per-closer objection grid that is not cosmetic — it is **Josh compared against himself three times**, with four names, four rates and four counts, all arithmetically correct.
+- **⚠⚠ THE SIGNAL IS THE ID PREFIX, AND FOR `demo-` ROWS IT IS THE ONLY SIGNAL THERE IS.** Measured the day it shipped:
+```
+class   calls   recording_url   prompt_version
+real     420    420 (100%)      genuine grader versions v10-v26
+seed     102      0 (0%)        'seed-2026-08-16'   (a sentinel)
+demo      33     33 (100%)      v4 / v5 / v8        (genuine, COPIED)
+```
+  **SEED rows are separable by real data properties. DEMO rows are separable by NOTHING** — real `recording_url`, real prompt version, because they are copies of real analyses. **Nothing in the row says "synthetic" except the id we gave it.**
+- **⚠ `recording_url IS NULL` FOR SEED + THE PREFIX FOR DEMO WAS CONSIDERED AND REJECTED.** Two mechanisms for one concept is two things to keep in sync, and that property is **a coincidence of today's data, not a guarantee** — a genuine call that failed to sync a `recording_url` would be silently discarded as synthetic. *A criterion is not a constant.* One rule: the prefix. `lib/real-calls.js`.
+- **FILTERED IN JS, NOT IN THE QUERY, DELIBERATELY.** A `.not(col,'like',…)` pair would be a SECOND expression of the rule that no test can see, and the two would drift. Volumes are in the hundreds; **what ships is exactly what the test pins.**
+- **THE DURABLE FIX, FILED NOT BUILT: an `is_synthetic boolean` column** written at insert time by the seeding scripts. Then the filter reads a property instead of parsing a name, and **a seed row that forgets the prefix stops being invisible.** Until then the prefixes ARE the contract.
+- **THE GENERAL RULE: before building any view that GROUPS BY an entity, ask what synthetic rows do to the grouping.** An aggregate hides them in a total; a per-entity breakdown puts them on screen as people.
+
+### ⚠⚠ TWO NUMBERS ON ONE SCREEN BOTH LABELLED "THE TEAM", DISAGREEING — NAME THE SET THE SURFACE ACTUALLY ENUMERATES (2026-08-22, `b265626`)
+**The picker read "My team (4)". The grid note beneath it read "the team has 5". Both correct, both labelled the same, and a manager adding them up has no way to see why.**
+- **They count different sets:** the picker's `rep_count` is **reps only**; the grid can show the **manager too**, so its denominator is `memberIds` = reps + board owner. Neither number is wrong — **the LABEL is what collides.**
+- **THE FIX IS NOT TO PICK ONE NUMBER.** It is to name the set each surface enumerates: *"1 of 5 closers on this board"* is checkable against the rows directly above it, and can no longer be read against a rep count elsewhere on the page.
+- **⚠ AND THE DEGRADED BRANCH DROPS THE DENOMINATOR RATHER THAN INVENTING ONE** — with no board size it reads "1 closer has objection data in this range." **A missing denominator is honest; a borrowed one is not.**
+- Same family as the reconcile rule (`credited (call closed)` as a visible fourth bucket) and the three-groups rule: **when a reader can add up what is on screen, the numbers have to survive it.**
+
+### ⚠⚠⚠ SHARED-CARRIER, NAVIGATION EDITION — A VALUE THAT IS PRESENT OR ABSENT DEPENDING ON HOW THE USER ARRIVED (2026-08-22, `9d58911`)
+**THE REASON THIS ONE HIDES: developers arrive by CLICKING THROUGH. Users arrive by BOOKMARK, DEEP LINK AND REFRESH. The bug exists only on the second path, so the person who wrote it structurally cannot see it.**
+- **The live case:** the drilldown's grid note read its denominator from `state.teamOverview` — a value only the **Team page** populates. Click through from Team and the note read *"1 of 5 closers on this board"*. Deep-link or refresh onto `#team-objections` and it read *"1 closer has objection data in this range."* **A count documented in its own comment as "always stated" that silently was not.**
+- **⚠ NOTHING FAILS.** No error, no empty state, no missing element — a sentence is simply shorter. It is the absence family again, at the level of a clause.
+- **THE FIX: the payload carries what the view renders.** `computeTeamObjections` returns `board_size` (= `memberIds.length`, the exact set it enumerates) **on every exit path including both early returns**, and the view reads its own response. **A lane must not depend on a value another lane happens to have loaded.**
+- **THE DIAGNOSTIC, and it is cheap: verify at least one surface by ARRIVING COLD.** A fresh navigation straight to the deep link, not a click-through. Anything that renders differently is a cross-lane dependency, and there is no other way to see it.
+- **⚠ IT WAS FOUND BY CLICKING, NOT BY THE SUITE — and the suite could not have found it**, because every test constructed the state the view needed. The guard written afterwards asserts the *structural* property instead: the grid function must reference `d.board_size` and must **not** contain `teamOverview`. **Both new guards were proven non-vacuous by stashing the fix and watching them fail.**
+- **⚠ A SECOND INSTANCE OF THE SAME SHAPE IS STILL LIVE AND WAS FILED, NOT FIXED:** the team `<h1>` reads *"Team"* on a deep link and *"My team"* via the Team page, for exactly the same reason. Pre-existing; in `BUILD-LIST.md` under OPEN.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

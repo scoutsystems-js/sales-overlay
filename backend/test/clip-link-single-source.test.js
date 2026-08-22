@@ -148,3 +148,46 @@ test('⚠⚠ source rides WITH clip_url at every emission — no dropped hops', 
     'clip_url is emitted without source beside it — the label would fall back '
     + 'to "Open Recording" for every provider:\n  ' + orphans.join('\n  '));
 });
+
+/**
+ * ⚠⚠ THE BUILDER SWEEP MISSED A RENDERER (found 2026-08-22).
+ *
+ * `b6f6264` routed every place that BUILDS an href through lib/clip-link, and
+ * this file guarded exactly that. It did NOT guard the WORD printed on the
+ * link — and `objFeedCard` went on emitting a literal "▶ Watch Clip" over a
+ * perfectly correct provider-aware clip_url. Six sibling render sites already
+ * used the helper, which is what made the seventh invisible: any spot check
+ * would have landed on a correct one.
+ *
+ * ⚠ It could not have RENDERED wrong at the time — there were zero analysed
+ * Zoom moments — so looking could never have caught it either. That is the
+ * argument for this guard rather than an inspection.
+ */
+test('⚠⚠ no render site hardcodes a clip label — the WORD comes from the helper too', () => {
+  const page = live(read('web/dashboard.html'));
+
+  // ⚠ CUT THE HELPER OUT FIRST. clipLabelFor's own body must contain both
+  // words; matching over it is the guard reporting the rule as a violation of
+  // itself — the same shape as a checker reading its own documentation.
+  const def = page.indexOf('function clipLabelFor');
+  assert.ok(def > -1, 'stale anchor: clipLabelFor must be defined in the page');
+  const body = page.slice(def, page.indexOf('\n  }', def) + 4);
+  assert.ok(body.length > 40 && body.length < 1200, 'helper slice: ' + body.length);
+  const outside = page.slice(0, def) + page.slice(def + body.length);
+
+  /* ⚠⚠ MATCH THE WORD, NOT ONE SPELLING OF IT. The guard this replaces looked
+     for the exact string "▶ Clip<" and therefore MISSED `objFeedCard` emitting
+     "▶ Watch Clip" — the identical defect wearing a different label. A guard
+     whose claim is "never hard-coded" and whose scope is one literal will keep
+     passing while the thing it names is on screen. */
+  ['Watch Clip', 'Open Recording', '▶ Clip'].forEach((lit) => {
+    assert.strictEqual(outside.indexOf(lit), -1,
+      'a clip label is hardcoded as "' + lit + '" outside clipLabelFor — it must come '
+      + 'from clipLabelFor(<row>.source), or a Zoom moment claims a seek it cannot deliver');
+  });
+
+  // ⚠ FLOOR, not just an absence check: "no literals" passes perfectly against
+  // a page with no clip links at all.
+  const uses = (outside.match(/clipLabelFor\(/g) || []).length;
+  assert.ok(uses >= 7, 'expected the label helper at every render site; found ' + uses);
+});
