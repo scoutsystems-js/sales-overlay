@@ -301,18 +301,26 @@ test('⚠ the moment card prefers the sales-language label over the stored categ
 
 /* ── the old panel, archived ───────────────────────────────────────────────── */
 
-test('⚠⚠ #team-needs-work REDIRECTS to the drilldown — archived, not deleted', () => {
-  const surf = slice('function renderTeamSurface', '\n  }');
-  assert.ok(/state\.view === 'team-needs-work'.*setView\('team-objections'\)/s.test(surf),
-    'a bookmark is a link too — it must land on the drilldown, not on an unmaintained page');
-  assert.strictEqual(/renderTeamNeedsWorkView\(\)/.test(surf), false,
-    'the team surface must no longer render the archived page');
+test('⚠⚠ #team-needs-work CANNOT REACH THE ARCHIVED PAGE — from ANY entry point', () => {
+  /* ⚠⚠ THIS GUARD USED TO SLICE renderTeamSurface ALONE, AND IT PASSED WHILE
+     THE OLD PAGE WAS STILL RENDERING ON PRODUCTION. The view is dispatched from
+     THREE places — render(), renderTeamSurface() and scheduleTeamRender() — and
+     boot goes through render(). A guard whose scope is one function reports
+     success over the two it never looked at.
 
-  /* ⚠ setView, NOT a direct render: renderTeamObjectionsView and the rep filter
-     both branch on state.view === 'team-objections'. Rendering the drilldown
-     while state still said 'team-needs-work' would produce a page whose
-     controls silently do nothing. */
-  assert.ok(surf.indexOf("setView('team-objections')") !== -1, 'via setView so state agrees with the page');
+     So it now asserts the PROPERTY instead: the archived name is normalised at
+     both places a view can be SET, and therefore no dispatcher can ever see it. */
+  assert.ok(/ARCHIVED_VIEWS\s*=\s*\{[^}]*'team-needs-work'\s*:\s*'team-objections'/.test(LIVE),
+    'setView must normalise the archived view name');
+
+  const teamHash = slice('var TEAM_HASH', '};');
+  assert.ok(/'team-needs-work':\s*'team-objections'/.test(teamHash),
+    'and the HASH path must too — it assigns state.view directly, not through setView, '
+    + 'so normalising in setView alone leaves a refresh or a pasted URL still opening it');
+
+  // ⚠ NON-VACUITY: the drilldown's own hash must still map to itself, or this
+  // passes by mapping everything to one place.
+  assert.ok(/'team-objections':\s*'team-objections'/.test(teamHash), 'the drilldown still routes normally');
 });
 
 test('⚠⚠ IT WAS ONLY SAFE TO ARCHIVE BECAUSE THE DRILLDOWN GAINED THE LAST MISSING PIECE', () => {

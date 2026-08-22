@@ -9885,8 +9885,13 @@
     // landing on or refreshing a team sub-page restored nothing and the range
     // fell back to the 7-day default — the picked window was silently lost.
     // Same shape as the coaching family below, which already did this correctly.
+    /* ⚠ `team-needs-work` maps to the DRILLDOWN — the old panel is archived and a
+       bookmark must land somewhere maintained. The hash path assigns state.view
+       DIRECTLY rather than through setView, so normalising in setView alone
+       would leave a refresh or a pasted URL still opening the archived page.
+       Two entry points, both normalised. */
     var TEAM_HASH = { 'team': 'team', 'team-recs': 'team-expanded',
-                      'team-needs-work': 'team-needs-work', 'team-members': 'team-members',
+                      'team-needs-work': 'team-objections', 'team-members': 'team-members',
                       'team-objections': 'team-objections' };
     if (Object.prototype.hasOwnProperty.call(TEAM_HASH, base)) {
       state.view = TEAM_HASH[base];
@@ -11441,7 +11446,17 @@
     panel.innerHTML = parts.join('');
   }
 
+  /* ⚠⚠ ARCHIVED VIEWS ARE NORMALISED HERE — AT THE POINT THE VIEW IS SET, NOT
+     AT EACH RENDERER. The first attempt put the redirect inside
+     renderTeamSurface(), which looked right and did nothing: `team-needs-work`
+     is dispatched from THREE places — render(), renderTeamSurface() and
+     scheduleTeamRender() — and boot goes through render(). The page kept
+     rendering, and the guard passed because it sliced renderTeamSurface alone.
+     One rename at the entry point cannot be half-applied. */
+  var ARCHIVED_VIEWS = { 'team-needs-work': 'team-objections' };
+
   function setView(view) {
+    view = ARCHIVED_VIEWS[view] || view;
     if (view === 'prospects' && !state.mergeLoading) loadMergeCandidates();
     state.view = view;
     render();
