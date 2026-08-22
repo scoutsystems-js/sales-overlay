@@ -30,6 +30,7 @@ const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
+const { computeTeamObjectionSummary } = require('../lib/team-objection-summary');
 
 const router = express.Router();
 const teamGate = [requireAuth, requireRole(['manager', 'owner'])];
@@ -594,6 +595,25 @@ router.post('/digest/run', requireAuth, requireRole(['owner']), async function (
  * surface uses, so the existing picker drives it with no new component and no
  * new default.
  */
+/**
+ * user_id → display name for a board.
+ *
+ * ⚠ SHARED BY THE GRID AND THE SUMMARY DELIBERATELY. They render on the same
+ * screen, and the summary names people in prose — a second copy of this that
+ * drifted would have the paragraph calling someone by a different name from the
+ * row directly above it.
+ */
+async function nameMapFor(admin, memberIds, em) {
+  var profOf = {};
+  if (memberIds.length > 0) {
+    var pr = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', memberIds);
+    if (!pr.error) (pr.data || []).forEach(function (x) { profOf[x.user_id] = x; });
+  }
+  var nameMap = {};
+  memberIds.forEach(function (id) { nameMap[id] = resolveDisplayName(profOf[id], em[id] || null, id); });
+  return nameMap;
+}
+
 router.get('/objections', teamGate, async function (req, res) {
   var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
   var category = (OBJ_DRILL_CATEGORIES.indexOf(req.query.category) !== -1) ? req.query.category : null;
@@ -601,18 +621,41 @@ router.get('/objections', teamGate, async function (req, res) {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
-    var profOf = {};
-    if (team.memberIds.length > 0) {
-      var pr = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', team.memberIds);
-      if (!pr.error) (pr.data || []).forEach(function (x) { profOf[x.user_id] = x; });
-    }
-    var nameMap = {};
-    team.memberIds.forEach(function (id) { nameMap[id] = resolveDisplayName(profOf[id], em[id] || null, id); });
+    var nameMap = await nameMapFor(admin, team.memberIds, em);
 
     var data = await computeTeamObjections(admin, team.memberIds, range.from, range.to,
       { category: category, emailMap: em, nameMap: nameMap });
     res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode } }, data));
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] objections:', err.message); res.status(500).json({ error: 'Failed to load team objections' }); }
+});
+
+/**
+ * The coaching summary — step 3. The only lane here that costs money.
+ *
+ * ⚠ SAME GATE, SAME `resolveTeam`, SAME NAME MAP as the grid. A separate
+ * authorization path for the expensive lane is how a closer ends up able to
+ * spend a model call on a board they cannot see.
+ */
+router.get('/objections/summary', teamGate, async function (req, res) {
+  var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var em = await emailMap(admin);
+    var nameMap = await nameMapFor(admin, team.memberIds, em);
+
+    var data = await computeTeamObjectionSummary(admin, team.memberIds, range.from, range.to,
+      { keyId: team.keyId, emailMap: em, nameMap: nameMap });
+    res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode } }, data));
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    // ⚠ the stack, not just the message — see the OPEN item on this file's catch
+    // shape: a ReferenceError and a DB timeout are otherwise indistinguishable,
+    // which is why /team/why-prose sat broken from the day it was written.
+    console.error('[team] objections/summary:', err.message, err.stack);
+    res.status(500).json({ error: 'Failed to load the coaching summary' });
+  }
 });
 
 // ⚠ Pure-ish helpers exported for test, per the log.js `_validateLogBatch`

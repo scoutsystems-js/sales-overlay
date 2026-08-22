@@ -2934,6 +2934,24 @@
 
     /* ── the objection drilldown grid ────────────────────────────────────── */
     .obj-grid-note { margin-bottom: 10px; }
+    /* The coaching summary. One card per closer — never a team paragraph. */
+    .objsum-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; background: var(--bg-elevated); }
+    .objsum-card:last-child { margin-bottom: 0; }
+    .objsum-name { font-weight: 600; margin-bottom: 8px; }
+    .objsum-cat { color: var(--accent); }
+    .objsum-counts { font-size: 12px; font-weight: 400; margin-left: 10px; }
+    .objsum-why { line-height: 1.55; margin-bottom: 10px; }
+    .objsum-do { border-left: 2px solid var(--accent); padding-left: 10px; line-height: 1.5; }
+    .objsum-do span { font-weight: 600; }
+    .objsum-evs { margin-top: 12px; display: grid; gap: 8px; }
+    .objsum-ev { border-left: 1px solid var(--border-strong); padding-left: 10px; font-size: 13px; }
+    .objsum-ev-where { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; opacity: .85; }
+    .objsum-ev-quote { line-height: 1.45; }
+    .objsum-ev-resp { line-height: 1.45; margin-top: 3px; opacity: .9; }
+    /* ⚠ A QUIET CARD IS STILL A CARD. A closer with no focus area must look like
+       a reported result, not like a rendering failure or a missing row. */
+    .objsum-quiet { border-style: dashed; }
+    .objsum-quiet-text { line-height: 1.5; }
     .obj-grid-head { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text); opacity: .8; }
     .obj-grid-row, .obj-grid-head { display: flex; align-items: center; gap: 8px; }
     .obj-grid-name { flex: 1 1 150px; min-width: 110px; font-weight: 600; }
@@ -3721,6 +3739,10 @@
     // '' = all objections; otherwise one of Scout's four objection_category values.
     teamRepSeries:  null,   teamRepSeriesLoading: false, teamObjectionCategory: '',
     teamObjections: null,   teamObjectionsLoading: false,
+    /* ⚠ DECLARED WITH THE EXACT SENTINEL ITS LAZY GUARD TESTS (`=== null`).
+       An undeclared key is `undefined`, the kick never fires, and the panel
+       shows a skeleton forever — which reads as "slow", not "broken". */
+    teamObjSummary: null,   teamObjSummaryLoading: false,   teamObjSummaryWaitLong: false,
     teamObjDrillCategory: '',   // the drilldown's OWN category filter, separate
                                 // from teamObjectionCategory (the graph's)
     // ⚠ MUST be declared null, not left undefined: the lazy kick tests
@@ -6134,6 +6156,14 @@
     // until the refetch lands, which reads as real data for the new selection.
     state.teamRepSeries = null;
     state.teamWhy = null;
+    /* ⚠⚠ THE DRILLDOWN LANES BELONG HERE TOO — they were missed when the
+       drilldown shipped, and the symptom was silent: the picker calls this,
+       so changing the range on #team-objections relabelled the picker while
+       the grid, the moments and the summary all kept the PREVIOUS range's
+       numbers. Nothing errors; the screen simply disagrees with its own
+       control. Same reasoning as teamRepSeries directly above. */
+    state.teamObjections = null;
+    state.teamObjSummary = null;
     state.teamDetailMetric = null; // exit any glance-box detail when team/range changes
   }
   // Re-render whichever team surface is active (main view or the expanded page).
@@ -7488,6 +7518,10 @@
     if (state.teamObjDrillCategory === cat) return;
     state.teamObjDrillCategory = cat || '';
     state.teamObjections = null;
+    /* ⚠ THE SUMMARY IS DELIBERATELY *NOT* INVALIDATED HERE. It covers every
+       category for every closer — the chips filter the MOMENT LIST, not the
+       analysis. Clearing it would fire a fresh Claude call on every chip click
+       for output that would come back identical. */
     loadTeam('objections');
     renderTeamObjectionsView();
   }
@@ -7501,16 +7535,127 @@
     ensureTeamDefaultRange();
     if (state.teamContext === null) loadTeam('context');
     if (state.teamObjections === null && !state.teamObjectionsLoading) loadTeam('objections');
+    if (state.teamObjSummary === null && !state.teamObjSummaryLoading) loadTeamObjSummary();
 
     content.innerHTML = teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>Per-Closer Objection Handling</h2>'
         + '<div class="meta">how each closer is dealing with each objection</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamObjGridHtml() + '</div>'
+      /* ⚠ THE SUMMARY SITS BETWEEN THE GRID AND THE MOMENTS DELIBERATELY. It
+         explains the grid directly above it and is evidenced by the moments
+         directly below it, so a manager can check the claim in both directions
+         without leaving the screen. */
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Why</h2>'
+        + '<div class="meta">what is behind those numbers, per closer</div></div></div>'
+        + teamObjSummaryHtml() + '</div>'
       + '<div class="section fade-in"><div class="section-header"><div><h2>Objection Moments</h2>'
         + '<div class="meta">' + escapeHtml(teamObjFeedMeta()) + '</div></div>'
         + teamObjCategoryChipsHtml() + '</div>'
         + teamObjFeedHtml() + '</div>';
+  }
+
+  /**
+   * The coaching summary lane — the ONE lane on this page that costs money.
+   *
+   * ⚠ IT GETS ITS OWN LOADER RATHER THAN A `loadTeam` ENTRY because it needs the
+   * honest waiting state. The Performance Summary measured 34s on a cache miss
+   * and ~0.8s cached, and this is the same shape: a Claude call keyed on the
+   * analysis set. A bare spinner on a 30-second wait reads as broken; the
+   * "touch some grass" line on a sub-second cached load would be a lie in the
+   * other direction. So it is TIME-GATED, exactly as PERF_LONG_WAIT_MS is.
+   */
+  var objSummaryWaitTimer = null;
+  async function loadTeamObjSummary() {
+    if (state.teamObjSummaryLoading) return;
+    state.teamObjSummaryLoading = true;
+    state.teamObjSummaryWaitLong = false;
+    if (objSummaryWaitTimer) clearTimeout(objSummaryWaitTimer);
+    objSummaryWaitTimer = setTimeout(function () {
+      if (!state.teamObjSummaryLoading) return;      // only if STILL waiting
+      state.teamObjSummaryWaitLong = true;
+      if (state.view === 'team-objections') scheduleTeamRender();
+    }, PERF_LONG_WAIT_MS);
+    try { state.teamObjSummary = await fetchTeamJSON('/team/objections/summary?' + teamQP()); }
+    catch (err) {
+      if (err.message === 'unauth') { state.teamObjSummaryLoading = false; return; }
+      state.teamObjSummary = { available: false, reason: err.message || 'unknown' };
+    }
+    state.teamObjSummaryLoading = false;
+    state.teamObjSummaryWaitLong = false;
+    if (objSummaryWaitTimer) { clearTimeout(objSummaryWaitTimer); objSummaryWaitTimer = null; }
+    scheduleTeamRender();
+  }
+
+  var OBJ_SUMMARY_STATE_TEXT = {
+    /* ⚠⚠ FOUR STATES, FOUR SENTENCES, AND THEY MUST NOT CONVERGE. "Not enough
+       data to say" and "nothing stands out" reading the same is the failure
+       already fixed once on this surface. A DATA PROBLEM MUST NEVER RENDER AS
+       GOOD NEWS — so no_volume and thin_types describe the WINDOW, and only
+       even_performance is phrased as a result about the closer. */
+    no_volume: function (n) { return n + ' has too few objections in this range to say anything useful yet.'; },
+    thin_types: function (n) { return n + '’s objections are spread across too many types to compare — no single type has enough volume to rank.'; },
+    even_performance: function (n) { return n + '’s objection handling is even across types — no type is more than ' + 5 + ' points below their own average.'; },
+  };
+
+  function objSummaryCloserHtml(c) {
+    var name = escapeHtml(c.name || 'Unknown');
+    if (c.state !== 'rate_gap') {
+      var f = OBJ_SUMMARY_STATE_TEXT[c.state];
+      return '<div class="objsum-card objsum-quiet"><div class="objsum-name">' + name + '</div>'
+        + '<div class="objsum-quiet-text">' + escapeHtml(f ? f(c.name || 'This closer') : 'No focus area in this range.') + '</div></div>';
+    }
+    var cat = (c.focus && c.focus.category) || '';
+    var label = OBJ_DRILL_LABELS[cat] || cat;
+    var counts = (c.focus && c.focus.total)
+      ? (c.focus.handled + ' of ' + c.focus.total + ' handled') : '';
+    /* ⚠ THE COUNTS ARE THE SUBHEAD, NOT THE FINDING. They are here so the claim
+       can be checked against the grid above; the WHY is the reason the panel
+       exists. If the why ever reads like a restatement of these numbers, the
+       feature has failed and the prose is the thing to fix — not this line. */
+    var ev = (c.evidence || []).slice(0, 2).map(function (m) {
+      var where = (typeof m.position_pct === 'number') ? (m.position_pct + '% through the call') : null;
+      var clip = m.clip_url
+        ? '<a class="obj-btn" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ ' + escapeHtml(clipLabelFor(m.source)) + '</a>'
+        : '';
+      return '<div class="objsum-ev">'
+        + (where ? '<div class="objsum-ev-where">' + escapeHtml(where) + '</div>' : '')
+        + '<div class="objsum-ev-quote">“' + escapeHtml(m.quote || '') + '”</div>'
+        + (m.closer_response ? '<div class="objsum-ev-resp">You said: “' + escapeHtml(m.closer_response) + '”</div>' : '')
+        + (clip ? '<div class="obj-footer" style="margin-top:6px;">' + clip + '</div>' : '')
+        + '</div>';
+    }).join('');
+
+    return '<div class="objsum-card">'
+      + '<div class="objsum-name">' + name + ' — <span class="objsum-cat">' + escapeHtml(label) + '</span>'
+      + (counts ? '<span class="objsum-counts">' + escapeHtml(counts) + '</span>' : '') + '</div>'
+      + (c.why ? '<div class="objsum-why">' + escapeHtml(c.why) + '</div>' : '')
+      + (c.what_to_do ? '<div class="objsum-do"><span>Next call:</span> ' + escapeHtml(c.what_to_do) + '</div>' : '')
+      + (ev ? '<div class="objsum-evs">' + ev + '</div>' : '')
+      + '</div>';
+  }
+
+  function teamObjSummaryHtml() {
+    var s = state.teamObjSummary;
+    if (s === null) {
+      return '<div class="load-state" style="padding:14px 4px;"><div class="spinner"></div> '
+        + (state.teamObjSummaryWaitLong
+            ? 'This will take a minute — go touch some grass'
+            : 'Working out why…')
+        + '</div>';
+    }
+    if (s._error) return '<div class="error">Could not load: ' + escapeHtml(s._error) + '</div>';
+    if (!s.available) {
+      return '<div class="empty"><h3>Coaching summary unavailable</h3><p>Could not generate it right now'
+        + (s.reason ? ' (' + escapeHtml(s.reason) + ')' : '')
+        + '. The grid and the moments above are unaffected.</p></div>';
+    }
+    if (s.state === 'no_volume') {
+      return '<div class="empty"><h3>Nothing to summarise yet</h3><p>' + escapeHtml(s.card_text || '') + '</p></div>';
+    }
+    var cards = (s.closers || []).map(objSummaryCloserHtml).join('');
+    if (!cards) return '<div class="empty"><h3>Nothing to summarise yet</h3><p>No closers on this board have objection data in this range.</p></div>';
+    return cards;
   }
 
   function teamObjFeedMeta() {

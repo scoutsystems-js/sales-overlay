@@ -25,6 +25,13 @@ const { realCallsOnly } = require('./real-calls');
 // which surfaces as two different handle rates on one screen. This module
 // would have been the eleventh copy.
 const { outcomeMap, isCredited } = require('./objection-handled');
+const crypto = require('crypto');
+
+/* The fingerprint of an empty analysis set. Written as the same md5 the loaded
+   path produces for 'empty' so an empty window and a populated one can never
+   collide on a cache key, and so the empty return is a real fingerprint rather
+   than a null the cache layer has to special-case. */
+const EMPTY_FINGERPRINT = crypto.createHash('md5').update('empty').digest('hex');
 
 const OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const UNCATEGORIZED = 'uncategorized';
@@ -52,6 +59,13 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   var wantCategory = (ALL_CATEGORIES.indexOf(opts.category) !== -1) ? opts.category : null;
   var emailMap = opts.emailMap || {};
   var nameMap = opts.nameMap || {};
+  /* ⚠ THE SUMMARY LANE READS THROUGH THIS FUNCTION ON PURPOSE. It could fetch
+     its own calls and highlights, and then the grid and the paragraph beneath
+     it could disagree about the same window on the same screen — the failure
+     that already cost a round when a picker and a note both said "the team".
+     One fetch, one filtered call list, one truth. The two knobs below exist
+     only so the summary can ask for the whole set and a cache fingerprint. */
+  var cap = (typeof opts.instanceCap === 'number' && opts.instanceCap > 0) ? opts.instanceCap : FEED_CAP;
 
   /**
    * ⚠ `board_size` IS RETURNED SO THE VIEW NEVER HAS TO ASK ANOTHER LANE.
@@ -67,7 +81,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   var empty = {
     category: wantCategory, instances: [], grid: [], closers: [],
     totals: emptyCounts(), instance_count: 0, truncated: false,
-    board_size: boardSize,
+    board_size: boardSize, analysis_fingerprint: EMPTY_FINGERPRINT,
   };
   if (!memberIds || memberIds.length === 0) return empty;
 
@@ -80,7 +94,10 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     var start = 0;
     for (;;) {
       var cq = await admin.from('fathom_calls')
-        .select('id, user_id, fathom_call_id, title, call_date, recording_url, source')
+        // duration_seconds powers "where in the call did this land" — the
+        // difference between a summary that restates a rate and one that can
+        // say an objection arrives at the end and was never pre-handled.
+        .select('id, user_id, fathom_call_id, title, call_date, recording_url, source, duration_seconds')
         .in('user_id', slice)
         .gte('call_date', from).lte('call_date', to)
         .not('not_a_sales_call', 'is', true)
@@ -115,8 +132,22 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   }
 
   // ── 2) outcomes, so a closed call credits its objections ──
-  var done = await inChunks('call_analyses', 'fathom_call_id, outcome', function (q) { return q.eq('status', 'done'); });
+  // `analyzed_at` rides along for the cache fingerprint — same select, one more
+  // column, no extra query.
+  var done = await inChunks('call_analyses', 'fathom_call_id, outcome, analyzed_at', function (q) { return q.eq('status', 'done'); });
   var outcomeByCall = outcomeMap(done);
+
+  /* ⚠⚠ THE FINGERPRINT IS COMPUTED HERE, OVER THE ALREADY-FILTERED CALL LIST,
+     AND THAT PLACEMENT IS THE WHOLE MECHANISM — not an implementation detail.
+     `callIds` has already had not_a_sales_call and the synthetic rows removed,
+     so marking a call drops its analysis out of `done`, which changes the
+     fingerprint, which misses the cache. A summary lane computing its own hash
+     from its own query would look identical and would keep serving a cached
+     paragraph built on a call the manager had just excluded. Copied from
+     lib/objection-synthesis.js rather than re-derived. */
+  var fingerprint = crypto.createHash('md5').update(
+    done.map(function (d) { return d.fathom_call_id + ':' + d.analyzed_at; }).sort().join('|') || 'empty'
+  ).digest('hex');
 
   // ── 3) the objection moments ──
   var rows = await inChunks(
@@ -159,6 +190,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
       title: m.title || null,
       call_date: m.call_date || null,
       timestamp_seconds: (typeof r.timestamp_seconds === 'number') ? r.timestamp_seconds : null,
+      duration_seconds: (typeof m.duration_seconds === 'number') ? m.duration_seconds : null,
       // ⚠ the ONE place a deep link is built — never construct it here.
       clip_url: clipHref(m.recording_url, r.timestamp_seconds),
       source: m.source || null,
@@ -212,10 +244,11 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
 
   return {
     category: wantCategory,
-    instances: instances.slice(0, FEED_CAP),
+    instances: instances.slice(0, cap),
     instance_count: instances.length,
     // ⚠ NO SILENT CAPS. If the list is trimmed the view must be able to say so.
-    truncated: instances.length > FEED_CAP,
+    truncated: instances.length > cap,
+    analysis_fingerprint: fingerprint,
     grid: grid,
     board_size: boardSize,
     closers: grid.map(function (g) { return { user_id: g.user_id, name: g.name }; }),
@@ -228,5 +261,6 @@ module.exports = {
   OBJECTION_CATEGORIES: OBJECTION_CATEGORIES,
   ALL_CATEGORIES: ALL_CATEGORIES,
   FEED_CAP: FEED_CAP,
+  EMPTY_FINGERPRINT: EMPTY_FINGERPRINT,
   _rateOf: rateOf,
 };
