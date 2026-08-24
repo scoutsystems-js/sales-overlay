@@ -2399,6 +2399,15 @@
     /* Account Connections rows */
     .conn-row { align-items: center; }
     .conn-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    /* The Fathom identity prompt, rendered inside Connections and inside the
+       Calls empty state — it is a setup step, not a notice, so it gets its own
+       block rather than borrowing .fathom-notice's flash styling. */
+    .conn-identity { margin: 0 0 12px; }
+    .conn-identity .fathom-strip { margin: 0; }
+    /* ⚠ INDETERMINATE ON PURPOSE — the sync is one request that returns when it
+       is done, so there is no real percentage to report. A bar that climbs on a
+       timer would keep climbing through a failure. */
+    .sync-indeterminate { display: flex; justify-content: center; margin-top: 14px; }
     .conn-state { font-size: 13px; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
     .conn-state.ok { color: var(--text); }
     .conn-disconnect { color: var(--bad); border-color: var(--border-strong); }
@@ -3832,6 +3841,12 @@
     fathomIdentitySuggestion: '', // pre-fill value for the identity input (stored email, else top suggestion)
     fathomIdentitySuggestions: [],// [{email,name,count}] distinct recorded_by identities from Fathom, most frequent first
     fathomIdentitySaving: false,  // true while POST /fathom/identity is in flight
+    /* ⚠⚠ null here means UNKNOWN, never "not connected". Connection status is
+       fetched by the OVERVIEW boot, so a deep link straight to Calls arrives
+       with it null — and the Calls empty state used to read that as "nothing
+       is connected" and offer a Connect button to someone already connected.
+       This flag lets that view fetch it once instead of guessing. */
+    connStatusLoading: false,
     // Call Library (Scout v2.0 Phase 2 Step 3)
     callLibrary:        null,  // null pre-load, then array of call rows from /fathom/calls
     callLibraryLoading: false, // gates "Load more" button while a fetch is in flight
@@ -4464,18 +4479,18 @@
     try {
       var res = await fetch('/auth/zoom/connect', { headers: authHeader() });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      if (!res.ok) { state.zoomNotice = { kind: 'error', text: 'Could not start Zoom connection (HTTP ' + res.status + ').' }; if (state.view === 'overview') renderOverview(false); return; }
+      if (!res.ok) { state.zoomNotice = { kind: 'error', text: 'Could not start Zoom connection (HTTP ' + res.status + ').' }; rerenderConnectionViews(); return; }
       var data = await res.json();
-      if (!data || !data.url) { state.zoomNotice = { kind: 'error', text: 'Zoom did not return an authorization URL.' }; if (state.view === 'overview') renderOverview(false); return; }
+      if (!data || !data.url) { state.zoomNotice = { kind: 'error', text: 'Zoom did not return an authorization URL.' }; rerenderConnectionViews(); return; }
       var w = 600, h = 720;
       var left = Math.max(0, Math.floor((window.screen.width - w) / 2));
       var top  = Math.max(0, Math.floor((window.screen.height - h) / 2));
       var popup = window.open(data.url, 'zoom_oauth', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
-      if (!popup) { state.zoomNotice = { kind: 'error', text: 'Popup blocked. Please allow popups for this site and try again.' }; if (state.view === 'overview') renderOverview(false); }
+      if (!popup) { state.zoomNotice = { kind: 'error', text: 'Popup blocked. Please allow popups for this site and try again.' }; rerenderConnectionViews(); }
       else startConnectPoll('zoom'); // fallback: card updates even if the popup can't signal back
     } catch (err) {
       state.zoomNotice = { kind: 'error', text: 'Could not start Zoom connection.' };
-      if (state.view === 'overview') renderOverview(false);
+      rerenderConnectionViews();
     }
   }
 
@@ -4553,11 +4568,32 @@
     return !!((state.fathomStatus && state.fathomStatus.connected) ||
               (state.zoomStatus && state.zoomStatus.connected));
   }
-  // Re-render whichever view shows connection state (overview strips OR the
-  // account Connections section) after a status change.
+  /* Re-render whichever view shows connection state after a status change.
+     ⚠⚠ THREE VIEWS, NOT TWO — the Calls page joined this list on 2026-08-24.
+     A brand-new account connected Fathom, clicked Sync FIVE TIMES from
+     #account, and saw nothing each time: the server correctly answered
+     `needs_identity`, the client correctly set the flag, and the only render
+     call was `if (state.view === 'overview')`. A render that simply does not
+     fire is invisible to every check except clicking.
+     ⚠ Anything that changes connection state must call THIS, never a bare
+     view-specific render — that is exactly how the miss above happened. */
   function rerenderConnectionViews() {
     if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'account') renderAccountView();
+    else if (state.view === 'call-library') renderCallLibrary();
+  }
+
+  /* ⚠⚠ A SYNC THAT WORKS AND SHOWS NOTHING IS INDISTINGUISHABLE FROM ONE THAT
+     FAILED. The Calls list is cached in state, so after a successful sync the
+     page kept rendering the CACHED EMPTY LIST — the user is told "Synced 20
+     calls" while looking at "no calls synced yet". Nulling it makes the next
+     render refetch (renderCallLibrary kicks loadCallLibrary when it is null).
+     ⚠ Offset and counts go with it, or the refetch pages from the middle. */
+  function invalidateCallLibrary() {
+    state.callLibrary = null;
+    state.callLibraryOffset = 0;
+    state.callLibraryHasMore = false;
+    state.callLibraryCounts = null;
   }
 
   async function refreshFathomStatusInBackground() {
@@ -4640,6 +4676,7 @@
           return;
         }
         var n = (data && typeof data.synced === 'number') ? data.synced : 0;
+        invalidateCallLibrary();   // else the Calls page keeps its cached empty list
         noticeText = 'Synced ' + n + ' new call' + (n === 1 ? '' : 's') + '.';
         if (data && data.truncated) {
           noticeText += ' (More calls available — run sync again to fetch the rest.)';
@@ -4693,6 +4730,7 @@
           noticeKind = 'warn';
         } else {
           var n = (data && typeof data.synced === 'number') ? data.synced : 0;
+          invalidateCallLibrary();   // else the Calls page keeps its cached empty list
           noticeText = 'Synced ' + n + ' new call' + (n === 1 ? '' : 's') + '.';
           if (data && data.truncated) { noticeText += ' (More calls available — run sync again to fetch the rest.)'; noticeKind = 'warn'; }
         }
@@ -4836,7 +4874,16 @@
     // Pre-fill: stored email, else the most-frequent recorder, else blank.
     state.fathomIdentitySuggestion = current || (suggestions[0] && suggestions[0].email) || '';
     state.fathomNeedsIdentity = true;
-    if (state.view === 'overview') renderOverview(false);
+    /* ⚠⚠ THE BUG THAT COST A TRIAL CLIENT A DAY (2026-08-24). This line read
+       `if (state.view === 'overview') renderOverview(false);`. The only manual
+       Sync a healthy account has lives in #account -> Connections, so the
+       prompt was set in state and NEVER DRAWN. Five clicks, five HTTP 200s,
+       nothing on screen — no progress, no calls, and no error, because
+       needs_identity is neither.
+       ⚠ The comment on syncProviderNow already ASSERTED this opens an inline
+       prompt. It was a load-bearing comment describing behaviour the code did
+       not deliver. */
+    rerenderConnectionViews();
   }
 
   // Chip click: drop the picked email into the identity input (no re-render, so
@@ -4855,7 +4902,12 @@
     var email = input ? input.value.trim() : '';
     if (!email) return;
     state.fathomIdentitySaving = true;
-    if (state.view === 'overview') renderOverview(false);
+    /* ⚠⚠ ALL THREE RENDERS IN THIS FUNCTION WERE OVERVIEW-ONLY (2026-08-24).
+       The prompt is reachable from #account and Calls, so saving from either
+       showed no spinner AND — far worse — swallowed the two error branches
+       below entirely: a failed save was completely silent. Same defect as the
+       sync handlers, in a function nobody re-read when those were fixed. */
+    rerenderConnectionViews();
     try {
       var res = await fetch('/fathom/identity', {
         method: 'POST',
@@ -4868,13 +4920,13 @@
         try { errBody = await res.json(); } catch (e) { /* ignore */ }
         state.fathomNotice = { kind: 'error', text: (errBody && errBody.error) || ('Could not save email (HTTP ' + res.status + ').') };
         state.fathomIdentitySaving = false;
-        if (state.view === 'overview') renderOverview(false);
+        rerenderConnectionViews();
         return;
       }
     } catch (err) {
       state.fathomNotice = { kind: 'error', text: 'Could not save email: ' + (err && err.message || 'unknown') };
       state.fathomIdentitySaving = false;
-      if (state.view === 'overview') renderOverview(false);
+      rerenderConnectionViews();
       return;
     }
     // Saved — clear the prompt and fire the filtered sync.
@@ -4883,11 +4935,13 @@
     await syncFathomNow();
   }
 
+  /* ⚠ #account WAS MISSING, so the × on a notice inside Connections did
+     nothing — the notice is rendered there by renderConnectionsSectionHtml.
+     A dismiss button that does not dismiss reads as a broken page. */
   function dismissFathomNotice() {
     state.fathomNotice = null;
-    if (state.view === 'overview') renderOverview(false);
-    else if (state.view === 'call-library') renderCallLibrary();
-    else if (state.view === 'call-review') renderCallReview();
+    if (state.view === 'call-review') renderCallReview();
+    else rerenderConnectionViews();
   }
 
   // ─── Fathom rendering helpers ─────────────────────────────────────────
@@ -5006,7 +5060,7 @@
       + '<button class="fathom-notice-dismiss" type="button" aria-label="Dismiss" onclick="dismissZoomNotice()">×</button>'
       + '</div>';
   }
-  function dismissZoomNotice() { state.zoomNotice = null; if (state.view === 'overview') renderOverview(false); }
+  function dismissZoomNotice() { state.zoomNotice = null; rerenderConnectionViews(); }
   function renderZoomSectionHtml() {
     if (state.viewingUserId !== state.me.user_id) return '';
     if (!state.zoomStatus) return '';
@@ -10140,8 +10194,35 @@
     return syncFathomNow();
   }
 
+  /* ⚠⚠ A FATHOM CONNECTION WITHOUT AN IDENTITY IS NOT A WORKING CONNECTION.
+     Every sync it runs is refused server-side, so showing a plain green
+     "Connected" is a lie of omission — that is precisely what a brand-new
+     account saw while five syncs did nothing.
+     ⚠ Detected from the STATUS (fathom_email null), not from having clicked
+     Sync, so it surfaces the moment the user lands here rather than only after
+     they hit a wall. */
+  function fathomIdentityMissing() {
+    var f = state.fathomStatus;
+    return !!(f && f.connected && !f.fathom_email);
+  }
+
   function renderConnectionsSectionHtml() {
+    /* ⚠ The prompt's only markup used to be in the OVERVIEW strip, so a
+       needs_identity answer raised from THIS section had nowhere to land. */
+    var identity = '';
+    if (fathomIdentityMissing()) {
+      identity = state.fathomNeedsIdentity
+        ? '<div class="conn-identity">' + renderFathomIdentityPrompt() + '</div>'
+        : '<div class="fathom-notice warn"><div class="fathom-notice-text">'
+            + 'Fathom is connected, but Scout does not know which email Fathom stamps on your '
+            + 'recordings yet — so syncing is paused. Without it a sync would pull your whole '
+            + 'team&rsquo;s calls.'
+          + '</div>'
+          + '<button class="btn-fathom-primary" type="button" onclick="showFathomIdentityPrompt()">'
+            + 'Finish setup</button></div>';
+    }
     return renderZoomNoticeHtml() + renderFathomNoticeHtml()
+      + identity
       + connectionRowHtml('fathom')
       + connectionRowHtml('zoom')
       + '<div class="meta" style="margin-top:8px;">Disconnecting keeps your synced calls, grades, and clips — it only stops new calls from coming in.</div>';
@@ -11999,6 +12080,115 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Objection Moments</h2><div class="meta">' + (d.feed || []).length + ' shown</div></div>' + feedHtml + '</div>';
   }
 
+  /* Fetch connection status for a view that did not boot it. The overview's
+     Promise.all is the only other place this happens, so a deep link to Calls
+     arrives with both statuses null. Degrades to "not connected" on failure —
+     which is safe HERE because the fallback offers a Connect button rather
+     than asserting something about the user's data. */
+  async function loadConnStatusForLibrary() {
+    if (state.connStatusLoading) return;
+    state.connStatusLoading = true;
+    try {
+      var pair = await Promise.all([
+        fetchFathomStatus().catch(function () { return { connected: false }; }),
+        fetchZoomStatus().catch(function () { return { connected: false }; }),
+      ]);
+      state.fathomStatus = pair[0];
+      state.zoomStatus = pair[1];
+    } finally {
+      state.connStatusLoading = false;
+      if (state.view === 'call-library') renderCallLibrary();
+    }
+  }
+
+  /**
+   * ⚠⚠ "NO CALLS" IS FIVE DIFFERENT PROBLEMS AND THEY HAVE DIFFERENT FIXES.
+   * This used to be one message — "Connect a recording source" — shown whenever
+   * the list was empty, with NO check of whether anything was connected. A
+   * brand-new account connected Fathom, synced five times, and was still being
+   * told to connect. Justin: "That is not a slow sync. That is the page
+   * believing nothing is connected."
+   *
+   * ⚠ Offering an action the user has already completed is worse than offering
+   * none: it sends them to redo the one step that already worked, and hides the
+   * step that actually needs them.
+   */
+  function callLibraryEmptyHtml() {
+    var f = state.fathomStatus, z = state.zoomStatus;
+
+    // 1 · UNKNOWN. Status not fetched yet — say nothing about connections.
+    // ⚠ null is "not asked", not "not connected"; conflating them is what
+    // produced the wrong message in the first place.
+    if (f === null && z === null) {
+      if (!state.connStatusLoading) loadConnStatusForLibrary();
+      return '<div class="empty fade-in"><h3>No calls yet</h3>'
+        + '<p>Checking your recording sources…</p></div>';
+    }
+
+    // 2 · IN FLIGHT. Honest indeterminate — see syncStateNoteHtml.
+    if (state.fathomSyncing || state.zoomSyncing) {
+      return '<div class="empty fade-in"><h3>Syncing Your Calls…</h3>'
+        + '<p>Fetching from ' + (state.fathomSyncing ? 'Fathom' : 'Zoom')
+        + '. This usually takes under a minute — the page updates itself when it finishes.</p>'
+        + '<div class="sync-indeterminate"><span class="spinner-tiny"></span></div></div>';
+    }
+
+    // 3 · NOTHING CONNECTED. The only state where "connect a source" is right.
+    if (!anySourceConnected()) {
+      return '<div class="empty fade-in">'
+        + '<h3>No calls synced yet</h3>'
+        + '<p>Connect a recording source (Zoom or Fathom) and your synced calls will show up here for grading.</p>'
+        + connectSourceCtaHtml()
+        + '</div>';
+    }
+
+    // 4 · CONNECTED BUT PAUSED — Fathom has no identity, so every sync is
+    // refused server-side. This is the exact state that produced no calls, no
+    // progress and no error.
+    if (fathomIdentityMissing()) {
+      return '<div class="empty fade-in">'
+        + '<h3>One step left before your calls can sync</h3>'
+        + '<p>Fathom is connected, but Scout needs to know which email Fathom stamps on your '
+        + 'recordings. Until then syncing is paused — without it a sync would pull your whole '
+        + 'team&rsquo;s calls instead of yours.</p>'
+        + (state.fathomNeedsIdentity
+            ? '<div class="conn-identity">' + renderFathomIdentityPrompt() + '</div>'
+            : '<button class="btn-fathom-primary" type="button" style="margin-top:14px;"'
+              + ' onclick="showFathomIdentityPrompt()">Choose My Fathom Email</button>')
+        + '</div>';
+    }
+
+    // 5 · CONNECTED AND FAILING. ⚠ A failed sync and a slow sync looked
+    // identical before this — the whole reason nobody could tell what was
+    // happening. A failure says so, in red, with the reason.
+    if (f && f.connected && f.last_sync_status === 'error') {
+      return '<div class="empty fade-in">'
+        + '<h3>Your Last Sync Failed</h3>'
+        + '<p>' + escapeHtml(f.last_sync_error || 'Fathom returned an error.') + '</p>'
+        + '<button class="btn-fathom-primary" type="button" style="margin-top:14px;"'
+        + ' onclick="syncProviderNow(\'fathom\')">Retry Sync</button>'
+        + '</div>';
+    }
+
+    // 6 · CONNECTED, NEVER SYNCED vs SYNCED-AND-EMPTY. Different facts, so
+    // different sentences — a user who has never run a sync needs a button, and
+    // one whose sync genuinely found nothing needs to know it ran.
+    var neverSynced = !!(f && f.connected && !f.last_sync_at);
+    var provider = (f && f.connected) ? 'fathom' : 'zoom';
+    var when = (f && f.last_sync_at) ? formatRelativeTime(f.last_sync_at) : null;
+    return '<div class="empty fade-in">'
+      + '<h3>' + (neverSynced ? 'Connected — no sync has run yet' : 'No calls found') + '</h3>'
+      + '<p>' + (neverSynced
+          ? 'Your recording source is connected. Run a sync to pull your calls in.'
+          : ('Your last sync' + (when ? ' (' + escapeHtml(when) + ')' : '')
+             + ' completed but found no calls. If you have recorded calls, check that they are '
+             + 'saved to the cloud with transcription enabled.'))
+      + '</p>'
+      + '<button class="btn-fathom-primary" type="button" style="margin-top:14px;"'
+      + ' onclick="syncProviderNow(\'' + provider + '\')">Sync Now</button>'
+      + '</div>';
+  }
+
   function renderCallLibrary() {
     var content = document.getElementById('content');
 
@@ -12025,12 +12215,7 @@
     }
 
     if (state.callLibrary.length === 0) {
-      content.innerHTML = header + notice
-        + '<div class="empty fade-in">'
-          + '<h3>No calls synced yet</h3>'
-          + '<p>Connect a recording source (Zoom or Fathom) and your synced calls will show up here for grading.</p>'
-          + connectSourceCtaHtml()
-        + '</div>';
+      content.innerHTML = header + notice + callLibraryEmptyHtml();
       return;
     }
 
