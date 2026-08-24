@@ -27,3 +27,20 @@ test('the /calls/:id highlights select includes id (Part 2b Add-to-KB)', () => {
   const m = src.match(/\.select\('id, timestamp_seconds[^']*'\)/);
   assert.ok(m, 'highlights select must lead with `id` for the Add-to-KB button');
 });
+
+/* ── the same defect class, third instance ────────────────────────────────── */
+
+test('⚠⚠ /fathom/status SELECTS sync_window — a column the response reads', () => {
+  /* Third time: Part-1b shipped without `section`, 2b without `id`, and this
+     block wrote `sync_window` into the response body while the query did not
+     ask for it. The component is correct; the thing that FEEDS it is broken, so
+     every check aimed at the component passes and the field is silently null. */
+  const fs2 = require('fs'), path2 = require('path');
+  const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8');
+  const i = src.indexOf("'connected_at, last_sync_at, last_sync_status");
+  assert.ok(i !== -1, 'stale anchor: the status connection select moved');
+  const sel = src.slice(i, src.indexOf(")", i));
+  assert.ok(sel.indexOf('sync_window') !== -1,
+    'the status route returns sync_window, so it must select it — otherwise the '
+    + 'history window selector silently shows the default for everyone');
+});

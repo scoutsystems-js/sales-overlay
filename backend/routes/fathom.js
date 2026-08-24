@@ -25,9 +25,10 @@ var router = express.Router();
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FATHOM_API_BASE   = 'https://api.fathom.ai/external/v1';
+const syncWindow = require('../lib/sync-window');
 const FATHOM_TOKEN_URL  = 'https://fathom.video/external/v1/oauth2/token';
 const TOKEN_EXPIRY_TOLERANCE_SECONDS = 300; // 5 min — matches OAuth route + SDK
-const MAX_PAGES         = 20;   // safety cap; 20 pages * Fathom page size ≈ enough for any realistic user
+const MAX_PAGES         = 20;   // legacy default; lib/sync-window scales it per choice   // safety cap; 20 pages * Fathom page size ≈ enough for any realistic user
 // LIMITATION (Phase 1): when a user has more calls than MAX_PAGES * Fathom's
 // page size in their FIRST sync (last_sync_at = null), the older tail may be
 // missed depending on Fathom's sort order. We do not currently persist the
@@ -356,7 +357,7 @@ function meetingToRow(userId, m) {
 //   { ok:true, synced, fetched, malformed, pages, truncated, dispatched }
 //   { ok:false, kind:'needs_identity' }
 //   { ok:false, kind:'refresh_failed'|'fetch_failed'|'insert_failed', error }
-async function syncUserCalls(admin, userId, conn) {
+async function syncUserCalls(admin, userId, conn, opts) {
   // Identity gate — without the recorded_by[] email a sync would pull the whole
   // team workspace, so refuse and signal the dashboard to prompt for it.
   if (!conn.fathom_email) {
@@ -378,9 +379,30 @@ async function syncUserCalls(admin, userId, conn) {
   var pageCount = 0;
   var allRows = [];
   var malformedCount = 0;
+
+  /* ⚠⚠ THE FIRST SYNC'S REACH IS THE USER'S CHOICE, AND THE PAGE CAP MUST
+     SCALE WITH IT. Fathom's page size is hard-coded at 10 and ignores `limit`,
+     so the old flat MAX_PAGES=20 was a hard 200-CALL ceiling — Josh received
+     exactly 200 (38 days) and 360 of his calls were silently unreachable.
+     Offering "All time" on a 20-page cap would be a lie.
+
+     ⚠ `historyMode` is the backfill: it IGNORES last_sync_at deliberately.
+     Once the first sync stamps last_sync_at, every normal sync passes
+     created_after=last_sync_at and can therefore only ever fetch NEWER calls —
+     the older tail is permanently unreachable, which is why "run sync again to
+     fetch the rest" was false. Inserts are ON CONFLICT DO NOTHING, so
+     re-walking known calls is harmless. */
+  var win = conn.sync_window || null;
+  var historyMode = !!(opts && opts.history);
+  var firstSync = !conn.last_sync_at;
+  var createdAfter = (historyMode || firstSync)
+    ? syncWindow.createdAfterFor(win, Date.now())
+    : conn.last_sync_at;
+  var pageCap = (historyMode || firstSync) ? syncWindow.pageCapFor(win) : MAX_PAGES;
+
   try {
-    while (pageCount < MAX_PAGES) {
-      var page = await fetchMeetingsPage(accessToken, cursor, conn.last_sync_at, false, false, conn.fathom_email);
+    while (pageCount < pageCap) {
+      var page = await fetchMeetingsPage(accessToken, cursor, createdAfter, false, false, conn.fathom_email);
       for (var i = 0; i < page.items.length; i++) {
         var row = meetingToRow(userId, page.items[i]);
         if (row) allRows.push(row);
@@ -472,7 +494,7 @@ router.get('/sync', requireAuth, async function(req, res) {
     // Look up the connection. 404 if the caller hasn't connected Fathom.
     var connResult = await admin
       .from('fathom_connections')
-      .select('access_token, refresh_token, expires_at, last_sync_at, fathom_email')
+      .select('access_token, refresh_token, expires_at, last_sync_at, fathom_email, sync_window')
       .eq('user_id', userId)
       .maybeSingle();
     if (connResult.error) {
@@ -526,7 +548,7 @@ router.post('/sync-all', async function(req, res) {
     var admin = getAdminClient();
     var connsResult = await admin
       .from('fathom_connections')
-      .select('user_id, access_token, refresh_token, expires_at, last_sync_at, fathom_email')
+      .select('user_id, access_token, refresh_token, expires_at, last_sync_at, fathom_email, sync_window')
       .not('fathom_email', 'is', null);
     if (connsResult.error) {
       console.error('[fathom] sync-all connection list failed: ' + connsResult.error.message);
@@ -995,6 +1017,59 @@ async function outdatedCallIds(admin, userId, currentVersion) {
   return out;
 }
 
+// ── POST /fathom/sync-window ────────────────────────────────────────────────
+// Store how far back the user wants their history pulled: 30d | 90d | all.
+router.post('/sync-window', requireAuth, async function (req, res) {
+  var win = syncWindow.sanitizeWindow(req.body && req.body.window);
+  if (win === undefined) {
+    return res.status(400).json({ error: 'window must be one of: ' + syncWindow.WINDOWS.join(', ') });
+  }
+  try {
+    var admin = getAdminClient();
+    var upd = await admin.from('fathom_connections')
+      .update({ sync_window: win, updated_at: new Date().toISOString() })
+      .eq('user_id', req.user.id).select('user_id, sync_window');
+    if (upd.error) throw new Error(upd.error.message);
+    if (!upd.data || !upd.data.length) return res.status(404).json({ error: 'Not connected to Fathom.' });
+    res.json({ ok: true, window: win, cost: syncWindow.windowCost(win) });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] sync-window error:', err.message);
+    res.status(500).json({ error: 'Could not save that choice' });
+  }
+});
+
+// ── POST /fathom/sync-history ───────────────────────────────────────────────
+// Pull the OLDER tail. A normal sync passes created_after=last_sync_at and can
+// only ever fetch NEWER calls, so once the first sync has stamped, history is
+// unreachable — this is the way back, and it exists so an ALREADY-CONNECTED
+// user (Josh) does not have to disconnect and reconnect to widen their window.
+router.post('/sync-history', requireAuth, async function (req, res) {
+  try {
+    var admin = getAdminClient();
+    var win = syncWindow.sanitizeWindow(req.body && req.body.window);
+    if (win !== undefined) {
+      await admin.from('fathom_connections')
+        .update({ sync_window: win, updated_at: new Date().toISOString() })
+        .eq('user_id', req.user.id);
+    }
+    var c = await admin.from('fathom_connections')
+      .select('user_id, access_token, refresh_token, expires_at, last_sync_at, fathom_email, sync_window')
+      .eq('user_id', req.user.id).maybeSingle();
+    if (c.error) throw new Error(c.error.message);
+    if (!c.data) return res.status(404).json({ error: 'Not connected to Fathom.' });
+
+    var r = await syncUserCalls(admin, req.user.id, c.data, { history: true });
+    if (!r.ok && r.kind === 'needs_identity') return res.json({ needs_identity: true });
+    if (!r.ok) return res.status(502).json({ error: r.error || 'History sync failed' });
+    res.json({ ok: true, synced: r.synced, fetched: r.fetched, pages: r.pages, truncated: r.truncated, window: c.data.sync_window || null });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[fathom] sync-history error:', err.message);
+    res.status(500).json({ error: 'History sync failed' });
+  }
+});
+
 router.get('/status', requireAuth, async function(req, res) {
   var userId = req.user.id;
   try {
@@ -1002,7 +1077,7 @@ router.get('/status', requireAuth, async function(req, res) {
 
     var connPromise = admin
       .from('fathom_connections')
-      .select('connected_at, last_sync_at, last_sync_status, last_sync_error, scope, expires_at, fathom_email')
+      .select('connected_at, last_sync_at, last_sync_status, last_sync_error, scope, expires_at, fathom_email, sync_window')
       .eq('user_id', userId)
       .maybeSingle();
     var countPromise = admin
@@ -1055,6 +1130,7 @@ router.get('/status', requireAuth, async function(req, res) {
     return res.json({
       connected:        true,
       fathom_email:     c.fathom_email || null,
+      sync_window:      c.sync_window || null,   // 30d|90d|all; null = never chosen
       connected_at:     c.connected_at,
       last_sync_at:     c.last_sync_at,
       last_sync_status: c.last_sync_status,

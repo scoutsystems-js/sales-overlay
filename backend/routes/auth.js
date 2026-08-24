@@ -376,6 +376,8 @@ router.post('/refresh', async function(req, res) {
 const FATHOM_AUTHORIZE_URL = 'https://fathom.video/external/v1/oauth2/authorize';
 const FATHOM_TOKEN_URL     = 'https://fathom.video/external/v1/oauth2/token';
 const FATHOM_SCOPE         = 'public_api';
+const FATHOM_API_BASE_FOR_IDENTITY = 'https://api.fathom.ai/external/v1';
+const { resolveFathomIdentity } = require('../lib/fathom-identity');
 const STATE_TTL_SECONDS    = 600;   // 10 minutes — plenty for a normal OAuth round-trip, short enough to limit replay window
 const TOKEN_EXPIRY_TOLERANCE_SECONDS = 300; // 5 min — matches fathom-typescript SDK; refresh slightly early to dodge clock skew
 
@@ -548,6 +550,44 @@ router.get('/fathom/callback', async function(req, res) {
     }
 
     console.log('[auth] Fathom connection stored for user ' + userId + ' (expires_in=' + data.expires_in + 's)');
+
+    /* ⚠⚠ TRY TO CAPTURE THE IDENTITY WITHOUT ASKING (Justin's challenge).
+       Probed live: Fathom has NO identity endpoint (/me, /users/me, /user,
+       /account, /whoami, /oauth/userinfo all 404) and its OAuth is
+       `scope=public_api`, not OIDC — no id_token, no userinfo. The token is
+       WORKSPACE-scoped: one unfiltered /meetings page returned 5 different
+       people's recordings, so `recorded_by[]` is genuinely required.
+
+       ⚠ But /team_members DOES list the workspace, so when the Scout login
+       email is EXACTLY one of them, that is the answer and the prompt is pure
+       friction. Exact equality only — a wrong match would sync a DIFFERENT
+       PERSON'S calls into this account.
+
+       ⚠ Best-effort and non-fatal: a failure here must never break a
+       successful connection. The picker remains the fallback. */
+    try {
+      var tm = await fetch(FATHOM_API_BASE_FOR_IDENTITY + '/team_members', {
+        headers: { Authorization: 'Bearer ' + data.access_token, Accept: 'application/json' },
+      });
+      if (tm.ok) {
+        var tmJson = await tm.json();
+        // The Scout account's own email — the state JWT carries only the id.
+        var who = await admin.auth.admin.getUserById(userId);
+        var scoutEmail = (who && who.data && who.data.user && who.data.user.email) || null;
+        var hit = resolveFathomIdentity(scoutEmail, (tmJson && tmJson.items) || []);
+        if (hit.email) {
+          await admin.from('fathom_connections')
+            .update({ fathom_email: hit.email, updated_at: new Date().toISOString() })
+            .eq('user_id', userId);
+          console.log('[auth] Fathom identity auto-captured for user ' + userId + ' (source=' + hit.source + ')');
+        } else {
+          console.log('[auth] Fathom identity not auto-resolvable for user ' + userId + ' (' + hit.reason + ') — the picker will ask');
+        }
+      }
+    } catch (idErr) {
+      console.error('[auth] Fathom identity auto-capture failed for user ' + userId + ': ' + (idErr.message || 'unknown'));
+    }
+
     return res.redirect('/connected?provider=fathom&status=connected');
   } catch (err) {
     console.error('[auth] Fathom callback fatal for user ' + (userId || 'unknown') + ':', err.message);

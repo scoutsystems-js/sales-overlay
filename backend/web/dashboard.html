@@ -3852,6 +3852,7 @@
        is connected" and offer a Connect button to someone already connected.
        This flag lets that view fetch it once instead of guessing. */
     connStatusLoading: false,
+    fathomHistorySyncing: false,   // true while POST /fathom/sync-history is in flight
     // Call Library (Scout v2.0 Phase 2 Step 3)
     callLibrary:        null,  // null pre-load, then array of call rows from /fathom/calls
     callLibraryLoading: false, // gates "Load more" button while a fetch is in flight
@@ -10221,6 +10222,85 @@
     return !!(f && f.connected && !f.fathom_email);
   }
 
+  /* ⚠⚠ HOW FAR BACK. Measured 2026-08-24: Fathom's page size is hard-coded at
+     10 and ignores `limit`, so the old flat 20-page cap was a hard 200-CALL
+     ceiling. Josh got exactly 200 (38 days) while his real history is 560 back
+     to 2021 — "it only goes back a month" was a symptom of a call cap, not a
+     date window, and nobody chose 30 days.
+
+     ⚠ AND THE TAIL WAS UNREACHABLE: after the first sync stamps last_sync_at,
+     every later sync asks for calls NEWER than that, so re-syncing can never
+     go backwards. This control is the way back, and it exists here rather than
+     only at connect-time so an ALREADY-CONNECTED user does not have to
+     disconnect and reconnect to widen their window. */
+  function fathomHistoryRowHtml() {
+    var f = state.fathomStatus;
+    if (!(f && f.connected)) return '';
+    var cur = f.sync_window || '30d';
+    var opts = [['30d', 'Last 30 days'], ['90d', 'Last 90 days'], ['all', 'All time']]
+      .map(function (o) {
+        return '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('');
+    var busy = !!state.fathomHistorySyncing;
+    return '<div class="eod-row conn-row"><div class="eod-label">HISTORY</div>'
+      + '<div class="conn-right">'
+        + '<select class="role-select" id="fathomWindow"' + (busy ? ' disabled' : '') + '>' + opts + '</select>'
+        + '<button class="btn-fathom-secondary" type="button" onclick="syncFathomHistory()"'
+          + (busy ? ' disabled' : '') + '>' + (busy ? 'Pulling…' : 'Pull History') + '</button>'
+        + '<span class="meta">' + escapeHtml(fathomWindowCost(cur)) + '</span>'
+      + '</div></div>';
+  }
+
+  /* ⚠ ONLY REPORT WHAT IS TRUE. All time really is slower and really does leave
+     most calls ungraded — say both next to the option rather than after. */
+  function fathomWindowCost(w) {
+    if (w === 'all') return 'Everything Fathom has — can take a minute or two. Newest 20 graded, rest ungraded.';
+    if (w === '90d') return 'Last 90 days. Newest 20 graded.';
+    return 'Last 30 days. Newest 20 graded.';
+  }
+
+  async function syncFathomHistory() {
+    if (state.fathomHistorySyncing) return;
+    var sel = document.getElementById('fathomWindow');
+    var win = sel ? sel.value : '30d';
+    state.fathomHistorySyncing = true;
+    rerenderConnectionViews();
+    var noticeText = null, noticeKind = 'success';
+    try {
+      var res = await fetch('/fathom/sync-history', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ window: win }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      var data = null; try { data = await res.json(); } catch (e) {}
+      if (res.ok && data && data.needs_identity) {
+        state.fathomHistorySyncing = false;
+        await showFathomIdentityPrompt();
+        return;
+      }
+      if (res.ok) {
+        var n = (data && typeof data.synced === 'number') ? data.synced : 0;
+        invalidateCallLibrary();   // else the Calls page keeps its cached list
+        noticeText = 'Pulled ' + n + ' call' + (n === 1 ? '' : 's') + ' from your history.';
+        if (n === 0) { noticeText += ' Nothing older was found in that window.'; noticeKind = 'warn'; }
+        if (data && data.truncated) {
+          noticeText += ' (Hit the fetch limit — run it again to keep going.)';
+          noticeKind = 'warn';
+        }
+      } else {
+        noticeText = 'History sync failed: ' + ((data && data.error) || ('HTTP ' + res.status));
+        noticeKind = 'error';
+      }
+    } catch (err) {
+      noticeText = 'History sync error: ' + ((err && err.message) || 'unknown');
+      noticeKind = 'error';
+    }
+    state.fathomNotice = { kind: noticeKind, text: noticeText };
+    state.fathomHistorySyncing = false;
+    await refreshFathomStatusInBackground();
+  }
+
   function renderConnectionsSectionHtml() {
     /* ⚠ The prompt's only markup used to be in the OVERVIEW strip, so a
        needs_identity answer raised from THIS section had nowhere to land. */
@@ -10239,6 +10319,7 @@
     return renderZoomNoticeHtml() + renderFathomNoticeHtml()
       + identity
       + connectionRowHtml('fathom')
+      + fathomHistoryRowHtml()
       + connectionRowHtml('zoom')
       + '<div class="meta" style="margin-top:8px;">Disconnecting keeps your synced calls, grades, and clips — it only stops new calls from coming in.</div>';
   }
