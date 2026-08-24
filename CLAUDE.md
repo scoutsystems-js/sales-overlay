@@ -1397,6 +1397,35 @@ A new test forbade `managed_by === x.user_id` anywhere in `admin.html`, to stop 
 - **The claim was "the page must not BUILD the buckets"; the scope was "this string appears nowhere".** Narrowed to assert `companiesArray` is assigned only from the server payload, that no local `bucketUsers` exists, and that the assignment count is exactly two.
 - **Nth instance of the scope-vs-claim family, and the second time it has happened INSIDE a guard I was writing to prevent a related failure.** Knowing the rule is demonstrably not the same as applying it.
 
+### ⚠⚠ FATHOM HAS NO IDENTITY ENDPOINT AND ITS TOKEN IS WORKSPACE-SCOPED — PROBED, NOT ASSUMED (2026-08-24)
+Justin challenged the identity prompt: *"He logs in to Fathom when he connects it. That's going to be the Fathom email."* **Probed live against a real token:**
+```
+/me /users/me /user /account /whoami /oauth/userinfo  ->  404
+/users                                                 ->  403
+/team_members  -> 200 {name,email,created_at}, and NO self-identifying field
+/meetings (unfiltered) -> 5 DISTINCT recorded_by identities in ONE page
+```
+- **The OAuth grant is `scope=public_api`, NOT OIDC** — no `id_token`, no userinfo. **Fathom genuinely does not tell us who authorised**, and without `recorded_by[]` a sync pulls the whole workspace. **The prompt is required and must not be removed.**
+- **⚠ BUT IT NO LONGER HAS TO BE THE FIRST RESORT.** `/team_members` lists the workspace, so when the **Scout login email is EXACTLY one member**, that is the answer — captured at connect, picker kept as fallback. **Exact equality only** (same contract as `lib/zoom-identity.js`): a wrong match syncs **a different person's calls** into the account. Plus-addresses are NOT folded, near-misses refuse, ambiguity refuses.
+- **The token exchange reads only `access_token`/`refresh_token`/`expires_in`/`scope` and never inspects the rest** — the standing *"a field absent from storage is not absent from the source"* hazard. Probing is what settled it.
+
+### ⚠⚠ "IT ONLY SYNCS 30 DAYS" WAS A CALL-COUNT CAP, NOT A DATE WINDOW (2026-08-24)
+```
+Fathom page size is HARD-CODED at 10 and IGNORES ?limit   (25 and 100 both -> 10, echoing "limit":10)
+MAX_PAGES 20  x  10  =  200 calls, ever, on a first sync
+Josh received exactly 200, spanning 38 days      <- the "month" was arithmetic
+his real history: 560 meetings / 56 pages / 17.8s, back to 2021-09-16
+```
+- **Nobody chose 30 days.** The number nobody set was `MAX_PAGES`, and it was silently dropping **360 of his calls**.
+- **⚠⚠ AND THE OLDER TAIL WAS PERMANENTLY UNREACHABLE.** Once the first sync stamps `last_sync_at`, every later sync passes `created_after = last_sync_at` and can therefore **only ever fetch NEWER calls**. The UI's *"run sync again to fetch the rest"* was **false** — re-running could never go backwards. That is why the fix is a re-runnable history pull that deliberately **ignores `last_sync_at`**, not merely a bigger cap.
+- **THE PAGE CAP MUST SCALE WITH THE CHOICE** or "All time" is a lie: offering it on a 20-page cap returns the same 200 rows and looks like it worked.
+- **⚠ NEVER SEND AN EPOCH `created_after` INSTEAD OF OMITTING IT** — Fathom returns ZERO for a 1970 value regardless of other filters. "Just send a very old date" is the obvious wrong fix.
+
+### ⚠⚠ A BACKFILL MUST NOT INHERIT STEADY-STATE GRADING (2026-08-24)
+`callIdsToAnalyze` grades **every** new row when `last_sync_at` is set — correct for a normal sync, whose window is bounded by real call volume, and **catastrophic for a backfill: pulling 560 calls would have fired 560 analyses.** History mode passes `null` so the first-sync cap applies.
+- **Caught BEFORE clicking it on production**, by asking what the existing selector would do with a 160-row insert. **Pulling calls and grading calls are separate budgets and must stay separate.**
+- Verified live: 160 backfilled, **159 with no analysis row**, library full, newest 20 graded.
+
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
 - **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
