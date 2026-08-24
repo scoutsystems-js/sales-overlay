@@ -2465,6 +2465,38 @@ fathom_calls.user_id / call_analyses.user_id / prospects.user_id   NOT NULL
 - **This is a verification boundary, not a defect.** Justin can click it; automation cannot. **Say so plainly rather than reporting the flow as click-verified.**
 - **⚠ THE TRADE IS WORTH RESTATING: the dialogs are the right choice for an irreversible action** — they are unmissable and cannot be dismissed by a stray click. The cost is that this specific path leaves the automated-verification envelope. **If that ever needs to change, the fix is a real in-page modal, not weaker confirmation.**
 
+### ⚠⚠⚠ "CONSUMERS OF THE SHARED LOADER" AND "SURFACES THAT DO THE THING" ARE DIFFERENT SETS — FIXING THE FIRST DID NOT FIX THE PAGE (2026-08-24)
+**The brief was: filter synthetic rows at `loadTeamWindow`, one chokepoint covers all the panels. I enumerated its consumers by capability, found SIX (two more than the file's own comment claimed), filtered the chokepoint, deployed — and the team page still showed *"Ava Mitchell — 39 calls, 13% closing rate"* for an account owning ZERO real calls.**
+- **THE REP CARDS NEVER WENT THROUGH THE LOADER.** Nor did the gauges, the rep graphs, the why-prose lane, or the close rate. Each has its own `fathom_calls` query. **A correct, careful enumeration of the wrong set.**
+- **⚠ THE ENUMERATION WAS THE ERROR, NOT THE FIX.** "Everything that calls `loadTeamWindow`" is a mechanical question with a checkable answer; "everything that aggregates across a team" is the question the RULE is about. Answering the first and reporting it as complete is how the most visible panel on the page kept lying — *and it read as thorough, because it was thorough about the wrong thing.*
+- **THE RIGHT PREDICATE IS THE QUERY SHAPE:** any `fathom_calls` query scoped to MANY users (`.in('user_id', …)`) is a cross-team aggregation and must filter. That is what the guard now asserts, per file, once per query. **Six call sites across five modules**, all importing the one rule.
+- **⚠ AND IT TOOK THREE ROUNDS TO STOP FABRICATING**: loader → the other call-level aggregators → the CLOSE RATE, which lives in its own module and was still printing *"13% closing rate, 3 of 24 prospects"* directly beneath an honest *"0 calls"*. **Each round looked complete until the page was looked at again.**
+
+### ⚠⚠ THE SYNTHETIC MARKER IS THE ID PREFIX — A CONVENTION, NOT A PROPERTY — AND THE ROBUST-LOOKING ALTERNATIVE IS WRONG (measured 2026-08-24)
+**Asked to pick the most robust available signal, the honest answer is that only one covers both kinds of fake row, and it is the one we invented.**
+```
+signal                    seeded rows        demo copies              verdict
+fathom_call_id prefix     seed-  (102)       demo- (33, incl demo-rv) BOTH      ← the only one
+owner identity            demo accounts      ⚠ reviewer owns 18 fake AND 6 REAL  WRONG
+recording_url IS NULL     0/102 have one     33/33 HAVE one                     seeded only
+prompt_version sentinel   'seed-2026-08-16'  v4/v5/v8 — genuine, copied         seeded only
+created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range  useless
+```
+- **⚠⚠ A USER-LEVEL RULE WOULD HAVE DELETED REAL DATA.** `reviewer@scoutsystems.io` owns **18 synthetic and 6 real** calls. "Exclude the demo accounts" is the obvious, tidier-looking rule and it silently drops a real person's real calls from every team metric. **The mixed owner is why the rule must be per ROW.** A fixture row encoding exactly that shape is now in the test, so nobody re-derives the tidier rule.
+- **⚠ AND NO THIRD CONVENTION FOR PROSPECTS.** The close rate is derived from CALLS grouped by `prospect_id`, so filtering the call query is sufficient — a prospect whose only calls are synthetic drops out of both numerator and denominator **by construction**. The seeded prospects *do* carry a `'Seed %'` display name, but adopting it would be a third marker to keep in sync; and the data-driven alternative, "has no real call", would have dropped **39 of Josh's genuine prospects**.
+- The durable fix — an `is_synthetic` column written at insert time — stays **filed, not built**.
+
+### ⚠⚠ THREE FILES IN ONE BLOCK CALLED AN IMPORTED FUNCTION THAT WAS NEVER IMPORTED — AND `require()` SUCCEEDING PROVES NOTHING (2026-08-24)
+**Adding `realCallsOnly` to five modules, three of them had no existing `require('./…')` to anchor the new import to, so a script that inserted "after the last local require" silently inserted nothing.** In each case the call site landed and the import did not — **the exact defect that had killed add-user hours earlier**.
+- **⚠ `node -e "require('./lib/team-analytics')"` PRINTED "module loads".** Of course it did: the call sits inside a function that had not run. **Loading a module proves its top level executes, and nothing whatsoever about the identifiers inside its functions.**
+- **WHAT ACTUALLY CAUGHT IT, every time: counting references.** `grep -c realCallsOnly <file>` should be *import + call sites*; a count one short means the import is missing. Cheap, mechanical, and it does not depend on any code path running.
+- **⚠ AND THE MIRROR CASE HAPPENED TOO** — one file ended up with the import and NO call site, because an earlier script aborted after its replacements but before writing. Harmless at runtime and *completely invisible*: the filter simply does nothing. **A guard that only asserts "does it import the rule" would have passed.** The test now asserts the rule is APPLIED, once per query.
+
+### ⚠ A GUARD'S SCOPE CAN INCLUDE THE LINE THAT IMPLEMENTS THE RULE (2026-08-24)
+**A check that "no raw `calls.data` survives after the filter" failed on `var realCalls = realCallsOnly(calls.data)` — the filtering line itself.** Same family as the checker that reads its own documentation as a violation, and as the comment-as-code trap: **the check's scope was wider than its claim, and the thing it flagged was the thing doing the work.**
+- **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
+- **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
