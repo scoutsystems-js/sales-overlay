@@ -98,9 +98,22 @@
       background: var(--bg2);
       border: 1px solid var(--border);
       border-radius: 10px;
-      overflow: auto;
-      max-height: 320px;
+      /* ⚠⚠ `max-height: 320px` WAS HERE AND IT HID PEOPLE. It clipped at ~6
+         rows behind an INNER scrollbar, so the 8-user All Users list was
+         already truncated before company blocks existed — and a stacked block
+         (384px for 5 members) lost its last two members entirely.
+         ⚠ Caught by LOOKING. Every DOM check said the rows were present and
+         `getBoundingClientRect` reported them visible, because they DO have
+         size — they just sit inside a clipped scroll container. A measurement
+         cannot see a composition problem.
+         ⚠ Horizontal scrolling is kept (wide tables); vertical is the page's
+         job. A nested vertical scrollbar inside a page that also scrolls hides
+         content that nobody knows to scroll for. */
+      overflow-x: auto;
     }
+    /* Company blocks bring their own border and background, so the wrapper
+       drops its panel chrome rather than drawing a box around a box. */
+    .users-table-wrap.blocks { background: none; border: none; border-radius: 0; }
     .users-table {
       width: 100%;
       border-collapse: collapse;
@@ -898,6 +911,7 @@
         ? companiesArray.map(function(c) { return companyBlockHtml(c, isOwnerViewer, mgrs); }).join('')
         : '<div class="empty-msg">No companies yet. A company appears once a user has team members assigned to them.</div>';
     }
+    wrap.classList.toggle('blocks', adminTab === 'companies');
     wrap.innerHTML = adminTabsHtml() + body;
   }
 
