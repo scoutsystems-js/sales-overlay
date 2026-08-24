@@ -30,6 +30,8 @@ const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
+// ⚠ ONE definition of "synthetic", shared with every other team surface.
+const { realCallsOnly } = require('../lib/real-calls');
 const { computeTeamObjectionSummary } = require('../lib/team-objection-summary');
 
 const router = express.Router();
@@ -272,7 +274,7 @@ router.get('/averages', teamGate, async function (req, res) {
     var calls = [], start = 0;
     for (;;) {
       var cq = await admin.from('fathom_calls')
-        .select('id, user_id, prospect_id, duration_seconds')
+        .select('id, user_id, fathom_call_id, prospect_id, duration_seconds')
         .in('user_id', candidates).gte('call_date', win.from).lte('call_date', win.to)
         .not('not_a_sales_call', 'is', true)
         .range(start, start + 999);
@@ -281,6 +283,9 @@ router.get('/averages', teamGate, async function (req, res) {
       if (!cq.data || cq.data.length < 1000) break;
       start += 1000;
     }
+    /* ⚠ SYNTHETIC EXCLUSION — same shared rule (lib/real-calls.js). This
+       aggregates across a team, so demo copies would count as real reps. */
+    calls = realCallsOnly(calls);
 
     var ids = calls.map(function (c) { return c.id; });
     var analyses = [], objections = [];
@@ -411,7 +416,7 @@ router.get('/rep-series', teamGate, async function (req, res) {
 
     var calls = [], start = 0;
     for (;;) {
-      var cq = await admin.from('fathom_calls').select('id, user_id, call_date, prospect_id')
+      var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, call_date, prospect_id')
         .in('user_id', candidates).gte('call_date', range.from).lte('call_date', range.to)
         .not('not_a_sales_call', 'is', true)
         .range(start, start + 999);
@@ -420,6 +425,9 @@ router.get('/rep-series', teamGate, async function (req, res) {
       if (!cq.data || cq.data.length < 1000) break;
       start += 1000;
     }
+    /* ⚠ SYNTHETIC EXCLUSION — same shared rule (lib/real-calls.js). This
+       aggregates across a team, so demo copies would count as real reps. */
+    calls = realCallsOnly(calls);
 
     var ids = calls.map(function (c) { return c.id; });
     var analyses = [], objections = [];

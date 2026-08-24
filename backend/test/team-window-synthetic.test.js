@@ -132,3 +132,58 @@ test('⚠⚠ THERE IS ONE FILTER, AND EVERY CONSUMER GOES THROUGH IT', () => {
       + 'two definitions of "fake" will drift');
   });
 });
+
+/* ── every TEAM AGGREGATOR, not just the loader ────────────────────────────── */
+
+test('⚠⚠ EVERY CROSS-TEAM QUERY FILTERS SYNTHETIC ROWS — the loader was not enough', () => {
+  /* ⚠⚠ THIS TEST EXISTS BECAUSE FIXING THE LOADER DID NOT FIX THE PAGE. After
+     loadTeamWindow was filtered, the team page still showed "Ava Mitchell —
+     39 calls, 13% closing rate" for an account owning ZERO real calls: the REP
+     CARDS never went through the loader at all. They have their own query, as
+     do the gauges, the rep graphs and the why-prose lane.
+
+     ⚠ THE LESSON IS THE ENUMERATION, NOT THE FIX. "Consumers of the loader" and
+     "surfaces that aggregate across a team" are different sets, and only the
+     second one is what the rule is about. Enumerating the first and calling it
+     complete is how the most visible panel on the page kept lying.
+
+     So the property asserted here is about the QUERY SHAPE: any fathom_calls
+     query scoped to MANY users (`.in('user_id', ...)`) is a cross-team
+     aggregation and must filter. */
+  const TEAM_AGGREGATORS = [
+    'lib/team-synthesis.js',   // the shared loader (needs-work, recs, digest, highlights, evidence, personal)
+    'lib/team-analytics.js',   // rep cards + team totals + trends
+    'lib/team-objections.js',  // the objection drilldown
+    'routes/team.js',          // team averages (gauges) + rep series (graphs)
+    'lib/why-prose.js',        // per-rep prose rendered on the team board
+  ];
+
+  TEAM_AGGREGATORS.forEach((f) => {
+    const src = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    const live = src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // it must IMPORT the one rule …
+    assert.ok(/require\(['"][^'"]*real-calls['"]\)/.test(live),
+      f + ' must import lib/real-calls.js — every team surface shares one definition of "fake"');
+
+    // … and actually APPLY it, once per fathom_calls query it makes
+    const queries = (live.match(/from\('fathom_calls'\)/g) || []).length;
+    const applied = (live.match(/realCallsOnly\(/g) || []).length;
+    assert.ok(applied >= queries,
+      f + ' makes ' + queries + ' fathom_calls quer' + (queries === 1 ? 'y' : 'ies')
+      + ' but applies the filter ' + applied + ' time(s). An unfiltered one is a panel '
+      + 'that still counts demo data.');
+  });
+});
+
+test('⚠ the filter is APPLIED, not merely imported — proven by removing one', () => {
+  /* ⚠ NON-VACUITY FOR THE CHECK ABOVE: an import with no call site would satisfy
+     a naive "does it import the rule" assertion while filtering nothing. */
+  const f = 'lib/team-analytics.js';
+  const live = fs.readFileSync(path.join(__dirname, '..', f), 'utf8')
+    .replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const applied = (live.match(/calls = realCallsOnly\(calls\)/g) || []).length;
+  assert.strictEqual(applied, 2,
+    f + ' has two paging loops and both must reassign the filtered list; found ' + applied
+    + '. Importing without reassigning filters nothing.');
+});

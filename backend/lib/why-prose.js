@@ -213,6 +213,7 @@ module.exports = {
 // the same day share a key.
 const crypto = require('crypto');
 const { cacheGet, cachePut } = require('./team-synthesis');
+const { realCallsOnly } = require('./real-calls');
 
 const WHY_LANE_VERSION = 'v1';
 
@@ -226,7 +227,7 @@ async function computeWhyProse(admin, rep, from, to, ask) {
   // Calls in window → their analyses' what_mattered.
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
-    var cq = await admin.from('fathom_calls').select('id')
+    var cq = await admin.from('fathom_calls').select('id, fathom_call_id')
       .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
       .range(start, start + PAGE - 1);
@@ -234,6 +235,9 @@ async function computeWhyProse(admin, rep, from, to, ask) {
     var b = cq.data || []; calls = calls.concat(b);
     if (b.length < PAGE) break; start += PAGE;
   }
+  /* ⚠ Same shared rule. A demo account's copied rows would otherwise become
+     that rep's 'why' prose on the team board. */
+  calls = realCallsOnly(calls);
   var ids = calls.map(function (c) { return c.id; });
   var rows = [];
   for (var i = 0; i < ids.length; i += 100) {

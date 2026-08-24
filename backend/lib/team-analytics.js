@@ -10,6 +10,9 @@ var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 var { fetchProspectCloseRates, closeRate } = require('./prospect-entity');
 var { weakestSection, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
 var { isHandled } = require('./objection-handled');
+// ⚠ ONE definition of "synthetic" — shared with lib/team-synthesis.js (the team
+// loader) and lib/team-objections.js (the drilldown). Never re-expressed here.
+var { realCallsOnly } = require('./real-calls');
 
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 
@@ -25,7 +28,7 @@ async function aggregateWindow(admin, repIds, from, to) {
   // calls in window for these reps
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
-    var cq = await admin.from('fathom_calls').select('id, user_id, call_date')
+    var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, call_date')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: false }).range(start, start + PAGE - 1);
@@ -33,6 +36,12 @@ async function aggregateWindow(admin, repIds, from, to) {
     var b = cq.data || []; calls = calls.concat(b);
     if (b.length < PAGE) break; start += PAGE;
   }
+  /* ⚠⚠ SYNTHETIC EXCLUSION — the SAME rule as lib/team-synthesis.js and the
+     objection drilldown, imported from lib/real-calls.js. This query aggregates
+     ACROSS a team (`.in('user_id', ...)`), so without it the demo accounts'
+     copied rows are counted as real people's performance. Ava Mitchell read
+     "39 calls, 13% closing" on the live board while owning ZERO real calls. */
+  calls = realCallsOnly(calls);
   var callRep = {}, callIds = [];
   // Ruling 2026-08-17: the objection loop needs the CALL's outcome, to credit
   // objections on calls that closed. `outcome` is already selected below, so
@@ -271,7 +280,7 @@ async function computeTeamTrends(admin, repIds, bucket, from, to) {
   // calls + done analyses in window
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
-    var cq = await admin.from('fathom_calls').select('id, call_date')
+    var cq = await admin.from('fathom_calls').select('id, fathom_call_id, call_date')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: true }).range(start, start + PAGE - 1);
@@ -279,6 +288,12 @@ async function computeTeamTrends(admin, repIds, bucket, from, to) {
     var b = cq.data || []; calls = calls.concat(b);
     if (b.length < PAGE) break; start += PAGE;
   }
+  /* ⚠⚠ SYNTHETIC EXCLUSION — the SAME rule as lib/team-synthesis.js and the
+     objection drilldown, imported from lib/real-calls.js. This query aggregates
+     ACROSS a team (`.in('user_id', ...)`), so without it the demo accounts'
+     copied rows are counted as real people's performance. Ava Mitchell read
+     "39 calls, 13% closing" on the live board while owning ZERO real calls. */
+  calls = realCallsOnly(calls);
   var dateOf = {}, callIds = [];
   calls.forEach(function (c) { dateOf[c.id] = c.call_date; callIds.push(c.id); });
   if (callIds.length === 0) return { bucket: bucket, buckets: [] };
