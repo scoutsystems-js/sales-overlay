@@ -1330,7 +1330,7 @@ the 3301 requeue                                   LIVE, bounded at 24h (a40b65b
 - **The inconsistency that caused this:** `dashboard.html` hides the second connect card once any source is connected (`anySourceConnected()`), while **#account → Connections shows both and connects both**. Josh walked straight through that gap.
 - **Currently INERT in practice, and know why:** Josh's "Impromptu Zoom Meeting" was captured by **Fathom's bot**, which records on Fathom's side and creates **no Zoom cloud recording**. Nothing to duplicate — until cloud recording is on. **This buys time, not a reprieve.**
 
-**⛔ HOLDS, BOTH STILL STANDING:** **no reviewer-data cleanup** and **no Fathom→`call_connections` cutover** while a security reviewer is mid-assessment. `reviewer@scoutsystems.io` connected 2026-08-19 and is actively probing.
+**⛔ HOLDS — THE STATED REASON IS STALE, THE HOLDS ARE NOT AUTOMATICALLY LIFTED (corrected 2026-08-24).** These two — **no reviewer-data cleanup** and **no Fathom→`call_connections` cutover** — were held *because a security reviewer was mid-assessment*. **Scout is APPROVED; that reviewer urgency no longer exists.** ⚠ But a hold does not lift itself when its reason expires: `reviewer@scoutsystems.io` still owns 24 real rows, and the cutover is still a live-token migration. **Reopen each deliberately rather than treating this correction as permission.**
 
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.

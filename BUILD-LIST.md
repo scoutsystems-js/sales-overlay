@@ -27,7 +27,7 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 
 | item | ruling | what it actually involves |
 |---|---|---|
-| **Zoom clip extraction — make the privacy policy true** | **Justin's ruling: BUILD IT, do not soften the policy.** His reasoning: it was judged doable when originally reconned. | ⚠ **NEITHER STEP EXISTS TODAY** — verified: `pickTranscriptFile` selects only `file_type='TRANSCRIPT'`, `downloadFile` runs only on that URL, and there is **no ffmpeg, no `.mp4`, no `createWriteStream`, no `os.tmpdir`** anywhere in the backend. This is **download + cut + store + serve**, not "add ffmpeg". ⚠ The policy states it in the **PRESENT TENSE** and a Zoom security reviewer is mid-assessment — so **until the build lands, the published statement is false today, and Justin is carrying that risk knowingly.** ⚠ It also claims **short-lived signed URLs** and **permanent deletion of the full recording** — both must actually be implemented, not just the cutting. |
+| **Zoom clip extraction — make the privacy policy true** | **Justin's ruling: BUILD IT, do not soften the policy.** His reasoning: it was judged doable when originally reconned. | ⚠ **NEITHER STEP EXISTS TODAY** — verified: `pickTranscriptFile` selects only `file_type='TRANSCRIPT'`, `downloadFile` runs only on that URL, and there is **no ffmpeg, no `.mp4`, no `createWriteStream`, no `os.tmpdir`** anywhere in the backend. This is **download + cut + store + serve**, not "add ffmpeg". ⚠ The policy states it in the **PRESENT TENSE**, so **until the build lands the published statement is false today, and Justin is carrying that risk knowingly.** ⚠ **CORRECTED 2026-08-24: Scout is APPROVED — the "reviewer mid-assessment" urgency that used to sit here is STALE and has been removed. The statement being false still stands on its own; the deadline pressure does not.** ⚠ It also claims **short-lived signed URLs** and **permanent deletion of the full recording** — both must actually be implemented, not just the cutting. |
 
 **⚠ DO NOT BUILD ANY OF IT YET. Zoom stays PINNED until Justin lifts it.**
 
@@ -106,7 +106,7 @@ Agreed direction, no date, no owner.
 
 | item | one line | depends on |
 |---|---|---|
-| Fathom → `call_connections` cutover | Move Fathom's 8 connection sites onto the unified store, drop `fathom_connections` | ⛔ held while a security reviewer is mid-assessment |
+| Fathom → `call_connections` cutover | Move Fathom's 8 connection sites onto the unified store, drop `fathom_connections` | ⚠ **The stated reason for this hold is STALE (corrected 2026-08-24): Scout is APPROVED, so no reviewer is mid-assessment.** The hold itself has NOT been lifted here — that is Justin's call, not a side effect of a records correction. Reopen it deliberately |
 | Reviewer demo-data cleanup | Remove `demo-rv-*` rows | ⛔ same hold |
 | Shared constants module | Payment-structure allowlist + sync-cap constants are duplicated across route files | hardening pass |
 | `/kb/upload` batch embeddings | Still embeds chunk-by-chunk; `getVoyageEmbeddings` drops straight in | ⚠ becomes load-bearing the moment similarity search surfaces harvested moments |

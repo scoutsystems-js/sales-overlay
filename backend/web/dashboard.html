@@ -9333,10 +9333,55 @@
     var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/email', { method: 'PATCH', body: JSON.stringify({ email: ne.trim() }) });
     if (r.ok) { alert('Email updated' + (r.data && r.data.old_notified === 'sent' ? ' — old address notified.' : '.')); refreshMembers(false); }
   }
+  /**
+   * ⚠⚠ IRREVERSIBLE, SO IT IS TWO DELIBERATE STEPS AND THE TEXT COMES FROM THE
+   * SERVER. The old version was ONE confirm() whose text said "this removes
+   * their account and all their data" and "only allowed if they have no call
+   * history" — BOTH now false. A stale warning on a destructive action is worse
+   * than none: it is read, believed, and acted on.
+   *
+   * ⚠ THE TYPED CONFIRMATION IS BACK, and the reason it was dropped is exactly
+   * why. It was removed 2026-07-31 as "redundant friction — delete is already
+   * owner-only AND zero-history-gated". The zero-history gate is what this
+   * ruling removes, so the friction has stopped being redundant.
+   */
   async function deleteMember(uid, email) {
-    if (!confirm('Permanently delete ' + (email || 'this rep') + '?\n\nThis removes their account and all their data, and can’t be undone.\n\n(Only allowed if they have no call history — otherwise deactivate instead.)')) return;
+    var pre = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/delete-preview', { method: 'GET' });
+    if (!pre.ok) return;
+    var p = pre.data || {};
+
+    if (p.mode === 'blocked') { alert(p.reason || 'This user cannot be deleted yet.'); return; }
+
+    var who = p.email || email || 'this rep';
+    var lines = ['Delete ' + who + '?', ''];
+    if (p.mode === 'tombstone') {
+      /* ⚠ NAME WHAT SURVIVES AND WHAT DOES NOT, in that order — the surprise is
+         that the calls stay, so it leads. */
+      lines.push('They have ' + p.calls + ' recorded call' + (p.calls === 1 ? '' : 's') + '.', '',
+        'THEIR CALLS STAY. Every call, analysis and prospect is kept, so your team',
+        'history, close rate and cash figures do not change.', '',
+        'THE PERSON GOES. They lose access immediately, leave the roster, and',
+        'their name is replaced everywhere by "' + (p.renders_as || 'Deleted user') + '".');
+    } else {
+      lines.push('They have no recorded calls, so nothing is kept — the account and',
+        'its rows are removed outright.');
+    }
+    lines.push('', 'This cannot be undone.');
+    if (!confirm(lines.join('\n'))) return;
+
+    // ⚠ SECOND STEP, and it must be typed — a second confirm() is still one
+    // reflex away from a double-click.
+    var typed = window.prompt('Type DELETE to confirm.\n\nThis is the last step.', '');
+    if (!typed || typed.trim().toUpperCase() !== 'DELETE') return;
+
     var r = await memberAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: '{}' });
-    if (r.ok) { alert('User deleted.'); refreshMembers(true); }
+    if (r.ok) {
+      var d = r.data || {};
+      alert(d.mode === 'tombstone'
+        ? ('Deleted. ' + d.calls_preserved + ' call' + (d.calls_preserved === 1 ? '' : 's') + ' kept on the team.')
+        : 'Deleted.');
+      refreshMembers(true);
+    }
   }
   function openAddMember() {
     var m = document.getElementById('memberAddModal'); if (!m) return;

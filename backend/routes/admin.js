@@ -8,7 +8,7 @@ const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { fetchSellingContext } = require('../lib/selling-context');
 const welcomeEmail = require('../lib/welcome-email');
-const { canManageTarget, deleteBlockReason, deactivateBlockReason } = require('../lib/user-management');
+const { canManageTarget, deletePlan, tombstoneIdentity, deactivateBlockReason } = require('../lib/user-management');
 const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const provisionUser = require('../lib/provision-user');
@@ -68,12 +68,20 @@ async function countManagedReps(admin, userId) {
   var r = await admin.from('user_profiles').select('user_id', { count: 'exact', head: true }).eq('managed_by', userId);
   return r.error ? 0 : (r.count || 0);
 }
-// Total recorded calls for the zero-history delete gate (fathom + sessions).
-/* ⚠⚠ DELIBERATELY NOT FILTERED FOR not_a_sales_call. This is a SAFETY CHECK,
-   not a metric: it feeds the zero-history rule that decides whether a user may be
-   DELETED. If every one of a user's calls were marked, a filtered count would
-   report NO history and permit a delete that destroys real data. Counting a
-   marked call here is correct — the call still exists. */
+// Total recorded calls for the delete plan (fathom + sessions).
+/* ⚠⚠ STILL DELIBERATELY NOT FILTERED FOR not_a_sales_call — AND THE REASON
+   SURVIVED THE RULING THAT CHANGED EVERYTHING AROUND IT (2026-08-24).
+
+   The rule it fed is gone: history no longer BLOCKS a delete (Justin: "make it
+   possible to delete people even if they have calls"). But this count now
+   chooses between HARD DELETE and TOMBSTONE, and the hazard is identical.
+
+   A hard delete cascades — proven on a throwaway: 2 calls in, delete the auth
+   row, 0 out. So if a user's calls were all marked not-a-sales-call and this
+   count filtered them, it would report zero history, take the hard path, and
+   destroy real rows. The consequence moved from "wrongly blocked" to "wrongly
+   destroyed", which is worse, so the unfiltered count is MORE load-bearing than
+   before, not less. Counting a marked call is correct — the call still exists. */
 async function countUserHistory(admin, userId) {
   var fc = await admin.from('fathom_calls').select('id', { count: 'exact', head: true }).eq('user_id', userId);
   var cs = await admin.from('call_sessions').select('id', { count: 'exact', head: true }).eq('user_id', userId);
@@ -684,22 +692,99 @@ router.patch('/users/:user_id/email', requireAuth, requireRole(['manager', 'owne
 // profile/rows. (2026-07-31: the typed-email confirmation was removed as redundant
 // friction — delete is already owner-only + zero-history-gated; a plain
 // name-the-user warning dialog on the client is the confirmation now.)
-router.delete('/users/:user_id', requireAuth, requireRole('owner'), async function(req, res) {
+/**
+ * GET /admin/users/:user_id/delete-preview — what a delete would actually do.
+ *
+ * ⚠⚠ THE CONFIRMATION DIALOG IS BUILT FROM THIS, and that is the point: the
+ * dialog and the delete both come from ONE `deletePlan` call, so the warning
+ * cannot promise something different from what the route then does. A client
+ * that computed its own message would drift the moment the rule changed — and
+ * the rule just changed.
+ */
+router.get('/users/:user_id/delete-preview', requireAuth, requireRole('owner'), async function(req, res) {
   try {
-    var admin = getAdminClient();
     var uid = req.params.user_id;
     if (uid === req.user.id) return res.status(400).json({ error: 'You can’t delete your own account.' });
+    var admin = getAdminClient();
+    var got = await admin.auth.admin.getUserById(uid);
+    if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
+    var hist = await countUserHistory(admin, uid);
+    var plan = deletePlan({ callCount: hist.calls, sessionCount: hist.sessions,
+                            repCount: await countManagedReps(admin, uid) });
+    res.json({
+      user_id: uid, email: got.data.user.email,
+      mode: plan.mode, calls: plan.calls, reason: plan.reason,
+      // what the surviving rows will render as — so the dialog can show it
+      renders_as: tombstoneIdentity(uid).first_name + ' ' + tombstoneIdentity(uid).last_name,
+    });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] delete-preview error:', err.message, err.stack);
+    res.status(500).json({ error: 'Failed to load the delete preview' });
+  }
+});
+
+router.delete('/users/:user_id', requireAuth, requireRole('owner'), async function(req, res) {
+  try {
+    /* ⚠ THE SELF-DELETE REFUSAL NEEDS NO DATABASE, so it is checked BEFORE the
+       admin client is built. It used to sit after, which meant a config outage
+       turned an unambiguous "you can't delete yourself" into a 503 about
+       Supabase — a clear refusal replaced by a confusing one. */
+    var uid = req.params.user_id;
+    if (uid === req.user.id) return res.status(400).json({ error: 'You can’t delete your own account.' });
+    var admin = getAdminClient();
     var got = await admin.auth.admin.getUserById(uid);
     if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
     var email = got.data.user.email;
     var hist = await countUserHistory(admin, uid);
-    var block = deleteBlockReason(hist.calls, hist.sessions);
-    if (block) return res.status(409).json({ error: block });
+    var plan = deletePlan({ callCount: hist.calls, sessionCount: hist.sessions,
+                            repCount: await countManagedReps(admin, uid) });
+    if (plan.mode === 'blocked') return res.status(409).json({ error: plan.reason });
 
-    var del = await admin.auth.admin.deleteUser(uid);
-    if (del.error) return res.status(500).json({ error: 'Could not delete user: ' + del.error.message });
-    console.log('[admin] user DELETED: actor=%s (%s) target=%s (%s)', req.user.email, req.user.id, uid, email);
-    res.json({ deleted: true, user_id: uid });
+    if (plan.mode === 'hard') {
+      // No history — nothing to preserve, so the row goes.
+      var del = await admin.auth.admin.deleteUser(uid);
+      if (del.error) return res.status(500).json({ error: 'Could not delete user: ' + del.error.message });
+      console.log('[admin] user HARD DELETED (no history): actor=%s (%s) target=%s (%s)',
+        req.user.email, req.user.id, uid, email);
+      return res.json({ deleted: true, mode: 'hard', user_id: uid, calls_preserved: 0 });
+    }
+
+    /* ⚠⚠ TOMBSTONE — THE AUTH ROW IS KEPT ON PURPOSE, AND THIS IS THE WHOLE
+       DESIGN. Every history table cascades on an auth.users delete (proven on a
+       throwaway: 2 calls in, delete, 0 out), so removing the row would not
+       orphan this person's history — it would DESTROY it, rewriting close rate,
+       cash and rankings for every period they worked. Keeping the row is what
+       holds all ~12 foreign keys intact without a migration.
+
+       ⚠ ORDER MATTERS: revoke access FIRST, rename SECOND. If the rename
+       succeeded and the ban failed we would have a scrubbed row that can still
+       sign in — a live account nobody can identify. The reverse leaves a banned
+       account with its old name, which is visible and fixable. */
+    var ban = await admin.auth.admin.updateUserById(uid, {
+      ban_duration: '876000h',                    // 100 years — Supabase has no "forever"
+      password: crypto.randomBytes(24).toString('hex'),
+      email_confirm: false,
+    });
+    if (ban.error) return res.status(500).json({ error: 'Could not revoke access: ' + ban.error.message });
+
+    var stone = tombstoneIdentity(uid);
+    var scrub = await admin.auth.admin.updateUserById(uid, { email: stone.email });
+    if (scrub.error) {
+      /* Access is already revoked, so the account is safe — it just still shows
+         the old address. Report it rather than pretending the delete completed. */
+      console.error('[admin] tombstone rename FAILED after ban: target=%s: %s', uid, scrub.error.message);
+      return res.status(500).json({ error: 'Access was revoked but the identity could not be scrubbed — retry.' });
+    }
+
+    var prof = await admin.from('user_profiles').update({
+      active: false, first_name: stone.first_name, last_name: stone.last_name,
+    }).eq('user_id', uid);
+    if (prof.error) console.error('[admin] tombstone profile update failed: %s', prof.error.message);
+
+    console.log('[admin] user TOMBSTONED (%d calls preserved): actor=%s (%s) target=%s (%s)',
+      plan.calls, req.user.email, req.user.id, uid, email);
+    res.json({ deleted: true, mode: 'tombstone', user_id: uid, calls_preserved: plan.calls });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] delete error:', err.message);
