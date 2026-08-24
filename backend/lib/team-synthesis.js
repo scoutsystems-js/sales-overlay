@@ -14,6 +14,8 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { displayNameFromEmail } = require('./display-name');
 const { isHandled } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
+// ⚠ ONE definition of 'synthetic', shared with the objection drilldown.
+const { realCallsOnly } = require('./real-calls');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
@@ -62,10 +64,21 @@ function apiFail(e) { return { available: false, reason: 'Anthropic API failure'
 async function loadTeamWindow(admin, repIds, from, to) {
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
-    /* ⚠⚠ THE NOT-A-SALES-CALL EXCLUSION, AND THIS IS THE CHOKEPOINT: team-digest,
-       team-needs-work and team-synthesis ALL load their window through here, so
-       one filter covers three lanes. Do not add a second filter downstream of
-       this — it would be redundant and would drift.
+    /* ⚠⚠ THE NOT-A-SALES-CALL EXCLUSION, AND THIS IS THE CHOKEPOINT. Do not add
+       a second filter downstream of this — it would be redundant and drift.
+
+       ⚠ IT IS SIX CONSUMERS, NOT THREE. This comment said "three lanes" until
+       2026-08-24; enumerated by capability, every caller of loadTeamWindow is:
+         computeTeamNeedsWork      — the team "Objection Handling Focus" card
+         computeTeamRecommendations— team recommendations
+         computeDailyDigest        — the manager's daily digest
+         computeWeeklyHighlights   — Call Highlights of the Week
+         loadBucketEvidence        — the per-call evidence behind a bucket
+         computePersonalNeedsWork  — ⚠ a CLOSER'S OWN coaching page, not a team
+                                      surface at all
+       The last two were missed by the old count. That is the argument for
+       filtering HERE rather than per panel: a per-panel filter would have been
+       applied to the three someone remembered.
 
        ⚠⚠ `.not(col,'is',true)`, NEVER `.eq(col,false)`. The column is nullable
        with three states (NULL never assessed / false confirmed / true excluded).
@@ -73,7 +86,11 @@ async function loadTeamWindow(admin, repIds, from, to) {
        SILENTLY EXCLUDE almost the entire corpus. Two silent-null bugs of this
        exact shape have already shipped here. test/not-a-sales-call.test.js scans
        every consumer and fails on the wrong form. */
-    var cq = await admin.from('fathom_calls').select('id, user_id, recording_url, call_date, title, source')
+    /* ⚠ `fathom_call_id` IS SELECTED FOR THE SYNTHETIC FILTER BELOW — it was not
+       in this select before, which is why the filter could not be applied here
+       until now. Same failure family as the Part-1b missing-`section` bug: the
+       predicate was fine, the column never arrived. */
+    var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, recording_url, call_date, title, source')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
       .order('call_date', { ascending: false }).range(start, start + PAGE - 1);
@@ -81,6 +98,29 @@ async function loadTeamWindow(admin, repIds, from, to) {
     var b = cq.data || []; calls = calls.concat(b);
     if (b.length < PAGE) break; start += PAGE;
   }
+
+  /* ⚠⚠ THE SYNTHETIC EXCLUSION, AT THE CHOKEPOINT (2026-08-24). Measured before
+     this landed: ~38% of what this loader returned for Josh's board was
+     fabricated — 102 seeded rows and 33 demo rows against 177 real objection
+     moments. The objection drilldown filtered them and read 20%; the team card
+     drew from here and read something else. The same metric, two numbers, one
+     product, nothing on screen saying which was right.
+
+     ⚠ ONE RULE, IMPORTED — `lib/real-calls.js`, the SAME predicate the drilldown
+     uses. A second definition of "fake" is exactly the divergence this fixes.
+
+     ⚠⚠ AND IT IS THE ID PREFIX, WHICH IS A CONVENTION AND NOT A PROPERTY — said
+     plainly because the alternative looks better and is WRONG. Owner identity
+     seems more robust ("exclude the demo accounts"), but measured on live data
+     `reviewer@scoutsystems.io` owns 18 SYNTHETIC rows AND 6 REAL ones, so a
+     user-level rule would delete real calls from every team metric. Nothing
+     else discriminates either: `recording_url IS NULL` and the seed
+     prompt_version separate the seeded rows but not the demo copies (which
+     carry real recording URLs and real grader versions, being copies of real
+     analyses), and the created_at clusters sit INSIDE the range of real calls.
+     The prefix is the only signal covering both kinds. The durable fix — an
+     `is_synthetic` column written at insert time — is filed, not built. */
+  calls = realCallsOnly(calls);
   var meta = {}, callIds = [];
   calls.forEach(function (c) { meta[c.id] = c; callIds.push(c.id); });
   async function inChunks(table, cols, refine) {
