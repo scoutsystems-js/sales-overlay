@@ -1332,6 +1332,47 @@ the 3301 requeue                                   LIVE, bounded at 24h (a40b65b
 
 **⛔ HOLDS — THE STATED REASON IS STALE, THE HOLDS ARE NOT AUTOMATICALLY LIFTED (corrected 2026-08-24).** These two — **no reviewer-data cleanup** and **no Fathom→`call_connections` cutover** — were held *because a security reviewer was mid-assessment*. **Scout is APPROVED; that reviewer urgency no longer exists.** ⚠ But a hold does not lift itself when its reason expires: `reviewer@scoutsystems.io` still owns 24 real rows, and the cutover is still a live-token migration. **Reopen each deliberately rather than treating this correction as permission.**
 
+### ⚠⚠⚠ A THIRD STATE THAT IS NEITHER SUCCESS NOR ERROR RENDERS NOWHERE — AND "NO PROGRESS, NO ERROR" IS ITS SIGNATURE (2026-08-24)
+**A new trial account connected Fathom, clicked Sync FIVE TIMES, and saw nothing. Every one of those was an HTTP 200.**
+```
+[auth]   Fathom connection stored for user 40616e16... (expires_in=86400s)
+[fathom] sync blocked ... fathom_email not set (needs_identity)   x5
+```
+- **THE CONNECTION SAVED AND THE SYNC RAN.** It was refused at the identity gate, which is **correct** — without `recorded_by[]` a sync pulls the WHOLE TEAM's recordings. **The gate is not the bug and must not be removed.**
+- **⚠⚠ THE SHAPE: every error path and every success path had a renderer, and the THIRD state had none.** `needs_identity` is neither, so no notice fired, no spinner resolved, nothing turned red. **A user cannot distinguish "blocked on you" from "broken" from "still working" — all three are a page that does not change.**
+- **THREE FAULTS, AND FIXING ANY ONE ALONE WOULD HAVE LOOKED LIKE A FIX AND CHANGED NOTHING:**
+  1. `showFathomIdentityPrompt()` ended `if (state.view === 'overview')`. The only manual Sync a healthy account has lives in **#account -> Connections** (moved there by `6adb774`). The flag was set in state and **never drawn**.
+  2. The prompt's only **MARKUP** was the overview strip — so even a correct render call had **nowhere to draw**. Fixing the call alone fires against a section with no markup for it.
+  3. The Calls empty state emitted "Connect a Recording Source" whenever the list was empty, **with no connectivity check at all**.
+- **⚠⚠ `6adb774` FIXED THIS EXACT DEFECT IN THE TWO SYNC FUNCTIONS AND ITS OWN COMMENT SAYS THE COMPLETION PATH "WAS ALREADY CORRECT" — WHICH WAS TRUE, AND INCOMPLETE.** The `needs_identity` branch is an **EARLY RETURN that bypasses the completion path entirely**, into a helper carrying its own uncorrected copy. **When you fix a defect class, grep the class — not the two call sites that reported it.** `saveFathomIdentity` carried three more, one of which made **a failed save completely silent**.
+- **⚠ AND A LOAD-BEARING COMMENT ASSERTED THE BEHAVIOUR THAT WAS MISSING:** `syncProviderNow`'s comment says Fathom *"must open an inline prompt"*. It did not. Same family as the stale-comment entries — **prose asserting a property nothing enforces.**
+
+### ⚠⚠ "OFFERING AN ACTION THE USER HAS ALREADY COMPLETED" IS WORSE THAN OFFERING NONE (2026-08-24)
+**The Calls page told a CONNECTED user to connect a recording source.** Justin: *"That is not a slow sync. That is the page believing nothing is connected."*
+- It **sends them to redo the one step that worked** and **hides the step that actually needs them** — so the user's own troubleshooting takes them further from the fix, confidently.
+- **THE CAUSE IS A COLLAPSED STATE SPACE: "the list is empty" was treated as one condition when it is SIX** — unknown / syncing / not connected / connected-but-unconfigured / failing / synced-and-empty. Each has a different fix, so each needs a different sentence.
+- **⚠⚠ AND `null` STATUS MEANT "UNKNOWN", NOT "NOT CONNECTED".** Connection status is fetched by the OVERVIEW boot, so a deep link straight to Calls arrives with it null — and the page **guessed**, wrongly, for the one user it mattered to. **Same family as write-the-null: absent and known-absent are opposite meanings and identical to a falsy check.**
+- **A FAILED SYNC AND A SLOW SYNC WERE INDISTINGUISHABLE**, which is the whole reason nobody could tell what was happening. A failure now says so, in red, **with the reason**.
+- **⚠ HONEST PROGRESS ONLY.** Justin asked for "Syncing in progress 58%". The sync is **ONE request that returns when it is done** — there is no intermediate count, so **there is no real percentage** and a bar climbing on a timer would keep climbing **through a failure**. Shipped an indeterminate state and said so; a test asserts **no `%` appears** in it.
+
+### ⚠⚠ A SUCCESSFUL ACTION THAT SHOWS NOTHING IS INDISTINGUISHABLE FROM A FAILED ONE — INVALIDATE THE CACHE THE ACTION INVALIDATES (2026-08-24)
+`state.callLibrary` is cached, so after a successful sync the page re-rendered **the cached empty list**: *"Synced 20 calls"* displayed directly above *"No calls synced yet"*. **Both sync handlers now clear it (list, offset, hasMore, counts) so the next render refetches.**
+- **The general form: any handler that changes server-side data must invalidate every client cache derived from it** — and the failure mode is not an error, it is **the user concluding the feature is broken while it is working**.
+
+### ⚠⚠ PROVING NON-VACUITY IS WHAT FOUND THE HOLE IN MY OWN TESTS (2026-08-24)
+**Reverting the fix to prove the guards fire, TEN OF TWELVE STAYED GREEN.**
+- Every empty-state assertion drove `callLibraryEmptyHtml()` **directly**, so it passed whether or not anything called it. **The defect was one line in `renderCallLibrary`, and nothing in the suite could see it.**
+- **This is the dead-call-site rule catching me while I was writing the guard for a dead-call-site bug.** Exercising a function and grepping for its name are the same check twice: both confirm it **exists**, neither confirms it **runs**.
+- **Had I skipped the revert, I would have shipped twelve passing tests and reported the bug as pinned.** The added guard asserts `renderCallLibrary` **calls** the helper **and** no longer emits the CTA itself; with the defect restored, **3 of 13 fail**.
+
+### ⚠ A SLICE FLOOR IS PER-FUNCTION — A BLANKET MINIMUM REJECTS A GENUINE FOUR-LINE PREDICATE (2026-08-24)
+The standing rule (assert the slice length, or a backwards slice silently tests `''`) shipped here with a blanket floor of 400 chars, and it **failed on a correct 123-char predicate**. A bound nothing can satisfy is as useless as one nothing can fail. **Pass the floor per call.**
+
+### ⚠ MY OWN FIXTURE LEAKED THROUGH A HASH-ONLY NAVIGATION AND NEARLY BECAME A FALSE BUG REPORT (2026-08-24)
+After injecting a fake `fathomStatus` to exercise the Calls empty state, I navigated to `#account` and read `fathom_email: null` for a user who **has** one — which looked exactly like the new banner firing incorrectly on a healthy account.
+- **A hash-only navigation does not reload the document**, so module state survives it. The rule was already on file for *stale code*; this is the same mechanism for **stale STATE**.
+- **A hard reload showed `identityMissing: false`, no banner, email displayed — no defect at all.** **When probing with injected state, the fixture is a suspect before the product is** — and the cheapest discriminator is a real reload.
+
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
 - **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
