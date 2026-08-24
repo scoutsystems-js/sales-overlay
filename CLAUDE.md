@@ -2424,6 +2424,33 @@ excluded: 13 disqualifications + 9 payment/logistical barriers = 22;  177 - 22 =
 - **The fix is the mechanism, not care:** `git commit -F - <<'MSG' … MSG`. A **quoted** heredoc delimiter suppresses every form of interpretation — backticks, `$`, history expansion.
 - **⚠ AND DO NOT FORCE-PUSH TO REPAIR A COMMIT MESSAGE.** This project has already lost five commits to a force-push. A cosmetic gap in a message is not worth that risk; note it and move on.
 
+### ⚠⚠⚠ CHECK THE FOREIGN KEYS BEFORE BUILDING TO A DESIGN THAT ASSUMES ORPHANED ROWS (2026-08-24)
+**The design was: "the user is deleted, their calls survive — so the calls need an owner that no longer exists." Reasonable, and NOT what the schema does.** Measured on production: **every** history table CASCADEs on an `auth.users` delete.
+```
+fathom_calls · call_analyses · call_highlights · prospects · eod_edits
+call_sessions · session_logs · session_objections · user_profiles
+call_connections · fathom_connections · objection_synthesis_cache      ALL CASCADE
+knowledge_base                                    NO FKs AT ALL — its rows survive
+fathom_calls.user_id / call_analyses.user_id / prospects.user_id   NOT NULL
+```
+- **PROVEN, NOT INFERRED, ON A THROWAWAY USER: 2 calls and 2 analyses in → delete the auth row → 0 out.** A hard delete does not *orphan* a person's history, it **destroys** it — rewriting close rate, cash and rankings for every period they worked.
+- **⚠ AND `SET NULL` IS NOT EVEN REACHABLE.** Those `user_id` columns are `NOT NULL`, so "make the owner nullable" is a migration across a dozen tables, not a config change. **The question "which option does the schema already support?" had the answer NONE — and saying so was the finding, not a blocker.**
+- **THE SHIPPED DESIGN IS THE TOMBSTONE**, which the architect had listed as an acceptable option and which needs **no migration**: keep the `auth.users` row so all ~12 foreign keys hold, revoke access (ban + random password), scrub the identity to `deleted-<uid8>@deleted.invalid` (RFC 2606 reserved — can never become a stranger's real mailbox), and set the profile inactive with a name that renders **"Deleted user (436a87e8)"** — never blank, never "undefined", never another user.
+- **⚠ THE NUMBERS DO NOT MOVE, AND THAT WAS MEASURED ON AN ISOLATED THROWAWAY TEAM, NOT ARGUED.** Before: `reps 2 · calls_analyzed 3 · cash 5000 · avg_score 65`. After the tombstone: **identical**. Team scoping is by `managed_by`, and the tombstone keeps its edge, so the calls stay inside every team window.
+- **THE THREE MODES** live in `lib/user-management.js deletePlan()`: `hard` (no history — nothing to preserve), `tombstone` (has history), `blocked` (still manages reps — they would end up managed by a deleted person, the same rule deactivate already has).
+
+### ⚠⚠ A GUARD'S REASONING CAN SURVIVE THE RULING THAT DELETES THE GUARD — AND GET *MORE* LOAD-BEARING (2026-08-24)
+**`countUserHistory` is deliberately NOT filtered by `not_a_sales_call`.** That was recorded as protecting the zero-history delete block: a fully-marked user must not read as empty and get wiped. **Justin's ruling removed the block. The reasoning did not become wrong — its consequence got worse.**
+- **BEFORE:** a filtered count → user wrongly reported as having no history → **wrongly BLOCKED** from deletion. Annoying.
+- **AFTER:** a filtered count → user takes the `hard` path instead of `tombstone` → **the cascade DESTROYS their real calls.** Irreversible.
+- **THE RULE: when a ruling removes a guard, ask what the guard's INPUTS were protecting, separately from the guard itself.** Here the count outlived the rule it fed, and the failure mode moved from *inconvenient* to *unrecoverable* — so the comment beside it had to be rewritten rather than deleted with the block. **A stale load-bearing comment on a destructive path is the worst place for one.**
+
+### ⚠⚠ THE PREMISE FOR REMOVING FRICTION CAN EXPIRE — RE-READ IT WHEN THE THING IT CITED CHANGES (2026-08-24)
+**The typed-email confirmation on user delete was removed 2026-07-31 as "redundant friction — delete is already owner-only AND zero-history-gated".** That justification named two guards. **This ruling removed one of them**, so the friction stopped being redundant the moment the gate went — and nothing would have flagged it, because the removal note read as settled.
+- **Restored as a two-step confirmation**, and the dialog text is now generated from the **same `deletePlan` the route executes** (via `GET /admin/users/:id/delete-preview`) so the warning cannot promise something different from what happens.
+- **⚠ THE OLD DIALOG SAID TWO THINGS THAT BECAME FALSE**: *"removes their account and all their data"* (the calls now survive) and *"only allowed if they have no call history"* (no longer the rule). **A stale warning on a destructive action is worse than no warning — it is read, believed, and acted on.** Both strings are now asserted ABSENT.
+- **Generalises:** whenever a change removes a named guard, grep for other decisions that were justified *by* that guard. Removal notes cite their reasons; those citations are the index.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
