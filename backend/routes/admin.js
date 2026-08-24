@@ -9,6 +9,13 @@ const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-ne
 const { fetchSellingContext } = require('../lib/selling-context');
 const welcomeEmail = require('../lib/welcome-email');
 const { canManageTarget, deletePlan, tombstoneIdentity, deactivateBlockReason } = require('../lib/user-management');
+/* ⚠⚠ THIS IMPORT WAS MISSING FROM 20ab18c UNTIL 2026-08-24, AND ADD-USER HAS
+   BEEN COMPLETELY BROKEN THAT ENTIRE TIME. That commit added two
+   normalizeName() calls to POST /admin/users and never imported the function,
+   so every attempt threw `ReferenceError: normalizeName is not defined`.
+   ⚠ `node -c` cannot catch this: the file PARSES perfectly. An identifier that
+   resolves to nothing is only found by RUNNING the line. */
+const { normalizeName } = require('../lib/display-name');
 const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const provisionUser = require('../lib/provision-user');
@@ -476,6 +483,15 @@ router.post('/reset-diagnose', requireAuth, requireRole(['owner']), async functi
 
 var CREATE_ROLES = ['user', 'manager'];
 router.post('/users', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  /* ⚠⚠ THE `try` STARTS HERE, NOT LOWER DOWN, AND THAT IS THE REAL LESSON OF
+     THE 2026-08-24 OUTAGE. `normalizeName` was called on line ~494 — ABOVE the
+     old try block — so when it turned out to be undefined the ReferenceError
+     escaped the handler entirely: nothing hit the catch, nothing was logged,
+     and the admin got a bare failure. Add-user was dead for days and the server
+     log said nothing at all.
+     A handler whose validation sits outside its own error guard can fail
+     INVISIBLY. Everything the handler does is now inside it. */
+  try {
   var body = req.body || {};
   var email = (typeof body.email === 'string') ? body.email.trim() : '';
   var role = body.role;
@@ -499,7 +515,6 @@ router.post('/users', requireAuth, requireRole(['manager', 'owner']), async func
   if (!firstName || firstName.length > 60) return res.status(400).json({ error: 'first_name is required (1-60 chars)' });
   if (!lastName || lastName.length > 60) return res.status(400).json({ error: 'last_name is required (1-60 chars)' });
 
-  try {
     var admin = getAdminClient();
 
     if (managedBy) {
@@ -570,8 +585,14 @@ router.post('/users', requireAuth, requireRole(['manager', 'owner']), async func
     res.json({ user_id: newId, email: email, first_name: firstName, last_name: lastName, role: role, managed_by: managedBy, billing_status: 'trial', temp_password: tempPassword, welcome_email: welcomeStatus });
   } catch (err) {
     if (handleConfigError(err, res)) return;
-    console.error('[admin] create-user error:', err.message);
-    res.status(500).json({ error: 'Failed to create user' });
+    /* ⚠ THE STACK, NOT JUST THE MESSAGE — a ReferenceError's message names the
+       symbol but not the line, and this file's other catches have the same gap
+       (filed). ⚠ AND THE REASON GOES TO THE ADMIN: "Failed to create user" told
+       Justin nothing and told the logs nothing. The route is manager/owner-only,
+       so surfacing the real error is safe and is the difference between a
+       five-minute fix and a feature that is dead for days. */
+    console.error('[admin] create-user error:', err.message, err.stack);
+    res.status(500).json({ error: 'Failed to create user: ' + (err.message || 'unknown error') });
   }
 });
 
