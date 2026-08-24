@@ -21,6 +21,13 @@
 //
 // Pure and total. No I/O, never throws.
 
+// ⚠ ONE definition of "synthetic", shared with every team surface. This file
+// had no requires at all, so the import needed an explicit home — and without
+// it `realCallsOnly` would have been an undefined identifier that `node -c`
+// happily accepts and that only throws when the line runs. Exactly the defect
+// that killed add-user.
+var { realCallsOnly } = require('./real-calls');
+
 // Normalized grouping key. Two calls resolving to the same key attach to the
 // same prospect automatically (exact match only — fuzzy joins are PROPOSALS for
 // human review in 3d-2, never automatic).
@@ -146,7 +153,7 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
        ⚠ `.not(col,'is',true)`, never `.eq(col,false)` — nullable column; see
        test/not-a-sales-call.test.js. */
     var cq = admin.from('fathom_calls')
-      .select('id, user_id, prospect_id, call_date')
+      .select('id, user_id, fathom_call_id, prospect_id, call_date')
       .in('user_id', ids)
       .not('not_a_sales_call', 'is', true)
       .not('prospect_id', 'is', null);
@@ -155,8 +162,23 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
     var calls = await cq;
     if (calls.error || !calls.data || !calls.data.length) return {};
 
+    /* ⚠⚠ SYNTHETIC EXCLUSION — AND IT NEEDS NO SECOND RULE FOR PROSPECTS.
+       The close rate is computed from CALLS grouped by prospect_id, so
+       filtering the calls is enough: a prospect whose only calls are synthetic
+       contributes zero calls and drops out of BOTH numerator and denominator
+       on its own — the same by-construction property the not-a-sales-call note
+       above relies on.
+       ⚠ A prospect-level rule was considered and REJECTED: the seeded rows
+       carry a 'Seed %' display name, but that would be a THIRD convention, and
+       'has no real call' would have dropped 39 of Josh's genuine prospects.
+       ⚠ Unfiltered until 2026-08-24, which is why a demo account with ZERO
+       calls still showed "13% closing rate, 3 of 24 prospects" directly under
+       an honest "0 calls". */
+    var realCalls = realCallsOnly(calls.data);
+    if (!realCalls.length) return {};
+
     var byId = {};
-    calls.data.forEach(function (c) { byId[c.id] = c; });
+    realCalls.forEach(function (c) { byId[c.id] = c; });
 
     // Outcomes come from call_analyses; only 'done' rows carry a real outcome.
     var an = await admin.from('call_analyses')
@@ -173,7 +195,7 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
       (pr.data || []).forEach(function (p) { if (p.merged_into) mergedInto[p.id] = p.merged_into; });
     }
 
-    var joined = calls.data
+    var joined = realCalls
       .filter(function (c) { return Object.prototype.hasOwnProperty.call(outcomeBy, c.id); })
       .map(function (c) {
         return { id: c.id, user_id: c.user_id, prospect_id: c.prospect_id, call_date: c.call_date, outcome: outcomeBy[c.id] };

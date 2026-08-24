@@ -156,6 +156,12 @@ test('⚠⚠ EVERY CROSS-TEAM QUERY FILTERS SYNTHETIC ROWS — the loader was no
     'lib/team-objections.js',  // the objection drilldown
     'routes/team.js',          // team averages (gauges) + rep series (graphs)
     'lib/why-prose.js',        // per-rep prose rendered on the team board
+    /* ⚠ THE CLOSE RATE, and it was the LAST thing still fabricating. After
+       every call-level surface was filtered, a demo account with ZERO calls
+       still displayed "13% closing rate, 3 of 24 prospects" — because the
+       close rate is computed in its own module. Filtering its CALLS query
+       fixes it without inventing a prospect-level rule. */
+    'lib/prospect-entity.js',
   ];
 
   TEAM_AGGREGATORS.forEach((f) => {
