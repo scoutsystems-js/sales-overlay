@@ -111,3 +111,20 @@ test('⚠ THE COST OF "All time" IS STATED, AND NAMES THE GRADING CAP', () => {
   assert.ok(/minute/i.test(c), 'and that it is slow');
   ['30d', '90d'].forEach((w) => assert.ok(/20/.test(W.windowCost(w)), w + ' must name the cap too'));
 });
+
+/* ── the grading cap must survive a history pull ──────────────────────────── */
+
+test('⚠⚠ A HISTORY PULL USES THE FIRST-SYNC GRADING CAP, NOT STEADY STATE', () => {
+  /* callIdsToAnalyze grades EVERY new row when last_sync_at is set. That is
+     right for a normal sync (bounded by real volume) and catastrophic for a
+     backfill: 560 pulled calls would fire 560 analyses. Caught before clicking
+     it on production. */
+  const fs2 = require('fs'), path2 = require('path');
+  const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const m = src.match(/callIdsToAnalyze\(newRows,\s*([^,]+),/);
+  assert.ok(m, 'the analyse-selection call moved');
+  assert.ok(/historyMode/.test(m[1]),
+    'a history pull must pass null for lastSyncAt so the first-sync cap applies; '
+    + 'got: ' + m[1].trim());
+});

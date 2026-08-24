@@ -457,7 +457,14 @@ async function syncUserCalls(admin, userId, conn, opts) {
   // Update-analyses backfill). On steady-state syncs (last_sync_at set) analyze
   // EVERY new call — a per-run cap would silently drop a busy day's calls past #20.
   var newRows = (insertResult && insertResult.data) || [];
-  var newCallIds = callIdsToAnalyze(newRows, conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
+  /* ⚠⚠ THE GRADING CAP MUST HOLD ON A HISTORY PULL. `callIdsToAnalyze` treats a
+     non-null last_sync_at as steady state and grades EVERY new row — correct
+     for a normal sync, where the window is naturally bounded by real call
+     volume, and catastrophic for a backfill: pulling 560 calls would fire 560
+     analyses. Passing null makes a history pull use the FIRST-SYNC cap, so the
+     user gets their whole library and the newest 20 graded, exactly as the UI
+     promises. Pulling calls and grading calls stay separate. */
+  var newCallIds = callIdsToAnalyze(newRows, historyMode ? null : conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
   if (newRows.length > newCallIds.length) {
     console.log('[fathom] sync: first-sync backlog — capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
   }
