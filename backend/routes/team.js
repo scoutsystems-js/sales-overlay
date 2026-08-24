@@ -32,6 +32,7 @@ const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
 // ⚠ ONE definition of "synthetic", shared with every other team surface.
 const { realCallsOnly } = require('../lib/real-calls');
+const { companyDisplayName } = require('../lib/company');
 const { computeTeamObjectionSummary } = require('../lib/team-objection-summary');
 
 const router = express.Router();
@@ -65,6 +66,18 @@ async function repIdsFor(admin, keyId) {
   if (r.error) throw new Error('reps lookup: ' + r.error.message);
   return (r.data || []).map(function (x) { return x.user_id; });
 }
+/* ⚠⚠ THE COMPANY NAME COMES FROM lib/company.js, NOT FROM A LOCAL STRING.
+   Before this, TWO places here built a team label and BOTH produced an email
+   dressed up as a company — `resolveTeam` ("josh@scoutsystems.io's team") and
+   the owner picker in /team/context. Justin's ruling is one name in one place;
+   with three generators and no shared rule that lasts about a week. */
+async function teamNameOf(admin, keyId) {
+  if (!keyId) return null;
+  var r = await admin.from('user_profiles').select('team_name').eq('user_id', keyId).maybeSingle();
+  if (r.error) return null;          // a naming failure must never break the board
+  return (r.data && r.data.team_name) || null;
+}
+
 async function profilesByRole(admin) {
   var r = await admin.from('user_profiles').select('user_id, role');
   if (r.error) throw new Error('profiles: ' + r.error.message);
@@ -105,7 +118,7 @@ async function resolveTeam(admin, req) {
   if (role !== 'owner') {
     // manager: always own reps, param ignored.
     var mine = await repIdsFor(admin, me);
-    return { keyId: me, memberIds: withBoardOwner(me, mine), label: 'My team', mode: 'own' };
+    return { keyId: me, memberIds: withBoardOwner(me, mine), label: companyDisplayName(await teamNameOf(admin, me)), mode: 'own' };
   }
 
   // owner
@@ -116,7 +129,7 @@ async function resolveTeam(admin, req) {
     }
     var reps = await repIdsFor(admin, teamParam);
     var em = await emailMap(admin);
-    return { keyId: teamParam, memberIds: withBoardOwner(teamParam, reps), label: ((em[teamParam] || 'manager') + "'s team"), mode: 'pick' };
+    return { keyId: teamParam, memberIds: withBoardOwner(teamParam, reps), label: companyDisplayName(await teamNameOf(admin, teamParam)), mode: 'pick' };
   }
 
   if (teamParam === 'all') {
@@ -128,7 +141,7 @@ async function resolveTeam(admin, req) {
 
   // default: own team if the owner has reps, else all users.
   var own = await repIdsFor(admin, me);
-  if (own.length > 0) return { keyId: me, memberIds: withBoardOwner(me, own), label: 'My team', mode: 'own' };
+  if (own.length > 0) return { keyId: me, memberIds: withBoardOwner(me, own), label: companyDisplayName(await teamNameOf(admin, me)), mode: 'own' };
   var pr3 = await profilesByRole(admin);
   var em3 = await emailMap(admin);
   return { keyId: me, memberIds: withBoardOwner(me, Object.keys(em3).filter(function (id) { return !pr3.owners[id]; })), label: 'All users', mode: 'all' };
@@ -149,7 +162,7 @@ router.get('/context', teamGate, async function (req, res) {
       var teams = [];
       for (var i = 0; i < managers.length; i++) {
         var reps = await repIdsFor(admin, managers[i]);
-        if (reps.length > 0) teams.push({ key: managers[i], label: (managers[i] === req.user.id ? 'My team' : (em[managers[i]] || 'manager') + "'s team"), rep_count: reps.length, is_self: managers[i] === req.user.id });
+        if (reps.length > 0) teams.push({ key: managers[i], label: companyDisplayName(await teamNameOf(admin, managers[i])), rep_count: reps.length, is_self: managers[i] === req.user.id });
       }
       teams.push({ key: 'all', label: 'All users', rep_count: Object.keys(em).filter(function (id) { return !pr.owners[id]; }).length, is_self: false });
       ctx.teams = teams;

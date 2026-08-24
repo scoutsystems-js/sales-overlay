@@ -16,6 +16,7 @@ const { canManageTarget, deletePlan, tombstoneIdentity, deactivateBlockReason } 
    ⚠ `node -c` cannot catch this: the file PARSES perfectly. An identifier that
    resolves to nothing is only found by RUNNING the line. */
 const { normalizeName } = require('../lib/display-name');
+const { sanitizeCompanyName, companyDisplayName, bucketUsers } = require('../lib/company');
 const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const provisionUser = require('../lib/provision-user');
@@ -206,6 +207,10 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
         active: u.active,
         first_name: u.first_name,
         last_name: u.last_name,
+        // ⚠ Company name. Meaningful only when this user HEADS a company (has
+        // reps); lib/company.js keys off reps, never role, so a `manager` with
+        // zero reps is a single user and this value is simply unused for them.
+        team_name: u.team_name,
         created_at: u.created_at,
         session_count: s.session_count,
         last_session_at: s.last_session_at,
@@ -214,7 +219,27 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
 
     // Seat count = active users in the visible scope (billing: seat = active user).
     var seatsActive = visible.filter(function (u) { return u.active !== false; }).length;
-    res.json({ users: enriched, seats_active: seatsActive, seats_total: visible.length });
+
+    /* ⚠⚠ THE GROUPING IS DONE HERE, ON THE SERVER, ON PURPOSE. The admin page
+       is a plain browser document and cannot `require` lib/company.js, so the
+       alternative was to reimplement "what is a company" inline in the page —
+       a FOURTH mirrored predicate in a codebase that has already paid for
+       duplicated scope rules, two `rankSections` meaning opposite directions,
+       and a manager-membership rule that eight endpoints did not have.
+       Grouping server-side means there is exactly one definition and the page
+       only renders what it is handed.
+       ⚠ `users` is still returned unchanged — the existing flat table (the
+       All Users tab) reads it, so this is additive and nothing had to be
+       migrated to land it. */
+    var grouped = bucketUsers(enriched);
+
+    res.json({
+      users: enriched,
+      companies: grouped.companies,
+      singles: grouped.singles,
+      seats_active: seatsActive,
+      seats_total: visible.length,
+    });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] users error:', err.message);
@@ -392,6 +417,67 @@ router.patch('/users/:user_id/billing_status', requireAuth, requireRole('owner')
     if (handleConfigError(err, res)) return;
     console.error('[admin] billing patch error:', err.message);
     res.status(500).json({ error: 'Failed to update billing status' });
+  }
+});
+
+// ── PATCH /admin/companies/:head_id/name ────────────────────────────────────
+// Rename a COMPANY. Justin's ruling (2026-08-24): a company IS a team, renamed
+// in the admin view only — so the "company" here is identified by its HEAD (the
+// user whose reps form the team), and the name lives on that user's row.
+//
+// ⚠⚠ THE TARGET MUST ACTUALLY HEAD A COMPANY. A name stored against a user with
+// no reps is invisible forever: lib/company.js buckets on HAVING REPS, never on
+// role, so such a user renders as a Single User and their team_name is never
+// read. Accepting the write would report success for something that can never
+// appear — a silent no-op, which is the failure mode this session has already
+// shipped three times. Refuse it instead, and say why.
+//
+// ⚠ Owner-only, matching role/billing (the other admin-console field edits).
+router.patch('/companies/:head_id/name', requireAuth, requireRole('owner'), async function(req, res) {
+  var headId = req.params.head_id;
+  var raw = (req.body && Object.prototype.hasOwnProperty.call(req.body, 'name')) ? req.body.name : undefined;
+
+  // ⚠ undefined = "you sent junk" (400). null = "clear the name" (allowed, and
+  // lands back on the fallback). Collapsing the two would let a malformed
+  // payload silently wipe a company's name.
+  if (raw === undefined) return res.status(400).json({ error: 'name is required' });
+  var name = sanitizeCompanyName(raw);
+  if (name === undefined) return res.status(400).json({ error: 'name must be a string' });
+
+  try {
+    var admin = getAdminClient();
+
+    var repCount = await admin
+      .from('user_profiles')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('managed_by', headId);
+    if (repCount.error) throw new Error('rep lookup failed: ' + repCount.error.message);
+    if (!repCount.count) {
+      return res.status(400).json({
+        error: 'That user has no team members, so there is no company to name.',
+      });
+    }
+
+    var upd = await admin
+      .from('user_profiles')
+      .update({ team_name: name, updated_at: new Date().toISOString() })
+      .eq('user_id', headId)
+      .select('user_id, team_name');
+    if (upd.error) throw new Error('update failed: ' + upd.error.message);
+    if (!upd.data || !upd.data.length) {
+      return res.status(404).json({ error: 'No profile found for that user.' });
+    }
+
+    console.log('[admin] company renamed: actor=%s head=%s name=%s',
+      req.user.email, headId, name === null ? '(cleared)' : JSON.stringify(name));
+
+    // Return BOTH the stored value and what will render, so the client never
+    // has to reimplement the fallback to show the result of its own save.
+    res.json({ ok: true, head_id: headId, team_name: name, display_name: companyDisplayName(name) });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company rename error:', err.message);
+    res.status(500).json({ error: 'Failed to rename the company' });
   }
 });
 
@@ -893,7 +979,7 @@ async function fetchUsersWithProfiles(admin) {
   if (authResult.error) throw new Error('listUsers failed: ' + authResult.error.message);
   var profilesResult = await admin
     .from('user_profiles')
-    .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name');
+    .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name, team_name');
   if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
 
   var profilesByUserId = {};
@@ -913,6 +999,7 @@ async function fetchUsersWithProfiles(admin) {
       billing_status: p.billing_status || 'trial',
       billing_plan: p.billing_plan || null,
       active: p.active !== false, // profile-less or unset → active (matches column default)
+      team_name: p.team_name || null,   // company name; meaningful only on a head
       first_name: p.first_name || null,
       last_name: p.last_name || null,
       created_at: u.created_at || null,
@@ -1183,3 +1270,10 @@ router._computeDurationSeconds = computeDurationSeconds;
 router._computeUserSessionStats = computeUserSessionStats;
 
 module.exports = router;
+
+/* ⚠ NARROW TEST HOOK — `_admin` is module-local, so an HTTP test that drives the
+   real router has no other way to substitute the database. One line, sets the
+   module-local client, production untouched. Same shape as routes/me.js.
+   ⚠ It is NOT a way to skip the auth gate: requireAuth is stubbed separately in
+   the test, and requireRole still runs for real against the forged actor. */
+module.exports._setAdminClientForTests = function (factory) { _admin = factory; };

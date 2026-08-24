@@ -275,6 +275,40 @@
     .pct-mid  { color: #facc15; }
     .pct-bad  { color: #f87171; }
     .pct-none { color: var(--muted); }
+
+    /* ─── Company blocks + admin tabs (2026-08-24) ─────────────────────────
+       A company IS a team, renamed in this view only. */
+    .admin-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .admin-tab {
+      background: var(--bg-elevated, #131313); color: var(--text, #ededed);
+      border: 1px solid var(--border-strong, #2a2a2a); border-radius: 6px;
+      padding: 7px 13px; font: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+    }
+    .admin-tab:hover { border-color: var(--green, #09e046); }
+    .admin-tab.active { border-color: var(--green, #09e046); color: var(--green, #09e046); }
+    .admin-tab-count {
+      font-size: 11px; font-weight: 600; opacity: 0.75;
+      border: 1px solid currentColor; border-radius: 10px; padding: 0 6px; line-height: 16px;
+    }
+
+    .company-block {
+      border: 1px solid var(--border-strong, #2a2a2a); border-radius: 10px;
+      padding: 16px; margin-bottom: 18px; background: var(--bg-elevated, #131313);
+    }
+    /* ⚠ TOP CENTRE — Justin's ruling. Scoped to the block; nothing else in the
+       admin page is centred, and this must not leak into the shared table. */
+    .company-head { text-align: center; margin-bottom: 14px; }
+    .company-name-input, .company-name-static {
+      font-size: 19px; font-weight: 700; text-align: center; color: var(--text, #ededed);
+      background: transparent; border: 1px solid transparent; border-radius: 6px;
+      padding: 5px 10px; max-width: 100%; width: 360px; font-family: inherit;
+    }
+    .company-name-input:hover { border-color: var(--border-strong, #2a2a2a); }
+    .company-name-input:focus { border-color: var(--green, #09e046); outline: none; }
+    /* An unnamed company reads as a gap to fill, not as a name. */
+    .company-name-input.unnamed::placeholder, .company-name-static.unnamed { opacity: 0.6; font-style: italic; }
+    .company-sub { font-size: 12px; opacity: 0.7; margin-top: 2px; }
   </style>
   <script src="/js/scout-auth.js"></script>
 </head>
@@ -434,7 +468,9 @@
 
   // ── State ───────────────────────────────────────────────────────────────
   var currentUser = null;          // { user_id, email, role } from /auth/me
-  var usersArray = [];             // Section A
+  var usersArray = [];
+  var companiesArray = [];   // [{key,name,is_unnamed,head,members,user_count}] from the server
+  var singlesArray = [];     // users with no reps AND no manager             // Section A
   var ownerCount = 0;              // derived from usersArray
 
   // ── Init ───────────────────────────────────────────────────────────────
@@ -462,6 +498,9 @@
       if (rd) rd.style.display = '';
     }
 
+    // ⚠ Restore the tab BEFORE the first render, or the page always opens on
+    // Companies and a refresh silently discards where the user was.
+    adminTab = readAdminTabFromHash();
     await loadUsers();
   }
 
@@ -531,6 +570,10 @@
     }
     var data = await res.json();
     usersArray = (data && data.users) || [];
+    // ⚠ Grouped by the SERVER (lib/company.js). The page deliberately does not
+    // reimplement "what is a company" — one definition, no mirror to drift.
+    companiesArray = (data && data.companies) || [];
+    singlesArray = (data && data.singles) || [];
     ownerCount = usersArray.filter(function(u) { return u.role === 'owner'; }).length;
     renderUsersTable();
     populateAnalyticsUserSelect();
@@ -675,16 +718,47 @@
   function managersList() { return usersArray.filter(function(u) { return u.role === 'manager' || u.role === 'owner'; }); }
   function shortDate(iso) { var d = new Date(iso); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); }
 
-  function renderUsersTable() {
-    var wrap = document.getElementById('usersTableWrap');
-    var isOwnerViewer = currentUser.role === 'owner';
-    var btn = document.getElementById('btnCreateUser');
-    if (btn) btn.style.display = isOwnerViewer ? '' : 'none';
-    if (usersArray.length === 0) { wrap.innerHTML = '<div class="empty-msg">No users to display.</div>'; return; }
+  /* ═══ COMPANY BLOCKS ══════════════════════════════════════════════════════
+     Justin's ruling (2026-08-24): the admin view is organised around COMPANIES,
+     which ARE teams renamed — no new tier, no schema change beyond the name.
 
-    var header = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Status</th><th>Created</th><th></th></tr>';
-    var mgrs = managersList();
-    var rows = usersArray.map(function(u) {
+     ⚠ A company is a user WITH REPS plus their reps. It is keyed on having
+     reps, never on role: live data has a `manager` with zero reps who is a
+     SINGLE USER, not a company of one.
+     ⚠ The grouping arrives from the server so this page never gets a second,
+     drifting copy of that rule. */
+  var ADMIN_TABS = [
+    { key: 'companies', label: 'Companies' },
+    { key: 'singles',   label: 'Single Users' },
+    { key: 'all',       label: 'All Users' },
+  ];
+  var adminTab = 'companies';
+
+  /* Tab state survives a refresh, consistent with the rest of the product
+     (the dashboard keeps its view + range in the hash). */
+  function readAdminTabFromHash() {
+    var h = (window.location.hash || '').replace(/^#/, '');
+    for (var i = 0; i < ADMIN_TABS.length; i++) if (ADMIN_TABS[i].key === h) return h;
+    return 'companies';
+  }
+  function setAdminTab(key) {
+    adminTab = key;
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', '#' + key);
+    } else { window.location.hash = key; }
+    renderUsersTable();
+  }
+  function adminTabsHtml() {
+    return '<div class="admin-tabs">' + ADMIN_TABS.map(function(t) {
+      var n = t.key === 'companies' ? companiesArray.length
+            : (t.key === 'singles' ? singlesArray.length : usersArray.length);
+      return '<button class="admin-tab' + (adminTab === t.key ? ' active' : '') + '"'
+        + ' onclick="setAdminTab(\'' + t.key + '\')">' + t.label
+        + '<span class="admin-tab-count">' + n + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function userRowHtml(u, isOwnerViewer, mgrs) {
       var isSelf = u.user_id === currentUser.user_id;
       var editable = isOwnerViewer && !isSelf;   // owners edit others; self + non-owner viewers are read-only
       var roleCell = editable ? roleControlHtml(u)
@@ -718,8 +792,113 @@
         + '<td style="color:var(--muted);font-size:12px;">' + escapeHtml(created) + '</td>'
         + '<td>' + actions + '</td>'
       + '</tr>';
-    });
-    wrap.innerHTML = '<table class="users-table"><thead>' + header + '</thead><tbody>' + rows.join('') + '</tbody></table>';
+
+  }
+
+  var USERS_TABLE_HEADER = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Managed by</th><th>Billing</th><th>Status</th><th>Created</th><th></th></tr>';
+
+  function usersTableHtml(list, isOwnerViewer, mgrs, emptyMsg) {
+    if (!list.length) return '<div class="empty-msg">' + escapeHtml(emptyMsg) + '</div>';
+    return '<table class="users-table"><thead>' + USERS_TABLE_HEADER + '</thead><tbody>'
+      + list.map(function(u) { return userRowHtml(u, isOwnerViewer, mgrs); }).join('')
+      + '</tbody></table>';
+  }
+
+  /* One company. Members render top-down by ROLE (the server sorted them), with
+     the HEAD first — they are the company, not a row in it. */
+  function companyBlockHtml(c, isOwnerViewer, mgrs) {
+    var members = (c.head ? [c.head] : []).concat(c.members || []);
+    return '<section class="company-block">'
+      + companyNameHtml(c, isOwnerViewer)
+      + usersTableHtml(members, isOwnerViewer, mgrs, 'No members.')
+    + '</section>';
+  }
+
+  /* ⚠⚠ THE NAME IS EDITABLE AT THE TOP CENTRE OF ITS BLOCK, AND THE SAVE MUST
+     SAY WHETHER IT WORKED. This session has already shipped three silent-save
+     defects — twice a render call that only fired on one view, and once a
+     cached list re-rendering stale content over a successful write. So this one
+     reports ✓ / ✗ inline and REVERTS the field on failure, the same contract
+     saveUserField already honours, and never leaves the input showing a value
+     the server did not accept. */
+  function companyNameHtml(c, isOwnerViewer) {
+    var shown = c.name || 'Unnamed company';
+    if (!isOwnerViewer) {
+      return '<div class="company-head"><div class="company-name-static'
+        + (c.is_unnamed ? ' unnamed' : '') + '">' + escapeHtml(shown) + '</div></div>';
+    }
+    return '<div class="company-head">'
+      + '<input class="company-name-input' + (c.is_unnamed ? ' unnamed' : '') + '"'
+        + ' id="cn-' + escapeHtml(c.key) + '"'
+        + ' value="' + escapeHtml(c.is_unnamed ? '' : shown) + '"'
+        + ' placeholder="Unnamed company" maxlength="80" autocomplete="off"'
+        + ' aria-label="Company name"'
+        + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}"'
+        + ' onblur="saveCompanyName(this, \'' + escapeHtml(c.key) + '\')">'
+      + '<span class="field-status" id="cns-' + escapeHtml(c.key) + '"></span>'
+      + '<div class="company-sub">' + (c.user_count || 0) + ' member' + ((c.user_count === 1) ? '' : 's') + '</div>'
+    + '</div>';
+  }
+
+  async function saveCompanyName(input, headId) {
+    var status = document.getElementById('cns-' + headId);
+    var company = null;
+    for (var i = 0; i < companiesArray.length; i++) if (companiesArray[i].key === headId) company = companiesArray[i];
+    var original = (company && !company.is_unnamed) ? company.name : '';
+    var next = input.value.trim();
+    if (next === original) return;
+
+    function fail(msg) {
+      input.value = original;                       // never show an unsaved value
+      if (status) { status.textContent = '✗ ' + msg; status.className = 'field-status err'; }
+    }
+    if (status) { status.textContent = '…'; status.className = 'field-status'; }
+
+    var res;
+    try {
+      res = await fetch('/admin/companies/' + encodeURIComponent(headId) + '/name', {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ name: next === '' ? null : next }),
+      });
+    } catch (e) { fail('network'); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      fail(err.error || 'failed'); return;
+    }
+    var data = await res.json();
+    if (company) {
+      company.name = data.display_name;
+      company.is_unnamed = !data.team_name;
+    }
+    input.value = data.team_name || '';
+    input.classList.toggle('unnamed', !data.team_name);
+    if (status) {
+      status.textContent = '✓'; status.className = 'field-status ok';
+      setTimeout(function() { if (status) { status.textContent = ''; status.className = 'field-status'; } }, 1400);
+    }
+  }
+
+  function renderUsersTable() {
+    var wrap = document.getElementById('usersTableWrap');
+    var isOwnerViewer = currentUser.role === 'owner';
+    var btn = document.getElementById('btnCreateUser');
+    if (btn) btn.style.display = isOwnerViewer ? '' : 'none';
+    var mgrs = managersList();
+    var body;
+
+    if (adminTab === 'all') {
+      body = usersTableHtml(usersArray, isOwnerViewer, mgrs, 'No users to display.');
+    } else if (adminTab === 'singles') {
+      body = usersTableHtml(singlesArray, isOwnerViewer, mgrs,
+        'No single users — everyone belongs to a company.');
+    } else {
+      body = companiesArray.length
+        ? companiesArray.map(function(c) { return companyBlockHtml(c, isOwnerViewer, mgrs); }).join('')
+        : '<div class="empty-msg">No companies yet. A company appears once a user has team members assigned to them.</div>';
+    }
+    wrap.innerHTML = adminTabsHtml() + body;
   }
 
   function fieldControl(u, field, original, opts) {

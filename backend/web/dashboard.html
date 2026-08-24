@@ -2397,6 +2397,11 @@
     .digest-notable .meta { margin-top: 4px; }
     .digest-focus { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--good); border-radius: var(--radius); background: var(--bg-elevated); }
     /* Account Connections rows */
+    /* ⚠ SCOPED CENTRING — see teamHeaderHtml. `.page-header` is shared by every
+       view; only the company header centres, and only because Justin asked for
+       the company name at the top centre of the Team view. */
+    .page-header--company .page-header-main { text-align: center; width: 100%; }
+    .page-header--company .review-meta-row { justify-content: center; }
     .conn-row { align-items: center; }
     .conn-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     /* The Fathom identity prompt, rendered inside Connections and inside the
@@ -9080,7 +9085,17 @@
     // panel above the title would push the page's own name halfway down.
     // The header keeps position:relative + z-index so the date panel still
     // escapes the stacking contexts below it — see the .page-header note.
-    return '<div class="page-header fade-in" style="margin-bottom:18px;">'
+    /* ⚠⚠ THE COMPANY NAME, TOP CENTRE (Justin, 2026-08-24). It is the SAME
+       string the admin company block edits — `team.label` now comes from
+       lib/company.js via resolveTeam, so there is one name in one place. An
+       unnamed company reads "Unnamed company", never blank and never the
+       head's email (which is exactly what this header used to show).
+
+       ⚠ THE CENTRING IS SCOPED TO `.page-header--company` AND MUST STAY THAT
+       WAY. `.page-header` is rendered by every view in the product; centring it
+       globally would silently re-align a dozen pages that had nothing to do
+       with this change — the shared-carrier failure, in CSS. */
+    return '<div class="page-header page-header--company fade-in" style="margin-bottom:18px;">'
       + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
         + '<div class="review-meta-row"><span>Manager view</span></div></div>'
     + '</div>';

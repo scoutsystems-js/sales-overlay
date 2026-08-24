@@ -34,14 +34,26 @@ const assert = require('node:assert');
 const router = require('../routes/team');
 const resolveTeam = router._resolveTeam;
 
-/** Minimal supabase stand-in: only what resolveTeam touches. */
+/** Minimal supabase stand-in: only what resolveTeam touches.
+ *  ⚠ resolveTeam now makes TWO kinds of user_profiles read: reps by
+ *  `managed_by`, and the COMPANY NAME by `user_id` (2026-08-24 — the team
+ *  label is the company name, so an unnamed team no longer renders its
+ *  manager's email dressed up as a company). The fake must answer both or the
+ *  membership assertions fail for a reason that has nothing to do with
+ *  membership. */
 function fakeAdmin(profiles) {
   return {
     from(table) {
       assert.strictEqual(table, 'user_profiles', 'resolveTeam only reads user_profiles');
       const api = {
         select() { return api; },
+        maybeSingle() { return api._single; },
         eq(col, val) {
+          if (col === 'user_id') {                       // the company-name read
+            const hit = profiles.filter((p) => p.user_id === val)[0];
+            api._single = Promise.resolve({ data: hit ? { team_name: hit.team_name || null } : null, error: null });
+            return api;
+          }
           assert.strictEqual(col, 'managed_by');
           return Promise.resolve({
             data: profiles.filter((p) => p.managed_by === val).map((p) => ({ user_id: p.user_id })),
@@ -126,4 +138,60 @@ test('⚠⚠ EVERY /team ENDPOINT USES THE RESOLVED SET — the rule has ONE hom
     'team.repIds is retired in favour of team.memberIds; a stale reader would silently '
     + 'drop the manager again, which is exactly how this bug happened');
   assert.ok(/memberIds/.test(live), 'resolveTeam must expose the member set');
+});
+
+/* ── the team LABEL is the company name (2026-08-24) ───────────────────────── */
+
+test('⚠⚠ AN UNNAMED TEAM LABELS AS "Unnamed company", NEVER THE MANAGER\'S EMAIL', async () => {
+  const team = await resolveTeam(fakeAdmin(PROFILES), reqFor(MANAGER, 'manager'));
+  assert.strictEqual(team.label, 'Unnamed company');
+  assert.ok(team.label.indexOf('@') === -1,
+    'the label used to be "<email>\'s team" — an email dressed up as a company');
+  assert.notStrictEqual(team.label, 'My team',
+    'the header now shows WHICH company, not a generic word');
+});
+
+test('⚠ A NAMED TEAM LABELS AS ITS COMPANY NAME — one name, one place', async () => {
+  const named = PROFILES.map((p) => (p.user_id === MANAGER ? Object.assign({}, p, { team_name: 'Sober Living Riches' }) : p));
+  const team = await resolveTeam(fakeAdmin(named), reqFor(MANAGER, 'manager'));
+  assert.strictEqual(team.label, 'Sober Living Riches',
+    'the Team view header reads the SAME stored value the admin company block edits');
+});
+
+/* ── the company picker is ADMIN-ONLY, enforced server-side ────────────────── */
+
+test('⚠⚠ A MANAGER CANNOT REACH ANOTHER COMPANY BY PASSING ?team= — HIDING THE CONTROL IS NOT A CHECK', async () => {
+  /* §6: an admin can cycle through every company. The control is rendered for
+     owners only — but a hidden control is a UI decision, not a permission, and
+     the param is trivially forgeable by hand. `resolveTeam` IGNORES the param
+     for any non-owner, so a manager asking for someone else's company gets
+     their OWN board back rather than an error or another team's numbers. */
+  const OTHER = 'mgr-2';
+  const profiles = PROFILES.concat([
+    { user_id: OTHER, role: 'manager', managed_by: null, team_name: 'Someone Else Co' },
+    { user_id: 'rep-x', role: 'user', managed_by: OTHER },
+  ]);
+
+  const team = await resolveTeam(fakeAdmin(profiles), reqFor(MANAGER, 'manager', { team: OTHER }));
+
+  assert.strictEqual(team.keyId, MANAGER,
+    'a forged ?team= must not move a manager onto another company; got ' + team.keyId);
+  assert.strictEqual(team.memberIds.indexOf('rep-x'), -1,
+    "another company's member leaked into the board");
+  assert.notStrictEqual(team.label, 'Someone Else Co',
+    "and the other company's NAME must not leak either — the label is the "
+    + 'company name now, so it is a disclosure too');
+});
+
+test('⚠ NON-VACUITY: the same param DOES move an OWNER', async () => {
+  /* Without this, the assertion above would pass against a resolveTeam that
+     ignored ?team= for everybody — including the admins the feature exists for. */
+  const OTHER = 'mgr-2';
+  const profiles = PROFILES.concat([
+    { user_id: OTHER, role: 'manager', managed_by: null, team_name: 'Someone Else Co' },
+    { user_id: 'rep-x', role: 'user', managed_by: OTHER },
+  ]);
+  const team = await resolveTeam(fakeAdmin(profiles), reqFor('owner-1', 'owner', { team: OTHER }));
+  assert.strictEqual(team.keyId, OTHER, 'an owner must be able to pivot');
+  assert.strictEqual(team.label, 'Someone Else Co', 'and sees that company by NAME');
 });
