@@ -4817,15 +4817,15 @@
     try {
       var pre = await fetch('/fathom/update-analyses', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ scope: scope, dry_run: true }) });
       if (pre.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      if (!pre.ok) { var e = null; try { e = await pre.json(); } catch (x) {} state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (e && e.error ? e.error : 'HTTP ' + pre.status) }; if (state.view === 'overview') renderOverview(false); return; }
+      if (!pre.ok) { var e = null; try { e = await pre.json(); } catch (x) {} state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (e && e.error ? e.error : 'HTTP ' + pre.status) }; rerenderConnectionViews(); return; }
       count = ((await pre.json()) || {}).count || 0;
-    } catch (err) { state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (err.message || 'unknown') }; if (state.view === 'overview') renderOverview(false); return; }
+    } catch (err) { state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (err.message || 'unknown') }; rerenderConnectionViews(); return; }
     var label = scope === 'all' ? 'all time' : (scope === '7d' ? 'the last 7 days' : 'the last 30 days');
-    if (count === 0) { state.fathomNotice = { kind: 'success', text: 'No outdated analyses in ' + label + '.' }; if (state.view === 'overview') renderOverview(false); return; }
+    if (count === 0) { state.fathomNotice = { kind: 'success', text: 'No outdated analyses in ' + label + '.' }; rerenderConnectionViews(); return; }
     if (!confirm('Re-analyze ' + count + ' call' + (count === 1 ? '' : 's') + ' from ' + label + '?\n\nThis runs ' + count + ' AI analysis' + (count === 1 ? '' : 'es') + ' and can take a while. Your manual outcome tags are preserved.')) return;
     // 2) run for real.
     state.fathomUpdating = true;
-    if (state.view === 'overview') renderOverview(false);
+    rerenderConnectionViews();
     var noticeText = null;
     var noticeKind = 'success';
     try {
@@ -4881,7 +4881,7 @@
     state.fathomIdentitySuggestion = current || (suggestions[0] && suggestions[0].email) || '';
     state.fathomNeedsIdentity = true;
     /* ⚠⚠ THE BUG THAT COST A TRIAL CLIENT A DAY (2026-08-24). This line read
-       `if (state.view === 'overview') renderOverview(false);`. The only manual
+       `rerenderConnectionViews();`. The only manual
        Sync a healthy account has lives in #account -> Connections, so the
        prompt was set in state and NEVER DRAWN. Five clicks, five HTTP 200s,
        nothing on screen — no progress, no calls, and no error, because
@@ -5154,6 +5154,15 @@
       + '</div>';
   }
 
+  /* ⚠⚠ DEAD SINCE `6adb774` AND ARCHIVED 2026-08-24. This built the reanalyze /
+     update-analyses controls for a healthy connection, and was orphaned when
+     the healthy "Fathom connected" card was removed — DEFINED, NEVER CALLED.
+     Removing the card moved Sync Now into Connections but left these behind, so
+     a working account had no way to grade its backlog at all. Replaced by
+     fathomBacklogRowHtml(), which lives in Connections beside Sync Now.
+     Kept commented rather than deleted per the archive convention; do not
+     revive it without moving its callers too. */
+/*
   function renderFathomStripConnected(status) {
     var count = (typeof status.call_count === 'number') ? status.call_count : 0;
     var pending = (typeof status.pending_count === 'number') ? status.pending_count : 0;
@@ -5202,6 +5211,8 @@
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + syncBtn + reanalyzeBtn + updateBtn + '</div>'
       + '</div>';
   }
+
+*/
 
   function renderFathomStripSyncing() {
     return '<div class="fathom-strip">'
@@ -5762,7 +5773,14 @@
     // falls back to counting all moments).
     var ohr = objectionHandleRate(state.needsWork);
     var tiles = '<div class="glance-row fade-in">'
-      + glanceTileHtml('Calls analyzed', analyzed, 'of ' + a.calls.total_in_range + ' in range', "drillCalls('analyzed',null)")
+      /* ⚠ "19 of 149" with no explanation reads as broken to a trial customer.
+         It is not: grading is capped when calls first arrive. Say so, and say
+         where to fix it, rather than leaving a number that looks like a fault. */
+      + glanceTileHtml('Calls analyzed', analyzed,
+          (analyzed < a.calls.total_in_range)
+            ? ('of ' + a.calls.total_in_range + ' in range · ' + (a.calls.total_in_range - analyzed) + ' not graded yet')
+            : ('of ' + a.calls.total_in_range + ' in range'),
+          "drillCalls('analyzed',null)")
       + glanceTileHtml('Avg score', avgBig, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
       + glanceTileHtml('Objection handle rate', ohr ? ohr.rate + '%' : '—', ohr ? (ohr.handled + ' of ' + ohr.total + ' handled') : 'true objections', "goObjections()")
       /* REMOVED 2026-08-17 — Justin: cash comes off the cards. This was the ONLY
@@ -10301,6 +10319,43 @@
     await refreshFathomStatusInBackground();
   }
 
+  /* ⚠⚠ THE ONLY REACHABLE WAY TO GRADE A BACKLOG. `renderFathomStripConnected`
+     built these controls and was ORPHANED when the healthy "Fathom connected"
+     card was removed — defined, never called, so a working account had NO way
+     to grade ungraded calls at all. Josh's trial account sat at 19 graded of
+     200 with no control anywhere on the page.
+
+     ⚠ AND THE OLD BRANCHING WAS WRONG EVEN WHEN IT RENDERED: the scope dropdown
+     only appeared when `outdated > 0`, so a pure backlog (pending, nothing
+     outdated — exactly the post-import case) fell through to "Analyze next 10",
+     which is 18 clicks for 180 calls. The window picker now shows whenever
+     there is ANY work, because /fathom/update-analyses dispatches pending AND
+     outdated in one batch. */
+  function fathomBacklogRowHtml() {
+    var f = state.fathomStatus;
+    if (!(f && f.connected)) return '';
+    var pending = (typeof f.pending_count === 'number') ? f.pending_count : 0;
+    var outdated = (typeof f.outdated_count === 'number') ? f.outdated_count : 0;
+    var work = pending + outdated;
+    if (work <= 0) return '';
+
+    var busy = !!state.fathomUpdating;
+    return '<div class="eod-row conn-row"><div class="eod-label">UNGRADED</div>'
+      + '<div class="conn-right">'
+        + '<span class="conn-state">' + work + ' call' + (work === 1 ? '' : 's') + ' not graded yet</span>'
+        + (busy
+            ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Grading…</button>'
+            : '<select class="role-select" onchange="if(this.value){updateOutdatedAnalysesNow(this.value);this.selectedIndex=0;}">'
+              + '<option value="" selected>Grade calls from…</option>'
+              + '<option value="7d">Last 7 days</option>'
+              + '<option value="30d">Last 30 days</option>'
+              + '<option value="all">All time</option>'
+              + '</select>')
+        + '<span class="meta">Grading is capped when calls first arrive so a large import '
+          + 'cannot fire hundreds of analyses at once. You choose when to grade the rest.</span>'
+      + '</div></div>';
+  }
+
   function renderConnectionsSectionHtml() {
     /* ⚠ The prompt's only markup used to be in the OVERVIEW strip, so a
        needs_identity answer raised from THIS section had nowhere to land. */
@@ -10320,6 +10375,7 @@
       + identity
       + connectionRowHtml('fathom')
       + fathomHistoryRowHtml()
+      + fathomBacklogRowHtml()
       + connectionRowHtml('zoom')
       + '<div class="meta" style="margin-top:8px;">Disconnecting keeps your synced calls, grades, and clips — it only stops new calls from coming in.</div>';
   }

@@ -144,20 +144,29 @@ test('⚠⚠ THE RESET-DIAGNOSTICS SURFACE IS GONE — UI **AND** ENDPOINT', () 
     assert.ok(LIVE.indexOf(m) !== -1, 'the removal took ' + m + ' with it'));
 });
 
-test('⚠ ADD COMPANY EXISTS, AND ITS HEAD COMES FROM SINGLE USERS', () => {
-  assert.ok(/submitAddCompany/.test(LIVE), 'the create flow must exist');
-  const i = LIVE.indexOf('function addCompanyBarHtml(');
-  assert.ok(i !== -1);
-  const fn = LIVE.slice(i, LIVE.indexOf('\n  }', i));
-  assert.ok(/singlesArray/.test(fn),
-    'the head must be picked from SINGLE USERS — offering someone already in a '
-    + 'company would silently remove them from it');
+test('⚠⚠ COMPANY CREATION LIVES IN "+ Create user", NOT AN INLINE BAR', () => {
+  /* Justin, 2026-08-24: "I don't like the New company / headed by / insert
+     email bar — move this to like the user onboarding from admin view."
+     ⚠ CONVERTED, not deleted: the old test asserted the bar existed and picked
+     its head from Single Users. The bar is gone; the property that outlived it
+     is that creating a company still happens somewhere, still needs a name, and
+     still reports failure. */
+  assert.strictEqual(LIVE.indexOf('addCompanyBarHtml'), -1, 'the inline bar must be gone');
+  assert.strictEqual(LIVE.indexOf('submitAddCompany'), -1, 'and its handler with it');
 
-  const j = LIVE.indexOf('async function submitAddCompany(');
-  const save = LIVE.slice(j, LIVE.indexOf('\n  }', j));
-  assert.ok(/'✓'/.test(save) && /'✗ '/.test(save), 'the create must report success AND failure');
-  assert.ok(/await loadUsers\(\)/.test(save),
-    'it must reload from the server — creating a company moves its head out of '
-    + 'Single Users, so both tab counts change and recomputing locally would be '
-    + 'a second copy of the bucketing rule');
+  assert.ok(/NEW_COMPANY/.test(LIVE), 'the create-user flow must offer a new company');
+  assert.ok(/cuNewCompany/.test(LIVE), 'with a name field');
+
+  const i2 = LIVE.indexOf('async function submitCreateUser(');
+  assert.ok(i2 !== -1);
+  const fn = LIVE.slice(i2, LIVE.indexOf('\n  }', i2));
+  assert.ok(/A company needs a name/.test(fn),
+    'a missing name must be caught BEFORE the user is created, or a real '
+    + 'account is left behind with no company');
+  assert.ok(/User created, but the company was not/.test(fn),
+    'a half-success must SAY it is one — the user exists by then either way');
+
+  // ⚠ naming an EXISTING company stays on its block: that is editing, not creating
+  assert.ok(/saveCompanyName/.test(LIVE), 'renaming from the block must survive the move');
 });
+

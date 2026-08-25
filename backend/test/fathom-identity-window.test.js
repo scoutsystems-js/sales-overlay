@@ -128,3 +128,45 @@ test('⚠⚠ A HISTORY PULL USES THE FIRST-SYNC GRADING CAP, NOT STEADY STATE', 
     'a history pull must pass null for lastSyncAt so the first-sync cap applies; '
     + 'got: ' + m[1].trim());
 });
+
+/* ── the backlog control must be REACHABLE (2026-08-24) ───────────────────── */
+
+test('⚠⚠ A HEALTHY ACCOUNT HAS A REACHABLE WAY TO GRADE ITS BACKLOG', () => {
+  /* ⚠ renderFathomStripConnected built these controls and was ORPHANED when the
+     healthy "Fathom connected" card was removed — defined, never called. Josh's
+     trial account sat at 19 graded of 200 with NO control anywhere on the page.
+     The capability was deleted silently along with the card that hosted it. */
+  const fs2 = require('fs'), path2 = require('path');
+  const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  const live = html.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  assert.ok(/function fathomBacklogRowHtml/.test(live), 'the control must exist');
+  // and be CALLED — a builder nothing calls is exactly the bug being fixed
+  assert.ok(/\+ fathomBacklogRowHtml\(\)/.test(live),
+    'fathomBacklogRowHtml must be rendered by Connections; defining it is not enough');
+  assert.ok(!/function renderFathomStripConnected/.test(live),
+    'the orphaned builder must be archived, not left looking live');
+});
+
+test('⚠⚠ THE WINDOW PICKER SHOWS FOR A PURE BACKLOG, not only for outdated work', () => {
+  /* The old branch showed the scope dropdown only when `outdated > 0`, so a
+     post-import backlog (pending, nothing outdated) fell through to
+     "Analyze next 10" — 18 clicks for 180 calls. */
+  const fs2 = require('fs'), path2 = require('path');
+  const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  const i = html.indexOf('function fathomBacklogRowHtml');
+  const fn = html.slice(i, html.indexOf('\n  }', i));
+  assert.ok(/pending \+ outdated/.test(fn),
+    'the control must key on pending PLUS outdated — update-analyses dispatches both');
+  // ⚠ the options are built as value="7d" (double quotes inside a single-quoted
+  // JS string), so matching "'7d'" finds nothing — the check, not the code.
+  ['7d', '30d', 'all'].forEach((w) =>
+    assert.ok(fn.indexOf('value="' + w + '"') !== -1, 'missing window ' + w));
+});
+
+test('⚠ THE TILE EXPLAINS ITSELF — "19 of 149" alone reads as broken', () => {
+  const fs2 = require('fs'), path2 = require('path');
+  const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  assert.ok(/not graded yet/.test(html.replace(/\/\*[\s\S]*?\*\//g, '')),
+    'an ungraded remainder must be named on the tile, not left as a bare ratio');
+});
