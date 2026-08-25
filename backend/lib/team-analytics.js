@@ -31,7 +31,7 @@ async function aggregateWindow(admin, repIds, from, to) {
     var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, call_date')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null)
+      .is('duplicate_of', null)
       .order('call_date', { ascending: false }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var b = cq.data || []; calls = calls.concat(b);
@@ -287,7 +287,7 @@ async function computeTeamTrends(admin, repIds, bucket, from, to) {
     var cq = await admin.from('fathom_calls').select('id, fathom_call_id, call_date')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null)
+      .is('duplicate_of', null)
       .order('call_date', { ascending: true }).range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var b = cq.data || []; calls = calls.concat(b);

@@ -50,7 +50,7 @@ test('⚠⚠ EVERY not_a_sales_call EXCLUSION IS PAIRED WITH A duplicate_of EXCL
     const re = /\.not\('not_a_sales_call', 'is', true\)([\s\S]{0,120})/g;
     let m;
     while ((m = re.exec(live)) !== null) {
-      if (/\.not\('duplicate_of', 'is', null\)/.test(m[1])) pairs++;
+      if (/\.is\('duplicate_of', null\)/.test(m[1])) pairs++;
       else misses.push(rel);
     }
   });
@@ -67,6 +67,42 @@ test('⚠ NON-VACUITY: an unpaired exclusion is caught', () => {
   const re = /\.not\('not_a_sales_call', 'is', true\)([\s\S]{0,120})/g;
   const m = re.exec(broken);
   assert.ok(m, 'the matcher must find the exclusion at all');
-  assert.ok(!/\.not\('duplicate_of', 'is', null\)/.test(m[1]),
+  assert.ok(!/\.is\('duplicate_of', null\)/.test(m[1]),
     'and must report an unpaired one as a miss — otherwise the check above is vacuous');
+});
+
+test('⚠⚠⚠ THE PREDICATE MUST MEAN "IS NULL" — I SHIPPED IT INVERTED (2026-08-25)', () => {
+  /* ⚠⚠ THIS IS THE TEST THAT SHOULD HAVE EXISTED YESTERDAY. The original guard
+     asserted the two exclusions appeared TOGETHER and never asserted what the
+     second one MEANT — so it passed happily against a predicate that was exactly
+     backwards.
+
+       .not('duplicate_of', 'is', null)   ->  NOT (x IS NULL)  ->  IS NOT NULL
+                                          ->  keeps ONLY the duplicates
+
+     Shipped in 21 places. Every count in the product showed the duplicates and
+     nothing else: Josh's dashboard read "24 of 25 in range" for an account with
+     165 calls in that window — 25 being precisely his suppressed-duplicate
+     count. It looked like a grading gap and was a sign error.
+
+     ⚠ A GUARD THAT PINS SHAPE WITHOUT MEANING IS NOT A GUARD. Pairing was the
+     easy property to assert and the useless one. */
+  const bad = ".not('duplicate_of', 'is', null)";
+  const offenders = [];
+  sources().forEach(({ rel, src }) => { if (src.indexOf(bad) !== -1) offenders.push(rel); });
+  assert.deepStrictEqual(offenders, [],
+    'these files exclude NON-duplicates and count only duplicates: ' + JSON.stringify(offenders));
+
+  // and the correct form must actually be present at every paired site
+  let correct = 0;
+  sources().forEach(({ src }) => {
+    correct += (src.match(/\.is\('duplicate_of', null\)/g) || []).length;
+  });
+  assert.ok(correct >= 21, 'expected at least 21 correct exclusions; found ' + correct);
+});
+
+test('⚠ NON-VACUITY: the inverted form is detected', () => {
+  const sample = "q.eq('user_id', id).not('duplicate_of', 'is', null)";
+  assert.ok(sample.indexOf(".not('duplicate_of', 'is', null)") !== -1,
+    'if this fails the check above cannot catch the regression it exists for');
 });

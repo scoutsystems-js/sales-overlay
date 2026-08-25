@@ -80,6 +80,7 @@ function fakeAdmin(over) {
       in(col, vals) { state.in.push([col, vals]); return api; },
       gte() { return api; }, lte() { return api; }, order() { return api; },
       not(col, op, val) { state.not.push([col, op, val]); return api; },
+      is() { return api; },
       range() { return finish(); },
       maybeSingle() { const r = finish(); return Promise.resolve({ data: r.data[0] || null, error: null }); },
       upsert(row) { writes.push(row); return Promise.resolve({ error: null }); },

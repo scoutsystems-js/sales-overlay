@@ -913,7 +913,7 @@ router.get('/prospects/merge-candidates', requireAuth, async function (req, res)
       // ⚠ not-a-sales-call excluded (aggregate). `.not(col,'is',true)`, never
       // `.eq(col,false)` — nullable column; see test/not-a-sales-call.test.js.
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null);
+      .is('duplicate_of', null);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var callIds = (cq.data || []).map(function (c) { return c.id; });
 
@@ -1110,7 +1110,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
     .select('id, title, call_date, recording_url, prospect_id, source')
     .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
     .not('not_a_sales_call', 'is', true)
-    .not('duplicate_of', 'is', null);
+    .is('duplicate_of', null);
   if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
   var callIds = (calls.data || []).map(function (c) { return c.id; });
   if (!callIds.length) return buildSectionBreakdown(section, { analyses: [], highlights: [], callMeta: {} });
@@ -1158,7 +1158,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
     var prevFrom = new Date(new Date(from).getTime() - span).toISOString();
     var prev = await admin.from('fathom_calls').select('id').eq('user_id', userId).gte('call_date', prevFrom).lt('call_date', from)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null);
+      .is('duplicate_of', null);
     var prevIds = (prev.data || []).map(function (c) { return c.id; });
     if (prevIds.length) {
       var pa = await admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds).eq('status', 'done');
@@ -1214,7 +1214,7 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
     // a window AGGREGATE -- an earlier pass listed it as a call LIST and would have
     // left it unfiltered.
     .not('not_a_sales_call', 'is', true)
-    .not('duplicate_of', 'is', null);
+    .is('duplicate_of', null);
   if (calls.error) throw new Error('fathom_calls: ' + calls.error.message);
   var callIds = (calls.data || []).map(function (c) { return c.id; });
   if (!callIds.length) return { sections: SR.rankSections({}), why: null };

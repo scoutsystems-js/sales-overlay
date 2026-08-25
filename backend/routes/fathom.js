@@ -1098,7 +1098,7 @@ router.get('/status', requireAuth, async function(req, res) {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null);
+      .is('duplicate_of', null);
     // Pending-call count drives the dashboard's "Reanalyze" button visibility —
     // the button only shows when there are calls sitting at sync_status='pending'
     // waiting for the analysis worker (e.g. rows reset after the transcript fix).
@@ -1107,7 +1107,7 @@ router.get('/status', requireAuth, async function(req, res) {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null)
+      .is('duplicate_of', null)
       .eq('sync_status', 'pending');
 
     var connResult = await connPromise;
@@ -1322,7 +1322,7 @@ async function windowOutcomeCounts(admin, userId, opts) {
   for (;;) {
     var q = admin.from('fathom_calls').select('id').eq('user_id', userId)
     .not('not_a_sales_call', 'is', true)
-    .not('duplicate_of', 'is', null);
+    .is('duplicate_of', null);
     if (opts.from) q = q.gte('call_date', opts.from);
     if (opts.to) q = q.lte('call_date', opts.to);
     var r = await q.range(start, start + PAGE - 1);

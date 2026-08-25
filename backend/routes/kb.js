@@ -665,7 +665,7 @@ router.get('/counter', protect, async function(req, res) {
           .select('id')
           .in('id', dayIds.slice(ki, ki + 100))
           .not('not_a_sales_call', 'is', true)
-          .not('duplicate_of', 'is', null);
+          .is('duplicate_of', null);
         if (kq.error) throw new Error('fathom_calls: ' + kq.error.message);
         (kq.data || []).forEach(function (c) { keep[c.id] = true; });
       }

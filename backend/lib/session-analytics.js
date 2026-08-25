@@ -48,7 +48,7 @@ async function computeCallAnalytics(admin, userId, from, to) {
       .gte('call_date', from)
       .lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null)
+      .is('duplicate_of', null)
       .order('call_date', { ascending: false })
       .range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
@@ -237,7 +237,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
       .gte('call_date', from)
       .lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null)
+      .is('duplicate_of', null)
       .order('call_date', { ascending: false, nullsFirst: false })
       .range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);

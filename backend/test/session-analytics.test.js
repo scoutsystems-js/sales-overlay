@@ -28,7 +28,7 @@ function fakeAdmin(tables) {
         // .not() is a NO-OP here, like the other filters: the stub returns the
         // seeded rows. The not-a-sales-call exclusion is proven separately by
         // test/not-a-sales-call.test.js scanning every consumer.
-        select() { return chain; }, in() { return chain; }, eq() { return chain; }, not() { return chain; },
+        select() { return chain; }, in() { return chain; }, eq() { return chain; }, not() { return chain; }, is() { return chain; },
         gte() { return chain; }, lte() { return chain; }, order() { return chain; },
         range() { return chain; }, then(resolve) { resolve({ data: data, error: null }); },
       };

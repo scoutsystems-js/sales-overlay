@@ -156,7 +156,7 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
       .select('id, user_id, fathom_call_id, prospect_id, call_date')
       .in('user_id', ids)
       .not('not_a_sales_call', 'is', true)
-      .not('duplicate_of', 'is', null)
+      .is('duplicate_of', null)
       .not('prospect_id', 'is', null);
     if (fromIso) cq = cq.gte('call_date', fromIso);
     if (toIso) cq = cq.lte('call_date', toIso);

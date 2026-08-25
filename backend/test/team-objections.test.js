@@ -49,6 +49,7 @@ function fakeAdmin() {
       gte() { return api; }, lte() { return api; },
       order() { return api; },
       not(col, op, val) { state.not.push([col, op, val]); return api; },
+      is(c, v) { state.is.push([c, v]); return api; },
       range() { return finish(); },
       // the strict-standard path reads/writes objection_synthesis_cache
       maybeSingle() { return Promise.resolve({ data: null, error: null }); },
@@ -69,12 +70,13 @@ function fakeAdmin() {
   }
   return {
     _lastNot: [],
+    _lastIs: [],
     from(table) {
-      const state = { eq: [], in: [], not: [] };
+      const state = { eq: [], in: [], not: [], is: [] };
       const rows = table === 'fathom_calls' ? CALLS
                  : table === 'call_highlights' ? HIGHLIGHTS
                  : table === 'call_analyses' ? ANALYSES : [];
-      if (table === 'fathom_calls') this._lastNot = state.not;
+      if (table === 'fathom_calls') { this._lastNot = state.not; this._lastIs = state.is; }
       return builder(rows, state);
     },
   };
@@ -132,10 +134,13 @@ test('⚠ not_a_sales_call is excluded, and the predicate keeps NULL rows', asyn
      (`duplicate_of is null`). Asserting the exact list rather than membership
      is deliberate — it means a THIRD exclusion appearing here has to be
      acknowledged rather than absorbed silently. */
-  assert.deepStrictEqual(admin._lastNot, [
-    ['not_a_sales_call', 'is', true],
-    ['duplicate_of', 'is', null],
-  ]);
+  assert.deepStrictEqual(admin._lastNot, [['not_a_sales_call', 'is', true]]);
+  /* ⚠⚠ THE DUPLICATE EXCLUSION MOVED FROM .not() TO .is(), AND THAT IS THE FIX,
+     NOT A REFACTOR. `.not('duplicate_of','is',null)` means NOT(IS NULL) — it
+     kept ONLY the duplicates, so every count in the product showed 25 rows
+     instead of 165. Asserting the CALL rather than just its presence is what
+     the earlier version of this test failed to do. */
+  assert.deepStrictEqual(admin._lastIs, [['duplicate_of', null]]);
   assert.ok(out.instances.some((i) => i.fathom_call_id === 'c1'),
     'NULL not_a_sales_call rows must survive — this is the half a `= false` predicate breaks');
 });

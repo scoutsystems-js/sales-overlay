@@ -46,6 +46,7 @@ function fakeAdmin() {
       in(c, v) { state.in.push([c, v]); return api; },
       gte() { return api; }, lte() { return api; }, order() { return api; },
       not(c, op, v) { state.not.push([c, op, v]); return api; },
+      is() { return api; },
       range() { return finish(); },
       then(res, rej) { return Promise.resolve(finish()).then(res, rej); },
     };

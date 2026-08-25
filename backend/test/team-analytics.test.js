@@ -33,7 +33,7 @@ function fakeAdmin(tables) {
         // other filters here it is a NO-OP: the stub returns the seeded rows and
         // the exclusion itself is proven by test/not-a-sales-call.test.js, which
         // scans every consumer for the forbidden `= false` form.
-        not() { return chain; },
+        not() { return chain; }, is() { return chain; },
         eq() { return chain; },
         gte() { return chain; },
         lte() { return chain; },
