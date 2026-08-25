@@ -2541,6 +2541,26 @@
     .calls-outcome-clear:hover { border-color: var(--border-hover); }
     .calls-outcome-note { font-size: 11px; }
 
+    /* Grading-backlog control (2026-08-25). Shared by the Calls page and
+       Account -> Connections; both mount it inside `.grade-backlog-host`. */
+    .grade-wrap { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .grade-select { font-size: 12px; }
+    .grade-cap-note { font-size: 11px; color: var(--text); opacity: 0.85; }
+    .grade-confirm {
+      display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      background: var(--bg-elevated); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm); padding: 8px 12px;
+    }
+    .grade-confirm-text { font-size: 12px; }
+    .grade-progress { gap: 10px; }
+    .grade-progress-text { font-size: 12px; font-weight: 600; }
+    .grade-bar {
+      display: inline-block; width: 120px; height: 6px; border-radius: 999px;
+      background: var(--bg-field); overflow: hidden; vertical-align: middle;
+    }
+    .grade-bar-fill { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+    .fathom-notice.grade-inline { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; padding: 8px 12px; }
+
     /* (n) The promoted Performance Summary card. Visual weight only — it is
        still a link, and the synthesis lane still fires on the page it opens. */
     .perf-feature .section-header h2 { font-size: 20px; }
@@ -3848,6 +3868,12 @@
     fathomNotice:    null,    // null | { kind: 'success'|'warn'|'error', text: string } — flash message above the section
     fathomSyncing:   false,   // true while a /fathom/sync request is in flight; drives spinner state
     fathomReanalyzing: false, // true while a /fathom/reanalyze request is in flight; drives the Reanalyze button spinner
+    /* ⚠ THREE separate flags, because they are three distinct states and one
+       flag cannot tell them apart: pricing a window, waiting on a human, and a
+       run in flight. Collapsing them is how a control fires twice. */
+    gradeChecking: false,   // a dry run is in flight (pricing a window)
+    gradeConfirm: null,     // {scope, count} — awaiting the user's confirmation
+    gradeRun: null,         // {scope,total,remaining,lastRemaining,quiet,done,failed,msg}
     fathomUpdating: false, // true while a /fathom/update-analyses request is in flight; drives the Update-analyses button spinner
     fathomNeedsIdentity: false,   // true when sync returned needs_identity — show the Fathom-email prompt in the strip
     fathomIdentitySuggestion: '', // pre-fill value for the identity input (stored email, else top suggestion)
@@ -4808,65 +4834,266 @@
     await refreshFathomStatusInBackground();
   }
 
-  // Re-grade calls analyzed under an older prompt version (POST
-  // /fathom/update-analyses — resets them to pending + fires the batch). Shown
-  // only when there's nothing pending but outdated_count > 0. Mirrors
-  // reanalyzeFathomNow's flag-guarded, notice-driven shape.
-  // How-far-back re-grade (2026-07-27): pick a window (7d/30d/all), see the
-  // exact count via a dry-run, and confirm before triggering — all-time on 250+
-  // calls is 250+ Claude calls. Manual outcome tags are preserved (analyzeCall
-  // freezes them).
-  async function updateOutdatedAnalysesNow(scope) {
-    if (state.fathomUpdating) return; // guard against double-click
-    scope = scope || '30d';
-    // 1) dry-run: how many calls will this touch?
-    var count = 0;
-    try {
-      var pre = await fetch('/fathom/update-analyses', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ scope: scope, dry_run: true }) });
-      if (pre.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      if (!pre.ok) { var e = null; try { e = await pre.json(); } catch (x) {} state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (e && e.error ? e.error : 'HTTP ' + pre.status) }; rerenderConnectionViews(); return; }
-      count = ((await pre.json()) || {}).count || 0;
-    } catch (err) { state.fathomNotice = { kind: 'error', text: 'Could not check: ' + (err.message || 'unknown') }; rerenderConnectionViews(); return; }
-    var label = scope === 'all' ? 'all time' : (scope === '7d' ? 'the last 7 days' : 'the last 30 days');
-    if (count === 0) { state.fathomNotice = { kind: 'success', text: 'No outdated analyses in ' + label + '.' }; rerenderConnectionViews(); return; }
-    if (!confirm('Re-analyze ' + count + ' call' + (count === 1 ? '' : 's') + ' from ' + label + '?\n\nThis runs ' + count + ' AI analysis' + (count === 1 ? '' : 'es') + ' and can take a while. Your manual outcome tags are preserved.')) return;
-    // 2) run for real.
-    state.fathomUpdating = true;
-    rerenderConnectionViews();
-    var noticeText = null;
-    var noticeKind = 'success';
+  /* ══ GRADING THE BACKLOG — ONE CONTROL, RENDERED IN TWO PLACES ══════════════
+     Replaces `updateOutdatedAnalysesNow` (deleted 2026-08-25, not archived in
+     place — a superseded copy of a control is the first thing a search finds,
+     and this codebase has already had a dead CSS rule collect a live edit).
+
+     ⚠⚠ WHY IT MOVED. It lived ONLY in Account → Connections. Justin went looking
+     for it on Calls and on the Coaching Review and could not find it — and the
+     CALLS page is where the problem is already NAMED: it renders "N not graded
+     yet — in neither group" under the Closed / Not Closed counts. A page that
+     states a problem and offers no way to act on it is the defect. It is now on
+     that line, and STILL in Connections, because that is where a user goes after
+     connecting a source. ⚠ TWO SITES, ONE IMPLEMENTATION — both call
+     gradeBacklogControlHtml(), so the option list, the role cap, the cost and
+     the progress state cannot diverge between them. Do not inline a second
+     option list at either site.
+
+     ⚠ THE CONTROL DOES NOT RESTATE A COUNT, DELIBERATELY. Three different
+     "ungraded" numbers are live at once and all three are correct for their own
+     window: the Coaching tile's is the selected date range (103 for Josh), the
+     Calls note's is the library query, and the grader's is all-time (291). A
+     count printed on the control would sit inches from a different count with
+     the same label. The ONE number it commits to is the dry run's, shown at
+     confirm time and labelled with the window it belongs to. */
+
+  var GRADE_COST_PER_CALL = 0.24;  /* measured: ~180 calls ≈ $43 of Claude spend
+     (grader + extractor, ~60k input tokens each). Deliberately rounded UP-ish so
+     the estimate is not the optimistic end of the range. */
+
+  /* ⚠ ALL-TIME IS OWNER-ONLY (Justin, 2026-08-25 — API cost). Mirrors the server
+     gate in routes/fathom.js. ⚠ POSITIVELY `=== 'owner'`: the trial account this
+     ruling caps is a `manager` on live data, so `!== 'user'` would grant it.
+     Hiding the option is NOT the restriction — the server is. */
+  function gradeAllTimeAllowed() { return !!(state.me && state.me.role === 'owner'); }
+
+  /* ONE source for the option list. Both render sites use it. */
+  function gradeScopeOptionsHtml() {
+    return '<option value="" selected>Grade calls from…</option>'
+      + '<option value="7d">Last 7 days</option>'
+      + '<option value="30d">Last 30 days</option>'
+      + (gradeAllTimeAllowed() ? '<option value="all">All time</option>' : '');
+  }
+
+  function gradeBacklogWorkCount() {
+    var f = state.fathomStatus;
+    if (!(f && f.connected)) return 0;
+    return (f.pending_count || 0) + (f.outdated_count || 0);
+  }
+
+  function gradeCostText(n) {
+    var d = n * GRADE_COST_PER_CALL;
+    return d < 1 ? 'under $1' : 'about $' + (d < 10 ? d.toFixed(2) : String(Math.round(d)));
+  }
+
+  function gradeScopeLabel(scope) {
+    return scope === 'all' ? 'all time' : (scope === '7d' ? 'the last 7 days' : 'the last 30 days');
+  }
+
+  /* The whole control, in whichever state it is in. Returns '' when the grader
+     has no work — an empty control on a fully-graded account is noise. */
+  function gradeBacklogControlHtml() {
+    var work = gradeBacklogWorkCount();
+    var run = state.gradeRun;
+    var cf  = state.gradeConfirm;
+
+    if (run) {
+      var doneN = Math.max(0, run.total - run.remaining);
+      var pct   = run.total > 0 ? Math.min(100, Math.round(doneN * 100 / run.total)) : 0;
+      if (run.failed) {
+        return '<span class="grade-wrap"><span class="fathom-notice error grade-inline">'
+          + '<strong>Grading stopped.</strong> ' + escapeHtml(run.msg || 'The run is no longer making progress.')
+          + ' ' + run.remaining + ' still ungraded.'
+          + ' <button class="calls-outcome-clear" type="button" onclick="gradeBacklogDismiss()">Dismiss</button>'
+          + '</span></span>';
+      }
+      if (run.done) {
+        return '<span class="grade-wrap"><span class="fathom-notice grade-inline">'
+          + escapeHtml(run.msg || ('Graded ' + doneN + ' of ' + run.total + '.'))
+          + ' <button class="calls-outcome-clear" type="button" onclick="gradeBacklogDismiss()">Dismiss</button>'
+          + '</span></span>';
+      }
+      return '<span class="grade-wrap grade-progress">'
+        + '<span class="spinner-tiny"></span>'
+        + '<span class="grade-progress-text">Grading ' + doneN + ' of ' + run.total
+          + ' · ' + run.remaining + ' to go</span>'
+        + '<span class="grade-bar"><span class="grade-bar-fill" style="width:' + pct + '%"></span></span>'
+        + '</span>';
+    }
+
+    if (cf) {
+      /* ⚠ THE COUNT IS THE DRY RUN'S — the server's own list of ids it would
+         dispatch, not a number derived a second way. A lookup that returned
+         empty once made every call look ungraded and nearly spent ~$75 nobody
+         approved; the fix is that the number shown and the number run are the
+         same query. */
+      return '<span class="grade-wrap"><span class="grade-confirm">'
+        + '<span class="grade-confirm-text">Grade <strong>' + cf.count + ' call'
+          + (cf.count === 1 ? '' : 's') + '</strong> from ' + escapeHtml(gradeScopeLabel(cf.scope))
+          + ' — <strong>' + escapeHtml(gradeCostText(cf.count)) + '</strong> of AI analysis.'
+          + ' Your manual outcome tags are kept.</span>'
+        + '<button class="calls-outcome-btn active" type="button" onclick="gradeBacklogGo()">Start Grading</button>'
+        + '<button class="calls-outcome-clear" type="button" onclick="gradeBacklogCancel()">Cancel</button>'
+        + '</span></span>';
+    }
+
+    if (state.gradeChecking) {
+      return '<span class="grade-wrap"><span class="spinner-tiny"></span>'
+        + '<span class="grade-progress-text">Counting…</span></span>';
+    }
+
+    if (work <= 0) return '';
+
+    /* ⚠ A CAPPED USER MUST SEE WHY. "Last 30 days" with no explanation reads as
+       broken rather than as a rule. */
+    var cap = gradeAllTimeAllowed() ? ''
+      : '<span class="grade-cap-note">Grading further back than 30 days is limited to admins.</span>';
+    return '<span class="grade-wrap">'
+      + '<select class="role-select grade-select" aria-label="Grade ungraded calls from"'
+        + ' onchange="if(this.value){var v=this.value;this.selectedIndex=0;gradeBacklogAsk(v);}">'
+        + gradeScopeOptionsHtml()
+      + '</select>' + cap + '</span>';
+  }
+
+  /* ⚠ REPAINT ONLY THE CONTROL, NOT THE PAGE. The poll runs every 15s, and a
+     full renderCallLibrary()/renderOverview() per tick reassigns innerHTML and
+     replays every `.fade-in` entrance — the blink that eight lanes re-rendering
+     the team page already caused once. Falls back to a full re-render only when
+     no host is mounted (the control is not on screen). */
+  function paintGradeBacklog() {
+    var hosts = document.querySelectorAll('.grade-backlog-host');
+    if (!hosts.length) { rerenderConnectionViews(); return; }
+    var html = gradeBacklogControlHtml();
+    for (var i = 0; i < hosts.length; i++) hosts[i].innerHTML = html;
+  }
+
+  /* Step 1 — price it. Never dispatches. */
+  async function gradeBacklogAsk(scope) {
+    if (state.gradeChecking || state.gradeConfirm) return;         // no double-fire
+    if (state.gradeRun && !state.gradeRun.done && !state.gradeRun.failed) return;
+    state.gradeRun = null;
+    state.gradeChecking = true;
+    paintGradeBacklog();
     try {
       var res = await fetch('/fathom/update-analyses', {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ scope: scope }),
+        body: JSON.stringify({ scope: scope, dry_run: true }),
       });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      if (res.ok) {
-        var data = await res.json();
-        var n = (data && typeof data.queued === 'number') ? data.queued : 0;
-        var remaining = (data && typeof data.remaining === 'number') ? data.remaining : 0;
-        noticeText = n === 0
-          ? 'No outdated analyses to update.'
-          : 'Updating ' + n + ' call' + (n === 1 ? '' : 's') + ' to the latest analysis.'
-            + (remaining > 0 ? ' ' + remaining + ' more remain — click again when these finish.' : '')
-            + ' Grades refresh as each completes.';
-      } else {
-        var errBody = null;
-        try { errBody = await res.json(); } catch (e) { /* ignore */ }
-        noticeText = 'Update failed: ' + (errBody && errBody.error ? errBody.error : 'HTTP ' + res.status);
-        noticeKind = 'error';
+      var body = null; try { body = await res.json(); } catch (e) {}
+      if (!res.ok) {
+        state.gradeRun = { total: 0, remaining: 0, failed: true,
+          msg: (body && body.error) ? body.error : ('HTTP ' + res.status) };
+        return;
       }
+      var count = (body && typeof body.count === 'number') ? body.count : 0;
+      if (count === 0) {
+        state.gradeRun = { total: 0, remaining: 0, done: true,
+          msg: 'Nothing to grade in ' + gradeScopeLabel(scope) + '.' };
+        return;
+      }
+      state.gradeConfirm = { scope: scope, count: count };
     } catch (err) {
-      noticeText = 'Update error: ' + (err && err.message || 'unknown');
-      noticeKind = 'error';
+      state.gradeRun = { total: 0, remaining: 0, failed: true,
+        msg: 'Could not check: ' + ((err && err.message) || 'unknown') };
+    } finally {
+      state.gradeChecking = false;
+      paintGradeBacklog();
     }
-    state.fathomNotice = { kind: noticeKind, text: noticeText };
-    state.fathomUpdating = false;
-    // Refresh status — outdated_count won't drop instantly (worker flips rows to
-    // 'processed' on the new version asynchronously); a later poll catches up.
-    await refreshFathomStatusInBackground();
   }
+
+  function gradeBacklogCancel() { state.gradeConfirm = null; paintGradeBacklog(); }
+  function gradeBacklogDismiss() { state.gradeRun = null; paintGradeBacklog(); }
+
+  /* Step 2 — run it. The request returns immediately; the work continues
+     server-side, so the progress below comes from polling, not from this call. */
+  async function gradeBacklogGo() {
+    var cf = state.gradeConfirm;
+    if (!cf) return;
+    if (state.gradeRun && !state.gradeRun.done && !state.gradeRun.failed) return;  // no double-fire
+    state.gradeConfirm = null;
+    state.gradeRun = { scope: cf.scope, total: cf.count, remaining: cf.count,
+                       lastRemaining: cf.count, quiet: 0, done: false, failed: false, msg: null };
+    paintGradeBacklog();
+    try {
+      var res = await fetch('/fathom/update-analyses', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ scope: cf.scope }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) {
+        var eb = null; try { eb = await res.json(); } catch (e) {}
+        state.gradeRun.failed = true;
+        state.gradeRun.msg = (eb && eb.error) ? eb.error : ('HTTP ' + res.status);
+        paintGradeBacklog();
+        return;
+      }
+      var data = await res.json();
+      var queued = (data && typeof data.queued === 'number') ? data.queued : cf.count;
+      state.gradeRun.total = queued;
+      state.gradeRun.remaining = queued;
+      state.gradeRun.lastRemaining = queued;
+    } catch (err) {
+      state.gradeRun.failed = true;
+      state.gradeRun.msg = 'Could not start: ' + ((err && err.message) || 'unknown');
+      paintGradeBacklog();
+      return;
+    }
+    paintGradeBacklog();
+    gradeBacklogSchedule();
+  }
+
+  /* ⚠⚠ A RUN THAT DIES MUST SAY SO, NOT SIT LOOKING BUSY. The analyze loop is
+     fire-and-forget on the server and DOES NOT SURVIVE A REDEPLOY — a push kills
+     it mid-drain, and until now the page would have spun forever. Progress is
+     therefore measured, not assumed: each tick re-reads pending+outdated and the
+     bar moves only when that number actually falls.
+
+     ⚠ THE STALL WINDOW IS DERIVED, NOT PICKED. Measured per-call analysis time is
+     p50 50s / p95 64s / max 247s, so a single very long call can legitimately
+     hold the count still for over four minutes. GRADE_STALL_TICKS × 15s must sit
+     clear of that maximum or a healthy run gets reported as dead. */
+  var GRADE_POLL_MS = 15000;
+  var GRADE_STALL_TICKS = 20;   // 5 minutes of no movement, against a 247s worst case
+  var gradeTimer = null;
+
+  function gradeBacklogSchedule() {
+    if (gradeTimer) clearTimeout(gradeTimer);
+    gradeTimer = setTimeout(gradeBacklogTick, GRADE_POLL_MS);
+  }
+
+  async function gradeBacklogTick() {
+    var run = state.gradeRun;
+    if (!run || run.done || run.failed) { gradeTimer = null; return; }
+    var st = null;
+    try { st = await fetchFathomStatus(); } catch (e) { st = null; }
+    if (st && st.connected) {
+      state.fathomStatus = st;
+      var remaining = Math.min(run.total, (st.pending_count || 0) + (st.outdated_count || 0));
+      if (remaining < run.lastRemaining) { run.quiet = 0; run.lastRemaining = remaining; }
+      else { run.quiet += 1; }
+      run.remaining = remaining;
+      if (remaining <= 0) {
+        run.done = true;
+        run.msg = 'Graded all ' + run.total + ' call' + (run.total === 1 ? '' : 's') + '.';
+      } else if (run.quiet >= GRADE_STALL_TICKS) {
+        run.failed = true;
+        run.msg = 'No calls have finished for ' + Math.round(GRADE_STALL_TICKS * GRADE_POLL_MS / 60000)
+          + ' minutes, so the run has probably stopped (a deploy ends one mid-way).'
+          + ' Nothing is lost — start it again to pick up where it left off.';
+      }
+    } else {
+      /* A status fetch that fails is NOT evidence the run died — count it as a
+         quiet tick and let the same stall rule decide. */
+      run.quiet += 1;
+    }
+    paintGradeBacklog();
+    if (!run.done && !run.failed) gradeBacklogSchedule(); else gradeTimer = null;
+  }
+
 
   // Fetch a suggested Fathom email (stored value, else Scout login email) and
   // flip the strip into identity-prompt mode. Called when sync returns
@@ -5168,7 +5395,15 @@
      a working account had no way to grade its backlog at all. Replaced by
      fathomBacklogRowHtml(), which lives in Connections beside Sync Now.
      Kept commented rather than deleted per the archive convention; do not
-     revive it without moving its callers too. */
+     revive it without moving its callers too.
+
+     ⚠⚠ AND IT IS NOW DOUBLY UNREVIVABLE (2026-08-25). It still calls
+     `updateOutdatedAnalysesNow`, which NO LONGER EXISTS — it was replaced by
+     gradeBacklogControlHtml() + gradeBacklogAsk/Go. Worse, the option list below
+     hardcodes an uncapped `<option value="all">`, and all-time is now OWNER-ONLY;
+     reviving this markup verbatim would put an option in front of every user that
+     the server refuses with a 403. If this is ever revived, take the control from
+     gradeBacklogControlHtml() and delete the select below. */
 /*
   function renderFathomStripConnected(status) {
     var count = (typeof status.call_count === 'number') ? status.call_count : 0;
@@ -6334,7 +6569,26 @@
     else if (state.view === 'team-members') renderTeamMembersView();
     else renderTeamView();
   }
-  function pickTeam(key) { state.teamSelected = (key === '__default') ? null : key; resetTeamData(); renderTeamSurface(); }
+  /* ⚠⚠ teamAverages IS CLEARED HERE, NOT IN resetTeamData(), AND THAT IS THE POINT.
+     It is the only team lane scoped to the TEAM but NOT to the RANGE — the gauges
+     are a fixed 7-day window and the panel says so on screen ("NOT AFFECTED BY THE
+     DATE FILTER BELOW"). resetTeamData() also runs on every date-range change, so
+     clearing it there would make the gauges visibly reload right after a label
+     promises they will not.
+
+     ⚠ THE BUG THIS FIXES was silent and demo-breaking: switching company changed
+     the header, the graphs, the rep list and the totals, and left the GAUGES
+     showing the previous company's numbers under the new company's name. Nothing
+     errored. Measured on production: picking "Sober Living Riches" kept Scout
+     Systems' 21% / 8-of-39 and its "4 not enough calls", which is Scout Systems'
+     rep count. Third instance of a lane being missed by resetTeamData — see its
+     own comment about the drilldown lanes. */
+  function pickTeam(key) {
+    state.teamSelected = (key === '__default') ? null : key;
+    state.teamAverages = null;
+    resetTeamData();
+    renderTeamSurface();
+  }
   function setTeamTrendBucket(b) { state.teamTrendBucket = b; state.teamTrends = null; loadTeam('trends'); }
   /* REMOVED 2026-08-16 — the preset setter, superseded by the date picker's
      own setter registered in ensureTeamPicker(). Kept in place for reference.
@@ -10342,18 +10596,13 @@
     var work = pending + outdated;
     if (work <= 0) return '';
 
-    var busy = !!state.fathomUpdating;
+    /* ⚠ SITE 1 OF 2. The control itself is gradeBacklogControlHtml() — shared
+       with the Calls page. Do NOT inline an option list here; that is how the
+       two would come to offer different windows. */
     return '<div class="eod-row conn-row"><div class="eod-label">UNGRADED</div>'
       + '<div class="conn-right">'
         + '<span class="conn-state">' + work + ' call' + (work === 1 ? '' : 's') + ' not graded yet</span>'
-        + (busy
-            ? '<button class="btn-fathom-secondary" type="button" disabled><span class="spinner-tiny"></span> Grading…</button>'
-            : '<select class="role-select" onchange="if(this.value){updateOutdatedAnalysesNow(this.value);this.selectedIndex=0;}">'
-              + '<option value="" selected>Grade calls from…</option>'
-              + '<option value="7d">Last 7 days</option>'
-              + '<option value="30d">Last 30 days</option>'
-              + '<option value="all">All time</option>'
-              + '</select>')
+        + '<span class="grade-backlog-host">' + gradeBacklogControlHtml() + '</span>'
         + '<span class="meta">Grading is capped when calls first arrive so a large import '
           + 'cannot fire hundreds of analyses at once. You choose when to grade the rest.</span>'
       + '</div></div>';
@@ -12464,12 +12713,24 @@
     // "ungraded" belongs to NEITHER side. On live data it is ~46% of calls, so
     // hiding it would make the two buttons look like they partition the range
     // when they do not.
+    /* ⚠⚠ SITE 2 OF 2 — THE CONTROL BELONGS ON THE LINE THAT NAMES THE PROBLEM.
+       This row already told the user "N not graded yet — in neither group" and
+       offered nothing to do about it, while the only way to grade them sat in
+       Account -> Connections where Justin went looking and could not find it.
+
+       ⚠ SELF ONLY. Grading is scoped to req.user.id, so on an admin pivot
+       (?user=) this control would grade the VIEWER's calls while showing someone
+       else's list — a wrong action with no error. isSelf() is the guard, and
+       fathomStatus is null on a pivot anyway. */
+    var gradeHost = (isSelf() && gradeBacklogWorkCount() > 0)
+      ? '<span class="grade-backlog-host">' + gradeBacklogControlHtml() + '</span>' : '';
     var outcomeControl = '<div class="calls-outcome">'
       + outBtn('closed', 'Closed', oc.closed)
       + outBtn('not_closed', 'Not Closed', oc.not_closed)
       + (f ? '<button class="calls-outcome-clear" type="button" onclick="clearCallsFilter()">Clear</button>' : '')
       + (typeof oc.ungraded === 'number' && oc.ungraded > 0
           ? '<span class="calls-outcome-note">' + oc.ungraded + ' not graded yet — in neither group</span>' : '')
+      + gradeHost
       + '</div>';
 
     // Active drill filter chip (only present when arrived via a donut).

@@ -154,14 +154,23 @@ test('⚠⚠ THE WINDOW PICKER SHOWS FOR A PURE BACKLOG, not only for outdated w
      "Analyze next 10" — 18 clicks for 180 calls. */
   const fs2 = require('fs'), path2 = require('path');
   const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-  const i = html.indexOf('function fathomBacklogRowHtml');
+  /* ⚠ CONVERTED 2026-08-25, NOT DELETED. The window options moved OUT of this
+     row into the shared gradeBacklogControlHtml() when the control was added to
+     the Calls page — so the option list is no longer inside this function and a
+     slice of it can no longer see them. The PROPERTY this test protects is
+     unchanged: a pure backlog (pending, nothing outdated) must still get the
+     window picker. It is now asserted where each half actually lives. */
+  const i = html.indexOf('function gradeBacklogWorkCount');
   const fn = html.slice(i, html.indexOf('\n  }', i));
-  assert.ok(/pending \+ outdated/.test(fn),
+  assert.ok(fn.length > 80 && fn.length < 600, 'work-count slice looks wrong: ' + fn.length);
+  assert.ok(/pending_count \|\| 0\) \+ \(f\.outdated_count/.test(fn),
     'the control must key on pending PLUS outdated — update-analyses dispatches both');
-  // ⚠ the options are built as value="7d" (double quotes inside a single-quoted
-  // JS string), so matching "'7d'" finds nothing — the check, not the code.
+
+  const j = html.indexOf('function gradeScopeOptionsHtml');
+  const opts = html.slice(j, html.indexOf('\n  }', j));
+  assert.ok(opts.length > 100 && opts.length < 800, 'options slice looks wrong: ' + opts.length);
   ['7d', '30d', 'all'].forEach((w) =>
-    assert.ok(fn.indexOf('value="' + w + '"') !== -1, 'missing window ' + w));
+    assert.ok(opts.indexOf('value="' + w + '"') !== -1, 'missing window ' + w));
 });
 
 test('⚠ THE TILE EXPLAINS ITSELF — "19 of 149" alone reads as broken', () => {

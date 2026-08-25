@@ -761,6 +761,38 @@ function callIdsToAnalyze(newRows, lastSyncAt, cap) {
 // /reanalyze) so the reset + dispatch are atomic and can't race a status poll.
 router.post('/update-analyses', requireAuth, async function(req, res) {
   var userId = req.user.id;
+
+  /* ⚠⚠ ALL-TIME IS OWNER-ONLY (Justin's ruling 2026-08-25, reason: API cost).
+     "just for Josh he has the ability to go back all time but everyone else
+     moving forward only gets 30 days."
+
+     ROLE answers this — there is no per-user flag and one must not be invented.
+     `owner` is this codebase's platform-admin role (the Admin nav is owner-only
+     for the same reason). ⚠ The check is POSITIVELY `=== 'owner'`, not
+     `!== 'user'`: measured on live data the trial account this ruling caps is a
+     `manager`, so a negative phrasing would have handed it exactly what it may
+     not have.
+
+     ⚠ FAIL CLOSED. requireAuth stamps req.userProfileRole from user_profiles and
+     FAILS OPEN on a DB error, leaving it undefined. Undefined is not 'owner', so
+     a blip refuses all-time rather than granting it — the safe direction when the
+     thing being gated is spend.
+
+     ⚠ REFUSE, NEVER TRUNCATE. Answering an all-time request with 30 days would
+     spend less than asked and report success, leaving the user believing their
+     whole history was graded.
+
+     ⚠ THIS RUNS BEFORE ANY LOOKUP, including dry_run — pricing a window you may
+     not run is not a loophole worth leaving, and it means the refusal costs no
+     database work. */
+  var scopeAsked = (req.body && typeof req.body.scope === 'string') ? req.body.scope : null;
+  if (scopeAsked === 'all' && req.userProfileRole !== 'owner') {
+    return res.status(403).json({
+      error: 'All-time grading is limited to admins. Choose the last 7 or 30 days.',
+      max_scope: '30d',
+    });
+  }
+
   try {
     var admin = getAdminClient();
     var worker = require('../lib/analysis-worker');
