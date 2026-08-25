@@ -1529,6 +1529,39 @@ Checked, and **I could not make it fail.** What was tested: offsets 0/20/40 acro
 - **⚠ ONE REAL DEFECT FOUND BY READING, NOT THE REPORTED ONE: `loadCallsList` uses `.range(0, 9999)` on the filtered/sorted path** — a silent **10,000-row ceiling**. Nowhere near Josh (596), so it is not this bug, but it truncates without saying so and will bite eventually. **Filed, not fixed.**
 - **Reported as unreproduced rather than fixed forward.** An intermittent symptom closed without a reproduction is a guess, and this codebase has already had two faults stacked where fixing one changed nothing.
 
+### ⚠⚠⚠ STANDING RULING — CASH COLLECTED IS EOD-ONLY (Justin, 2026-08-25)
+His words: *"we don't track cash collected at all, it's too finicky right now. The only time it's needed is on the EOD report."*
+- **DO NOT report cash figures in findings, do not use cash as evidence, do not put it in before/after tables.** It kept being surfaced; this stops it.
+- **A DISPLAY RULING, NOT A DATA ONE.** `call_analyses.cash_collected` is still extracted by the grader and still drives the EOD report. **Do not drop the column or stop collecting it.**
+- **Removed from every other surface, enumerated by capability:** the team glance tile · the per-rep quick-stats line · that tile's per-rep drilldown · the drilldown metric label · both copy-for-summary payloads · `avg_cash` in the needs-work summary · and the derivations in `lib/team-analytics.js` and `lib/session-analytics.js`.
+- **⚠ REMOVED FROM THE PAYLOADS, not merely unrendered** — a field that is still computed is one edit away from reappearing on a tile.
+- **Nothing renders blank:** the team stat row simply carries five tiles instead of six, and cash was never the default drilldown metric.
+
+### ⚠⚠ "SHOW MORE" WAS THE FIRST RENDER, NOT THE QUERY (2026-08-25)
+Proven the block before that every page position returns full rows, so the data was never the problem. **`renderCallLibrary` only loads when the list is null**, so entering Calls re-rendered whatever was cached earlier in the session — **the rows AND `callLibraryHasMore`, both computed at some earlier moment and never re-checked.**
+- **THE SEQUENCE: page to the end once (`hasMore=false`), leave, come back after new calls have synced** — that account syncs every 2 hours — **and the stale list renders with no button and no hint that more exist.** Whether it looked broken depended on what you had done earlier in the session, which is exactly why it read as *random*.
+- **⚠ THE FIX IS NOT A LONGER WAIT** (the brief said so, and it was right): entering the view now refetches, so the control's visibility is a function of data fetched when it renders.
+- **⚠ `call-review` IS EXCLUDED DELIBERATELY.** Coming back from a call to the list is not a fresh entry; resetting there would drop the user's place — a regression dressed as a fix.
+- **⚠ AND IT IS INVALIDATED IN `setView`, NEVER IN THE RENDERER.** `loadCallLibrary` re-renders when it finishes, so nulling the list inside the renderer would wipe it mid-page and paging could never advance.
+
+### ⚠⚠⚠ THE COMMENT-STRIPPER ORDERING BUG WAS IN **ELEVEN** GUARDS, AND ONE CORRECT EDIT DETONATED TWO OF THEM (2026-08-25)
+The hazard is already on file — strip LINE comments before BLOCK comments, because a block-comment opener inside a line comment is a false opener that pairs with the next real closer and swallows everything between. **What was not on file is how widespread it was.**
+- Adding ONE block comment to `lib/session-analytics.js` made **two separate guards** fail: one reported a missing query, the other a missing import. **Both were plainly present** — the raw greps said 21 and 1, and the syntax check passed.
+- **⚠ BOTH FAILURES POINTED AT THE EDIT, NOT AT THE CHECKER**, which is the whole danger: the natural response is to revert a correct change.
+- **Fixed the ORDER in all 11 live guards** rather than the two that happened to fire. A latent parser bug held in check by an accident of the input will detonate on ordinary work, and the other nine were one comment away.
+- **⚠ AND THE COMMENT EXPLAINING THE FIX TERMINATED ITSELF** by quoting a closing delimiter — the same self-inflicted case already recorded. **Describe the characters; never type them.**
+
+### ⚠ ZOOM-SOURCED CALLS CANNOT BE GRADED FROM A LOCAL RUN (2026-08-25)
+`ZOOM_CLIENT_ID` / `ZOOM_CLIENT_SECRET` exist **only on Railway** — they are not in `API Keys.md` (verified: zero matches). So `analyzeCall` on a `source='zoom'` row fails locally with *"Zoom not configured"* no matter how the environment is exported.
+- **Fathom rows are unaffected**, so a local backfill still covers the overwhelming majority: 315 of 316 in the 30-day run, with the single failure being the one Zoom-sourced call.
+- **⚠ IT IS NOT A DEAD END — it just has to run where the credentials are.** The deployed reanalyze path on Railway has them. **Do not conclude such a call is ungradeable; conclude it is ungradeable HERE.**
+
+### ⚠⚠ A FILTER WHOSE SHAPE YOU ASSUMED WILL SILENTLY SELECT EVERYTHING (2026-08-25)
+A run to grade Josh's last 30 days was sized at **134 calls** by SQL. The script that executed it re-derived the set with an embedded `call_analyses(status)` select and reported **315** — it would have re-graded **180 already-done calls**, roughly **$75 of spend nobody approved**.
+- **THE EMBED RETURNED NOTHING FOR EVERY ROW**, so `status !== 'done'` was true for all of them. **An empty result and "no match" are indistinguishable to a filter**, and the failure direction was *include everything* — the expensive one.
+- **CAUGHT BY THE COUNT DISAGREEING WITH THE SIZING QUERY**, which is the only reason it cost one call instead of two hours. **Killed after 1.**
+- **⚠ THE RULE, ALREADY ON FILE FOR DESTRUCTIVE OPS, APPLIES TO EXPENSIVE ONES TOO: PIN TO VERIFIED IDS.** Select with the predicate you actually validated, **print the count**, write the ids to a file, and have the executing script read that list rather than re-deriving it. The rebuilt run took a pinned list of 135 and matched the reconciliation exactly.
+
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
 - **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
