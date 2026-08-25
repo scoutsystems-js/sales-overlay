@@ -329,6 +329,13 @@
       border: 1px dashed var(--border); border-radius: 10px; background: var(--bg2);
     }
     .add-company-name { width: 220px; }
+
+    .company-block.deactivated { opacity: 0.72; border-style: dashed; }
+    .company-actions { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .company-off-badge {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      border: 1px solid var(--border-strong, #2a2a2a); border-radius: 10px; padding: 2px 9px;
+    }
   </style>
   <script src="/js/scout-auth.js"></script>
 </head>
@@ -789,10 +796,91 @@
      the HEAD first — they are the company, not a row in it. */
   function companyBlockHtml(c, isOwnerViewer, mgrs) {
     var members = (c.head ? [c.head] : []).concat(c.members || []);
-    return '<section class="company-block">'
+    return '<section class="company-block' + (c.is_deactivated ? ' deactivated' : '') + '">'
       + companyNameHtml(c, isOwnerViewer)
+      + companyActionsHtml(c, isOwnerViewer)
       + usersTableHtml(members, isOwnerViewer, mgrs, 'No members.')
     + '</section>';
+  }
+
+  /* ⚠ DEACTIVATE AND DELETE ARE DIFFERENT ACTIONS AND MUST NOT READ ALIKE.
+     Deactivate is reversible and keeps every number; delete destroys the data
+     and cannot be undone. So delete is the only one styled as destructive, and
+     it is the only one that demands a typed confirmation. */
+  function companyActionsHtml(c, isOwnerViewer) {
+    if (!isOwnerViewer) return '';
+    var off = !!c.is_deactivated;
+    return '<div class="company-actions">'
+      + (off ? '<span class="company-off-badge">Deactivated</span>' : '')
+      + '<button class="btn-resend" onclick="companyLifecycleAction(\'' + escapeHtml(c.key) + '\', \''
+        + (off ? 'reactivate' : 'deactivate') + '\')">' + (off ? 'Reactivate company' : 'Deactivate company') + '</button>'
+      + '<button class="btn-resend admin-danger" onclick="deleteCompany(\'' + escapeHtml(c.key) + '\')">Delete company</button>'
+      + '<span class="field-status" id="cls-' + escapeHtml(c.key) + '"></span>'
+    + '</div>';
+  }
+
+  async function companyLifecycleAction(headId, action) {
+    var status = document.getElementById('cls-' + headId);
+    if (status) { status.textContent = '…'; status.className = 'field-status'; }
+    var res;
+    try {
+      res = await fetch('/admin/companies/' + encodeURIComponent(headId) + '/' + action,
+        { method: 'POST', headers: authHeader() });
+    } catch (e) {
+      if (status) { status.textContent = '✗ network'; status.className = 'field-status err'; }
+      return;
+    }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) {
+      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      var st = document.getElementById('cls-' + headId);
+      if (st) { st.textContent = '✗ ' + (err.error || 'failed'); st.className = 'field-status err'; }
+      return;
+    }
+    var d = await res.json();
+    await loadUsers();
+    var st2 = document.getElementById('cls-' + headId);
+    if (st2) {
+      /* ⚠ Say what happened to the people who were ALREADY deactivated, or a
+         reactivate that deliberately left someone off looks like it failed. */
+      var msg = '✓';
+      if (action === 'reactivate' && d.kept_deactivated) msg += ' (' + d.kept_deactivated + ' left deactivated)';
+      st2.textContent = msg; st2.className = 'field-status ok';
+      setTimeout(function () { var e2 = document.getElementById('cls-' + headId); if (e2) { e2.textContent = ''; e2.className = 'field-status'; } }, 2600);
+    }
+  }
+
+  /* ⚠⚠ FINAL AND UNRECOVERABLE, so never from a single click. The preview is
+     fetched from the server so the confirmation names the REAL counts rather
+     than describing the action in the abstract, and the second step requires
+     the company name to be typed. */
+  async function deleteCompany(headId) {
+    var pv;
+    try {
+      var r = await fetch('/admin/companies/' + encodeURIComponent(headId) + '/delete-preview', { headers: authHeader() });
+      if (r.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!r.ok) { var e1; try { e1 = await r.json(); } catch (x) { e1 = {}; } alert('Could not load the preview: ' + (e1.error || r.status)); return; }
+      pv = await r.json();
+    } catch (e) { alert('Could not reach the server.'); return; }
+
+    var extra = pv.kb_global_kept
+      ? '\n\nNOTE: ' + pv.kb_global_kept + ' knowledge-base entries they shared platform-wide will be KEPT, '
+        + 'because deleting them would remove content from every other company.'
+      : '';
+    if (!confirm(pv.confirmation + extra)) return;
+    var typed = prompt('Type the company name to confirm:\n\n' + pv.name);
+    if (typed === null) return;
+    if (typed.trim() !== pv.name) { alert('That did not match. Nothing was deleted.'); return; }
+
+    var res;
+    try {
+      res = await fetch('/admin/companies/' + encodeURIComponent(headId), { method: 'DELETE', headers: authHeader() });
+    } catch (e) { alert('Delete failed: could not reach the server.'); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    var d; try { d = await res.json(); } catch (e) { d = {}; }
+    if (!res.ok) { alert('Delete failed: ' + (d.error || ('HTTP ' + res.status))); return; }
+    await loadUsers();
+    alert('Deleted "' + pv.name + '" — ' + d.deleted_users + ' users and their data removed.');
   }
 
   /* ⚠⚠ THE NAME IS EDITABLE AT THE TOP CENTRE OF ITS BLOCK, AND THE SAVE MUST

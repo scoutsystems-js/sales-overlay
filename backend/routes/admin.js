@@ -17,6 +17,7 @@ const { canManageTarget, deletePlan, tombstoneIdentity, deactivateBlockReason } 
    resolves to nothing is only found by RUNNING the line. */
 const { normalizeName } = require('../lib/display-name');
 const { sanitizeCompanyName, companyDisplayName, bucketUsers } = require('../lib/company');
+const companyLifecycle = require('../lib/company-lifecycle');
 const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const provisionUser = require('../lib/provision-user');
@@ -211,6 +212,7 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
         // reps); lib/company.js keys off reps, never role, so a `manager` with
         // zero reps is a single user and this value is simply unused for them.
         team_name: u.team_name,
+        deactivated_with_company: u.deactivated_with_company,
         created_at: u.created_at,
         session_count: s.session_count,
         last_session_at: s.last_session_at,
@@ -232,6 +234,12 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
        All Users tab) reads it, so this is additive and nothing had to be
        migrated to land it. */
     var grouped = bucketUsers(enriched);
+    /* ⚠ A deactivated company must READ as deactivated, not look identical to a
+       live one. Derived (every member inactive) rather than stored, so there is
+       no second source of truth to fall out of step with `active`. */
+    grouped.companies.forEach(function (c) {
+      c.is_deactivated = companyLifecycle.isCompanyDeactivated(c);
+    });
 
     res.json({
       users: enriched,
@@ -430,6 +438,186 @@ router.patch('/users/:user_id/billing_status', requireAuth, requireRole('owner')
     if (handleConfigError(err, res)) return;
     console.error('[admin] billing patch error:', err.message);
     res.status(500).json({ error: 'Failed to update billing status' });
+  }
+});
+
+// ── GET /admin/companies/:head_id/delete-preview ────────────────────────────
+// The real cost, counted from the database, so the confirmation names it rather
+// than describing it in the abstract.
+router.get('/companies/:head_id/delete-preview', requireAuth, requireRole('owner'), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var members = await companyMembers(admin, req.params.head_id);
+    if (!members.length) return res.status(404).json({ error: 'No such company.' });
+    var ids = members.map(function (m) { return m.user_id; });
+
+    var head = members.filter(function (m) { return m.user_id === req.params.head_id; })[0];
+    var calls = await admin.from('fathom_calls').select('id', { count: 'exact', head: true }).in('user_id', ids);
+    var kb = await admin.from('knowledge_base').select('id', { count: 'exact', head: true })
+      .in('uploaded_by', ids).in('scope', companyLifecycle.KB_SCOPES_TO_DELETE);
+    var kbGlobal = await admin.from('knowledge_base').select('id', { count: 'exact', head: true })
+      .in('uploaded_by', ids).eq('scope', 'global');
+
+    res.json({
+      head_id: req.params.head_id,
+      name: companyDisplayName(head && head.team_name),
+      user_count: members.length,
+      call_count: calls.count || 0,
+      kb_deleted: kb.count || 0,
+      // ⚠ Surfaced because it is the ONE thing that survives, and the admin
+      // should know before pressing rather than discover it afterwards.
+      kb_global_kept: kbGlobal.count || 0,
+      confirmation: companyLifecycle.deleteConfirmation(
+        companyDisplayName(head && head.team_name), members.length, calls.count || 0),
+    });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company delete-preview error:', err.message);
+    res.status(500).json({ error: 'Could not load the delete preview' });
+  }
+});
+
+// ── DELETE /admin/companies/:head_id ────────────────────────────────────────
+// ⚠⚠ FINAL. Justin's ruling: a company delete DESTROYS the data, unlike a
+// single-user delete which keeps the calls. See lib/company-lifecycle.js for
+// why both are correct at their own scale.
+//
+// ⚠ ORDER MATTERS. `knowledge_base` has NO foreign key to auth.users, so its
+// rows survive a cascade and must be removed FIRST — deleting the users first
+// would orphan them beyond reach of this scope. `profiles` (vestigial) has a
+// NO ACTION foreign key that would BLOCK the auth delete outright, so it goes
+// too. Everything else cascades: calls, analyses, highlights, prospects,
+// eod_edits, sessions, logs, objections, connections, synthesis cache.
+router.delete('/companies/:head_id', requireAuth, requireRole('owner'), async function(req, res) {
+  var headId = req.params.head_id;
+  try {
+    var admin = getAdminClient();
+    var members = await companyMembers(admin, headId);
+    if (!members.length) return res.status(404).json({ error: 'No such company.' });
+    var ids = members.map(function (m) { return m.user_id; });
+
+    /* ⚠ Refuse to delete a company containing the actor. An owner deleting
+       themselves mid-request leaves the rest of the operation running without
+       an account, and the failure would be untraceable. */
+    if (ids.indexOf(req.user.id) !== -1) {
+      return res.status(400).json({ error: 'You cannot delete a company that you are part of.' });
+    }
+
+    // 1 · KB rows that would otherwise survive — personal + team only.
+    var kbDel = await admin.from('knowledge_base').delete()
+      .in('uploaded_by', ids).in('scope', companyLifecycle.KB_SCOPES_TO_DELETE).select('id');
+    if (kbDel.error) throw new Error('kb delete failed: ' + kbDel.error.message);
+
+    // 2 · the vestigial profiles row, whose NO ACTION FK would block the delete
+    await admin.from('profiles').delete().in('id', ids);
+
+    // 3 · the auth users. Everything else cascades from here.
+    var deleted = [], failed = [];
+    for (var i = 0; i < ids.length; i++) {
+      var d = await admin.auth.admin.deleteUser(ids[i]);
+      if (d.error) { failed.push({ user_id: ids[i], error: d.error.message }); continue; }
+      deleted.push(ids[i]);
+    }
+
+    console.log('[admin] COMPANY DELETED: actor=%s head=%s users=%d kb_rows=%d failed=%d',
+      req.user.email, headId, deleted.length, (kbDel.data || []).length, failed.length);
+    res.json({
+      ok: failed.length === 0,
+      deleted_users: deleted.length,
+      kb_rows_deleted: (kbDel.data || []).length,
+      failed: failed,
+    });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company delete error:', err.message);
+    res.status(500).json({ error: 'Could not delete the company' });
+  }
+});
+
+// ── company membership helper ───────────────────────────────────────────────
+// The head plus everyone managed by them. Used by every company-scoped action
+// so "who is in this company" has ONE definition on the server too.
+async function companyMembers(admin, headId) {
+  var r = await admin.from('user_profiles')
+    .select('user_id, role, active, managed_by, team_name, deactivated_with_company')
+    .or('user_id.eq.' + headId + ',managed_by.eq.' + headId);
+  if (r.error) throw new Error('member lookup failed: ' + r.error.message);
+  return r.data || [];
+}
+
+// ── POST /admin/companies/:head_id/deactivate ───────────────────────────────
+// Nobody in the company can log in. EVERY NUMBER THEY PRODUCED STAYS (Justin's
+// ruling) — this touches login only, exactly like single-user deactivate.
+//
+// ⚠ It REUSES that path per member rather than inventing a second one: ban the
+// auth account, set active=false. The ONLY addition is the flag that records
+// which rows this action switched off, so reactivate can put back exactly those.
+router.post('/companies/:head_id/deactivate', requireAuth, requireRole('owner'), async function(req, res) {
+  var headId = req.params.head_id;
+  try {
+    var admin = getAdminClient();
+    var members = await companyMembers(admin, headId);
+    if (!members.length) return res.status(404).json({ error: 'No such company.' });
+
+    /* ⚠ ONLY the currently-active. Someone already deactivated by hand is left
+       alone AND left unflagged, which is what stops reactivate resurrecting
+       them. */
+    var ids = companyLifecycle.membersToDeactivate(members);
+    var done = [], failed = [];
+    for (var i = 0; i < ids.length; i++) {
+      var uid = ids[i];
+      var banned = await admin.auth.admin.updateUserById(uid, { ban_duration: '876000h' });
+      if (banned.error) { failed.push(uid); continue; }
+      var up = await admin.from('user_profiles')
+        .upsert({ user_id: uid, active: false, deactivated_with_company: true }, { onConflict: 'user_id' });
+      if (up.error) {
+        // roll this one back so state stays consistent
+        await admin.auth.admin.updateUserById(uid, { ban_duration: 'none' }).catch(function () {});
+        failed.push(uid); continue;
+      }
+      done.push(uid);
+    }
+    console.log('[admin] company deactivated: actor=%s head=%s off=%d failed=%d',
+      req.user.email, headId, done.length, failed.length);
+    res.json({ ok: failed.length === 0, deactivated: done.length, already_off: members.length - ids.length, failed: failed.length });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company deactivate error:', err.message);
+    res.status(500).json({ error: 'Could not deactivate the company' });
+  }
+});
+
+// ── POST /admin/companies/:head_id/reactivate ───────────────────────────────
+// ⚠⚠ Restores EXACTLY the rows the company action switched off — identified by
+// `deactivated_with_company`, never by "is inactive". The obvious rule
+// (reactivate everyone who is off) resurrects the person who was deactivated on
+// purpose beforehand, and nothing afterwards could tell you it happened.
+router.post('/companies/:head_id/reactivate', requireAuth, requireRole('owner'), async function(req, res) {
+  var headId = req.params.head_id;
+  try {
+    var admin = getAdminClient();
+    var members = await companyMembers(admin, headId);
+    if (!members.length) return res.status(404).json({ error: 'No such company.' });
+
+    var ids = companyLifecycle.membersToReactivate(members);
+    var done = [], failed = [];
+    for (var i = 0; i < ids.length; i++) {
+      var uid = ids[i];
+      var un = await admin.auth.admin.updateUserById(uid, { ban_duration: 'none' });
+      if (un.error) { failed.push(uid); continue; }
+      var up = await admin.from('user_profiles')
+        .upsert({ user_id: uid, active: true, deactivated_with_company: false }, { onConflict: 'user_id' });
+      if (up.error) { failed.push(uid); continue; }
+      done.push(uid);
+    }
+    var keptOff = members.filter(function (m) { return m.active === false && !m.deactivated_with_company; }).length;
+    console.log('[admin] company reactivated: actor=%s head=%s on=%d kept_off=%d failed=%d',
+      req.user.email, headId, done.length, keptOff, failed.length);
+    res.json({ ok: failed.length === 0, reactivated: done.length, kept_deactivated: keptOff, failed: failed.length });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company reactivate error:', err.message);
+    res.status(500).json({ error: 'Could not reactivate the company' });
   }
 });
 
@@ -1033,7 +1221,7 @@ async function fetchUsersWithProfiles(admin) {
   if (authResult.error) throw new Error('listUsers failed: ' + authResult.error.message);
   var profilesResult = await admin
     .from('user_profiles')
-    .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name, team_name');
+    .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name, team_name, deactivated_with_company');
   if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
 
   var profilesByUserId = {};
@@ -1054,6 +1242,7 @@ async function fetchUsersWithProfiles(admin) {
       billing_plan: p.billing_plan || null,
       active: p.active !== false, // profile-less or unset → active (matches column default)
       team_name: p.team_name || null,   // company name; meaningful only on a head
+      deactivated_with_company: p.deactivated_with_company === true,
       first_name: p.first_name || null,
       last_name: p.last_name || null,
       created_at: u.created_at || null,
