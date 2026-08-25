@@ -664,7 +664,8 @@ router.get('/counter', protect, async function(req, res) {
         var kq = await admin.from('fathom_calls')
           .select('id')
           .in('id', dayIds.slice(ki, ki + 100))
-          .not('not_a_sales_call', 'is', true);
+          .not('not_a_sales_call', 'is', true)
+          .not('duplicate_of', 'is', null);
         if (kq.error) throw new Error('fathom_calls: ' + kq.error.message);
         (kq.data || []).forEach(function (c) { keep[c.id] = true; });
       }

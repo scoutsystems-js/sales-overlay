@@ -3552,6 +3552,13 @@
       border-color: var(--accent);
       outline: none;
     }
+
+    /* Neutral, not red: nothing is WRONG with a duplicate — it is just not counted. */
+    .dupe-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+      border: 1px solid var(--border-strong, #2a2a2a); border-radius: 4px;
+      padding: 2px 7px; margin-left: 8px; opacity: 0.85; white-space: nowrap;
+    }
   </style>
   <script src="/js/scout-auth.js"></script>
 </head>
@@ -12590,6 +12597,12 @@
       + '</div>'
       + '<div class="library-card-side">'
         + (isNS ? '<span class="not-sales-badge">Not a sales call</span>' : '')
+        /* ⚠ A suppressed cross-provider duplicate is SHOWN and LABELLED, never
+           hidden — the same treatment as a not-a-sales-call row. The library is
+           a RECORD; the counts are the aggregate. Hiding it would be data loss
+           wearing a filter's clothes, and a user who knows both providers
+           recorded a meeting would find one copy simply gone. */
+        + (c.is_duplicate ? '<span class="dupe-badge" title="The same meeting was also recorded by your other provider. This copy is not counted.">Duplicate</span>' : '')
         + (c.analysis_status === 'done' ? outcomeTagHtml(c.id, c.outcome, c.outcome_source, true) : '')
         + badge
         + recordingLink

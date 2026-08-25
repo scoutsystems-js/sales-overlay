@@ -26,6 +26,7 @@ var router = express.Router();
 
 const FATHOM_API_BASE   = 'https://api.fathom.ai/external/v1';
 const syncWindow = require('../lib/sync-window');
+const { applyDuplicateSuppression } = require('../lib/duplicate-calls');
 const FATHOM_TOKEN_URL  = 'https://fathom.video/external/v1/oauth2/token';
 const TOKEN_EXPIRY_TOLERANCE_SECONDS = 300; // 5 min — matches OAuth route + SDK
 const MAX_PAGES         = 20;   // legacy default; lib/sync-window scales it per choice   // safety cap; 20 pages * Fathom page size ≈ enough for any realistic user
@@ -464,6 +465,11 @@ async function syncUserCalls(admin, userId, conn, opts) {
      analyses. Passing null makes a history pull use the FIRST-SYNC cap, so the
      user gets their whole library and the newest 20 graded, exactly as the UI
      promises. Pulling calls and grading calls stay separate. */
+  /* ⚠ Suppress cross-provider duplicates BEFORE dispatching analyses, so a
+     duplicate is never graded — grading one costs two Claude calls and puts a
+     second set of highlights against a meeting that already has them. */
+  await applyDuplicateSuppression(admin, userId);
+
   var newCallIds = callIdsToAnalyze(newRows, historyMode ? null : conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
   if (newRows.length > newCallIds.length) {
     console.log('[fathom] sync: first-sync backlog — capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
@@ -1091,7 +1097,8 @@ router.get('/status', requireAuth, async function(req, res) {
       .from('fathom_calls')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .not('not_a_sales_call', 'is', true);
+      .not('not_a_sales_call', 'is', true)
+      .not('duplicate_of', 'is', null);
     // Pending-call count drives the dashboard's "Reanalyze" button visibility —
     // the button only shows when there are calls sitting at sync_status='pending'
     // waiting for the analysis worker (e.g. rows reset after the transcript fix).
@@ -1100,6 +1107,7 @@ router.get('/status', requireAuth, async function(req, res) {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .not('not_a_sales_call', 'is', true)
+      .not('duplicate_of', 'is', null)
       .eq('sync_status', 'pending');
 
     var connResult = await connPromise;
@@ -1247,7 +1255,7 @@ async function loadCallsList(admin, userId, opts) {
        using one you forgot to select, are the same bug from opposite ends; this
        codebase has shipped the second four times. The flag is emitted in the
        mapped payload below and asserted in test/not-a-sales-call.test.js. */
-    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call')
+    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, duplicate_of')
     .eq('user_id', userId)
     .order('call_date', { ascending: false, nullsFirst: false });
   if (opts.from) q = q.gte('call_date', opts.from);
@@ -1277,6 +1285,12 @@ async function loadCallsList(admin, userId, opts) {
       // ⚠ THE FLAG. Selected above and USED here — a marked call renders flagged
       // in the library rather than disappearing from it.
       not_a_sales_call: cc.not_a_sales_call === true,
+      /* ⚠ SHOWN, NOT HIDDEN — the same treatment not_a_sales_call gets. The
+         library is a RECORD; the counts are the aggregate. Hiding a suppressed
+         duplicate would be data loss wearing a filter's clothes, and a user who
+         knows both providers recorded a call would find one of them missing
+         with no explanation. */
+      is_duplicate: !!cc.duplicate_of,
       analysis_status: a ? a.status : null, overall_score: a ? a.overall_score : null, overall_summary: a ? a.overall_summary : null,
       outcome: a ? a.outcome : null, outcome_source: a ? a.outcome_source : null,
     };
@@ -1307,7 +1321,8 @@ async function windowOutcomeCounts(admin, userId, opts) {
   var ids = [], PAGE = 1000, start = 0;
   for (;;) {
     var q = admin.from('fathom_calls').select('id').eq('user_id', userId)
-    .not('not_a_sales_call', 'is', true);
+    .not('not_a_sales_call', 'is', true)
+    .not('duplicate_of', 'is', null);
     if (opts.from) q = q.gte('call_date', opts.from);
     if (opts.to) q = q.lte('call_date', opts.to);
     var r = await q.range(start, start + PAGE - 1);

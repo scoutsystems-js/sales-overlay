@@ -2,6 +2,7 @@
 // connect-UI needs it); sync + webhook land in later sub-stages. Reads the
 // unified call_connections table (provider='zoom').
 const express = require('express');
+const { applyDuplicateSuppression } = require('../lib/duplicate-calls');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { requireAuth } = require('../middleware/auth');
@@ -193,6 +194,10 @@ async function syncZoomCalls(admin, userId, conn) {
   } catch (rqErr) {
     console.error('[zoom] requeue lookup failed for user ' + userId + ': ' + (rqErr.message || 'unknown'));
   }
+
+  // ⚠ Same as the Fathom path: suppress before dispatching, so a duplicate is
+  // never graded.
+  await applyDuplicateSuppression(admin, userId);
 
   var newCallIds = callIdsToAnalyze(newRows, conn && conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
   if (newRows.length > newCallIds.length) {

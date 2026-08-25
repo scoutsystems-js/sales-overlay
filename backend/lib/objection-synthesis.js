@@ -94,6 +94,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
       .select('id, recording_url, call_date, source')
       .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
+      .not('duplicate_of', 'is', null)
       .order('call_date', { ascending: false, nullsFirst: false })
       .range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);

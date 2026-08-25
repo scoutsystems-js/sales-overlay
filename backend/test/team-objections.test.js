@@ -126,8 +126,16 @@ test('⚠ not_a_sales_call is excluded, and the predicate keeps NULL rows', asyn
   const admin = fakeAdmin();
   const out = await computeTeamObjections(admin, [JOSH, AVA], FROM, TO, OPTS);
   assert.ok(out.instances.every((i) => i.fathom_call_id !== 'c3'), 'the marked call must not appear');
-  // ⚠ `is not true`, never `= false` — most rows are NULL, and `= false` drops them all.
-  assert.deepStrictEqual(admin._lastNot, [['not_a_sales_call', 'is', true]]);
+  /* ⚠ `is not true`, never `= false` — most rows are NULL, and `= false` drops
+     them all. That property is what this line protects and it is unchanged.
+     ⚠ A SECOND exclusion joined it 2026-08-24: cross-provider duplicates
+     (`duplicate_of is null`). Asserting the exact list rather than membership
+     is deliberate — it means a THIRD exclusion appearing here has to be
+     acknowledged rather than absorbed silently. */
+  assert.deepStrictEqual(admin._lastNot, [
+    ['not_a_sales_call', 'is', true],
+    ['duplicate_of', 'is', null],
+  ]);
   assert.ok(out.instances.some((i) => i.fathom_call_id === 'c1'),
     'NULL not_a_sales_call rows must survive — this is the half a `= false` predicate breaks');
 });

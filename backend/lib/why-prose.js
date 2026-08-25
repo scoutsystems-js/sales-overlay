@@ -230,6 +230,7 @@ async function computeWhyProse(admin, rep, from, to, ask) {
     var cq = await admin.from('fathom_calls').select('id, fathom_call_id')
       .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
+      .not('duplicate_of', 'is', null)
       .range(start, start + PAGE - 1);
     if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
     var b = cq.data || []; calls = calls.concat(b);
