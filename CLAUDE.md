@@ -1426,6 +1426,28 @@ his real history: 560 meetings / 56 pages / 17.8s, back to 2021-09-16
 - **Caught BEFORE clicking it on production**, by asking what the existing selector would do with a 160-row insert. **Pulling calls and grading calls are separate budgets and must stay separate.**
 - Verified live: 160 backfilled, **159 with no analysis row**, library full, newest 20 graded.
 
+### ⚠⚠ NAMING RULING — "COMPANY" IN ADMIN, "TEAM" EVERYWHERE ELSE (Justin, 2026-08-24)
+He asked for a professional opinion and accepted this one. **The admin console says COMPANY; every other surface keeps saying TEAM.**
+- **⚠⚠ THE CAVEAT THAT WILL BITE, RECORDED BECAUSE IT IS A TIME BOMB, NOT A NITPICK: a company is currently stored as ONE MANAGER'S TEAM** (`user_profiles.team_name` on the head's row). **A client with TWO sales managers therefore appears as TWO companies.** That is acceptable today and **stops being true the moment the filed Director role lands**, because a Director sits above several managers — at which point one company legitimately spans several teams and the label can no longer live on a head's row.
+- **WHEN THAT HAPPENS, "company" needs REAL STORAGE** (its own row, with teams pointing at it) rather than a name on a user. **Do not treat the current column as the design** — it is the cheapest thing that is correct under a one-manager-per-company assumption, and that assumption has a known expiry date.
+
+### ⚠⚠ A COMPANY IS "HAS REPS **OR** IS NAMED" — WIDENED SO ONE CAN BE CREATED (2026-08-24)
+The original definition was **has reps**, which makes "Add company" **impossible by construction**: a brand-new company has no members, so its head files under Single Users and the company **vanishes the instant it is made**.
+- Now: **reps OR an explicitly-set name.** **It reclassifies nobody** — naming is an explicit owner action, and the one pre-existing named row already had reps. A `manager` with zero reps and no name (a real production row) is **still a single user**. **Role is never the key.**
+- **⚠ THIS SUPERSEDED A GUARD SHIPPED THE SAME DAY.** `PATCH /admin/companies/:id/name` refused a target with no reps, reasoning that *"a name stored there is invisible forever"*. **That reasoning is now false** — naming is how a company is created. The guard became a **ROLE** check (a plain `user` may not head a company), and **its HTTP test was CONVERTED, not deleted**: the property that outlived the old rule is the one still asserted.
+- **CREATING A COMPANY = PROMOTING AN EXISTING SINGLE USER**, not creating a person and a company together: `+ Create user` already assigns a role and a manager, every real company starts from someone already in Scout, and **promoting the wrong person is one dropdown to undo where a duplicate account is not.**
+
+### ⚠⚠⚠ MOVING A REP RETROACTIVELY MOVES ALL THEIR HISTORY — UNDECIDED, JUSTIN'S CALL (2026-08-24)
+```
+fathom_calls carries ONLY user_id — no team_id, no company_id, no snapshot
+team scope resolves managed_by AT QUERY TIME (repIdsFor)
+=> reassigning a rep moves EVERY past quarter's calls, cash, close rate and
+   objections from the old company's totals to the new one, retroactively
+```
+- **Nothing records which team a call belonged to WHEN IT HAPPENED**, so there is no way to answer "what did this company do last quarter" independently of today's org chart.
+- **⚠ NOT CHANGED, AND DELIBERATELY SO.** Fixing it means either freezing history (snapshot the team on each call) or accepting the retroactive move — **a reporting decision, not an implementation detail.** Reported and stopped.
+- **What WAS added: a cycle guard** so a head cannot be pointed at one of their own reps. ⚠ **It is currently UNREACHABLE in live data** — the pre-existing "managed_by must be manager|owner" check fires first for every member, since all members are plain users. It is defence-in-depth for the reps-AND-a-manager shape, which does not exist yet. **Do not record it as live-exercised.**
+
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
 - **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
