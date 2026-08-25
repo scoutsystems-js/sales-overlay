@@ -1460,6 +1460,27 @@ The grading cap is deliberate: a first sync (or a history pull) grades the newes
 - **⚠ THE WINDOW PICKER USED TO REQUIRE `outdated > 0`**, so a pure post-import backlog (pending, nothing outdated) fell through to "Analyze next 10" — **18 clicks for 180 calls**. It now shows whenever `pending + outdated > 0`, because `/fathom/update-analyses` dispatches both in one batch. This mismatch was already recorded once as the reason a 2026-08-01 backfill was abandoned; it is now fixed rather than re-noted.
 - **COST OF GRADING A BACKLOG, measured from real transcripts (avg 110k chars ≈ 30k tokens, sent to BOTH the grader and the extractor):** ~**2 Sonnet calls and ~60k input tokens per call**, ~50s each serially. **180 calls ≈ 360 model calls ≈ $43 and ~2.5 hours.** ⚠ And the drain **dies on redeploy**, so a multi-hour run must not overlap a push.
 
+### ⚠⚠ AN UPSTREAM DEFAULT IS NOT A DECISION (2026-08-24)
+Justin ruled that a new connection backdates **30 days only**. Checking both providers found two different shapes, and only one was a bug:
+- **FATHOM had NO date limit** — a first sync omitted `created_after` and pulled to the 200-call page cap. Genuinely unchosen.
+- **ZOOM already pulled ~30 days — by INHERITING Zoom's API default when `from` is omitted.** The behaviour was already right, so the tempting conclusion is "Zoom needs no change".
+- **⚠ IT DID. A default that lives in someone else's API is not a decision we have made**: Zoom can change it, and nothing in our code states what we intended, so the day it changes the diff shows nothing and the behaviour moves anyway. **Sending the date explicitly costs one line and converts an accident into a choice.**
+- **THE GENERAL RULE: when behaviour depends on an upstream default, STATE IT LOCALLY even when the current default already matches.** Same family as the stale load-bearing comment — the difference between something being true and something being *enforced*.
+- **⚠ AND A DEFAULT MUST NOT OVERWRITE A CHOICE.** The Fathom connect handler is an **upsert**, so writing `'30d'` unconditionally would silently narrow anyone **reconnecting** who had chosen 90 days or all time — with nothing on screen to say so. It reads the existing window first.
+
+### ⚠⚠ DELETE-A-COMPANY: THE VERIFICATION, AND THE ONE HAZARD THAT REMAINS (2026-08-24)
+Proven on a throwaway seeded with **all seven** data types the ruling names. **Every other company byte-identical before and after; zero residue.**
+```
+knowledge_base  1134 -> 1132  (-2, exactly the seeded personal rows)
+  scope=global   583 ->  583  UNCHANGED — shared content preserved
+eod_edits           7 ->    1  (-6)
+synthesis cache   452 ->  450  (-2)
+calls / analyses / highlights / prospects        all gone via CASCADE
+```
+- **⚠ THE FIRST ATTEMPT PROVED NOTHING AND SAID IT HAD.** The fixture's KB insert failed silently (`label` is NOT NULL and I did not check `.error`), so `kb_rows_deleted: 0` was reported as a pass when the path had **never been exercised**. **A cleanup count of zero is only evidence if you first proved the rows existed.** The second run seeded 2 and deleted 2.
+- **⚠⚠ THE HAZARD, REPORTED AND NOT FIXED: A REP WHO MOVED COMPANIES CARRIES THEIR OLD CALLS.** Calls belong to a PERSON; team totals are computed from who manages whom *right now*. So deleting a company destroys **calls earned at a previous company**, and nothing warns — the confirmation counts them as this company's. **It cannot be detected from the data** either, because nothing records which team a call belonged to when it happened. **This is the history-freeze question wearing its most expensive costume**, and it is Justin's to rule on.
+- **⚠ THE FINAL CLICK IS UNVERIFIED.** The confirm + typed-name prompt are native dialogs this harness cannot drive; the endpoint was exercised over HTTP instead. **Do not record the button as click-tested.**
+
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
 - **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
