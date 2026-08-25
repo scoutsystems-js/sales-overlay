@@ -125,3 +125,39 @@ test('⚠ THE PAGE DOES NOT REIMPLEMENT "WHAT IS A COMPANY"', () => {
     'companiesArray should be declared once and assigned once (from the server); '
     + 'a third assignment means the page is computing groups somewhere. Found ' + assigns);
 });
+
+/* ── password reset diagnostics: REMOVED 2026-08-24 ───────────────────────── */
+
+test('⚠⚠ THE RESET-DIAGNOSTICS SURFACE IS GONE — UI **AND** ENDPOINT', () => {
+  /* Justin: "that was in there a while ago for some testing I did and needs to
+     be removed completely." Removing only the UI would leave a live owner-only
+     endpoint mounted with nothing watching it. */
+  const routes = fs.readFileSync(path.join(__dirname, '..', 'routes', 'admin.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+
+  ['runResetDiagnose', 'resetDiagSection', 'rdEmail', 'rdBtn', 'rdResult', 'Password reset diagnostics']
+    .forEach((m) => assert.strictEqual(LIVE.indexOf(m), -1, 'admin.html still contains ' + m));
+  assert.strictEqual(routes.indexOf('reset-diagnose'), -1, 'the endpoint is still mounted');
+
+  // ⚠ CUT-TOO-DEEP CHECK: the surrounding page must survive the removal.
+  ['renderUsersTable', 'usersTableWrap', 'loadUsers'].forEach((m) =>
+    assert.ok(LIVE.indexOf(m) !== -1, 'the removal took ' + m + ' with it'));
+});
+
+test('⚠ ADD COMPANY EXISTS, AND ITS HEAD COMES FROM SINGLE USERS', () => {
+  assert.ok(/submitAddCompany/.test(LIVE), 'the create flow must exist');
+  const i = LIVE.indexOf('function addCompanyBarHtml(');
+  assert.ok(i !== -1);
+  const fn = LIVE.slice(i, LIVE.indexOf('\n  }', i));
+  assert.ok(/singlesArray/.test(fn),
+    'the head must be picked from SINGLE USERS — offering someone already in a '
+    + 'company would silently remove them from it');
+
+  const j = LIVE.indexOf('async function submitAddCompany(');
+  const save = LIVE.slice(j, LIVE.indexOf('\n  }', j));
+  assert.ok(/'✓'/.test(save) && /'✗ '/.test(save), 'the create must report success AND failure');
+  assert.ok(/await loadUsers\(\)/.test(save),
+    'it must reload from the server — creating a company moves its head out of '
+    + 'Single Users, so both tab counts change and recomputing locally would be '
+    + 'a second copy of the bucketing rule');
+});

@@ -366,6 +366,19 @@ router.patch('/users/:user_id/managed_by', requireAuth, requireRole(['manager', 
     var cur = await admin.from('user_profiles').select('managed_by').eq('user_id', targetId).maybeSingle();
     if (cur.error) { console.error('[admin] managed_by current lookup failed:', cur.error.message); return res.status(500).json({ error: 'Could not load target user' }); }
     var currentManagedBy = (cur.data && cur.data.managed_by) || null;
+    /* ⚠ REFUSE A CYCLE. Moving a company HEAD into another company is allowed
+       (they keep their own reps and still head their own company), but pointing
+       them at one of their OWN reps makes A manage B while B manages A — a
+       state nothing else in the product can render sensibly. Today's model is
+       one level deep, so checking one hop catches every reachable case. */
+    var mgrProfile = await admin.from('user_profiles')
+      .select('managed_by').eq('user_id', newManagedBy).maybeSingle();
+    if (!mgrProfile.error && mgrProfile.data && mgrProfile.data.managed_by === targetId) {
+      return res.status(400).json({
+        error: 'That would put each of them in charge of the other. Move one of them out first.',
+      });
+    }
+
     if (currentManagedBy === newManagedBy) return res.json({ user_id: targetId, managed_by: newManagedBy });
 
     var up = await admin.from('user_profiles')
@@ -420,6 +433,73 @@ router.patch('/users/:user_id/billing_status', requireAuth, requireRole('owner')
   }
 });
 
+// ── POST /admin/companies ───────────────────────────────────────────────────
+// Create a company. Owner-only.
+//
+// ⚠⚠ WHAT "CREATE A COMPANY" MEANS, decided rather than assumed: a company IS a
+// manager's team, so it cannot exist without a head. Two options were possible —
+// create a brand-new manager and their company together, or promote an existing
+// SINGLE USER to head a new one. This does the SECOND, because:
+//   • "+ Create user" already exists and already assigns a role and a manager,
+//     so building a second person-creation flow here would duplicate it;
+//   • every company in practice starts from someone who is already in Scout;
+//   • and the failure mode is gentler — promoting the wrong person is one
+//     dropdown to undo, whereas creating a duplicate account is not.
+//
+// The head is promoted to `manager` if they are a plain `user`, because a
+// company head must be able to lead a team (the managed_by route requires
+// manager|owner as a target). An owner heading a company keeps their role.
+router.post('/companies', requireAuth, requireRole('owner'), async function(req, res) {
+  var headId = req.body && req.body.head_id;
+  var name = sanitizeCompanyName(req.body && req.body.name);
+  if (!headId || typeof headId !== 'string') return res.status(400).json({ error: 'head_id is required' });
+  if (name === undefined) return res.status(400).json({ error: 'name must be a string' });
+  if (!name) return res.status(400).json({ error: 'A company needs a name.' });
+
+  try {
+    var admin = getAdminClient();
+    var prof = await admin.from('user_profiles')
+      .select('user_id, role, managed_by, team_name').eq('user_id', headId).maybeSingle();
+    if (prof.error) throw new Error('head lookup failed: ' + prof.error.message);
+    if (!prof.data) return res.status(404).json({ error: 'No profile found for that user.' });
+
+    /* ⚠ Refuse a head who is already inside another company. Allowing it would
+       create the reps-AND-a-manager shape, which lib/company.js resolves by
+       making them head their OWN company — so they would silently vanish from
+       the company they were a member of. That is a reassignment, and it should
+       be done deliberately via "Managed by", not as a side effect of creating
+       a company. */
+    if (prof.data.managed_by) {
+      return res.status(400).json({
+        error: 'That user is already in a company. Move them out first using Managed by.',
+      });
+    }
+    if (prof.data.team_name && prof.data.team_name.trim()) {
+      return res.status(400).json({ error: 'That user already heads a company.' });
+    }
+
+    var patch = { team_name: name, updated_at: new Date().toISOString() };
+    var promoted = false;
+    if (prof.data.role !== 'manager' && prof.data.role !== 'owner') {
+      patch.role = 'manager';
+      promoted = true;
+    }
+
+    var upd = await admin.from('user_profiles').update(patch)
+      .eq('user_id', headId).select('user_id, role, team_name');
+    if (upd.error) throw new Error('create failed: ' + upd.error.message);
+    if (!upd.data || !upd.data.length) return res.status(404).json({ error: 'No profile found for that user.' });
+
+    console.log('[admin] company created: actor=%s head=%s name=%s promoted=%s',
+      req.user.email, headId, JSON.stringify(name), promoted);
+    res.json({ ok: true, head_id: headId, name: name, display_name: companyDisplayName(name), promoted: promoted });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company create error:', err.message);
+    res.status(500).json({ error: 'Could not create the company' });
+  }
+});
+
 // ── PATCH /admin/companies/:head_id/name ────────────────────────────────────
 // Rename a COMPANY. Justin's ruling (2026-08-24): a company IS a team, renamed
 // in the admin view only — so the "company" here is identified by its HEAD (the
@@ -447,14 +527,22 @@ router.patch('/companies/:head_id/name', requireAuth, requireRole('owner'), asyn
   try {
     var admin = getAdminClient();
 
-    var repCount = await admin
-      .from('user_profiles')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('managed_by', headId);
-    if (repCount.error) throw new Error('rep lookup failed: ' + repCount.error.message);
-    if (!repCount.count) {
+    /* ⚠⚠ THIS GUARD CHANGED 2026-08-24, AND THE OLD REASONING IS NOW WRONG.
+       It used to refuse a target with NO REPS, because a name stored there was
+       invisible forever — lib/company.js bucketed on reps alone, so a named
+       repless user rendered as a Single User and the name was never read.
+       Naming now MAKES a company (that is how one is created), so the name is
+       no longer invisible and refusing it would make "Add company" impossible.
+       ⚠ What must still be refused is a target who cannot lead a team: a plain
+       `user` heading a company would contradict the role model, and
+       PATCH /users/:id/managed_by already requires manager|owner as a target. */
+    var prof = await admin
+      .from('user_profiles').select('user_id, role').eq('user_id', headId).maybeSingle();
+    if (prof.error) throw new Error('head lookup failed: ' + prof.error.message);
+    if (!prof.data) return res.status(404).json({ error: 'No profile found for that user.' });
+    if (prof.data.role !== 'manager' && prof.data.role !== 'owner') {
       return res.status(400).json({
-        error: 'That user has no team members, so there is no company to name.',
+        error: 'Only a manager or admin can head a company. Change their role first.',
       });
     }
 
@@ -529,43 +617,9 @@ async function sendWelcomeInvite(admin, email, firstName) {
   }
 }
 
-// ── POST /admin/reset-diagnose (owner-only) ──────────────────────────────────
-// Visibility for FD-1: an owner can tell WHY a password reset didn't arrive —
-// no Scout account, a rejected/dud link, or email transport off — WITHOUT reading
-// Railway logs. Dry run: mints the recovery link exactly as the real endpoint
-// (redirect_to = /set-password?flow=reset) and runs the same guard, but sends
-// NOTHING. Owner-gated, so revealing account existence here is fine; the public
-// POST /auth/forgot-password stays enumeration-safe (the requester sees no change).
-router.post('/reset-diagnose', requireAuth, requireRole(['owner']), async function(req, res) {
-  try {
-    var raw = req.body && req.body.email;
-    if (typeof raw !== 'string' || raw.indexOf('@') === -1) {
-      return res.status(400).json({ error: 'Enter a valid email address.' });
-    }
-    var email = raw.trim().toLowerCase();
-    if (!welcomeEmail.isConfigured()) {
-      return res.json({ status: 'email_not_configured', message: 'RESEND_API_KEY is unset — no reset email can be sent for anyone until it is configured.' });
-    }
-    var admin = getAdminClient();
-    var r = await admin.auth.admin.generateLink({
-      type: 'recovery', email: email,
-      options: { redirectTo: CANONICAL_ORIGIN + '/set-password?flow=reset' },
-    });
-    if (r.error || !r.data || !r.data.properties || !r.data.properties.action_link) {
-      return res.json({ status: 'no_account', message: 'No Scout account for this email. A real request returns the same neutral message but sends nothing.' });
-    }
-    if (!linkTargetsSetPassword(r.data.properties.action_link)) {
-      var resolved = '';
-      try { resolved = new URL(r.data.properties.action_link).searchParams.get('redirect_to') || ''; } catch (e) {}
-      return res.json({ status: 'link_rejected', message: 'A link was minted but does not target /set-password (redirect-allowlist / Site-URL fallback). It would be refused — no email sends.', resolved_redirect: resolved });
-    }
-    return res.json({ status: 'would_send', message: 'All good — a real reset request for this email would email a working link.' });
-  } catch (err) {
-    if (err.message && err.message.indexOf('not configured') !== -1) return res.status(503).json({ error: err.message });
-    console.error('[admin] reset-diagnose error: ' + (err && err.message));
-    return res.status(500).json({ error: 'Diagnostic failed. Please try again.' });
-  }
-});
+// ⚠ POST /admin/reset-diagnose REMOVED 2026-08-24 (Justin). It was a one-off
+// testing surface. Removing the UI alone would have left a live owner-only
+// endpoint mounted with nothing watching it.
 
 var CREATE_ROLES = ['user', 'manager'];
 router.post('/users', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {

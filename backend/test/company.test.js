@@ -3,8 +3,10 @@
  *
  * The two properties that matter most here are the ones a reader would
  * otherwise have to re-derive:
- *   1. a company is defined by HAVING REPS, not by ROLE — live data has a
- *      `manager` with zero reps, and they are a SINGLE USER;
+ *   1. a company is defined by HAVING REPS **or being explicitly NAMED**, and
+ *      never by ROLE — live data has a `manager` with zero reps and no name,
+ *      and they are a SINGLE USER. (The "or named" half was added 2026-08-24
+ *      so a company can be created before it has any members.);
  *   2. every user lands in EXACTLY ONE of Companies / Single Users, including
  *      the shape the schema allows but the data does not yet contain (a user
  *      with both reps AND a manager).
@@ -90,7 +92,7 @@ const REP_M = { user_id: 'r3', email: 'mid@x.com', role: 'manager', managed_by: 
 const LONE_MANAGER = { user_id: 's1', email: 'joshua@soberlivingriches.com', role: 'manager', managed_by: null };
 const LONE_OWNER = { user_id: 's2', email: 'justin@x.com', role: 'owner', managed_by: null };
 
-test('⚠⚠ A COMPANY IS DEFINED BY HAVING REPS, NOT BY ROLE', () => {
+test('⚠⚠ A COMPANY IS NEVER DEFINED BY ROLE', () => {
   const { companies, singles } = bucketUsers([HEAD, REP_A, LONE_MANAGER]);
   assert.strictEqual(companies.length, 1, 'exactly one company');
   assert.strictEqual(companies[0].key, 'h1');
@@ -174,4 +176,46 @@ test('degenerate input never throws', () => {
     const r = bucketUsers(v);
     assert.ok(Array.isArray(r.companies) && Array.isArray(r.singles));
   });
+});
+
+/* ── creating a company (2026-08-24) ──────────────────────────────────────── */
+
+test('⚠⚠ A NAMED HEAD WITH NO REPS IS A COMPANY — otherwise "Add company" is impossible', () => {
+  /* A brand-new company has no members yet. Under a reps-only rule its head
+     files as a Single User and the company vanishes the instant it is created. */
+  const fresh = { user_id: 'n1', email: 'new@x.com', role: 'manager', managed_by: null, team_name: 'Acme Roofing' };
+  const { companies, singles } = bucketUsers([fresh]);
+  assert.strictEqual(companies.length, 1, 'an empty NAMED company still exists');
+  assert.strictEqual(companies[0].name, 'Acme Roofing');
+  assert.strictEqual(companies[0].user_count, 1, 'just the head for now');
+  assert.strictEqual(singles.length, 0, 'and the head is no longer a single user');
+});
+
+test('⚠⚠ NAMING DOES NOT RECLASSIFY THE UNNAMED — a repless manager stays single', () => {
+  /* This is a REAL production row: role `manager`, zero reps, no name. Widening
+     the definition to "reps OR named" must not sweep them into Companies. */
+  const lone = { user_id: 's1', email: 'joshua@soberlivingriches.com', role: 'manager', managed_by: null, team_name: null };
+  const { companies, singles } = bucketUsers([lone]);
+  assert.strictEqual(companies.length, 0);
+  assert.deepStrictEqual(singles.map((u) => u.user_id), ['s1']);
+  // whitespace is not a name
+  const blank = Object.assign({}, lone, { team_name: '   ' });
+  assert.strictEqual(bucketUsers([blank]).singles.length, 1, 'a whitespace name is not a company');
+});
+
+test('⚠ EXACTLY-ONE STILL HOLDS with named-but-empty companies in the mix', () => {
+  const all = [
+    { user_id: 'h1', email: 'a@x.com', role: 'owner', managed_by: null, team_name: null },
+    { user_id: 'r1', email: 'b@x.com', role: 'user', managed_by: 'h1' },
+    { user_id: 'n1', email: 'c@x.com', role: 'manager', managed_by: null, team_name: 'Empty Co' },
+    { user_id: 's1', email: 'd@x.com', role: 'user', managed_by: null },
+  ];
+  const { companies, singles } = bucketUsers(all);
+  const seen = [];
+  companies.forEach((c) => { if (c.head) seen.push(c.head.user_id); c.members.forEach((m) => seen.push(m.user_id)); });
+  singles.forEach((u) => seen.push(u.user_id));
+  assert.strictEqual(seen.length, all.length, 'nobody lost');
+  assert.strictEqual(new Set(seen).size, all.length, 'nobody twice');
+  assert.strictEqual(companies.length, 2);
+  assert.deepStrictEqual(singles.map((u) => u.user_id), ['s1']);
 });

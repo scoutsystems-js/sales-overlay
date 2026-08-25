@@ -90,14 +90,16 @@ function byRoleThenEmail(a, b) {
 /**
  * Partition a flat user list into COMPANIES and SINGLE USERS.
  *
- * ⚠⚠ THE DEFINITION (§4), chosen deliberately and stated so it is not
- * re-derived: a COMPANY is a user who has at least one rep, plus those reps.
- * A SINGLE USER has no reps AND no manager — they belong to no company.
+ * ⚠⚠ THE DEFINITION, stated so it is not re-derived: a COMPANY is a user who
+ * has at least one rep OR has been explicitly NAMED, plus their reps. A SINGLE
+ * USER has neither, and no manager — they belong to no company.
  *
- * ⚠ IT IS KEYED ON HAVING REPS, NOT ON ROLE, and that is load-bearing: live
- * data has a user whose role is `manager` with ZERO reps. By role they look
- * like a company; they are a single user. This matches the standing rule that
- * "has assigned reps (not role)" grants the manager experience.
+ * ⚠ IT IS NEVER KEYED ON ROLE, and that is load-bearing: live data has a user
+ * whose role is `manager` with ZERO reps and no name. By role they look like a
+ * company; they are a single user. This matches the standing rule that "has
+ * assigned reps (not role)" grants the manager experience.
+ *
+ * ⚠ The "or named" half exists so a company can be CREATED — see isHead().
  *
  * ⚠⚠ EXACTLY-ONE IS GUARANTEED BY CONSTRUCTION, including the case the schema
  * allows and the data does not yet contain: a user with BOTH reps and a
@@ -141,9 +143,24 @@ function bucketUsers(users) {
     return companies[key];
   }
 
+  /* ⚠⚠ A COMPANY EXISTS IF IT HAS MEMBERS **OR** HAS BEEN EXPLICITLY NAMED.
+     The "has reps" half is unchanged. The "named" half was added 2026-08-24 so
+     a company can be CREATED — otherwise "Add company" is impossible by
+     definition: a brand-new company has no members yet, so a reps-only rule
+     would file its head under Single Users and the new company would vanish
+     the instant it was made.
+     ⚠ This does NOT reclassify anyone: naming is an explicit owner action, and
+     the only pre-existing named row already had reps. A `manager` with zero
+     reps and no name (a real production row) is still correctly a single user.
+     ⚠ An EMPTY named company is a legitimate state — you create it, then move
+     people into it. */
+  function isHead(u) {
+    return repsOf[u.user_id] > 0 || !!(typeof u.team_name === 'string' && u.team_name.trim());
+  }
+
   arr.forEach(function (u) {
     if (!u || !u.user_id) return;
-    if (repsOf[u.user_id] > 0) { company(u.user_id); return; }   // heads first — see above
+    if (isHead(u)) { company(u.user_id); return; }               // heads first — see above
     if (u.managed_by) { company(u.managed_by).members.push(u); return; }
     singles.push(u);
   });

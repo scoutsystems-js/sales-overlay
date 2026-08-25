@@ -322,6 +322,13 @@
     /* An unnamed company reads as a gap to fill, not as a name. */
     .company-name-input.unnamed::placeholder, .company-name-static.unnamed { opacity: 0.6; font-style: italic; }
     .company-sub { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+
+    .add-company-bar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 16px; padding: 12px 14px;
+      border: 1px dashed var(--border); border-radius: 10px; background: var(--bg2);
+    }
+    .add-company-name { width: 220px; }
   </style>
   <script src="/js/scout-auth.js"></script>
 </head>
@@ -360,19 +367,11 @@
     </div>
   </section>
 
-  <!-- Owner-only: password-reset diagnostics. Tells you WHY a reset didn't arrive
-       (no account / rejected link / email off) without reading Railway logs. Dry
-       run — sends nothing. Owner-gated, so the public reset stays enumeration-safe. -->
-  <section class="users-section" id="resetDiagSection" style="display:none">
-    <div class="users-header"><h2>Password reset diagnostics</h2></div>
-    <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Check what a password-reset request for an email would do right now — nothing is sent.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <input type="email" id="rdEmail" placeholder="user@example.com" autocomplete="off"
-             style="flex:1;min-width:220px;padding:8px 10px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;">
-      <button class="btn-add-user" id="rdBtn" onclick="runResetDiagnose()">Check</button>
-    </div>
-    <div id="rdResult" style="margin-top:12px;font-size:13px;line-height:1.5;"></div>
-  </section>
+  <!-- ⚠ PASSWORD RESET DIAGNOSTICS REMOVED 2026-08-24 (Justin: "that was in
+       there a while ago for some testing I did and needs to be removed
+       completely"). The route behind it went too — a diagnostic endpoint left
+       mounted is an unused surface nobody is watching. -->
+
 
   <!-- Create-user modal (owner only). Temp password shown ONCE on success. -->
   <div class="modal-overlay" id="createUserModal" style="display:none" onclick="if(event.target===this)closeCreateUserModal()">
@@ -506,10 +505,6 @@
     if (!currentUser) { clearSession(); window.location.replace('/login'); return; }
     if (currentUser.role === 'user') { window.location.replace('/dashboard'); return; }
     document.getElementById('roleLabel').textContent = currentUser.role === 'owner' ? 'Owner' : 'Admin';
-    if (currentUser.role === 'owner') {
-      var rd = document.getElementById('resetDiagSection');
-      if (rd) rd.style.display = '';
-    }
 
     // ⚠ Restore the tab BEFORE the first render, or the page always opens on
     // Companies and a refresh silently discards where the user was.
@@ -518,33 +513,6 @@
   }
 
   // Owner-only dry-run: what would a password reset for this email do right now?
-  async function runResetDiagnose() {
-    var email = (document.getElementById('rdEmail').value || '').trim();
-    var out = document.getElementById('rdResult');
-    if (!email || email.indexOf('@') === -1) { out.innerHTML = '<span style="color:#f87171;">Enter a valid email address.</span>'; return; }
-    var btn = document.getElementById('rdBtn'); var prev = btn.textContent;
-    btn.disabled = true; btn.textContent = 'Checking…'; out.textContent = '';
-    try {
-      var res = await fetch('/admin/reset-diagnose', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ email: email }),
-      });
-      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      var data = null; try { data = await res.json(); } catch (e) {}
-      if (!res.ok) { out.innerHTML = '<span style="color:#f87171;">' + escapeHtml((data && data.error) || ('HTTP ' + res.status)) + '</span>'; return; }
-      var color = data.status === 'would_send' ? '#09e046' : (data.status === 'no_account' ? 'var(--muted)' : '#fbbf24');
-      var label = { would_send: '✓ Would send a reset link', no_account: '○ No Scout account', link_rejected: '✗ Link rejected (dud)', email_not_configured: '✗ Email transport off' }[data.status] || escapeHtml(data.status || 'unknown');
-      var extra = data.resolved_redirect ? '<div style="color:var(--muted);font-size:12px;margin-top:4px;">resolved redirect_to: ' + escapeHtml(data.resolved_redirect) + '</div>' : '';
-      out.innerHTML = '<div style="color:' + color + ';font-weight:600;">' + label + '</div>'
-        + '<div style="color:var(--muted);margin-top:2px;">' + escapeHtml(data.message || '') + '</div>' + extra;
-    } catch (e2) {
-      out.innerHTML = '<span style="color:#f87171;">Could not reach the server.</span>';
-    } finally {
-      btn.disabled = false; btn.textContent = prev;
-    }
-  }
-
   async function fetchMe() {
     try {
       var res = await fetch('/auth/me', { headers: authHeader() });
@@ -893,6 +861,78 @@
     }
   }
 
+  /* ⚠⚠ CREATING A COMPANY NEEDS A HEAD — a company IS a manager's team, so an
+     ownerless one cannot exist. The head comes from SINGLE USERS: anyone
+     already in a company is deliberately not offered, because taking them
+     would silently remove them from their current company. That is a
+     reassignment and belongs in "Managed by", not in a create flow. */
+  function addCompanyBarHtml(isOwnerViewer) {
+    if (adminTab !== 'companies' || !isOwnerViewer) return '';
+    if (!singlesArray.length) {
+      return '<div class="add-company-bar"><span class="meta">'
+        + 'To add a company you need someone to head it. Everyone already belongs to one — '
+        + 'create a user first, or move someone out of their company.</span></div>';
+    }
+    var opts = singlesArray.map(function (u) {
+      var label = (u.email || u.user_id.slice(0, 8)) + ' (' + roleLabel(u.role) + ')';
+      return '<option value="' + escapeHtml(u.user_id) + '">' + escapeHtml(label) + '</option>';
+    }).join('');
+    var busy = !!companyCreating;
+    return '<div class="add-company-bar">'
+      + '<input class="modal-input add-company-name" id="ncName" placeholder="New company name"'
+        + ' maxlength="80" autocomplete="off"' + (busy ? ' disabled' : '') + '>'
+      + '<span class="meta">headed by</span>'
+      + '<select class="role-select" id="ncHead"' + (busy ? ' disabled' : '') + '>' + opts + '</select>'
+      + '<button class="btn-add-user" onclick="submitAddCompany()"' + (busy ? ' disabled' : '')
+        + '>' + (busy ? 'Adding…' : '+ Add company') + '</button>'
+      + '<span class="field-status" id="ncStatus"></span>'
+    + '</div>';
+  }
+
+  var companyCreating = false;
+
+  /* ⚠ Reports success AND failure. Three silent-save defects have shipped this
+     session; a create that says nothing would be the fourth. */
+  async function submitAddCompany() {
+    if (companyCreating) return;
+    var nameEl = document.getElementById('ncName');
+    var headEl = document.getElementById('ncHead');
+    var status = document.getElementById('ncStatus');
+    var name = nameEl ? nameEl.value.trim() : '';
+    var headId = headEl ? headEl.value : '';
+    function fail(msg) { if (status) { status.textContent = '✗ ' + msg; status.className = 'field-status err'; } }
+    if (!name) { fail('name required'); return; }
+    if (!headId) { fail('pick a head'); return; }
+
+    companyCreating = true;
+    if (status) { status.textContent = '…'; status.className = 'field-status'; }
+    var res;
+    try {
+      res = await fetch('/admin/companies', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ head_id: headId, name: name }),
+      });
+    } catch (e) { companyCreating = false; fail('network'); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    companyCreating = false;
+    if (!res.ok) {
+      var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; }
+      fail(err.error || 'failed');
+      return;
+    }
+    // ⚠ Reload from the server rather than patching local arrays: creating a
+    // company MOVES its head out of Single Users, so both tab counts change.
+    // Recomputing locally would be a second copy of the bucketing rule.
+    await loadUsers();
+    var s2 = document.getElementById('ncStatus');
+    if (s2) {
+      s2.textContent = '✓';
+      s2.className = 'field-status ok';
+      setTimeout(function () { var e2 = document.getElementById('ncStatus'); if (e2) { e2.textContent = ''; e2.className = 'field-status'; } }, 1600);
+    }
+  }
+
   function renderUsersTable() {
     var wrap = document.getElementById('usersTableWrap');
     var isOwnerViewer = currentUser.role === 'owner';
@@ -912,7 +952,7 @@
         : '<div class="empty-msg">No companies yet. A company appears once a user has team members assigned to them.</div>';
     }
     wrap.classList.toggle('blocks', adminTab === 'companies');
-    wrap.innerHTML = adminTabsHtml() + body;
+    wrap.innerHTML = adminTabsHtml() + addCompanyBarHtml(isOwnerViewer) + body;
   }
 
   function fieldControl(u, field, original, opts) {

@@ -2,12 +2,15 @@
  * PATCH /admin/companies/:head_id/name — over real HTTP, with forged actors.
  *
  * ⚠⚠ THE PROPERTY THAT MATTERS MOST HERE IS NOT THE GATE, IT IS THE REFUSAL TO
- * ACCEPT A WRITE THAT COULD NEVER RENDER. `lib/company.js` buckets on HAVING
- * REPS, never on role — so a name stored against a user with no reps is
- * invisible forever: they render as a Single User and their `team_name` is
- * never read. Accepting that write would return 200 for something with no
- * observable effect, which is the silent-success failure this session has
- * already shipped three times.
+ * ACCEPT A HEAD WHO CANNOT LEAD A TEAM. A plain `user` heading a company
+ * contradicts the role model — PATCH /users/:id/managed_by already requires
+ * manager|owner as a target — so accepting it would produce a company nobody
+ * could legitimately be moved into.
+ *
+ * ⚠ THIS GUARD CHANGED 2026-08-24. It previously refused a target with NO REPS,
+ * because naming a repless user stored something that could never render. Now
+ * naming IS how a company is created, so that reasoning is gone; the role
+ * check is what survived. See the converted test below.
  *
  * ⚠ A predicate proven in isolation is not an API boundary. `sanitizeCompanyName`
  * is unit-tested next door; neither that nor a grep tells you whether the ROUTE
@@ -71,21 +74,20 @@ function patch(port, headId, body) {
   });
 }
 
-/** Supabase stand-in: `repsOf` decides who is a company; writes are recorded. */
-function fakeAdmin(repsOf, writes) {
+/** Supabase stand-in: `roleOf` decides who may head a company; writes recorded. */
+function fakeAdmin(roleOf, writes) {
   return {
     from() {
       const st = { eqs: {}, update: null };
       const api = {
-        select(_cols, opts) {
-          if (opts && opts.count === 'exact' && opts.head === true) api._countMode = true;
-          return api;
-        },
+        select() { return api; },
         update(vals) { st.update = vals; return api; },
-        eq(col, val) {
-          st.eqs[col] = val;
-          if (api._countMode) return Promise.resolve({ count: (repsOf[val] || 0), error: null });
-          return api;
+        eq(col, val) { st.eqs[col] = val; return api; },
+        maybeSingle() {
+          const id = st.eqs.user_id;
+          return Promise.resolve({
+            data: roleOf[id] ? { user_id: id, role: roleOf[id] } : null, error: null,
+          });
         },
         then(res) {
           if (st.update) {
@@ -100,11 +102,11 @@ function fakeAdmin(repsOf, writes) {
   };
 }
 
-const HEAD = '00000000-0000-4000-8000-00000000aaaa';   // has 3 reps
-const LONER = '00000000-0000-4000-8000-00000000bbbb';  // has none
+const HEAD = '00000000-0000-4000-8000-00000000aaaa';   // a manager: may head a company
+const PLAIN = '00000000-0000-4000-8000-00000000bbbb';  // a plain user: may not
 
 async function serve(actor, writes) {
-  const h = withActor(actor, fakeAdmin({ [HEAD]: 3 }, writes));
+  const h = withActor(actor, fakeAdmin({ [HEAD]: 'manager', [PLAIN]: 'user' }, writes));
   const server = await new Promise((r) => { const s = http.createServer(h.app); s.listen(0, () => r(s)); });
   return { h, server, port: server.address().port };
 }
@@ -130,18 +132,24 @@ test('⚠⚠ THE GATE: a closer and a manager are refused; an owner clears it', 
   } finally { server.close(); h.restore(); }
 });
 
-test('⚠⚠ A TARGET WITH NO REPS IS REFUSED — the write would be invisible forever', async () => {
+test('⚠⚠ A TARGET WHO CANNOT LEAD A TEAM IS REFUSED', async () => {
+  /* ⚠ THIS TEST WAS CONVERTED, NOT DELETED (2026-08-24). It used to assert that
+     a target with NO REPS was refused, because a name stored there was
+     invisible forever. Naming now CREATES a company, so that reasoning is gone
+     and refusing it would make "Add company" impossible.
+     ⚠ The property that OUTLIVED the old rule is the one still asserted here:
+     a user who cannot lead a team must not end up heading a company. A plain
+     `user` heading one contradicts the role model, and PATCH
+     /users/:id/managed_by already requires manager|owner as a target. */
   const actor = { current: { id: 'owner-1', role: 'owner' } };
   const writes = [];
   const { h, server, port } = await serve(actor, writes);
   try {
-    if (!h.hasHook) return;   // route needs its test hook; covered by the unit tests otherwise
-    const r = await patch(port, LONER, { name: 'Ghost Co' });
-    assert.strictEqual(r.status, 400,
-      'naming a user with no team members must be refused, not silently stored: '
-      + 'lib/company.js renders them as a Single User and never reads the name');
-    assert.ok(/no team members/i.test(r.body), 'and the reason must say why: ' + r.body);
-    assert.strictEqual(writes.length, 0, 'nothing may be written for a non-company');
+    if (!h.hasHook) return;
+    const r = await patch(port, PLAIN, { name: 'Ghost Co' });
+    assert.strictEqual(r.status, 400, 'a plain user must not head a company: ' + r.body);
+    assert.ok(/manager or admin/i.test(r.body), 'and the reason must say why: ' + r.body);
+    assert.strictEqual(writes.length, 0, 'nothing may be written for an ineligible head');
   } finally { server.close(); h.restore(); }
 });
 
