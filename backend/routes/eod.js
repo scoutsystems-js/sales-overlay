@@ -12,6 +12,7 @@
 // convention established by the digest lane (lib/team-digest.js helpers).
 
 const express = require('express');
+const { syncFreshness } = require('../lib/eod-freshness');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const teamDigest = require('../lib/team-digest');
@@ -116,6 +117,23 @@ router.get('/', requireAuth, async function (req, res) {
       ? req.query.date : teamDigest.etDateOf(new Date());
     var bounds = teamDigest.etDayBoundsUtc(date);
 
+    /* ⚠⚠ IS THIS DAY FINISHED? Josh's EOD showed 3 for a day he took 6 on, and
+       the 3 was correct — two calls had not synced yet and one exists only in a
+       provider he is not connected to. The page said nothing, so a still-filling
+       day looked identical to a finished one.
+       ⚠ The NEWEST sync across his sources: if any source has run since the day
+       ended, everything that source had a chance to deliver is here. */
+    var syncTimes = [];
+    var fq = await admin.from('fathom_connections').select('last_sync_at').eq('user_id', userId).maybeSingle();
+    if (!fq.error && fq.data) syncTimes.push(fq.data.last_sync_at || null);
+    var zq = await admin.from('call_connections').select('last_sync_at').eq('user_id', userId);
+    if (!zq.error) (zq.data || []).forEach(function (c) { syncTimes.push(c.last_sync_at || null); });
+    var connected = syncTimes.length > 0;
+    var newest = syncTimes.filter(Boolean).sort().pop() || null;
+    var freshness = syncFreshness({
+      date: date, lastSyncAt: newest, dayEndsIso: bounds.toIso, connected: connected, now: new Date(),
+    });
+
     var callsQ = await admin.from('fathom_calls')
       .select('id, title, call_date, recording_url')
       .eq('user_id', userId)
@@ -124,7 +142,7 @@ router.get('/', requireAuth, async function (req, res) {
       .order('call_date', { ascending: true });
     if (callsQ.error) throw new Error('fathom_calls: ' + callsQ.error.message);
     var calls = callsQ.data || [];
-    if (calls.length === 0) return res.json({ date: date, calls: [] });
+    if (calls.length === 0) return res.json({ date: date, calls: [], sync: freshness });
 
     var callIds = calls.map(function (c) { return c.id; });
     var anQ = await admin.from('call_analyses')
@@ -162,7 +180,7 @@ router.get('/', requireAuth, async function (req, res) {
         edited: merged.edited,
       };
     });
-    res.json({ date: date, calls: out });
+    res.json({ date: date, calls: out, sync: freshness });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[eod] list:', err.message);

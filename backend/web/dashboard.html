@@ -10712,6 +10712,32 @@
       window.prompt('Copy the report below:', text);
     }
   }
+  /* ⚠⚠ A STILL-FILLING DAY MUST NOT LOOK LIKE A FINISHED ONE. Josh's EOD showed
+     3 calls for a day he took 6 on, and the 3 was CORRECT — two had not synced
+     yet and one exists only in a provider that account is not connected to.
+     Nothing on the page said the day was still open, so "3" and "3 so far"
+     rendered identically.
+     ⚠ THIS DOES NOT CHANGE THE COUNT. Inflating it would put calls on the page
+     the data cannot support; what was missing was the caveat, not the number. */
+  function eodSyncNoteHtml(sync) {
+    if (!sync) return '';
+    if (sync.connected === false) {
+      return '<div class="fathom-notice warn"><div class="fathom-notice-text">'
+        + 'No recording source is connected, so nothing can appear here yet.'
+        + '</div></div>';
+    }
+    if (sync.complete) return '';
+    var when = sync.synced_through ? formatRelativeTime(sync.synced_through) : null;
+    return '<div class="fathom-notice warn"><div class="fathom-notice-text">'
+      + (when
+          ? ('This day is still filling up — calls are synced up to ' + escapeHtml(when)
+             + '. Anything recorded after that will appear on the next sync.')
+          : 'This day is still filling up — no sync has run yet, so calls may be missing.')
+      + '</div>'
+      + '<button class="btn-fathom-primary" type="button" onclick="syncFathomNow()">Sync Now</button>'
+      + '</div>';
+  }
+
 
   function renderEodView() {
     /**
@@ -10814,6 +10840,9 @@
       + '<div class="meta">your calls for the day — edit inline, then copy for Slack</div></div>'
       // (u2) On the page as well as in the paste, from the one helper.
       + (daySummary ? '<div class="eod-summary">' + escapeHtml(daySummary) + '</div>' : '')
+      // ⚠ ABOVE the toolbar and the list: a caveat under the calls is a caveat
+      // nobody reads, and this one changes how the count should be read.
+      + eodSyncNoteHtml(d.sync)
       + toolbar + body + '</div>';
   }
 
