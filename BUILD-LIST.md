@@ -8,6 +8,16 @@
 
 ---
 
+## ⚠ OPEN — RAISED 2026-08-25, NEEDS A RULING
+
+| item | state | what it needs |
+|---|---|---|
+| **180 calls no control can reach** | ⛔ **reported, not fixed — spend decision** | `/fathom/update-analyses` finds its pending block with `.eq('sync_status','pending')`. Measured on Josh's main account: **271 pending (reachable), 180 `synced_unanalyzed` (NOT), 3 error (NOT)** — so an **"All time" run grades 267 and silently leaves 183 behind while the label says all time**. The holdback is deliberate (the first-sync cap), but the Update-analyses dropdown is documented as the backfill path for exactly that tail and cannot reach it. ⚠ Admitting them adds **~$43 to every all-time run** — Justin's call, not an implementation detail. |
+| **The company picker has no chevron** | 👁 observation | It works and switches data correctly, but beside "All objections" (which has one) it renders as a static text field. **Two people concluded it had never shipped.** Styling only. |
+| **The grading control could be fired repeatedly** | ✅ fixed for the new control, ⚠ note the evidence | Three concurrent analyze loops were found running on Josh's account when this block started — the old control's guard reset as soon as the request returned. The new one holds a run state across the whole dispatch, and `claimAnalysisRun` was already preventing double-spend per call. |
+
+---
+
 ## 🚨 TOP OF THE LIST — ADMIN VIEW REBUILD, AROUND COMPANIES (filed 2026-08-24)
 
 **⚠⚠ PART 1 IS SHIPPED (`e4679e8`, `a7ad0c4`). PART 2 IS NOT.** What remains is listed at the bottom of this block, and **one of it needs a ruling from Justin before it can be built.**
@@ -100,6 +110,10 @@ Shipped, deployed, and verified on production.
 
 | item | one line | notes |
 |---|---|---|
+| **Grading control on the Calls page** | The backlog control moved onto the line that already said "N not graded yet"; still in Connections | shipped `e56b78a`. It lived ONLY in Account -> Connections and **Justin could not find it**, while the Calls page named the problem and offered no fix. **Two render sites, ONE implementation** — a guard fails if a second window-option list appears. **⚠ It deliberately restates no count**: three "ungraded" numbers are live at once, each correct for its own window (Coaching tile = the date range, Calls note = the library query, grader = all time), so a count on the control would sit inches from a different count with the same label. `isSelf()`-gated — on an admin pivot it would grade the VIEWER's calls. **Verified by clicking on production** (1 mousedown delivered): confirm panel -> 267 calls / ~$64 -> Start Grading -> progress moved, both sites showing the same live state |
+| **All-time grading is owner-only** | Everyone else capped at 30 days (Justin, API cost) | shipped `e56b78a`. **403, refused not truncated** — answering an all-time request with 30 days spends less than asked and reports success. Gated **before any lookup**, `dry_run` included; **fails closed** because `requireAuth` fails OPEN on a DB error. **⚠ The architect read the trial account as a `user`; measured it is a `manager`**, so `!== 'user'` would have granted all-time to exactly the account the ruling caps — the check is positively `=== 'owner'`. A capped user is told why. Proven over HTTP with a forged non-owner, plus non-vacuity cases (owner passes, 7d/30d pass) |
+| **A dying grading run says so** | Polled progress + a stall detector, instead of a spinner that never resolves | shipped `e56b78a`. The analyze loop is fire-and-forget and **does not survive a redeploy**. Remaining is re-read from `/fathom/status` every 15s and the bar moves only when it actually falls. **⚠ The stall window is derived**: measured per-call time is p50 50s / max 247s, so a shorter one reports a healthy run as dead. A failed status fetch counts as a quiet tick, not a failure. **⚠ Repaints only the control host** — a full re-render every 15s replays every `.fade-in` |
+| **fix: switching company left the previous company's GAUGES on screen** | Header, graphs, rep list and totals switched; Team Averages did not | shipped `e56b78a`. Measured on production: picking "Sober Living Riches" kept Scout Systems' 21% / 8-of-39 and its "4 not enough calls" (Scout Systems' rep count) under the other company's name, with no error. `resetTeamData()` missed `teamAverages` — **third lane it has missed**. ⚠ Cleared in `pickTeam`, NOT `resetTeamData`: the gauges are range-independent and their own label says the date filter does not affect them, so clearing them on a range change would make them reload right after that promise |
 | Fathom OAuth + auto-sync | Connect Fathom, 2-hourly GitHub-Actions cron syncs calls | 381 calls synced on Josh |
 | Post-call analysis pipeline | Grader + highlight extractor per call, 2 Claude calls | `ANALYSIS_PROMPT_VERSION` currently v17-era |
 | Call library + call review | List of analysed calls; per-call grades, highlights, follow-up email | |
