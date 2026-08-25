@@ -1505,6 +1505,30 @@ On the account with BOTH providers connected, **EOD shows 10 calls for 6 real me
 - **⚠ AND `meeting_id` DOES NOT PAIR THEM EITHER** — a Personal Meeting Room reuses ONE id for every meeting, so all ten rows share `8924530025`. What identifies a pair is **start time within ~60s plus near-identical duration**. Any future dedupe has to key on that, not on an id.
 - **Not an EOD bug; EOD is faithfully reporting what was ingested. Filed.**
 
+### ⚠⚠ CROSS-PROVIDER DUPLICATES — THE MATCH, AND WHY OVERLAP BEAT DURATION (2026-08-24)
+Josh had both providers connected; **23 duplicate rows** inflated his cash by **$44,100 (16%)**. Tolerances **derived from his whole corpus**, ranked by how much the two recordings OVERLAP as a fraction of the longer one:
+```
+99 99 99 99 99 98 98 98 98 98 97 97 96 96 95 95 93 92 92 86 78 72 71   genuine
+                                                                42     ambiguous
+                                                                 0     KNOWN false pair
+```
+**An EMPTY BAND between 42 and 71**, so the threshold sits inside it rather than on a round number — same discipline as `MIN_CUE_GAP_SECONDS`.
+- **⚠⚠ DURATION DELTA WAS THE OBVIOUS METRIC AND IS THE WRONG ONE. Zoom reports WHOLE MINUTES** (every Zoom value in the corpus divides by 60) while Fathom reports exact seconds, so a delta conflates **rounding** with a real difference. It is also **scale-blind**: 90s is fatal on a 4-minute call and meaningless on a 90-minute one. Overlap answers the question actually being asked — *were these recordings of the same stretch of time?*
+- **⚠⚠ AND `meeting_id` CANNOT PAIR THEM.** A Personal Meeting Room reuses ONE id for every meeting it ever hosts — all of Josh's rows carry `8924530025`. Anything keyed on it would merge his entire history into one call.
+- **FALSE POSITIVE >> FALSE NEGATIVE**, and the rule is tuned for it: two back-to-back calls share **no** time, so they score 0% and are rejected by the gap AND the overlap. A missed duplicate only leaves a count high — visible and reversible.
+- **⚠ MY FIRST TEST FIXTURE HAD THE SIGN REVERSED**, which placed the short call INSIDE the long one and made the known false pair overlap 10% instead of 0%. **Direction matters in an interval comparison** — quote the real timestamps rather than reconstructing them.
+- **SUPPRESS, NEVER DELETE.** `duplicate_of` points at the row KEPT, `ON DELETE SET NULL` so a duplicate un-suppresses if its survivor ever goes. Fathom wins today as an **ordered preference that can flip** — Justin intends Zoom to replace Fathom.
+
+### ⚠⚠ 21 EXCLUSION SITES, AND THE GUARD ASSERTS THE **PAIRING** (2026-08-24)
+`not_a_sales_call` is excluded in 21 places across 13 files. A duplicate is the same kind of row — present, real, must not be counted — so both exclusions now sit **adjacent** at every site.
+- **⚠ COUNTING EACH FILTER SEPARATELY WOULD PASS WHILE THEY SAT IN DIFFERENT QUERIES.** The test asserts they appear **together**, so a new counting surface cannot pick up one and forget the other. That is precisely how nine modules have dropped out of lists here before.
+- **THE LIST DELIBERATELY DOES NOT FILTER EITHER.** The library is a RECORD; the counts are the aggregate. A suppressed duplicate is **shown with a badge**, exactly like a not-a-sales-call row — hiding it would be data loss wearing a filter's clothes.
+
+### ⚠ "SHOW MORE DOESN'T ALWAYS SHOW UP" — NOT REPRODUCED (2026-08-24)
+Checked, and **I could not make it fail.** What was tested: offsets 0/20/40 across all five filters and both sorts on live data — **every page returned a full 20**; the has-more rule (`returned >= limit`) against the rows actually rendered; that filter/range/sort changes reset the offset and null the list; and that the default 7-day range is not simply under one page (it holds 72 calls).
+- **⚠ ONE REAL DEFECT FOUND BY READING, NOT THE REPORTED ONE: `loadCallsList` uses `.range(0, 9999)` on the filtered/sorted path** — a silent **10,000-row ceiling**. Nowhere near Josh (596), so it is not this bug, but it truncates without saying so and will bite eventually. **Filed, not fixed.**
+- **Reported as unreproduced rather than fixed forward.** An intermittent symptom closed without a reproduction is a guess, and this codebase has already had two faults stacked where fixing one changed nothing.
+
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
 - **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
