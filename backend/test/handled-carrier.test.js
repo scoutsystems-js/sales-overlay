@@ -26,8 +26,9 @@ function read(rel) {
   // literal survives in a /* */ block long after the live code stopped using it
   // — and matching the archive would answer the wrong question in both
   // directions.
-  return raw.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-    .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  return raw.split('\n')
+    .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 // ── the ten that must credit a closed call ────────────────────────────────

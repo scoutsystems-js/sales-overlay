@@ -25,8 +25,9 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'admin.html'), 'u
 // ⚠ Comments stripped before any ABSENCE check — the comment explaining the
 // removal quotes the removed rule, and matching it would report a shipped fix
 // as un-shipped.
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-  .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+const LIVE = HTML.split('\n')
+  .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
 
 function rule(selector) {
   const i = LIVE.indexOf(selector + ' {');

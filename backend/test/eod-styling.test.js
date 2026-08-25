@@ -12,8 +12,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-  .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+const LIVE = HTML.split('\n')
+  .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
 
 test('⚠ the outcome chip uses SEMANTIC tokens only — no new hues', () => {
   ['good', 'mid', 'bad'].forEach((tone) => {

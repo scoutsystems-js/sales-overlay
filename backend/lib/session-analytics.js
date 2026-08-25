@@ -69,7 +69,6 @@ async function computeCallAnalytics(admin, userId, from, to) {
     calls: { analyzed: 0, total_in_range: 0, processing: 0, error: 0 },
     avg_score: { mean: null, graded_calls: 0, win_mean: null, win_n: 0, other_mean: null, other_n: 0 },
     objections: { calls_with_objection: 0, total_highlights: 0 },
-    cash_collected: 0,
     close_rate: null, close_wins: 0, close_decided: 0,
     sections: sectionsShape(),
     weakest_section: null, strongest_section: null,
@@ -183,7 +182,11 @@ async function computeCallAnalytics(admin, userId, from, to) {
       other_mean: otherN > 0 ? Math.round(otherSum / otherN) : null, other_n: otherN,
     },
     objections: { calls_with_objection: Object.keys(objCalls).length, total_highlights: objRows.length },
-    cash_collected: Math.round(cashSum * 100) / 100,
+    /* ⚠ CASH REMOVED FROM THIS PAYLOAD 2026-08-25 (Justin): "we don't track
+       cash collected at all... the only time it's needed is on the EOD report."
+       A DISPLAY ruling — call_analyses.cash_collected is still extracted by the
+       grader and still drives EOD. Removed from the payload rather than merely
+       unrendered, so it cannot quietly reappear on a tile later. */
     // 3d-3: close rate is now closed PROSPECTS / TOTAL prospects. The old
     // decided-only per-CALL figure is kept ONLY as close_wins/close_decided for
     // any legacy caller; the rendered rate comes from prospect_close_* below.

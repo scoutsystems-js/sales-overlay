@@ -162,7 +162,11 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       trend: trend,
       win_mean: avg(c.win_sum, c.win_n),
       win_n: c.win_n,
-      cash_collected: Math.round(c.cash_sum * 100) / 100,
+    /* ⚠ CASH REMOVED FROM THIS PAYLOAD 2026-08-25 (Justin): "we don't track
+       cash collected at all... the only time it's needed is on the EOD report."
+       A DISPLAY ruling — call_analyses.cash_collected is still extracted by the
+       grader and still drives EOD. Removed from the payload rather than merely
+       unrendered, so it cannot quietly reappear on a tile later. */
       close_wins: c.close_won,
       close_decided: c.close_decided,
       close_rate: c.close_decided > 0 ? Math.round((c.close_won / c.close_decided) * 100) : null,
@@ -219,7 +223,6 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     prior_avg_score: avg(tp.score_sum, tp.score_n),
     win_mean: avg(t.win_sum, t.win_n),
     win_n: t.win_n,
-    cash_collected: Math.round(t.cash_sum * 100) / 100,
     close_wins: t.close_won,
     close_decided: t.close_decided,
     close_rate: t.close_decided > 0 ? Math.round((t.close_won / t.close_decided) * 100) : null,

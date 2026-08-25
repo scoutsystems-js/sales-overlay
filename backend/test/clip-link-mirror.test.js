@@ -16,8 +16,9 @@ const path = require('node:path');
 const C = require('../lib/clip-link');
 
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-  .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+const LIVE = HTML.split('\n')
+  .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
 
 test('the label follows the provider, and an unknown provider is treated as Zoom', () => {
   assert.strictEqual(C.clipLabel('fathom'), 'Clip');

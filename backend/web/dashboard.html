@@ -3797,7 +3797,7 @@
     teamRecs:       null,   teamRecsLoading: false,
     teamHighlights: null,   teamHighlightsLoading: false,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
-    teamDetailMetric: null, // glance-box detail drill: null | 'cash' | 'close' | 'objection'
+    teamDetailMetric: null, // glance-box detail drill: null | 'close' | 'objection' (cash removed 2026-08-25)
     // ⚠ TEAM OWNS ITS OWN RANGE (stage 2). state.dateRange stays COACHING's until
     // stage 3 splits the rest — every view owning its own range is the ruling.
     teamWhy:        null,   teamWhyLoading: false,   // 10d: one verified sentence per rep
@@ -9252,7 +9252,7 @@
   function _summaryTeamLabel() { var o = state.teamOverview; return (o && o.team && o.team.label) || 'Team'; }
   function _trimRep(r) {
     return { name: r.display_name || r.email || (r.user_id || '').slice(0, 8), calls_analyzed: r.calls_analyzed, avg_score: r.avg_score,
-      cash_collected: r.cash_collected, close_rate: r.close_rate, obj_handle_rate: r.obj_handle_rate, sections: r.sections };
+      close_rate: r.close_rate, obj_handle_rate: r.obj_handle_rate, sections: r.sections };
   }
 
   // Assemble {label, data} from state for the current page — no fetching.
@@ -9267,14 +9267,14 @@
     if (p.key === 'detail') {
       if (!o || !o.per_rep) return null;
       var m = state.teamDetailMetric;
-      var ml = m === 'cash' ? 'Cash collected' : (m === 'close' ? 'Close rate' : 'Objection Handling');
+      var ml = (m === 'close') ? 'Close rate' : 'Objection Handling';
       return { label: _summaryTeamLabel() + ' — ' + ml + ' by rep', data: { metric: ml, reps: (o.per_rep || []).map(_trimRep) } };
     }
     if (p.key === 'needs-work') {
       var d = state.teamNeedsWork; if (!d || d.available === false || !d.card_text) return null;
       return { label: _summaryTeamLabel() + ' — what needs work', data: {
         headline: d.card_text, bucket: d.bucket, extra: d.extra,
-        buckets: d.detail && d.detail.buckets, linkage: d.detail && d.detail.linkage, avg_cash: d.detail && d.detail.avg_cash } };
+        buckets: d.detail && d.detail.buckets, linkage: d.detail && d.detail.linkage } };
     }
     if (p.key === 'team-recs') {
       var r = state.teamRecs, h = state.teamHighlights;
@@ -9290,7 +9290,7 @@
       var who = (u && u.email) || 'This rep';
       return { label: who + ' — coaching dashboard', data: {
         rep: who, calls: a.calls, avg_score: a.avg_score, objections: a.objections,
-        cash_collected: a.cash_collected, close_rate: a.close_rate, close_wins: a.close_wins, close_decided: a.close_decided,
+        close_rate: a.close_rate, close_wins: a.close_wins, close_decided: a.close_decided,
         sections: a.sections, weakest_section: a.weakest_section, strongest_section: a.strongest_section } };
     }
     return null;
@@ -9579,7 +9579,7 @@
     return '<div class="team-stat-row">'
       + stat('Reps active', t.active_reps + '<span class="team-stat-sub">/' + t.reps + '</span>')
       + stat('Calls analyzed', t.calls_analyzed)
-      + glance('cash', 'Cash collected', fmtCash(t.cash_collected), 'across closed calls')
+      /* CASH REMOVED 2026-08-25 — Justin: "we don't track cash collected at all, it's too finicky right now. The only time it's needed is on the EOD report." A DISPLAY ruling: call_analyses.cash_collected is still extracted and still drives EOD. */
       + glance('close', 'Close rate', closeRateDisplay(t).value, closeRateDisplay(t).sub)
       + glance('objection', 'Objection handle', (t.obj_handle_rate == null ? '—' : t.obj_handle_rate + '%'), t.objections_handled + '/' + t.objections_total + ' handled')
       + stat('Avg score', (t.avg_score == null ? '—' : t.avg_score), ' ' + trendArrow(t.avg_score != null && t.prior_avg_score != null ? (t.avg_score - t.prior_avg_score) : 0))
@@ -9795,7 +9795,6 @@
       // Compact quick-stats line, then the Coach-Summary section bars.
       var quick = '<div class="team-rep-quick">'
         + '<span>' + r.calls_analyzed + ' calls</span>'
-        + '<span>' + fmtCash(r.cash_collected) + '</span>'
         + '<span>' + closeRateDisplay(r).value + ' close</span>'
         + '<span>' + (r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%') + ' obj</span>'
         + '<span>avg ' + (r.avg_score == null ? '—' : r.avg_score) + ' ' + trendArrow(r.trend) + '</span>'
@@ -9812,10 +9811,7 @@
   // /team/overview per_rep data — no extra fetch). Rows click through to the
   // rep's pivoted coaching dashboard.
   var TEAM_DETAIL = {
-    cash:      { title: 'Cash collected', meta: 'closed-call cash, by rep',
-                 value: function (r) { return r.cash_collected || 0; },
-                 label: function (r) { return fmtCash(r.cash_collected); },
-                 sub:   function (r) { return r.close_wins + ' closed'; } },
+    /* cash: removed 2026-08-25 — its tile is gone, so nothing can open this. */
     close:     { title: 'Close rate', meta: 'closed prospects / total prospects, by rep',
                  value: function (r) { return r.prospect_close_rate == null ? -1 : r.prospect_close_rate; },
                  label: function (r) { return closeRateDisplay(r).value; },
@@ -11772,6 +11768,35 @@
   function setView(view) {
     view = ARCHIVED_VIEWS[view] || view;
     if (view === 'prospects' && !state.mergeLoading) loadMergeCandidates();
+
+    /* ⚠⚠ ENTERING CALLS REFRESHES THE LIST. It used to render whatever was
+       cached from earlier in the session, because renderCallLibrary only loads
+       when state.callLibrary is null — so the rows AND `callLibraryHasMore`
+       were both computed at some earlier moment and never re-checked.
+
+       That is the "Show more doesn't always show up" report: page to the end
+       once (hasMore=false), come back later after new calls have synced — the
+       account syncs every 2 hours — and the stale list renders with no button
+       and no indication that more exist. Whether it looks broken depends on
+       what you did earlier in the session, which is exactly why it read as
+       random.
+
+       ⚠ THE FIX IS NOT A LONGER WAIT. The control's visibility is now a
+       function of data fetched when the view is entered, rather than of a value
+       left over from before.
+
+       ⚠ ONLY ON ENTRY, never in the renderer: loadCallLibrary triggers a
+       re-render, so invalidating there would null the list mid-page and paging
+       could never advance.
+       ⚠ call-review is excluded deliberately — returning from one call to the
+       list is not a fresh entry, and dropping their place would be a
+       regression, not a fix. */
+    if (view === 'call-library' && state.view !== 'call-library' && state.view !== 'call-review') {
+      state.callLibrary = null;
+      state.callLibraryOffset = 0;
+      state.callLibraryHasMore = false;
+    }
+
     state.view = view;
     render();
     syncHashFromState();

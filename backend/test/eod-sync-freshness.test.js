@@ -109,3 +109,40 @@ test('⚠ THE NOTE NEVER INFLATES THE COUNT — it only adds the caveat', () => 
     'the note must not touch the call list — the number is correct and only the '
     + 'wording was wrong');
 });
+
+/* ── "Show more" — entering Calls must not render a stale list ────────────── */
+
+test('⚠⚠ ENTERING CALLS INVALIDATES THE CACHED LIST — and hasMore with it', () => {
+  /* The reported symptom: "Show more doesn't always show up, randomly, when
+     Josh clicks in to Calls." The data was proven fine (every page position
+     returns full rows), so it was the FIRST RENDER — renderCallLibrary only
+     loads when the list is null, so a list paged to the end earlier in the
+     session rendered again later with hasMore=false and no button, while new
+     calls had synced in between. */
+  const fs2 = require('fs'), path2 = require('path');
+  const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  const i = html.indexOf('function setView(view) {');
+  assert.ok(i !== -1, 'setView moved');
+  const fn = html.slice(i, html.indexOf('\n  }', i));
+
+  assert.ok(/state\.callLibraryHasMore = false/.test(fn),
+    'hasMore must be cleared on entry — it is the value that decides the button, '
+    + 'and leaving it stale is the whole bug');
+  assert.ok(/state\.callLibrary = null/.test(fn), 'and the rows must be refetched');
+
+  /* ⚠ call-review must be excluded, or returning from a call to the list loses
+     the user's place — a regression dressed as a fix. */
+  assert.ok(/'call-review'/.test(fn),
+    'coming back from a call is not a fresh entry and must not reset paging');
+});
+
+test('⚠ THE INVALIDATION IS ON ENTRY, NOT IN THE RENDERER', () => {
+  /* loadCallLibrary re-renders when it finishes, so nulling the list inside
+     renderCallLibrary would wipe it mid-page and paging could never advance. */
+  const fs2 = require('fs'), path2 = require('path');
+  const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  const i = html.indexOf('function renderCallLibrary()');
+  const fn = html.slice(i, html.indexOf('\n  }', i)).replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/state\.callLibrary = null/.test(fn),
+    'renderCallLibrary must never null the list — it would break pagination');
+});

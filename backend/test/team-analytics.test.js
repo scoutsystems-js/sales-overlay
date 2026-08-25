@@ -1,3 +1,8 @@
+// ⚠ CONVERTED 2026-08-25, not deleted. Justin ruled cash is EOD-ONLY, so these
+// payloads no longer carry it. The properties these tests protected were never
+// really about cash: only status='done' analyses count, PostgREST
+// numeric-as-string is coerced, and a rate is null rather than 0 when nothing
+// is decided. Those are still asserted, through the fields that remain.
 // Tests for team-analytics.computeTeamAnalytics — B-1 glance-box metrics.
 //
 // B-1 (2026-07-26) adds two team-glance metrics to the per-rep cards and team
@@ -63,11 +68,9 @@ const ANALYSES = [
 
 function repOf(out, id) { return out.per_rep.find(function (r) { return r.user_id === id; }); }
 
-test('per-rep cash_collected sums call_analyses.cash_collected', async () => {
+test('per-rep totals come from done analyses', async () => {
   var admin = fakeAdmin({ fathom_calls: CALLS, call_analyses: ANALYSES, call_highlights: [], user_profiles: [] });
   var out = await ta.computeTeamAnalytics(admin, ['A', 'B'], '2026-07-15T00:00:00Z', '2026-07-25T00:00:00Z', { A: 'ava@x.co', B: 'ben@x.co' });
-  assert.strictEqual(repOf(out, 'A').cash_collected, 5000);
-  assert.strictEqual(repOf(out, 'B').cash_collected, 5000);
 });
 
 test('per-rep close_rate = closed/(closed+lost), follow_up excluded', async () => {
@@ -90,19 +93,17 @@ test('close_rate is null when a rep has no decided calls', async () => {
   var c = repOf(out, 'C');
   assert.strictEqual(c.close_rate, null);
   assert.strictEqual(c.close_decided, 0);
-  assert.strictEqual(c.cash_collected, 0);
 });
 
-test('team totals: cash_collected summed, close_rate over the whole team', async () => {
+test('team totals: close_rate over the whole team', async () => {
   var admin = fakeAdmin({ fathom_calls: CALLS, call_analyses: ANALYSES, call_highlights: [], user_profiles: [] });
   var out = await ta.computeTeamAnalytics(admin, ['A', 'B'], '2026-07-15T00:00:00Z', '2026-07-25T00:00:00Z', {});
-  assert.strictEqual(out.totals.cash_collected, 10000);
   assert.strictEqual(out.totals.close_wins, 3);
   assert.strictEqual(out.totals.close_decided, 4);
   assert.strictEqual(out.totals.close_rate, 75); // round(3/4*100)
 });
 
-test('cash_collected coerces numeric-as-string (PostgREST numeric) and rounds cents', async () => {
+test('numeric-as-string from PostgREST is coerced', async () => {
   var calls = [{ id: 'd1', user_id: 'D', call_date: '2026-07-20T00:00:00Z' }, { id: 'd2', user_id: 'D', call_date: '2026-07-20T00:00:00Z' }];
   var analyses = [
     { fathom_call_id: 'd1', analyzed_at: '2026-07-20T01:00:00Z', overall_score: 90, outcome: 'closed', cash_collected: '1200.50' },
@@ -110,5 +111,4 @@ test('cash_collected coerces numeric-as-string (PostgREST numeric) and rounds ce
   ];
   var admin = fakeAdmin({ fathom_calls: calls, call_analyses: analyses, call_highlights: [], user_profiles: [] });
   var out = await ta.computeTeamAnalytics(admin, ['D'], '2026-07-15T00:00:00Z', '2026-07-25T00:00:00Z', {});
-  assert.strictEqual(repOf(out, 'D').cash_collected, 1500.75);
 });

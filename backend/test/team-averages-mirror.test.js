@@ -20,8 +20,9 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html')
 // Comments stripped: this codebase archives replaced code in place, so the OLD
 // gauge constants still exist verbatim in a /* */ block a few lines above the
 // new ones. Matching the raw file would read the retired values.
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-  .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+const LIVE = HTML.split('\n')
+  .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
 
 function liveNumber(name) {
   const m = LIVE.match(new RegExp('var\\s+' + name + '\\s*=\\s*(-?[\\d.]+)'));

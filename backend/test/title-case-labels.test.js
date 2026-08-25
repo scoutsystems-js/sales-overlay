@@ -24,8 +24,9 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html')
 // ⚠ Comments stripped first — this codebase archives replaced code in place, so
 // an old lowercase label survives in a /* */ block long after it stopped
 // rendering, and matching it would fail the guard for a label nobody can see.
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-  .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+const LIVE = HTML.split('\n')
+  .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
 
 // Static label text only: no interpolation, no entities-as-first-char, short.
 function staticLabels(re) {

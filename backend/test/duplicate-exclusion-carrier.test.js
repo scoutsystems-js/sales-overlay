@@ -35,8 +35,18 @@ test('⚠⚠ EVERY not_a_sales_call EXCLUSION IS PAIRED WITH A duplicate_of EXCL
   const misses = [];
   let pairs = 0;
   sources().forEach(({ rel, src }) => {
-    const live = src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-      .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    /* ⚠⚠ LINE COMMENTS FIRST, THEN BLOCK COMMENTS. A block-comment OPENER
+       sitting inside a line comment is a FALSE opener, and stripping blocks
+       first pairs it with the next real closer, swallowing everything between.
+       Not hypothetical: adding a block comment to lib/session-analytics.js
+       during this very change made this guard lose one of its two real queries
+       and report 20 instead of 21, while the syntax check and a raw grep both
+       said 21. The failure pointed at the edit, not at the checker.
+       ⚠ And this comment itself had to be rewritten — quoting the closing
+       delimiter terminated it early. Describe the characters, never type
+       them. */
+    const live = src.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
     const re = /\.not\('not_a_sales_call', 'is', true\)([\s\S]{0,120})/g;
     let m;
     while ((m = re.exec(live)) !== null) {

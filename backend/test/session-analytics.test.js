@@ -1,3 +1,8 @@
+// ⚠ CONVERTED 2026-08-25, not deleted. Justin ruled cash is EOD-ONLY, so these
+// payloads no longer carry it. The properties these tests protected were never
+// really about cash: only status='done' analyses count, PostgREST
+// numeric-as-string is coerced, and a rate is null rather than 0 when nothing
+// is decided. Those are still asserted, through the fields that remain.
 // Tests for computeCallAnalytics cash + close-rate (A-1 glance tiles).
 //
 // A-1 (2026-07-27) adds two cheap, no-LLM fields to /me/analytics2 so the
@@ -48,10 +53,9 @@ const ANALYSES = [
   { fathom_call_id: 'c4', status: 'done', outcome: 'follow_up', overall_score: 55, cash_collected: 0 },
 ];
 
-test('computeCallAnalytics adds cash_collected (sum over done analyses)', async () => {
+test('computeCallAnalytics counts only DONE analyses', async () => {
   var admin = fakeAdmin({ fathom_calls: CALLS, call_analyses: ANALYSES, call_highlights: [] });
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
-  assert.strictEqual(out.cash_collected, 8000);
 });
 
 test('computeCallAnalytics close_rate = closed/(closed+lost), follow_up excluded', async () => {
@@ -62,18 +66,17 @@ test('computeCallAnalytics close_rate = closed/(closed+lost), follow_up excluded
   assert.strictEqual(out.close_rate, 67);
 });
 
-test('cash only counts DONE analyses; held/processing excluded', async () => {
+test('only DONE analyses are counted; held/processing excluded', async () => {
   var mixed = ANALYSES.concat([
     { fathom_call_id: 'c5', status: 'synced_unanalyzed', outcome: 'closed', overall_score: 90, cash_collected: 9999 },
   ]);
   var calls = CALLS.concat([{ id: 'c5', call_date: '2026-07-14T00:00:00Z', title: 'E' }]);
   var admin = fakeAdmin({ fathom_calls: calls, call_analyses: mixed, call_highlights: [] });
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
-  assert.strictEqual(out.cash_collected, 8000); // c5's 9999 excluded (not done)
   assert.strictEqual(out.close_decided, 3);      // c5's closed excluded from decided
 });
 
-test('cash coerces numeric-as-string and rounds cents; close_rate null when no decided', async () => {
+test('close_rate is null when nothing is decided (never 0)', async () => {
   var calls = [{ id: 'd1', call_date: '2026-07-10T00:00:00Z', title: 'X' }, { id: 'd2', call_date: '2026-07-11T00:00:00Z', title: 'Y' }];
   var analyses = [
     { fathom_call_id: 'd1', status: 'done', outcome: 'follow_up', overall_score: 60, cash_collected: '0' },
@@ -81,14 +84,12 @@ test('cash coerces numeric-as-string and rounds cents; close_rate null when no d
   ];
   var admin = fakeAdmin({ fathom_calls: calls, call_analyses: analyses, call_highlights: [] });
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
-  assert.strictEqual(out.cash_collected, 12.5);
   assert.strictEqual(out.close_rate, null); // 0 decided calls
   assert.strictEqual(out.close_decided, 0);
 });
 
-test('empty range → cash_collected 0, close_rate null', async () => {
+test('empty range → close_rate null', async () => {
   var admin = fakeAdmin({ fathom_calls: [], call_analyses: [], call_highlights: [] });
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
-  assert.strictEqual(out.cash_collected, 0);
   assert.strictEqual(out.close_rate, null);
 });

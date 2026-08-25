@@ -227,8 +227,9 @@ test('HEADINGS are title case on this view', () => {
   });
   // The retired names must be gone from the render path entirely, or the page
   // would carry two names for one graph — the thing (k) exists to remove.
-  const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-    .filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const LIVE = HTML.split('\n')
+    .filter((l) => !/^\s*\/\//.test(l)).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
   ['Objection Handling Over Time', 'Closing Rate Over Time'].forEach((h) => {
     assert.strictEqual(LIVE.indexOf(h), -1, 'the retired graph title is still live: ' + h);
   });
