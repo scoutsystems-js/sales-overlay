@@ -170,3 +170,41 @@ test('⚠ THE TILE EXPLAINS ITSELF — "19 of 149" alone reads as broken', () =>
   assert.ok(/not graded yet/.test(html.replace(/\/\*[\s\S]*?\*\//g, '')),
     'an ungraded remainder must be named on the tile, not left as a bare ratio');
 });
+
+/* ── 30-day default on a NEW connection (Justin, 2026-08-24) ──────────────── */
+
+test('⚠⚠ A NEW FATHOM CONNECTION DEFAULTS TO 30 DAYS — but never overwrites a choice', () => {
+  const fs2 = require('fs'), path2 = require('path');
+  const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'auth.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.ok(/sync_window:\s*keepWindow \|\| '30d'/.test(src),
+    'the connect upsert must default to 30d');
+  assert.ok(/select\('sync_window'\)/.test(src),
+    'and must READ the existing window first — this is an upsert, so writing '
+    + '30d unconditionally would silently narrow anyone RECONNECTING who had '
+    + 'chosen 90d or all time');
+});
+
+test('⚠⚠ ZOOM SENDS THE 30-DAY DATE rather than inheriting Zoom\'s default', () => {
+  const fs2 = require('fs'), path2 = require('path');
+  const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'zoom.js'), 'utf8');
+  assert.ok(/ZOOM_FIRST_SYNC_DAYS\s*=\s*30/.test(src), 'the window must be stated, not implied');
+
+  const i = src.indexOf('function zoomFromDate');
+  const fn = src.slice(i, src.indexOf('\n}', i));
+  assert.ok(!/return null/.test(fn),
+    'a first sync must send a date. Omitting `from` relied on Zoom DEFAULTING '
+    + 'to the last month — an upstream default is not a decision, and nothing '
+    + 'in our code would say what we intended if Zoom changed it');
+});
+
+test('⚠ THE GRADING CAP IS UNCHANGED BY THIS — 30 days can still exceed 20 calls', () => {
+  const fs2 = require('fs'), path2 = require('path');
+  ['fathom', 'zoom'].forEach((r) => {
+    const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', r + '.js'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    assert.ok(/callIdsToAnalyze\(/.test(src) && /FIRST_SYNC_ANALYZE_CAP/.test(src),
+      r + ' must still cap grading on a first sync — pulling fewer calls does '
+      + 'not mean grading all of them');
+  });
+});

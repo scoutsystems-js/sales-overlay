@@ -81,16 +81,26 @@ async function markZoomConnError(admin, userId, reason) {
   }
 }
 
-// Zoom's `from` is a YYYY-MM-DD date. LIMITATION (sub-stage 2): Zoom caps each
-// from→to span at ~1 month and defaults to the last month when `from` is omitted,
-// so a first sync (last_sync_at=null) pulls roughly the last month of recordings;
-// older history needs a wider backfill (a later refinement). Steady-state (the
-// 2h cron, last_sync_at set to ~2h ago) is always inside one window.
+// Zoom's `from` is a YYYY-MM-DD date. Zoom caps each from→to span at ~1 month.
+// Steady-state (the 2h cron, last_sync_at ~2h ago) is always inside one window.
+//
+// ⚠⚠ A FIRST SYNC BACKDATES 30 DAYS, EXPLICITLY (Justin, 2026-08-24). It used
+// to omit `from` and rely on Zoom DEFAULTING to the last month — which happened
+// to match the ruling, but by inheritance rather than by choice. An upstream
+// default is not a decision: Zoom could change it, and nothing here would say
+// what we intended. Sending the date states it.
+//
+// ⚠ Fathom expresses the same ruling through `sync_window`; Zoom has no
+// equivalent picker yet, so this is a constant rather than a stored choice.
+var ZOOM_FIRST_SYNC_DAYS = 30;
+
 function zoomFromDate(lastSyncAtIso) {
-  if (!lastSyncAtIso) return null;
-  var d = new Date(lastSyncAtIso);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+  if (lastSyncAtIso) {
+    var d = new Date(lastSyncAtIso);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  var back = new Date(Date.now() - ZOOM_FIRST_SYNC_DAYS * 86400000);
+  return back.toISOString().slice(0, 10);
 }
 
 async function syncZoomCalls(admin, userId, conn) {

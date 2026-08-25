@@ -530,9 +530,26 @@ router.get('/fathom/callback', async function(req, res) {
     var nowIso = new Date().toISOString();
 
     var admin = getAdminClient();
+
+    /* ⚠⚠ A NEW CONNECTION BACKDATES 30 DAYS ONLY (Justin, 2026-08-24). Before
+       this, a first Fathom sync omitted `created_after` entirely and pulled
+       until the page cap — up to 200 calls of unbounded history, which nobody
+       chose. 30 days is now the DEFAULT, not the limit: the History picker in
+       Account -> Connections still offers 90 days and all time, so anyone can
+       deliberately pull further back afterwards.
+
+       ⚠ ONLY ON A CONNECTION THAT HAS NO WINDOW YET. This is an upsert, so
+       writing '30d' unconditionally would silently reset the choice of anyone
+       RECONNECTING — Josh picked 'all' today, and a reconnect would quietly
+       narrow him back to a month with nothing on screen to say so. */
+    var existingWin = await admin.from('fathom_connections')
+      .select('sync_window').eq('user_id', userId).maybeSingle();
+    var keepWindow = (!existingWin.error && existingWin.data && existingWin.data.sync_window) || null;
+
     var upsert = await admin
       .from('fathom_connections')
       .upsert({
+        sync_window:      keepWindow || '30d',
         user_id:          userId,
         access_token:     data.access_token,
         refresh_token:    data.refresh_token,
