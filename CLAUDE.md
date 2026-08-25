@@ -1481,6 +1481,30 @@ calls / analyses / highlights / prospects        all gone via CASCADE
 - **⚠⚠ THE HAZARD, REPORTED AND NOT FIXED: A REP WHO MOVED COMPANIES CARRIES THEIR OLD CALLS.** Calls belong to a PERSON; team totals are computed from who manages whom *right now*. So deleting a company destroys **calls earned at a previous company**, and nothing warns — the confirmation counts them as this company's. **It cannot be detected from the data** either, because nothing records which team a call belonged to when it happened. **This is the history-freeze question wearing its most expensive costume**, and it is Justin's to rule on.
 - **⚠ THE FINAL CLICK IS UNVERIFIED.** The confirm + typed-name prompt are native dialogs this harness cannot drive; the endpoint was exercised over HTTP instead. **Do not record the button as click-tested.**
 
+### ⚠⚠ "3 CALLS, HE TOOK 6" — THE NUMBER WAS RIGHT AND THE PAGE WAS STILL WRONG (2026-08-24)
+Three separate causes, and the count itself was never one of them.
+```
+17:0x fathom  present          20:0x fathom  present
+18:0x fathom  present          22:0x fathom  NOT SYNCED YET (last sync 22:34)
+19:01 ZOOM ONLY — that account has no Zoom connection, so it can NEVER appear
+                               23:02 fathom  NOT SYNCED YET
+```
+- **EOD reads `fathom_calls` and LEFT-joins analyses, so it counts SYNCED calls, not analysed ones.** The grading backlog — the obvious suspect given everything else this week — **is not involved**. Ruled out with evidence rather than assumed away, along with the ET bounds, `eod_edits`, and `not_a_sales_call`.
+- **⚠ THE FIX WAS THE WORDING. `3` AND `3 SO FAR` RENDER IDENTICALLY**, and only one is true. Inflating the count would have put calls on the page the data cannot support. EOD now carries sync freshness and says *"still filling up — synced up to X"*.
+- **⚠ COMPLETE MEANS "A SYNC RAN AFTER THE DAY ENDED", NOT "THE SYNC IS RECENT".** A historical day synced days later is complete; warning on it would be noise, and noise is how a real warning gets ignored.
+- **⚠ BOTH EXITS CARRY IT — the EMPTY-day return most of all.** Zero calls with no explanation is the worst version of this bug, and that early return is the one easiest to forget.
+
+### ⚠⚠⚠ DUAL-SOURCE INGESTION IS NOW VISIBLY DOUBLE-COUNTING A REAL SURFACE (2026-08-24)
+On the account with BOTH providers connected, **EOD shows 10 calls for 6 real meetings.** Fathom and Zoom each ingest the same meeting ~1 minute apart. **Proven, not inferred:**
+```
+17:02 zoom 240s  <-> 17:03 fathom 228s      20:01 zoom 3120s <-> 20:02 fathom 3088s
+18:01 zoom 3000s <-> 18:02 fathom 2997s     22:03 zoom    0s <-> 22:04 fathom 1850s
+```
+- **This is the recorded ONE-ACTIVE-SOURCE-PER-USER ruling, which was never built.** It was filed as inert *"because Fathom's bot creates no Zoom cloud recording"* — **that reprieve has expired**: cloud recording is now on, and every call is arriving twice.
+- **⚠ THE DEDUPE KEY CANNOT SOLVE IT.** `UNIQUE (user_id, fathom_call_id)` holds each PROVIDER'S OWN id, so two providers can never collide by construction. **It is the wrong key for the question, not a gap in the logic.**
+- **⚠ AND `meeting_id` DOES NOT PAIR THEM EITHER** — a Personal Meeting Room reuses ONE id for every meeting, so all ten rows share `8924530025`. What identifies a pair is **start time within ~60s plus near-identical duration**. Any future dedupe has to key on that, not on an id.
+- **Not an EOD bug; EOD is faithfully reporting what was ingested. Filed.**
+
 ### ⚠ A SCHEDULE'S NOMINAL CADENCE IS A CLAIM; ITS OBSERVED INTERVALS ARE THE MEASUREMENT (2026-08-19)
 **The cron is `0 */2 * * *`. It has never once run on the hour.** Measured across 8 consecutive successful runs: **1h40m, 1h48m, 1h50m, 1h51m, 1h57m, 2h06m, 2h25m** — GitHub Actions treats scheduled workflows as best-effort and defers them under load.
 - **The cost of reading the crontab instead of the history:** a time-boxed push was planned against "~22:00" derived from the expression. The real window was **22:16–23:01** and the run landed at **22:31**. The deadline was met, but the precision claimed was not earned — and the correct number was one `gh run list` away the whole time.
