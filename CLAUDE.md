@@ -1921,6 +1921,20 @@ done
 - **The same shape has now cost twice.** The invitee email is discarded at normalize time (ruling 6a) with the cost recorded; here the loss was undocumented and therefore invisible. **When a mapping drops a field, say so where the mapping is** — otherwise the only way to rediscover it is to probe.
 - **⚠ THE SECOND KEEPER FROM THE SAME PROBE — MEASURED BOT-JOIN DRIFT IS 92s TO 467s.** Fathom's bot joins after the meeting opens, so `recording_start_time` could NEVER have been the join key; matching on it would have been lucky rather than sound. **Both sides carry `scheduled_start_time`** — the calendar's own value — and that is what makes the match exact. **When two systems must agree on "when", use the field they BOTH derive from the same source, not the one each observes independently.**
 
+### ⚠⚠⚠ THE RUN WAS STOPPED ON COST, NOT ON COMPLETION — AND THE ONLY KILL SWITCH IS A REDEPLOY (2026-08-25/26)
+**Justin halted grading at ~$50 in the final hour and $200+ across the day, with 495 of 581 countable calls graded. "522 graded is enough."**
+- **⚠⚠ THERE IS NO WAY TO STOP A DISPATCHED RUN EXCEPT A REDEPLOY.** `/fathom/update-analyses` fires a **detached, fire-and-forget server-side loop** over a fixed id list; nothing can cancel it. The push that ships code IS the kill switch. **Plan every dispatch as irreversible for the length of its list** — that is what makes fan-out decisions expensive rather than merely fast.
+- **HOW A STOP IS VERIFIED — a frozen counter is not enough.** `processing` sat at **6 after the kill** and stayed there: those are **stranded claims** from loops killed mid-call, not live work. **The proof is `max(analyzed_at)` not advancing** (204s and counting) while every counter held. **Always confirm a stop by the absence of WRITES, never by the absence of pending.**
+- **FINAL STATE — recorded because the completeness ruling demands the casualties be named:**
+```
+graded 495 / 581 countable      30-day surface 167 / 168
+pending 78    (never dispatched — deliberately NOT re-admitted, spend not approved)
+processing 6  (STRANDED CLAIMS, not running — will re-claim if ever redispatched)
+errored 2     1 Zoom no-transcript (permanent), 1 grader unparseable-JSON
+```
+- **⚠ THE 78 PENDING AND 6 STRANDED ARE A KNOWN, DELIBERATE RESIDUE, NOT SILENT CASUALTIES.** They are old history, they appear on no surface Justin shows, and re-admitting them was explicitly declined on cost. **They are recorded here so a future session does not rediscover them as a mystery.**
+- **⚠ COST IS A FIRST-CLASS CONSTRAINT AND IT ARRIVED LATE.** ~$200 in a day on one account's backfill, with the twelve-loop incident burning a meaningful share of it on 429 casualties that were then re-graded. **Anything that dispatches per-call model work must state its cost BEFORE running** — the grading control already does; ad-hoc dispatches from a console do not, and that asymmetry is how the day's spend got away.
+
 ### ⚠⚠⚠ STANDING RULING — DO NOT SACRIFICE DATA QUALITY OR COMPLETENESS FOR SPEED (Justin, 2026-08-25)
 **Six concurrent grading loops is the ceiling on this account. Twelve rate-limited Fathom's transcript fetch and silently dropped calls into `error`, where NOTHING RETRIES THEM.**
 - **NEVER FAN OUT PAST THE LEVEL WHERE ERRORS START CLIMBING, REGARDLESS OF DEADLINE PRESSURE.**
