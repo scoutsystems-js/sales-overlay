@@ -699,6 +699,23 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
   - wants to buy, genuinely **cannot afford it** → **FINANCIAL DQ** — not an objection at all, not coachable
 - **⚠ FILED ONLY (2026-08-25). Nothing in the prompt has changed yet.** The current stored taxonomy remains `fear` / `logistical` / `timing` / `partner`.
 
+### ⚠⚠⚠ A RAW NEWLINE INSIDE A JSON STRING DESTROYS THE ENTIRE ANALYSIS — AND THE CAUSE IS ONE OF OUR OWN INSTRUCTIONS (found 2026-08-26, PRE-EXISTING)
+**JSON forbids a literal newline inside a string literal. When the grader emits one, `JSON.parse` rejects THE WHOLE RESPONSE — every section grade, the outcome, the coaching, all of it — not merely the offending field.**
+```
+longest call in the corpus (2123 turns) : 10 raw newlines, ALL of them inside follow_up_email
+                                          braces balance perfectly, no code fence, stop_reason=end_turn
+                                          reproduced on 2 of 2 runs — deterministic for that call
+production casualties sitting in error  : 2
+recovered value once repaired           : outcome "closed", 1030-char email, all 10 breaks intact
+```
+- **⚠⚠ THE CAUSE IS v25's OWN PARAGRAPH-BREAK RULE.** A live sample had come back as one unbroken slab, so v25 told the grader to put a blank line between paragraphs — *"stated mechanically, per operation-not-adjective"*, which was the right call for the symptom it fixed. **The model obliges literally, and a literal newline is exactly what the transport forbids.** A correct instruction, in the wrong medium.
+- **⚠ IT IS NOT TRUNCATION, WHICH IS WHY THE TOKEN GATE WOULD NEVER HAVE CAUGHT IT.** `stop_reason` is `end_turn`, output was 2618/4500, and the object is complete and balanced. Every existing check for "did the response fit" passes. **The failure is a CONTENT property, not a LENGTH one** — and the two are easy to conflate because both surface as "unparseable JSON".
+- **⚠⚠ THE REPAIR IS SAFE BY CONSTRUCTION, and that is the argument for it: it runs ONLY after a normal parse has already failed, and a response that parses cannot contain a raw control character inside a string. So for every currently-healthy response it is a PROVABLE NO-OP** — it can turn a failure into a success and can never do the reverse. It escapes only characters below `0x20` **inside** a string; structure and every other byte are untouched, so the parsed object is exactly what the model meant to send.
+- **Applied to BOTH extractors.** The array extractor carries the identical exposure — `observation` and `quote` are free prose — and fixing only the object one would have left the highlight path to fail the same way later.
+- **⚠ FOUND BY THE TRUNCATION GATE, NOT BY THE SUITE.** The gate was run because the house rule demands measuring the six longest calls before adding a grader field; it reported the token headroom I was looking for **and** a `parsed=NO` I was not. **The rule paid for itself on a defect it was not written to find** — which is the argument for running a mandated gate even when you are confident the answer will be fine.
+- **⚠ AND THE FIRST DIAGNOSIS WAS WRONG.** The raw tail ended in a markdown code fence, so the obvious read was "fences break the extractor". Testing six fenced shapes showed it handles every one — **the fence was a coincidence sitting next to the real cause.** The discriminating step was walking the braces and reporting WHERE `JSON.parse` gave up (`position 8533`), not what the response looked like at the end.
+- **⚠ NOT RE-ADMITTED: the 2 errored calls are recoverable now but re-running them costs their whole window (the control is window-scoped). Spend not approved — left for Justin.**
+
 ### ⚠⚠⚠ THE QUALIFICATION CHECK — THE COMPARISON THAT WAS MISSING (v28, shipped 2026-08-26, migration 049)
 **`qualification_covered` stored the prospect's disclosure VERBATIM and the rep's criteria ALREADY reached the grader. Nothing joined them.** That field answers *"was the topic covered"*, never *"did the prospect pass"*. The grader now returns a verdict **per criterion**.
 
