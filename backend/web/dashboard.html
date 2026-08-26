@@ -10221,7 +10221,10 @@
     }).join('');
 
     return chips
-      + '<div class="meta">' + escapeHtml(d.date || '') + (d.quiet ? ' \u00B7 quiet day' : '') + '</div>'
+      /* ⚠ THE DATE MOVED INTO THE DAY NAV, so printing it here too showed it
+         TWICE. The quiet-day badge stays — it is a real signal about the day,
+         not a label — and now renders on its own only when it applies. */
+      + (d.quiet ? '<div class="meta">Quiet day</div>' : '')
       + stats
       + '<div class="digest-summary">' + escapeHtml(d.summary || '') + '</div>'
       + notable

@@ -105,3 +105,17 @@ test('Title Case labels, per the house rule', () => {
   const h = nav(WEEK, '2026-08-22');
   assert.ok(!/Prev day|Next day/.test(h), 'labels are Title Case');
 });
+
+test('⚠ THE DATE IS SHOWN ONCE, NOT TWICE', () => {
+  /* It moved into the nav; the panel body used to print it again, which the
+     live screenshot caught as a duplicated line under the control. */
+  /* ⚠ ASSERT THE THING THAT CHANGED, not a page-wide count. `escapeHtml(d.date`
+     appears twice on the page and BOTH are legitimate empty-state headings in
+     DIFFERENT panels ("No digest for X" and "No calls on X"). A count over the
+     whole page fails on an unrelated panel — scope wider than the claim. */
+  assert.ok(!/<div class="meta">' \+ escapeHtml\(d\.date/.test(LIVE),
+    'the digest body must not print the date again — the nav shows it');
+  assert.match(LIVE, /Quiet day/, 'the quiet-day signal must survive');
+  assert.match(LIVE, /No digest for ' \+ escapeHtml\(d\.date/,
+    'the no-digest empty state still names the day it could not find');
+});
