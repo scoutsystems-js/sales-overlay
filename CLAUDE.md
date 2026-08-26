@@ -1390,7 +1390,37 @@ muted text itself falls below 4.5:1 above opacity 0.219
 - **⚠ THE TRIGGER: when Zoom Marketplace approval lands and real Zoom traffic starts being analysed, thread `source` through those six payloads.** The moment a Zoom call produces an analysed highlight, the labels are wrong on screen.
 - **The reason this is written as a trigger and not a backlog line (Justin, 2026-08-17): "a logged item with a trigger gets done; one without gets rediscovered."**
 
-### ⏸⏸ ZOOM — PINNED AT JUSTIN'S CALL 2026-08-19. THE HANDOFF: WHAT IS PROVEN, WHAT IS NOT, AND THE TRAP A FRESH SESSION WILL WALK INTO
+### ⚠⚠⚠ ZOOM UNPINNED AND DIAGNOSED 2026-08-26 — IT IS A FIX, NOT A REBUILD, AND TWO OF THE THREE REPORTED SYMPTOMS WERE OVERSTATED
+**Measured on real traffic — Josh now has 48 analysed Zoom calls, and 30 meetings exist that BOTH providers recorded, which is a true paired control.**
+
+**⚠⚠ GRADING IS EQUIVALENT. The same meeting, graded from each provider's transcript, comes out the same:** `67/63 · 74/74 · 73/73 · 68/57 · 62/63 · 70/71 · 73/71 · 58/59 · 64/66 · 67/67 · 55/56`. **Any future claim that Zoom "grades worse" must be measured against these pairs, not against a Zoom-vs-Fathom average** — the unpaired averages differ by 14 points (49.2 vs 63.1) purely because the Zoom sample is a handful of recent calls that includes internal team meetings.
+
+**THE TRANSCRIPT IS NOT EMPTY AND IS PARSED.** Zoom delivers **775 chars/min against Fathom's 841 (92%)** on calls over 10 minutes. The difference is GRANULARITY, not content: **177 chars/turn vs 53**, because the VTT adapter merges consecutive same-speaker cues.
+- **⚠ THE COARSER TURNS DO NOT HURT QUOTE ACCURACY — MEASURED, AND IT IS THE OPPOSITE OF THE INTUITION.** Zoom highlights verify at **97%** against Fathom's **92%**. A longer line gives the locator more to match. **Do not "fix" the merge on quality grounds.**
+
+**⚠⚠ THE ONE REAL FAULT: HIGHLIGHTS VANISH ON LONG ZOOM CALLS.**
+```
+calls over 60 min     Fathom 176 → 0 with zero highlights      Zoom 8 → 7 with zero highlights
+the Fathom twins of those Zoom calls, analysed the SAME MINUTE, produced 5-7 each
+```
+- **⚠⚠ IT DOES NOT REPRODUCE. Re-running the extractor on the two worst calls returned 8 moments each, 666 and 623 tokens of 3000, `stop_reason=end_turn`.** So it is not a property of Zoom transcripts.
+- **RULED OUT BY MEASUREMENT, NOT BY REASONING — record these so nobody re-runs them:** empty transcript · unparsed transcript · input size (Zoom chars are within 3% of the Fathom twin, and a 27,834-char call failed while a 53,413-char one succeeded) · timestamps past the hour (`max_start` tracks duration correctly, 6050 on a 6000s call) · newlines in turn text (**zero** calls on either source) · output truncation · a rate-limit burst (only **2-4 analyses that hour**).
+- **⚠ THE MECHANISM IS NOT DETERMINABLE FROM STORED DATA, AND THAT IS ITSELF THE FINDING: an extractor failure writes NO reason anywhere.** It is non-fatal by design (*"proceeding with grades only"*), so it produces a perfectly normal graded call with an empty highlight list and no trace of what happened. **The already-filed "no failure HISTORY" gap is what blocks a proper fix.**
+- **The JSON control-character repair shipped the same day covers the one failure mode with exactly this signature** (unparseable extractor array → non-fatal → zero highlights). **Stated as a candidate, NOT as the cause** — causation is unprovable with no recorded reason.
+- **⚠ PRACTICAL: re-analysing those 8 calls would recover their highlights. Not done — spend not approved.**
+
+**⚠⚠ THE PROSPECT-NAME SYMPTOM WAS OVERSTATED. 81% of Zoom calls DO get a name (34 of 42) against Fathom's 99%.** The TITLE is genuinely useless — 45 of 53 Zoom calls are `Josh's Personal Meeting Room` or `Josh's Zoom Meeting` — but **names never come from the title**. Source breakdown: **20 diarized (from Zoom's own speaker labels), 20 grader, 0 title.** That also answers what else Zoom carries that could identify a prospect: **its own participant display names, already in use.**
+
+**⚠ SIX CALLS COLLAPSE INTO A SINGLE TURN, and the cause is upstream.** When Zoom labels every cue with one name (a dial-in participant, or a genuine one-sided call), the merge produces ONE turn for the whole recording — a voicemail greeting attributed to Josh, or both sides of a conversation run together. **`lib/zoom-identity` then correctly REFUSES to identify the closer**, since one distinct label cannot separate closer from prospect. **Fathom's single-speaker calls still yield 38 turns**, so this is a Zoom-specific amplification of an upstream limitation.
+
+**FEATURE STATUS, measured:** grading **WORKS** · EOD figures **WORKS** (outcome + `eod_summary` on 48/48) · team analytics **WORKS** (same tables) · prospect name **DEGRADED** (81%) · highlights **DEGRADED** (fine under an hour) · objections **DEGRADED** (0.43/call vs 0.93 — downstream of highlights) · clips **DEGRADED** (`recording_url` on 53/53, but no timestamp deep-link, so `clipLabelFor` correctly says "Open Recording") · speaker split **DEGRADED** (6 of 39).
+
+**⚠ CLIP EXTRACTION IS THE LARGEST REMAINING ITEM AND NEITHER HALF EXISTS** — no download, no cutting. Zoom has no jump-to-a-moment link, so this is the only route to parity. **The published privacy policy still describes it as if it were built** (already filed).
+
+### ⏸⏸ ZOOM — **UNPINNED 2026-08-26; THIS ENTRY IS SUPERSEDED BY THE DIAGNOSIS ABOVE AND IS KEPT FOR HISTORY.**
+**⚠ THE TRAP IT WARNS ABOUT IS NOW STALE IN ONE DIRECTION AND STILL LIVE IN ANOTHER: Zoom rows are NO LONGER all 2-minute reviewer test meetings — Josh has 48 real analysed calls. But the reviewer's rows still exist, so the underlying rule stands: CHECK WHOSE A ZOOM ROW IS AND HOW LONG IT IS before drawing a conclusion from it.**
+
+#### (superseded) THE 2026-08-19 HANDOFF: WHAT WAS PROVEN, WHAT WAS NOT, AND THE TRAP
 **Josh's Zoom settings are now correct — automatic recording ON, TO THE CLOUD, with "Create audio transcript" and "Save closed caption as a VTT" both ticked. Nothing further happens until he records a call under those settings. Do NOT start Zoom work before that call exists; there is nothing to act on.**
 
 **✅ PROVEN 2026-08-19 — and this is the thing that had never been proven before that day: THE INSTALL PATH WORKS FOR A REAL THIRD PARTY.** Every earlier Zoom run was the developer's own account or a reviewer's.

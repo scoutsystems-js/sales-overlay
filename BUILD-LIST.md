@@ -109,7 +109,37 @@ So **"at least 10 characters" is already the rule and is already enforced** — 
 
 ---
 
-## 🚨 TOP OF THE LIST — ZOOM CALLS PRODUCE NO USABLE DATA (filed 2026-08-22)
+## ✅ ZOOM — UNPINNED AND DIAGNOSED 2026-08-26. **IT IS A FIX, NOT A REBUILD.**
+
+**⚠⚠ THE HEADLINE BELOW ("produces no usable data") IS WRONG AND IS KEPT ONLY AS HISTORY.** Measured on 48 real analysed Zoom calls and 30 meetings recorded by BOTH providers:
+
+| feature | Zoom | evidence |
+|---|---|---|
+| **Grading** | **WORKS** | same meeting, both providers: 67/63 · 74/74 · 73/73 · 70/71 · 67/67 · 55/56 |
+| **EOD figures** | **WORKS** | outcome + `eod_summary` on 48/48 |
+| **Team analytics** | **WORKS** | same tables |
+| **Prospect name** | **DEGRADED** | **81%** (34/42) vs Fathom 99% — 20 diarized, 20 grader, **0 from title** |
+| **Highlights** | **DEGRADED** | fine under an hour; **7 of 8 calls over 60 min have ZERO** (Fathom: 0 of 176) |
+| **Objections** | **DEGRADED** | 0.43/call vs 0.93 — downstream of highlights |
+| **Clips** | **DEGRADED** | `recording_url` on 53/53, but no timestamp deep-link |
+| **Speaker split** | **DEGRADED** | 6 of 39 calls collapse into one turn |
+
+**⚠ The transcript is NOT empty and IS parsed** — 775 chars/min vs Fathom's 841 (92%). The difference is granularity (177 chars/turn vs 53), and **that does NOT hurt quote accuracy: Zoom verifies at 97%, Fathom 92%.**
+
+**⚠⚠ THE LONG-CALL HIGHLIGHT FAULT DOES NOT REPRODUCE** — re-running the extractor on the two worst calls returned 8 moments each. Ruled out by measurement: empty/unparsed transcript, input size, timestamps past the hour, newlines, output truncation, rate-limit burst. **The mechanism is undeterminable because an extractor failure records NO reason — that gap is the blocker, and it is already filed below.** Re-analysing those 8 calls would recover their highlights; **not done, spend not approved.**
+
+### ORDERED — hardest first. ⚠ Items 1-3 and 5 are ENGINEERING; item 4 depends on how the closer runs meetings.
+1. **Clip extraction** — **neither the download nor the cutting step exists.** Zoom has no jump-to-a-moment link, so this is the only route to parity. ⚠ **The published privacy policy already describes it as if it were built.**
+2. **Record why an extraction failed** — until this exists the long-call fault can only be guessed at.
+3. **Stop a one-speaker call collapsing into one turn** — Zoom labels every cue with one name on some calls; Fathom's equivalent still yields 38 turns.
+4. **The Personal Meeting Room** *(not engineering)* — 45 of 53 calls share one title, so the title can never name a prospect. Booking through a calendar link fixes it at source; the transcript route already covers 81%.
+5. **Turn granularity** — measured NOT to hurt quality. **Leave it alone.**
+
+---
+
+<details><summary>(superseded) original filing, 2026-08-22</summary>
+
+## 🚨 ZOOM CALLS PRODUCE NO USABLE DATA (filed 2026-08-22 — headline since DISPROVEN)
 
 **⚠⚠ FILED, NOT INVESTIGATED. Justin's ruling: recon happens AFTER this session, and Zoom stays PINNED until he lifts it. Do not measure, diagnose or fix any part of this from the entry below — it is a report of what he observed, not a set of findings.**
 
@@ -133,6 +163,8 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 **⚠ DO NOT BUILD ANY OF IT YET. Zoom stays PINNED until Justin lifts it.**
 
 **⚠ Known-relevant context already on file, so recon does not rediscover it:** the VTT adapter has **never been exercised on a real-length call** (everything it has parsed is ≤120 seconds); the 3301 requeue has **never fired live**; and every Zoom row that existed before Josh connected belonged to the **security reviewer** and was a 2-minute test meeting. Check **whose** a Zoom row is and **how long** it is before drawing any conclusion from it.
+
+</details>
 
 ---
 
