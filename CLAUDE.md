@@ -1568,8 +1568,8 @@ After injecting a fake `fathomStatus` to exercise the Calls empty state, I navig
 ### ⚠⚠ A CONNECTION CAN WORK PERFECTLY AND STILL PRODUCE NOTHING GRADEABLE — MEASURED PER USER (2026-08-26)
 **Empty-transcript rate across one company's Fathom accounts, as a share of everything actually processed:**
 ```
-gabriel  57%   (20 empty vs 15 graded)   ⚠ MORE THAN HALF HIS CALLS CANNOT BE GRADED
-josh.n   14%
+gabriel  31%   (40 empty vs 89 graded)   ⚠ NEARLY A THIRD OF HIS CALLS CANNOT BE GRADED
+josh.n   13%   (1 of 8)
 yazan     1%   (3 of 294)
 joshua / nick / dre   0%
 ```
@@ -1578,6 +1578,14 @@ joshua / nick / dre   0%
 - **⚠ THIS IS THE ARGUMENT FOR THE CONNECT-TIME CHECK, EXTENDED PAST ZOOM.** The filed item says *connect then check, do not instruct and hope*. **Gabriel proves the check must not stop at "are there recordings" — it has to ask "are they TRANSCRIBED", because he has plenty of recordings and no transcripts.**
 - **⚠ AND IT MUST BE REPORTED PER PERSON, NOT AS A TOTAL.** Folded into a company-wide "N ungradeable", gabriel's 57% disappears into a rounding error; per user it is obviously one account needing a setting changed. **A rate is only actionable at the level where somebody can act on it.**
 
+
+### ⚠⚠ "PENDING" AND "PERMANENTLY UNGRADEABLE" ARE INDISTINGUISHABLE UNTIL YOU TRY THE CALL — SO A PENDING COUNT CANNOT TELL YOU WHETHER WORK REMAINS (2026-08-26)
+**I reported "nothing retryable is left waiting" and the close-out check found TWO calls still `pending`. Running them returned the same empty-transcript result as their owner's other 38 — they were never retryable, merely UNATTEMPTED.**
+- **THE SHAPE: a row that has not been tried and a row that can never succeed look IDENTICAL in the queue.** Both read `pending`; only an attempt converts one into `error` and the other into `done`. **So "N pending" answers "how much is unattempted", never "how much is achievable"** — and those are the two different questions a completeness claim depends on.
+- **⚠ THE CLAIM WAS WRONG IN FORM AND RIGHT IN SUBSTANCE, WHICH IS THE WORST KIND TO LEAVE UNCHECKED.** Nothing retryable *was* left — but I could not have known that when I said it, because the only evidence available was a pending count that cannot express the distinction. **A statement that happens to be true on evidence that cannot support it is not verified; it is lucky.**
+- **THE RULE: a run is finished when the queue is EMPTY, not when the remainder is believed unachievable.** Attempt every pending row and let it classify itself. The cost is one attempt per row; the alternative is a permanent residue nobody can distinguish from unfinished work.
+- **AND IT IS THE `write-the-null` RULE FROM THE OTHER SIDE.** That one says an absent row and a row saying "nothing here" are identical to a query and opposite in meaning. This is the same collapse in the STATUS column: **unattempted and unachievable are opposite meanings wearing one value**, and the only way to separate them is to do the work.
+- **⚠ A MID-RUN MEASUREMENT IS NOT A RESULT, EITHER.** The entry directly above originally recorded gabriel's empty-transcript rate as **57% (20 vs 15)** — captured while his run was still going. Final is **31% (40 vs 89)**. **A rate computed over a partial denominator is a snapshot of progress, not a property of the account**, and it will be read as the latter unless the run is finished when you write it down.
 ### ⚠⚠⚠ ONE GRADED CALL MAKES THE ONBOARDING CARD VANISH — WHICH IS WHY GODWIN NEVER SAW HIS 101 UNGRADED CALLS (found 2026-08-26, FILED NOT BUILT)
 **The ungraded count and the grading control DO exist — on the CALLS page, gated on `if (work <= 0)`, source-agnostic, so a Zoom-only user reaches them fine. That is not the gap. The gap is that a newly-connected user is never on that page.**
 ```js
