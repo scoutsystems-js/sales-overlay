@@ -672,6 +672,21 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
   > *"When someone is worried about paying because of whatever excuse, it's fear. Prospects will never say 'I'm scared'. If they say anything at all it's 'I'm nervous'."*
 - **⚠⚠ THIS SHAPES THE GRADER, NOT THE DISPLAY.** The rule generalises past the one label: **hesitation about paying is `fear` regardless of the wrapper** — wanting proof, questioning legitimacy, needing to check with someone, wanting to think about it. **Do not implement this as a rename in a label table** — the classification guidance in the extractor prompt is where it belongs, because the model is being told *what the words mean*, not what to call them.
 - **This EXTENDS the rule already encoded** ("money-phrased objections classified as `fear` unless a genuine logistical payment constraint appears") from money-phrased to **excuse-phrased**. The existing `logistical` carve-out is unaffected: a real external payment constraint is still logistical.
+- **⚠⚠⚠ THE BOUNDARY IS THREE-WAY, NOT TWO (Justin, 2026-08-25, sharpening the above). HIS WORDS VERBATIM:**
+  > *"LOGISTICAL IS WHEN THEY WANT TO BUY BUT PHYSICALLY CANT FOR SOME REASON"*
+  > *"I NEED TO TALK TO MY WIFE/PARTNER/PET GOLDFISH IS SPOUSE-PARTNER. AND I WANT TO I JUST CANT AFFORD IT IS A FINANCIAL DQ"*
+
+  | the prospect | classification | is it a coaching failure? |
+  |---|---|---|
+  | wants to buy, **genuinely cannot afford it** | **FINANCIAL DISQUALIFICATION** — *not an objection at all* | **NO** |
+  | wants to buy, blocked by an **external constraint they cannot control** | **LOGISTICAL** | **NO** |
+  | **able but hesitant**, whatever excuse they wrap it in | **FEAR** | **YES — this is the coachable one** |
+
+  **THE DISCRIMINATOR IN ONE LINE: WILLING BUT UNABLE vs ABLE BUT HESITANT.** Unable splits again by *why*: **can't afford → DQ**, **externally blocked → logistical**.
+- **SPOUSE / PARTNER IS ANYONE THEY MUST CONSULT BEFORE DECIDING**, regardless of who that person is — spouse, partner, business partner, parent, *"pet goldfish"*. The category is defined by **the need to consult**, not by the relationship.
+- **⚠ A FLAG I RAISED IS HEREBY WITHDRAWN, NOT LEFT OPEN.** I queried `logistical` being both a NAMED category and an EXCLUDED one. **That is CORRECT and intentional:** a genuine inability to proceed is not a coaching failure — **there was nothing the closer could have done differently**. Being named lets it be *counted and shown*; being excluded keeps it out of the *handle rate*. Both at once is the design.
+  - ⚠ **One precision, because the two rulings arrived minutes apart and the second revises the first's wording:** the rationale was first phrased as *"a genuine inability to PAY"*, which the three-way ruling reclassifies as a **DQ**, not logistical. **The withdrawal stands either way** — DQ and logistical are both non-coachable — but `logistical` now means an **external blocker**, not an affordability problem. Do not carry the older phrasing forward.
+- **⚠⚠ CROSS-REFERENCE — THIS IS THE LIKELY CAUSE OF THE ABU FAILURE FILED BELOW.** The digest read **a financial DQ as a winnable close** and built the day's highest-leverage coaching point on it. **The DQ boundary being unclear to the grader is the probable mechanism**, so **whoever picks up the Abu item starts HERE**, with this three-way rule, rather than treating it as a digest-only bug.
 - **⚠ PRICE STAYS A SEPARATE CATEGORY AND IS STILL UNRESOLVED.** It is **not stored separately today**, so splitting it out is a **RE-CLASSIFICATION, not a rename** — it needs a prompt change, a version bump, and a decision about historical rows. Not ruled, not built.
 - **⚠ FILED ONLY (2026-08-25). Nothing in the prompt has changed yet.** The current stored taxonomy remains `fear` / `logistical` / `timing` / `partner`.
 
@@ -680,7 +695,7 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - The digest said Abu *"said 'I'm in' — a clean verbal close — and Josh immediately subordinated that commitment… the day's single most expensive mistake"*, and framed the day's focus around enrolling him on the spot.
 - **Abu was a financial DISQUALIFICATION, and it was a FOLLOW-UP call.**
 - **⚠⚠ TWO SEPARATE BLIND SPOTS, EITHER OF WHICH ALONE PRODUCES BAD COACHING:**
-  1. **A DISQUALIFICATION WAS READ AS A WINNABLE CLOSE.** Scout **already has a disqualification concept** — the objection surfaces deliberately exclude DQs as non-coachable (see the strict-objection ruling). **The digest does not apply it.**
+  1. **A DISQUALIFICATION WAS READ AS A WINNABLE CLOSE.** ⚠⚠ **START WITH THE THREE-WAY BOUNDARY RULING DIRECTLY ABOVE** — *can't afford = DQ, externally blocked = logistical, able but hesitant = fear*. That boundary being unclear to the grader is the probable cause of this, not a digest-only bug. Scout **already has a disqualification concept** — the objection surfaces deliberately exclude DQs as non-coachable (see the strict-objection ruling). **The digest does not apply it.**
   2. **A FOLLOW-UP CALL WAS TREATED AS A FIRST CALL.** *"Enroll them on the spot"* is first-call advice. **Open question: does the grader know a call is a follow-up at all?** Prospect grouping exists (`prospects` + `fathom_calls.prospect_id`), so the information is in the system — whether it reaches the grader is not established.
 - **⚠⚠ THE FAILURE MODE IS THE POINT, AND IT IS THE WORST ONE THIS FILE TRACKS.** This is **not a wrong number** — it is confident, specific, actionable advice that is wrong, presented as the day's top insight. **A manager acting on it would coach the wrong thing.** It is *a data problem must never render as good news* in its most expensive form: it rendered as an **insight**.
 - **⚠ NOT A GENERAL RELIABILITY PROBLEM.** Josh confirmed the other items (Kevin, Tyrone) were accurate. **Two specific blind spots, not a flaky grader** — which matters, because the fix is targeted rather than a rewrite.
