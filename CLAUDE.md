@@ -699,6 +699,35 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
   - wants to buy, genuinely **cannot afford it** → **FINANCIAL DQ** — not an objection at all, not coachable
 - **⚠ FILED ONLY (2026-08-25). Nothing in the prompt has changed yet.** The current stored taxonomy remains `fear` / `logistical` / `timing` / `partner`.
 
+### ⚠⚠⚠ THE QUALIFICATION CHECK — THE COMPARISON THAT WAS MISSING (v28, shipped 2026-08-26, migration 049)
+**`qualification_covered` stored the prospect's disclosure VERBATIM and the rep's criteria ALREADY reached the grader. Nothing joined them.** That field answers *"was the topic covered"*, never *"did the prospect pass"*. The grader now returns a verdict **per criterion**.
+
+**⚠ WHAT WAS ESTABLISHED BEFORE BUILDING — the answers changed the design:**
+```
+qualification_covered on 690 real analyses : 689 populated · 581 financial=true · 581 of 581 carry evidence (100%)
+                                             ONE flag and ONE quote — but Josh has THREE criteria
+evidence reconstructs (349 checked)        : 286 (82%) — of which PROSPECT 231, ⚠ CLOSER 55 (19%)
+speakers matched on recent real calls      : 675 / 685 (99%)
+criteria on file, whole platform           : ONE user. Free text, 69 chars, no structure
+```
+- **⚠⚠ 55 OF 286 RECONSTRUCTIBLE QUOTES ARE THE CLOSER SPEAKING** — *"Your credit, is your credit shot?"*, *"you have 5 to 10K set aside, right?"*. **That is the closer ASKING, not the prospect ANSWERING**, and deciding a criterion on one would let a closer's own question disqualify a buyer. **This is why a decided verdict requires `labelForQuote === 'PROSPECT'`, which is stricter than the coverage map's "does this line exist".** It costs almost nothing: 99% of real calls have matched speakers.
+- **⚠ ONE FLAG, THREE CRITERIA — the structural mismatch that made the old field unable to answer the question even in principle.** A call that discussed credit but not savings stored `financial:true` with one credit quote, which reads as "financial qualification covered" when a third of it was.
+
+**⚠⚠ WHICH CRITERIA CAN ACTUALLY BE CHECKED — asked before building, and the answer is "not all of them":** of Josh's three, **`10k saved` and `640 or above credit score` are NUMERIC BARS** a model can compare against; **`not living paycheck to paycheck` is a JUDGEMENT with no threshold.** Forcing a verdict on the third would manufacture one, so the prompt tells the model to use `undetermined` **freely and without hesitation**, and says it is expected to be common. **DO NOT later "improve" the yield by pressing the model to decide more often** — that is the exact trade this design refuses.
+
+**⚠⚠ THREE VERDICTS, AND THE THIRD IS NOT A FAILURE MODE.** `passed` / `failed` / `undetermined`. **A prospect who never mentioned money is NOT a prospect who failed**, and this project has already had to fix a two-state collapse twice on other surfaces. `undetermined` is the honest, common answer.
+
+**⚠ THE DOWNGRADE IS ONE-WAY, BY CONSTRUCTION.** An unprovable or closer-spoken quote turns a decided verdict INTO `undetermined` and withholds the quote. **Nothing anywhere can turn something INTO `failed`.** A wrong disqualification is worse than no verdict — the same governing principle as prospect names, and it is pinned by a test.
+
+**⚠ ONE NOTION OF A DQ, NOT TWO.** A failed criterion **IS** the financial disqualification v27 defined; `hasFailedCriterion` is the single place that decides it, and the prompt feeds it into the **EXISTING** outcome rule (a DQ the closer accepts and does not overcome is `lost`). **No server-side forcing of `outcome`** — a criterion the closer genuinely overcomes is not a lost call.
+
+**⚠⚠ CRITERIA ARE FREE TEXT, PER COMPANY — SO NOTHING MAY HARDCODE A THRESHOLD.** `user_profiles.qualifications` is one prose field with no schema, and **640 is Josh's bar, not Scout's**. The model is handed the rep's own words and asked to split and judge them; a test fails if any comparison against a literal threshold appears in the code. **Only 1 of 8 profiles has any, so the block is ABSENT and the prompt BYTE-IDENTICAL for everyone else** — the same shape as the coverage map, and it costs the other seven nothing.
+- **⚠ THE RAW CRITERIA ARE RETURNED SEPARATELY from `contextText`, deliberately.** That block is budget-limited, so a long criteria field could be truncated inside it, and silently checking only the criteria that survived chunking would under-report what the closer failed to establish.
+
+**⚠ AGGREGATION IS NOT YET POSSIBLE AND THAT IS DELIBERATE.** The criterion is stored as the model's own verbatim text, so *"how often does credit fail"* has no stable key to group on — the same non-determinism already recorded for coaching-area keys. **Per-call recording is what was asked for; a stable key is a prerequisite for any future trend.**
+
+**NO UI.** Per the standing pattern (v12/v15/7c), a new structured field is stored and read before it is surfaced. Recording it and driving the DQ through the existing outcome rule is this block's scope; a surface built before anyone has read the field would be thrown away.
+
 ### ⚠⚠⚠ THE ABU FAILURE — INVESTIGATED 2026-08-26. THE GRADER HAD BOTH HALVES OF THE ANSWER AND NEVER JOINED THEM
 **BOTH open questions are now settled, and the second one is a capability gap, not a bug.**
 

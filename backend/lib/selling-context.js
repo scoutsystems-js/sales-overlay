@@ -62,7 +62,14 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
     // usableProfileField rejects stray values — the demo accounts store
     // offer = "Ava"/"Ben"/"Cara", which must never reach the grader as an offer.
     var qualChunks = [], offerChunks = [], scriptChunks = [];
+    // ⚠ THE RAW CRITERIA ARE RETURNED SEPARATELY, not just chunked into the
+    // prose block. The per-criterion qualification CHECK must see the COMPLETE
+    // list: contextText is budget-limited, so a long criteria field could be
+    // truncated there, and silently checking only the criteria that survived
+    // chunking would under-report what the closer failed to establish.
+    var qualificationsRaw = null;
     if (usableProfileField(pdata.qualifications)) {
+      qualificationsRaw = pdata.qualifications.trim().slice(0, 1000);
       qualChunks = chunkForContext('QUALIFYING CRITERIA for this offer (the bar a prospect must clear): ' + pdata.qualifications.trim());
     }
     var offerParts = [];
@@ -105,7 +112,7 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
         chars: got.reduce(function (n, c) { return n + c.length; }, 0),
       });
     });
-    if (!out.length) return { contextText: '', kbHash: 'none', sources: [] };
+    if (!out.length) return { contextText: '', kbHash: 'none', sources: [], qualifications: qualificationsRaw };
 
     var contextText = out.join('\n\n');
     // Hash covers BOTH sources so a profile edit invalidates cached syntheses
@@ -118,10 +125,12 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
     var kbHash = hashParts.length
       ? crypto.createHash('sha1').update(hashParts.join('|')).digest('hex')
       : 'none';
-    return { contextText: contextText, kbHash: kbHash, sources: sourceSummary };
+    return { contextText: contextText, kbHash: kbHash, sources: sourceSummary, qualifications: qualificationsRaw };
   } catch (err) {
     console.error('[selling-context] fetch failed for user ' + userId + ' — returning empty: ' + (err && err.message));
-    return { contextText: '', kbHash: 'none', sources: [] };
+    // ⚠ NULL, not undefined — the caller branches on it, and a failed fetch must
+    // read as "no criteria" rather than reaching the grader with a partial list.
+    return { contextText: '', kbHash: 'none', sources: [], qualifications: null };
   }
 }
 
