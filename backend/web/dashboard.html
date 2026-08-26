@@ -2389,9 +2389,6 @@
     .team-stat-sub { font-size: 13px; font-weight: 500; color: var(--text); }
     .team-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin-top: 6px; }
     /* Manager daily digest */
-    .digest-date-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-    .digest-date-chip { font-size: 12px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-elevated); color: var(--text); cursor: pointer; }
-    .digest-date-chip.active { color: var(--text); border-color: var(--accent); }
     .digest-summary { font-size: 14px; line-height: 1.55; color: var(--text); margin: 12px 0; }
     .digest-notable { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0; background: var(--bg-elevated); border-radius: 0 var(--radius) var(--radius) 0; }
     .digest-notable .meta { margin-top: 4px; }
@@ -2540,6 +2537,17 @@
     }
     .calls-outcome-clear:hover { border-color: var(--border-hover); }
     .calls-outcome-note { font-size: 11px; }
+
+    /* Digest day navigation (2026-08-26) — replaced the date chip row. */
+    .digest-day-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .digest-day-btn {
+      background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text);
+      padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+    }
+    .digest-day-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .digest-day-btn:disabled { opacity: .45; cursor: default; }
+    .digest-day-current { font-size: 13px; font-weight: 700; letter-spacing: .01em; }
 
     /* Grading-backlog control (2026-08-25). Shared by the Calls page and
        Account -> Connections; both mount it inside `.grade-backlog-host`. */
@@ -10145,20 +10153,50 @@
   }
 
   function teamDigestHtml() {
+  /* ⚠⚠ THE WALK IS BOUNDED TO `recent_dates`, AND THAT IS THE LOAD-BEARING PART.
+     35 digest days exist for this account (back to 2026-07-21) but the chip row
+     only ever offered SEVEN — and days 8+ predate the manager-missing fix, so
+     they read "quiet day · 0 calls" for days the closer worked (08-17 had 6 real
+     calls, 08-16 had 4, 08-14 had 6). That 7-day cap was accidentally shielding
+     the reader from 28 stale days. An UNBOUNDED walk reaches the first of them
+     one click past the end and presents it as the current view.
+     So this walks exactly the days the chips offered: same exposure, new shape.
+     ⚠ A navigation change must not smuggle in a data regression.
+
+     ⚠ BOTH DIRECTIONS, because a one-way control strands whoever uses it, and
+     DISABLED rather than hidden at each end — a control that vanishes reads as a
+     bug, one that greys out tells you that you have reached the end of history.
+     ⚠ Next cannot walk into a day with no digest BY CONSTRUCTION: the newest
+     entry in recent_dates is the newest digest that exists, and the digest is
+     structurally a day behind. */
+  function digestDayNavHtml(recentDates, current) {
+    var days = Array.isArray(recentDates) ? recentDates.slice() : [];   // newest first
+    var idx = days.indexOf(current);
+    // An unknown current date (never in the list) degrades to "newest": you can
+    // still see where you are and step back, rather than getting a dead control.
+    var prevDay = (idx === -1) ? days[0] : days[idx + 1];
+    var nextDay = (idx === -1) ? null    : days[idx - 1];
+    function btn(day, label, arrow) {
+      var on = !!day;
+      return '<button type="button" class="digest-day-btn"'
+        + (on ? ' onclick="selectDigestDate(\'' + day + '\')"' : ' disabled')
+        + '>' + (arrow === 'left' ? '\u2190 ' : '') + label + (arrow === 'right' ? ' \u2192' : '')
+        + '</button>';
+    }
+    return '<div class="digest-day-nav">'
+      + btn(prevDay, 'Prev Day', 'left')
+      + '<span class="digest-day-current">' + escapeHtml(current || '') + '</span>'
+      + btn(nextDay, 'Next Day', 'right')
+      + '</div>';
+  }
+
     var d = state.teamDigest;
     if (!d) return '<div class="skeleton" style="height:80px;"></div>';
     if (d._error) return '<div class="error">Could not load digest: ' + escapeHtml(d._error) + '</div>';
 
-    // History chips (last 7 stored digest days) — render whenever present so
-    // the manager can page through recent days, including from a pending state.
-    var chips = '';
-    var recents = Array.isArray(d.recent_dates) ? d.recent_dates : [];
-    if (recents.length > 1 || (recents.length === 1 && recents[0] !== d.date)) {
-      chips = '<div class="digest-date-row">' + recents.map(function (dt) {
-        return '<button type="button" class="digest-date-chip' + (dt === d.date ? ' active' : '')
-          + '" onclick="selectDigestDate(\'' + dt + '\')">' + escapeHtml(dt) + '</button>';
-      }).join('') + '</div>';
-    }
+    /* Day navigation. Replaced the chip row 2026-08-26 — Justin: "the dates
+       going backwards but moving to the right just looks off." */
+    var chips = digestDayNavHtml(d.recent_dates, d.date);
 
     if (!d.available) {
       return chips + '<div class="empty"><h3>No digest for ' + escapeHtml(d.date || '') + '</h3><p>'
