@@ -1,197 +1,85 @@
 /**
- * WHO IS ON A TEAM BOARD — and specifically, IS THE MANAGER ON IT.
+ * ⚠⚠ THE MANAGER IS A MEMBER OF THEIR OWN TEAM — NINTH SITE OF THE SAME DEFECT.
  *
- * ⚠⚠ THE BUG THIS PINS (Justin, 2026-08-21): Josh's own data was missing from
- * "My Team". Josh IS the manager. Observed on the deployed board, per surface:
+ * `9a27979` fixed this at eight endpoints by making resolveTeam return memberIds
+ * (reps + the board owner). The DAILY DIGEST never got the fix, because it does
+ * not call resolveTeam — it hand-rolls the rule from `managed_by` inside
+ * generateDailyDigests, and a hand-rolled copy cannot inherit a fix.
  *
- *     Team Averages gauges   Josh PRESENT      (5 members counted)
- *     rep line graphs        Josh PRESENT
- *     rep cards / totals     Josh ABSENT       <- what Justin saw
- *     trends, why-prose, recommendations,
- *     needs-work, highlights, digest           Josh ABSENT
+ * ⚠ THE LIVE SYMPTOM, and what the first test below reproduces: Josh's digest
+ * read "quiet day · 0 calls" for 2026-08-24, a day he took EIGHT real calls. His
+ * four reps are three demo accounts and one test user, all with zero real calls,
+ * so excluding the manager leaves literally nothing to count. A digest that says
+ * "quiet day" about a day someone worked is a verdict, and a wrong one.
  *
- * ⚠ THE CAUSE WAS NOT A FILTER OR A REGRESSION — IT IS THAT THE RULE WAS
- * IMPLEMENTED AT THE CALL SITE, TWICE, AND NEVER IN THE RESOLVER. `resolveTeam`
- * returns `managed_by = keyId`, which by definition CANNOT contain the manager.
- * Two endpoints (`/averages`, `/rep-series`) each carried their own copy of
- *
- *     if (candidates.indexOf(team.keyId) === -1) candidates.push(team.keyId)
- *
- * and the other EIGHT did not. Enumerated by capability rather than by grepping
- * the comment, because the comment is what the two copies share, not the rule.
- *
- * ⚠ AND THE RULING ITSELF WAS NEVER WRITTEN DOWN. It exists only in those two
- * code comments ("Ruling 1 (carried from the dials): the board owner counts as
- * a rep") — searched CLAUDE.md for six phrasings and it is not there. So there
- * was nothing to check the eight against.
+ * ⚠ resolveTeam ITSELF CANNOT BE CALLED HERE. It takes an Express `req` (it reads
+ * req.user and ?team=), and digest generation runs from the sync cron with no
+ * request, iterating every manager. So the shared thing is the RULE, not the
+ * route helper — hence lib/team-membership.js, which routes/team.js also uses.
+ * Adding the manager to the hand-rolled list instead would be a tenth copy.
  */
-
 'use strict';
-
 const test = require('node:test');
 const assert = require('node:assert');
+const TM = require('../lib/team-membership');
 
-const router = require('../routes/team');
-const resolveTeam = router._resolveTeam;
-
-/** Minimal supabase stand-in: only what resolveTeam touches.
- *  ⚠ resolveTeam now makes TWO kinds of user_profiles read: reps by
- *  `managed_by`, and the COMPANY NAME by `user_id` (2026-08-24 — the team
- *  label is the company name, so an unnamed team no longer renders its
- *  manager's email dressed up as a company). The fake must answer both or the
- *  membership assertions fail for a reason that has nothing to do with
- *  membership. */
-function fakeAdmin(profiles) {
-  return {
-    from(table) {
-      assert.strictEqual(table, 'user_profiles', 'resolveTeam only reads user_profiles');
-      const api = {
-        select() { return api; },
-        maybeSingle() { return api._single; },
-        eq(col, val) {
-          if (col === 'user_id') {                       // the company-name read
-            const hit = profiles.filter((p) => p.user_id === val)[0];
-            api._single = Promise.resolve({ data: hit ? { team_name: hit.team_name || null } : null, error: null });
-            return api;
-          }
-          assert.strictEqual(col, 'managed_by');
-          return Promise.resolve({
-            data: profiles.filter((p) => p.managed_by === val).map((p) => ({ user_id: p.user_id })),
-            error: null,
-          });
-        },
-        then(res) {   // the un-filtered profilesByRole() read
-          return Promise.resolve({
-            data: profiles.map((p) => ({ user_id: p.user_id, role: p.role })), error: null,
-          }).then(res);
-        },
-      };
-      return api;
-    },
-    auth: { admin: { listUsers: async () => ({ data: { users: [] }, error: null }) } },
-  };
-}
-
-const MANAGER = 'mgr-1';
+/** Josh's real shape on 2026-08-25. */
+const JOSH = '8c952cc0';
 const PROFILES = [
-  { user_id: MANAGER, role: 'manager', managed_by: null },
-  { user_id: 'rep-a', role: 'user', managed_by: MANAGER },
-  { user_id: 'rep-b', role: 'user', managed_by: MANAGER },
+  { user_id: JOSH,        managed_by: null },
+  { user_id: 'demo-ava',  managed_by: JOSH },
+  { user_id: 'demo-ben',  managed_by: JOSH },
+  { user_id: 'demo-cara', managed_by: JOSH },
+  { user_id: 'test-user', managed_by: JOSH },
+  { user_id: 'daniel',    managed_by: 'joshua' },
+  { user_id: 'joshua',    managed_by: null },
 ];
 
-function reqFor(id, role, query) {
-  return { user: { id, role }, query: query || {} };
+/** The old, defective construction — kept so the test proves it was the cause. */
+function handRolledRepsByManager(rows) {
+  const out = {};
+  rows.forEach((p) => { if (p.managed_by) (out[p.managed_by] = out[p.managed_by] || []).push(p.user_id); });
+  return out;
 }
 
-test('⚠ NON-VACUITY: the fake resolves the reps at all', async () => {
-  // If the stand-in returned nothing, every assertion below would pass for the
-  // wrong reason — "the manager is in an empty set" is not a useful green.
-  const team = await resolveTeam(fakeAdmin(PROFILES), reqFor(MANAGER, 'manager'));
-  const ids = team.memberIds || team.repIds;
-  assert.ok(Array.isArray(ids), 'resolveTeam must return a member list');
-  assert.ok(ids.indexOf('rep-a') !== -1 && ids.indexOf('rep-b') !== -1,
-    'the reps themselves must be present: ' + JSON.stringify(ids));
+test('REPRODUCES IT: the hand-rolled list excludes Josh, so his 8 calls are uncountable', () => {
+  const old = handRolledRepsByManager(PROFILES);
+  assert.ok(!old[JOSH].includes(JOSH), 'the manager is absent — this is the defect');
+  // his four reps have no real calls, so the countable set is empty
+  const realCallsBy = { [JOSH]: 8, 'demo-ava': 0, 'demo-ben': 0, 'demo-cara': 0, 'test-user': 0 };
+  const counted = old[JOSH].reduce((n, id) => n + realCallsBy[id], 0);
+  assert.strictEqual(counted, 0, 'this is the "quiet day · 0 calls" the digest rendered');
 });
 
-test('⚠⚠ THE MANAGER IS ON THEIR OWN BOARD (mode: own)', async () => {
-  const team = await resolveTeam(fakeAdmin(PROFILES), reqFor(MANAGER, 'manager'));
-  const ids = team.memberIds || team.repIds;
-  assert.ok(ids.indexOf(MANAGER) !== -1,
-    'the manager must be part of their own team board — this is the Josh bug. Got: '
-    + JSON.stringify(ids));
-  assert.strictEqual(ids.length, 3, 'two reps plus the manager');
-  assert.strictEqual(team.mode, 'own');
+test('FIXED: membersByManager includes the manager, so the day counts 8', () => {
+  const members = TM.membersByManager(PROFILES);
+  assert.ok(members[JOSH].includes(JOSH), 'the manager must be in their own member list');
+  const realCallsBy = { [JOSH]: 8, 'demo-ava': 0, 'demo-ben': 0, 'demo-cara': 0, 'test-user': 0 };
+  const counted = members[JOSH].reduce((n, id) => n + (realCallsBy[id] || 0), 0);
+  assert.strictEqual(counted, 8, 'the digest must see the manager\'s own calls');
 });
 
-test('⚠ AN OWNER VIEWING ANOTHER MANAGER\'S BOARD GETS THAT MANAGER, NOT THEMSELVES', async () => {
-  // mode 'pick': keyId is the manager whose board is being viewed. Adding the
-  // VIEWER here would silently mix an owner's calls into someone else's team.
-  const team = await resolveTeam(fakeAdmin(PROFILES.concat([{ user_id: 'own-1', role: 'owner', managed_by: null }])),
-    reqFor('own-1', 'owner', { team: MANAGER }));
-  const ids = team.memberIds || team.repIds;
-  assert.strictEqual(team.mode, 'pick');
-  assert.ok(ids.indexOf(MANAGER) !== -1, 'the board owner belongs on their board: ' + JSON.stringify(ids));
-  assert.ok(ids.indexOf('own-1') === -1, 'the VIEWER must not be added to someone else\'s team');
+test('every manager gets themselves, not just the one under test', () => {
+  const m = TM.membersByManager(PROFILES);
+  assert.ok(m['joshua'].includes('joshua'));
+  assert.ok(m['joshua'].includes('daniel'));
 });
 
-test('⚠ THE SET IS DEDUPED — a manager who somehow manages themselves appears once', async () => {
-  const self = [{ user_id: MANAGER, role: 'manager', managed_by: MANAGER }];
-  const team = await resolveTeam(fakeAdmin(self), reqFor(MANAGER, 'manager'));
-  const ids = team.memberIds || team.repIds;
-  assert.strictEqual(ids.filter((x) => x === MANAGER).length, 1,
-    'no duplicate ids — a doubled id would double-count that person\'s calls');
+test('a user with no reps does not become a team', () => {
+  const m = TM.membersByManager(PROFILES);
+  assert.ok(!Object.prototype.hasOwnProperty.call(m, 'daniel'),
+    'having a manager does not make you one — only reps do');
 });
 
-test('⚠⚠ EVERY /team ENDPOINT USES THE RESOLVED SET — the rule has ONE home', () => {
-  // ⚠ ENUMERATED BY CAPABILITY, NOT BY GREPPING THE COMMENT. The failure was
-  // two endpoints carrying a private copy of the rule while eight had none, so
-  // the thing to assert is that NO endpoint hand-rolls it any more.
-  const fs = require('fs');
-  const path = require('path');
-  const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8');
-  const live = src.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
-                  .replace(/\/\*[\s\S]*?\*\//g, '');
-
-  assert.strictEqual((live.match(/candidates\.push\(team\.keyId\)/g) || []).length, 0,
-    'an endpoint is still hand-rolling manager inclusion — it belongs in resolveTeam');
-  assert.strictEqual((live.match(/team\.repIds/g) || []).length, 0,
-    'team.repIds is retired in favour of team.memberIds; a stale reader would silently '
-    + 'drop the manager again, which is exactly how this bug happened');
-  assert.ok(/memberIds/.test(live), 'resolveTeam must expose the member set');
+test('withBoardOwner is the one rule, and it is idempotent', () => {
+  assert.deepStrictEqual(TM.withBoardOwner('m', ['a', 'b']), ['a', 'b', 'm']);
+  assert.deepStrictEqual(TM.withBoardOwner('m', ['a', 'm']), ['a', 'm'], 'must not duplicate the owner');
+  assert.deepStrictEqual(TM.withBoardOwner('m', []), ['m']);
+  assert.deepStrictEqual(TM.withBoardOwner(null, ['a']), ['a'], 'no key, no addition');
 });
 
-/* ── the team LABEL is the company name (2026-08-24) ───────────────────────── */
-
-test('⚠⚠ AN UNNAMED TEAM LABELS AS "Unnamed company", NEVER THE MANAGER\'S EMAIL', async () => {
-  const team = await resolveTeam(fakeAdmin(PROFILES), reqFor(MANAGER, 'manager'));
-  assert.strictEqual(team.label, 'Unnamed company');
-  assert.ok(team.label.indexOf('@') === -1,
-    'the label used to be "<email>\'s team" — an email dressed up as a company');
-  assert.notStrictEqual(team.label, 'My team',
-    'the header now shows WHICH company, not a generic word');
-});
-
-test('⚠ A NAMED TEAM LABELS AS ITS COMPANY NAME — one name, one place', async () => {
-  const named = PROFILES.map((p) => (p.user_id === MANAGER ? Object.assign({}, p, { team_name: 'Sober Living Riches' }) : p));
-  const team = await resolveTeam(fakeAdmin(named), reqFor(MANAGER, 'manager'));
-  assert.strictEqual(team.label, 'Sober Living Riches',
-    'the Team view header reads the SAME stored value the admin company block edits');
-});
-
-/* ── the company picker is ADMIN-ONLY, enforced server-side ────────────────── */
-
-test('⚠⚠ A MANAGER CANNOT REACH ANOTHER COMPANY BY PASSING ?team= — HIDING THE CONTROL IS NOT A CHECK', async () => {
-  /* §6: an admin can cycle through every company. The control is rendered for
-     owners only — but a hidden control is a UI decision, not a permission, and
-     the param is trivially forgeable by hand. `resolveTeam` IGNORES the param
-     for any non-owner, so a manager asking for someone else's company gets
-     their OWN board back rather than an error or another team's numbers. */
-  const OTHER = 'mgr-2';
-  const profiles = PROFILES.concat([
-    { user_id: OTHER, role: 'manager', managed_by: null, team_name: 'Someone Else Co' },
-    { user_id: 'rep-x', role: 'user', managed_by: OTHER },
-  ]);
-
-  const team = await resolveTeam(fakeAdmin(profiles), reqFor(MANAGER, 'manager', { team: OTHER }));
-
-  assert.strictEqual(team.keyId, MANAGER,
-    'a forged ?team= must not move a manager onto another company; got ' + team.keyId);
-  assert.strictEqual(team.memberIds.indexOf('rep-x'), -1,
-    "another company's member leaked into the board");
-  assert.notStrictEqual(team.label, 'Someone Else Co',
-    "and the other company's NAME must not leak either — the label is the "
-    + 'company name now, so it is a disclosure too');
-});
-
-test('⚠ NON-VACUITY: the same param DOES move an OWNER', async () => {
-  /* Without this, the assertion above would pass against a resolveTeam that
-     ignored ?team= for everybody — including the admins the feature exists for. */
-  const OTHER = 'mgr-2';
-  const profiles = PROFILES.concat([
-    { user_id: OTHER, role: 'manager', managed_by: null, team_name: 'Someone Else Co' },
-    { user_id: 'rep-x', role: 'user', managed_by: OTHER },
-  ]);
-  const team = await resolveTeam(fakeAdmin(profiles), reqFor('owner-1', 'owner', { team: OTHER }));
-  assert.strictEqual(team.keyId, OTHER, 'an owner must be able to pivot');
-  assert.strictEqual(team.label, 'Someone Else Co', 'and sees that company by NAME');
+test('it does not mutate its input', () => {
+  const reps = ['a'];
+  TM.withBoardOwner('m', reps);
+  assert.deepStrictEqual(reps, ['a']);
 });

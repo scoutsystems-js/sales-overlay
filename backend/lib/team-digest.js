@@ -27,6 +27,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
+const { membersByManager } = require('./team-membership');
 
 const { clipHref } = require('./clip-link');
 const DIGEST_MAX_TOKENS = 1200;
@@ -281,12 +282,20 @@ async function generateDailyDigests(admin, opts) {
   try {
     var profs = await admin.from('user_profiles').select('user_id, managed_by, first_name, last_name');
     if (profs.error) throw new Error('user_profiles: ' + profs.error.message);
-    var repsByManager = {}, nameMap = {};
+    /* ⚠⚠ THE MANAGER IS ON THEIR OWN TEAM. This used to build the list from
+       `managed_by` alone, which CANNOT contain the manager — so Josh's own calls
+       were excluded from his own digest and it rendered "quiet day · 0 calls" for
+       2026-08-24, a day he took EIGHT real calls (his four reps are three demo
+       accounts and a test user, none with real calls). Ninth site of the defect
+       `9a27979` fixed at eight endpoints; it never reached here because this runs
+       from the cron with no `req` and so cannot call resolveTeam. The shared rule
+       lives in lib/team-membership.js — do NOT re-add the manager inline. */
+    var nameMap = {};
     (profs.data || []).forEach(function (p) {
-      if (p.managed_by) (repsByManager[p.managed_by] = repsByManager[p.managed_by] || []).push(p.user_id);
       var n = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
       if (n) nameMap[p.user_id] = n;
     });
+    var repsByManager = membersByManager(profs.data || []);
     var managerIds = Object.keys(repsByManager); // has-reps, NOT role — owner-with-reps included
     summary.managers = managerIds.length;
     if (managerIds.length === 0) return summary;

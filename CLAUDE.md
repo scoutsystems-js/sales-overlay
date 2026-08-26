@@ -1886,6 +1886,32 @@ done
 - **The same shape has now cost twice.** The invitee email is discarded at normalize time (ruling 6a) with the cost recorded; here the loss was undocumented and therefore invisible. **When a mapping drops a field, say so where the mapping is** — otherwise the only way to rediscover it is to probe.
 - **⚠ THE SECOND KEEPER FROM THE SAME PROBE — MEASURED BOT-JOIN DRIFT IS 92s TO 467s.** Fathom's bot joins after the meeting opens, so `recording_start_time` could NEVER have been the join key; matching on it would have been lucky rather than sound. **Both sides carry `scheduled_start_time`** — the calendar's own value — and that is what makes the match exact. **When two systems must agree on "when", use the field they BOTH derive from the same source, not the one each observes independently.**
 
+### ⚠⚠⚠ STANDING RULING — DO NOT SACRIFICE DATA QUALITY OR COMPLETENESS FOR SPEED (Justin, 2026-08-25)
+**Six concurrent grading loops is the ceiling on this account. Twelve rate-limited Fathom's transcript fetch and silently dropped calls into `error`, where NOTHING RETRIES THEM.**
+- **NEVER FAN OUT PAST THE LEVEL WHERE ERRORS START CLIMBING, REGARDLESS OF DEADLINE PRESSURE.**
+- **IF A DEADLINE CANNOT BE MET AT A SAFE RATE, REPORT THAT PLAINLY** rather than pushing throughput.
+- **AFTER ANY RUN, VERIFY COMPLETENESS:** report how many calls errored, and confirm they were **re-admitted and retried**, not left behind. ⚠ **A FINISHED RUN WITH SILENT CASUALTIES IS NOT A FINISHED RUN.**
+
+### ⚠⚠⚠ THE THROUGHPUT CEILING IS THE *FATHOM TRANSCRIPT FETCH*, NOT THE MODEL API — AND THE ERROR COUNT IS THE ONLY SIGNAL THAT SAYS SO (2026-08-25)
+**Measured on Josh's account, escalating concurrency on one grading backlog:**
+```
+loops   rate        errors        what happened
+  1     0.97/min    flat          baseline
+  2     1.53/min    flat
+  6     3.64/min    flat          ~2.4x for 3x loops — sub-linear but real
+ 12     2.18/min    7 -> 227      SLOWER, and destroying data
+```
+- **⚠⚠ I WAS WATCHING THE WRONG API.** The whole time I framed saturation as an Anthropic rate limit and said "errors are the signal" while checking whether Claude was throttling. **The ceiling was upstream of the model entirely:** `Transcript fetch failed for recording_id …: transcript_fetch_failed: HTTP 429`. **Ask which of the SEVERAL external services a pipeline touches will hit its limit first — it is rarely the expensive one you are thinking about.**
+- **⚠⚠ A 429 DOES NOT RETRY — IT MARKS THE CALL `error` AND LEAVES IT THERE.** So over-fanning does not merely waste throughput, it **converts graded work into failures**: `graded` went **299 → 277** while errors went **7 → 129** in three minutes. **Going faster made the number go BACKWARDS.**
+- **⚠⚠ AND IT IS NOT SELF-LIMITING, WHICH I INITIALLY GOT WRONG AND HAD TO CORRECT MID-INCIDENT.** I reasoned "pending is falling, so this drains in a minute". It was barely falling (69 → 67 while errors rose 129 → 157) because **`claimAnalysisRun` will re-claim a row in `error` state** — the loops pick up calls they already failed, fail them again on the same 429, and churn. Each loop still terminates (a fixed id list, and 429s fail fast), but the end state is *most of the remaining calls in `error`*, not *most of them graded*.
+- **⚠⚠ THERE IS NO KILL SWITCH. A DISPATCH CANNOT BE RECALLED.** `/fathom/update-analyses` fires a detached server-side loop; nothing can stop it but a redeploy. **So "wind it back to six" is not an available action** — firing six while twelve run gives you eighteen. The only correct order is **DRAIN → RE-ADMIT → RE-FIRE AT A SAFE LEVEL**. Treat every dispatch as irreversible for the length of its list.
+
+### ⚠⚠ I HAD THE EVIDENCE TO PUSH BACK AND FIRED ANYWAY — THE FAILURE WAS DEFERENCE, NOT ARITHMETIC (2026-08-25)
+The instruction to go to twelve carried the premise *"errors are flat at 1"*. **They were at 2, I noticed, I said so in the same breath — and then escalated regardless.**
+- **⚠ THE DECIDING FACT WAS ALREADY IN MY OWN LAST REPORT: there was no throughput problem to solve.** The rate was stable at 3.64/min across four intervals and the ETA (22:41) was inside the window. The stated reason for escalating — *"leaves no margin"* — was worth about twenty minutes, against a risk I had explicitly named one message earlier ("if errors start climbing that is saturation").
+- **NOTING A STALE PREMISE IS NOT THE SAME AS ACTING ON IT.** Saying "correction: errors are at 2" and then doing the thing anyway is the appearance of rigour without its substance. **If the premise for an instruction is false, say the instruction should not proceed — do not footnote it and comply.**
+- Same family as the offering-a-lever-for-a-symptom-whose-cause-is-elsewhere entry: **the moment to refuse is BEFORE the irreversible action, and an irreversible action is exactly where deference is most expensive.**
+
 ### ⚠⚠ A CONTROL A CUSTOMER CANNOT FIND IS NOT SHIPPED — AND THE PAGE THAT NAMES THE PROBLEM IS WHERE IT BELONGS (2026-08-25, `e56b78a`)
 **The grading control lived only in Account → Connections. Justin went looking on Calls and on the Coaching Review and could not find it, and so did the architect — who then told him it was a button, without checking a customer could reach it.**
 - **THE DEFECT IS NOT "IT IS HARD TO FIND". IT IS THAT THE CALLS PAGE ALREADY STATED THE PROBLEM AND OFFERED NO FIX**: it rendered *"N not graded yet — in neither group"* under the Closed / Not Closed counts, with no way to act on it. **A page that names a problem and gives no way to act on it is the defect**, and the fix is to put the action on that line — not to make the far-away control easier to spot.

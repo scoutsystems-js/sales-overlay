@@ -9,6 +9,7 @@
 
 const express = require('express');
 const { resolveDisplayName } = require('../lib/display-name');
+var { withBoardOwner } = require('../lib/team-membership');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
@@ -105,11 +106,8 @@ async function profilesByRole(admin) {
 // below, so "All users" contains exactly one owner — the viewer. That is what
 // /averages and /rep-series already did; unifying preserves it rather than
 // inventing new behaviour under cover of a bug fix. Flagged, not changed.
-function withBoardOwner(keyId, repIds) {
-  var out = (repIds || []).slice();
-  if (keyId && out.indexOf(keyId) === -1) out.push(keyId);
-  return out;
-}
+/* withBoardOwner now lives in lib/team-membership.js so the digest cron can use
+   the SAME rule — see that file for why nine sites got this wrong. */
 async function resolveTeam(admin, req) {
   var me = req.user.id;
   var role = req.user.role;
