@@ -1935,6 +1935,30 @@ errored 2     1 Zoom no-transcript (permanent), 1 grader unparseable-JSON
 - **⚠ THE 78 PENDING AND 6 STRANDED ARE A KNOWN, DELIBERATE RESIDUE, NOT SILENT CASUALTIES.** They are old history, they appear on no surface Justin shows, and re-admitting them was explicitly declined on cost. **They are recorded here so a future session does not rediscover them as a mystery.**
 - **⚠ COST IS A FIRST-CLASS CONSTRAINT AND IT ARRIVED LATE.** ~$200 in a day on one account's backfill, with the twelve-loop incident burning a meaningful share of it on 429 casualties that were then re-graded. **Anything that dispatches per-call model work must state its cost BEFORE running** — the grading control already does; ad-hoc dispatches from a console do not, and that asymmetry is how the day's spend got away.
 
+### ⚠⚠⚠ ONE TRANSCRIPT, ONE SEND — MEASURED, AND REFUSED ON QUALITY (2026-08-26)
+**Every call is sent to Claude TWICE carrying the same ~40k-token transcript — once to the section grader, once to the highlight extractor. Merging them saves 46-47% of INPUT tokens, measured from real API usage on the six longest calls (104,610 → 55,388). IT STILL DOES NOT SHIP.**
+- **⚠ THE HEADLINE NUMBER IS NOT THE SAVING.** Input is only part of the bill: output is unchanged (both outputs are still produced) and priced 5×, so the real cost saving is **~37%**, not 47%. And it **shrinks with transcript length** — 31.9% on the shortest call in the sample. Quote the cost figure, not the token figure.
+- **⚠⚠ WHAT KILLED IT — THREE REGRESSIONS, NONE OF WHICH A "DOES IT PARSE" CHECK WOULD CATCH:**
+```
+                          objections split -> merged      grader sections
+  8e375428 (1501 turns)   3 -> 2   (lost `timing`)        all 5
+  65c82844  (748 turns)   4 -> 2   (lost 2 x `partner`)   all 5
+  c1097d61  (232 turns)   0 -> 0                          objection + close MISSING
+```
+  1. **fewer objection moments on BOTH calls that had any**; 2. **two of five grader sections absent** on one call (they would store as NULL — blank cards, not wrong numbers); 3. **merged output smaller every single time (−7% to −19%)**, which is the mechanism behind the other two.
+- **⚠⚠ THE ADVERSARIAL SAMPLE IS WHAT CAUGHT IT, AND THIS IS THE TRANSFERABLE PART.** The three LONGEST calls all had **zero objections** and came back perfectly equivalent. **Sampling only the longest calls — the obvious "hardest cases" — would have shipped this looking clean.** The regression was only visible on calls chosen for a *different* kind of difficulty (many objection moments) and on the one call known to have failed at the cap. **"Hardest" is not one axis.**
+- **⚠ THE CONTROL MATTERED TOO.** Comparing merged output against the STORED rows would have been worthless: this grader has a documented ±14/section noise floor and ~6-point between-round drift, so any score difference is unattributable. The current split path was re-run **in the same session** as the control. Scores duly moved up to 14 points in both directions and were correctly ignored; **the finding rests on structural counts (objections, sections), which noise does not explain.**
+- **⚠ AND MERGING WOULD HAVE WORSENED FAILURE COUPLING.** Today a grader parse failure is FATAL but an extractor failure is NOT (`proceeding with grades only`, zero highlights). In one JSON blob, a single parse failure loses both. Recorded because it is an argument against the merge that is independent of the measured regressions.
+- **If it is ever revisited:** the output ceiling is NOT the blocker (worst merged output ≈ 4,119 tokens against caps we set ourselves; the experiment ran at 8,000). The blocker is that one model call doing two jobs does each of them less thoroughly.
+
+### ⚠⚠ A UI CAP CAN BE SILENTLY LOAD-BEARING — THE DIGEST CHIP ROW WAS HIDING 28 STALE DAYS (2026-08-26)
+Replacing the digest date chips with a **Prev Day / Next Day** control (Justin: *"the dates going backwards but moving to the right just looks off"*) surfaced something the chips had been concealing.
+- **35 digest days exist for this account, back to 2026-07-21. The chip row only ever rendered SEVEN** (`recent_dates` is capped at 7). Days 8 and older were generated **before** the manager-missing fix, so they read **"quiet day · 0 calls" for days the closer worked** — 08-17 had 6 real calls, 08-16 had 4, 08-14 had 6.
+- **⚠⚠ SO THE 7-DAY CAP WAS ACCIDENTALLY SHIELDING THE READER FROM 28 WRONG DAYS.** An unbounded Prev Day walk reaches the first of them **one click past the end of the old chip row**, and presents it as the current view rather than as history.
+- **THE WALK IS THEREFORE BOUNDED TO `recent_dates` — the same days the chips offered.** Same exposure, new shape. ⚠ **A NAVIGATION CHANGE MUST NOT SMUGGLE IN A DATA REGRESSION**, and "it's just a UI swap" is exactly how one gets in.
+- **THE GENERAL FORM: before replacing a bounded control with an unbounded one, ask what the bound was doing.** A limit that looks cosmetic may be the only thing standing between the user and bad data — and nobody wrote that down when the limit was chosen, because at the time it wasn't true.
+- Design decisions worth keeping: **both directions** (one-way strands the reader); **disabled, not hidden** at each end (a control that vanishes reads as a bug, one that greys out says "end of history"); Next cannot reach a day with no digest **by construction**, since the newest entry in `recent_dates` is the newest digest that exists.
+
 ### ⚠⚠⚠ STANDING RULING — DO NOT SACRIFICE DATA QUALITY OR COMPLETENESS FOR SPEED (Justin, 2026-08-25)
 **Six concurrent grading loops is the ceiling on this account. Twelve rate-limited Fathom's transcript fetch and silently dropped calls into `error`, where NOTHING RETRIES THEM.**
 - **NEVER FAN OUT PAST THE LEVEL WHERE ERRORS START CLIMBING, REGARDLESS OF DEADLINE PRESSURE.**
