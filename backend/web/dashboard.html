@@ -6841,13 +6841,46 @@
   // money-phrased objections are classified `fear` by standing rule unless a
   // genuine logistical payment constraint appears. That is the taxonomy working
   // as designed, not a gap — do not add a parallel vocabulary here.
-  var OBJECTION_CATEGORY_OPTIONS = [
-    { key: '', label: 'All objections' },
-    { key: 'fear', label: 'Fear / money' },
-    { key: 'timing', label: 'Timing' },
+  // ⚠⚠ MIRROR OF backend/lib/objection-categories.js — THE ONE SOURCE OF TRUTH for
+  // objection category names (Justin's ruling 2026-08-26). This file is served to a
+  // browser and cannot require(), so the list is duplicated here and
+  // test/objection-labels-mirror.test.js FAILS if the two ever drift. Two schemes
+  // were live before this and disagreed about the same metric; a second copy is how
+  // they diverged, so the copy that must exist is now GUARDED rather than trusted.
+  //
+  // ⚠ 'other' IS THE STORED NULL, not a fifth stored value. The DB CHECK allows only
+  // fear|logistical|timing|partner (or NULL), and the API keys that bucket
+  // 'uncategorized'. Displaying it as "Other" is a pure rename — no migration.
+  var OBJECTION_CATEGORIES = [
+    { key: 'fear',       label: 'Fear' },
+    { key: 'timing',     label: 'Timing' },
+    { key: 'partner',    label: 'Spouse/Partner' },
     { key: 'logistical', label: 'Logistical' },
-    { key: 'partner', label: 'Partner / spouse' },
+    { key: 'other',      label: 'Other' },
   ];
+
+  // ⚠ TOTAL BY CONSTRUCTION — null, an unknown key and every legacy spelling all
+  // resolve to "Other" rather than printing a raw key or an empty cell. A category
+  // that renders blank reads as a broken row, not as an unclassified one.
+  function objectionLabel(key) {
+    var k = (key == null) ? '' : String(key).trim().toLowerCase();
+    for (var i = 0; i < OBJECTION_CATEGORIES.length; i++) {
+      if (OBJECTION_CATEGORIES[i].key === k) return OBJECTION_CATEGORIES[i].label;
+    }
+    return 'Other';
+  }
+
+  // The four the API actually filters on — 'other' is not a stored value, so it is
+  // not offered as a filter. Derived, never re-typed.
+  var OBJECTION_CATEGORY_OPTIONS = [{ key: '', label: 'All objections' }].concat(
+    OBJECTION_CATEGORIES.filter(function (c) { return c.key !== 'other'; })
+  );
+
+  // Weakest-objection naming on the rep cards. Derived from the canonical list.
+  // ⚠ DEFINED HERE, beside its source, NOT next to its consumer — it previously
+  // sat inside the span display-name-mirror.test.js slices and evaluates, where a
+  // reference to OBJECTION_CATEGORIES resolves to nothing.
+  var OBJECTION_LABEL = OBJECTION_CATEGORIES.reduce(function (acc, c) { acc[c.key] = c.label; return acc; }, {});
 
   // ⚠ TOGGLEABLE IS OPT-IN. The two TEAM graphs get the legend toggle; the
   // pivoted rep's OWN graph (repOwnChart) does not — it plots exactly one rep,
@@ -8004,9 +8037,15 @@
   /* Below this, "the team average" is one person's own row copied — see the
      note where it is used. */
   var MIN_CLOSERS_FOR_TEAM_AVG = 2;
-  var OBJ_DRILL_LABELS = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing',
-                           partner: 'Partner / spouse', uncategorized: 'Uncategorised' };
-  var OBJ_DRILL_ORDER = ['fear', 'logistical', 'timing', 'partner', 'uncategorized'];
+  // ⚠ DERIVED FROM THE CANONICAL LIST — names AND order both. The API keys the
+  // catch-all bucket 'uncategorized', so that stays the DATA key while "Other" is
+  // the DISPLAY name; only the label is renamed, nothing about the payload moves.
+  var OBJ_DRILL_ORDER = OBJECTION_CATEGORIES.map(function (c) {
+    return c.key === 'other' ? 'uncategorized' : c.key;
+  });
+  var OBJ_DRILL_LABELS = OBJECTION_CATEGORIES.reduce(function (acc, c) {
+    acc[c.key === 'other' ? 'uncategorized' : c.key] = c.label; return acc;
+  }, {});
 
   function renderTeamObjectionsView() {
     var content = document.getElementById('content');
@@ -8100,7 +8139,7 @@
         + '<div class="objsum-quiet-text">' + escapeHtml(f ? f(c.name || 'This closer') : 'No focus area in this range.') + '</div></div>';
     }
     var cat = (c.focus && c.focus.category) || '';
-    var label = OBJ_DRILL_LABELS[cat] || cat;
+    var label = OBJ_DRILL_LABELS[cat] || objectionLabel(cat);
     var counts = (c.focus && c.focus.total)
       ? (c.focus.handled + ' of ' + c.focus.total + ' handled') : '';
     /* ⚠ THE COUNTS ARE THE SUBHEAD, NOT THE FINDING. They are here so the claim
@@ -8389,7 +8428,7 @@
     });
     if (!list.length) {
       var anyHidden = (d.instances || []).length > 0;
-      return '<div class="empty"><h3>No objection moments' + (d.category ? ' in ' + escapeHtml(OBJ_DRILL_LABELS[d.category] || d.category) : '') + '</h3>'
+      return '<div class="empty"><h3>No objection moments' + (d.category ? ' in ' + escapeHtml(OBJ_DRILL_LABELS[d.category] || objectionLabel(d.category)) : '') + '</h3>'
         + '<p>' + (anyHidden
             ? 'Every moment here belongs to a closer you have hidden. Use the rep filter to show them again.'
             : 'Try another category, or widen the date range.') + '</p></div>';
@@ -9934,7 +9973,6 @@
   // ⚠ UNMEASURED IS SAID IN WORDS, NEVER A DASH. "—" reads as zero, and a rep
   // with no prospects has not closed 0% — they have no prospects. The distinction
   // is the same one the graphs make between an empty bucket and a real zero.
-  var OBJECTION_LABEL = { fear: 'Fear / money', timing: 'Timing', logistical: 'Logistical', partner: 'Partner / spouse' };
 
   // ⚠ WHEN UNMEASURED, THE WORDS ARE THE VALUE — there is no dash at all. A big
   // "—" sitting where a percentage goes reads as zero however carefully the line
@@ -9959,7 +9997,7 @@
       return '<div class="rep-weak"><span class="rep-weak-label">Weakest objection</span>'
         + '<span class="rep-weak-none">not enough objections yet to judge a category</span></div>';
     }
-    var name = OBJECTION_LABEL[wo.category] || wo.category;
+    var name = OBJECTION_LABEL[wo.category] || objectionLabel(wo.category);
     // ⚠ The comparison appears ONLY when it qualifies (≥3 reps with ≥6 in that
     // category). Off n=1 a ranking reads as a finding and means nothing.
     var comparison = wo.comparable

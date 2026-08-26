@@ -18,6 +18,8 @@
 // failure returns available:false and is NOT cached (retries next load).
 
 const Anthropic = require('@anthropic-ai/sdk');
+var objectionCats = require('./objection-categories');
+
 const { displayNameFromEmail } = require('./display-name');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
@@ -415,6 +417,25 @@ var BUCKET_CLASSES = ['true_objection', 'logistical_barrier', 'disqualification'
 // Claude bucketing of the DISTINCT surfaces only (no numbers). It (a) groups
 // COARSELY — collapses synonyms into one bucket — and (b) CLASSIFIES each bucket.
 // Returns {ok:true, mapping, bucketClass} | {ok:false, empty:true} | {ok:false, reason}.
+
+// Maps a model-returned bucket label onto a canonical category KEY. Exact match
+// on key or label first; then a contains-match so a near-miss ("Spouse / partner")
+// still lands rather than silently becoming Other. Anything unrecognised is Other,
+// which is the honest answer and is already this module's existing default.
+function canonicalKeyForLabel(raw) {
+  var v = (raw == null) ? '' : String(raw).trim().toLowerCase();
+  if (!v) return 'other';
+  var cats = objectionCats.OBJECTION_CATEGORIES;
+  for (var i = 0; i < cats.length; i++) {
+    if (v === cats[i].key || v === cats[i].label.toLowerCase()) return cats[i].key;
+  }
+  for (var j = 0; j < cats.length; j++) {
+    if (v.indexOf(cats[j].key) !== -1) return cats[j].key;
+  }
+  if (v.indexOf('spouse') !== -1 || v.indexOf('partner') !== -1) return 'partner';
+  return 'other';
+}
+
 async function getBucketMapping(objs) {
   var counts = {};
   objs.forEach(function (o) { var k = String(o.surface == null ? '' : o.surface).trim(); if (k) counts[k] = (counts[k] || 0) + 1; });
@@ -425,8 +446,12 @@ async function getBucketMapping(objs) {
     'You are grouping and classifying sales-objection phrases.',
     'Below is every DISTINCT objection phrase a salesperson heard this period (with how many times it came up).',
     '',
-    'STEP 1 — GROUP COARSELY. Collapse synonyms and near-duplicates into ONE bucket; do NOT make several buckets that mean the same thing. Aim for 4-8 buckets. Examples of coarse buckets: "Price / too expensive", "Timing", "Spouse / partner", "Trust / proof". Give each a short human label (<= 30 chars).',
-    'Keep each bucket CLASSIFICATION-COHERENT (step 2): never mix, say, a price objection with a declined payment in the same bucket — split them.',
+    'STEP 1 — ASSIGN each phrase to EXACTLY ONE of these five categories. These are the ONLY labels you may use; do not invent your own, do not reword them:',
+    '  ' + objectionCats.OBJECTION_CATEGORIES.map(function (c) { return c.label; }).join('  |  '),
+    '',
+    objectionCats.CLASSIFICATION_GUIDANCE,
+    '',
+    '  Use "Other" only for a phrase that genuinely fits none of the other four.',
     '',
     'STEP 2 — CLASSIFY each bucket as exactly one "class":',
     '  "true_objection"     — a real, coachable objection the closer can overcome (price/too expensive, timing, needs to think, spouse approval, trust/proof, competitor).',
@@ -440,7 +465,7 @@ async function getBucketMapping(objs) {
   ].concat(distinct.map(function (s) { return '  - ' + s + ' — ' + counts[s]; })).concat([
     '',
     'Respond with ONLY this JSON — no markdown:',
-    '{ "buckets": [ { "label": "Price / too expensive", "class": "true_objection", "phrases": ["too expensive", "wants lower price"] }, { "label": "Payment failure", "class": "logistical_barrier", "phrases": ["card declined"] } ] }',
+    '{ "buckets": [ { "label": "Fear", "class": "true_objection", "phrases": ["too expensive", "wants to think about it", "not sure it works"] }, { "label": "Logistical", "class": "logistical_barrier", "phrases": ["card declined"] }, { "label": "Other", "class": "disqualification", "phrases": ["cannot afford it"] } ] }',
   ]).join('\n');
 
   var mapping = {}, bucketClass = {};
@@ -449,7 +474,12 @@ async function getBucketMapping(objs) {
     var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
     if (!parsed || !Array.isArray(parsed.buckets)) return { ok: false, reason: 'Bucketing returned unusable output — will retry on the next load.' };
     parsed.buckets.forEach(function (bk) {
-      var label = str(bk && bk.label, 30); if (!label) return;
+      // ⚠ COERCED, NOT TRUNCATED. The old code did str(label, 30) on a label the
+      // model invented, which is exactly how "Needs To Consult Spouse/Partne"
+      // reached the live page — a 31-char invention cut mid-word. Matching against
+      // the closed vocabulary makes both the truncation and the drift impossible.
+      var label = objectionCats.objectionLabel(canonicalKeyForLabel(bk && bk.label));
+      if (!label) return;
       var cls = (bk && BUCKET_CLASSES.indexOf(bk.class) !== -1) ? bk.class : 'true_objection'; // default coachable
       bucketClass[label] = cls;
       (Array.isArray(bk && bk.phrases) ? bk.phrases : []).forEach(function (p) { var k = normSurface(p); if (k) mapping[k] = label; });
