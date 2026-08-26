@@ -1565,6 +1565,17 @@ After injecting a fake `fathomStatus` to exercise the Calls empty state, I navig
 - **A hash-only navigation does not reload the document**, so module state survives it. The rule was already on file for *stale code*; this is the same mechanism for **stale STATE**.
 - **A hard reload showed `identityMissing: false`, no banner, email displayed — no defect at all.** **When probing with injected state, the fixture is a suspect before the product is** — and the cheapest discriminator is a real reload.
 
+### ⚠⚠⚠ THE UNGRADED BACKLOG GROWS FASTER THAN IT CLEARS AS CLOSERS ONBOARD (measured 2026-08-26)
+**Every new closer arrives with 100-475 calls of history, and the first-sync cap grades the newest 20. The remainder sits pending, and NOTHING ON THEIR SCREEN SAYS IT EXISTS.**
+```
+one company, six closers, measured in ONE evening
+  yazan 475 · joshua 212 · gabriel 129 · godwin 121 · nick 117 · dre 34
+  ungraded across them: 695 calls ≈ $195 to finish
+```
+- **⚠⚠ THE FIGURE MOVED $107 → $195 IN THREE HOURS, and not because anything was wrong** — **two more accounts came online mid-session** (gabriel at 129, dre at 34), and yazan's own history was re-pulled from 292 to 475. **Any cost total for this company has a shelf life measured in hours**, so quote one with its timestamp or not at all.
+- **THE CAP ITSELF IS CORRECT** — without it, connecting would fire hundreds of analyses on a single click. **The gap is that the remainder is invisible**: a closer who syncs 121 calls and sees 20 graded reasonably concludes it half-worked, which is exactly the Godwin ticket.
+- **⚠ THIS IS A PRICING AND PRODUCT QUESTION, NOT A DEFECT.** Either the backlog is funded, or new closers are told plainly that only recent calls are graded. **Choosing neither is what produces support tickets** — and two have already come out of a handful of users.
+
 ### ⚠⚠ THE SATURATION ABORT MUST COUNT SATURATION, NOT "ANY ERROR" (yazan backfill, 2026-08-26)
 **The six-loop ruling exists because TWELVE loops rate-limited Fathom and silently errored 153 calls. That is a SATURATION rule — and my first runner counted EVERY error toward its abort.**
 - **⚠ A CALL WHOSE TRANSCRIPT FATHOM RETURNS EMPTY WILL NEVER SUCCEED, AT ANY SPEED.** One appeared at call 10 of 173; at that rate ~17 would have accumulated and **halted a completely healthy run at around call 80, with nothing actually wrong.** Backing off is the correct response to overload and the *wrong* response to bad data — the two are opposite instructions wearing the same counter.
