@@ -16,11 +16,23 @@
 // therefore a PURE RENAME — no migration, no re-grade, no data touched. Adding a
 // fifth stored value would have meant both.
 
+// ⚠ ORDER AND WORDING BOTH COME FROM THE COACHING REVIEW (Justin, 2026-08-26):
+// "I need the obj handling category on the teams view to match this in the
+// coaching review." The team view moved to match it, not the other way round —
+// so this list is the Coaching Review's order, and changing it moves BOTH pages.
+//
+// ⚠ "Partner", not "Spouse/Partner" — Justin: "I want partner and
+// uncategorized/other." The CLASSIFICATION is unchanged and still covers anyone
+// the prospect must consult; only the label is shorter.
+//
+// ⚠ "Other", not "Uncategorized" — he wrote the two as equivalent, and this is
+// the shorter of the pair. The stored/API key for that bucket is still
+// 'uncategorized'; only the display name is Other.
 var OBJECTION_CATEGORIES = [
   { key: 'fear',       label: 'Fear' },
-  { key: 'timing',     label: 'Timing' },
-  { key: 'partner',    label: 'Spouse/Partner' },
   { key: 'logistical', label: 'Logistical' },
+  { key: 'timing',     label: 'Timing' },
+  { key: 'partner',    label: 'Partner' },
   { key: 'other',      label: 'Other' },
 ];
 

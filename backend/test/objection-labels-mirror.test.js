@@ -33,10 +33,13 @@ function slice(src, from, to, floor) {
   return out;
 }
 
-test('the canonical list is exactly Justin\'s five, in his order', () => {
+test('the canonical list matches the Coaching Review, in its order', () => {
+  // ⚠ Justin, 2026-08-26: the TEAM view moved to match the Coaching Review, not
+  // the other way round. Order is load-bearing — two lists with the same names in
+  // different orders still read as a difference.
   assert.deepStrictEqual(
     cats.OBJECTION_CATEGORIES.map(c => c.label),
-    ['Fear', 'Timing', 'Spouse/Partner', 'Logistical', 'Other']
+    ['Fear', 'Logistical', 'Timing', 'Partner', 'Other']
   );
 });
 
@@ -74,7 +77,7 @@ test('objectionLabel is total — null, unknown and legacy spellings all resolve
   [null, undefined, '', 'zzz', 'uncategorized', 'uncategorised'].forEach(k => {
     assert.strictEqual(cats.objectionLabel(k), 'Other', 'unresolved: ' + JSON.stringify(k));
   });
-  assert.strictEqual(cats.objectionLabel('partner'), 'Spouse/Partner');
+  assert.strictEqual(cats.objectionLabel('partner'), 'Partner');
   assert.strictEqual(cats.objectionLabel('FEAR'), 'Fear');
 });
 
@@ -128,8 +131,8 @@ test('the coercion maps every label the live page currently shows', () => {
   const expected = [
     ['Trust / Proof / Skepticism', 'Fear'],          // Justin's explicit mapping
     ['Price / too expensive', 'Fear'],               // price folds into fear by default
-    ['Needs To Consult Spouse/Partne', 'Spouse/Partner'], // the truncated live label
-    ['Needs To Consult Spouse/Partner', 'Spouse/Partner'],
+    ['Needs To Consult Spouse/Partne', 'Partner'], // the truncated live label
+    ['Needs To Consult Spouse/Partner', 'Partner'],
     ['Needs More Time / Stalling', 'Timing'],
     ['Payment failure', 'Logistical'],
     ['card declined', 'Logistical'],
@@ -153,4 +156,94 @@ test('no emitted label can reach the 30-char cut that truncated the live page', 
   // and the truncating call itself is gone from the module
   assert.ok(!/str\(bk && bk\.label/.test(stripComments(NEEDS)),
     'the label truncation is back — that is what produced "Spouse/Partne"');
+});
+
+test('the Coaching Review derives its category list — it does not keep its own', () => {
+  // ⚠⚠ THE WHOLE POINT. The two surfaces diverged because each had its own copy;
+  // the earlier sweep unified three maps in the team area and MISSED these three
+  // in the Coaching Review, which is why they still disagreed. Assert the
+  // DERIVATION, not the resulting strings — a literal list that happens to match
+  // today is exactly how this drifts again.
+  const live = stripComments(HTML);
+  assert.ok(/var cats = OBJ_DRILL_ORDER\.map/.test(live),
+    'the By Category table still holds its own [key,label] pairs');
+  assert.ok(/var order = OBJ_DRILL_ORDER;/.test(live),
+    'the objection feed still holds its own order');
+  assert.ok(/var labels = OBJ_DRILL_LABELS;/.test(live),
+    'the objection feed still holds its own labels');
+  assert.ok(/var labelMap = OBJECTION_LABEL;/.test(live),
+    'objSynthSection still holds its own labelMap');
+  // ⚠ And exactly ONE place spells the labels out — the mirror itself. Written
+  // against the mirror's real shape (key/label pairs); an earlier draft of this
+  // assertion used a pattern the mirror does not use, so it matched nothing and
+  // was checking nothing.
+  assert.strictEqual((live.match(/label:\s*'Fear'/g) || []).length, 1,
+    'more than one place spells out the category labels');
+  assert.strictEqual((live.match(/label:\s*'Partner'/g) || []).length, 1,
+    'more than one place spells out the category labels');
+});
+
+test('both surfaces render the same names in the same ORDER', () => {
+  // Order is load-bearing: same words in a different sequence still reads as a
+  // difference. Executing the real derivations rather than trusting the source.
+  const slicePart = (from, to) => {
+    const a = HTML.indexOf(from); assert.ok(a !== -1, 'stale anchor: ' + from);
+    const b = HTML.indexOf(to, a); assert.ok(b !== -1, 'stale end anchor: ' + to);
+    const out = HTML.slice(a, b);
+    assert.ok(out.length > 80, 'slice too short: ' + out.length);
+    return out;
+  };
+  const src = [
+    slicePart('var OBJECTION_CATEGORIES = [', 'var OBJECTION_CATEGORY_OPTIONS'),
+    slicePart('var OBJECTION_CATEGORY_OPTIONS = [', '// ⚠ TOGGLEABLE'),
+    slicePart('var OBJ_DRILL_ORDER = OBJECTION_CATEGORIES', 'function renderTeamObjectionsView'),
+  ].join('\n');
+  const r = new Function(src + '; return { OBJ_DRILL_ORDER, OBJ_DRILL_LABELS };')();
+  const rendered = r.OBJ_DRILL_ORDER.map(k => r.OBJ_DRILL_LABELS[k]);
+  assert.deepStrictEqual(rendered, ['Fear', 'Logistical', 'Timing', 'Partner', 'Other']);
+  // the lib agrees, so the mirror cannot drift in order either
+  assert.deepStrictEqual(rendered, cats.OBJECTION_CATEGORIES.map(c => c.label));
+  // the catch-all keeps its API key while showing the new name
+  assert.strictEqual(r.OBJ_DRILL_ORDER[4], 'uncategorized');
+  assert.strictEqual(r.OBJ_DRILL_LABELS.uncategorized, 'Other');
+});
+
+/* ── every category is listed, including the empty ones ───────────────────────
+   Justin, 2026-08-26: the per-closer grid showed FIVE columns while "Handle rate
+   by objection type" below it showed THREE, because categories with no
+   objections in range were dropped at BOTH ends — built lazily on the server and
+   filtered again on the client.
+
+   ⚠ ZERO IS A MEASUREMENT, ABSENCE IS NOT. A missing category reads as "does not
+   exist"; 0/0 reads as "nothing came up this period". */
+
+test('the server SEEDS all five buckets rather than building them from what appears', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-objections.js'), 'utf8');
+  const live = stripComments(src);
+  assert.ok(/CANONICAL_CATEGORIES\.forEach\(function \(c\) \{\s*bucketTotals\[c\.label\]/.test(live),
+    'bucketTotals is not seeded — an empty category would never reach the client');
+  assert.ok(/require\('\.\/objection-categories'\)/.test(live),
+    'team-objections does not read the canonical list');
+});
+
+test('the client does NOT filter empty buckets out again', () => {
+  const live = stripComments(HTML);
+  assert.ok(!/\}\)\.filter\(function \(b\) \{ return b\.total > 0; \}\)/.test(live),
+    'the drop-empty filter is back — the list will disagree with the grid above it');
+});
+
+test('an empty category sorts LAST and cannot produce NaN', () => {
+  // n/0 is NaN, and NaN comparisons make a sort silently incoherent — so the
+  // empty rows are separated out rather than ranked against measured ones.
+  const src = slice(HTML, 'var brs = (d.bucket_rates', 'bucketRows = ', 400);
+  const sortFn = new Function('return ' + src.slice(src.indexOf('function (a, b) {'), src.indexOf('});', src.indexOf('function (a, b) {')) + 1))();
+  const measured = { total: 10, handled: 2, credited: 0 };
+  const better = { total: 10, handled: 8, credited: 0 };
+  const empty = { total: 0, handled: 0, credited: 0 };
+  assert.ok(sortFn(measured, better) < 0, 'weakest must sort first');
+  assert.ok(sortFn(empty, measured) > 0, 'an empty category must sort after a measured one');
+  assert.ok(sortFn(measured, empty) < 0, 'and symmetrically');
+  assert.strictEqual(sortFn(empty, empty), 0, 'two empties are equal, not NaN');
+  [sortFn(measured, better), sortFn(empty, measured), sortFn(measured, empty)]
+    .forEach(v => assert.ok(!Number.isNaN(v), 'sort produced NaN'));
 });

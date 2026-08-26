@@ -215,10 +215,11 @@ test('⚠ the grid note reads its OWN payload, never state.teamOverview', () => 
   /* ⚠ The bound is a RUNAWAY-SLICE guard, not a size budget — it exists so a
      mis-anchored slice that swallowed half the file cannot pass. Raised
      2026-08-22 when the function legitimately grew (the strict-standard notice,
-     the rep filter, client-side pooling of the average). Keep an upper bound:
-     without one, a slice running to the end of the document would satisfy every
-     assertion below by containing everything. */
-  assert.ok(src.length > 800 && src.length < 12000, 'slice must cover the function: ' + src.length);
+     the rep filter, client-side pooling of the average), and again 2026-08-26
+     when every objection category — including the empty ones — started being
+     listed. Keep an upper bound: without one, a slice running to the end of the
+     document would satisfy every assertion below by containing everything. */
+  assert.ok(src.length > 800 && src.length < 14000, 'slice must cover the function: ' + src.length);
 
   // strip comments — this file archives removed code in place and explains its
   // own rules in prose, so a raw match reports the explanation as a violation.

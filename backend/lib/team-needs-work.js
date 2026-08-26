@@ -62,7 +62,10 @@ const BUCKET_MAX_TOKENS = 1500;
 // the Focus page would keep rendering the model-invented labels (and the
 // mid-word "Spouse/Partne" truncation) until something else happened to move
 // the hash. The rename would have looked shipped and changed nothing on screen.
-const NEEDS_WORK_LANE_VERSION = 'v3-canonical-names';
+// ⚠ v4 = "Partner" replaces "Spouse/Partner" and the order now follows the
+// Coaching Review. The labels live INSIDE the cached payload, so without this
+// bump the Focus page would keep rendering the old wording indefinitely.
+const NEEDS_WORK_LANE_VERSION = 'v4-coaching-review-order';
 
 var _anthropic = null;
 function getAnthropic() {

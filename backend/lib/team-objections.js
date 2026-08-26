@@ -33,6 +33,7 @@ const { outcomeMap, isCredited } = require('./objection-handled');
    OBJECTION, and there is no disqualification concept stored at all. It comes
    from the same classifier the old panel used, imported rather than rebuilt. */
 const { getBucketMapping, normSurface } = require('./team-needs-work');
+const { OBJECTION_CATEGORIES: CANONICAL_CATEGORIES } = require('./objection-categories');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 
@@ -270,7 +271,21 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
      compute these rates over a truncated sample as soon as a board got busy —
      a wrong number with nothing on screen to suggest it. Keyed per closer as
      well, so the rep filter can pool over the visible ones. */
+  /* ⚠⚠ SEEDED WITH ALL FIVE CANONICAL CATEGORIES, not built lazily from what
+     happens to appear (Justin, 2026-08-26). Lazy construction silently omitted
+     any category with no objections in range, so the "Handle rate by objection
+     type" list rendered THREE bars while the per-closer grid above it rendered
+     FIVE columns — the same page disagreeing with itself.
+
+     ⚠ THIS IS THE STANDING zero-is-a-measurement RULE: a category that is
+     ABSENT reads as "does not exist"; one showing 0/0 reads as "nothing came up
+     this period". Those are different facts, and the omission told the wrong
+     one. catTotals (which drives the grid) was already seeded this way — only
+     this map was not, which is exactly why the two disagreed. */
   var bucketTotals = {};
+  CANONICAL_CATEGORIES.forEach(function (c) {
+    bucketTotals[c.label] = { label: c.label, by_closer: {} };
+  });
 
   rows.forEach(function (r) {
     var m = meta[r.fathom_call_id];

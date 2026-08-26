@@ -2399,6 +2399,31 @@
        the company name at the top centre of the Team view. */
     .page-header--company .page-header-main { text-align: center; width: 100%; }
     .page-header--company .review-meta-row { justify-content: center; }
+    /* ⚠ THE COMPANY PICKER SITS TOP-RIGHT OF THE COMPANY CARD (Justin, 2026-08-26),
+       moved out of the controls row. ABSOLUTE, so the company name stays truly
+       CENTRED — a flex sibling would shift the title left by half the control's
+       width, and the centring is a thing he approved.
+       ⚠ SCOPED TO .page-header--company, like the centring above it. .page-header
+       is rendered by every view in the product; positioning a side slot globally
+       would silently re-lay-out a dozen unrelated pages. */
+    .page-header--company .page-header-side {
+      /* ⚠ 0/0, NOT an arbitrary inset. An absolutely positioned child resolves
+         its offsets against the ancestor's PADDING box, and .page-header already
+         pads 14px 18px — so `right: 18px` would double that and sit visibly
+         inset. Zero aligns the control with the card's own content edge. */
+      position: absolute; top: 0; right: 0; margin: 0;
+    }
+    /* Reserve the picker's lane so a long company name can never run underneath
+       it. Cheaper and more reliable than truncating the name. */
+    .page-header--company .page-header-main { padding: 0 250px; box-sizing: border-box; }
+    @media (max-width: 860px) {
+      /* Below this the reserved lane costs more than it buys — stack instead,
+         which is also what stops the control overlapping the title. */
+      .page-header--company .page-header-side {
+        position: static; width: 100%; display: flex; justify-content: center; margin-top: 10px;
+      }
+      .page-header--company .page-header-main { padding: 0; }
+    }
     .conn-row { align-items: center; }
     .conn-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     /* The Fathom identity prompt, rendered inside Connections and inside the
@@ -6851,11 +6876,15 @@
   // ⚠ 'other' IS THE STORED NULL, not a fifth stored value. The DB CHECK allows only
   // fear|logistical|timing|partner (or NULL), and the API keys that bucket
   // 'uncategorized'. Displaying it as "Other" is a pure rename — no migration.
+  // ⚠ ORDER AND WORDING BOTH COME FROM THE COACHING REVIEW (Justin, 2026-08-26).
+  // The team view moved to match it, not the other way round. "Partner", not
+  // "Spouse/Partner"; "Other", not "Uncategorized" — his written ruling, and the
+  // classification behind both is unchanged.
   var OBJECTION_CATEGORIES = [
     { key: 'fear',       label: 'Fear' },
-    { key: 'timing',     label: 'Timing' },
-    { key: 'partner',    label: 'Spouse/Partner' },
     { key: 'logistical', label: 'Logistical' },
+    { key: 'timing',     label: 'Timing' },
+    { key: 'partner',    label: 'Partner' },
     { key: 'other',      label: 'Other' },
   ];
 
@@ -8384,11 +8413,25 @@
       acc.label = b.label;
       acc.rate = acc.total ? Math.round(((acc.handled + acc.credited) / acc.total) * 100) : null;
       return acc;
-    }).filter(function (b) { return b.total > 0; });
+    });
+    /* ⚠⚠ NO .filter(total > 0) — EVERY category is listed, including the ones
+       with nothing in range (Justin, 2026-08-26: "match the Coaching Review",
+       which renders them as 0). Dropping them made this list show THREE bars
+       under a grid showing FIVE columns — one page disagreeing with itself.
+
+       ⚠ ZERO IS A MEASUREMENT, ABSENCE IS NOT. A missing category reads as
+       "does not exist"; 0/0 reads as "nothing came up this period". */
     if (brs.length) {
       // weakest first, on the exact ratio — rounding first collapses distinct
       // rates into ties and the tie-break then picks a stable wrong winner.
+      // ⚠ AN EMPTY CATEGORY HAS NO RATE, so it cannot be ranked against one that
+      // does — n/0 is NaN, and NaN comparisons make a sort silently incoherent.
+      // Measured categories sort weakest-first; empty ones go last, in canonical
+      // order, because "no data" is not "worst".
       brs.sort(function (a, b) {
+        if (!a.total && !b.total) return 0;
+        if (!a.total) return 1;
+        if (!b.total) return -1;
         var ea = (a.handled + a.credited) / a.total, eb = (b.handled + b.credited) / b.total;
         return ea === eb ? b.total - a.total : ea - eb;
       });
@@ -9427,9 +9470,17 @@
        WAY. `.page-header` is rendered by every view in the product; centring it
        globally would silently re-align a dozen pages that had nothing to do
        with this change — the shared-carrier failure, in CSS. */
+    /* ⚠ THE COMPANY PICKER LIVES HERE NOW, and this is its ONLY render site
+       (Justin, 2026-08-26: "top right of the company name card"). It was in the
+       controls row AND in the drilldown's own strip; every team surface renders
+       this header, so one call here reaches all of them and the two other call
+       sites were REMOVED rather than left as a second and third copy.
+       ⚠ teamSelectHtml() returns '' for a non-owner, so the admin-only gate is
+       unchanged by the move — and it is enforced server-side regardless. */
     return '<div class="page-header page-header--company fade-in" style="margin-bottom:18px;">'
       + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
         + '<div class="review-meta-row"><span>Manager view</span></div></div>'
+      + '<div class="page-header-side">' + teamSelectHtml() + '</div>'
     + '</div>';
   }
   // The controls row — picker, team select, buttons. Rendered BELOW the gauge
@@ -9470,7 +9521,7 @@
   function teamControlsHtml() {
     ensureTeamPicker();
     return '<div class="page-header fade-in team-controls-row">'
-      + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' + teamSelectHtml()
+      + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
         + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewSoonHtml() + '</div>'
     + '</div>';
@@ -9497,7 +9548,11 @@
        the render; here the roster comes from state that is already loaded, so
        an empty host would leave the control missing until something happened to
        re-render it. Same host id — only one of these surfaces is ever mounted. */
-    return '<div class="objdrill-controls">' + teamSelectHtml()
+    /* ⚠ THE TEAM PICKER IS NO LONGER HERE. It moved to the company card at the
+       top of the page, which this view also renders — keeping it here as well
+       would put TWO pickers on the drilldown. The reuse principle the note above
+       describes still holds: one function, and now one call site. */
+    return '<div class="objdrill-controls">'
       + '<span id="repFilterHost">' + repFilterHtml() + '</span>'
       + '<div class="date-presets">' + datePickerHtml('team') + '</div></div>';
   }
@@ -12538,7 +12593,8 @@
   }
 
   function objSynthSection(c) {
-    var labelMap = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing', partner: 'Partner' };
+    // Derived from the canonical list — see OBJECTION_CATEGORIES.
+    var labelMap = OBJECTION_LABEL;
     var tag = c.grounded
       ? '<span class="badge badge-win">grounded</span>'
       : '<span class="scope-pill">general best practice</span>';
@@ -12592,7 +12648,10 @@
           (m.credited ? m.credited + ' credited (call closed) · ' : '') + m.partial + ' partial · ' + m.unhandled + ' unhandled')
       + '</div>';
 
-    var cats = [['fear', 'Fear'], ['logistical', 'Logistical'], ['timing', 'Timing'], ['partner', 'Partner'], ['uncategorized', 'Uncategorized']];
+    // ⚠ THE CANONICAL LIST DRIVES BOTH THE NAMES AND THE ORDER. This table and
+    // the team view render the same five in the same sequence because they read
+    // the same source; they diverged before precisely because each had its own.
+    var cats = OBJ_DRILL_ORDER.map(function (k) { return [k, OBJ_DRILL_LABELS[k]]; });
     var catRows = cats.map(function(pair) {
       var b = d.by_category[pair[0]] || { total: 0, handled: 0 };
       var pct = m.total > 0 ? Math.round(100 * b.total / m.total) : 0;
@@ -12608,8 +12667,8 @@
       : '';
 
     // Feed grouped by category, count header per group, ordered fear→…→uncategorized.
-    var order = ['fear', 'logistical', 'timing', 'partner', 'uncategorized'];
-    var labels = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing', partner: 'Partner', uncategorized: 'Uncategorized' };
+    var order = OBJ_DRILL_ORDER;
+    var labels = OBJ_DRILL_LABELS;
     var groups = {}; order.forEach(function(k) { groups[k] = []; });
     (d.feed || []).forEach(function(f) { groups[(order.indexOf(f.category) !== -1) ? f.category : 'uncategorized'].push(f); });
     var feedHtml = '';

@@ -105,9 +105,13 @@ test('⚠⚠ the drilldown renders its controls IN the card, and drops the team-
     assert.ok(view.indexOf(m) !== -1, m + ' must survive the toolbar move');
   });
 
-  // and the controls must genuinely carry the picker + the calendar
+  // ⚠ CONVERTED 2026-08-26, NOT DELETED. The picker moved to the company card at
+  // the top of the page, which THIS VIEW ALSO RENDERS — keeping it here too would
+  // put two pickers on the drilldown. What this test protects is unchanged: the
+  // controls live in the card and carry the calendar; only the picker line moved.
   const ctrl = slice('function objDrillControlsHtml', '\n  }');
-  assert.ok(ctrl.indexOf('teamSelectHtml()') !== -1, 'the team selector');
+  assert.strictEqual(ctrl.indexOf('teamSelectHtml()'), -1,
+    'the drilldown must NOT render its own picker — the company card above it does');
   assert.ok(ctrl.indexOf("datePickerHtml('team')") !== -1, 'the SAME date picker id as the team page');
   assert.ok(ctrl.indexOf('ensureTeamPicker()') !== -1, 'registered, or the calendar has no setter');
   ['manageMembersBtnHtml', 'customizeViewSoonHtml'].forEach((b) => {
@@ -132,10 +136,13 @@ test('⚠⚠ ONE team-selector definition in the whole page', () => {
     + 'label, a different handler, a selection that persists on one page and not the other, '
     + 'and nothing reports it because both render a perfectly good dropdown.');
 
-  // it is a function both callers use, not markup pasted twice
+  // it is a function, not markup pasted twice
   assert.ok(LIVE.indexOf('function teamSelectHtml') > -1, 'extracted into a function');
+  // ⚠ CONVERTED 2026-08-26: there is now exactly ONE call site (the company card),
+  // down from two. The rule this test exists for — never a second COPY — is
+  // strictly better served by one caller than by two, so the floor became a ceiling.
   const callers = (LIVE.match(/teamSelectHtml\(\)/g) || []).length;
-  assert.ok(callers >= 3, 'expected the definition plus both call sites; found ' + callers);
+  assert.strictEqual(callers, 2, 'expected the definition plus a single call site; found ' + callers);
 });
 
 /* ── 5 · the team average ──────────────────────────────────────────────────── */
