@@ -1565,7 +1565,29 @@ After injecting a fake `fathomStatus` to exercise the Calls empty state, I navig
 - **A hash-only navigation does not reload the document**, so module state survives it. The rule was already on file for *stale code*; this is the same mechanism for **stale STATE**.
 - **A hard reload showed `identityMissing: false`, no banner, email displayed — no defect at all.** **When probing with injected state, the fixture is a suspect before the product is** — and the cheapest discriminator is a real reload.
 
+### ⚠⚠⚠ THE TARGET ORG SHAPE AND THE VISIBILITY RULE — THIS AMENDS THE ROLE-HIERARCHY ITEM (filed 2026-08-26, NOT BUILT)
+**The largest agency Justin would sign, in his own framing — recorded as SHAPE, not as work:**
+```
+Company
+  └── Head of Sales / CSO          ⚠ NOT NEEDED YET — the eventual top of the tree, not a request
+        ├── Director 1 ── 3 Managers ── ~7 Closers each
+        ├── Director 2 ── 3 Managers ── ~7 Closers each
+        └── Director 3 ── 3 Managers ── ~7 Closers each
+                              ≈ 9 managers, 63 closers under ONE company
+```
+
+**⚠⚠ THE VISIBILITY RULE, VERBATIM: *"A manager can only view closers under him. Directors can see all teams below him. Head of sales can see all teams in the company."*** → **EVERY LEVEL SEES EVERYTHING BENEATH IT AND NOTHING BESIDE IT.**
+- **⚠⚠ THIS IS NOT AN ADMIN-VIEW RULE, AND READING IT AS ONE IS THE EXPENSIVE MISTAKE.** It governs **every number Scout produces** — team averages, the daily digest, objection drilldowns, needs-work, rankings, EOD, every synthesis. **Each of those has to know where the viewer sits in the tree.** A director's team average spans all their managers' closers; **two directors in the same company must never see each other's numbers.**
+- **⚠ SO THE FILED ROLE ITEM IS NO LONGER "A RENAME PLUS ONE NEW TIER". It is A HIERARCHY WITH INHERITED VISIBILITY**, and whoever picks it up reads this entry first.
+
+**⚠⚠ TWO CONSEQUENCES, RECORDED AND DELIBERATELY NOT RESOLVED:**
+1. **"A COMPANY IS A RENAMED TEAM" STOPS BEING TRUE AT THIS SCALE — flagged AGAINST that ruling rather than silently contradicting it.** It holds **today**, because a company is one manager's people. In this diagram a company is **the whole tree** with a head of sales at the top. **The ruling is correct now and must be revisited when Director lands.** ⚠ It is the same expiry the `team_name` storage entry already names (*"a client with TWO sales managers appears as TWO companies … a known expiry date"*) — **now with the full shape attached, so the revisit has something concrete to aim at.**
+2. **SCOPE RESOLUTION BECOMES A TREE WALK, NOT A LOOKUP.** `resolveTeam` (`routes/team.js:111`) answers *"who does this manager manage"* in **ONE** step off `managed_by`. **A director is TWO steps; a head of sales is THREE.** Doing that on every page load, for 63 closers, is a **different job** from what exists — and every team-scoped query downstream inherits it. ⚠ **Recorded as a design question for whoever builds the roles. Do NOT design it now.**
+
+**⚠ THE PART MOST LIKELY TO BE UNDER-ESTIMATED: the visibility rule is not a filter you add at the end.** Scope is resolved once, near the top, and then flows into every lane — so a change from *lookup* to *tree walk* touches the one place every metric already depends on. That is why this amends the role item rather than sitting beside it.
+
 ### ⚠⚠ COMPANIES ARE RENAMED TEAMS — THE STORAGE DECISION, AND WHY IT IS A COLUMN (2026-08-24, `e4679e8`)
+**⚠⚠ READ THE ENTRY DIRECTLY ABOVE FIRST (2026-08-26): the target org shape puts a HEAD OF SALES over several DIRECTORS, at which point a company is the WHOLE TREE and "a company is one manager's team" stops being true. This ruling is correct TODAY and has a named expiry — it is flagged, not superseded.**
 **Justin's ruling: a COMPANY IS A RENAMED TEAM, admin view only. No new tier, no schema change beyond storage for the name.** Migration 043 adds **`user_profiles.team_name`** — one nullable column on the HEAD's row.
 - **⚠⚠ A COLUMN, NOT A `companies` TABLE, AND THE REASONING IS THE DURABLE PART.** A team is ALREADY uniquely identified by the user its members point at via `managed_by`, so there is no second key to invent and a table would add an id, an FK and a join to store one string. **More importantly: creating the entity is the first half of a company TIER — it is exactly how "renamed team" quietly becomes "a thing above teams", which is the ruling this is meant to respect.** Promote it to a table when something else about a company needs storing, with a real reason, not speculatively.
 - **NULL IS MEANINGFUL** (never named) — a `''` default would make "unnamed" and "named the empty string" indistinguishable. Applied **inert**, before any code read it.
