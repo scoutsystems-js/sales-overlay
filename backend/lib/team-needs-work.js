@@ -437,7 +437,28 @@ function canonicalKeyForLabel(raw) {
   for (var j = 0; j < cats.length; j++) {
     if (v.indexOf(cats[j].key) !== -1) return cats[j].key;
   }
-  if (v.indexOf('spouse') !== -1 || v.indexOf('partner') !== -1) return 'partner';
+  // ⚠ SEMANTIC FALLBACK — honours Justin's explicit mappings for the descriptive
+  // labels the bucketer used to invent, so a model that slips back to its old
+  // habit still lands in the right category instead of silently becoming "Other".
+  // A wrong-but-plausible bucket is worse than Other; these are the mappings he
+  // named, not guesses. ⚠ ORDER MATTERS: "Needs More Time / Stalling" contains
+  // both a timing word and nothing else, so timing must be tested before the
+  // generic money terms that would otherwise capture broader phrases.
+  var RULES = [
+    ['partner',    ['spouse', 'partner', 'wife', 'husband', 'consult', 'approval', 'decision maker']],
+    ['timing',     ['timing', 'time', 'stall', 'later', 'delay', 'next quarter', 'not now', 'busy', 'bandwidth']],
+    ['logistical', ['declin', 'payment fail', 'card', 'logistic', 'schedul', 'mechanic', 'lapsed']],
+    // Justin: "Trust / Proof / Skepticism" IS fear, and price folds into fear or
+    // logistical by circumstance — a bare label carries no circumstance, and the
+    // extractor's own default for a money-phrased objection is fear.
+    ['fear',       ['trust', 'proof', 'skeptic', 'doubt', 'nervous', 'think about', 'research',
+                    'not sure', 'believe', 'price', 'expensive', 'afford', 'money', 'cost', 'budget']],
+  ];
+  for (var r = 0; r < RULES.length; r++) {
+    for (var t = 0; t < RULES[r][1].length; t++) {
+      if (v.indexOf(RULES[r][1][t]) !== -1) return RULES[r][0];
+    }
+  }
   return 'other';
 }
 

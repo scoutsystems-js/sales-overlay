@@ -116,3 +116,41 @@ test('the shared boundary states all four cases', () => {
   assert.ok(/partner/.test(g), 'missing the consult-someone case');
   assert.ok(/EXCUSE IS NOT THE CLASSIFICATION/.test(g), 'missing the excuse rule');
 });
+
+test('the coercion maps every label the live page currently shows', () => {
+  // ⚠ These are the REAL labels the bucketer invented and rendered in production,
+  // including the mid-word truncation Justin reported. The model is now told to
+  // emit only canonical names, so this path is a SAFETY NET — but a net that sent
+  // "Trust / Proof / Skepticism" to Other would silently contradict Justin's
+  // explicit ruling that it is fear.
+  const src = slice(NEEDS, 'function canonicalKeyForLabel', '\nasync function getBucketMapping', 600);
+  const keyFor = new Function('objectionCats', src + '\n; return canonicalKeyForLabel;')(cats);
+  const expected = [
+    ['Trust / Proof / Skepticism', 'Fear'],          // Justin's explicit mapping
+    ['Price / too expensive', 'Fear'],               // price folds into fear by default
+    ['Needs To Consult Spouse/Partne', 'Spouse/Partner'], // the truncated live label
+    ['Needs To Consult Spouse/Partner', 'Spouse/Partner'],
+    ['Needs More Time / Stalling', 'Timing'],
+    ['Payment failure', 'Logistical'],
+    ['card declined', 'Logistical'],
+    ['Fear', 'Fear'], ['Logistical', 'Logistical'], ['Other', 'Other'],
+    ['total garbage', 'Other'], [null, 'Other'], ['', 'Other'],
+  ];
+  expected.forEach(([input, want]) => {
+    assert.strictEqual(cats.objectionLabel(keyFor(input)), want,
+      JSON.stringify(input) + ' should map to ' + want);
+  });
+});
+
+test('no emitted label can reach the 30-char cut that truncated the live page', () => {
+  const src = slice(NEEDS, 'function canonicalKeyForLabel', '\nasync function getBucketMapping', 600);
+  const keyFor = new Function('objectionCats', src + '\n; return canonicalKeyForLabel;')(cats);
+  ['Needs To Consult Spouse/Partner', 'a'.repeat(120), 'Trust / Proof / Skepticism', null]
+    .forEach(input => {
+      const out = cats.objectionLabel(keyFor(input));
+      assert.ok(out.length <= 30 && out.length > 0, 'emitted label was ' + out.length + ' chars');
+    });
+  // and the truncating call itself is gone from the module
+  assert.ok(!/str\(bk && bk\.label/.test(stripComments(NEEDS)),
+    'the label truncation is back — that is what produced "Spouse/Partne"');
+});
