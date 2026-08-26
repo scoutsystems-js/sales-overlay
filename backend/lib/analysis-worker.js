@@ -60,6 +60,7 @@ const zoomClient = require('./zoom-client');
 const { parseVttToTranscript } = require('./vtt-adapter');
 const zoomRetry = require('./zoom-retry');
 const fathomRetry = require('./fathom-retry');
+const modelRetry = require('./model-retry');
 const closerVoice = require('./closer-voice');
 // v26: the derived voice PROFILE + outcome-scaled form constraints. Replaces
 // feeding exemplar lines — see lib/voice-profile for why lines were the wrong
@@ -1129,11 +1130,17 @@ async function analyzeCall(fathomCallId, userId) {
     /* Attempt counter for the transcript retry bound (migration 047). Read once
        here; fails CLOSED to a spent counter if the column is unreadable. */
     var callRow_attempts = 0;
+    var modelAttempts = 0;
     try {
-      var attQ = await admin.from('call_analyses').select('transcript_attempts').eq('fathom_call_id', fathomCallId).maybeSingle();
+      var attQ = await admin.from('call_analyses').select('transcript_attempts, model_attempts').eq('fathom_call_id', fathomCallId).maybeSingle();
       callRow_attempts = (attQ && attQ.data && typeof attQ.data.transcript_attempts === 'number')
         ? attQ.data.transcript_attempts : 0;
-    } catch (e) { callRow_attempts = fathomRetry.MAX_TRANSCRIPT_ATTEMPTS; }
+      modelAttempts = (attQ && attQ.data && typeof attQ.data.model_attempts === 'number')
+        ? attQ.data.model_attempts : 0;
+    } catch (e) {
+      callRow_attempts = fathomRetry.MAX_TRANSCRIPT_ATTEMPTS;
+      modelAttempts = modelRetry.MAX_MODEL_ATTEMPTS;   // fail CLOSED, as above
+    }
 
     // ─── Phase 3+4: fetch the transcript, SOURCE-AWARE ────────────────────
     // Everything downstream (normalize → grade → extract) is source-agnostic:
@@ -1169,7 +1176,11 @@ async function analyzeCall(fathomCallId, userId) {
      * recorded with transcription" cases are textually identical, and age is
      * the only thing that separates them.
      */
-    async function requeueTranscript(reason) {
+    /* ⚠ ONE REQUEUE, THREE CALLERS (transcript-not-ready, model failure, unusable
+       model output). `why` is a label for the log line ONLY — the behaviour is
+       identical for all three and must stay that way, or "recoverable" comes to
+       mean different things on different paths. */
+    async function requeueTranscript(reason, why) {
       await setAnalysisStatus(admin, fathomCallId, userId, 'pending', {
         overall_summary: reason,
         analyzed_at:     new Date().toISOString(),
@@ -1177,7 +1188,7 @@ async function analyzeCall(fathomCallId, userId) {
       var rq = await admin.from('fathom_calls').update({ sync_status: 'pending' })
         .eq('id', fathomCallId).eq('user_id', userId);
       if (rq.error) console.error('[analysis] requeue failed for call ' + fathomCallId + ': ' + rq.error.message);
-      console.warn('[analysis] REQUEUED (transcript not ready) ' + reason
+      console.warn('[analysis] REQUEUED (' + (why || 'transcript not ready') + ') ' + reason
         + ' (call=' + fathomCallId + ' user=' + userId + ')');
       return { status: 'requeued', reason: reason };
     }
@@ -1453,6 +1464,21 @@ async function analyzeCall(fathomCallId, userId) {
     } catch (apiErr) {
       var apiStatus = (apiErr && (apiErr.status || apiErr.statusCode)) || '';
       var apiReason = 'Anthropic API failure' + (apiStatus ? ' (HTTP ' + apiStatus + ')' : '') + ': ' + ((apiErr && apiErr.message) || 'unknown');
+      /* ⚠⚠ A TEMPORARY MODEL FAILURE MUST NOT PERMANENTLY UNGRADE THE CALL.
+         This branch used to error EVERY failure, and nothing moves 'error' back
+         to 'pending' — so one 429 was a silent hole, exactly the Fathom defect
+         one layer down. ⚠ The SDK has ALREADY retried 3× with backoff by the
+         time we get here (maxRetries 2), so this only fires on a sustained
+         problem rather than a blip. */
+      if (modelRetry.shouldRetryModel(apiErr, modelAttempts)) {
+        var nextModel = (modelAttempts || 0) + 1;
+        await admin.from('call_analyses').update({ model_attempts: nextModel }).eq('fathom_call_id', fathomCallId);
+        return await requeueTranscript(apiReason + ' — temporary, requeued (attempt ' + nextModel
+          + ' of ' + modelRetry.MAX_MODEL_ATTEMPTS + ')', 'model failure');
+      }
+      apiReason += (modelRetry.classifyModelFailure(apiErr) === 'temporary')
+        ? ' — temporary but retried ' + modelRetry.MAX_MODEL_ATTEMPTS + ' times, giving up'
+        : ' — permanent, not retried';
       await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
         overall_summary: apiReason.slice(0, 1000),
         analyzed_at:     new Date().toISOString(),
@@ -1473,6 +1499,20 @@ async function analyzeCall(fathomCallId, userId) {
     var graderParsed = extractFirstJsonObject(graderText);
     if (!graderParsed) {
       var graderReason = 'Section grader returned unparseable JSON: ' + graderText.slice(0, 200);
+      /* ⚠⚠ ITS OWN BRANCH, BECAUSE THIS IS A 200 — the SDK never sees it and
+         cannot have retried it. ⚠ AND IT IS WORTH RETRYING: measured 2026-08-26,
+         it is length-CORRELATED, not length-determined — a call that failed on
+         it in production parsed cleanly hours later, and a live error count fell
+         2→1 when a loop re-claimed one and it succeeded. Bounded TIGHTER than a
+         transient API error (2 vs 3): the same call is likelier to fail again,
+         and each attempt costs a full transcript. */
+      if (modelRetry.shouldRetryUnparseable(modelAttempts)) {
+        var nextU = (modelAttempts || 0) + 1;
+        await admin.from('call_analyses').update({ model_attempts: nextU }).eq('fathom_call_id', fathomCallId);
+        return await requeueTranscript(graderReason + ' — requeued (attempt ' + nextU
+          + ' of ' + modelRetry.MAX_UNPARSEABLE_ATTEMPTS + ')', 'unusable model output');
+      }
+      graderReason += ' — retried ' + modelRetry.MAX_UNPARSEABLE_ATTEMPTS + ' times, giving up';
       await setAnalysisStatus(admin, fathomCallId, userId, 'error', {
         overall_summary: graderReason,
         analyzed_at:     new Date().toISOString(),
@@ -1702,6 +1742,11 @@ async function analyzeCall(fathomCallId, userId) {
       analyzed_at:         new Date().toISOString(),
       prompt_version:      ANALYSIS_PROMPT_VERSION,
       status:              'done',
+      /* ⚠ A CLEAN RUN CLEARS BOTH COUNTERS — the bounds are on CONSECUTIVE
+         failures, not lifetime ones. Without this a call that flaked twice a
+         month ago would arrive at its next real failure with no budget left. */
+      transcript_attempts: 0,
+      model_attempts:      0,
     };
     var upsert = await admin
       .from('call_analyses')
