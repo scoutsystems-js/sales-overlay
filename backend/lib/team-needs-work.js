@@ -57,7 +57,12 @@ const BUCKET_MAX_TOKENS = 1500;
 // Bumped when the bucketing/classification logic changes — folded into the cache
 // hash so cached needs-work results regenerate on deploy (a prompt change alone
 // doesn't move the analyses/surface hash). v2 = taxonomy (true-objections-only).
-const NEEDS_WORK_LANE_VERSION = 'v2-taxonomy';
+// ⚠ v3 = the canonical five-name vocabulary. THIS BUMP IS LOAD-BEARING, not
+// bookkeeping: the bucket labels live INSIDE the cached payload, so without it
+// the Focus page would keep rendering the model-invented labels (and the
+// mid-word "Spouse/Partne" truncation) until something else happened to move
+// the hash. The rename would have looked shipped and changed nothing on screen.
+const NEEDS_WORK_LANE_VERSION = 'v3-canonical-names';
 
 var _anthropic = null;
 function getAnthropic() {
