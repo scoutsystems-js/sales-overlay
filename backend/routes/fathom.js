@@ -26,6 +26,7 @@ var router = express.Router();
 
 const FATHOM_API_BASE   = 'https://api.fathom.ai/external/v1';
 const syncWindow = require('../lib/sync-window');
+var { classifyFailure } = require('../lib/failure-class');
 const { applyDuplicateSuppression } = require('../lib/duplicate-calls');
 const FATHOM_TOKEN_URL  = 'https://fathom.video/external/v1/oauth2/token';
 const TOKEN_EXPIRY_TOLERANCE_SECONDS = 300; // 5 min — matches OAuth route + SDK
@@ -834,17 +835,46 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
       .order('call_date', { ascending: false, nullsFirst: false });
     var pendingIds2 = pendingQ.error ? [] : (pendingQ.data || []).map(function (r) { return r.id; });
     if (pendingQ.error) console.error('[fathom] update-analyses pending lookup failed (proceeding with outdated only): ' + pendingQ.error.message);
+
+    /* ⚠⚠ FAILED CALLS ARE NOW REACHABLE. Before this the batch was
+       pending ∪ outdated, and an errored row is in NEITHER — so no button
+       anywhere could retry one, and last night's 153 only cleared because they
+       were flipped in SQL by hand. ⚠ Only the RETRYABLE ones: a call whose
+       transcript does not exist would otherwise be re-dispatched forever and
+       keep the failed count permanently non-zero. */
+    var failedIds = [];
+    try {
+      var fq = await admin.from('fathom_calls').select('id, call_date')
+        .eq('user_id', userId).eq('sync_status', 'error')
+        .not('not_a_sales_call', 'is', true).is('duplicate_of', null);
+      var failedRows = fq.error ? [] : (fq.data || []);
+      for (var fi = 0; fi < failedRows.length; fi += 100) {
+        var slice = failedRows.slice(fi, fi + 100);
+        var fa = await admin.from('call_analyses').select('fathom_call_id, overall_summary')
+          .in('fathom_call_id', slice.map(function (x) { return x.id; })).eq('status', 'error');
+        var reasonBy = {};
+        if (!fa.error) (fa.data || []).forEach(function (a) { reasonBy[a.fathom_call_id] = a.overall_summary; });
+        slice.forEach(function (row) {
+          if (classifyFailure(reasonBy[row.id], row.call_date) !== 'permanent') failedIds.push(row.id);
+        });
+      }
+    } catch (fErr) {
+      console.error('[fathom] update-analyses failed-call lookup failed (proceeding without them): ' + (fErr.message || 'unknown'));
+    }
     // Newest-first by CALL date across both blocks (outdatedCallIds orders by
     // analyzed_at, which is analysis recency, not call recency) — fetch the
     // call dates for the union and let orderBatchIds do the rest.
     var dateById = {};
-    var allIds = pendingIds2.concat(outdatedIds);
+    var allIds = pendingIds2.concat(failedIds).concat(outdatedIds);
     for (var ci = 0; ci < allIds.length; ci += 100) {
       var dq = await admin.from('fathom_calls').select('id, call_date').in('id', allIds.slice(ci, ci + 100));
       if (dq.error) { console.error('[fathom] update-analyses date lookup failed (order degrades to analyzed_at): ' + dq.error.message); break; }
       (dq.data || []).forEach(function (r) { dateById[r.id] = r.call_date || ''; });
     }
-    var unionIds = orderBatchIds(pendingIds2, outdatedIds, dateById);
+    /* Failed rows ride with the pending block — both are "explicitly queued
+       work" and outrank staleness, and orderBatchIds keeps each block
+       newest-first. */
+    var unionIds = orderBatchIds(pendingIds2.concat(failedIds), outdatedIds, dateById);
 
     // How-far-back scope (2026-07-27): '7d' | '30d' | 'all' re-grades EVERY
     // outdated/pending call in that window (not just the newest 20). Backward-
@@ -866,7 +896,8 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
     }
 
     if (body.dry_run) {
-      return res.json({ count: ids.length, scope: scope || null, outdated: outdatedIds.length, pending: pendingIds2.length });
+      return res.json({ count: ids.length, scope: scope || null, outdated: outdatedIds.length,
+                        pending: pendingIds2.length, failed: failedIds.length });
     }
 
     if (ids.length > 0) {
@@ -877,7 +908,13 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
         console.error('[fathom] update-analyses fathom_calls reset failed for user ' + userId + ': ' + fcReset.error.message);
         return res.status(500).json({ error: 'Could not reset calls' });
       }
-      var caReset = await admin.from('call_analyses').update({ status: 'pending' }).in('fathom_call_id', ids);
+      /* ⚠ A HUMAN PRESSING RETRY GETS A FULL BUDGET. The attempt counters bound
+         AUTOMATIC retries; a person choosing to run this is a different act, and
+         leaving a spent counter would make their click a no-op that fails again
+         immediately with "giving up". */
+      var caReset = await admin.from('call_analyses')
+        .update({ status: 'pending', transcript_attempts: 0, model_attempts: 0 })
+        .in('fathom_call_id', ids);
       if (caReset.error) {
         // Non-fatal: fathom_calls is already pending; the worker re-upserts the
         // analysis row anyway. Log and proceed.
@@ -1360,9 +1397,12 @@ async function loadCallsList(admin, userId, opts) {
 // analyses sweep, mirroring the enrichment above rather than inventing a
 // different way to ask the same question.
 async function windowOutcomeCounts(admin, userId, opts) {
-  var ids = [], PAGE = 1000, start = 0;
+  /* ⚠ call_date comes along because the FAILED split needs it: a Zoom transcript
+     that is merely late is retryable and one past the window is not, and
+     lib/zoom-retry.js decides that on AGE. */
+  var ids = [], dateById = {}, PAGE = 1000, start = 0;
   for (;;) {
-    var q = admin.from('fathom_calls').select('id').eq('user_id', userId)
+    var q = admin.from('fathom_calls').select('id, call_date').eq('user_id', userId)
     .not('not_a_sales_call', 'is', true)
     .is('duplicate_of', null);
     if (opts.from) q = q.gte('call_date', opts.from);
@@ -1370,22 +1410,43 @@ async function windowOutcomeCounts(admin, userId, opts) {
     var r = await q.range(start, start + PAGE - 1);
     if (r.error) return { closed: null, not_closed: null, ungraded: null, total: null };
     var b = r.data || [];
-    b.forEach(function (x) { ids.push(x.id); });
+    b.forEach(function (x) { ids.push(x.id); dateById[x.id] = x.call_date || null; });
     if (b.length < PAGE) break;
     start += PAGE;
   }
   var closed = 0, notClosed = 0, graded = 0;
+  /* ⚠⚠ FAILED CALLS WERE ABSENT FROM THIS ENTIRELY. They are not 'done', so they
+     fell out of every count — a failure was visible only by opening the call and
+     seeing the red banner, never as "3 calls failed today". Split into the two
+     that mean different things to a reader:
+       failed_retryable — worth pressing the button at
+       failed_permanent — will never grade; showing it as actionable would leave
+                          a number that never reaches zero, and a number that
+                          never reaches zero stops being read. */
+  var failedRetryable = 0, failedPermanent = 0;
   for (var i = 0; i < ids.length; i += 100) {
+    var chunk = ids.slice(i, i + 100);
     var ar = await admin.from('call_analyses').select('fathom_call_id, outcome')
-      .in('fathom_call_id', ids.slice(i, i + 100)).eq('status', 'done');
+      .in('fathom_call_id', chunk).eq('status', 'done');
     if (ar.error) return { closed: null, not_closed: null, ungraded: null, total: ids.length };
     (ar.data || []).forEach(function (a) {
       if (a.outcome == null) return;      // graded but no outcome → neither side
       graded++;
       if (a.outcome === 'closed') closed++; else notClosed++;
     });
+    var er = await admin.from('call_analyses').select('fathom_call_id, overall_summary')
+      .in('fathom_call_id', chunk).eq('status', 'error');
+    if (!er.error) {
+      (er.data || []).forEach(function (e) {
+        if (classifyFailure(e.overall_summary, dateById[e.fathom_call_id]) === 'permanent') failedPermanent++;
+        else failedRetryable++;
+      });
+    }
   }
-  return { closed: closed, not_closed: notClosed, ungraded: ids.length - graded, total: ids.length };
+  return {
+    closed: closed, not_closed: notClosed, ungraded: ids.length - graded, total: ids.length,
+    failed_retryable: failedRetryable, failed_permanent: failedPermanent,
+  };
 }
 
 router.get('/calls', requireAuth, async function(req, res) {

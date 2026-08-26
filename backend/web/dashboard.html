@@ -2537,6 +2537,11 @@
     }
     .calls-outcome-clear:hover { border-color: var(--border-hover); }
     .calls-outcome-note { font-size: 11px; }
+    /* A retryable failure is an ACTION (red, like the error badge). A permanent
+       one is a FACT — deliberately neutral, so it does not read as something to
+       keep pressing a button at. */
+    .calls-failed { color: var(--bad); font-weight: 600; }
+    .calls-failed-perm { opacity: .8; cursor: help; border-bottom: 1px dotted var(--border-strong); }
 
     /* Digest day navigation (2026-08-26) — replaced the date chip row. */
     .digest-day-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
@@ -12771,6 +12776,17 @@
       + (f ? '<button class="calls-outcome-clear" type="button" onclick="clearCallsFilter()">Clear</button>' : '')
       + (typeof oc.ungraded === 'number' && oc.ungraded > 0
           ? '<span class="calls-outcome-note">' + oc.ungraded + ' not graded yet — in neither group</span>' : '')
+      /* ⚠⚠ FAILED CALLS WERE INVISIBLE HERE. They are not 'done', so they were in
+         no count at all — the only way to know a call had failed was to open it
+         and see the red banner. ⚠ SPLIT IN TWO, because they mean different
+         things to a reader: the retryable ones are an action, the permanent ones
+         are a fact. Folding them together would leave a number that never
+         reaches zero, and a number that never reaches zero stops being read. */
+      + (typeof oc.failed_retryable === 'number' && oc.failed_retryable > 0
+          ? '<span class="calls-outcome-note calls-failed">' + oc.failed_retryable + ' failed \u2014 can be retried</span>' : '')
+      + (typeof oc.failed_permanent === 'number' && oc.failed_permanent > 0
+          ? '<span class="calls-outcome-note calls-failed-perm" title="These cannot be graded — the recording has no transcript, or it is gone. Retrying will not help.">'
+            + oc.failed_permanent + ' cannot be graded</span>' : '')
       + gradeHost
       + '</div>';
 
