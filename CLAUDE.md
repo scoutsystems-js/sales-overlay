@@ -687,7 +687,15 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ A FLAG I RAISED IS HEREBY WITHDRAWN, NOT LEFT OPEN.** I queried `logistical` being both a NAMED category and an EXCLUDED one. **That is CORRECT and intentional:** a genuine inability to proceed is not a coaching failure — **there was nothing the closer could have done differently**. Being named lets it be *counted and shown*; being excluded keeps it out of the *handle rate*. Both at once is the design.
   - ⚠ **One precision, because the two rulings arrived minutes apart and the second revises the first's wording:** the rationale was first phrased as *"a genuine inability to PAY"*, which the three-way ruling reclassifies as a **DQ**, not logistical. **The withdrawal stands either way** — DQ and logistical are both non-coachable — but `logistical` now means an **external blocker**, not an affordability problem. Do not carry the older phrasing forward.
 - **⚠⚠ CROSS-REFERENCE — THIS IS THE LIKELY CAUSE OF THE ABU FAILURE FILED BELOW.** The digest read **a financial DQ as a winnable close** and built the day's highest-leverage coaching point on it. **The DQ boundary being unclear to the grader is the probable mechanism**, so **whoever picks up the Abu item starts HERE**, with this three-way rule, rather than treating it as a digest-only bug.
-- **⚠ PRICE STAYS A SEPARATE CATEGORY AND IS STILL UNRESOLVED.** It is **not stored separately today**, so splitting it out is a **RE-CLASSIFICATION, not a rename** — it needs a prompt change, a version bump, and a decision about historical rows. Not ruled, not built.
+- **⚠⚠ SUPERSEDED 2026-08-26 — PRICE IS NOT A CATEGORY AT ALL. JUSTIN HAS RULED, AND IT CLOSES THIS QUESTION.** *(Struck text, kept so the reversal is visible: "PRICE STAYS A SEPARATE CATEGORY AND IS STILL UNRESOLVED… splitting it out is a RE-CLASSIFICATION, not a rename.")*
+  > **His words: *"Price is either fear or logistical so it can fold into one of those depending on the circumstance."***
+
+  **THE CANONICAL SET IS FIVE: Fear · Timing · Spouse/Partner · Logistical · Other.**
+- **⚠⚠ THIS REMOVES THE RE-CLASSIFICATION PROBLEM ENTIRELY, WHICH IS THE WHOLE POINT OF THE RULING.** Price was **the only item in the canonical set that was not a rename** — it was not stored separately, so surfacing it would have meant a prompt change, a version bump and a decision about historical rows. Being ruled out of existence as a category means **there is nothing to re-grade and no migration**. The objection-naming work is now **purely a rename plus one source of truth for both surfaces**.
+- **PRICE FOLDS INTO THE THREE-WAY BOUNDARY ALREADY FILED ABOVE — it needs no new rule:**
+  - hesitant about money, whatever excuse they wrap it in → **FEAR**
+  - wants to buy, genuinely cannot move money right now, external constraint → **LOGISTICAL**
+  - wants to buy, genuinely **cannot afford it** → **FINANCIAL DQ** — not an objection at all, not coachable
 - **⚠ FILED ONLY (2026-08-25). Nothing in the prompt has changed yet.** The current stored taxonomy remains `fear` / `logistical` / `timing` / `partner`.
 
 ### ⚠⚠⚠ THE DIGEST PRODUCED CONFIDENT, SPECIFIC, ACTIONABLE COACHING THAT WAS WRONG — TOP OF THE QUEUE (filed 2026-08-25)
