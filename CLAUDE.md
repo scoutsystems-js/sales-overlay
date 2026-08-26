@@ -1912,6 +1912,27 @@ The instruction to go to twelve carried the premise *"errors are flat at 1"*. **
 - **NOTING A STALE PREMISE IS NOT THE SAME AS ACTING ON IT.** Saying "correction: errors are at 2" and then doing the thing anyway is the appearance of rigour without its substance. **If the premise for an instruction is false, say the instruction should not proceed — do not footnote it and comply.**
 - Same family as the offering-a-lever-for-a-symptom-whose-cause-is-elsewhere entry: **the moment to refuse is BEFORE the irreversible action, and an irreversible action is exactly where deference is most expensive.**
 
+### ⚠⚠⚠ THE MANAGER-IS-A-TEAM-MEMBER DEFECT HAS NOW BEEN FOUND NINE TIMES — THE NINTH WAS THE DAILY DIGEST (2026-08-25)
+**It rendered `"quiet day · 0 calls"` for 2026-08-24, a day Josh took EIGHT real calls.** His four reps are three demo accounts and one test user, none with real calls, so excluding the manager left **literally nothing to count — every single day**.
+- **⚠⚠ A WRONG "QUIET DAY" IS A VERDICT, NOT A BLANK.** This is the *data problem must never render as good news* rule in its most expensive form: the panel did not look broken, it looked like a slow day, and it was shown on a manager's board. **An empty state that reads as a judgement is worse than an error.**
+- **WHY THE `9a27979` FIX DID NOT REACH IT:** that commit fixed eight endpoints by routing them through `resolveTeam`. **The digest hand-rolls the rule** (`if (p.managed_by) reps[p.managed_by].push(...)`), and **a hand-rolled copy cannot inherit a fix**. That is the whole mechanism, and it is why the count keeps climbing.
+- **⚠⚠ `resolveTeam` COULD NOT BE CALLED, AND SAYING SO MATTERS.** It takes an Express `req` (it reads `req.user` and `?team=`); **digest generation runs from the sync cron with no request**, iterating every manager. So "just call resolveTeam" was not available — **the shareable thing is the RULE, not the route helper.** `lib/team-membership.js` now holds `withBoardOwner` + `membersByManager`, and `routes/team.js` imports it instead of defining its own copy (0 local definitions, 1 import, 5 call sites). **Adding the manager inline would have been the TENTH copy.**
+- **⚠ ENUMERATED BY CAPABILITY AND THE RESULT IS CLEAN — record it so nobody re-runs the sweep.** On the comment-stripped tree only FIVE live sites build a user set from `managed_by`, and **the digest was the only one that dropped the manager**:
+```
+routes/admin.js countManagedReps      excludes self CORRECTLY (you do not move yourself)
+routes/admin.js pivot scope           seeds ids = [user.id]   already correct
+routes/auth.js  has_reps count        excludes self correctly
+routes/kb.js    getVisibleUploaderIds seeds ids = [userId]    already correct
+lib/team-digest.js                    THE DEFECT — fixed
+```
+  ⚠ A sixth apparent hit in `lib/team-needs-work.js` is **inside an ARCHIVED comment block and never runs** — the archived-code-is-found-first trap, caught only by stripping comments before believing the list.
+
+### ⚠ THE DAILY DIGEST IS STRUCTURALLY A DAY BEHIND — BY DESIGN, FILED NOT CHANGED (2026-08-25)
+`GET /team/digest` is a **cache read only**. Generation happens in the sync cron's post-sync pass, which means **each day's digest is built ~00:45 ET the FOLLOWING morning** for the previous ET day, and the read route defaults to `etYesterday()`. **So today's digest never exists during today** — the newest tab is always yesterday. Verified against the cache: `08-24` written `08-25 04:47Z`, `08-23` written `08-24 04:54Z`.
+- **It is NOT a timezone bug.** It uses `America/New_York` correctly, and ET-yesterday at 18:18 ET on the 25th genuinely is the 24th.
+- **The tab list only shows days that HAVE a digest** (`recent_dates`), so a missing day simply never appears — real, but downstream of the above.
+- **THE TWO ALTERNATIVES AND WHAT THEY COST, so the ruling can be made without re-deriving them:** generate **on read** = one Claude call per manager per page load (seconds of latency, and repeated every view unless cached within the day); or a **much shorter cron** = one call per manager per interval, most of them producing nothing new. The current design deliberately rides the 2-hourly sync so the cost is **one model call per manager per day**. **Justin has not ruled; do not build either.**
+
 ### ⚠⚠ A CONTROL A CUSTOMER CANNOT FIND IS NOT SHIPPED — AND THE PAGE THAT NAMES THE PROBLEM IS WHERE IT BELONGS (2026-08-25, `e56b78a`)
 **The grading control lived only in Account → Connections. Justin went looking on Calls and on the Coaching Review and could not find it, and so did the architect — who then told him it was a button, without checking a customer could reach it.**
 - **THE DEFECT IS NOT "IT IS HARD TO FIND". IT IS THAT THE CALLS PAGE ALREADY STATED THE PROBLEM AND OFFERED NO FIX**: it rendered *"N not graded yet — in neither group"* under the Closed / Not Closed counts, with no way to act on it. **A page that names a problem and gives no way to act on it is the defect**, and the fix is to put the action on that line — not to make the far-away control easier to spot.
