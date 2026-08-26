@@ -1565,6 +1565,32 @@ After injecting a fake `fathomStatus` to exercise the Calls empty state, I navig
 - **A hash-only navigation does not reload the document**, so module state survives it. The rule was already on file for *stale code*; this is the same mechanism for **stale STATE**.
 - **A hard reload showed `identityMissing: false`, no banner, email displayed — no defect at all.** **When probing with injected state, the fixture is a suspect before the product is** — and the cheapest discriminator is a real reload.
 
+### ⚠⚠ A CONNECTION CAN WORK PERFECTLY AND STILL PRODUCE NOTHING GRADEABLE — MEASURED PER USER (2026-08-26)
+**Empty-transcript rate across one company's Fathom accounts, as a share of everything actually processed:**
+```
+gabriel  57%   (20 empty vs 15 graded)   ⚠ MORE THAN HALF HIS CALLS CANNOT BE GRADED
+josh.n   14%
+yazan     1%   (3 of 294)
+joshua / nick / dre   0%
+```
+- **⚠⚠ 57% IS A PROPERTY OF HIS ACCOUNT, NOT A SCOUT DEFECT.** Fathom returns the recording and an **empty transcript array** — the fetch SUCCEEDS and there is nothing to read. Retrying cannot help, at any speed.
+- **IT IS THE SAME SHAPE AS GODWIN'S ZOOM QUESTION, ON THE OTHER PROVIDER: a connection that is genuinely working while producing nothing Scout can use.** Zoom's version is *cloud recording vs local*; Fathom's appears to be **transcription not enabled on those recordings**. **Both look identical from the product — calls arrive, grades do not.**
+- **⚠ THIS IS THE ARGUMENT FOR THE CONNECT-TIME CHECK, EXTENDED PAST ZOOM.** The filed item says *connect then check, do not instruct and hope*. **Gabriel proves the check must not stop at "are there recordings" — it has to ask "are they TRANSCRIBED", because he has plenty of recordings and no transcripts.**
+- **⚠ AND IT MUST BE REPORTED PER PERSON, NOT AS A TOTAL.** Folded into a company-wide "N ungradeable", gabriel's 57% disappears into a rounding error; per user it is obviously one account needing a setting changed. **A rate is only actionable at the level where somebody can act on it.**
+
+### ⚠⚠⚠ ONE GRADED CALL MAKES THE ONBOARDING CARD VANISH — WHICH IS WHY GODWIN NEVER SAW HIS 101 UNGRADED CALLS (found 2026-08-26, FILED NOT BUILT)
+**The ungraded count and the grading control DO exist — on the CALLS page, gated on `if (work <= 0)`, source-agnostic, so a Zoom-only user reaches them fine. That is not the gap. The gap is that a newly-connected user is never on that page.**
+```js
+var analyzed = !!(state.analytics2 && state.analytics2.calls && state.analytics2.calls.analyzed > 0);
+if (connected && analyzed) return '';   // ⚠ ONE graded call and the whole card disappears
+…
+s2 = stepHtml(true, 'Get your calls graded', 'Your recent calls are graded — your scores are up top.', '');
+```
+- **⚠⚠ `analyzed > 0` IS THE DEFECT IN ONE EXPRESSION.** Godwin synced **121**, the first-sync cap graded **20**, and at the first completion the onboarding card **removed itself entirely** — having last said *"Your recent calls are graded"*, which is **true of the 20 and reads as "finished"**. Nothing anywhere then mentions the remaining 101.
+- **⚠ THIS IS THE SAME FAMILY AS "correct-but-unexplained is indistinguishable from broken", and worse: here the correct statement actively asserts completion.** A closer who syncs 121 and sees 20 does not conclude "20 is the cap" — they conclude it half-worked, and raise a ticket. **That is exactly the ticket that arrived.**
+- **THE FIX IS SMALL AND SPECIFIC** — and grading a backlog by hand does not deliver any of it: the step must say **how many of how many** (`20 of 121 graded`), and must **not disappear while a backlog remains** — i.e. gate the card on *no ungraded work left*, not on *at least one graded call*. **The count and the control already exist; they just need to be where the new user is looking.**
+- **⚠ FILED, NOT BUILT.** Backfilling by hand fixes today's customers and changes nothing for the next one — **and there is a next one every time an account onboards** (six in one evening at this company).
+
 ### ⚠⚠⚠ THE UNGRADED BACKLOG GROWS FASTER THAN IT CLEARS AS CLOSERS ONBOARD (measured 2026-08-26)
 **Every new closer arrives with 100-475 calls of history, and the first-sync cap grades the newest 20. The remainder sits pending, and NOTHING ON THEIR SCREEN SAYS IT EXISTS.**
 ```
