@@ -59,6 +59,7 @@ const callConnections = require('./call-connections');
 const zoomClient = require('./zoom-client');
 const { parseVttToTranscript } = require('./vtt-adapter');
 const zoomRetry = require('./zoom-retry');
+const fathomRetry = require('./fathom-retry');
 const closerVoice = require('./closer-voice');
 // v26: the derived voice PROFILE + outcome-scaled form constraints. Replaces
 // feeding exemplar lines — see lib/voice-profile for why lines were the wrong
@@ -1125,6 +1126,14 @@ async function analyzeCall(fathomCallId, userId) {
       throw new Error('Scope mismatch: call ' + fathomCallId + ' does not belong to user ' + userId);
     }
     var callRow = callQ.data;
+    /* Attempt counter for the transcript retry bound (migration 047). Read once
+       here; fails CLOSED to a spent counter if the column is unreadable. */
+    var callRow_attempts = 0;
+    try {
+      var attQ = await admin.from('call_analyses').select('transcript_attempts').eq('fathom_call_id', fathomCallId).maybeSingle();
+      callRow_attempts = (attQ && attQ.data && typeof attQ.data.transcript_attempts === 'number')
+        ? attQ.data.transcript_attempts : 0;
+    } catch (e) { callRow_attempts = fathomRetry.MAX_TRANSCRIPT_ATTEMPTS; }
 
     // ─── Phase 3+4: fetch the transcript, SOURCE-AWARE ────────────────────
     // Everything downstream (normalize → grade → extract) is source-agnostic:
@@ -1235,8 +1244,36 @@ async function analyzeCall(fathomCallId, userId) {
       var accessToken = await fathomRoutes._getValidAccessToken(admin, userId, connQ.data);
       try {
         transcript = await fathomRoutes._fetchRecordingTranscript(accessToken, callRow.fathom_call_id);
+        /* A clean fetch clears the counter — the bound is CONSECUTIVE temporary
+           failures, not lifetime ones. */
+        if ((callRow_attempts || 0) > 0) {
+          await admin.from('call_analyses').update({ transcript_attempts: 0 }).eq('fathom_call_id', fathomCallId);
+        }
       } catch (transcriptErr) {
-        return await failTranscript('Transcript fetch failed for recording_id ' + callRow.fathom_call_id + ': ' + ((transcriptErr && transcriptErr.message) || 'unknown'));
+        /* ⚠⚠ A TEMPORARY REFUSAL MUST NOT PERMANENTLY DESTROY THE CALL.
+           This branch used to call failTranscript() for ANY error, and nothing
+           moves 'error' back to 'pending' — so one HTTP 429 or 502 made the call
+           a silent hole in the customer's data forever. 151 calls were lost that
+           way in three minutes on 2026-08-25.
+           lib/fathom-retry.js reads the HTTP status out of the message and
+           requeues only what is genuinely temporary, bounded by attempts (NOT by
+           call age — see that file for why Zoom's bound is wrong here). */
+        var tMsg = (transcriptErr && transcriptErr.message) || 'unknown';
+        var reason = 'Transcript fetch failed for recording_id ' + callRow.fathom_call_id + ': ' + tMsg;
+        if (fathomRetry.shouldRequeue(tMsg, callRow_attempts)) {
+          var nextAttempt = (callRow_attempts || 0) + 1;
+          var waitFor = fathomRetry.retryAfterSeconds(tMsg);
+          await admin.from('call_analyses').update({ transcript_attempts: nextAttempt }).eq('fathom_call_id', fathomCallId);
+          return await requeueTranscript(reason + ' — temporary, requeued (attempt ' + nextAttempt
+            + ' of ' + fathomRetry.MAX_TRANSCRIPT_ATTEMPTS + ')'
+            + (waitFor ? '; Fathom asked for ' + waitFor + 's' : ''));
+        }
+        /* Permanent, or the attempt bound is spent — record WHICH, so a stuck
+           call is legible rather than just "failed". */
+        var why = (fathomRetry.classifyTranscriptFailure(tMsg) === 'temporary')
+          ? ' — temporary but retried ' + fathomRetry.MAX_TRANSCRIPT_ATTEMPTS + ' times, giving up'
+          : ' — permanent, not retried';
+        return await failTranscript(reason + why);
       }
     }
 

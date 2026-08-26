@@ -276,8 +276,18 @@ async function fetchRecordingTranscript(accessToken, recordingId) {
   if (!resp.ok) {
     var bodyText = '';
     try { bodyText = await resp.text(); } catch (e) { /* ignore */ }
-    console.error('[fathom] transcript fetch failed for recording ' + recordingId + ': HTTP ' + resp.status + ' — ' + bodyText.slice(0, 200));
-    throw new Error('transcript_fetch_failed: HTTP ' + resp.status + ' — ' + bodyText.slice(0, 200));
+    /* ⚠ THE STATUS AND Retry-After ARE CARRIED IN THE MESSAGE ON PURPOSE. This
+       is the only channel the worker has for telling a TEMPORARY refusal (429 /
+       5xx) from a permanent one — lib/fathom-retry.js reads them back out. Before
+       this, every non-OK response looked identical downstream and a single 429
+       marked the call errored forever. Do not shorten this string. */
+    var retryAfter = '';
+    try {
+      var ra = resp.headers && resp.headers.get && resp.headers.get('retry-after');
+      if (ra && /^\d+$/.test(String(ra).trim())) retryAfter = ' retry_after=' + String(ra).trim();
+    } catch (e) { /* header access must never break the error path */ }
+    console.error('[fathom] transcript fetch failed for recording ' + recordingId + ': HTTP ' + resp.status + retryAfter + ' — ' + bodyText.slice(0, 200));
+    throw new Error('transcript_fetch_failed: HTTP ' + resp.status + ' — ' + bodyText.slice(0, 200) + retryAfter);
   }
 
   var data;
