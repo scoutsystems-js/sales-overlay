@@ -169,7 +169,9 @@ test('⚠⚠ THE WINDOW PICKER SHOWS FOR A PURE BACKLOG, not only for outdated w
      dispatches both in one batch. */
   const i = html.indexOf('function gradeBacklogWorkCount');
   const fn = html.slice(i, html.indexOf('\n  }', i));
-  assert.ok(fn.length > 40 && fn.length < 600, 'work-count slice looks wrong: ' + fn.length);
+  /* ⚠ Widened 2026-08-27 — gradeBacklogWorkCount gained the pivot branch
+     (a manager reads the viewed rep's count, not their own). */
+  assert.ok(fn.length > 40 && fn.length < 1600, 'work-count slice looks wrong: ' + fn.length);
   assert.ok(/gradingBacklog/.test(fn) && /\.work/.test(fn),
     'the control must read the shared, source-agnostic work count');
   const BL = fs2.readFileSync(path2.join(__dirname, '..', 'lib', 'grading-backlog.js'), 'utf8');

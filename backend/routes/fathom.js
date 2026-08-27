@@ -779,8 +779,20 @@ function callIdsToAnalyze(newRows, lastSyncAt, cap) {
 // call_analyses.status back to 'pending', then fires the same fire-and-forget
 // analyze loop. Kept as its own route (rather than two client round-trips to
 // /reanalyze) so the reset + dispatch are atomic and can't race a status poll.
-router.post('/update-analyses', requireAuth, async function(req, res) {
-  var userId = req.user.id;
+/* ⚠⚠ THE BATCH, WITH THE TARGET PASSED IN. Extracted 2026-08-27 so a manager can
+   re-grade a REP's backlog without the self-serve route ever gaining the ability
+   to grade someone else.
+
+   ⚠⚠ THE GUARD IT REPLACES WAS NOT REMOVED — IT WAS LEFT INTACT AND ROUTED
+   AROUND. `POST /fathom/update-analyses` still passes `req.user.id` and cannot
+   do anything else; the cross-user case is a SEPARATE, role-gated route. The
+   old shape — point the existing control at a rep — would have made the
+   self-serve path capable of grading a stranger, one bad argument away from
+   spending someone else's money.
+
+   ⚠ `actorRole` is the SIGNED-IN user's role, never the target's. All-time is
+   owner-only, and a manager must not inherit an owner rep's allowance. */
+async function runUpdateAnalyses(req, res, userId, actorRole) {
 
   /* ⚠⚠ ALL-TIME IS OWNER-ONLY (Justin's ruling 2026-08-25, reason: API cost).
      "just for Josh he has the ability to go back all time but everyone else
@@ -806,7 +818,7 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
      not run is not a loophole worth leaving, and it means the refusal costs no
      database work. */
   var scopeAsked = (req.body && typeof req.body.scope === 'string') ? req.body.scope : null;
-  if (scopeAsked === 'all' && req.userProfileRole !== 'owner') {
+  if (scopeAsked === 'all' && actorRole !== 'owner') {
     return res.status(403).json({
       error: 'All-time grading is limited to admins. Choose the last 7 or 30 days.',
       max_scope: '30d',
@@ -954,6 +966,57 @@ router.post('/update-analyses', requireAuth, async function(req, res) {
     console.error('[fathom] update-analyses fatal for user ' + userId + ':', err.message);
     res.status(500).json({ error: 'Update analyses failed' });
   }
+}
+
+// Self-serve: grades YOUR OWN calls. Unchanged — it has never been able to
+// name another user and still cannot.
+router.post('/update-analyses', requireAuth, async function(req, res) {
+  return runUpdateAnalyses(req, res, req.user.id, req.userProfileRole);
+});
+
+/* ── POST /fathom/update-analyses/:user_id ───────────────────────────────────
+ * A manager or owner re-grades a REP's backlog. Justin's ruling — it is the
+ * proper fix for handing a customer a list of steps to run it themselves.
+ *
+ * ⚠⚠ WHAT IT GRADES, STATED PLAINLY: the calls belonging to `:user_id`, never
+ * the caller's. That single fact is the whole feature, and it is why this is a
+ * separate route rather than a parameter on the self-serve one — that route
+ * still passes `req.user.id` and is structurally incapable of naming anyone else.
+ *
+ * ⚠⚠ THE BOUNDARY, DECIDED AND ENFORCED: a manager may only grade a rep ON
+ * THEIR OWN TEAM (`managed_by === self`); an owner may grade anyone. This is the
+ * SAME predicate every other cross-user route in this codebase uses, and it is
+ * checked SERVER-SIDE — a hidden button is a suggestion, and this one spends
+ * money. A plain user is refused outright: a rep must not grade a peer.
+ *
+ * ⚠ ALL-TIME REMAINS OWNER-ONLY and reuses the EXISTING check inside
+ * runUpdateAnalyses — `actorRole` is the SIGNED-IN user's role, so a manager
+ * cannot inherit an owner rep's allowance by pointing at them. No second cap is
+ * introduced: two caps that disagree is the same defect class as two panels
+ * answering about different populations.
+ */
+router.post('/update-analyses/:user_id', requireAuth, async function(req, res) {
+  var target = req.params.user_id;
+  var role = req.userProfileRole;
+
+  /* ⚠ FAIL CLOSED. requireAuth fails OPEN on a DB error, leaving the role
+     undefined — which is neither 'manager' nor 'owner', so a blip refuses
+     rather than grants. The safe direction when the thing being gated is spend. */
+  if (role !== 'manager' && role !== 'owner') {
+    console.warn('[fathom] update-analyses scope violation: actor=%s (role=%s) target=%s', req.user.id, role, target);
+    return res.status(403).json({ error: 'Only managers and owners can grade another user\'s calls.' });
+  }
+
+  if (role !== 'owner') {
+    var admin = getAdminClient();
+    var t = await admin.from('user_profiles').select('managed_by').eq('user_id', target).maybeSingle();
+    if (t.error || !t.data || t.data.managed_by !== req.user.id) {
+      console.warn('[fathom] update-analyses scope violation: actor=%s target=%s not on their team', req.user.id, target);
+      return res.status(403).json({ error: 'That user is not on your team.' });
+    }
+  }
+
+  return runUpdateAnalyses(req, res, target, role);
 });
 
 // ── GET /fathom/identity-options ──────────────────────────────────────────────

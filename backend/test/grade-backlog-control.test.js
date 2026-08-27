@@ -68,9 +68,13 @@ function control(role, over) {
   const costM = /GRADE_COST_PER_CALL = ([0-9.]+)/.exec(HTML);
   assert.ok(costM, 'GRADE_COST_PER_CALL is gone from the page');
   const preamble = 'var GRADE_COST_PER_CALL = ' + costM[1] + ';\n';
-  const g = new Function('state', 'escapeHtml',
+  /* ⚠ THE EXTRACTED CODE NOW CALLS isSelf()/viewedUserLabel() — cross-user
+     grading, 2026-08-27. A real page has them; the harness did not, so every
+     case threw a ReferenceError. A FIXTURE gap, not a product one: supply them
+     rather than making production defend against a shape no browser produces. */
+  const g = new Function('state', 'escapeHtml', 'isSelf', 'viewedUserLabel',
     preamble + optSrc + '\n' + src + '\n; return gradeBacklogControlHtml();');
-  return g(state, (x) => String(x));
+  return g(state, (x) => String(x), () => true, () => 'this rep');
 }
 
 test('a non-owner is NOT offered all time; an owner is', () => {
@@ -108,9 +112,17 @@ test('BOTH render sites mount the same host', () => {
   const at = live.indexOf('var gradeHost =');
   assert.ok(at !== -1, 'the Calls-page host is gone');
   const slice = live.slice(at, at + 240);
-  assert.match(slice, /isSelf\(\)/,
-    'the Calls control must be self-only: grading is scoped to req.user.id, so on an '
-    + 'admin pivot it would grade the VIEWER\'s calls while showing another user\'s list');
+  /* ⚠⚠ CONVERTED 2026-08-27, NOT DELETED — the RULING changed, the risk did not.
+     This asserted the control was self-only, because grading is scoped to
+     req.user.id and a pivot would have graded the VIEWER's calls. Justin ruled
+     that managers and above may grade a rep, so the guard was REPLACED rather
+     than removed: the control now gates on canGradeViewedUser() and the pivoted
+     case posts to a separate role-gated route that names the target.
+     ⚠ The property that must never lapse: the Calls control is NEVER ungated. */
+  assert.match(slice, /canGradeViewedUser\(\)/,
+    'the Calls control must stay gated — ungated it would grade the viewer on a pivot');
+  assert.doesNotMatch(slice, /^\s*var gradeHost = \(gradeBacklogWorkCount/,
+    'it must not become a bare work-count check');
 });
 
 test('the cost shown is derived from the count, and scales', () => {

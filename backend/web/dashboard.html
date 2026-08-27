@@ -4986,6 +4986,20 @@
      count. Naming a problem and offering nothing to do about it.
      ⚠ /me/grading-backlog answers it for every source. */
   function gradeBacklogWorkCount() {
+    /* ⚠⚠ ON A PIVOT THE SHARED BACKLOG IS NULL — /me/grading-backlog is
+       self-scoped and the boot skips it when viewing someone else. Reading it
+       anyway returns 0 and the control never renders: the feature would look
+       shipped and do nothing, the dead-call-site shape again.
+       ⚠ SO A PIVOT USES THE NUMBER ALREADY ON SCREEN — the same `ungraded` count
+       printed on the line this control sits beside, from the pivot-scoped
+       /admin/fathom-calls/:id. A control gated on a DIFFERENT number from the one
+       next to it is how two figures come to disagree in front of a manager.
+       ⚠ It is a GATE, not a claim: the server's dry run is what states the real
+       count and cost before anything is spent. */
+    if (!isSelf()) {
+      var oc = state.callLibraryCounts || {};
+      return (typeof oc.ungraded === 'number') ? oc.ungraded : 0;
+    }
     var b = state.gradingBacklog;
     return (b && typeof b.work === 'number') ? b.work : 0;
   }
@@ -5036,11 +5050,21 @@
          empty once made every call look ungraded and nearly spent ~$75 nobody
          approved; the fix is that the number shown and the number run are the
          same query. */
+      /* ⚠⚠ SAY WHOSE CALLS AND WHOSE MONEY. A manager spending on a rep's
+         backlog is not the same act as a closer spending on their own, and
+         leaving that implied is how someone runs 101 calls without registering
+         that they just spent company money on another person's account. */
+      /* ⚠ SELF KEEPS ITS ORIGINAL WORDING — "Grade 291 calls". Only the pivoted
+         case names the rep, because that is the case where whose calls these are
+         is not obvious from where you are standing. */
+      var whose = isSelf() ? '' : ' of ' + escapeHtml(viewedUserLabel()) + '&rsquo;s';
+      var whoseMoney = isSelf() ? '' : ' This is billed to the company, not to them.';
       return '<span class="grade-wrap"><span class="grade-confirm">'
-        + '<span class="grade-confirm-text">Grade <strong>' + cf.count + ' call'
+        + '<span class="grade-confirm-text">Grade <strong>' + cf.count + whose + ' call'
           + (cf.count === 1 ? '' : 's') + '</strong> from ' + escapeHtml(gradeScopeLabel(cf.scope))
           + ' — <strong>' + escapeHtml(gradeCostText(cf.count)) + '</strong> of AI analysis.'
-          + ' Your manual outcome tags are kept.</span>'
+          + whoseMoney
+          + ' Manual outcome tags are kept.</span>'
         + '<button class="calls-outcome-btn active" type="button" onclick="gradeBacklogGo()">Start Grading</button>'
         + '<button class="calls-outcome-clear" type="button" onclick="gradeBacklogCancel()">Cancel</button>'
         + '</span></span>';
@@ -5077,6 +5101,33 @@
   }
 
   /* Step 1 — price it. Never dispatches. */
+  /* ⚠⚠ WHOSE CALLS THIS GRADES, IN ONE PLACE. Self -> the self-serve route,
+     which is structurally incapable of naming another user. Pivoted -> the
+     role-gated route that grades the REP being viewed.
+     ⚠ THE isSelf() GUARD WAS REPLACED, NOT REMOVED: without a target the old
+     control would have graded the VIEWER's calls while showing someone else's
+     list — a wrong action, someone else's money, and no error. */
+  /* The viewed rep, named. ⚠ Falls back to "this rep" rather than an empty
+     string or an id — a confirmation that spends money must not read
+     "Grade 101 of 's calls". A wrong-looking name is worse than a generic one. */
+  function viewedUserLabel() {
+    var u = (state.users || []).filter(function (x) { return x.user_id === state.viewingUserId; })[0];
+    if (!u) return 'this rep';
+    var n = [u.first_name, u.last_name].filter(Boolean).join(' ');
+    return n || u.email || 'this rep';
+  }
+  function gradeBacklogUrl() {
+    return isSelf() ? '/fathom/update-analyses'
+                    : '/fathom/update-analyses/' + encodeURIComponent(state.viewingUserId);
+  }
+  /* Managers and above only, and the server enforces it — this merely stops
+     offering an action that would 403. A rep must not grade a peer. */
+  function canGradeViewedUser() {
+    if (isSelf()) return true;
+    var r = state.me && state.me.role;
+    return r === 'manager' || r === 'owner';
+  }
+
   async function gradeBacklogAsk(scope) {
     if (state.gradeChecking || state.gradeConfirm) return;         // no double-fire
     if (state.gradeRun && !state.gradeRun.done && !state.gradeRun.failed) return;
@@ -5084,7 +5135,7 @@
     state.gradeChecking = true;
     paintGradeBacklog();
     try {
-      var res = await fetch('/fathom/update-analyses', {
+      var res = await fetch(gradeBacklogUrl(), {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
         body: JSON.stringify({ scope: scope, dry_run: true }),
@@ -5126,7 +5177,7 @@
                        lastRemaining: cf.count, quiet: 0, done: false, failed: false, msg: null };
     paintGradeBacklog();
     try {
-      var res = await fetch('/fathom/update-analyses', {
+      var res = await fetch(gradeBacklogUrl(), {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
         body: JSON.stringify({ scope: cf.scope }),
@@ -13039,7 +13090,10 @@
        (?user=) this control would grade the VIEWER's calls while showing someone
        else's list — a wrong action with no error. isSelf() is the guard, and
        fathomStatus is null on a pivot anyway. */
-    var gradeHost = (isSelf() && gradeBacklogWorkCount() > 0)
+    /* ⚠ WAS isSelf()-ONLY. It now renders on a pivot for a manager or owner and
+       grades the REP — the proper fix for handing a customer written steps to
+       run it themselves. Still hidden for a plain user viewing someone else. */
+    var gradeHost = (canGradeViewedUser() && gradeBacklogWorkCount() > 0)
       ? '<span class="grade-backlog-host">' + gradeBacklogControlHtml() + '</span>' : '';
     var outcomeControl = '<div class="calls-outcome">'
       + outBtn('closed', 'Closed', oc.closed)
