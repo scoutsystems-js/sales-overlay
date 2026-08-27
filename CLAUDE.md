@@ -2254,6 +2254,30 @@ AFTER     every table back to its ORIGINAL count — no other user's figures mov
   **The one apparent drift was the GLOBAL kb row, surviving by design** (`kb_rows_deleted: 1` = the personal one only). Deleted as test residue afterwards; residue 0.
 - **⚠⚠ THREE ROWS FROM BEFORE THE RULING ARE STILL TOMBSTONED, HOLDING 117 CALLS — REPORTED, NOT DECIDED.** `deleted-49711e7d` (39), `deleted-8bda1aac` (37), `deleted-e3ae475c` (41), all on Josh's board and all still counted in his team numbers (`repIdsFor` does not filter `active`). **They were deleted under the OLD contract, where the person was told the calls stay.** Purging them would remove 117 calls from every period Josh's team has worked. **That is a decision, not a tidy-up** — do not make it without Justin. `tombstoneIdentity` is kept for the same reason and marked legacy-only at the function.
 
+### ⚠⚠⚠ THE ZOOM HIGHLIGHT FAILURE — EVERY HYPOTHESIS DISPROVEN, AND THE HONEST ANSWER IS "NOT DETERMINABLE FROM STORED DATA" (2026-08-27)
+**The instrumentation shipped (migration 050); the ROOT CAUSE did not, because it cannot be recovered. Recorded so nobody re-runs these six tests.**
+```
+                                  calls   zero-highlight
+josh   ZOOM   v26                   42        21  (50%)
+josh   FATHOM v26                  483        16  (3.3%)
+godwin ZOOM   v28                   19         1  (5.3%)
+```
+- **⚠⚠ THE HEADLINE THAT STARTED THIS WAS WRONG IN TWO WAYS.** *"7 of 8 Zoom calls over 60 minutes"* was measured over ONE account before godwin's existed, and **zero-highlight is INDEPENDENT OF LENGTH** — on josh's calls a 3-minute call fails and a 101-minute call succeeds. It is ~50%, scattered, at every duration. **Long-call was never the variable.**
+- **⚠⚠ SIX HYPOTHESES TESTED AGAINST THE REAL FAILING TRANSCRIPTS, ALL DISPROVEN — do not re-run them:**
+```
+raw control chars in JSON   0 found; the PRE-FIX strict parser succeeds on all 3 calls
+the v26 extractor prompt    reconstructed from 74cd455 and run: 8 and 7 moments
+concurrency (Promise.all)   grader+extractor together, exactly as the pipeline: 6 moments
+the sanitizer               8 parsed -> 8 sanitized -> 0 dropped by the anchor guard
+duration_seconds            real (6000 vs max_ts 6050). ⚠ duration=0 DOES drop everything —
+                            worth knowing, but not what happened here
+speaker labelling           CLOSER/PROSPECT correctly set on the failing calls too
+```
+- **⚠ SO THE CAUSE WAS ENVIRONMENTAL AT THE TIME THOSE ANALYSES RAN, AND IT LEFT NO TRACE.** That window (08-20 to 08-26 on josh's account) is the same one that carried **three concurrent analyze loops** and the **update-analyses reset of 128 graded calls**. Not proven — stated as the only remaining candidate.
+- **⚠⚠ `persistHighlights` CANNOT PRODUCE ZERO BY CONCURRENCY, and that is worth recording because it is the obvious suspect.** It captures the prior ids BEFORE inserting and deletes exactly those, so two overlapping runs produce DUPLICATES, never an empty set. A failed INSERT can produce zero — which is why the persist error is now recorded separately.
+- **THE REAL DELIVERABLE IS THAT THE NEXT OCCURRENCE WILL SAY WHY.** `call_analyses.highlight_error` is written on every analysis that reaches the step, NULL when it worked. **Four outcomes kept apart, and `no_moments` is deliberately NOT a failure** — a short or one-sided call legitimately has nothing to flag, and folding it in with the parse failures makes a healthy call look broken and puts a number in front of someone that never reaches zero.
+- **⚠ THE FIRST DRAFT PUT THE FIELD IN THE RETURN VALUE, NOT THE DB PAYLOAD** — the column would have stayed empty forever while every test passed. Same shape as the dead call site. A guard now asserts it is inside the upserted object, proven by removing the write and watching it fail.
+
 ### ⚠⚠⚠ STANDING RULING — IF THE USER HAS TO DO SOMETHING, SCOUT MUST SAY SO ON THE PAGE THEY ARE ON (Justin, 2026-08-26)
 **His words: *"When something like the examples above where the user needs to do something, we have to let them know that in a very obvious way."***
 - **⚠⚠ IT IS A RULE ABOUT A CLASS OF STATE, NOT A LIST OF FIXES. Scout routinely KNOWS the user must act and stays silent**, and every instance looks like a different bug to whoever hits it. Four surfaced in one day's work, all on one company:
