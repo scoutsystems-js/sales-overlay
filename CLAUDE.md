@@ -2254,6 +2254,26 @@ AFTER     every table back to its ORIGINAL count — no other user's figures mov
   **The one apparent drift was the GLOBAL kb row, surviving by design** (`kb_rows_deleted: 1` = the personal one only). Deleted as test residue afterwards; residue 0.
 - **⚠⚠ THREE ROWS FROM BEFORE THE RULING ARE STILL TOMBSTONED, HOLDING 117 CALLS — REPORTED, NOT DECIDED.** `deleted-49711e7d` (39), `deleted-8bda1aac` (37), `deleted-e3ae475c` (41), all on Josh's board and all still counted in his team numbers (`repIdsFor` does not filter `active`). **They were deleted under the OLD contract, where the person was told the calls stay.** Purging them would remove 117 calls from every period Josh's team has worked. **That is a decision, not a tidy-up** — do not make it without Justin. `tombstoneIdentity` is kept for the same reason and marked legacy-only at the function.
 
+### ⚠⚠⚠ OPT-IN SURVIVAL — A PIVOT RESETS EVERYTHING IT DOES NOT EXPLICITLY KEEP (2026-08-27)
+**`setUser` cleared TWO lanes and `reloadAll` two more. Enumerated by capability — every fetch whose URL depends on the viewed user — EIGHTEEN of 22 rep-scoped lanes survived a pivot.** A rep with ZERO calls rendered *"Discovery 43/100 across 150 graded calls"* with quotes from two prospects he had never spoken to.
+- **⚠⚠ WORSE THAN A BLANK PANEL, AND THAT IS WHY IT RANKS: one person's coaching under another person's name, with NOTHING on screen saying so.** A manager cannot tell. It is the *data problem must never render as good news* family at its most expensive — it renders as a **finding about a named individual**.
+- **⚠⚠ THE FIX IS THE DIRECTION OF THE LIST, NOT ITS LENGTH.** Clearing a list of known lanes is the same defect with a longer fuse — the next lane anyone adds inherits it silently. State is snapshotted at boot (`INITIAL_STATE`) and **everything not named in `PIVOT_KEEP` resets to its DECLARED initial value**, so `[]` stays `[]` and `0` stays `0` and a reset lane is indistinguishable from a freshly-booted one.
+- **⚠⚠ THE ASYMMETRY IS THE WHOLE ARGUMENT, and it is the transferable part:**
+```
+forget to add to KEEP    -> one needless refetch          a COST
+forget to add to CLEAR   -> another person's data under   what Justin saw
+                            this person's name
+```
+  **Opt-in survival fails safe; opt-out clearing fails silently.** Reach for it wherever a context switch invalidates cached state — a tenant switch, a date change, a document switch.
+- **⚠⚠ THERE WERE TWO PIVOT DOORS, AND ENUMERATING THEM IS WHAT MADE THE FIX REAL.** `setUser` (team/admin row) and **`setCallLibraryUser`** (the Calls-page rep picker), which cleared three Calls lanes and left every coaching lane on the previous rep — so switching rep there and opening Coaching showed the old numbers under the new name. **Patching `setUser` alone would have been a fix that is half unreachable**, the multiple-dispatch trap this file has already recorded for archived views.
+- **⚠⚠ MY OWN FIRST TESTS PROVED THE HELPER, NOT THE PIVOT — 5 of 6 passed against the restored defect.** They drove `resetRepScopedState` directly, which says nothing about whether the pivot calls it. **Executing the REAL `setUser` and `setCallLibraryUser` against injected state fails 3 of 8 when the old code is restored, including both end-to-end tests.** The dead-call-site rule, caught inside the guard written for a stale-state bug.
+
+### ⚠⚠ NOT THE SAME BUG — THE REP GRAPH IS SCOPED TO THE CALLER'S TEAM, NOT THE VIEWED REP'S (2026-08-27)
+**I carried "this likely explains the no-objection-data message too" as likely. It is a SECOND fault, and the message misattributes it.**
+- **`loadRepGraph` fetches `/team/rep-series` with NO `team=` param**, so `resolveTeam` resolves the CALLER's default team. `repOwnSeries()` then filters to `viewingUserId` and returns null when that rep is not in the fetched set — which renders *"No objection data for this rep in the selected range."*
+- **⚠ THE MESSAGE IS FALSE IN THE ONE WAY THAT MATTERS: it blames the DATE RANGE.** Measured on dre — **19 objections in 7d, 30d AND 90d.** He has data in every window. The truth is *"this rep is not in the team I fetched"*, which is a completely different thing for a manager to do something about.
+- **Filed, not fixed.** Same class as *absent and excluded must never look alike*, with the extra sting that the explanation offered is the one thing that is definitely not the cause.
+
 ### ⚠⚠⚠ THE ZOOM HIGHLIGHT FAILURE — EVERY HYPOTHESIS DISPROVEN, AND THE HONEST ANSWER IS "NOT DETERMINABLE FROM STORED DATA" (2026-08-27)
 **The instrumentation shipped (migration 050); the ROOT CAUSE did not, because it cannot be recovered. Recorded so nobody re-runs these six tests.**
 ```
