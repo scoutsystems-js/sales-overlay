@@ -2254,6 +2254,31 @@ AFTER     every table back to its ORIGINAL count — no other user's figures mov
   **The one apparent drift was the GLOBAL kb row, surviving by design** (`kb_rows_deleted: 1` = the personal one only). Deleted as test residue afterwards; residue 0.
 - **⚠⚠ THREE ROWS FROM BEFORE THE RULING ARE STILL TOMBSTONED, HOLDING 117 CALLS — REPORTED, NOT DECIDED.** `deleted-49711e7d` (39), `deleted-8bda1aac` (37), `deleted-e3ae475c` (41), all on Josh's board and all still counted in his team numbers (`repIdsFor` does not filter `active`). **They were deleted under the OLD contract, where the person was told the calls stay.** Purging them would remove 117 calls from every period Josh's team has worked. **That is a decision, not a tidy-up** — do not make it without Justin. `tombstoneIdentity` is kept for the same reason and marked legacy-only at the function.
 
+### ⚠⚠⚠ A TEST WHOSE PASSING VALUE IS INDISTINGUISHABLE FROM ITS FAILING VALUE IS NOT A TEST (2026-08-27)
+**The cross-user grading proof was `95` against `0` — TWO DIFFERENT NUMBERS. Had both come back the same, nothing would have been learned about which set the query selected.**
+- **⚠⚠ THE SHAPE TO REACH FOR: make the correct answer and the wrong answer produce DIFFERENT OBSERVABLE VALUES, then show both.** A single call returning 200 proves the route runs; it does not prove it ran on the right data. This is the same discipline as *restore the defect and count what fails*, applied to a live probe instead of a suite.
+- Sits with the vacuous-assertion family — an absence assertion against an empty string, a conditional ordering check with a stale anchor, a guard proven only against inputs it should pass.
+
+### ⚠⚠⚠ A FEATURE CAN BE COMPLETE AND UNREACHABLE — THE CHECK IS "DID I SEE IT WORK", NEVER "IS THE CODE THERE" (third instance this week, 2026-08-27)
+```
+the voice profile      built, wired to nothing
+resetRepScopedState    helper correct, 5 of 6 tests passed with the bug restored
+the grading control    visibility read a count only ever loaded for your OWN
+                       account — it would have hidden itself on the rep page it
+                       was built for. Feature shipped, does nothing.
+```
+- **⚠⚠ ALL THREE PASS EVERY STATIC CHECK.** The code exists, it parses, it is imported, the suite is green. **What is missing is an execution path, and nothing about the artefact reveals that.**
+- **THE HABIT: after building, ask what would have to be TRUE AT RUNTIME for this to appear, and check that condition directly** — not the code that depends on it. For the grading control that was "is the count non-zero on a pivot", and the answer was no.
+
+### ⚠⚠ THE SUPPORT TICKET — TWO PERMISSION ANSWERS, AND THE FAILURE MODE THAT MATTERS (2026-08-27)
+**`POST /support/tickets` is UNIVERSAL; `GET /support/tickets` is OWNER-ONLY.** Closers are the ones who hit problems; the list carries other companies' account state in every attached snapshot. **One feature, opposite gates — conflating them is a data leak.**
+- **⚠⚠ THE TICKET LANDS EVEN IF THE SNAPSHOT FAILS, and this is the whole design of the endpoint.** A support tool that refuses a report because its own diagnostics broke fails at exactly the moment someone needs to reach us. **Proven by making `buildSnapshot` throw: 200, message stored, `snapshot_error` recorded.** Restoring the refusing behaviour fails the guard.
+- **⚠ "NO SNAPSHOT" AND "THE SNAPSHOT BROKE" ARE DIFFERENT FACTS** — an empty one rendered as though nothing were wrong is the absent-vs-excluded collapse, and here it would mean answering a ticket from data that never loaded.
+- **⚠⚠ THE SNAPSHOT IS CAPTURED AT RAISE TIME, NEVER REGENERATED ON READ.** Regenerating answers *what is true now*, **looks identical**, and would make a backlog they have since cleared read as though it never existed — an unanswerable ticket with nothing to signal the substitution.
+- **⚠ THE PERSON MUST NOT SUBMIT INTO SILENCE.** With an admin-only list they otherwise get no acknowledgement, no reference and no way to know anything happened — **worse than an email address, which at least lands somewhere they can see.** The server returns a real reference; a send failure offers a mailto rather than an apology, because they are already reporting that something is broken.
+- **⚠⚠ REPLYING IN-APP NEEDS A NOTIFICATION SYSTEM AND THERE IS NONE — no table, no delivery, no read state.** It is already filed as a hard prerequisite for EOD manager approval. **Do NOT half-build one as a side effect of a support tool: that is how it ends up wrong for the three other things that need it.** Replies happen by email until it is built deliberately.
+- **Cost, stated: ~5.7s end to end** (the snapshot is 2-4s of it). Kept SYNCHRONOUS deliberately — an async attach would leave a window where a crash produces a ticket with neither a snapshot nor a recorded reason, collapsing the two facts the schema exists to keep apart.
+
 ### ⚠⚠⚠ REPLACE A GUARD BY ROUTING AROUND IT, NEVER BY WIDENING IT (2026-08-27)
 **Managers and above can now grade a rep's backlog. The self-serve route was NOT given a target parameter — a SEPARATE role-gated route was added, and `POST /fathom/update-analyses` still passes `req.user.id` and remains STRUCTURALLY INCAPABLE of naming another user.**
 - **⚠⚠ THE TEMPTING FIX WAS TO ADD `target_user_id` TO THE EXISTING ROUTE. That makes the self-serve path able to grade a stranger — one bad argument from spending someone else's money** — and every existing caller of that route becomes a thing you have to re-audit. Extracting the batch into `runUpdateAnalyses(req, res, userId, actorRole)` and giving the cross-user case its own gated door leaves the old guarantee provably intact.
