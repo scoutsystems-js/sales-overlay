@@ -540,7 +540,11 @@ test('10e: a stale rep\'s line cannot survive a pivot or a range change', () => 
 test('10e: no data for that rep renders a plain message, not an empty canvas', () => {
   const out = renderOverviewAs({ repGraph: { buckets: [], reps: [], team: { handle: [], close: [] } } });
   assert.strictEqual(out.charts.length, 0);
-  assert.ok(out.html.indexOf('No objection data for this rep') !== -1);
+  /* ⚠ COPY UPDATED 2026-08-27. The old text said "in the selected range", which
+     named a cause it had not established — the rep was missing because the WRONG
+     TEAM had been fetched, and they had objections in every window measured. The
+     PROPERTY is unchanged: no data renders a plain message, not an empty canvas. */
+  assert.ok(out.html.indexOf('No objection moments recorded for this rep') !== -1);
 });
 
 test('10e: the chart is drawn AFTER the canvas is in the DOM', () => {

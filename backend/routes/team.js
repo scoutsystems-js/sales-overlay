@@ -113,6 +113,39 @@ async function resolveTeam(admin, req) {
   var role = req.user.role;
   var teamParam = req.query.team || null;
 
+  /* ⚠⚠ `rep=` RESOLVES THE TEAM THAT CONTAINS THAT REP, and it exists because a
+     rep-scoped panel was resolving the CALLER's team instead. The pivoted rep's
+     objection graph fetches /team/rep-series; with no team named, an owner got
+     their OWN default team, the viewed rep was absent from it, and the panel
+     rendered "no objection data for this rep in the selected range" — while that
+     rep had 19 objections in every window measured. Same family as the stale-
+     panel bug: a panel answering about the WRONG POPULATION and saying nothing.
+
+     ⚠ RESOLVED SERVER-SIDE ON PURPOSE. The client does not reliably know a rep's
+     manager (`state.users` is loaded for some surfaces and not others), so
+     deriving it there would fail back to the caller's team exactly when the list
+     happened to be missing — the silent wrong-population failure again.
+
+     ⚠ It is IGNORED for a non-owner: a manager only ever resolves their own
+     reps, and the pivot itself is already 403'd server-side for anyone else's. */
+  var repParam = req.query.rep || null;
+  if (repParam && role === 'owner' && !teamParam) {
+    var rp = await admin.from('user_profiles').select('managed_by, role').eq('user_id', repParam).maybeSingle();
+    if (rp.error) throw new Error('rep lookup: ' + rp.error.message);
+    var rprof = rp.data || {};
+    if (rprof.managed_by) {
+      teamParam = rprof.managed_by;                       // their manager's board
+    } else if (rprof.role === 'manager' || rprof.role === 'owner') {
+      teamParam = repParam;                               // they head their own
+    } else {
+      /* ⚠ AN UNMANAGED PLAIN USER IS ON NO TEAM, and that is a real state — not
+         an error and not an empty result. Return them as a board of one so their
+         own line still draws; the team baseline is simply themselves. Silently
+         returning nothing here is the defect this block exists to remove. */
+      return { keyId: repParam, memberIds: [repParam], label: 'This rep', mode: 'rep' };
+    }
+  }
+
   if (role !== 'owner') {
     // manager: always own reps, param ignored.
     var mine = await repIdsFor(admin, me);

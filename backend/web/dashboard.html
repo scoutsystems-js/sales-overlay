@@ -7889,7 +7889,12 @@
     try {
       var r = state.dateRange;
       var qp = 'from=' + encodeURIComponent(r.from) + '&to=' + encodeURIComponent(r.to)
-        + '&bucket=' + bucketForRange(r);
+        + '&bucket=' + bucketForRange(r)
+        /* ⚠⚠ NAME THE REP, or this resolves the CALLER's team. Without it an
+           owner viewing a rep on another manager's board fetched their OWN team,
+           found the rep absent, and rendered an empty state that blamed the date
+           range — on a rep with 19 objections in every window. */
+        + '&rep=' + encodeURIComponent(state.viewingUserId);
       var res = await fetch('/team/rep-series?' + qp, { headers: authHeader() });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -7925,7 +7930,12 @@
       ? '<div class="rep-graph-slot" data-loading="1"><div class="rep-graph-skeleton skeleton"></div></div>'
       : (series
           ? '<div class="rep-graph-slot" data-canvas="repOwnChart"></div>'
-          : '<div class="empty"><p>No objection data for this rep in the selected range.</p></div>');
+          /* ⚠⚠ THE OLD COPY NAMED A CAUSE IT HAD NOT ESTABLISHED — "in the
+             selected range" — and the range was the one thing it was NOT: the
+             rep was missing because the wrong team had been fetched. A message
+             must not assert a reason it does not know. This states only what is
+             true: there are no objection moments here. */
+          : '<div class="empty"><p>No objection moments recorded for this rep yet.</p></div>');
     return '<div class="section fade-in">'
       + '<div class="section-header"><h2>Objection Handling %</h2>'
         + '<div class="meta">this rep, against the team average</div></div>'
