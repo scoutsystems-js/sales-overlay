@@ -142,7 +142,12 @@ async function syncZoomCalls(admin, userId, conn) {
   if (allRows.length === 0) {
     var nowIsoEmpty = new Date().toISOString();
     await admin.from('call_connections')
-      .update({ last_sync_at: nowIsoEmpty, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIsoEmpty })
+      /* ⚠⚠ WHAT THE SYNC ACTUALLY DID — the fact that answered a live ticket and
+         existed only in a Railway log that does not survive a restart. `fetched>0
+         inserted=0` is the whole "it says connected and nothing happened" case,
+         and without it a support answer needs a human reading logs. */
+      .update({ last_sync_at: nowIsoEmpty, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIsoEmpty,
+                last_sync_fetched: 0, last_sync_inserted: 0, last_sync_analyzed: 0 })
       .eq('user_id', userId).eq('provider', 'zoom');
     console.log('[zoom] Sync complete for user ' + userId + ': no cloud recordings (fetched=0, malformed=' + malformedCount + ')');
     return { ok: true, synced: 0, fetched: 0, malformed: malformedCount, pages: pageCount, truncated: hitPageCap, dispatched: 0, no_recordings: true };
@@ -164,7 +169,12 @@ async function syncZoomCalls(admin, userId, conn) {
   // Mark connection success.
   var nowIso = new Date().toISOString();
   var statusUpdate = await admin.from('call_connections')
-    .update({ last_sync_at: nowIso, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIso })
+    /* ⚠⚠ WHAT THE SYNC ACTUALLY DID — the fact that answered a live ticket and
+       existed only in a Railway log that does not survive a restart. `fetched>0
+       inserted=0` is the whole "it says connected and nothing happened" case,
+       and without it a support answer needs a human reading logs. */
+    .update({ last_sync_at: nowIso, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIso,
+              last_sync_fetched: allRows.length, last_sync_inserted: insertedCount })
     .eq('user_id', userId).eq('provider', 'zoom');
   if (statusUpdate.error) console.error('[zoom] sync status update failed for user ' + userId + ': ' + statusUpdate.error.message);
 
@@ -200,6 +210,12 @@ async function syncZoomCalls(admin, userId, conn) {
   await applyDuplicateSuppression(admin, userId);
 
   var newCallIds = callIdsToAnalyze(newRows, conn && conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
+  /* ⚠ WRITTEN SEPARATELY because the cap is applied AFTER the status write. On a
+     FIRST sync this is deliberately smaller than `inserted` — which is exactly
+     why a customer can sync 121 calls and see 20 graded, and why a snapshot that
+     omits it cannot explain the gap. */
+  await admin.from('call_connections').update({ last_sync_analyzed: newCallIds.length })
+    .eq('user_id', userId).eq('provider', 'zoom');
   if (newRows.length > newCallIds.length) {
     console.log('[zoom] sync: first-sync backlog — capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
   }

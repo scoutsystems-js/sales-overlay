@@ -10,6 +10,11 @@ const { fetchSellingContext } = require('../lib/selling-context');
 const welcomeEmail = require('../lib/welcome-email');
 const { canManageTarget, deletePlan, deleteUserConfirmation, deactivateBlockReason } = require('../lib/user-management');
 const { purgeUsers } = require('../lib/user-purge');
+const healthSnapshot = require('../lib/health-snapshot');
+/* ⚠ IMPORTED, NOT ASSUMED. A called-but-undeclared identifier is a RUNTIME
+   fault that node -c and the whole suite pass straight over — it took down
+   add-user for days with a silent ReferenceError. */
+const { classifyFailure } = require('../lib/failure-class');
 /* ⚠⚠ THIS IMPORT WAS MISSING FROM 20ab18c UNTIL 2026-08-24, AND ADD-USER HAS
    BEEN COMPLETELY BROKEN THAT ENTIRE TIME. That commit added two
    normalizeName() calls to POST /admin/users and never imported the function,
@@ -1063,6 +1068,35 @@ router.get('/users/:user_id/delete-preview', requireAuth, requireRole('owner'), 
     if (handleConfigError(err, res)) return;
     console.error('[admin] delete-preview error:', err.message, err.stack);
     res.status(500).json({ error: 'Failed to load the delete preview' });
+  }
+});
+
+/* ── GET /admin/users/:user_id/health ────────────────────────────────────────
+ * The account health snapshot. Generated ON DEMAND and attached to a ticket —
+ * it is NOT a dashboard and there is deliberately no page for it.
+ *
+ * ⚠⚠ IT LEADS WITH WHAT THE USER CAN SEE. Both tickets this week were reported
+ * as broken syncs and neither was one; the second was a working sync with
+ * nothing on screen about 101 ungraded calls. A snapshot reporting system state
+ * alone would have answered it "everything is fine" — which a human already had.
+ *
+ * ⚠ OWNER-ONLY: it reports another person's account state. Enforced here on the
+ * server, never by hiding a control.
+ * ⚠ Cost: bounded — head-counts and two small selects, no model call, nothing
+ * that pages a table. Measured 1.8-4.2s per account on live data.
+ */
+router.get('/users/:user_id/health', requireAuth, requireRole('owner'), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var got = await admin.auth.admin.getUserById(req.params.user_id);
+    if (got.error || !got.data || !got.data.user) return res.status(404).json({ error: 'user not found' });
+    var snap = await healthSnapshot.buildSnapshot(admin, req.params.user_id, { classifyFailure: classifyFailure });
+    snap.email = got.data.user.email;
+    res.json(snap);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] health snapshot failed for ' + req.params.user_id + ':', err.stack || err.message);
+    res.status(500).json({ error: 'Could not build the health snapshot' });
   }
 });
 

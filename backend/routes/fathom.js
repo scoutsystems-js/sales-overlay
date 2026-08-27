@@ -454,7 +454,12 @@ async function syncUserCalls(admin, userId, conn, opts) {
   var nowIso = new Date().toISOString();
   var statusUpdate = await admin
     .from('fathom_connections')
-    .update({ last_sync_at: nowIso, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIso })
+    /* ⚠⚠ WHAT THE SYNC ACTUALLY DID — the fact that answered a live ticket and
+       existed only in a Railway log that does not survive a restart. `fetched>0
+       inserted=0` is the whole "it says connected and nothing happened" case,
+       and without it a support answer needs a human reading logs. */
+    .update({ last_sync_at: nowIso, last_sync_status: 'ok', last_sync_error: null, updated_at: nowIso,
+              last_sync_fetched: allRows.length, last_sync_inserted: insertedCount })
     .eq('user_id', userId);
   if (statusUpdate.error) {
     // Calls saved but status row didn't update — log; the next sync fixes it.
@@ -483,6 +488,9 @@ async function syncUserCalls(admin, userId, conn, opts) {
   await applyDuplicateSuppression(admin, userId);
 
   var newCallIds = callIdsToAnalyze(newRows, historyMode ? null : conn.last_sync_at, FIRST_SYNC_ANALYZE_CAP);
+  // ⚠ Separate write — the cap lands after the status update. See zoom.js.
+  await admin.from('fathom_connections').update({ last_sync_analyzed: newCallIds.length })
+    .eq('user_id', userId);
   if (newRows.length > newCallIds.length) {
     console.log('[fathom] sync: first-sync backlog — capped auto-analysis to newest ' + newCallIds.length + ' of ' + newRows.length + ' new calls for user ' + userId + ' (rest stay pending for backfill)');
   }
