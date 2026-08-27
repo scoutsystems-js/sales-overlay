@@ -61,6 +61,7 @@ const { parseVttToTranscript } = require('./vtt-adapter');
 const zoomRetry = require('./zoom-retry');
 const fathomRetry = require('./fathom-retry');
 const modelRetry = require('./model-retry');
+const highlightFailure = require('./highlight-failure');
 const closerVoice = require('./closer-voice');
 // v26: the derived voice PROFILE + outcome-scaled form constraints. Replaces
 // feeding exemplar lines — see lib/voice-profile for why lines were the wrong
@@ -1060,7 +1061,11 @@ async function persistHighlights(admin, fathomCallId, userId, sanitizedHighlight
     // Insert failed → DO NOT delete. Existing highlights stay intact; the next
     // re-analysis retries.
     console.warn('[analysis] highlight insert failed for ' + fathomCallId + ' — keeping existing highlights (no delete): ' + ins.error.message);
-    return { inserted: 0, deleted: 0, kept_existing: true };
+    /* ⚠ THE REASON TRAVELS WITH THE RESULT. A failed insert leaves a call with
+       zero highlights and is INDISTINGUISHABLE from an extraction that found
+       none — the exact confusion that made the Zoom investigation take days.
+       The caller records it on the row. */
+    return { inserted: 0, deleted: 0, kept_existing: true, error: 'insert failed: ' + ins.error.message };
   }
 
   // New set is safely in — now delete exactly the prior rows.
@@ -1617,8 +1622,20 @@ async function analyzeCall(fathomCallId, userId) {
     // Highlight failure is non-fatal — we still ship the grades. Stored as
     // zero highlights (the review page renders "No highlights extracted").
     var highlightParsed = extractFirstJsonArray(highlighterText);
-    if (!highlightParsed) {
-      console.warn('[analysis] highlight extractor returned unparseable JSON for ' + fathomCallId + ' — proceeding with grades only');
+    /* ⚠⚠ RECORD WHY, ON THE ROW. This used to be a bare console.warn carrying no
+       reason and no snippet, in a log that does not survive a restart — so a
+       highlight failure reached the database as a perfectly normal graded call
+       with an empty list and NOTHING saying what happened. That is what made
+       the long-Zoom defect undiagnosable for days.
+       ⚠ Non-fatal is unchanged: the grades still ship. Only the silence goes. */
+    var highlightErrorReason = highlightFailure.describeHighlightFailure({
+      text:       highlighterText,
+      parsed:     highlightParsed,
+      count:      highlightParsed ? highlightParsed.length : 0,
+      stopReason: (highlighterResp && highlighterResp.stop_reason) || null,
+    });
+    if (highlightErrorReason) {
+      console.warn('[analysis] highlight extraction produced nothing for ' + fathomCallId + ': ' + highlightErrorReason);
     }
 
     // ─── 7c: verify the coverage / context evidence at WRITE TIME ────────
@@ -1858,6 +1875,14 @@ async function analyzeCall(fathomCallId, userId) {
       analyzed_at:         new Date().toISOString(),
       prompt_version:      ANALYSIS_PROMPT_VERSION,
       status:              'done',
+      /* ⚠⚠ WRITTEN ON EVERY ANALYSIS THAT REACHES THE HIGHLIGHT STEP, including
+         the successful ones (as NULL). "No reason recorded" and "nothing went
+         wrong" are opposite meanings and identical to a query — write the null.
+         ⚠ IT BELONGS IN THIS PAYLOAD, NOT THE RETURN VALUE. The first draft put
+         it beside `highlights_count` in the returned object, which reaches no
+         database at all: the column would have stayed empty forever while every
+         test passed. Same shape as the dead call site that hid for months. */
+      highlight_error:     highlightErrorReason,
       /* ⚠ A CLEAN RUN CLEARS BOTH COUNTERS — the bounds are on CONSECUTIVE
          failures, not lifetime ones. Without this a call that flaked twice a
          month ago would arrive at its next real failure with no budget left. */
@@ -1932,7 +1957,18 @@ async function analyzeCall(fathomCallId, userId) {
         if ((typeof h.closer_response === 'string') && h.closer_response.trim()) h.closer_response_verified = false;
       });
     }
-    await persistHighlights(admin, fathomCallId, userId, sanitizedHighlights);
+    var persisted = await persistHighlights(admin, fathomCallId, userId, sanitizedHighlights);
+    /* ⚠⚠ A PERSIST FAILURE IS A SECOND WAY TO REACH ZERO HIGHLIGHTS, and the
+       parse-time classifier cannot see it — the extraction succeeded and the
+       WRITE failed. Without this the row would read "extraction fine, no
+       moments", which is the opposite of what happened.
+       ⚠ One extra write, and only on failure. The analysis row is already
+       upserted by this point, so this amends it rather than racing it. */
+    if (persisted && persisted.error) {
+      await admin.from('call_analyses')
+        .update({ highlight_error: 'persist_failed: ' + String(persisted.error).slice(0, 400) })
+        .eq('fathom_call_id', fathomCallId);
+    }
 
     // ─── Phase 7b: auto-populate the rep's KB from a CLOSED call ─────────
     // KB Part 2, sub-stage 2d. Gated on effectiveOutcome — the manual-override-
@@ -2020,6 +2056,7 @@ async function analyzeCall(fathomCallId, userId) {
       status:            'done',
       overall_score:     overallScore,
       highlights_count:  sanitizedHighlights.length,
+      highlight_error:   highlightErrorReason,
       speaker_confidence: normalized.speaker_confidence,
     };
   } catch (err) {

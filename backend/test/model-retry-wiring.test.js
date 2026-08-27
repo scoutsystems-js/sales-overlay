@@ -112,7 +112,10 @@ test('⚠ and it gives up SOONER than a transient error does', async () => {
 test('a clean run clears BOTH counters', () => {
   const at = SRC.indexOf("status:              'done',");
   assert.ok(at !== -1, 'stale anchor: the success write moved');
-  const win = SRC.slice(at, at + 600);
+  /* ⚠ WIDENED 2026-08-26 — `highlight_error` and its comment now sit between
+     the status line and the counters. The window exists to keep the slice near
+     the success write, not to encode how long that block may be. */
+  const win = SRC.slice(at, at + 1400);
   assert.match(win, /transcript_attempts: 0/);
   assert.match(win, /model_attempts:\s+0/);
 });
