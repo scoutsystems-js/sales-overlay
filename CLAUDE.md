@@ -2254,6 +2254,37 @@ AFTER     every table back to its ORIGINAL count — no other user's figures mov
   **The one apparent drift was the GLOBAL kb row, surviving by design** (`kb_rows_deleted: 1` = the personal one only). Deleted as test residue afterwards; residue 0.
 - **⚠⚠ THREE ROWS FROM BEFORE THE RULING ARE STILL TOMBSTONED, HOLDING 117 CALLS — REPORTED, NOT DECIDED.** `deleted-49711e7d` (39), `deleted-8bda1aac` (37), `deleted-e3ae475c` (41), all on Josh's board and all still counted in his team numbers (`repIdsFor` does not filter `active`). **They were deleted under the OLD contract, where the person was told the calls stay.** Purging them would remove 117 calls from every period Josh's team has worked. **That is a decision, not a tidy-up** — do not make it without Justin. `tombstoneIdentity` is kept for the same reason and marked legacy-only at the function.
 
+### ⚠⚠⚠ SCOPED STATE — CLEAR EVERYTHING EXCEPT A PROTECTED LIST (the general rule, 2026-08-27)
+**Promoted out of the pivot fix because it applies to ANY scoped state, not one page: a tenant switch, a date change, a document switch, a customer switch.**
+```
+forget to PROTECT something  ->  one needless reload            a COST
+forget to CLEAR   something  ->  one subject's data under       A WRONG ANSWER
+                                 another subject's name          NOBODY CAN SEE
+```
+- **⚠⚠ THE DIRECTION OF THE LIST IS THE WHOLE FIX. Clearing a list of known lanes is the same defect with a longer fuse** — the next lane anyone adds inherits it silently. **Opt-in survival fails safe; opt-out clearing fails invisibly.**
+- Reset from a **snapshot of the declared initial values**, not by assigning `null`: `[]` stays `[]`, `0` stays `0`, and a reset lane is indistinguishable from a freshly-booted one.
+- **⚠ ENUMERATE THE DOORS, NOT JUST THE STATE.** There were TWO ways to change the viewed rep; patching one is a fix that is half unreachable.
+
+### ⚠⚠⚠ A UNIT TEST OF A HELPER CANNOT DETECT THAT NOTHING INVOKES THE HELPER (2026-08-27)
+**My first six tests drove the clearing function directly. FIVE OF SIX PASSED WITH THE BUG FULLY RESTORED.**
+- **Testing the function proves the function. It says nothing about whether the caller calls it** — and "the caller doesn't call it" is one of the commonest failures in this codebase (the orphaned strip builder, the dead mount line, the return-value column that reached no database).
+- **THE TESTS THAT CAUGHT IT RAN THE REAL PIVOT** — `setUser` and `setCallLibraryUser` executed against injected state with navigation stubbed. Against the original code those fail; the helper-only tests pass either way, **which is exactly why they are not the proof**.
+- **⚠ THE DISCRIMINATOR, and it is cheap: RESTORE THE DEFECT AND COUNT WHAT FAILS.** If a guard written for a bug does not fail against that bug, it is describing the code rather than testing it. **A count of 5-of-6 passing is the signal** — not that the tests are wrong, but that they are aimed one level too low.
+
+### ⚠⚠ A MESSAGE MUST NOT NAME A CAUSE IT HAS NOT ESTABLISHED (2026-08-27)
+**"No objection data for this rep in the selected range" blamed the DATE RANGE. Measured: that rep had 19 objections in the last 7, 30 AND 90 days — the range was the one thing it definitively was not.**
+- The real cause was that a rep-scoped panel fetched a TEAM endpoint without naming the rep, so an owner resolved their OWN default board and the viewed rep was absent from it. **Proven on production: with no rep named the board holds 5 members and that rep is not among them; named, it resolves their manager's board of 9 and includes them.**
+- **⚠ A WRONG REASON IS WORSE THAN NO REASON — it sends someone to change the one thing that will not help**, and it reads as a considered explanation. The replacement states only what is true.
+- **⚠ RESOLVE SCOPE SERVER-SIDE WHERE THE ANSWER IS AUTHORITATIVE.** The client does not reliably know a rep's manager, so deriving it there would fall back to the caller's team exactly when the roster happened to be unloaded — the same silent wrong-population failure in a new place.
+- **⚠ "ON NO TEAM" IS A REAL STATE, not an empty result.** An unmanaged rep resolves as a board of one so their own line still draws.
+
+### ⚠⚠ THE HEALTH SNAPSHOT LEADS WITH WHAT THE USER CAN SEE — THAT ORDERING IS THE DESIGN (2026-08-27)
+**Both tickets this week were reported as broken syncs and NEITHER was one.** Josh was recording locally so Zoom exposed nothing; Godwin's sync fetched 121, inserted 121, graded 20 under the first-sync cap, **and nothing on his screen mentioned the other 101.**
+- **⚠⚠ A SNAPSHOT REPORTING SYSTEM STATE ALONE WOULD HAVE ANSWERED HIM "EVERYTHING IS FINE" — which a human already had, and which was true and useless.** `WORKING, BUT INCOMPLETE ON SCREEN` is its own verdict, never a shade of working.
+- **⚠ MIGRATION 051 STORES WHAT THE LAST SYNC DID** (`fetched`/`inserted`/`analyzed`). That line lived only in a Railway log that does not survive a restart and was **the single fact that settled the ticket**. NULL = no sync since the columns shipped; 0 = the sync found nothing. **Different answers, kept apart.**
+- **Cost stated because support tools are run at the worst moment:** head-counts and two small selects, no model call, nothing that pages a table — **1.8-4.2s per account measured live.**
+- **It attaches to a ticket. It is NOT a dashboard and there is deliberately no page.**
+
 ### ⚠⚠⚠ OPT-IN SURVIVAL — A PIVOT RESETS EVERYTHING IT DOES NOT EXPLICITLY KEEP (2026-08-27)
 **`setUser` cleared TWO lanes and `reloadAll` two more. Enumerated by capability — every fetch whose URL depends on the viewed user — EIGHTEEN of 22 rep-scoped lanes survived a pivot.** A rep with ZERO calls rendered *"Discovery 43/100 across 150 graded calls"* with quotes from two prospects he had never spoken to.
 - **⚠⚠ WORSE THAN A BLANK PANEL, AND THAT IS WHY IT RANKS: one person's coaching under another person's name, with NOTHING on screen saying so.** A manager cannot tell. It is the *data problem must never render as good news* family at its most expensive — it renders as a **finding about a named individual**.
