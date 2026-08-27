@@ -2261,6 +2261,29 @@ AFTER     every table back to its ORIGINAL count — no other user's figures mov
 - **THE HABIT, and it generalises to anything support-facing, any degraded path, any fallback: BREAK THE DEPENDENCY DELIBERATELY AND WATCH.** A degraded path that has never been exercised is a guess. Reading the try/catch is not the same as seeing it hold.
 - **⚠ AND KEEP THE GATHER IN THE FOREGROUND.** Backgrounding the 2-4s snapshot would leave a window where a crash produces a ticket with NEITHER diagnostics NOR a recorded reason — collapsing the two facts the schema exists to keep apart. **An unexplainable ticket is worse than a slow form.**
 
+### ⚠⚠⚠ TWO CORRECT HALVES DO NOT MAKE A WORKING WHOLE (2026-08-27)
+**The ticket reference: the send returned one, the list showed tickets, and NEITHER SIDE WAS WRONG. What was missing was the JOIN between them — a code handed to a person and displayed nowhere the admin could see.**
+- **⚠⚠ NOTHING STATIC CATCHES THIS, and that is the point.** Every check that examines one side passes, because each side is complete on its own terms. There is no dead code, no unused import, no failing assertion — **the defect lives in the space between two correct things.**
+- **THE ONLY TEST THAT FINDS IT IS THE ROUND TRIP A PERSON WOULD ACTUALLY MAKE:** raise one, take the value the PERSON was given, and find that exact row from it. Not "does the API return a reference" and separately "does the list render" — **one continuous path, end to end.**
+- **Sibling of the shipped-but-inert family, but distinct: there the code never runs; here BOTH SIDES RUN CORRECTLY and do not meet.** Ask, of any feature with two ends: *what is the single journey that crosses both, and have I made it?*
+
+### ⚠⚠ SUPPORT ATTACHMENTS — WHAT MAKES AN UPLOAD PATH SAFE, AND WHERE THE LIMITS LIVE (2026-08-27)
+**Storage was already provisioned and completely unused (0 buckets, 0 objects), so nothing needed enabling and no paid tier was touched.** Bucket `support-attachments`: PRIVATE, 5 MB, images only.
+- **⚠⚠ THE LIMITS ARE ON THE BUCKET, NOT ONLY IN CODE.** A limit that lives solely in application code is one bad path from being bypassed; Supabase refuses an oversized or wrong-typed object outright. **The code check exists so the person gets a clear message BEFORE waiting for an upload storage would reject anyway.**
+- **PRIVATE BUCKET + GENERATED PATH + IMAGES ONLY + 5 MB + A PER-USER RATE LIMIT.** No public URL means nothing can be guessed, shared onward, or rendered as HTML. **An uploaded filename is attacker-controlled text and must never become a path** — the stored name is random, prefixed with the uploader's id.
+- **⚠⚠ THAT PREFIX IS WHAT MAKES OWNERSHIP CHECKABLE.** The path arrives from the client at raise time, so without `path.startsWith(userId + '/')` a crafted value could attach ANOTHER USER'S stored object to your own ticket. **Verified: rejected, and the reason recorded rather than silently dropped.**
+- **⚠ SCHEME ALLOWLIST ON THE PASTED LINK, NEVER A BLOCKLIST.** `javascript:` and `data:` in a field an admin later clicks is the obvious way to turn a support form into an attack surface. http/https only, via `new URL()`.
+- **⚠⚠ STOP BUFFERING AT THE CAP, BUT KEEP READING.** `req.destroy()` protects memory AND kills the connection before the 413 can be written — the person then sees a network error instead of *"that image is over 5 MB"*, which is the one thing they needed. **Memory is still bounded because chunks stop accumulating; what is given up is bandwidth on a request the client-side check already prevents.**
+- **THE UPLOAD IS ITS OWN REQUEST.** Folding it into a send already at ~6s would push it past tolerable **and would surface a failure only after they had written everything.** On pick, they learn immediately while the form still holds their words — and the ticket can still go without it.
+- **⚠ A NEW DRAFT MUST NOT INHERIT THE LAST ONE'S FILE.** A wrong screenshot on the wrong problem is worse than none, and nothing on screen would say so.
+
+### ⚠ CATEGORIES: THE FILTER MUST NEVER BE ABLE TO COST YOU THE REPORT (2026-08-27)
+**Five approved keys, grounded in what has ACTUALLY been reported — both real tickets were sync/grading, and most of Justin's screenshot defects were a wrong number or a wrong message.**
+- **⚠ AN UNRECOGNISED CATEGORY STORES NULL RATHER THAN REFUSING THE TICKET.** The MESSAGE is the ticket; losing it over a dropdown value would trade the thing that matters for the thing that does not.
+- **⚠⚠ AN UNKNOWN CATEGORY FILTER NARROWS TO NOTHING, NEVER TO EVERYTHING.** Silently ignoring a bad filter returns the whole list — the opposite of what was asked, and it looks like a working search.
+- **NULLABLE, because tickets raised before this shipped have no category — a different fact from "they chose Other".** Defaulting them would invent an answer.
+- **⚠ NO BILLING/ACCESS CATEGORY, DELIBERATELY.** Nobody can be invited or billed yet, so it would be an option nobody could pick — **and an unpickable option teaches people the list is wrong.** It becomes necessary the moment seats exist; recorded against the invite-onboarding row.
+
 ### ⚠⚠ A REFERENCE THE OTHER SIDE CANNOT LOOK UP IS NOT A REFERENCE (2026-08-27)
 **The ticket flow handed the person an 8-character code and displayed it NOWHERE in the admin list.** Someone reading it out on a call could not be found — **in the one moment the reference exists for.**
 - **⚠⚠ IT LOOKED COMPLETE FROM BOTH ENDS SEPARATELY.** The submit path returned a reference; the list showed tickets. **Nothing was missing from either half — what was missing was the JOIN between them**, and no static check can see that. Sibling of the shipped-but-inert family.
