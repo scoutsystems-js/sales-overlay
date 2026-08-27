@@ -604,6 +604,10 @@
     .support-card textarea { width: 100%; box-sizing: border-box; background: var(--bg-field);
       color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius);
       padding: 10px; font: inherit; font-size: 14px; resize: vertical; }
+    .support-attach { margin-top: 12px; }
+    .support-attach-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .support-hint { font-weight: 400; font-size: 12px; }
+    .support-attach input[type=file] { font-size: 13px; }
     .support-mine { margin: 14px 0 0; border-top: 1px solid var(--border-strong); padding-top: 12px; }
     .support-mine-head { font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
       text-transform: uppercase; margin-bottom: 8px; }
@@ -3684,7 +3688,31 @@
            looked" — the silence this whole flow exists to remove. -->
       <br><strong>If it needs a reply, it comes by email.</strong></p>
     <div id="supportMine"></div>
+    <!-- ⚠ THE CATEGORY IS A FILTER, NEVER A REPLACEMENT FOR THE MESSAGE. A
+         category with no message is a ticket nobody can action, so the textarea
+         stays required and this does not. Five options, grounded in what has
+         actually been reported — too many and people pick the wrong one. -->
+    <select id="supportCategory" class="role-select" style="width:100%; margin-bottom:10px;">
+      <option value="">What kind of problem? (optional)</option>
+      <option value="sync_grading">My calls aren&rsquo;t syncing or being graded</option>
+      <option value="wrong_data">A number or a panel looks wrong</option>
+      <option value="wrong_coaching">The coaching or feedback is wrong</option>
+      <option value="cant_find">I can&rsquo;t find or use something</option>
+      <option value="other">Something else</option>
+    </select>
     <textarea id="supportMessage" rows="5" maxlength="4000" placeholder="What were you trying to do, and what happened instead?"></textarea>
+
+    <!-- ⚠⚠ THE LIMITS ARE STATED BEFORE THEY PICK, not after they wait. Being
+         told "that file is too big" after a 5 MB upload is the cost landing on
+         the person who can least do anything about it. -->
+    <div class="support-attach">
+      <label class="support-attach-label" for="supportFile">Screenshot <span class="support-hint">optional · PNG, JPEG, GIF or WEBP · up to 5 MB</span></label>
+      <input type="file" id="supportFile" accept="image/png,image/jpeg,image/gif,image/webp" onchange="uploadSupportFile()">
+      <div id="supportFileState" class="support-hint"></div>
+
+      <label class="support-attach-label" for="supportLink" style="margin-top:10px;">Or a video link <span class="support-hint">optional · Loom, Drive, anything with a URL</span></label>
+      <input type="url" id="supportLink" class="role-select" style="width:100%;" placeholder="https://www.loom.com/share/…">
+    </div>
     <div class="support-error" id="supportError" style="display:none"></div>
     <div class="support-actions">
       <button class="btn-fathom-primary" type="button" id="supportSend" onclick="sendSupport()">Send</button>
@@ -5200,6 +5228,10 @@
     document.getElementById('supportError').style.display = 'none';
     // Restore the form if a previous send left the confirmation on screen.
     var card = m.querySelector('.support-card');
+    /* ⚠ CLEAR THE DRAFT'S ATTACHMENT. Otherwise a second report silently
+       inherits the first one's screenshot — a wrong image attached to the wrong
+       problem is worse than none, and nothing on screen would say so. */
+    supportAttach = null;
     if (card.getAttribute('data-sent')) { card.innerHTML = card.getAttribute('data-form'); card.removeAttribute('data-sent'); }
     else if (!card.getAttribute('data-form')) card.setAttribute('data-form', card.innerHTML);
     m.classList.remove('hidden');
@@ -5246,6 +5278,51 @@
     };
     return names[state.view] || state.view || 'unknown';
   }
+  /* The uploaded screenshot for THIS draft. ⚠ Held in module state, not read
+     back off the input, because the input is cleared when the modal resets. */
+  var supportAttach = null;   // { path, name } | { error, name } | null
+
+  /* ⚠⚠ UPLOAD ON PICK, NOT ON SEND. Send already takes ~6 seconds; adding an
+     upload to it would push it well past tolerable AND would surface a failure
+     only after they had written everything. Here they find out immediately,
+     while the form still holds their words — and the ticket can go without it. */
+  async function uploadSupportFile() {
+    var input = document.getElementById('supportFile');
+    var stateEl = document.getElementById('supportFileState');
+    var f = input && input.files && input.files[0];
+    supportAttach = null;
+    if (!f) { stateEl.textContent = ''; return; }
+
+    // ⚠ CHECKED BEFORE THE UPLOAD STARTS. Telling someone their file is too big
+    // after they have waited for it is the cost landing on the wrong person.
+    if (f.size > 5 * 1024 * 1024) {
+      stateEl.textContent = 'That image is over 5 MB — please crop or compress it.';
+      supportAttach = { error: 'over 5 MB', name: f.name };
+      return;
+    }
+    stateEl.textContent = 'Uploading…';
+    try {
+      var res = await fetch('/support/attachments', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': f.type }, authHeader()),
+        body: f,
+      });
+      var body = null; try { body = await res.json(); } catch (e) {}
+      if (!res.ok || !body || !body.ok) {
+        /* ⚠⚠ A FAILED UPLOAD MUST NOT COST THEM THE REPORT — same rule as the
+           broken diagnostics. Record it, say so, and let Send proceed. */
+        stateEl.textContent = ((body && body.error) || 'Could not upload that image.') + ' You can still send the report.';
+        supportAttach = { error: (body && body.error) || 'upload failed', name: f.name };
+        return;
+      }
+      supportAttach = { path: body.path, name: f.name };
+      stateEl.textContent = 'Attached: ' + f.name;
+    } catch (e) {
+      stateEl.textContent = 'Could not upload that image. You can still send the report.';
+      supportAttach = { error: 'network error during upload', name: f.name };
+    }
+  }
+
   async function sendSupport() {
     var box = document.getElementById('supportMessage');
     var err = document.getElementById('supportError');
@@ -5257,7 +5334,15 @@
       var res = await fetch('/support/tickets', {
         method: 'POST',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ message: msg, page: supportPageLabel() }),
+        body: JSON.stringify({
+          message: msg,
+          page: supportPageLabel(),
+          category: (document.getElementById('supportCategory') || {}).value || null,
+          link_url: ((document.getElementById('supportLink') || {}).value || '').trim() || null,
+          attachment_path: supportAttach && supportAttach.path || null,
+          attachment_name: supportAttach && supportAttach.name || null,
+          attachment_error: supportAttach && supportAttach.error || null,
+        }),
       });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
       var body = null; try { body = await res.json(); } catch (e) {}

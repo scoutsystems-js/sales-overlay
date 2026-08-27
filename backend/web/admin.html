@@ -392,6 +392,14 @@
              anything in the message. -->
         <input class="role-select" id="ticketSearch" type="search" placeholder="Reference, email or text"
                oninput="renderTickets()" style="min-width:220px;">
+        <select class="role-select" id="ticketCategory" onchange="loadTickets()">
+          <option value="">All kinds</option>
+          <option value="sync_grading">Syncing / grading</option>
+          <option value="wrong_data">Wrong number or panel</option>
+          <option value="wrong_coaching">Wrong coaching</option>
+          <option value="cant_find">Cannot find or use</option>
+          <option value="other">Other</option>
+        </select>
         <select class="role-select" id="ticketFilter" onchange="loadTickets()">
           <option value="open">Open</option>
           <option value="closed">Closed</option>
@@ -564,7 +572,9 @@
     var status = document.getElementById('ticketFilter').value;
     wrap.innerHTML = '<div class="empty-msg"><span class="spinner"></span></div>';
     try {
-      var res = await fetch('/support/tickets?status=' + encodeURIComponent(status), { headers: authHeader() });
+      var cat = document.getElementById('ticketCategory').value;
+      var res = await fetch('/support/tickets?status=' + encodeURIComponent(status)
+        + (cat ? '&category=' + encodeURIComponent(cat) : ''), { headers: authHeader() });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var d = await res.json();
       ticketCache = d.tickets || [];
@@ -572,6 +582,20 @@
     } catch (e) {
       wrap.innerHTML = '<div class="empty-msg">Could not load tickets: ' + escapeHtml(e.message) + '</div>';
     }
+  }
+  /* ⚠ THE LABELS LIVE HERE, THE KEYS LIVE IN THE ROUTE. One list of keys,
+     validated server-side; the human wording is presentation. */
+  var TICKET_CATEGORY_LABELS = {
+    sync_grading: 'Syncing / grading', wrong_data: 'Wrong number or panel',
+    wrong_coaching: 'Wrong coaching', cant_find: 'Cannot find or use', other: 'Other',
+  };
+  async function openAttachment(id) {
+    try {
+      var res = await fetch('/support/attachment/' + encodeURIComponent(id), { headers: authHeader() });
+      if (!res.ok) { alert('Could not open that attachment.'); return; }
+      var d = await res.json();
+      window.open(d.url, '_blank', 'noopener');
+    } catch (e) { alert('Could not reach the server.'); }
   }
   var ticketCache = [];
   function renderTickets() {
@@ -605,14 +629,33 @@
           ? '<div><strong>' + escapeHtml(s.verdict) + '</strong></div>'
             + '<div class="empty-msg">' + (s.what_they_see || []).map(esc).join('<br>') + '</div>'
           : '<div class="empty-msg">No diagnostics attached.</div>');
+    /* ⚠ THE ATTACHMENT IS OPENED THROUGH A SIGNED URL, never linked directly.
+       The bucket is private, so there is no public URL to link to — which is
+       exactly what stops a screenshot leaking by being shared or guessed. */
+    var attach = '';
+    if (t.attachment_path) {
+      attach = '<div style="margin:6px 0;"><button class="btn-add-user" onclick="openAttachment(\'' + t.id + '\')">'
+        + 'View screenshot</button> <span class="empty-msg">' + escapeHtml(t.attachment_name || '') + '</span></div>';
+    } else if (t.attachment_error) {
+      /* ⚠ "NO SCREENSHOT" AND "THE UPLOAD FAILED" ARE DIFFERENT FACTS. A blank
+         read as "they didn't send one" loses the evidence that they tried. */
+      attach = '<div class="empty-msg">⚠ They tried to attach a screenshot and it failed: '
+        + escapeHtml(t.attachment_error) + '</div>';
+    }
+    if (t.link_url) {
+      attach += '<div style="margin:6px 0;"><a class="nav-link" href="' + escapeHtml(t.link_url)
+        + '" target="_blank" rel="noopener noreferrer">Open video link →</a></div>';
+    }
+    var cat = t.category ? '<span class="support-ref-admin">' + escapeHtml(TICKET_CATEGORY_LABELS[t.category] || t.category) + '</span> ' : '';
     return '<div class="user-row" style="display:block; padding:14px 0;">'
       /* ⚠ THE REFERENCE LEADS. It is what the person quotes, so it is the first
          thing to scan for — it was previously shown nowhere at all. */
-      + '<div><span class="support-ref-admin">' + escapeHtml(t.reference || '') + '</span> '
+      + '<div>' + cat + '<span class="support-ref-admin">' + escapeHtml(t.reference || '') + '</span> '
       + '<strong>' + escapeHtml(t.email || t.user_id) + '</strong>'
       + ' <span class="empty-msg">· ' + escapeHtml(t.page || 'unknown page') + ' · '
       + escapeHtml(new Date(t.created_at).toLocaleString()) + '</span></div>'
       + '<div style="margin:8px 0; white-space:pre-wrap;">' + escapeHtml(t.message) + '</div>'
+      + attach
       + diag
       + '<div style="margin-top:10px;"><button class="btn-add-user" onclick="setTicketStatus(\'' + t.id + '\', \''
       + (t.status === 'open' ? 'closed' : 'open') + '\')">'

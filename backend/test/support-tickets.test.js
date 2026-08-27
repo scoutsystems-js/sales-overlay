@@ -28,12 +28,14 @@ const LIVE = DASH.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
 function fn(src, name, min, max) {
   const at = src.indexOf(name);
   assert.ok(at !== -1, 'stale anchor: ' + name);
-  /* ⚠ THREE TERMINATORS, because the same helper reads route handlers (\n});),
-     top-level functions (\n}) and INDENTED client functions (\n  }). Missing the
-     indented one made a client slice run 296,944 chars to the end of the file and
-     fail for a reason that had nothing to do with the code. */
-  const ends = [src.indexOf('\n});', at), src.indexOf('\n}\n', at), src.indexOf('\n  }', at)]
-    .filter((i) => i !== -1);
+  /* ⚠⚠ THE TERMINATOR IS CHOSEN BY WHAT IS BEING SLICED, not by taking whichever
+     comes first. A route handler ends `\n});` and legitimately CONTAINS `\n  }`
+     from its own inner blocks — taking the minimum truncated the route the moment
+     it grew an if-block, and four previously-passing tests failed for a reason
+     that had nothing to do with the code. */
+  const ends = /^router\./.test(name)
+    ? [src.indexOf('\n});', at)].filter((i) => i !== -1)
+    : [src.indexOf('\n});', at), src.indexOf('\n}\n', at), src.indexOf('\n  }', at)].filter((i) => i !== -1);
   const out = src.slice(at, Math.min.apply(null, ends));
   assert.ok(out.length > (min || 80) && out.length < (max || 6000), name + ' slice: ' + out.length);
   return out;
@@ -200,4 +202,107 @@ test('⚠ LOADING THEIR OWN REPORTS MUST NEVER BLOCK THE FORM', () => {
   assert.ok(/if \(!res\.ok\) \{ host\.innerHTML = ''; return; \}/.test(src),
     'a failure here must be silent — the point of the modal is to REPORT a problem');
   assert.ok(/catch \(e\) \{ host\.innerHTML = ''; \}/.test(src));
+});
+
+/* ══ CATEGORIES AND ATTACHMENTS ═══════════════════════════════════════════ */
+
+test('⚠ THE CATEGORY IS OPTIONAL AND THE MESSAGE IS NOT', () => {
+  // A category with no message is a ticket nobody can action.
+  const src = fn(SUPPORT, "router.post('/tickets'");
+  assert.ok(/if \(!message\) return res\.status\(400\)/.test(src), 'the message is required');
+  assert.ok(!/if \(!category\) return/.test(src), 'the category must never block a report');
+  // An unexpected value stores NULL rather than refusing the whole ticket.
+  assert.ok(/CATEGORIES\.indexOf\(req\.body\.category\) !== -1\) \? req\.body\.category : null/.test(src));
+});
+
+test('⚠ ONE LIST OF CATEGORY KEYS, shared by the raise and the filter', () => {
+  assert.strictEqual((SUPPORT.match(/const CATEGORIES = /g) || []).length, 1);
+  assert.ok((SUPPORT.match(/CATEGORIES\.indexOf/g) || []).length >= 2,
+    'the raise and the admin filter must validate against the same list');
+  // The five approved keys, and no billing/access one — nobody can be billed yet.
+  ['sync_grading', 'wrong_data', 'wrong_coaching', 'cant_find', 'other'].forEach(function (k) {
+    assert.ok(SUPPORT.indexOf("'" + k + "'") !== -1, 'missing approved category: ' + k);
+  });
+});
+
+test('⚠⚠ AN UNKNOWN CATEGORY FILTER NARROWS TO NOTHING, never to everything', () => {
+  const src = fn(SUPPORT, "router.get('/tickets'");
+  assert.ok(/CATEGORIES\.indexOf\(req\.query\.category\) === -1\) return res\.json\(\{ tickets: \[\] \}\)/.test(src),
+    'silently ignoring a bad filter returns the whole list, which is the opposite of what was asked');
+});
+
+test('⚠⚠ IMAGES ONLY, AND THE BUCKET ENFORCES IT TOO', () => {
+  const src = fn(SUPPORT, "router.post('/attachments'", 200, 6000);
+  assert.ok(/ALLOWED_TYPES\.indexOf\(contentType\) === -1/.test(src), 'type checked before anything is read');
+  const types = /const ALLOWED_TYPES = \[([^\]]+)\]/.exec(SUPPORT);
+  assert.ok(types && !/pdf|svg|html/i.test(types[1]),
+    'SVG and HTML can carry script — an image allowlist must not include them');
+});
+
+test('⚠⚠ THE STORED NAME IS GENERATED AND SCOPED TO THE UPLOADER', () => {
+  const src = fn(SUPPORT, "router.post('/attachments'", 200, 6000);
+  assert.ok(/randomBytes\(16\)/.test(src), 'an uploaded filename is attacker-controlled text and must not become a path');
+  assert.ok(/req\.user\.id \+ '\/'/.test(src), 'the prefix is what makes the ownership check possible');
+});
+
+test('⚠⚠ A CRAFTED PATH CANNOT ATTACH SOMEONE ELSE\'S FILE', () => {
+  const src = fn(SUPPORT, "router.post('/tickets'");
+  assert.ok(/attachPath\.indexOf\(req\.user\.id \+ '\/'\) !== 0/.test(src),
+    'the path is client-supplied — without this check any stored object could be attached to your own ticket');
+  // ⚠ And it is REJECTED, not silently accepted: the reason is recorded.
+  assert.ok(/attachment rejected/.test(src));
+});
+
+test('⚠⚠ A FAILED UPLOAD MUST NOT COST THEM THE REPORT', () => {
+  // Same rule as the broken diagnostics: the tool must work when things are broken.
+  const src = fn(SUPPORT, "router.post('/tickets'");
+  assert.ok(/attachment_error: attachError/.test(src), 'the failure is stored');
+  assert.ok(!/if \(attachError\) return res\.status/.test(src), 'and must never refuse the ticket');
+  const client = fn(LIVE, 'async function uploadSupportFile', 200, 4000);
+  assert.ok(/still send the report/.test(client), 'and the person is told so');
+});
+
+test('⚠ THE UPLOAD IS ITS OWN REQUEST — Send is already at ~6 seconds', () => {
+  const client = fn(LIVE, 'async function uploadSupportFile', 200, 4000);
+  assert.ok(/\/support\/attachments/.test(client));
+  const send = fn(LIVE, 'async function sendSupport', 200, 5000);
+  assert.ok(!/\/support\/attachments/.test(send), 'sending must not upload');
+  assert.ok(/attachment_path: supportAttach/.test(send), 'it only references what is already stored');
+});
+
+test('⚠⚠ ONLY http/https LINKS — a scheme allowlist, never a blocklist', () => {
+  const src = fn(SUPPORT, 'function cleanLink', 100, 1200);
+  assert.ok(/protocol !== 'http:' && u\.protocol !== 'https:'/.test(src),
+    'a javascript: or data: URL in a field an admin later clicks is the obvious attack');
+});
+
+test('⚠⚠ THE ATTACHMENT IS GATED IN THE QUERY: owner, or the uploader, nobody else', () => {
+  const src = fn(SUPPORT, "router.get('/attachment/:ticket_id'", 200, 3000);
+  assert.ok(/t\.data\.user_id !== req\.user\.id/.test(src), 'the uploader may see their own file');
+  assert.ok(/userProfileRole === 'owner'/.test(src), 'and an owner may see any');
+  assert.ok(/403/.test(src), 'everyone else is refused');
+  // ⚠ A SIGNED, EXPIRING URL — the bucket is private, so there is no public URL
+  // to leak, and a copied link dies.
+  assert.ok(/createSignedUrl\([^,]+, 300\)/.test(src));
+});
+
+test('⚠ THEIR OWN LIST RETURNS THE FILE NAME, NEVER THE PATH', () => {
+  const src = fn(SUPPORT, "router.get('/my-tickets'");
+  assert.ok(/attachment_name: t\.attachment_name/.test(src));
+  assert.ok(!/attachment_path:/.test(src),
+    'handing back the path would let a client mint a URL outside the route that gates access');
+});
+
+test('⚠ A NEW DRAFT DOES NOT INHERIT THE LAST ONE\'S SCREENSHOT', () => {
+  const src = fn(LIVE, 'function openSupport', 200, 2000);
+  assert.ok(/supportAttach = null/.test(src),
+    'a wrong image on the wrong problem is worse than none, and nothing would say so');
+});
+
+test('⚠ THE LIMITS ARE ON THE FORM, BEFORE THEY PICK', () => {
+  const at = DASH.indexOf('id="supportFile"');
+  const form = DASH.slice(at - 700, at + 300);
+  assert.ok(/5 MB/.test(form), 'the size must be stated before they wait for an upload');
+  assert.ok(/PNG, JPEG, GIF or WEBP/.test(form), 'and the types');
+  assert.ok(/accept="image\//.test(DASH.slice(at, at + 300)), 'the picker filters too');
 });
