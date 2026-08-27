@@ -6982,6 +6982,22 @@
     return days <= DAILY_BUCKET_MAX_DAYS ? 'day' : 'week';
   }
   function repSeriesBucket() { return bucketForRange(state.teamRange); }
+  var TEAM_PICK_KEY = 'scout_team_pick_v1';
+  /* ⚠⚠ VALIDATED AGAINST THE TEAMS THIS PERSON CAN ACTUALLY PICK. A stored key
+     for a team that has since gone, or that they no longer manage, would give an
+     empty board with nothing saying why — the silent wrong-population failure
+     this arc keeps removing. An unrecognised key falls back to the default. */
+  function restoreTeamPick(ctx) {
+    if (state.teamSelected !== null) return;         // an explicit pick this session wins
+    var saved = null;
+    try { saved = localStorage.getItem(TEAM_PICK_KEY); } catch (e) {}
+    if (!saved) return;
+    var teams = (ctx && ctx.teams) || [];
+    var ok = saved === 'all' || teams.some(function (t) { return t.user_id === saved || t.key === saved; });
+    if (ok) state.teamSelected = saved;
+    else { try { localStorage.removeItem(TEAM_PICK_KEY); } catch (e) {} }
+  }
+
   function teamQP(extra) {
     var r = teamRange();
     var qp = 'from=' + encodeURIComponent(r.from) + '&to=' + encodeURIComponent(r.to);
@@ -7061,6 +7077,15 @@
      own comment about the drilldown lanes. */
   function pickTeam(key) {
     state.teamSelected = (key === '__default') ? null : key;
+    /* ⚠⚠ IT FORGOT BECAUSE IT WAS NEVER STORED — not because something reset it.
+       `teamSelected` lived only in module state, so a refresh rebooted it to
+       null, which means "default team". Its sibling the rep filter has persisted
+       to localStorage all along; this is the same treatment.
+       ⚠ Wrapped: a browser with storage blocked must not lose the picker. */
+    try {
+      if (state.teamSelected) localStorage.setItem(TEAM_PICK_KEY, state.teamSelected);
+      else localStorage.removeItem(TEAM_PICK_KEY);
+    } catch (e) {}
     state.teamAverages = null;
     resetTeamData();
     renderTeamSurface();
@@ -7109,6 +7134,18 @@
     try { state[c.set] = await fetchTeamJSON(c.url); }
     catch (err) { if (err.message === 'unauth') return; state[c.set] = { _error: err.message || 'unknown' }; }
     if (c.flag) state[c.flag] = false;
+    /* ⚠⚠ RESTORED HERE AND NOWHERE ELSE: /team/context is the only response that
+       says which teams this person may pick, and the saved key is validated
+       against it. Restoring earlier would either skip validation or race the
+       fetch that makes validation possible.
+       ⚠ It refetches the lanes, because they were loaded for the default team. */
+    if (which === 'context' && state.teamContext && !state.teamContext._error) {
+      var before = state.teamSelected;
+      restoreTeamPick(state.teamContext);
+      /* ⚠ THE SAME TWO CALLS pickTeam MAKES — reusing them rather than inventing
+         a refetch, so a restored pick behaves exactly like a chosen one. */
+      if (state.teamSelected !== before) { resetTeamData(); renderTeamSurface(); }
+    }
     scheduleTeamRender();
   }
 
@@ -8806,7 +8843,17 @@
 
     var rows = grid.map(function (g) {
       var cells = OBJ_DRILL_ORDER.map(function (k) { return cellHtml(g.by_category[k], true, k); }).join('');
-      return '<div class="team-detail-row obj-grid-row"><span class="obj-grid-name">' + escapeHtml(g.name) + '</span>'
+      /* ⚠⚠ THESE ROWS ALREADY LOOKED CLICKABLE AND WERE NOT. They share the
+         `.team-detail-row` class with the score list, which carries
+         `cursor: pointer` and an accent hover — so the affordance was inherited
+         while the behaviour was not. A row that invites a click and does nothing
+         is worse than one that never invited it, and it is why this was reported
+         twice as two separate items.
+         ⚠ It opens that closer's own objection page, which is what the name
+         promises when you point at it. */
+      return '<div class="team-detail-row obj-grid-row" onclick="openCloserObjections(\'' + escapeHtml(g.user_id || '') + '\')"'
+        + ' title="Open ' + escapeHtml(g.name) + '&rsquo;s objections">'
+        + '<span class="obj-grid-name">' + escapeHtml(g.name) + '</span>'
         + cells + cellHtml(g.total, false, null) + '</div>';
     }).join('');
 
@@ -9976,10 +10023,22 @@
   /* ⚠ The drilldown's entry point. It sits in the team controls row beside
      Manage Members, because that row is where actions ON the team live — and
      because a control parked wherever it fitted would have to move later. */
-  function objectionsDrillBtnHtml() {
-    if (state.view === 'team-objections') return '';
-    return '<button class="date-preset" onclick="openTeamObjections()">Objection Handling</button>';
+  /* Open one closer's objections. ⚠ setUser() already resets every rep-scoped
+     lane and lands on their dashboard, so this reuses it rather than inventing a
+     second pivot — there were two pivot doors once and that cost a week. */
+  function openCloserObjections(userId) {
+    if (!userId) return;
+    setUser(userId);
+    setView('objections-intel');
   }
+
+  /* ⚠ REMOVED 2026-08-27 (Justin: "it makes no sense there"). It sat beside the
+     DATE PICKER, which reads as a filter — so a navigation button in that row
+     looked like a way to narrow the data rather than leave the page.
+     ⚠ THE DESTINATION IS NOT ORPHANED: the objection drilldown is still reached
+     from the Objection Handling gauge and from the per-closer card. Removing the
+     only way in would be deleting a capability, which has happened here twice. */
+  function objectionsDrillBtnHtml() { return ''; }
 
   /**
    * The team selector — ONE definition, two callers.
