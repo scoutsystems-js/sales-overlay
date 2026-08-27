@@ -6,6 +6,9 @@
   <title>Admin — Scout Systems</title>
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
+    .support-ref-admin { font-family: ui-monospace, Menlo, monospace; font-size: 13px;
+      background: var(--bg-field); border: 1px solid var(--border-strong);
+      border-radius: 4px; padding: 1px 6px; }
     /* Three-section admin layout:
          A — user management (top, full width)
          B — session list    (bottom left)
@@ -382,11 +385,19 @@
   <section class="users-section" id="ticketsSection" style="display:none">
     <div class="users-header">
       <h2>Support Tickets</h2>
-      <select class="role-select" id="ticketFilter" onchange="loadTickets()">
-        <option value="open">Open</option>
-        <option value="closed">Closed</option>
-        <option value="all">All</option>
-      </select>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <!-- ⚠⚠ THE REFERENCE IS THE ONLY THING THE PERSON HAS. Without a way to
+             search on it, a code read out on a call cannot be found — which is
+             the one moment it exists for. Matches the reference, the email or
+             anything in the message. -->
+        <input class="role-select" id="ticketSearch" type="search" placeholder="Reference, email or text"
+               oninput="renderTickets()" style="min-width:220px;">
+        <select class="role-select" id="ticketFilter" onchange="loadTickets()">
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+          <option value="all">All</option>
+        </select>
+      </div>
     </div>
     <div class="users-table-wrap" id="ticketsWrap"><div class="empty-msg">—</div></div>
   </section>
@@ -556,12 +567,32 @@
       var res = await fetch('/support/tickets?status=' + encodeURIComponent(status), { headers: authHeader() });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       var d = await res.json();
-      var list = d.tickets || [];
-      if (!list.length) { wrap.innerHTML = '<div class="empty-msg">No ' + escapeHtml(status === 'all' ? '' : status) + ' tickets.</div>'; return; }
-      wrap.innerHTML = list.map(ticketRowHtml).join('');
+      ticketCache = d.tickets || [];
+      renderTickets();
     } catch (e) {
       wrap.innerHTML = '<div class="empty-msg">Could not load tickets: ' + escapeHtml(e.message) + '</div>';
     }
+  }
+  var ticketCache = [];
+  function renderTickets() {
+    var wrap = document.getElementById('ticketsWrap');
+    var q = (document.getElementById('ticketSearch').value || '').trim().toLowerCase();
+    var list = ticketCache;
+    if (q) {
+      list = list.filter(function (t) {
+        return (t.reference || '').toLowerCase().indexOf(q) !== -1
+            || (t.email || '').toLowerCase().indexOf(q) !== -1
+            || (t.message || '').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    if (!list.length) {
+      /* ⚠ "NO MATCHES" AND "NO TICKETS" ARE DIFFERENT FACTS — one means you
+         searched for something that is not here, the other that there is
+         nothing at all. Saying the wrong one sends someone looking again. */
+      wrap.innerHTML = '<div class="empty-msg">' + (q ? 'Nothing matches “' + escapeHtml(q) + '”.' : 'No tickets.') + '</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(ticketRowHtml).join('');
   }
   function ticketRowHtml(t) {
     var s = t.snapshot || {};
@@ -575,7 +606,10 @@
             + '<div class="empty-msg">' + (s.what_they_see || []).map(esc).join('<br>') + '</div>'
           : '<div class="empty-msg">No diagnostics attached.</div>');
     return '<div class="user-row" style="display:block; padding:14px 0;">'
-      + '<div><strong>' + escapeHtml(t.email || t.user_id) + '</strong>'
+      /* ⚠ THE REFERENCE LEADS. It is what the person quotes, so it is the first
+         thing to scan for — it was previously shown nowhere at all. */
+      + '<div><span class="support-ref-admin">' + escapeHtml(t.reference || '') + '</span> '
+      + '<strong>' + escapeHtml(t.email || t.user_id) + '</strong>'
       + ' <span class="empty-msg">· ' + escapeHtml(t.page || 'unknown page') + ' · '
       + escapeHtml(new Date(t.created_at).toLocaleString()) + '</span></div>'
       + '<div style="margin:8px 0; white-space:pre-wrap;">' + escapeHtml(t.message) + '</div>'

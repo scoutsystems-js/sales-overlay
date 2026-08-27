@@ -126,3 +126,78 @@ test('⚠ THE ROUTER IS MOUNTED AFTER the exact-match support PAGE', () => {
   assert.ok(pageAt !== -1 && routerAt > pageAt,
     'the public support page must keep winning /support; the router serves /support/tickets');
 });
+
+/* ══ OWN TICKETS, THE REFERENCE LOOP, AND THE EMAIL NOTICE ════════════════ */
+
+test('⚠⚠ THE OWN-TICKETS LIST IS A SEPARATE QUERY, NOT THE ADMIN ONE FILTERED', () => {
+  const src = fn(SUPPORT, "router.get('/my-tickets'");
+  assert.ok(/eq\('user_id', req\.user\.id\)/.test(src), 'server-enforced, never a client filter');
+  // A hidden row is only a suggestion; one forgotten filter leaks every snapshot.
+  assert.ok(!/requireRole/.test(src.slice(0, 140)), 'any authenticated person may see their own');
+});
+
+test('⚠⚠ THE SNAPSHOT COLUMNS ARE NOT EVEN SELECTED — stronger than not rendering them', () => {
+  const src = fn(SUPPORT, "router.get('/my-tickets'");
+  const sel = /\.select\('([^']+)'\)/.exec(src);
+  assert.ok(sel, 'the select must be explicit, never select(*)');
+  assert.ok(sel[1].indexOf('snapshot') === -1,
+    'diagnostics describe an ACCOUNT, and on a shared company account that is not automatically theirs');
+  /* ⚠ STRIP COMMENTS FIRST — the prose EXPLAINING that the columns are excluded
+     names them, so a raw check reports the documentation of the rule as a
+     violation of it. Nth instance of that trap, this time inside the guard. */
+  /* ⚠ BOTH COMMENT FORMS. Dropping only lines that BEGIN with a marker leaves
+     TRAILING comments — and the select line carries one naming the very columns
+     it excludes. Third time this exact gap has bitten; strip leading AND
+     trailing, always. */
+  const code = src.split('\n')
+    .filter((l) => !/^\s*(\*|\/\*|\/\/)/.test(l))
+    .map((l) => l.replace(/\s\/\/.*$/, ''))
+    .join('\n');
+  assert.ok(!/snapshot/.test(code), 'and nothing downstream may reintroduce them');
+});
+
+test('⚠⚠ ONE DEFINITION OF THE REFERENCE — the value given must be the value found', () => {
+  assert.strictEqual((SUPPORT.match(/function referenceFor/g) || []).length, 1, 'exactly one definition');
+  // All three consumers derive it: the confirmation, the admin list, their own list.
+  assert.ok((SUPPORT.match(/referenceFor\(/g) || []).length >= 3,
+    'the raise, the admin list and the own list must all use it');
+});
+
+test('⚠⚠ THE ADMIN LIST CARRIES THE REFERENCE — it was previously shown NOWHERE', () => {
+  // A code read out on a call could not be found, in the one moment it exists for.
+  const src = fn(SUPPORT, "router.get('/tickets'");
+  assert.ok(/reference: referenceFor/.test(src), 'the API must return it');
+  assert.ok(/support-ref-admin/.test(ADMIN), 'and the row must display it');
+  assert.ok(/ticketSearch/.test(ADMIN), 'with a way to search on it');
+});
+
+test('⚠ THE SEARCH DISTINGUISHES "no matches" FROM "no tickets"', () => {
+  // Different facts: one means you searched for something absent, the other that
+  // there is nothing at all. The wrong one sends someone looking again.
+  assert.ok(/Nothing matches/.test(ADMIN) && /No tickets\./.test(ADMIN));
+});
+
+test('⚠⚠ THEY ARE TOLD REPLIES COME BY EMAIL, BEFORE THEY SEND', () => {
+  // There is no in-app messaging, so without this "no reply in Scout" reads as
+  // "nobody looked" — the silence this whole flow exists to remove.
+  const formAt = DASH.indexOf('id="supportModal"');
+  const form = DASH.slice(formAt, formAt + 1600);
+  assert.ok(/comes by email/i.test(form), 'the FORM must say it, not only the confirmation');
+  const client = fn(LIVE, 'async function sendSupport', 200, 5000);
+  assert.ok(/by email/i.test(client), 'and the confirmation repeats it');
+});
+
+test('⚠ NO NOTIFICATION MACHINERY WAS BUILT HERE', () => {
+  /* Filed as a hard prerequisite for EOD approval. A notification system built
+     as a side effect of a support tool is how it ends up wrong for everything
+     else that needs it. */
+  assert.ok(!/notification/i.test(SUPPORT), 'no notification concepts in the support route');
+  assert.ok(!/unread|read_at|deliver/i.test(SUPPORT), 'and none of its vocabulary');
+});
+
+test('⚠ LOADING THEIR OWN REPORTS MUST NEVER BLOCK THE FORM', () => {
+  const src = fn(LIVE, 'async function loadMyTickets', 200, 3000);
+  assert.ok(/if \(!res\.ok\) \{ host\.innerHTML = ''; return; \}/.test(src),
+    'a failure here must be silent — the point of the modal is to REPORT a problem');
+  assert.ok(/catch \(e\) \{ host\.innerHTML = ''; \}/.test(src));
+});

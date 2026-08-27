@@ -32,6 +32,13 @@ function handleConfigError(err, res) {
   return false;
 }
 
+/* ⚠⚠ ONE DEFINITION, because a reference is only useful if the value the PERSON
+   was given is the value the ADMIN can find. Derived from the id rather than
+   stored, so it can never drift from the row and needs no collision handling.
+   ⚠ HEX HAS NO LETTER O, so there is no 0/O ambiguity when it is read aloud —
+   the one property that matters for a code quoted down a phone line. */
+function referenceFor(id) { return String(id || '').slice(0, 8).toUpperCase(); }
+
 const MAX_MESSAGE = 4000;
 const MAX_PAGE = 120;
 
@@ -70,7 +77,7 @@ router.post('/tickets', requireAuth, async function (req, res) {
 
     /* A short human reference. ⚠ The person needs something CONCRETE to quote —
        "I raised a ticket" is not checkable by either side. */
-    var ref = String(ins.data.id).slice(0, 8).toUpperCase();
+    var ref = referenceFor(ins.data.id);
     console.log('[support] ticket %s raised by %s from %s%s', ref, req.user.id, page || 'unknown page',
       snapshotError ? ' (snapshot FAILED)' : '');
     res.json({ ok: true, reference: ref, created_at: ins.data.created_at, snapshot_attached: !snapshotError });
@@ -78,6 +85,47 @@ router.post('/tickets', requireAuth, async function (req, res) {
     if (handleConfigError(err, res)) return;
     console.error('[support] ticket raise failed for user ' + req.user.id + ':', err.stack || err.message);
     res.status(500).json({ error: 'Could not send that. Please email justin@scoutsystems.io.' });
+  }
+});
+
+/* ── GET /support/my-tickets ──────────────────────────────────────────────────
+ * A person's OWN tickets. Status only — no replies, no diagnostics.
+ *
+ * ⚠⚠ A SEPARATE QUERY, NOT THE ADMIN LIST FILTERED. The admin list carries other
+ * companies' account state, so "the same list scoped to them" must be a
+ * different query with a different SELECT — a hidden row is only a suggestion,
+ * and one forgotten filter would leak every attached snapshot.
+ *
+ * ⚠⚠ THE SNAPSHOT COLUMNS ARE NOT SELECTED AT ALL, deliberately. They describe
+ * an ACCOUNT, and on a shared company account that is not automatically theirs
+ * to read. Omitting them from the query is stronger than omitting them from the
+ * render: the data never leaves the database.
+ *
+ * ⚠ Justin's ruling: "admin-only" was about people seeing EACH OTHER'S tickets.
+ * Someone seeing their own submission is not that list — the same distinction as
+ * the submit control being universal while the list is not.
+ */
+router.get('/my-tickets', requireAuth, async function (req, res) {
+  try {
+    var admin = getAdminClient();
+    var r = await admin.from('support_tickets')
+      .select('id, created_at, page, message, status')   // ⚠ no snapshot, no snapshot_error
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (r.error) throw new Error('list: ' + r.error.message);
+    res.json({
+      tickets: (r.data || []).map(function (t) {
+        return {
+          reference: referenceFor(t.id),
+          created_at: t.created_at, page: t.page, message: t.message, status: t.status,
+        };
+      }),
+    });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[support] my-tickets failed for user ' + req.user.id + ':', err.stack || err.message);
+    res.status(500).json({ error: 'Could not load your reports' });
   }
 });
 
@@ -102,8 +150,11 @@ router.get('/tickets', requireAuth, requireRole('owner'), async function (req, r
     ((users.data && users.data.users) || []).forEach(function (u) { emailOf[u.id] = u.email; });
 
     res.json({
+      /* ⚠⚠ THE REFERENCE TRAVELS WITH THE ROW. Without it the code we hand the
+         person appears NOWHERE an admin can see — so someone reading it out on a
+         call could not be found, in the one moment the reference exists for. */
       tickets: (r.data || []).map(function (t) {
-        return Object.assign({}, t, { email: emailOf[t.user_id] || null });
+        return Object.assign({}, t, { email: emailOf[t.user_id] || null, reference: referenceFor(t.id) });
       }),
     });
   } catch (err) {
