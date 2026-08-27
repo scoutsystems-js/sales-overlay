@@ -3960,6 +3960,66 @@
     mergeLoading: false,
     followupCopied:     false, // transient "Copied!" feedback flag (set true, render, then false 2s later)
   };
+  /* ══ THE REP PIVOT RESETS EVERYTHING IT DOES NOT EXPLICITLY KEEP ══════════
+   *
+   * ⚠⚠ THE BUG THIS EXISTS TO MAKE IMPOSSIBLE. `setUser` used to clear TWO
+   * lanes and `reloadAll` two more. Measured 2026-08-27, EIGHTEEN of the 22
+   * rep-scoped lanes survived a pivot — so a manager moving between reps saw
+   * one person's coaching under another person's name, with nothing on screen
+   * saying so. A rep with ZERO calls rendered "Discovery 43/100 across 150
+   * graded calls" with quotes from two prospects he had never spoken to.
+   *
+   * ⚠⚠ OPT-IN SURVIVAL, NOT OPT-OUT CLEARING, AND THE ASYMMETRY IS THE WHOLE
+   * ARGUMENT. Clearing a list of known lanes is the same defect with a longer
+   * fuse: the next lane anyone adds inherits it silently. Here a new key added
+   * to `state` is RESET by default, and the failure modes are not comparable —
+   *     forgetting to add to KEEP   -> one needless refetch
+   *     forgetting to add to CLEAR  -> another person's data under this name
+   * The first is a cost. The second is what Justin saw.
+   *
+   * ⚠ WHAT SURVIVES IS SESSION, TEAM AND UI CHROME — never anything fetched
+   * for the VIEWED user. Team lanes survive because a rep pivot does not change
+   * which team is selected; they have their own picker.
+   */
+  var PIVOT_KEEP = {
+    // who I am, and the roster I picked from
+    me: 1, users: 1, viewingUserId: 1, view: 1,
+    kbCounter: 1, kbCounterLoading: 1,
+    // the windows and UI preferences a pivot must not throw away
+    dateRange: 1, teamRange: 1, teamRangeInit: 1, overviewExpanded: 1,
+    callLibraryRange: 1, callLibraryShowAllUsers: 1, teamTrendBucket: 1,
+    repLineHidden: 1, repFilterLoadedKey: 1, teamObjDrillCategory: 1,
+    // team-scoped lanes — a rep pivot does not change the selected team
+    teamContext: 1, teamSelected: 1, teamOverview: 1, teamOverviewLoading: 1,
+    teamTrends: 1, teamTrendsLoading: 1, teamRecs: 1, teamRecsLoading: 1,
+    teamHighlights: 1, teamHighlightsLoading: 1, teamDigest: 1,
+    teamDigestLoading: 1, teamDigestDate: 1, teamDetailMetric: 1,
+    teamWhy: 1, teamWhyLoading: 1, teamNeedsWork: 1, teamNeedsWorkLoading: 1,
+    teamRepSeries: 1, teamRepSeriesLoading: 1, teamObjectionCategory: 1,
+    teamObjections: 1, teamObjectionsLoading: 1, teamObjSummary: 1,
+    teamObjSummaryLoading: 1, teamObjSummaryError: 1,
+    teamAverages: 1, teamAveragesLoading: 1,
+    /* ⚠ THE SIGNED-IN USER'S OWN CONNECTIONS, NOT THE VIEWED USER'S. These
+       describe MY Fathom/Zoom and MY grading backlog, and every control that
+       reads them is isSelf()-gated. A pivot does not change them. */
+    fathomStatus: 1, zoomStatus: 1, gradingBacklog: 1,
+  };
+
+  /* The declared initial value of every key, captured ONCE before anything
+     mutates state. Resetting from here rather than assigning `null` keeps a
+     lane's real empty value — `[]` stays `[]`, `{}` stays `{}`, `0` stays `0`
+     — so a reset lane is indistinguishable from a freshly-booted one. */
+  var INITIAL_STATE = JSON.parse(JSON.stringify(state));
+
+  // Reset every rep-scoped lane to its declared initial value.
+  function resetRepScopedState() {
+    Object.keys(INITIAL_STATE).forEach(function (k) {
+      if (PIVOT_KEEP[k]) return;
+      var v = INITIAL_STATE[k];
+      state[k] = (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v;
+    });
+  }
+
 
   // ──────────────────────────────────────────────────────────────────
   // Init
@@ -5652,8 +5712,12 @@
     window.history.replaceState({}, '', url.toString());
     state.viewingUserId = userId;
     state.view = 'overview';
-    state.needsWork = null; // fixed-window card, but it IS per-user → refetch on pivot
-    state.repGraph = null;  // 10e: otherwise the PREVIOUS rep's line survives the pivot
+    /* ⚠⚠ EVERYTHING REP-SCOPED GOES, not the two lanes that were listed here.
+       Measured: 18 of 22 rep-scoped lanes used to survive this call, which is
+       how a rep with zero calls rendered another rep's discovery score and
+       another prospect's quotes. See PIVOT_KEEP — survival is opt-in now, so a
+       lane added tomorrow cannot inherit this. */
+    resetRepScopedState();
     reloadAll();
   }
 
@@ -12503,9 +12567,12 @@
     if (userId === state.me.user_id) url.searchParams.delete('user'); else url.searchParams.set('user', userId);
     window.history.replaceState({}, '', url.toString());
     state.viewingUserId = userId;
-    state.callLibrary = null;
-    state.callLibraryOffset = 0;
-    state.callLibraryError = null;
+    /* ⚠⚠ THE SECOND PIVOT DOOR, AND IT HAD THE SAME DEFECT. This cleared three
+       Calls lanes and left analytics2, needsWork, sectionData, objectionsIntel
+       and the rest pointing at the PREVIOUS rep — so switching rep here and
+       then opening Coaching showed the old rep's numbers under the new name.
+       ⚠ `view` is in PIVOT_KEEP, so this stays on the Calls page. */
+    resetRepScopedState();
     renderCallLibrary(); // kicks loadCallLibrary(0)
   }
 

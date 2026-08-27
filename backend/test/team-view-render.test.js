@@ -521,10 +521,18 @@ test('10e: reuses /team/rep-series — no parallel route', () => {
 });
 
 test('10e: a stale rep\'s line cannot survive a pivot or a range change', () => {
-  const setUser = HTML.slice(HTML.indexOf('function setUser'), HTML.indexOf('function setCoachingRange') > HTML.indexOf('function setUser')
-    ? HTML.indexOf('function setCoachingRange') : HTML.length);
-  assert.ok(/state\.repGraph = null/.test(HTML.slice(HTML.indexOf('function setUser'), HTML.indexOf('function setUser') + 700)),
-    'setUser must clear it');
+  /* ⚠ CONVERTED 2026-08-27, NOT DELETED. This asserted the literal
+     `state.repGraph = null` inside setUser. That hand-clearing is exactly the
+     pattern being retired: it cleared TWO lanes while EIGHTEEN rep-scoped lanes
+     survived a pivot. The PROPERTY is unchanged and now holds more strongly —
+     repGraph is reset because it is not in PIVOT_KEEP, so it cannot be
+     forgotten. Asserted where each half actually lives. */
+  const setUserSrc = HTML.slice(HTML.indexOf('function setUser'), HTML.indexOf('function setUser') + 900);
+  assert.ok(/resetRepScopedState\(\)/.test(setUserSrc),
+    'setUser must reset rep-scoped state, which is what clears repGraph');
+  const keep = HTML.slice(HTML.indexOf('var PIVOT_KEEP = {'), HTML.indexOf('var INITIAL_STATE'));
+  assert.ok(!/\brepGraph\s*:/.test(keep), 'repGraph must NOT be in PIVOT_KEEP or it survives the pivot');
+
   const range = HTML.slice(HTML.indexOf('function setCoachingRange'), HTML.indexOf('function setCoachingRange') + 700);
   assert.ok(/state\.repGraph = null/.test(range), 'a range change must clear it too');
 });
