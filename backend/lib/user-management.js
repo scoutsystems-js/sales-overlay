@@ -21,22 +21,42 @@ function canManageTarget(actorRole, actorId, target) {
  * caller would keep compiling and keep producing confident wrong output.
  * Renaming forces each one to be found and re-read.
  *
- * ⚠⚠ AND WHY THERE ARE TWO MODES RATHER THAN ONE. Measured on production
- * 2026-08-24: EVERY history table cascades on an `auth.users` delete —
- * fathom_calls, call_analyses, call_highlights, prospects, eod_edits, the
- * session tables, user_profiles. Proven on a throwaway user: 2 calls and 2
- * analyses in, delete the auth row, 0 out. So a hard delete does not orphan a
- * user's history, it DESTROYS it — which would rewrite close rate, cash and
- * rankings for every period that person worked.
+ * ⚠⚠⚠ THE TOMBSTONE IS GONE — SUPERSEDED BY JUSTIN'S RULING, 2026-08-26.
+ * Deleting a user now deletes their calls and history too, the same blast
+ * radius as deleting a company. **The earlier "calls survive a user delete"
+ * design is SUPERSEDED, not a bug** — it is recorded that way in CLAUDE.md so
+ * nobody reads the two and tries to restore one.
  *
- *   'hard'      — no history at all. Nothing to preserve, so remove the row.
- *   'tombstone' — has history. Keep the auth row so every foreign key survives,
- *                 scrub the identity, and drop them from the roster. This is the
- *                 "tombstone user row" option, and it needs no migration.
- *   'blocked'   — still manages reps. Those reps would end up managed by a
- *                 deleted person, so move them first (same rule deactivate has).
+ * ⚠⚠ HIS REASONING, AND IT IS WHAT MAKES THIS COHERENT RATHER THAN MERELY
+ * DESTRUCTIVE: *"we have DEACTIVATE as the safeguard and it's why only admins
+ * can actually delete people."* There are TWO DOORS.
+ *   DEACTIVATE  the everyday action. The person is switched off, every number
+ *               they produced stays, nothing breaks, fully reversible.
+ *   DELETE      deliberate and destructive, and it takes their history with it.
+ * **THE SAFEGUARD IS NEITHER A DIALOG NOR A RECOVERABLE COPY — it is that the
+ * destructive door is behind the ADMIN role.** That is why the admin check must
+ * be enforced SERVER-SIDE rather than by hiding a button, and why the
+ * confirmation must still name the cost. Anyone later tempted to soften delete,
+ * add an undo, or open it to managers should read this first.
  *
- * @returns {{mode:'hard'|'tombstone'|'blocked', reason:string|null, calls:number}}
+ * ⚠ MEASURED 2026-08-24, and it is why this works with no migration: EVERY
+ * history table cascades on an `auth.users` delete — fathom_calls,
+ * call_analyses, call_highlights, prospects, eod_edits, the session tables,
+ * user_profiles. Proven on a throwaway: 2 calls and 2 analyses in, delete the
+ * auth row, 0 out. `knowledge_base` is the one exception and is handled
+ * explicitly in lib/user-purge.js.
+ *
+ *   'purge'   — delete the account AND everything it produced.
+ *   'blocked' — still manages reps. Those reps would end up managed by a
+ *               deleted person, so move them first (same rule deactivate has).
+ *
+ * ⚠⚠ RENAMED 'hard' -> 'purge' ON PURPOSE. 'hard' used to mean "no history, so
+ * nothing to preserve"; it would now mean "destroy the history too". **A value
+ * whose MEANING changes while its type does not is the silent-semantic-change
+ * trap** — every existing caller keeps working and keeps producing confident
+ * wrong output. Renaming forces each one to be found.
+ *
+ * @returns {{mode:'purge'|'blocked', reason:string|null, calls:number}}
  */
 function deletePlan(opts) {
   opts = opts || {};
@@ -47,12 +67,18 @@ function deletePlan(opts) {
       reason: 'This user manages ' + reps + ' rep' + (reps === 1 ? '' : 's') +
         ' — move ' + (reps === 1 ? 'that rep' : 'them') + ' to another manager first, then delete.' };
   }
-  if (calls > 0) return { mode: 'tombstone', calls: calls, reason: null };
-  return { mode: 'hard', calls: 0, reason: null };
+  return { mode: 'purge', calls: calls, reason: null };
 }
 
 /**
  * The identity a tombstoned user is scrubbed to.
+ *
+ * ⚠⚠ LEGACY ONLY — NOTHING CALLS THIS ANY MORE. The tombstone was superseded on
+ * 2026-08-26 (a delete now destroys the account and its history), so no NEW row
+ * can be created in this shape. It is kept, not deleted, because THREE ROWS IN
+ * PRODUCTION still carry this identity from before the ruling — they hold 117
+ * calls between them and what to do with them is Justin's decision, not a
+ * tidy-up. Delete this function once those rows are resolved.
  *
  * ⚠ DETERMINISTIC AND DERIVED FROM THE ID, so two deleted people never collide
  * on one email and never render as the same person. `resolveDisplayName` reads
@@ -90,7 +116,28 @@ function deactivateBlockReason(opts) {
   return null;
 }
 
+/**
+ * The confirmation text for deleting ONE person.
+ *
+ * ⚠ IT MUST NAME THE COST — who, how many calls, and that there is no undo. A
+ * destructive action described in the abstract ("are you sure?") tells the
+ * reader nothing they can weigh. Mirrors company-lifecycle.deleteConfirmation
+ * deliberately: the two destructive actions should read in one voice.
+ * ⚠ IT ALSO NAMES THE OTHER DOOR. Deactivate keeps every number and is
+ * reversible, and someone about to delete may simply not want this.
+ */
+function deleteUserConfirmation(email, callCount) {
+  var c = callCount === 1 ? '1 call' : callCount + ' calls';
+  return 'Delete ' + (email || 'this user') + '?\n\n'
+    + 'This permanently deletes their account and ' + c + ', along with every '
+    + 'grade, highlight, objection, prospect and EOD entry belonging to them.\n\n'
+    + 'This CANNOT be undone. There is no recovery.\n\n'
+    + 'If you only want to switch them off, use Deactivate instead — that keeps '
+    + 'all of their numbers and can be reversed.';
+}
+
 module.exports = {
+  deleteUserConfirmation: deleteUserConfirmation,
   canManageTarget: canManageTarget,
   deletePlan: deletePlan,
   tombstoneIdentity: tombstoneIdentity,

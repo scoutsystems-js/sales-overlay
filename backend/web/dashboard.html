@@ -9915,34 +9915,24 @@
 
     if (p.mode === 'blocked') { alert(p.reason || 'This user cannot be deleted yet.'); return; }
 
-    var who = p.email || email || 'this rep';
-    var lines = ['Delete ' + who + '?', ''];
-    if (p.mode === 'tombstone') {
-      /* ⚠ NAME WHAT SURVIVES AND WHAT DOES NOT, in that order — the surprise is
-         that the calls stay, so it leads. */
-      lines.push('They have ' + p.calls + ' recorded call' + (p.calls === 1 ? '' : 's') + '.', '',
-        'THEIR CALLS STAY. Every call, analysis and prospect is kept, so your team',
-        'history, close rate and cash figures do not change.', '',
-        'THE PERSON GOES. They lose access immediately, leave the roster, and',
-        'their name is replaced everywhere by "' + (p.renders_as || 'Deleted user') + '".');
-    } else {
-      lines.push('They have no recorded calls, so nothing is kept — the account and',
-        'its rows are removed outright.');
-    }
-    lines.push('', 'This cannot be undone.');
-    if (!confirm(lines.join('\n'))) return;
+    /* ⚠⚠ THE WARNING TEXT COMES FROM THE SERVER, from the SAME plan the delete
+       route acts on. A dialog that builds its own message drifts the moment the
+       rule changes — and this rule just changed in the most consequential
+       direction possible: the calls no longer survive. */
+    var msg = p.confirmation
+      || ('Delete ' + (p.email || email || 'this rep') + '?\n\nThis cannot be undone.');
+    if (!confirm(msg)) return;
 
-    // ⚠ SECOND STEP, and it must be typed — a second confirm() is still one
-    // reflex away from a double-click.
+    // ⚠ SECOND STEP, and it must be TYPED — a second confirm() is still one
+    // reflex away from a double-click, and there is no undo behind this one.
     var typed = window.prompt('Type DELETE to confirm.\n\nThis is the last step.', '');
     if (!typed || typed.trim().toUpperCase() !== 'DELETE') return;
 
     var r = await memberAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: '{}' });
     if (r.ok) {
       var d = r.data || {};
-      alert(d.mode === 'tombstone'
-        ? ('Deleted. ' + d.calls_preserved + ' call' + (d.calls_preserved === 1 ? '' : 's') + ' kept on the team.')
-        : 'Deleted.');
+      var n = d.calls_deleted || 0;
+      alert('Deleted' + (n ? ' — ' + n + ' call' + (n === 1 ? '' : 's') + ' removed.' : '.'));
       refreshMembers(true);
     }
   }

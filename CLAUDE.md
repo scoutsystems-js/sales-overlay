@@ -2233,6 +2233,27 @@ errored 2     1 Zoom no-transcript (permanent), 1 grader unparseable-JSON
 - **⚠ THE 78 PENDING AND 6 STRANDED ARE A KNOWN, DELIBERATE RESIDUE, NOT SILENT CASUALTIES.** They are old history, they appear on no surface Justin shows, and re-admitting them was explicitly declined on cost. **They are recorded here so a future session does not rediscover them as a mystery.**
 - **⚠ COST IS A FIRST-CLASS CONSTRAINT AND IT ARRIVED LATE.** ~$200 in a day on one account's backfill, with the twelve-loop incident burning a meaningful share of it on 429 casualties that were then re-graded. **Anything that dispatches per-call model work must state its cost BEFORE running** — the grading control already does; ad-hoc dispatches from a console do not, and that asymmetry is how the day's spend got away.
 
+### ⚠⚠⚠ DELETING A USER DELETES THEIR CALLS AND HISTORY — THE TOMBSTONE IS SUPERSEDED (Justin, 2026-08-26)
+**Same blast radius as deleting a company, and it REUSES that path — `lib/user-purge.js`, one implementation, two callers.**
+- **⚠⚠ THE EARLIER "CALLS SURVIVE A USER DELETE" DESIGN IS SUPERSEDED, NOT A BUG.** It is recorded that way here, in `lib/user-management.js`, in `lib/company-lifecycle.js` and in the tests, **because a future session finding an inverted assertion cold would read it as a regression and restore it.** The tombstone kept the auth row so ~12 foreign keys held and last quarter's numbers still added up. That is now explicitly not wanted.
+- **⚠⚠ HIS REASONING, AND IT IS WHAT MAKES THIS COHERENT RATHER THAN MERELY DESTRUCTIVE: *"we have DEACTIVATE as the safeguard and it's why only admins can actually delete people."*** **TWO DOORS:**
+```
+DEACTIVATE   the everyday action — switched off, every number stays,
+             nothing breaks, fully reversible
+DELETE       deliberate and destructive, and it takes the history with it
+```
+  **THE SAFEGUARD IS NEITHER A DIALOG NOR A RECOVERABLE COPY — it is that the destructive door is behind the ADMIN role.** That is why the check is `requireRole('owner')` **on the route**, never a hidden button (a hidden control is a suggestion), and why the confirmation must still name the cost. **Anyone later tempted to soften delete, add an undo, or open it to managers reads this entry first.**
+- **⚠⚠ `deletePlan` MODES RENAMED `hard` -> `purge`, DELIBERATELY.** `hard` meant *"no history, so nothing to preserve"*; it would now mean *"destroy the history too"*. **A value whose MEANING changes while its TYPE does not is the silent-semantic-change trap** — every caller keeps compiling and keeps producing confident wrong output. The rename forces each one to be found. `tombstone` is gone entirely; a test asserts neither name can come back.
+- **ORDER IN THE PURGE IS LOAD-BEARING, NOT STYLE.** `knowledge_base` has **NO foreign key to auth.users**, so its rows SURVIVE the cascade and must go FIRST — deleting the users first orphans them beyond the reach of this scope, permanently, with nothing to find them by. `profiles` (vestigial) has a **NO ACTION** FK that BLOCKS the auth delete outright. **Global KB rows are KEPT**: they are shared material other people are graded against.
+- **VERIFIED ON A THROWAWAY, BEFORE AND AFTER, against a baseline captured before anything was seeded:**
+```
+ORIGINAL  calls 1872 · analyses 1711 · highlights 7741 · prospects 1241 · kb 2247 · profiles 16 · users 16
+SEEDED    +3 calls · +3 analyses · +1 highlight · +1 prospect · +2 kb · +1 profile · +1 user
+AFTER     every table back to its ORIGINAL count — no other user's figures moved
+```
+  **The one apparent drift was the GLOBAL kb row, surviving by design** (`kb_rows_deleted: 1` = the personal one only). Deleted as test residue afterwards; residue 0.
+- **⚠⚠ THREE ROWS FROM BEFORE THE RULING ARE STILL TOMBSTONED, HOLDING 117 CALLS — REPORTED, NOT DECIDED.** `deleted-49711e7d` (39), `deleted-8bda1aac` (37), `deleted-e3ae475c` (41), all on Josh's board and all still counted in his team numbers (`repIdsFor` does not filter `active`). **They were deleted under the OLD contract, where the person was told the calls stay.** Purging them would remove 117 calls from every period Josh's team has worked. **That is a decision, not a tidy-up** — do not make it without Justin. `tombstoneIdentity` is kept for the same reason and marked legacy-only at the function.
+
 ### ⚠⚠⚠ STANDING RULING — IF THE USER HAS TO DO SOMETHING, SCOUT MUST SAY SO ON THE PAGE THEY ARE ON (Justin, 2026-08-26)
 **His words: *"When something like the examples above where the user needs to do something, we have to let them know that in a very obvious way."***
 - **⚠⚠ IT IS A RULE ABOUT A CLASS OF STATE, NOT A LIST OF FIXES. Scout routinely KNOWS the user must act and stays silent**, and every instance looks like a different bug to whoever hits it. Four surfaced in one day's work, all on one company:
@@ -2380,6 +2401,8 @@ anything unclassifiable                  -> PERMANENT — retrying what you cann
 - A clean fetch **resets** the counter: the bound is CONSECUTIVE failures. Past the cap the reason records **which** — *"temporary but retried 5 times, giving up"* vs *"permanent, not retried"* — so a stuck call is legible rather than merely failed.
 - **⚠ PROVED BY FORCING A 429 THROUGH THE REAL BRANCH.** The actual try/catch is extracted from `analysis-worker.js` and executed with the fetch stubbed; disabling the retry fails all 7. A classifier unit test alone would have proved the RULE and not that the worker USES it — the dead-call-site family.
 - **⚠⚠ AND THE HARNESS CAUGHT ITSELF, WHICH IS THE TRANSFERABLE PART: OMITTING ONE FREE IDENTIFIER FROM AN INJECTED SCOPE MADE EVERY CASE PASS THROUGH THE WRONG BRANCH.** Leaving `accessToken` out meant the TRY threw a `ReferenceError`, which the catch classified as permanent — so the **404 test passed for the wrong reason** while the 429 tests failed. **When executing extracted source, every free identifier must be supplied, and something must assert a scope error cannot masquerade as a verdict.**
+
+### ⚠⚠ SUPERSEDED IN PART 2026-08-26 — DELETING A USER NOW DELETES THEIR CALLS. The entry below still governs MOVING a rep between companies; its "delete a company destroys its data" half is unchanged; but **any reading of it that implies a single-user delete PRESERVES history is dead.** See the deletion ruling above.
 
 ### ⚠⚠⚠ JUSTIN'S HISTORY RULING — SETTLES A QUESTION OPEN SINCE 2026-08-24 (ruled 2026-08-25)
 **His words:** *"no I don't want their past to move with them unless we're able to copy/paste it. I don't care if it messes with all-companies data, that's not really something we would look at. And if I delete a company and their data is deleted, that's fine — that's why we also have a deactivate button."*

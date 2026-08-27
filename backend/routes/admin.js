@@ -8,7 +8,8 @@ const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { fetchSellingContext } = require('../lib/selling-context');
 const welcomeEmail = require('../lib/welcome-email');
-const { canManageTarget, deletePlan, tombstoneIdentity, deactivateBlockReason } = require('../lib/user-management');
+const { canManageTarget, deletePlan, deleteUserConfirmation, deactivateBlockReason } = require('../lib/user-management');
+const { purgeUsers } = require('../lib/user-purge');
 /* ⚠⚠ THIS IMPORT WAS MISSING FROM 20ab18c UNTIL 2026-08-24, AND ADD-USER HAS
    BEEN COMPLETELY BROKEN THAT ENTIRE TIME. That commit added two
    normalizeName() calls to POST /admin/users and never imported the function,
@@ -503,29 +504,18 @@ router.delete('/companies/:head_id', requireAuth, requireRole('owner'), async fu
       return res.status(400).json({ error: 'You cannot delete a company that you are part of.' });
     }
 
-    // 1 · KB rows that would otherwise survive — personal + team only.
-    var kbDel = await admin.from('knowledge_base').delete()
-      .in('uploaded_by', ids).in('scope', companyLifecycle.KB_SCOPES_TO_DELETE).select('id');
-    if (kbDel.error) throw new Error('kb delete failed: ' + kbDel.error.message);
-
-    // 2 · the vestigial profiles row, whose NO ACTION FK would block the delete
-    await admin.from('profiles').delete().in('id', ids);
-
-    // 3 · the auth users. Everything else cascades from here.
-    var deleted = [], failed = [];
-    for (var i = 0; i < ids.length; i++) {
-      var d = await admin.auth.admin.deleteUser(ids[i]);
-      if (d.error) { failed.push({ user_id: ids[i], error: d.error.message }); continue; }
-      deleted.push(ids[i]);
-    }
+    /* ⚠ THE BLAST RADIUS MOVED TO lib/user-purge.js — a single-user delete now
+       has the SAME one (Justin, 2026-08-26), and two copies of an unrecoverable
+       operation is how they come to differ. Order and reasoning live there. */
+    var purged = await purgeUsers(admin, ids);
 
     console.log('[admin] COMPANY DELETED: actor=%s head=%s users=%d kb_rows=%d failed=%d',
-      req.user.email, headId, deleted.length, (kbDel.data || []).length, failed.length);
+      req.user.email, headId, purged.deleted.length, purged.kb_rows_deleted, purged.failed.length);
     res.json({
-      ok: failed.length === 0,
-      deleted_users: deleted.length,
-      kb_rows_deleted: (kbDel.data || []).length,
-      failed: failed,
+      ok: purged.failed.length === 0,
+      deleted_users: purged.deleted.length,
+      kb_rows_deleted: purged.kb_rows_deleted,
+      failed: purged.failed,
     });
   } catch (err) {
     if (handleConfigError(err, res)) return;
@@ -1063,8 +1053,11 @@ router.get('/users/:user_id/delete-preview', requireAuth, requireRole('owner'), 
     res.json({
       user_id: uid, email: got.data.user.email,
       mode: plan.mode, calls: plan.calls, reason: plan.reason,
-      // what the surviving rows will render as — so the dialog can show it
-      renders_as: tombstoneIdentity(uid).first_name + ' ' + tombstoneIdentity(uid).last_name,
+      /* ⚠ THE DIALOG TEXT IS BUILT HERE, FROM THE SAME PLAN THE DELETE USES —
+         so the warning cannot promise something different from what happens.
+         `renders_as` is gone with the tombstone: nothing survives to render. */
+      confirmation: plan.mode === 'purge'
+        ? deleteUserConfirmation(got.data.user.email, plan.calls) : null,
     });
   } catch (err) {
     if (handleConfigError(err, res)) return;
@@ -1090,50 +1083,28 @@ router.delete('/users/:user_id', requireAuth, requireRole('owner'), async functi
                             repCount: await countManagedReps(admin, uid) });
     if (plan.mode === 'blocked') return res.status(409).json({ error: plan.reason });
 
-    if (plan.mode === 'hard') {
-      // No history — nothing to preserve, so the row goes.
-      var del = await admin.auth.admin.deleteUser(uid);
-      if (del.error) return res.status(500).json({ error: 'Could not delete user: ' + del.error.message });
-      console.log('[admin] user HARD DELETED (no history): actor=%s (%s) target=%s (%s)',
-        req.user.email, req.user.id, uid, email);
-      return res.json({ deleted: true, mode: 'hard', user_id: uid, calls_preserved: 0 });
+    /* ⚠⚠ THE TOMBSTONE IS GONE — SUPERSEDED, NOT BROKEN. Justin's ruling
+       2026-08-26: deleting a user deletes their calls and history too, the same
+       blast radius as deleting a company. The previous design kept the auth row
+       so ~12 foreign keys held and last quarter's numbers still added up; that
+       is now explicitly not wanted. **DEACTIVATE is the safeguard** — it keeps
+       every number and is reversible — **and the reason only admins may delete.**
+
+       ⚠ SO THE ONLY GATE THAT MATTERS IS `requireRole('owner')` ON THIS ROUTE.
+       It is enforced HERE, server-side, never by hiding the button: a hidden
+       control is a suggestion, and this operation has no undo. */
+    var purged = await purgeUsers(admin, [uid]);
+    if (purged.failed.length) {
+      console.error('[admin] user delete FAILED: target=%s: %s', uid, purged.failed[0].error);
+      return res.status(500).json({ error: 'Could not delete user: ' + purged.failed[0].error });
     }
 
-    /* ⚠⚠ TOMBSTONE — THE AUTH ROW IS KEPT ON PURPOSE, AND THIS IS THE WHOLE
-       DESIGN. Every history table cascades on an auth.users delete (proven on a
-       throwaway: 2 calls in, delete, 0 out), so removing the row would not
-       orphan this person's history — it would DESTROY it, rewriting close rate,
-       cash and rankings for every period they worked. Keeping the row is what
-       holds all ~12 foreign keys intact without a migration.
-
-       ⚠ ORDER MATTERS: revoke access FIRST, rename SECOND. If the rename
-       succeeded and the ban failed we would have a scrubbed row that can still
-       sign in — a live account nobody can identify. The reverse leaves a banned
-       account with its old name, which is visible and fixable. */
-    var ban = await admin.auth.admin.updateUserById(uid, {
-      ban_duration: '876000h',                    // 100 years — Supabase has no "forever"
-      password: crypto.randomBytes(24).toString('hex'),
-      email_confirm: false,
+    console.log('[admin] user PURGED (%d calls destroyed, %d kb rows): actor=%s (%s) target=%s (%s)',
+      plan.calls, purged.kb_rows_deleted, req.user.email, req.user.id, uid, email);
+    res.json({
+      deleted: true, mode: 'purge', user_id: uid,
+      calls_deleted: plan.calls, kb_rows_deleted: purged.kb_rows_deleted,
     });
-    if (ban.error) return res.status(500).json({ error: 'Could not revoke access: ' + ban.error.message });
-
-    var stone = tombstoneIdentity(uid);
-    var scrub = await admin.auth.admin.updateUserById(uid, { email: stone.email });
-    if (scrub.error) {
-      /* Access is already revoked, so the account is safe — it just still shows
-         the old address. Report it rather than pretending the delete completed. */
-      console.error('[admin] tombstone rename FAILED after ban: target=%s: %s', uid, scrub.error.message);
-      return res.status(500).json({ error: 'Access was revoked but the identity could not be scrubbed — retry.' });
-    }
-
-    var prof = await admin.from('user_profiles').update({
-      active: false, first_name: stone.first_name, last_name: stone.last_name,
-    }).eq('user_id', uid);
-    if (prof.error) console.error('[admin] tombstone profile update failed: %s', prof.error.message);
-
-    console.log('[admin] user TOMBSTONED (%d calls preserved): actor=%s (%s) target=%s (%s)',
-      plan.calls, req.user.email, req.user.id, uid, email);
-    res.json({ deleted: true, mode: 'tombstone', user_id: uid, calls_preserved: plan.calls });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[admin] delete error:', err.message);

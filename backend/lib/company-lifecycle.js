@@ -2,15 +2,20 @@
 //
 // ⚠⚠ JUSTIN'S RULING (2026-08-24): DEACTIVATE keeps the data, DELETE destroys it.
 //
-// ⚠⚠ DELETE DELIBERATELY DIFFERS FROM SINGLE-USER DELETE, WHICH KEEPS THE CALLS.
-// Both are correct at their own scale, and the next person to read the two paths
-// will otherwise think one is a bug:
-//   • ONE REP LEAVING must not rewrite their team's history. Their calls stay,
-//     the person is tombstoned, and last quarter's numbers still add up. That is
-//     lib/user-management.js.
-//   • A CHURNED CLIENT should not sit in the numbers at all. Their whole company
-//     goes, calls included, because there is no longer a team whose history it
-//     would be rewriting.
+// ⚠⚠ SUPERSEDED 2026-08-26 — THE TWO DELETES NOW MATCH. This block used to
+// explain why a single-user delete KEPT the calls while a company delete did
+// not. Justin ruled that a user delete destroys their history too, so there is
+// no longer a distinction to defend — and both paths share ONE implementation,
+// lib/user-purge.js, so they cannot drift.
+//
+// ⚠ THE SAFEGUARD IS DEACTIVATE, NOT A RECOVERABLE COPY. Deactivating keeps
+// every number and is reversible; deleting is deliberate, destructive, and
+// behind the admin role for exactly that reason. Anyone tempted to soften
+// delete or add an undo should read lib/user-management.js deletePlan first.
+//
+// ⚠ Kept as a correction rather than deleted: the old text asserted a property
+// the code no longer has, and prose that quietly stops being true is worse than
+// no prose — it answers the question wrongly instead of prompting a look.
 // The distinction is WHOSE HISTORY IS BEING PROTECTED. For a rep it is the
 // team's; for a company there is no surviving team.
 //

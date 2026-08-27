@@ -143,20 +143,31 @@ test('⚠⚠ AN IRREVERSIBLE DELETE CANNOT HAPPEN FROM ONE CLICK', () => {
   assert.ok(src.indexOf('cannot be undone') !== -1, 'and it must say it is irreversible');
 });
 
-test('⚠⚠ THE WARNING NAMES WHO, HOW MANY CALLS, AND WHAT SURVIVES', () => {
+test('⚠⚠ THE WARNING NAMES WHO, HOW MANY CALLS, AND THAT NOTHING SURVIVES', () => {
+  /* ⚠⚠ REWRITTEN 2026-08-26 — THE RULING INVERTED. This used to assert the
+     dialog said "THEIR CALLS STAY". Justin's ruling: a user delete now destroys
+     their calls and history, the same blast radius as a company delete.
+     ⚠ The old strings are asserted ABSENT below: a stale warning on a
+     destructive action is worse than none, because it is read and believed. */
   const src = fn('async function deleteMember');
-  assert.ok(/p\.email \|\| email/.test(src), 'who');
-  assert.ok(/p\.calls/.test(src), 'how many calls');
-  assert.ok(/THEIR CALLS STAY/.test(src), 'that the calls remain');
-  assert.ok(/THE PERSON GOES/.test(src), 'and that the person does not');
-  assert.ok(/p\.renders_as/.test(src), 'and what the surviving rows will be labelled');
+  // The text now comes from the SERVER, from the same plan the delete acts on,
+  // so the dialog cannot promise something different from what happens.
+  assert.ok(/p\.confirmation/.test(src), 'the warning must come from the server plan');
 
-  /* ⚠ THE OLD TEXT SAID BOTH OF THESE AND BOTH ARE NOW FALSE. A stale warning
-     on a destructive action is worse than none — it is read and believed. */
-  assert.strictEqual(/removes their account and all their data/.test(LIVE), false,
-    'the old "all their data" claim must be gone — the calls now survive');
-  assert.strictEqual(/Only allowed if they have no call history/.test(LIVE), false,
-    'and the old zero-history claim, which is no longer the rule');
+  const um = require('../lib/user-management');
+  const t = um.deleteUserConfirmation('rep@example.com', 12);
+  assert.match(t, /rep@example\.com/, 'who');
+  assert.match(t, /12 calls/, 'how many');
+  assert.match(t, /permanently deletes/, 'and that it is destructive');
+  assert.match(t, /CANNOT be undone/, 'with no recovery');
+  assert.match(t, /Deactivate/, 'and it must point at the reversible door');
+
+  /* ⚠ EVERY CLAIM FROM THE SUPERSEDED DESIGN MUST BE GONE FROM THE PAGE. */
+  [/THEIR CALLS STAY/, /THE PERSON GOES/, /renders_as/, /calls_preserved/,
+   /removes their account and all their data/, /Only allowed if they have no call history/]
+    .forEach(function (re) {
+      assert.strictEqual(re.test(LIVE), false, 'stale claim still on the page: ' + re);
+    });
 });
 
 test('⚠ the dialog is built from the SERVER plan, not a client guess', () => {

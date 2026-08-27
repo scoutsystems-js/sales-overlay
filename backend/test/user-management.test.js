@@ -32,17 +32,49 @@ test('canManageTarget: plain user can manage nobody', () => {
    "tombstone". A test whose SUBJECT outlives its VEHICLE gets rewritten, not
    dropped — deleting it is how a property silently stops being covered. */
 
-test('⚠⚠ HISTORY ROUTES TO A TOMBSTONE — a delete must never destroy calls', () => {
-  assert.strictEqual(um.deletePlan({ callCount: 3, sessionCount: 0 }).mode, 'tombstone');
-  assert.strictEqual(um.deletePlan({ callCount: 0, sessionCount: 5 }).mode, 'tombstone', 'sessions count too');
-  assert.strictEqual(um.deletePlan({ callCount: 1, sessionCount: 0 }).mode, 'tombstone', 'ONE call is history');
-  assert.strictEqual(um.deletePlan({ callCount: 3, sessionCount: 2 }).calls, 5, 'both sources sum');
+test('⚠⚠ HISTORY IS DESTROYED WITH THE USER — the tombstone is SUPERSEDED', () => {
+  /* ⚠⚠ THIS TEST USED TO ASSERT THE OPPOSITE, and that is not a bug that was
+     found — it is a RULING that changed (Justin, 2026-08-26). Deleting a user
+     now takes their calls and history with it, the same blast radius as
+     deleting a company. **DEACTIVATE is the safeguard**: it keeps every number
+     and is reversible, and it is why only admins may delete.
+     ⚠ Recorded here rather than only in CLAUDE.md, because whoever finds this
+     inverted assertion cold would otherwise read it as a regression. */
+  assert.strictEqual(um.deletePlan({ callCount: 3, sessionCount: 0 }).mode, 'purge');
+  assert.strictEqual(um.deletePlan({ callCount: 0, sessionCount: 5 }).mode, 'purge', 'sessions count too');
+  assert.strictEqual(um.deletePlan({ callCount: 3, sessionCount: 2 }).calls, 5, 'both sources still sum');
+  // ⚠ THE COUNT IS THE COST NOW, NOT A ROUTING SIGNAL — the dialog names it.
+  assert.strictEqual(um.deletePlan({ callCount: 12 }).calls, 12);
 });
 
-test('⚠ zero history hard-deletes — there is nothing to preserve', () => {
-  assert.strictEqual(um.deletePlan({ callCount: 0, sessionCount: 0 }).mode, 'hard');
-  assert.strictEqual(um.deletePlan({}).mode, 'hard');
-  assert.strictEqual(um.deletePlan().mode, 'hard', 'a missing argument must not become a tombstone');
+test('⚠⚠ RENAMED hard -> purge ON PURPOSE — the meaning changed, the type did not', () => {
+  /* 'hard' meant "no history, so nothing to preserve". It would now mean
+     "destroy the history too". A value whose meaning moves while its type stays
+     put is the silent-semantic-change trap: every caller keeps working and keeps
+     producing confident wrong output. The rename forces each one to be found. */
+  ['hard', 'tombstone'].forEach(function (dead) {
+    assert.notStrictEqual(um.deletePlan({ callCount: 3 }).mode, dead, dead + ' must not come back');
+    assert.notStrictEqual(um.deletePlan({ callCount: 0 }).mode, dead, dead + ' must not come back');
+  });
+});
+
+test('⚠ no history is the SAME path — one destructive mode, not two', () => {
+  // Nothing to destroy is not a different KIND of delete, and treating it as one
+  // is how the two paths drift.
+  assert.strictEqual(um.deletePlan({ callCount: 0, sessionCount: 0 }).mode, 'purge');
+  assert.strictEqual(um.deletePlan({}).mode, 'purge');
+  assert.strictEqual(um.deletePlan().mode, 'purge', 'a missing argument must not change the mode');
+});
+
+test('⚠⚠ THE CONFIRMATION NAMES THE COST AND THE OTHER DOOR', () => {
+  var t = um.deleteUserConfirmation('rep@example.com', 12);
+  assert.match(t, /rep@example\.com/, 'who');
+  assert.match(t, /12 calls/, 'how many');
+  assert.match(t, /CANNOT be undone/, 'and that there is no recovery');
+  // ⚠ Deactivate is the safeguard, so the destructive dialog must point at it —
+  // someone about to delete may simply not want this.
+  assert.match(t, /Deactivate/, 'must offer the reversible door');
+  assert.match(um.deleteUserConfirmation('a@b.com', 1), /1 call\b/, 'singular');
 });
 
 test('⚠ still managing reps BLOCKS — they would be managed by a deleted person', () => {
