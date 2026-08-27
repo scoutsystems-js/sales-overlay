@@ -584,6 +584,32 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* ⚠ FIXED BOTTOM-LEFT. The content column is centred and capped at 1200px,
+       so the left gutter is empty at every desktop width; bottom-RIGHT is where
+       browser download bars and extension chrome land. Hidden under 900px where
+       there is no gutter to sit in. */
+    .support-fab { position: fixed; left: 20px; bottom: 20px; z-index: 40;
+      background: var(--bg-elevated); color: var(--text);
+      border: 1px solid var(--border-strong); border-radius: 999px;
+      padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    .support-fab:hover { border-color: var(--accent); color: var(--accent); }
+    @media (max-width: 900px) { .support-fab { display: none; } }
+    .support-modal { position: fixed; inset: 0; z-index: 100; display: flex;
+      align-items: center; justify-content: center; background: rgba(0,0,0,0.6); }
+    .support-modal.hidden { display: none; }
+    .support-card { background: var(--bg-elevated); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg); padding: 22px; width: min(92vw, 520px); }
+    .support-card h3 { margin: 0 0 6px; font-size: 18px; }
+    .support-sub { margin: 0 0 14px; font-size: 13px; color: var(--text); }
+    .support-card textarea { width: 100%; box-sizing: border-box; background: var(--bg-field);
+      color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius);
+      padding: 10px; font: inherit; font-size: 14px; resize: vertical; }
+    .support-error { margin-top: 10px; font-size: 13px; color: var(--bad); }
+    .support-actions { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+    .support-ok { font-size: 14px; line-height: 1.55; }
+    .support-ref { font-family: ui-monospace, Menlo, monospace; font-size: 15px;
+      background: var(--bg-field); border: 1px solid var(--border-strong);
+      border-radius: var(--radius); padding: 3px 8px; }
     .top-bar {
       background: linear-gradient(180deg, #161616 0%, #0d0d0d 100%);
       border-bottom: 1px solid var(--border);
@@ -3622,6 +3648,35 @@
 </head>
 <body>
 
+<!-- ══ SUPPORT — ONE CONTROL, RENDERED ONCE, PRESENT ON EVERY PAGE ═══════════
+     ⚠⚠ IT LIVES HERE, OUTSIDE #content, BECAUSE render() REPLACES #content ON
+     EVERY VIEW. Copying a control onto each page is this codebase's most
+     repeated mistake — the objection labels needed unifying twice, the company
+     picker rendered twice on one page, and splitting teamHeaderHtml silently
+     removed the date picker from three views. At ~15 views that would be the
+     same mistake fifteen times.
+     ⚠ EVERY ROLE. Closers are the ones who hit problems. The LIST is admin-only
+     (it carries other companies' state) — one feature, two permission answers,
+     and conflating them is a data leak.
+     ⚠ IT MUST NOT OBSTRUCT ANYTHING: fixed, bottom-left, clear of the 1200px
+     content column, and permanently on screen — so it can never cover a control
+     that appears later. -->
+<button id="supportFab" type="button" class="support-fab" onclick="openSupport()"
+        aria-label="Report a problem to Scout support">Need help?</button>
+
+<div id="supportModal" class="support-modal hidden" role="dialog" aria-modal="true" aria-labelledby="supportTitle">
+  <div class="support-card">
+    <h3 id="supportTitle">Report a Problem</h3>
+    <p class="support-sub">Tell us what went wrong. We attach what we can see about your account automatically, so you don&rsquo;t have to explain the technical part.</p>
+    <textarea id="supportMessage" rows="5" maxlength="4000" placeholder="What were you trying to do, and what happened instead?"></textarea>
+    <div class="support-error" id="supportError" style="display:none"></div>
+    <div class="support-actions">
+      <button class="btn-fathom-primary" type="button" id="supportSend" onclick="sendSupport()">Send</button>
+      <button class="calls-outcome-clear" type="button" onclick="closeSupport()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <nav class="top-bar">
   <div class="top-bar-left">
     <span>Scout</span>
@@ -5116,6 +5171,78 @@
     var n = [u.first_name, u.last_name].filter(Boolean).join(' ');
     return n || u.email || 'this rep';
   }
+  /* ══ SUPPORT ══════════════════════════════════════════════════════════════
+   * ⚠⚠ THE PERSON MUST NOT SUBMIT INTO SILENCE. The list is admin-only, so
+   * without a confirmation they get no acknowledgement, no reference and no way
+   * to tell whether anything happened — which is worse than an email address,
+   * because an email at least lands somewhere they can see. This returns a REAL
+   * REFERENCE from the server so they have something concrete to quote.
+   * ⚠ Whether they can later see their own ticket history is Justin's call and
+   * is NOT built here — see the findings. */
+  function openSupport() {
+    var m = document.getElementById('supportModal'); if (!m) return;
+    document.getElementById('supportError').style.display = 'none';
+    // Restore the form if a previous send left the confirmation on screen.
+    var card = m.querySelector('.support-card');
+    if (card.getAttribute('data-sent')) { card.innerHTML = card.getAttribute('data-form'); card.removeAttribute('data-sent'); }
+    else if (!card.getAttribute('data-form')) card.setAttribute('data-form', card.innerHTML);
+    m.classList.remove('hidden');
+    var t = document.getElementById('supportMessage'); if (t) t.focus();
+  }
+  function closeSupport() {
+    var m = document.getElementById('supportModal'); if (m) m.classList.add('hidden');
+  }
+  /* The page they were on, in the words a person would use. ⚠ FREE CONTEXT THE
+     APP ALREADY HOLDS — it turns "X isn't working" into "X isn't working on the
+     Calls page", which is exactly what a support conversation has to ask for. */
+  function supportPageLabel() {
+    var names = {
+      overview: 'Coaching Dashboard', 'call-library': 'Calls', 'call-review': 'Call Review',
+      team: 'Team', 'team-objections': 'Team Objections', 'team-needs-work': 'Objection Focus',
+      'team-members': 'Manage Members', eod: 'EOD Report', kb: 'Knowledge Base',
+      account: 'Account', 'objections-intel': 'Objections', performance: 'Performance',
+      section: 'Section Detail', prospects: 'Prospects', 'needs-work': 'What Needs Work',
+    };
+    return names[state.view] || state.view || 'unknown';
+  }
+  async function sendSupport() {
+    var box = document.getElementById('supportMessage');
+    var err = document.getElementById('supportError');
+    var btn = document.getElementById('supportSend');
+    var msg = (box && box.value || '').trim();
+    if (!msg) { err.textContent = 'Please tell us what went wrong.'; err.style.display = ''; return; }
+    btn.disabled = true; btn.textContent = 'Sending…'; err.style.display = 'none';
+    try {
+      var res = await fetch('/support/tickets', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ message: msg, page: supportPageLabel() }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      var body = null; try { body = await res.json(); } catch (e) {}
+      if (!res.ok || !body || !body.ok) {
+        /* ⚠ A FAILURE HERE MUST GIVE THEM ANOTHER ROUTE, not just an apology.
+           This is the one moment where "something went wrong" is unacceptable
+           on its own — they are already reporting that something went wrong. */
+        err.innerHTML = escapeHtml((body && body.error) || 'Could not send that.')
+          + ' You can email <a href="mailto:justin@scoutsystems.io">justin@scoutsystems.io</a>.';
+        err.style.display = '';
+        btn.disabled = false; btn.textContent = 'Send';
+        return;
+      }
+      var card = document.querySelector('#supportModal .support-card');
+      card.setAttribute('data-sent', '1');
+      card.innerHTML = '<h3>Thanks — we have it.</h3>'
+        + '<p class="support-ok">Your reference is <span class="support-ref">' + escapeHtml(body.reference) + '</span>.<br>'
+        + 'We look at these directly. If it needs a reply you&rsquo;ll hear from us by email.</p>'
+        + '<div class="support-actions"><button class="btn-fathom-primary" type="button" onclick="closeSupport()">Close</button></div>';
+    } catch (e) {
+      err.innerHTML = 'Could not reach the server. You can email <a href="mailto:justin@scoutsystems.io">justin@scoutsystems.io</a>.';
+      err.style.display = '';
+      btn.disabled = false; btn.textContent = 'Send';
+    }
+  }
+
   function gradeBacklogUrl() {
     return isSelf() ? '/fathom/update-analyses'
                     : '/fathom/update-analyses/' + encodeURIComponent(state.viewingUserId);

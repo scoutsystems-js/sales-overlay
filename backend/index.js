@@ -150,6 +150,11 @@ app.use('/proxy', proxyRoutes);
 app.use('/download', downloadRoutes);
 app.use('/log', logRoutes);
 app.use('/admin', adminRoutes);
+/* ⚠ MOUNTED AFTER the exact-match `GET /support` above, deliberately — that
+   route serves the public support PAGE (a Zoom submission requirement) and must
+   keep winning. Express matches in order, so /support/tickets reaches the router
+   while /support still serves the page. Same pattern as /admin. */
+app.use('/support', require('./routes/support'));
 app.use('/me', meRoutes);
 app.use('/kb', kbRoutes);
 app.use('/fathom', fathomRoutes);

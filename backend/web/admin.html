@@ -374,6 +374,23 @@
     </div>
   </section>
 
+  <!-- ⚠⚠ ADMIN-ONLY BY RULING, and the reason is not tidiness: this list carries
+       OTHER COMPANIES' account state in every attached snapshot. The SUBMIT
+       control is universal and this is not — one feature, two permission
+       answers, and conflating them is a data leak. Gated on the server too
+       (requireRole('owner')); hiding the section is presentation, not security. -->
+  <section class="users-section" id="ticketsSection" style="display:none">
+    <div class="users-header">
+      <h2>Support Tickets</h2>
+      <select class="role-select" id="ticketFilter" onchange="loadTickets()">
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+        <option value="all">All</option>
+      </select>
+    </div>
+    <div class="users-table-wrap" id="ticketsWrap"><div class="empty-msg">—</div></div>
+  </section>
+
   <!-- ⚠ PASSWORD RESET DIAGNOSTICS REMOVED 2026-08-24 (Justin: "that was in
        there a while ago for some testing I did and needs to be removed
        completely"). The route behind it went too — a diagnostic endpoint left
@@ -520,6 +537,64 @@
     // Companies and a refresh silently discards where the user was.
     adminTab = readAdminTabFromHash();
     await loadUsers();
+    if (currentUser.role === 'owner') {
+      document.getElementById('ticketsSection').style.display = '';
+      loadTickets();
+    }
+  }
+
+  /* ══ SUPPORT TICKETS ══════════════════════════════════════════════════════
+   * ⚠ THE SNAPSHOT SHOWN IS THE ONE STORED WITH THE TICKET — captured when they
+   * hit the problem, never regenerated on read. Regenerating would answer "what
+   * is true now", look identical, and quietly make a cleared backlog read as
+   * though it never existed. */
+  async function loadTickets() {
+    var wrap = document.getElementById('ticketsWrap');
+    var status = document.getElementById('ticketFilter').value;
+    wrap.innerHTML = '<div class="empty-msg"><span class="spinner"></span></div>';
+    try {
+      var res = await fetch('/support/tickets?status=' + encodeURIComponent(status), { headers: authHeader() });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var d = await res.json();
+      var list = d.tickets || [];
+      if (!list.length) { wrap.innerHTML = '<div class="empty-msg">No ' + escapeHtml(status === 'all' ? '' : status) + ' tickets.</div>'; return; }
+      wrap.innerHTML = list.map(ticketRowHtml).join('');
+    } catch (e) {
+      wrap.innerHTML = '<div class="empty-msg">Could not load tickets: ' + escapeHtml(e.message) + '</div>';
+    }
+  }
+  function ticketRowHtml(t) {
+    var s = t.snapshot || {};
+    /* ⚠ "NO SNAPSHOT" AND "THE SNAPSHOT BROKE" ARE DIFFERENT FACTS. Showing an
+       empty one as though nothing were wrong is the absent-vs-excluded collapse
+       — and here it would mean answering a ticket from data that never loaded. */
+    var diag = t.snapshot_error
+      ? '<div class="empty-msg">⚠ Diagnostics failed when this was raised: ' + escapeHtml(t.snapshot_error) + '</div>'
+      : (s.verdict
+          ? '<div><strong>' + escapeHtml(s.verdict) + '</strong></div>'
+            + '<div class="empty-msg">' + (s.what_they_see || []).map(esc).join('<br>') + '</div>'
+          : '<div class="empty-msg">No diagnostics attached.</div>');
+    return '<div class="user-row" style="display:block; padding:14px 0;">'
+      + '<div><strong>' + escapeHtml(t.email || t.user_id) + '</strong>'
+      + ' <span class="empty-msg">· ' + escapeHtml(t.page || 'unknown page') + ' · '
+      + escapeHtml(new Date(t.created_at).toLocaleString()) + '</span></div>'
+      + '<div style="margin:8px 0; white-space:pre-wrap;">' + escapeHtml(t.message) + '</div>'
+      + diag
+      + '<div style="margin-top:10px;"><button class="btn-add-user" onclick="setTicketStatus(\'' + t.id + '\', \''
+      + (t.status === 'open' ? 'closed' : 'open') + '\')">'
+      + (t.status === 'open' ? 'Mark handled' : 'Reopen') + '</button></div>'
+      + '</div>';
+  }
+  async function setTicketStatus(id, status) {
+    try {
+      var res = await fetch('/support/tickets/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ status: status }),
+      });
+      if (!res.ok) { alert('Could not update that ticket.'); return; }
+      loadTickets();
+    } catch (e) { alert('Could not reach the server.'); }
   }
 
   // Owner-only dry-run: what would a password reset for this email do right now?
