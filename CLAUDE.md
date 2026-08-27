@@ -2254,6 +2254,31 @@ AFTER     every table back to its ORIGINAL count — no other user's figures mov
   **The one apparent drift was the GLOBAL kb row, surviving by design** (`kb_rows_deleted: 1` = the personal one only). Deleted as test residue afterwards; residue 0.
 - **⚠⚠ THREE ROWS FROM BEFORE THE RULING ARE STILL TOMBSTONED, HOLDING 117 CALLS — REPORTED, NOT DECIDED.** `deleted-49711e7d` (39), `deleted-8bda1aac` (37), `deleted-e3ae475c` (41), all on Josh's board and all still counted in his team numbers (`repIdsFor` does not filter `active`). **They were deleted under the OLD contract, where the person was told the calls stay.** Purging them would remove 117 calls from every period Josh's team has worked. **That is a decision, not a tidy-up** — do not make it without Justin. `tombstoneIdentity` is kept for the same reason and marked legacy-only at the function.
 
+### ⚠⚠⚠ A TOOL FOR WHEN THINGS BREAK MUST WORK WHEN THINGS ARE BROKEN — AND THE ONLY WAY TO KNOW IS TO BREAK THEM (2026-08-27)
+**`buildSnapshot` was made to throw, on purpose, and the ticket was raised anyway: 200, message stored, `snapshot_error` recorded.** Restoring the refusing behaviour fails the guard.
+- **⚠⚠ THE FAILURE MODE IS THE WHOLE POINT: a support tool that refuses a report because ITS OWN diagnostics broke fails at exactly the moment someone needs to reach us.** The person is already telling you something is wrong; answering "we can't take that right now" is the worst available reply.
+- **⚠ AND THE FAILURE MUST BE RECORDED, NOT SWALLOWED.** "No snapshot" and "the snapshot broke" are different facts to whoever reads the ticket — an empty one rendered as though nothing were wrong means answering from data that never loaded. Same family as write-the-null.
+- **THE HABIT, and it generalises to anything support-facing, any degraded path, any fallback: BREAK THE DEPENDENCY DELIBERATELY AND WATCH.** A degraded path that has never been exercised is a guess. Reading the try/catch is not the same as seeing it hold.
+- **⚠ AND KEEP THE GATHER IN THE FOREGROUND.** Backgrounding the 2-4s snapshot would leave a window where a crash produces a ticket with NEITHER diagnostics NOR a recorded reason — collapsing the two facts the schema exists to keep apart. **An unexplainable ticket is worse than a slow form.**
+
+### ⚠⚠ A REFERENCE THE OTHER SIDE CANNOT LOOK UP IS NOT A REFERENCE (2026-08-27)
+**The ticket flow handed the person an 8-character code and displayed it NOWHERE in the admin list.** Someone reading it out on a call could not be found — **in the one moment the reference exists for.**
+- **⚠⚠ IT LOOKED COMPLETE FROM BOTH ENDS SEPARATELY.** The submit path returned a reference; the list showed tickets. **Nothing was missing from either half — what was missing was the JOIN between them**, and no static check can see that. Sibling of the shipped-but-inert family.
+- **THE TEST IS THE ROUND TRIP, NOT THE FIELD: raise one, take the value the PERSON was given, and find that exact row from it.** Verified live — exactly one match.
+- **ONE DEFINITION (`referenceFor`), THREE CONSUMERS** — the confirmation, the admin list, their own list. Derived from the id rather than stored, so it cannot drift and needs no collision handling.
+- **⚠ HEX HAS NO LETTER O**, so there is no 0/O ambiguity when it is spoken. That is the one property that matters for a code read down a phone line, and it is why the id prefix was kept rather than replaced with a prettier scheme.
+
+### ⚠⚠ OMITTING A COLUMN FROM THE QUERY IS STRONGER THAN OMITTING IT FROM THE RENDER (2026-08-27)
+**A person's own ticket list is a SEPARATE query, not the admin list filtered** — and it does not SELECT `snapshot`/`snapshot_error` at all.
+- **⚠ "THE SAME LIST FILTERED TO THEM" IS THE TEMPTING SHAPE AND IT IS THE WRONG ONE.** The admin list carries other companies' account state; one forgotten filter leaks every attached snapshot. **A hidden row is only a suggestion.**
+- **The data never leaves the database**, so no later render change, debug dump or error path can expose it. **Not-fetched cannot leak; not-rendered can.**
+- **⚠ THE DIAGNOSTICS DESCRIBE AN ACCOUNT, and on a shared company account that is not automatically the submitter's to read** — which is why "they raised it" is not sufficient grounds to show it back to them.
+
+### ⚠ STRIP LEADING **AND TRAILING** COMMENTS — THIRD INSTANCE (2026-08-27)
+**A guard asserting `snapshot` appears nowhere in a route failed on the TRAILING comment naming the columns it excludes** (`.select('id, …')   // ⚠ no snapshot, no snapshot_error`).
+- Filtering lines that BEGIN with a marker leaves every trailing comment intact. **Third time this exact gap has bitten** — the served-page marker check, the update-analyses URL count, and now this. **Strip both forms, always.**
+- It is the comment-as-code family again: **the prose explaining a rule reported as a violation of it**, this time inside the guard written to enforce it.
+
 ### ⚠⚠⚠ A TEST WHOSE PASSING VALUE IS INDISTINGUISHABLE FROM ITS FAILING VALUE IS NOT A TEST (2026-08-27)
 **The cross-user grading proof was `95` against `0` — TWO DIFFERENT NUMBERS. Had both come back the same, nothing would have been learned about which set the query selected.**
 - **⚠⚠ THE SHAPE TO REACH FOR: make the correct answer and the wrong answer produce DIFFERENT OBSERVABLE VALUES, then show both.** A single call returning 200 proves the route runs; it does not prove it ran on the right data. This is the same discipline as *restore the defect and count what fails*, applied to a live probe instead of a suite.
