@@ -2261,6 +2261,40 @@ AFTER     every table back to its ORIGINAL count — no other user's figures mov
 - **THE HABIT, and it generalises to anything support-facing, any degraded path, any fallback: BREAK THE DEPENDENCY DELIBERATELY AND WATCH.** A degraded path that has never been exercised is a guess. Reading the try/catch is not the same as seeing it hold.
 - **⚠ AND KEEP THE GATHER IN THE FOREGROUND.** Backgrounding the 2-4s snapshot would leave a window where a crash produces a ticket with NEITHER diagnostics NOR a recorded reason — collapsing the two facts the schema exists to keep apart. **An unexplainable ticket is worse than a slow form.**
 
+### ⚠⚠⚠ COACHING EVIDENCE IS THE WRONG KIND OF MOMENT 61% OF THE TIME — DIAGNOSED 2026-08-27, NOT FIXED
+**Justin's example: *"So when I get to the payment plan, choose the one with zero due today"* shown as proof of the team's weakest section. That is a prospect asking HOW TO PAY.**
+```
+the quote's stored classification :  buying_signal · PROSPECT · close   ← CORRECT
+what-to-improve quotes matched    :  414
+  negative-type moment            :  106 (26%)  coherent
+  positive, claim IS about a miss :   55 (13%)  legitimate — "you failed to act on buying signals"
+  ⚠ positive, claim is NOT        :  253 (61%)  THE FAULT
+live example: "Payment successful." cited as the biggest gap on loss calls
+```
+- **⚠⚠ IT IS NOT A DISPLAY FAULT AND NOT A MISCLASSIFICATION.** The moment is stored correctly. **`lib/team-synthesis.js` builds its candidate list from ALL highlight types, uses `type` ONLY FOR SCORING, and never puts it in the prompt** — each candidate reaches the model tagged with WIN/LOSS and the rep and nothing else. **The model cannot know it is citing a buying signal, and neither can a reader.**
+- **⚠ TWO CANDIDATE FIXES AND THEY ARE DIFFERENT — do not conflate them:** (1) **tag each candidate with its type** so the model can reason about it; (2) **constrain WHAT-TO-IMPROVE to negative-type moments** unless the claim is explicitly about a missed positive one. The first makes it possible to be right; the second makes it hard to be wrong.
+- **⚠⚠ THE 74% FIGURE WOULD HAVE BEEN THE WRONG NUMBER TO REPORT.** A raw "positive-type evidence" count is 74%, and **a claim about FAILING TO ACT on buying signals legitimately cites one.** Splitting the coherent from the incoherent is what turns an alarming number into an actionable one — 61%, with the 13% named as fine.
+- **This is the product, not a cosmetic defect** — same class as the digest coaching confidently on the wrong thing.
+
+### ⚠⚠ A ZERO CAN BE REAL AND A WIDER RANGE CAN BE THE MISLEADING ONE (Godwin, 2026-08-27)
+**0 of 36 handled in one week against 19 of 138 across a wider range. The ZERO is right; the wider figure is the one carrying an effect.**
+- **⚠ DETECTION RAN — that is the check that settles it.** 40 objections extracted that week and **every one carries a resolution (0 null)**: 20 partial, 20 unhandled, 0 handled. Transcripts read normally (avg 315 turns, 52 min, score 60). **A detection failure leaves nulls; this left verdicts.**
+- **⚠⚠ THE WIDER RANGE IS INFLATED BY THE CLOSED-CALL CREDIT RULE.** His RAW handled rate is **11 of 138 (8%)**; the surfaced figure counts objections credited **because the call closed**. He closed **1 of 29** that week against **15 earlier**, so almost nothing got credited. **The two numbers are measuring different things and only one of them says he handled an objection.**
+- **⚠ DO NOT CARRY A PRIOR MEASUREMENT ACROSS RANGES.** An earlier block established his zero as real on a DIFFERENT window; that was not evidence about this one, and re-checking is what produced the credit-rule explanation.
+- **The real finding is that `partial` dominates — 74 of 138 all-time. That is a coaching fact, not a defect.**
+
+### ⚠⚠ A SHARED CLASS CAN LEND AN AFFORDANCE WITHOUT THE BEHAVIOUR (2026-08-27)
+**Two separate bug reports — "closer cards aren't clickable" and "names in the grid aren't clickable" — were ONE fault.** The Per-Closer grid rows carry `.team-detail-row`, which has `cursor: pointer` and an accent hover, so **they inherited the clickable LOOK from the score list while having no handler.**
+- **⚠ A ROW THAT INVITES A CLICK AND DOES NOTHING IS WORSE THAN ONE THAT NEVER INVITED IT** — the person concludes the page is broken rather than that the row is inert, which is exactly why it got reported twice.
+- **THE TELL: two reports about "not clickable" on one page usually means one shared style, not two missing handlers.** Look at what the elements have in common before wiring each separately.
+- Same family as the shared-carrier rules: **the styling is the carrier here, and it travelled further than the behaviour did.**
+
+### ⚠ IT DID NOT "FORGET" — IT WAS NEVER STORED (2026-08-27)
+**The team picker reset to the default company on every refresh.** `teamSelected` lived only in module state; nothing ever wrote it down. **Its sibling the rep filter has persisted to `localStorage` all along.**
+- **⚠⚠ "MAKE IT PERSIST" WITHOUT KNOWING WHY IT RESETS IS HOW IT COMES BACK.** There was no reset to find — the distinction between *a value being cleared* and *a value never being saved* points at completely different code, and only one of them exists here.
+- **⚠ A RESTORED KEY MUST BE VALIDATED against what the person may actually pick.** A team that has gone, or that they no longer manage, would otherwise give an empty board with nothing saying why — the silent wrong-population failure again. Unrecognised keys are discarded, not retried.
+- **Restored only after `/team/context` lands**, because that response is the only thing that says which teams are pickable — restoring earlier would skip validation or race the fetch that enables it.
+
 ### ⚠⚠⚠ TWO CORRECT HALVES DO NOT MAKE A WORKING WHOLE (2026-08-27)
 **The ticket reference: the send returned one, the list showed tickets, and NEITHER SIDE WAS WRONG. What was missing was the JOIN between them — a code handed to a person and displayed nowhere the admin could see.**
 - **⚠⚠ NOTHING STATIC CATCHES THIS, and that is the point.** Every check that examines one side passes, because each side is complete on its own terms. There is no dead code, no unused import, no failing assertion — **the defect lives in the space between two correct things.**
