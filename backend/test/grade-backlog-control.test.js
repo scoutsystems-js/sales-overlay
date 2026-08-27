@@ -51,7 +51,13 @@ function control(role, over) {
   ].join('\n');
   const state = Object.assign({
     me: { role: role, user_id: 'u1' },
-    fathomStatus: { connected: true, pending_count: 40, outdated_count: 0 },
+    /* ⚠ THE WORK COUNT MOVED OFF THE PROVIDER STATUS. It used to read
+       fathomStatus.pending_count, which is why a Zoom-only user got no control
+       at all; it now reads the source-agnostic /me/grading-backlog. The
+       PROPERTY these tests protect is unchanged — an owner is offered all time
+       and nobody else is — so the fixture moves, not the assertions. */
+    fathomStatus: { connected: true },
+    gradingBacklog: { total: 40, graded: 0, waiting: 40, outdated: 0, work: 40 },
     gradeRun: null, gradeConfirm: null, gradeChecking: false,
   }, over || {});
   // gradeScopeOptionsHtml sits above the slice; pull it separately.

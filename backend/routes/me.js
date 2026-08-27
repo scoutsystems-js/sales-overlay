@@ -5,6 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
 const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
+const { gradingBacklog } = require('../lib/grading-backlog');
 const { generateCandidates } = require('../lib/prospect-merge');
 const { buildSectionBreakdown, sectionScoreOf, SECTIONS } = require('../lib/section-breakdown');
 // ⚠ TWO FUNCTIONS CALLED rankSections EXISTED, MEANING OPPOSITE THINGS:
@@ -513,6 +514,32 @@ function extractLabelFromMatchMessage(message) {
 // Fathom-era Coaching Dashboard analytics (call_analyses + call_highlights).
 // One round trip; feeds all overview widgets (Calls / Avg Score / Objections
 // donuts + computed coach summary). Admin pivot equivalent: /admin/analytics2/:user_id.
+/* ── GET /me/grading-backlog ────────────────────────────────────────────────
+   How many of the caller's calls are graded, and how many are still waiting.
+
+   ⚠⚠ ITS OWN ROUTE, NOT A FIELD ON A PROVIDER STATUS — that was the bug. These
+   counts were computed inside GET /fathom/status, which returns
+   `{connected:false}` and nothing else when there is no fathom_connections row.
+   A Zoom-only user therefore had NO count and NO grading control anywhere on
+   the dashboard, while the Calls page went on printing "102 not graded yet"
+   from its own source-agnostic query. Nothing about this question belongs to a
+   provider: fathom_calls holds Zoom rows too.
+
+   ⚠ SELF-SCOPED. Grading dispatches against req.user.id, so the control that
+   reads this must never render on an admin pivot — the frontend gates on
+   isSelf() for exactly that reason. */
+router.get('/grading-backlog', requireAuth, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var currentVersion = require('../lib/analysis-worker').ANALYSIS_PROMPT_VERSION;
+    res.json(await gradingBacklog(admin, req.user.id, currentVersion));
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[me] grading-backlog failed for user ' + req.user.id + ':', err.stack || err.message);
+    res.status(500).json({ error: 'Failed to load grading backlog' });
+  }
+});
+
 router.get('/analytics2', requireAuth, async function(req, res) {
   var to = req.query.to || new Date().toISOString();
   var from = req.query.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();

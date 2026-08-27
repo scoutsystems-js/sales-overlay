@@ -3932,6 +3932,11 @@
     callLibraryFilter:  null,  // 'analyzed' | 'objections' | 'closed' | 'not_closed' | null
     // (q) window-wide outcome counts for the filter labels; null until a load.
     callLibraryCounts:  null,
+    /* Source-agnostic graded/waiting counts from GET /me/grading-backlog.
+       null = not loaded (a lazy guard tests `=== null`, so it must be declared
+       as exactly that — an undeclared key is `undefined` and the guard can
+       never fire). */
+    gradingBacklog:     null,
     callLibrarySort:    null,  // drill sort: 'score' | null
     callLibraryError:   null,  // last fetch error message; cleared on successful re-fetch
     callLibraryRange:   null,  // manager Calls view date window {from,to,days}; default 7d (non-managers unaffected)
@@ -4914,10 +4919,15 @@
       + (gradeAllTimeAllowed() ? '<option value="all">All time</option>' : '');
   }
 
+  /* ⚠⚠ THIS WAS FATHOM-GATED AND IT HID THE CONTROL FROM ZOOM-ONLY USERS.
+     `fathomStatus.connected` is false without a fathom_connections row, so this
+     returned 0, so the grading control rendered on NEITHER site — while the
+     Calls page went on printing "N not graded yet" from its own source-agnostic
+     count. Naming a problem and offering nothing to do about it.
+     ⚠ /me/grading-backlog answers it for every source. */
   function gradeBacklogWorkCount() {
-    var f = state.fathomStatus;
-    if (!(f && f.connected)) return 0;
-    return (f.pending_count || 0) + (f.outdated_count || 0);
+    var b = state.gradingBacklog;
+    return (b && typeof b.work === 'number') ? b.work : 0;
   }
 
   function gradeCostText(n) {
@@ -5106,11 +5116,18 @@
   async function gradeBacklogTick() {
     var run = state.gradeRun;
     if (!run || run.done || run.failed) { gradeTimer = null; return; }
+    /* ⚠ POLLS THE SOURCE-AGNOSTIC BACKLOG, NOT /fathom/status. The old poll
+       gated on `st.connected`, so for a Zoom-only user the remaining count never
+       moved and this bar would have sat at its start value until the stall timer
+       gave up — reporting a healthy run as dead. */
     var st = null;
-    try { st = await fetchFathomStatus(); } catch (e) { st = null; }
-    if (st && st.connected) {
-      state.fathomStatus = st;
-      var remaining = Math.min(run.total, (st.pending_count || 0) + (st.outdated_count || 0));
+    try {
+      var r = await fetch('/me/grading-backlog', { headers: authHeader() });
+      st = r.ok ? await r.json() : null;
+    } catch (e) { st = null; }
+    if (st) {
+      state.gradingBacklog = st;
+      var remaining = Math.min(run.total, st.work || 0);
       if (remaining < run.lastRemaining) { run.quiet = 0; run.lastRemaining = remaining; }
       else { run.quiet += 1; }
       run.remaining = remaining;
@@ -5681,14 +5698,27 @@
       // three feed only the dormant Live-Sessions branch, so they're dropped
       // (kills a Claude call on every dashboard load). Performance Summary's LLM
       // call is now deferred to its accordion expand, not fired here.
+      /* ⚠ GRADING BACKLOG IS ITS OWN LANE, NOT A FIELD ON A PROVIDER STATUS.
+         It used to ride on /fathom/status, which returns `{connected:false}`
+         and nothing else without a fathom_connections row — so a Zoom-only user
+         had no counts and no grading control anywhere. Self only: grading
+         dispatches against req.user.id, so on a pivot there is nothing to show.
+         ⚠ Non-fatal — a failure here must not take the dashboard down with it. */
+      var backlogPromise = isSelf()
+        ? fetch('/me/grading-backlog', { headers: authHeader() })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+        : Promise.resolve(null);
       var results = await Promise.all([
         fathomPromise,
         fetchAnalytics2(),
         zoomPromise,
+        backlogPromise,
       ]);
-      state.fathomStatus = results[0];
-      state.analytics2   = results[1];
-      state.zoomStatus   = results[2];
+      state.fathomStatus   = results[0];
+      state.analytics2     = results[1];
+      state.zoomStatus     = results[2];
+      state.gradingBacklog = results[3];
       render();
       // ⚠ THE READINESS SIGNAL THE WELCOME HOLD POLLS. Set AFTER render(), so
       // "ready" means the board is actually painted, not merely fetched. It is
@@ -5970,9 +6000,31 @@
 
   function getStartedCardHtml() {
     if (gsDismissed('card')) return '';
+    /* ⚠ SELF ONLY. Every step is about YOUR connections and YOUR backlog, and
+       /me/grading-backlog is self-scoped — so on an admin pivot the counts are
+       null and the card would reappear reading like a fresh account. It was
+       never right to show a manager onboarding steps for someone else. */
+    if (!isSelf()) return '';
     var connected = anySourceConnected();
-    var analyzed = !!(state.analytics2 && state.analytics2.calls && state.analytics2.calls.analyzed > 0);
-    if (connected && analyzed) return ''; // essentials done — nothing left to onboard
+    /* ⚠⚠ THIS CARD USED TO DELETE ITSELF THE MOMENT ONE CALL WAS GRADED, having
+       just said "Your recent calls are graded." A live customer synced 121,
+       had 20 graded by the first-sync cap, and the card removed itself — so the
+       only thing on screen about his backlog was a sentence saying it was done.
+       He reported it as a broken sync. It was a true statement about 20 calls
+       presented as a statement about all of them.
+
+       ⚠ THE OLD TEST WAS `analytics2.calls.analyzed > 0`, which is wrong twice:
+       it is RANGE-SCOPED (the default 30 days, not the user's history) and
+       `> 0` is not the same question as "is anything still waiting".
+       ⚠ THE CARD NOW LEAVES ONLY WHEN THE WORK IS ACTUALLY DONE — something
+       graded AND nothing waiting. A user with everything graded still sees it
+       disappear, which is the state we must not trade away to fix the other. */
+    var bl = state.gradingBacklog || {};
+    var blGraded  = (typeof bl.graded  === 'number') ? bl.graded  : 0;
+    var blWaiting = (typeof bl.waiting === 'number') ? bl.waiting : 0;
+    var blTotal   = (typeof bl.total   === 'number') ? bl.total   : 0;
+    var analyzed = blGraded > 0;
+    if (connected && analyzed && blWaiting === 0) return ''; // nothing left to onboard
     var canManageKb = kbCanManage();
 
     function stepHtml(done, title, body, action) {
@@ -6001,8 +6053,24 @@
     // Step 2 — get calls graded. Connecting does NOT auto-sync, so this step carries
     // the action itself. Both Fathom and Zoom now have a real one-click sync.
     var s2;
-    if (analyzed) {
+    if (analyzed && blWaiting === 0) {
       s2 = stepHtml(true, 'Get your calls graded', 'Your recent calls are graded — your scores are up top.', '');
+    } else if (analyzed && blWaiting > 0) {
+      /* ⚠ SOME GRADED, SOME WAITING — the state that had no branch at all, and
+         the one every new user with a backlog lands in. Grading is capped when
+         calls first arrive so a large import cannot fire hundreds of analyses,
+         so this is the NORMAL first-run outcome, not an edge case.
+         ⚠ SAY BOTH NUMBERS. "N of M graded" is the whole point — a bare "graded"
+         reads as finished.
+         ⚠ LINK TO THE CALLS PAGE rather than repeat the control. The count and
+         the grading button already live there together; a second control here
+         would be a second option list to keep in step. */
+      s2 = stepHtml(false, 'Get your calls graded',
+        blGraded + ' of your ' + blTotal + ' calls are graded. The other ' + blWaiting
+          + ' are waiting — Scout caps grading when calls first arrive so a big import '
+          + 'cannot fire hundreds of analyses at once. You choose when to grade the rest.',
+        '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="goCallLibrary()">'
+          + 'Grade the other ' + blWaiting + ' →</button>');
     } else if (fathomConnected) {
       s2 = state.fathomSyncing
         ? stepHtml(false, 'Get your calls graded', 'Syncing your calls now — this usually takes a few minutes. Your grades appear up top as each one finishes.', '')
@@ -7010,9 +7078,43 @@
     // legitimately has no `price` array — and an older SERVER would serve one.
     // Throwing here would take the whole team view down over a missing field.
     var series_of = function (r) { var v = pick(r); return Array.isArray(v) ? v : []; };
-    var reps = (series.reps || []).filter(function (r) {
+    var allReps = series.reps || [];
+    var hasPoint = function (r) {
       return series_of(r).some(function (p) { return p && p.rate !== null; });
-    });
+    };
+    var reps = allReps.filter(hasPoint);
+    /* ⚠⚠ THE DROP IS KEPT, THE SILENCE IS NOT. An all-null dataset draws no line,
+       so plotting it would add a legend entry indistinguishable from a rep whose
+       line is merely off-screen — absence dressed as data. But dropping the rep
+       with nothing said is why Closing % showed many lines and Time to Price
+       showed one on the same page, and read as broken.
+       ⚠ ZERO IS A MEASUREMENT, ABSENCE IS NOT — so the excluded reps are NAMED,
+       and the two reasons are kept apart because they need different actions:
+       a rep with no offer price saved can NEVER be measured here until they save
+       one, while a rep with no priced calls this window may simply have had a
+       quiet week. */
+    var dropped = allReps.filter(function (r) { return !hasPoint(r); });
+    var exEl = document.getElementById(canvasId + 'Excluded');
+    if (exEl) {
+      var nameOf = function (r) { return r.name || 'Unnamed'; };
+      var parts = [];
+      if (dropped.length) {
+        // has_price is only carried for the price series; elsewhere every rep is
+        // measurable in principle, so they all fall into the second group.
+        var noPrice = isMinutes ? dropped.filter(function (r) { return r.has_price === false; }) : [];
+        var noData  = dropped.filter(function (r) { return noPrice.indexOf(r) === -1; });
+        if (noPrice.length) {
+          parts.push('Not measured — no offer price saved: ' + noPrice.map(nameOf).join(', ')
+            + '. Scout finds this moment by looking for the rep&rsquo;s own price in the '
+            + 'transcript, so it needs saving in Account first.');
+        }
+        if (noData.length) {
+          parts.push('No data in this window: ' + noData.map(nameOf).join(', ') + '.');
+        }
+      }
+      exEl.innerHTML = parts.join(' ');
+      exEl.style.display = parts.length ? '' : 'none';
+    }
 
     var datasets = reps.map(function (r, i) {
       var pts = series_of(r);
@@ -7380,7 +7482,12 @@
       // so a child would be clipped or would fight the canvas for the space.
       // Rendered empty and filled by updateRepGraphAllHiddenNotes, because it
       // changes on a legend click with no re-render of the surrounding markup.
-      + '<div class="rep-graph-note" id="' + canvasId + 'Note"></div>';
+      + '<div class="rep-graph-note" id="' + canvasId + 'Note"></div>'
+      /* ⚠ A SECOND NOTE, AND SEPARATE ON PURPOSE. The one above is live legend
+         state (what YOU hid) and is rewritten on every legend click; this one is
+         a fact about the DATA (who has nothing to plot). Sharing an element
+         would mean a legend click silently wiped the excluded line. */
+      + '<div class="rep-graph-note" id="' + canvasId + 'Excluded"></div>';
   }
 
   /**
@@ -10728,11 +10835,11 @@
      there is ANY work, because /fathom/update-analyses dispatches pending AND
      outdated in one batch. */
   function fathomBacklogRowHtml() {
-    var f = state.fathomStatus;
-    if (!(f && f.connected)) return '';
-    var pending = (typeof f.pending_count === 'number') ? f.pending_count : 0;
-    var outdated = (typeof f.outdated_count === 'number') ? f.outdated_count : 0;
-    var work = pending + outdated;
+    /* ⚠ NO LONGER GATED ON FATHOM. This row sits in Connections and reports the
+       user's OWN backlog, which has nothing to do with which provider it came
+       from — gating it on a fathom_connections row hid it from Zoom-only users
+       entirely. gradeBacklogWorkCount() is the shared, source-agnostic count. */
+    var work = gradeBacklogWorkCount();
     if (work <= 0) return '';
 
     /* ⚠ SITE 1 OF 2. The control itself is gradeBacklogControlHtml() — shared

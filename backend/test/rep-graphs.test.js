@@ -16,7 +16,11 @@ const SRC = HTML.slice(HTML.indexOf('var REP_LINE_COLORS'), HTML.indexOf('functi
 function buildChart(series, pick, yLabel) {
   let cfg = null;
   const Chart = function (ctx, c) { cfg = c; this.destroy = () => {}; };
-  const doc = { getElementById: () => ({ getContext: () => ({}) }) };
+  /* ⚠ A REAL ELEMENT ALWAYS HAS .style AND .innerHTML. The stub returned an
+     object with neither, so the excluded-reps note (which writes both) threw —
+     a defect in the FIXTURE, not in the product. Fixing it here rather than
+     making production guard for a shape no browser produces. */
+  const doc = { getElementById: () => ({ getContext: () => ({}), style: {}, innerHTML: '', textContent: '' }) };
   const fn = new Function('Chart', 'document', 'window', SRC + '; return repSeriesChart;')(Chart, doc, { Chart });
   fn('canvas', series, pick, yLabel);
   return cfg;
@@ -256,7 +260,7 @@ test('⚠⚠ the hidden set is keyed by user_id, NEVER by legend index', () => {
   /* ⚠ BOUND RAISED 2026-08-20 — generateLabels grew when the legend became
      selected-reps-only + capped + overflow-named. The bound exists to catch a
      RUNAWAY slice, not to encode how long the function may be. */
-  assert.ok(fn.length > 800 && fn.length < 26000, 'slice suspicious: ' + fn.length);
+  assert.ok(fn.length > 800 && fn.length < 32000, 'slice suspicious: ' + fn.length);
   assert.ok(fn.indexOf('function repSeriesChart') === 0, 'slice must start at the function');
   assert.ok(/_userId: toggleable \? r\.user_id : null/.test(fn), 'the dataset must carry user_id');
   assert.ok(/state\.repLineHidden\[r\.user_id\]/.test(fn), 'restore must look up BY user_id');

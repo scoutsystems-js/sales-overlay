@@ -2233,6 +2233,48 @@ errored 2     1 Zoom no-transcript (permanent), 1 grader unparseable-JSON
 - **⚠ THE 78 PENDING AND 6 STRANDED ARE A KNOWN, DELIBERATE RESIDUE, NOT SILENT CASUALTIES.** They are old history, they appear on no surface Justin shows, and re-admitting them was explicitly declined on cost. **They are recorded here so a future session does not rediscover them as a mystery.**
 - **⚠ COST IS A FIRST-CLASS CONSTRAINT AND IT ARRIVED LATE.** ~$200 in a day on one account's backfill, with the twelve-loop incident burning a meaningful share of it on 429 casualties that were then re-graded. **Anything that dispatches per-call model work must state its cost BEFORE running** — the grading control already does; ad-hoc dispatches from a console do not, and that asymmetry is how the day's spend got away.
 
+### ⚠⚠⚠ STANDING RULING — IF THE USER HAS TO DO SOMETHING, SCOUT MUST SAY SO ON THE PAGE THEY ARE ON (Justin, 2026-08-26)
+**His words: *"When something like the examples above where the user needs to do something, we have to let them know that in a very obvious way."***
+- **⚠⚠ IT IS A RULE ABOUT A CLASS OF STATE, NOT A LIST OF FIXES. Scout routinely KNOWS the user must act and stays silent**, and every instance looks like a different bug to whoever hits it. Four surfaced in one day's work, all on one company:
+```
+yazan    174 Zoom calls stuck — Zoom disconnected            Scout knew. Said nothing.
+gabriel  40 calls with no transcript — transcription off     Scout knew. Said nothing.
+josh/godwin  277 calls needing the grade button pressed      Scout knew. Said nothing.
+godwin   the setup card claiming grading was FINISHED        Scout knew. Said the opposite.
+```
+- **⚠ THE FOURTH IS THE WORST AND SHOWS WHY SILENCE IS NOT THE ONLY FAILURE MODE.** The card did not merely omit the backlog — it said *"Your recent calls are graded"* and removed itself. **A true statement about 20 calls, presented as a statement about all 121.** The customer reported a broken sync.
+- **SAME CLASS AS THE DEAD SYNC THAT HID FOR DAYS AND THE DIGEST THAT COUNTED ZERO FOR WEEKS.** In every one the data was right, the code ran, nothing errored — and the user could not tell a state that needed them from a product that was broken.
+- **⚠ THE TEST TO APPLY, at any surface that reports a count or a status: IF THIS NUMBER MEANS SOMEBODY HAS TO DO SOMETHING, DOES THE PAGE SAY WHAT?** Naming a problem and offering nothing to act on is the defect — the Calls page printed *"102 not graded yet"* directly beside a control that had silently failed to render.
+- **⚠ AND A STATE THAT NEEDS ACTION MUST NOT BE ABLE TO DISAPPEAR.** The card's vanish condition was `analyzed > 0`; it is now `something graded AND nothing waiting`. **A surface that removes itself on partial success is strictly worse than one that never existed.**
+
+### ⚠⚠⚠ THE COUNT WAS SOURCE-AGNOSTIC AND THE CONTROL WAS NOT — A ZOOM-ONLY USER SAW THE NUMBER AND HAD NO BUTTON (2026-08-26)
+**Measured on the account that raised the ticket: 123 calls, 19 graded, 102 waiting, and NO grading control anywhere on the dashboard.**
+```
+GET /fathom/status  ->  { connected: false }        no fathom_connections row, so it
+                                                     early-returns BEFORE the counts
+gradeBacklogWorkCount()  ->  0                       gated on fathomStatus.connected
+fathomBacklogRowHtml()   ->  ''                      site 1 gone
+the Calls page control   ->  ''                      site 2 gone
+the Calls page COUNT     ->  "102 not graded yet"    its own query, no source filter
+```
+- **⚠⚠ AN EARLIER ENTRY IN THIS FILE ASSERTED THE OPPOSITE AND WAS WRONG.** It said the count and control *"DO exist — on the CALLS page … source-agnostic, so a Zoom-only user reaches them fine."* **The COUNT is source-agnostic; the CONTROL's gate was not**, and the two live in different functions. Scope-vs-claim, in a filing meant to close this exact ticket.
+- **THE FIX IS WHERE THE ANSWER LIVES, NOT A SECOND GATE: `GET /me/grading-backlog`.** How many of a user's calls are graded is a property of THE USER'S CALLS — `fathom_calls` holds Zoom rows too — so it does not belong on a provider status where a missing connection row can delete it.
+- **⚠ THE PROGRESS POLL HAD THE IDENTICAL GATE and would have reported a healthy Zoom run as dead** — it read `/fathom/status` and required `st.connected`, so the remaining count never moved and the stall timer would have fired. **One gate, three surfaces; fixing the two visible ones would have left a bar that silently never advances.**
+- **⚠ `graded` USES `sync_status='processed'`, NOT A JOIN — stated because it is a deliberate trade.** A head-count is one cheap query and this runs on every boot; the cost is that a row mid-analysis counts as graded (measured 6 of 1370, only during a drain). **It can be seconds EARLY; it can never claim work is finished while `waiting` is non-zero**, which is the only property the card depends on.
+
+### ⚠⚠ THE GRAPH SHOWED ONE REP BECAUSE 8 OF 9 HAVE NO PRICE ON FILE — A GENUINE THRESHOLD, PRESENTED AS A SILENT DROP (2026-08-26)
+**Justin: Closing Rate shows many reps, Time to Price shows one. The working hypothesis was the drop-empty fault fixed twice before. IT IS BOTH, AND THE ROOT CAUSE IS NEITHER.**
+```
+price_pif on the live board :  joshua 9800  ·  the other 8 reps NULL
+priced calls, last 90 days  :  Josh Pinner 99  ·  Yazan 0 of 290 graded
+                               Nick 0 of 119  ·  Gabriel 0 of 91  ·  Dre 0 of 33
+```
+- **`lib/price-moment` ONLY RUNS WHEN THE REP HAS SAVED THEIR OWN OFFER PRICE** — it searches the transcript for that figure. No `price_pif`, no measurement, ever, silently. **A closer stating a price on 0 of 290 calls is not a sales reality; it is an unfilled profile field.**
+- **⚠ SO THE REPS ARE NOT "SLOW TO PRICE" — THEY ARE UNMEASURED**, and those need different words. The chart now names both groups separately: *no offer price saved* (can never be measured until they save one) and *no data in this window* (may just be a quiet week). **Merging them would tell a rep to price faster when the truth is that Scout cannot see them at all.**
+- **THE DROP ITSELF IS KEPT — an all-null dataset draws no line**, so plotting it adds a legend entry indistinguishable from a rep whose line is off-screen. **Absence dressed as data is not an improvement on absence.** Zero is a measurement, absence is not: the answer is to NAME who was excluded, not to plot them.
+- **⚠ IT IS ONE FUNCTION, NOT A PRICE BUG.** Enumerated by capability — `new Chart(` appears twice in the whole page — all four line graphs go through `repSeriesChart`, which drops empty reps for every metric. It only *showed* on the price graph because that is the sparse one. **One fix, four graphs.**
+- **⚠ THE EXCLUDED NOTE IS ITS OWN ELEMENT, beside the all-hidden note rather than sharing it.** One is live legend state (what YOU hid) and is rewritten on every legend click; the other is a fact about the data. **Sharing the element would let a legend click silently wipe the explanation.**
+
 ### ⚠⚠⚠ ONE TRANSCRIPT, ONE SEND — MEASURED, AND REFUSED ON QUALITY (2026-08-26)
 **Every call is sent to Claude TWICE carrying the same ~40k-token transcript — once to the section grader, once to the highlight extractor. Merging them saves 46-47% of INPUT tokens, measured from real API usage on the six longest calls (104,610 → 55,388). IT STILL DOES NOT SHIP.**
 - **⚠ THE HEADLINE NUMBER IS NOT THE SAVING.** Input is only part of the bill: output is unchanged (both outputs are still produced) and priced 5×, so the real cost saving is **~37%**, not 47%. And it **shrinks with transcript length** — 31.9% on the shortest call in the sample. Quote the cost figure, not the token figure.

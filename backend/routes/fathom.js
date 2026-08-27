@@ -1,6 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
+const { outdatedCallIds } = require('../lib/grading-backlog');
 
 var router = express.Router();
 
@@ -1066,48 +1067,9 @@ router.post('/identity', requireAuth, async function(req, res) {
 // done+old analysis row, but escaped the 'processed' filter. Now N == exactly
 // "all done analyses where prompt_version != CURRENT". Paginated to dodge the
 // supabase-js 1000-row cap.
-async function outdatedCallIds(admin, userId, currentVersion) {
-  var out = [];
-  var PAGE = 1000;
-  var offset = 0;
-  while (true) {
-    var q = await admin
-      .from('call_analyses')
-      .select('fathom_call_id, prompt_version')
-      .eq('user_id', userId)
-      .eq('status', 'done')
-      .order('analyzed_at', { ascending: false, nullsFirst: false })
-      .range(offset, offset + PAGE - 1);
-    if (q.error) throw new Error('call_analyses: ' + q.error.message);
-    var rows = q.data || [];
-    /* ⚠⚠ MARKED CALLS ARE EXCLUDED FROM THE OUTDATED COUNT — DECIDED, NOT
-       OVERLOOKED. This count drives the "Update analyses (N outdated)" button,
-       i.e. a BULK re-grade that spends two Claude calls per row. Re-grading a
-       call that is excluded from every metric buys nothing: the output feeds
-       nothing and the spend is real.
-       ⚠ THE TEST IS CONSISTENCY: if a marked call should never be re-analysed,
-       it must not be COUNTED as pending re-analysis either — otherwise the
-       button offers work it should not do, and the number never reaches zero.
-       ⚠ This does NOT touch re-analysis ON TOGGLE, which is a targeted re-run
-       triggered by the mark/un-mark itself. Different path, different purpose:
-       un-marking a call genuinely does need its analysis back. */
-    var markedOut = {};
-    var ids0 = rows.map(function (r) { return r.fathom_call_id; }).filter(Boolean);
-    for (var mi = 0; mi < ids0.length; mi += 100) {
-      var mq = await admin.from('fathom_calls').select('id')
-        .in('id', ids0.slice(mi, mi + 100))
-        .eq('not_a_sales_call', true);
-      (mq.data || []).forEach(function (c) { markedOut[c.id] = true; });
-    }
-    for (var i = 0; i < rows.length; i++) {
-      if (markedOut[rows[i].fathom_call_id]) continue;
-      if (rows[i].prompt_version !== currentVersion) out.push(rows[i].fathom_call_id);
-    }
-    if (rows.length < PAGE) break;
-    offset += PAGE;
-  }
-  return out;
-}
+/* ⚠ MOVED to lib/grading-backlog.js — it answers a backlog question, not a
+   route question, and a second caller (GET /me/grading-backlog) now needs it.
+   Imported at the top of this file; the name and behaviour are unchanged. */
 
 // ── POST /fathom/sync-window ────────────────────────────────────────────────
 // Store how far back the user wants their history pulled: 30d | 90d | all.

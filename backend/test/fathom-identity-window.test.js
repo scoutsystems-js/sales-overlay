@@ -160,10 +160,20 @@ test('⚠⚠ THE WINDOW PICKER SHOWS FOR A PURE BACKLOG, not only for outdated w
      slice of it can no longer see them. The PROPERTY this test protects is
      unchanged: a pure backlog (pending, nothing outdated) must still get the
      window picker. It is now asserted where each half actually lives. */
+  /* ⚠ CONVERTED AGAIN 2026-08-26, NOT DELETED. The work count moved OFF
+     fathomStatus and into lib/grading-backlog.js — it was gated on a
+     fathom_connections row, so a Zoom-only user got no grading control on
+     either site while the Calls page printed "102 not graded yet" beside
+     nothing. The PROPERTY is unchanged and is now asserted where it lives:
+     `work` must still be waiting PLUS outdated, because /fathom/update-analyses
+     dispatches both in one batch. */
   const i = html.indexOf('function gradeBacklogWorkCount');
   const fn = html.slice(i, html.indexOf('\n  }', i));
-  assert.ok(fn.length > 80 && fn.length < 600, 'work-count slice looks wrong: ' + fn.length);
-  assert.ok(/pending_count \|\| 0\) \+ \(f\.outdated_count/.test(fn),
+  assert.ok(fn.length > 40 && fn.length < 600, 'work-count slice looks wrong: ' + fn.length);
+  assert.ok(/gradingBacklog/.test(fn) && /\.work/.test(fn),
+    'the control must read the shared, source-agnostic work count');
+  const BL = fs2.readFileSync(path2.join(__dirname, '..', 'lib', 'grading-backlog.js'), 'utf8');
+  assert.ok(/work:\s*w \+ outdated/.test(BL),
     'the control must key on pending PLUS outdated — update-analyses dispatches both');
 
   const j = html.indexOf('function gradeScopeOptionsHtml');

@@ -31,10 +31,11 @@ function fnBody(name) {
   const end = LIVE.indexOf('\n  }', at);
   assert.ok(end > at, 'could not bracket ' + name);
   const body = LIVE.slice(at, end + 4);
-  /* ⚠ 8000, not 4000 — repSeriesChart is 6508 chars and my first bound
-     rejected a correct slice. The bound exists to catch a RUNAWAY slice, not to
-     encode how long a function may be. */
-  assert.ok(body.length > 60 && body.length < 8000, name + ' slice suspicious: ' + body.length);
+  /* ⚠ RAISED TWICE NOW — 4000 -> 8000 -> 12000. repSeriesChart grew again when
+     it started NAMING the reps it drops instead of removing them silently. The
+     bound exists to catch a RUNAWAY slice, not to encode how long a function may
+     be, so it is raised rather than the function being split to satisfy it. */
+  assert.ok(body.length > 60 && body.length < 12000, name + ' slice suspicious: ' + body.length);
   return body;
 }
 

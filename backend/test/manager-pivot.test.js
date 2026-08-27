@@ -24,7 +24,14 @@ const LIVE = HTML.split('\n')
 function fn(name) {
   const at = LIVE.indexOf('function ' + name);
   assert.ok(at !== -1, name + ' must exist');
-  const end = LIVE.indexOf('\n  function ', at + 10);
+  /* ⚠ THE END ANCHOR MISSED `async function`. It looked only for
+     `\n  function `, so setUser's slice ran straight past `async function
+     reloadAll` and swallowed whatever followed — it tripped on growth in a
+     completely unrelated function. Match both forms so the slice covers the
+     function it names. */
+  const nexts = [LIVE.indexOf('\n  function ', at + 10), LIVE.indexOf('\n  async function ', at + 10)]
+    .filter((i) => i !== -1);
+  const end = nexts.length ? Math.min.apply(null, nexts) : -1;
   const src = LIVE.slice(at, end === -1 ? at + 900 : end);
   assert.ok(src.length > 20 && src.length < 2000, name + ' slice: ' + src.length);
   return src;

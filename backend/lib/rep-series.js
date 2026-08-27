@@ -180,6 +180,10 @@ function buildRepSeries(input) {
     return {
       user_id: u,
       name: (r && r.name) || null,
+      // Carried straight through from the route. False = this rep has no offer
+      // price saved, so the price series can never have a point for them — the
+      // chart says so by name rather than dropping them without explanation.
+      has_price: !!(r && r.has_price),
       handle: keys.map(function (k, i) {
         var cell = (hAcc[u] || {})[i] || { handled: 0, total: 0 };
         return { rate: pct(cell.handled, cell.total), handled: cell.handled, total: cell.total };
