@@ -19,6 +19,7 @@ const { realCallsOnly } = require('./real-calls');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
+const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
@@ -170,7 +171,14 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   // KB-grounded: the manager/owner's team selling context (cap 3000), folded into
   // the set-hash so a KB upload invalidates the cached team recommendations.
   var selling = await fetchSellingContext(admin, keyId, 3000, SYNTHESIS_CATEGORIES);
-  var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash).digest('hex');
+  var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash
+    /* ⚠⚠ THE RULE VERSION IS DELIBERATELY *NOT* IN THIS KEY — see CLAUDE.md.
+       Adding it forces every cached synthesis to regenerate at real cost, and
+       the rule was MEASURED not to work: 67% mismatched before, 75% after. A
+       version bump is how you make a change take effect; spending on one for a
+       change that does not help would be paying to look busy.
+       ⚠ New syntheses pick the rule up naturally. Put the version back the day a
+       fix demonstrably moves the number. */).digest('hex');
   var cached = await cacheGet(admin, keyId, 'team', from, to, hash);
   if (cached) return Object.assign({ available: true, cached: true }, cached);
 
@@ -219,7 +227,12 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     'GRADER one-thing notes across reps (synthesize the recurring TEAM theme; names prefixed):',
   ].concat(oneThings.map(function (t) { return '  - ' + t.slice(0, 200); })).concat([
     '',
-    'EVIDENCE MOMENTS (cite one by id in evidence_id; do not invent quotes). Each is tagged with the rep:',
+    /* ⚠ THE RULE SITS DIRECTLY ABOVE THE LIST it governs. The type was already
+       on every candidate line and the model cited positives for gaps anyway —
+       what was missing is what the types MEAN for a claim. */
+    EVIDENCE_RULE,
+    '',
+    'EVIDENCE MOMENTS (cite one by id in evidence_id; do not invent quotes). Each is tagged with the rep and its TYPE:',
   ]).concat(candidates.map(function (c) { return '  [' + c.id + '] (' + c.cls.toUpperCase() + ', rep ' + c.rep + ') ' + c.type + ': "' + c.quote + '"'; })).concat([
     '',
     'Produce: WHATS WORKING (2-3 team strengths, each grounded in an evidence_id + a number), WHAT TO IMPROVE (2-3 team gaps: the team-wide weakest section, the most-lost objection category, and the synthesized one-thing theme; cite the rep(s) it most applies to and a representative evidence_id).',

@@ -13,6 +13,7 @@ const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
+const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
@@ -87,7 +88,11 @@ function buildPrompt(agg, oneThings, candidates, sellingContext) {
   }
   oneThings.forEach(function (t) { lines.push('  - ' + t.slice(0, 220)); });
   lines.push('');
-  lines.push('EVIDENCE MOMENTS (cite exactly one by its id in evidence_id; do not invent quotes):');
+  // ⚠ The rule immediately above the list it governs — same placement as the
+  //   team synthesis, so the two cannot drift on where it appears.
+  lines.push(EVIDENCE_RULE);
+  lines.push('');
+  lines.push('EVIDENCE MOMENTS (cite exactly one by its id in evidence_id; do not invent quotes). Each carries its TYPE:');
   candidates.forEach(function (c) {
     lines.push('  [' + c.id + '] (' + c.cls.toUpperCase() + ' call) ' + c.type + ': "' + (c.quote || '').slice(0, 160) + '"');
   });
@@ -155,7 +160,14 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   // KB-grounded: fetch the closer's selling context (offer/scripts, cap 3000) and
   // fold its hash into the set-hash so a KB upload invalidates the cached synthesis.
   var selling = await fetchSellingContext(admin, userId, 3000, SYNTHESIS_CATEGORIES);
-  var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash;
+  var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash
+    /* ⚠⚠ THE RULE VERSION IS DELIBERATELY *NOT* IN THIS KEY — see CLAUDE.md.
+       Adding it forces every cached synthesis to regenerate at real cost, and
+       the rule was MEASURED not to work: 67% mismatched before, 75% after. A
+       version bump is how you make a change take effect; spending on one for a
+       change that does not help would be paying to look busy.
+       ⚠ New syntheses pick the rule up naturally. Put the version back the day a
+       fix demonstrably moves the number. */;
   var hash = crypto.createHash('md5').update(hashInput).digest('hex');
 
   // 3) cache check.
