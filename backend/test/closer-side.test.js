@@ -111,3 +111,60 @@ test('the sentinel strings are defined ONCE, not written out per consumer', () =
       f + ' compares against a hand-rolled sentinel; use closerSide.isSentinel');
   });
 });
+
+// ─── ⚠⚠ THE GUARD THAT WOULD HAVE CAUGHT THE FIRST v29 SHIP ─────────────────
+
+test('⚠⚠ the SANITIZER keeps closer_response for EVERY type — not just the three', () => {
+  // THIS IS THE ONE THAT MATTERED. v29 shipped with the prompt asking every type
+  // for a reply and the SANITIZER still assigning closerResponse only inside
+  // `if (risk_signal||barrier)` and `if (objection)`. The model supplied the
+  // value and the pipeline threw it away.
+  //
+  // ⚠ AND EVERY CHECK PASSED: the token gate read the model's RAW JSON, so it
+  // reported 12/12 coverage while a 30-call production re-grade wrote 0 of 137.
+  // A measurement taken at the MODEL BOUNDARY cannot see a consumer downstream
+  // of it discarding the value. This test runs the real sanitizer instead.
+  const types = worker._VALID_HIGHLIGHT_TYPES;
+  assert.ok(types.length >= 8, 'the real type list must load');
+  const rows = types.map((t) => ({
+    timestamp_seconds: 10, speaker: 'PROSPECT',
+    quote: 'How much is this going to cost me',
+    observation: 'the prospect asked for the price',
+    type: t, closer_response: 'Well it depends which package you go with',
+  }));
+  const out = worker._sanitizeHighlights(rows, 3600);
+  assert.strictEqual(out.length, types.length, 'no moment may be dropped');
+  const lost = out.filter((o) => !o.closer_response).map((o) => o.type);
+  assert.deepStrictEqual(lost, [], 'sanitizer discarded closer_response for: ' + lost.join(', '));
+});
+
+test('the sanitizer preserves both sentinels for every type', () => {
+  // A sentinel that survives the model and dies in the sanitizer is the same
+  // defect one layer down, and it would look identical: an empty column.
+  const types = worker._VALID_HIGHLIGHT_TYPES;
+  [cs.NO_REPLY, cs.MOMENT_IS_CLOSER].forEach((sent) => {
+    const out = worker._sanitizeHighlights(types.map((t) => ({
+      timestamp_seconds: 10, speaker: 'PROSPECT', quote: 'a quote that is long enough',
+      observation: 'an observation', type: t, closer_response: sent,
+    })), 3600);
+    const lost = out.filter((o) => o.closer_response !== sent).map((o) => o.type);
+    assert.deepStrictEqual(lost, [], sent + ' lost for: ' + lost.join(', '));
+  });
+});
+
+test('handling stays risk/barrier-only — the hoist must not have widened it too', () => {
+  // closer_response became universal; `handling` deliberately did NOT. Two
+  // competing "was it dealt with" fields on one row is a bug factory, and
+  // `resolution` belongs to objections alone.
+  const out = worker._sanitizeHighlights(worker._VALID_HIGHLIGHT_TYPES.map((t) => ({
+    timestamp_seconds: 10, speaker: 'PROSPECT', quote: 'a quote that is long enough',
+    observation: 'an observation', type: t,
+    closer_response: 'some reply', handling: 'deflected', resolution: 'handled',
+  })), 3600);
+  out.forEach((o) => {
+    if (o.type === 'risk_signal' || o.type === 'barrier') assert.strictEqual(o.handling, 'deflected', o.type);
+    else assert.strictEqual(o.handling, null, o.type + ' must not carry handling');
+    if (o.type === 'objection') assert.strictEqual(o.resolution, 'handled');
+    else assert.strictEqual(o.resolution, null, o.type + ' must not carry resolution');
+  });
+});

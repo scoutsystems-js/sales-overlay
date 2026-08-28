@@ -1016,8 +1016,6 @@ function sanitizeHighlights(arr, durationSeconds) {
     if (type === 'risk_signal' || type === 'barrier') {
       var hv = (typeof h.handling === 'string') ? h.handling.toLowerCase().trim() : null;
       handling = (VALID_HANDLING.indexOf(hv) !== -1) ? hv : null;
-      closerResponse = (typeof h.closer_response === 'string' && h.closer_response.trim())
-        ? h.closer_response.trim().slice(0, 1500) : null;
     }
     if (type === 'objection') {
       objSurface = (typeof h.objection_surface === 'string' && h.objection_surface.trim())
@@ -1032,9 +1030,17 @@ function sanitizeHighlights(arr, durationSeconds) {
       // here would file weak handling under "what worked" — the opposite of
       // coaching. The rate surfaces credit closed calls; these five do not.
       objHandled = (resolution === null) ? null : (resolution === 'handled'); // back-compat with mig 012 column
-      closerResponse = (typeof h.closer_response === 'string' && h.closer_response.trim())
-        ? h.closer_response.trim().slice(0, 1500) : null;
     }
+    /* ⚠⚠ v29: EVERY TYPE, and this line is the whole fix. closerResponse used to
+       be assigned ONLY inside the two type gates above, so for the other five
+       types the model's answer was DISCARDED HERE — silently, after the prompt
+       had asked for it and the model had supplied it.
+       ⚠ THE FIRST v29 SHIP MISSED THIS AND MEASURED CLEAN: the token gate read
+       the model's RAW JSON and never ran the sanitizer, so it reported 12/12
+       coverage while a 30-call re-grade wrote 0 of 137. A check at the model
+       boundary cannot see a consumer that throws the value away. */
+    closerResponse = (typeof h.closer_response === 'string' && h.closer_response.trim())
+      ? h.closer_response.trim().slice(0, 1500) : null;
     out.push({
       timestamp_seconds:  ts,
       speaker:            speaker,

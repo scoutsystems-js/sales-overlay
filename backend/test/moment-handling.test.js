@@ -94,11 +94,20 @@ test('an OBJECTION does not carry handling — it already has resolution', () =>
   assert.strictEqual(out[0].handling, null);
 });
 
-test('types that carry neither get null for both', () => {
+test('v29: these types get `handling` null but now KEEP closer_response', () => {
+  // ⚠⚠ THIS TEST USED TO ASSERT closer_response WAS NULL HERE, AND IT WAS RIGHT
+  // UNTIL v29. It is also the test that should have caught v29's first ship:
+  // I changed the PROMPT to ask every type for a reply and never touched the
+  // sanitizer, so this stayed GREEN while the pipeline discarded every value
+  // the model returned. A green suite meant "you changed nothing I guard",
+  // and I read it as "shipped".
+  //
+  // `handling` is still risk/barrier-only, deliberately — closer_response
+  // became universal, the verdict fields did not.
   ['buying_signal', 'strong_moment', 'rapport_moment', 'missed_opportunity', 'disqualify_signal'].forEach((t) => {
     const out = worker._sanitizeHighlights([hl({ type: t, closer_response: 'x y z', handling: 'addressed' })], 3600);
-    assert.strictEqual(out[0].handling, null, t);
-    assert.strictEqual(out[0].closer_response, null, t);
+    assert.strictEqual(out[0].handling, null, t + ' must not carry a handling verdict');
+    assert.strictEqual(out[0].closer_response, 'x y z', t + ' must KEEP the closer side (v29)');
   });
 });
 
