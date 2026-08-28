@@ -51,11 +51,19 @@ test('handling is stated as an OPERATION with the worked example, not an adjecti
   assert.ok(/validates the feeling and never touches the concern/i.test(h), 'must say WHY it is a deflection');
 });
 
-test('closer_response for these types inherits the v14 verbatim contract', () => {
-  const r = PROMPT.split('\n').find((l) => l.indexOf('- closer_response:') !== -1 && /risk|barrier|responding to it/i.test(l))
-    || PROMPT.split('\n').filter((l) => l.indexOf('- closer_response:') !== -1).pop();
-  assert.ok(/contiguous verbatim span|HOW TO QUOTE/.test(r), 'must demand an exact span');
-  assert.ok(/null/.test(r), 'must allow null rather than forcing a quote');
+test('closer_response inherits the v14 verbatim contract', () => {
+  // ⚠ THE SELECTOR WAS HEURISTIC-THEN-POSITIONAL (match on "risk|barrier", else
+  // .pop()). v29 consolidated three instructions into one, so both halves would
+  // have retargeted silently. Select by content, and assert the PROPERTY where
+  // it now lives: the span rule on the instruction, the null rule in its block.
+  const r = closerResponseInstructions();
+  assert.strictEqual(r.length, 1);
+  assert.ok(/contiguous verbatim span/.test(r[0]), 'must demand an exact span');
+  assert.ok(/HOW TO QUOTE/.test(r[0]), 'and point at the shared contract');
+  const at = PROMPT.indexOf('FOR EVERY MOMENT OF EVERY TYPE');
+  assert.ok(at !== -1);
+  assert.ok(/Use null ONLY/.test(PROMPT.slice(at, at + 2200)),
+    'must still allow null rather than forcing a quote it cannot produce');
 });
 
 // ─── sanitation ────────────────────────────────────────────────────────────
@@ -113,36 +121,86 @@ test('a missing closer_response is null, not an empty string', () => {
   assert.strictEqual(out[0].handling, 'ignored', 'ignored is meaningful precisely when there is no response');
 });
 
+// Selects the closer_response instruction(s) BY CONTENT. Positional selection
+// (all[0] / .pop()) silently retargets the moment another one is added — which
+// is exactly what v29 did to the two guards that used to do it.
+function closerResponseInstructions() {
+  return PROMPT.split('\n').filter((l) => l.indexOf('- closer_response:') !== -1);
+}
+
 test('closer_response must INCLUDE short interjections, not tidy them out', () => {
-  // The version pin lives in ONE place (the tripwire in grader-v11.test.js).
-  // What belongs here is the contract this file is about.
-  //
-  // Measured cause of the failure this fixes: the deflection spans four closer
+  // Measured cause of the failure this fixes: the deflection spanned four closer
   // turns, and the model quoted it while dropping "You know what I mean?" from
-  // the middle — which HOW TO QUOTE already forbids in the abstract, but which
-  // a human transcriber would naturally omit. The span broke and the quote was
-  // discarded, leaving the handling verdict with no evidence.
-  // v20 (Justin's ruling) supersedes v19 here: rather than teaching the model
-  // to keep a long span intact, take the SINGLE SHARPEST LINE. Single-line
-  // spans reconstruct reliably; multi-turn ones are where it broke (2 of 3).
-  // Seeing the real words beats reading an explanation of why there are none.
-  const r = PROMPT.split('\n').filter((l) => l.indexOf('- closer_response:') !== -1).pop();
-  assert.ok(/SINGLE SHARPEST LINE, NOT THE FULLEST REPLY/i.test(r), 'v20 ruling missing');
-  assert.ok(/rather than stitching several together/i.test(r));
-  assert.ok(/interjection/i.test(r), 'the multi-line fallback must still name what gets dropped');
-  assert.ok(/A short quote that survives beats a fuller one that does not/i.test(r),
+  // the middle. The span broke and the quote was discarded, leaving the handling
+  // verdict with no evidence. v20 (Justin's ruling): take the SINGLE SHARPEST
+  // LINE — single-line spans reconstruct reliably, multi-turn ones are where it
+  // broke (2 of 3).
+  //
+  // ⚠ THIS USED TO SELECT ITS TARGET WITH .pop() — the LAST closer_response line.
+  // v29 added a universal instruction, so .pop() would silently have begun
+  // checking a DIFFERENT line while the one it was written for stopped being
+  // checked at all. A positional anchor is not an anchor; select by content.
+  const r = closerResponseInstructions();
+  assert.strictEqual(r.length, 1, 'ONE definition of closer_response, not one per type');
+  assert.ok(/SINGLE SHARPEST LINE, NOT THE FULLEST REPLY/i.test(r[0]), 'v20 ruling missing');
+  assert.ok(/rather than stitching several together/i.test(r[0]));
+  assert.ok(/interjection/i.test(r[0]), 'the multi-line fallback must still name what gets dropped');
+  assert.ok(/A short quote that survives beats a fuller one that does not/i.test(r[0]),
     'must tell it which way to trade off, not just what to avoid');
+  assert.ok(/HOW TO QUOTE/.test(r[0]), 'and still inherit the verbatim contract');
 });
 
-test('the OBJECTION closer_response instruction was not collateral damage', () => {
-  // Both blocks contain a line starting "- closer_response: the closer", and a
-  // prefix-matching edit overwrote the objection one while leaving the
-  // risk/barrier one untouched. Pin both so the next edit cannot repeat it.
-  const all = PROMPT.split('\n').filter((l) => l.indexOf('- closer_response:') !== -1);
-  assert.strictEqual(all.length, 2, 'expected exactly two closer_response instructions');
-  const objection = all[0];
-  assert.ok(/answering this objection/i.test(objection), 'the objection instruction must address objections');
-  assert.ok(/HOW TO QUOTE/.test(objection), 'and still inherit the verbatim contract');
+// ─── v29: BOTH SIDES OF EVERY MOMENT ─────────────────────────────────────────
+
+test('⚠⚠ EVERY citable moment type is asked for the closer side, by capability', () => {
+  // The fault this closes: only objection/risk_signal/barrier were ever asked
+  // for a reply, so 4,692 of 8,238 real moments (55%) carried ONLY the
+  // prospect's words — and a synthesis making a claim about the CLOSER could
+  // not quote him. `missed_opportunity` was the sharpest case: a type whose
+  // whole meaning is that the closer missed something, recording nothing he did.
+  //
+  // ⚠ ASSERTED AGAINST THE REAL TYPE LIST, NOT ONE COPIED IN HERE. A hand-copied
+  // enumeration passes forever after a ninth type is added; reading
+  // VALID_HIGHLIGHT_TYPES means a new type FAILS this until it is covered.
+  const types = worker._VALID_HIGHLIGHT_TYPES;
+  assert.ok(Array.isArray(types) && types.length >= 8, 'the real type list must load: ' + types);
+  const at = PROMPT.indexOf('FOR EVERY MOMENT OF EVERY TYPE');
+  assert.ok(at !== -1, 'the universal block must exist and be scoped to every type');
+  const scope = PROMPT.slice(at, at + 2200);
+  assert.ok(scope.length > 1000, 'scope must cover the block: ' + scope.length);
+  // the five that carried nothing before are named explicitly, so the model
+  // cannot read "every type" as "the ones I was already doing".
+  ['buying_signal', 'strong_moment', 'missed_opportunity', 'rapport_moment', 'disqualify_signal']
+    .forEach((t) => assert.ok(scope.indexOf(t) !== -1, 'previously-empty type not named: ' + t));
+  // and no type in the real list is excluded by the instruction.
+  types.forEach((t) => assert.ok(!new RegExp('omit[^.]*' + t).test(scope), 'excluded: ' + t));
+});
+
+test('⚠⚠ "he said nothing" is recordable, and is DISTINCT from "we could not find it"', () => {
+  // A single null would collapse "the closer did not reply" into "no exact span
+  // available" — the absent-vs-excluded failure this codebase has hit before.
+  // On a missed_opportunity the first is often the most coachable fact there is.
+  const at = PROMPT.indexOf('FOR EVERY MOMENT OF EVERY TYPE');
+  const scope = PROMPT.slice(at, at + 2200);
+  assert.ok(/__no_reply__/.test(scope), 'no-reply must have its own value');
+  assert.ok(/Use null ONLY when he did reply/.test(scope),
+    'null must be reserved for the could-not-quote case, or the two collapse');
+  assert.ok(!/Use null if the closer did not respond/i.test(PROMPT),
+    'the old wording sent BOTH cases to null — it must not survive anywhere');
+});
+
+test('the risk/barrier block keeps `handling` and no longer claims closer_response as its own', () => {
+  // It used to say "omit them for every other type", which DIRECTLY contradicts
+  // a universal closer_response rule. Contradictory instructions inside one
+  // prompt get resolved by the model, not by us.
+  assert.ok(/FOR type="risk_signal" AND type="barrier" MOMENTS, also include this field/.test(PROMPT));
+  assert.ok(!/also include these two fields/.test(PROMPT), 'stale two-field header survived');
+  assert.ok(/- handling: exactly one of/.test(PROMPT), 'handling itself must survive');
+});
+
+test('the objection block kept its own fields and lost only the duplicated instruction', () => {
+  assert.ok(/- resolution: exactly one of/.test(PROMPT), 'resolution must survive');
+  assert.ok(/objection_surface/.test(PROMPT), 'the objection block itself must survive');
 });
 
 // ─── the 8b panel was REMOVED; its good parts live in the ROW ────────────

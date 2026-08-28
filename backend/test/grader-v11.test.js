@@ -17,7 +17,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.j
    A prompt edit and its version bump are ONE atomic change — a lagging
    version makes the DB stamp, the outdated count and the update button all
    agree with each other and all be wrong. */
-test('ANALYSIS_PROMPT_VERSION is the current shipped version (v28)', () => {
+test('ANALYSIS_PROMPT_VERSION is the current shipped version (v29)', () => {
   // House rule: a prompt change and its version bump are ONE atomic change. If
   // the constant lags the prompt, every downstream system lies coherently.
   //
@@ -28,7 +28,13 @@ test('ANALYSIS_PROMPT_VERSION is the current shipped version (v28)', () => {
   // v28 = per-criterion qualification check — the grader COMPARES the prospect's
   // disclosure against the rep's own criteria, three verdicts, prospect-verified. v14 = verbatim quoting for every quoted field
   // the extractor emits. (v13 = 6a deterministic speaker labelling.)
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v28-2026-08-26'/);
+  // v29 = BOTH SIDES OF EVERY MOMENT — closer_response is asked for on EVERY
+  //       citable type, not just objection/risk_signal/barrier. Measured: of
+  //       8,238 real moments only those three carried a reply, so 55% had no
+  //       closer side and a synthesis claiming something about the CLOSER could
+  //       only quote the PROSPECT. Grading-time change, so already-graded calls
+  //       keep one-sided moments; a re-grade is the only route and Justin rules.
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v29-2026-08-28'/);
 });
 
 /* ⚠⚠ v25's three fixes, asserted on the BUILT PROMPT STRING rather than on the

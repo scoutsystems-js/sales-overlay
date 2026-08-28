@@ -666,6 +666,71 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ THE COACHING EVIDENCE QUOTED THE WRONG PERSON BECAUSE MOST MOMENTS ONLY HAVE ONE SIDE (v29, 2026-08-28)
+**Third attempt at this fault, and the first to name the mechanism. THE MODEL WAS NEVER MISBEHAVING — when the synthesis makes a claim about the CLOSER, over half of the moments it can cite contain only what the PROSPECT said. It cannot quote the thing it is talking about.**
+```
+closer_response coverage, 8,238 real stored moments
+  objection          1247/1277  98%
+  risk_signal        1579/1674  94%
+  barrier             732/751   97%
+  buying_signal          0/2428  ← never asked for
+  strong_moment          0/929   ← never asked for
+  missed_opportunity     0/909   ← never asked for
+  rapport_moment         0/154   ← never asked for
+  disqualify_signal      0/116   ← never asked for
+                     4,692 of 8,238 (55%) have NO closer side at all
+```
+- **⚠⚠ ONLY THREE OF EIGHT TYPES WERE EVER ASKED. The extractor prompt requested `closer_response` in exactly two blocks — the objection block and the risk_signal/barrier block.** The other five were never asked, so the field is not sparse for them, it is **structurally empty**. `missed_opportunity` is the sharpest case: a type whose entire meaning is that the closer missed something, **recording nothing about what he did**.
+- **⚠⚠ AND IT EXPLAINS WHY THE PREVIOUS FIX MADE IT WORSE (67% → 75%).** The v1 evidence RULE forbade quoting a positive moment when the claim was negative. **Forbidding a quote does not create a closer line** — it pushes the model to a weaker claim over the same one-sided evidence. A rule cannot supply data that was never recorded, and shipping one that measured worse is what finally forced the question *"what text does it actually have?"*
+- **⚠⚠ THE FREE BACKFILL WAS TRIED FIRST AND FAILED — MEASURED TWICE, AND THE MEASUREMENT IS THE REASON THIS COST MONEY.** Every one of the 8,238 moments has a `timestamp_seconds` and a stored transcript, so "derive the reply from the next closer turn" looks obviously right. Against the 846 moments where the model's OWN reply is on record as ground truth:
+```
+  next closer turn == the model's reply     10% exact  +  6% containment  =  16% AGREEMENT
+                                            83% derived a DIFFERENT line
+  window coverage   60s 37%  ·  120s 46%  ·  180s 52%
+                    at a cost of 8 / 16 / 25 closer turns per moment
+```
+  **A rule that silently picks a distant line is how a quote ends up attached to the wrong exchange** — at 16% agreement it would have been wrong five times in six, confidently, with a real quote from a real person. `lib/closer-reply.js` was written and **deleted**.
+- **THE FIX IS AT GRADING TIME, so it ships with a version bump and REACHES NO EXISTING CALL.** v28 → **v29-2026-08-28**.
+- **⚠⚠ CONSEQUENCE, STATED PLAINLY RATHER THAN BURIED: THE 69% BASELINE CANNOT MOVE THIS BLOCK.** No call has been re-graded, so every measurable surface still reads the one-sided moments. **4,692 moments across 1,331 already-graded calls, of 1,400 real graded calls total — a ~$320-340 re-grade at the recorded ~$0.24/call. NOT RUN. Justin rules.**
+- **ONE INSTRUCTION, NOT THREE — and the consolidation was forced by a contradiction, not by tidiness.** The risk/barrier block said *"omit them for every other type"*, which **directly contradicts** a universal rule. Contradictory instructions inside one prompt get resolved by the model, not by us. The two type-specific `closer_response` lines were folded into one universal instruction carrying the v14 verbatim contract and the v20 single-sharpest-line ruling; `handling` stays risk/barrier-only.
+- **⚠⚠ "HE SAID NOTHING" IS A RESULT, NOT MISSING DATA — `__no_reply__`, not null.** A single null collapses *"the closer did not reply"* into *"we could not find an exact span"*. **On a `missed_opportunity` the first is often the most coachable fact on the call**, and the two are opposite meanings wearing one value. Same family as write-the-null.
+
+### ⚠⚠ TWO GUARDS SELECTED THEIR TARGET BY POSITION AND BOTH SILENTLY RETARGETED (2026-08-28)
+**Adding a third `closer_response` instruction did not break the guards — it made them check a DIFFERENT LINE while still passing, which is worse.**
+- `all[0]` ("the objection instruction") and `.pop()` ("the risk/barrier one") were both written when there were exactly two. **A third arrives and each silently points somewhere else; the line each was written to protect stops being checked at all, with nothing failing.** One of them survived only because a hard `strictEqual(all.length, 2)` happened to fail first — the count was doing the work, not the selector.
+- **THE RULE: select by CONTENT, never by index.** `closerResponseInstructions()` is now one shared selector, and the assertions name what they are checking.
+- **Same family as the stale non-vacuity anchor and the ordering anchor that passed vacuously.** ⚠ It is the *inverse* of those: there a stale anchor matched NOTHING and the check evaporated; here it matched the WRONG THING and the check kept reporting success about something nobody asked about.
+- **PROVEN NON-VACUOUS: reintroducing the exact defect (rescoping the instruction back to three types, sending no-reply back to null) fails 3 of the new guards; all 1,563 pass restored.**
+
+### ⚠⚠ A GATE THAT SILENTLY SKIPS ITS SAMPLE REPORTS A CLEAN PASS — THREE TIMES ON ONE MEASUREMENT (2026-08-28)
+**The mandated extractor token gate ("measure the six longest calls") was run three times before it measured anything, and every failed run PASSED.**
+```
+run 1   duration_seconds DESC       → Postgres puts NULLS FIRST → ONE null-duration call measured SIX TIMES
+                                      reported: worst 157/3000, coverage 0/0    ← 0/0 is the tell
+run 2   + NOT NULL, assert distinct → duration_seconds is CORRUPT on real rows ("458 min" with 32 turns),
+                                      and 5 of 6 had no stored transcript and were silently `continue`d
+                                      reported: worst 506/3000 — from ONE call
+run 3   rank by TURN COUNT          → 2776 / 2069 / 1886 / 1862 / 1805 / 1764 turns. A real sample.
+```
+- **⚠ THE ORDERING TRAP IS WORTH KNOWING ON ITS OWN: `ORDER BY col DESC` PUTS NULLS FIRST IN POSTGRES.** "The six longest" quietly became "six rows with no duration".
+- **⚠⚠ AND THE SECOND RUN IS THE MORE INSTRUCTIVE ONE: THE SORT KEY ITSELF WAS WRONG.** `duration_seconds` is corrupt on some rows, and it is **not what drives extractor output** anyway — TURN COUNT is. **Rank by the quantity that causes the thing you are measuring, not by the one that sounds like it.**
+- **A `continue` on missing data is a silent sample reduction.** Five skips left one call, and the gate said six.
+- **THE SHAPE, and it is the minimum-sample rule again: A CHECK THAT CAN PASS BY MEASURING NOTHING WILL, AND IT REPORTS SUCCESS LOUDEST WHEN IT MEASURES LEAST.** The gate now asserts six distinct calls, prints the sample, and **throws if zero moments were extracted** so a vacuous coverage figure cannot be reported as a result.
+
+### ⚠⚠ 100% COVERAGE MEANT THE FIELD WAS FILLED, NOT THAT IT WAS RIGHT — THE HAND-CHECK FOUND WHAT THE PERCENTAGE COULD NOT (2026-08-28)
+**v29's coverage came back 12/12 on the six longest calls. Sampling 8 by hand against the transcript is what showed the number was measuring the wrong property.**
+```
+  independently PROVEN to be the closer      4 of 7
+  within 4 turns of the moment               4
+  __moment_is_closer__, correctly applied    1   ("So you guys talk offline." — closer-spoken)
+  ⚠ proven to be the PROSPECT                1
+  ⚠ locator could not place it at all        2   (both very short: "Oh, no, no.")
+  ⚠ one reply sat NINE TURNS from its moment — the distant-line failure occurring DESPITE the instruction
+```
+- **THE INSTRUCTION REDUCES THE WRONG-EXCHANGE FAILURE; IT DOES NOT ELIMINATE IT.** Saying so matters, because "the prompt forbids it" reads as "it cannot happen".
+- **⚠⚠ WHAT MAKES IT SAFE TO SHIP AT 57% PROVABLE IS A SAFETY NET THAT ALREADY EXISTED, NOT THE NEW PROMPT.** `closer_response_verified` is stamped true only when the locator independently proves the closer said it, and every closer-side lane requires that flag — so the mis-attributed reply and the nine-turn one are **recorded and excluded**, not silently trusted. **A new field landing behind an existing verification gate is a completely different risk from one landing in front of it, and that distinction should be established BEFORE deciding how good the extraction has to be.**
+- **⚠ `__no_reply__` WAS NEVER EMITTED across 20 moments on 9 calls.** Designed, guarded, unit-tested — **and unobserved on real output.** It is not claimed to work; it is claimed to exist and to be impossible to confuse with the other three states. **Do not record it as verified until a real call produces one.**
+
 ### ⚠⚠⚠ CLASSIFICATION PRINCIPLE — THE PROSPECT'S STATED EXCUSE IS NOT THE CLASSIFICATION (Justin, 2026-08-25). **BUILT 2026-08-26 (v27) — see the Abu entry above.**
 **⚠ NO LONGER "FILED, NOT BUILT": the three-way boundary is now in the extractor prompt and shared with the surface bucketer. What remains unbuilt is the SEPARATE thing — comparing a disclosed qualification against the rep's stored threshold. The taxonomy note below still describes the STORED values correctly (`fear`/`logistical`/`timing`/`partner`); a disqualification is deliberately NOT one of them, because it is not an objection — it is emitted as `disqualify_signal`.**
 **"Trust / Proof / Skepticism" MAPS TO `fear`.** That closes the open question on his canonical six: **Fear · Price · Timing · Spouse/Partner · Logistical · Other**.

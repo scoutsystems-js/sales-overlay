@@ -26,6 +26,26 @@
  * which is the opposite of coaching. Those five are deliberately untouched and
  * each carries a comment saying so.
  *
+ * ⚠⚠ A PROPERTY OF THIS NUMBER THAT WILL BE REPORTED AS A FAULT, SO READ IT
+ * BEFORE INVESTIGATING ONE. Because a closed call credits every objection on it,
+ * THE HANDLE RATE IS PARTLY A RESTATEMENT OF THE CLOSING RATE. The two move
+ * together by construction, and in a week where a rep closes nothing the handle
+ * rate loses its entire closed-call credit at once. On a graph that is a CLIFF —
+ * a sharp drop with no gradual decline in front of it, which looks exactly like a
+ * data outage or a broken metric.
+ *
+ * ⚠ IT IS NOT ONE. It is the definition doing what it was asked to do: a rep who
+ * closed nothing that week genuinely has no side-stepped-and-still-won objections
+ * to credit, so their rate falls back to resolution alone. The floor is what they
+ * actually handled on the merits; the height above it is what closing bought them.
+ *
+ * ⚠ SO THE DIAGNOSTIC IS ONE QUERY, NOT AN INVESTIGATION: plot the CLOSING rate
+ * for the same window. If the cliff is in both, nothing is broken and the graph is
+ * telling the truth twice. Only a handle-rate cliff with a FLAT closing rate is a
+ * defect worth chasing. And do not "fix" it by softening the definition — Justin
+ * ruled the credit deliberately, and removing it would make the number measure a
+ * different thing rather than a steadier version of the same thing.
+ *
  * ⚠ AND THE REASON THE MONEY MATH HAD TO GO IN THE SAME COMMIT: What-Needs-Work
  * measured P(closed | handled) − P(closed | not handled). Under this definition
  * the not-handled group CANNOT contain a closed call, so that second term is
