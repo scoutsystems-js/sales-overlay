@@ -666,6 +666,64 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ v29 SHIPPED AND DID NOTHING — THE PROMPT ASKED, THE SANITIZER DISCARDED (2026-08-28)
+**A 30-call sample re-graded under v29 wrote `closer_response` on 0 of 137 moments. The fix was inert, and every check said it worked.**
+```
+_sanitizeHighlights: closerResponse was assigned ONLY inside
+    if (type === 'risk_signal' || type === 'barrier') { ... }
+    if (type === 'objection')                         { ... }
+  -> for the other FIVE types the model's answer was dropped on the way to the DB
+after the hoist, same 30 calls:   0 of 134  ->  134 of 134 (100%)
+```
+- **⚠⚠ THE MANDATED TOKEN GATE READ THE MODEL'S RAW JSON AND REPORTED 12/12 COVERAGE.** That was TRUE and IRRELEVANT: it measured the model boundary, and the value died one layer downstream. **A check upstream of a consumer cannot see the consumer throwing the value away.** Same family as the dead call site, one layer further on.
+- **⚠⚠ AND THE SUITE HELD THE ANSWER. `types that carry neither get null for both` pinned exactly the old sanitizer behaviour and stayed GREEN** — because the prompt was edited and the code that test guards was not. **GREEN MEANT "YOU CHANGED NOTHING I GUARD", AND IT WAS READ AS "SHIPPED".** That is the specific misreading to watch for after a prompt-only change: the tests that cover the CONSUMER stay green precisely because you did not touch it.
+- **THE GUARD NOW RUNS THE REAL SANITIZER OVER THE REAL TYPE LIST** (`worker._VALID_HIGHLIGHT_TYPES`), asserting every type keeps a span and both sentinels survive. Restoring the shipped defect fails 2 of them; 1,573 pass restored.
+- **⚠ THE COST OF NOT SAMPLING WOULD HAVE BEEN ~$320 TO WRITE NOTHING.** The 30-call sample cost ~$7.20 and caught it on the first run. **A staged sample is not caution, it is the cheapest possible test of whether a fix reaches the database.**
+
+### ⚠⚠ `__no_reply__` DOES NOT WORK — 0 FIRINGS ACROSS 51 REAL OPPORTUNITIES (measured 2026-08-28)
+**The sample was BUILT to make it fire: 10 of the 30 calls were selected because the closer demonstrably never takes the floor within two turns of a moment, 51 such moments in total. It never once fired.**
+- Designed, guarded, unit-tested, given a genuine adversarial opportunity — **and the model does not use it.** Recorded as a FAILURE of that sub-feature, not as "unobserved".
+- **⚠ THE OTHER SENTINEL WORKS: `__moment_is_closer__` fired 29 times**, correctly, on closer-spoken moments. So the mechanism is sound and the instruction for the no-reply case is what is not landing.
+- **⚠ FIX IT BEFORE ANY LARGE RE-GRADE, NOT AFTER.** Re-grading 1,331 calls and then discovering the no-reply path is still dead means paying twice.
+
+### ⚠⚠ THE WRONG-EXCHANGE FAILURE IS REAL AND MEASURABLE — THE INSTRUCTION REDUCES IT, IT DOES NOT ELIMINATE IT (2026-08-28)
+**Hand-checked 105 spans (not 8), each proven independently against the transcript:**
+```
+proven THE CLOSER        76  (72%)      within 4 turns of the moment   55
+proven THE PROSPECT       7  wrong      further away / not located     16 / 34
+locator could not place  22
+worst observed: a reply 121 TURNS after its moment, and several with a NEGATIVE gap
+                — the "reply" PRECEDES the moment it answers
+```
+- **⚠⚠ WHAT MAKES IT SHIPPABLE IS THE PRE-EXISTING SAFETY NET, NOT THE NEW PROMPT.** `closer_response_verified` is stamped true only when the locator independently proves the closer said it — **76 of 105** — and every closer-side lane requires that flag. The 7 mis-attributed and 22 unplaceable are **recorded and excluded**. **A new field landing BEHIND an existing verification gate is a completely different risk from one landing in front of it, and that has to be established before deciding how good the extraction must be.**
+- No regression on the three types that always worked: **59 of 60 (98%)** against a 94–98% baseline.
+
+### ⚠⚠ A SAMPLE CANNOT MOVE A PER-USER-PER-RANGE STATISTIC — MEASURE THE DENSITY BEFORE CLAIMING IT CAN (2026-08-28)
+**The 69% evidence-mismatch figure is computed by a synthesis scoped to ONE user over ONE date range. The 30-call sample spans SIX users over FOUR months, so it cannot be scoped to.**
+```
+Josh's windows, share that was re-graded:   7d 3%   ·   30d 4%   ·   90d 3%
+```
+- **At 4% density any synthesis run would be 96% unchanged one-sided moments** — dominated by old data, and it would say nothing about the fix. **Reporting it would be a measurement whose scope does not match its claim.**
+- **WHAT WAS REPORTED INSTEAD, and the distinction is the point: the structural CAUSE of the 69%, measured on the same calls** — a what-to-improve claim citing a positive-type moment could quote the closer **0%** before and **72%** (verified) after. **Same property, honestly labelled, rather than a diluted version of the headline number.**
+- **⚠ A SAMPLE IS A SAMPLE.** 30 adversarially-chosen calls picked to be hard is not a corpus figure, and a good number from it must not be quoted as one.
+
+### ⚠⚠ `analyzeCall(id)` WITH ONE ARGUMENT STRANDS THE ROW AND RECORDS NO ERROR (2026-08-28)
+**The real signature is `analyzeCall(fathomCallId, userId)`. Passing one argument fails the scope check with `user=undefined` — and because `call_analyses.user_id` is NOT NULL, the ERROR-STATUS WRITE ALSO FAILS. So the row is left CLAIMED at `processing` with no error recorded.**
+- 30 rows were stranded this way. **No spend** (it fails before any model call) and **no data loss** (analyses and highlights intact) — only `status` was flipped, and all 30 were restored to `done`, verified 0 still stuck.
+- **⚠ THE SHAPE: A FAILURE PATH THAT ITSELF DEPENDS ON THE THING THAT IS MISSING CANNOT RECORD THE FAILURE.** The error handler needed `user_id` to write the error about `user_id` being absent. That is how a loud failure becomes an invisible one.
+- **THE FIX IS A PRECONDITION, NOT CARE:** the runner now resolves every owner from the database up front and **refuses to start** if any is unresolved.
+
+### ⚠ DELETED USERS ON THE TEAM BOARD — NEITHER A CACHE NOR AN INCOMPLETE DELETE (diagnosed 2026-08-28, NOT FIXED)
+**The reported bug is THREE ROWS deliberately left by the SUPERSEDED tombstone contract — already on file, already awaiting a ruling.**
+```
+deleted-49711e7d  39 calls  ·  deleted-8bda1aac  37  ·  deleted-e3ae475c  41     = 117 calls, 56 prospects
+all active=false, all still managed_by josh@scoutsystems.io, all on the Scout Systems board
+platform-wide: exactly 3 inactive users (these) and ZERO deleted company heads — the purge left no debris
+```
+- **⚠ THE IMPORTANT HALF IS THE NEGATIVE RESULT: it is NOT an incomplete delete path**, which would have been materially worse than the annoyance it was reported as.
+- **THE MECHANISM IS THAT NOTHING FILTERS `active`.** `routes/team.js:66` selects members on `managed_by` alone; `getAllowedUserIds` in `routes/admin.js` has no `active` filter either.
+- **⚠⚠ SO IT IS BROADER THAN THE REPORT: A MERELY DEACTIVATED USER WOULD ALSO STILL RENDER AS A ROW.** Whether their NUMBERS should still count is arguably by design — the deletion ruling positions deactivate as *"switched off, every number they produced stays"* — but a row reading **"Deleted user (49711e7d)"** on a live team board is not. **Those are two different questions and a fix must not silently answer both.**
+
 ### ⚠⚠⚠ THE COACHING EVIDENCE QUOTED THE WRONG PERSON BECAUSE MOST MOMENTS ONLY HAVE ONE SIDE (v29, 2026-08-28)
 **Third attempt at this fault, and the first to name the mechanism. THE MODEL WAS NEVER MISBEHAVING — when the synthesis makes a claim about the CLOSER, over half of the moments it can cite contain only what the PROSPECT said. It cannot quote the thing it is talking about.**
 ```
