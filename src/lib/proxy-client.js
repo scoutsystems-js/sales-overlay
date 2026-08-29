@@ -33,7 +33,25 @@ class ProxyClient {
     this.getToken = getToken;
   }
 
+  /**
+   * ⚠ ONE RETRY ON 401, and only one.
+   *
+   * getToken() routes through ensureFreshToken(), which refreshes an EXPIRED
+   * JWT — but a token can expire IN FLIGHT, between the check and the server
+   * reading it. Before this, that surfaced to the user as "Session expired —
+   * please log in again" for a session that was perfectly valid a moment
+   * earlier and would refresh cleanly on the next attempt.
+   *
+   * ⚠ BOUNDED AT ONE. If a freshly refreshed token is still refused, the
+   * session really is gone and retrying again would only delay saying so.
+   */
   async _request(method, path, body) {
+    var out = await this._attempt(method, path, body, false);
+    if (out && out.__retry401) return (await this._attempt(method, path, body, true)).value;
+    return out.value;
+  }
+
+  async _attempt(method, path, body, isRetry) {
     var token = await Promise.resolve(this.getToken());
     if (!token) {
       throw new Error('Not logged in — cannot reach backend proxy.');
@@ -61,12 +79,13 @@ class ProxyClient {
       } catch (_) {
         errText = 'HTTP ' + res.status;
       }
+      if (res.status === 401 && !isRetry) return { __retry401: true };
       if (res.status === 401) throw new Error('Session expired — please log in again.');
       if (res.status === 403) throw new Error('Subscription required — please finish checkout.');
       throw new Error(errText);
     }
 
-    return res.json();
+    return { value: await res.json() };
   }
 
   async _post(path, body) {

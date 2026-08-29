@@ -37,6 +37,27 @@
         setTimeout(function () { el.removeAttribute('data-welcoming'); }, 8000);
       } catch (e) { /* private mode → no marker, no cover, no harm */ }
     })();
+
+    /**
+     * BACKGROUND OFF — a per-user preference (the 2026-08-20 ruling: this kind
+     * of customisation is per person and needs no org entity).
+     *
+     * ⚠ APPLIED BEFORE FIRST PAINT, for the same reason the welcome cover is:
+     * setting it after boot would show the background and then remove it, which
+     * is worse than never having offered the setting.
+     *
+     * ⚠⚠ THE STORED VALUE IS THE DEVIATION ('off'), NEVER THE DEFAULT. Storing
+     * "on" would mean anyone whose storage is empty — a new browser, a private
+     * window, a cleared cache — gets no background at all, and would never know
+     * a setting existed. Storing the deviation fails toward the shipped design.
+     */
+    (function () {
+      try {
+        if (localStorage.getItem('scout_bg_v1') === 'off') {
+          document.documentElement.setAttribute('data-bg', 'off');
+        }
+      } catch (e) { /* unreadable storage → the default, never a crash */ }
+    })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
@@ -534,6 +555,9 @@
        asserts the DEFAULT clears AA; the bright path is a named exception it
        knows about, because a guard deleted for a trial never comes back. */
     html[data-mesh="bright"] { --motif-alpha: 1; }
+    /* ⚠ The per-user background-off preference. `display:none` rather than
+       alpha 0, so the layer costs nothing at all when it is switched off. */
+    html[data-bg="off"] body[data-view]::before { display: none; }
     /* ⚠⚠ ?mesh=dense — THE THIRD POINT, AND THE ONE TO REACH FOR FIRST.
        CONTRAST IS A PROPERTY OF ALPHA ALONE, so density buys richness FOR FREE:
        260 nodes / 926 edges at the SAME 0.25 still measures 6.68 on accent,
@@ -878,6 +902,7 @@
     .members-seats { font-size: 14px; color: var(--text); }
     .members-seats b { color: var(--text); }
     .members-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .acct-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
     .members-price { width: 92px; padding: 5px 7px; font-size: 13px; background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; }
     .members-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); padding: 8px 10px; border-bottom: 1px solid var(--border); }
     .members-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -11989,6 +12014,31 @@
     } catch (err) { if (msg) msg.textContent = 'Could not reach the server.'; }
   }
 
+  /**
+   * BACKGROUND OFF — read and write the per-user preference.
+   *
+   * ⚠ The STORED value is the DEVIATION ('off'), never the default. Storing
+   * "on" would leave anyone with empty storage — a new browser, a private
+   * window, a cleared cache — with no background and no idea a setting existed.
+   * Same asymmetry as Customize View's hidden set: fail toward the shipped
+   * design, not away from it.
+   */
+  function backgroundIsOff() {
+    try { return localStorage.getItem('scout_bg_v1') === 'off'; } catch (e) { return false; }
+  }
+  function setBackgroundOff(off) {
+    try {
+      if (off) localStorage.setItem('scout_bg_v1', 'off');
+      else localStorage.removeItem('scout_bg_v1');
+    } catch (e) { /* a private window must not break the toggle */ }
+    /* Applied immediately as well as before paint on the next load, so the
+       setting is visibly a setting rather than something that needs a refresh. */
+    try {
+      if (off) document.documentElement.setAttribute('data-bg', 'off');
+      else document.documentElement.removeAttribute('data-bg');
+    } catch (e) {}
+  }
+
   function renderAccountView() {
     var content = document.getElementById('content');
     if (state.account === null && !state.accountLoading) loadAccount();
@@ -12051,6 +12101,15 @@
     var billingBody = acctRow('Status', '<div>' + badge + '</div>') + planRow
       + '<div class="eod-row"><div class="eod-label"></div><div>' + billingAction + '</div></div>';
 
+    /* ⚠ PURELY LOCAL — no server round-trip and nothing on the profile. It is a
+       per-user display preference (the 2026-08-20 ruling), so localStorage is
+       the right home and it needs no account entity. */
+    var bgOff = backgroundIsOff();
+    var displayBody = acctRow('Background',
+      '<div><label class="acct-toggle"><input type="checkbox" id="acctBgOff"' + (bgOff ? ' checked' : '')
+      + ' onchange="setBackgroundOff(this.checked)"> Turn the background artwork off</label>'
+      + '<div class="meta" style="margin-top:4px;">Plain black instead of the raster. Applies on this browser.</div></div>');
+
     content.innerHTML =
         '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
       + '<div class="section fade-in" id="connectionsSection"><div class="section-header"><h2>Connections</h2><div class="meta">your call recording sources</div></div>' + renderConnectionsSectionHtml() + '</div>'
@@ -12058,6 +12117,7 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody
         + priceFieldHtml(a) + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>'
+      + '<div class="section fade-in"><div class="section-header"><h2>Display</h2></div>' + displayBody + '</div>'
       /* Their own reports live here now, not in the modal. ⚠ STATUS ONLY — the
          server does not even SELECT the diagnostics, because those describe an
          ACCOUNT and on a shared company account that is not automatically

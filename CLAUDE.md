@@ -3224,6 +3224,22 @@ grep -rn "recording_url.*?t="                   # the EXPECTED SHAPE — found s
   - **✅ FOURTH INSTANCE, AND THE FIRST CAUGHT BEFORE IT WAS REPORTED AS A PROBLEM (2026-08-18).** A post-deploy check flagged two pastel hexes as *"still present"* after the ramp went vivid. Re-scoped to the ramp instead of the whole document, the ramp held exactly its seven new entries — the hits were `#c4b5fd` on a **KB category badge** (an unrelated taxonomy palette) and `#22d3ee` as the **`--cyan` token**, the objection-category colours, and the comment naming the pastel it replaced. **Cost of the catch: one extra command.**
   - **⚠ RECORD THE CATCHES, NOT ONLY THE FAILURES — A RULE THAT STOPS A MISTAKE PRODUCES NOTHING.** No incident, no fix, no diff, nothing to point at: **it looks exactly like the rule was never needed.** Three instances here are damage and the fourth is the rule working, and without the fourth written down this entry reads as a list of past mistakes rather than as a practice that pays for itself. **Every rule in this file has the same problem — the evidence for keeping it is invisible by construction.**
 
+### ⚠⚠⚠ CONVERTING A SYNCHRONOUS `confirm()` TO A PROMISE SILENTLY DELETES THE GUARD (2026-08-29)
+**`confirm()` returns a boolean. A modal returns a PROMISE, and a promise is ALWAYS TRUTHY.**
+```
+if (!confirm('Delete?')) return;        // guards the delete
+if (!scoutConfirm('Delete?')) return;   // NEVER returns — the delete always runs
+```
+- **⚠⚠ IT THROWS NOTHING, READS CORRECTLY, AND SITS ON A DELETE BUTTON.** It is the placeholder-is-a-valid-value family at its most expensive: the check is present, the syntax is right, and the negation of a promise is simply always false. Code review does not catch it because the line looks identical to the one it replaced.
+- **THE GUARD IS PER CALL SITE, NOT PER FILE: every `scoutConfirm(`/`scoutPrompt(` must be immediately preceded by `await`.** Proven by removing one `await` and watching the test fail. **All 16 enclosing functions happened to be `async` already** — worth checking first, because if they were not, converting them is a much larger change than adding a keyword.
+- **⚠ AND WHAT THE NATIVE DIALOG GAVE FREE HAS TO BE REBUILT: Escape, a focus trap in BOTH directions, focus RETURNED to the opener, `aria-modal`, and an idempotent close** (Escape and a backdrop click can race). A modal that swallows focus and never returns it strands a keyboard user on the page behind it.
+- **⚠ THE TYPED CONFIRMATION MUST NOT BE HOMOGENISED.** Two call sites had two different match rules — case-insensitive `DELETE` for a rep, the exact name for a company. Making one option fit both would have weakened a confirmation standing in front of an irreversible act, so both rules were carried across intact.
+
+### ⚠⚠ A SHARED MODULE'S CSS MUST CARRY FALLBACKS WHEN ITS PAGES DO NOT SHARE TOKENS (2026-08-29)
+**`admin.html` USES `var(--bg-field)`, `var(--border-strong)`, `var(--accent)` and `var(--bad)` — and NOTHING DEFINES THEM on that page.** `/css/style.css` declares only `--text` and `--muted`.
+- So a shared component styled with bare tokens renders **unstyled on exactly the page whose delete flows most need to look deliberate.** Every colour in the modal is `var(--token, #fallback)`.
+- **⚠ THE GENERAL FORM: a component shared across pages inherits the WEAKEST page's token set, not the richest.** Check what the *other* page defines before relying on a token — the page you developed against will always look right.
+
 ### ⚠⚠⚠ THE COACHING PANEL RENDERS THE PROSPECT'S WORDS AND DROPS THE CLOSER'S LINE IT ALREADY HAS (diagnosed 2026-08-29)
 **Justin: *"a lot of weak, lazy coaching advice, mainly in What Needs Work."* Measured live across all 8 reps, 90 days:**
 ```

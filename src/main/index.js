@@ -26,6 +26,7 @@ const SessionLogger = require('../lib/session-logger');
 const pkg = require('../../package.json');
 const config = require('../config');
 const { exec } = require('child_process');
+const { shouldClearSession, needsProactiveRefresh, PROACTIVE_MARGIN_MS, PROACTIVE_INTERVAL_MS } = require('../lib/session-refresh');
 
 const BACKEND_URL = config.BACKEND_URL;
 const SKIP_AUTH = process.env.SKIP_AUTH === 'true';
@@ -367,8 +368,19 @@ async function ensureFreshToken() {
         body: JSON.stringify({ refresh_token: session.refresh_token }),
       });
       if (!res.ok) {
-        console.log('[auth] Refresh failed:', res.status, '— clearing session.');
-        clearSessionFromDisk();
+        /* ⚠⚠ ONLY A DEFINITIVE AUTH FAILURE CLEARS THE SESSION. This used to
+           clear on ANY non-OK status, so a 500 or a 429 logged the user out —
+           the exact bug the web app fixed in July and this one never inherited.
+           Being wrong by KEEPING the session costs one failed request that
+           retries; being wrong by clearing it costs the login for no reason. */
+        var body = '';
+        try { body = await res.text(); } catch (e) {}
+        if (shouldClearSession(res.status, body)) {
+          console.log('[auth] Refresh rejected:', res.status, '— clearing session.');
+          clearSessionFromDisk();
+        } else {
+          console.log('[auth] Refresh failed transiently:', res.status, '— keeping the session for the next attempt.');
+        }
         return null;
       }
       var data = await res.json();
@@ -389,8 +401,9 @@ async function ensureFreshToken() {
       console.log('[auth] Session refreshed.');
       return newAccess;
     } catch (err) {
-      console.error('[auth] Refresh error:', err.message);
-      clearSessionFromDisk();
+      /* A thrown error is a NETWORK failure — no status, nothing definitive.
+         Keeping the session is the whole point of this change. */
+      console.error('[auth] Refresh error (network):', err.message, '— keeping the session.');
       return null;
     } finally {
       _refreshInFlight = null;
@@ -1239,7 +1252,33 @@ function initAutoUpdater() {
   }, 30 * 60 * 1000);
 }
 
+/**
+ * PROACTIVE REFRESH — every 4 minutes, refresh a session that is within 5
+ * minutes of expiry. Mirrors the web timer in scout-auth.js.
+ *
+ * ⚠ It exists so the app never hands the renderer an about-to-expire token. The
+ * 401 retry in proxy-client is the safety net BELOW this, not a replacement:
+ * this one keeps the token fresh, that one recovers when it expires in flight.
+ *
+ * ⚠ NEVER let a refresh failure surface — ensureFreshToken already decides
+ * whether a failure is definitive, and a timer must not be able to crash the
+ * main process.
+ */
+function startProactiveTokenRefresh() {
+  setInterval(function () {
+    try {
+      var session = readSessionFromDisk();
+      if (!session || !session.access_token || !session.refresh_token) return;
+      if (!needsProactiveRefresh(session.expires_at, Date.now(), PROACTIVE_MARGIN_MS)) return;
+      Promise.resolve(ensureFreshToken()).catch(function (e) {
+        console.warn('[auth] proactive refresh failed (non-fatal):', e && e.message);
+      });
+    } catch (e) { /* a background timer must never take the app down */ }
+  }, PROACTIVE_INTERVAL_MS);
+}
+
 app.whenReady().then(async function() {
+  startProactiveTokenRefresh();
   // Set token storage path now that app is ready
   tokenPath = path.join(app.getPath('userData'), 'scout-session.json');
 

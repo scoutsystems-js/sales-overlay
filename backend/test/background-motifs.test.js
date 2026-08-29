@@ -301,14 +301,35 @@ test('⚠⚠ ONE artwork, ONE layer — per-page variation is retired', () => {
  * background-size after the 207px incident — the lesson had been learned for
  * DECLARATIONS and never extended to SELECTORS. One level up, same failure.
  */
-test('⚠⚠ exactly ONE live body[data-view]::before rule (excluding media queries)', () => {
+test('⚠⚠ exactly ONE live body[data-view]::before rule that PAINTS', () => {
+  /* ⚠ TIGHTENED 2026-08-29, not loosened. It used to count SELECTORS outside
+     media queries, which flagged the per-user background-off override
+     (`html[data-bg="off"] body[data-view]::before { display: none; }`) — a
+     scoped rule that turns the layer OFF, exactly like the media-query copies
+     this always excluded.
+
+     Counting selectors was the wrong proxy for the property. The thing that
+     must be unique is the rule that PAINTS: two of those silently supersede
+     each other, and every search finds the dead one first. So the check now
+     counts rules CONTAINING background-image, and separately requires every
+     other copy to be display:none only — which is stricter, because a second
+     painting rule inside a media query would now also be caught. */
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
-  // media-query copies are display:none only and are not the painting rule
-  const painting = live.replace(/@media[^{]*\{[^}]*\{[^}]*\}\s*\}/g, '');
-  const n = (painting.match(/body\[data-view\]::before\s*\{/g) || []).length;
-  assert.strictEqual(n, 1,
-    'found ' + n + ' painting rules. A second definition SILENTLY SUPERSEDES the '
-    + 'first, and every search finds the dead one first — position vs precedence.');
+  const rules = [];
+  const re = /(^|[};\s])([^{}]*body\[data-view\]::before)\s*\{([^}]*)\}/g;
+  let m;
+  while ((m = re.exec(live)) !== null) rules.push({ sel: m[2].trim(), body: m[3] });
+  assert.ok(rules.length > 0, 'no rule found — the anchor is stale, not the code');
+
+  const painting = rules.filter(r => /background-image\s*:/.test(r.body));
+  assert.strictEqual(painting.length, 1,
+    'found ' + painting.length + ' PAINTING rules. A second definition SILENTLY '
+    + 'SUPERSEDES the first, and every search finds the dead one first — position vs precedence.');
+
+  rules.filter(r => !/background-image\s*:/.test(r.body)).forEach(r => {
+    assert.ok(/display\s*:\s*none/.test(r.body),
+      'a non-painting copy must only switch the layer off, got: ' + r.sel + ' {' + r.body.trim() + '}');
+  });
 });
 
 /**
