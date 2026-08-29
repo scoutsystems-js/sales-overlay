@@ -666,6 +666,28 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ A CLEARANCE IS ONLY AS GOOD AS THE SYMPTOM IT WAS TESTED AGAINST (2026-08-29)
+**I examined `restoreTeamPick` against the symptom "the pick does not apply", found it correctly guarded, and CLEARED IT. The real symptom was "the pick is remembered by the CONTROL and not by the DATA" — a half-restored selection, which is exactly what that code introduces. Re-examining with the corrected symptom found it in minutes.**
+- **THE CLEARANCE WAS HONEST AND THE REASONING WAS SOUND. It was simply an answer to a different question**, and nothing in the result said so — "I checked X and it is fine" reads identically whether or not X was the right thing to check.
+- **THE RULE: when you clear a suspect, RECORD THE SYMPTOM YOU TESTED IT AGAINST.** A clearance without its symptom is unfalsifiable later: the next person reads "already ruled out" and does not re-open it, even though the observation has since changed.
+- **⚠ AND WHEN A REPORT ARRIVES WITH A SHARPER SYMPTOM, RE-OPEN EVERY CLEARANCE THAT TOUCHED IT** — do not treat the earlier pass as covering the new description. Justin's *"the dropdown still reads Sober Living Riches"* was the same feature and a different failure.
+- **SAME SHAPE AS THE COMPOSITION-TEST FAMILY, DIFFERENT AXIS.** There the check measured the right thing in the wrong SPACE (source vs render, element vs container). Here it measured the right thing against the wrong SYMPTOM. **In both, every step is correct and the verdict is about something nobody asked.**
+
+### ⚠⚠ AN UNOBSERVED CONDITION IS NOT A BROKEN ONE — AND A ROW MUST NOT UPGRADE THE CLAIM IT WAS WRITTEN FROM (2026-08-29)
+**`__no_reply__` was reported honestly as "designed, guarded, unit-tested — and unobserved on real output". The BUILD-LIST row hardened that into "fires zero times out of 51 real opportunities", i.e. DOES NOT WORK.**
+```
+measured 2026-08-29 on 80 v29-graded calls
+  __no_reply__ stored          4     <- it fires
+  __moment_is_closer__ stored 83
+the "51 opportunities" proxy: closer does not take the floor within 2 turns
+  matching that proxy        147
+    speaks within 60 seconds 119  (81%)
+    NEVER speaks again         8   <- the genuine population
+```
+- **THE PROXY OVER-COUNTED BY ~18x.** "Did not take the floor within two turns" is not "did not reply" — in a sales call the closer nearly always comes back, just not immediately. **4 fires against ~8 is a rare condition correctly treated as rare.**
+- **⚠⚠ THE GAP BETWEEN "UNOBSERVED" AND "BROKEN" WAS ONLY THE NUMBER OF CALLS GRADED SINCE ANYONE LOOKED.** Under new-calls-only, a path that has not fired yet is indistinguishable from one that cannot — **and time alone resolves it, so the honest record must state WHICH claim it is making and on what corpus.**
+- **THE RULE: a row may restate a finding, never STRENGTHEN it.** "Not yet seen" must not become "does not work" when it is transcribed, because the stronger claim is the one people act on — here it would have bought a prompt change to fix a path that was already working.
+
 ### ⚠⚠⚠ THE CONTROL KEPT THE SELECTION AND THE BOARD REVERTED — TWO SOURCES, AND A RACE THAT MADE THEM DISAGREE (2026-08-29)
 **Justin: on Sober Living Riches he hits refresh and the page returns with SCOUT SYSTEMS' name and numbers while the DROPDOWN still reads SOBER LIVING RICHES.**
 - **⚠⚠ THAT IS THE OPPOSITE OF THE FILED BUG, AND MY EARLIER CLEARANCE OF THE PERSISTENCE FIX WAS WRONG.** I checked `restoreTeamPick` against the symptom *"the pick does not apply"* and cleared it. The real symptom is *"the pick is remembered by the CONTROL and not by the DATA"* — a half-restored selection, which is exactly what the persistence fix introduced. **Before it, `teamSelected` was always null at boot and everything agreed on the default.** ⚠ **A clearance is only as good as the symptom it was tested against**, and re-examining with the corrected symptom is what found it in minutes.
