@@ -3953,6 +3953,25 @@ by SIZE (what I sorted on)        by RATE (the actual question)
 - **THE CHECK THAT FINDS IT: compute brace depth (skipping strings and comments) and assert a declaration sits at the SAME depth as its callers.** Not that it exists, not that it parses — that it is reachable from where it is called.
 - **⚠ AND IT WAS FOUND WHILE HUNTING AN UNRELATED BUG.** It would otherwise have shipped and surfaced as "the not-a-sales-call toggle is broken", days later, with no obvious link to the commit that caused it.
 
+### ⚠⚠⚠ A LANE CAN RESOLVE TO THE WRONG POPULATION IN **THREE** WAYS, AND THE THIRD IS THE ONE NOBODY LOOKS FOR (2026-08-29)
+**"Opening each rep shows the same What Needs Work for all of them." Two candidates were on the table and it was NEITHER.**
+```
+STALE            the panel was not cleared on pivot   -> shows the PREVIOUS rep
+WRONG POPULATION the lane queries the TEAM            -> shows the team, on a rep page
+THE VIEWER       the lane never asked whose page it is -> shows YOU, identically, on every rep
+```
+- **THE THIRD IS THE HARDEST TO SEE because it needs no wrong query and no stale state — the lane simply calls the SELF route from a page that can show someone else.** `loadSectionRank` fetched `/me/needs-work-sections` unconditionally, on a panel whose own comment says *"REP PAGE ONLY"*.
+- **⚠⚠ AND IT HID BEHIND THE EARLIER BUG. While the panel was showing the PREVIOUS rep's data, nobody could tell it was ALSO showing the wrong person's.** Fixing one defect is what made the other visible — so **a fix landing does not mean the surface is now correct**, and the second bug looks like a regression introduced by the first fix when it is nothing of the kind.
+- **THE SYMPTOM DISTINGUISHES THEM AND IS FREE TO ASK FOR: "the PREVIOUS one you looked at" is STALE; "THE SAME on every one" is a wrong population** — and then *whose* it is separates team from viewer.
+- **THE ENUMERATION THAT FINDS IT: list every fetch on the page and ask which ones CHOOSE a scope.** Eight already branched on `isSelf()`; one never asked. **A lane that cannot be wrong is invisible in a diff — only the inventory shows the one that never had the branch.**
+- **⚠ THE GUARD IS AN ALLOWLIST, NOT A FIXED LIST OF OFFENDERS:** every `/me/` fetch must be either scope-choosing or on a short list of genuinely-own-only lanes (account, own backlog, per-call actions that are owner-checked server-side). **The next lane someone adds inherits the check instead of the bug.**
+
+### ⚠⚠ A CACHED LANE CANNOT BE A/B TESTED — CHECK `cached` BEFORE REPORTING A BEFORE/AFTER (2026-08-29)
+**Threading a name map into the needs-work lane, I ran it with and without the map and got IDENTICAL output — which reads as "the change does nothing".** It was `cached: true` both times: the second call returned the first call's stored payload, and the first returned an older one.
+- **⚠ THE TELL WAS IN THE DATA AND I NEARLY MISSED IT:** the "before" arm returned **full profile names** ("Nick O'Neal"), which the email-derived path can never produce — it yields "Nick". **An arm producing output its own code path cannot produce is a cached arm.**
+- **THE HONEST REPORT IS "NOT MEASURABLE LIVE", NOT A NULL RESULT.** Saying "no difference" would have been a false negative about a correct change; **a cached lane takes effect when its key moves**, exactly like every other synthesis change here.
+- Same family as the earlier *"203 both marked and un-marked"* reading, where a cached response and a computed one were indistinguishable in the output. **Whenever a before/after shows no change, check whether either side was served from cache before concluding the mechanism failed.**
+
 ### ⚠⚠ A LABEL HANDED TO A MODEL GETS SHORTENED — SO DISAMBIGUATE THE LABEL, NOT THE COLUMN (2026-08-29)
 **Two reps on one board: Josh Pinner and Josh Niebloom. In a GRID both full names render and they are already distinct, so there is nothing to fix. The digest is a different matter: it hands those labels to a model, and the model shortens them.** A stored digest reads *"Yazan's close on Alicia Robinson is the model"* — with two Joshes that becomes **"Josh"**, attributing one rep's work to another, with nothing on screen to say which.
 - **⚠⚠ THE FIX HAS TO SURVIVE BEING SHORTENED, WHICH MEANS IT BELONGS IN THE LABEL ITSELF** — "Josh P" / "Josh N". Widening a column or styling the grid does nothing for prose, and prose is where the ambiguity actually costs something.
