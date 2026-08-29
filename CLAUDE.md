@@ -3874,6 +3874,34 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **(2) A LITERAL ANCHOR THAT GOES STALE ON THE CHANGE IT POLICES.** A test pinned `sync_status, not_a_sales_call')` — i.e. the tag being the LAST column in a select. Appending a column legitimately broke it. **What the check MEANS is membership, not terminal position**, so it now asserts the tag appears anywhere inside the select. Same family as *derive a guard from the source of truth, never pin a literal*.
 - **⚠ THE DIAGNOSTIC IS THE ONE ALREADY ON FILE: ask whether the assertion could be true of the code as written.** In both cases the thing being asserted was plainly there in the file, so the failure was a statement about the checker. **A red guard beside a correct change is the moment to re-read the guard, not the change.**
 
+### ⚠⚠ A FALLBACK THAT IS HELPFUL IN THE COMMON CASE AND WRONG IN THE DANGEROUS ONE (2026-08-29)
+**`(payload.team.key) || state.me.user_id` on Manage Members. Correct for a MANAGER — their team IS their own id. Wrong for an OWNER who has picked another company, which is the only case where being wrong matters.**
+- **The view renders BEFORE the lane it depends on lands**, so the first paint used the fallback and listed **the viewer's own members under another company's name**. Then the real payload arrived and it corrected itself — a transient, and transients of this kind are what the picker incident turned out to be too.
+- **⚠ THE SHAPE TO DISTRUST: a default that is right most of the time is not a safe default — it is a default whose failures are concentrated in exactly the situation that motivated the feature.** The more ordinary the common case, the longer the wrong case survives unnoticed.
+- **THE RULE, already established for the team heading and now applied twice: when a scoped lookup fails, render NOTHING.** Titling one company's data with another's name is worse than a skeleton. Scope the fallback to the case where it is provably safe (`if (!state.teamSelected)`), rather than removing it and blanking the common case.
+- **⚠ FOUND BY SWEEPING FOR THE FAMILY, NOT BY WAITING FOR A REPORT** — searching for viewer-identity on the right-hand side of a fallback. The same sweep confirmed a second candidate was already correct: it falls back to a NEUTRAL placeholder (`'This rep'`), never to the viewer. **A neutral fallback is fine; a self-substituting one is the bug.**
+
+### ⚠⚠⚠ WHEN A THRESHOLD MUST BE CHOSEN, LOOK FOR THE GAP RATHER THAN PICKING A NUMBER (the general method, 2026-08-29)
+**A threshold placed inside an EMPTY BAND is one that no value in the band would change, which is a completely different kind of claim from a round number that happens to work.**
+- **The live case:** single-speaker calls sat at 35146 / 13641 / 10678 / 4731, then 1179 / 1108 / 878 down to 21. **A gap 3,552 characters wide** separates the substantial ones from the short ones, so anything inside it splits the same two groups. 2,000 is not defended as "about 350 words" — it is defended as **not balanced on a data point**.
+- **Already used twice before and worth naming as the method:** `MIN_CUE_GAP_SECONDS` (degenerate pairs topped out at 101s, the next genuine pair was 183s) and the cross-provider duplicate overlap (a clean band between 42% and 71%).
+- **⚠ THE TEST THAT MAKES IT REAL: assert the threshold is INSIDE the band**, not that it equals a number. `floor > 1179 && floor < 4731` survives a re-derivation; `floor === 2000` breaks on one.
+- **⚠ AND IF THERE IS NO GAP, SAY SO** — a continuous distribution means any threshold is arbitrary, and that is worth reporting rather than hiding behind a plausible constant.
+
+### ⚠⚠⚠ AN AUTOMATIC CORRECTION THAT CANNOT BE OVERRULED IS NOT A CORRECTION (2026-08-29)
+**And the failure is a LOOP, not a one-off: un-marking fires a re-analysis, the re-analysis re-detects, and the call is re-marked instantly. The person's decision is reversed by the system while they watch.**
+- **THE FIELD THAT RECORDS *WHO* IS ALSO WHAT MAKES THE OVERRIDE DURABLE.** An automatic mark leaves `not_sales_marked_by` NULL; a human mark writes their id. So *"has a person spoken about this call"* is answerable from one column — **and an automatic mark that wrote a user id would be indistinguishable from a human one, which would silently disable the guard.**
+- **⚠ THE BACKFILL MUST CARRY THE SAME GUARD, not just the live path.** A bulk correction that sweeps up a call a person deliberately un-marked is the same defect with a bigger blast radius. The runner checks it per call and reports what it skips.
+- Same shape as the grader's `manualLocked` for outcome. **Whenever an automated pass writes a field a human can also set, the read-before-write guard is part of the feature, not a refinement.**
+
+### ⚠⚠ A REFUSAL MUST CLEAR WHAT THE OLD SUCCESS LEFT BEHIND — AND ONLY PRE-EXISTING ROWS SHOW IT (2026-08-29)
+**The gate correctly refused to grade, correctly excluded and labelled the call — and left the score and highlights from the previous grading in place. The review page would have read "this could not be graded" beside a confident 60 and three quotes from that very transcript.**
+- **⚠⚠ IT IS INVISIBLE ON NEW DATA BY CONSTRUCTION. A call that has never been graded has nothing to leave behind**, so every test and every verification against a fresh call passes. It only appears on rows that already carried the old output — which is precisely the set a backfill targets.
+- **THE RULE: when adding a refusal to a path that previously SUCCEEDED, ask what the success wrote and clear it.** A score, derived sections, extracted rows, a cached synthesis. Anything left is a confident artefact of a source you have just declared unusable.
+- **⚠ BUT NOT A HUMAN'S FIELD.** A manually set outcome is a person's judgement about how the call ended, not something derived from the transcript, so the clear is scoped to model-derived output.
+- **ONE DEFINITION OF WHAT GETS CLEARED, SHARED BY THE LIVE PATH AND THE BACKFILL.** Two hand-written lists drift, and the drift shows up as one path leaving a stale score while the other does not.
+- **FOUND BY RE-READING THE ROWS AFTER THE RUN, NOT BY READING THE CODE.** The run reported success on every count it checked — excluded, labelled, automatic — because those were the counts I thought to check. **Checking the rest of the row is what found it.**
+
 ### ⚠⚠⚠ A COMPROMISED FILE IS REFUSED BEFORE GRADING — AND THE SHAPE IS "ONE FLAG, TWO REASONS" (2026-08-29, migration 052)
 **Justin's ruling and his word. One distinct speaker across a substantial transcript is not graded at all.**
 - **THE REFUSAL SITS BEFORE THE TWO CLAUDE CALLS, not after.** Grading and then flagging still produces a score that exists, and a score that exists gets read. Refusing first means no number is ever created from an unreadable source.
