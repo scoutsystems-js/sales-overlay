@@ -3668,6 +3668,7 @@
     }
   </style>
   <script src="/js/scout-auth.js"></script>
+  <script src="/js/scout-modal.js"></script>
 </head>
 <body>
 
@@ -4798,7 +4799,7 @@
   // history (calls/analyses/highlights) is preserved server-side.
   async function disconnectProvider(provider) {
     var label = provider === 'zoom' ? 'Zoom' : 'Fathom';
-    if (!window.confirm('Disconnect ' + label + '? Your already-synced calls, grades, and clips stay — but Scout will stop pulling in new ' + label + ' calls until you reconnect.')) return;
+    if (!(await scoutConfirm({ title: 'Disconnect ' + label + '?', body: 'Your already-synced calls, grades, and clips stay — but Scout will stop pulling in new ' + label + ' calls until you reconnect.', confirmText: 'Disconnect', danger: true }))) return;
     var path = provider === 'zoom' ? '/zoom/disconnect' : '/fathom/disconnect';
     try {
       var res = await fetch(path, { method: 'DELETE', headers: authHeader() });
@@ -10915,12 +10916,12 @@
     } catch (err) { alert('Request failed: ' + (err.message || 'unknown')); return { ok: false }; }
   }
   async function deactivateMember(uid) {
-    if (!confirm('Deactivate this rep? They will be unable to log in and the seat is freed. Their calls and history stay.')) return;
+    if (!(await scoutConfirm({ title: 'Deactivate this rep?', body: 'They will be unable to log in and the seat is freed.\nTheir calls and history stay.', confirmText: 'Deactivate', danger: true }))) return;
     var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/deactivate', { method: 'POST', body: '{}' });
     if (r.ok) refreshMembers(false);
   }
   async function reactivateMember(uid) {
-    if (!confirm('Reactivate this rep? This adds a billable seat and restores their login.')) return;
+    if (!(await scoutConfirm({ title: 'Reactivate this rep?', body: 'This adds a billable seat and restores their login.', confirmText: 'Reactivate' }))) return;
     var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/reactivate', { method: 'POST', body: '{}' });
     if (r.ok) refreshMembers(false);
   }
@@ -10934,7 +10935,8 @@
     if (r.ok) alert((r.data && r.data.welcome_email === 'invite_sent') ? 'Reset link sent.' : ('Status: ' + (r.data && r.data.welcome_email)));
   }
   async function editMemberEmail(uid, oldEmail) {
-    var ne = window.prompt('New login email (a heads-up is sent to the old address):', oldEmail || '');
+    var ne = await scoutPrompt({ title: 'Change login email', body: 'A heads-up is sent to the old address.',
+      value: oldEmail || '', inputLabel: 'New login email', confirmText: 'Change email' });
     if (!ne || !ne.trim() || ne.trim() === oldEmail) return;
     var r = await memberAction('/admin/users/' + encodeURIComponent(uid) + '/email', { method: 'PATCH', body: JSON.stringify({ email: ne.trim() }) });
     if (r.ok) { alert('Email updated' + (r.data && r.data.old_notified === 'sent' ? ' — old address notified.' : '.')); refreshMembers(false); }
@@ -10964,12 +10966,14 @@
        direction possible: the calls no longer survive. */
     var msg = p.confirmation
       || ('Delete ' + (p.email || email || 'this rep') + '?\n\nThis cannot be undone.');
-    if (!confirm(msg)) return;
+    if (!(await scoutConfirm({ title: 'Delete this rep?', body: msg, confirmText: 'Continue', danger: true }))) return;
 
     // ⚠ SECOND STEP, and it must be TYPED — a second confirm() is still one
     // reflex away from a double-click, and there is no undo behind this one.
-    var typed = window.prompt('Type DELETE to confirm.\n\nThis is the last step.', '');
-    if (!typed || typed.trim().toUpperCase() !== 'DELETE') return;
+    var typed = await scoutPrompt({ title: 'Type DELETE to confirm', body: 'This is the last step.',
+      mustMatch: 'DELETE', matchCaseInsensitive: true, placeholder: 'DELETE',
+      confirmText: 'Delete', danger: true, mismatchText: 'That did not match. Nothing was deleted.' });
+    if (typed === null) return;
 
     var r = await memberAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: '{}' });
     if (r.ok) {
@@ -11052,7 +11056,7 @@
     try {
       await navigator.clipboard.writeText(_lastSummaryText);
       if (note) { note.textContent = 'Copied ✓'; setTimeout(function () { if (note) note.textContent = ''; }, 2500); }
-    } catch (e) { window.prompt('Copy the summary below:', _lastSummaryText); }
+    } catch (e) { await scoutPrompt({ title: 'Copy the summary below', value: _lastSummaryText, selectOnOpen: true, confirmText: 'Done', cancelText: 'Close' }); }
   }
 
   function trendArrow(t) {
@@ -12261,7 +12265,7 @@
       if (note) { note.textContent = 'Copied ✓'; setTimeout(function () { if (note) note.textContent = ''; }, 2500); }
     } catch (err) {
       // clipboard API can fail on some setups — fall back to a prompt
-      window.prompt('Copy the report below:', text);
+      await scoutPrompt({ title: 'Copy the report below', value: text, selectOnOpen: true, confirmText: 'Done', cancelText: 'Close' });
     }
   }
   /* ⚠⚠ A STILL-FILLING DAY MUST NOT LOOK LIKE A FINISHED ONE. Josh's EOD showed
@@ -12522,7 +12526,7 @@
   }
 
   async function applyMerge(fromId, intoId, i) {
-    if (!window.confirm('Merge these two into one prospect?\n\nThis changes your close rate. It can be undone.')) return;
+    if (!(await scoutConfirm({ title: 'Merge these two into one prospect?', body: 'This changes your close rate. It can be undone.', confirmText: 'Merge' }))) return;
     var res;
     try {
       res = await fetch('/me/prospects/merge', {
@@ -13104,7 +13108,7 @@
     var msg = (targetScope === 'team')
       ? 'Promote "' + sourceLabel + '" to the team knowledge base?\n\nEveryone on your team will be able to see it, and Scout will ground their coaching in it.'
       : 'Remove "' + sourceLabel + '" from the team knowledge base?\n\nIt goes back to being personal to whoever uploaded it. Nothing is deleted.';
-    if (!window.confirm(msg)) return;
+    if (!(await scoutConfirm({ title: 'Change who can see this?', body: msg, confirmText: 'Continue' }))) return;
 
     var res;
     try {
@@ -13129,7 +13133,7 @@
 
   async function deleteKbItem(sourceLabel) {
     if (!sourceLabel) return;
-    var ok = window.confirm('Delete "' + sourceLabel + '"?\n\nThis removes all chunks for this resource. Cannot be undone.');
+    var ok = await scoutConfirm({ title: 'Delete "' + sourceLabel + '"?', body: 'This removes all chunks for this resource. Cannot be undone.', confirmText: 'Delete', danger: true });
     if (!ok) return;
 
     var res;

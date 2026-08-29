@@ -132,10 +132,20 @@ function fn(name) {
 }
 
 test('⚠⚠ AN IRREVERSIBLE DELETE CANNOT HAPPEN FROM ONE CLICK', () => {
+  /* ⚠ CONVERTED 2026-08-29 — the native dialogs became in-page modals, so the
+     VEHICLE changed and the property did not. Both steps still exist and the
+     typed step is still actually checked; the case-insensitive DELETE match
+     moved INTO the modal (matchCaseInsensitive) rather than being re-tested at
+     the call site, which is why the old toUpperCase assertion is gone. */
   const src = fn('async function deleteMember');
-  assert.ok(src.indexOf('confirm(') !== -1, 'step 1: a confirmation');
-  assert.ok(/window\.prompt\(/.test(src), 'step 2: a typed confirmation');
-  assert.ok(/toUpperCase\(\) !== 'DELETE'/.test(src), 'and it must actually be checked');
+  assert.ok(/await scoutConfirm\(/.test(src), 'step 1: a confirmation');
+  assert.ok(/await scoutPrompt\(/.test(src), 'step 2: a typed confirmation');
+  assert.ok(/mustMatch: 'DELETE'/.test(src) && /matchCaseInsensitive: true/.test(src),
+    'and the typed value must actually be checked, case-insensitively as before');
+  /* ⚠ The await is what makes these guards real at all — an un-awaited promise
+     is truthy, so the check would pass and the delete would run regardless.
+     test/modals.test.js pins that across every call site. */
+  assert.ok(!/\bwindow\.(confirm|prompt)\(/.test(src), 'no native dialog may remain');
 
   /* ⚠ THE TYPED STEP WAS REMOVED IN JULY as "redundant friction — delete is
      already owner-only AND zero-history-gated". This ruling removes the

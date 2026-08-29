@@ -341,6 +341,7 @@
     }
   </style>
   <script src="/js/scout-auth.js"></script>
+  <script src="/js/scout-modal.js"></script>
 </head>
 <body>
 
@@ -1022,10 +1023,11 @@
       ? '\n\nNOTE: ' + pv.kb_global_kept + ' knowledge-base entries they shared platform-wide will be KEPT, '
         + 'because deleting them would remove content from every other company.'
       : '';
-    if (!confirm(pv.confirmation + extra)) return;
-    var typed = prompt('Type the company name to confirm:\n\n' + pv.name);
+    if (!(await scoutConfirm({ title: 'Delete this company?', body: pv.confirmation + extra, confirmText: 'Continue', danger: true }))) return;
+    var typed = await scoutPrompt({ title: 'Type the company name to confirm', body: pv.name,
+      mustMatch: pv.name, placeholder: pv.name, confirmText: 'Delete company', danger: true,
+      mismatchText: 'That did not match. Nothing was deleted.' });
     if (typed === null) return;
-    if (typed.trim() !== pv.name) { alert('That did not match. Nothing was deleted.'); return; }
 
     var res;
     try {
@@ -1367,17 +1369,30 @@
     } catch (err) { alert('Request failed: ' + (err.message || 'unknown')); return { ok: false }; }
   }
   async function adminDeactivate(uid) {
-    if (!confirm('Deactivate this user? They can’t log in and the seat is freed. Their calls and history stay.')) return;
+    if (!(await scoutConfirm({ title: 'Deactivate this user?', body: 'They can’t log in and the seat is freed.\nTheir calls and history stay.', confirmText: 'Deactivate', danger: true }))) return;
     var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid) + '/deactivate', { method: 'POST', body: '{}' });
     if (r.ok) loadUsers();
   }
   async function adminReactivate(uid) {
-    if (!confirm('Reactivate this user? This adds a billable seat and restores their login.')) return;
+    if (!(await scoutConfirm({ title: 'Reactivate this user?', body: 'This adds a billable seat and restores their login.', confirmText: 'Reactivate' }))) return;
     var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid) + '/reactivate', { method: 'POST', body: '{}' });
     if (r.ok) loadUsers();
   }
   async function adminDelete(uid, email) {
-    if (!confirm('Permanently delete ' + (email || 'this user') + '?\n\nThis removes their account and all their data, and can’t be undone.\n\n(Only allowed if they have no call history — otherwise deactivate instead.)')) return;
+    /* ⚠⚠ THE WARNING TEXT COMES FROM THE SERVER, from the SAME plan the delete
+       route acts on — exactly as the members table already did. The hardcoded
+       string this replaces had gone STALE and was actively false: it said
+       "(Only allowed if they have no call history — otherwise deactivate
+       instead.)" when the deletion ruling had already removed that gate and
+       made a delete take the calls with it. A stale warning on an irreversible
+       action is worse than no warning, because it is read and believed. */
+    var pre = await adminUserAction('/admin/users/' + encodeURIComponent(uid) + '/delete-preview', { method: 'GET' });
+    if (!pre.ok) return;
+    var p = pre.data || {};
+    if (p.mode === 'blocked') { alert(p.reason || 'This user cannot be deleted yet.'); return; }
+    var body = p.confirmation
+      || ('Delete ' + (p.email || email || 'this user') + '?\n\nThis cannot be undone.');
+    if (!(await scoutConfirm({ title: 'Delete this user?', body: body, confirmText: 'Delete', danger: true }))) return;
     var r = await adminUserAction('/admin/users/' + encodeURIComponent(uid), { method: 'DELETE', body: '{}' });
     if (r.ok) { alert('User deleted.'); loadUsers(); }
   }
