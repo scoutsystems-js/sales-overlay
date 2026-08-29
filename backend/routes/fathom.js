@@ -921,6 +921,52 @@ async function runUpdateAnalyses(req, res, userId, actorRole) {
                         pending: pendingIds2.length, failed: failedIds.length });
     }
 
+    /* ⚠⚠⚠ NEVER RESET A CALL THAT A RUN IS CURRENTLY WORKING ON — THE CLAIM IS
+       THE SAFETY MECHANISM AND THIS RESET USED TO DESTROY IT.
+
+       `claimAnalysisRun` refuses a duplicate only while the row reads
+       status='processing' with a FRESH `analyzed_at`. The reset below writes
+       'pending' over every id with no status guard, so a second press wiped that
+       claim and a second loop could grade a call the first loop was mid-way
+       through. Two full analyses, one call, and the rep pays for both.
+
+       ⚠ CORRECTING MY OWN EARLIER REPORT: rows the first run has FINISHED are
+       NOT re-selected — analyzeCall sets sync_status='processed' and stamps the
+       current prompt_version, which removes them from both the pending and the
+       outdated lists. The exposure is IN-FLIGHT and NOT-YET-STARTED rows.
+
+       ⚠ Fresh claims are excluded from the reset AND from the dispatch list:
+       resetting them is the corruption, and dispatching them is the double
+       spend. A stale claim (older than CLAIM_STALE_MS) is a dead run and is
+       deliberately still reclaimable — that is what lets a killed drain heal. */
+    var heldIds = [];
+    if (ids.length > 0) {
+      var claimCutoff = new Date(Date.now() - worker._CLAIM_STALE_MS).toISOString();
+      for (var hi = 0; hi < ids.length; hi += 100) {
+        var held = await admin.from('call_analyses')
+          .select('fathom_call_id')
+          .in('fathom_call_id', ids.slice(hi, hi + 100))
+          .eq('status', 'processing')
+          .gt('analyzed_at', claimCutoff);
+        if (held.error) {
+          /* ⚠ FAIL CLOSED. If we cannot tell which calls are being worked on we
+             must not reset anything — a wrong reset spends money twice, and
+             doing nothing costs only a retry. */
+          console.error('[fathom] update-analyses could not read in-flight claims for user ' + userId
+            + ' — refusing to reset: ' + held.error.message);
+          return res.status(503).json({ error: 'Grading is busy right now. Try again in a moment.' });
+        }
+        (held.data || []).forEach(function (r) { heldIds.push(r.fathom_call_id); });
+      }
+      if (heldIds.length) {
+        var heldSet = {};
+        heldIds.forEach(function (x) { heldSet[x] = true; });
+        ids = ids.filter(function (x) { return !heldSet[x]; });
+        console.log('[fathom] update-analyses skipped ' + heldIds.length
+          + ' call(s) already being graded by a live run (user ' + userId + ')');
+      }
+    }
+
     if (ids.length > 0) {
       // Reset step: back to 'pending' on both tables so the worker re-grades them
       // (and so the reanalyze/pending UI reflects them if the page reloads mid-run).
@@ -959,8 +1005,9 @@ async function runUpdateAnalyses(req, res, userId, actorRole) {
       })();
     }
 
-    console.log('[fathom] Update-analyses queued for user ' + userId + ': queued=' + ids.length + ' remaining=' + (unionIds.length - ids.length) + ' (outdated=' + outdatedIds.length + ', pending=' + pendingIds2.length + ', batch_limit=' + limit + ')');
-    return res.json({ queued: ids.length, remaining: unionIds.length - ids.length, batch_limit: limit });
+    console.log('[fathom] Update-analyses queued for user ' + userId + ': queued=' + ids.length + ' remaining=' + (unionIds.length - ids.length) + ' (outdated=' + outdatedIds.length + ', pending=' + pendingIds2.length + ', in_flight_skipped=' + heldIds.length + ', batch_limit=' + limit + ')');
+    return res.json({ queued: ids.length, remaining: unionIds.length - ids.length,
+                      already_running: heldIds.length, batch_limit: limit });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] update-analyses fatal for user ' + userId + ':', err.message);

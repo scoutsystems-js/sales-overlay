@@ -120,7 +120,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
   // set, email prefix fallback otherwise), so the fallback lives in one place.
   var profileMap = {};
   if (repIds.length > 0) {
-    var profs = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', repIds);
+    var profs = await admin.from('user_profiles').select('user_id, first_name, last_name, active').in('user_id', repIds);
     if (!profs.error) (profs.data || []).forEach(function (p) { profileMap[p.user_id] = p; });
   }
 
@@ -156,6 +156,15 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       user_id: id,
       email: (emailMap && emailMap[id]) || null,
       display_name: resolveDisplayName(profileMap[id], (emailMap && emailMap[id]) || null, id),
+      /* ⚠⚠ RENDERING AND COUNTING ARE TWO DIFFERENT QUESTIONS AND THIS FLAG
+         ANSWERS ONLY THE FIRST. Justin's ruling: DEACTIVATE LEAVES THE NUMBERS.
+         So a deactivated person stays in every aggregate — their calls, cash and
+         objections still count, exactly as they did — and the ONLY thing that
+         changes is that the board stops drawing a card for someone who has been
+         switched off. ⚠ A fix that filtered them out of `repIds` instead would
+         silently rewrite the team's history, which is the opposite of the
+         ruling. Nothing here touches the scope. */
+      active: (profileMap[id] && profileMap[id].active) !== false,
       calls_analyzed: c.calls_analyzed,
       avg_score: curAvg,
       prior_avg_score: priAvg,

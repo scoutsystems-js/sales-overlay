@@ -30,6 +30,27 @@
 // Calls graded under an older prompt version — the "outdated" half of `work`.
 // ⚠ MOVED HERE FROM routes/fathom.js: it answers a backlog question, not a
 // route question, and two callers now need it. routes/fathom.js imports it.
+/* ⚠⚠ ONE definition of the staleness window, taken from the worker that WRITES
+   the claim — a second copy would drift, and the symptom would be a page showing
+   a run that is not running, or hiding one that is.
+
+   ⚠⚠ RESOLVED LAZILY, AND THAT IS NOT STYLE. analysis-worker and this module are
+   in a REQUIRE CYCLE (worker -> routes/fathom -> grading-backlog -> worker), so a
+   top-level require here can return a partially-initialised module and hand back
+   `undefined`. `Date.now() - undefined` is NaN, `new Date(NaN).toISOString()`
+   THROWS, the catch below swallows it, and the in-flight count would read 0
+   FOREVER — silently, which is the exact failure this whole change exists to
+   remove. At call time the cycle is resolved and the value is real.
+   ⚠ It also THROWS rather than defaulting: a wrong window is worse than a loud
+   failure, because it would silently mis-classify live runs as dead. */
+function claimStaleMs() {
+  var v = require('./analysis-worker')._CLAIM_STALE_MS;
+  if (typeof v !== 'number' || !isFinite(v) || v <= 0) {
+    throw new Error('claim staleness window unavailable (got ' + v + ')');
+  }
+  return v;
+}
+
 async function outdatedCallIds(admin, userId, currentVersion) {
   var out = [];
   var PAGE = 1000;
@@ -97,6 +118,33 @@ async function gradingBacklog(admin, userId, currentVersion) {
     console.error('[grading-backlog] outdated count failed for user ' + userId + ': ' + err.message);
   }
 
+  /* ⚠⚠ THE IN-FLIGHT SIGNAL. Without this the page CANNOT KNOW a run is live:
+     `state.gradeRun` is module state, so a refresh loses it, and nothing else
+     here distinguishes "16 calls waiting, nobody working" from "16 waiting and
+     a run halfway through them". Justin saw the second and was offered the
+     first — a button to start a run that was already going.
+
+     ⚠ A CLAIM ONLY COUNTS WHILE IT IS FRESH. A row left at 'processing' by a
+     killed drain is NOT a live run; treating it as one would show a phantom run
+     forever and permanently hide the button. Same staleness window the claim
+     itself uses, so the page and the worker can never disagree. */
+  var processing = 0;
+  try {
+    var claimCutoff = new Date(Date.now() - claimStaleMs()).toISOString();
+    var proc = await admin.from('call_analyses')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'processing')
+      .gt('analyzed_at', claimCutoff);
+    if (proc.error) throw new Error(proc.error.message);
+    processing = (typeof proc.count === 'number') ? proc.count : 0;
+  } catch (err) {
+    /* ⚠ 0 means "no live run", which UNBLOCKS the button — the safe direction,
+       because the reset now refuses to touch a claimed row anyway, so a wrong 0
+       costs a redundant press rather than a double grade. Logged, never silent. */
+    console.error('[grading-backlog] in-flight count failed for user ' + userId + ': ' + err.message);
+  }
+
   var t = (typeof total.count   === 'number') ? total.count   : 0;
   var g = (typeof graded.count  === 'number') ? graded.count  : 0;
   var w = (typeof waiting.count === 'number') ? waiting.count : 0;
@@ -106,6 +154,7 @@ async function gradingBacklog(admin, userId, currentVersion) {
     graded: g,
     waiting: w,
     outdated: outdated,
+    processing: processing,   // LIVE claims only — see the block above
     // What the grading button would dispatch. Kept SEPARATE from `waiting`
     // because they answer different questions: `waiting` decides whether the
     // setup card may disappear, `work` decides whether a control renders.

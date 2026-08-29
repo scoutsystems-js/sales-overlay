@@ -5117,8 +5117,56 @@
 
   /* The whole control, in whichever state it is in. Returns '' when the grader
      has no work — an empty control on a fully-graded account is noise. */
+  /* ⚠⚠ A RUN IN FLIGHT MUST SURVIVE A REFRESH — THIS IS THE HALF THAT MADE THE
+     SPEND BUG REACHABLE. `state.gradeRun` is module state, so a reload lost it
+     and the page offered to START a run that was already going. The server now
+     reports LIVE claims (`processing`), so the run is reconstructed from it.
+
+     ⚠ THE TOTAL IS REMEMBERED, NEVER INVENTED. Without a stored total we can
+     honestly say how many are LEFT but not "X of Y" — and a made-up denominator
+     on a progress bar is worse than no bar. Same localStorage treatment the rep
+     filter and the team picker already use, and it is wrapped: a browser with
+     storage blocked degrades to the remaining count, not to a wrong one. */
+  var GRADE_RUN_KEY = 'scout_grade_run_v1';
+  function saveGradeRunTotal(total, scope) {
+    try { localStorage.setItem(GRADE_RUN_KEY, JSON.stringify({ total: total, scope: scope, at: Date.now() })); } catch (e) {}
+  }
+  function readGradeRunTotal() {
+    try {
+      var raw = localStorage.getItem(GRADE_RUN_KEY);
+      if (!raw) return null;
+      var v = JSON.parse(raw);
+      /* ⚠ A stale record is worse than none: a run from yesterday would give a
+         denominator that has nothing to do with the one now running. The claim
+         window is 10 minutes; allow generously beyond it, then discard. */
+      if (!v || typeof v.total !== 'number' || (Date.now() - (v.at || 0)) > 6 * 60 * 60 * 1000) return null;
+      return v;
+    } catch (e) { return null; }
+  }
+  function clearGradeRunTotal() { try { localStorage.removeItem(GRADE_RUN_KEY); } catch (e) {} }
+
+  /* Rebuild `state.gradeRun` after a reload when the SERVER says a run is live.
+     Returns true if it adopted one, so the caller knows not to offer a start. */
+  function adoptRunningGrade() {
+    if (state.gradeRun) return true;                       // this session already has one
+    var b = state.gradingBacklog;
+    if (!b || !(b.processing > 0)) return false;           // no live claim -> no run
+    var remaining = gradeBacklogWorkCount();
+    var saved = readGradeRunTotal();
+    var total = (saved && saved.total >= remaining) ? saved.total : remaining;
+    state.gradeRun = {
+      total: total, remaining: remaining, lastRemaining: remaining, quiet: 0,
+      scope: saved ? saved.scope : null, adopted: true,
+    };
+    gradeBacklogSchedule();
+    return true;
+  }
+
   function gradeBacklogControlHtml() {
     var work = gradeBacklogWorkCount();
+    /* ⚠ BEFORE reading state.gradeRun — this is what stops the button being
+       offered while a run is live. */
+    adoptRunningGrade();
     var run = state.gradeRun;
     var cf  = state.gradeConfirm;
 
@@ -5447,7 +5495,14 @@
   }
 
   function gradeBacklogCancel() { state.gradeConfirm = null; paintGradeBacklog(); }
-  function gradeBacklogDismiss() { state.gradeRun = null; paintGradeBacklog(); }
+  function gradeBacklogDismiss() {
+    /* ⚠ Clear the remembered total too, or the NEXT run adopted after a refresh
+       inherits this one's denominator and reports a progress bar against a size
+       that has nothing to do with it. */
+    clearGradeRunTotal();
+    state.gradeRun = null;
+    paintGradeBacklog();
+  }
 
   /* Step 2 — run it. The request returns immediately; the work continues
      server-side, so the progress below comes from polling, not from this call. */
@@ -5458,6 +5513,10 @@
     state.gradeConfirm = null;
     state.gradeRun = { scope: cf.scope, total: cf.count, remaining: cf.count,
                        lastRemaining: cf.count, quiet: 0, done: false, failed: false, msg: null };
+    /* ⚠ Remembered so a REFRESH can still say "X of Y" rather than only "Y to
+       go". Written before the request, because the refresh we are protecting
+       against can happen while it is in flight. */
+    saveGradeRunTotal(cf.count, cf.scope);
     paintGradeBacklog();
     try {
       var res = await fetch(gradeBacklogUrl(), {
@@ -5527,6 +5586,7 @@
       run.remaining = remaining;
       if (remaining <= 0) {
         run.done = true;
+        clearGradeRunTotal();   // finished — a later refresh must not adopt it
         run.msg = 'Graded all ' + run.total + ' call' + (run.total === 1 ? '' : 's') + '.';
       } else if (run.quiet >= GRADE_STALL_TICKS) {
         run.failed = true;
@@ -8529,7 +8589,7 @@
     if (!o) return '<div class="skeleton" style="height:80px;"></div>';
     if (o._forbidden) return '<div class="error">Not authorized for this team.</div>';
     if (o._error) return '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
-    var reps = (o.per_rep || []).slice();
+    var reps = visibleReps(o.per_rep).slice();
     if (!reps.length) return '<div class="empty"><p>No reps in this team yet.</p></div>';
     reps.sort(function (a, b) {
       var va = scoreFn(a), vb = scoreFn(b);
@@ -10693,6 +10753,18 @@
     });
   }
 
+  /* ⚠⚠ ROWS ONLY — NEVER NUMBERS. Justin's ruling: DEACTIVATE LEAVES THE
+     NUMBERS. A switched-off person's calls, cash and objections still count in
+     every team aggregate, exactly as they did; what stops is the board drawing
+     a CARD for them. The server keeps them in scope and simply marks them, so
+     nothing here can change a total.
+     ⚠ It also removes the "Deleted user (…)" rows: a tombstoned account is
+     inactive, so it stops rendering without anyone deciding to purge its calls
+     — which is a SEPARATE question, and Justin's. */
+  function visibleReps(list) {
+    return (list || []).filter(function (r) { return r && r.active !== false; });
+  }
+
   function repCardsHtml() {
     var o = state.teamOverview;
     if (o === null) return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
@@ -10706,7 +10778,7 @@
     return '<div class="section fade-in">'
       + '<div class="section-header"><h2>Reps</h2>'
         + '<div class="meta">weakest first · click a rep to open their report</div></div>'
-      + '<div class="rep-card-list">' + reps.map(repCardHtml).join('') + '</div>'
+      + '<div class="rep-card-list">' + visibleReps(reps).map(repCardHtml).join('') + '</div>'
       + '</div>';
   }
 
