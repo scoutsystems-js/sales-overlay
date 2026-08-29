@@ -168,6 +168,20 @@ function buildSectionBreakdown(section, input) {
       // not provable (model's guess), null = never assessed. Carried through so
       // the closer view can require proof; the good/bad groups ignore it.
       speaker_verified: (typeof h.speaker_verified === 'boolean') ? h.speaker_verified : null,
+      /* ⚠⚠ THE CLOSER'S OWN LINE. It was selected by every query that feeds this
+         and then DROPPED HERE, so "What Needs Work" rendered three orphan
+         prospect quotes with no coaching in them — measured, 92% of what that
+         panel shows is the prospect speaking, and 93% of those rows had a
+         closer_response sitting in them unrendered.
+
+         ⚠ SENTINEL-GATED. `__no_reply__` and `__moment_is_closer__` are real
+         stored values; rendering one raw is a recorded defect.
+         ⚠ AND THE VERDICT RIDES WITH IT, because a surface that says "you said"
+         must be able to require PROOF — an unverified reply is the model's
+         guess at who spoke, and attributing it to the rep is the 6b defect. */
+      closer_response: displayCloserResponse(h.closer_response) || null,
+      closer_response_verified: (typeof h.closer_response_verified === 'boolean')
+        ? h.closer_response_verified : null,
     };
     callsWithMoments[h.fathom_call_id] = true;
     if (highlightGroup(h) === 'good') good.push(moment); else bad.push(moment);

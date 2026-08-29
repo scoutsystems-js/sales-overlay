@@ -902,6 +902,14 @@
     .members-seats { font-size: 14px; color: var(--text); }
     .members-seats b { color: var(--text); }
     .members-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    /* ⚠ NOT --muted: the no-grey ruling forbids grey BODY TEXT and the guard
+       enforces it by reference, not just by definition. Dimming with opacity is
+       the approved exception (it is a depth cue, not unreadable body text), so
+       the label recedes without becoming grey. */
+    .srk-speaker { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); opacity: 0.7; margin-bottom: 2px; }
+    .srk-reply { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin: 6px 0; }
+    .srk-reply-label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 2px; }
+    .srk-obs { font-size: 12.5px; color: var(--text); opacity: 0.85; margin-top: 4px; }
     .sec-note { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin-bottom: 7px; }
     .acct-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
     .members-price { width: 92px; padding: 5px 7px; font-size: 13px; background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; }
@@ -6829,8 +6837,36 @@
     // Prospect AND date together — a quote with neither cannot be checked by the
     // person reading it, which is the whole point of showing evidence.
     var who = [m.prospect_name, when].filter(Boolean).join(' · ');
+
+    /* ⚠⚠ THE EXCHANGE, NOT AN ORPHAN QUOTE. This panel rendered the quote alone,
+       and MEASURED across all 8 reps, 109 of 118 of those quotes (92%) are the
+       PROSPECT speaking — while 110 of 118 (93%) had the rep's own reply sitting
+       in the row, never selected. Three bare prospect lines is what "weak, lazy
+       coaching advice" looked like from the inside.
+
+       ⚠ THE QUOTE IS LABELLED BY WHO ACTUALLY SPOKE IT. Before, an unlabelled
+       quote under a heading about the REP read as the rep's words — which for
+       92% of them was wrong.
+
+       ⚠ THE REPLY IS SHOWN ONLY WHEN PROVEN. An unverified closer_response is
+       the model's guess at who spoke; attributing it to the rep is the 6b
+       defect that had to be repaired in the KB once already. Absent rather than
+       hedged — a caveat inside a two-line row reads as noise. */
+    var speakerLabel = (m.speaker === 'CLOSER') ? 'You said' : 'They said';
+    var reply = (m.closer_response && m.closer_response_verified)
+      ? '<div class="srk-reply"><span class="srk-reply-label">You said</span>'
+        + escapeHtml(m.closer_response) + '</div>'
+      : '';
+    /* The observation is what happened, in Scout's words. It was already on the
+       row and already rendered nowhere. */
+    var obs = m.observation
+      ? '<div class="srk-obs">' + escapeHtml(m.observation) + '</div>' : '';
+
     return '<div class="srk-moment">'
-      + '<div class="srk-quote">“' + escapeHtml(m.quote) + '”</div>'
+      + '<div class="srk-quote"><span class="srk-speaker">' + speakerLabel + '</span>“'
+        + escapeHtml(m.quote) + '”</div>'
+      + reply
+      + obs
       + '<div class="srk-who">' + (who ? escapeHtml(who) : '') + clipLinkHtml(m) + '</div>'
       + '</div>';
   }

@@ -1364,6 +1364,14 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
         return { quote: m.quote, observation: m.observation || null, call_id: m.fathom_call_id,
           call_date: m.call_date || null, prospect_name: m.prospect_name || null,
           clip_url: m.clip_url || null, speaker_verified: m.speaker_verified === true,
+          /* ⚠ WHO ACTUALLY SPOKE THE QUOTE. Without it the render labels every
+             moment "They said" — right for 92% and silently wrong for the rest,
+             which is worse than no label at all. */
+          speaker: m.speaker || null,
+          /* ⚠ The rep's own reply, so the panel shows an EXCHANGE rather than an
+             orphan prospect quote. Only when PROVEN — see the render. */
+          closer_response: m.closer_response || null,
+          closer_response_verified: m.closer_response_verified === true,
           // ⚠ The LABEL depends on the provider, not just on having a link.
           source: (meta[m.fathom_call_id] || {}).source || null };
       });
