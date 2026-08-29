@@ -10529,13 +10529,26 @@
   }
   function teamMembersScope() {
     var o = state.teamOverview;
-    var key = (o && o.team && o.team.key) || state.me.user_id;
+    /* ⚠⚠ THE SELF FALLBACK IS ONLY SAFE WHEN NO OTHER COMPANY IS SELECTED.
+       This view renders BEFORE the overview lane lands, so the key was
+       unresolved on the first paint and fell back to the viewer's own id — for
+       an OWNER who had picked another company that renders THEIR OWN members
+       under the other company's name. It is correct for a manager (their team
+       IS their own id) and wrong in exactly the case that matters, which is the
+       shape to distrust: a fallback that is helpful in the common case and
+       silently wrong in the dangerous one.
+       ⚠ Same ruling as the team heading: when the selection cannot be resolved
+       render NOTHING rather than the viewer's own context. */
+    var key = (o && o.team && o.team.key) || (state.teamSelected ? null : state.me.user_id);
+    if (!key) return { key: null, members: [] };
     return { key: key, members: (state.users || []).filter(function (u) { return u.managed_by === key; }) };
   }
   function teamMembersBodyHtml() {
     if (!state.users) return '<div class="skeleton" style="height:120px;"></div>';
     var isOwner = state.me.role === 'owner';
     var sc = teamMembersScope();
+    // an unresolved company shows a skeleton, never another company's members
+    if (!sc.key) return '<div class="skeleton" style="height:120px;"></div>';
     var members = sc.members.slice().sort(function (a, b) {
       // active first, then by email
       if ((a.active !== false) !== (b.active !== false)) return (a.active !== false) ? -1 : 1;

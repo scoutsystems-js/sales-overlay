@@ -120,3 +120,43 @@ test('the customer never sees the mechanism', () => {
   });
   assert.ok(/mark it as a sales call/i.test(msg), 'it must say what they can do');
 });
+
+// ── clearing the grade a pre-existing call already carries ─────────────────
+test('the refusal CLEARS the stale grade, or the page contradicts itself', () => {
+  const gate = WORKER.slice(WORKER.indexOf('Phase 5b'), WORKER.indexOf('Phase 6: two parallel'));
+  assert.ok(gate.length > 600, 'gate slice too small — the check is not measuring');
+  /* FOUND ON REAL DATA, NOT BY READING: after the first re-analysis the five
+     Fathom calls still carried 60/58/26/20/14 and up to 5 highlights, so the
+     review page would have shown "this could not be graded" beside a confident
+     score drawn from the very transcript it says is unreadable. A brand-new
+     call has nothing to clear, which is exactly why it never showed up in the
+     original verification. */
+  assert.ok(/clearedGradeFields/.test(gate), 'the gate must clear the graded output');
+  assert.ok(/call_highlights[\s\S]{0,80}\.delete\(\)/.test(gate),
+    'highlights quote speakers we cannot attribute — they must go too');
+});
+
+test('a MANUALLY set outcome survives the refusal', () => {
+  const gate = WORKER.slice(WORKER.indexOf('Phase 5b'), WORKER.indexOf('Phase 6: two parallel'));
+  assert.ok(/outcome_source === 'manual'/.test(gate), 'must read the prior outcome source');
+  assert.ok(/clearedGradeFields\(!outcomeIsManual\)/.test(gate),
+    "a person's judgement about how the call ended is not derived from the transcript");
+  const cf = require('../lib/compromised-file');
+  assert.ok('outcome' in cf.clearedGradeFields(true), 'inferred outcome is cleared');
+  assert.ok(!('outcome' in cf.clearedGradeFields(false)), 'manual outcome is never cleared');
+});
+
+test('ONE definition of the cleared fields, shared with the backfill', () => {
+  const cf = require('../lib/compromised-file');
+  const f = cf.clearedGradeFields(true);
+  // the headline number and every section score must be in it
+  ['overall_score', 'intro_score', 'discovery_score', 'pitch_score', 'objection_score',
+   'close_score', 'close_score_earned'].forEach(k => {
+    assert.ok(k in f, 'clearedGradeFields must clear ' + k);
+    assert.strictEqual(f[k], null, k + ' must be cleared to null');
+  });
+  const backfill = fs.readFileSync(
+    path.join(__dirname, '..', 'scripts', 'mark-compromised-zoom-2026-08-29.js'), 'utf8');
+  assert.ok(/clearedGradeFields/.test(backfill),
+    'the backfill must share the helper — two hand-written lists drift');
+});

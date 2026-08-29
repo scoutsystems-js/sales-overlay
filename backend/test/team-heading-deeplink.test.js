@@ -71,3 +71,47 @@ test('no context yet: returns null so the caller can fall through', () => {
   assert.strictEqual(resolver({ teamContext: null, teamSelected: null }), null);
   assert.strictEqual(resolver({ teamContext: { teams: [] }, teamSelected: null }), null);
 });
+
+// ── the same family, found by sweeping for viewer-context fallbacks ─────────
+function membersScope(state) {
+  const at = HTML.indexOf('function teamMembersScope()');
+  assert.ok(at > 0, 'teamMembersScope is missing — anchor stale');
+  const end = HTML.indexOf('\n  }', at);
+  const src = HTML.slice(at, end + 4);
+  assert.ok(src.length > 300 && src.length < 3000, 'slice must cover the function: ' + src.length);
+  // eslint-disable-next-line no-new-func
+  return new Function('state', src + '\n return teamMembersScope();')(state);
+}
+
+test('Manage Members never falls back to the VIEWER\'s own team while another is selected', () => {
+  /* The first paint happens before the overview lane lands. With a company
+     selected, falling back to state.me.user_id renders the viewer's OWN
+     members under the other company's name. */
+  const r = membersScope({
+    teamOverview: null, teamSelected: 'other-company',
+    me: { user_id: 'viewer' },
+    users: [{ user_id: 'x', managed_by: 'viewer' }],
+  });
+  assert.strictEqual(r.key, null, 'an unresolved company must resolve to nothing');
+  assert.deepStrictEqual(r.members, [], 'and must list nobody');
+});
+
+test('a MANAGER on their own team still resolves — the fix must not blank the common case', () => {
+  const r = membersScope({
+    teamOverview: null, teamSelected: null,
+    me: { user_id: 'mgr' },
+    users: [{ user_id: 'rep', managed_by: 'mgr' }, { user_id: 'other', managed_by: 'someone' }],
+  });
+  assert.strictEqual(r.key, 'mgr');
+  assert.strictEqual(r.members.length, 1, 'their own reps still list');
+});
+
+test('once the payload lands, the payload wins over the viewer', () => {
+  const r = membersScope({
+    teamOverview: { team: { key: 'other-company' } }, teamSelected: 'other-company',
+    me: { user_id: 'viewer' },
+    users: [{ user_id: 'a', managed_by: 'other-company' }, { user_id: 'b', managed_by: 'viewer' }],
+  });
+  assert.strictEqual(r.key, 'other-company');
+  assert.strictEqual(r.members.length, 1);
+});

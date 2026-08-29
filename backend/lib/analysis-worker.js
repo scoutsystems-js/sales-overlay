@@ -1522,11 +1522,34 @@ async function analyzeCall(fathomCallId, userId) {
         not_sales_marked_at:   new Date().toISOString(),
         sync_status: 'processed',
       }).eq('id', fathomCallId);
-      await setAnalysisStatus(admin, fathomCallId, userId, 'done', {
+      /* ⚠⚠ CLEAR THE GRADE THIS CALL ALREADY CARRIES, AND ITS HIGHLIGHTS.
+         A brand-new call has nothing to clear, so this is a no-op for them —
+         but a call graded BEFORE the refusal shipped keeps its old score, and
+         the review page would then show "this could not be graded" directly
+         beside a confident 60 and three highlights quoting an unreadable
+         transcript. THAT IS THE EXACT CONTRADICTION THE REFUSAL EXISTS TO
+         PREVENT: leaving any of it is keeping a confident number from a source
+         we have just declared unreadable.
+
+         ⚠ A MANUALLY SET OUTCOME IS LEFT ALONE — a person's judgement about how
+         the call ended is not derived from the transcript and is not ours to
+         erase. Same read-before-write rule as the grader's manualLocked. */
+      var priorOutcome = await admin.from('call_analyses')
+        .select('outcome_source').eq('fathom_call_id', fathomCallId).maybeSingle();
+      var outcomeIsManual = !!(priorOutcome.data && priorOutcome.data.outcome_source === 'manual');
+      var cleared = compromisedFile.clearedGradeFields(!outcomeIsManual);
+      await setAnalysisStatus(admin, fathomCallId, userId, 'done', Object.assign({
         overall_summary: compReason,
         analyzed_at:     new Date().toISOString(),
         prompt_version:  ANALYSIS_PROMPT_VERSION,
-      });
+      }, cleared));
+      /* Highlights quote speakers we cannot attribute, so they go too. Failure
+         here must not fail the refusal — the exclusion is already durable. */
+      try {
+        await admin.from('call_highlights').delete().eq('fathom_call_id', fathomCallId);
+      } catch (e) {
+        console.warn('[analysis] compromised: could not clear highlights (non-fatal):', e && e.message);
+      }
       console.warn('[analysis] compromised file, not graded (call=%s speakers=%d chars=%d)',
         fathomCallId, fileCheck.speakers, fileCheck.chars);
       return { status: 'compromised_file', speakers: fileCheck.speakers, chars: fileCheck.chars };

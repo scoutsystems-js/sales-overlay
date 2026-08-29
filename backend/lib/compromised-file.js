@@ -82,8 +82,29 @@ function assessTranscript(turns) {
   };
 }
 
+/**
+ * The graded output a refusal must remove. ONE DEFINITION, because the worker's
+ * gate and any backfill that cannot reach the gate must clear exactly the same
+ * fields — two hand-written lists would drift and leave one path showing a
+ * stale score beside "this could not be graded".
+ * The caller decides about `outcome`: a MANUALLY set one is a person's
+ * judgement, not something derived from the transcript, and is never cleared.
+ */
+function clearedGradeFields(includeOutcome) {
+  var f = {
+    overall_score: null, one_thing: null, why_outcome: null, why_quote: null,
+    follow_up_email: null, eod_summary: null,
+    intro_score: null, intro_grade: null, discovery_score: null, discovery_grade: null,
+    pitch_score: null, pitch_grade: null, objection_score: null, objection_grade: null,
+    close_score: null, close_grade: null, close_score_earned: null,
+  };
+  if (includeOutcome) { f.outcome = null; f.outcome_source = null; }
+  return f;
+}
+
 module.exports = {
   assessTranscript: assessTranscript,
+  clearedGradeFields: clearedGradeFields,
   distinctSpeakers: distinctSpeakers,
   transcriptChars: transcriptChars,
   MIN_COMPROMISED_CHARS: MIN_COMPROMISED_CHARS,
