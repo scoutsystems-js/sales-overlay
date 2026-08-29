@@ -3938,6 +3938,30 @@ by SIZE (what I sorted on)        by RATE (the actual question)
 - **THE SHAPE, and it generalises past Zoom: when an input is detectably unusable, silently producing an output from it is worse than producing none.** The project already applies this to prospect names (refuse rather than guess) and to quote attribution (refuse rather than misattribute); the grader has no equivalent refusal.
 - **⚠ FILED, NOT BUILT — refusing to grade is a product ruling, not a bug fix.**
 
+### ⚠⚠⚠ AN APPROVED SPEND ITEM IS A CLAIM ABOUT THE DATA, AND THE DATA MOVES — RE-MEASURE BEFORE SPENDING (2026-08-29)
+**Four spend runs were approved on filed counts. Measured first, TWO HAD NO GRADEABLE TARGET AT ALL and a third was off by 50x.**
+```
+godwin  filed 102 ungraded   ->  11        the rest were graded since
+yazan   filed 181            ->  181 exist, ZERO Zoom connections => NONE gradeable
+josh    filed 153 errored    ->  3
+josh    filed 180 `synced_unanalyzed`  ->  THAT STATUS DOES NOT EXIST IN THE TABLE
+```
+- **⚠⚠ THE APPROVAL IS NOT THE PROBLEM — THE PREMISE IS.** "Grade the backlog" is a sound instruction; the backlog had changed underneath it. **Spending on a set that no longer exists produces failures, not grades**, and those failures then look like a broken pipeline.
+- **⚠ THE MOST IMPORTANT ONE IS NOT THE STALE COUNT, IT IS THE UNGRADEABLE SET.** yazan's 181 are Zoom calls on an account with no Zoom connection — **no amount of money grades them**, and 40 are already flagged duplicates of the Fathom calls that ARE graded. **"Ungraded" and "gradeable" are different questions and only the second justifies spend.**
+- **THE HABIT: before running an approved batch, ask what the target set is TODAY and whether each row CAN succeed.** A count is cheap; a run against a dead set is not, and it ends with casualties that need explaining.
+
+### ⚠⚠⚠ I RAN A BATCH IN AN ENVIRONMENT THAT COULD NOT POSSIBLY SUCCEED, AND IT WROTE `error` ONTO 11 HEALTHY ROWS (2026-08-29)
+**I established at the TOP of the block that this machine has no Zoom credentials. I then ran Godwin's 11 Zoom calls anyway.** All 11 failed with *"Zoom not configured"* — and `failTranscript` did exactly what it should: recorded the failure, **converting 11 gradeable `pending` rows into `error` rows, which is the one state the normal control cannot reach.**
+- **⚠⚠ THE DAMAGE WAS DONE BY CORRECT CODE.** Nothing malfunctioned. The worker cannot tell "the provider refused us" from "our own environment is missing a key", so a local run against a provider we cannot reach **manufactures permanent-looking failures on healthy data.**
+- **THE RULE: A LOCAL RUN INHERITS THE LOCAL ENVIRONMENT'S CAPABILITIES, AND A BATCH MUST BE CHECKED AGAINST THEM BEFORE IT STARTS — not against the target's.** The precondition is not "does this call have a connection", it is **"can THIS PROCESS reach that provider at all"**. One `if (!process.env.ZOOM_CLIENT_ID) refuse` would have cost nothing.
+- **Restored: all 11 back to pending/pending, verified.** They are gradeable from Railway, which has the credentials. **Recorded because the recovery was easy and the next one might not be** — an errored row is unreachable by every control the product ships.
+- Same family as the owner-resolution precondition that stranded 30 rows: **a runner must refuse to start when it cannot succeed, rather than discovering it one row at a time.**
+
+### ⚠ `grep -o "\." | wc -l` COUNTS EVERY FULL STOP IN THE PROSE, NOT YOUR PROGRESS MARKERS (2026-08-29)
+**A runner printed a dot per call; I counted dots and read 9 attempted against 3 graded, and went looking for 6 missing outcomes that did not exist.** The log is full of English sentences.
+- **The authoritative check was one query against the database**, which said 3 done / 1 processing / 36 pending — consistent, and no mystery.
+- **⚠ A PROGRESS MARKER MUST BE UNAMBIGUOUS IN THE STREAM IT SHARES.** A single character that also occurs in prose is not a marker. **And when a derived count disagrees with the source of truth, believe the source and suspect the derivation.**
+
 ### ⚠⚠⚠ A QUEUE ROW GOES STALE WHEN THE WORK SHIPS AND NOBODY EDITS THE ROW — AND THE FILE THEN CARRIES BOTH ANSWERS AT ONCE (fourth instance 2026-08-29)
 **Four rows now: the health snapshot, the update-analyses filing, the sub-page hashes, and admin-view-rebuild part 2. This is a recurring failure of the queue itself, not four coincidences.**
 - **The live case:** the row said *"PART 2 IS NOT [shipped]"* and *"NOT BUILT: deactivate/delete a whole company"*. **Both shipped in `319d06b` on 2026-08-24 — FOUR DAYS BEFORE the 2026-08-28 ruling the row records as unblocking them.** The row was diligently updated with the ruling; nobody asked whether the work had already been done.
