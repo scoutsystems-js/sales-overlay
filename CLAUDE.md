@@ -3953,6 +3953,24 @@ by SIZE (what I sorted on)        by RATE (the actual question)
 - **THE CHECK THAT FINDS IT: compute brace depth (skipping strings and comments) and assert a declaration sits at the SAME depth as its callers.** Not that it exists, not that it parses — that it is reachable from where it is called.
 - **⚠ AND IT WAS FOUND WHILE HUNTING AN UNRELATED BUG.** It would otherwise have shipped and surfaced as "the not-a-sales-call toggle is broken", days later, with no obvious link to the commit that caused it.
 
+### ⚠⚠⚠ A RULING RECORDED IN ONE FILE AND NOT THE OTHER STOPS A BLOCK — SEVENTH INSTANCE, AND THE COSTLIEST SHAPE (2026-08-29)
+**`CLAUDE.md` said *"Justin has NOT ruled — record it, do not decide it"* for a full day AFTER he ruled, while the ruling sat recorded as ✅ in `BUILD-LIST.md`. A block correctly refused to build the feature, because the file said its core design decision was still open.**
+- **⚠⚠ THIS IS WORSE THAN A STALE QUEUE ROW AND THE DIFFERENCE IS THE COST.** A stale row wastes the work of re-checking. **A stale RULING stops the work entirely — and it stops it for the right reason**, because refusing to decide something the architect has reserved is correct behaviour. The guard fires perfectly on false information.
+- **⚠ AND IT IS INVISIBLE FROM EITHER SIDE.** The file recording the ruling looks complete; the file recording the question looks like an honest open item. **Only reading both together shows the contradiction**, and nothing prompts that.
+- **THE RULE, which is the ordering rule applied across files: WHEN A RULING LANDS, EVERY PLACE THAT STATES THE QUESTION CLOSES IN THE SAME EDIT.** Not "the ruling is recorded somewhere" — every place that asks it.
+- **⚠⚠ AND IT IS NOW A CLASS, SO SWEEP IT RATHER THAN FIXING ONE.** Searching for the shape (`NOT ruled` · `awaiting a ruling` · `needs a decision` · `Justin's call`) and checking each against the ✅ entries found **six more rows** stating questions that had already been answered — an approved-and-run backlog, a status that does not exist, the purged tombstones, and two copy rows that had shipped. **One grep, six closures.**
+- Same family as *a queue row goes stale when the work ships*, and the mechanism is identical: **something becomes true, and nothing re-reads the places that assert otherwise.**
+
+### ⚠⚠ AN EXCEPTION SURFACE MUST SHOW NOTHING WHEN THERE IS NOTHING — AND THAT DOES NOT VIOLATE "ZERO IS A MEASUREMENT" (2026-08-29)
+**Two rules that look contradictory and are not, recorded together because the next session will read them as a conflict.**
+```
+a DATA surface      a reader COUNTS and RECONCILES it   -> an omitted row changes the total, so render 0
+an EXCEPTION surface  it exists to say "this needs you"  -> "0 things need you" is furniture
+```
+- **A banner that is always present trains people to stop seeing it**, so a fully connected team must see NOTHING from a who-has-not-connected badge. **The distinction is the surface's JOB, not the value.**
+- **⚠ AND AN EXCEPTION THAT NAMES A REAL PERSON RAISES THE BAR ON ITS INPUT.** The badge tests `connected === false`, never `!connected`: a missing field means the server could not tell us, and **accusing someone by name on an unknown is worse than staying silent.** A lookup failure degrades to CONNECTED for the same reason.
+- **⚠ DISMISSAL IS PER PERSON, NOT PER BADGE — and the prune is what makes it true.** Dismissing "the badge" forever means someone onboarded in three weeks never triggers it; dismissing until tomorrow nags. Per person works ONLY if the dismissed set is **pruned to the currently-unconnected on every read**, or a reconnect followed by a later disconnect stays dismissed forever — the same "never again" failure, one level down and invisible.
+
 ### ⚠⚠⚠ BEFORE STARTING ANY QUEUE ROW, VERIFY THE ROW IS STILL TRUE — SIX STALE ROWS AND COUNTING (standing process step, 2026-08-29)
 **The health snapshot · update-analyses · the sub-page hashes · admin part 2 · the Anthropic retry fix · the Zoom connect-time guidance. That is a PATTERN, not a run of bad luck, and it has cost six blocks' worth of false starts.**
 - **⚠ VERIFY THE ROW YOU ARE ABOUT TO WORK, NOT THE WHOLE FILE.** It is a two-minute check — grep for the symbol, hit the endpoint, read the string — against work that is routinely half a block.
