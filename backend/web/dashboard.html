@@ -5263,6 +5263,20 @@
   /* The viewed rep, named. ⚠ Falls back to "this rep" rather than an empty
      string or an id — a confirmation that spends money must not read
      "Grade 101 of 's calls". A wrong-looking name is worse than a generic one. */
+  /* ⚠⚠ ONE WAY TO NAME A PERSON ON SCREEN. Rep pages were titled with the raw
+     EMAIL — and with a bare UUID when the user was not in the loaded list, which
+     is the worse half: a heading reading `a99f548b-…` names nobody.
+     ⚠ SWEPT BY CAPABILITY, not just the page Justin was looking at: the page
+     heading, the two rep-row tooltips and the two person pickers all went
+     through their own expression. The email is still shown where it IS the
+     subject (the signed-in address, the Account field, the line UNDER a name in
+     the members table) — those are not titles and were deliberately left. */
+  function personLabel(u) {
+    if (!u) return null;
+    var n = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+    return n || u.display_name || u.email || null;
+  }
+
   function viewedUserLabel() {
     var u = (state.users || []).filter(function (x) { return x.user_id === state.viewingUserId; })[0];
     if (!u) return 'this rep';
@@ -6263,7 +6277,8 @@
       sub = 'Your call patterns, objection handling, and coaching feedback.';
     } else {
       var u = state.users.find(function(x) { return x.user_id === state.viewingUserId; });
-      heading = (u ? u.email : state.viewingUserId);
+      /* ⚠ NEVER the raw id: a heading reading a UUID names nobody. */
+      heading = personLabel(u) || 'This rep';
       sub = 'Viewing as ' + state.me.role + '.';
     }
 
@@ -6271,7 +6286,7 @@
     if (state.me.role === 'admin' || state.me.role === 'owner') {
       var opts = state.users.slice().sort(function(a, b) { return (a.email || '').localeCompare(b.email || ''); }).map(function(u) {
         var sel = u.user_id === state.viewingUserId ? ' selected' : '';
-        return '<option value="' + escapeHtml(u.user_id) + '"' + sel + '>' + escapeHtml(u.email || u.user_id) + '</option>';
+        return '<option value="' + escapeHtml(u.user_id) + '"' + sel + '>' + escapeHtml(personLabel(u) || u.user_id) + '</option>';
       }).join('');
       userPicker = '<select class="user-select" onchange="setUser(this.value)">' + opts + '</select>';
     }
@@ -7123,6 +7138,16 @@
     state.teamObjections = null;
     state.teamObjSummary = null;
     state.teamDetailMetric = null; // exit any glance-box detail when team/range changes
+    /* ⚠⚠ BUMP THE EPOCH AND CLEAR THE IN-FLIGHT FLAGS — nulling the data alone
+       was the bug. A lane still marked loading REFUSES to refetch (`if
+       (state[c.flag]) return`), so the reset silently produced no new request,
+       and the in-flight answer for the PREVIOUS team then landed. */
+    teamEpoch++;
+    state.teamOverviewLoading = false;   state.teamTrendsLoading = false;
+    state.teamRecsLoading = false;       state.teamNeedsWorkLoading = false;
+    state.teamHighlightsLoading = false; state.teamDigestLoading = false;
+    state.teamWhyLoading = false;        state.teamRepSeriesLoading = false;
+    state.teamObjectionsLoading = false; state.teamObjSummaryLoading = false;
   }
   // Re-render whichever team surface is active (main view or the expanded page).
   function renderTeamSurface() {
@@ -7192,6 +7217,27 @@
   }
   */
   // Generic lazy loader for each team panel.
+  /* ⚠⚠⚠ THE TEAM EPOCH — WHY A REFRESH SHOWED ONE COMPANY'S NAME OVER ANOTHER'S
+     NUMBERS (Justin, 2026-08-29).
+
+     At boot renderTeamView kicks EIGHT lanes in parallel and `loadTeam` builds
+     each URL AT CALL TIME. `state.teamSelected` is still null then, so overview
+     asks for the DEFAULT team. `/team/context` returns (it is small and fast,
+     overview is heavy, so it nearly always wins), restoreTeamPick sets the saved
+     selection and calls resetTeamData() — which nulled the DATA but not the
+     `*Loading` FLAGS. The refetch hit `if (state[c.flag]) return` and never ran,
+     and the original DEFAULT-team response then landed.
+
+     Result: the dropdown read the restored company and the title and numbers
+     were the default one. ⚠⚠ SILENTLY WRONG AND CONFIDENTLY LABELLED — a manager
+     reading one company's figures under another company's name.
+
+     ⚠ CLEARING THE FLAGS ALONE IS NOT ENOUGH: the first request is still in
+     flight and would still resolve LAST, overwriting the correct payload. The
+     epoch is what makes a stale response discardable — it is bumped on every
+     reset, and a response carrying an old epoch is dropped instead of stored. */
+  var teamEpoch = 0;
+
   async function loadTeam(which) {
     var map = {
       context:  { flag: null,                    set: 'teamContext',    url: '/team/context' },
@@ -7222,8 +7268,23 @@
     var c = map[which]; if (!c) return;
     if (c.flag && state[c.flag]) return;
     if (c.flag) state[c.flag] = true;
-    try { state[c.set] = await fetchTeamJSON(c.url); }
-    catch (err) { if (err.message === 'unauth') return; state[c.set] = { _error: err.message || 'unknown' }; }
+    /* The epoch this request belongs to. If a reset happens while it is in
+       flight, the answer describes a team nobody is looking at any more. */
+    var epoch = teamEpoch;
+    var payload;
+    try { payload = await fetchTeamJSON(c.url); }
+    catch (err) {
+      if (err.message === 'unauth') return;
+      payload = { _error: err.message || 'unknown' };
+    }
+    /* ⚠⚠ DISCARD A STALE ANSWER. `context` is exempt: it is not team-scoped —
+       it is the list of teams this person may pick, and it is what TRIGGERS the
+       reset, so dropping it would discard the very response that caused the bump. */
+    if (which !== 'context' && epoch !== teamEpoch) {
+      if (c.flag) state[c.flag] = false;
+      return;
+    }
+    state[c.set] = payload;
     if (c.flag) state[c.flag] = false;
     /* ⚠⚠ RESTORED HERE AND NOWHERE ELSE: /team/context is the only response that
        says which teams this person may pick, and the saved key is validated
@@ -8598,7 +8659,7 @@
     return '<div class="team-detail-list">' + reps.map(function (r) {
       var v = scoreFn(r);
       var pct = v == null ? 0 : Math.max(0, Math.min(100, v));
-      return '<div class="team-detail-row" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(r.email || '') + '\'s dashboard">'
+      return '<div class="team-detail-row" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(personLabel(r) || 'this rep') + '\'s dashboard">'
         + '<div class="team-detail-name">' + escapeHtml(repName(r)) + '</div>'
         + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;background:' + scoreColor(v) + ';"></div></div>'
         + '<div class="team-detail-val">' + (v == null ? '—' : v) + '</div>'
@@ -10057,7 +10118,22 @@
   }
 
   function teamHeaderHtml() {
-    var label = (state.teamOverview && state.teamOverview.team && state.teamOverview.team.label) || 'Team';
+    /* ⚠⚠ THE TITLE AND THE DROPDOWN NOW READ FROM ONE VALUE — `state.teamSelected`,
+       which is what the picker itself renders from. They used to have two
+       sources: the dropdown read the SELECTION and this read the DATA payload
+       (`teamOverview.team.label`). Two sources can disagree, and after a refresh
+       they did — the control said one company and the title said another, over a
+       third company's numbers.
+       ⚠ The epoch above stops the DATA going stale; this stops the LABEL being
+       able to contradict the control at all, including for the moment before a
+       refetch lands. Belt and braces on purpose: one of them fixes the cause,
+       the other makes the symptom unrepresentable.
+       ⚠ Falls back to the payload label (a non-owner has no picker, so
+       teamContext.teams is empty and the payload is the only name available),
+       then to 'Team'. */
+    var label = teamLabelForSelection()
+      || (state.teamOverview && state.teamOverview.team && state.teamOverview.team.label)
+      || 'Team';
     /* ⚠⚠ A DEAD SECOND COPY OF THE TEAM PICKER LIVED HERE AND WAS REMOVED
        2026-08-22. This function built `picker` (a byte-identical duplicate of
        the select in teamSelectHtml) and `presets`, and then RETURNED NEITHER —
@@ -10145,6 +10221,21 @@
    * Persistence comes from `state.teamSelected` and `pickTeam`, which are
    * global, so reusing this function means reusing the persistence too.
    */
+  /* The name of the CURRENTLY SELECTED team, resolved from the same list and
+     the same selection the dropdown renders from — so the header and the picker
+     cannot disagree. Returns null when there is nothing to resolve against
+     (no context yet, or a non-owner with no picker), and the caller falls back. */
+  function teamLabelForSelection() {
+    var ctx = state.teamContext;
+    var teams = (ctx && Array.isArray(ctx.teams)) ? ctx.teams : [];
+    if (!teams.length) return null;
+    for (var i = 0; i < teams.length; i++) {
+      var t = teams[i];
+      if (state.teamSelected ? (t.key === state.teamSelected) : t.is_self) return t.label || null;
+    }
+    return null;
+  }
+
   function teamSelectHtml() {
     var ctx2 = state.teamContext;
     if (!(ctx2 && ctx2.is_owner && Array.isArray(ctx2.teams) && ctx2.teams.length)) return '';
@@ -10365,7 +10456,7 @@
       var moveSel = '<select class="user-select members-move" onchange="moveMember(\'' + m.user_id + '\', this.value)">'
         + managerOpts.map(function (mo) {
           return '<option value="' + escapeHtml(mo.user_id) + '"' + (mo.user_id === m.managed_by ? ' selected' : '') + '>'
-            + escapeHtml((mo.user_id === state.me.user_id ? 'Me' : (mo.email || mo.user_id))) + '</option>';
+            + escapeHtml((mo.user_id === state.me.user_id ? 'Me' : (personLabel(mo) || mo.user_id))) + '</option>';
         }).join('') + '</select>';
       var acts = '<button class="members-act" onclick="' + (active ? 'deactivateMember' : 'reactivateMember') + '(\'' + m.user_id + '\')">' + (active ? 'Deactivate' : 'Reactivate') + '</button>'
         + '<button class="members-act" onclick="editMemberEmail(\'' + m.user_id + '\', \'' + escapeHtml(m.email || '') + '\')">Email</button>'
@@ -10798,7 +10889,7 @@
         + '<span>' + (r.obj_handle_rate == null ? '—' : r.obj_handle_rate + '%') + ' obj</span>'
         + '<span>avg ' + (r.avg_score == null ? '—' : r.avg_score) + ' ' + trendArrow(r.trend) + '</span>'
         + '</div>';
-      return '<div class="team-rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(r.email || '') + '\'s dashboard">'
+      return '<div class="team-rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(personLabel(r) || 'this rep') + '\'s dashboard">'
         + '<div class="team-rep-head"><div class="team-rep-name">' + escapeHtml(name) + '</div>' + quick + '</div>'
         + '<div class="team-rep-bars">' + sectionBarsHtml(r.sections) + '</div>'
         + '</div>';
@@ -10835,7 +10926,7 @@
     var rows = reps.map(function (r) {
       var v = Math.max(0, cfg.value(r));
       var pct = Math.round((v / max) * 100);
-      return '<div class="team-detail-row" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(r.email || '') + '\'s dashboard">'
+      return '<div class="team-detail-row" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(personLabel(r) || 'this rep') + '\'s dashboard">'
         + '<div class="team-detail-name">' + escapeHtml(repName(r)) + '</div>'
         + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;"></div></div>'
         + '<div class="team-detail-val">' + cfg.label(r) + '<span class="team-detail-sub">' + escapeHtml(cfg.sub(r)) + '</span></div>'
