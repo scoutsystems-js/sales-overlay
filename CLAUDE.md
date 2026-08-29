@@ -3224,6 +3224,29 @@ grep -rn "recording_url.*?t="                   # the EXPECTED SHAPE — found s
   - **✅ FOURTH INSTANCE, AND THE FIRST CAUGHT BEFORE IT WAS REPORTED AS A PROBLEM (2026-08-18).** A post-deploy check flagged two pastel hexes as *"still present"* after the ramp went vivid. Re-scoped to the ramp instead of the whole document, the ramp held exactly its seven new entries — the hits were `#c4b5fd` on a **KB category badge** (an unrelated taxonomy palette) and `#22d3ee` as the **`--cyan` token**, the objection-category colours, and the comment naming the pastel it replaced. **Cost of the catch: one extra command.**
   - **⚠ RECORD THE CATCHES, NOT ONLY THE FAILURES — A RULE THAT STOPS A MISTAKE PRODUCES NOTHING.** No incident, no fix, no diff, nothing to point at: **it looks exactly like the rule was never needed.** Three instances here are damage and the fourth is the rule working, and without the fourth written down this entry reads as a list of past mistakes rather than as a practice that pays for itself. **Every rule in this file has the same problem — the evidence for keeping it is invisible by construction.**
 
+### ⚠⚠ A DATA FIX MUST NOT STAND IN FOR A CODE FIX — AND THE BACKFILL WOULD HAVE HIDDEN THE FAULT (2026-08-29)
+**The 170 seeded framework rows were backfilled and every one now has an embedding. `scripts/seed-frameworks.js` still contained NO embedding code, so the very next seed would have recreated the gap — with the evidence of the last one already tidied away.**
+- **⚠⚠ AND IT WAS WIDER THAN FILED: ALL FIVE seed scripts had zero embedding references**, not the one that was named. The named one is fixed; **the other four are PINNED BY A TEST** so the gap is found rather than rediscovered, and retiring one means updating the list and the row together.
+- **⚠ THE SEED SCRIPT REFUSES TO RUN WITHOUT THE CAPABILITY, WHICH IS THE OPPOSITE OF THE LIVE PATH'S RULE — deliberately.** On the live path a row must still be written unembedded rather than lost, because losing a real call moment is worse than storing an unsearchable one. **In a seed, nothing is lost by stopping** (re-run it) **and 170 silently unsearchable rows is the entire defect.** The correct failure direction follows the consequence, not the shape — the same reasoning that gives `failure-class` a different default from `model-retry`.
+- **THE GENERAL FORM: after repairing data, ask what PRODUCED it and whether that thing has changed.** A backfill makes the symptom disappear, which is exactly what stops anyone looking for the cause.
+
+### ⚠⚠ A REVERT-TO-PROVE-NON-VACUITY MUST BACK UP EVERY CHANGED FILE — AND `git stash` SILENTLY SKIPS UNTRACKED ONES (2026-08-29)
+**Two failures in one check, and the first one REPORTED SUCCESS.**
+```
+git stash push -q <files>   ->  failed (a NEW file is untracked), error hidden by 2>/dev/null
+tests re-run                ->  10 pass  ... against COMPLETELY UNCHANGED CODE
+```
+- **⚠⚠ "ALL TESTS STILL PASS" AFTER A REVERT LOOKS LIKE THE GUARDS ARE VACUOUS. Here it meant THE REVERT NEVER HAPPENED** — the opposite conclusion, from an identical output. **A non-vacuity check is itself code, and it fails the same ways the thing it checks does.**
+- **THE FIX IS TO ASSERT THE REVERT TOOK EFFECT BEFORE TRUSTING THE RESULT** — print the marker counts and require them to be zero. `reverted: lib=0 me=0 page=0` is the line that makes the run meaningful.
+- **⚠ THEN I DESTROYED TWO FILES' WORK BY BACKING UP ONLY THE THIRD** and reverting the others with `git checkout --`. **Back up EVERY file the change touched, or use `git stash -u`.**
+- **⚠ AND A COARSE PROOF CAN MASK THE GRANULAR ONE:** removing the new module made the test file fail to LOAD (1 test, 0 pass), which proves dependence but says nothing about which assertions fire. **Reverting only the WIRING, with the module kept, failed exactly the 3 wiring guards** — that is the proof worth having, because those are the ones that could pass vacuously.
+
+### ⚠⚠ A CEILING LIFTS AND THE WORKAROUND BECOMES AN UNEXPLAINED CONSTANT — CONFIRM FROM THE PROVIDER, THEN REMOVE IT (2026-08-29)
+**The 3 RPM / 10K TPM cap was lifted when a payment method was added. Confirmed FROM THE PROVIDER before repacing anything: five unpaced requests of 96 texts and 9,600 tokens each all returned 200 in ~2 seconds — under the old tier the FIRST would have exhausted the minute.**
+- **⚠ DO NOT INFER A TIER CHANGE FROM AN ACTION TAKEN.** "A card was entered" and "the limit moved" are different facts, and the provider answers the second one directly. **The backfill then ran 706 rows in 8 requests with 0 failures, against a 40-minute paced estimate.**
+- **⚠⚠ THE PACING HAD TO GO, NOT STAY AS A SAFETY MARGIN.** A throttle whose justification has expired is exactly the unexplained constant the next person inherits, works around, and never re-derives. **The KNOB survives (`--pace`) because a tier is an account property that can change back; what does not survive is it being ON by default with a stale reason.**
+- **⚠ AND VERIFY THE OUTCOME AGAINST THE DATABASE, NOT THE RUN'S OWN OUTPUT.** "The backfill finished" and "no null rows remain" are different claims — the first is about a process, the second about the data, and only the second is the precondition anything downstream depends on.
+
 ### ⚠⚠⚠ THE EMBEDDING GAP WAS THREE FAULTS, AND THE PROVIDER NAMED THE ONE THAT MATTERED (2026-08-29)
 **Filed as "rate limiting under sustained analysis — the spikes line up with the grading runs". That correlation was real, the story was wrong, and reading the ACTUAL failure changed both the diagnosis and the fix.**
 ```
