@@ -1777,6 +1777,13 @@
        border, coloured text). That is deliberate — a badge should look like the
        other badge on the row and differ only in hue, so red vs green reads as
        "excluded vs scored" rather than as two unrelated objects. */
+    .unconnected-badge {
+      display: flex; align-items: center; gap: 14px; justify-content: space-between;
+      border-left: 3px solid var(--mid);
+    }
+    .unconnected-badge-body { font-size: 14px; color: var(--text); line-height: 1.5; }
+    .unconnected-badge strong { color: var(--text); }
+
     .not-sales-badge {
       display: inline-block; padding: 2px 7px; border-radius: 5px;
       border: none; background: rgba(var(--bad-rgb), 0.14);
@@ -8600,6 +8607,9 @@
     // (Highlights now live on the expanded recommendations page).
     content.innerHTML =
       teamHeaderHtml()
+      /* ⚠ FIRST THING UNDER THE HEADER. It is an exception, so it outranks every
+         metric on the page — and it renders '' when nobody is unconnected. */
+      + unconnectedBadgeHtml()
       // Justin's placement: title → gauges → picker → line graphs. The dials sit
       // ABOVE the picker because they do not answer to it.
       + avgPanelHtml()
@@ -10204,6 +10214,75 @@
       + '<div class="avg-head"><div class="avg-title">Team Averages</div>'
       + '<div class="avg-window">Last 7 days · fixed — not affected by the date filter below</div></div>'
       + body + '</div>';
+  }
+
+  /* ⚠⚠ WHO HAS NOT CONNECTED A RECORDING SOURCE (Justin, ruled 2026-08-28:
+     OPTION 3, PER PERSON). A rep who never connected looked exactly like one
+     having a quiet week — a manager's most actionable fact was invisible.
+
+     ⚠ DISMISSAL IS PER PERSON, NOT PER BADGE, and that is the whole ruling.
+     Dismissing "the badge" forever means a rep onboarded in three weeks never
+     triggers it; dismissing until tomorrow nags, and a daily nag is ignored on
+     sight. Per person, it is gone for everyone the manager has been told about
+     and returns the moment someone NEW is unconnected.
+
+     ⚠ THE DISMISSED SET IS PRUNED TO THE CURRENTLY-UNCONNECTED on every read.
+     Without that, someone who connects and later disconnects stays dismissed
+     forever — the "never again" failure in miniature, and invisible.
+
+     ⚠ A FULLY CONNECTED TEAM SEES NOTHING. This is an EXCEPTION surface, not a
+     data surface: "0 people need your attention" is furniture, and a banner
+     that is always present trains people to stop seeing it. That is why the
+     zero-is-a-measurement rule does NOT apply here. */
+  var UNCONNECTED_KEY = 'scout_unconnected_dismissed_v1';
+
+  function unconnectedReps() {
+    var o = state.teamOverview;
+    var rows = (o && Array.isArray(o.per_rep)) ? o.per_rep : [];
+    /* ⚠ `connected === false` and not `!connected`: a missing field means the
+       server could not tell us, and a badge that accuses a real person by name
+       must never fire on an unknown. Deactivated people are not chased. */
+    return rows.filter(function (r) { return r.active !== false && r.connected === false; });
+  }
+
+  function unconnectedDismissed() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(UNCONNECTED_KEY) || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) { return []; }
+  }
+
+  function unconnectedToShow() {
+    var un = unconnectedReps();
+    if (!un.length) return [];
+    var dismissed = unconnectedDismissed();
+    return un.filter(function (r) { return dismissed.indexOf(r.user_id) === -1; });
+  }
+
+  function dismissUnconnected() {
+    // prune to the CURRENTLY unconnected, then add them — so a reconnect
+    // followed by a later disconnect counts as new again
+    var ids = unconnectedReps().map(function (r) { return r.user_id; });
+    try { localStorage.setItem(UNCONNECTED_KEY, JSON.stringify(ids)); } catch (e) {}
+    renderTeamView();
+  }
+
+  function unconnectedBadgeHtml() {
+    var show = unconnectedToShow();
+    if (!show.length) return '';           // a fully connected team sees NOTHING
+    var names = show.map(function (r) {
+      return escapeHtml(r.display_name || r.email || 'A team member');
+    });
+    var who = names.length === 1 ? names[0]
+      : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    var verb = names.length === 1 ? 'has not connected a recording source'
+                                  : 'have not connected a recording source';
+    return '<div class="section fade-in unconnected-badge">'
+      + '<div class="unconnected-badge-body">'
+        + '<strong>' + who + '</strong> ' + verb + ', so none of their calls can be graded.'
+      + '</div>'
+      + '<button class="date-preset" onclick="dismissUnconnected()">Dismiss</button>'
+    + '</div>';
   }
 
   function teamHeaderHtml() {
@@ -13660,12 +13739,25 @@
      CUSTOMER LANGUAGE: "Compromised file" is Justin's word and it is what the
      user sees; the title says what they can do about it. */
   function exclusionLabel(c) {
-    return (c && c.exclusion_reason === 'compromised_file') ? 'Compromised file' : 'Not a sales call';
+    var r = c && c.exclusion_reason;
+    if (r === 'compromised_file')    return 'Compromised file';
+    if (r === 'source_disconnected') return 'Can\u2019t be graded';
+    return 'Not a sales call';
   }
   function exclusionTitle(c) {
-    return (c && c.exclusion_reason === 'compromised_file')
-      ? 'This recording only captured one voice, so it could not be graded and is not counted. If both sides were speaking, open the call and mark it as a sales call to include it.'
-      : 'A person marked this as not a sales call, so it is not counted.';
+    var r = c && c.exclusion_reason;
+    if (r === 'compromised_file') {
+      return 'This recording only captured one voice, so it could not be graded and is not counted. '
+           + 'If both sides were speaking, open the call and mark it as a sales call to include it.';
+    }
+    if (r === 'source_disconnected') {
+      /* ⚠ SAYS WHAT HAPPENED AND WHAT THEY CAN DO. These are not waiting to be
+         graded — the recording they came from can never be reached again — and
+         reading as a backlog is exactly what this label exists to stop. */
+      return 'The app that recorded this call is no longer connected, so it can\u2019t be graded. '
+           + 'Reconnect it if you want calls like this graded.';
+    }
+    return 'A person marked this as not a sales call, so it is not counted.';
   }
 
   function renderCallLibrary() {

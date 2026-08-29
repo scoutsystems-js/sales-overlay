@@ -118,6 +118,32 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
 
   // Names for the rep cards — resolved through the shared helper (real name when
   // set, email prefix fallback otherwise), so the fallback lives in one place.
+  /* WHO HAS A RECORDING SOURCE CONNECTED. Nothing on the team board knew this,
+     so a rep who had never connected looked identical to one who simply had a
+     quiet week — the manager's most actionable fact was invisible.
+     ⚠ BOTH tables: Fathom lives in fathom_connections, everything else in
+     call_connections. Checking one would report every Fathom user as
+     unconnected, which is most of the platform.
+     ⚠ IT DEGRADES TO "CONNECTED". On a read failure nobody is reported as
+     unconnected — a false alarm naming a real person is worse than silence,
+     and this drives a badge that accuses someone by name. */
+  var connectedSet = {};
+  if (repIds.length > 0) {
+    var conns = await Promise.all([
+      admin.from('fathom_connections').select('user_id').in('user_id', repIds),
+      admin.from('call_connections').select('user_id').in('user_id', repIds),
+    ]);
+    var connErr = conns.some(function (c) { return !!c.error; });
+    if (connErr) {
+      console.error('[team-analytics] connection lookup failed — nobody will be reported unconnected');
+      repIds.forEach(function (id) { connectedSet[id] = true; });
+    } else {
+      conns.forEach(function (c) {
+        (c.data || []).forEach(function (r) { connectedSet[r.user_id] = true; });
+      });
+    }
+  }
+
   var profileMap = {};
   if (repIds.length > 0) {
     var profs = await admin.from('user_profiles').select('user_id, first_name, last_name, active').in('user_id', repIds);
@@ -165,6 +191,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
          silently rewrite the team's history, which is the opposite of the
          ruling. Nothing here touches the scope. */
       active: (profileMap[id] && profileMap[id].active) !== false,
+      connected: connectedSet[id] === true,
       calls_analyzed: c.calls_analyzed,
       avg_score: curAvg,
       prior_avg_score: priAvg,

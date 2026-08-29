@@ -160,3 +160,46 @@ test('ONE definition of the cleared fields, shared with the backfill', () => {
   assert.ok(/clearedGradeFields/.test(backfill),
     'the backfill must share the helper — two hand-written lists drift');
 });
+
+/* ── the third exclusion reason: the source is gone ───────────────────────── */
+test('a THIRD reason rides the same flag, and each renders its own label', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  function fn(name) {
+    const at = html.indexOf('function ' + name + '(');
+    assert.ok(at > 0, name + ' is missing — anchor stale');
+    const end = html.indexOf('\n  }', at);
+    const src = html.slice(at, end + 4);
+    assert.ok(src.length > 100 && src.length < 3000, 'slice must cover ' + name + ': ' + src.length);
+    return src;
+  }
+  const api = new Function(fn('exclusionLabel') + '\n' + fn('exclusionTitle')
+    + '\nreturn { label: exclusionLabel, title: exclusionTitle };')();
+
+  assert.strictEqual(api.label({ exclusion_reason: 'compromised_file' }), 'Compromised file');
+  assert.strictEqual(api.label({ exclusion_reason: null }), 'Not a sales call');
+  const sd = api.label({ exclusion_reason: 'source_disconnected' });
+  assert.ok(/can.{0,3}t be graded/i.test(sd), 'the third reason needs its own label, got: ' + sd);
+
+  /* ⚠ EACH REASON MUST READ DIFFERENTLY. Three states sharing one label is the
+     absent-vs-excluded collapse: a call that CAN never be graded would look
+     identical to one a person set aside. */
+  const labels = ['compromised_file', 'source_disconnected', null].map(r => api.label({ exclusion_reason: r }));
+  assert.strictEqual(new Set(labels).size, 3, 'all three labels must differ: ' + labels.join(' | '));
+
+  // customer language: says what happened AND what they can do, no mechanism
+  const t = api.title({ exclusion_reason: 'source_disconnected' });
+  assert.ok(/reconnect/i.test(t), 'it must say what they can do');
+  [/transcript/i, /provider/i, /null/i, /exclusion/i, /sync_status/i].forEach(re => {
+    assert.ok(!re.test(t), 'customer copy names a mechanism: ' + re);
+  });
+});
+
+test('the exclusion stays ONE flag — the third reason adds no second boolean', () => {
+  const sql = fs.readFileSync(
+    path.join(__dirname, '..', 'migrations', '054_exclusion_reason_source_disconnected.sql'), 'utf8');
+  assert.ok(/source_disconnected/.test(sql), 'the migration must allow the new reason');
+  assert.ok(/compromised_file/.test(sql), 'and must keep the existing one');
+  /* ⚠ A new BOOLEAN would be ~21 more filters that can drift out of step with
+     not_a_sales_call. The reason column is never aggregated on. */
+  assert.ok(!/add column/i.test(sql), 'no new column — the reason rides the existing one');
+});
