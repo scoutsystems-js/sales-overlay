@@ -47,7 +47,15 @@ var VOYAGE_MODEL = 'voyage-3-lite'; // 512-dim; matches every existing row
 var { PERMANENT_STATUSES } = require('./model-retry');
 
 /** 3 attempts per page. Bounded deliberately: past this a 429 is not a blip,
- *  and every extra attempt delays an upload the caller is waiting on. */
+ *  and every extra attempt delays an upload the caller is waiting on.
+ *
+ *  ⚠⚠ A CALLER MAY ASK FOR ONE ATTEMPT, AND BULK WORK SHOULD. Measured against
+ *  the live 3 RPM ceiling: a page's three attempts fire inside ~1.5s and eat the
+ *  WHOLE minute's request budget, so the next page 429s even when it is paced
+ *  20s later. Under a per-minute REQUEST ceiling an inline retry is not merely
+ *  useless, it is actively counterproductive — it converts one failed page into
+ *  two. The request path still wants the retry (a genuine blip clears in
+ *  milliseconds); a paced backfill wants a single attempt and another pass. */
 var MAX_EMBED_ATTEMPTS = 3;
 
 /** Honour the provider's own Retry-After when it sends one, else back off
@@ -145,8 +153,10 @@ async function getVoyageEmbedding(text, label) {
 // rather than left to whatever the API happens to allow.
 var VOYAGE_MAX_INPUTS = 96;
 
-async function getVoyageEmbeddings(texts, label) {
+async function getVoyageEmbeddings(texts, label, opts) {
   var tag = label || 'kb';
+  var attempts = (opts && typeof opts.attempts === 'number' && opts.attempts > 0)
+    ? Math.min(opts.attempts, MAX_EMBED_ATTEMPTS) : MAX_EMBED_ATTEMPTS;
   if (!Array.isArray(texts) || texts.length === 0) return [];
   var out = new Array(texts.length).fill(null);
 
@@ -155,7 +165,7 @@ async function getVoyageEmbeddings(texts, label) {
     return out;
   }
   for (var start = 0; start < texts.length; start += VOYAGE_MAX_INPUTS) {
-    await embedPage(texts, out, start, Math.min(start + VOYAGE_MAX_INPUTS, texts.length), tag);
+    await embedPage(texts, out, start, Math.min(start + VOYAGE_MAX_INPUTS, texts.length), tag, attempts);
   }
   var missingTotal = out.filter(function (v) { return v === null; }).length;
   if (missingTotal > 0) {
@@ -169,10 +179,11 @@ async function getVoyageEmbeddings(texts, label) {
    REQUEST, so a paged mapping must add `start` — without it page two would
    overwrite page one's vectors and every embedding after the first page would
    belong to the wrong chunk, silently. */
-async function embedPage(texts, out, start, end, tag) {
+async function embedPage(texts, out, start, end, tag, maxAttempts) {
   var page = texts.slice(start, end);
+  var limit = maxAttempts || MAX_EMBED_ATTEMPTS;
 
-  for (var attempt = 1; attempt <= MAX_EMBED_ATTEMPTS; attempt++) {
+  for (var attempt = 1; attempt <= limit; attempt++) {
     try {
       var res = await fetch('https://api.voyageai.com/v1/embeddings', {
         method: 'POST',
@@ -185,10 +196,10 @@ async function embedPage(texts, out, start, end, tag) {
 
       if (!res.ok) {
         var kind = classifyEmbedStatus(res.status);
-        if (kind === 'temporary' && attempt < MAX_EMBED_ATTEMPTS) {
+        if (kind === 'temporary' && attempt < limit) {
           var wait = backoffMs(res, attempt);
           console.warn('[' + tag + '] Voyage HTTP ' + res.status + ' — retrying in ' + wait +
-                       'ms (attempt ' + attempt + '/' + MAX_EMBED_ATTEMPTS + ', ' + page.length + ' texts)');
+                       'ms (attempt ' + attempt + '/' + limit + ', ' + page.length + ' texts)');
           await sleep(wait);
           continue;
         }
@@ -218,10 +229,10 @@ async function embedPage(texts, out, start, end, tag) {
     } catch (err) {
       /* A network/timeout error is temporary by the same rule the model path
          uses: no status means a connection failure, not a rejection. */
-      if (attempt < MAX_EMBED_ATTEMPTS) {
+      if (attempt < limit) {
         var w = Math.min(500 * Math.pow(2, attempt - 1), MAX_BACKOFF_MS);
         console.warn('[' + tag + '] Voyage network error — retrying in ' + w + 'ms (attempt ' +
-                     attempt + '/' + MAX_EMBED_ATTEMPTS + '): ' + err.message);
+                     attempt + '/' + limit + '): ' + err.message);
         await sleep(w);
         continue;
       }

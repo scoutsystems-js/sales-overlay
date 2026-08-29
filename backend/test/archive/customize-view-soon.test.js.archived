@@ -1,3 +1,14 @@
+/* ⚠⚠ SUPERSEDED 2026-08-29 — THE FEATURE LANDED, so the marker these tests
+   pinned no longer exists. Archived rather than deleted so the REASONING for
+   the inert-span pattern survives for the next coming-soon marker; the
+   `.archived` suffix keeps it out of the test glob.
+
+   ⚠ ITS ONE SURVIVING PROPERTY WAS CONVERTED, NOT DROPPED: placement in the
+   team controls row beside Manage Members and Generate Summary is now asserted
+   in test/customize-view.test.js, which also pins that this placeholder is
+   gone. A coming-soon marker promises a LOCATION, and the real control had to
+   honour it. */
+
 /**
  * "CUSTOMIZE VIEW" — the coming-soon tag on the team controls row (2026-08-20).
  *

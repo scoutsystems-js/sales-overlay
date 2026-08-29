@@ -102,7 +102,8 @@ test('⚠ every new tab carries its own separator — nothing generates them', (
 test('⚠ dimming is by OPACITY, never a grey colour', () => {
   /* ⚠ ANCHOR UPDATED 2026-08-20: the rule was unscoped from `.top-bar-left
      .nav-soon` to `.nav-soon` when the coming-soon pattern gained a second
-     consumer outside the nav (Customize View, in the team controls row).
+     consumer outside the nav. (Customize View used it until the real control
+     shipped on 2026-08-29; the class stays general for the next marker.)
      ⚠⚠ THE ANCHOR ASSERTION BELOW IS WHY THAT WAS SAFE — it failed loudly with
      "stale anchor" instead of silently slicing an empty string and passing over
      nothing, which is exactly what this shape exists to prevent. */

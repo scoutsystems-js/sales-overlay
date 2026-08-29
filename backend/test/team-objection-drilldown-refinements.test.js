@@ -114,7 +114,7 @@ test('⚠⚠ the drilldown renders its controls IN the card, and drops the team-
     'the drilldown must NOT render its own picker — the company card above it does');
   assert.ok(ctrl.indexOf("datePickerHtml('team')") !== -1, 'the SAME date picker id as the team page');
   assert.ok(ctrl.indexOf('ensureTeamPicker()') !== -1, 'registered, or the calendar has no setter');
-  ['manageMembersBtnHtml', 'customizeViewSoonHtml'].forEach((b) => {
+  ['manageMembersBtnHtml', 'customizeViewHtml'].forEach((b) => {
     assert.strictEqual(ctrl.indexOf(b), -1, b + ' belongs on the team page, not here');
   });
 });
@@ -122,7 +122,7 @@ test('⚠⚠ the drilldown renders its controls IN the card, and drops the team-
 test('⚠ the buttons still exist on the MAIN team controls row', () => {
   // removing them from one page must not remove them from the app
   const main = slice('function teamControlsHtml', '\n  }');
-  ['manageMembersBtnHtml()', 'customizeViewSoonHtml()', 'summaryBtnHtml()'].forEach((b) => {
+  ['manageMembersBtnHtml()', 'customizeViewHtml()', 'summaryBtnHtml()'].forEach((b) => {
     assert.ok(main.indexOf(b) !== -1, b + ' must remain on the team page');
   });
 });

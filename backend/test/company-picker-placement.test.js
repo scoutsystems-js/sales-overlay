@@ -44,7 +44,7 @@ test('the controls row and the drilldown no longer render their own', () => {
   assert.ok(!/teamSelectHtml/.test(controls), 'the controls row still renders a picker');
   // ⚠ END ANCHOR MUST BE DISTINCTIVE — 'function ' matches the START anchor
   // itself, giving an empty slice that passes every negative assertion vacuously.
-  const drill = slice('function objDrillControlsHtml()', 'function customizeViewSoonHtml', 150);
+  const drill = slice('function objDrillControlsHtml()', 'function customizeViewHtml', 150);
   assert.ok(!/teamSelectHtml/.test(drill),
     'the drilldown still renders its own — with the header it would show TWO');
 });
@@ -54,7 +54,7 @@ test('the date picker survived the move', () => {
   // three pages. The picker leaving must not take anything else with it.
   const controls = slice('function teamControlsHtml()', 'function objDrillControlsHtml', 200);
   assert.ok(/datePickerHtml\('team'\)/.test(controls), 'the controls row lost its date picker');
-  const drill = slice('function objDrillControlsHtml()', 'function customizeViewSoonHtml', 150);
+  const drill = slice('function objDrillControlsHtml()', 'function customizeViewHtml', 150);
   assert.ok(/datePickerHtml\('team'\)/.test(drill), 'the drilldown lost its date picker');
   assert.ok(/repFilterHost/.test(drill), 'the drilldown lost its rep filter');
 });

@@ -8617,7 +8617,7 @@
       + unconnectedBadgeHtml()
       // Justin's placement: title → gauges → picker → line graphs. The dials sit
       // ABOVE the picker because they do not answer to it.
-      + avgPanelHtml()
+      + (teamPanelVisible('gauges') ? avgPanelHtml() : '')
       /* MOVED TO THE TOP 2026-08-19 (Justin): the digest was the LAST section on
          the page, below the three score lists. It now sits directly under the
          gauges.
@@ -8630,7 +8630,7 @@
          chips, so two adjacent date controls would read as one.
          The rule this page now follows: everything ABOVE the picker is a fixed
          window; everything below answers to it. */
-      + '<div class="section fade-in"><div class="section-header"><h2>Manager Daily Digest</h2></div>' + teamDigestHtml() + '</div>'
+      + (teamPanelVisible('digest') ? '<div class="section fade-in"><div class="section-header"><h2>Manager Daily Digest</h2></div>' + teamDigestHtml() + '</div>' : '')
       + teamControlsHtml()
       /* REMOVED 2026-08-16 — Justin asked twice: the glance stat card between the
          picker and the graphs is gone. Its Cash Collected / Close Rate /
@@ -8640,22 +8640,27 @@
          restoring the card is re-adding this one line — nothing else was ripped
          out. The equivalent numbers now live on the rep cards, per rep.
       + '<div class="section fade-in">' + teamAggregateHtml() + '</div>' */
-      + repSeriesSectionHtml()
+      + (teamPanelVisible('graphs') ? repSeriesSectionHtml() : '')
       // Justin, 2026-08-18: Team Recommendations sits directly UNDER the two
       // graphs. Layout only — the compact card, its data and its scoping are
       // untouched, and it still expands to the same dedicated page.
-      + '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>' + teamRecsCompactHtml() + '</div>'
-      + repCardsHtml()
-      + '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
+      + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>' + teamRecsCompactHtml() + '</div>' : '')
+      + (teamPanelVisible('reps') ? repCardsHtml() : '')
+      + (teamPanelVisible('needswork') ? '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>' : '')
+      + (teamPanelVisible('overview') ? '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
-        + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Closing Score</h2>'
+        + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>' : '')
+      + (teamPanelVisible('closing') ? '<div class="section fade-in"><div class="section-header"><h2>Closing Score</h2>'
         + '<div class="meta">avg Close-section score</div></div>'
-        + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Objection Handling Score</h2>'
+        + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>' : '')
+      + (teamPanelVisible('objection') ? '<div class="section fade-in"><div class="section-header"><h2>Objection Handling Score</h2>'
         + '<div class="meta">avg Objection-section score</div></div>'
-        + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>';
+        + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>' : '')
+      /* ⚠ HIDING EVERYTHING MUST SAY SO. The controls row still renders, so the
+         page is not blank — it is a header and a toolbar, which reads as a
+         broken page rather than as a choice. Same reason the graph legend says
+         so when every rep is hidden. */
+      + allPanelsHiddenNoteHtml();
       // (Manager Daily Digest was here; moved to the top — see above.)
 
     // Chart.js draws only after the assignment above has put the canvases in
@@ -10432,7 +10437,7 @@
     return '<div class="page-header fade-in team-controls-row">'
       + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
-        + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewSoonHtml() + '</div>'
+        + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewHtml() + '</div>'
     + '</div>';
   }
 
@@ -10487,9 +10492,161 @@
    * buttons with a gap — so adding one here would invent a divider the row has
    * never had. Checked in the rendered result, not assumed from the nav.
    */
-  function customizeViewSoonHtml() {
-    return '<span class="nav-link nav-soon" aria-disabled="true">Customize View'
-         + '<span class="nav-soon-tag">soon</span></span>';
+  /**
+   * THE PANELS A MANAGER MAY HIDE, in render order.
+   *
+   * ⚠⚠ THE STORED SET IS THE **HIDDEN** ONE, NEVER THE VISIBLE ONE, and that
+   * choice is the whole safety of this feature. Storing "what to show" means a
+   * panel added next month is absent for every existing manager, silently and
+   * permanently — they never asked to hide it and nothing tells them it exists.
+   * Storing "what to hide" makes a new panel VISIBLE by default and fails
+   * toward showing too much rather than too little. Same asymmetry as the
+   * opt-in-survival rule for pivot state: forgetting to list something costs a
+   * redundant panel, and the other direction costs a manager data they never
+   * chose to lose.
+   *
+   * ⚠ THE CONTROLS ROW AND THE UNCONNECTED BADGE ARE NOT IN THIS LIST, on
+   * purpose. The row carries this very control, so hiding it would strand a
+   * manager with no way back; and the badge is an EXCEPTION surface that
+   * already disappears by itself when there is nothing to report — an alert you
+   * can permanently switch off is not an alert.
+   */
+  var TEAM_PANELS = [
+    { key: 'gauges',    label: 'Team Averages' },
+    { key: 'digest',    label: 'Manager Daily Digest' },
+    { key: 'graphs',    label: 'Performance graphs' },
+    { key: 'recs',      label: 'Team Recommendations' },
+    { key: 'reps',      label: 'Rep cards' },
+    { key: 'needswork', label: 'What needs work' },
+    { key: 'overview',  label: 'Team Overview' },
+    { key: 'closing',   label: 'Closing Score' },
+    { key: 'objection', label: 'Objection Handling Score' }
+  ];
+  var TEAM_PANELS_KEY = 'scout_team_panels_v1';
+
+  /* Read once per session, then cached in state. ⚠ Unknown keys are DISCARDED
+     rather than kept: a panel that no longer exists must not sit in storage
+     hiding nothing, and a typo must not become permanent. */
+  function teamPanelsHidden() {
+    if (state.teamPanelsHidden) return state.teamPanelsHidden;
+    var h = {};
+    try {
+      var raw = localStorage.getItem(TEAM_PANELS_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          arr.forEach(function (k) {
+            if (TEAM_PANELS.some(function (p) { return p.key === k; })) h[k] = true;
+          });
+        }
+      }
+    } catch (e) { h = {}; }   // unreadable storage is "nothing hidden", never a crash
+    state.teamPanelsHidden = h;
+    return h;
+  }
+
+  function teamPanelVisible(key) { return !teamPanelsHidden()[key]; }
+
+  function saveTeamPanels() {
+    try {
+      localStorage.setItem(TEAM_PANELS_KEY,
+        JSON.stringify(Object.keys(state.teamPanelsHidden || {}).filter(function (k) {
+          return state.teamPanelsHidden[k];
+        })));
+    } catch (e) { /* a private window must not break the toggle */ }
+  }
+
+  function teamPanelToggle(key) {
+    var h = teamPanelsHidden();
+    if (h[key]) delete h[key]; else h[key] = true;
+    saveTeamPanels();
+    renderTeamView();
+  }
+
+  function teamPanelsAll(show) {
+    var h = teamPanelsHidden();
+    Object.keys(h).forEach(function (k) { delete h[k]; });
+    if (!show) TEAM_PANELS.forEach(function (p) { h[p.key] = true; });
+    saveTeamPanels();
+    renderTeamView();
+  }
+
+  function customizeViewMenuToggle() {
+    if (state.customizeOpen) customizeViewClose(); else customizeViewOpen();
+  }
+  function customizeViewOpen() {
+    state.customizeOpen = true;
+    renderTeamView();
+    document.addEventListener('click', customizeViewOutsideClick);
+  }
+  function customizeViewClose() {
+    if (!state.customizeOpen) return;
+    state.customizeOpen = false;
+    document.removeEventListener('click', customizeViewOutsideClick);
+    renderTeamView();
+  }
+  /* ⚠ CONTAINMENT, not stopPropagation on every row. Asking WHERE the click
+     landed cannot be defeated by phase or ordering — the capture-phase bug the
+     rep filter shipped with, avoided by construction. */
+  function customizeViewOutsideClick(e) {
+    var t = e && e.target;
+    if (t && t.closest && t.closest('.customize-wrap')) return;
+    customizeViewClose();
+  }
+  function customizeViewKeydown(e, key) {
+    if (e.key === 'Escape') { e.preventDefault(); customizeViewClose(); return; }
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();          // Space would scroll the page under the open menu
+    if (key === null) customizeViewMenuToggle();
+    else if (key === '__all') teamPanelsAll(true);
+    else if (key === '__none') teamPanelsAll(false);
+    else teamPanelToggle(key);
+  }
+
+  function allPanelsHiddenNoteHtml() {
+    var hidden = teamPanelsHidden();
+    if (TEAM_PANELS.some(function (p) { return !hidden[p.key]; })) return '';
+    return '<div class="section fade-in"><div class="meta">'
+      + 'Every panel on this page is hidden. Use Customize View above to bring them back.'
+      + '</div></div>';
+  }
+
+  function customizeViewHtml() {
+    var hidden = teamPanelsHidden();
+    var shown = TEAM_PANELS.filter(function (p) { return !hidden[p.key]; }).length;
+    var on = shown !== TEAM_PANELS.length;
+    var label = on ? (shown + ' of ' + TEAM_PANELS.length + ' panels') : 'Customize View';
+    var open = !!state.customizeOpen;
+    /* ⚠ ROWS STAY IN THE LIST WHEN HIDDEN — removing one would make absent and
+       excluded look alike, which is how a manager loses track of what exists. */
+    var rows = TEAM_PANELS.map(function (p) {
+      var isHidden = !!hidden[p.key];
+      return '<div class="rep-filter-row" role="option" tabindex="0"'
+        + ' aria-selected="' + (isHidden ? 'false' : 'true') + '"'
+        + ' onclick="event.stopPropagation(); teamPanelToggle(\'' + p.key + '\');"'
+        + ' onkeydown="customizeViewKeydown(event, \'' + p.key + '\');">'
+        + '<span class="rep-filter-check">' + (isHidden ? '\u2610' : '\u2611') + '</span>'
+        + '<span class="rep-filter-name">' + escapeHtml(p.label) + '</span>'
+      + '</div>';
+    }).join('');
+    var actions = '<div class="rep-filter-actions">'
+      + '<div class="rep-filter-row rep-filter-action" role="option" tabindex="0" aria-selected="false"'
+        + ' onclick="event.stopPropagation(); teamPanelsAll(true);"'
+        + ' onkeydown="customizeViewKeydown(event, \'__all\');">Show all</div>'
+      + '<div class="rep-filter-row rep-filter-action" role="option" tabindex="0" aria-selected="false"'
+        + ' onclick="event.stopPropagation(); teamPanelsAll(false);"'
+        + ' onkeydown="customizeViewKeydown(event, \'__none\');">Hide all</div>'
+    + '</div>';
+    return '<div class="customize-wrap rep-filter-wrap">'
+      + '<button type="button" class="user-select rep-filter' + (on ? ' rep-filter-on' : '') + '"'
+        + ' aria-haspopup="listbox" aria-expanded="' + (open ? 'true' : 'false') + '"'
+        + ' aria-label="Choose which panels this page shows"'
+        + ' onclick="event.stopPropagation(); customizeViewMenuToggle();"'
+        + ' onkeydown="customizeViewKeydown(event, null);">'
+        + escapeHtml(label) + '<span class="rep-filter-caret">\u25be</span></button>'
+      + (open ? '<div class="rep-filter-menu" role="listbox" aria-multiselectable="true">'
+                 + rows + actions + '</div>' : '')
+    + '</div>';
   }
 
   // "Manage members" opens the hidden #team-members page (not on the page itself).
