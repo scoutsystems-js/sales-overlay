@@ -159,7 +159,7 @@ async function cachePut(admin, keyId, type, from, to, hash, synthesis) {
 }
 
 // ── Team recommendations ─────────────────────────────────────────────────────
-async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailMap) {
+async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailMap, nameMap) {
   if (!repIds || repIds.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
   var w = await loadTeamWindow(admin, repIds, from, to);
   if (w.callIds.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
@@ -192,7 +192,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     SECTIONS.forEach(function (s) { var v = a[s + '_score']; if (typeof v === 'number') { secSum[s] += v; secN[s]++; } });
     if (typeof a.overall_score === 'number') { if (a.outcome === 'closed') { winSum += a.overall_score; winN++; } else if (a.outcome === 'lost') { lossSum += a.overall_score; lossN++; } }
     if (typeof a.one_thing === 'string' && a.one_thing.trim() && oneThings.length < MAX_ONE_THINGS) {
-      var em = emailMap && emailMap[repOf(a.fathom_call_id)]; oneThings.push((em ? displayNameFromEmail(em) + ': ' : '') + a.one_thing.trim());
+      var rid0 = repOf(a.fathom_call_id); var nm0 = nameMap && nameMap[rid0]; var em = emailMap && emailMap[rid0]; oneThings.push((nm0 ? nm0 + ': ' : em ? displayNameFromEmail(em) + ': ' : '') + a.one_thing.trim());
     }
   });
   var sections = {}, strongest = null, weakest = null;
@@ -209,7 +209,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
   var candidates = hlRows.map(function (r) {
     var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
-    return { cls: c, type: r.type, rep: (emailMap && emailMap[rid]) || rid,
+    return { cls: c, type: r.type, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
       quote: str(displayCloserResponse(r.closer_response), 200) || str(r.quote, 200) || '',   // sentinel-gated
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
       source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
@@ -264,7 +264,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
 
 // ── Call Highlights of the Week ──────────────────────────────────────────────
 var LANES = ['objection_handling', 'challenging', 'pain_excavation'];
-async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap) {
+async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap, nameMap) {
   if (!repIds || repIds.length === 0) return { available: true, lanes: {}, generated_at: new Date().toISOString() };
   var w = await loadTeamWindow(admin, repIds, from, to);
   if (w.callIds.length === 0) return { available: true, lanes: {}, generated_at: new Date().toISOString() };
@@ -279,7 +279,7 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap)
   // coaching. The rate surfaces credit closed calls; these five do not.
   var cands = hlRows.filter(function (r) { return r.type === 'strong_moment' || r.resolution === 'handled'; }).map(function (r) {
     var rid = w.meta[r.fathom_call_id] ? w.meta[r.fathom_call_id].user_id : null;
-    return { type: r.type, rep: (emailMap && emailMap[rid]) || rid, rep_id: rid,
+    return { type: r.type, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid, rep_id: rid,
       quote: str(displayCloserResponse(r.closer_response), 220) || str(r.quote, 220) || '', observation: str(r.observation, 200) || '',
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
       source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,

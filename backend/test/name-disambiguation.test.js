@@ -81,3 +81,33 @@ test('the Calls rep picker names the person rather than showing a raw email', ()
   assert.ok(!/\(self \? 'Me — ' : ''\) \+ \(u\.email \|\| u\.user_id\)/.test(code),
     'the raw-email label must not come back');
 });
+
+/* ── the prose lanes, which are where an ambiguous label costs most ────────── */
+
+test('the prose lanes prefer the PROFILE name over the email-derived one', () => {
+  const nwSrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-needs-work.js'), 'utf8');
+  const synSrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
+  const strip = s => s.split('\n').filter(l => l.trim().indexOf('//') !== 0).join('\n')
+                      .replace(/\/\*[\s\S]*?\*\//g, '');
+  const nw = strip(nwSrc), syn = strip(synSrc);
+
+  /* ⚠ These two lanes fed a MODEL while naming people from their email — so
+     they said "Joshua" where the board said "Josh P". A model shortens what it
+     is given, which is exactly where an ambiguous label does damage. */
+  assert.ok(/computeTeamNeedsWork\(admin, keyId, repIds, from, to, emailMap, nameMap\)/.test(nw),
+    'needs-work must accept a name map');
+  assert.ok(/\(nameMap && nameMap\[rid\]\) \|\|/.test(nw),
+    'and prefer it over the email-derived name');
+
+  ['computeTeamRecommendations', 'computeWeeklyHighlights'].forEach(fn => {
+    assert.ok(new RegExp(fn + '\\(admin, keyId, repIds, from, to, emailMap, nameMap\\)').test(syn),
+      fn + ' must accept a name map');
+  });
+  // it used to hand the model a RAW EMAIL as the rep
+  assert.ok(!/rep: \(emailMap && emailMap\[rid\]\) \|\| rid,/.test(syn),
+    'a raw email must never be handed to the model as the rep name');
+
+  const team = strip(fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8'));
+  const calls = (team.match(/await nameMapFor\(admin, team\.memberIds, em\)/g) || []).length;
+  assert.ok(calls >= 5, 'every lane that names people must be passed the map, found ' + calls);
+});

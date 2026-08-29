@@ -797,6 +797,9 @@ router.post('/sessions/:session_id/extract-prospect-name', requireAuth, async fu
 // regimes — it will state confidence and skip patterns that aren't backed
 // by enough evidence.
 
+/* Shared with GET /admin/needs-work-sections/:user_id — a manager viewing a rep
+   must get THAT REP's section ranking. Same precedent as _computeSectionBreakdown. */
+router._computeNeedsWorkSections = computeNeedsWorkSections;
 router._computeCountsBySession = computeCountsBySession;
 router._computeDurationSeconds = computeDurationSeconds;
 router._extractLabelFromMatchMessage = extractLabelFromMatchMessage;

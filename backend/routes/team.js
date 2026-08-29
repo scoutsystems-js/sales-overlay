@@ -548,7 +548,7 @@ router.get('/recommendations', teamGate, async function (req, res) {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
-    var data = await computeTeamRecommendations(admin, team.keyId, team.memberIds, range.from, range.to, em);
+    var data = await computeTeamRecommendations(admin, team.keyId, team.memberIds, range.from, range.to, em, await nameMapFor(admin, team.memberIds, em));
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] recommendations:', err.message); res.status(500).json({ error: 'Failed to load team recommendations' }); }
 });
@@ -595,7 +595,7 @@ router.get('/needs-work', teamGate, async function (req, res) {
     var admin = getAdmin();
     var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
-    var data = await computeTeamNeedsWork(admin, team.keyId, team.memberIds, range.from, range.to, em);
+    var data = await computeTeamNeedsWork(admin, team.keyId, team.memberIds, range.from, range.to, em, await nameMapFor(admin, team.memberIds, em));
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] needs-work:', err.message); res.status(500).json({ error: 'Failed to load what-needs-work' }); }
 });
@@ -610,7 +610,7 @@ router.get('/highlights', teamGate, async function (req, res) {
     if (req.query.week && !isNaN(Date.parse(req.query.week))) { weekFrom = new Date(req.query.week); }
     else { var now = new Date(); var day = (now.getUTCDay() + 6) % 7; weekFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day)); }
     weekTo = new Date(weekFrom.getTime() + 7 * 24 * 60 * 60 * 1000);
-    var data = await computeWeeklyHighlights(admin, team.keyId, team.memberIds, weekFrom.toISOString(), weekTo.toISOString(), em);
+    var data = await computeWeeklyHighlights(admin, team.keyId, team.memberIds, weekFrom.toISOString(), weekTo.toISOString(), em, await nameMapFor(admin, team.memberIds, em));
     res.json(Object.assign({ week_from: weekFrom.toISOString(), week_to: weekTo.toISOString() }, data));
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] highlights:', err.message); res.status(500).json({ error: 'Failed to load highlights' }); }
 });

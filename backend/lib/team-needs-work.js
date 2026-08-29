@@ -439,7 +439,7 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
 // ── DB + cache + Claude-mapping wrapper ─────────────────────────────────────
 // Same envelope family as the other lanes: {available, cached?, ...core} or
 // {available:false, reason} (NOT cached) on a Claude/DB failure.
-async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
+async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap, nameMap) {
   if (!repIds || repIds.length === 0) {
     return Object.assign({ available: true, cached: false }, computeNeedsWork([], [], {}));
   }
@@ -468,7 +468,11 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap) {
       handled: isHandled(r, outcomeByCall[r.fathom_call_id]),
       quote: str(r.quote, 300),
       observation: str(r.observation, 240),
-      rep: (emailMap && emailMap[rid] ? displayNameFromEmail(emailMap[rid]) : null),
+      /* ⚠ THE PROFILE NAME FIRST. Deriving from the email says "Joshua" where
+         the board says "Josh P" — and this lane feeds a MODEL, so an ambiguous
+         label is the one that survives being shortened. The email is only a
+         fallback for someone with no profile name. */
+      rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid] ? displayNameFromEmail(emailMap[rid]) : null),
       clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
       source: srcOf(r.fathom_call_id),
     };

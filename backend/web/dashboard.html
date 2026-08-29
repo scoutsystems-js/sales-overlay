@@ -6758,7 +6758,12 @@
     state.sectionRankLoading = true;
     try {
       var qs = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
-      var res = await fetch('/me/needs-work-sections?' + qs, { headers: authHeader() });
+      /* ⚠ SCOPED LIKE EVERY SIBLING LANE. This fetched /me/... unconditionally
+         on a panel that is REP PAGE ONLY, so a manager opening any rep saw
+         THEIR OWN ranking — the same content on every rep. */
+      var base = isSelf() ? '/me/needs-work-sections'
+                          : '/admin/needs-work-sections/' + encodeURIComponent(state.viewingUserId);
+      var res = await fetch(base + '?' + qs, { headers: authHeader() });
       state.sectionRank = res.ok ? await res.json() : { _error: 'HTTP ' + res.status };
     } catch (e) { state.sectionRank = { _error: (e && e.message) || 'unknown' }; }
     state.sectionRankLoading = false;

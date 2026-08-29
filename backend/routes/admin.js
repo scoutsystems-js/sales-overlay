@@ -1171,6 +1171,45 @@ router.get('/needs-work/:user_id', requireAuth, requireRole(['manager', 'owner']
   }
 });
 
+/**
+ * GET /admin/needs-work-sections/:user_id — "what part of the sales process
+ * needs work", for a manager viewing a rep.
+ *
+ * ⚠⚠ THE GAP THIS CLOSES, AND IT IS JUSTIN'S BUG: the client fetched
+ * `/me/needs-work-sections` with NO scope choice, on a panel whose own comment
+ * says "REP PAGE ONLY". So a manager opening any rep saw THEIR OWN section
+ * ranking — identical for every rep, which is exactly what was reported.
+ *
+ * ⚠ NOT a team-scoped lane and NOT stale state: the population was the VIEWER.
+ * Every other lane on that page already chose isSelf(); this one never asked.
+ *
+ * ⚠ It hid behind the 20 Aug pivot bug — while the panel showed the PREVIOUS
+ * rep's data, nobody could tell it was also showing the wrong person's.
+ */
+router.get('/needs-work-sections/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  var to = req.query.to || new Date().toISOString();
+  var from = req.query.from || new Date(Date.now() - 30 * 86400000).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to))) return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
+  try {
+    var admin = getAdminClient();
+    // the same scope predicate every other pivot route uses — never a second one
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
+      var t = await loadTargetProfile(admin, targetUserId);
+      if (!t || t.managed_by !== req.user.id) {
+        console.warn('[admin] Scope violation on needs-work-sections: actor=%s target=%s', req.user.id, targetUserId);
+        return res.status(403).json({ error: 'Not authorized for that user' });
+      }
+    }
+    var meRoutes = require('./me');
+    return res.json(await meRoutes._computeNeedsWorkSections(admin, targetUserId, from, to));
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] needs-work-sections error:', err.message);
+    return res.status(500).json({ error: 'Could not load the section ranking' });
+  }
+});
+
 // ── POST /admin/needs-work/:user_id/bucket — per-call bucket evidence (pivot) ─
 router.post('/needs-work/:user_id/bucket', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   var targetUserId = req.params.user_id;
