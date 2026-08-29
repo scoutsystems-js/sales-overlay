@@ -1,5 +1,21 @@
 require('dotenv').config();
 var { createClient } = require('@supabase/supabase-js');
+var { getVoyageEmbeddings, embeddingCapability } = require('../backend/lib/voyage');
+
+/**
+ * ⚠⚠ THIS USED TO SEED ROWS WITH NO EMBEDDING — the same code fault as
+ * seed-frameworks.js. A row written that way is PRESENT in the table and
+ * PERMANENTLY INVISIBLE to similarity search, which is the worst kind of
+ * defect to leave in a seed: nothing errors and nobody looks.
+ *
+ * ⚠ IT REFUSES TO RUN WITHOUT THE CAPABILITY, which is the opposite of the
+ * LIVE path's rule and deliberately so. On the live path a row must still be
+ * written unembedded rather than lost, because losing a real call moment is
+ * worse. Here nothing is lost by stopping — re-run the seed — and silently
+ * unsearchable rows are the entire defect. `--no-embeddings` is the explicit
+ * escape for anyone who genuinely wants them.
+ */
+var SKIP_EMBEDDINGS = process.argv.indexOf('--no-embeddings') !== -1;
 
 var supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
@@ -128,10 +144,30 @@ var entries = [
 ];
 
 async function seed() {
+  if (!SKIP_EMBEDDINGS) {
+    var cap = embeddingCapability();
+    if (!cap.ok) {
+      console.error('REFUSING TO SEED: ' + cap.reason);
+      console.error('Every row would be written unsearchable. Re-run with the key set,');
+      console.error('or pass --no-embeddings if you genuinely want rows without them.');
+      process.exit(1);
+    }
+  }
+
   console.log('Seeding knowledge base with ' + entries.length + ' entries...');
+
+  /* ONE batched request for the whole seed, never one per row — a per-item loop
+     is what rate-limits, and the contract returns an array the SAME LENGTH as
+     the input so it can be indexed positionally. */
+  var vectors = SKIP_EMBEDDINGS
+    ? entries.map(function () { return null; })
+    : await getVoyageEmbeddings(entries.map(function (e) { return e.content; }), 'seed-knowledge-base');
+
+  var unembedded = 0;
 
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
+    if (!SKIP_EMBEDDINGS && !vectors[i]) unembedded++;
     var result = await supabase
       .from('knowledge_base')
       .insert({
@@ -140,6 +176,7 @@ async function seed() {
         content: e.content,
         triggers: e.triggers,
         metadata: e.metadata,
+        embedding: vectors[i] || null,
       });
 
     if (result.error) {
@@ -150,6 +187,12 @@ async function seed() {
   }
 
   console.log('\nDone! Knowledge base seeded.');
+  /* ⚠ SAY IT rather than letting it pass — an unembedded row looks identical to
+     an embedded one in the table, and this is the only moment it is visible. */
+  if (unembedded > 0) {
+    console.error('⚠ ' + unembedded + ' row(s) were written WITHOUT an embedding — '
+      + 'they are keyword-searchable only and invisible to similarity search.');
+  }
 }
 
 seed();

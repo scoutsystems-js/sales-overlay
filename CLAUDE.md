@@ -3224,6 +3224,26 @@ grep -rn "recording_url.*?t="                   # the EXPECTED SHAPE — found s
   - **✅ FOURTH INSTANCE, AND THE FIRST CAUGHT BEFORE IT WAS REPORTED AS A PROBLEM (2026-08-18).** A post-deploy check flagged two pastel hexes as *"still present"* after the ramp went vivid. Re-scoped to the ramp instead of the whole document, the ramp held exactly its seven new entries — the hits were `#c4b5fd` on a **KB category badge** (an unrelated taxonomy palette) and `#22d3ee` as the **`--cyan` token**, the objection-category colours, and the comment naming the pastel it replaced. **Cost of the catch: one extra command.**
   - **⚠ RECORD THE CATCHES, NOT ONLY THE FAILURES — A RULE THAT STOPS A MISTAKE PRODUCES NOTHING.** No incident, no fix, no diff, nothing to point at: **it looks exactly like the rule was never needed.** Three instances here are damage and the fourth is the rule working, and without the fourth written down this entry reads as a list of past mistakes rather than as a practice that pays for itself. **Every rule in this file has the same problem — the evidence for keeping it is invisible by construction.**
 
+### ⚠⚠ "FIVE SCRIPTS LACK A REFERENCE" AND "FIVE SCRIPTS HAVE THE DEFECT" ARE DIFFERENT CLAIMS — I FILED THE SECOND AND MEASURED THE FIRST (2026-08-29)
+**I reported "all five seed scripts had zero embedding references". True, and it named four files as needing a fix when only ONE did.**
+```
+seed-client-ssi.js          2-line retired stub — writes NOTHING
+seed-client-globalbanks.js  2-line retired stub — writes NOTHING
+clear-and-reseed.js         only DELETES — cannot write a blind row
+seed-knowledge-base.js      17 inserts, no embedding   <- the one real case
+```
+- **⚠⚠ THE GREP WAS CORRECT AND THE CLAIM WAS WIDER THAN IT.** *Lacking a reference* is a property of the text; *writing an unembedded row* is a property of the behaviour. **A file that inserts nothing cannot have the defect**, so counting absent references over-reports by however many files do not write.
+- **THE FIX IS TO ENUMERATE BY CAPABILITY: does this script INSERT into `knowledge_base`?** The guard now asks that instead of holding a list of four names — so a NEW seed script is caught automatically, and the three that do not write are pinned as non-writing *with the reason*, so nobody "fixes" them.
+- **⚠ CONFIRM THE GUARD FAILS BEFORE THE FIX, NOT AFTER.** Flipping the assertion from "these four are unfixed" to "anything that writes must embed" produced a failure naming `seed-knowledge-base.js` — which is what proves the guard can see the defect at all. A guard written after the fix has never been shown to detect anything.
+- Same family as the scope-vs-claim entries, and the reason it matters here is that acting on the wrong count would have meant editing three files that were already correct.
+
+### ⚠⚠ ADDING A KNOWN CASE TO A LIST IS NOT THE SAME ACT AS WEAKENING THE DEFAULT THAT LIST FALLS BACK TO (2026-08-29)
+**`failure-class` fails OPEN — an unrecognised reason is retryable — because wrongly declaring something permanent hides a recoverable call forever. That ruling is right and is not what the 45 calls are about.**
+- *"No transcript turns after normalize"* is **recognised, and its outcome is certain**: the fetch SUCCEEDS and returns an empty array because transcription was never enabled, so no retry can ever produce a transcript. **Moving it to the permanent list narrows nothing about the DEFAULT** — an unknown reason stays retryable exactly as before.
+- **THE MEASURED CONSEQUENCE OF LEAVING IT: 47 "can be retried" / 5 "cannot be graded" becomes 1 / 51.** One user alone goes from 41 invitations to retry to 41 honest "cannot be graded".
+- **⚠ AND THE PERMANENT BUCKET'S OWN TOOLTIP ALREADY DESCRIBES THE CASE VERBATIM** — *"the recording has no transcript... Retrying will not help."* **The copy is already right; only the classification puts them on the wrong side**, which is a strong sign the case belongs there.
+- **THE TRANSFERABLE PART: when a fix looks like it re-opens a ruling, check whether it changes the RULE or adds an INSTANCE.** Stating that distinction is what turns "I stopped because this is yours" into a question the architect can actually answer.
+
 ### ⚠⚠ A DATA FIX MUST NOT STAND IN FOR A CODE FIX — AND THE BACKFILL WOULD HAVE HIDDEN THE FAULT (2026-08-29)
 **The 170 seeded framework rows were backfilled and every one now has an embedding. `scripts/seed-frameworks.js` still contained NO embedding code, so the very next seed would have recreated the gap — with the evidence of the last one already tidied away.**
 - **⚠⚠ AND IT WAS WIDER THAN FILED: ALL FIVE seed scripts had zero embedding references**, not the one that was named. The named one is fixed; **the other four are PINNED BY A TEST** so the gap is found rather than rediscovered, and retiring one means updating the list and the row together.

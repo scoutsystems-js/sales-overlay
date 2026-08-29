@@ -77,8 +77,8 @@
 
 | item | state | what it needs |
 |---|---|---|
-| `🐛 BUG` **Four more seed scripts still write rows with NO embedding** | found 2026-08-29 — wider than filed | `seed-frameworks.js` was named and is FIXED (it now embeds in one batched request and refuses to run without the capability). ⚠ **But ALL FIVE seed scripts had zero embedding references**: `clear-and-reseed.js`, `seed-client-globalbanks.js`, `seed-client-ssi.js`, `seed-knowledge-base.js` still write rows that are present in the table and **permanently invisible to similarity search**. ⚠ **Pinned by `test/seed-embeddings.test.js`** so the gap is FOUND rather than rediscovered — fixing one means updating that list and this row together. **A data fix must not stand in for a code fix, and backfilling the rows would have hidden this.** |
-| `🐛 BUG` **45 permanently-ungradeable calls are offered to the user as "can be retried"** | found 2026-08-29 while measuring the single-call-retry row | `lib/failure-class` classifies **"No transcript turns after normalize"** as RETRYABLE. It is not: the fetch **SUCCEEDS and returns an empty array** because transcription was never enabled on those recordings, so no retry can ever produce a transcript. Measured: **52 errored calls → 47 shown as retryable, of which 45 are this.** ⚠⚠ **That is precisely the "a number that never reaches zero stops being read" failure the retryable/permanent split exists to prevent** — and the fail-open default put them on the wrong side. ⚠ The cost is worse than one wasted click, because the retry control is WINDOW-scoped: retrying one of them runs its whole window. ⚠ **NOT FIXED — the fail-open default was a deliberate ruling** (*wrongly declaring something permanent hides a recoverable call forever*), so narrowing it is re-opening that ruling rather than a tidy-up. |
+| `✅ FIXED` **The seed scripts — ONE wrote blind rows, not four. My previous filing was wrong.** | `seed-knowledge-base.js` fixed; the guard now enumerates by CAPABILITY | ⚠⚠ **I reported "all five seed scripts had zero embedding references", which was TRUE AND MISLEADING.** Measured: `seed-client-ssi.js` and `seed-client-globalbanks.js` are **2-line retired stubs that write nothing**, and `clear-and-reseed.js` **only DELETES**. Counting files that lack a reference is not the same as counting files that write blind rows, and only the second is a defect. **`seed-knowledge-base.js` was the one real case** (17 entries, no embedding) and now embeds in one batched request and refuses to run without the capability. ⚠ **The guard was rewritten to key on whether a script WRITES to `knowledge_base`**, so a new seed script is caught automatically rather than needing to be added to a list — and it was **confirmed failing, naming the script, BEFORE the fix.** |
+| `🔴 NEEDS JUSTIN` **45 permanently-ungradeable calls are offered to users as "can be retried"** | sharpened 2026-08-29 — this is a narrower question than it first looked | ⚠⚠ **THIS IS NOT "WEAKEN FAIL-OPEN". It is ADDING A KNOWN-PERMANENT CASE TO THE PERMANENT LIST.** The fail-open default exists so an *unrecognised* reason stays retryable; this reason is recognised and its outcome is certain — **the fetch SUCCEEDS and returns an empty array** because transcription was never enabled on the recording, so no retry can ever produce a transcript. Those are different acts. **What a user sees now → what they would see:** total **47 "can be retried" / 5 "cannot be graded"** → **1 / 51**. Gabriel alone goes from **41 can be retried** to **41 cannot be graded**. ⚠ **The permanent bucket's own tooltip already describes this case verbatim** — *"the recording has no transcript... Retrying will not help."* — so the copy is right and only the classification puts them on the wrong side. ⚠ The cost of leaving it is worse than a wasted click: the retry control is **window-scoped**, so acting on one runs its whole window, and a count that can never reach zero stops being read. **NOT CHANGED — Justin's ruling.** |
 | `✅ FIXED` **The embedding gap — THREE faults, and the provider named the one that mattered** | shipped `2ff890f`, deploy confirmed | ⚠⚠ **The "live and worsening" reading was WRONG and the correlation was a false lead.** Measured: **84 rows** were the harvest running in a LOCAL shell with **no `VOYAGE_API_KEY`** (the embedded/null boundary flips FOUR MINUTES apart — no rate limit does that, two execution environments do); **299 rows** were partial failure under concurrent grading; **170 seeded rows** are a DIFFERENT fault entirely — `seed-frameworks.js` has never contained embedding code. ⚠⚠ **Then the 429 body said it outright: the Voyage account has NO PAYMENT METHOD, so it is capped at `3 RPM and 10K TPM`** — a hard ceiling no retry can defeat (see NEEDS JUSTIN). **Shipped:** bounded retry reusing `model-retry`'s `PERMANENT_STATUSES`; `embeddingCapability()` so a bulk runner refuses to start without the key; `no_capability` vs provider failure distinguished and logged loudly; `unembedded_moments` in the health snapshot. ⚠ **A retry is COUNTERPRODUCTIVE under a per-minute ceiling** — it spends the whole minute's budget on one page (measured 143 written / 134 failed), so bulk callers pass `{ attempts: 1 }`. |
 2026-08-27   113 moments,   0 unembedded
 2026-08-28    42 moments,  39 unembedded  (93%)
@@ -101,6 +101,43 @@
 ---
 
 ## ▪ FEATURES — MINOR
+
+### ⚠⚠ MINOR IS **NOT** FINISHED — definitive status, 2026-08-29. 33 rows, every one classified.
+
+**Do not infer completion from rows running out. Eight rows are genuinely buildable today.**
+
+**✅ DONE / NO ACTION (12)** — shipped, ruled, or answered as observations:
+single-call retry (answered: ~5 calls would use it) · failure history (answered: 0 overwrites so far, trigger named) · qualification aggregation (needs a stable key first) · three concurrent loops · "on no team" (ruled + applied) · message must establish its cause (ruled) · shared styling affordance (swept) · **Customize View (shipped)** · **section drilldown surfacing (shipped)** · login page (2 of 3 closed, the third is a recorded choice) · **self-serve forgot/reset — ALREADY BUILT, the row was stale** · Godwin partial objections (coaching)
+
+**🔴 NEEDS A RULING FROM JUSTIN (6)** — nothing can start until each is answered:
+| row | the question |
+|---|---|
+| offer-price permissions | ruled in principle, **not built** — and row 33 (Time to Price) is blocked on it |
+| harvest gate | supersedes KB ruling 4; open: extra model calls, and what stops a weak moment being kept once the closed filter goes |
+| Fathom → `call_connections` cutover | the hold's stated reason is **stale** (Scout is approved); reopening a live-token migration is deliberate |
+| reviewer demo-data cleanup | same hold, same question |
+| delete 6 orphan auth accounts | accepted as-is; needs an explicit go |
+| old "Objection Handling Focus" panel | keep or retire — it carries three things the drilldown does not |
+
+**🎨 BLOCKED ON AN ASSET (2)** — no code can start:
+nav wordmark (needs a redrawn small-size mark — scaling cannot fix it, measured) · new Scout Systems logo (needs the SVG)
+
+**⛔ BLOCKED ON DATA OR OTHER WORK (5)**:
+Cash tile → EOD (**verified: EOD is still self-only**) · 8c/8d barrier link (needs ≥2 uncovered areas per call; currently 0/1/1) · role-inversion detector (n=2 labelled calls) · shape (b) missed cue (needs a purpose-built signal + a ruling) · Time to Price (blocked on the offer-price row above)
+
+**🟢 GENUINELY BUILDABLE NOW (8)**:
+| row | note |
+|---|---|
+| Slack connect | EOD one-click send + manager digests. **Verified genuinely unbuilt** — the only "slack" hits in the tree are the word in prose about budget slack |
+| Zoom sub-stage 4 | webhook + polling + connect UI. **0 refs today.** Justin already filed the connect-time guidance as high priority |
+| modals for user-management confirms | **16 dialogs, not 2.** Native dialogs block the harness, so those flows are human-only to verify until this lands — an argument FOR it |
+| `is_synthetic` column | the durable fix for synthetic-row identification; today it is an id-prefix convention |
+| settings toggle — background off | per-user, already ruled; **0 refs** |
+| first-run onboarding sequence | the get-started card exists; a fuller sequence needs scoping |
+| desktop persistent-login parity | designed and approved; ships with the next DMG |
+| exposure sweep guard | **not cheap** — needs a headless-browser devDependency this repo does not have |
+
+
 
 **⚠ Justin's queue order leads this section: admin rebuild part 2 → password page → Zoom.** Everything after those three is unordered.
 ### 1 · ADMIN VIEW REBUILD, PART 2 — around companies (filed 2026-08-24)
@@ -260,7 +297,7 @@ So **"at least 10 characters" is already the rule and is already enforced** — 
 | `▪ MINOR` Reviewer demo-data cleanup | Remove `demo-rv-*` rows | ⛔ same hold |
 | ✅ **Shared constants module — DONE 2026-08-29** | `lib/sales-constants.js` | ⚠ **THE ROW WAS HALF-STALE, and the correction matters: the SYNC CAP WAS NEVER DUPLICATED** — `routes/zoom` already imported it from `routes/fathom`. What was wrong there was the COUPLING (a route file importing another route file for a constant), not a second copy. Both now read the shared module. **The payment-structure allowlist genuinely existed three times**: `analysis-worker` (sanitising what the grader returns), `routes/eod` (validating what a human edits), and migration 022's CHECK. ⚠⚠ **Each JS copy had its OWN test, so a drift would have surfaced as one test failing and the other passing — never as a disagreement.** The SQL copy cannot import, so it is pinned textually, and the guard asserts every JS value is permitted by the constraint: adding one without a migration writes a row the database rejects. |
 | `✅ SHIPPED` **Section drilldown surfacing — "here are your best discovery moments"** | the rep's own proven lines in that section, from calls they CLOSED | ⚠ **The precondition was re-verified AFTER the backfill, not assumed from it finishing** — 2,395 of 2,395 rows embedded, 0 missing, checked against the database. ⚠⚠ **It selects by SECTION AND OWNER, never by similarity** — deterministic, explainable, no model call, and structurally immune to the unembedded-row problem that blocked it. ⚠ **Proven closer lines only**: harvested moments include prospect-spoken objections, and showing those would file the prospect's words as the rep's winning material (6b repaired exactly that once). ⚠ All-time while the rest of the page is windowed, so the **label carries the scope**. Admin pivot inherits scoping by construction. |
-| `▪ MINOR` Self-serve forgot/reset | No reset UI exists anywhere | front-door arc |
+| `✅ ALREADY BUILT — the row was STALE, corrected 2026-08-29` **Self-serve forgot/reset** | verified live, not inferred | The row read *"No reset UI exists anywhere"*. It does: `POST /auth/forgot-password` is mounted and validating (400 on an empty body), `/set-password` returns 200, and `login.html` carries a **Forgot password?** control plus a self-service reset section. ⚠ **Sixth instance of the stale-row pattern** — something shipped and nothing re-read the row that says it did not exist. |
 | `▪ MINOR` Onboarding sequence for a first-run user | | front-door arc |
 | `▪ MINOR` Slack connect | EOD one-click send + manager digests | |
 | `▪ MINOR` **Modals for user-management confirms — BIGGER THAN FILED, measured 2026-08-29** | ⛔ **STOPPED AND REPORTED, not started** | The row reads *"email-change + delete still use `prompt()`"* — two places. **Measured: 16 native dialogs across `admin.html` and `dashboard.html`** — deactivate, reactivate, delete a user, delete a company (with its typed confirmation), change email, disconnect a provider, merge prospects, delete a KB source, and the copy-to-clipboard fallbacks. ⚠⚠ **DOING ONLY THE TWO WOULD BE WORSE THAN EITHER EXTREME: two confirmation styles inside the SAME admin table.** So it is a reusable modal plus a rewiring of every destructive flow, not a polish edit. ⚠ **THE TYPED CONFIRMATION MUST SURVIVE** — it was deliberately restored after being removed as "redundant friction", and the reasoning that removal cited (delete is owner-only AND zero-history-gated) no longer holds since the gate went. ⚠ **A real benefit worth recording: native dialogs BLOCK the browser harness**, so today these flows can only be verified by a human. Modals would make them click-testable. |

@@ -51,18 +51,43 @@ test('an unembedded row is REPORTED rather than passing silently', () => {
     'the only moment an unembedded row is visible is at write time — say so');
 });
 
-/* ⚠⚠ THE OTHER FOUR SEED SCRIPTS SHARE THE FAULT AND ARE FILED, NOT FIXED.
-   This test PINS the list, so a future session finds a failing check naming
-   them rather than rediscovering the gap. Fixing one and moving the count down
-   is the intended way to retire it. */
-test('the remaining seed scripts that still write unembedded rows are pinned', () => {
-  const unfixed = ['clear-and-reseed.js', 'seed-client-globalbanks.js',
-                   'seed-client-ssi.js', 'seed-knowledge-base.js'];
-  const still = unfixed.filter(f => {
-    const p = path.join(ROOT, 'scripts', f);
-    if (!fs.existsSync(p)) return false;
-    return !/getVoyageEmbeddings/.test(code(p));
+/* ⚠⚠ ENUMERATE BY CAPABILITY, NOT BY A HARDCODED LIST. The question is not
+   "are these four named files fixed" — it is "does anything that WRITES to
+   knowledge_base do so without an embedding". A list goes stale the moment
+   someone adds a seed script; this predicate catches it automatically.
+
+   ⚠ AND IT IS WHAT CORRECTED MY OWN FILING. The previous block reported "all
+   five seed scripts had zero embedding references", which was true and
+   misleading: two are 2-line dead stubs and a third only DELETES. Counting
+   files that lack a reference is not the same as counting files that write
+   blind rows, and only the second is a defect. */
+test('every script that WRITES to knowledge_base embeds what it writes', () => {
+  const dir = path.join(ROOT, 'scripts');
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.js'));
+  assert.ok(files.length >= 4, 'no scripts found — the check is not measuring');
+
+  const writers = files.filter(f => {
+    const src = code(path.join(dir, f));
+    return /\.from\(['"]knowledge_base['"]\)[\s\S]{0,120}\.insert\(/.test(src);
   });
-  assert.deepStrictEqual(still.sort(), unfixed.sort(),
-    'a seed script changed state — update this list and the BUILD-LIST row together');
+  assert.ok(writers.length >= 1, 'no writers found — the predicate is broken, not the scripts');
+
+  const blind = writers.filter(f => !/getVoyageEmbeddings/.test(code(path.join(dir, f))));
+  assert.deepStrictEqual(blind, [],
+    'these write knowledge_base rows with no embedding — present in the table and '
+    + 'permanently invisible to similarity search: ' + blind.join(', '));
+});
+
+/* ⚠ The three that do NOT write are recorded here so nobody "fixes" them and so
+   the distinction survives: two are retired stubs, one only clears. */
+test('the non-writing scripts are non-writing for a stated reason', () => {
+  const dir = path.join(ROOT, 'scripts');
+  ['seed-client-ssi.js', 'seed-client-globalbanks.js'].forEach(f => {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    assert.ok(/no longer used/i.test(src), f + ' should say it is retired');
+    assert.ok(!/\.insert\(/.test(code(path.join(dir, f))), f + ' must not write');
+  });
+  const clear = code(path.join(dir, 'clear-and-reseed.js'));
+  assert.ok(/\.delete\(\)/.test(clear), 'clear-and-reseed should delete');
+  assert.ok(!/\.insert\(/.test(clear), 'clear-and-reseed must not insert — it only clears');
 });
