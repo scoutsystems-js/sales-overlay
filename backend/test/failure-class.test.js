@@ -85,3 +85,43 @@ test('a missing call date does not make something permanent', () => {
   assert.strictEqual(FC.classifyFailure(r, null), 'permanent',
     'with no age, zoom-retry refuses to requeue — so it is not worth a button');
 });
+
+/* ── (a) 2026-08-29: an empty transcript after a SUCCESSFUL fetch ─────────── */
+
+test('⚠⚠ an empty-transcript-after-successful-fetch is PERMANENT, not retryable', () => {
+  /* THIS IS AN INSTANCE ADDED TO THE PERMANENT LIST, NOT A NARROWING OF THE
+     FAIL-OPEN DEFAULT. The default exists so an UNRECOGNISED reason stays
+     retryable; this reason is recognised and its outcome is certain — the fetch
+     SUCCEEDED and returned an empty array because transcription was never
+     enabled on the recording, so no retry can ever produce a transcript.
+
+     Measured when this shipped: 47 "can be retried" / 5 "cannot be graded"
+     across the platform became 1 / 51. One user alone was being offered 41
+     retries that could never work, and the retry control is WINDOW-scoped, so
+     acting on one runs its whole window. */
+  var real = 'No transcript turns after normalize (recording_id 17abc; fetched 0 raw turn(s)). First raw turn: none';
+  assert.strictEqual(FC.classifyFailure(real, '2026-08-01T00:00:00Z'), 'permanent');
+});
+
+test('⚠ the FAIL-OPEN DEFAULT IS UNCHANGED — an unknown reason is still retryable', () => {
+  /* The guard that proves this is an instance and not a rule change. */
+  [
+    'Something nobody has seen before',
+    'Claude API call failed: HTTP 529 overloaded',
+    'Section grader returned unparseable JSON',
+    ''
+  ].forEach(function (r) {
+    assert.strictEqual(FC.classifyFailure(r, '2026-08-01T00:00:00Z'), 'retryable',
+      'unrecognised/transient must stay retryable: ' + JSON.stringify(r));
+  });
+});
+
+test('⚠ zoom-retry still OWNS the zoom-pending case — the new rule must not shadow it', () => {
+  /* "not ready yet" and "was never recorded" are textually identical for Zoom,
+     and only AGE separates them. That judgement stays in one place. */
+  var pending = 'zoom_no_transcript: code 3301 still being processed';
+  var fresh = new Date(Date.now() - 3600e3).toISOString();
+  var old = new Date(Date.now() - 90 * 864e5).toISOString();
+  assert.strictEqual(FC.classifyFailure(pending, fresh), 'retryable', 'a young zoom call is still worth a look');
+  assert.strictEqual(FC.classifyFailure(pending, old), 'permanent', 'past the window it is not');
+});

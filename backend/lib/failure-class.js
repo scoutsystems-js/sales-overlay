@@ -49,6 +49,23 @@ function classifyFailure(reason, callDate) {
     return zoomRetry.withinRetryWindow(callDate, new Date()) ? 'retryable' : 'permanent';
   }
 
+  /* ⚠⚠ AN EMPTY TRANSCRIPT AFTER A SUCCESSFUL FETCH IS PERMANENT (2026-08-29).
+     The provider ANSWERED and returned an empty array — transcription was never
+     enabled on that recording — so no retry can ever produce turns. Before this,
+     45 such calls sat in the retryable count: one account alone was offered 41
+     retries that could never work, and the retry control is WINDOW-scoped, so
+     acting on one runs its whole window.
+
+     ⚠ THIS IS AN INSTANCE ADDED TO THE PERMANENT LIST, NOT A NARROWING OF THE
+     FAIL-OPEN DEFAULT ABOVE. That default protects UNRECOGNISED reasons; this
+     one is recognised and its outcome is certain. An unknown reason is still
+     retryable, and a test pins that so the distinction cannot erode.
+
+     ⚠ It sits AFTER the zoom check on purpose — zoom-retry owns the
+     "not ready yet" case, and its message is textually different anyway
+     (`zoom_no_transcript` / 3301 / "still being processed"). */
+  if (/No transcript turns after normalize/.test(r)) return 'permanent';
+
   var m = /HTTP (\d{3})/.exec(r);
   if (m && PERMANENT_HTTP.indexOf(parseInt(m[1], 10)) !== -1) return 'permanent';
 

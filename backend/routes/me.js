@@ -15,6 +15,7 @@ const { buildSectionBreakdown, sectionScoreOf, SECTIONS } = require('../lib/sect
 // labelled "rank". One definition now, and the copy says which end it means.
 const SR = require('../lib/section-ranking');
 const { selectLibraryMoments } = require('../lib/section-library');
+const { applyPriceFields } = require('../lib/price-fields');
 const { clipHref } = require('../lib/clip-link');
 const { computeWhyFacts } = require('../lib/why-prose');
 /* const { quoteHash } = require('../lib/kb-entry'); */ // only reader was the
@@ -890,15 +891,7 @@ router.patch('/account', requireAuth, async function(req, res) {
      * It is accepted here for completeness of the profile, and lib/price-moment
      * never reads it.
      */
-    ['price_pif', 'price_2pay'].forEach(function (k) {
-      if (body[k] === undefined) return;
-      if (body[k] === null || body[k] === '') { updates[k] = null; return; }
-      var n = Number(body[k]);
-      if (!isFinite(n) || n <= 0 || n > 10000000 || Math.round(n) !== n) {
-        throw Object.assign(new Error(k + ' must be a whole number of dollars'), { status: 400 });
-      }
-      updates[k] = n;
-    });
+    applyPriceFields(body, updates);
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: first_name, last_name, price_pif, price_2pay)' });
     updates.updated_at = new Date().toISOString();
     var up = await admin.from('user_profiles').update(updates).eq('user_id', req.user.id);

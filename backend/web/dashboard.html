@@ -878,6 +878,7 @@
     .members-seats { font-size: 14px; color: var(--text); }
     .members-seats b { color: var(--text); }
     .members-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .members-price { width: 92px; padding: 5px 7px; font-size: 13px; background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; }
     .members-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); padding: 8px 10px; border-bottom: 1px solid var(--border); }
     .members-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .members-table tr.inactive td { opacity: 0.6; }
@@ -6238,7 +6239,6 @@
     else if (state.view === 'performance') renderPerformanceView();
     else if (state.view === 'team') renderTeamView();
     else if (state.view === 'team-expanded') renderTeamExpanded();
-    else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
     else if (state.view === 'kb') renderKbView();
@@ -7405,7 +7405,6 @@
       teamRenderQueued = false;
       if (state.view === 'team') renderTeamView();
       else if (state.view === 'team-expanded') renderTeamExpanded();
-      else if (state.view === 'team-needs-work') renderTeamNeedsWorkView();
       else if (state.view === 'team-objections') renderTeamObjectionsView();
       else if (state.view === 'team-members') renderTeamMembersView();
       else return;
@@ -9274,21 +9273,43 @@
     return list.map(objFeedCard).join('');
   }
 
-  function renderTeamNeedsWorkView() {
-    var content = document.getElementById('content');
-    ensureTeamDefaultRange();
-    if (state.teamContext === null) { loadTeam('context'); }
-    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
-    if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
-    content.innerHTML = teamHeaderHtml() + teamControlsHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Objection Handling Focus</h2>'
-        + '<div class="meta">objection-handling focus for this period</div></div>'
-        + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
-        + teamNeedsWorkDetailHtml() + '</div>';
-  }
+  /* RETIRED 2026-08-29 (Justin's ruling). The old team "Objection Handling
+     Focus" VIEW is gone. Every team entry point already opened the drilldown,
+     and BOTH dispatchers normalised team-needs-work to team-objections, so this
+     render path was already unreachable.
 
-  function teamNeedsWorkDetailHtml() { return needsWorkDetailBodyHtml(state.teamNeedsWork); }
-  // Shared detail body for team + personal What-needs-work (subject-aware copy).
+     WHAT WAS NOT REMOVED, AND WHY. The row said this panel carried three things
+     the drilldown does not. Measured before retiring, TWO WERE ALREADY STALE:
+       - the sales-language taxonomy: the DRILLDOWN has it, in teamObjGridHtml
+         under "Handle rate by objection type";
+       - the true-objection denominator AND the exclusion counts: the drilldown
+         has both, via lib/team-objections strict / excluded, since 2026-08-22;
+       - clickable bucket to per-call evidence: NOT unique here either. It lives
+         in needsWorkDetailBodyHtml, which is SHARED with the LIVE personal
+         rep-page needs-work detail, so openBucketEvidence stays reachable.
+     THEREFORE needsWorkDetailBodyHtml, teamNeedsWorkCardHtml and
+     openBucketEvidence ALL STAY. Removing the first would have broken a live
+     personal surface - the shared-carrier trap. The team-page CARD stays too:
+     it is the only place its context line renders.
+
+     The removed code was:
+       function renderTeamNeedsWorkView() {
+         var content = document.getElementById('content');
+         ensureTeamDefaultRange();
+         if (state.teamContext === null) { loadTeam('context'); }
+         if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+         if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
+         content.innerHTML = teamHeaderHtml() + teamControlsHtml()
+           + '<div class="section fade-in"><div class="section-header"><div><h2>Objection Handling Focus</h2>'
+             + '<div class="meta">objection-handling focus for this period</div></div>'
+             + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
+             + teamNeedsWorkDetailHtml() + '</div>';
+       }
+     
+       function teamNeedsWorkDetailHtml() { return needsWorkDetailBodyHtml(state.teamNeedsWork); }
+       // Shared detail body for team + personal What-needs-work (subject-aware copy).
+  */
+
   function needsWorkDetailBodyHtml(d) {
     if (!d) return '<div class="skeleton" style="height:200px;"></div>';
     if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
@@ -10818,15 +10839,65 @@
         + '<td>' + escapeHtml(m.role || 'user') + '</td>'
         + '<td>' + (active ? '<span class="member-badge on">● active</span>' : '<span class="member-badge off">○ inactive</span>') + '</td>'
         + '<td>' + escapeHtml(m.billing_plan || '—') + '</td>'
+        + '<td>' + priceCellHtml(m) + '</td>'
         + '<td>' + moveSel + '</td>'
         + '<td class="members-actions">' + acts + '</td>'
         + '</tr>';
     }).join('');
     return head + '<div style="overflow-x:auto;"><table class="members-table"><thead><tr>'
-      + '<th>Rep</th><th>Role</th><th>Status</th><th>Plan</th><th>Manager</th><th></th></tr></thead><tbody>'
+      + '<th>Rep</th><th>Role</th><th>Status</th><th>Plan</th><th>Offer price</th><th>Manager</th><th></th></tr></thead><tbody>'
       + rows + '</tbody></table></div>'
-      + '<div class="meta" style="margin-top:10px;">Seat = an active user. Deactivating frees a seat; adding or reactivating adds one. Plan is per-user until the billing block adds an account entity.</div>';
+      + '<div class="meta" style="margin-top:10px;">Seat = an active user. Deactivating frees a seat; adding or reactivating adds one. Plan is per-user until the billing block adds an account entity.'
+      + ' Offer price is the pay-in-full figure Scout listens for — a rep without one gets no time-to-price measurement at all.</div>';
   }
+  /**
+   * THE OFFER PRICE, SET BY THE MANAGER (Justin's ruling 2026-08-26).
+   *
+   * ⚠ A rep may no longer set their own — PATCH /me/account already 403s a
+   * managed user — so without this cell the value is unreachable for anyone on
+   * a team, which is why 8 of 9 reps had none and the Time-to-Price graph drew
+   * a single line.
+   *
+   * ⚠ THE PLACEHOLDER NAMES THE CONSEQUENCE rather than saying "none". An empty
+   * price is not a cosmetic gap: it is the reason that rep is UNMEASURED, and
+   * unmeasured and flat look identical on a graph.
+   */
+  function priceCellHtml(m) {
+    var v = (m.price_pif != null) ? String(m.price_pif) : '';
+    return '<input class="members-price" type="number" min="1" step="1" value="' + escapeHtml(v) + '"'
+      + ' placeholder="not set" aria-label="Offer price for ' + escapeHtml(personName(m, m.email, m.user_id)) + '"'
+      + ' onchange="setMemberPrice(\'' + m.user_id + '\', this.value, this)">';
+  }
+
+  async function setMemberPrice(userId, raw, el) {
+    var val = String(raw == null ? '' : raw).trim();
+    /* '' CLEARS the price — a manager removing one is a real action, and it
+       must not be confused with "not supplied". The server treats both '' and
+       null as a clear, so the two paths cannot disagree. */
+    if (val !== '' && (!isFinite(Number(val)) || Number(val) <= 0)) {
+      alert('Enter a whole number of dollars, or clear it.');
+      if (el) {
+        var cur = (state.users || []).filter(function (x) { return x.user_id === userId; })[0];
+        el.value = (cur && cur.price_pif != null) ? String(cur.price_pif) : '';
+      }
+      return;
+    }
+    /* No success message, deliberately: this fires on every edit and the page
+       reports with alert(). A modal on each keystroke-commit would be worse
+       than silence, and memberAction still alerts on failure. */
+    var r = await memberAction('/admin/users/' + encodeURIComponent(userId) + '/price',
+      { method: 'PATCH', body: JSON.stringify({ price_pif: val === '' ? null : Number(val) }) });
+    if (r && r.ok) {
+      /* Keep local state in step so a re-render does not show the old value —
+         the members table re-renders from state.users, not from the input. */
+      var u = (state.users || []).filter(function (x) { return x.user_id === userId; })[0];
+      if (u) u.price_pif = val === '' ? null : Number(val);
+    } else if (el) {
+      var back = (state.users || []).filter(function (x) { return x.user_id === userId; })[0];
+      el.value = (back && back.price_pif != null) ? String(back.price_pif) : '';
+    }
+  }
+
   // Re-fetch users (+ team roster when membership changed) and re-render.
   async function refreshMembers(rosterChanged) {
     try { await loadUsers(); } catch (e) {}

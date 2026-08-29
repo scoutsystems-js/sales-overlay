@@ -27,6 +27,7 @@ const companyLifecycle = require('../lib/company-lifecycle');
 const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const provisionUser = require('../lib/provision-user');
+const { applyPriceFields } = require('../lib/price-fields');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -211,6 +212,10 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
         managed_by: u.managed_by,
         billing_status: u.billing_status,
         billing_plan: u.billing_plan,
+        /* ⚠ RE-PICKED EXPLICITLY. fetchUsersWithProfiles selects it, but this
+           route builds its own object field by field — so adding the column
+           upstream is not enough to make it reach the page. */
+        price_pif: (u.price_pif != null) ? Number(u.price_pif) : null,
         active: u.active,
         first_name: u.first_name,
         last_name: u.last_name,
@@ -617,6 +622,62 @@ router.post('/companies/:head_id/reactivate', requireAuth, requireRole('owner'),
 });
 
 // ── POST /admin/companies ───────────────────────────────────────────────────
+// ── PATCH /admin/users/:user_id/price ───────────────────────────────────────
+// THE OFFER PRICE IS SET BY MANAGERS AND ABOVE (Justin's ruling 2026-08-26).
+//
+// ⚠⚠ IT IS A PERMISSIONS CHANGE, NOT A DATA CHANGE. `user_profiles.price_pif`
+// STAYS ON THE INDIVIDUAL — no migration, no moved column, no fallback in the
+// analysis worker — because a manager may set a DIFFERENT price per rep. All
+// that changes is WHO MAY WRITE IT.
+//
+// ⚠ HALF THIS RULING ALREADY HELD AND IT IS WORTH KNOWING WHY: PATCH
+// /me/account 403s any user whose `managed_by` is set, so a managed rep already
+// could not set their own price, and a SINGLE USER (no manager) already could
+// set their own. The only missing half was a manager being able to set a rep's
+// — which is this route.
+//
+// ⚠ The validation is SHARED with /me/account via lib/price-fields, not copied:
+// the value drives lib/price-moment, so two sets of numeric rules would show up
+// as a metric that works for some reps and not others.
+router.patch('/users/:user_id/price', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  try {
+    var admin = getAdminClient();
+    var t = await admin.from('user_profiles')
+      .select('user_id, managed_by').eq('user_id', targetUserId).maybeSingle();
+    if (t.error) throw new Error('target lookup: ' + t.error.message);
+    if (!t.data) return res.status(404).json({ error: 'No profile found for that user.' });
+
+    /* The same scope predicate every cross-user route uses: a non-owner may
+       only act on their OWN reps. Acting on yourself is allowed — a manager
+       has a price too. */
+    if (req.user.role !== 'owner'
+        && t.data.user_id !== req.user.id
+        && t.data.managed_by !== req.user.id) {
+      console.warn('[admin] price scope violation: actor=%s target=%s', req.user.email, targetUserId);
+      return res.status(403).json({ error: 'You can only set the price for your own reps.' });
+    }
+
+    var updates = applyPriceFields(req.body || {}, {});
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'Nothing to update (editable: price_pif, price_2pay)' });
+    }
+    updates.updated_at = new Date().toISOString();
+    var up = await admin.from('user_profiles').update(updates).eq('user_id', targetUserId);
+    if (up.error) throw new Error('update: ' + up.error.message);
+
+    console.log('[admin] price set: actor=%s target=%s fields=%s',
+      req.user.email, targetUserId,
+      Object.keys(updates).filter(function (k) { return k !== 'updated_at'; }).join(','));
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] price update:', err.message);
+    res.status(500).json({ error: 'Could not set the price' });
+  }
+});
+
 // Create a company. Owner-only.
 //
 // ⚠⚠ WHAT "CREATE A COMPANY" MEANS, decided rather than assumed: a company IS a
@@ -1265,7 +1326,7 @@ async function fetchUsersWithProfiles(admin) {
   if (authResult.error) throw new Error('listUsers failed: ' + authResult.error.message);
   var profilesResult = await admin
     .from('user_profiles')
-    .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name, team_name, deactivated_with_company');
+    .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name, team_name, deactivated_with_company, price_pif');
   if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
 
   var profilesByUserId = {};
@@ -1284,6 +1345,10 @@ async function fetchUsersWithProfiles(admin) {
       managed_by: p.managed_by || null,
       billing_status: p.billing_status || 'trial',
       billing_plan: p.billing_plan || null,
+      /* Managers set this for their reps (ruling 2026-08-26); it rides here so
+         the members table can show whose price is missing — the reason a rep
+         has no time-to-price measurement at all. */
+      price_pif: (p.price_pif != null) ? Number(p.price_pif) : null,
       active: p.active !== false, // profile-less or unset → active (matches column default)
       team_name: p.team_name || null,   // company name; meaningful only on a head
       deactivated_with_company: p.deactivated_with_company === true,

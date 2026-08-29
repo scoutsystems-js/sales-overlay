@@ -72,23 +72,35 @@ test('⚠⚠ THE PERSONAL SURFACES ARE DELIBERATELY NOT RETARGETED — the drill
   assert.ok(personalCard > -1, 'the personal what-needs-work card must keep its own destination');
 });
 
-/* ── 2 · the old panel is NOT archived — something is lost ─────────────────── */
+/* ── 2 · CONVERTED 2026-08-29 — the old panel is now RETIRED ──────────────── */
 
-test('⚠⚠ team-needs-work SURVIVES: it carries three things the drilldown does not', () => {
-  /* Reported rather than archived, per the block's own instruction. The
-     drilldown buckets by the STORED objection_category (4 values); this panel
-     buckets by an LLM surface-label taxonomy, excludes disqualifications and
-     logistical barriers from the rate, SAYS SO in a context line, and makes
-     each bucket clickable through to the calls. None of that exists on the new
-     page, so removing this would lose it. */
-  assert.ok(LIVE.indexOf('function renderTeamNeedsWorkView') > -1, 'the view must still exist');
-  assert.ok(LIVE.indexOf('not counted as coachable objections') > -1,
-    'the disqualification / logistical context line is the specific thing with no equivalent');
+test('⚠⚠ team-needs-work is RETIRED, and nothing it carried was lost', () => {
+  /* ⚠ THIS TEST USED TO ASSERT THE OPPOSITE, and it was right at the time: the
+     view survived precisely because it carried things the drilldown did not.
+     Justin ruled it retired on 2026-08-29, and measuring first showed TWO of
+     the three named differences had ALREADY moved to the drilldown, while the
+     third was never unique to it. So the SUBJECT of this test — nothing is lost
+     — outlives the scaffolding, and only the vehicle inverts.
+
+     The removal itself is guarded in test/objections-panel-retired.js. */
+  assert.strictEqual(LIVE.indexOf('function renderTeamNeedsWorkView'), -1,
+    'the view must no longer have a live render path');
+
+  /* the two that MOVED */
+  assert.ok(LIVE.indexOf('Handle rate by objection type') > -1,
+    'the sales-language taxonomy must still render — it is in the drilldown now');
+  const lane = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'team-objections.js'), 'utf8');
+  assert.ok(/excluded:/.test(lane) && /strict:/.test(lane),
+    'the true-objection denominator and its exclusion counts live in the drilldown lane');
+
+  /* the one that was never unique: it is SHARED with the live personal page */
   assert.ok(LIVE.indexOf('openBucketEvidence') > -1, 'bucket → per-call evidence must survive');
+  assert.ok(LIVE.indexOf('needsWorkDetailBodyHtml(state.needsWork)') > -1,
+    'and stay reachable from the personal rep page, which shares that renderer');
 
-  // the card stays on the team view too — it is the only place that line renders there
+  // the team card stays — it is the only place that context line renders there
   assert.ok(LIVE.indexOf('nwContextLineHtml(d)') > -1,
-    'the team card must keep the context line; retargeting its click does not remove it');
+    'the team card must keep the context line');
 });
 
 /* ── 3 + 6 · controls moved INTO the card; two buttons gone from this page ── */
