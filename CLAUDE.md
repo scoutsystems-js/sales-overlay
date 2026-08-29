@@ -666,6 +666,37 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ THE CLAIM IS THE ENFORCEMENT AND THE RESET DESTROYED IT — A REFRESH COULD MAKE A REP PAY TWICE (2026-08-29)
+**`claimAnalysisRun` refuses a duplicate ONLY while a row reads `status='processing'` with a FRESH `analyzed_at`. `runUpdateAnalyses` wrote `'pending'` over EVERY id with NO status guard — so a second press wiped the claim and a second loop could grade a call the first was mid-way through.**
+- **⚠⚠ I REPORTED THE WRONG SET FIRST, AND THE CORRECTION MATTERS BECAUSE THE FIX HANGS OFF IT.** I said a second press *"re-grades rows the first run already FINISHED"*. **It does not:** `analyzeCall` sets `sync_status='processed'` and stamps the current `prompt_version`, which removes a finished row from **both** the pending list and the outdated list. **The exposure is IN-FLIGHT and NOT-YET-STARTED rows.** Same severity, different set — and a fix aimed at the wrong set would have protected nothing.
+- **THE FIX IS ON THE RESET, NOT ON THE BUTTON.** A disabled button is a suggestion; the claim is enforcement. Live claims are excluded from **both** the reset and the dispatch — resetting them is the corruption, dispatching them is the spend.
+- **⚠ IT FAILS CLOSED:** if the claims cannot be read it refuses to reset anything (503). **A wrong reset spends money twice; doing nothing costs a retry.** The safe direction is unambiguous, so it is not left to chance.
+- **⚠ A STALE CLAIM IS STILL RECLAIMABLE — deliberately.** A row left `processing` by a killed drain is not a live run; treating it as one would strand it forever behind a guard meant for live work. **Verified on live data: 7 `processing` rows, 0 reported live, because all 7 are stale.**
+- **THE PAGE COULD NOT KNOW A RUN WAS LIVE.** `state.gradeRun` is module state, so a refresh lost it, and `/me/grading-backlog` returned no `processing` count. It does now, and the page reconstructs the run instead of offering to start it. **⚠ The TOTAL is remembered in localStorage, never invented — without it we can honestly say how many are LEFT but not "X of Y", and a made-up denominator on a progress bar is worse than no bar.**
+
+### ⚠⚠ A REQUIRE CYCLE CAN TURN A SHARED CONSTANT INTO `undefined`, AND THE CATCH BELOW HIDES IT (2026-08-29)
+**`analysis-worker → routes/fathom → grading-backlog → analysis-worker`. A TOP-LEVEL `require` inside a cycle can return a partially-initialised module.**
+```
+CLAIM_STALE_MS -> undefined
+Date.now() - undefined -> NaN
+new Date(NaN).toISOString() -> THROWS
+the catch swallows it -> the in-flight count reads 0 FOREVER
+```
+- **⚠⚠ THE FAILURE IS SILENT AND RE-OPENS THE BUG THE CODE WAS ADDED TO CLOSE.** A permanent 0 means "no live run", which un-blocks the button — the exact double-spend the change exists to prevent, restored by an import.
+- **RESOLVE IT LAZILY (at call time the cycle is complete) AND THROW ON A BAD VALUE.** Defaulting to a plausible number would silently mis-classify live runs as dead. **A loud failure beats a wrong window.**
+- **The tell was a Node warning** — *"Accessing non-existent property … inside circular dependency"* — printed during a probe I ran for a different reason. **Warnings in unrelated output are worth reading.**
+
+### ⚠⚠ RENDERING AND COUNTING ARE TWO QUESTIONS, AND A FIX MUST NOT SILENTLY ANSWER BOTH (2026-08-29)
+**`active` was filtered NOWHERE, so deleted and deactivated users still drew rows on the team board — including three reading "Deleted user (49711e7d)".**
+- **⚠ THE OBVIOUS FIX IS THE WRONG ONE.** Filtering inactive users out of `repIds` would remove their rows **and** their calls, cash and objections from every team total — **silently rewriting history, which is the opposite of the ruling** that deactivate leaves the numbers.
+- **THE SERVER MARKS, THE CLIENT SKIPS.** `per_rep` carries `active`; the board does not draw inactive rows; the scope is untouched. **Verified: 3 rows hidden, team total unchanged at 320.**
+- **⚠ THE DEFAULT IS `active !== false`, NOT `active === true`.** A rep whose profile row failed to load must still appear — requiring `true` would make a lookup failure look like a deactivation, which is the absent-vs-excluded collapse in a new place.
+- **⚠ AND IT LEAVES THE OTHER QUESTION OPEN ON PURPOSE:** purging the three tombstones destroys 117 calls of team history and is Justin's call. This change makes them stop appearing without deciding anything about their data.
+
+### ⚠ MY OWN GUARD WAS WIDER THAN ITS CLAIM — AGAIN, AND THE SANITY ASSERTION IS THE FIX (2026-08-29)
+A new test asserted team-analytics never filters on `active`, and matched **`active_reps: per_rep.filter(r => r.calls_analyzed > 0)`** — a pre-existing field counting reps who took calls, nothing to do with the column.
+- **Narrowed to `filter(... .active)`, and paired with a SANITY ASSERTION that the unrelated `active_reps` field still exists** — so the narrowed check cannot start passing because the thing it scans for disappeared. **A negative assertion needs a positive companion, or it decays into a check that passes over an empty string.**
+
 ### ⚠⚠⚠ STANDING RULING — ANYTHING A CUSTOMER CAN SEE IS WRITTEN FOR THEM (Justin, 2026-08-28)
 **He caught three in one evening, which is why this is a RULE and not three string fixes.**
 ```
