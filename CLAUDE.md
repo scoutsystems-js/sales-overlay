@@ -3953,6 +3953,19 @@ by SIZE (what I sorted on)        by RATE (the actual question)
 - **THE CHECK THAT FINDS IT: compute brace depth (skipping strings and comments) and assert a declaration sits at the SAME depth as its callers.** Not that it exists, not that it parses — that it is reachable from where it is called.
 - **⚠ AND IT WAS FOUND WHILE HUNTING AN UNRELATED BUG.** It would otherwise have shipped and surfaced as "the not-a-sales-call toggle is broken", days later, with no obvious link to the commit that caused it.
 
+### ⚠⚠ "LOGGED WHERE NOBODY READS" IS NOT "SILENTLY SWALLOWED" — AND THE DIFFERENCE CHANGES THE FIX (2026-08-29)
+**`/team/why-prose` had never worked and was described here as silently swallowed. It was not: it logged `ReferenceError: getAdminClient is not defined` on every single request, for weeks.**
+- **⚠⚠ WHAT FAILED WAS NOT THE LOGGING, IT WAS THE READING.** Nobody reads server logs for a panel that renders its own error state — an empty panel looks like no data, not like a crash. So the fix is not "log more"; it is **make a programmer error look different from an operational one**, because the two were identical: one line, `err.message`, no stack.
+- **A `ReferenceError` or `TypeError` IS A BUG IN OUR CODE and gets its stack; a database timeout is an operational fact and does not.** One line each, and the class is in the message.
+- **⚠ THE GENERIC CLIENT MESSAGE STAYS. The fix makes the SERVER loud, not the client chatty** — leaking an internal name to a browser is the worse failure, and the temptation when a panel is unhelpful is to say more to the user.
+- **⚠ AND CORRECT THE EARLIER DESCRIPTION RATHER THAN INHERITING IT.** "Silently swallowed" sends the next person to look for a missing `console.error`; "logged where nobody reads" sends them to the log's SHAPE. **A wrong diagnosis in a note costs more than no note, because it is acted on.**
+
+### ⚠⚠ COUNT WHAT A QUEUE SECTION ACTUALLY CONTAINS BEFORE ANYONE PLANS AROUND ITS LENGTH (2026-08-29)
+**A MINOR section of 39 rows contained about ELEVEN startable items.** The rest: 12 already done or observations that were never tasks, 6 held on data or a decision, 6 blocked on a prerequisite (an asset, a headless browser, an explicit go), 4 deliberate non-work.
+- **⚠ A LINE COUNT READS AS A WORKLOAD AND IS NOT ONE.** Someone planning from "39 minor items" plans a very different week from someone planning from eleven — and several of those eleven are FEATURES (Slack connect, onboarding, Customize View) rather than the polish the section's name implies.
+- **THE CLASSIFICATION IS THE DELIVERABLE, NOT THE TOTAL.** *Held*, *blocked*, *already done* and *buildable* need different actions from different people, and a single number hides which.
+- **⚠ AND A BLOCKER CAN LIFT WITHOUT ANYONE NOTICING.** One row read *"needs the batch-embedding fix first"* — that fix had shipped, in a block about something else entirely. **Nothing re-reads the rows that named a dependency when the dependency lands**, which is the stale-row mechanism pointed at prerequisites instead of at rulings.
+
 ### ⚠⚠⚠ A LANE CAN RESOLVE TO THE WRONG POPULATION IN **THREE** WAYS, AND THE THIRD IS THE ONE NOBODY LOOKS FOR (2026-08-29)
 **"Opening each rep shows the same What Needs Work for all of them." Two candidates were on the table and it was NEITHER.**
 ```
