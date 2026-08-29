@@ -90,11 +90,23 @@ function digestCacheKey(dateStr) {
 // just analyses: a day whose calls have synced but not yet analyzed must not
 // hash-collide with a true zero-call day, or a cached quiet digest would pin
 // until the analyses landed.
+/* ⚠⚠ THE PROMPT VERSION IS IN THE KEY, AND IT IS LOAD-BEARING — NOT BOOKKEEPING.
+   A digest is generated once per day and CACHED. The compliance suppression is a
+   PROMPT change, so without this every digest already in the cache — including
+   the one that made a legal matter the day's focus — would keep rendering
+   exactly as before, indefinitely. The fix would look shipped and change nothing
+   on screen. Same failure the needs-work lane already paid for once, where the
+   bucket labels lived inside the cached payload.
+   ⚠ Bumping this invalidates cached digests so they regenerate under the new
+   prompt. That is the intent, not a side effect. */
+var DIGEST_PROMPT_VERSION = 'v2-2026-08-29-compliance-suppression';
+
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
     .update((analyses || []).map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|')
       + '||calls:' + (callIds || []).slice().sort().join(',')
-      + '||kb:' + kbHash)
+      + '||kb:' + kbHash
+      + '||prompt:' + DIGEST_PROMPT_VERSION)
     .digest('hex');
 }
 
@@ -229,6 +241,28 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     '  "focus": "ONE clear coaching focus for the team today — the single highest-leverage thing, specific enough to act on this morning. If one rep needs it most, say who."',
     '}',
     'Rules: every claim must trace to the facts above. call_id values MUST be copied from the CALLS list. If nothing is genuinely notable, return "notable": [].',
+    /* ⚠⚠⚠ JUSTIN'S RULING 2026-08-28 — SUPPRESS. SCOUT DOES NOT SURFACE LEGAL OR
+       LIABILITY MATTERS ANYWHERE: not as coaching, not as a notable moment, not
+       as the day's focus, and NOT on some other surface either. The open
+       question ("suppress entirely, or show it away from coaching?") is CLOSED
+       and the answer is suppress. DO NOT BUILD A SECOND SURFACE FOR IT.
+
+       ⚠ THE INCIDENT THIS EXISTS FOR: a rep told a prospect to overstate income
+       on a financing application, and the digest made it TODAY'S FOCUS. Scout
+       has zero context on liability and must never base coaching on it — and
+       this failed in the most expensive way available, by rendering as an
+       INSIGHT rather than as a wrong number. A manager acting on it coaches the
+       wrong thing.
+
+       ⚠ SUPPRESSION IS AT SELECTION, NOT AT DISPLAY. The moment must never be
+       CHOSEN as notable or as the focus; filtering it after the model has built
+       the day around it would leave the summary and the focus still shaped by
+       it, with the evidence quietly missing — worse than including it, because
+       the reasoning would no longer be checkable. */
+    '',
+    'EXCLUSION — legal, compliance and liability matters:',
+    'Scout does not coach on legal or liability questions and has no context to judge them. If a moment involves a possible legal, regulatory or compliance problem — misrepresenting income or assets on an application, advising someone to state something untrue to a lender or insurer, or anything of that kind — DO NOT select it as a notable moment and DO NOT make it the focus, however significant it seems. Choose the next most useful SALES coaching point instead, and do not allude to the excluded moment in the summary.',
+    'If excluding it leaves nothing genuinely notable, return "notable": [] — an empty list is the correct answer, not a reason to reach for it.',
   ]);
 
   var synthesis;

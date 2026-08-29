@@ -666,6 +666,29 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ STANDING INSTRUCTION — STOP REPORTING COST (Justin, 2026-08-29)
+**He does not want a running commentary on what things cost. Not in findings, not in reports, not as a caveat appended to a recommendation. When cost is genuinely a decision he needs to make, HE WILL RAISE IT.**
+- **⚠⚠ THIS CHANGES THE REPORTING, NOT THE APPROVAL RULE. Spend still needs approval BEFORE it is spent** — the dry-run-then-confirm discipline, the six-loop ceiling, "do not run it, Justin rules" all stand exactly as they are. What stops is **narrating the price of everything**.
+- **⚠ THE DISTINCTION IN ONE LINE: ASK BEFORE SPENDING, DON'T ANNOUNCE AFTER.** A request for approval names what it will do. A finished report does not need a price tag on every option, a per-call figure, or a "this would cost ~$X" aside on work nobody asked about.
+- **⚠ IT APPLIES TO CLAUDE TOO** — the same instruction covers the assistant's own reports and summaries, not only the documents.
+- **WHY IT IS WORTH RECORDING RATHER THAN JUST DOING:** cost commentary reads as diligence, so it accumulates without anyone asking for it — and every unrequested figure is one more thing between the reader and the finding. **The absence of a price is not an omission.**
+
+### ⚠⚠ THE COMMENT-AS-CODE TRAP, IN DEPLOY VERIFICATION — AND IT LOOKED LIKE A PARTIAL DEPLOY (2026-08-29)
+**A served-page check reported a state that contradicted itself: `Your Reports` PRESENT (from `efb89b3`) while `billed to the company` and `no inbox in Scout` — both removed by that SAME COMMIT — were also present. Two markers from one commit, only one behaving. That reads as a half-applied deploy.**
+```
+served /dashboard   raw 800,515 bytes   ->   470,384 after stripping comments
+                    330,131 bytes (41%) IS COMMENT
+marker                     RAW  LIVE
+Your Reports                1    1     really there
+billed to the company       1    0     COMMENT ONLY
+no inbox in Scout           1    0     COMMENT ONLY
+whoseMoney                  0    0     genuinely gone
+```
+- **⚠⚠ THE STRINGS SURVIVED ONLY INSIDE THE COMMENTS EXPLAINING THEIR OWN REMOVAL** — prose I had written saying *"it read: This is billed to the company, not to them"* and *"it used to say: there is no inbox in Scout"*, precisely so nobody reinstates them. **The documentation of a rule, reported as a violation of it.**
+- **⚠ THE RULE WAS ALREADY ON FILE AND I STILL HIT IT.** *"STRIP COMMENTS IN DEPLOY VERIFICATION TOO, NOT ONLY IN TESTS"* — my own guard test strips them, which is why the suite was green while a raw `curl | grep` disagreed. **The test and the deploy check were asking the same question of different text.**
+- **⚠⚠ AND THE FAILURE MODE HERE IS WORSE THAN A FALSE POSITIVE: it impersonates a PARTIAL DEPLOY**, which is a genuinely alarming state and sends you looking at the platform, the build, the commit range — everywhere except the checker. **At 41% comment, a raw grep on this page is not evidence of anything.**
+- **THE CHEAP DISCRIMINATOR: print RAW and STRIPPED counts side by side.** One number is ambiguous; the pair is self-explaining, and it cost one command.
+
 ### ⚠⚠⚠ THE CLAIM IS THE ENFORCEMENT AND THE RESET DESTROYED IT — A REFRESH COULD MAKE A REP PAY TWICE (2026-08-29)
 **`claimAnalysisRun` refuses a duplicate ONLY while a row reads `status='processing'` with a FRESH `analyzed_at`. `runUpdateAnalyses` wrote `'pending'` over EVERY id with NO status guard — so a second press wiped the claim and a second loop could grade a call the first was mid-way through.**
 - **⚠⚠ I REPORTED THE WRONG SET FIRST, AND THE CORRECTION MATTERS BECAUSE THE FIX HANGS OFF IT.** I said a second press *"re-grades rows the first run already FINISHED"*. **It does not:** `analyzeCall` sets `sync_status='processed'` and stamps the current `prompt_version`, which removes a finished row from **both** the pending list and the outdated list. **The exposure is IN-FLIGHT and NOT-YET-STARTED rows.** Same severity, different set — and a fix aimed at the wrong set would have protected nothing.
