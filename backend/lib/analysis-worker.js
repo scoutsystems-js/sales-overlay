@@ -2106,6 +2106,17 @@ async function analyzeCall(fathomCallId, userId) {
       }).then(function (s) {
         console.log('[kb-harvest] call=%s added=%d duplicate=%d failed=%d unembedded=%d%s',
           fathomCallId, s.added, s.duplicate, s.failed, s.unembedded, s.skipped_reason ? ' skipped=' + s.skipped_reason : '');
+        /* ⚠ LOUD, and naming the consequence. The degrade is correct — the rows
+           are written — so nothing else about this run looks wrong. That is
+           exactly how 386 unembedded moments accumulated unnoticed. */
+        if (s.unembedded > 0) {
+          console.error('[kb-harvest] ⚠ call=%s wrote %d moment(s) WITHOUT an embedding (%s) — ' +
+            'they are keyword-searchable only and invisible to similarity search',
+            fathomCallId, s.unembedded,
+            s.embed_reason === 'no_capability'
+              ? 'VOYAGE_API_KEY is not set in this environment'
+              : 'the provider failed after retries');
+        }
       }).catch(function (e) {
         console.error('[kb-harvest] unexpected: ' + ((e && e.message) || 'unknown'));
       });

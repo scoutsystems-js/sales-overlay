@@ -94,14 +94,21 @@ test('paging maps every vector to its own input, even out of order', async () =>
   } finally { global.fetch = realFetch; }
 });
 
-test('one failed page does not lose the others', async () => {
+/* ⚠ CONVERTED 2026-08-29, NOT REWRITTEN TO PASS. This used to fail the page
+   with a 429 — which no longer leaves it null, because a temporary status is
+   now retried and recovers. The SUBJECT of the test outlives that scaffolding:
+   one page failing must not lose the others, and the survivors must still sit
+   at their ABSOLUTE offsets. So the vehicle changes to a PERMANENT status (400,
+   which is deliberately not retried) and the assertions are untouched.
+   The recovery behaviour itself is covered in test/voyage-retry.test.js. */
+test('one PERMANENTLY failed page does not lose the others', async () => {
   process.env.VOYAGE_API_KEY = 'test';
   const realFetch = global.fetch;
   let call = 0;
   global.fetch = async (u, o) => {
     const body = JSON.parse(o.body);
     call++;
-    if (call === 2) return { ok: false, status: 429, json: async () => ({}) };
+    if (call === 2) return { ok: false, status: 400, headers: { get: () => null }, json: async () => ({}) };
     return { ok: true, json: async () => ({ data: body.input.map((t, i) => ({ index: i, embedding: [Number(t)] })) }) };
   };
   try {

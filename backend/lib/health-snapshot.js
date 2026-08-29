@@ -131,6 +131,13 @@ async function buildSnapshot(admin, userId, deps) {
   var hlErr = (await admin.from('call_analyses').select('id', { count: 'exact', head: true })
     .eq('user_id', userId).not('highlight_error', 'is', null)).count || 0;
 
+  /* ⚠⚠ UNEMBEDDED COACHING MOMENTS. An embedding failure degrades CORRECTLY —
+     the row is still written and still keyword-searchable — which is precisely
+     why 386 of them accumulated over two days with nobody noticing. A correct
+     silent degrade needs a place it becomes visible, and this is it. */
+  var unembedded = (await admin.from('knowledge_base').select('id', { count: 'exact', head: true })
+    .eq('uploaded_by', userId).eq('metadata->>category', 'call_moment').is('embedding', null)).count || 0;
+
   var providers = [];
   if (fc.data) providers.push('Fathom');
   if (zc.data) providers.push('Zoom');
@@ -163,6 +170,7 @@ async function buildSnapshot(admin, userId, deps) {
     failed_retryable: failed.length - permanent,
     failed_permanent: permanent,
     calls_with_no_highlights: hlErr,
+    unembedded_moments: unembedded,
     // A first sync whose grading was capped is the commonest "nothing happened".
     first_sync_capped: !!(conn && conn.last_sync_inserted > 0
       && conn.last_sync_analyzed != null && conn.last_sync_analyzed < conn.last_sync_inserted),

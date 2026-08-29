@@ -12,7 +12,78 @@
 //   • harvested moments store null too — the row is still a real KB entry.
 // Embedding availability must never be the thing that fails a write.
 
+// ── WHY THERE IS A RETRY HERE (diagnosed 2026-08-29) ──────────────────────
+// 386 of 1,625 harvested moments carried no embedding, and the obvious story —
+// "rate limiting under sustained grading" — was only half right and was NOT the
+// live fault. Measured, there were THREE separate populations:
+//
+//   84 rows (28-29 Aug)  the harvest ran in a LOCAL shell with no
+//                        VOYAGE_API_KEY. TOTAL failure per call, and the
+//                        embedded/null boundary flips four minutes apart —
+//                        which no rate limit does, but two execution
+//                        environments do. NOT a production fault.
+//   299 rows (25-26 Aug) PARTIAL failure (26% and 32%) during heavy concurrent
+//                        grading on Railway. Consistent with rate limiting;
+//                        ⚠ NOT provable from logs, whose retention no longer
+//                        covers those days. This retry is aimed at it.
+//   170 seeded rows      a DIFFERENT fault entirely — scripts/seed-frameworks.js
+//                        contains no embedding code at all, so those April rows
+//                        never had one. A retry cannot help them; only a
+//                        backfill can.
+//
+// ⚠ THE DEGRADE STAYS CORRECT. A row must still be written unembedded rather
+// than lost — that is why the harvest survived all three of these. What was
+// missing was any attempt to recover a transient failure, and any way to SEE a
+// persistent one.
+
 var VOYAGE_MODEL = 'voyage-3-lite'; // 512-dim; matches every existing row
+
+/* Reused, not re-declared. lib/model-retry already decides which HTTP statuses
+   will not improve on their own, and a second list here would be free to drift
+   from it — the exact duplication the shared-constants work exists to retire.
+   ⚠ We reuse the CLASSIFICATION only. model-retry's other half counts attempts
+   ACROSS analysis runs to requeue a row; this is an INLINE retry inside one
+   request. Same question, different mechanism. */
+var { PERMANENT_STATUSES } = require('./model-retry');
+
+/** 3 attempts per page. Bounded deliberately: past this a 429 is not a blip,
+ *  and every extra attempt delays an upload the caller is waiting on. */
+var MAX_EMBED_ATTEMPTS = 3;
+
+/** Honour the provider's own Retry-After when it sends one, else back off
+ *  exponentially. Capped so a hostile header cannot stall a request path. */
+var MAX_BACKOFF_MS = 4000;
+
+function backoffMs(res, attempt) {
+  var hdr = res && res.headers && res.headers.get && res.headers.get('retry-after');
+  var secs = hdr ? Number(hdr) : NaN;
+  if (isFinite(secs) && secs > 0) return Math.min(secs * 1000, MAX_BACKOFF_MS);
+  return Math.min(500 * Math.pow(2, attempt - 1), MAX_BACKOFF_MS);
+}
+
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+/** 'temporary' | 'permanent' for an HTTP status we hold directly. */
+function classifyEmbedStatus(status) {
+  return PERMANENT_STATUSES.indexOf(status) !== -1 ? 'permanent' : 'temporary';
+}
+
+/**
+ * Can this process embed at all?
+ *
+ * ⚠⚠ THIS IS THE ONE THAT WOULD HAVE PREVENTED THE 84. A missing key is not a
+ * transient failure to be retried — it is a GUARANTEED total failure for every
+ * row, and it is invisible because the degrade is correct. A batch runner must
+ * call this and REFUSE TO START rather than discover it one call at a time.
+ * Same shape as the Zoom capability abort: a local run inherits the local
+ * environment's capabilities, and must check them before spending.
+ */
+function embeddingCapability() {
+  if (!process.env.VOYAGE_API_KEY) {
+    return { ok: false, reason: 'VOYAGE_API_KEY is not set in this environment — every row would be written unembedded' };
+  }
+  return { ok: true, reason: null };
+}
 
 async function getVoyageEmbedding(text, label) {
   var tag = label || 'kb';
@@ -100,39 +171,74 @@ async function getVoyageEmbeddings(texts, label) {
    belong to the wrong chunk, silently. */
 async function embedPage(texts, out, start, end, tag) {
   var page = texts.slice(start, end);
-  try {
-    var res = await fetch('https://api.voyageai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + process.env.VOYAGE_API_KEY,
-      },
-      body: JSON.stringify({ input: page, model: VOYAGE_MODEL }),
-    });
-    if (!res.ok) {
-      console.error('[' + tag + '] Voyage batch embedding failed: HTTP ' + res.status + ' (' + page.length + ' texts)');
-      return;   // this page stays null; other pages are unaffected
-    }
-    var data = await res.json();
-    if (!data || !Array.isArray(data.data)) {
-      console.error('[' + tag + '] Voyage batch embedding: unexpected response shape');
+
+  for (var attempt = 1; attempt <= MAX_EMBED_ATTEMPTS; attempt++) {
+    try {
+      var res = await fetch('https://api.voyageai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + process.env.VOYAGE_API_KEY,
+        },
+        body: JSON.stringify({ input: page, model: VOYAGE_MODEL }),
+      });
+
+      if (!res.ok) {
+        var kind = classifyEmbedStatus(res.status);
+        if (kind === 'temporary' && attempt < MAX_EMBED_ATTEMPTS) {
+          var wait = backoffMs(res, attempt);
+          console.warn('[' + tag + '] Voyage HTTP ' + res.status + ' — retrying in ' + wait +
+                       'ms (attempt ' + attempt + '/' + MAX_EMBED_ATTEMPTS + ', ' + page.length + ' texts)');
+          await sleep(wait);
+          continue;
+        }
+        /* Abandoned. Loud, and it names WHY it will not be retried, so a
+           permanent failure is never mistaken for a transient one that simply
+           ran out of attempts. */
+        console.error('[' + tag + '] Voyage batch embedding ABANDONED: HTTP ' + res.status +
+                      ' (' + kind + ', ' + page.length + ' texts, ' + attempt + ' attempt(s)) — ' +
+                      'these rows will be written unembedded and will be invisible to similarity search');
+        return;
+      }
+
+      var data = await res.json();
+      if (!data || !Array.isArray(data.data)) {
+        console.error('[' + tag + '] Voyage batch embedding: unexpected response shape');
+        return;
+      }
+      for (var i = 0; i < data.data.length; i++) {
+        var item = data.data[i];
+        if (!item || typeof item.index !== 'number') continue;
+        if (item.index < 0 || item.index >= page.length) continue;  // never write past this page
+        if (!Array.isArray(item.embedding)) continue;               // malformed -> stays null
+        out[start + item.index] = item.embedding;                   // ABSOLUTE offset
+      }
+      return;
+
+    } catch (err) {
+      /* A network/timeout error is temporary by the same rule the model path
+         uses: no status means a connection failure, not a rejection. */
+      if (attempt < MAX_EMBED_ATTEMPTS) {
+        var w = Math.min(500 * Math.pow(2, attempt - 1), MAX_BACKOFF_MS);
+        console.warn('[' + tag + '] Voyage network error — retrying in ' + w + 'ms (attempt ' +
+                     attempt + '/' + MAX_EMBED_ATTEMPTS + '): ' + err.message);
+        await sleep(w);
+        continue;
+      }
+      console.error('[' + tag + '] Voyage batch embedding ABANDONED after ' + attempt +
+                    ' attempt(s): ' + err.message +
+                    ' — these rows will be written unembedded');
       return;
     }
-    for (var i = 0; i < data.data.length; i++) {
-      var item = data.data[i];
-      if (!item || typeof item.index !== 'number') continue;
-      if (item.index < 0 || item.index >= page.length) continue;  // never write past this page
-      if (!Array.isArray(item.embedding)) continue;               // malformed → stays null
-      out[start + item.index] = item.embedding;                   // ABSOLUTE offset
-    }
-  } catch (err) {
-    console.error('[' + tag + '] Voyage batch embedding error:', err.message);
   }
 }
 
 module.exports = {
   getVoyageEmbedding: getVoyageEmbedding,
   getVoyageEmbeddings: getVoyageEmbeddings,
+  embeddingCapability: embeddingCapability,
+  classifyEmbedStatus: classifyEmbedStatus,
+  MAX_EMBED_ATTEMPTS: MAX_EMBED_ATTEMPTS,
   VOYAGE_MAX_INPUTS: VOYAGE_MAX_INPUTS,
   VOYAGE_MODEL: VOYAGE_MODEL,
 };

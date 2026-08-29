@@ -36,7 +36,7 @@
 
 var { highlightGroup } = require('./highlight-section');
 var { buildMomentRow, insertMoment, quoteHash } = require('./kb-entry');
-var { getVoyageEmbeddings } = require('./voyage');
+var { getVoyageEmbeddings, embeddingCapability } = require('./voyage');
 
 // Ruling 3. Per SECTION, per call.
 var HARVEST_SECTION_CAP = 2;
@@ -99,7 +99,7 @@ function selectHarvestMoments(highlights, cap) {
 // caller is the analysis worker, and the standing house rule is that a KB
 // problem can never fail or stall an analysis. Returns a summary for logging.
 async function harvestClosedCall(admin, opts) {
-  var summary = { attempted: 0, added: 0, duplicate: 0, failed: 0, unembedded: 0, skipped_reason: null };
+  var summary = { attempted: 0, added: 0, duplicate: 0, failed: 0, unembedded: 0, skipped_reason: null, embed_reason: null };
   try {
     if (!shouldHarvest(opts && opts.outcome)) {
       summary.skipped_reason = 'not_closed';
@@ -141,11 +141,21 @@ async function harvestClosedCall(admin, opts) {
     // Contract: same length as the input, each slot a vector or null. A partial
     // or total embedding failure must never lose the harvest — every row is
     // still written, just unembedded (and still keyword-searchable).
+    /* ⚠⚠ DISTINGUISH THE TWO REASONS A MOMENT ENDS UP UNEMBEDDED, because they
+       need opposite responses and they looked identical for two days. A missing
+       key is a CAPABILITY failure — guaranteed, total, and fixed by exporting
+       the key or running where it exists. A provider failure is transient and
+       has just been retried. Reporting both as "unembedded=N" is what let a
+       local run without a key look like rate limiting. */
+    var cap = embeddingCapability();
+    if (!cap.ok) summary.embed_reason = 'no_capability';
+
     var embeddings = await getVoyageEmbeddings(rows.map(function (r) { return r.content; }), 'kb-harvest');
     for (var e = 0; e < rows.length; e++) {
       rows[e].embedding = embeddings[e] || null;
       if (rows[e].embedding === null) summary.unembedded++;
     }
+    if (summary.unembedded > 0 && !summary.embed_reason) summary.embed_reason = 'provider';
 
     for (var i = 0; i < rows.length; i++) {
       summary.attempted++;
