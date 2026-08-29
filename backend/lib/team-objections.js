@@ -37,6 +37,7 @@ const { OBJECTION_CATEGORIES: CANONICAL_CATEGORIES } = require('./objection-cate
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 
+const { displayCloserResponse } = require('./closer-side');
 /* The fingerprint of an empty analysis set. Written as the same md5 the loaded
    path produces for 'empty' so an empty window and a populated one can never
    collide on a cache key, and so the empty return is a real fingerprint rather
@@ -357,7 +358,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
       credited: credited,
       quote: r.quote || null,
       observation: r.observation || null,
-      closer_response: r.closer_response || null,
+      closer_response: displayCloserResponse(r.closer_response),
       speaker_verified: r.speaker_verified === true,
       closer_response_verified: r.closer_response_verified === true,
     });

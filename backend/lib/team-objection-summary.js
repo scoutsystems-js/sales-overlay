@@ -38,6 +38,7 @@ const { computeTeamObjections, OBJECTION_CATEGORIES } = require('./team-objectio
    up claiming a focus area the panel beside it calls too thin to judge. */
 const { _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP } = require('./team-needs-work');
 
+const { displayCloserResponse } = require('./closer-side');
 const SYNTHESIS_TYPE = 'team_objections';
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
@@ -208,7 +209,7 @@ function pickEvidence(instances, userId, category) {
     if (!m.closer || m.closer.user_id !== userId) return;
     if (m.category !== category) return;
     if (m.resolution === 'handled') {
-      if (worked.length < MAX_WORKED_EVIDENCE && m.closer_response) worked.push(m);
+      if (worked.length < MAX_WORKED_EVIDENCE && displayCloserResponse(m.closer_response)) worked.push(m);
     } else if (failed.length < MAX_FAILED_EVIDENCE) {
       failed.push(m);
     }
@@ -220,7 +221,8 @@ function evidenceLine(m) {
   var pos = positionPct(m.timestamp_seconds, m.duration_seconds);
   var where = (pos === null) ? 'position in call unknown' : (pos + '% through the call');
   var parts = ['    - [' + where + '] prospect: "' + (m.quote || m.surface || '').slice(0, 220) + '"'];
-  parts.push('      closer replied: ' + (m.closer_response ? '"' + m.closer_response.slice(0, 300) + '"' : '(no reply captured)'));
+  var shown = displayCloserResponse(m.closer_response);   // ⚠ never a sentinel in a prompt
+  parts.push('      closer replied: ' + (shown ? '"' + shown.slice(0, 300) + '"' : '(no reply captured)'));
   if (m.observation) parts.push('      what happened: ' + m.observation.slice(0, 240));
   parts.push('      outcome of the moment: ' + (m.resolution || 'not recorded')
     + (m.credited && m.resolution !== 'handled' ? ' (the CALL closed anyway — the moment itself was not handled)' : ''));
@@ -415,7 +417,7 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
 /** Evidence as the client sees it — resolved from the DB row, never the model. */
 function publicMoment(m) {
   return {
-    quote: str(m.quote, 300), closer_response: str(m.closer_response, 400),
+    quote: str(m.quote, 300), closer_response: str(displayCloserResponse(m.closer_response), 400),
     observation: str(m.observation, 300), clip_url: m.clip_url || null,
     source: m.source || null, call_date: m.call_date || null,
     resolution: m.resolution || null,

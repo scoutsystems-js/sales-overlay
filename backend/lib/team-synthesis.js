@@ -22,6 +22,7 @@ const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
+const { displayCloserResponse } = require('./closer-side');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const MAX_CANDIDATES = 20;
@@ -209,7 +210,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   var candidates = hlRows.map(function (r) {
     var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
     return { cls: c, type: r.type, rep: (emailMap && emailMap[rid]) || rid,
-      quote: str(r.closer_response, 200) || str(r.quote, 200) || '',
+      quote: str(displayCloserResponse(r.closer_response), 200) || str(r.quote, 200) || '',   // sentinel-gated
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
       source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
       call_id: r.fathom_call_id,
@@ -279,7 +280,7 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap)
   var cands = hlRows.filter(function (r) { return r.type === 'strong_moment' || r.resolution === 'handled'; }).map(function (r) {
     var rid = w.meta[r.fathom_call_id] ? w.meta[r.fathom_call_id].user_id : null;
     return { type: r.type, rep: (emailMap && emailMap[rid]) || rid, rep_id: rid,
-      quote: str(r.closer_response, 220) || str(r.quote, 220) || '', observation: str(r.observation, 200) || '',
+      quote: str(displayCloserResponse(r.closer_response), 220) || str(r.quote, 220) || '', observation: str(r.observation, 200) || '',
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
       source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
       call_id: r.fathom_call_id };

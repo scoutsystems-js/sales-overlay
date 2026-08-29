@@ -35,6 +35,7 @@
 
 const crypto = require('crypto');
 
+const { displayCloserResponse } = require('./closer-side');
 // The metadata content-type for a harvested call moment. MUST stay out of
 // GRADER_CATEGORIES and SYNTHESIS_CATEGORIES — see ruling 1 above.
 var KB_ENTRY_METADATA_CATEGORY = 'call_moment';
@@ -76,7 +77,8 @@ function buildEntryContent(h) {
   var speaker = (typeof hl.speaker === 'string' && hl.speaker) ? hl.speaker : 'SPEAKER';
   var quote = (typeof hl.quote === 'string') ? hl.quote.trim() : '';
   var observation = (typeof hl.observation === 'string') ? hl.observation.trim() : '';
-  var response = (typeof hl.closer_response === 'string') ? hl.closer_response.trim() : '';
+  // ⚠ sentinel-gated: a harvested KB moment must never contain one.
+  var response = displayCloserResponse(hl.closer_response) || '';
 
   var parts = ['During ' + section + ', ' + speaker + ' said: "' + quote + '".'];
   if (observation) parts.push('What happened: ' + observation + '.');
@@ -147,7 +149,7 @@ function buildMomentRow(opts) {
         : opts.speakerConfidence === 'matched',
       quote: h.quote || null,
       observation: h.observation || null,
-      closer_response: h.closer_response || null,
+      closer_response: displayCloserResponse(h.closer_response),
       timestamp_seconds: (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null,
       source_fathom_call_id: opts.fathomCallId,
       source_highlight_id: h.id || null,      // provenance only — NEVER the dedupe key

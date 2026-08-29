@@ -963,7 +963,7 @@ function selectMissedCuePair(highlights, minGap) {
       if (ts(obstacles[j]) - ts(cues[i]) >= gap) {
         return {
           cue_quote: cues[i].quote, cue_timestamp_seconds: ts(cues[i]),
-          closer_said: cues[i].closer_response || null,
+          closer_said: closerSide.displayCloserResponse(cues[i].closer_response),
           obstacle_quote: obstacles[j].quote, obstacle_timestamp_seconds: ts(obstacles[j]),
           gap_seconds: ts(obstacles[j]) - ts(cues[i]), verified: true,
         };

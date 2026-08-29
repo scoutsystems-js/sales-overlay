@@ -28,6 +28,7 @@ const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
 const { isHandled, outcomeMap } = require('./objection-handled');
 
 const { clipHref } = require('./clip-link');
+const { displayCloserResponse } = require('./closer-side');
 // ── Guardrails (Phase 1, approved) ──────────────────────────────────────────
 const MIN_BUCKET = 6;        // no "needs work" claim off a tiny bucket
 const MIN_GAP_PP = 5;        // rate must be at least this far below baseline
@@ -583,7 +584,7 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
       title: nameByCall[r.fathom_call_id] || c.title || null,
       prospect_name: nameByCall[r.fathom_call_id] || null,
       surface: r.objection_surface, handled: isHandled(r, evidenceOutcome[r.fathom_call_id]),
-      quote: str(r.quote, 400), closer_response: str(r.closer_response, 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
+      quote: str(r.quote, 400), closer_response: str(displayCloserResponse(r.closer_response), 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
       source: srcOf(r.fathom_call_id) };
   }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
 }

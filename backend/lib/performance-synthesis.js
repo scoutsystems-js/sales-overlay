@@ -12,10 +12,14 @@ const { isHandled } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
+/* Bumped ONLY for a correctness defect in what the cache already holds —
+   never for a speculative improvement. See the key comment below. */
+const SYNTH_RULE_VERSION = 'v2-2026-08-29-sentinel-gate';
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
+const { displayCloserResponse } = require('./closer-side');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const SYNTH_MAX_TOKENS = 2600;
@@ -161,13 +165,25 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   // fold its hash into the set-hash so a KB upload invalidates the cached synthesis.
   var selling = await fetchSellingContext(admin, userId, 3000, SYNTHESIS_CATEGORIES);
   var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash
-    /* ⚠⚠ THE RULE VERSION IS DELIBERATELY *NOT* IN THIS KEY — see CLAUDE.md.
-       Adding it forces every cached synthesis to regenerate at real cost, and
-       the rule was MEASURED not to work: 67% mismatched before, 75% after. A
-       version bump is how you make a change take effect; spending on one for a
-       change that does not help would be paying to look busy.
-       ⚠ New syntheses pick the rule up naturally. Put the version back the day a
-       fix demonstrably moves the number. */;
+    /* ⚠⚠ A VERSION IS IN THIS KEY AGAIN, AND THE DISTINCTION IS THE POINT.
+
+       It was deliberately LEFT OUT for the v1 evidence RULE, because that rule
+       was MEASURED not to work (67% mismatched before, 75% after) and bumping a
+       key to make an ineffective change take effect is paying to look busy. That
+       reasoning still stands for a speculative rule, and the note said so:
+       "put the version back the day a fix demonstrably moves the number."
+
+       ⚠⚠ THIS IS NOT THAT CASE. It is a CORRECTNESS defect, not a hoped-for
+       improvement: cached syntheses render the literal string
+       `__moment_is_closer__` as the evidence quote, because a sentinel is a
+       non-empty string and won the `closer_response || quote` fallback. A user
+       reads an internal token as the proof of their weakness. Without the
+       version those cached entries keep showing it forever and the gate below
+       reaches nothing — the same shape the digest cache had.
+       ⚠ THE TEST TO APPLY NEXT TIME: does the cached output contain something
+       WRONG, or merely something that could be better? Only the first earns a
+       bump. */
+    + '||v:' + SYNTH_RULE_VERSION;
   var hash = crypto.createHash('md5').update(hashInput).digest('hex');
 
   // 3) cache check.
@@ -218,7 +234,9 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
     var cls = outcomeClass(outcomeByCall[r.fathom_call_id]);
     return {
       cls: cls, type: r.type,
-      quote: str(r.closer_response, 220) || str(r.quote, 220) || '',
+      /* ⚠ SENTINEL-GATED: a sentinel is a non-empty string and would WIN this
+         fallback, rendering `__moment_is_closer__` as the evidence quote. */
+      quote: str(displayCloserResponse(r.closer_response), 220) || str(r.quote, 220) || '',
       clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
       source: (meta[r.fathom_call_id] || {}).source || null,
       call_id: r.fathom_call_id,

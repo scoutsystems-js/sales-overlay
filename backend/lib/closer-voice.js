@@ -16,6 +16,7 @@
  * transcript scrapings and must never be replaced with unverified ones — see
  * the Zoom note at the bottom for why that distinction is load-bearing.
  */
+const { displayCloserResponse } = require('./closer-side');
 'use strict';
 
 // How many lines reach the prompt. Enough to establish a register, few enough
@@ -81,7 +82,9 @@ function isCleanVoiceLine(text) {
 function selectVoiceLines(rows, limit) {
   const cap = limit || VOICE_LINE_COUNT;
   const clean = (rows || [])
-    .map((r) => (r && typeof r.closer_response === 'string' ? r.closer_response.trim() : ''))
+    /* ⚠ A SENTINEL MUST NEVER BECOME A VOICE EXEMPLAR — it is not something
+       the closer said. */
+    .map((r) => (r ? (displayCloserResponse(r.closer_response) || '') : ''))
     .filter(isCleanVoiceLine);
 
   // dedupe on a normalised form — the same handling line recurs across calls

@@ -13,6 +13,7 @@ const { isCredited } = require('./objection-handled');
 var { fetchProspectCloseRates } = require('./prospect-entity');
 
 const { clipHref } = require('./clip-link');
+const { displayCloserResponse } = require('./closer-side');
 // Prior equal-length window's avg score for `userId`, via the reused team
 // aggregator. Returns a rounded mean, or null when there are no graded calls in
 // the prior window (new user / window predates their first call) → tile shows no
@@ -316,7 +317,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
       credited: credited,   // 'Credited (call closed)' badge
       quote: r.quote || null,
       observation: r.observation || null,
-      closer_response: r.closer_response || null,
+      closer_response: displayCloserResponse(r.closer_response),
     });
   });
   base.metrics.calls_with_objection = Object.keys(callsWith).length;

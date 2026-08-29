@@ -25,6 +25,7 @@
 var { highlightGroup } = require('./highlight-section');
 
 const { clipHref } = require('./clip-link');
+const { displayCloserResponse } = require('./closer-side');
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 var HISTOGRAM_BUCKETS = [
@@ -225,7 +226,7 @@ function buildSectionBreakdown(section, input) {
   highlights.forEach(function (h) {
     if (!h || h.section !== section) return;
     if (String(h.type || '').toLowerCase() !== 'objection') return;
-    var resp = (typeof h.closer_response === 'string') ? h.closer_response.trim() : '';
+    var resp = displayCloserResponse(h.closer_response) || '';   // sentinel-gated
     if (!resp) return;                                   // no response is not a withheld response
     // ⚠ DELIBERATELY NOT the shared isHandled() predicate (ruling 2026-08-17).
     // This asks "was this a GOOD MOMENT?", not "what is the rate?". A moment

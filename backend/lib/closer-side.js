@@ -39,4 +39,26 @@ function isSentinel(v) {
   return typeof v === 'string' && SENTINELS.indexOf(v.trim()) !== -1;
 }
 
-module.exports = { NO_REPLY, MOMENT_IS_CLOSER, SENTINELS, isSentinel };
+/* ⚠⚠⚠ THE DISPLAY GATE. A SENTINEL IS A RESULT, NOT A QUOTE — AND IT MUST NEVER
+   REACH A SCREEN, A PROMPT, THE VOICE CORPUS OR A KB ENTRY.
+
+   This exists because it already leaked. The performance synthesis renders
+   `quote: str(closer_response) || str(quote)`, and a sentinel is a NON-EMPTY
+   STRING, so it WON over the real quote and the evidence line came back as the
+   literal text `__moment_is_closer__`. A manager would have read that as the
+   proof of a weakness.
+
+   ⚠ v29 added the sentinels and guarded them against the quote VERIFIER only.
+   The RENDER paths were never checked — and there are a dozen of them, because
+   `closer_response` is consumed by both syntheses, the objection lanes, the
+   section breakdown, the voice corpus, KB harvesting and several API payloads.
+   ⚠ A consumer that genuinely wants the MEANING ("he did not reply") asks
+   isSentinel() explicitly; everything that wants TEXT goes through here. */
+function displayCloserResponse(v) {
+  if (typeof v !== 'string') return null;
+  var t = v.trim();
+  if (!t || isSentinel(t)) return null;
+  return t;
+}
+
+module.exports = { NO_REPLY, MOMENT_IS_CLOSER, SENTINELS, isSentinel, displayCloserResponse };

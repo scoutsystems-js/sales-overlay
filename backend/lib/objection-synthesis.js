@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 
 const { clipHref } = require('./clip-link');
+const { displayCloserResponse } = require('./closer-side');
 const OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const SYNTH_MAX_TOKENS = 2500;
 
@@ -156,8 +157,10 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     // copy. Examples stay on the moment's own resolution.
     if (isHandled(r, outcomeByCall[r.fathom_call_id])) b.handled += 1;
     if (r.resolution === 'handled') {
-      if (r.closer_response && b.examples.length < 3) {
-        b.examples.push({ quote: str(r.quote, 300), closer_response: str(r.closer_response, 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
+      /* ⚠ SENTINEL-GATED: an example is EVIDENCE OF GOOD HANDLING shown to a
+         closer — a sentinel is not something he said. */
+      if (displayCloserResponse(r.closer_response) && b.examples.length < 3) {
+        b.examples.push({ quote: str(r.quote, 300), closer_response: str(displayCloserResponse(r.closer_response), 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
           source: (meta[r.fathom_call_id] || {}).source || null });
       }
     }
