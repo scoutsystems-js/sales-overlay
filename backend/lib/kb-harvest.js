@@ -63,7 +63,18 @@ var HARVEST_SECTION_CAP = 2;
  */
 function shouldHarvest(outcome, notASalesCall) {
   if (notASalesCall === true) return false;
-  return outcome === 'closed';
+  /* ⚠⚠ THE CLOSED-ONLY GATE IS GONE (Justin's ruling, approved 2026-08-29):
+     "there's always a coaching moment you can take from a call". RULING 4 above
+     is superseded on the OUTCOME question only — cash is still forbidden from
+     this decision, and the arity stays 2 so it cannot creep back in.
+
+     ⚠ THE DILUTION RISK IS REAL AND IS HANDLED BY A BAR, NOT BY THE GATE. See
+     selectHarvestMoments: a moment must now be a PROVEN CLOSER LINE. Measured
+     before wiring, on the live corpus:
+       now  (closed only, any speaker):  972 candidate moments from 272 calls
+       this (any outcome, proven closer): 938 candidate moments from 699 calls
+     Volume-NEUTRAL at -3%, with 2.6x the calls contributing. */
+  return true;
 }
 
 // Which moments to file. Good-group + section-tagged + non-blank quote, capped
@@ -86,6 +97,25 @@ function selectHarvestMoments(highlights, cap) {
     // entirely; storing it would allow unbounded duplicates of the same moment.
     if (!quoteHash(h.quote)) continue;
     if (highlightGroup(h) !== 'good') continue;
+    /* ⚠⚠ THE QUALITY BAR THAT REPLACES THE CLOSED-ONLY GATE: a PROVEN CLOSER
+       LINE. Both conditions, both fail closed.
+
+       THE ARGUMENT IS THAT THE READ PATH ALREADY REQUIRES THIS. The section
+       library (lib/section-library.js) filters to exactly `speaker === 'CLOSER'
+       && speaker_verified === true` at render time, so storing anything else is
+       storing material the only surface reading it discards.
+
+       AND THE SPLIT PROVES IT: `buying_signal` is 2,525 moments of which only
+       47 (1.9%) are the closer speaking — a buying signal is by definition
+       something the PROSPECT says. `strong_moment` is 967 of which 846 (87%)
+       are. Without this bar, widening the gate would file ~2,700 prospect
+       quotes as the rep's own coaching material, which is the exact defect 6b
+       had to repair in this table once already.
+
+       ⚠ === true / === 'CLOSER', never truthiness: an ABSENT verdict is not a
+       positive one. */
+    if (h.speaker !== 'CLOSER') continue;
+    if (h.speaker_verified !== true) continue;
 
     var n = perSection[h.section] || 0;
     if (n >= limit) continue;

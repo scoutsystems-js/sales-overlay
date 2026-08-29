@@ -3224,6 +3224,24 @@ grep -rn "recording_url.*?t="                   # the EXPECTED SHAPE — found s
   - **✅ FOURTH INSTANCE, AND THE FIRST CAUGHT BEFORE IT WAS REPORTED AS A PROBLEM (2026-08-18).** A post-deploy check flagged two pastel hexes as *"still present"* after the ramp went vivid. Re-scoped to the ramp instead of the whole document, the ramp held exactly its seven new entries — the hits were `#c4b5fd` on a **KB category badge** (an unrelated taxonomy palette) and `#22d3ee` as the **`--cyan` token**, the objection-category colours, and the comment naming the pastel it replaced. **Cost of the catch: one extra command.**
   - **⚠ RECORD THE CATCHES, NOT ONLY THE FAILURES — A RULE THAT STOPS A MISTAKE PRODUCES NOTHING.** No incident, no fix, no diff, nothing to point at: **it looks exactly like the rule was never needed.** Three instances here are damage and the fourth is the rule working, and without the fourth written down this entry reads as a list of past mistakes rather than as a practice that pays for itself. **Every rule in this file has the same problem — the evidence for keeping it is invisible by construction.**
 
+### ⚠⚠⚠ THE COACHING PANEL RENDERS THE PROSPECT'S WORDS AND DROPS THE CLOSER'S LINE IT ALREADY HAS (diagnosed 2026-08-29)
+**Justin: *"a lot of weak, lazy coaching advice, mainly in What Needs Work."* Measured live across all 8 reps, 90 days:**
+```
+rendered quotes                          118
+  the PROSPECT speaking                  109   (92%)
+  the CLOSER speaking                      9
+  that HAVE a closer_response stored      110   (93%)  <- rendered: NONE
+```
+- **⚠⚠ IT IS NOT AN ATTRIBUTION BUG AND v29 DOES NOT FIX IT.** v29 is demonstrably working — `closer_response` coverage on this pool went **75% (v28) → 98.7% (v29)**. The prospect-dominance is **BY DESIGN**: the panel shows the `bad` group, and `risk_signal` / `barrier` / `objection` are prospect statements by definition — the speaker-anchoring guard *enforces* that. **The defect is what the panel RENDERS, not how the moment was attributed**, and the closer's own line is sitting in the row unselected.
+- **⚠ THE PANEL IS NOT THE ONE ITS NAME SUGGESTS.** "What Needs Work" here is `sectionRankCardHtml` fed by `computeNeedsWorkSections` — **not** `team-needs-work` / `lib/team-needs-work.js`, which is a different surface with a different query. Two things share the phrase, and reading the wrong one costs the whole diagnosis. **Find the render by its heading string, not by the name of the module you expect.**
+- **⚠⚠ I SAMPLED THREE OBSERVATIONS, SAW A PRESCRIPTION, AND WAS WRONG.** Three real rows all contained *"closer needs to…"*, so I nearly reported that the missing coaching already existed and only needed rendering. **Measured: 31 of 537 (5.8%) are prescriptive, and 3 say "should have".** A three-row sample of a 537-row population is an anecdote; the difference between "already there" and "5.8%" is the difference between a render fix and a prompt change.
+- **THE SHAPE THE TARGET NEEDS, and what exists today:** the moment ✓100% · what the prospect revealed ✓100% · what the closer did ✓98.7% · **what they should have asked ✗5.8%** · **why it would have mattered ✗5.8%**. **Three of five are free and unrendered; two need generating.**
+
+### ⚠⚠ A ROW LISTING WHAT SOMETHING UNIQUELY CARRIES IS A CLAIM, NOT AN INVENTORY (2026-08-29)
+**Recorded as its own rule because it generalises past the one row.** The old objections view was kept for three named reasons; at removal, **two were already stale and the third was never true** — it named a renderer SHARED with a live surface, so acting on the row would have meant either keeping a dead page for nothing or deleting something a working page depends on.
+- **THE ASYMMETRY: a preservation reason is written once, in the past, about a moving codebase — and it is then used to justify an IRREVERSIBLE act.** Every other kind of row gets re-verified before work starts; this kind tends not to, because it reads as settled history rather than as a task.
+- **THE CHECK IS TWO QUESTIONS PER CLAIM: is it still true, and is it implemented HERE or merely REACHED from here?** The second is what separates "unique feature" from "shared function", and only one of those is safe to delete.
+
 ### ⚠⚠⚠ A DEFENSIBLE READING OF A ROW IS NOT THE FEATURE — CUSTOMIZE VIEW SHIPPED AND WAS NOT WHAT WAS ASKED FOR (2026-08-29)
 **The row said *"let a manager choose what the team page shows"*. A panel show/hide satisfies that sentence completely. Justin: *"what was shipped wasn't close to what I originally asked for. It's going to be a big lift for what I want."***
 - **⚠⚠ THE FAILURE IS NOT MISREADING — IT IS THAT A ONE-LINE ROW CANNOT CARRY A FEATURE.** What he described is a **WIDGET CATALOG**: the manager picks the METRIC *and* the VIEW TYPE — speedometer, line, plain number, horizontal or vertical bar. Nothing in the row said so, and nothing in it ruled it out.

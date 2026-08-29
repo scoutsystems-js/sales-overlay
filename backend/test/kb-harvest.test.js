@@ -13,7 +13,9 @@ const assert = require('node:assert');
 const { selectHarvestMoments, shouldHarvest, HARVEST_SECTION_CAP } = require('../lib/kb-harvest');
 
 function hl(section, type, quote, extra) {
-  return Object.assign({ id: 'h-' + quote, section: section, type: type, quote: quote, speaker: 'CLOSER', observation: 'o' }, extra || {});
+  /* ⚠ speaker_verified defaults TRUE because the harvest bar now requires a
+     PROVEN closer line. Tests that care about the bar override it explicitly. */
+  return Object.assign({ id: 'h-' + quote, section: section, type: type, quote: quote, speaker: 'CLOSER', speaker_verified: true, observation: 'o' }, extra || {});
 }
 
 // ── The gate (ruling 4) ──────────────────────────────────────────────────
@@ -21,10 +23,45 @@ test('harvest fires on a closed call', () => {
   assert.strictEqual(shouldHarvest('closed'), true);
 });
 
-test('harvest does NOT fire on follow_up, lost, no_show, or null', () => {
-  for (const o of ['follow_up', 'lost', 'no_show', null, undefined, '', 'CLOSED ']) {
-    assert.strictEqual(shouldHarvest(o), false, 'should not harvest: ' + JSON.stringify(o));
-  }
+test('⚠⚠ CONVERTED 2026-08-29 — the gate now fires on EVERY outcome', () => {
+  /* THIS TEST USED TO ASSERT THE OPPOSITE, and it was right at the time: the
+     gate was `outcome === 'closed'` ALONE (ruling 4). Justin ruled it widened —
+     "there's always a coaching moment you can take from a call" — and approved
+     it on the measured evidence that it is volume-NEUTRAL once the quality bar
+     is in place (972 moments from 272 calls -> 938 from 699).
+
+     ⚠ The SUBJECT that outlives the change: the gate must still refuse a
+     not-a-sales-call, and CASH must still be incapable of entering it. */
+  ['closed', 'follow_up', 'lost', 'no_show', null, undefined].forEach((o) => {
+    assert.strictEqual(shouldHarvest(o, null), true, String(o) + ' must now harvest');
+  });
+  assert.strictEqual(shouldHarvest('closed', true), false, 'a not-a-sales-call is still refused');
+  assert.strictEqual(shouldHarvest('follow_up', true), false);
+  /* ⚠ NULL is unassessed and must NOT block — only an explicit true does. */
+  assert.strictEqual(shouldHarvest('lost', null), true);
+  /* ⚠ THE ARITY PIN STAYS AT 2. It exists to keep CASH out of this decision:
+     the grader records cash by payment structure, so a payment-plan close
+     legitimately shows zero and `cash > 0` would drop real wins. */
+  assert.strictEqual(shouldHarvest.length, 2, 'cash must remain incapable of entering the gate');
+});
+
+test('⚠⚠ THE BAR THAT REPLACES THE GATE: a PROVEN CLOSER LINE, both halves required', () => {
+  /* The read path already requires this — lib/section-library filters to
+     exactly it at render time — so anything else is stored only to be
+     discarded. And `buying_signal` is 2,525 moments of which 47 are the closer
+     speaking: without this bar, widening the gate would file ~2,700 PROSPECT
+     quotes as the rep's own winning material, which is the defect 6b repaired. */
+  const good = hl('discovery', 'strong_moment', 'a proven closer line');
+  assert.strictEqual(selectHarvestMoments([good]).length, 1);
+
+  // the prospect speaking — never the rep's material
+  assert.strictEqual(selectHarvestMoments([hl('discovery', 'strong_moment', 'q', { speaker: 'PROSPECT' })]).length, 0);
+
+  // an UNPROVEN speaker: absent is not a positive verdict
+  [undefined, null, false, 'true', 0].forEach((v) => {
+    assert.strictEqual(selectHarvestMoments([hl('discovery', 'strong_moment', 'q', { speaker_verified: v })]).length, 0,
+      'speaker_verified=' + JSON.stringify(v) + ' must not qualify');
+  });
 });
 
 test('RULING 4: the gate does not consider cash — a zero-cash close still harvests', () => {
