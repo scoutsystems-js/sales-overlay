@@ -666,6 +666,20 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠ PROSPECT GROUPING — THE MACHINERY WORKS AND THE REVIEW SURFACE IS UNREACHABLE (2026-08-29)
+**Filed as "grouping is broken — one person, three prospect rows". It is not broken. The proposals are correct and nobody can reach the page that applies them.**
+```
+joshua   158 prospects   54 proposals   [first] Abu and Jelani <-> Abu Askia and Shakrea
+                                        [name]  Abu and Jelani <-> Abu
+josh     551 prospects  355 proposals
+merges ever performed, platform-wide:   4   of 1,371 prospects
+```
+- **⚠⚠ `#prospects` HAS NO NAV ENTRY** — the code says so in its own comment — so the merge review is reachable only by typing the hash. **That is why the splits accumulate**, and every unmerged pair inflates the close-rate denominator (measured previously at ~0.9 points per missed merge).
+- **⚠ THE NAV ENTRY WAS NOT RE-ADDED. It was removed deliberately**, so restoring it is a product decision rather than a bug fix — and quietly re-adding a surface someone removed is how a ruling gets reversed by accident.
+- **⚠⚠ AND THE VOLUME IS THE ACTUAL PROBLEM, NOT THE ROUTING: 355 proposals on one account is not reviewable by hand.** Any fix has to answer that, not merely restore a link.
+- **⚠⚠ DO NOT REACH FOR AUTO-MERGE — the same run proposes `Mark-Anthony ↔ Mark Churchill` and `Mark-Anthony ↔ Mark Saville`, plainly different people.** The `first`-name reason is noisy BY DESIGN; that is precisely why these are proposals and why the standing ruling argues hardest against automating them. **A wrong merge silently fabricates close-rate numbers and is invisible in the aggregate.**
+- **THE SHAPE, and it generalises: a feature can be complete, correct and worthless because its entry point is gone.** Same family as the dead call site and the orphaned strip builder — here the unreachable thing is a whole page, and the evidence is a usage count of 4.
+
 ### ⚠⚠⚠ STANDING INSTRUCTION — STOP REPORTING COST (Justin, 2026-08-29)
 **He does not want a running commentary on what things cost. Not in findings, not in reports, not as a caveat appended to a recommendation. When cost is genuinely a decision he needs to make, HE WILL RAISE IT.**
 - **⚠⚠ THIS CHANGES THE REPORTING, NOT THE APPROVAL RULE. Spend still needs approval BEFORE it is spent** — the dry-run-then-confirm discipline, the six-loop ceiling, "do not run it, Justin rules" all stand exactly as they are. What stops is **narrating the price of everything**.
