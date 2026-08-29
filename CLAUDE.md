@@ -666,17 +666,32 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
-### ⚠⚠⚠ A PLACEHOLDER THAT IS A VALID VALUE OF ITS OWN TYPE PASSES EVERY PRESENCE CHECK (2026-08-29)
-**The general form behind two separate defects found in one block. Same family as zero-versus-absence, one level up: there the placeholder is a valid NUMBER, here it is a valid STRING or a valid OBJECT.**
+### ⚠⚠⚠ A TRUTHY ERROR, A NON-EMPTY SENTINEL, A ZERO — THREE INSTANCES OF ONE FAULT (stated together 2026-08-29)
+**A PLACEHOLDER THAT IS A VALID VALUE OF ITS OWN TYPE DEFEATS EVERY CHECK THAT ASKS WHETHER SOMETHING IS PRESENT.**
 ```
-a SENTINEL is a non-empty string   ->  `closer_response || quote` picked the sentinel OVER the real quote
-                                       and rendered `__moment_is_closer__` as a manager's evidence
-an ERROR is a truthy object        ->  `!state.teamRepSeries` was FALSE, so a FAILED lane read as ARRIVED:
-                                       the skeleton was dropped and an empty 300px box replaced it, silently
+0            is a valid NUMBER   ->  "zero calls" and "no data" become one state
+'__no_reply__' is a valid STRING ->  `closer_response || quote` picked the SENTINEL over the real quote
+{_error:...}   is a valid OBJECT ->  `!state.teamRepSeries` was false, so a FAILED lane read as ARRIVED
 ```
-- **⚠⚠ THE CHECK IS NOT WRONG — IT IS ANSWERING "IS SOMETHING THERE?" WHEN THE QUESTION IS "IS SOMETHING USABLE?"** Both defects sat behind guards that were correct for presence and blind to kind.
-- **THE RULE: WHEREVER A FIELD CAN HOLD A PLACEHOLDER, THE CHECK MUST TEST FOR THE PLACEHOLDER, NOT FOR EMPTINESS.** `displayCloserResponse()` and an explicit `failed` flag are the two shapes that fell out of it here.
-- **⚠ AND THE FALLBACK OPERATOR IS THE TELL: `a || b` PREFERS ANYTHING TRUTHY.** Any `x || y` where `x` can carry a sentinel or an error object is this bug waiting to happen — the more "defensive" the fallback looks, the more reliably it selects the wrong branch.
+- **⚠⚠ IN ALL THREE THE CHECK IS CORRECT AND ANSWERING THE WRONG QUESTION.** It asks *is something there?* when the question is *is something USABLE?* — and presence is exactly what a placeholder guarantees.
+- **⚠ THE FALLBACK OPERATOR IS THE TELL: `a || b` PREFERS ANYTHING TRUTHY.** Any `x || y` where `x` can hold a sentinel or an error object is this bug waiting. **The more defensive the fallback looks, the more reliably it selects the wrong branch.**
+- **THE RULE: WHEREVER A FIELD CAN CARRY A PLACEHOLDER, TEST FOR THE PLACEHOLDER — NOT FOR EMPTINESS.** The three shapes that fell out here: `displayCloserResponse()` (gate the text), an explicit `failed` flag (gate the render), and `write-the-null` (gate the meaning).
+
+### ⚠⚠⚠ THE GAUGES KEPT THE PREVIOUS COMPANY'S NUMBERS — AND NO REQUEST WAS EVER MADE (2026-08-29)
+**Justin, testing the picker fix: *"the dropdown works BUT the team averages numbers stay the same as Scout Systems on refresh — if I cycle through the dropdown back to Sober Living it updates."* THE FIX WAS PARTIAL AND THE ROW WAS NOT CLOSED.**
+- **THE CAUSE WAS NOT THE EPOCH, AND THAT DISTINCTION IS THE WHOLE POINT.** `teamAverages` was cleared in `pickTeam()` and **not** in `resetTeamData()`. A refresh resets through `restoreTeamPick`, not `pickTeam`, so the lane was never nulled — and the lazy kick is `if (lane === null)`, so it never refetched either. **NO REQUEST WAS MADE AT ALL.** A stale-response guard cannot help a lane that never asks.
+- **⚠ THE EXEMPTION WAS LEGITIMATE; THE PLACEMENT WAS WRONG.** The gauges are a fixed 7-day window and the panel promises on screen that the date filter does not affect them — so a RANGE change genuinely must not reload them. Clearing it by hand in one caller meant only the paths that *remembered* worked.
+- **⚠⚠ AND A COMMENT ASSERTED A PARITY THAT DID NOT HOLD.** The restore path read *"THE SAME TWO CALLS pickTeam MAKES"* while `pickTeam` made **three**. **Prose claiming an equivalence that nothing enforced** — the stale-load-bearing-comment family, and it is what let this through.
+- **THE FIX IS THAT SCOPE IS A PROPERTY OF THE LANE, NOT OF THE CALL SITE.** `TEAM_LANE_SCOPE` declares each lane `'both'` or `'team'`; `resetTeamData(reason)` clears from it. **The default is `'team'` because that fails toward a visible reload rather than toward one company's numbers under another's name.**
+- **⚠⚠ MY FIRST VERSION REINTRODUCED THE BUG ONE LINE DOWN, AND THE PROBE CAUGHT IT.** I cleared the DATA from the map and the FLAGS from a hand-written list — and `teamAverages` was missing from the list. Nulling a lane while it is still marked loading makes the refetch a no-op, so the lane sat empty. **The data and its flag are now cleared from the same map, which is the only version that cannot diverge.**
+- **THE ENUMERATION IS WHAT MADE IT FINDABLE:** every lane `renderTeamView` kicks, checked for which team it holds after a refresh — 7 of 8 correct, one wrong. **Justin found the gauges because that is where he happened to look; the table is what proves the other seven.**
+- **⚠ HONEST LIMIT OF THE PROOF: in the BEFORE arm the harness yields `null` where he saw Scout Systems' actual numbers.** Directionally right, not an exact reproduction — and the gesture has now caught this twice, so his refresh is still the closing check.
+
+### ⚠⚠ THE ORDERING MODEL HAS NOW MISPREDICTED THREE TIMES — STOP REASONING FROM IT (2026-08-29)
+**It said the persistence fix was clear (it was the cause). It said the epoch would cover the blank graphs (the race yields WRONG lines, not none). It did not anticipate the gauges lane at all (which never requests).**
+- **⚠ EACH TIME THE MODEL WAS INTERNALLY COHERENT AND THE PREDICTION WAS WRONG**, because the failure lived somewhere the model did not represent: a half-restored control, a truthy error object, a lane outside the reset.
+- **THE REPLACEMENT IS ENUMERATION BY CAPABILITY, THEN EXECUTION.** List every lane / consumer / call site mechanically, drive the SHIPPED functions, and print a table of what each one actually holds. **Every one of the last four defects was found that way and none by reasoning about the sequence.**
+- **⚠ A DEADLOCKED PROBE PRINTS NOTHING AND EXITS 0.** My lane enumeration awaited promises that only settle later in the same function; node exited with them pending, silently, exit code 0 — which looks exactly like a clean run with no output. **A probe that prints nothing has not passed; it has not run.**
 
 ### ⚠⚠ A MARKER CHECKED AGAINST A FILE THAT COULD NEVER CONTAIN IT IS INDISTINGUISHABLE FROM A MISSING DEPLOY (2026-08-29)
 **I checked for `EXCLUSION — legal` on the served `/dashboard`. It lives in `lib/team-digest.js`. It returned 0 — and 0 is exactly what a failed deploy looks like.**
