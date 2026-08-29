@@ -3868,6 +3868,26 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ⚠⚠ SORTING BY SIZE IS NOT SAMPLING BY FREQUENCY — THE BIGGEST INSTANCES NAMED THE WRONG ACCOUNT (2026-08-29)
+**Investigating the Zoom one-speaker collapse, I pulled the failing calls ordered by transcript length, found the top three all belonged to one user, and started writing up "his account has a recurring Zoom problem". Measured per account he has the LOWEST rate in the corpus.**
+```
+by SIZE (what I sorted on)        by RATE (the actual question)
+  1st Godwin  35,146 chars          reviewer  6 of 6   100%   <- test meetings
+  2nd Godwin  13,641                josh      7 of 42   17%
+  3rd Godwin  10,678                godwin    4 of 126   3%   <- the LOWEST
+```
+- **⚠⚠ THE ORDERING WAS CORRECT AND THE INFERENCE WAS BACKWARDS.** His calls are the longest, so his failures are the biggest transcripts; that says nothing about how OFTEN he fails. **A sort by magnitude answers "which instances are worst", and it is read as "who has the problem".**
+- **THE TELL IS A NARRATIVE FORMING FROM THE TOP OF A SORTED LIST.** Any `ORDER BY size DESC` concentrates whoever produces the largest items, so the top of the list is a statement about their volume, not their failure rate. **Ask for the rate per group before attributing a cause to a group.**
+- **AND THE SCALE CHANGED WITH IT.** "17 of 174 calls collapse" reads as a real defect; **only 4 carry substantial content** — ten are under 500 characters and several are 0-duration test meetings. **The headline count and the count that matters differed by 4x**, and only bucketing by content size separated them.
+- Same family as *the average is the one number that cannot see regions*: a single ordering, faithfully computed, answering a question nobody asked.
+
+### ⚠⚠ A COLLAPSED TRANSCRIPT IS STILL GRADED — THE UNUSABLE INPUT PRODUCES A CONFIDENT SCORE (2026-08-29)
+**Four Zoom calls whose entire two-sided conversation is attributed to one speaker were graded 71, 47 and 32, with `speaker_closer_name` NULL and 5-8 highlights extracted from them.**
+- **Nothing refuses.** The grader is handed a transcript in which one person appears to say everything — including the prospect's objections — and returns a score that enters the rep's averages indistinguishably from a real one.
+- **⚠ THE CAUSE IS UPSTREAM AND UNFIXABLE IN CODE, WHICH IS EXACTLY WHY THE CONSEQUENCE NEEDS A DECISION.** The host phones the prospect, so both voices arrive on one audio channel and Zoom labels all of it with the host's name. No adapter can split one channel — so the only lever is whether such a call should be graded at all.
+- **THE SHAPE, and it generalises past Zoom: when an input is detectably unusable, silently producing an output from it is worse than producing none.** The project already applies this to prospect names (refuse rather than guess) and to quote attribution (refuse rather than misattribute); the grader has no equivalent refusal.
+- **⚠ FILED, NOT BUILT — refusing to grade is a product ruling, not a bug fix.**
+
 ### ⚠⚠⚠ A QUEUE ROW GOES STALE WHEN THE WORK SHIPS AND NOBODY EDITS THE ROW — AND THE FILE THEN CARRIES BOTH ANSWERS AT ONCE (fourth instance 2026-08-29)
 **Four rows now: the health snapshot, the update-analyses filing, the sub-page hashes, and admin-view-rebuild part 2. This is a recurring failure of the queue itself, not four coincidences.**
 - **The live case:** the row said *"PART 2 IS NOT [shipped]"* and *"NOT BUILT: deactivate/delete a whole company"*. **Both shipped in `319d06b` on 2026-08-24 — FOUR DAYS BEFORE the 2026-08-28 ruling the row records as unblocking them.** The row was diligently updated with the ruling; nobody asked whether the work had already been done.
