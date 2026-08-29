@@ -110,16 +110,25 @@ test('⚠ THE CONTROL RENDERS ON A PIVOT ONLY FOR MANAGERS AND ABOVE', () => {
     'and the render gate must use it');
 });
 
-test('⚠⚠ THE CONFIRMATION NAMES WHOSE CALLS AND WHOSE MONEY', () => {
-  // A manager spending on a rep's backlog is not the same act as a closer
-  // spending on their own, and leaving it implied is how 101 calls get run
-  // without anyone registering it was company money on another person's account.
+test('⚠⚠ THE CONFIRMATION NAMES WHOSE CALLS — AND NO LONGER WHOSE MONEY', () => {
+  // ⚠⚠ CONVERTED 2026-08-28, NOT DELETED. This test pinned two properties and
+  // Justin ruled one of them OUT. Whose CALLS is still required — a manager
+  // grading a rep's backlog should see whose calls they are. Whose MONEY is now
+  // FORBIDDEN: the sentence "This is billed to the company, not to them" was
+  // removed, not softened, because telling a rep whose money is being spent puts
+  // a hesitation in their head about spending someone else's money on their own
+  // coaching. There is no billing decision for them to make here.
+  //
+  // ⚠ The subject outlived the vehicle: deleting this test with the sentence
+  // would have quietly stopped checking that the rep is named at all.
   const at = LIVE.indexOf('var whose = isSelf()');
-  assert.ok(at !== -1, 'the confirmation must distinguish self from a rep');
+  assert.ok(at !== -1, 'the confirmation must still distinguish self from a rep');
   const src = LIVE.slice(at, at + 900);
-  assert.ok(/viewedUserLabel\(\)/.test(src), 'it must name the rep');
-  assert.ok(/billed to the company/.test(src), 'and say whose money it is');
+  assert.ok(src.length > 300, 'slice must cover the confirmation: ' + src.length);
+  assert.ok(/viewedUserLabel\(\)/.test(src), 'it must still name the rep');
   assert.ok(/gradeCostText/.test(src), 'with the cost, as the self-serve one does');
+  assert.ok(!/billed to the company/.test(src), 'the cost-ownership sentence must NOT come back');
+  assert.ok(!/whoseMoney/.test(src), 'nor the variable that carried it');
 });
 
 test('⚠ THE REP LABEL NEVER RENDERS BLANK — a money dialog must not read "Grade 101 of ’s calls"', () => {

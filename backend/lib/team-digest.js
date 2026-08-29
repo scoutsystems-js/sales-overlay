@@ -239,7 +239,8 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     });
     var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
     if (!parsed || !str(parsed.summary, 1000)) {
-      return { available: false, reason: 'Digest synthesis returned unusable output — will retry on the next run.' };
+      // ⚠ CUSTOMER-FACING: no internal mechanism named.
+      return { available: false, reason: 'Today\'s summary is not ready yet — it will appear shortly.' };
     }
     // Resolve notable entries against REAL rows only (never LLM-invented links).
     var notable = [];

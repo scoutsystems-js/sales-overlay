@@ -1327,8 +1327,8 @@
       : 'User created. Share this temporary password with them now — <strong>it will not be shown again.</strong>';
     if (es) {
       if (inviteSent) { es.textContent = '✓ Invite sent — they\'ll set their own password from the email.'; es.style.color = 'var(--good)'; }
-      else if (data.welcome_email === 'failed') { es.textContent = '✗ Email failed — temp password fallback shown below.'; es.style.color = 'var(--bad)'; }
-      else { es.textContent = 'Email not configured — temp password fallback shown below.'; es.style.color = 'var(--text-muted)'; }
+      else if (data.welcome_email === 'failed') { es.textContent = '\u2717 We could not email them. Give them the temporary password below.'; es.style.color = 'var(--bad)'; }
+      else { es.textContent = 'Email is not set up yet. Give them the temporary password below.'; es.style.color = 'var(--text-muted)'; }
     }
     document.getElementById('createUserForm').style.display = 'none';
     document.getElementById('createUserSuccess').style.display = '';

@@ -501,7 +501,10 @@ async function getBucketMapping(objs) {
   try {
     var resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: BUCKET_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] });
     var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
-    if (!parsed || !Array.isArray(parsed.buckets)) return { ok: false, reason: 'Bucketing returned unusable output — will retry on the next load.' };
+    if (!parsed || !Array.isArray(parsed.buckets)) /* ⚠ CUSTOMER-FACING: names no mechanism. It used to say "Bucketing returned
+       unusable output — will retry on the next load", which tells the reader
+       about an internal step and gives them nothing to do. */
+      return { ok: false, reason: 'Objection coaching is not ready yet — check back shortly.' };
     parsed.buckets.forEach(function (bk) {
       // ⚠ COERCED, NOT TRUNCATED. The old code did str(label, 30) on a label the
       // model invented, which is exactly how "Needs To Consult Spouse/Partne"

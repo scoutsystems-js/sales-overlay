@@ -3687,7 +3687,10 @@
            messaging, so without this "no reply in Scout" reads as "nobody
            looked" — the silence this whole flow exists to remove. -->
       <br><strong>If it needs a reply, it comes by email.</strong></p>
-    <div id="supportMine"></div>
+    <!-- ⚠ THE PERSON'S OWN REPORT HISTORY MOVED TO THE ACCOUNT PAGE (Justin,
+         2026-08-28). A list of past reports is reference material; the modal
+         exists to get ONE report written and sent. Mixing them made the modal
+         longer every time it was used, and pushed the textarea down. -->
     <!-- ⚠ THE CATEGORY IS A FILTER, NEVER A REPLACEMENT FOR THE MESSAGE. A
          category with no message is a ticket nobody can action, so the textarea
          stays required and this does not. Five options, grounded in what has
@@ -5016,7 +5019,7 @@
         var data = await res.json();
         var n = (data && typeof data.queued === 'number') ? data.queued : 0;
         noticeText = n === 0
-          ? 'No pending calls to reanalyze.'
+          ? 'Nothing is waiting to be graded.'   // ⚠ no internal verb on a customer screen
           : 'Queued ' + n + ' call' + (n === 1 ? '' : 's') + ' for reanalysis. Grades will populate as each finishes.';
       } else {
         var errBody = null;
@@ -5149,20 +5152,23 @@
          empty once made every call look ungraded and nearly spent ~$75 nobody
          approved; the fix is that the number shown and the number run are the
          same query. */
-      /* ⚠⚠ SAY WHOSE CALLS AND WHOSE MONEY. A manager spending on a rep's
-         backlog is not the same act as a closer spending on their own, and
-         leaving that implied is how someone runs 101 calls without registering
-         that they just spent company money on another person's account. */
-      /* ⚠ SELF KEEPS ITS ORIGINAL WORDING — "Grade 291 calls". Only the pivoted
-         case names the rep, because that is the case where whose calls these are
+      /* ⚠ SAY WHOSE CALLS — a manager grading a rep's backlog should see whose
+         calls they are. SELF keeps its original wording ("Grade 291 calls");
+         only the pivoted case names the rep, because that is the case where it
          is not obvious from where you are standing. */
+      /* ⚠⚠ THE COST-OWNERSHIP SENTENCE WAS REMOVED, NOT SOFTENED (Justin's
+         ruling 2026-08-28). It read "This is billed to the company, not to
+         them." ⚠ THE PROBLEM IS NOT THE WORDING, IT IS THAT THE SENTENCE
+         EXISTS: telling a rep whose money is being spent puts a hesitation in
+         their head about spending someone else's money on their own coaching —
+         and that hesitation is the opposite of what the control is for. There
+         is no billing decision for them to make here, so there is nothing to
+         warn about. DO NOT REINSTATE IT IN ANY FORM. */
       var whose = isSelf() ? '' : ' of ' + escapeHtml(viewedUserLabel()) + '&rsquo;s';
-      var whoseMoney = isSelf() ? '' : ' This is billed to the company, not to them.';
       return '<span class="grade-wrap"><span class="grade-confirm">'
         + '<span class="grade-confirm-text">Grade <strong>' + cf.count + whose + ' call'
           + (cf.count === 1 ? '' : 's') + '</strong> from ' + escapeHtml(gradeScopeLabel(cf.scope))
           + ' — <strong>' + escapeHtml(gradeCostText(cf.count)) + '</strong> of AI analysis.'
-          + whoseMoney
           + ' Manual outcome tags are kept.</span>'
         + '<button class="calls-outcome-btn active" type="button" onclick="gradeBacklogGo()">Start Grading</button>'
         + '<button class="calls-outcome-clear" type="button" onclick="gradeBacklogCancel()">Cancel</button>'
@@ -5225,18 +5231,36 @@
    * is NOT built here — see the findings. */
   function openSupport() {
     var m = document.getElementById('supportModal'); if (!m) return;
-    document.getElementById('supportError').style.display = 'none';
-    // Restore the form if a previous send left the confirmation on screen.
+    /* ⚠⚠ RESTORE THE FORM **FIRST**. THIS ORDER IS THE WHOLE FIX.
+       The confirmation replaces the card's innerHTML, which DELETES every child
+       inside it — including #supportError. This function used to open by doing
+       `document.getElementById('supportError').style.display = 'none'`, so on
+       the next open that line threw a TypeError on null and the restore two
+       lines below NEVER RAN. The support tool broke itself on first use, and
+       the confirmation then told the person to use the button it had just
+       killed. ⚠ The restore logic was correct the whole time; a line above it
+       threw first — the dead-call-site family, one statement apart. */
     var card = m.querySelector('.support-card');
+    if (card) {
+      if (card.getAttribute('data-sent')) {
+        card.innerHTML = card.getAttribute('data-form') || card.innerHTML;
+        card.removeAttribute('data-sent');
+      } else if (!card.getAttribute('data-form')) {
+        card.setAttribute('data-form', card.innerHTML);
+      }
+    }
+    /* ⚠ NULL-GUARDED, because these are children of the card we may have just
+       swapped. Reaching for one before it exists is exactly what broke this. */
+    var errEl = document.getElementById('supportError');
+    if (errEl) errEl.style.display = 'none';
     /* ⚠ CLEAR THE DRAFT'S ATTACHMENT. Otherwise a second report silently
        inherits the first one's screenshot — a wrong image attached to the wrong
        problem is worse than none, and nothing on screen would say so. */
     supportAttach = null;
-    if (card.getAttribute('data-sent')) { card.innerHTML = card.getAttribute('data-form'); card.removeAttribute('data-sent'); }
-    else if (!card.getAttribute('data-form')) card.setAttribute('data-form', card.innerHTML);
     m.classList.remove('hidden');
     var t = document.getElementById('supportMessage'); if (t) t.focus();
-    loadMyTickets();   // ⚠ after the form is on screen — it must never gate it
+    /* ⚠ The report HISTORY is no longer in this modal — it is on the Account
+       page. Nothing to load here. */
   }
   /* Their own reports. ⚠ STATUS ONLY — no diagnostics, and the server does not
      even SELECT them. They describe an account, and on a shared company account
@@ -5358,11 +5382,15 @@
       }
       var card = document.querySelector('#supportModal .support-card');
       card.setAttribute('data-sent', '1');
+      /* ⚠⚠ WRITTEN FOR THE PERSON, NOT ABOUT SCOUT (standing rule 2026-08-28).
+         It used to say "there is no inbox in Scout" — an internal fact about
+         how the product is built, which the reader can do nothing with. What
+         they need is: it arrived, here is the reference, a reply comes by
+         email, and here is where to look it up. */
       card.innerHTML = '<h3>Thanks — we have it.</h3>'
         + '<p class="support-ok">Your reference is <span class="support-ref">' + escapeHtml(body.reference) + '</span>.<br>'
-        + 'We look at these directly. <strong>If it needs a reply you&rsquo;ll hear from us by email</strong> — '
-        + 'there is no inbox in Scout.<br>'
-        + 'You can see this report and its status any time from <em>Need help?</em>.</p>'
+        + '<strong>If it needs a reply, it comes by email.</strong><br>'
+        + 'You can check this report and its status any time under <em>Your reports</em> on your Account page.</p>'
         + '<div class="support-actions"><button class="btn-fathom-primary" type="button" onclick="closeSupport()">Close</button></div>';
     } catch (e) {
       err.innerHTML = 'Could not reach the server. You can email <a href="mailto:justin@scoutsystems.io">justin@scoutsystems.io</a>.';
@@ -5502,9 +5530,12 @@
         run.msg = 'Graded all ' + run.total + ' call' + (run.total === 1 ? '' : 's') + '.';
       } else if (run.quiet >= GRADE_STALL_TICKS) {
         run.failed = true;
-        run.msg = 'No calls have finished for ' + Math.round(GRADE_STALL_TICKS * GRADE_POLL_MS / 60000)
-          + ' minutes, so the run has probably stopped (a deploy ends one mid-way).'
-          + ' Nothing is lost — start it again to pick up where it left off.';
+        /* ⚠ CUSTOMER-FACING: "a deploy ends one mid-way" is our mechanism, not
+           their problem. What they need is that it stopped, nothing is lost,
+           and what to do. */
+        run.msg = 'Grading has stopped — no calls have finished for '
+          + Math.round(GRADE_STALL_TICKS * GRADE_POLL_MS / 60000) + ' minutes.'
+          + ' Nothing is lost. Start it again and it picks up where it left off.';
       }
     } else {
       /* A status fetch that fails is NOT evidence the run died — count it as a
@@ -11437,12 +11468,21 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody
         + priceFieldHtml(a) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>';
+      + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>'
+      /* Their own reports live here now, not in the modal. ⚠ STATUS ONLY — the
+         server does not even SELECT the diagnostics, because those describe an
+         ACCOUNT and on a shared company account that is not automatically
+         theirs to read. */
+      + '<div class="section fade-in"><div class="section-header"><h2>Your Reports</h2></div>'
+        + '<div id="supportMine"></div></div>';
 
     // Arrived via /connect → bring the Connections section (Zoom Connect button)
     // into view and briefly highlight the Zoom row. Runs once, on the first
     // full-content render (skeleton branch returns above before reaching here).
     if (pendingConnectFocus) { pendingConnectFocus = false; focusConnections(); }
+    /* Their own support reports. ⚠ AFTER the markup exists — loadMyTickets
+       writes into #supportMine, which this render just created. */
+    loadMyTickets();
   }
 
   // Scroll the #account Connections section into view and pulse the Zoom row, so
