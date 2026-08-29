@@ -209,7 +209,7 @@ router.get('/context', teamGate, async function (req, res) {
       ctx.teams = teams;
     }
     res.json(ctx);
-  } catch (err) { if (handleConfigError(err, res)) return; console.error('[team] context:', err.message); res.status(500).json({ error: 'Failed to load team context' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; logTeamError('context', err); res.status(500).json({ error: 'Failed to load team context' }); }
 });
 
 router.get('/overview', teamGate, async function (req, res) {
@@ -220,7 +220,7 @@ router.get('/overview', teamGate, async function (req, res) {
     var em = await emailMap(admin);
     var data = await computeTeamAnalytics(admin, team.memberIds, range.from, range.to, em);
     res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode } }, data));
-  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] overview:', err.message); res.status(500).json({ error: 'Failed to load team overview' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('overview', err); res.status(500).json({ error: 'Failed to load team overview' }); }
 });
 
 router.get('/trends', teamGate, async function (req, res) {
@@ -231,7 +231,7 @@ router.get('/trends', teamGate, async function (req, res) {
     var team = await resolveTeam(admin, req);
     var data = await computeTeamTrends(admin, team.memberIds, bucket, range.from, range.to);
     res.json(data);
-  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] trends:', err.message); res.status(500).json({ error: 'Failed to load team trends' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('trends', err); res.status(500).json({ error: 'Failed to load team trends' }); }
 });
 
 
@@ -291,7 +291,7 @@ router.get('/why-prose', teamGate, async function (req, res) {
   } catch (err) {
     if (handleConfigError(err, res)) return;
     if (err.status) return res.status(err.status).json({ error: err.message });
-    console.error('[team] why-prose:', err.message);
+    logTeamError('why-prose', err);
     res.status(500).json({ error: 'Failed to load rep summaries' });
   }
 });
@@ -430,7 +430,7 @@ router.get('/averages', teamGate, async function (req, res) {
   } catch (err) {
     if (handleConfigError(err, res)) return;
     if (err.status) return res.status(err.status).json({ error: err.message });
-    console.error('[team] averages:', err.message);
+    logTeamError('averages', err);
     res.status(500).json({ error: 'Failed to load team averages' });
   }
 });
@@ -537,7 +537,7 @@ router.get('/rep-series', teamGate, async function (req, res) {
   } catch (err) {
     if (handleConfigError(err, res)) return;
     if (err.status) return res.status(err.status).json({ error: err.message });
-    console.error('[team] rep-series:', err.message);
+    logTeamError('rep-series', err);
     res.status(500).json({ error: 'Failed to load rep series' });
   }
 });
@@ -550,7 +550,7 @@ router.get('/recommendations', teamGate, async function (req, res) {
     var em = await emailMap(admin);
     var data = await computeTeamRecommendations(admin, team.keyId, team.memberIds, range.from, range.to, em, await nameMapFor(admin, team.memberIds, em));
     res.json(data);
-  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] recommendations:', err.message); res.status(500).json({ error: 'Failed to load team recommendations' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('recommendations', err); res.status(500).json({ error: 'Failed to load team recommendations' }); }
 });
 
 // C-1: "Generate summary" — page-agnostic executive summary. The client hands
@@ -569,7 +569,7 @@ router.post('/summary', teamGate, async function (req, res) {
     var admin = getAdmin();
     var out = await computePageSummary(admin, req.user.id, pageLabel, data);
     res.json(out);
-  } catch (err) { if (handleConfigError(err, res)) return; console.error('[team] summary:', err.message); res.status(500).json({ error: 'Failed to generate summary' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; logTeamError('summary', err); res.status(500).json({ error: 'Failed to generate summary' }); }
 });
 
 // POST /team/needs-work/bucket — per-call evidence for one bucket across the team.
@@ -597,7 +597,7 @@ router.get('/needs-work', teamGate, async function (req, res) {
     var em = await emailMap(admin);
     var data = await computeTeamNeedsWork(admin, team.keyId, team.memberIds, range.from, range.to, em, await nameMapFor(admin, team.memberIds, em));
     res.json(data);
-  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] needs-work:', err.message); res.status(500).json({ error: 'Failed to load what-needs-work' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('needs-work', err); res.status(500).json({ error: 'Failed to load what-needs-work' }); }
 });
 
 // Call Highlights of the Week. ?week=<ISO monday> optional; default = this week.
@@ -612,7 +612,7 @@ router.get('/highlights', teamGate, async function (req, res) {
     weekTo = new Date(weekFrom.getTime() + 7 * 24 * 60 * 60 * 1000);
     var data = await computeWeeklyHighlights(admin, team.keyId, team.memberIds, weekFrom.toISOString(), weekTo.toISOString(), em, await nameMapFor(admin, team.memberIds, em));
     res.json(Object.assign({ week_from: weekFrom.toISOString(), week_to: weekTo.toISOString() }, data));
-  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] highlights:', err.message); res.status(500).json({ error: 'Failed to load highlights' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('highlights', err); res.status(500).json({ error: 'Failed to load highlights' }); }
 });
 
 // Manager daily digest — cache read. Generation is the sync cron's post-sync
@@ -639,7 +639,7 @@ router.get('/digest', teamGate, async function (req, res) {
     }
     if (!q.error && q.data && q.data.synthesis) return res.json(Object.assign({ available: true, date: date, recent_dates: recent }, q.data.synthesis));
     res.json({ available: false, date: date, recent_dates: recent, reason: 'No digest for ' + date + ' yet — it generates after the morning sync.' });
-  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] digest:', err.message); res.status(500).json({ error: 'Failed to load digest' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('digest', err); res.status(500).json({ error: 'Failed to load digest' }); }
 });
 
 // Owner-only manual trigger: generate digests on demand (all users-with-reps)
@@ -658,7 +658,7 @@ router.post('/digest/run', requireAuth, requireRole(['owner']), async function (
     }
     var summary = await generateDailyDigests(admin, opts);
     res.json(summary);
-  } catch (err) { if (handleConfigError(err, res)) return; console.error('[team] digest/run:', err.message); res.status(500).json({ error: 'Digest generation failed' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; logTeamError('digest/run', err); res.status(500).json({ error: 'Digest generation failed' }); }
 });
 
 /**
@@ -681,6 +681,27 @@ router.post('/digest/run', requireAuth, requireRole(['owner']), async function (
  * drifted would have the paragraph calling someone by a different name from the
  * row directly above it.
  */
+/**
+ * ⚠⚠ A PROGRAMMER ERROR AND AN OPERATIONAL ONE MUST NOT LOOK THE SAME IN THE LOG.
+ *
+ * Every catch here answered a 500 with a generic client message and logged
+ * `err.message` alone — no stack. `/team/why-prose` had NEVER worked (it called
+ * an undefined `getAdminClient`, throwing a ReferenceError on its first line)
+ * and the only trace was one line saying "getAdminClient is not defined", with
+ * nothing to say WHERE. It sat broken for weeks behind a panel that rendered
+ * its own error state.
+ *
+ * ⚠ THE GENERIC CLIENT MESSAGE IS CORRECT AND STAYS. Leaking an internal name
+ * to a browser is worse. The fix is to make a programmer error LOUD on the
+ * SERVER — a ReferenceError or TypeError is a bug in our code and gets its
+ * stack; a database timeout is an operational fact and does not.
+ */
+function logTeamError(tag, err) {
+  var isBug = (err instanceof ReferenceError) || (err instanceof TypeError);
+  if (isBug) console.error('[team] ' + tag + ' — PROGRAMMER ERROR (this is a bug, not an outage):', err && err.stack);
+  else console.error('[team] ' + tag + ':', err && err.message);
+}
+
 async function nameMapFor(admin, memberIds, em) {
   var profOf = {};
   if (memberIds.length > 0) {
@@ -708,7 +729,7 @@ router.get('/objections', teamGate, async function (req, res) {
     var data = await computeTeamObjections(admin, team.memberIds, range.from, range.to,
       { category: category, emailMap: em, nameMap: nameMap });
     res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode } }, data));
-  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); console.error('[team] objections:', err.message); res.status(500).json({ error: 'Failed to load team objections' }); }
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('objections', err); res.status(500).json({ error: 'Failed to load team objections' }); }
 });
 
 /**
