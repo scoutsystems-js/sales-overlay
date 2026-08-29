@@ -404,8 +404,11 @@ test('10d: a card WITHOUT a sentence renders complete, with no placeholder', () 
 
 test('10d loads LAZILY and is cleared when the team or range changes', () => {
   assert.ok(/why:\s*\{ flag: 'teamWhyLoading'/.test(HTML), 'has its own loader entry');
-  const reset = HTML.slice(HTML.indexOf('function resetTeamData'), HTML.indexOf('function renderTeamSurface'));
-  assert.ok(/state\.teamWhy = null/.test(reset), 'stale sentences must not survive a range change');
+  /* ⚠ CONVERTED 2026-08-29: lanes are no longer nulled one by one — they are
+     declared in TEAM_LANE_SCOPE and cleared from it. Assert the DECLARATION;
+     a per-lane literal is what went stale when teamAverages was added. */
+  const scope = HTML.slice(HTML.indexOf('var TEAM_LANE_SCOPE'), HTML.indexOf('};', HTML.indexOf('var TEAM_LANE_SCOPE')));
+  assert.ok(/teamWhy:\s*'both'/.test(scope), 'stale sentences must not survive a team OR a range change');
 });
 
 test('the cards sit between the graphs and the needs-work card', () => {

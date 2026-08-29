@@ -7118,17 +7118,62 @@
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
   }
-  function resetTeamData() {
+  /* ⚠⚠⚠ EVERY TEAM LANE DECLARES ITS SCOPE. A CALLER MUST NOT HAVE TO REMEMBER.
+     Justin, after the picker fix: "the dropdown works BUT the team averages
+     numbers stay the same as Scout Systems on refresh — if I cycle through the
+     dropdown back to Sober Living it updates."
+
+     ⚠ THE CAUSE WAS NOT THE EPOCH. `teamAverages` was cleared in pickTeam() and
+     NOT in resetTeamData(), so on a REFRESH (which resets via restoreTeamPick,
+     not pickTeam) the lane was never nulled — and the lazy kick is
+     `if (state.teamAverages === null)`, so it never refetched either. No request
+     was made at all, which is why a stale-response guard could not help.
+     ⚠ The exemption itself is LEGITIMATE: the gauges are a fixed 7-day window
+     and the panel says so on screen, so a RANGE change must not reload them.
+     It was the SCOPE that was right and the PLACEMENT that was wrong.
+
+     ⚠⚠ AND A COMMENT ASSERTED A PARITY THAT DID NOT HOLD — the restore path said
+     "THE SAME TWO CALLS pickTeam MAKES" while pickTeam made THREE. That is what
+     let it through: prose claiming an equivalence nothing enforced.
+
+     SO THE SCOPE IS A PROPERTY OF THE LANE, NOT OF THE CALL SITE. Adding a lane
+     means declaring what invalidates it, once, here. */
+  var TEAM_LANE_SCOPE = {
+    teamOverview: 'both', teamTrends: 'both', teamRecs: 'both', teamHighlights: 'both',
+    teamDigest: 'both', teamNeedsWork: 'both', teamRepSeries: 'both', teamWhy: 'both',
+    teamObjections: 'both', teamObjSummary: 'both',
+    // ⚠ TEAM-ONLY: a fixed 7-day window that must survive a range change.
+    teamAverages: 'team',
+  };
+
+  /* reason: 'team' | 'range'. ⚠ DEFAULTS TO 'team' BECAUSE THAT IS THE SAFE
+     DIRECTION: clearing a fixed-window lane on a range change costs a visible
+     reload, while NOT clearing it on a team change shows one company's numbers
+     under another company's name — silently. A forgotten argument must fail
+     toward the merely annoying, never toward the wrong. */
+  function resetTeamData(reason) {
     // ⚠ the hidden set is PER TEAM — reload it here, or one team's filter
     // silently applies to another team's reps.
     loadRepFilter();
-    state.teamOverview = null; state.teamTrends = null; state.teamRecs = null;
-    state.teamHighlights = null; state.teamDigest = null; state.teamDigestDate = null;
-    state.teamNeedsWork = null;
+    var why = (reason === 'range') ? 'range' : 'team';
+    Object.keys(TEAM_LANE_SCOPE).forEach(function (lane) {
+      var sc = TEAM_LANE_SCOPE[lane];
+      if (sc !== 'both' && sc !== why) return;
+      state[lane] = null;
+      /* ⚠⚠ THE FLAG IS CLEARED FROM THE SAME MAP AS THE DATA, AND THAT PAIRING
+         IS THE POINT. Nulling a lane while it is still marked loading makes the
+         refetch a NO-OP — `loadTeam` opens with `if (state[c.flag]) return` — so
+         the lane sits empty until an in-flight answer for the PREVIOUS team
+         lands. My first version of this fix cleared the data from the map and
+         the flags from a HAND-WRITTEN LIST, and teamAverages was missing from
+         the list: the exact lane the bug was about, reintroduced one line down.
+         Deriving both from one map is what makes them unable to diverge. */
+      state[lane + 'Loading'] = false;
+    });
+    state.teamDigestDate = null;
     // Without this the previous team's / previous range's lines stay on screen
     // until the refetch lands, which reads as real data for the new selection.
     state.teamRepSeries = null;
-    state.teamWhy = null;
     /* ⚠⚠ THE DRILLDOWN LANES BELONG HERE TOO — they were missed when the
        drilldown shipped, and the symptom was silent: the picker calls this,
        so changing the range on #team-objections relabelled the picker while
@@ -7143,11 +7188,6 @@
        (state[c.flag]) return`), so the reset silently produced no new request,
        and the in-flight answer for the PREVIOUS team then landed. */
     teamEpoch++;
-    state.teamOverviewLoading = false;   state.teamTrendsLoading = false;
-    state.teamRecsLoading = false;       state.teamNeedsWorkLoading = false;
-    state.teamHighlightsLoading = false; state.teamDigestLoading = false;
-    state.teamWhyLoading = false;        state.teamRepSeriesLoading = false;
-    state.teamObjectionsLoading = false; state.teamObjSummaryLoading = false;
   }
   // Re-render whichever team surface is active (main view or the expanded page).
   function renderTeamSurface() {
@@ -7177,20 +7217,28 @@
     else if (state.view === 'team-members') renderTeamMembersView();
     else renderTeamView();
   }
-  /* ⚠⚠ teamAverages IS CLEARED HERE, NOT IN resetTeamData(), AND THAT IS THE POINT.
+  /* ⚠⚠ SUPERSEDED 2026-08-29 — teamAverages IS NO LONGER CLEARED HERE. It is
+     declared `'team'` in TEAM_LANE_SCOPE and resetTeamData('team') clears it, so
+     this path and the RESTORE path can no longer diverge.
+     ⚠ THE REASONING BELOW WAS RIGHT AND IS KEPT — the scope was correct and the
+     PLACEMENT was wrong. Clearing it by hand HERE meant only the paths that
+     remembered to do it worked, and the refresh path did not: Justin saw the
+     dropdown and the title switch to Sober Living Riches while the gauges kept
+     Scout Systems' numbers, correcting only when he cycled the picker by hand.
+
      It is the only team lane scoped to the TEAM but NOT to the RANGE — the gauges
      are a fixed 7-day window and the panel says so on screen ("NOT AFFECTED BY THE
-     DATE FILTER BELOW"). resetTeamData() also runs on every date-range change, so
-     clearing it there would make the gauges visibly reload right after a label
-     promises they will not.
+     DATE FILTER BELOW"). resetTeamData('range') therefore leaves it alone, which
+     is what the on-screen promise requires.
 
      ⚠ THE BUG THIS FIXES was silent and demo-breaking: switching company changed
      the header, the graphs, the rep list and the totals, and left the GAUGES
      showing the previous company's numbers under the new company's name. Nothing
      errored. Measured on production: picking "Sober Living Riches" kept Scout
      Systems' 21% / 8-of-39 and its "4 not enough calls", which is Scout Systems'
-     rep count. Third instance of a lane being missed by resetTeamData — see its
-     own comment about the drilldown lanes. */
+     rep count. Third instance of a lane being missed by resetTeamData — and the
+     FOURTH was this same lane again, from a different call path, which is why the
+     lane list is now declared once instead of written out per caller. */
   function pickTeam(key) {
     state.teamSelected = (key === '__default') ? null : key;
     /* ⚠⚠ IT FORGOT BECAUSE IT WAS NEVER STORED — not because something reset it.
@@ -7202,8 +7250,9 @@
       if (state.teamSelected) localStorage.setItem(TEAM_PICK_KEY, state.teamSelected);
       else localStorage.removeItem(TEAM_PICK_KEY);
     } catch (e) {}
-    state.teamAverages = null;
-    resetTeamData();
+    /* ⚠ teamAverages is no longer nulled by hand here — TEAM_LANE_SCOPE owns it,
+       so the restore path below cannot diverge from this one again. */
+    resetTeamData('team');
     renderTeamSurface();
   }
   function setTeamTrendBucket(b) { state.teamTrendBucket = b; state.teamTrends = null; loadTeam('trends'); }
@@ -7294,9 +7343,13 @@
     if (which === 'context' && state.teamContext && !state.teamContext._error) {
       var before = state.teamSelected;
       restoreTeamPick(state.teamContext);
-      /* ⚠ THE SAME TWO CALLS pickTeam MAKES — reusing them rather than inventing
-         a refetch, so a restored pick behaves exactly like a chosen one. */
-      if (state.teamSelected !== before) { resetTeamData(); renderTeamSurface(); }
+      /* ⚠⚠ THIS COMMENT USED TO SAY "the same two calls pickTeam makes". IT WAS
+         FALSE — pickTeam made THREE, and the missing one nulled teamAverages, so
+         a REFRESH left the gauges on the previous team while the dropdown and
+         the title both read the new one. Prose asserting an equivalence that
+         nothing enforced. The equivalence is now STRUCTURAL: both paths call
+         resetTeamData('team') and the lane list lives in TEAM_LANE_SCOPE. */
+      if (state.teamSelected !== before) { resetTeamData('team'); renderTeamSurface(); }
     }
     scheduleTeamRender();
   }
@@ -7408,7 +7461,7 @@
     teamPickerReady = true;
     registerDatePicker('team', function () { return teamRange(); }, function (from, to) {
       state.teamRange = { from: from, to: to };
-      resetTeamData();
+      resetTeamData('range');   // ⚠ the gauges are a fixed 7-day window — see TEAM_LANE_SCOPE
       syncHashFromState(true);      // the range lives in the URL — refreshable, shareable
       renderTeamSurface();
     });

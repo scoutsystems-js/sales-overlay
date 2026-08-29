@@ -24,9 +24,14 @@ test('⚠⚠ resetTeamData CLEARS THE IN-FLIGHT FLAGS — nulling the data alone
   assert.ok(at !== -1);
   const fn = LIVE.slice(at, LIVE.indexOf('\n  }', at));
   assert.ok(fn.length > 300, 'slice must cover it: ' + fn.length);
-  ['teamOverviewLoading', 'teamRepSeriesLoading', 'teamWhyLoading', 'teamObjectionsLoading']
-    .forEach((f) => assert.ok(new RegExp(f + ' = false').test(fn),
-      f + ' must be cleared, or its lane refuses to refetch'));
+  /* ⚠ CONVERTED 2026-08-29: the flags were a hand-written list and are now
+     derived from TEAM_LANE_SCOPE, so assert the DERIVATION — a list would go
+     stale the moment a lane is added, which is exactly how teamAverages was
+     missed twice. */
+  assert.ok(/state\[lane \+ 'Loading'\] = false/.test(fn),
+    'the flag must be cleared alongside the data, from the same map');
+  assert.ok(/Object\.keys\(TEAM_LANE_SCOPE\)/.test(fn),
+    'and the lane list must come from the declared scopes, not a literal');
 });
 
 test('⚠⚠ a STALE response is discarded — clearing the flags alone is not enough', () => {

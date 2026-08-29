@@ -39,17 +39,37 @@ function slice(startMarker, endMarker, lo, hi) {
   return src;
 }
 
-test('pickTeam clears the gauges', () => {
-  const src = slice('function pickTeam(', 'function setTeamTrendBucket', 80, 1200);
-  assert.match(src, /state\.teamAverages\s*=\s*null/,
-    'switching company leaves the previous company\'s gauges on screen');
-  assert.match(src, /resetTeamData\(\)/, 'the other lanes still reset');
+/* ⚠⚠ CONVERTED 2026-08-29, NOT DELETED. These pinned the old MECHANISM — a
+   hand-written `state.teamAverages = null` inside pickTeam, and a resetTeamData
+   that never mentioned the lane. Both properties still matter and are asserted
+   below; what changed is that the lane's scope is now DECLARED in
+   TEAM_LANE_SCOPE, so the two call paths cannot diverge.
+
+   ⚠ THE DIVERGENCE WAS THE BUG: pickTeam nulled it by hand and the RESTORE path
+   (a refresh) did not, so the gauges kept the previous company's numbers under
+   the new company's name — Justin's report. */
+
+test('the gauges are declared TEAM-scoped, not cleared by hand', () => {
+  const src = slice('var TEAM_LANE_SCOPE', '};', 100, 900);
+  assert.match(src, /teamAverages:\s*'team'/,
+    'the gauges must be declared team-only — a range change must not reload them');
+  const pick = slice('function pickTeam(key)', '\n  }', 200, 2000);
+  assert.ok(!/state\.teamAverages\s*=\s*null/.test(pick),
+    'pickTeam must NOT hand-null the lane any more — that is what diverged');
+  assert.match(pick, /resetTeamData\('team'\)/, 'it states its reason instead');
 });
 
-test('resetTeamData does NOT clear them — a range change must not reload the fixed gauges', () => {
-  const src = slice('function resetTeamData()', 'function renderTeamSurface', 200, 3000);
-  assert.ok(!/state\.teamAverages/.test(src),
-    'the gauges are range-independent; clearing them here contradicts their own label');
-  // non-vacuity: the slice really is resetTeamData's body
-  assert.match(src, /state\.teamOverview\s*=\s*null/, 'slice does not contain resetTeamData');
+test('a TEAM change clears the gauges; a RANGE change does not', () => {
+  // The property the old pair of tests protected, now asserted on the map that
+  // both call paths share rather than on one call site's source text.
+  const src = slice('function resetTeamData', '\n  }', 400, 4000);
+  assert.match(src, /sc !== 'both' && sc !== why/, 'the scope decides, not a hand-written list');
+  assert.match(src, /state\[lane \+ 'Loading'\] = false/,
+    'and the flag clears with the data, or the refetch is a no-op');
+});
+
+test('every caller of resetTeamData states its reason', () => {
+  const whole = LIVE;
+  assert.ok(!/resetTeamData\(\)/.test(whole.replace(/function resetTeamData\(reason\)/, '')),
+    'a bare call defaults to team — safe, but the reason must be explicit at the call site');
 });

@@ -71,6 +71,9 @@ test('⚠ IT IS RESTORED ONLY AFTER /team/context ARRIVES', () => {
   assert.ok(at !== -1, 'the restore must hang off the context lane');
   const src = LIVE.slice(at, at + 400);
   assert.ok(/restoreTeamPick\(state\.teamContext\)/.test(src));
-  assert.ok(/resetTeamData\(\); renderTeamSurface\(\)/.test(src),
+  /* ⚠ CONVERTED 2026-08-29: the call now STATES ITS REASON. It used to be a
+     bare resetTeamData(), which is exactly how this path diverged from pickTeam
+     and left the gauges on the previous team. */
+  assert.ok(/resetTeamData\('team'\); renderTeamSurface\(\)/.test(src),
     'a restored pick must behave exactly like a chosen one — same two calls pickTeam makes');
 });

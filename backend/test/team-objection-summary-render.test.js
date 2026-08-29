@@ -45,16 +45,22 @@ test('⚠⚠ resetTeamData CLEARS THE DRILLDOWN LANES — the picker calls it', 
      the PREVIOUS range's numbers. Nothing errors — the screen just disagrees
      with its own control, which is the two-numbers-on-one-screen failure with
      one of them being a date. */
-  const src = slice('function resetTeamData', '\n  }');
+    function scopeSrc(){ var a=LIVE.indexOf("var TEAM_LANE_SCOPE"); return LIVE.slice(a, LIVE.indexOf("};", a)); }
+const src = slice('function resetTeamData', '\n  }');
   ['teamObjections', 'teamObjSummary'].forEach((k) => {
-    assert.ok(new RegExp('state\\.' + k + '\\s*=\\s*null').test(src),
+    /* ⚠ CONVERTED 2026-08-29: cleared via TEAM_LANE_SCOPE, not a literal null. */
+    assert.ok(new RegExp(k + ":\\s*'both'").test(scopeSrc()) || new RegExp('state\\.' + k + '\\s*=\\s*null').test(src),
       k + ' must be reset when the team or range changes, or a stale range renders as current');
   });
 
   // and the picker must genuinely route through it, or the test above is moot
   const picker = slice('function ensureTeamPicker', '\n  }');
-  assert.ok(picker.indexOf('resetTeamData()') !== -1,
-    'the picker must call resetTeamData — otherwise clearing lanes there proves nothing');
+  /* ⚠ CONVERTED 2026-08-29: the picker now passes its REASON — resetTeamData('range'),
+     because the date picker is a RANGE change and the fixed-window gauges must
+     survive it. The property this guards is unchanged (the picker genuinely
+     routes through the reset); only the literal moved. */
+  assert.ok(/resetTeamData\('range'\)/.test(picker),
+    'the picker must call resetTeamData WITH ITS REASON — otherwise clearing lanes there proves nothing');
 });
 
 test('⚠ a CATEGORY chip does NOT invalidate the summary — that would bill a call per click', () => {
