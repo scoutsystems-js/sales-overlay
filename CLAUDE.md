@@ -3224,6 +3224,34 @@ grep -rn "recording_url.*?t="                   # the EXPECTED SHAPE — found s
   - **✅ FOURTH INSTANCE, AND THE FIRST CAUGHT BEFORE IT WAS REPORTED AS A PROBLEM (2026-08-18).** A post-deploy check flagged two pastel hexes as *"still present"* after the ramp went vivid. Re-scoped to the ramp instead of the whole document, the ramp held exactly its seven new entries — the hits were `#c4b5fd` on a **KB category badge** (an unrelated taxonomy palette) and `#22d3ee` as the **`--cyan` token**, the objection-category colours, and the comment naming the pastel it replaced. **Cost of the catch: one extra command.**
   - **⚠ RECORD THE CATCHES, NOT ONLY THE FAILURES — A RULE THAT STOPS A MISTAKE PRODUCES NOTHING.** No incident, no fix, no diff, nothing to point at: **it looks exactly like the rule was never needed.** Three instances here are damage and the fourth is the rule working, and without the fourth written down this entry reads as a list of past mistakes rather than as a practice that pays for itself. **Every rule in this file has the same problem — the evidence for keeping it is invisible by construction.**
 
+### ⚠⚠⚠ A DEFENSIBLE READING OF A ROW IS NOT THE FEATURE — CUSTOMIZE VIEW SHIPPED AND WAS NOT WHAT WAS ASKED FOR (2026-08-29)
+**The row said *"let a manager choose what the team page shows"*. A panel show/hide satisfies that sentence completely. Justin: *"what was shipped wasn't close to what I originally asked for. It's going to be a big lift for what I want."***
+- **⚠⚠ THE FAILURE IS NOT MISREADING — IT IS THAT A ONE-LINE ROW CANNOT CARRY A FEATURE.** What he described is a **WIDGET CATALOG**: the manager picks the METRIC *and* the VIEW TYPE — speedometer, line, plain number, horizontal or vertical bar. Nothing in the row said so, and nothing in it ruled it out.
+- **THE TELL, available before building: "choose what the page shows" has at least three readings** — which panels, which metrics, which view types — and they differ by an order of magnitude in effort. **When a row admits readings that differ that much, the cheap reading is the one you will pick, and it will be wrong.** Ask.
+- **⚠ THE DESIGN IS RECORDED SO IT IS NOT REDISCOVERED, and the load-bearing part is that METRIC AND VIEW ARE NOT INDEPENDENT. The bridge is DATA SHAPE:**
+```
+one number now            -> gauge, plain number
+number + delta            -> trend, sparkline
+time series per rep       -> line
+ranking across reps       -> bar, list
+categorical breakdown     -> bar, list
+```
+  **Valid views fall out of the shape, and that is what stops a manager building a page that lies.**
+- **⚠⚠ THREE CONSTRAINTS, EACH OF WHICH HAS ALREADY CAUSED A REAL DEFECT HERE:** the **WINDOW** (gauges are a fixed 7 days, graphs follow the picker — one metric shown as both appears to disagree) · **TARGETS** (no target means no gauge) · **DIRECTION** (avg call time is inverted, and that already put a wrong reading on screen).
+- **What shipped stays live and is useful. It is not the feature**, and the row moved to MAJOR rather than being marked done.
+
+### ⚠⚠ BEFORE REMOVING SOMETHING "BECAUSE IT CARRIES THINGS THE REPLACEMENT DOES NOT", CHECK WHETHER IT STILL DOES (2026-08-29)
+**The old team objections view was kept for three named reasons. Measured at retirement, TWO WERE ALREADY STALE and the third was never true.**
+```
+sales-language taxonomy      -> the DRILLDOWN has it (teamObjGridHtml)
+strict denominator + counts  -> the drilldown has both (since 2026-08-22)
+clickable bucket -> calls    -> NEVER unique: it lives in needsWorkDetailBodyHtml,
+                                SHARED with the LIVE personal rep page
+```
+- **⚠⚠ THE THIRD IS THE DANGEROUS ONE AND IT CUTS BOTH WAYS.** Believing it was unique to the retired view would have meant either keeping a dead page for nothing, or — far worse — deleting the shared renderer along with it and silently breaking a live personal surface. **A "unique feature" that is actually a SHARED function is the shared-carrier trap wearing a justification.**
+- **THE RULE: a preservation reason decays exactly like any other row.** Re-measure each stated difference at removal time, and **check whether each one is implemented HERE or merely REACHED from here.**
+- Related and worth pairing: the earlier instance where the guard's own list went stale. **Anything written to justify keeping something needs re-reading before it is used to justify removing it.**
+
 ### ⚠⚠ "FIVE SCRIPTS LACK A REFERENCE" AND "FIVE SCRIPTS HAVE THE DEFECT" ARE DIFFERENT CLAIMS — I FILED THE SECOND AND MEASURED THE FIRST (2026-08-29)
 **I reported "all five seed scripts had zero embedding references". True, and it named four files as needing a fix when only ONE did.**
 ```
