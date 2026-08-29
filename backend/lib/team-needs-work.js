@@ -228,18 +228,62 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   // is optional — the team lane does not pass it and keeps its old wording.
   var win = (opts && opts.windowDays) ? opts.windowDays : null;
   var winPhrase = win ? ('in the ' + win + ' day' + (win === 1 ? '' : 's') + ' you selected') : null;
-  var insufficientText = subject === 'personal'
-    ? (winPhrase
-        ? 'Not enough of your objections ' + winPhrase + ' to pinpoint a focus area — try a wider range.'
-        : 'Not enough of your objections yet to pinpoint a focus area — keep logging calls.')
-    : 'Not enough objection volume this period to pinpoint a focus area.';
-  // Overall-volume gate → deterministic insufficient (cacheable, no Claude).
-  /* ⚠⚠ (a) NO VOLUME — THE ONLY CASE THAT MAY SAY NOTHING CAN BE DETERMINED,
-     and it must read as a fact about the WINDOW rather than a verdict on the
-     rep. Previously this shared `state:'insufficient'` with two other,
-     genuinely different situations. */
-  if (analyzed < minAnalyzed || totalObj === 0) {
-    return { state: 'no_volume', headline: 'What needs work', card_text: insufficientText,
+  /* ⚠⚠ EVEN ONE OBJECTION IS DATA (Justin's ruling 2026-08-29). The panel used
+     to DECLINE TO RANK whenever the sample was small and then report the
+     declining as though it were a finding — "not enough data to pinpoint a
+     focus area". That is a statement about our own bar, not about the rep.
+     WHEREVER THERE IS ANY DATA AT ALL, SAY WHAT IT SHOWS: name the type, name
+     the rate, and attribute the smallness to the DATA rather than to them.
+     A genuine empty state is reserved for genuinely NO objections. */
+
+  /** The type that came up most. Frequency is countable at any sample size —
+      unlike "your weakest", which is a ranking three calls cannot support. */
+  function mostCommon() {
+    var best = null;
+    Object.keys(buckets).forEach(function (label) {
+      if (label === 'Other') return;             // the grab-bag names nothing
+      var b = buckets[label];
+      if (!best || b.total > best.total) best = b;
+    });
+    return best;
+  }
+
+  /* (A) GENUINELY NO OBJECTIONS — the only true empty state, and it is a fact
+     about the WINDOW rather than a verdict on the rep. */
+  /* ⚠ NAME THE WINDOW IN EVERY DEGRADE. A manager can select six days and land
+     here; without the window the sentence reads as a verdict on the rep rather
+     than a fact about the range they picked. The team lane says "this period",
+     which is the wording it has always used. */
+  /* ⚠ THE TEAM LANE ALWAYS SAYS "this period" AND NEVER "you selected" — that
+     is pre-existing and deliberate, so the window phrase is PERSONAL-ONLY.
+     Giving winPhrase priority for both would silently change the team wording. */
+  var periodPhrase = (subject === 'personal') ? winPhrase : 'this period';
+  var personalWin = (subject === 'personal') ? winPhrase : null;
+
+  if (totalObj === 0) {
+    var noneText = periodPhrase
+      ? ('No objections came up ' + periodPhrase + '.'
+         + (personalWin ? ' Try a wider range.' : ''))
+      : 'No objections have come up yet — keep logging calls.';
+    return { state: 'no_volume', headline: 'What needs work', card_text: noneText,
+      bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
+  }
+
+  /* (B) THERE ARE OBJECTIONS, JUST FEW. Say what they show.
+     ⚠ THE SMALLNESS BELONGS TO THE DATA, NOT TO THE REP: "there are only a few
+     objections to go on" is about the sample; "your lowest" would assert a
+     ranking the sample cannot support. And the type named is the MOST COMMON
+     one — a frequency, which is true at any n — never the "worst". */
+  if (analyzed < minAnalyzed) {
+    var few = mostCommon();
+    var fewWhen = periodPhrase ? (' ' + periodPhrase) : ' so far';
+    var fewText = few
+      ? ('There are only a few objections to go on' + fewWhen + '. The most common is '
+         + few.label + ' — handled ' + few.handled + ' of ' + few.total + '.'
+         + (personalWin ? ' Try a wider range.' : ''))
+      : (periodPhrase ? 'No objections came up ' + periodPhrase + '.'
+                      : 'No objections have come up yet — keep logging calls.');
+    return { state: 'no_volume', headline: 'What needs work', card_text: fewText,
       bucket: null, extra: null, detail: baseDetail(null), generated_at: new Date().toISOString() };
   }
 
@@ -284,11 +328,17 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
      spread too thin across types. */
   if (sizeable === 0) {
     var thinDetail = baseDetail(null); thinDetail.ranking = [];
+    /* (B) again — objections exist, no single type has enough of them. The old
+       copy reported the DECLINED COMPARISON ("spread across too many types to
+       compare", "no single type has enough volume to rank"), which is a
+       statement about our bar. Say what the data shows instead. */
+    var thinTop = mostCommon();
+    var thinWhen = periodPhrase ? (' ' + periodPhrase) : ' so far';
     return { state: 'thin_types', headline: 'What needs work',
-      card_text: subject === 'personal'
-        ? ('Your objections are spread across too many types to compare yet'
-           + (winPhrase ? ' ' + winPhrase : '') + ' — no single type has enough volume to rank.')
-        : 'Objections are spread across too many types to compare this period.',
+      card_text: thinTop
+        ? ('There are only a few objections of any one type' + thinWhen + '. The most common is '
+           + thinTop.label + ' — handled ' + thinTop.handled + ' of ' + thinTop.total + '.')
+        : ('There are only a few objections to go on' + thinWhen + '.'),
       bucket: null, extra: null, detail: thinDetail, generated_at: new Date().toISOString() };
   }
 
@@ -301,15 +351,31 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   if (candidates.length === 0) {
     var evenDetail = baseDetail(null); evenDetail.ranking = rankingRows();
     var worst = ranked[0];
+    /* (C) A GENUINE FINDING: there IS enough data, it WAS compared, and the
+       answer is that handling is level. ⚠ The old copy cited the threshold
+       ("no type is more than N points below your average"), which describes
+       our bar rather than the rep. State the result and its evidence — the
+       lowest type and what it runs against — with no threshold and no
+       "average" mechanism. A ranking claim is supported HERE because enough
+       data was compared to support one. */
+    var lowRate = worst ? pctWhole(worst.b.handled, worst.b.total) : null;
+    var elseRate = worst ? Math.round(worst.baseline * 100) : null;
+    var evenLead = subject === 'personal'
+      ? ('Your objection handling is running level across types'
+         + (winPhrase ? ' ' + winPhrase : '') + '.')
+      : 'Objection handling is running level across types this period.';
     return { state: 'even_performance', headline: 'What needs work',
-      card_text: subject === 'personal'
-        ? ('Your objection handling is even across types'
-           + (winPhrase ? ' ' + winPhrase : '') + ' — no type is more than '
-           + MIN_GAP_PP + ' points below your average. '
-           + (worst ? 'Closest to it: ' + worst.b.label + ' at '
-              + pctWhole(worst.b.handled, worst.b.total) + '%.' : ''))
-        : 'Objection handling is even across types this period — no type is more than '
-          + MIN_GAP_PP + ' points below the baseline.',
+      /* ⚠ THE CONTRAST CLAUSE IS DROPPED WHEN THE TWO NUMBERS ARE EQUAL.
+         "The lowest is X at 30%, against 30% everywhere else" contrasts a
+         number with itself — it reads as a mistake, and on genuinely level
+         handling the two ARE equal after rounding, which is exactly the state
+         this branch describes. */
+      card_text: evenLead + (worst
+        ? (lowRate === elseRate
+            ? (' Every type is close to ' + lowRate + '%.')
+            : (' The lowest is ' + worst.b.label + ' at ' + lowRate
+               + '%, against ' + elseRate + '% everywhere else.'))
+        : ''),
       bucket: null, extra: null, detail: evenDetail, generated_at: new Date().toISOString() };
   }
 

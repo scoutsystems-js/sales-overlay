@@ -99,7 +99,16 @@ test('personal thin_types when no bucket reaches 4', () => {
      sentence: "not enough of your objections" was FALSE here -- there IS volume,
      it is spread too thin across types to rank. The assertion checks that
      property rather than the old string. */
-  assert.match(r.card_text, /spread across too many types|no single type has enough volume/);
+  /* ⚠ CONVERTED 2026-08-29 (Justin: even one objection is data). The property
+     is unchanged — thin_types must not borrow the volume-gate sentence — but
+     the copy no longer reports the DECLINED COMPARISON either. It names the
+     most common type and its rate. */
+  assert.match(r.card_text, /only a few objections of any one type/);
+  assert.match(r.card_text, /The most common is/);
+  assert.ok(!/not enough of your objections/i.test(r.card_text),
+    'thin_types must not borrow the volume-gate sentence');
+  assert.ok(!/enough volume|to rank|to compare/i.test(r.card_text),
+    'a declined comparison must not be reported as the finding');
 });
 
 /* ⚠ REMOVED 2026-08-17 with the money math it tested. Archived, not deleted —
@@ -131,5 +140,9 @@ test('team path unchanged: default opts still say "Your team" + no personal floo
   // bucket floor -- see the correction above. What this still proves is that
   // team defaults do NOT inherit the personal floors.
   assert.strictEqual(r.state, 'no_volume');
-  assert.match(r.card_text, /objection volume this period/); // team copy, not personal
+  /* ⚠ CONVERTED 2026-08-29: the team copy changed with the ruling, but what
+     this test protects has not — the TEAM lane says "this period" and never
+     borrows the personal "you selected" phrasing. */
+  assert.match(r.card_text, /this period/);            // team copy, not personal
+  assert.ok(!/you selected/.test(r.card_text), 'the team lane must not use the personal window phrase');
 });

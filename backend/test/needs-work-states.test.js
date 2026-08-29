@@ -82,6 +82,13 @@ test('⚠⚠ (c) THIN TYPES is its own state — enough calls, no single type bi
   assert.strictEqual(r.state, 'thin_types',
     'enough calls overall but no ONE type big enough is a THIRD case — it is ' +
     'neither "nothing can be said" nor "nothing stands out"');
+  /* ⚠ CONVERTED: thin types must no longer report the DECLINED COMPARISON.
+     It names the most common type and its rate instead — even one objection
+     is data (Justin, 2026-08-29). */
+  assert.ok(/The most common is/i.test(r.card_text),
+    'it must name the most common type rather than decline to compare');
+  assert.ok(!/enough volume|to rank|to compare/i.test(r.card_text),
+    'a declined comparison must not be reported as the finding');
   assert.ok(!/stands out/i.test(r.card_text),
     'it must not claim performance is even — nothing was actually compared');
 });
@@ -95,8 +102,20 @@ test('⚠⚠ (b) EVEN PERFORMANCE is a FINDING, and it still shows the ranking',
   assert.strictEqual(r.state, 'even_performance', 'a real, positive finding');
   assert.ok(!/not enough|keep logging|wider range/i.test(r.card_text),
     'even performance must NOT render as a shortage');
-  assert.ok(/even/i.test(r.card_text),
-    'wording states what it measures: handling is EVEN across types');
+  /* ⚠ CONVERTED 2026-08-29, not deleted. The property still holds — this is a
+     RESULT, not a shortage — but the wording no longer cites the threshold
+     ("no type is more than N points below your average"), which described our
+     own bar rather than the rep. It now states the finding and its evidence. */
+  assert.ok(/running level across types/i.test(r.card_text),
+    'wording states the result: handling is running level across types');
+  /* ⚠ Two valid evidence forms: the contrast, or — when the rates are EQUAL
+     after rounding — a plain statement of the level rate, because contrasting
+     a number with itself reads as a mistake. */
+  assert.ok(/The lowest is .+ at \d+%, against \d+% everywhere else/.test(r.card_text)
+            || /Every type is close to \d+%/.test(r.card_text),
+    'it must state the evidence for the claim: ' + r.card_text);
+  assert.ok(!/points below|average|baseline/i.test(r.card_text),
+    'the threshold and the "average" mechanism must not return to customer copy');
   // ⚠ Justin still wants to see the ranking
   assert.ok(Array.isArray(r.detail.ranking) && r.detail.ranking.length >= 3,
     'the ranking is shown even when nothing is a standout');

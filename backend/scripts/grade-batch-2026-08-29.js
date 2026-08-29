@@ -28,6 +28,15 @@ const LABEL = process.env.LABEL || 'batch';
 const SATURATION = /429|rate.?limit|too many requests|overloaded|529/i;
 const SATURATION_ABORT = 4;
 
+/* ⚠⚠ A CAPABILITY FAILURE IS NOT A DATA FAILURE, AND IT MUST STOP THE RUN AT
+   ONCE. If THIS PROCESS cannot reach the provider — a missing client id, a
+   token that expired mid-run — then every remaining call will fail for the same
+   reason, and the worker will record each one as `error`: a state no shipped
+   control can reach. That is how a previous run turned 11 GRADEABLE pending
+   calls into errored ones. One occurrence is enough to stop; there is nothing
+   to retry and nothing to learn from the twelfth. */
+const CAPABILITY = /not configured|missing [A-Z_]*CLIENT_ID|connection not found|token unavailable/i;
+
 async function main() {
   const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } });
@@ -68,6 +77,12 @@ async function main() {
       errored++;
       // NAME every call that cannot be graded, never fold it into a zero
       casualties.push({ id: c.id, source: c.source, reason: String(reason).slice(0, 110) });
+      if (CAPABILITY.test(String(reason))) {
+        console.error('\n[' + LABEL + '] ABORTING — THIS PROCESS CANNOT REACH THE PROVIDER.');
+        console.error('   ' + String(reason).slice(0, 160));
+        console.error('   Remaining calls were NOT attempted, so they stay reachable by the normal control.');
+        break;
+      }
       if (SATURATION.test(String(reason))) {
         saturation++;
         if (saturation >= SATURATION_ABORT) {
