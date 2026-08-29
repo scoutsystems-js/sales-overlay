@@ -902,6 +902,7 @@
     .members-seats { font-size: 14px; color: var(--text); }
     .members-seats b { color: var(--text); }
     .members-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .sec-note { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin-bottom: 7px; }
     .acct-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
     .members-price { width: 92px; padding: 5px 7px; font-size: 13px; background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; }
     .members-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); padding: 8px 10px; border-bottom: 1px solid var(--border); }
@@ -4083,7 +4084,11 @@
     callReviewLoading:  false, // gates retry click while a fetch is in flight
     callReviewError:    null,  // last fetch error message; cleared on successful re-fetch
     expandedGradeCards: {},    // map of section key ('intro'|'discovery'|...) → true when expanded
-    /* savedMomentIds: {}, */  // REMOVED 2026-08-18 with the Add-to-KB buttons
+    /* Restored 2026-08-29 for the MANAGER Add-to-KB button. The 2026-08-18
+       removal is not being reversed: that was a REP button duplicating
+       auto-harvest (313 auto vs 0 manual). A manager marking the standard is a
+       correction mechanism, and there is no way to do it at all today. */
+    savedMomentIds: {},
     selectedSection: null,     // 4a: which section the drilldown is showing
     sectionExpanded: {},       // which moment groups are expanded past the first 5
     sectionData: null,
@@ -13005,8 +13010,16 @@
         ? '<a class="sec-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">'
           + escapeHtml(clipLabelFor(m.source)) + '</a>'
         : '<span class="sec-clip disabled">—</span>';
+      /* ⚠⚠ THE NOTE IS SHOWN, AND IT IS NOT ATTRIBUTED. Justin's standing ruling
+         on the related case: coaching reads "here's what you should try next
+         time", NOT "this is how your manager handles it". Naming the manager
+         turns coaching into a directive, and a rep argues with a directive
+         instead of trying it. So the reasoning appears; the author does not. */
+      var noteHtml = m.note
+        ? '<div class="sec-note">' + escapeHtml(m.note) + '</div>' : '';
       return '<div class="sec-moment sec-moment-closer">'
         + '<div class="sec-moment-top">' + clip + '<span class="sec-when">' + escapeHtml(when) + '</span></div>'
+        + noteHtml
         + '<div class="sec-quote sec-quote-you"><span class="sec-you-label">You said</span>'
           + escapeHtml(m.quote || '') + '</div>'
         + (m.observation ? '<div class="sec-obs">' + escapeHtml(m.observation) + '</div>' : '')
@@ -14442,6 +14455,11 @@
     }
     state.callReviewLoading = false;
     if (state.view === 'call-review') renderCallReview();
+    /* ⚠ Which moments are already in the KB. Only a manager can add, so only a
+       manager needs the answer — and asking for everyone would be a per-review
+       request whose result nobody renders. Fire-and-forget: it re-renders when
+       it lands, and every row is correctly "unsaved" until then. */
+    if (canMarkStandard()) loadSavedMoments(callId);
   }
 
   /*
@@ -14966,7 +14984,103 @@
   // any future consumer cannot disagree about which moments earn a badge.
   var HANDLING_TYPES = ['risk_signal', 'barrier', 'objection'];
 
-  function highlightEntryHtml(h, recordingUrl) {
+  /**
+   * ADD TO KNOWLEDGE BASE — MANAGERS AND ABOVE (2026-08-29).
+   *
+   * ⚠⚠ THIS IS NOT A REVERSAL OF THE 2026-08-18 REMOVAL. That deleted a REP
+   * button that duplicated auto-harvest — 313 moments filed automatically, ZERO
+   * added by hand. A MANAGER marking the standard is a different act: it is the
+   * correction mechanism, and there is no way to do it at all today.
+   *
+   * ⚠ WHERE IT LANDS is decided by the SERVER (lib/kb-entry resolveEntryTarget):
+   * a manager on a REP's call → the TEAM knowledge base, keyed to their team,
+   * with `uploaded_by` keeping true provenance. On their OWN call it lands in
+   * their own KB — so the title says which, rather than letting a manager
+   * discover it afterwards.
+   */
+  function canMarkStandard() {
+    var r = state.me && state.me.role;
+    return r === 'manager' || r === 'owner';
+  }
+  function markStandardTitle() {
+    return isSelf()
+      ? 'Save this moment to your own knowledge base'
+      : 'Add this moment to your team\'s knowledge base';
+  }
+
+  /* Which moments are already in the KB. Fire-and-forget and fully degradable:
+     on any failure every row renders as unsaved, and adding again is idempotent
+     server-side anyway. */
+  async function loadSavedMoments(callId) {
+    try {
+      var res = await fetch('/kb/saved-moments/' + encodeURIComponent(callId), { headers: authHeader() });
+      if (!res.ok) return;
+      var data = await res.json();
+      if (state.selectedCallId !== callId) return;   // navigated away
+      var map = {};
+      ((data && data.saved_highlight_ids) || []).forEach(function (id) { map[id] = true; });
+      state.savedMomentIds = map;
+      if (state.view === 'call-review') renderCallReview();
+    } catch (err) { /* unsaved is the safe default */ }
+  }
+
+  /**
+   * ⚠⚠ THE NOTE IS OPTIONAL, AND THE MEASUREMENT IS WHY IT EXISTS AT ALL.
+   * Across 939 good closer moments, 100% carry an observation but only 15%
+   * contain any reasoning — and the observation is sometimes CRITICAL of the
+   * moment it describes ("names the real objection, but does so late"). So a
+   * moment marked as the standard, framed only by the model's description, can
+   * reach a rep as a criticism filed as an example. The manager's note is what
+   * makes it a standard rather than a description.
+   *
+   * ⚠ OPTIONAL, NOT REQUIRED: demanding one would block the fast path this
+   * button exists for — "sees a great moment, clicks add". Skipping is a click.
+   */
+  async function addMomentToKb(highlightId, btn) {
+    if (!highlightId || !state.selectedCallId) return;
+    var note = await scoutPrompt({
+      title: 'Why is this the standard?',
+      body: 'Optional — but a moment with no reasoning is much weaker material for a rep. Leave it blank to add the moment on its own.',
+      placeholder: 'e.g. he isolates the objection before answering it',
+      inputLabel: 'Why this is the standard',
+      confirmText: 'Add to Knowledge Base',
+      cancelText: 'Cancel',
+    });
+    if (note === null) return;                      // cancelled — not "no note"
+    if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+    try {
+      var res = await fetch('/kb/from-highlight', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({
+          fathom_call_id: state.selectedCallId,
+          highlight_id: highlightId,
+          note: note || '',
+        }),
+      });
+      var d = null; try { d = await res.json(); } catch (e) {}
+      if (!res.ok) {
+        alert((d && d.error) || 'Could not add that moment.');
+        if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
+        return;
+      }
+      /* A duplicate is reported as success — the intent ("this moment should be
+         in the knowledge base") is already satisfied, which is what makes this
+         idempotent with auto-population. */
+      state.savedMomentIds[highlightId] = true;
+      if (btn) { btn.className = 'review-kb-btn is-saved'; btn.textContent = 'In KB ✓'; btn.title = 'Already in the knowledge base'; }
+    } catch (err) {
+      alert('Could not reach the server.');
+      if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
+    }
+  }
+
+  /* ⚠ `opts` is accepted but the Add-to-KB gate is ROLE-based, not per-call-site:
+     the button belongs on every surface that shows a moment a manager might
+     mark, and a per-site flag is how it ended up on ONE of them last time
+     (it lived only in the expanded section cards, never on the timeline —
+     which is the surface Justin describes). */
+  function highlightEntryHtml(h, recordingUrl, opts) {
     var seconds = (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null;
     var label = (seconds != null) ? formatTimestampDisplay(seconds) : '—';
     var timeHtml;
@@ -14987,6 +15101,21 @@
 
     var quote = (typeof h.quote === 'string') ? h.quote : '';
     var observation = (typeof h.observation === 'string') ? h.observation : '';
+
+    /* ── Add to Knowledge Base (restored 2026-08-29, MANAGERS AND ABOVE) ─────
+       ⚠ THE BUTTON SENDS IDS ONLY and the server re-reads the highlight, so
+       nothing rendered here is trusted on write.
+       ⚠ It is gated on ROLE, not on styling: a control that looks available and
+       403s is worse than one that is absent. */
+    var kbBtn = '';
+    if (canMarkStandard() && h.id) {
+      var alreadySaved = !!(state.savedMomentIds && state.savedMomentIds[h.id]);
+      kbBtn = alreadySaved
+        ? '<button class="review-kb-btn is-saved" disabled title="Already in the knowledge base">In KB ✓</button>'
+        : '<button class="review-kb-btn" data-hid="' + escapeHtml(String(h.id)) + '"'
+          + ' onclick="addMomentToKb(this.getAttribute(\'data-hid\'), this)"'
+          + ' title="' + escapeHtml(markStandardTitle()) + '">+ Add to KB</button>';
+    }
 
     /* REMOVED 2026-08-18 — the live Add-to-KB button. See addSectionMomentToKb
      * for the ruling, the 313-vs-0 measurement, and the manager→team consequence.
@@ -15028,7 +15157,7 @@
     return '<div class="review-highlight">'
       + timeHtml
       + '<div class="review-highlight-body">'
-        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + handlingBadge + '</div>'
+        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + handlingBadge + kbBtn + '</div>'
         + '<div class="review-quote">' + escapeHtml(quote) + '</div>'
         + replyHtml
         + '<div class="review-observation">' + escapeHtml(observation) + '</div>'

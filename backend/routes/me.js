@@ -15,6 +15,7 @@ const { buildSectionBreakdown, sectionScoreOf, SECTIONS } = require('../lib/sect
 // labelled "rank". One definition now, and the copy says which end it means.
 const SR = require('../lib/section-ranking');
 const { selectLibraryMoments } = require('../lib/section-library');
+const { kbReadRowVisible } = require('../lib/kb-scope');
 const { applyPriceFields } = require('../lib/price-fields');
 const { clipHref } = require('../lib/clip-link');
 const { computeWhyFacts } = require('../lib/why-prose');
@@ -1242,15 +1243,32 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
   out.library = [];
   out.library_scope = 'closed_calls_all_time';
   try {
+    /* ⚠⚠ TEAM MOMENTS COUNT TOO, AND THIS USED TO BE `uploaded_by = userId`
+       ALONE — which made the whole manager Add-to-KB path invisible. A promoted
+       moment carries `uploaded_by` = THE MANAGER and `team_owner_id` = the team,
+       so a rep-scoped filter could never return one: the manager would mark the
+       standard and no rep would ever see it. A feature complete and unreachable.
+
+       ⚠ The candidate set is narrowed in SQL, then `kbReadRowVisible` — the
+       SHARED predicate — is the authority. Hand-rolling the rule here would be
+       a second copy free to drift from the one the RPC and /kb/list use. */
+    var prof = await admin.from('user_profiles').select('role, managed_by').eq('user_id', userId).maybeSingle();
+    var role = (prof.data && prof.data.role) || 'user';
+    var adminId = (role === 'manager' || role === 'owner') ? userId : ((prof.data && prof.data.managed_by) || null);
+    var callerScope = { role: role, p_user_id: userId, p_admin_id: adminId };
+
+    var ors = ['uploaded_by.eq.' + userId];
+    if (adminId) ors.push('team_owner_id.eq.' + adminId);
     var kb = await admin.from('knowledge_base')
-      .select('source_fathom_call_id, source_section, metadata, created_at')
-      .eq('uploaded_by', userId)
+      .select('source_fathom_call_id, source_section, metadata, created_at, uploaded_by, scope, team_owner_id')
+      .or(ors.join(','))
       .eq('source_section', section)
       .eq('metadata->>category', 'call_moment')
       .order('created_at', { ascending: false })
       .limit(200);
     if (!kb.error) {
-      var picked = selectLibraryMoments(kb.data || []);
+      var visible = (kb.data || []).filter(function (r) { return kbReadRowVisible(r, callerScope); });
+      var picked = selectLibraryMoments(visible);
       /* The clip link needs recording_url AND source, which live on the call,
          not on the KB row. Resolved through lib/clip-link so the label is
          provider-aware — Fathom's ?t= seeks, Zoom's does not. */
@@ -1266,6 +1284,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
         return {
           quote: m.quote,
           observation: m.observation,
+          note: m.note,
           type: m.type,
           call_date: c.call_date || null,
           clip_url: c.recording_url ? clipHref(c.recording_url, m.timestamp_seconds) : null,

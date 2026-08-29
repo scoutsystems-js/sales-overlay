@@ -46,6 +46,12 @@ function selectLibraryMoments(rows, cap) {
     var quote = (m.quote || '').trim();
     if (!quote) continue;                       // nothing to show
     keep.push({
+      /* ⚠⚠ THE MANAGER'S NOTE, AND IT IS NOT ATTRIBUTED — Justin's standing
+         ruling on the related case: coaching reads "here's what you should try
+         next time", NOT "this is how your manager handles it". Naming the
+         manager turns coaching into a directive, and a rep reading a directive
+         argues with it instead of trying it. */
+      note: (typeof m.note === 'string' && m.note.trim()) ? m.note.trim() : null,
       quote: quote,
       observation: (m.observation || '').trim() || null,
       type: m.type || null,

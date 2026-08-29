@@ -80,7 +80,17 @@ function buildEntryContent(h) {
   // ⚠ sentinel-gated: a harvested KB moment must never contain one.
   var response = displayCloserResponse(hl.closer_response) || '';
 
-  var parts = ['During ' + section + ', ' + speaker + ' said: "' + quote + '".'];
+  /* ⚠⚠ THE MANAGER'S NOTE LEADS, when there is one. Measured on 939 good
+     closer moments: 100% carry an observation but only 15% contain any
+     reasoning — and the observation is sometimes CRITICAL of the very moment
+     ("names the real objection but does so late"). So a moment marked as the
+     standard, with the model's description as its only framing, can read as a
+     criticism filed as an example. The note is what makes it a standard rather
+     than a description, so it goes FIRST. */
+  var note = (typeof hl.note === 'string') ? hl.note.trim() : '';
+  var parts = [];
+  if (note) parts.push('Why this is the standard: ' + note);
+  parts.push('During ' + section + ', ' + speaker + ' said: "' + quote + '".');
   if (observation) parts.push('What happened: ' + observation + '.');
   if (response) parts.push('The closer responded: "' + response + '".');
   if (hl.resolution) parts.push('Outcome: ' + hl.resolution + '.');
@@ -124,7 +134,7 @@ function buildMomentRow(opts) {
   return {
     category: 'learned_pattern',              // RULING 1 — filter (a)
     label: label,
-    content: buildEntryContent(h),
+    content: buildEntryContent(Object.assign({}, h, { note: opts.note })),
     triggers: [],
     metadata: {
       category: KB_ENTRY_METADATA_CATEGORY,   // RULING 1 — filter (b)
@@ -155,6 +165,9 @@ function buildMomentRow(opts) {
       source_highlight_id: h.id || null,      // provenance only — NEVER the dedupe key
       source_user_id: opts.sourceUserId || null,
       added_by: opts.addedBy || null,
+      /* The marking manager's reasoning, when supplied. Stored separately from
+         the composed content so a surface can show it on its own. */
+      note: (typeof opts.note === 'string' && opts.note.trim()) ? opts.note.trim() : null,
     },
     embedding: opts.embedding === undefined ? null : opts.embedding,
     uploaded_by: target.uploaded_by,

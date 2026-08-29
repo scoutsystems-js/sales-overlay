@@ -845,6 +845,10 @@ router.get('/entries/:source_label', protect, async function(req, res) {
 router.post('/from-highlight', protect, async function(req, res) {
   var fathomCallId = req.body && req.body.fathom_call_id;
   var highlightId  = req.body && req.body.highlight_id;
+  /* ⚠ OPTIONAL, and capped. The manager's reasoning is what turns a moment into
+     a STANDARD rather than a description — but requiring it would block the
+     fast path this button exists for ("sees a great moment, clicks add"). */
+  var note = (req.body && typeof req.body.note === 'string') ? req.body.note.trim().slice(0, 600) : '';
   if (!fathomCallId || !highlightId) {
     return res.status(400).json({ error: 'fathom_call_id and highlight_id required' });
   }
@@ -921,6 +925,7 @@ router.post('/from-highlight', protect, async function(req, res) {
       sourceUserId: callOwnerId,   // whose call it came from (attribution)
       addedBy: req.user.id,        // who clicked
       speakerConfidence: speakerConfidence,
+      note: note,
     });
     row.embedding = await getVoyageEmbedding(row.content, 'kb');
 
@@ -1117,3 +1122,8 @@ router.delete('/:source_label', manage, async function(req, res) {
 router.resolvePromotion = resolvePromotion;
 
 module.exports = router;
+
+/* Shared with routes/me.js's section library, so the caller-scope rule has ONE
+   definition. A second copy would be free to drift from the visibility
+   predicate it feeds. */
+module.exports._resolveUserScope = resolveUserScope;

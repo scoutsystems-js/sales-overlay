@@ -101,9 +101,19 @@ function code(p) {
 
 test('the lane is scoped to the SUBJECT, and selects by section — not by similarity', () => {
   const src = code('routes/me.js');
-  assert.ok(/selectLibraryMoments\(kb\.data \|\| \[\]\)/.test(src), 'it must use the shared rule');
-  assert.ok(/\.eq\('uploaded_by', userId\)[\s\S]{0,200}\.eq\('source_section', section\)/.test(src),
-    'scoped to the subject user AND the section');
+  assert.ok(/selectLibraryMoments\(visible\)/.test(src),
+    'it must use the shared selection rule, over the VISIBILITY-filtered rows');
+  /* ⚠ CONVERTED 2026-08-29. This used to pin `.eq('uploaded_by', userId)`, and
+     that filter is exactly what made the manager Add-to-KB path invisible: a
+     promoted moment carries uploaded_by = THE MANAGER, so a rep-scoped filter
+     could never return one. The SUBJECT survives — the lane is still scoped to
+     what this user may see, and still selects by SECTION rather than by
+     similarity — but the rule is now the SHARED predicate. */
+  assert.ok(/kbReadRowVisible\(r, callerScope\)/.test(src),
+    'visibility must come from the shared predicate, not a hand-rolled filter');
+  assert.ok(/\.eq\('source_section', section\)/.test(src), 'still selected by section');
+  assert.ok(/uploaded_by\.eq\.' \+ userId/.test(src), 'the candidate set still includes their own');
+  assert.ok(/team_owner_id\.eq\.' \+ adminId/.test(src), 'and their team\'s');
   /* ⚠ NO similarity search anywhere in this lane. A section filter cannot
      silently omit an unembedded row; a similarity query can. */
   const s0 = src.indexOf('out.library = []');
