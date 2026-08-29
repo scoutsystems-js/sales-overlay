@@ -3938,6 +3938,25 @@ by SIZE (what I sorted on)        by RATE (the actual question)
 - **THE SHAPE, and it generalises past Zoom: when an input is detectably unusable, silently producing an output from it is worse than producing none.** The project already applies this to prospect names (refuse rather than guess) and to quote attribution (refuse rather than misattribute); the grader has no equivalent refusal.
 - **⚠ FILED, NOT BUILT — refusing to grade is a product ruling, not a bug fix.**
 
+### ⚠⚠⚠ BEFORE STARTING ANY QUEUE ROW, VERIFY THE ROW IS STILL TRUE — SIX STALE ROWS AND COUNTING (standing process step, 2026-08-29)
+**The health snapshot · update-analyses · the sub-page hashes · admin part 2 · the Anthropic retry fix · the Zoom connect-time guidance. That is a PATTERN, not a run of bad luck, and it has cost six blocks' worth of false starts.**
+- **⚠ VERIFY THE ROW YOU ARE ABOUT TO WORK, NOT THE WHOLE FILE.** It is a two-minute check — grep for the symbol, hit the endpoint, read the string — against work that is routinely half a block.
+- **⚠⚠ THE CHECK IS "IS IT WIRED", NOT "DOES IT EXIST".** `lib/model-retry.js` existing proves nothing; **9 call sites in the worker** proves it runs. A row can equally be stale because the feature shipped OR because the data it describes has moved.
+- **THE MECHANISM IS ALWAYS THE SAME: a row is written when something is TRUE and nothing re-checks it when the world changes.** A ruling arriving on a row, a fix shipping in another block, a backlog being graded by cron — none of them edit the row.
+- **⚠ AND A STALE ROW COSTS MORE THAN THE WASTED WORK: it spends the architect's approval on something that does not need doing**, and the approval then reads as licence to build a second copy of a thing that already exists.
+
+### ⚠⚠⚠ I CHECKED WHETHER I *HAD* THE CREDENTIAL, NOT WHETHER THE OPERATION *NEEDED* IT — AND THAT CORRECTS WHAT I FILED YESTERDAY (2026-08-29)
+**Filed yesterday: "a local run inherits the local environment's capabilities, check them before starting". True, and it identified the WRONG capability.**
+```
+getValidAccessToken:
+  line 49   if (!needsRefresh(conn.expires_at)) return conn.access_token;   <- NO credential needed
+  line 53   ... _refreshAndPersist(...)  ->  the refresher  ->  ZOOM_CLIENT_ID
+```
+- **The credential is only reached ON REFRESH.** Yesterday Godwin's Zoom token had EXPIRED, so the run refreshed and hit the missing client id. Today the same token is VALID, the same code takes line 49, and **the same 11 calls grade normally on the same machine with the same missing credential.**
+- **⚠⚠ SO "I HAVE NO ZOOM CREDENTIALS, THEREFORE I CANNOT RUN ZOOM WORK" WAS A REASONABLE INFERENCE AND IT WAS WRONG.** The blocker was not the credential, it was the TOKEN STATE — a different, cheaper, and time-varying thing. **A capability check must trace the actual code path, not the plausible one.**
+- **THE HABIT: when a run fails on a missing dependency, find the LINE that needed it before generalising.** "This environment cannot do X" is a much stronger claim than "this run needed a refresh and could not do one", and only the second was true.
+- **⚠ AND THE GUARD THAT MATTERS IS AT THE FAILURE, NOT AT THE START: a CAPABILITY failure must abort the whole run immediately** — every remaining call fails for the same reason, and the worker records each as `error`, a state no shipped control can reach. **That is how 11 gradeable pending calls became errored.** One occurrence is enough; there is nothing to learn from the twelfth.
+
 ### ⚠⚠⚠ AN APPROVED SPEND ITEM IS A CLAIM ABOUT THE DATA, AND THE DATA MOVES — RE-MEASURE BEFORE SPENDING (2026-08-29)
 **Four spend runs were approved on filed counts. Measured first, TWO HAD NO GRADEABLE TARGET AT ALL and a third was off by 50x.**
 ```
