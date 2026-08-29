@@ -3868,6 +3868,14 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ⚠⚠⚠ A QUEUE ROW GOES STALE WHEN THE WORK SHIPS AND NOBODY EDITS THE ROW — AND THE FILE THEN CARRIES BOTH ANSWERS AT ONCE (fourth instance 2026-08-29)
+**Four rows now: the health snapshot, the update-analyses filing, the sub-page hashes, and admin-view-rebuild part 2. This is a recurring failure of the queue itself, not four coincidences.**
+- **The live case:** the row said *"PART 2 IS NOT [shipped]"* and *"NOT BUILT: deactivate/delete a whole company"*. **Both shipped in `319d06b` on 2026-08-24 — FOUR DAYS BEFORE the 2026-08-28 ruling the row records as unblocking them.** The row was diligently updated with the ruling; nobody asked whether the work had already been done.
+- **⚠⚠ AND THE LIVE SECTION HAD CARRIED THE SHIPPED ROW THE WHOLE TIME.** So BUILD-LIST asserted **both** answers simultaneously — `Company lifecycle … shipped 319d06b, 982d259` in one section, `NOT BUILT` in another. **A reader who hits the second one first gets the opposite of the truth, stated confidently.** This is the unamended-predecessor failure already recorded for CLAUDE.md, now happening to BUILD-LIST.
+- **⚠⚠ THE MECHANISM IS SPECIFIC AND WORTH NAMING: A RULING ARRIVING FOR WORK THAT IS ALREADY DONE.** A ruling lands, the row is updated to say *"now buildable"*, and that edit reads as maintenance — it makes the row look freshly checked while confirming nothing about the code. **The edit that makes a row look current is exactly the edit that does not verify it.**
+- **THE HABIT: when a ruling unblocks a row, CHECK THE CODE BEFORE RECORDING THE RULING.** *"Ruled buildable"* and *"not built"* are independent facts and the second is the one that decays.
+- **⚠ AND A ROW MOVED TO A DONE SECTION BEFORE THE USER HAS CONFIRMED IS THE SAME BUG POINTED FORWARD.** The team-picker row had been filed under LIVE while Justin had not yet refreshed. **A gesture-verified fix is not closed until the gesture has been made** — the picker has caught this twice.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
