@@ -14,6 +14,8 @@ const { buildSectionBreakdown, sectionScoreOf, SECTIONS } = require('../lib/sect
 // opens would have shown "1 of 5" and "5 of 5" for the SAME section, both
 // labelled "rank". One definition now, and the copy says which end it means.
 const SR = require('../lib/section-ranking');
+const { selectLibraryMoments } = require('../lib/section-library');
+const { clipHref } = require('../lib/clip-link');
 const { computeWhyFacts } = require('../lib/why-prose');
 /* const { quoteHash } = require('../lib/kb-entry'); */ // only reader was the
 // saved-to-KB badge, removed 2026-08-18 with the Add-to-KB buttons
@@ -1227,6 +1229,58 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
    *   out.good.forEach(mark); out.bad.forEach(mark);
    * } catch (e) { }
    */
+
+  /* ── 2c(iii): the rep's own proven lines in this section ────────────────
+     "Discovery is your weakest section — here are your best discovery
+     moments." Harvested from calls they CLOSED, so it is evidence of what
+     already works for THIS rep rather than a generic standard.
+
+     ⚠⚠ ALL-TIME, NOT WINDOWED, AND THE PANEL SAYS SO. Everything else on this
+     page answers to the date picker; this does not, because the harvest only
+     fires on closed calls and a 7-day window would usually be empty. Two
+     scopes on one screen is exactly the kind of thing that reads as a bug, so
+     the label carries the scope rather than leaving the reader to infer it.
+
+     ⚠ SELECTED BY SECTION AND OWNER — never by embedding similarity. See
+     lib/section-library.js for why that is a decision rather than a shortcut.
+
+     ⚠ NON-FATAL. A library failure must not take down the drilldown, which is
+     the part that answers the question the user actually clicked. */
+  out.library = [];
+  out.library_scope = 'closed_calls_all_time';
+  try {
+    var kb = await admin.from('knowledge_base')
+      .select('source_fathom_call_id, source_section, metadata, created_at')
+      .eq('uploaded_by', userId)
+      .eq('source_section', section)
+      .eq('metadata->>category', 'call_moment')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (!kb.error) {
+      var picked = selectLibraryMoments(kb.data || []);
+      /* The clip link needs recording_url AND source, which live on the call,
+         not on the KB row. Resolved through lib/clip-link so the label is
+         provider-aware — Fathom's ?t= seeks, Zoom's does not. */
+      var ids = picked.map(function (m) { return m.fathom_call_id; }).filter(Boolean);
+      var callBy = {};
+      if (ids.length) {
+        var cr = await admin.from('fathom_calls')
+          .select('id, recording_url, source, call_date, prospect_id').in('id', ids);
+        ((cr && cr.data) || []).forEach(function (c) { callBy[c.id] = c; });
+      }
+      out.library = picked.map(function (m) {
+        var c = callBy[m.fathom_call_id] || {};
+        return {
+          quote: m.quote,
+          observation: m.observation,
+          type: m.type,
+          call_date: c.call_date || null,
+          clip_url: c.recording_url ? clipHref(c.recording_url, m.timestamp_seconds) : null,
+          source: c.source || null,
+        };
+      });
+    }
+  } catch (e) { out.library = []; }
 
   return out;
 }

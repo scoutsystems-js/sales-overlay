@@ -12835,7 +12835,52 @@
     }
 
     content.innerHTML = head + headline + coverage
-      + sectionHistogramHtml(d.histogram || [], d.uses_earned_close_score, d.average, label, d.min_score, d.max_score) + groups + examples;
+      + sectionHistogramHtml(d.histogram || [], d.uses_earned_close_score, d.average, label, d.min_score, d.max_score)
+      + groups + examples + sectionLibraryHtml(d, label);
+  }
+
+  /**
+   * "Discovery is your weakest section — here are your best discovery moments."
+   *
+   * The rep's OWN proven lines in this section, harvested from calls they
+   * CLOSED. It answers a different question from everything above it: not "what
+   * happened this period" but "what already works for you".
+   *
+   * ⚠⚠ IT DOES NOT ANSWER TO THE DATE PICKER, AND THE LABEL SAYS SO. Every other
+   * panel on this page is windowed; this one is all-time, because the harvest
+   * only fires on closed calls and a 7-day window would almost always be empty.
+   * Two scopes on one screen reads as a bug unless the scope is stated — the
+   * same rule the team gauges follow.
+   *
+   * ⚠ THE EMPTY STATE EXPLAINS WHERE MOMENTS COME FROM rather than rendering
+   * nothing. A silent absence here is indistinguishable from a broken panel,
+   * and the answer ("close a call") is something the rep can act on.
+   */
+  function sectionLibraryHtml(d, label) {
+    var lib = (d && d.library) || [];
+    var lower = String(label || '').toLowerCase();
+    if (!lib.length) {
+      return '<div class="sec-group"><h2>Your best ' + escapeHtml(lower) + ' moments</h2>'
+        + '<div class="meta">Nothing captured yet. Scout saves your strongest lines from calls you close, '
+        + 'so these build up as you close more.</div></div>';
+    }
+    var rows = lib.map(function (m) {
+      var when = m.call_date ? formatDate(m.call_date) : '';
+      var clip = m.clip_url
+        ? '<a class="sec-clip" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener">'
+          + escapeHtml(clipLabelFor(m.source)) + '</a>'
+        : '<span class="sec-clip disabled">—</span>';
+      return '<div class="sec-moment sec-moment-closer">'
+        + '<div class="sec-moment-top">' + clip + '<span class="sec-when">' + escapeHtml(when) + '</span></div>'
+        + '<div class="sec-quote sec-quote-you"><span class="sec-you-label">You said</span>'
+          + escapeHtml(m.quote || '') + '</div>'
+        + (m.observation ? '<div class="sec-obs">' + escapeHtml(m.observation) + '</div>' : '')
+      + '</div>';
+    }).join('');
+    return '<div class="sec-group"><h2>Your best ' + escapeHtml(lower) + ' moments</h2>'
+      + '<div class="meta">From calls you closed, all time — not affected by the date filter above.</div>'
+      + rows
+    + '</div>';
   }
 
   /*
