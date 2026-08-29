@@ -80,8 +80,54 @@ function normalizeName(input) {
   });
 }
 
+/**
+ * DISAMBIGUATE A SET OF PEOPLE (Justin, 2026-08-29): "when two people on a board
+ * share a first name, show the surname initial — Josh P."
+ * Live today: Josh Pinner and Josh Niebloom on one board.
+ *
+ * WHY IT MATTERS MOST IN PROSE, NOT IN A COLUMN. A grid shows the full name and
+ * the two are already distinct — but the digest and the coaching lanes hand
+ * these labels to a MODEL, and the model SHORTENS them: a real digest reads
+ * "Yazan's close on Alicia Robinson is the model". With two Joshes that becomes
+ * "Josh", naming one rep's work as another's, with nothing on screen to say
+ * which. Making the LABEL itself unambiguous is what survives being shortened.
+ *
+ * ONLY COLLIDING NAMES CHANGE. A rep whose first name is unique keeps their full
+ * name exactly as before — this fixes an ambiguity, it is not a rename.
+ *
+ * AND IT NEVER INVENTS AN INITIAL IT DOES NOT HAVE. If a colliding person has no
+ * surname their label is left unchanged: a wrong initial is worse than the
+ * collision it was meant to solve — the same governing rule as prospect names.
+ *
+ * @param {Object} nameMap  { id: "Full Name" }
+ * @returns {Object}        { id: "Full Name" | "First L" }
+ */
+function disambiguateNames(nameMap) {
+  var out = {};
+  if (!nameMap || typeof nameMap !== 'object') return out;
+  var ids = Object.keys(nameMap);
+
+  var byFirst = {};
+  ids.forEach(function (id) {
+    var first = String(nameMap[id] || '').trim().split(/\s+/)[0] || '';
+    if (!first) return;
+    var key = first.toLowerCase();
+    (byFirst[key] = byFirst[key] || []).push(id);
+  });
+
+  ids.forEach(function (id) {
+    var full = String(nameMap[id] || '').trim();
+    var parts = full.split(/\s+/).filter(Boolean);
+    var group = byFirst[(parts[0] || '').toLowerCase()] || [];
+    if (group.length < 2 || parts.length < 2) { out[id] = full; return; }
+    out[id] = parts[0] + ' ' + parts[parts.length - 1].charAt(0).toUpperCase();
+  });
+  return out;
+}
+
 module.exports = {
   resolveDisplayName: resolveDisplayName,
+  disambiguateNames: disambiguateNames,
   normalizeName: normalizeName,
   displayNameFromEmail: displayNameFromEmail,
   titleCaseHandle: titleCaseHandle,

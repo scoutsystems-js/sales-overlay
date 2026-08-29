@@ -3,7 +3,7 @@
 // permission before calling in here. All queries are chunked .in() to dodge the
 // supabase-js 1000-row cap, same as session-analytics.js.
 
-var { resolveDisplayName } = require('./display-name');
+var { resolveDisplayName, disambiguateNames } = require('./display-name');
 
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
@@ -171,6 +171,15 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     });
   });
 
+  /* ⚠ Names are resolved for the WHOLE board first, then disambiguated across
+     it — two reps sharing a first name get a surname initial ("Josh P"). It has
+     to see every member at once, so it cannot be done per row. */
+  var nameOf = {};
+  repIds.forEach(function (id) {
+    nameOf[id] = resolveDisplayName(profileMap[id], (emailMap && emailMap[id]) || null, id);
+  });
+  nameOf = disambiguateNames(nameOf);
+
   var per_rep = repIds.map(function (id) {
     var c = cur.rep[id];
     var p = prior.rep[id];
@@ -181,7 +190,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     return {
       user_id: id,
       email: (emailMap && emailMap[id]) || null,
-      display_name: resolveDisplayName(profileMap[id], (emailMap && emailMap[id]) || null, id),
+      display_name: nameOf[id],
       /* ⚠⚠ RENDERING AND COUNTING ARE TWO DIFFERENT QUESTIONS AND THIS FLAG
          ANSWERS ONLY THE FIRST. Justin's ruling: DEACTIVATE LEAVES THE NUMBERS.
          So a deactivated person stays in every aggregate — their calls, cash and

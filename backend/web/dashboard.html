@@ -13894,7 +13894,11 @@
       if (list.length >= 2 || isOwner) {
         var opts = list.map(function (u) {
           var self = u.user_id === me;
-          var lbl = (self ? 'Me — ' : '') + (u.email || u.user_id);
+          /* ⚠ THE PERSON'S NAME, NOT THEIR EMAIL. personLabel already resolves
+             first/last from the profile and only falls back to the email when
+             there is no name at all — this picker was the last surface still
+             rendering a raw handle where a person is being chosen. */
+          var lbl = (self ? 'Me — ' : '') + (personLabel(u) || u.user_id);
           return '<option value="' + escapeHtml(u.user_id) + '"' + (u.user_id === state.viewingUserId ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>';
         }).join('');
         picker = '<select class="user-select" onchange="onCallLibraryPick(this.value)">' + opts + tail + '</select>';

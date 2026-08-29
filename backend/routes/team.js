@@ -8,7 +8,7 @@
 // owner with reps defaults to their own team.
 
 const express = require('express');
-const { resolveDisplayName } = require('../lib/display-name');
+const { resolveDisplayName, disambiguateNames } = require('../lib/display-name');
 var { withBoardOwner } = require('../lib/team-membership');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
@@ -689,7 +689,11 @@ async function nameMapFor(admin, memberIds, em) {
   }
   var nameMap = {};
   memberIds.forEach(function (id) { nameMap[id] = resolveDisplayName(profOf[id], em[id] || null, id); });
-  return nameMap;
+  /* ⚠ TWO PEOPLE SHARING A FIRST NAME GET A SURNAME INITIAL — "Josh P" (Justin,
+     2026-08-29; live: Josh Pinner and Josh Niebloom). Applied HERE so every lane
+     fed by this map is consistent, rather than each surface disambiguating on
+     its own and disagreeing. Only colliding names change. */
+  return disambiguateNames(nameMap);
 }
 
 router.get('/objections', teamGate, async function (req, res) {
