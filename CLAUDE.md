@@ -666,6 +666,57 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ STANDING RULING — ANYTHING A CUSTOMER CAN SEE IS WRITTEN FOR THEM (Justin, 2026-08-28)
+**He caught three in one evening, which is why this is a RULE and not three string fixes.**
+```
+"Bucketing returned unusable output — will retry on the next load."   an internal step, named on screen
+the cost warning: the money "goes to the company not them"            a hesitation, not information
+the ticket confirmation: "there is no inbox in Scout"                 how we are built, not what to do
+```
+- **THE RULE: no internal names, no mechanism, no explanation of how Scout works inside, and nothing they cannot act on. If a message cannot tell them WHAT HAPPENED and WHAT TO DO, it should not be on screen.**
+- **⚠⚠ THE COST WARNING IS REMOVED, NOT SOFTENED — and this is the sharpest of the three.** Telling a rep the money comes from the company **puts a hesitation in their head about spending someone else's money on their own coaching.** There is no billing decision for them to make at that button, so there is nothing to warn about. **Do not reinstate it in any form**, including a gentler wording — a reworded cost warning is still a cost warning, and the guard pins that.
+- **SWEPT BY CAPABILITY, NOT BY THE THREE NAMED.** A first pass matched code identifiers (`null`, `row`, `query`) and returned 173 false hits — the verdict was wider than the claim. Narrowed to quoted strings of **five or more real words with no code punctuation**, which found the real set: the three above plus *"Digest synthesis returned unusable output"*, *"a deploy ends one mid-way"*, *"No pending calls to reanalyze"*, and two admin *"temp password fallback"* strings.
+- **GUARDED** (`test/customer-language.test.js`) — mechanism vocabulary in customer-visible sentences, plus the cost warning pinned as absent. Comments are stripped **line-first, then block**, or the prose explaining the rule is reported as a violation of it.
+
+### ⚠⚠⚠ THE SUPPORT BUTTON BROKE ITSELF ON FIRST USE — AND THE RESTORE LOGIC WAS CORRECT THE WHOLE TIME (2026-08-28)
+**`openSupport()` opened with `document.getElementById('supportError').style.display = 'none'`. The confirmation had replaced the card's `innerHTML`, which DELETED `#supportError` — so that line threw a TypeError on null and the restore two lines below NEVER RAN.**
+- **⚠⚠ THE FIX IS AN ORDERING, NOT A FEATURE.** Restore the form FIRST, then touch children, all null-guarded. Nothing was missing; a statement above the working code threw first. **Dead-call-site family, one statement apart** — the code exists, it just never runs.
+- **⚠ AND THE CONFIRMATION TOLD THE PERSON TO USE THE BUTTON IT HAD JUST KILLED** (*"you can see this report any time from Need help?"*). A tool that breaks itself and then points at the broken thing is worse than one that simply fails.
+- **The report history moved OUT of the modal to Account → Your Reports** (Justin). A list of past reports is reference material; the modal exists to get ONE report written and sent, and mixing them made the modal longer every time it was used.
+
+### ⚠⚠⚠ A FIXED OUTPUT CAP BECOMES UNSATISFIABLE AS A BOARD GROWS — THE OBJECTION PANEL HAD BEEN FAILING FOR SOME TIME (2026-08-28)
+**The bucketing model must ECHO BACK every distinct objection phrase inside its JSON, so its output cost scales with the board. `BUCKET_MAX_TOKENS` was a constant 1500.**
+```
+live Sober Living board, 373 distinct phrases
+  cap 1500 -> output 1500, stop_reason=max_tokens, DOES NOT PARSE
+  cap 8000 -> output 3637, stop_reason=end_turn,   parses
+~10 output tokens per phrase => 1500 covered roughly 150 phrases
+after the fix: ok=true, 373 phrases mapped, 5 buckets, correct classes
+```
+- **⚠⚠ THE CAP IS NOW DERIVED FROM THE PHRASE COUNT, NOT A BIGGER CONSTANT.** Replacing 1500 with 8000 would fail again at the next size; the guard fails if the cap ever stops being a function of the input.
+- **⚠⚠ TRUNCATION AND JUNK REACHED THE SAME BRANCH AND WERE INDISTINGUISHABLE.** A cap that had grown too small looked exactly like a model returning nonsense — **and only one of those is fixed by changing a number.** `stop_reason === 'max_tokens'` is now detected and logged separately.
+- **⚠ THE BLAST RADIUS IS WIDER THAN THE PANEL, and this is the part worth carrying: on a bucketing failure `computeTeamObjections` sets `strict = false`, which falls back to the LOOSE denominator — DISQUALIFICATIONS AND LOGISTICAL BARRIERS COUNT AS OBJECTIONS.** So the drilldown's per-closer coaching was being computed over moments that are **not coachable by ruling**. That is why the "why" answers read weak.
+- **⚠ BUT `why-prose` IS A SEPARATE LANE — 0 bucketing references, measured.** The team-page per-rep sentence is unaffected. **One cause, two symptoms, and a third thing that only looked related.**
+
+### ⚠⚠⚠ AN UNCHUNKED `.in()` PUT AN ENTIRE BOARD'S CLOSE RATE AT ZERO, SILENTLY (2026-08-28)
+**PostgREST carries `.in()` in the URL, so one call per id-list means a URL that grows with the board. `fetchProspectCloseRates` passed EVERY call id in one request.**
+```
+live board, 600 call ids in a 30-day window (URL ~22,199 chars)
+  .in() with 100 ids -> 100 rows
+  .in() with 300 ids -> 300 rows
+  .in() with 600 ids -> TypeError: fetch failed
+then `if (an.error) return {}` swallowed it
+```
+- **EVERY rep card read "0 prospects" and a null close rate while the database held 109-254 prospects each.** After chunking at 100: **129/109/103/95/72/28/13 prospects and real rates (25%, 20%, 16%, 8%…).**
+- **⚠⚠ IT WAS REPORTED AS ONE REP'S CARD BEING WRONG. IT WAS EVERY CARD** — on any board large enough to cross the URL limit, which is why it appeared only as the company grew. **A symptom noticed on one row is not evidence the fault is on that row**, and checking the peers first is what turned a one-rep mystery into a one-line cause.
+- **⚠ EVERY OTHER `.in()` IN THIS CODEBASE ALREADY CHUNKS AT 100. This one did not** — so the guard pins the SHAPE (a 100-sized pager) rather than the symptom.
+- **⚠ RETURNING `{}` ON ERROR IS STILL RIGHT — a wrong close rate is worse than none — BUT IT MUST SAY SO.** A silent `{}` sends the next person to look at the data instead of at the query.
+
+### ⚠⚠ THE GRADING CONTROL: WHAT IT ACTUALLY DOES, AND THE DOUBLE-SPEND (established 2026-08-28)
+- **THE FILE SAID A PRESS GRADES TEN, implying eleven more presses. THAT IS THE `no-scope` PATH, WHICH THE UI NEVER USES.** The control sends `{scope}`, and with a scope `ids = unionIds` filtered to the window — **the whole window in one press**. `limit` applies only without a scope. **The user's account of the product was right and the documentation was wrong.**
+- **⚠⚠ A SECOND PRESS IS NOT A NO-OP.** The reset writes `pending` over **every id in the window with no status guard**, so it resets rows already `done` (re-grading them) **and** rows currently `processing` — **which destroys the very claim `claimAnalysisRun` would have used to refuse the duplicate.** Two loops can grade one call at once. **That makes a refresh-and-repress a SPEND bug, not a display bug.**
+- **⚠⚠ WHAT A REP LOSES MID-RUN — the answer is not "their coaching", it is "their numbers".** The analysis row survives intact and the call review page renders it (no `pending` gate). **But every aggregate filters `status='done'`**, so the call vanishes from the coaching dashboard, the rep cards, needs-work and the Calls filters, and its list badge reverts from the score to "Pending". **Josh has 38 previously-graded calls sitting pending since 2026-08-26 — missing from his numbers for two days.**
+
 ### ⚠⚠⚠ A RULING THAT DOES NOT CLOSE ITS OPEN ROW GETS RE-ASKED — JUSTIN ANSWERED THREE QUESTIONS TWICE (2026-08-28)
 **FIVE questions he had already ruled on were still sitting in BUILD-LIST's open sections. He answered three of them a SECOND time.**
 - **⚠⚠ THE FAILURE IS NOT THE ROWS, IT IS THE ORDERING OF THE EDIT.** A ruling was recorded (in CLAUDE.md, in a findings report, in a commit message) and the OPEN row it answered was left where it was. **An open list is read as the list of undecided things** — so a decided question sitting in one is indistinguishable from an undecided one, and the only person who can tell is the person who already answered it.

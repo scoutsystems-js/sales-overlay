@@ -182,13 +182,39 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
     realCalls.forEach(function (c) { byId[c.id] = c; });
 
     // Outcomes come from call_analyses; only 'done' rows carry a real outcome.
-    var an = await admin.from('call_analyses')
-      .select('fathom_call_id, outcome')
-      .in('fathom_call_id', Object.keys(byId))
-      .eq('status', 'done');
-    if (an.error) return {};
+    /* ⚠⚠ CHUNKED AT 100 — AN UNCHUNKED .in() PUT THE WHOLE BOARD'S CLOSE RATE
+       AT ZERO, SILENTLY. PostgREST carries `.in()` in the URL, so one call per
+       id-list means a URL that grows with the board. Measured on the live Sober
+       Living board 2026-08-28, 600 call ids in a 30-day window:
+
+         .in() with 100 ids -> 100 rows
+         .in() with 300 ids -> 300 rows
+         .in() with 600 ids -> TypeError: fetch failed   (URL ~22,199 chars)
+
+       ⚠⚠ AND THE FAILURE WAS INVISIBLE: `if (an.error) return {}` swallowed it,
+       so every rep card on the board read "0 prospects" and a null close rate
+       while the database held 109-254 prospects each. Nothing errored on screen.
+       It was reported as one rep's card being wrong; it was every card, on any
+       board big enough to cross the URL limit — which is why it appeared only
+       as the company grew. Every other `.in()` in this codebase already chunks
+       at 100; this one did not. */
     var outcomeBy = {};
-    (an.data || []).forEach(function (a) { outcomeBy[a.fathom_call_id] = a.outcome; });
+    var allIds = Object.keys(byId);
+    for (var oi = 0; oi < allIds.length; oi += 100) {
+      var an = await admin.from('call_analyses')
+        .select('fathom_call_id, outcome')
+        .in('fathom_call_id', allIds.slice(oi, oi + 100))
+        .eq('status', 'done');
+      /* ⚠ LOUD, NOT SILENT. Returning {} on error is still the safe answer — a
+         wrong close rate is worse than none — but it must say so, or the next
+         person sees zeros and looks at the data instead of the query. */
+      if (an.error) {
+        console.error('[prospect-entity] outcome lookup failed (' + allIds.length
+          + ' calls, chunk at ' + oi + '): ' + an.error.message);
+        return {};
+      }
+      (an.data || []).forEach(function (a) { outcomeBy[a.fathom_call_id] = a.outcome; });
+    }
 
     var pr = await admin.from('prospects').select('id, merged_into').in('user_id', ids);
     var mergedInto = {};

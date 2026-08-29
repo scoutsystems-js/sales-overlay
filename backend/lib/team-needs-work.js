@@ -53,7 +53,26 @@ const MIN_ANALYZED = 10;     // analyzed calls needed to model at all
 const PERSONAL_MIN_BUCKET = 4;
 const PERSONAL_MIN_ANALYZED = 3;
 
-const BUCKET_MAX_TOKENS = 1500;
+/* ⚠⚠ THE OUTPUT CAP MUST SCALE WITH THE NUMBER OF PHRASES — A FIXED ONE IS
+   UNSATISFIABLE THE MOMENT A BOARD GROWS. Measured on the live Sober Living
+   board 2026-08-28: 373 distinct phrases, all of which the model must ECHO BACK
+   in its JSON.
+
+     cap 1500  -> output 1500, stop_reason=max_tokens, DOES NOT PARSE
+     cap 8000  -> output 3637, stop_reason=end_turn,   parses
+
+   ~10 output tokens per phrase, so 1500 covered roughly 150 and had been
+   impossible to satisfy on this board for some time. The panel showed a failure
+   message and nobody could tell it from a model that returned junk.
+   ⚠ 20/phrase is deliberate headroom over the measured 10 — a phrase longer
+   than average costs more, and the failure mode of being too small is TOTAL. */
+const BUCKET_TOKENS_PER_PHRASE = 20;
+const BUCKET_MIN_TOKENS = 1500;
+const BUCKET_MAX_TOKENS_CEIL = 16000;
+function bucketMaxTokens(distinctCount) {
+  var n = (typeof distinctCount === 'number' && distinctCount > 0) ? distinctCount : 0;
+  return Math.max(BUCKET_MIN_TOKENS, Math.min(BUCKET_MAX_TOKENS_CEIL, n * BUCKET_TOKENS_PER_PHRASE));
+}
 // Bumped when the bucketing/classification logic changes — folded into the cache
 // hash so cached needs-work results regenerate on deploy (a prompt change alone
 // doesn't move the analyses/surface hash). v2 = taxonomy (true-objections-only).
@@ -499,7 +518,17 @@ async function getBucketMapping(objs) {
 
   var mapping = {}, bucketClass = {};
   try {
-    var resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: BUCKET_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] });
+    var resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL,
+      max_tokens: bucketMaxTokens(distinct.length), messages: [{ role: 'user', content: prompt }] });
+    /* ⚠⚠ TRUNCATION AND JUNK ARE DIFFERENT FAILURES AND USED TO LOOK IDENTICAL.
+       Both ended at the same unparseable-output branch, so a cap that had become
+       too small was indistinguishable from a model returning nonsense — and only
+       one of those is fixed by changing a number. Log them apart. */
+    if (resp.stop_reason === 'max_tokens') {
+      console.error('[team-needs-work] bucket mapping TRUNCATED at the output cap: '
+        + distinct.length + ' distinct phrases, cap ' + bucketMaxTokens(distinct.length)
+        + ' — raise BUCKET_TOKENS_PER_PHRASE or chunk the phrase list.');
+    }
     var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
     if (!parsed || !Array.isArray(parsed.buckets)) /* ⚠ CUSTOMER-FACING: names no mechanism. It used to say "Bucketing returned
        unusable output — will retry on the next load", which tells the reader
@@ -674,6 +703,7 @@ module.exports = {
      panels different ideas of what counts, which is precisely the divergence
      this ruling exists to end. */
   getBucketMapping: getBucketMapping,
+  _bucketMaxTokens: bucketMaxTokens,
   normSurface: normSurface,
   BUCKET_CLASSES: BUCKET_CLASSES,
   // pure test surface (underscore = test-only)
