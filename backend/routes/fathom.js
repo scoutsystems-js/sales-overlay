@@ -1553,73 +1553,93 @@ router.get('/calls', requireAuth, async function(req, res) {
 // zero-or-one relationship). Highlights query is non-fatal: a transient
 // call_highlights outage still surfaces the call + its analysis with
 // highlights:[].
+/**
+ * THE CALL REVIEW PAYLOAD — ONE IMPLEMENTATION, TWO CALLERS.
+ *
+ * ⚠⚠ WHY THIS EXISTS: the Calls LIST could already be scoped to another user
+ * (`/admin/fathom-calls/:user_id`) while the review route was ALWAYS scoped to
+ * `req.user.id`. So a manager or owner could list a rep's calls perfectly and
+ * every single click returned **404 "Call not found"** — the coaching page, for
+ * every rep, for every manager. The list had a cross-user variant and the thing
+ * it links to did not.
+ *
+ * ⚠ THE OWNER IS AN ARGUMENT, NEVER A REQUEST PARAMETER READ IN HERE. The
+ * caller decides whose call this is: the self route passes req.user.id, the
+ * admin route passes a target it has ALREADY scope-checked. That keeps
+ * GET /fathom/calls/:id structurally incapable of reading someone else's call —
+ * the same shape as the grading control, where adding a target parameter to the
+ * self-serve route would have been one bad argument away from a leak.
+ *
+ * Returns { status, body } — never throws for an expected outcome.
+ */
+async function loadCallReview(admin, callId, ownerUserId) {
+  var callResult = await admin
+    .from('fathom_calls')
+    /* ⚠ not_a_sales_call SELECTED: the review page renders the mark/un-mark
+       button from it. Omit the column and it is undefined, the button always
+       reads "unmarked", and a marked call can never be un-marked — the
+       missing-column bug this codebase has now shipped four times. */
+    .select('id, user_id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, exclusion_reason')
+    .eq('id', callId)
+    .maybeSingle();
+  if (callResult.error) {
+    console.error('[fathom] call review fetch failed for owner ' + ownerUserId + ' call ' + callId + ': ' + callResult.error.message);
+    return { status: 500, body: { error: 'Could not load call' } };
+  }
+  /* 404 covers both "does not exist" and "belongs to another user", so an id
+     probe cannot distinguish them. The ownership check stays HERE even though
+     the admin caller has already scope-checked — it is the last line of
+     defence and it costs nothing. */
+  if (!callResult.data || callResult.data.user_id !== ownerUserId) {
+    return { status: 404, body: { error: 'Call not found' } };
+  }
+  var call = callResult.data;
+
+  // Analysis row (zero-or-one). Non-fatal: render without analysis on error.
+  var analysisResult = await admin
+    .from('call_analyses')
+    .select('status, prospect_name, overall_score, overall_summary, one_thing, outcome, outcome_source, why_outcome, why_quote, why_timestamp_seconds, one_thing_timestamp_seconds, follow_up_email, speaker_closer_name, intro_grade, intro_score, intro_notes, discovery_grade, discovery_score, discovery_notes, pitch_grade, pitch_score, pitch_notes, objection_grade, objection_score, objection_notes, close_grade, close_score, close_notes, what_mattered, role_inverted, coverage, prospect_context, barrier_trace')
+    .eq('fathom_call_id', callId)
+    .maybeSingle();
+  if (analysisResult.error) {
+    console.error('[fathom] call review analysis fetch failed for call ' + callId + ': ' + analysisResult.error.message);
+  }
+  var analysis = analysisResult.data || null;
+
+  // Highlights (zero or many). Non-fatal — render with an empty array.
+  var highlightsResult = await admin
+    .from('call_highlights')
+    .select('id, timestamp_seconds, speaker, quote, observation, type, sequence_order, section, resolution, handling, closer_response, closer_response_verified, speaker_verified')
+    .eq('fathom_call_id', callId)
+    .order('sequence_order', { ascending: true });
+  if (highlightsResult.error) {
+    console.error('[fathom] call review highlights fetch failed for call ' + callId + ': ' + highlightsResult.error.message);
+  }
+
+  return { status: 200, body: {
+    id:               call.id,
+    fathom_call_id:   call.fathom_call_id,
+    title:            call.title,
+    call_date:        call.call_date,
+    duration_seconds: call.duration_seconds,
+    recording_url:    call.recording_url,
+    sync_status:      call.sync_status,
+    // ⚠ SELECTED *AND* EMITTED. Selected-but-not-emitted is the same bug as
+    // emitted-but-not-selected, from the other end.
+    not_a_sales_call: call.not_a_sales_call === true,
+    exclusion_reason: call.exclusion_reason || null,
+    analysis:         analysis,
+    highlights:       highlightsResult.data || [],
+  } };
+}
+
 router.get('/calls/:id', requireAuth, async function(req, res) {
   var userId = req.user.id;
   var callId = req.params.id;
   if (!callId) return res.status(400).json({ error: 'call id required' });
-
   try {
-    var admin = getAdminClient();
-
-    // 1) Call row — ownership-checked. 404 covers both "doesn't exist" and
-    //    "belongs to another user" to avoid leaking ID validity.
-    var callResult = await admin
-      .from('fathom_calls')
-      /* ⚠ not_a_sales_call SELECTED: the review page renders the mark/un-mark button
-       from it. Omit the column and it is undefined, the button always reads
-       "unmarked", and a marked call can never be un-marked -- the missing-column
-       bug this codebase has now shipped four times. */
-    .select('id, user_id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, exclusion_reason')
-      .eq('id', callId)
-      .maybeSingle();
-    if (callResult.error) {
-      console.error('[fathom] /calls/:id fetch failed for user ' + userId + ' call ' + callId + ': ' + callResult.error.message);
-      return res.status(500).json({ error: 'Could not load call' });
-    }
-    if (!callResult.data || callResult.data.user_id !== userId) {
-      return res.status(404).json({ error: 'Call not found' });
-    }
-    var call = callResult.data;
-
-    // 2) Analysis row (zero-or-one). Non-fatal: render the call without
-    //    analysis fields if the table read errors.
-    var analysisResult = await admin
-      .from('call_analyses')
-      .select('status, prospect_name, overall_score, overall_summary, one_thing, outcome, outcome_source, why_outcome, why_quote, why_timestamp_seconds, one_thing_timestamp_seconds, follow_up_email, speaker_closer_name, intro_grade, intro_score, intro_notes, discovery_grade, discovery_score, discovery_notes, pitch_grade, pitch_score, pitch_notes, objection_grade, objection_score, objection_notes, close_grade, close_score, close_notes, what_mattered, role_inverted, coverage, prospect_context, barrier_trace')
-      .eq('fathom_call_id', callId)
-      .maybeSingle();
-    if (analysisResult.error) {
-      console.error('[fathom] /calls/:id analysis fetch failed for user ' + userId + ' call ' + callId + ': ' + analysisResult.error.message);
-    }
-    var analysis = analysisResult.data || null;
-
-    // 3) Highlights rows (zero or many). Non-fatal — render with empty
-    //    highlights array on failure so the page still loads.
-    var highlightsResult = await admin
-      .from('call_highlights')
-      .select('id, timestamp_seconds, speaker, quote, observation, type, sequence_order, section, resolution, handling, closer_response, closer_response_verified, speaker_verified')
-      .eq('fathom_call_id', callId)
-      .order('sequence_order', { ascending: true });
-    if (highlightsResult.error) {
-      console.error('[fathom] /calls/:id highlights fetch failed for user ' + userId + ' call ' + callId + ': ' + highlightsResult.error.message);
-    }
-    var highlights = highlightsResult.data || [];
-
-    res.json({
-      id:               call.id,
-      fathom_call_id:   call.fathom_call_id,
-      title:            call.title,
-      call_date:        call.call_date,
-      duration_seconds: call.duration_seconds,
-      recording_url:    call.recording_url,
-      sync_status:      call.sync_status,
-      // ⚠ SELECTED *AND* EMITTED. The review page renders the mark/un-mark
-      // button from this; selected-but-not-emitted is the same bug as
-      // emitted-but-not-selected, from the other end.
-      not_a_sales_call: call.not_a_sales_call === true,
-      analysis:         analysis,
-      highlights:       highlights,
-    });
+    var out = await loadCallReview(getAdminClient(), callId, userId);
+    return res.status(out.status).json(out.body);
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[fathom] /calls/:id fatal for user ' + userId + ' call ' + callId + ':', err.message);
@@ -1641,6 +1661,7 @@ router._fetchRecordingTranscript = fetchRecordingTranscript;
 router._markConnectionError = markConnectionError;
 router._loadCallsList       = loadCallsList;      // shared with /admin/fathom-calls/:user_id
 router._parseCallListOpts   = parseCallListOpts;
+router._loadCallReview      = loadCallReview;   // shared with /admin/fathom-calls/:user_id/:call_id
 
 // ── DELETE /fathom/disconnect ────────────────────────────────────────────────
 // Deletes the caller's OWN Fathom connection (stops syncing new calls). NEVER

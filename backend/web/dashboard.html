@@ -13646,6 +13646,28 @@
       + '</div>';
   }
 
+  /* ⚠ LIFTED TO TOP LEVEL 2026-08-29. These were accidentally inserted INSIDE
+     the card-render function (brace depth 4 while every sibling is 3), which
+     PARSES FINE — a nested declaration is legal and hoists — so `node -c` and
+     the suite were both green. But they were then out of scope for
+     toggleNotSalesFromRow, which calls exclusionLabel() after a toggle and
+     would have thrown a ReferenceError at runtime. Indentation looked
+     top-level and was cosmetic; only brace depth tells the truth. */
+  /* ONE LABEL FUNCTION FOR BOTH RENDER SITES. The row is drawn server-side on
+     load and patched in place after a toggle; two copies of this string is how
+     the two come to disagree, which has already happened on this page with the
+     clip label and the objection categories.
+     CUSTOMER LANGUAGE: "Compromised file" is Justin's word and it is what the
+     user sees; the title says what they can do about it. */
+  function exclusionLabel(c) {
+    return (c && c.exclusion_reason === 'compromised_file') ? 'Compromised file' : 'Not a sales call';
+  }
+  function exclusionTitle(c) {
+    return (c && c.exclusion_reason === 'compromised_file')
+      ? 'This recording only captured one voice, so it could not be graded and is not counted. If both sides were speaking, open the call and mark it as a sales call to include it.'
+      : 'A person marked this as not a sales call, so it is not counted.';
+  }
+
   function renderCallLibrary() {
     var content = document.getElementById('content');
 
@@ -13882,21 +13904,6 @@
         + ' onclick="event.stopPropagation()">↗</a>';
     }
 
-  /* ONE LABEL FUNCTION FOR BOTH RENDER SITES. The row is drawn server-side on
-     load and patched in place after a toggle; two copies of this string is how
-     the two come to disagree, which has already happened on this page with the
-     clip label and the objection categories.
-     CUSTOMER LANGUAGE: "Compromised file" is Justin's word and it is what the
-     user sees; the title says what they can do about it. */
-  function exclusionLabel(c) {
-    return (c && c.exclusion_reason === 'compromised_file') ? 'Compromised file' : 'Not a sales call';
-  }
-  function exclusionTitle(c) {
-    return (c && c.exclusion_reason === 'compromised_file')
-      ? 'This recording only captured one voice, so it could not be graded and is not counted. If both sides were speaking, open the call and mark it as a sales call to include it.'
-      : 'A person marked this as not a sales call, so it is not counted.';
-  }
-
     var cardId = escapeHtml(String(c.id || ''));
     var isNS = c.not_a_sales_call === true;
     return '<div class="library-card' + (isNS ? ' is-not-sales' : '') + '" id="libcard-' + cardId + '"'
@@ -13964,7 +13971,15 @@
   }
 
   async function fetchCallReview(callId) {
-    var res = await fetch('/fathom/calls/' + encodeURIComponent(callId), { headers: authHeader() });
+    /* ⚠⚠ THE REVIEW MUST FOLLOW THE SAME SCOPE AS THE LIST. The Calls list
+       already switched to /admin/fathom-calls/:user_id when viewing another
+       user; this did not, and stayed on the self-scoped route — so a manager
+       could list a rep's calls and EVERY click returned "Call not found".
+       The two are chosen the same way now, from the same isSelf(). */
+    var url = isSelf()
+      ? '/fathom/calls/' + encodeURIComponent(callId)
+      : '/admin/fathom-calls/' + encodeURIComponent(state.viewingUserId) + '/' + encodeURIComponent(callId);
+    var res = await fetch(url, { headers: authHeader() });
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
     if (res.status === 404) throw new Error('Call not found');
     if (!res.ok) throw new Error('HTTP ' + res.status);

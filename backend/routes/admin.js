@@ -1397,6 +1397,55 @@ router.get('/fathom-calls/:user_id', requireAuth, requireRole(['manager', 'owner
   }
 });
 
+/**
+ * GET /admin/fathom-calls/:user_id/:call_id — ONE CALL, for a manager or owner.
+ *
+ * ⚠⚠ THE GAP THIS CLOSES: the LIST already had a cross-user variant
+ * (/admin/fathom-calls/:user_id) and the review page it links to did NOT — that
+ * route was always scoped to req.user.id. So a manager could list a rep's calls
+ * perfectly and every click returned 404 "Call not found". The coaching page,
+ * for every rep, for every manager.
+ *
+ * ⚠ A SEPARATE ROLE-GATED ROUTE, NOT A TARGET PARAMETER ON THE SELF ROUTE.
+ * GET /fathom/calls/:id still passes req.user.id and remains structurally
+ * incapable of naming another user — same reasoning as the grading control.
+ *
+ * ⚠ THE SCOPE CHECK IS THE ONE THE LIST ALREADY USES: an owner may view anyone;
+ * anyone else may view only their own reps. Copying the predicate rather than
+ * inventing a second one is deliberate — two authorization rules that can
+ * disagree is worse than one.
+ */
+router.get('/fathom-calls/:user_id/:call_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  var targetUserId = req.params.user_id;
+  var callId = req.params.call_id;
+  try {
+    var admin = getAdminClient();
+
+    if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
+      var scopeCheck = await admin
+        .from('user_profiles')
+        .select('user_id, managed_by')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+      if (scopeCheck.error) {
+        console.error('[admin] fathom-call review scope check failed:', scopeCheck.error.message);
+        return res.status(500).json({ error: 'Could not verify access' });
+      }
+      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+        console.warn('[admin] Scope violation on fathom-call review: actor=%s target=%s', req.user.id, targetUserId);
+        return res.status(403).json({ error: 'Not authorized for that user' });
+      }
+    }
+
+    var out = await fathomRoutes._loadCallReview(admin, callId, targetUserId);
+    res.status(out.status).json(out.body);
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] fathom-call review error:', err.message);
+    res.status(500).json({ error: 'Failed to load call' });
+  }
+});
+
 // ── GET /admin/objections-intel/:user_id ────────────────────────────────────
 // Admin-pivot equivalent of /me/objections-intel. Same scope enforcement.
 router.get('/objections-intel/:user_id', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
