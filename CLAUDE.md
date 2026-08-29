@@ -666,6 +666,31 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ THE CONTROL KEPT THE SELECTION AND THE BOARD REVERTED — TWO SOURCES, AND A RACE THAT MADE THEM DISAGREE (2026-08-29)
+**Justin: on Sober Living Riches he hits refresh and the page returns with SCOUT SYSTEMS' name and numbers while the DROPDOWN still reads SOBER LIVING RICHES.**
+- **⚠⚠ THAT IS THE OPPOSITE OF THE FILED BUG, AND MY EARLIER CLEARANCE OF THE PERSISTENCE FIX WAS WRONG.** I checked `restoreTeamPick` against the symptom *"the pick does not apply"* and cleared it. The real symptom is *"the pick is remembered by the CONTROL and not by the DATA"* — a half-restored selection, which is exactly what the persistence fix introduced. **Before it, `teamSelected` was always null at boot and everything agreed on the default.** ⚠ **A clearance is only as good as the symptom it was tested against**, and re-examining with the corrected symptom is what found it in minutes.
+- **THE MECHANISM:** `renderTeamView` kicks EIGHT lanes in parallel and `loadTeam` builds each URL **at call time**, while `teamSelected` is still null — so overview asks for the DEFAULT team. `/team/context` (small, fast) wins the race, `restoreTeamPick` sets the saved selection and calls `resetTeamData()`, which nulled the DATA **but not the `*Loading` FLAGS**. The refetch hit `if (state[c.flag]) return` and **never ran**, and the original default-team response then landed.
+- **⚠⚠ CLEARING THE FLAGS ALONE IS NOT ENOUGH — and this is the part that would have been missed.** The first request is still in flight and would still resolve **last**, overwriting the correct payload. A **team epoch**, bumped on every reset, makes a stale answer discardable. **`context` is exempt: it is not team-scoped and it is what TRIGGERS the bump**, so dropping it would discard the very response that caused the reset.
+- **AND THE DEEPER FIX IS ONE SOURCE.** The dropdown read the SELECTION; the title read the DATA payload (`teamOverview.team.label`). **Two sources can disagree, and after a refresh they did.** The title now resolves from `teamSelected` through the same list the picker renders from, so the symptom is unrepresentable even transiently. **The epoch fixes the cause; the shared source makes the symptom impossible.**
+- **⚠⚠ WHY IT RANKS: SILENTLY WRONG AND CONFIDENTLY LABELLED.** A manager reads one company's figures under another company's name. Same family as the stale panels that showed one rep's coaching under another's — and the reason the opt-in-survival rule exists.
+- **PROVEN BY EXECUTING THE REAL SHIPPED FUNCTIONS**, extracted from `dashboard.html` and driven through the actual boot ordering with a stubbed fetch (context fast, overview slow): **before → dropdown "Sober Living Riches", title "Scout Systems"; after → both agree.** ⚠ A first attempt used a hand-written harness mirroring the logic; that demonstrates a mechanism, not the shipped code, and was replaced.
+
+### ⚠⚠ `__no_reply__` WORKS, AND THE "51 OPPORTUNITIES" WAS A WEAK PROXY (corrected 2026-08-29)
+**Filed as "zero fires across 51 real opportunities". Both halves were wrong.**
+```
+80 v29-graded calls, 420 prospect-side moments
+  __no_reply__ actually stored            4      <- the path DOES fire
+  __moment_is_closer__ stored            83      <- and so does the other sentinel
+
+the "opportunity" proxy was: closer does not take the floor within 2 turns
+  moments matching that proxy            147
+    ...but he speaks within 60 seconds   119  (81%)
+    ...and NEVER speaks again at all       8   <- the genuine population
+```
+- **⚠⚠ THE PROXY OVER-COUNTED BY ~18x.** "Did not take the floor within two turns" is not "did not reply" — in a sales call the closer nearly always comes back, just not immediately. **The true no-reply population is ~8 per 80 calls, and 4 fires against that is not a broken path, it is a rare condition correctly treated as rare.**
+- **THE EARLIER READING WAS "UNOBSERVED", AND I RECORDED IT AS SUCH — but the filed row hardened it into "does not work".** ⚠ **An unobserved path and a broken path are different claims, and the gap between them is exactly the number of calls graded since you last looked.**
+- **The 4 fires are plausible on inspection** — 2 `missed_opportunity`, 1 `objection`, 1 `risk_signal`, all prospect-spoken, on lines the closer visibly let pass. **NOTHING WAS CHANGED**, which is the right outcome of "establish why before changing anything".
+
 ### ⚠⚠ PROSPECT GROUPING — THE MACHINERY WORKS AND THE REVIEW SURFACE IS UNREACHABLE (2026-08-29)
 **Filed as "grouping is broken — one person, three prospect rows". It is not broken. The proposals are correct and nobody can reach the page that applies them.**
 ```
