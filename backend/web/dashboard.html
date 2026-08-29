@@ -8031,7 +8031,22 @@
    * kept outside the render cycle and re-appended after each assignment.
    */
   function repGraphBodyHtml(canvasId) {
-    var loading = state.teamRepSeriesLoading || (!state.teamRepSeries && !state.teamRepSeriesLoading);
+    /* ⚠⚠ A FAILED LANE IS NOT A LOADING LANE. `_error` / `_forbidden` are
+       truthy objects, so the old expression treated them as ARRIVED and the
+       skeleton went away — leaving an empty 300px box and no explanation.
+       That silence is the "unidentified guard" this row carried for days. */
+    var failed = !!(state.teamRepSeries && (state.teamRepSeries._error || state.teamRepSeries._forbidden));
+    var loading = !failed && (state.teamRepSeriesLoading || (!state.teamRepSeries && !state.teamRepSeriesLoading));
+    if (failed) {
+      var why = state.teamRepSeries._forbidden
+        ? 'You do not have access to this team&rsquo;s graphs.'
+        : 'These graphs could not be loaded. Refresh to try again.';
+      return '<div class="rep-graph-slot" data-canvas="' + canvasId + '" data-loading="1">'
+        + '<div class="empty" style="height:100%;display:flex;align-items:center;justify-content:center;">'
+        + '<p>' + why + '</p></div></div>'
+        + '<div class="rep-graph-note" id="' + canvasId + 'Note"></div>'
+        + '<div class="rep-graph-note" id="' + canvasId + 'Excluded"></div>';
+    }
     return '<div class="rep-graph-slot" data-canvas="' + canvasId + '"'
       + (loading ? ' data-loading="1"' : '') + '>'
       + (loading ? '<div class="rep-graph-skeleton skeleton"></div>' : '')
@@ -8570,7 +8585,10 @@
   // Both graphs, guarded so a missing/failed series simply leaves the empty
   // state that repSeriesSectionHtml already rendered.
   function drawRepSeriesCharts() {
-    if (!state.teamRepSeries || state.teamRepSeries._error) return;
+    /* ⚠ `_forbidden` was NOT checked here: it is a truthy object with no
+       `.reps`, so it slipped past this guard and drew an empty chart instead
+       of being reported. The section renderer now says so; this just stops. */
+    if (!state.teamRepSeries || state.teamRepSeries._error || state.teamRepSeries._forbidden) return;
     /* ⚠⚠ THE SAVED SELECTION IS READ HERE, AND BOTH HALVES OF THE BUG WERE REAL.
        (1) loadRepFilter() had ONE call site — inside resetTeamData(), which fires on
            a TEAM SWITCH or a RANGE CHANGE. It never ran on boot, so a refresh started
