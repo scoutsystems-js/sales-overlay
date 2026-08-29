@@ -9,7 +9,7 @@ const { sanitizeSectionValue } = require('../lib/highlight-section');
 const {
   quoteHash, resolveEntryTarget, buildMomentRow, insertMoment,
 } = require('../lib/kb-entry');
-const { getVoyageEmbedding } = require('../lib/voyage');
+const { getVoyageEmbedding, getVoyageEmbeddings } = require('../lib/voyage');
 
 var router = express.Router();
 
@@ -473,12 +473,19 @@ router.post('/upload', manage, upload.single('file'), async function(req, res) {
     var chunks = (category === 'winning_call') ? chunkTranscript(text) : chunkText(text);
     if (chunks.length === 0) return res.status(400).json({ error: 'No usable chunks produced' });
 
-    // Generate embeddings sequentially. Per-chunk failure is non-fatal —
-    // chunk gets stored with embedding: null and stays findable via the
-    // /kb/search keyword fallback.
+    /* ONE REQUEST PER 96 CHUNKS, not one per chunk (2026-08-29). The old loop
+       fired a separate Voyage call for every chunk — a 48-chunk document was 48
+       sequential round-trips, exposed to the same 429 that silently left the
+       harvest's late-call moments unembedded until it was batched.
+
+       THE DEGRADE IS UNCHANGED AND IS THE POINT: getVoyageEmbeddings always
+       returns one slot per input, so a failed request leaves those chunks at
+       null and they are still WRITTEN — findable by keyword, just not by
+       similarity. An embedding failure must never cost the upload. */
+    var embeddings = await getVoyageEmbeddings(chunks, 'kb-upload');
     var rows = [];
     for (var i = 0; i < chunks.length; i++) {
-      var emb = await getVoyageEmbedding(chunks[i]);
+      var emb = embeddings[i] || null;
       var chunkMeta = Object.assign({}, sourceMeta, {
         category: category,
         chunk_index: i,
@@ -549,8 +556,10 @@ router.post('/store-patterns', protect, async function(req, res) {
       if (!situation || !response) continue;
 
       var content = 'When ' + situation + ', closer responded: "' + response + '". Prospect reaction: ' + (outcome || '(unspecified)') + '.';
-      var emb = await getVoyageEmbedding(content);
 
+      /* embedding filled in by ONE batched call below — see the note there.
+         Building the rows first is what lets a `continue` above skip an invalid
+         pattern without the embeddings drifting out of step with the rows. */
       rows.push({
         category: 'learned_pattern',
         label: sourceLabel,
@@ -564,7 +573,7 @@ router.post('/store-patterns', protect, async function(req, res) {
           outcome: outcome,
           source: 'auto_extracted',
         },
-        embedding: emb,
+        embedding: null,
         uploaded_by: req.user.id,
         scope: 'personal',
         source_label: sourceLabel,
@@ -574,6 +583,14 @@ router.post('/store-patterns', protect, async function(req, res) {
     if (rows.length === 0) {
       return res.json({ ok: true, stored: 0 });
     }
+
+    /* ONE request instead of one per pattern — the same fix as /kb/upload, and
+       fixed at the same time because it is the same defect rather than a
+       separate one. Positional by contract: getVoyageEmbeddings always returns
+       one slot per input, so rows[i] pairs with embeddings[i]. A failure leaves
+       nulls and every row is still stored, keyword-searchable. */
+    var patternEmb = await getVoyageEmbeddings(rows.map(function (r) { return r.content; }), 'kb-patterns');
+    for (var e = 0; e < rows.length; e++) rows[e].embedding = patternEmb[e] || null;
 
     var insert = await admin.from('knowledge_base').insert(rows);
     if (insert.error) {

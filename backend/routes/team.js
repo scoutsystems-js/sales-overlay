@@ -185,6 +185,16 @@ router.get('/context', teamGate, async function (req, res) {
     var admin = getAdmin();
     var myReps = await repIdsFor(admin, req.user.id);
     var ctx = { role: req.user.role, is_owner: req.user.role === 'owner', has_reps: myReps.length > 0, my_rep_count: myReps.length, teams: null };
+    /* THE CALLER'S OWN COMPANY NAME, so every team surface can title itself.
+       `teams` is populated for OWNERS ONLY (they are the only ones with a
+       picker), which left a MANAGER arriving on #team-recs or #team-members by
+       deep link with nothing to resolve: the heading fell through to the
+       team-overview payload — a lane those sub-pages never load — and rendered
+       the bare word "Team".
+       It is a property of the CALLER, not of the current selection, so context
+       stays un-scoped to the picked team. That matters: context is what
+       RESTORES the selection and must not depend on it. */
+    ctx.my_team_label = companyDisplayName(await teamNameOf(admin, req.user.id));
     if (req.user.role === 'owner') {
       var em = await emailMap(admin);
       var pr = await profilesByRole(admin);

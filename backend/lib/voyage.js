@@ -62,6 +62,18 @@ async function getVoyageEmbedding(text, label) {
 // • PARTIAL failure degrades per-item to null; TOTAL failure degrades to
 //   all-nulls. Never throws, never returns a short array. A batch error must
 //   never lose the harvest — every row stays writable, just unembedded.
+// PAGED, because one request per document would trade one failure mode for a
+// worse one. Voyage caps how many inputs a single request may carry, and an
+// upload above that cap would fail ENTIRELY — every chunk unembedded — where
+// the old chunk-by-chunk loop at least got most of them through. Paging keeps
+// the batch win (one request per 96 chunks instead of 96) without introducing
+// an all-or-nothing document.
+//
+// A LIMIT WE SET, NOT ONE WE INHERIT. The largest upload in the corpus is 48
+// chunks so nothing hits this today; that is precisely why it is stated here
+// rather than left to whatever the API happens to allow.
+var VOYAGE_MAX_INPUTS = 96;
+
 async function getVoyageEmbeddings(texts, label) {
   var tag = label || 'kb';
   if (!Array.isArray(texts) || texts.length === 0) return [];
@@ -71,6 +83,23 @@ async function getVoyageEmbeddings(texts, label) {
     console.error('[' + tag + '] VOYAGE_API_KEY not configured — batch embedding skipped');
     return out;
   }
+  for (var start = 0; start < texts.length; start += VOYAGE_MAX_INPUTS) {
+    await embedPage(texts, out, start, Math.min(start + VOYAGE_MAX_INPUTS, texts.length), tag);
+  }
+  var missingTotal = out.filter(function (v) { return v === null; }).length;
+  if (missingTotal > 0) {
+    console.warn('[' + tag + '] Voyage returned ' + (out.length - missingTotal) + '/' + out.length + ' embeddings');
+  }
+  return out;
+}
+
+/* One page. Writes straight into `out` at its absolute offset.
+   THE OFFSET IS THE WHOLE RISK HERE: Voyage's `index` is relative to the
+   REQUEST, so a paged mapping must add `start` — without it page two would
+   overwrite page one's vectors and every embedding after the first page would
+   belong to the wrong chunk, silently. */
+async function embedPage(texts, out, start, end, tag) {
+  var page = texts.slice(start, end);
   try {
     var res = await fetch('https://api.voyageai.com/v1/embeddings', {
       method: 'POST',
@@ -78,37 +107,32 @@ async function getVoyageEmbeddings(texts, label) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + process.env.VOYAGE_API_KEY,
       },
-      body: JSON.stringify({ input: texts, model: VOYAGE_MODEL }),
+      body: JSON.stringify({ input: page, model: VOYAGE_MODEL }),
     });
     if (!res.ok) {
-      console.error('[' + tag + '] Voyage batch embedding failed: HTTP ' + res.status + ' (' + texts.length + ' texts)');
-      return out;
+      console.error('[' + tag + '] Voyage batch embedding failed: HTTP ' + res.status + ' (' + page.length + ' texts)');
+      return;   // this page stays null; other pages are unaffected
     }
     var data = await res.json();
     if (!data || !Array.isArray(data.data)) {
       console.error('[' + tag + '] Voyage batch embedding: unexpected response shape');
-      return out;
+      return;
     }
     for (var i = 0; i < data.data.length; i++) {
       var item = data.data[i];
       if (!item || typeof item.index !== 'number') continue;
-      if (item.index < 0 || item.index >= out.length) continue;   // never write past the end
+      if (item.index < 0 || item.index >= page.length) continue;  // never write past this page
       if (!Array.isArray(item.embedding)) continue;               // malformed → stays null
-      out[item.index] = item.embedding;
+      out[start + item.index] = item.embedding;                   // ABSOLUTE offset
     }
-    var missing = out.filter(function (v) { return v === null; }).length;
-    if (missing > 0) {
-      console.warn('[' + tag + '] Voyage batch returned ' + (out.length - missing) + '/' + out.length + ' embeddings');
-    }
-    return out;
   } catch (err) {
     console.error('[' + tag + '] Voyage batch embedding error:', err.message);
-    return out;
   }
 }
 
 module.exports = {
   getVoyageEmbedding: getVoyageEmbedding,
   getVoyageEmbeddings: getVoyageEmbeddings,
+  VOYAGE_MAX_INPUTS: VOYAGE_MAX_INPUTS,
   VOYAGE_MODEL: VOYAGE_MODEL,
 };

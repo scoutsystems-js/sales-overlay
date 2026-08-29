@@ -10317,11 +10317,19 @@
   function teamLabelForSelection() {
     var ctx = state.teamContext;
     var teams = (ctx && Array.isArray(ctx.teams)) ? ctx.teams : [];
-    if (!teams.length) return null;
     for (var i = 0; i < teams.length; i++) {
       var t = teams[i];
       if (state.teamSelected ? (t.key === state.teamSelected) : t.is_self) return t.label || null;
     }
+    /* NON-OWNER, OR AN OWNER WHOSE PICKER HAS NOT ARRIVED. `teams` is sent to
+       owners only, so a manager had nothing here and the heading fell through
+       to the team-overview payload — a lane the sub-pages never load — leaving
+       the bare word "Team" on a deep link.
+       my_team_label rides on /team/context, which EVERY team surface loads, so
+       the name no longer depends on which lane a particular page happens to
+       fetch. Only used when the selection could not be resolved above: an owner
+       viewing another company must never be titled with their own. */
+    if (!state.teamSelected && ctx && ctx.my_team_label) return ctx.my_team_label;
     return null;
   }
 
@@ -13861,6 +13869,21 @@
         + ' onclick="event.stopPropagation()">↗</a>';
     }
 
+  /* ONE LABEL FUNCTION FOR BOTH RENDER SITES. The row is drawn server-side on
+     load and patched in place after a toggle; two copies of this string is how
+     the two come to disagree, which has already happened on this page with the
+     clip label and the objection categories.
+     CUSTOMER LANGUAGE: "Compromised file" is Justin's word and it is what the
+     user sees; the title says what they can do about it. */
+  function exclusionLabel(c) {
+    return (c && c.exclusion_reason === 'compromised_file') ? 'Compromised file' : 'Not a sales call';
+  }
+  function exclusionTitle(c) {
+    return (c && c.exclusion_reason === 'compromised_file')
+      ? 'This recording only captured one voice, so it could not be graded and is not counted. If both sides were speaking, open the call and mark it as a sales call to include it.'
+      : 'A person marked this as not a sales call, so it is not counted.';
+  }
+
     var cardId = escapeHtml(String(c.id || ''));
     var isNS = c.not_a_sales_call === true;
     return '<div class="library-card' + (isNS ? ' is-not-sales' : '') + '" id="libcard-' + cardId + '"'
@@ -13870,7 +13893,7 @@
         + '<div class="library-card-meta">' + meta + '</div>'
       + '</div>'
       + '<div class="library-card-side">'
-        + (isNS ? '<span class="not-sales-badge">Not a sales call</span>' : '')
+        + (isNS ? '<span class="not-sales-badge" title="' + escapeHtml(exclusionTitle(c)) + '">' + escapeHtml(exclusionLabel(c)) + '</span>' : '')
         /* ⚠ A suppressed cross-provider duplicate is SHOWN and LABELLED, never
            hidden — the same treatment as a not-a-sales-call row. The library is
            a RECORD; the counts are the aggregate. Hiding it would be data loss
@@ -14835,7 +14858,9 @@
         var existing = side.querySelector('.not-sales-badge');
         if (marked && !existing) {
           var sp = document.createElement('span');
-          sp.className = 'not-sales-badge'; sp.textContent = 'Not a sales call';
+          /* a human toggle always clears the reason server-side, so the badge
+             it produces is the plain one — never a stale "Compromised file". */
+          sp.className = 'not-sales-badge'; sp.textContent = exclusionLabel({});
           side.insertBefore(sp, side.firstChild);
         } else if (!marked && existing) { existing.remove(); }
       }

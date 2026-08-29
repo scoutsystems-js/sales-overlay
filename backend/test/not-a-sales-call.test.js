@@ -150,7 +150,12 @@ test('⚠⚠ the call library SELECTS the tag AND EMITS it — both ends of the 
   const src = fs.readFileSync(path.join(ROOT, 'routes', 'fathom.js'), 'utf8');
   const s = live(src);
   // selected...
-  assert.ok(/sync_status, not_a_sales_call'\)/.test(s),
+  /* ⚠ ASSERT MEMBERSHIP, NOT TERMINAL POSITION. This used to pin
+     `sync_status, not_a_sales_call')` and went stale the moment a column was
+     legitimately appended (exclusion_reason, 2026-08-29) — a guard that pins a
+     literal fails on exactly the change it polices. What it means is that the
+     review select carries the tag. */
+  assert.ok(/\.select\('[^']*\bnot_a_sales_call\b[^']*'\)/.test(s),
     'the library select must include the tag, or the flag is always undefined');
   // ...AND used. Selecting a column you forget to use, and using one you forgot
   // to select, are the same bug from opposite ends; this codebase has shipped
@@ -158,7 +163,8 @@ test('⚠⚠ the call library SELECTS the tag AND EMITS it — both ends of the 
   assert.ok(/not_a_sales_call: cc\.not_a_sales_call === true/.test(s),
     'the library payload must EMIT the flag');
   // and it must NOT be filtered out of the list
-  const at = s.indexOf("sync_status, not_a_sales_call')");
+  const at = s.search(/\.select\('[^']*\bnot_a_sales_call\b[^']*'\)/);
+  assert.ok(at > 0, 'could not locate the library select — anchor stale');
   const window = s.slice(Math.max(0, at - 400), at + 600);
   assert.ok(!/not\('not_a_sales_call', 'is', true\)/.test(window),
     'the LIBRARY must not filter — a marked call that vanishes cannot be un-marked');

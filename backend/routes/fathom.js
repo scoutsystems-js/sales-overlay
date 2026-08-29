@@ -1414,7 +1414,7 @@ async function loadCallsList(admin, userId, opts) {
        using one you forgot to select, are the same bug from opposite ends; this
        codebase has shipped the second four times. The flag is emitted in the
        mapped payload below and asserted in test/not-a-sales-call.test.js. */
-    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, duplicate_of')
+    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, duplicate_of, exclusion_reason')
     .eq('user_id', userId)
     .order('call_date', { ascending: false, nullsFirst: false });
   if (opts.from) q = q.gte('call_date', opts.from);
@@ -1569,7 +1569,7 @@ router.get('/calls/:id', requireAuth, async function(req, res) {
        from it. Omit the column and it is undefined, the button always reads
        "unmarked", and a marked call can never be un-marked -- the missing-column
        bug this codebase has now shipped four times. */
-    .select('id, user_id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call')
+    .select('id, user_id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, exclusion_reason')
       .eq('id', callId)
       .maybeSingle();
     if (callResult.error) {

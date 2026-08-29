@@ -45,6 +45,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
+const compromisedFile = require('./compromised-file');
 const { fetchSellingContext } = require('./selling-context');
 const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
 const { resolveProspectName } = require('./prospect-name');
@@ -1248,7 +1249,7 @@ async function analyzeCall(fathomCallId, userId) {
          component is correct and the thing that reaches it is broken. That exact
          missing-column bug has shipped here three times (the review page's
          `section`/`resolution`, and `id` on the highlights select). */
-      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url, source, not_a_sales_call')
+      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url, source, not_a_sales_call, not_sales_marked_by, exclusion_reason')
       .eq('id', fathomCallId)
       .maybeSingle();
     if (callQ.error) throw new Error('fathom_calls fetch: ' + callQ.error.message);
@@ -1480,6 +1481,55 @@ async function analyzeCall(fathomCallId, userId) {
       await markFathomCallErrored(admin, fathomCallId, userId);
       console.error('[analysis] ' + emptyReason + ' (call=' + fathomCallId + ')');
       return { status: 'error', reason: emptyReason };
+    }
+
+    /* ─── Phase 5b: refuse to grade a COMPROMISED FILE ────────────────────
+       Justin's ruling 2026-08-29. One distinct speaker across a substantial
+       transcript means the model would be told one person said everything,
+       including the prospect's objections — and it returns a confident score
+       anyway (measured: 71, 47, 32, and a 100-minute Fathom call at 60).
+       A confident number from an unreadable source is worse than none.
+
+       PLACED BEFORE PHASE 6 ON PURPOSE: the call is never graded rather than
+       graded-and-then-flagged, so no score is ever produced from it.
+
+       IT REUSES not_a_sales_call AS THE EXCLUSION and records only the REASON
+       separately — one flag, already filtered in 21 places, so a compromised
+       file cannot drift out of step with the other exclusion.
+
+       AND IT NEVER OVERRULES A PERSON. If someone has explicitly said this call
+       counts (not_a_sales_call === false with a human in not_sales_marked_by),
+       the detection is skipped — the same read-before-write guard that stops a
+       re-analysis re-stamping a manually set outcome. Without it, un-marking
+       would trigger a re-analysis that immediately re-marked the call. */
+    var humanSaidItCounts = (callRow.not_a_sales_call === false && !!callRow.not_sales_marked_by);
+    var fileCheck = compromisedFile.assessTranscript(normalized.turns);
+    if (fileCheck.compromised && !humanSaidItCounts) {
+      /* CUSTOMER LANGUAGE: this string renders on the call review page, so it
+         says what happened and what they can do — never how it was detected.
+         No speaker counts, no character counts, no internal names. */
+      var compReason = 'This recording only captured one voice, so it could not be '
+        + 'graded and is not counted in your numbers. If both sides were speaking, '
+        + 'mark it as a sales call on this page to include it.';
+      await admin.from('fathom_calls').update({
+        not_a_sales_call:  true,
+        exclusion_reason:  'compromised_file',
+        /* marked_by stays NULL — no person marked this, and writing a user id
+           would make an automatic exclusion indistinguishable from a human one,
+           which is the very thing the override guard above reads. */
+        not_sales_marked_by:   null,
+        not_sales_marked_role: null,
+        not_sales_marked_at:   new Date().toISOString(),
+        sync_status: 'processed',
+      }).eq('id', fathomCallId);
+      await setAnalysisStatus(admin, fathomCallId, userId, 'done', {
+        overall_summary: compReason,
+        analyzed_at:     new Date().toISOString(),
+        prompt_version:  ANALYSIS_PROMPT_VERSION,
+      });
+      console.warn('[analysis] compromised file, not graded (call=%s speakers=%d chars=%d)',
+        fathomCallId, fileCheck.speakers, fileCheck.chars);
+      return { status: 'compromised_file', speakers: fileCheck.speakers, chars: fileCheck.chars };
     }
 
     // ─── Phase 6: two parallel Claude calls ──────────────────────────────

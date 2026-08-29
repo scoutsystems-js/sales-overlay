@@ -1028,8 +1028,18 @@ router.post('/calls/:id/not-a-sales-call', requireAuth, async function (req, res
       return res.status(403).json({ error: 'You are not allowed to mark this call' });
     }
 
+    /* exclusion_reason IS CLEARED ON EVERY HUMAN MARK, in both directions.
+       Un-marking a COMPROMISED FILE has to remove the reason or the call comes
+       back into the numbers still wearing the "compromised file" badge — the
+       flag and the label would disagree on screen. And a person marking a call
+       not-a-sales-call is a different reason from the automatic one, so leaving
+       a stale 'compromised_file' there would mislabel their decision too.
+       Writing the human's id into not_sales_marked_by is what makes the
+       override durable: the worker reads exactly that to know a person has
+       spoken, and skips re-detecting the call on the re-analysis below. */
     var up = await admin.from('fathom_calls').update({
       not_a_sales_call:      marked,
+      exclusion_reason:      null,
       not_sales_marked_by:   req.user.id,
       not_sales_marked_at:   new Date().toISOString(),
       not_sales_marked_role: markRoleFor(actor, ownerProfile),
