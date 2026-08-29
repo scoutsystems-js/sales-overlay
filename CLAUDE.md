@@ -666,6 +666,30 @@ fathom-typescript SDK (v0.0.41) is the source of truth for the API surface.
 - **⚠ ROLE-INVERTED CALLS (the recorded user is the one being SOLD TO).** Live case: the closer's own disclosures (*"I own a primary residence"*, *"I have cash on hand"*) were counted as covered PROSPECT ground. **The `role_inverted` detector is a WEAK FLAG, NOT THE PROTECTION** — it keys on the model citing closer lines as prospect attributes, and it fired on one run of a call and not the next. A deterministic alternative (closer question share: inverted 39% vs normal 51-63%) is promising but **only 2 corpus calls have role-labelled turns**, too few to set a threshold. **What actually protects the output is the verification chain**: `what_mattered` came out null on the inverted call in both runs, because closer words cannot pass a proven-prospect-quote test. Do not describe the flag as the safety mechanism.
   - **⚠ THIS IS A DATA PROBLEM, NOT A CODE PROBLEM — do not "fix" it by tuning the detector.** Reliable inversion detection needs labelled examples that do not exist yet: only calls analysed under **v13+** carry role-labelled turns, so the corpus of calibratable calls is 2 and grows only as new calls are analysed. **Justin's ruling 2026-08-12: do NOT ship a threshold justified by n=2.** Revisit when enough v13+ calls have accumulated to separate the distributions honestly — until then the verification chain carries it, and that is sufficient.
 
+### ⚠⚠⚠ A PLACEHOLDER THAT IS A VALID VALUE OF ITS OWN TYPE PASSES EVERY PRESENCE CHECK (2026-08-29)
+**The general form behind two separate defects found in one block. Same family as zero-versus-absence, one level up: there the placeholder is a valid NUMBER, here it is a valid STRING or a valid OBJECT.**
+```
+a SENTINEL is a non-empty string   ->  `closer_response || quote` picked the sentinel OVER the real quote
+                                       and rendered `__moment_is_closer__` as a manager's evidence
+an ERROR is a truthy object        ->  `!state.teamRepSeries` was FALSE, so a FAILED lane read as ARRIVED:
+                                       the skeleton was dropped and an empty 300px box replaced it, silently
+```
+- **⚠⚠ THE CHECK IS NOT WRONG — IT IS ANSWERING "IS SOMETHING THERE?" WHEN THE QUESTION IS "IS SOMETHING USABLE?"** Both defects sat behind guards that were correct for presence and blind to kind.
+- **THE RULE: WHEREVER A FIELD CAN HOLD A PLACEHOLDER, THE CHECK MUST TEST FOR THE PLACEHOLDER, NOT FOR EMPTINESS.** `displayCloserResponse()` and an explicit `failed` flag are the two shapes that fell out of it here.
+- **⚠ AND THE FALLBACK OPERATOR IS THE TELL: `a || b` PREFERS ANYTHING TRUTHY.** Any `x || y` where `x` can carry a sentinel or an error object is this bug waiting to happen — the more "defensive" the fallback looks, the more reliably it selects the wrong branch.
+
+### ⚠⚠ A MARKER CHECKED AGAINST A FILE THAT COULD NEVER CONTAIN IT IS INDISTINGUISHABLE FROM A MISSING DEPLOY (2026-08-29)
+**I checked for `EXCLUSION — legal` on the served `/dashboard`. It lives in `lib/team-digest.js`. It returned 0 — and 0 is exactly what a failed deploy looks like.**
+- **⚠ THE CHECK COULD NOT FAIL CORRECTLY, BECAUSE IT WAS NEVER ABLE TO SUCCEED.** Same family as the gate that reports a clean pass while measuring nothing: a verdict of "absent" over a scope where the thing could not have been present.
+- **THE FIX IS STRUCTURAL, NOT VIGILANCE: `backend/scripts/verify-deploy.js` requires every marker to DECLARE ITS ARTEFACT.** `page` markers are fetched and checked in comment-stripped CODE with RAW and CODE printed side by side; `server` markers are verified by COMMIT ANCESTRY, because there is no HTTP surface that would ever show them. **A marker with no artefact cannot be checked at all.**
+- **⚠ AND THE RAW/CODE PAIR IS NOT OPTIONAL ON THIS PAGE — IT IS 42% COMMENT.** This codebase archives removed code in place and explains its rules in prose, so a string routinely survives inside the comment describing its own removal. One number is ambiguous; the pair explains itself.
+
+### ⚠⚠ WHEN A PALETTE RUNS OUT, VARY A DIFFERENT DIMENSION — DO NOT REACH FOR MORE HUES (2026-08-29)
+**Seven rep-line hues against a board of NINE: reps 8 and 9 drew in reps 1 and 2's colours. Live on the main board, not theoretical.**
+- **⚠⚠ ADDING HUES WAS TRIED AND MEASURED FIRST, AND THE SPACE IS GENUINELY EXHAUSTED.** Against the ramp's own minimum separation (**ΔE 28.2**) and the reserved semantic colours, the ONLY candidates clearing both are **greys** — `#64748b` (ΔE 35.6) and `#94a3b8` (30.0). **A desaturated line on a dark card reads as DISABLED or as a gridline, which is precisely the complaint that killed the pastels.** Every remaining vivid hue is within ΔE 25 of an existing line or of `--accent` / `--bad` / `--mid`.
+- **THE ANSWER IS AN ORTHOGONAL DIMENSION: the second cycle is DASHED.** No new colour, no semantic collision, 14 distinguishable series, and the first cycle is untouched.
+- **⚠ THE MEASUREMENT IS RECORDED AT THE CODE, NOT JUST THE FIX** — otherwise the next person "improves" it by adding two colours and re-creates either the semantic collision or the pastel complaint. **A rejected option with its reason is worth as much as the option taken.**
+
 ### ⚠⚠⚠ A CLEARANCE IS ONLY AS GOOD AS THE SYMPTOM IT WAS TESTED AGAINST (2026-08-29)
 **I examined `restoreTeamPick` against the symptom "the pick does not apply", found it correctly guarded, and CLEARED IT. The real symptom was "the pick is remembered by the CONTROL and not by the DATA" — a half-restored selection, which is exactly what that code introduces. Re-examining with the corrected symptom found it in minutes.**
 - **THE CLEARANCE WAS HONEST AND THE REASONING WAS SOUND. It was simply an answer to a different question**, and nothing in the result said so — "I checked X and it is fine" reads identically whether or not X was the right thing to check.

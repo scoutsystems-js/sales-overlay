@@ -7689,6 +7689,24 @@
         hidden: !!(toggleable && state.repLineHidden && state.repLineHidden[r.user_id]),
         borderColor: REP_LINE_COLORS[i % REP_LINE_COLORS.length],
         backgroundColor: REP_LINE_COLORS[i % REP_LINE_COLORS.length],
+        /* ⚠⚠ THE SECOND CYCLE IS DASHED, AND THAT IS THE FIX FOR 8+ REPS.
+           The ramp has SEVEN hues and Sober Living Riches is a board of NINE, so
+           reps 8 and 9 were drawing in reps 1 and 2's colours — two lines the
+           same colour on one chart, which the legend cannot disambiguate.
+
+           ⚠ ADDING MORE HUES WAS TRIED AND MEASURED, AND THE SPACE IS EXHAUSTED.
+           Against the ramp's own minimum separation (ΔE 28.2) and the reserved
+           semantic colours, the only candidates that clear both are GREYS
+           (#64748b ΔE 35.6, #94a3b8 ΔE 30.0) — and a desaturated line on a dark
+           card reads as DISABLED or as a gridline, which is exactly the
+           complaint that killed the pastels. Every vivid hue left is either
+           within ΔE 25 of an existing line or of --accent / --bad / --mid.
+
+           ⚠ SO VARY A SECOND DIMENSION INSTEAD. Dash is orthogonal to hue: it
+           costs no new colour, cannot collide with a semantic one, and doubles
+           the ramp to 14 distinguishable series. The colour still groups; the
+           dash separates the repeat. */
+        borderDash: (Math.floor(i / REP_LINE_COLORS.length) % 2) ? [6, 4] : undefined,
         borderWidth: 2, pointRadius: 3, tension: 0.25, spanGaps: false,
       };
     });
