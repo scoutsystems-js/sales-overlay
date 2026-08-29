@@ -3224,6 +3224,37 @@ grep -rn "recording_url.*?t="                   # the EXPECTED SHAPE — found s
   - **✅ FOURTH INSTANCE, AND THE FIRST CAUGHT BEFORE IT WAS REPORTED AS A PROBLEM (2026-08-18).** A post-deploy check flagged two pastel hexes as *"still present"* after the ramp went vivid. Re-scoped to the ramp instead of the whole document, the ramp held exactly its seven new entries — the hits were `#c4b5fd` on a **KB category badge** (an unrelated taxonomy palette) and `#22d3ee` as the **`--cyan` token**, the objection-category colours, and the comment naming the pastel it replaced. **Cost of the catch: one extra command.**
   - **⚠ RECORD THE CATCHES, NOT ONLY THE FAILURES — A RULE THAT STOPS A MISTAKE PRODUCES NOTHING.** No incident, no fix, no diff, nothing to point at: **it looks exactly like the rule was never needed.** Three instances here are damage and the fourth is the rule working, and without the fourth written down this entry reads as a list of past mistakes rather than as a practice that pays for itself. **Every rule in this file has the same problem — the evidence for keeping it is invisible by construction.**
 
+### ⚠⚠⚠ THE EMBEDDING GAP WAS THREE FAULTS, AND THE PROVIDER NAMED THE ONE THAT MATTERED (2026-08-29)
+**Filed as "rate limiting under sustained analysis — the spikes line up with the grading runs". That correlation was real, the story was wrong, and reading the ACTUAL failure changed both the diagnosis and the fix.**
+```
+ 84 rows (28-29 Aug)  the harvest ran in a LOCAL shell with NO VOYAGE_API_KEY
+299 rows (25-26 Aug)  partial failure, 26-32%, under concurrent grading
+170 seeded rows       seed-frameworks.js has NEVER contained embedding code
+```
+- **⚠⚠ THE SIGNATURE THAT SEPARATED THEM IS THE SHAPE, NOT THE TIMING: the embedded/null boundary FLIPS FOUR MINUTES APART** (16:39 embedded, 16:43 null, then 45 minutes unbroken) **and the null rows belong exactly to the accounts graded LOCALLY** while the embedded ones are the cron firing in the same window. **A rate limit cannot flip like that; two execution environments can.** A near-total failure and a partial one are different faults wearing one symptom.
+- **⚠ THE CONTENT, THE KEY AND THE BATCH SIZE WERE ALL CLEARED BY REPLAY** — the exact stored text of a failing call embedded 9/9 with the production key. **Replaying the real input is what turns "probably rate limiting" into "not the input".**
+- **⚠⚠ THEN THE PROVIDER SAID IT OUTRIGHT, in the 429 body: the account has NO PAYMENT METHOD, so it is capped at `3 RPM and 10K TPM`.** A hard per-minute ceiling, not transient load — **and no retry can defeat it.** Adding a payment method lifts it; the free token allowance still applies. **The instruction to say what the provider actually returned is what produced this; nothing in the timing could have.**
+- **⚠ THE SEEDED ROWS WERE A SECOND FAULT AND HAD TO BE ESTABLISHED SEPARATELY** — a path that never embedded at all, since April. **Treating them together would have "fixed" them with a retry that could never apply.**
+
+### ⚠⚠ A RETRY IS COUNTERPRODUCTIVE UNDER A PER-MINUTE CEILING — IT SPENDS THE QUOTA (measured 2026-08-29)
+**A page's 3 attempts fire inside ~1.5s. Against a 3 RPM limit that consumes the WHOLE minute's budget, so the NEXT page 429s even when it is paced 20s later — the retry converts one failed page into two.** Measured on the first paced backfill: **143 written / 134 failed**; single-attempt + pacing took it to 1 failure in the first 9 pages.
+- **THE RULE: an inline retry is right for a BLIP and wrong for BULK.** The request path keeps it (a genuine transient clears in milliseconds); a paced bulk job asks for one attempt and another pass. `getVoyageEmbeddings(texts, tag, { attempts: 1 })`.
+- **⚠ AND CHECK WHICH CEILING BINDS.** Pages sized to ~8K tokens sent every 21s satisfy the REQUEST limit and blow the 10K TOKEN limit by 2.3x. Two limits, and the one you did not think about is the one that fires. **The floor is then the account tier, not the code: ~370K tokens at 10K/min is ~40 minutes however it is paged.**
+- **⚠ A CAPABILITY FAILURE IS NOT A TRANSIENT ONE.** A missing key is guaranteed and total, so it is reported as `no_capability` and a bulk runner REFUSES TO START — the Zoom capability-abort pattern, applied to the fault it would have prevented.
+
+### ⚠⚠ STORE THE **HIDDEN** SET, NEVER THE VISIBLE ONE — OPT-IN SURVIVAL APPLIED TO PREFERENCES (2026-08-29)
+**Customize View lets a manager hide team-page panels. Which set is PERSISTED decides what happens to every panel added later.**
+```
+store the VISIBLE set  ->  a panel added next month is ABSENT for every existing
+                           manager, silently and permanently. They never chose to
+                           hide it and nothing tells them it exists.
+store the HIDDEN set   ->  a new panel SHOWS. Costs a redundant panel at worst.
+```
+- **THE ASYMMETRY IS THE WHOLE SAFETY OF THE FEATURE**, and it is the pivot-state opt-in-survival rule in a new place: **the direction that fails toward showing too much is the correct one.** Pinned by a test that replays storage written when the list was shorter.
+- **⚠ UNKNOWN KEYS ARE DISCARDED ON READ** — a removed panel must not sit in storage hiding nothing, and a typo must not become permanent.
+- **⚠ WHAT MUST NOT BE HIDEABLE IS A DESIGN DECISION, NOT AN OMISSION:** the controls row carries the control itself (hiding it strands the manager with no way back), and the unconnected badge is an EXCEPTION surface — **an alert you can permanently switch off is not an alert.**
+- **HIDING EVERYTHING SAYS SO.** The toolbar alone reads as a broken page rather than a choice — the same reason the graph legend explains itself when every rep is hidden. And hidden panels **stay listed**, so absent and excluded never look alike.
+
 ### ⚠⚠⚠ REPS AGREEING IS NOT EVIDENCE — THE VOLUME BEHIND EACH ONE IS (measured 2026-08-29)
 **"Four reps are all weakest at Partner" is a striking sentence and an EMPTY one if each rep has three objections. A team-wide claim aggregates weak evidence into something that LOOKS strong, and the count of agreeing reps is what makes it look strong.**
 - **The live case:** Partner objections are handled 3 times in 149 across 6 reps, against 41% for logistical — so the pattern is real. But it is real for SOME of them and unremarkable for others, and only the per-rep volume separates the two. Taking the 11.5% rest-of-field rate as the baseline, P(zero handled by luck):
