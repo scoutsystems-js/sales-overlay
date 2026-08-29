@@ -748,7 +748,7 @@ function orderBatchIds(pendingIds, outdatedIds, dateById) {
 // hundreds of Claude analyses, slow + costly, never chosen. Capping gives fast
 // time-to-value and loses nothing (the dropdown is the deliberate backfill path).
 // MIRROR this cap for Zoom sync when that lands (sub-stage 2).
-var FIRST_SYNC_ANALYZE_CAP = 20;
+var FIRST_SYNC_ANALYZE_CAP = require('../lib/sales-constants').FIRST_SYNC_ANALYZE_CAP;
 
 // Pure: given newly-inserted rows [{id, call_date}], return the ids of the newest
 // `cap` by call_date (descending; missing/null dates sort last). Exported for tests.

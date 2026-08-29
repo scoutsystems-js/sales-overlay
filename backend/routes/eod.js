@@ -30,7 +30,7 @@ const EDITABLE_FIELDS = ['prospect_name', 'cash_collected', 'summary', 'payment_
 const VALUE_CAPS = { prospect_name: 200, cash_collected: 20, summary: 3000, payment_structure: 20 };
 // payment_structure is a CONSTRAINED choice — mirrors the analysis-worker
 // allowlist; the route rejects anything else (no free text).
-const PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_stated'];
+const PAYMENT_STRUCTURES = require('../lib/sales-constants').PAYMENT_STRUCTURES;
 
 // Outcome prefill (product ruling 2026-07-22): closed calls with a KNOWN
 // payment structure prefill as a composed label ("Closed - PIF" etc.) instead

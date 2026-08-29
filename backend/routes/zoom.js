@@ -11,7 +11,10 @@ const zoomClient = require('../lib/zoom-client');
 // Reuse Fathom's first-sync cap + newest-picker VERBATIM so the two sources share
 // one rule (the FD-4 cap, coming due for Zoom here). Not duplicated — imported.
 const fathomRoutes = require('./fathom');
-const FIRST_SYNC_ANALYZE_CAP = fathomRoutes._FIRST_SYNC_ANALYZE_CAP;
+/* ⚠ FROM THE SHARED MODULE, NOT FROM routes/fathom. The value was never
+   duplicated — but a route file importing another route file for a constant
+   is the coupling the hardening row was filed against. */
+const FIRST_SYNC_ANALYZE_CAP = require('../lib/sales-constants').FIRST_SYNC_ANALYZE_CAP;
 const pickNewestForAnalysis  = fathomRoutes._pickNewestForAnalysis;
 const callIdsToAnalyze       = fathomRoutes._callIdsToAnalyze; // FIRST-SYNC-ONLY cap (shared)
 

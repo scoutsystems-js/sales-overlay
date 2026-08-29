@@ -118,7 +118,7 @@ const VALID_HANDLING = ['addressed', 'deflected', 'ignored'];
 const VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 // Payment structures (migration 022). Closed calls only — the worker forces
 // 'none_stated' for every other outcome.
-const VALID_PAYMENT_STRUCTURES = ['paid_in_full', 'payment_plan', 'bnpl', 'none_stated'];
+const VALID_PAYMENT_STRUCTURES = require('./sales-constants').PAYMENT_STRUCTURES;
 // Analysis prompt version (migration 014) — BUMP MANUALLY whenever the grader or
 // highlight-extractor prompts change. Stamped on every call_analyses row so a
 // stale-prompt analysis is one query away (the guard for the Issue-1 class of
