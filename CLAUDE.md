@@ -4094,6 +4094,28 @@ then, 3 MORE runs per arm on that sample:
 - **⚠⚠ IF AN UNSUPERVISED OUTPUT INVENTS, NAMES A PROSPECT, LEAKS INTERNALS OR COACHES A REP OUT OF CORRECT TECHNIQUE, THAT IS A STOP-AND-REPORT, NOT A TUNE.** Each of those is a rule Justin ruled on after reading real output, so a breach means **the rule is not holding in the wild** — a different problem from a rule that needs adjusting, and it must not be quietly softened into one.
 - **THE ASYMMETRY THAT MAKES THIS WORTH A STANDING NOTE: a curated sample and an unattended population are different populations**, and every guarantee established on the first is a hypothesis about the second. **The mechanical guards (no markdown, no placeholder, no gendered pronoun) transfer; the JUDGEMENT ones — right register, right technique, no invention — were only ever verified by a human reading them.**
 
+### ⚠⚠⚠ THE GATE MEASURED NOTHING — +3 IS INSIDE THE DOCUMENTED NOISE, AND THE CHANGE'S TARGET CASE WAS NEVER SAMPLED (2026-08-30, TWO CORRECTIONS TO MY OWN REPORT)
+**I told Justin the Discovery deltas were "the grade becoming correct, as predicted for the PAIN caveat". BOTH HALVES OF THAT ARE WRONG.**
+```
+closed     Rogerlyn 29 Aug   78 -> 81   +3   outcome stable
+follow_up  Reggie   29 Aug   65 -> 65    0   outcome stable
+lost       Deep     14 Jun   58 -> 61   +3   ⚠ OUTCOME FLIPPED (old follow_up 6/6, new lost 2/6)
+```
+- **⚠⚠ CORRECTION 1 — THE SCORE MOVEMENT IS INSIDE NOISE AND MEASURES NOTHING.** The recorded profile is ±14 per section AND **~6 points of overall-score drift BETWEEN ROUNDS on byte-identical input** (documented case: median 50 one round, 56 the next, same prompt, same call). **+3 / 0 / +3 sits well inside that.** A 3-sample median cannot separate a real effect from ordinary variance at that magnitude, and **reading the DIRECTION as confirmation is exactly the trap the noise profile exists to prevent.**
+- **⚠⚠ CORRECTION 2 — THE PAIN CAVEAT WAS NEVER EXERCISED, BECAUSE NO SAMPLE IS A LOGICAL SALE.** Rogerlyn: *"Emotional depth was genuinely strong…"* · Reggie: *"Emotional pain was surfaced clearly…"* · Deep: *"thin and largely logistical rather than emotional"*. **The caveat only fires where an offer is bought on LOGIC and pain is legitimately absent — and none of the three is that.** So the change's main predicted benefit is untested, and the rise cannot be attributed to it.
+- **⚠⚠ THE GENERAL FAILURE, AND IT IS THE ONE WORTH CARRYING: A GATE CAN RUN CORRECTLY, REPORT REAL NUMBERS, AND ANSWER A DIFFERENT QUESTION THAN THE ONE ASKED.** Here it measured OVERALL score — where the noise lives — on three samples that **exclude the case the change targets**. The spec says overall-only, which is why it could not see either problem. **A gate's SAMPLE SELECTION is part of its validity, not a detail: if the change's target case is not in the sample, a pass and a fail mean the same thing.**
+- **WHAT WOULD ACTUALLY ANSWER IT: at least one genuine LOGICAL-SALE call in the sample, and a read on `discovery_score` — the field the change is supposed to move — rather than overall.**
+- **THE ONLY REAL SIGNAL REMAINS THE OUTCOME FLIP, and it is attributable** (six runs per arm: old stable at follow_up 6/6, new `lost` 2/6). **Recommendation stands: do not ship on this evidence — not because the change looks wrong, but because the evidence does not speak to it.**
+- **⚠ NOTHING WAS TUNED BACK toward the old number to make the delta look small.**
+
+### ⚠⚠ SHAPE ③ WILL NOT APPEAR — PERMISSION AND A WORKED EXEMPLAR BOTH FAILED, AND I STOPPED AT TWO ATTEMPTS (2026-08-30)
+**Justin ruled the richest coaching shape — directional advice PLUS an illustrative quoted line — should come back. It did not.**
+- **ATTEMPT 1, explicit permission** (*"welcome where a concrete example genuinely helps… never required"*) → **0 of 3.**
+- **ATTEMPT 2, the likely cause: THE ONLY POSITIVE EXEMPLAR IN THE PROMPT WAS THE NO-QUOTE SHAPE, annotated *"no quote at all"*.** A model imitates the example it is shown is good. Justin's own quoted example now sits beside it, marked equally good → **still 0 of 3.**
+- **THEN A DIAGNOSTIC RATHER THAN A THIRD TUNE: does it produce ③ where ③ obviously fits?** Run on a think-about-it objection — the exact context of his example — it produced the no-quote shape again, with excellent both-branches routing and no illustration. **4 samples, 0 × ③.**
+- **⚠⚠ STOPPING WAS THE POINT. A third change aimed at producing a target shape is TUNING UNTIL THE OUTPUT MATCHES**, which is on the standing list. **Permission is in the prompt, a worked exemplar is in the prompt, and the model is choosing — whether to FORCE it is a ruling, not an implementation detail.**
+- **⚠ AND MY FIRST MIX COUNT WAS WRONG:** it scored the model quoting the closer's OWN PAST WORDS as an illustration, because the case differed between the quote and the stored reply. **The true count was always zero** — the fourth checker in this project whose scope exceeded its claim.
+
 ### ⚠⚠⚠ COACHING MUST BE STRATEGIC, NOT SCRIPTED — AND THE REASON IS TRUST, NOT STYLE (Justin, 2026-08-30)
 **His words: *"If it doesn't line up with something that closer would say, they're going to start trusting it less and less."*** ⚠⚠ **A REP READING ADVICE THAT DOES NOT SOUND LIKE THEM STOPS BELIEVING THE PRODUCT. That is a churn mechanism, not a style preference** — which is why this outranks how polished the sentence is.
 - **⚠⚠ THE TEST, AND IT IS MECHANICAL: STRIP THE QUOTED LINE OUT. If the advice still stands, it was DIRECTIONAL. If nothing is left, it was a SCRIPT.**
