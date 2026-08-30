@@ -4099,6 +4099,39 @@ then, 3 MORE runs per arm on that sample:
 - **⚠⚠ IF AN UNSUPERVISED OUTPUT INVENTS, NAMES A PROSPECT, LEAKS INTERNALS OR COACHES A REP OUT OF CORRECT TECHNIQUE, THAT IS A STOP-AND-REPORT, NOT A TUNE.** Each of those is a rule Justin ruled on after reading real output, so a breach means **the rule is not holding in the wild** — a different problem from a rule that needs adjusting, and it must not be quietly softened into one.
 - **THE ASYMMETRY THAT MAKES THIS WORTH A STANDING NOTE: a curated sample and an unattended population are different populations**, and every guarantee established on the first is a hypothesis about the second. **The mechanical guards (no markdown, no placeholder, no gendered pronoun) transfer; the JUDGEMENT ones — right register, right technique, no invention — were only ever verified by a human reading them.**
 
+### ⚠⚠⚠ I CALLED AN OUTCOME FLIP "ATTRIBUTABLE, NOT NOISE" AND IT DID NOT REPRODUCE — WITHDRAWN 2026-08-30
+**0-of-6 against 2-of-6 looked clean. Re-run, the new arm returned `follow_up` 4 of 4 with no `lost` at all.**
+```
+Deep, cumulative   OLD  follow_up  8 / 8   never once lost
+                   NEW  follow_up  8 / 10  lost 2 / 10
+6 further calls, 1 run per arm: 1 disagreement of 6 — and it ran lost -> follow_up,
+                                the OPPOSITE direction
+```
+- **⚠⚠ 0-of-8 AGAINST 2-of-10 SUPPORTS NOTHING, and disagreements pointing BOTH WAYS is the tell that this is borderline-call wobble rather than a systematic push.** The honest reading is that **outcome is unstable on ambiguous calls and the criterion is not moving it anywhere in particular.**
+- **⚠ THE LESSON IS ABOUT SAMPLE SIZE AND MY OWN CONFIDENCE: a clean-looking 0-vs-2 split at n=6 is exactly what ordinary variance produces**, and I reported it as a finding. **A rare event needs enough runs that ZERO occurrences in the control arm is itself improbable — six is not that.**
+- **⚠⚠ AND THE SIGNAL THE OUTCOME NOISE WAS HIDING: `discovery_score` moved +0/+4/+11/+12/+13/+10, mean +8.3, EVERY ONE NON-NEGATIVE.** That is large, consistent and one-directional, **on exactly the field the change targets** — and it is far outside the noise that made the overall-score deltas meaningless. **The gate measured the wrong field and therefore saw a phantom instead of the real effect.**
+
+### ⚠⚠⚠ OUTCOME AND SECTION GRADES SHARE ONE PASS — SO ANY CRITERION CHANGE CAN MOVE OUTCOMES (established 2026-08-30)
+**Justin asked the right question: *"why would coaching mess with the call outcome?"* The framing had been mine and it was sloppy — the COACHING text is additive and touches nothing; the DISCOVERY CRITERION is a grading change, and outcome is decided in the same grader pass.**
+- **THE OUTCOME RULE REFERENCES NO SECTION SCORE AND NO DISCOVERY QUALITY.** It is defined purely by what happened: committed or paid → `closed`; a genuine live path forward → `follow_up`; declined, walked or DISQUALIFIED → `lost`; never joined → `no_show`.
+- **⚠⚠ SO THERE IS NO SPECIFIC DEPENDENCY — THEY ARE ENTANGLED BECAUSE ONE MODEL CALL PRODUCES BOTH, FROM ONE READING OF THE TRANSCRIPT. That is a much bigger fact than any single flip: ANY criterion change ANYWHERE can move outcomes, and nothing isolates them.**
+- **⚠ ONE SEMANTIC BRIDGE IS WORTH NAMING, AS PLAUSIBLE AND NOT DEMONSTRATED:** the `lost` rule explicitly covers *"was DISQUALIFIED… they fail a qualification on credit/finances/fit"*, and the criterion change ADDED **FINANCIAL RESOURCES**. Pointing the grader at whether a prospect can fund it sits one step from a rule that routes an accepted financial DQ to `lost`.
+- **⚠⚠ THE DESIGN QUESTION, NAMED RATHER THAN TREATED AS A DEFECT: OUTCOME OUGHT TO BE INDEPENDENT OF SECTION QUALITY.** A call ended in a sale, a follow-up or a loss — **that is a fact about what happened, not a judgement about how well it was run.** A rep who runs a poor call on a prospect who books a real next step still has a `follow_up`. Separating them means asking for the outcome independently, which has its own cost and should not be done off the back of one ambiguous flip.
+
+### ⚠⚠ WHAT A `follow_up` → `lost` FLIP ACTUALLY COSTS A REP: ALMOST NOTHING MEASURED (traced 2026-08-30)
+**Traced every consumer before judging how much the flip mattered — the bar for accepting it is lower than it looked.**
+```
+rendered close rate (closed PROSPECTS / TOTAL)  NO difference — both are "not closed", both in the denominator
+close_score                                      NO difference — forced to 100 only on `closed`
+objection handle rate                            NO difference — only a `closed` call credits its objections
+EOD                                              shows the MANUAL outcome tag, not the inferred one
+manager digest                                   DIFFERS — a manager reads a different word and reason
+legacy per-call close rate                       `lost` enters the denominator, `follow_up` does not
+                                                 — but it is "retained only for compatibility" and RENDERED NOWHERE
+```
+- **⚠ THE ONE PLACE IT WOULD BITE IS IF THAT LEGACY PER-CALL RATE IS EVER RENDERED AGAIN.** Worth knowing before anyone revives it.
+- **⚠ THE HABIT WORTH KEEPING: TRACE WHAT A VALUE DRIVES BEFORE ARGUING ABOUT WHETHER IT IS RIGHT.** A flip that changes a rep's measured close rate and a flip that changes one word in a digest are different problems, and they were indistinguishable until the consumers were enumerated.
+
 ### ✅ v32 SHIPPED 2026-08-30 — THE DISCOVERY CRITERION, OVER A TRIPPED GATE, KNOWINGLY
 **Adds GOALS and CURRENT SITUATION — which were not looked for AT ALL — and puts a LOGICAL-SALE CAVEAT on PAIN, which was mandatory.** The other four of Justin's six were already present in some form; **FINANCIAL RESOURCES only partially**, as a dollar/timeline COMMITMENT rather than capacity to pay.
 - **⚠⚠ THE OUTCOME FLIP IS AN ACCEPTED TRADE, NOT AN OVERSIGHT, AND IT IS RECORDED IN THOSE WORDS SO NOBODY LATER READS IT AS AN UNNOTICED REGRESSION.** The gate's one real signal: on sample **Deep (14 Jun), six runs per arm — the OLD criterion returned `follow_up` 6/6 and NEVER ONCE `lost`; the NEW one returned `lost` 2/6. Attributable, not noise.** Justin has that number and shipped anyway.
