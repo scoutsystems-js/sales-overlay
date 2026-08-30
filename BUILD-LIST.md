@@ -113,6 +113,17 @@
 
 ---
 
+### N · TWO CUSTOMER-VISIBLE TEXT DEFECTS FOUND IN ONE RENDER (2026-08-29 — **FILED, NOT FIXED**)
+
+**Both surfaced while producing a before/after on a call nobody had looked at. Neither is in the coaching prompt — both are in fields that feed it.**
+
+| item | state | the evidence |
+|---|---|---|
+| **`why_outcome` names the prospect and has NO name contract — it took a name from the SIGN-OFF over the one established in the intro** | ⚠⚠ **FILED — a grader prompt change** | On a live call `prospect_name` reads **"Jay and Leticia"** (correct — the closer establishes both names explicitly: *"Yeah, you're Jay, and you are, ma'am?"* → *"Leticia. Okay. Jay and Leticia."*) while `why_outcome` says **"Gary" three times** and builds its whole explanation around him. **"Gary" appears ONCE in 911 turns**, in the closer's sign-off: *"You have a good one, Gary."* ⚠⚠ **THE CARD CONTRADICTS ITSELF**: the attribution renders *"Jay and Leticia · Aug 15"* while the prose beneath discusses Gary. ⚠ **THE GENERAL CAUSE: `prospect_name` was hardened three times and `why_outcome` inherited none of it, because the hardening was per-FIELD rather than per-KIND.** ⚠ **Closed downstream in the coaching prompt** (it may not name the prospect at all, only "they" — removes the class rather than the instance); **the grader field itself is untouched.** |
+| **A raw seconds value in customer-visible text** | ⚠ **FILED** | An observation rendered on the live panel reads *"Objection at 3598 remained unresolved."* **3598 is `timestamp_seconds`.** The customer-language ruling forbids mechanism in customer-visible text, and `observation` had never been swept for it. |
+
+---
+
 ## ▪ FEATURES — MINOR
 
 ### ⚠⚠ MINOR IS **NOT** FINISHED — definitive status, 2026-08-29. 33 rows, every one classified.

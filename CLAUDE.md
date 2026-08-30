@@ -4043,6 +4043,40 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ⚠⚠⚠ `why_outcome` NAMES THE PROSPECT WITH NO CONTRACT — AND PICKED A NAME FROM THE SIGN-OFF OVER THE ONE ESTABLISHED IN THE INTRO (2026-08-29)
+**On a live call `prospect_name` reads "Jay and Leticia" and `why_outcome` says "Gary" three times, building its whole explanation around him.**
+```
+the closer establishes the names in the intro, explicitly:
+  "Yeah, you're Jay, and you are, ma'am? What's your name?"  ->  "Leticia. Okay. Jay and Leticia."
+"Gary" appears ONCE in 911 turns — the closer's sign-off:
+  "You're welcome, man. You have a good one, Gary."
+prospect_name -> Jay and Leticia   CORRECT, and it has the v11 transcript-established-name contract
+why_outcome   -> Gary x3            NO CONTRACT, and it took the trailing line
+```
+- **⚠⚠ THE VISIBLE CONSEQUENCE IS A CARD THAT CONTRADICTS ITSELF:** the attribution line renders *"Jay and Leticia · Aug 15"* while the prose beneath it discusses Gary. **A coaching note naming the wrong person is the credibility failure the never-invent ruling exists to prevent** — arriving not by invention but by an uncontracted field.
+- **THE GENERAL RULE: A CONTRACT ON ONE FIELD DOES NOT COVER ANOTHER FIELD THAT HOLDS THE SAME KIND OF VALUE.** `prospect_name` was hardened three times (grader → diarized → cleaned title → NULL, with the governing *a WRONG name is worse than NO name*). **`why_outcome` names people too and inherited none of it**, because the hardening was applied per-FIELD rather than per-KIND. **Whenever a rule protects a value, grep for every other field that can hold that kind of value.**
+- **⚠ IT WAS CAUGHT BECAUSE A DOWNSTREAM CONSUMER SURFACED IT.** The coaching prompt receives `why_outcome` as context and duly wrote *"Gary's objection"* — the model behaved correctly on bad input. **A field nobody reads closely can be wrong indefinitely; the defect only became visible when something started quoting it.**
+- **THE DOWNSTREAM FIX IS TO REFUSE THE CLASS, NOT THE INSTANCE:** the coaching prompt may not name the prospect **at all**, only "they" — the card already shows who the call was with. Same shape as the gender rule, and it removes every future instance rather than this one. **The `why_outcome` defect itself is FILED, NOT FIXED** — it is a grader prompt change.
+- **⚠ FOUND IN THE SAME RENDER: an observation reading *"Objection at 3598 remained unresolved."*** A raw seconds value in customer-visible text — the customer-language ruling, in a field nobody had swept.
+
+### ⚠⚠ THROWAWAY SCRIPTS RUN FROM `/tmp` FAIL THREE WAYS, AND THEY LOOK LIKE THREE DIFFERENT PROBLEMS (2026-08-29)
+**Asked why I kept hitting errors, the honest count was that ONLY ONE was an API error. The rest were one mistake wearing three costumes: the script was not where its dependencies are.**
+```
+require('@supabase/supabase-js')  ->  MODULE_NOT_FOUND      node_modules lives in backend/
+dotenv pointed at a guessed path  ->  supabaseUrl required
+__dirname                         ->  /private/tmp          every repo-relative read fails
+```
+- **⚠⚠ THE ONE GENUINE API ERROR IS A STANDING TRAP: `ANTHROPIC_API_KEY` IS DEFINED IN BOTH `.env` AND `API Keys.md`, AND THE ONE IN `.env` IS STALE — it returns 401.** Anything that loads `.env` first gets the dead key. **`API Keys.md` must win.**
+- **THE FIX IS ONE BOOTSTRAP, NOT THREE PATCHES.** A single required file that pushes `backend/node_modules` onto `Module.globalPaths`, loads credentials from `API Keys.md` **then** `.env`, and exports a `repo(rel)` helper so nothing guesses a path. **Patching each symptom as it appears is what made this recur all session.**
+- **⚠ AND TWO MORE THAT ARE ORDINARY BUGS, WORTH KNOWING: a comma inside a PostgREST `.or()` filter breaks its parser** (*"failed to parse logic tree"*) — split into separate queries — **and `.ilike()`/`.like()` on a `uuid` column returns null rather than matching a prefix.** Resolve full ids first.
+
+### ⚠⚠ A HAND-ROLLED JS SCANNER CANNOT HANDLE REGEX LITERALS — AND THE FUNCTION YOU NEED IS USUALLY THE SIMPLE ONE (2026-08-29)
+**Extracting live functions from `dashboard.html` by brace-matching ran away to 1,930 lines, then failed as unbalanced. Two causes, both instructive.**
+- **COMMENTS FIRST: the page is 42% comment, and an apostrophe inside one — *"the closer's reply"* — opens a phantom string that swallows hundreds of lines.** The scanner must skip `//` and `/* */`, **line comments first** per the recorded ordering rule.
+- **THEN REGEX LITERALS, WHICH ARE THE ONE A SCANNER CANNOT WIN.** `escapeHtml` contains `/[&<>"']/g` — **a regex holding BOTH quote characters.** Deciding whether `/` opens a regex or is division needs real parsing, and that is scope creep on a tooling problem.
+- **⚠⚠ THE PROPORTIONATE ANSWER: EXTRACT ONLY THE FUNCTION UNDER TEST AND STUB THE HELPERS, THEN SAY SO.** `sectionRankMomentHtml` is pure string concatenation with no regexes, so brace-matching is sound for it; `escapeHtml`/`dayLabel`/`clipLinkHtml` affect only escaping and a date label, neither of which changes the text being judged. **Reconstructing a helper is fine when it cannot influence the property under test — reconstructing the thing under test is not.**
+- **⚠ A LENGTH ASSERTION ON EVERY EXTRACTION IS WHAT MADE BOTH FAILURES LOUD** rather than silently testing the wrong text. It fired correctly twice here.
+
 ### ⚠⚠⚠ SCOUT COACHED A REP OUT OF A CORRECT SALES TACTIC — AND IT CANNOT TELL THE TACTIC FROM ITS OPPOSITE (2026-08-29)
 **On a real call the closer said *"money aside"*. That is ISOLATION — step one of objection handling. Scout called it *"skipping past the gap"* and told him to do something else instead.**
 - **THE TACTIC, in Justin's words:** a prospect raises a blocker; the closer says in essence *"if we removed this blocker, would you close?"* **Yes = a real objection, and it can be solved. Anything else = a smokescreen** — a psychologically easier way of saying no — **and that is what must be attacked.**
