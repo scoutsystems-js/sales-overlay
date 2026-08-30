@@ -7,6 +7,16 @@
 // the handle % and the card below it agree, and the tile never triggers its own
 // LLM. Returns { rate, handled, total } or null when the classification isn't
 // available (still loading / error) or there are no true objections → tile renders "—".
+// ⚠⚠ EXPECT THIS RATE TO DRIFT UPWARD FOR WEEKS, AND DO NOT CHASE IT (v35, 2026-08-30).
+// The extractor's boundary now asks TWO questions in order — do they WANT it, then
+// CAN they buy — so a prospect who states a reason the offer does not apply to them
+// is emitted as disqualify_signal instead of an objection. Under NEW-CALLS-ONLY nothing
+// re-grades, so any window blends moments routed under both rules and the number moves
+// as the corpus turns over. ⚠ THE DIRECTION IS UP: those moments were sitting in the
+// DENOMINATOR as unhandled objections a rep never had a chance to handle, and removing
+// them is the fix arriving, NOT a regression. Same shape as the v17 taxonomy drift note
+// in CLAUDE.md, which warned the same thing when `objection` narrowed to post-price
+// resistance — read both before treating a moved rate as a defect.
 function objectionHandleRate(needsWork) {
   var d = needsWork && needsWork.detail;
   if (!d || !Array.isArray(d.buckets)) return null;
