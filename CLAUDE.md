@@ -4436,6 +4436,34 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠⚠ THE CONTROL ARM IS WHAT SEPARATES "MY CHANGE CAUSED THIS" FROM "THIS WAS ALREADY TRUE" (v35, 2026-08-30)
+**A single-run A/B found ONE objection→disqualification flip. I read the transcript, concluded the new boundary was swallowing a genuine objection, and was about to report a regression I had caused. Re-running that one call THREE TIMES PER ARM inverted it:**
+```
+OLD arm, that moment, 3 runs: objection/fear | objection/fear | disqualify_signal
+NEW arm, that moment, 3 runs: disqualify_signal | objection/fear | objection/fear
+```
+**The old rule produces the same classification at the same 1-in-3 rate. The flip was run variance on a borderline moment, and the mis-routing is PRE-EXISTING.**
+- **⚠⚠ THE FAILURE I ALMOST SHIPPED IS A REPORT, NOT A DEFECT — AND THAT IS THE EXPENSIVE KIND.** Attributing an existing behaviour to a change under review sends the architect to re-open an approved design, and the "evidence" is a real transcript that genuinely reads badly. **Nothing about the observation is wrong except the attribution.**
+- **THE RULE: a difference observed ONCE between two arms is not a difference between the ARMS.** Before attributing anything to a change, run the CONTROL arm enough times to establish its own rate. One run per arm measures the sampler, not the rule.
+- **⚠ THE NOISE FLOOR WAS VISIBLE IN THE SAME OUTPUT AND I NEARLY WALKED PAST IT: `buying_signal` moved −5 on a category the change does not touch.** The extractor selects 5–8 moments from hundreds of candidates, so *which* it picks varies run to run. **An untouched category moving more than the touched one IS the resolution limit of that comparison**, printed right there in the table.
+
+### ⚠⚠ AN ADVERSARIAL SAMPLE IS THE ONLY WAY TO TEST A RULE THAT FIRES ON 1% OF CASES (2026-08-30)
+**The first v35 check — 8 real calls, >500 turns — returned ZERO disqualifications in EITHER arm. That is not a clean pass; it is a sample containing none of the phenomenon.** At a 1.2% corpus DQ rate, 52 moments expects 0.6.
+- **THE FIX IS SELECTION, NOT SIZE:** scan the corpus for the LANGUAGE the rule keys on (8,654 real moments → 61 calls carrying no-need phrasing), then test the calls that contain it. That sample runs ~6× the corpus rate **by construction**.
+- **⚠ AND SAY SO IN THE REPORT.** An adversarially-selected rate is not a corpus rate, and quoting one as the other is the sort-by-size error in a new costume.
+- Same family as the minimum-sample rule: **a check that can pass by finding nothing will, and it reports success loudest when it measures least.**
+
+### ⚠⚠ CHECK WHETHER THE OLD RULE ALREADY HANDLED THE CANONICAL EXAMPLE BEFORE ESTIMATING A FIX'S SIZE (2026-08-30)
+**The architect's own motivating example — *"I have a company that's making $3 million a year, so I don't need this headache"* — was ALREADY stored as `disqualify_signal` under the rule being replaced.** The v27 boundary was catching a good share of these despite never asking the want question.
+- **CONSEQUENCE: the measured effect of v35 on an adversarial sample is DQ 5 → 5, objection 10 → 10.** The change closes a door properly rather than opening one that was shut, and reporting it as a large win would have been wrong.
+- **THE HABIT: query the corpus for the motivating case before estimating impact.** A defect described from one bad output can already be handled correctly most of the time, and the fix's real value is then *consistency*, not *coverage*.
+
+### ⚠⚠ THE v35 DQ RULE DOES NOT ASK WHOSE REASON IT IS — FILED, NOT FIXED
+**On call `5f6a7052` the prospect says *"It makes sense for me. Yes. I need it"*, sixteen turns later defers to the CLOSER's framing (*"if YOU think it would be a waste of time... I will have to agree with you because you know your program better than I do"*), the closer answers *"Okay, cool"*, and the prospect leaves.**
+- **A closer talking a buyer out of it produces a prospect stating a reason the offer does not apply — which BOTH the old and new rules can read as a disqualification, i.e. "nothing the closer could have done".**
+- **⚠⚠ IT IS THE ABU FAILURE INVERTED.** There a DQ was read as a winnable close; here a winnable close reads as a DQ. **Hiding coaching is the direction that costs**, because nobody questions a call that was never a fit.
+- **Requiring the reason to be the PROSPECT'S OWN is a design change to an approved design, so it is Justin's ruling, not a tidy-up.** Recorded here so it is found rather than rediscovered.
+
 ### ⚠⚠ A GUARD'S OWN REGEX CAN FAIL ON CORRECT CODE — AND THE FIRST INSTINCT IS TO EDIT THE CODE (2026-08-29)
 **Twice in one block, and both times the failing check pointed at a change that was right.**
 - **(1) A CHARACTER CLASS THAT STOPS AT THE WRONG DELIMITER.** `getVoyageEmbeddings\([^)]*'kb-patterns'` fails on `getVoyageEmbeddings(rows.map(function (r) { return r.content; }), 'kb-patterns')` — **the map callback's own `)` closes the class early.** The call was correct and present; the guard could not see past the first bracket.
