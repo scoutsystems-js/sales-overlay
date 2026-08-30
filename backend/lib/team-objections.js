@@ -188,7 +188,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   // ── 3) the objection moments ──
   var rows = await inChunks(
     'call_highlights',
-    'id, fathom_call_id, objection_category, objection_surface, resolution, quote, observation, ' +
+    'id, fathom_call_id, objection_category, objection_surface, objection_class, resolution, quote, observation, ' +
     'closer_response, timestamp_seconds, speaker_verified, closer_response_verified',
     function (q) { return q.eq('type', 'objection'); }
   );
@@ -261,6 +261,16 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
 
   /** true when this moment counts toward a rate under the strict standard. */
   function isCoachable(r) {
+    /* ⚠⚠ THE STORED CLASS WINS WHEN IT IS THERE (migration 057, v37). It is the
+       SAME definition the gauge, the rep cards and the manager graph now read,
+       which is the whole point — objection handling % meant two different things
+       on six surfaces because this judgement lived here and nowhere else.
+       ⚠ THE LLM PATH REMAINS AS THE PRE-v37 FALLBACK, not as a second opinion:
+       nothing re-analyses, so older moments carry no class and this page keeps
+       classifying them exactly as it does today. New calls agree everywhere from
+       the moment they are graded; the population converges as calls turn over. */
+    var stored = r.objection_class;
+    if (stored) return stored === 'true_objection';
     if (!strict) return true;
     var b = bucketOf[normSurface(r.objection_surface)];
     /* ⚠ AN UNCLASSIFIED PHRASE COUNTS. Dropping it would silently shrink the

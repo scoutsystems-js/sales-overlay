@@ -8,6 +8,8 @@
 // owner with reps defaults to their own team.
 
 const { isDisqualified } = require('./../lib/dq-exclusion');
+const { strictObjections } = require('./../lib/objection-strict');
+const { closeRateForCalls } = require('./../lib/prospect-entity');
 const express = require('express');
 const { resolveDisplayName, disambiguateNames } = require('../lib/display-name');
 var { withBoardOwner } = require('../lib/team-membership');
@@ -329,7 +331,10 @@ router.get('/averages', teamGate, async function (req, res) {
     var calls = [], start = 0;
     for (;;) {
       var cq = await admin.from('fathom_calls')
-        .select('id, user_id, fathom_call_id, prospect_id, duration_seconds')
+        // ⚠ call_date rides along because closeRateForCalls orders a prospect's
+        // calls oldest-first; without it the 'most recent decided outcome' rule
+        // would be reading an undefined sort key.
+        .select('id, user_id, fathom_call_id, prospect_id, duration_seconds, call_date')
         .in('user_id', candidates).gte('call_date', win.from).lte('call_date', win.to)
         .not('not_a_sales_call', 'is', true)
         .is('duplicate_of', null)
@@ -374,6 +379,12 @@ router.get('/averages', teamGate, async function (req, res) {
     var dqGauge = {};
     analyses.forEach(function (a2) { if (isDisqualified(a2)) dqGauge[a2.fathom_call_id] = 1; });
     objections = objections.filter(function (o) { return !dqGauge[o.fathom_call_id]; });
+    /* ⚠⚠ THE STRICT DENOMINATOR, FROM THE STORED CLASS — this gauge used to count
+       EVERY objection moment while the focus panel counted true objections only,
+       so a rep read two different numbers under one name. One definition now:
+       lib/objection-strict.js. Nothing gets slower — the class is cached on the
+       moment at analysis time rather than classified per surface. */
+    objections = strictObjections(objections);
     var ratedCalls = calls.filter(function (c) { return !dqGauge[c.id]; });
 
     var callOwner = {}, callDuration = {};
@@ -409,10 +420,26 @@ router.get('/averages', teamGate, async function (req, res) {
         if (outcomeByCall[c.id] === 'closed') prospectClosed[c.prospect_id] = true;
       }
     });
-    Object.keys(prospectOwner).forEach(function (pid) {
-      var s = slot(prospectOwner[pid]);
-      s.closing.total += 1;
-      if (prospectClosed[pid]) s.closing.numerator += 1;
+    /* ⚠⚠ ONE COMPUTATION — this gauge used to roll its own prospects up, and the
+       manager graph rolled up a third way. The three agreed by luck rather than
+       by construction, and only one of them applied merge remapping.
+       closeRateForCalls is now THE definition; the WINDOW stays this endpoint's
+       own concern (fixed 7 days here, the picker on the graph).
+       ⚠ It is called PER REP so each gauge slot gets its own rate, and no-shows
+       and DQs leave the denominator inside it — calls TAKEN, not booked. */
+    var byRep = {};
+    ratedCalls.forEach(function (c) {
+      if (!c.prospect_id) return;
+      (byRep[c.user_id] = byRep[c.user_id] || []).push({
+        id: c.id, user_id: c.user_id, prospect_id: c.prospect_id,
+        call_date: c.call_date, outcome: outcomeByCall[c.id],
+      });
+    });
+    Object.keys(byRep).forEach(function (uid) {
+      var r = closeRateForCalls(byRep[uid], {});
+      var sl = slot(uid);
+      sl.closing.total += r.total;
+      sl.closing.numerator += r.closed;
     });
     objections.forEach(function (o) {
       var uid = callOwner[o.fathom_call_id];

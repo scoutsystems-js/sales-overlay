@@ -9,6 +9,7 @@ var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 var { fetchProspectCloseRates, closeRate } = require('./prospect-entity');
 var { DQ_OUTCOME } = require('./dq-exclusion');
+var { countsAsObjection } = require('./objection-strict');
 var { weakestSection, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
 var { isHandled } = require('./objection-handled');
 // ⚠ ONE definition of "synthetic" — shared with lib/team-synthesis.js (the team
@@ -92,6 +93,10 @@ async function aggregateWindow(admin, repIds, from, to) {
          so leaving them in the denominator marks the rep down for a call that
          could not be won. ⚠ calls_analyzed above is UNTOUCHED — the work happened. */
       if (callOutcome[h.fathom_call_id] === DQ_OUTCOME) return;
+      /* ⚠ SAME ONE DEFINITION as the gauge, the graph and the focus panel: a
+         disqualification or a logistical barrier is not a coachable objection
+         and does not belong in a handle rate. Stored class, no model call. */
+      if (!countsAsObjection(h)) return;
       // Shared predicate. This same rate is quoted IN PROSE by the WHY sentence
       // and decides which category the rep card names as the rep's weakest, so
       // it must never become a second local definition.

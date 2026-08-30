@@ -183,7 +183,12 @@ function computeNeedsWork(objs, analyses, mapping, opts) {
   var scopedAll = objs.filter(function (o) { return Object.prototype.hasOwnProperty.call(outcomeByCall, o.call_id); });
   var scoped = [], context = { disqualifications: 0, logistical: 0 };
   scopedAll.forEach(function (o) {
-    var cls = classOf(labelOf(o));
+    /* ⚠⚠ THE STORED CLASS WINS WHEN PRESENT (migration 057, v37) — the SAME
+       definition the gauge, rep cards and manager graph read, which is why the
+       six surfaces now agree. The LLM label remains the PRE-v37 FALLBACK, not a
+       second opinion: nothing re-analyses, so older moments keep being
+       classified here exactly as they are today. */
+    var cls = o.objection_class || classOf(labelOf(o));
     if (cls === 'disqualification') context.disqualifications++;
     else if (cls === 'logistical_barrier') context.logistical++;
     else scoped.push(o); // true_objection (the default) → counted in the math
@@ -452,7 +457,7 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap, na
   var analyses = await w.inChunks('call_analyses', ANALYSIS_COLS,
     function (q) { return q.eq('status', 'done'); });
   var objRowsAll = await w.inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, resolution, type',
+    'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, objection_class, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
 
   /* ⚠⚠ DISQUALIFIED CALLS LEAVE THE BUCKETS. This panel's buckets ARE the
@@ -478,6 +483,8 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap, na
       call_id: r.fathom_call_id,
       surface: r.objection_surface,
       handled: isHandled(r, outcomeByCall[r.fathom_call_id]),
+      // ⚠ carried through, or the stored class is invisible to the split above
+      objection_class: r.objection_class || null,
       quote: str(r.quote, 300),
       observation: str(r.observation, 240),
       /* ⚠ THE PROFILE NAME FIRST. Deriving from the email says "Joshua" where
@@ -643,7 +650,7 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
   var w = await loadTeamWindow(admin, userIds, from, to);
   if (!w.callIds.length) return [];
   var rows = await w.inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, quote, closer_response, objection_surface, resolution, type',
+    'fathom_call_id, timestamp_seconds, quote, closer_response, objection_surface, objection_class, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
   var clip = function (cid, ts) { return clipHref(w.meta[cid] && w.meta[cid].recording_url, ts); };
   // the provider travels WITH the link — a label cannot be derived from a URL
@@ -666,6 +673,8 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
       title: nameByCall[r.fathom_call_id] || c.title || null,
       prospect_name: nameByCall[r.fathom_call_id] || null,
       surface: r.objection_surface, handled: isHandled(r, evidenceOutcome[r.fathom_call_id]),
+      // ⚠ carried through, or the stored class is invisible to the split above
+      objection_class: r.objection_class || null,
       quote: str(r.quote, 400), closer_response: str(displayCloserResponse(r.closer_response), 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
       source: srcOf(r.fathom_call_id) };
   }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
@@ -677,11 +686,11 @@ function toObjs(objRows, w, outcomeByCall) {
   // the provider travels WITH the link — a label cannot be derived from a URL
   var srcOf = function (cid) { return (w.meta[cid] && w.meta[cid].source) || null; };
   return objRows.map(function (r) {
-    return { call_id: r.fathom_call_id, surface: r.objection_surface, handled: isHandled(r, (outcomeByCall || {})[r.fathom_call_id]),
+    return { call_id: r.fathom_call_id, surface: r.objection_surface, objection_class: r.objection_class || null, handled: isHandled(r, (outcomeByCall || {})[r.fathom_call_id]),
       quote: str(r.quote, 300), observation: str(r.observation, 240), rep: null, clip_url: clip(r.fathom_call_id, r.timestamp_seconds), source: srcOf(r.fathom_call_id) };
   });
 }
-var OBJ_COLS = 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, resolution, type';
+var OBJ_COLS = 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, objection_class, resolution, type';
 // cash_collected dropped 2026-08-17 with the money math — nothing in this
 // module reads it now. `outcome` STAYS: it is what credits an objection on a
 // closed call under the handled ruling.
@@ -726,8 +735,8 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
       var tw = await loadTeamWindow(admin, repIds, from, to);
       if (tw.callIds.length) {
         var tAnalyses = await tw.inChunks('call_analyses', ANALYSIS_COLS, function (q) { return q.eq('status', 'done'); });
-        var tObjRows = await tw.inChunks('call_highlights', 'fathom_call_id, objection_surface, resolution, type', function (q) { return q.eq('type', 'objection'); });
-        var tObjs = tObjRows.map(function (r) { return { call_id: r.fathom_call_id, surface: r.objection_surface, handled: r.resolution === 'handled' }; });
+        var tObjRows = await tw.inChunks('call_highlights', 'fathom_call_id, objection_surface, objection_class, resolution, type', function (q) { return q.eq('type', 'objection'); });
+        var tObjs = tObjRows.map(function (r) { return { call_id: r.fathom_call_id, surface: r.objection_surface, objection_class: r.objection_class || null, handled: r.resolution === 'handled' }; });
         var link = computeLinkage(tObjs, tAnalyses);
         if (link.delta != null) { injected = { delta: link.delta, avgCash: link.avgCash, handledN: link.handledN, notHandledN: link.notHandledN, closedCount: link.closedCount, pH: link.pH, pN: link.pN }; }
         teamKeyForHash = managedBy + ':' + repIds.slice().sort().join(',');

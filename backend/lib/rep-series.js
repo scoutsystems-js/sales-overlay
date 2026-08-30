@@ -39,8 +39,9 @@
  */
 
 const { DQ_OUTCOME } = require('./dq-exclusion');
+const { countsAsObjection } = require('./objection-strict');
 const { bucketStart, bucketRangeLabel } = require('./team-analytics');
-const { prospectOutcome } = require('./prospect-entity');
+const { prospectOutcome, hadAConversation } = require('./prospect-entity');
 const { isHandled } = require('./objection-handled');
 
 // The selector vocabulary. Scout's own labels — see the ruling above.
@@ -132,6 +133,8 @@ function buildRepSeries(input) {
        Their objections were never winnable, and their prospect was never
        closeable. The call still counts as analysed elsewhere. */
     if (outcomeOf[o.fathom_call_id] === DQ_OUTCOME) return;
+    // ⚠ one definition — see lib/objection-strict.js
+    if (!countsAsObjection(o)) return;
     if (isHandled(o, outcomeOf[o.fathom_call_id])) cell.handled++;
   });
 
@@ -158,6 +161,12 @@ function buildRepSeries(input) {
       if (i === undefined) return;
       var byUser = cAcc[user] || (cAcc[user] = {});
       var cell = byUser[i] || (byUser[i] = { closed: 0, total: 0 });
+      /* ⚠⚠ ONE DEFINITION, AND ONLY THE closed/total DECISION MOVED — the
+         BUCKETING is still this module's own concern, which is the point: the
+         window differs legitimately (picker here, fixed 7 days on the gauge),
+         the definition must not. `hadAConversation` is what drops a no-show or
+         a DQ prospect: calls TAKEN, not booked. */
+      if (!hadAConversation(p.outcomes)) return;
       cell.total++;
       if (prospectOutcome(p.outcomes) === 'closed') cell.closed++;
     });
