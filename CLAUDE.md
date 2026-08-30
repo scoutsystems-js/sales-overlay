@@ -4043,6 +4043,30 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ⚠⚠⚠ SCOUT COACHED A REP OUT OF A CORRECT SALES TACTIC — AND IT CANNOT TELL THE TACTIC FROM ITS OPPOSITE (2026-08-29)
+**On a real call the closer said *"money aside"*. That is ISOLATION — step one of objection handling. Scout called it *"skipping past the gap"* and told him to do something else instead.**
+- **THE TACTIC, in Justin's words:** a prospect raises a blocker; the closer says in essence *"if we removed this blocker, would you close?"* **Yes = a real objection, and it can be solved. Anything else = a smokescreen** — a psychologically easier way of saying no — **and that is what must be attacked.**
+- **⚠⚠ THE FAILURE IS THE MOST EXPENSIVE KIND A COACHING PRODUCT HAS: IT IS CONFIDENT, SPECIFIC, AND TEACHES THE OPPOSITE OF THE RIGHT THING.** A wrong number gets corrected when someone checks it; a wrong technique gets practised on the next fifty calls. Same family as the Abu digest failure, one level deeper — there the classification was wrong, here **the classification was right and the JUDGEMENT of correct execution was inverted.**
+- **THE MINIMUM CONSTRAINT, and it is deliberately narrower than teaching the method:** state isolation as a technique with worked examples, say it is step one and not avoidance, then forbid two things — **describing it as skipping / dodging / brushing past / avoiding / ignoring, and telling the rep to do something else instead.** It may say what to **ADD**; it may never say **stop**. Result on the same call: *"That isolation move was right."*
+- **⚠⚠ THE COST IS REAL AND MUST BE STATED WHEREVER THIS IS RELIED ON: SCOUT CANNOT DISTINGUISH ISOLATION FROM GENUINE AVOIDANCE, because the difference is WHETHER THE CLOSER CAME BACK TO IT — and that is not in the inputs.** The constraint therefore keys on the closer's WORDS resembling isolation, so a closer who sets a blocker aside and never returns will now be told to *finish* the isolation rather than told he dodged. **That is under-coaching a real avoidance, accepted knowingly**: coaching a rep out of correct technique is worse than being gentle about one dodge. It stops being a trade only when Scout can see whether the loop was closed.
+- **⚠ THE GENERAL FORM, worth carrying past this instance: BEFORE CRITICISING AN ACTION, ASK WHETHER IT IS A KNOWN TECHNIQUE.** The v20 rule already established this for one case — deflecting a price question asked before the pitch is CORRECT and must never be `missed_opportunity` — and this is the second. **A model with no domain doctrine will read deliberate technique as a mistake, because skipping and setting-aside look identical in a transcript.**
+
+### ⚠⚠ "DOESN'T WANT IT AT ALL" IS A FOURTH CASE THE BOUNDARY DOES NOT COVER — MEASURED 2026-08-29, FILED NOT FIXED
+**The three-way boundary covers affordability, external blockers and hesitancy. A prospect who CAN pay and simply does not want the offer satisfies the `fear` rule exactly — and `fear` is labelled the coachable one.**
+```
+the extractor's test is AFFORDABILITY-ONLY:  "can the prospect buy right now if they decide to?
+                                              If they genuinely CANNOT AFFORD IT..."
+disqualify_signal is defined as:             "no budget, no decision authority, wrong stage"
+                                              -> no BUDGET, never no NEED
+fear explicitly claims the remainder:        "wanting more proof, questioning whether it is
+                                              legitimate, wanting to think about it... are all
+                                              fear when the prospect can afford it"
+```
+- **MEASURED on 30 prospect-spoken no-need / bad-fit moments — it scatters across SIX types with no rule routing it:** `risk_signal 10 · buying_signal 7 · objection/fear 6 · disqualify_signal 4 · objection/logistical 2 · missed_opportunity 1`. **Seven of thirty land somewhere that counts against the rep** (6 fear + 1 missed_opportunity); **four land correctly.**
+- **THE CLEANEST PROOF IS A PAIR OF LINES SAYING THE SAME THING AND ROUTING OPPOSITE WAYS:** *"I have an MBA. Do I really need this? I don't need this."* → **`objection/fear`**, counted against the rep's handle rate. *"I have a company that's making $3 million a year, so I don't need this headache"* → correctly **`disqualify_signal`**.
+- **⚠ HONEST LIMIT ON THE SAMPLE: it is a keyword search and it over-matches** — *"I don't need to finance it"* is a genuine buying signal it caught. **Treat the counts as illustrative, never as a rate. The structural finding does not depend on them**, because it follows from the three prompt definitions above.
+- **WHY IT MATTERS: coaching a rep for not closing someone who should never have bought is actively wrong**, and it silently depresses the handle rate on exactly the calls where the rep did nothing wrong.
+
 ### ⚠⚠⚠ NEVER INVENT THE PROSPECT (Justin, 2026-08-29) — AND TIGHTENING AGAINST INVENTION CAUSED A LITERAL MISREADING
 **His words: *"Scout can NEVER EVER EVER EVER EVER make up things a prospect said. That absolutely KILLS our credibility and reputation and will turn every client away."* Absolute, and it covers PARAPHRASE, not just quotation** — *"She said yes with her silence"* is not a quote and is exactly the thing banned.
 - **⚠⚠ THE REP'S OWN SIDE IS UNAFFECTED, AND THE ASYMMETRY IS THE RULE:** judging what the CLOSER should have done is judgement about our own person and is the job. **The ban is on asserting anything about the PROSPECT that is not in the given lines.**
