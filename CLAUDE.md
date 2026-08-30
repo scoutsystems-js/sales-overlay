@@ -4436,6 +4436,41 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠ THE CHEAP PATH WAS CHECKED BEFORE THE CACHE WAS BUILT, AND THE NEGATIVE RESULT IS WHAT JUSTIFIES THE WORK (2026-08-30, v37)
+**Scout already types every moment — v17 split objection/risk_signal/barrier, v27/v35 route DQs to `disqualify_signal` — so the obvious hope was that `type='objection'` ALREADY means "true objection" and there is nothing to cache. Measured on 813 live moments already typed `objection`:**
+```
+true_objection      589
+disqualification    129     ⚠ 195 of 813 = 24% are NOT true objections
+logistical_barrier   66
+and objection_category CANNOT predict it:
+  disqualifications come from  fear 81 · timing 21 · logistical 21 · partner 6
+```
+- **⚠⚠ THE TAXONOMY NARROWING OPERATES ON THE MOMENT TYPE; THE CLASSIFIER JUDGES THE SURFACE PHRASE, AND THEY DISAGREE A QUARTER OF THE TIME.** Two correct-looking classifications of the same moment, at different levels, is not redundancy — **it is why the derivation does not exist.**
+- **THE ANSWER WAS ASKED FOR IN MINUTES AND COULD HAVE REMOVED THE WHOLE BLOCK.** It did not, and the measurement is now the justification in the migration and the version note. **A cache built without that check is a cache nobody can defend later.**
+- **⚠ AND THE FIRST RUN OF THE MEASUREMENT REPORTED `UNCLASSIFIED 813` — a vacuous result from guessing the classifier's return shape.** Dumping the real shape first is what turned it into evidence. **A measurement where everything lands in one bucket is an extraction failure, not a finding.**
+
+### ⚠⚠ CLASSIFY ONCE AT ANALYSIS TIME AS A PROMPT FIELD, NOT AS A SECOND MODEL CALL (2026-08-30)
+**The strict/loose objection class had to be computed somewhere. Three options, and the one chosen costs nothing:**
+```
+per surface, live      a ~20s NON-DETERMINISTIC LLM call behind a GAUGE      rejected
+per call, extra call   one more model call on every analysis                 rejected
+an EXTRACTOR FIELD     the model already makes this exact judgement (v27/v35)  ← shipped
+```
+- **⚠ THE EXTRACTOR ALREADY DECIDES THE THREE-WAY BOUNDARY** (coachable objection / logistical barrier / disqualification), so asking it to name the class is one field on a call that was happening anyway — **additive, no delta gate, and the token gate had ~1592 spare.**
+- **⚠⚠ THE PROMPT MUST NAME THE SAFE DIRECTION WHEN UNSURE, BECAUSE THE TWO ERRORS ARE NOT SYMMETRIC: counting a moment the closer could have handled costs a slightly loose rate; dropping a real objection HIDES COACHING.** The instruction says choose `true_objection` when genuinely unsure.
+- **AND THE CROSSOVER IS A DESIGNED STATE: NULL COUNTS.** Nothing re-analyses, so pre-v37 moments carry no class and are counted — **the loose behaviour that already existed**. The number degrades in the direction it already had rather than into a third thing. **If NULL had read as "not an objection", the denominator would have silently shrunk across the entire historical corpus** — the placeholder-is-a-valid-value family, pre-empted rather than survived.
+
+### ⚠⚠ A COLUMN CAN BE READ AT FIVE SITES AND SELECTED AT NONE (2026-08-30)
+**Wiring `objection_class` meant widening FIVE selects and TWO mappers across two modules. Miss any one and `o.objection_class` is `undefined` there, `countsAsObjection` returns true, and that surface silently stays loose — with no error and no failing test.**
+- **THE GUARD IS PART OF THE FEATURE, NOT A FOLLOW-UP:** every line that is a COLUMN LIST naming `objection_surface` must also name `objection_class`. **Dead-call-site family, applied to a column rather than a function.**
+- **⚠ AND MY FIRST TWO ATTEMPTS AT THAT GUARD WERE WRONG IN OPPOSITE DIRECTIONS: a quoted-string regex SPANNED concatenated selects and reported a code fragment (`'); }`) as a column list; then a line-based version matched a MAPPER line (`surface: r.objection_surface, handled: …`).** Fixed by requiring the literal column form (`fathom_call_id,` with a comma) plus a quote on the line.
+- **⚠⚠ THE SANITY COMPANION IS WHAT MADE EACH FAILURE LOUD RATHER THAN VACUOUS** — `assert(lines.length > 0)` before comparing. **A negative assertion over an empty match set passes perfectly**, and this guard would have reported success three times without it.
+
+### ⚠ ONE PREDICATE FOR TWO EXCLUSIONS THAT SHARE A REASON (2026-08-30)
+**`no_show` and `disqualified` both leave the closing denominator BECAUSE THERE WAS NO CLOSEABLE CONVERSATION. That is one rule, so it is one predicate (`hadAConversation`), not two that can drift apart.**
+- **⚠ IT IS ALL-OR-NOTHING PER PROSPECT, and that distinction is the whole correctness of it:** a prospect is dropped only when EVERY one of their calls is a no-show or a DQ. **Someone who no-showed once and then turned up is a real prospect with a real conversation**, and a per-call rule would have silently removed them.
+- **⚠ AND IT MADE ONE OF MY OWN EARLIER TESTS STALE — CORRECTLY.** The DQ guard asserted a baseline in which an unfiltered rollup still counted a DQ prospect; the shared rule now drops it, so DQ leaves at TWO levels that agree. **A test failing because the system got better is a result to read, not a break to patch** — the assertion was updated to the new truth with the reason recorded.
+
 ### ⚠⚠⚠ STANDING RULE — A METRIC HAS ONE DEFINITION AND ONE COMPUTATION, AND EVERY SURFACE READS THE SAME ONE (Justin's ruling, 2026-08-30)
 **His words: *"if a closer has 3 different closing % on 3 different pages we look like amateurs. If something is true on 1 page shouldn't it be true on all?"***
 - **⚠⚠ WHERE A SURFACE LEGITIMATELY DIFFERS, THE DIFFERENCE IS THE WINDOW, NEVER THE DEFINITION** — a fixed 7-day gauge against a picker-driven graph is fine, **and the surface must say which window it is showing.**
