@@ -339,7 +339,10 @@
       font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
       border: 1px solid var(--border-strong, #2a2a2a); border-radius: 10px; padding: 2px 9px;
     }
-  </style>
+      /* ⚠ the head's cell is a FACT, not a disabled control — no dropdown chrome,
+       because there is no choice to make. Same weight as the select beside it. */
+    .company-head-label { font-size: 12px; color: var(--text); }
+</style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>
 </head>
@@ -1154,11 +1157,53 @@
     }).join('');
     return fieldControl(u, 'role', u.role, opts);
   }
+  /* ⚠⚠ THE COMPANY A USER BELONGS TO — and a HEAD belongs to their OWN company.
+     A head has no `managed_by` (the column is who manages you, and nobody
+     manages the head), so rendering that raw column printed "None — single
+     user" for the person who RUNS the company. The grouping was never wrong:
+     joshua@soberlivingriches.com has 8 reps and team_name "Sober Living Riches"
+     and is bucketed correctly. The COLUMN was rendering a foreign key where a
+     business fact belongs. */
+  function companyOf(u) {
+    if (!u) return null;
+    for (var i = 0; i < companiesArray.length; i++) {
+      var c = companiesArray[i];
+      if (c.key === u.user_id) return { company: c, isHead: true };
+      if (u.managed_by && c.key === u.managed_by) return { company: c, isHead: false };
+    }
+    return null;
+  }
+
   function managedByControlHtml(u, mgrs) {
-    var opts = '<option value="">None — single user</option>' + mgrs.filter(function(m) { return m.user_id !== u.user_id; }).map(function(m) {
-      var lbl = (m.email || m.user_id.slice(0, 8)) + ' (' + roleLabel(m.role) + ')';
-      return '<option value="' + escapeHtml(m.user_id) + '"' + (u.managed_by === m.user_id ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>';
+    var found = companyOf(u);
+
+    /* ⚠ A HEAD GETS A STATIC LABEL, NOT A DROPDOWN, AND THAT IS THE DATA MODEL
+       RATHER THAN A STYLING CHOICE. This control writes `managed_by`, and a
+       head cannot be assigned into their own company — `no_self_manage` forbids
+       managed_by = self. Offering a dropdown here would present a choice that
+       cannot be made. They ARE the company; the cell says so. */
+    if (found && found.isHead) {
+      return '<span class="company-head-label" title="Heads this company">'
+        + escapeHtml(found.company.name) + '</span>';
+    }
+
+    /* ⚠ COMPANIES BY NAME, not managers by email — the same rule the create-user
+       modal already follows. Nobody outside the build knows which email is which
+       company, and the value stays the head's id because that is what
+       `managed_by` stores. ⚠ Falls back to the manager list only if the grouped
+       payload is missing, so this can never render an empty picker. */
+    var byName = companiesArray.filter(function(c) { return c.key !== u.user_id; }).map(function(c) {
+      return '<option value="' + escapeHtml(c.key) + '"'
+        + (u.managed_by === c.key ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>';
     }).join('');
+    if (!byName) {
+      byName = mgrs.filter(function(m) { return m.user_id !== u.user_id; }).map(function(m) {
+        var lbl = (m.email || m.user_id.slice(0, 8)) + ' (' + roleLabel(m.role) + ')';
+        return '<option value="' + escapeHtml(m.user_id) + '"' + (u.managed_by === m.user_id ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>';
+      }).join('');
+    }
+    // ⚠ "None" stays a REAL state — an unaffiliated user genuinely has no company.
+    var opts = '<option value="">None — single user</option>' + byName;
     return fieldControl(u, 'managed_by', u.managed_by || '', opts);
   }
   function billingControlHtml(u) {
@@ -1168,8 +1213,12 @@
     }).join('');
     return fieldControl(u, 'billing_status', cur, opts);
   }
+  // ⚠ THE READ-ONLY CELL IS THE SAME FACT, so it resolves the same way — a head
+  // reads as their company, not as a dash.
   function managedByLabel(u) {
-    if (!u.managed_by) return '<span style="color:var(--muted);font-size:12px;">—</span>';
+    var found = companyOf(u);
+    if (found) return '<span style="font-size:12px;">' + escapeHtml(found.company.name) + '</span>';
+    if (!u.managed_by) return '<span style="font-size:12px;opacity:0.6;">— none</span>';
     var m = usersArray.filter(function(x) { return x.user_id === u.managed_by; })[0];
     return '<span style="font-size:12px;">' + escapeHtml(m ? (m.email || u.managed_by.slice(0, 8)) : u.managed_by.slice(0, 8)) + '</span>';
   }
