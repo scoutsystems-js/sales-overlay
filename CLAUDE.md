@@ -4436,6 +4436,36 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠⚠ A PROMPT CHANGE WITHOUT A VERSION IN THE CACHE KEY SHIPS NOTHING — SECOND INSTANCE (2026-08-30)
+**The per-closer coaching copy was rewritten and approved. Its cache key was `(board owner, window, analysis fingerprint, members)` — NO PROMPT VERSION — so all 20 cached entries for that lane would have gone on serving the REJECTED copy while the change looked shipped.**
+- **⚠⚠ THE GENERATED TEXT LIVES INSIDE THE CACHED PAYLOAD.** That is the whole mechanism: the cache is keyed on the DATA, and the copy is not data. **Nothing about a prompt edit moves a key computed from analyses.**
+- **THIS IS THE `NEEDS_WORK_LANE_VERSION` LESSON, WHICH IS ALREADY ON FILE — and it recurred anyway**, in a different lane, because the fix had been applied per-lane rather than as a rule. **Every cached synthesis lane needs its prompt version in its own key.**
+- **⚠ IT IS NOT THE GRADER VERSION.** `ANALYSIS_PROMPT_VERSION` governs the grader and extractor and has nothing to do with a synthesis lane. Reaching for it here would bump every analysis and still not move this text.
+- **THE RULE: A PROMPT EDIT AND ITS LANE VERSION BUMP ARE ONE ATOMIC CHANGE**, exactly as they are for the grader — and the guard asserts the version is IN the hash, not merely declared.
+
+### ⚠⚠ TESTING THE WRONG SHAPE LOOKS EXACTLY LIKE A REAL ABSENCE (2026-08-30)
+**`call_analyses.coverage` stores an ARRAY of `{area_key, covered, evidence, evidence_verified}`. I queried it with `coverage ? 'pain'` — an OBJECT-key test — which returns false for every row regardless of content.**
+```
+what I measured   "0 of 1,520 analyses carry the six discovery items"
+what is true      every v33+ call carries all six, with verbatim evidence
+```
+- **⚠⚠ I WAS ONE STEP FROM FILING "the six items are captured nowhere" AS A SERIOUS FINDING** — a claim that would have sent someone to debug a working pipeline, and that reads as far more alarming than a query bug.
+- **THE TELL WAS AN IMPLAUSIBLE CLEAN ZERO**: not "few", not "some", but zero across every version including the ones that had just shipped the feature. **A perfectly uniform negative result is more often a wrong question than a real absence.**
+- **THE FIX IS TO INSPECT THE SHAPE BEFORE COUNTING IT.** One `jsonb_pretty` answered it. Same family as the classifier measurement that returned `UNCLASSIFIED 813` from a guessed return shape — **and that one happened the same week.**
+
+### ⚠⚠ "NOT COVERED" MUST BE CARRIED BY THE DESIGN, NOT BY THE WORDING (2026-08-30, surface ①)
+**Six discovery items rendered with crosses and error colour would make a call the closer ran well look like six failures. The words can say "this is not a criticism" and the page will still read as a scold.**
+- **SO THE STATES RENDER AT THE SAME WEIGHT** — a filled dot against an outline, one shared text colour, no red anywhere — and the guard asserts the absence of crosses, failure vocabulary and `--bad` rather than the presence of a disclaimer.
+- **⚠ AND THE CAVEAT IS CONDITIONAL: the logical-sale note appears ONLY when pain is uncovered.** Shown always it is noise; shown never, absent pain reads as a miss. **A caveat that fires unconditionally stops being read, which is the same reason an alert that is always present stops being seen.**
+- **⚠⚠ AN UNVERIFIED QUOTE IS WITHHELD, AND THAT IS THE POINT OF THE SURFACE RATHER THAN A DETAIL OF IT.** This exists so the captured quotes can be TRUSTED before anything is built on them; showing an unproven line as the prospect's words defeats the check it was built to perform. Covered-without-a-provable-quote still says so.
+- **A PRE-v33 CALL RENDERS NOTHING, NOT SIX BLANKS** — absent and unestablished are different facts, and an empty grid asserts the second.
+
+### ⚠ PUT NEW DETAIL INSIDE THE SECTION THAT OWNS IT, NOT IN A NEW PANEL (2026-08-30)
+**Three panels were removed from the call review page by ruling — *"I just want the call highlights… we keep over complicating things"* — so adding a seventh was the obvious wrong move.**
+- **THE SIX DISCOVERY ITEMS ARE THE DISCOVERY CRITERIA, so they belong in the discovery grade card, which already exists and already expands.** Improving the surface beat adding to the page, which is the recorded lesson from the three removals.
+- **⚠ AND A COUNT ON THE COLLAPSED HEADER IS WHAT STOPS IT BEING UNREACHABLE.** Detail behind a click is fine; detail behind a click that nothing hints at is the merge-review-page failure — complete, correct, and used four times in its life.
+- **⚠ FOUR EXISTING RENDER TESTS FAILED AND WERE RIGHT.** They execute the real `gradeCardHtml`, which gained a dependency. **A harness that breaks when the function it drives changes is the harness working** — inject the dependency, never stub the function under test.
+
 ### ⚠⚠ THE CHEAP PATH WAS CHECKED BEFORE THE CACHE WAS BUILT, AND THE NEGATIVE RESULT IS WHAT JUSTIFIES THE WORK (2026-08-30, v37)
 **Scout already types every moment — v17 split objection/risk_signal/barrier, v27/v35 route DQs to `disqualify_signal` — so the obvious hope was that `type='objection'` ALREADY means "true objection" and there is nothing to cache. Measured on 813 live moments already typed `objection`:**
 ```
