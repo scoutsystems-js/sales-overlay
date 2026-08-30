@@ -23,7 +23,7 @@ const { computeWhyFacts } = require('../lib/why-prose');
 // saved-to-KB badge, removed 2026-08-18 with the Add-to-KB buttons
 const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
-const { VALID_OUTCOMES, effectiveCloseScore, canTagOutcome,
+const { VALID_OUTCOMES, TAGGABLE_OUTCOMES, effectiveCloseScore, canTagOutcome,
         canMarkNotSalesCall, markRoleFor } = require('../lib/outcome-tag');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
@@ -590,7 +590,12 @@ router.get('/needs-work', requireAuth, async function(req, res) {
 router.patch('/calls/:call_id/outcome', requireAuth, async function(req, res) {
   var callId = req.params.call_id;
   var outcome = req.body && req.body.outcome;
-  if (VALID_OUTCOMES.indexOf(outcome) === -1) return res.status(400).json({ error: 'outcome must be one of: ' + VALID_OUTCOMES.join(', ') });
+  /* ⚠⚠ TAGGABLE, NOT VALID — the two lists differ ON PURPOSE. A HUMAN may set
+     'disqualified'; the GRADER cannot, because its own list (analysis-worker
+     VALID_OUTCOMES) is deliberately narrower. A DQ mark removes the call from
+     the close rate and the handle rate, so a model error here would silently
+     let a rep off — or mark them down — with nothing on screen to say so. */
+  if (TAGGABLE_OUTCOMES.indexOf(outcome) === -1) return res.status(400).json({ error: 'outcome must be one of: ' + TAGGABLE_OUTCOMES.join(', ') });
   try {
     var admin = getAdminClient();
     var a = await admin.from('call_analyses').select('fathom_call_id, user_id, close_score, close_score_earned').eq('fathom_call_id', callId).maybeSingle();

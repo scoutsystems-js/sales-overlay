@@ -18,6 +18,7 @@
 
 'use strict';
 
+const { isDisqualified } = require('./dq-exclusion');
 const { clipHref } = require('./clip-link');
 const { realCallsOnly } = require('./real-calls');
 // ⚠ isCredited is IMPORTED, never re-expressed. objection-handled.js exists
@@ -151,7 +152,25 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   // ── 2) outcomes, so a closed call credits its objections ──
   // `analyzed_at` rides along for the cache fingerprint — same select, one more
   // column, no extra query.
-  var done = await inChunks('call_analyses', 'fathom_call_id, outcome, analyzed_at', function (q) { return q.eq('status', 'done'); });
+  var doneAll = await inChunks('call_analyses', 'fathom_call_id, outcome, analyzed_at', function (q) { return q.eq('status', 'done'); });
+
+  /* ⚠⚠ DISQUALIFIED CALLS LEAVE THE OBJECTION RATE HERE, BEFORE THE MOMENTS ARE
+     FETCHED — and the placement is the mechanism, exactly as it is for the
+     fingerprint below. Removing the ids from `callIds` means the moments are
+     never loaded, so a DQ call contributes to neither the handled count nor the
+     total, on the grid AND in the feed, with no second filter to keep in sync.
+     ⚠ Justin's ruling: a disqualified prospect was never closeable, so their
+     objections were never winnable either, and leaving them in the denominator
+     marks a rep down for a call that could not be won.
+     ⚠⚠ AND THE CACHE INVALIDATES FOR FREE. `done` feeds the fingerprint, so
+     marking a call DQ drops it out and the hash changes — the same property the
+     not_a_sales_call note below relies on. A lane computing its own hash would
+     go on serving a paragraph built on a call the manager had just excluded. */
+  var dqIds = {};
+  doneAll.forEach(function (d) { if (isDisqualified(d)) dqIds[d.fathom_call_id] = 1; });
+  var done = doneAll.filter(function (d) { return !dqIds[d.fathom_call_id]; });
+  callIds = callIds.filter(function (id) { return !dqIds[id]; });
+  if (callIds.length === 0) return empty;
   var outcomeByCall = outcomeMap(done);
 
   /* ⚠⚠ THE FINGERPRINT IS COMPUTED HERE, OVER THE ALREADY-FILTERED CALL LIST,

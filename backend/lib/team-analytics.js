@@ -8,6 +8,7 @@ var { resolveDisplayName, disambiguateNames } = require('./display-name');
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 var { fetchProspectCloseRates, closeRate } = require('./prospect-entity');
+var { DQ_OUTCOME } = require('./dq-exclusion');
 var { weakestSection, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
 var { isHandled } = require('./objection-handled');
 // ⚠ ONE definition of "synthetic" — shared with lib/team-synthesis.js (the team
@@ -87,6 +88,10 @@ async function aggregateWindow(admin, repIds, from, to) {
     if (hq.error) throw new Error('call_highlights: ' + hq.error.message);
     (hq.data || []).forEach(function (h) {
       var r = rep[callRep[h.fathom_call_id]]; if (!r) return;
+      /* ⚠ A DQ CALL'S OBJECTIONS DO NOT COUNT. The prospect was never closeable,
+         so leaving them in the denominator marks the rep down for a call that
+         could not be won. ⚠ calls_analyzed above is UNTOUCHED — the work happened. */
+      if (callOutcome[h.fathom_call_id] === DQ_OUTCOME) return;
       // Shared predicate. This same rate is quoted IN PROSE by the WHY sentence
       // and decides which category the rep card names as the rep's weakest, so
       // it must never become a second local definition.

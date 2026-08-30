@@ -38,6 +38,7 @@
  * working as designed, not a gap. Do not invent a parallel vocabulary.
  */
 
+const { DQ_OUTCOME } = require('./dq-exclusion');
 const { bucketStart, bucketRangeLabel } = require('./team-analytics');
 const { prospectOutcome } = require('./prospect-entity');
 const { isHandled } = require('./objection-handled');
@@ -127,6 +128,10 @@ function buildRepSeries(input) {
     // Ruling 2026-08-17: an objection on a CLOSED call is credited whatever its
     // resolution — they side-stepped the barrier and still closed. One shared
     // predicate; see lib/objection-handled.js for why it is not inlined.
+    /* ⚠ DQ CALLS LEAVE BOTH GRAPHS — objection handling % and closing %.
+       Their objections were never winnable, and their prospect was never
+       closeable. The call still counts as analysed elsewhere. */
+    if (outcomeOf[o.fathom_call_id] === DQ_OUTCOME) return;
     if (isHandled(o, outcomeOf[o.fathom_call_id])) cell.handled++;
   });
 
@@ -134,6 +139,10 @@ function buildRepSeries(input) {
   var prospects = {};  // user -> prospect_id -> {firstMs, outcomes:[]}
   calls.forEach(function (c) {
     if (!c || !c.prospect_id || !c.call_date) return;   // no prospect => not a prospect
+    /* ⚠ AND THE SAME EXCLUSION ON THE CLOSING GRAPH. A prospect whose only call
+       is a DQ contributes no calls and leaves both halves by construction —
+       the same property lib/prospect-entity relies on. */
+    if (outcomeOf[c.id] === DQ_OUTCOME) return;
     var byUser = prospects[c.user_id] || (prospects[c.user_id] = {});
     var p = byUser[c.prospect_id] || (byUser[c.prospect_id] = { firstMs: Infinity, outcomes: [] });
     var ms = new Date(c.call_date).getTime();

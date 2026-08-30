@@ -8,6 +8,7 @@
 var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 // Reuse the TEAM view's prior-window machinery for the Avg-score tile trend, so
 // "prior period" means the exact same thing everywhere (no second implementation).
+const { isDisqualified } = require('./dq-exclusion');
 var teamAnalytics = require('./team-analytics');
 const { isCredited } = require('./objection-handled');
 var { fetchProspectCloseRates } = require('./prospect-entity');
@@ -162,9 +163,16 @@ async function computeCallAnalytics(admin, userId, from, to) {
   var latestOneThings = oneThings.slice(0, 5);
 
   // 3) objection highlights — distinct calls + total count.
-  var objRows = await fetchByCallIds('call_highlights', 'fathom_call_id', function(qb) {
+  var objRowsAll = await fetchByCallIds('call_highlights', 'fathom_call_id', function(qb) {
     return qb.eq('type', 'objection');
   });
+  /* ⚠⚠ DISQUALIFIED CALLS LEAVE THE OBJECTION FIGURES AND STAY IN `analyzed`.
+     That split is the whole ruling: the work happened, so the call counts as
+     work; the prospect was never closeable, so their objections do not count
+     against the rep. ⚠ `statusCounts.done` above is deliberately untouched. */
+  var dqSet = {};
+  (analyses || []).forEach(function (a2) { if (isDisqualified(a2)) dqSet[a2.fathom_call_id] = 1; });
+  var objRows = objRowsAll.filter(function (r) { return !dqSet[r.fathom_call_id]; });
   var objCalls = {};
   for (var o = 0; o < objRows.length; o++) { objCalls[objRows[o].fathom_call_id] = true; }
 

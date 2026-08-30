@@ -21,6 +21,7 @@
 // string at UTC midnight (read-route convention); the call_date QUERY WINDOW
 // uses the real ET day bounds in UTC (04:00Z summer / 05:00Z winter).
 
+const { isDisqualified } = require('./dq-exclusion');
 const crypto = require('crypto');
 const { displayNameFromEmail } = require('./display-name');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -198,9 +199,17 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
         : ' | not yet analyzed'));
   });
 
-  var objections = await w.inChunks('call_highlights',
+  var objectionsAll = await w.inChunks('call_highlights',
     'fathom_call_id, timestamp_seconds, speaker, quote, observation, type, objection_category, resolution',
-    function (q) { return q.eq('type', 'objection'); });
+    function (q) { return q.eq('type', 'objection');
+  /* ⚠ A DQ CALL'S OBJECTIONS DO NOT REACH THE DIGEST'S FIGURES. Its prospect was
+     never closeable, so counting them would put a rate in front of a manager
+     that marks a rep down for a call that could not be won. The call itself is
+     still analysed and still appears everywhere a COUNT is shown. */
+  var dqDigest = {};
+  (analyses || []).forEach(function (a2) { if (isDisqualified(a2)) dqDigest[a2.fathom_call_id] = 1; });
+  var objections = objectionsAll.filter(function (r) { return !dqDigest[r.fathom_call_id]; });
+ });
   var objLines = objections.slice(0, 20).map(function (h) {
     return '- [' + h.fathom_call_id + ' @' + h.timestamp_seconds + 's] ' + (h.objection_category || 'uncategorized')
       + ' / ' + (h.resolution || 'unknown') + ': "' + str(h.quote, 150) + '"';

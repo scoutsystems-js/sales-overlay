@@ -7,6 +7,7 @@
 // "Has assigned reps" (not role) is what grants the manager experience, so an
 // owner with reps defaults to their own team.
 
+const { isDisqualified } = require('./../lib/dq-exclusion');
 const express = require('express');
 const { resolveDisplayName, disambiguateNames } = require('../lib/display-name');
 var { withBoardOwner } = require('../lib/team-membership');
@@ -361,6 +362,20 @@ router.get('/averages', teamGate, async function (req, res) {
     // lib/objection-handled.js and the per-call-site guard in
     // test/handled-carrier.test.js. Do not hand-roll the comparison here.
     var outcomeByCall = outcomeMap(analyses);
+
+    /* ⚠⚠ DISQUALIFIED CALLS LEAVE BOTH GAUGES — closing rate AND objection
+       handling. Justin's ruling: a DQ'd prospect was never closeable, so their
+       objections were never winnable either, and leaving them in either
+       denominator marks a rep down for a call that could not be won.
+       ⚠ THE CALL-TIME GAUGE IS DELIBERATELY LEFT ALONE. It is an average
+       DURATION, not a rate with a prospect or objection denominator — the call
+       genuinely happened and genuinely took that long. Excluding it there would
+       be hiding the work, which is the not_a_sales_call behaviour this is not. */
+    var dqGauge = {};
+    analyses.forEach(function (a2) { if (isDisqualified(a2)) dqGauge[a2.fathom_call_id] = 1; });
+    objections = objections.filter(function (o) { return !dqGauge[o.fathom_call_id]; });
+    var ratedCalls = calls.filter(function (c) { return !dqGauge[c.id]; });
+
     var callOwner = {}, callDuration = {};
     calls.forEach(function (c) { callOwner[c.id] = c.user_id; callDuration[c.id] = c.duration_seconds; });
 
@@ -381,7 +396,7 @@ router.get('/averages', teamGate, async function (req, res) {
     // A prospect is counted ONCE for its owner, and closed if ANY of their calls
     // closed — the standing close-rate ruling, not a per-call rate.
     var prospectClosed = {}, prospectOwner = {};
-    calls.forEach(function (c) {
+    ratedCalls.forEach(function (c) {
       var s = slot(c.user_id);
       // ⚠ duration is nullable (1 of 368 real calls). A missing duration is
       // EXCLUDED from the average, never counted as a zero-length call.

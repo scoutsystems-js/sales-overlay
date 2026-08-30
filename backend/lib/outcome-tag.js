@@ -3,6 +3,17 @@
 
 var VALID_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show'];
 
+/* ⚠⚠ TWO LISTS, AND THE GAP BETWEEN THEM IS A SAFETY PROPERTY (2026-08-30).
+   TAGGABLE = what a HUMAN may set. The GRADER has its own list in
+   lib/analysis-worker.js and it is deliberately NOT widened, so the model is
+   STRUCTURALLY INCAPABLE of emitting 'disqualified'.
+   ⚠ WHY THAT MATTERS: a DQ mark removes the call from the close rate and the
+   handle rate. If the model could infer it, a model error would silently let a
+   rep off — or mark them down — with nothing on screen to say so. Whether a
+   prospect was ever winnable turns on things that are not in the transcript.
+   A guard asserts the grader's list still excludes it. */
+var TAGGABLE_OUTCOMES = VALID_OUTCOMES.concat([require('./dq-exclusion').DQ_OUTCOME]);
+
 // The DISPLAYED close score (Thread 2): 100 when the EFFECTIVE outcome is
 // 'closed', else the grader's earned score. `earned` is call_analyses
 // .close_score_earned; fall back to the current close_score for any pre-027 row
@@ -64,6 +75,7 @@ function markRoleFor(actor, ownerProfile) {
 
 module.exports = {
   VALID_OUTCOMES: VALID_OUTCOMES,
+  TAGGABLE_OUTCOMES: TAGGABLE_OUTCOMES,
   effectiveCloseScore: effectiveCloseScore,
   canTagOutcome: canTagOutcome,
   canMarkNotSalesCall: canMarkNotSalesCall,

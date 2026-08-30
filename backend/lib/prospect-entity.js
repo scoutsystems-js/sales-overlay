@@ -26,6 +26,7 @@
 // it `realCallsOnly` would have been an undefined identifier that `node -c`
 // happily accepts and that only throws when the line runs. Exactly the defect
 // that killed add-user.
+const { ratedCallsOnly } = require('./dq-exclusion');
 var { realCallsOnly } = require('./real-calls');
 
 // Normalized grouping key. Two calls resolving to the same key attach to the
@@ -227,7 +228,18 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
       .map(function (c) {
         return { id: c.id, user_id: c.user_id, prospect_id: c.prospect_id, call_date: c.call_date, outcome: outcomeBy[c.id] };
       });
-    return rollupProspects(joined, mergedInto);
+    /* ⚠⚠ DISQUALIFIED CALLS LEAVE THE RATE HERE, AND THE SAME BY-CONSTRUCTION
+       PROPERTY THE TWO NOTES ABOVE RELY ON DOES THE REST. A prospect whose only
+       call is a DQ contributes zero calls and disappears from BOTH numerator and
+       denominator; a prospect with other calls keeps every one of them.
+       ⚠ Justin's ruling: a DQ'd prospect was never closeable, so leaving them in
+       the denominator marks a rep down for a call that could not be won.
+       ⚠⚠ THIS IS THE *RATE*, NOT THE COUNT. The call still counts in calls
+       analyzed, still appears in the library, and still carries its score,
+       coaching and moments — filtering it anywhere else would HIDE it, which is
+       precisely the not_a_sales_call behaviour this deliberately is not. */
+    var rated = ratedCallsOnly(joined);
+    return rollupProspects(rated, mergedInto);
   } catch (err) {
     console.error('[prospect-entity] close-rate fetch failed: ' + ((err && err.message) || 'unknown'));
     return {};

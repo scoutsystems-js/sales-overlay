@@ -17,6 +17,7 @@
 // "insufficient" states are cached too (free repeat loads); only a Claude/DB
 // failure returns available:false and is NOT cached (retries next load).
 
+const { isDisqualified } = require('./dq-exclusion');
 const Anthropic = require('@anthropic-ai/sdk');
 var objectionCats = require('./objection-categories');
 
@@ -450,9 +451,20 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap, na
 
   var analyses = await w.inChunks('call_analyses', ANALYSIS_COLS,
     function (q) { return q.eq('status', 'done'); });
-  var objRows = await w.inChunks('call_highlights',
+  var objRowsAll = await w.inChunks('call_highlights',
     'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
+
+  /* ⚠⚠ DISQUALIFIED CALLS LEAVE THE BUCKETS. This panel's buckets ARE the
+     denominator the coaching handle-rate tile reads (lib/tile-metrics.js
+     REUSES detail.buckets precisely so the tile and this card cannot disagree),
+     so excluding here fixes both with one filter. Justin's ruling: a DQ'd
+     prospect was never closeable, so their objections were never winnable.
+     ⚠ ANALYSES ARE **NOT** FILTERED — `analyzed_calls` is a COUNT and the call
+     still counts as work done. Only the objection rows leave. */
+  var dqCalls = {};
+  analyses.forEach(function (a2) { if (isDisqualified(a2)) dqCalls[a2.fathom_call_id] = 1; });
+  var objRows = objRowsAll.filter(function (r) { return !dqCalls[r.fathom_call_id]; });
 
   // Ruling 2026-08-17: an objection on a CLOSED call counts as handled.
   var outcomeByCall = outcomeMap(analyses);

@@ -14389,7 +14389,12 @@
     if (state.me && (state.me.role === 'manager' || state.me.role === 'owner')) return true;
     return !!(state.me && !state.me.is_managed && isSelf());
   }
-  var OUTCOME_OPTS = [['closed', 'Closed'], ['follow_up', 'Follow up'], ['lost', 'Lost'], ['no_show', 'No show']];
+  /* ⚠ 'Disqualified' is LAST and separated by meaning, not by styling: the first
+     four say how the deal ended, the fifth says it was never a deal. It counts
+     in calls analyzed and is excluded from the closing and objection-handling
+     rates — a DQ'd prospect was never closeable, so leaving them in either
+     denominator marks the rep down for a call that could not be won. */
+  var OUTCOME_OPTS = [['closed', 'Closed'], ['follow_up', 'Follow up'], ['lost', 'Lost'], ['no_show', 'No show'], ['disqualified', 'Disqualified']];
   function outcomeTagHtml(callId, outcome, source, stopProp) {
     var sp = stopProp ? 'event.stopPropagation();' : '';
     if (!canTagOutcomeClient()) {
