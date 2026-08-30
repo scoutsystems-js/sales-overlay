@@ -4043,6 +4043,42 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ⚠⚠⚠ TONE IS A FUNCTION OF THE OBJECTION TYPE — THE SAME THREE STEPS DELIVERED BLUNTLY MAKE FEAR WORSE (Justin, 2026-08-29)
+**The draft coached a prospect who said *"I'm scared, I'm still scared"* with *"If that were handled, is there anything stopping you from moving forward today?"* — Justin: too aggressive, it reads as pushy and as a closer trying too hard.**
+- **⚠⚠ THE PATTERN IS IDENTICAL AND THE WORDS ARE NOT: isolate → overcome → ask for the sale, in every case.** What changes is delivery. **On a LOGISTICAL or money objection the blunt ask is CORRECT and must not be softened** — a real constraint wants a plan, not reassurance. **On FEAR the same sentence is counterproductive.**
+- **THE THREE MOVES FOR FEAR, from Justin's own script:** **(1) NORMALISE THE EMOTION** — *"every single person I've ever enrolled has had some butterflies"*, so the prospect stops feeling like an outlier; **(2) REFRAME THE NERVES AS EVIDENCE THEY CARE**, tied back to the goal they stated earlier in the call; **(3) ASK FOR THE CLOSE AS A TIMING QUESTION** — *"when would you want to get started?"* rather than *"is anything stopping you?"*. **Same ask, no pressure.**
+- **⚠⚠ DO NOT MAKE EVERYTHING GENTLE. A tone rule that flattens every type is the failure mode here** — bluntness is what the voice was chosen for, and softening the logistical coaching would lose it. **Verified by measurement, not by reading: across two fear samples and one logistical, the normalise/timing moves appear on both fear samples and NEITHER appears on the logistical one, which kept the direct question. No bleed in either direction.**
+
+### ⚠⚠⚠ THE PROSPECT'S STATED GOAL IS NOT STORED ANYWHERE — THE REFRAME CANNOT BE FULLY GROUNDED (measured 2026-08-29)
+**Move (2) above ties the reframe to what the prospect said they want. Asked whether that input exists, the answer is no.**
+```
+call_analyses.prospect_context, measured over 1,500 graded calls
+  EMPTY array []                      925  (62%)
+  attributes that exist             1,710
+  attributes that read like a GOAL      9  (1%)
+  what they actually hold: "Registered nurse, 10+ years" · "Based in Arizona"
+                           "Owns property in Kenya" — IDENTITY, never intent
+```
+- **⚠ AND IT WAS EMPTY ON ALL THREE SAMPLE CALLS**, including the fear call the reframe was designed for. **A field that is 100% non-null and 62% empty is not an available input** — the `not null` count is the trap.
+- **THE CONSEQUENCE, STATED RATHER THAN PAPERED OVER: the prompt asks for the reframe WITHOUT the goal clause and explicitly forbids inventing one.** What survives — *"the fact that you're scared tells me this matters to you"* — is true and groundable and **weaker than the version that uses their own words.**
+- **THE FIX IS A NEW GRADER FIELD** (the goal the prospect stated, verbatim, under the same contract `coverage` and `what_mattered` use). **FILED, NOT BUILT.**
+- **⚠ SAME SHAPE AS THE MECHANISM-SENTENCE FINDING, AND THAT IS NOW TWICE:** a coaching move Justin describes from his own practice needs an INPUT Scout does not capture. **When a spec quotes a human expert, check what the move consumes before assuming it can be expressed as wording.**
+
+### ⚠⚠ THE TONE SELECTOR RE-DERIVES THE OBJECTION TYPE RATHER THAN TRUSTING THE STORED ONE — AND THE STORED ONE IS WRONG ON THE MOTIVATING SAMPLE (2026-08-29)
+**Manuel's stored `objection_category` is `fear`, on a moment where the prospect is short roughly $5,800 in CASH.**
+- **⚠⚠ HAD THE TONE RULE KEYED ON THAT FIELD, A MAN WITH A REAL CASH SHORTFALL WOULD HAVE BEEN NORMALISED AND REASSURED** instead of given a financing plan — the exact failure mode the fear rule exists to prevent, in reverse.
+- **It did not, because `objection_category` IS NEVER PASSED to the coaching model.** Its only inputs are outcome, section, timestamp, quote, closer reply, observation and later-context, so it classifies from the words in front of it — and on that moment it said *"That is not an objection — it is a real constraint"* and went direct.
+- **⚠ THIS IS A DELIBERATE ROBUSTNESS PROPERTY, NOT AN OVERSIGHT. Do NOT "improve" it by feeding in `objection_category`** — a stored classification that is wrong on a sample this central would silently select the wrong register.
+
+### ⚠⚠⚠ THE DEFINITION OF DONE ON THE COACHING PROMPT INCLUDES JUSTIN READING REAL OUTPUT — TWICE NOW A SHIPPING DECISION HAS BEEN CORRECTED BY NUANCE NO CHECK COULD CATCH (2026-08-29)
+```
+Scout coached a rep OUT of isolating   "money aside" read as "skipping past the gap"
+the fear tone was too aggressive       a correct question, wrong register for the type
+```
+- **⚠⚠ NEITHER WOULD HAVE FAILED ANY TEST I COULD HAVE WRITTEN.** Both outputs were well-formed, grounded, invention-free and passed every mechanical audit — banned phrases at zero, quotes verbatim, timestamps present. **The defect was that the advice was WRONG, and wrongness of that kind is a domain judgement, not a property of the text.**
+- **THE RULE FOR THIS FEATURE: a passing measurement is a precondition, never the verdict.** Generate real output on real calls, chosen adversarially, and put it in front of the person who sells for a living **before** shipping a version bump.
+- **⚠ IT IS THE SUBJECTIVE-TARGET RULE ARRIVING FROM A NEW DIRECTION.** That one says a likeness cannot be certified by scalars; this says **a JUDGEMENT cannot be either.** In both, every number can be green while the thing is wrong — and the only instrument that resolves it is a human who knows the domain.
+
 ### ⚠⚠⚠ `why_outcome` NAMES THE PROSPECT WITH NO CONTRACT — AND PICKED A NAME FROM THE SIGN-OFF OVER THE ONE ESTABLISHED IN THE INTRO (2026-08-29)
 **On a live call `prospect_name` reads "Jay and Leticia" and `why_outcome` says "Gary" three times, building its whole explanation around him.**
 ```
