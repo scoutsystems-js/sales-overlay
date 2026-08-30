@@ -4094,6 +4094,34 @@ then, 3 MORE runs per arm on that sample:
 - **⚠⚠ IF AN UNSUPERVISED OUTPUT INVENTS, NAMES A PROSPECT, LEAKS INTERNALS OR COACHES A REP OUT OF CORRECT TECHNIQUE, THAT IS A STOP-AND-REPORT, NOT A TUNE.** Each of those is a rule Justin ruled on after reading real output, so a breach means **the rule is not holding in the wild** — a different problem from a rule that needs adjusting, and it must not be quietly softened into one.
 - **THE ASYMMETRY THAT MAKES THIS WORTH A STANDING NOTE: a curated sample and an unattended population are different populations**, and every guarantee established on the first is a hypothesis about the second. **The mechanical guards (no markdown, no placeholder, no gendered pronoun) transfer; the JUDGEMENT ones — right register, right technique, no invention — were only ever verified by a human reading them.**
 
+### ⚠⚠⚠ STANDING RULE — "ALL THINGS IN SALES SHOULD BE LOOKED AT AS FRAMEWORKS, NOT STRICT WORD TRACKS" (Justin, 2026-08-30)
+**He restated principles-not-word-tracks and extended it to EVERYTHING: the starter set, the Knowledge Base, and every future coaching surface.**
+- **⚠⚠ IT APPLIES TO HIS OWN EXAMPLES TOO, AND THAT IS THE PART THAT IS EASY TO MISS.** When he supplies a worked framework — an objection script, a coaching sentence, a discovery sequence — **Scout must extract the SHAPE and let the wording follow the call.** Reproducing his sentence pattern verbatim is the same failure as reproducing his objection scripts verbatim.
+- **THE TEST IS VARIATION ACROSS DIFFERENT INPUTS: if two different calls would produce the same first sentence, it is a formula being filled in rather than a description of what happened.** Identical output across different inputs is the failure signal for any rule meant to be a principle.
+
+### ⚠⚠⚠ A FIX SHIPPED IN THE SAME BLOCK AS THE THING IT BREAKS IS INDISTINGUISHABLE FROM THE ORIGINAL DEFECT RETURNING (2026-08-30)
+**The timestamp went missing from the first real coaching for the THIRD time — and this time WE removed it.** The render-time duplicate-stripper shipped in the SAME block as the assembled opening it strips.
+```
+STORED coaching, first line : "At 00:00:07 the prospect said: …"   PRESENT
+RENDERED on the card         : no timestamp anywhere, no "At "
+```
+- **THE CARD CARRIED NO TIMESTAMP OF ITS OWN, so stripping the "duplicate" deleted the ONLY occurrence on the surface.** Each half was individually correct; the defect existed only in their combination — the composition-test family again.
+- **⚠⚠ THE REPORTING HAZARD IS THE POINT: it presented as "the structural fix did not hold", i.e. a THIRD failure of an old rule, when it was a NEW defect introduced by the fix for a different one.** Two changes in one block make the second one's damage read as the first one's relapse. **When shipping a fix and the thing it modifies together, expect any later report to be attributed to the wrong change.**
+- **⚠⚠ THE DESIGN WAS WRONG, NOT THE IMPLEMENTATION — AND THIS IS THE DURABLE RULE: AN ANCHOR IS DATA ABOUT A MOMENT, SO IT BELONGS TO THE SURFACE RENDERING THAT MOMENT, NOT BAKED INTO PROSE SEVERAL SURFACES WILL CONSUME.** Three attempts tell it: as a PROMPT INSTRUCTION it was dropped twice; as ASSEMBLED PROSE it was removed by a de-duplicator; **rendered from `timestamp_seconds` by the card it depends on no model and no other rule.** Each surface renders its own anchor.
+- **⚠ AND A DETAIL THAT VINDICATES THE MOVE: SCOUT HOLDS TWO TIMESTAMPS FOR THE SAME MOMENT.** A draft wrote `00:47:49` while `timestamp_seconds` is `00:47:47` — not an invention, because the grader's own `objection_notes` says `[00:47:49]`. **Asking a model to state a value that exists twice in its inputs means it may state either.**
+
+### ⚠⚠ PARTNER IS NOT "EVERYTHING ELSE" — TONE-BY-TYPE HAD A GAP (Justin, 2026-08-30)
+**Tone-by-type was built as FEAR gentle, everything else direct. PARTNER fell into "everything else" and got the full blunt register**, producing *"That is not objection handling. It hands control to someone who is not on the call."*
+- **⚠⚠ A PARTNER OBJECTION CONTAINS A REAL RELATIONSHIP AND A REAL PERSON, and coaching that treats consulting a spouse as a failure of nerve reads as telling the closer to steamroll someone's marriage.** Justin's own spouse script is warm — *"I'm married, I get it, we're not here to ruin relationships"*.
+- **THE COACHABLE PART IS WHETHER THE OBJECTION WAS ISOLATED AND A NEXT STEP SECURED — never that the closer respected the relationship.** After the fix the same moment reads *"You asked whether he would be supportive. That was the right first move."*
+- **⚠ LOGISTICAL AND MONEY STAY DIRECT AND WERE VERIFIED UNCHANGED. A tone rule that flattens every type remains the failure mode** — the gentler treatment appears on neither logistical sample.
+
+### ⚠⚠⚠ A COACHING NOTE THAT CANNOT BE READ WITHOUT ALREADY KNOWING THE CALL IS NOT COACHING (Justin, 2026-08-30)
+**His words: *"what did she say? how did the overall objection handling go? did she close? When giving coaching, the context behind what was said is vital."*** **THE CONTEXT IS THE OPENING LINE, NOT AN ADDITION.**
+- **THE SHAPE — a FRAMEWORK, not a sentence to reproduce:** ① the outcome AND ITS CAUSE in one sentence, so the reader knows where they are before any detail · ② when it happened and what the prospect raised · ③ what the closer did · ④ the behaviour to change.
+- **⚠ THE MODEL HAD MORE THAN IT WAS USING, and checking beat assuming: `objection_notes` — the grader's own account of how objection handling went ACROSS the call — existed and was never passed.** Real rather than inferred, so **nothing had to be invented**.
+- **⚠⚠ BUT RICHER CONTEXT CARRIES ITS OWN CONTAMINATION, AND THIS IS THE COST TO STATE WHENEVER A FIELD IS ADDED TO A PROMPT: `objection_notes` is written in the THIRD PERSON with GENDERED PRONOUNS and it NAMES THE CLOSER.** The model duly copied a pronoun — *"you let her off the call"* — breaching a rule that had previously held on a gendered observation. **Every field handed to a model is also a field it can copy the wrong parts of.** Fixed by naming the hazard in the prompt; the closer's name never leaked.
+
 ### ⚠⚠⚠ COACHING IS PRINCIPLES, NOT WORD TRACKS (Justin, 2026-08-29) — THIS SUPERSEDES THE FIVE-MOVE FEAR SHAPE
 **His words: *"Coaching needs to be about principles, not exact word tracks."* Scout was enforcing a PATTERN as a SCRIPT.**
 - **⚠⚠ THE WHOLE REASON IT MATTERS: A REP COACHED TO SAY EXACT WORDS IS A REP READING A TELEPROMPTER, which is the opposite of what this product is for.** A closer who achieves the same thing in different words has done it right and **must never be coached as though they failed.**
