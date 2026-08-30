@@ -68,3 +68,18 @@ test('⚠ the server both SELECTS and EMITS the flag — either alone is the sam
   assert.ok(/not_a_sales_call, exclusion_reason'\)/.test(f), 'selected on the review query');
   assert.ok(/not_a_sales_call: call\.not_a_sales_call === true/.test(f), 'and emitted to the client');
 });
+
+test('⚠⚠ a MARKED call is not clickable from the list — but still renders', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(/isNS \? '' : ' onclick="openCallReview/.test(page),
+    'THE EARLIER RULING IS CLOSED OFF: a marked call had to stay openable so it could be '
+    + 'un-marked. It no longer does — the COUNT THIS CALL button is on the row itself, so '
+    + 'the un-mark is reachable without opening the call.');
+  assert.ok(/is-not-sales not-clickable/.test(page),
+    'and it must stop LOOKING clickable — a row that invites a click and does nothing reads '
+    + 'as broken, which is worse than one that never invited it');
+  assert.ok(/library-card' \+ \(isNS \? ' is-not-sales/.test(page),
+    'the row STILL RENDERS with its badge — excluded must stay visible, only the way in closes');
+});

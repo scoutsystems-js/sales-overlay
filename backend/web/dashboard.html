@@ -1807,6 +1807,10 @@
        doing that work. Strikethrough + dimmed title + the red badge carry it, and
        the first two are exactly what still dims. */
     .library-card.is-not-sales .library-card-main { opacity: 0.55; }
+    /* ⚠ the row must stop LOOKING clickable too — a row that invites a click and
+       does nothing reads as broken, which is worse than one that never invited it. */
+    .library-card.not-clickable { cursor: default; }
+    .library-card.not-clickable:hover { border-color: var(--border); }
     .library-card.is-not-sales .library-card-title { text-decoration: line-through; }
     /* ⚠⚠ RED BADGE = THE STATE. Recoloured 2026-08-20 (Justin), and the FORM
        changed with it: the border is GONE and a red tint fill takes its place,
@@ -9079,14 +9083,35 @@
         + '. A small sample for any one type.';
     },
     even_performance: function (n, c) {
-      /* ⚠ THE CONTRAST CLAUSE IS DROPPED WHEN THE TWO NUMBERS ARE EQUAL — on
-         genuinely level handling they ARE equal after rounding, and "the lowest
-         is X at 30%, against 30% everywhere else" contrasts a number with
-         itself and reads as a mistake. Same rule as the focus panel. */
+      /* ⚠⚠ "LEVEL" IS ONLY A FINDING WHEN THE LEVEL IS ANY GOOD. This state fires
+         when no category is far enough below the others to name — which is ALSO
+         true when a closer is failing EVERY type equally. On the live board three
+         closers handled 0 of 32, 0 of 14 and 0 of 12 and each was told their
+         handling was "running level across types". ⚠ THAT IS A DATA PROBLEM
+         RENDERING AS GOOD NEWS, which is the exact failure the four-state model
+         exists to prevent, and it was reintroduced by the copy rewrite.
+         ⚠ Justin's ruling: EVEN ONE OBJECTION IS DATA. Name the rate. Level at
+         zero is the most actionable fact on the board, not a clean bill. */
       var w = c && c.ranking && c.ranking[0];
-      var lead = n + '’s objection handling is running level across types.';
+      var total = (typeof c.total === 'number') ? c.total : 0;
+      var handled = (typeof c.handled === 'number') ? c.handled : 0;
+      var overall = total > 0 ? Math.round((handled / total) * 100) : null;
+
+      if (total > 0 && handled === 0) {
+        return n + ' did not handle any of the ' + total + ' objections that came up — '
+          + 'not one type, not one moment. That is the place to start.';
+      }
+      if (overall !== null && overall < 25) {
+        return n + ' handled ' + handled + ' of ' + total + ' objections, and it is low across '
+          + 'every type rather than one weak spot'
+          + (w ? ' — the lowest is ' + objTypeLabel(w.category) + ' at ' + w.rate_pct + '%.' : '.');
+      }
+      var lead = n + '’s objection handling is even across types — ' + handled + ' of ' + total + '.';
       if (!w) return lead;
       var low = w.rate_pct, other = w.baseline_pct;
+      /* ⚠ the contrast clause is dropped when the two numbers are equal: on
+         genuinely level handling they ARE equal after rounding, and contrasting
+         a number with itself reads as a mistake. */
       if (typeof other !== 'number' || low === other) {
         return lead + ' Every type is close to ' + low + '%.';
       }
@@ -14482,8 +14507,15 @@
 
     var cardId = escapeHtml(String(c.id || ''));
     var isNS = c.not_a_sales_call === true;
-    return '<div class="library-card' + (isNS ? ' is-not-sales' : '') + '" id="libcard-' + cardId + '"'
-      + ' onclick="openCallReview(\'' + cardId + '\')">'
+    /* ⚠⚠ A MARKED CALL IS NOT CLICKABLE (Justin's ruling 2026-08-30, closing off
+       the earlier one). The previous position was that it must stay openable or
+       it could never be un-marked — THAT NO LONGER HOLDS: the "COUNT THIS CALL"
+       button is on this row, so the un-mark is reachable without opening the
+       call and the data-loss argument is gone.
+       ⚠ The row still RENDERS, with its badge and its un-mark button. Excluded
+       must stay visible; only the way in is closed. */
+    return '<div class="library-card' + (isNS ? ' is-not-sales not-clickable' : '') + '" id="libcard-' + cardId + '"'
+      + (isNS ? '' : ' onclick="openCallReview(\'' + cardId + '\')"') + '>'
       + '<div class="library-card-main">'
         + '<div class="library-card-title' + (c.title ? '' : ' anon') + '">' + title + '</div>'
         + '<div class="library-card-meta">' + meta + '</div>'

@@ -118,7 +118,11 @@ test('⚠⚠ "not enough data" and "nothing stands out" DO NOT RENDER THE SAME',
     top: { category: 'fear', total: 2, handled: 1, rate_pct: 50 } });
   const thin = renderCloser({ name: 'Ben', state: 'thin_types', total: 9,
     top: { category: 'timing', total: 4, handled: 1, rate_pct: 25 } });
-  const even = renderCloser({ name: 'Cara', state: 'even_performance',
+  /* ⚠ REAL COUNTS: even_performance requires volume by definition, so a 0-of-0
+     fixture tests a state that cannot occur. And the wording moved from "running
+     level" to "even across types" when level-at-ZERO stopped being reported as a
+     finding — the SUBJECT of this test (a result, not a shortage) is unchanged. */
+  const even = renderCloser({ name: 'Cara', state: 'even_performance', total: 40, handled: 16,
     ranking: [{ category: 'partner', rate_pct: 30, baseline_pct: 33 }] });
 
   const texts = [noVolume, thin, even].map((h) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim());
@@ -133,9 +137,9 @@ test('⚠⚠ "not enough data" and "nothing stands out" DO NOT RENDER THE SAME',
   // ⚠ A DATA PROBLEM MUST NEVER READ AS GOOD NEWS — the shortage states say so.
   assert.ok(/small|thin/i.test(texts[0]), 'no_volume flags the sample size: ' + texts[0]);
   assert.ok(/small|thin/i.test(texts[1]), 'thin_types flags the sample size: ' + texts[1]);
-  assert.ok(/running level/i.test(texts[2]), 'even_performance states a RESULT: ' + texts[2]);
+  assert.ok(/even across types/i.test(texts[2]), 'even_performance states a RESULT: ' + texts[2]);
   [texts[0], texts[1]].forEach((t) => {
-    assert.ok(!/running level/i.test(t), 'a data shortage must not borrow the good-news wording: ' + t);
+    assert.ok(!/even across types/i.test(t), 'a data shortage must not borrow the good-news wording: ' + t);
   });
 });
 
