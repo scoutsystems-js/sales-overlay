@@ -4436,6 +4436,18 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠ A COLUMN THAT RENDERS A FOREIGN KEY STATES SOMETHING FALSE ABOUT A REAL PERSON (2026-08-30, admin Company column)
+**The admin users table showed `managed_by` in its Company column. Two symptoms, one cause:**
+```
+labels companies by the MANAGER'S EMAIL   nobody outside the build knows which email is which company
+a company HEAD reads "None — single user" a head has no managed_by, because NOBODY MANAGES THE HEAD
+```
+- **⚠⚠ THE GROUPING WAS CORRECT AND THAT WAS ESTABLISHED BEFORE THE LABEL WAS TOUCHED.** `joshua@soberlivingriches.com` has role manager, **8 reps** and `team_name` "Sober Living Riches", and `bucketUsers` places him correctly. **A label fix on a WRONG grouping hides the real defect; a label fix on a correct one is the whole fix.** Those need different work, and the symptom cannot tell you which.
+- **⚠ IT IS A LABEL DEFECT AND IT IS NOT COSMETIC.** The cell asserted that the person who RUNS the company is in no company. **A false statement about a real person on an admin screen is not a styling problem**, even when the data behind it is right.
+- **⚠⚠ THE HEAD GETS A STATIC LABEL RATHER THAN A DROPDOWN, AND THAT IS THE DATA MODEL SPEAKING.** The control writes `managed_by`, and `no_self_manage` forbids `managed_by = self` — **a dropdown there would offer a choice that cannot be made.** When a control cannot express a row's state, the answer is to stop rendering a control for that row.
+- **⚠ THE CREATE-USER MODAL HAD ALREADY BEEN FIXED AND THIS CONTROL HAD NOT** — two things answering one question, one of them updated. **The fixed one is what makes the unfixed one invisible: the feature demonstrably works somewhere.**
+- **⚠ AND MY OWN RECORDED NOTE ABOUT THIS USER WAS STALE IN THE WRONG DIRECTION** — it said he had ZERO reps and was correctly a single user. True when written; he has 8 now. **A note about live data decays exactly like a queue row.**
+
 ### ⚠⚠⚠ A FORWARD-ONLY GATE CANNOT UN-SAY SOMETHING — MARKING IS RETROACTIVE, SO THE RETRACTION MUST BE (2026-08-30)
 **Justin found Discovery coaching on a closer's internal meeting with his own sales manager. The `not_a_sales_call` gate on the KB harvest was CORRECT and PASSED THE FLAG — and 4 harvested moments from 2 marked calls were in the knowledge base anyway.**
 ```

@@ -26,16 +26,34 @@
 
 ## 🎯 CURRENT SESSION
 
-**What is actually being worked, in order. Everything below this section is queue or history.**
+### ✅ COMPLETE as of 2026-08-30 — all five items shipped, deployed and verified
 
-| # | item | state |
+| # | item | shipped |
 |---|---|---|
-| ✅ | **DQ dropdown** | ✅ **SHIPPED 2026-08-30 (`301defc`, migration 056), deployed and verified on the served page.** A fifth manual outcome, `disqualified`. **Counts in calls analyzed; excluded from every rate with a prospect or objection denominator.** ⚠⚠ **NOT the `not_a_sales_call` flag** — that one is filtered in ~25 places and removes a call from EVERYTHING including calls-analyzed, which contradicts the ruling. ⚠ **Manual-only BY CONSTRUCTION:** the grader keeps its own four-value list, so a model error cannot silently let a rep off. ⚠ The call keeps its **score, coaching and moments** |
-| ✅ | **ONE DEFINITION PER METRIC** | ✅ **SHIPPED 2026-08-30 (`b5201ab`, migration 057), two commits, deployed.** **Objection handling %**: the class is now cached ON the moment at analysis time (extractor field, v37 — **no second model call, nothing slower**) and all six surfaces read it. ⚠⚠ **The cheap path was checked first and failed: of 813 moments already typed `objection`, 24% are NOT true objections, and `objection_category` cannot predict it.** **Closing %**: three computations collapsed into `closeRateForCalls`; the graph keeps its bucketing and the gauge its fixed 7-day window — **the window differs, the definition does not**. **No-shows leave the denominator** (calls TAKEN, not booked), by the same predicate as DQ. ⚠ Guard is per call site and fails if a surface forms the ratio itself. ⚠ Crossover: pre-v37 moments count, as ruled |
-| ✅ | **The coaching copy revamp — VOICE C** | ✅ **SHIPPED 2026-08-30 (`ca60a3b`), deployed.** Three beats — what happened (timestamp + their own words) → the principle → what to do next time, drawn from the team's own framework. Second person; the closer's name is the card heading so a manager can forward it unchanged. ⚠⚠ **The load-bearing part was the CACHE KEY: it had no prompt version, so all 20 cached entries would have served the rejected copy while the change looked shipped** (the `NEEDS_WORK_LANE_VERSION` lesson, second instance — now guarded). ⚠ Justin read all three samples before it went. **Two items filed NOT built by ruling:** the stitched-quote write-time check (1 of 5 quotes; two prompt wordings failed identically, so the answer is `quote-locate`-style verification, not more wording) and passing the prospect's name in |
-| ③ | **The six discovery items — ② and ③ remain** | ⚠ **SURFACE ① SHIPPED 2026-08-30 (`0e42c03`), deployed.** The six render **inside the discovery grade card** — not a new panel, because the standing ruling removed three from that page and these ARE the discovery criteria. Covered/not-covered at the **same visual weight** (no red, no crosses), the verbatim line underneath, **PAIN's logical-sale caveat only when uncovered**, an **unverified quote withheld**, nothing at all on a pre-v33 call, and the count on the collapsed header so it is not unreachable. ⚠⚠ **Only 2 calls carry the six today** — v33 shipped 2026-08-30 and nothing re-analyses — **so the trust check becomes possible as calls arrive, not immediately.** **NEXT: ② the coaching. ③ is the same feature as "what is true for the whole team" — cross-reference, do not duplicate** |
-| ④ | **The admin company dropdown** | ⚠⚠ **ONE ROW, NOT TWO — Justin has confirmed it is the same item as "assign by company name, not manager email."** Two symptoms: assignment and the dropdown both key on the **manager's email** rather than the company, **AND the dropdown lists `joshua@soberlivingriches.com` as a SINGLE USER when he is a manager inside Sober Living Riches.** ⚠ **DIAGNOSE THE GROUPING BEFORE TOUCHING THE LABEL** — a label fix on a wrong grouping hides the real defect |
-| — | ~~The "Why" panel on per-closer objection handling~~ | ✅ **DONE 2026-08-30 (`7f8dd47`) — comes off the list.** The quiet states now name the type and the rate instead of describing our comparison bar |
+| ✅ | **DQ dropdown** | `301defc` + migration 056 — a fifth manual outcome. Counts in calls analyzed, out of every rate with a prospect or objection denominator. **Manual-only by construction** |
+| ✅ | **One definition per metric** | `b5201ab` + migration 057 — objection class cached on the moment (**the cheap path was checked and failed: 24% of moments already typed `objection` are not true objections**); closing % collapsed from three computations into one; **no-shows leave the denominator** |
+| ✅ | **The coaching copy revamp — VOICE C** | `ca60a3b` — three beats, second person, drawn from the team's own framework. ⚠⚠ **The load-bearing part was the CACHE KEY**: it carried no prompt version, so all 20 entries would have served the rejected copy while the change looked shipped |
+| ✅ | **The six discovery items — SURFACE ① (call review)** | `0e42c03` — inside the discovery grade card, not a new panel. **"Not covered" carried by the DESIGN, not the wording.** ⚠ Only new calls carry the six; nothing re-analyses |
+| ✅ | **The admin company dropdown** | `6a318c7` — ⚠ **the GROUPING was correct and was established BEFORE the label was touched.** The column rendered `managed_by`, a foreign key, so it labelled companies by manager email and printed **"None — single user" for the person who RUNS the company** |
+
+**Plus, mid-session and unplanned:** `aa63add` — **not-a-sales-call data was reaching coaching** (Justin saw it live). Three defects; the silent one was **4 harvested KB moments from 2 marked calls**, because a forward-only gate cannot un-say something.
+
+---
+
+### ⚠ WHAT IS ACTUALLY NEXT — read from this file, not from memory
+
+**Justin chooses. These are the facts:**
+
+| candidate | why it is a candidate |
+|---|---|
+| **The six discovery items ② and ③** | ① is shipped and ② was always the next step: **the six are the upstream causes of the five objection types.** ③ is the same feature as *"what is true for the whole team"* — cross-reference, do not duplicate |
+| 🔴 **Objection handling % — which definition is THE definition?** | **The only open question blocked on him.** Strict is already the standard by his 2026-08-22 ruling, but strict costs a model call the three fast surfaces do not make. **Either they get it, or they say plainly that they count every moment** |
+| 🐛 **A call that cannot be graded looks identical to one merely waiting** | filed 2026-08-29, not built |
+| 🐛 **Blank graphs — the silence is fixed, the cause is not** | still open |
+| 🐛 **The two "What Needs Work" surfaces hold different proof standards** | found while fixing the other one |
+| ▪ **Admin view rebuild part 2, first-time password page, Zoom's ordered fix list** | the named MINOR keeps, unbuilt and unblocked |
+
+⚠ **Three BUGS rows are environmental or deliberate and are NOT candidates:** the date-picker focus trap (held on purpose), bare-domain HTTPS (needs a Cloudflare migration) and the DMG notarization gap.
 
 ---
 
