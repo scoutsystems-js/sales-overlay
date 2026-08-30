@@ -4436,6 +4436,38 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠⚠ STANDING RULE — A METRIC HAS ONE DEFINITION AND ONE COMPUTATION, AND EVERY SURFACE READS THE SAME ONE (Justin's ruling, 2026-08-30)
+**His words: *"if a closer has 3 different closing % on 3 different pages we look like amateurs. If something is true on 1 page shouldn't it be true on all?"***
+- **⚠⚠ WHERE A SURFACE LEGITIMATELY DIFFERS, THE DIFFERENCE IS THE WINDOW, NEVER THE DEFINITION** — a fixed 7-day gauge against a picker-driven graph is fine, **and the surface must say which window it is showing.**
+- **⚠⚠ THIS IS THE MOST-REPEATED DEFECT ON THIS PROJECT, IN A NEW FORM.** The manager counted on two team surfaces and not six · the objection graph fetching the viewer's team · the "why" copy fixed in one of two copies · eighteen stale panels · cash read from two columns · two `rankSections` meaning opposite directions. **Every one was two things answering one question and disagreeing.**
+- **THE FIX IS ALWAYS THE SAME SHAPE AND IT IS NOT A SWEEP: ONE COMPUTATION, CALLED BY ALL OF THEM, PLUS A GUARD THAT FAILS IF A SURFACE COMPUTES THE RATE ITSELF.** Making five surfaces agree today does not stop the sixth disagreeing tomorrow.
+
+### ⚠⚠⚠ SHARING THE PREDICATE IS NOT SHARING THE METRIC — THE NUMERATOR WAS CENTRALISED AND THE DENOMINATOR NEVER WAS (measured 2026-08-30)
+**`lib/objection-handled.js` did exactly what it was written to do — "one definition, ten callers" — and objection handling % still means TWO different things on six surfaces.**
+```
+LOOSE  (every objection moment)      team gauge · rep cards · manager graph
+STRICT (true objections only)        per-closer grid+feed · focus panel + coaching tile
+measured on one rep: 20% (35/177) loose   vs   17% (26/155) strict
+```
+- **⚠⚠ THE SHARED MODULE ANSWERS *"IS THIS ONE HANDLED?"* AND NEVER *"DOES THIS ONE COUNT?"*** The split lives in the question nobody centralised. **When auditing a rate for one definition, check the NUMERATOR PREDICATE AND THE DENOMINATOR SEPARATELY — a shared predicate reads as a shared metric and is not one.**
+- **⚠⚠ AND THE DIVERGENCE HERE IS AN UNSTATED TRADE, NOT A COPY-PASTE, WHICH CHANGES WHO DECIDES IT.** Strict requires classifying the distinct objection phrases with an LLM (cold ~20s, non-deterministic across cold runs), and the three loose surfaces are the ones that must render fast. **A divergence with a cost behind it is a product ruling; a divergence with nothing behind it is a bug. Establish which before proposing a fix.**
+
+### ⚠⚠ A MODULE'S OWN COMMENT CLAIMED IT WAS THE SINGLE CHOKEPOINT. IT IS ONE OF THREE (2026-08-30)
+**`lib/prospect-entity.js` says *"THE shared computation — every surface that shows a close rate routes through this"*. Two more compute it independently:** `lib/rep-series.js` (the manager graph, which borrows `prospectOutcome` and then accumulates its own way) and `routes/team.js` (the gauge, hand-rolled end to end).
+- **THE DEFINITIONS AGREE AND THE IMPLEMENTATIONS DO NOT** — so the numbers match by luck. The one live difference is **merge remapping, applied in one of the three**.
+- **⚠ QUOTE THE MEASURED MAGNITUDE: 4 merged prospects exist platform-wide out of 1,375**, so the three numbers are within a rounding error TODAY. **Structurally real, currently small, and growing** — 355 merge proposals are outstanding on one account and each missed merge is worth ~0.9 points. **Reporting it as a live three-way split would have been false.**
+- **⚠⚠ THE TRANSFERABLE PART IS THAT THE COMMENT IS THE TRAP.** A file asserting it is the only implementation is exactly what stops the next person grepping for the others — the stale-load-bearing-comment failure, applied to an architectural claim rather than to a behaviour.
+
+### ⚠⚠ CLOSING % IS ON CALLS TAKEN, NOT CALLS BOOKED (Justin's ruling 2026-08-30) — AND IT IS NOT IMPLEMENTED
+**A no-show, a reschedule, or a prospect who never turned up must not count against a closing rate: there was no conversation to close.**
+```
+DQ           leaves the denominator      shipped 2026-08-30
+no_show      leaves it NOWHERE           verified by search across all three computations
+reschedule   NOT MODELLED AT ALL         no outcome, no flag, no field
+```
+- **⚠ ALL THREE LEAVE FOR THE SAME REASON — there was no closeable conversation — SO THEY WANT ONE MECHANISM, NOT THREE.** But they cannot get one until the three closing computations are collapsed into one; today it is one line in `prospect-entity` plus two more places.
+- **⚠ AND `no_show` IS ALREADY AN OUTCOME, WHICH MAKES IT LOOK DONE.** It is not — the value exists and nothing excludes it. **Verified rather than assumed; a row stale in the wrong direction has cost a block twice this week.**
+
 ### ⚠⚠⚠ THE MANUAL `disqualified` OUTCOME — COUNTED AS WORK, OUT OF EVERY RATE (shipped 2026-08-30, `301defc`, migration 056)
 **Justin: *"when a call is marked as DQ it should count in calls analyzed but not obj handling % or closing %."*** It stops asking Scout to INFER a judgement a human can STATE — whether a prospect was ever winnable turns on things that are not in the transcript.
 - **⚠⚠ IT IS NOT `not_a_sales_call`, AND THE INSTRUCTION TO REUSE THAT MECHANISM COULD NOT BE FOLLOWED LITERALLY.** That flag is filtered in ~25 places and removes a call from **EVERYTHING, calls-analyzed included** — so setting it contradicts the ruling's first clause. **What was reused is the SHAPE** (one shared predicate, visible, flagged, reversible, guarded) rather than the flag. **Reporting the conflict beat silently picking one half of the instruction.**
