@@ -4094,6 +4094,29 @@ then, 3 MORE runs per arm on that sample:
 - **⚠⚠ IF AN UNSUPERVISED OUTPUT INVENTS, NAMES A PROSPECT, LEAKS INTERNALS OR COACHES A REP OUT OF CORRECT TECHNIQUE, THAT IS A STOP-AND-REPORT, NOT A TUNE.** Each of those is a rule Justin ruled on after reading real output, so a breach means **the rule is not holding in the wild** — a different problem from a rule that needs adjusting, and it must not be quietly softened into one.
 - **THE ASYMMETRY THAT MAKES THIS WORTH A STANDING NOTE: a curated sample and an unattended population are different populations**, and every guarantee established on the first is a hypothesis about the second. **The mechanical guards (no markdown, no placeholder, no gendered pronoun) transfer; the JUDGEMENT ones — right register, right technique, no invention — were only ever verified by a human reading them.**
 
+### ⚠⚠⚠ COACHING MUST BE STRATEGIC, NOT SCRIPTED — AND THE REASON IS TRUST, NOT STYLE (Justin, 2026-08-30)
+**His words: *"If it doesn't line up with something that closer would say, they're going to start trusting it less and less."*** ⚠⚠ **A REP READING ADVICE THAT DOES NOT SOUND LIKE THEM STOPS BELIEVING THE PRODUCT. That is a churn mechanism, not a style preference** — which is why this outranks how polished the sentence is.
+- **⚠⚠ THE TEST, AND IT IS MECHANICAL: STRIP THE QUOTED LINE OUT. If the advice still stands, it was DIRECTIONAL. If nothing is left, it was a SCRIPT.**
+```
+✗ "At that moment, pause and ask: 'What specifically needs to get resolved…'"
+    strip the quote -> "pause and ask" -> NOTHING SURVIVES. A script.
+✓ "…ask what specifically they want to sit with. That one question tells you whether it is a
+   real concern you can address now or a timing preference, and it lets you book a specific
+   call instead of leaving follow-up to an assistant with no date."
+    strip the quote -> the whole second half SURVIVES.
+```
+- **THE RULE THAT CAUSED IT WAS "GIVE THE ACTUAL WORDS TO SAY", and it is removed.** A quoted line is **permitted as an ILLUSTRATION of a move already named; it may NEVER be the advice itself.**
+- **⚠⚠ THE PROPERTY THAT MAKES COACHING TRANSFERABLE: NAME WHAT THE ANSWER TELLS THEM — BOTH POSSIBLE REPLIES AND WHAT EACH ONE OPENS.** *"If they name it, you know whether it is something you can address. If they cannot name it, that tells you something too."* **That is the routing insight from the isolation work surfacing inside the coaching, and it is what lets a rep handle the NEXT one alone** rather than repeating a line.
+- **⚠ AND GUARD THE OPPOSITE FAILURE: DIRECTIONAL CAN DECAY INTO VAGUE, AND "dig deeper, isolate the objection" WITH NO SUBSTANCE IS WORSE THAN A SCRIPT.** The target is not vagueness, it is **SPECIFIC ABOUT THE MOVE** — name the exact information to get.
+- **VERIFIED across three samples: 0 word tracks, advice survives the strip in all three, all three name both answers, no shared opening stem, 0 gendered pronouns.**
+- **⚠ OBSERVED AND REPORTED RATHER THAN TUNED: the richest form has DISAPPEARED.** Justin rated three shapes — scripted (bad), directional-with-no-quote (his preference), and **directional-plus-an-illustrative-quote (also good, and arguably the best because it gives both the words and the reasoning)**. The model now produces only the middle one. **The anti-script language appears to have over-corrected**, and that is a ruling for him rather than something to tune at n=3.
+
+### ⚠⚠ MY OWN STRIP TEST TREATED APOSTROPHES AS QUOTES AND REPORTED A FALSE FAILURE (2026-08-30)
+**The checker matched `['"][^'"]{12,}['"]`, so `didn't … what's` read as a quoted span. It shredded the advice sentences and declared a perfectly good sample "COLLAPSED — a script".**
+- **⚠⚠ I NEARLY FILED A DEFECT THAT DID NOT EXIST**, and the tell was that the verdict contradicted the visible text: the sample plainly contained no quoted line at all.
+- **AN APOSTROPHE IS NOT A QUOTE DELIMITER IN ENGLISH PROSE.** Match only `"` and curly quotes, or a single-quoted span that **starts with a capital** — a spoken line looks different from a contraction.
+- **Same family as every other scope-vs-claim entry**, and the third time a checker of mine has been wider than its claim. **The habit that catches it stays the same: when a check reports a problem, confirm the CHECK is sound before acting on what it says — and the cheapest confirmation is whether its verdict contradicts something already visible.**
+
 ### ⚠⚠⚠ STANDING RULE — "ALL THINGS IN SALES SHOULD BE LOOKED AT AS FRAMEWORKS, NOT STRICT WORD TRACKS" (Justin, 2026-08-30)
 **He restated principles-not-word-tracks and extended it to EVERYTHING: the starter set, the Knowledge Base, and every future coaching surface.**
 - **⚠⚠ IT APPLIES TO HIS OWN EXAMPLES TOO, AND THAT IS THE PART THAT IS EASY TO MISS.** When he supplies a worked framework — an objection script, a coaching sentence, a discovery sequence — **Scout must extract the SHAPE and let the wording follow the call.** Reproducing his sentence pattern verbatim is the same failure as reproducing his objection scripts verbatim.
