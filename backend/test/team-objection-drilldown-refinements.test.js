@@ -342,21 +342,24 @@ test('⚠⚠ #team-needs-work CANNOT REACH THE ARCHIVED PAGE — from ANY entry 
   assert.ok(/'team-objections':\s*'team-objections'/.test(teamHash), 'the drilldown still routes normally');
 });
 
-test('⚠⚠ IT WAS ONLY SAFE TO ARCHIVE BECAUSE THE DRILLDOWN GAINED THE LAST MISSING PIECE', () => {
-  /* Rates per SALES-LANGUAGE bucket — "Spouse / partner approval", "Needs time
-     / think it over" — were the one thing the old panel had and this one did
-     not. Archiving before adding them would have lost them. */
+test('⚠⚠ THE ARCHIVE JUSTIFICATION EXPIRED — the bucket list stopped being extra information', () => {
+  /* ⚠ CONVERTED 2026-08-30, NOT DELETED. This recorded WHY the old Objection
+     Handling Focus panel was safe to archive: the drilldown had gained "rates per
+     SALES-LANGUAGE bucket", the one thing the old panel had and this one did not.
+
+     ⚠⚠ THAT PREMISE EXPIRED. The canonical-names ruling (2026-08-26) coerced the
+     model-invented labels into the SAME closed five the grid's columns use —
+     bucketTotals is seeded from CANONICAL_CATEGORIES and any LLM label is
+     coerced. So the list and the grid showed the same five categories, which is
+     what Justin saw. ⚠ THE RULING DID NOT BECOME WRONG, ITS PREMISE DID — the
+     same shape as the marked-call ruling that expired when a COUNT THIS CALL
+     button appeared on the row. */
   const grid = slice('function teamObjGridHtml', '\n  }');
-  assert.ok(grid.indexOf('Handle rate by objection type') !== -1, 'the bucket list must render');
-  assert.ok(grid.indexOf('d.bucket_rates') !== -1, 'from the server, not tallied from the capped feed');
-
-  /* ⚠ AND POOLED OVER THE VISIBLE CLOSERS — the server sends per-closer counts
-     precisely so the rep filter reaches this list too, rather than it quietly
-     describing people who are filtered out. */
-  assert.ok(/b\.by_closer/.test(grid), 'pooled per visible closer');
-
-  // weakest first on the EXACT ratio — rounding first makes a stable wrong winner
-  assert.ok(/ea === eb \?/.test(grid), 'sorted on the exact ratio, not the rounded rate');
+  assert.ok(grid.indexOf('Handle rate by objection type') === -1,
+    'the duplicated bucket list must be gone from this card');
+  assert.ok(/OBJ_DRILL_ORDER/.test(grid),
+    'and the categories must still reach the manager as the grid\'s own columns — '
+    + 'removing a duplicate must not remove the information');
 });
 
 test('⚠ the PERSONAL needs-work view is untouched — it shares the detail renderer', () => {

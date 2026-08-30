@@ -412,6 +412,30 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
   var classified = (data.grid || []).map(function (row) {
     return Object.assign({ user_id: row.user_id, name: row.name }, classifyCloser(row));
   });
+  /* ⚠⚠ EVERY CLOSER ON THE BOARD APPEARS (Justin's ruling 2026-08-30). `data.grid`
+     only carries closers who HAVE objection data, so a rep with none in range was
+     absent from the panel entirely — two of nine on the live board. A manager
+     reading a list of seven on a team of nine cannot tell whether the other two
+     are fine, missing, or not on the team.
+     ⚠ `no_data` is its own state, not `no_volume`: "no objections came up" and
+     "too few to say anything" are different facts, and this project has paid
+     twice for collapsing two meanings into one sentence. */
+  var present = {};
+  classified.forEach(function (c) { present[c.user_id] = 1; });
+  /* ⚠⚠ ONLY CLOSERS WHO TOOK A REAL CALL. Adding every memberId put a DEMO
+     account on the board — caught by the guard that exists for exactly that.
+     `real_call_owners` is derived from the already-filtered call list, so the
+     synthetic exclusion is inherited rather than re-implemented here. */
+  var tookCalls = {};
+  (data.real_call_owners || []).forEach(function (id) { tookCalls[id] = 1; });
+  (memberIds || []).forEach(function (id) {
+    if (present[id]) return;
+    if (!tookCalls[id]) return;
+    var nm = (opts.nameMap && opts.nameMap[id]) || (opts.emailMap && opts.emailMap[id]) || null;
+    if (!nm) return;                       // ⚠ never render an unnamed row — a uuid is not a person
+    classified.push({ user_id: id, name: nm, state: 'no_data', total: 0, handled: 0, ranking: [] });
+  });
+
   var speakable = classified.filter(function (c) { return c.state === 'rate_gap'; });
 
   if (classified.length === 0) {

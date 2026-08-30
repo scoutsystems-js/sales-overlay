@@ -54,3 +54,28 @@ test('⚠ the contrast clause is dropped when the two numbers are equal', () => 
   assert.ok(/Every type is close to 40%/.test(out),
     'contrasting a number with itself reads as a mistake: ' + out);
 });
+
+test('⚠⚠ EVERY closer on the board appears, including one with no objections', () => {
+  const t = render();
+  const out = t({ name: 'Daniel Lizarazo', state: 'no_data', total: 0, handled: 0, ranking: [] });
+  assert.ok(/had no objections come up in this range/.test(out),
+    'two of nine on the live board were absent entirely. A manager reading a list of seven '
+    + 'on a team of nine cannot tell whether the other two are fine, missing, or not on the '
+    + 'team: ' + out);
+  assert.ok(!/level|even across|small sample/i.test(out),
+    'no_data must not borrow another state\'s wording — "no objections came up" and "too few '
+    + 'to say anything" are different facts');
+});
+
+test('⚠ the panel is handed the MEMBER list, not only those with data', () => {
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'lib', 'team-objection-summary.js'), 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(/\(memberIds \|\| \[\]\)\.forEach/.test(src),
+    'data.grid only carries closers WITH objection data — the member list is what makes '
+    + '"every closer appears" possible at all');
+  assert.ok(/state: 'no_data'/.test(src), 'and they get their own state');
+  assert.ok(/if \(!nm\) return;/.test(src),
+    'never render an unnamed row — a uuid is not a person');
+});

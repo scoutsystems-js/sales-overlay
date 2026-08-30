@@ -232,18 +232,13 @@ test('the client does NOT filter empty buckets out again', () => {
     'the drop-empty filter is back — the list will disagree with the grid above it');
 });
 
-test('an empty category sorts LAST and cannot produce NaN', () => {
-  // n/0 is NaN, and NaN comparisons make a sort silently incoherent — so the
-  // empty rows are separated out rather than ranked against measured ones.
-  const src = slice(HTML, 'var brs = (d.bucket_rates', 'bucketRows = ', 400);
-  const sortFn = new Function('return ' + src.slice(src.indexOf('function (a, b) {'), src.indexOf('});', src.indexOf('function (a, b) {')) + 1))();
-  const measured = { total: 10, handled: 2, credited: 0 };
-  const better = { total: 10, handled: 8, credited: 0 };
-  const empty = { total: 0, handled: 0, credited: 0 };
-  assert.ok(sortFn(measured, better) < 0, 'weakest must sort first');
-  assert.ok(sortFn(empty, measured) > 0, 'an empty category must sort after a measured one');
-  assert.ok(sortFn(measured, empty) < 0, 'and symmetrically');
-  assert.strictEqual(sortFn(empty, empty), 0, 'two empties are equal, not NaN');
-  [sortFn(measured, better), sortFn(empty, measured), sortFn(measured, empty)]
-    .forEach(v => assert.ok(!Number.isNaN(v), 'sort produced NaN'));
-});
+/* ⚠ ARCHIVED 2026-08-30 — this tested the bucket list's OWN sort, and both the
+   list and its sort are gone with it. Its subject did NOT outlive its vehicle:
+   the grid's columns render in a fixed canonical order and are never
+   ratio-sorted, so there is no NaN hazard left to guard.
+   Kept as the record of why the sort existed rather than converted into an
+   assertion about code that no longer runs: it sorted weakest-first on the EXACT
+   ratio, because rounding first collapses distinct rates into ties and the
+   tie-break then picks a stable wrong winner — and an empty category has no rate
+   at all, so n/0 is NaN and makes a sort silently incoherent. */
+

@@ -95,6 +95,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     totals: emptyCounts(), instance_count: 0, truncated: false,
     strict: true, strict_reason: null, excluded: { disqualifications: 0, logistical: 0 },
     bucket_rates: [],
+    real_call_owners: [],
     board_size: boardSize, analysis_fingerprint: EMPTY_FINGERPRINT,
     category_totals: (function () {
       var out = {}; ALL_CATEGORIES.forEach(function (c) { out[c] = Object.assign(emptyCounts(), { rate: null }); }); return out;
@@ -457,6 +458,18 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     })(),
     board_size: boardSize,
     closers: grid.map(function (g) { return { user_id: g.user_id, name: g.name }; }),
+    /* ⚠⚠ WHO TOOK A REAL CALL IN THE WINDOW — not who has an objection. The Why
+       panel needs this to show EVERY closer on the board (Justin, 2026-08-30): a
+       rep with calls but no objections must still appear, and `grid` cannot say
+       so because it only carries closers WITH objections.
+       ⚠ It is derived from `calls`, which has ALREADY had the synthetic and
+       not_a_sales_call filters applied — so a demo account has no real calls and
+       is excluded BY CONSTRUCTION rather than by a second rule that could drift. */
+    real_call_owners: (function () {
+      var seen = {}, out = [];
+      calls.forEach(function (c) { if (c && c.user_id && !seen[c.user_id]) { seen[c.user_id] = 1; out.push(c.user_id); } });
+      return out;
+    })(),
     totals: Object.assign({}, totals, { rate: rateOf(totals) }),
   };
 }
