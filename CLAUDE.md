@@ -4043,6 +4043,29 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ⚠⚠⚠ NEVER INVENT THE PROSPECT (Justin, 2026-08-29) — AND TIGHTENING AGAINST INVENTION CAUSED A LITERAL MISREADING
+**His words: *"Scout can NEVER EVER EVER EVER EVER make up things a prospect said. That absolutely KILLS our credibility and reputation and will turn every client away."* Absolute, and it covers PARAPHRASE, not just quotation** — *"She said yes with her silence"* is not a quote and is exactly the thing banned.
+- **⚠⚠ THE REP'S OWN SIDE IS UNAFFECTED, AND THE ASYMMETRY IS THE RULE:** judging what the CLOSER should have done is judgement about our own person and is the job. **The ban is on asserting anything about the PROSPECT that is not in the given lines.**
+- **⚠⚠ THREE DEFECTS, THREE DIFFERENT MECHANISMS — AND ONLY ONE IS FABRICATION.** Audited against the real transcripts:
+```
+A "she said yes with her silence"   CONTRADICTED  she answered aloud, at length, twice
+A "a buried partner objection"      INVENTED      a husband IS in that call, raised openly
+                                                  at 00:07:44 and in NONE of the inputs
+B "it didn't land"                  HARDENED      Scout's own why_outcome said "only
+                                                  PARTIALLY resolved"; the transcript shows
+                                                  the prospect conceding, then arguing our
+                                                  side back to us 40 minutes later
+C "under pressure"                  INVENTED      but the SPLIT PAYMENT was real
+```
+- **⚠⚠ THE INVENTED PARTNER OBJECTION IS THE MOST DANGEROUS OF THE FOUR BECAUSE IT WAS ROUGHLY TRUE.** The model had no source for it and guessed something the call happens to contain — **so it reads as insight rather than as an error**, and nobody checks a claim that sounds right.
+- **⚠ AND A HARDENED CLAIM NEEDS A DIFFERENT FIX FROM A FABRICATED ONE.** B's came from real stored data made stronger in the retelling; no ban on invention touches it. **Classify which mechanism you are looking at before writing the rule.**
+- **⚠⚠⚠ THE REGRESSION THE RULE ITSELF CAUSED, AND IT IS THE MOST TRANSFERABLE PART: "IF A LINE IS NOT ABOVE, IT DOES NOT EXIST" MADE THE RAW QUOTE OUTRANK THE OBSERVATION.** On a real call the ASR quote reads *"I would say we have $9,800 on me at the moment"* while the observation says the prospect does **not** have it. The model asserted he had the money and contradicted itself one clause later — **and the PREVIOUS draft, with no rule at all, read it correctly.**
+  - **⚠⚠ TIGHTENING AGAINST INVENTION PRODUCED A FALSE STATEMENT ABOUT A PROSPECT — the exact failure the rule exists to prevent, arriving by the opposite route.** A constraint that says *trust only what you were given* is silent about **which given thing wins when two of them disagree**, and raw speech-to-text read literally can say the opposite of what was meant.
+  - **THE FIX IS A PRECEDENCE, NOT A LOOSENING: the observation is Scout's verified reading and OUTRANKS the quote.**
+  - **THE GENERAL FORM: whenever you narrow a model to a fixed set of inputs, rank them.** An unranked set makes the most literal input the most authoritative, and the most literal input is usually the least processed one.
+- **⚠ MEASURED: REMOVING THE INVENTIONS DID NOT THIN THE OUTPUT.** 621 → 596 words across six samples (−4%); the two that lost inventions shrank by roughly the length of the invented sentences and the rest were unchanged. **"It will read thin" is the argument for softening this later, and it is not supported.**
+- **⚠ THE AUDIT CAUGHT ME MAKING THE SAME CLASS OF ERROR: I SEARCHED FOR THE WORD, NOT THE THING.** I grepped C's transcript for *"split"*, found nothing, and reported that no split payment existed. It did — *"we can try with that $7,500, and then the rest, we can take care of it after 60 days"*. **A claim about what a transcript does not contain has to be built from the CAPABILITY, not from the phrasing you expect.**
+
 ### ⚠⚠⚠ A MODEL CAN CLASSIFY FROM THE TRANSCRIPT AND CANNOT EXPLAIN *WHY* — THE EXTRACTOR HAS NO DOMAIN SOURCE AT ALL (measured 2026-08-29)
 **Justin's own coaching of a moment ends with a mechanism — *"when prospects don't understand what they are getting it creates confusion and skepticism"* — and he named that as THE PART THAT TRANSFERS TO THE NEXT CALL. Asked whether Scout can produce it, the answer is no, and it is measured rather than argued:**
 ```
