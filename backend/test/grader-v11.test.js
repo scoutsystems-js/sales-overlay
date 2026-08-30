@@ -34,7 +34,10 @@ test('ANALYSIS_PROMPT_VERSION is the current shipped version (v29)', () => {
   //       closer side and a synthesis claiming something about the CLOSER could
   //       only quote the PROSPECT. Grading-time change, so already-graded calls
   //       keep one-sided moments; a re-grade is the only route and Justin rules.
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v29-2026-08-28'/);
+  // v30 = PER-MOMENT COACHING — a third model call writes call_highlights.coaching.
+  //       ONE call per CALL covering all its moments, never one per moment.
+  //       Additive: no existing prompt touched, no score moves, so no delta gate.
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v30-2026-08-29'/);
 });
 
 /* ⚠⚠ v25's three fixes, asserted on the BUILT PROMPT STRING rather than on the

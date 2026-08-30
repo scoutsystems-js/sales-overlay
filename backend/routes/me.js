@@ -1157,7 +1157,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
   if (an.error) throw new Error('call_analyses: ' + an.error.message);
 
   var hl = await admin.from('call_highlights')
-    .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified')
+    .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified, coaching')
     .in('fathom_call_id', callIds).eq('section', section);
   if (hl.error) throw new Error('call_highlights: ' + hl.error.message);
 
@@ -1334,7 +1334,7 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
     if (an.error) throw new Error('call_analyses: ' + an.error.message);
     analyses = analyses.concat(an.data || []);
     var hl = await admin.from('call_highlights')
-      .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified')
+      .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified, coaching')
       .in('fathom_call_id', slice).not('section', 'is', null);
     if (hl.error) throw new Error('call_highlights: ' + hl.error.message);
     highlights = highlights.concat(hl.data || []);
@@ -1372,6 +1372,11 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
              orphan prospect quote. Only when PROVEN — see the render. */
           closer_response: m.closer_response || null,
           closer_response_verified: m.closer_response_verified === true,
+          /* ⚠ v30 per-moment coaching. NULL is meaningful — never coached.
+             Selected by the query, copied by the shaper, mapped here and
+             rendered below: a field dropped at ANY of those four hops is
+             invisible at both ends. */
+          coaching: m.coaching || null,
           // ⚠ The LABEL depends on the provider, not just on having a link.
           source: (meta[m.fathom_call_id] || {}).source || null };
       });

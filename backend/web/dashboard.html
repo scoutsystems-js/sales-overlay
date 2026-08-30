@@ -910,6 +910,7 @@
     .srk-reply { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin: 6px 0; }
     .srk-reply-label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 2px; }
     .srk-obs { font-size: 12.5px; color: var(--text); opacity: 0.85; margin-top: 4px; }
+    .srk-coach { margin-top:10px; padding:10px 12px; border-left:2px solid var(--accent); background:rgba(var(--accent-rgb),0.06); border-radius:0 6px 6px 0; line-height:1.55; }
     .sec-note { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin-bottom: 7px; }
     .acct-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
     .members-price { width: 92px; padding: 5px 7px; font-size: 13px; background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; }
@@ -6861,12 +6862,34 @@
        row and already rendered nowhere. */
     var obs = m.observation
       ? '<div class="srk-obs">' + escapeHtml(m.observation) + '</div>' : '';
+    /* ⚠ v30 coaching, rendered as its own block beneath the exchange. Absent
+       rather than hedged when NULL — a moment that was never coached shows the
+       exchange exactly as before, with no empty state and no placeholder. The
+       text already carries its own opening line (assembled server-side), so
+       nothing here re-states the timestamp. */
+    /* ⚠ THE OPENING IS STRIPPED ON THIS SURFACE, and only here. The coaching
+       text carries its own "At HH:MM:SS the prospect said: ..." line so it is
+       self-contained wherever it appears — a digest, an email, a feed. On THIS
+       card the exchange is already rendered directly above it, so the line is
+       a duplicate of the quote the reader just read. Stripped at RENDER, never
+       at write: the stored text stays whole for every other consumer. */
+    var coachText = m.coaching || '';
+    if (coachText && m.quote) {
+      var firstBreak = coachText.indexOf('\n');
+      var firstLine = (firstBreak === -1) ? coachText : coachText.slice(0, firstBreak);
+      if (firstLine.indexOf('At ') === 0 && firstLine.indexOf(m.quote) !== -1) {
+        coachText = (firstBreak === -1) ? '' : coachText.slice(firstBreak).replace(/^\s+/, '');
+      }
+    }
+    var coach = coachText
+      ? '<div class="srk-coach">' + escapeHtml(coachText).replace(/\n/g, '<br>') + '</div>' : '';
 
     return '<div class="srk-moment">'
       + '<div class="srk-quote"><span class="srk-speaker">' + speakerLabel + '</span>“'
         + escapeHtml(m.quote) + '”</div>'
       + reply
       + obs
+      + coach
       + '<div class="srk-who">' + (who ? escapeHtml(who) : '') + clipLinkHtml(m) + '</div>'
       + '</div>';
   }

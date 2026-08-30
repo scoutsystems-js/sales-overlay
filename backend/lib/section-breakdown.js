@@ -182,6 +182,11 @@ function buildSectionBreakdown(section, input) {
       closer_response: displayCloserResponse(h.closer_response) || null,
       closer_response_verified: (typeof h.closer_response_verified === 'boolean')
         ? h.closer_response_verified : null,
+      /* ⚠⚠ v30 coaching. This is the hop where `closer_response` was lost —
+         every query SELECTED it and the shaper did not copy it onto the moment,
+         so both ends looked correct and the panel rendered orphan quotes for
+         weeks. Copied here deliberately. NULL = never coached. */
+      coaching: h.coaching || null,
     };
     callsWithMoments[h.fathom_call_id] = true;
     if (highlightGroup(h) === 'good') good.push(moment); else bad.push(moment);
