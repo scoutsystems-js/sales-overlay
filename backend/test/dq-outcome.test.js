@@ -33,9 +33,15 @@ test('⚠⚠ a DQ prospect leaves BOTH halves of the close rate', () => {
     { id: '2', user_id: 'u', prospect_id: 'pB', call_date: '2026-08-01', outcome: 'lost' },
     { id: '3', user_id: 'u', prospect_id: 'pC', call_date: '2026-08-01', outcome: 'disqualified' },
   ];
-  const before = prospect.rollupProspects(calls, {}).u;
-  assert.deepStrictEqual({ c: before.closed, t: before.total }, { c: 1, t: 3 },
-    'baseline: without the filter the DQ prospect is in the denominator');
+  /* ⚠ UPDATED 2026-08-30: DQ now leaves the denominator at TWO levels, and they
+     agree. `ratedCallsOnly` drops the CALLS before rollup (used where a call list
+     is filtered); `hadAConversation` inside closeRate drops a prospect whose every
+     call was a no-show or a DQ (used by the graph and gauge, which do not filter
+     the call list). Both are the same ruling — calls TAKEN, not booked — so the
+     old "baseline includes it" assertion is no longer true, by design. */
+  const shared = prospect.closeRateForCalls(calls, {});
+  assert.deepStrictEqual({ c: shared.closed, t: shared.total }, { c: 1, t: 2 },
+    'the SHARED computation drops the DQ prospect on its own');
 
   const after = prospect.rollupProspects(dq.ratedCallsOnly(calls), {}).u;
   assert.deepStrictEqual({ c: after.closed, t: after.total }, { c: 1, t: 2 },

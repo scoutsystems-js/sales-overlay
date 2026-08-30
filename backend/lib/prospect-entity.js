@@ -54,6 +54,25 @@ function nameKey(v) {
 
 // Outcomes for ONE prospect, oldest → newest, → that prospect's state.
 var DECIDED = { closed: 1, lost: 1 };
+
+/* ⚠⚠ CLOSING % IS ON CALLS TAKEN, NOT CALLS BOOKED (Justin's ruling 2026-08-30).
+   A prospect who never turned up had NO CONVERSATION TO CLOSE, so counting them
+   against a rep is marking them down for something that never happened.
+   ⚠ `no_show` and `disqualified` leave the denominator FOR THE SAME REASON —
+   there was no closeable conversation — which is why one predicate covers both
+   rather than two rules that can drift apart.
+   ⚠ AND IT IS ALL-OR-NOTHING PER PROSPECT: a prospect is dropped only when EVERY
+   one of their calls is a no-show or a DQ. Someone who no-showed once and then
+   turned up is a real prospect with a real conversation. */
+var NOT_A_CONVERSATION = { no_show: 1, disqualified: 1 };
+function hadAConversation(outcomes) {
+  var arr = Array.isArray(outcomes) ? outcomes : [];
+  for (var i = 0; i < arr.length; i++) {
+    if (!NOT_A_CONVERSATION[arr[i]]) return true;   // null/open counts — a call happened
+  }
+  return arr.length === 0;                          // no outcomes at all → keep (unknown, not absent)
+}
+
 function prospectOutcome(outcomes) {
   var arr = Array.isArray(outcomes) ? outcomes : [];
   for (var i = 0; i < arr.length; i++) {
@@ -72,7 +91,9 @@ function prospectOutcome(outcomes) {
 // pct is null (not 0) when there are no prospects: "no prospects yet" is not a
 // 0% close rate, and rendering 0% would be a lie about performance.
 function closeRate(prospects) {
-  var arr = Array.isArray(prospects) ? prospects : [];
+  var all = Array.isArray(prospects) ? prospects : [];
+  // ⚠ CALLS TAKEN, NOT BOOKED — see NOT_A_CONVERSATION above.
+  var arr = all.filter(function (p) { return hadAConversation((p || {}).outcomes); });
   var closed = 0;
   for (var i = 0; i < arr.length; i++) {
     var p = arr[i] || {};
@@ -87,7 +108,11 @@ function closeRate(prospects) {
 }
 
 // Roll a flat list of calls up into per-user prospect close rates.
-// THE shared computation — every surface that shows a close rate routes through
+// ⚠ CORRECTED 2026-08-30: this comment used to claim every close-rate surface
+// routed through here. It did not — the manager graph (lib/rep-series.js) and the
+// team gauge (routes/team.js) each computed their own, and the three agreed by
+// luck rather than by construction. They now call closeRateForCalls below.
+// The shared computation — every surface that shows a close rate routes through
 // this, so the coaching tile, the team glance box and the team score list can
 // never drift into three different definitions (which is what "closed/(closed+
 // lost) — decided calls only" was, in three places, before 3d-3).
@@ -246,7 +271,31 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
   }
 }
 
+/**
+ * ⚠⚠ THE ONE COMPUTATION. Give it calls, get the rate — this is what the tile,
+ * the rep cards, the score list, the manager graph AND the team gauge all call,
+ * so "closing %" cannot mean three things on three pages.
+ *
+ * calls: [{ id, user_id, prospect_id, outcome }]  → { closed, total, pct }
+ * ⚠ THE WINDOW IS THE CALLER'S CONCERN AND THE DEFINITION IS NOT. The gauge is a
+ * fixed 7 days and the graph follows the picker — that difference is legitimate
+ * and each surface says which window it shows. What must never differ is THIS.
+ */
+function closeRateForCalls(calls, mergedInto) {
+  var rolled = rollupProspects(Array.isArray(calls) ? calls : [], mergedInto || {});
+  var all = [];
+  Object.keys(rolled).forEach(function (uid) {
+    var r = rolled[uid];
+    all.push({ closed: r.closed, total: r.total });
+  });
+  var closed = 0, total = 0;
+  all.forEach(function (r) { closed += r.closed; total += r.total; });
+  return { closed: closed, total: total, pct: total > 0 ? Math.round((100 * closed) / total) : null };
+}
+
 module.exports = {
+  closeRateForCalls: closeRateForCalls,
+  hadAConversation: hadAConversation,
   nameKey: nameKey,
   prospectOutcome: prospectOutcome,
   closeRate: closeRate,
