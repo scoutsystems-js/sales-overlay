@@ -907,6 +907,7 @@
        the approved exception (it is a depth cue, not unreadable body text), so
        the label recedes without becoming grey. */
     .srk-speaker { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); opacity: 0.7; margin-bottom: 2px; }
+    .srk-at { margin-left:8px; opacity:0.55; font-variant-numeric:tabular-nums; letter-spacing:0; text-transform:none; }
     .srk-reply { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin: 6px 0; }
     .srk-reply-label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 2px; }
     .srk-obs { font-size: 12.5px; color: var(--text); opacity: 0.85; margin-top: 4px; }
@@ -6854,6 +6855,15 @@
        defect that had to be repaired in the KB once already. Absent rather than
        hedged — a caveat inside a two-line row reads as noise. */
     var speakerLabel = (m.speaker === 'CLOSER') ? 'You said' : 'They said';
+    /* ⚠ STRUCTURAL, and this is the third attempt at it. As a prompt instruction
+       it was dropped twice; assembled into the coaching prose it was then removed
+       by the duplicate-stripper. Rendered from timestamp_seconds it depends on no
+       model and no other rule. */
+    var ts = m.timestamp_seconds;
+    var stamp = (typeof ts === 'number' && ts >= 0)
+      ? [Math.floor(ts / 3600), Math.floor((ts % 3600) / 60), ts % 60]
+          .map(function (v) { return String(v).padStart(2, '0'); }).join(':')
+      : null;
     var reply = (m.closer_response && m.closer_response_verified)
       ? '<div class="srk-reply"><span class="srk-reply-label">You said</span>'
         + escapeHtml(m.closer_response) + '</div>'
@@ -6867,25 +6877,12 @@
        exchange exactly as before, with no empty state and no placeholder. The
        text already carries its own opening line (assembled server-side), so
        nothing here re-states the timestamp. */
-    /* ⚠ THE OPENING IS STRIPPED ON THIS SURFACE, and only here. The coaching
-       text carries its own "At HH:MM:SS the prospect said: ..." line so it is
-       self-contained wherever it appears — a digest, an email, a feed. On THIS
-       card the exchange is already rendered directly above it, so the line is
-       a duplicate of the quote the reader just read. Stripped at RENDER, never
-       at write: the stored text stays whole for every other consumer. */
-    var coachText = m.coaching || '';
-    if (coachText && m.quote) {
-      var firstBreak = coachText.indexOf('\n');
-      var firstLine = (firstBreak === -1) ? coachText : coachText.slice(0, firstBreak);
-      if (firstLine.indexOf('At ') === 0 && firstLine.indexOf(m.quote) !== -1) {
-        coachText = (firstBreak === -1) ? '' : coachText.slice(firstBreak).replace(/^\s+/, '');
-      }
-    }
-    var coach = coachText
-      ? '<div class="srk-coach">' + escapeHtml(coachText).replace(/\n/g, '<br>') + '</div>' : '';
+    /* The coaching no longer carries its own opening — see the route map. */
+    var coach = m.coaching
+      ? '<div class="srk-coach">' + escapeHtml(m.coaching).replace(/\n/g, '<br>') + '</div>' : '';
 
     return '<div class="srk-moment">'
-      + '<div class="srk-quote"><span class="srk-speaker">' + speakerLabel + '</span>“'
+      + '<div class="srk-quote"><span class="srk-speaker">' + speakerLabel + (stamp ? '<span class="srk-at">' + stamp + '</span>' : '') + '</span>“'
         + escapeHtml(m.quote) + '”</div>'
       + reply
       + obs

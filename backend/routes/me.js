@@ -1377,6 +1377,13 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
              rendered below: a field dropped at ANY of those four hops is
              invisible at both ends. */
           coaching: m.coaching || null,
+          /* ⚠⚠ THE ANCHOR BELONGS TO THE CARD, NOT TO THE PROSE. The coaching
+             text used to carry an assembled "At HH:MM:SS the prospect said …"
+             opening; the panel stripped it as a duplicate of the quote shown
+             above, and because the card had no timestamp of its own that strip
+             deleted the ONLY occurrence on the surface. Rendered from data here
+             it cannot be dropped by a model or removed by a de-duplicator. */
+          timestamp_seconds: (typeof m.timestamp_seconds === 'number') ? m.timestamp_seconds : null,
           // ⚠ The LABEL depends on the provider, not just on having a link.
           source: (meta[m.fathom_call_id] || {}).source || null };
       });

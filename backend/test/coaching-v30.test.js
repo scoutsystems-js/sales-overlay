@@ -28,14 +28,31 @@ function code(s) {
           .replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
-test('the opening is ASSEMBLED from fields, never asked for', () => {
-  assert.strictEqual(
-    C.coachingOpening({ time: '00:12:34', quote: 'I need to think about it.' }),
-    'At 00:12:34 the prospect said: "I need to think about it."');
-  // missing either field yields null rather than a malformed line
-  assert.strictEqual(C.coachingOpening({ time: '00:01:00' }), null);
-  assert.strictEqual(C.coachingOpening({ quote: 'x' }), null);
-  assert.strictEqual(C.coachingOpening(null), null);
+test('⚠ THE ANCHOR IS RENDERED BY THE CARD, NOT CARRIED IN THE PROSE', () => {
+  /* Third attempt at this. As a PROMPT INSTRUCTION it was dropped twice. Assembled
+     into the coaching prose it was then removed by the duplicate-stripper — and
+     because the card had no timestamp of its own, that strip deleted the ONLY
+     timestamp on the surface. It now comes from timestamp_seconds at render, where
+     no model and no de-duplicator can reach it. */
+  assert.strictEqual(typeof C.coachingOpening, 'undefined',
+    'the prose opening must not come back — the card owns the anchor');
+  const lib = fs.readFileSync(path.join(__dirname, '..', 'lib', 'coaching.js'), 'utf8');
+  assert.ok(!/function coachingOpening/.test(lib), 'the builder must be gone, not merely unexported');
+
+  const page = code(read('web/dashboard.html'));
+  assert.ok(/var ts = m\.timestamp_seconds/.test(page), 'the card must read the timestamp');
+  assert.ok(/srk-at/.test(page), 'and render it beside the speaker label');
+  const me = code(read('routes/me.js'));
+  assert.ok(/timestamp_seconds: \(typeof m\.timestamp_seconds === 'number'\)/.test(me),
+    'the route must carry timestamp_seconds to the card');
+});
+
+test('⚠ the render-time stripper is GONE — it is what removed the timestamp', () => {
+  const page = code(read('web/dashboard.html'));
+  assert.ok(!/var coachText/.test(page), 'the duplicate-stripper must not survive');
+  const w = code(read('lib/analysis-worker.js'));
+  assert.ok(!/opening \+ '\\n\\n'/.test(w), 'the write path must not prepend an opening');
+  assert.ok(/coaching: entry\.coaching\.trim\(\)/.test(w), 'it stores the model text as written');
 });
 
 test('only coachable moments are selected — and a HANDLED objection is not one', () => {
@@ -92,7 +109,7 @@ test('⚠ THE PIPELINE ACTUALLY CALLS IT — a function nothing invokes is the r
   const w = code(read('lib/analysis-worker.js'));
   assert.ok(/coachingLib = require\('\.\/coaching'\)/.test(w), 'the module must be imported');
   // called from inside analyzeCall, with in-scope identifiers
-  const call = w.match(/coachCallMoments\(admin, fathomCallId, effectiveOutcome, whyReason\)/);
+  const call = w.match(/coachCallMoments\(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection\.notes\)/);
   assert.ok(call, 'the call site must pass the pipeline arguments');
   // it must run AFTER persistHighlights — it needs the row ids the insert created
   assert.ok(w.indexOf('persistHighlights(admin, fathomCallId') < w.indexOf('coachCallMoments(admin'),
@@ -133,20 +150,6 @@ test('hop 2 in ACTION — the shaper really carries it onto the moment', () => {
   const m = (bd.bad || [])[0];
   assert.ok(m, 'the moment must reach the bad group');
   assert.ok(/coach text/.test(m.coaching), 'the shaper must copy coaching onto the moment');
-});
-
-test('the duplicate opening is stripped AT RENDER only, never at write', () => {
-  const page = read('web/dashboard.html');
-  const at = page.indexOf('var coachText = m.coaching');
-  assert.ok(at !== -1, 'the render-side strip must exist');
-  const slice = page.slice(at, at + 700);
-  assert.ok(slice.length > 300, 'slice must cover the strip: ' + slice.length);
-  assert.ok(/firstLine\.indexOf\('At '\) === 0/.test(slice), 'it keys on the assembled opening');
-  assert.ok(/indexOf\(m\.quote\) !== -1/.test(slice), 'and on the quote already shown above');
-  // the WRITE path must keep the opening whole for every other consumer
-  const w = code(read('lib/analysis-worker.js'));
-  assert.ok(/opening \+ '\\n\\n' \+ entry\.coaching\.trim\(\)/.test(w),
-    'the stored text must keep its opening');
 });
 
 test('the version bump landed and marks the coaching release', () => {

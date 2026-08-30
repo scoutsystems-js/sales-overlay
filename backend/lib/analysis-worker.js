@@ -2096,7 +2096,7 @@ async function analyzeCall(fathomCallId, userId) {
     //
     // ⚠ It runs AFTER persistHighlights because it needs the real row ids the
     // insert created — the rows are re-read rather than inferred.
-    coachCallMoments(admin, fathomCallId, effectiveOutcome, whyReason)
+    coachCallMoments(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection.notes)
       .then(function (r) {
         console.log('[coaching] call=%s moments=%d written=%d%s',
           fathomCallId, r.selected, r.written, r.skipped ? ' skipped=' + r.skipped : '');
@@ -2221,7 +2221,7 @@ async function analyzeCall(fathomCallId, userId) {
  * Generate coaching for every coachable moment on a call, in ONE model call.
  * Returns a summary; never throws — the caller treats failure as "no coaching".
  */
-async function coachCallMoments(admin, fathomCallId, outcome, later) {
+async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNotes) {
   var res = await admin.from('call_highlights')
     .select('id, type, resolution, section, timestamp_seconds, quote, observation, closer_response, closer_response_verified')
     .eq('fathom_call_id', fathomCallId);
@@ -2231,7 +2231,8 @@ async function coachCallMoments(admin, fathomCallId, outcome, later) {
   if (!coachable.length) return { selected: 0, written: 0, skipped: 'no_coachable_moments' };
 
   var moments = coachable.map(coachingLib.toMoment);
-  var prompt = coachingLib.buildCoachingPrompt(moments, { outcome: outcome, later: later });
+  var prompt = coachingLib.buildCoachingPrompt(moments, { outcome: outcome, later: later,
+    objectionNotes: objectionNotes || null });
 
   var reply = await getAnthropic().messages.create({
     model: coachingLib.CLAUDE_COACHING_MODEL,
@@ -2251,11 +2252,13 @@ async function coachCallMoments(admin, fathomCallId, outcome, later) {
       ? entry.moment - 1 : k;
     var m = moments[idx];
     if (!m) continue;
-    var opening = coachingLib.coachingOpening(m);
-    if (!opening) continue;
-    // ⚠ THE OPENING IS PREPENDED HERE, never asked for — see lib/coaching.js.
-    var full = opening + '\n\n' + entry.coaching.trim();
-    var up = await admin.from('call_highlights').update({ coaching: full }).eq('id', m.id);
+    /* ⚠⚠ THE ASSEMBLED OPENING IS GONE, and removing it FIXES a regression it
+       caused. Prepending "At HH:MM:SS the prospect said …" made the card show the
+       quote twice, so the panel stripped that line — and because the card carried no
+       timestamp of its own, the strip deleted the ONLY timestamp on the surface. The
+       anchor now belongs to the CARD, rendered from timestamp_seconds, where neither
+       a model nor a de-duplicator can remove it. */
+    var up = await admin.from('call_highlights').update({ coaching: entry.coaching.trim() }).eq('id', m.id);
     if (!up.error) written++;
   }
   return { selected: moments.length, written: written, skipped: null };

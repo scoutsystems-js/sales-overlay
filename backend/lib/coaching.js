@@ -25,18 +25,11 @@ var COACHING_MAX_TOKENS   = 2000;
    Coaching moments nobody renders is spend with no consumer. */
 var COACHABLE_TYPES = ['objection', 'risk_signal', 'barrier', 'missed_opportunity', 'disqualify_signal'];
 
-/**
- * ⚠⚠ THE OPENING IS ASSEMBLED FROM FIELDS, NOT ASKED FOR.
- * "Lead with the timestamp and their actual words" was an INSTRUCTION twice, and
- * both times it was dropped once other instructions competed for attention. It
- * is pure field assembly — there is nothing for a model to decide — so it is
- * built here and prepended to whatever the model returns. An instruction that
- * can be dropped under pressure is not holding; this one cannot be dropped.
- */
-function coachingOpening(m) {
-  if (!m || !m.time || !m.quote) return null;
-  return 'At ' + m.time + ' the prospect said: "' + m.quote + '"';
-}
+/* ⚠ `coachingOpening` REMOVED 2026-08-30. It assembled "At HH:MM:SS the prospect
+   said …" and prepended it, which made the card show the quote twice; the panel
+   then stripped that line and, because the card had no timestamp of its own, the
+   strip deleted the ONLY timestamp on the surface. THE ANCHOR BELONGS TO THE CARD,
+   rendered from timestamp_seconds — do not reintroduce it into the prose. */
 
 function hms(x) {
   var n = Math.floor(Number(x) || 0);
@@ -65,9 +58,6 @@ function momentBlock(m, i) {
       ? 'The closer replied: "' + m.closerResponse + '"'
       : 'The closer did not reply to this.'),
     'What was observed: ' + (m.observation || '(nothing recorded)'),
-    '⚠ The opening line for this moment is already written and will be placed above',
-    'your text: ' + coachingOpening(m),
-    'Do NOT repeat it, do not restate the timestamp, and do not re-quote that line.',
   ].join('\n');
 }
 
@@ -86,6 +76,10 @@ function buildCoachingPrompt(moments, opts) {
     '',
     'Call outcome: ' + outcome + '.',
     (o.later ? 'What happened on the call overall: ' + o.later : ''),
+    /* ⚠ How objection handling went ACROSS the call — Justin: "the context behind
+       what was said is vital". It is the grader's own objection_notes, so it is
+       real rather than inferred; absent when the grader wrote none. */
+    (o.objectionNotes ? 'How objection handling went across the whole call: ' + o.objectionNotes : ''),
     '',
     'There are ' + moments.length + ' moments below. Coach each one separately.',
     '',
@@ -113,10 +107,12 @@ function buildCoachingPrompt(moments, opts) {
     '- Saying the closer\'s reply "did not land" or "was not enough" unless a line above',
     '  SHOWS the prospect repeating or escalating the concern. You do not know how they',
     '  took it.',
-    '⚠ You do not know the prospect\'s gender. Say "they", never "he" or "she".',
+    '⚠⚠ You do not know the prospect\'s gender. Say "they", never "he" or "she" —',
+    '  AND THE CONTEXT ABOVE MAY USE "he" OR "she" FOR THEM. It is written about the\n      call, not to the closer. Do not copy its pronouns, and do not copy any name it\n      uses for the closer: you are writing TO the closer, so say "you".',
     '⚠⚠ NEVER NAME THE PROSPECT. Write "they" or "the prospect" — never a first name,',
     '  even if a name appears in the context above. A name in that context is not',
     '  guaranteed to be this prospect, and the card already shows who the call was with.',
+    '⚠ AND DO NOT NAME THE CLOSER EITHER. You are writing TO them — say "you". A name\n      may appear in the context above; it is not for the coaching.',
     '⚠ NEVER write a placeholder. No $X, no <name>. If you were not given a number,',
     '  describe it in words or leave it out.',
     '',
@@ -174,10 +170,41 @@ function buildCoachingPrompt(moments, opts) {
     'phrasing, has done it right. Never coach someone as though they failed because they',
     'used different words from your example.',
     '',
-    'LOGISTICAL, MONEY, BARRIER, TIMING, PARTNER. Stay direct. "If we could handle that,',
-    'is there anything else stopping you from moving forward today?" is the RIGHT question',
-    'here and must not be softened. Do not apply the fear treatment to these — a real',
-    'constraint wants a plan, not reassurance.',
+    'PARTNER — a spouse, a business partner, anyone they must consult. ⚠ THIS IS NOT',
+    '"everything else" AND IT MUST NOT GET THE BLUNT REGISTER. There is a real person',
+    'and a real relationship in it, and coaching that treats consulting a spouse as a',
+    'failure of nerve reads as telling the closer to steamroll someone\'s marriage.',
+    'Acknowledge the relationship as legitimate — a closer who says in effect "I am',
+    'married too, I get it, we are not here to cause problems at home" has done the',
+    'right thing. The coachable part is whether the objection was ISOLATED and whether',
+    'a next step was secured, NOT that they respected the relationship.',
+    '',
+    'LOGISTICAL, MONEY, BARRIER, TIMING. Stay direct. "If we could handle that, is',
+    'there anything else stopping you from moving forward today?" is the RIGHT question',
+    'here and must not be softened. Do not apply the gentler treatment to these — a',
+    'real constraint wants a plan, not reassurance.',
+    '',
+    '⚠⚠ START WITH THE CONTEXT. A coaching note that cannot be read without already',
+    'knowing the call is not coaching. Before any detail, the reader must know WHERE',
+    'THEY ARE: how the call ended and what drove it. Then the moment.',
+    '',
+    'THE SHAPE — and it is a FRAMEWORK, not a sentence to reproduce:',
+    '  1. the outcome AND its cause, in one sentence',
+    '  2. when it happened and what the prospect raised',
+    '  3. what the closer did, plainly',
+    '  4. the specific behaviour to change',
+    '⚠ An example of that shape, NOT a template to copy: "This call didn\'t close',
+    'because of a spousal objection. At 00:47 she brings it up and you never attempt',
+    'to handle it — you asked if he would be supportive and let her off the hook."',
+    '⚠⚠ DO NOT REPRODUCE THAT WORDING. Write the opening the CALL needs. If two',
+    'different calls would produce the same first sentence from you, you are filling',
+    'in a formula rather than describing what happened.',
+    '⚠ AND DO NOT OPEN EVERY NOTE THE SAME WAY. "The call ended…" is one way in, not',
+    '  THE way in. Lead with whatever actually explains THIS call — the outcome, the',
+    '  moment, what the closer did, or what it cost. Vary it because the calls vary.',
+    '⚠ Use the call outcome and the overall context you were given. If you were not',
+    'told how something went, DO NOT INVENT IT — say less. The rule against inventing',
+    'the prospect outranks every instruction here.',
     '',
     'HOW TO WRITE EACH ONE',
     '1. SEPARATE THE OBJECTION INTO ITS PARTS if the words above show two different things.',
@@ -239,7 +266,6 @@ module.exports = {
   CLAUDE_COACHING_MODEL: CLAUDE_COACHING_MODEL,
   COACHING_MAX_TOKENS:   COACHING_MAX_TOKENS,
   COACHABLE_TYPES:       COACHABLE_TYPES,
-  coachingOpening:       coachingOpening,
   selectCoachableMoments: selectCoachableMoments,
   buildCoachingPrompt:   buildCoachingPrompt,
   toMoment:              toMoment,
