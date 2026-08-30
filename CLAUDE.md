@@ -4436,6 +4436,37 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠⚠ THE MANUAL `disqualified` OUTCOME — COUNTED AS WORK, OUT OF EVERY RATE (shipped 2026-08-30, `301defc`, migration 056)
+**Justin: *"when a call is marked as DQ it should count in calls analyzed but not obj handling % or closing %."*** It stops asking Scout to INFER a judgement a human can STATE — whether a prospect was ever winnable turns on things that are not in the transcript.
+- **⚠⚠ IT IS NOT `not_a_sales_call`, AND THE INSTRUCTION TO REUSE THAT MECHANISM COULD NOT BE FOLLOWED LITERALLY.** That flag is filtered in ~25 places and removes a call from **EVERYTHING, calls-analyzed included** — so setting it contradicts the ruling's first clause. **What was reused is the SHAPE** (one shared predicate, visible, flagged, reversible, guarded) rather than the flag. **Reporting the conflict beat silently picking one half of the instruction.**
+- **THE OUTCOME COLUMN WAS THE CHEAP DOOR: it already exists, already renders in the dropdown the ruling names, and already carries the `outcome_source='manual'` freeze.** A second boolean would have been the second exclusion path the ruling forbids.
+- **⚠⚠ MANUAL-ONLY BY CONSTRUCTION, AND THAT IS A SAFETY PROPERTY RATHER THAN A POLICY: the grader keeps its OWN four-value `VALID_OUTCOMES`, deliberately not widened.** A DQ removes the call from two rates, so an inferred one would **silently let a rep off — or mark them down — with nothing on screen to say so.** A guard pins the gap between the two lists.
+- **THE FREEZE WAS CONFIRMED, NOT ASSUMED: `manualLocked` keys on the SOURCE, not the value**, so it is value-agnostic and covers a new outcome for free. **Guarded, because if it ever enumerated outcomes a new value would silently stop being frozen.**
+- **⚠ WHAT A DQ CALL KEEPS IS A DECISION, STATED RATHER THAN LEFT TO FALL OUT: its score (kept as EARNED — not forced to 100 like a close, not zeroed), its coaching, its moments, its review page, and its place in calls-analyzed and the backlog.** Hiding any of that is the behaviour this deliberately is not.
+- **⚠ AND THE CALL-TIME GAUGE KEEPS DQ CALLS — it is an average DURATION, not a rate with a prospect or objection denominator.** My first edit filtered it by accident **while the comment I had just written claimed it did not** — a stale load-bearing comment created in the same commit. Caught by re-reading the edit against its own prose.
+
+### ⚠⚠ ENUMERATE THE DENOMINATORS BY CAPABILITY, NOT BY THE ONES THE USER CAN SEE (2026-08-30)
+**Justin named two rates. There were EIGHT.**
+```
+close rate            lib/prospect-entity.js    THE single chokepoint — every close-rate surface routes here
+per-closer grid+feed  lib/team-objections.js    ids dropped BEFORE the moments are fetched
+focus panel + tile    lib/team-needs-work.js    the tile REUSES these buckets, so one filter fixes both
+personal analytics    lib/session-analytics.js
+rep cards             lib/team-analytics.js
+BOTH manager graphs   lib/rep-series.js
+daily digest          lib/team-digest.js
+BOTH team gauges      routes/team.js            its own fetch, not shared
+```
+- **⚠ THE TWO NAMED RATES WERE PRODUCED BY EIGHT DIFFERENT MODULES**, several with their own fetches, so "fix the closing rate" is not one edit. **The capability question — *what has a prospect or objection denominator?* — is what finds them; the surface names do not.**
+- **⚠⚠ AND THE PLACEMENT MATTERS AS MUCH AS THE FILTER: dropping the ids BEFORE the moments are fetched makes the cache invalidate for free**, because the fingerprint is computed over the filtered call list. A filter applied after the fetch would look identical and would go on serving a cached paragraph built on a call the manager had just excluded.
+- **⚠ SAY WHAT YOU DID NOT TOUCH, AND WHY.** Three synthesis lanes fetch moments for EVIDENCE rather than for a rate; they were **flagged, not silently extended to**. An unexplained omission and an oversight are indistinguishable.
+
+### ⚠⚠ I TRUSTED A SUPERSEDED NOTE OVER THE SOURCE — INSIDE A GUARD I WAS WRITING (2026-08-30)
+**A test asserted `shouldHarvest('disqualified') === false`, citing the recorded ruling that the KB harvest gate is `outcome === 'closed'` ALONE. It returns TRUE, and TRUE is correct** — that gate was superseded on 2026-08-29 by *"there's always a coaching moment you can take from a call"*, with quality held by a proven-closer-line bar instead of by the outcome.
+- **⚠⚠ THE NOTE WAS ACCURATE WHEN WRITTEN AND WAS INVALIDATED BY A RULING RECORDED ELSEWHERE IN THE SAME FILE.** So the file simultaneously carried the old gate description and the ruling that replaced it — **the unamended-predecessor failure, happening to a note I then acted on.**
+- **THE TELL WAS THE TEST FAILING, WHICH IS THE SYSTEM WORKING**: the guard was written from documentation and checked against the code, and the code won. **Had I written the assertion to match the code without reading the note, I would have learned nothing; had I "fixed" the code to match the note, I would have broken a shipped ruling.**
+- **THE RULE: when a note and the source disagree, the source is the fact and the note is a claim about the past.** Read the function, not the paragraph about the function — and amend the paragraph.
+
 ### ⚠⚠⚠ A RULE CAN BE EXPRESSIBLE AND STILL NOT BE RELIABLY APPLIED — AND THAT LANDS IN THE SAME PLACE AS INEXPRESSIBLE (2026-08-30, v36 held)
 **The architect's stop condition was "if this cannot be expressed cleanly, say so and stop". The answer split in two, and only one half was the question asked.**
 ```

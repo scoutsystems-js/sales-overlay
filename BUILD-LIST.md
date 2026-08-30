@@ -28,18 +28,25 @@
 
 **What is actually being worked, in order. Everything below this section is queue or history.**
 
-| item | state |
-|---|---|
-| **Disqualification routing** | **IN FLIGHT.** v35 shipped (`004c033`) — the boundary asks whether they WANT it before whether they CAN buy. ⚠⚠ **The whose-reason correction is what is being built now, and the FIRST version of it was withdrawn before it ever shipped.** Justin's caveat: ***"sometimes as closers the most ethical thing we can do is turn someone away"*** — so the test is **whether the prospect had ALREADY expressed wanting it**, NOT who said the reason. A closer naming a genuine mismatch is doing the right thing and must never be coached as a failure |
-| **The "Why" panel on per-closer objection handling** | ⚠ **BUILT THIS BLOCK, NOT YET PUSHED** *(the queue said NEXT; it was done in the same block as the correction)*. Three identical sentences with only the name swapped, live since 19 Aug. ⚠⚠ **The cause is that this is a SECOND COPY of the state logic** — `lib/team-objection-summary.js` imports only the two thresholds and re-implements the classification, with its own sentences in `dashboard.html`. **That is why the earlier fix to the FOCUS panel never reached it.** Fixed by giving the quiet states the type data they never carried (`top`) so they can name a type and a rate instead of describing our bar |
-| **The coaching copy revamp** | **VOICE C, chosen.** ⚠ Justin's updated C adds a **THIRD paragraph applying the starter set**: *"Next time isolate the objection to make sure the partner isn't a smokescreen. If it's a real blocker, get a timeline and book a follow-up on the call."* The first two paragraphs diagnose; **the third IS the coaching, and without it the note is an assessment** |
-| **The six discovery items on three surfaces** | **AFTER the above.** Order: **① call review page** — cheapest, and it is the **TRUST CHECK**: read the captured quotes before building anything on them → **② the coaching** — the six are the upstream causes of the five objection types → **③ team pattern** — the same feature as *"what is true for the whole team"*; **cross-reference it, do not duplicate it** |
+| # | item | state |
+|---|---|---|
+| ① | **DQ dropdown** | ✅ **SHIPPED 2026-08-30 (`301defc`, migration 056), deployed and verified on the served page.** A fifth manual outcome, `disqualified`. **Counts in calls analyzed; excluded from every rate with a prospect or objection denominator.** ⚠⚠ **NOT the `not_a_sales_call` flag** — that one is filtered in ~25 places and removes a call from EVERYTHING including calls-analyzed, which contradicts the ruling. ⚠ **Manual-only BY CONSTRUCTION:** the grader keeps its own four-value list, so a model error cannot silently let a rep off. ⚠ The call keeps its **score, coaching and moments** |
+| ② | **The coaching copy revamp — VOICE C** | **NEXT.** ⚠ Justin's updated C adds a **THIRD paragraph applying the starter set**: *"Next time isolate the objection to make sure the partner isn't a smokescreen. If it's a real blocker, get a timeline and book a follow-up on the call."* The first two paragraphs diagnose; **the third IS the coaching, and without it the note is an assessment** |
+| ③ | **The six discovery items on three surfaces** | **AFTER ②.** Order: **call review page** — cheapest, and it is the **TRUST CHECK**: read the captured quotes before building anything on them → **the coaching** — the six are the upstream causes of the five objection types → **team pattern** — the same feature as *"what is true for the whole team"*; **cross-reference it, do not duplicate it** |
+| ④ | **The admin company dropdown** | ⚠⚠ **ONE ROW, NOT TWO — Justin has confirmed it is the same item as "assign by company name, not manager email."** Two symptoms: assignment and the dropdown both key on the **manager's email** rather than the company, **AND the dropdown lists `joshua@soberlivingriches.com` as a SINGLE USER when he is a manager inside Sober Living Riches.** ⚠ **DIAGNOSE THE GROUPING BEFORE TOUCHING THE LABEL** — a label fix on a wrong grouping hides the real defect |
+| — | ~~The "Why" panel on per-closer objection handling~~ | ✅ **DONE 2026-08-30 (`7f8dd47`) — comes off the list.** The quiet states now name the type and the rate instead of describing our comparison bar |
 
 ---
 
 ## 🔴 NEEDS JUSTIN — decisions and spend, nothing else
 
 **Everything here is blocked on him, not on work.**
+
+### 💰 SPEND — unapproved
+
+| item | state | the measurement |
+|---|---|---|
+| **The real ungraded backlog is joshua and gabriel, not yazan** | ⚠ **FILED 2026-08-30, SPEND NOT APPROVED** | Surfaced while VERIFYING the rows below, and filed rather than dropped — **pruning a stale row must not prune the fact underneath it.** Measured on the live board: **joshua 52 ungraded of 218**, **gabriel 41 of 142**, everyone else **≤ 3**. ⚠ **Gabriel's are the KNOWN empty-transcript calls** — a ~31% rate on that account, which is a transcription setting on his side, **not a Scout defect and not fixable by grading them**. ⚠ So the genuinely gradeable part is joshua's 52 plus a handful; the rest would fail the same way they failed before. **Justin rules** |
 
 ### ✅ EMPTY as of 2026-08-30 — all five rows were answered or stale, and every one was VERIFIED before it was moved
 
