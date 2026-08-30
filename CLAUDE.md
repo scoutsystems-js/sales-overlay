@@ -4436,6 +4436,30 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠⚠ A FORWARD-ONLY GATE CANNOT UN-SAY SOMETHING — MARKING IS RETROACTIVE, SO THE RETRACTION MUST BE (2026-08-30)
+**Justin found Discovery coaching on a closer's internal meeting with his own sales manager. The `not_a_sales_call` gate on the KB harvest was CORRECT and PASSED THE FLAG — and 4 harvested moments from 2 marked calls were in the knowledge base anyway.**
+```
+harvest gate    shouldHarvest(outcome, callRow.not_a_sales_call)   correct, and forward-only
+the mechanism   a call is almost always marked AFTER it is analysed
+the result      an internal check-up's admin lines — "Make sure to put in the annual
+                income like $120,000" — filed as examples of good selling
+```
+- **⚠⚠ THE GATE WAS NEVER THE BUG, WHICH IS WHY GREPPING FOR THE FILTER FINDS NOTHING WRONG.** Every site had it. The defect is entirely in the TIME ORDER: a flag set later than the work it should have prevented.
+- **THE RULE: WHENEVER A FLAG CAN BE SET AFTER THE FACT, ASK WHAT THE THING ALREADY PRODUCED AND RETRACT IT.** A gate answers "should this happen"; it never answers "what happened before you told me".
+- **⚠ THE RETRACTION IS AWAITED WHERE THE ENRICHMENT IS NOT.** The re-analysis beside it is fire-and-forget; this is not, because **the caller must not be told a call is excluded while its moments are still teaching the knowledge base.** A data correction and an enrichment have different urgency, and treating them the same is how one of them quietly loses.
+- **⚠ AND A FAILED RETRACTION MUST NEVER ROLL BACK THE MARK.** The mark is the user's decision; a failed cleanup is a data problem, logged and visible. **Rolling back would discard a human judgement because a follow-up query failed.**
+
+### ⚠⚠ TWO ADJACENT WRITE PATHS, ONE GATED AND ONE NOT — AND THE GATED ONE IS WHAT HIDES IT (2026-08-30)
+**`coachCallMoments` (Phase 7c) had no `not_a_sales_call` check. `shouldHarvest` — ONE LINE BELOW IT — did.**
+- **⚠⚠ THE PRESENCE OF THE NEIGHBOUR IS WHAT MAKES THIS INVISIBLE TO REVIEW.** Reading that region of the worker, the flag is right there being checked; the eye reports "this is handled". **A guard on the adjacent line reads as a guard on the block.**
+- **THE CHECK: for any two write paths that fire from the same place on the same row, assert BOTH gates or neither — per call site.** The guard here pins the pair, not each one, so the next path added beside them inherits the question.
+
+### ⚠⚠ THE FLAG WAS FLAT AND I READ IT AS NESTED — THE FIX WOULD HAVE BEEN INERT AND LOOKED CORRECT (2026-08-30)
+**The review payload emits `not_a_sales_call` beside `id` and `title`. My first suppression read `review.call.not_a_sales_call` — always `undefined`, so `excluded` was always false and the entire block would never have rendered.**
+- **⚠ IT WOULD HAVE PASSED EVERY READING.** The variable name is right, the property name is right, the logic is right; only the PATH is wrong, and a wrong path on an optional-chained read produces silence rather than an error.
+- **CAUGHT BY READING THE SERVER'S RETURN SHAPE, NOT BY REASONING ABOUT IT** — the same discipline that caught the `coverage`-is-an-array query the day before. **Two shape errors in two days, both silent, both from assuming a structure rather than printing it.**
+- **⚠ AND A GUARD OF MINE ANCHORED ON `indexOf('retractExcludedCall')`, WHICH FINDS THE IMPORT, NOT THE CALL SITE** — so it inspected the top of the file and failed on correct code. **Anchor on the call, not the name.**
+
 ### ⚠⚠⚠ A PROMPT CHANGE WITHOUT A VERSION IN THE CACHE KEY SHIPS NOTHING — SECOND INSTANCE (2026-08-30)
 **The per-closer coaching copy was rewritten and approved. Its cache key was `(board owner, window, analysis fingerprint, members)` — NO PROMPT VERSION — so all 20 cached entries for that lane would have gone on serving the REJECTED copy while the change looked shipped.**
 - **⚠⚠ THE GENERATED TEXT LIVES INSIDE THE CACHED PAYLOAD.** That is the whole mechanism: the cache is keyed on the DATA, and the copy is not data. **Nothing about a prompt edit moves a key computed from analyses.**
