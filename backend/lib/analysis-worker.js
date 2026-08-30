@@ -2126,6 +2126,14 @@ async function analyzeCall(fathomCallId, userId) {
     //
     // ⚠ It runs AFTER persistHighlights because it needs the real row ids the
     // insert created — the rows are re-read rather than inferred.
+    /* ⚠⚠ GATED ON not_a_sales_call, THE SAME WAY THE HARVEST BELOW IS. This was
+       missing: the harvest checked the flag and the coaching one line above it
+       did not, so a marked call still had per-moment coaching written for it.
+       Justin found Discovery coaching on a closer's internal meeting with his
+       own sales manager. */
+    if (callRow && callRow.not_a_sales_call === true) {
+      console.log('[coaching] call=%s skipped — not a sales call', fathomCallId);
+    } else
     coachCallMoments(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection.notes)
       .then(function (r) {
         console.log('[coaching] call=%s moments=%d written=%d%s',

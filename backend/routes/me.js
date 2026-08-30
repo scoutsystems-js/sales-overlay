@@ -23,6 +23,7 @@ const { computeWhyFacts } = require('../lib/why-prose');
 // saved-to-KB badge, removed 2026-08-18 with the Add-to-KB buttons
 const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
+const { retractExcludedCall } = require('../lib/excluded-call-retraction');
 const { VALID_OUTCOMES, TAGGABLE_OUTCOMES, effectiveCloseScore, canTagOutcome,
         canMarkNotSalesCall, markRoleFor } = require('../lib/outcome-tag');
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
@@ -1049,6 +1050,30 @@ router.post('/calls/:id/not-a-sales-call', requireAuth, async function (req, res
       not_sales_marked_role: markRoleFor(actor, ownerProfile),
     }).eq('id', callId).select('id, not_a_sales_call, not_sales_marked_role').single();
     if (up.error) throw new Error('update: ' + up.error.message);
+
+    /* ⚠⚠ RETRACT WHAT THE CALL ALREADY PRODUCED. The gates look FORWARD — a
+       marked call is never harvested or coached again — but a call is almost
+       always marked AFTER it was analysed, and by then its moments are in the
+       knowledge base and its coaching is written. A forward-only gate cannot
+       un-say something. Measured before this shipped: 4 KB moments from 2 marked
+       calls, one of them an internal check-up.
+       ⚠ AWAITED, unlike the re-analysis below, because it is a data correction
+       rather than an enrichment: the caller must not be told the call is excluded
+       while its moments are still teaching the knowledge base.
+       ⚠ Un-marking does not restore them — the re-analysis below regenerates
+       both from scratch, which is better than restoring stale text. */
+    if (marked) {
+      try {
+        var retraction = await retractExcludedCall(admin, callId);
+        console.log('[me] not-a-sales-call retraction: call=%s kb_deleted=%d coaching_cleared=%d%s',
+          callId, retraction.kb_deleted, retraction.coaching_cleared,
+          retraction.errors.length ? ' errors=' + retraction.errors.join('; ') : '');
+      } catch (e) {
+        // ⚠ NEVER roll back the mark over this. The mark is the user's decision;
+        // a failed retraction is a data-cleanup problem, logged and visible.
+        console.error('[me] not-a-sales-call retraction failed for %s: %s', callId, (e && e.message) || 'unknown');
+      }
+    }
 
     /* ⚠ RE-ANALYSIS ON TOGGLE is fire-and-forget and MUST NOT gate the response.
        The mark itself is already durable; making the user wait on a Claude run

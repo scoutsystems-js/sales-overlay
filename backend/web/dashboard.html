@@ -2310,6 +2310,13 @@
       white-space: pre-wrap;
       padding-top: 16px;
     }
+    .review-excluded { padding: 28px 24px; background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: 10px; margin-top: 16px; }
+    .review-excluded h3 { margin: 0 0 8px; font-size: 16px; color: var(--text); }
+    /* ⚠ opacity, not a grey token — the no-grey rule bans unreadable body text. */
+    .review-excluded p { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--text); opacity: 0.85; }
+    .review-excluded-undo { opacity: 0.7 !important; }
+
     /* ── the six discovery items (surface ①) ──────────────────────────────
        ⚠ NO RED AND NO CROSSES. "Not established" is a FACT, not a criticism —
        an unestablished item on a call the closer ran well must not read as a
@@ -14684,6 +14691,36 @@
           + '<div class="review-skeleton-section"></div>'
           + '<div class="review-skeleton-section"></div>'
           + '<div class="review-skeleton-section"></div>'
+        + '</div>';
+      return;
+    }
+
+    /* ⚠⚠ A CALL MARKED "NOT A SALES CALL" SHOWS NO COACHING. Justin found
+       Discovery coaching on a closer's internal meeting with his own sales
+       manager — the flag removed the call from every AGGREGATE and left this
+       page presenting the full analysis of it.
+
+       ⚠⚠ IT STILL OPENS, AND THAT IS DELIBERATE RATHER THAN A HALF-FIX. The
+       standing ruling on this control is that the row must remain openable, or
+       the call cannot be UN-marked from here — hiding it would be data loss
+       wearing a filter's clothes. So the page opens, the header and its un-mark
+       control render exactly as before, and everything that COACHES is withheld:
+       grades, the verdict, highlights, the six discovery items, the follow-up
+       email. What is left is the header, the reason, and the way back. */
+    /* ⚠ THE FLAG IS FLAT ON THE REVIEW OBJECT, not nested under .call — the
+       server emits it beside id/title/sync_status. A first version of this check
+       read review.call.not_a_sales_call, which is always undefined, so the whole
+       suppression would have been inert while looking correct. */
+    var excluded = !!(review && review.not_a_sales_call === true)
+      || !!(seed && seed.not_a_sales_call === true);
+    if (excluded) {
+      content.innerHTML = header + notice
+        + '<div class="review-excluded fade-in">'
+          + '<h3>No coaching for this call</h3>'
+          + '<p>It is marked as not a sales call, so it is left out of every score '
+          + 'and rate — and there is nothing here worth coaching against.</p>'
+          + '<p class="review-excluded-undo">If that is wrong, use the button above to count it again. '
+          + 'Its coaching is rebuilt from scratch when you do.</p>'
         + '</div>';
       return;
     }
