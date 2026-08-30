@@ -40,6 +40,17 @@ const { _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP } = require('./team-nee
 
 const { displayCloserResponse } = require('./closer-side');
 const SYNTHESIS_TYPE = 'team_objections';
+
+/* ⚠⚠ THE PROMPT VERSION IS PART OF THE CACHE KEY, AND IT IS LOAD-BEARING.
+   The generated COPY lives inside the cached payload, so a prompt change alone
+   moves nothing on screen: every existing entry keeps serving the old wording
+   until the underlying analyses happen to change. There are 20 cached entries
+   for this lane today — all of them would have gone on rendering the rejected
+   third-person copy while the change looked shipped.
+   ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
+   to buildPrompt, in the SAME commit — a prompt edit and its version bump are
+   one atomic change, exactly as they are for the grader. */
+const PROMPT_VERSION = 'v2-2026-08-30-voice-c';
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -241,7 +252,16 @@ function pickEvidence(instances, userId, category) {
 function evidenceLine(m) {
   var pos = positionPct(m.timestamp_seconds, m.duration_seconds);
   var where = (pos === null) ? 'position in call unknown' : (pos + '% through the call');
-  var parts = ['    - [' + where + '] prospect: "' + (m.quote || m.surface || '').slice(0, 220) + '"'];
+  // ⚠ THE CLOCK TIME, not just the position — the copy must LEAD with a timestamp
+  // and the model cannot write one it was never given.
+  var hms = null;
+  if (typeof m.timestamp_seconds === 'number' && isFinite(m.timestamp_seconds) && m.timestamp_seconds >= 0) {
+    var t = Math.floor(m.timestamp_seconds);
+    hms = [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60]
+      .map(function (n) { return String(n).padStart(2, '0'); }).join(':');
+  }
+  var parts = ['    - at ' + (hms || 'time unknown') + ' (' + where + ') prospect: "'
+    + (m.quote || m.surface || '').slice(0, 220) + '"'];
   var shown = displayCloserResponse(m.closer_response);   // ⚠ never a sentinel in a prompt
   parts.push('      closer replied: ' + (shown ? '"' + shown.slice(0, 300) + '"' : '(no reply captured)'));
   if (m.observation) parts.push('      what happened: ' + m.observation.slice(0, 240));
@@ -252,28 +272,81 @@ function evidenceLine(m) {
 
 function buildPrompt(subjects) {
   var lines = [
-    'You are a high-ticket sales coach reviewing a manager\'s team.',
+    'You are a high-ticket sales coach writing to ONE closer at a time.',
     '',
-    'For EACH closer below, explain WHY they are losing their weakest objection category.',
+    '⚠ THERE MAY BE SEVERAL CLOSERS BELOW. WRITE ONE ENTRY FOR EVERY SINGLE ONE OF',
+    'THEM — one object in the array per closer, using their name exactly as given.',
+    'Never merge two closers into one entry and never skip one.',
     '',
-    'THE ONE RULE THAT MATTERS: do NOT restate the numbers. The manager is already',
-    'looking at a grid of counts and rates. "Josh handled 4 of 55 timing objections"',
-    'is worthless to him. Tell him the MECHANISM — what the closer is actually doing,',
-    'or failing to do, that produces that number. Read the exchanges and the point in',
-    'the call where each one landed, and name the behaviour.',
+    '⚠ THE MANAGER READS THIS, BUT YOU ARE WRITING TO THE CLOSER. Their name is',
+    'already the heading above your text, so write in the SECOND PERSON — "you",',
+    'not their name and not "the closer". A manager should be able to forward what',
+    'you write, unchanged, to the person it is about.',
     '',
-    'Examples of the KIND of answer wanted (do not copy these — they are shape, not content):',
-    '  - "He is not pre-handling it. Every one of these lands after the price, and by',
-    '     then he is arguing rather than isolating."',
-    '  - "He accepts the first reason given and moves on, so he never finds out whether',
-    '     the timing objection is real or a polite exit."',
+    'WRITE EXACTLY THREE SHORT PARAGRAPHS, in this order.',
+    '',
+    '1. WHAT HAPPENED. Lead with the moment: the timestamp and what the prospect',
+    '   actually said. Then the miss, in one plain sentence. Say what it cost.',
+    '2. THE PRINCIPLE. The general rule this is an instance of — the thing that will',
+    '   be true on the next call and the one after. One or two sentences.',
+    '3. WHAT TO DO NEXT TIME. A concrete move. This paragraph IS the coaching, and',
+    '   without it you have written an assessment, not a coaching note.',
+    '',
+    '⚠⚠ THE TEST, AND APPLY IT TO YOUR OWN THIRD PARAGRAPH BEFORE YOU FINISH: STRIP',
+    'THE QUOTED LINE OUT. If what remains still tells them what to do and why, you',
+    'have written coaching. If nothing is left, you have written a script. Give the',
+    'MOVE and what it achieves — never a sentence to recite.',
+    '',
+    'HOW TO WRITE IT — this matters as much as what you say:',
+    '  - Plain words a closer uses out loud. If you would not say it on a call, cut it.',
+    '  - ⚠ NO ABSTRACT NOUNS STACKED TOGETHER. "relational equity", "a handled',
+    '    variable", "a hard structural block" are all rejected copy. Say the thing.',
+    '  - No buzzwords: leverage, holistic, robust, seamless, streamline, alignment.',
+    '  - Be specific — the actual timestamp, the actual words, the actual number.',
+    '  - ⚠ If you cannot picture it happening in a real conversation, rewrite it.',
+    '  - ⚠⚠ SHORT. Each paragraph is TWO OR THREE SENTENCES. The third one is the',
+    '    coaching, not an essay — give the move and stop. If a paragraph runs past',
+    '    about 60 words you are explaining rather than coaching, and the note stops',
+    '    being read. "So wordy" is the single most common complaint about this text.',
+    '',
+    '⚠⚠ NEVER INVENT, AND HOW TO QUOTE IS AN OPERATION, NOT AN ADJECTIVE: COPY A',
+    'CONTIGUOUS RUN OF CHARACTERS FROM ONE LINE BELOW. You may shorten by cutting',
+    'from the START or the END. You may NEVER join a beginning to a later ending,',
+    'and you may never bridge a gap with a dash or an ellipsis — that produces a',
+    'sentence the prospect never said. If the full line is too long, quote LESS of',
+    'it, not a stitched-together version of it.',
+    '⚠ If a claim is not supported by a moment here, do not make it.',
+    '⚠⚠ DO NOT NAME ANYONE — NOT THE PROSPECT AND NOT ANY THIRD PARTY. Write "they",',
+    '"the prospect", "their partner". A name may appear inside a quote you were given,',
+    'but you have NOT been told who that person is or what role they played, so any',
+    'claim about them is a guess. "Henry was the second decision-maker" is exactly the',
+    'kind of confident invented detail that destroys the whole note.',
+    '⚠ do NOT restate the numbers. The manager is already looking at a grid of',
+    'counts and rates. Tell them the MECHANISM — what this closer is actually doing,',
+    'or failing to do, that produces that number.',
+    '⚠ Never write about "closers" or "the team" collectively. One closer is not the',
+    'team, and a note about everyone is a note to no one.',
+    '',
+    'TONE FOLLOWS THE OBJECTION. Fear wants a gentler read — the prospect is hesitant,',
+    'not blocked. A real logistical constraint wants directness. Do not flatten them.',
+    '',
+    'WHAT GOOD LOOKS LIKE (shape, not content — do not copy these words):',
+    '  "The husband was never on your radar because you never asked. That is a',
+    '   discovery miss, and it cost you the close."',
+    '  "When someone gives you a real constraint, pushing makes you the problem. Find',
+    '   out which kind you are facing before you decide how hard to press."',
+    '  "Next time isolate the objection to make sure the partner is not a smokescreen.',
+    '   If it is a real blocker, get a timeline and book the follow-up ON THE CALL."',
+    '',
+    '⚠ THAT THIRD LINE IS DRAWN FROM THIS TEAM\'S OWN OBJECTION FRAMEWORK, AND SO',
+    'SHOULD YOURS BE: isolate first to find out whether a partner objection is a',
+    'smokescreen or real. You cannot overcome a genuine logistical blocker — so',
+    'identify it, get a timeline, and book the next call while you still have them on',
+    'the phone rather than leaving it to a text that may never come.',
     '',
     'Ground every claim in the moments provided. If the evidence does not support a',
     'confident mechanism, say what the evidence DOES show and no more — a vague honest',
     'answer is worth more than a confident invented one.',
-    '',
-    'Write about each closer BY NAME, in the third person. Never write about "closers"',
-    'or "the team" collectively.',
     '',
     'CLOSERS:',
   ];
@@ -298,8 +371,9 @@ function buildPrompt(subjects) {
 
   lines.push('');
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
-  lines.push('{"closers":[{"name":"<exact name as given>","why":"2-3 sentences naming the mechanism",'
-    + '"what_to_do":"1-2 sentences, a concrete change to make on the next call"}]}');
+  lines.push('{"closers":[{"name":"<exact name as given>",'
+    + '"why":"paragraph 1 then paragraph 2, separated by a blank line: what happened (lead with the timestamp and their words), then the principle",'
+    + '"what_to_do":"paragraph 3: the concrete move for next time, drawn from the framework above"}]}');
   return lines.join('\n');
 }
 
@@ -362,7 +436,8 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
   // list — see the note there for why the placement is the mechanism.
   var ck = snapCacheWindow(from, to);
   var hash = crypto.createHash('md5')
-    .update(data.analysis_fingerprint + '|' + memberIds.slice().sort().join(',')).digest('hex');
+    .update(PROMPT_VERSION + '|' + data.analysis_fingerprint + '|' + memberIds.slice().sort().join(','))
+    .digest('hex');
 
   if (!opts.force) {
     var cq = await admin.from('objection_synthesis_cache')
@@ -458,6 +533,7 @@ function withoutInternals(c) {
 module.exports = {
   computeTeamObjectionSummary: computeTeamObjectionSummary,
   SYNTHESIS_TYPE: SYNTHESIS_TYPE,
+  _PROMPT_VERSION: PROMPT_VERSION,
   _classifyCloser: classifyCloser,
   _positionPct: positionPct,
   _pickEvidence: pickEvidence,

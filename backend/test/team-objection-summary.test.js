@@ -458,3 +458,15 @@ test('⚠⚠ THE OUTPUT BUDGET CLEARS A FULL BOARD — a truncated JSON fails EV
   assert.ok(oldBudget(_MAX_CLOSERS_IN_PROMPT) < need,
     'the superseded 4096 ceiling should fail this check — if it passes, the check is toothless');
 });
+
+test('⚠⚠ the PROMPT VERSION is in the cache key, or a copy change ships nothing', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'team-objection-summary.js'), 'utf8')
+    .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(/const PROMPT_VERSION = '/.test(src), 'the lane must declare a prompt version');
+  assert.ok(/update\(PROMPT_VERSION \+ '\|'/.test(src),
+    'THE GENERATED COPY LIVES INSIDE THE CACHED PAYLOAD. Without the version in the key, '
+    + 'a prompt change moves nothing on screen — every existing entry keeps serving the old '
+    + 'wording and the change looks shipped while rendering the text it replaced. Same '
+    + 'lesson as NEEDS_WORK_LANE_VERSION.');
+});
