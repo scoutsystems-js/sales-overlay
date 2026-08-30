@@ -4436,6 +4436,54 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠⚠ A RULE CAN BE EXPRESSIBLE AND STILL NOT BE RELIABLY APPLIED — AND THAT LANDS IN THE SAME PLACE AS INEXPRESSIBLE (2026-08-30, v36 held)
+**The architect's stop condition was "if this cannot be expressed cleanly, say so and stop". The answer split in two, and only one half was the question asked.**
+```
+IS IT EXPRESSIBLE?           YES — the extractor gets the FULL transcript, speaker-labelled,
+                             in order, with timestamps. "Did they express wanting it earlier"
+                             is a question about text already in front of it.
+IS IT RELIABLY APPLIED?      NO — on its own worked example, 1 of 3 runs.
+```
+- **⚠⚠ THE CONTRAST THAT MAKES THE FIRST HALF CHECKABLE: the COACHING prompt gets MOMENTS, not transcripts**, which is why it genuinely cannot tell isolation from avoidance. **Availability is a property of the INPUTS and is answerable in one command; reliability is a property of the OUTPUT and needs runs.** Answering the first and reporting it as the answer would have been a scope-vs-claim failure.
+- **THE MEASUREMENT: the control was STABLE and the corrected arm was LESS so.** `v35` gave `missed_opportunity` 6/6 across two separate rounds of three; `v36` gave `missed_opportunity | objection | disqualify_signal`. **A change that increases variance on the case it targets has not fixed that case**, whatever its direction looks like at n=1.
+- **⚠ AND THE SHAPE CHECK COULD NOT HAVE ARBITRATED IT: two UNTOUCHED categories moved by −6 and +4** while both touched ones moved +1. **The resolution limit was printed in the same table as the result.**
+- **THE RULE: when a stop condition names one failure mode, check whether the failure you actually have is that one.** Reporting "it is expressible" as a pass would have been true and irrelevant.
+
+### ⚠⚠ A SECOND FORMULATION AIMED AT ONE FAILING CASE IS TUNING UNTIL THE OUTPUT MATCHES (2026-08-30)
+**One formulation of the corrected rule was written, measured, and held. A second one, written specifically to make `5f6a7052` come out right, is the same act as moving a threshold until a test passes** — and this project has already recorded stopping at two attempts for exactly this reason (the v31 shape ③ ruling).
+- **The distinction worth keeping: fixing a rule because you understand WHY it fails is engineering; rewording it until one sample flips is fitting.** Nothing in the measurement explained *why* the model applies the temporal test unreliably, so there was no understood cause to fix.
+- **⚠ THE HONEST OUTPUT OF A HELD BLOCK IS A PATCH AND A REPORT, NOT A SILENT REVERT.** The work is saved (`~/Desktop/v36-want-first-UNPUSHED.patch`), the tree is back on the shipped version, and the report says which. **A reverted-and-unrecorded change is indistinguishable from work never done.**
+
+### ⚠⚠⚠ THE SAME DEFECT SURVIVED ITS OWN FIX BECAUSE THE SECOND COPY HAD NOTHING TO SAY (2026-08-30)
+**Three closers rendered the identical sentence with only the name swapped. The fix for that exact defect had shipped six days earlier — to the OTHER copy.**
+```
+lib/team-needs-work.js          produces the 4 states AND its own card_text   <- fixed 2026-08-29
+lib/team-objection-summary.js   imports ONLY the two thresholds, then
+                                RE-IMPLEMENTS the classification              <- never touched
+web/dashboard.html              its own sentences for those states            <- never touched
+```
+- **⚠⚠ THE STRUCTURAL CAUSE IS THE PART THAT GENERALISES: THE SECOND COPY DESCRIBED OUR THRESHOLD BECAUSE IT HAD NOTHING ELSE TO DESCRIBE.** Its quiet states returned `ranking: []`, so the renderer was handed **no type and no rate** — and a renderer with no data can only talk about the rule that produced the emptiness. **Insufficiency-dressed-as-a-finding is often a PAYLOAD problem wearing a copy problem's clothes; rewriting the sentence alone cannot fix it.**
+- **THE FIX IS THEREFORE TWO-SIDED: give the quiet states the data (`top` — the most common category at ANY size), THEN write the sentence.** Justin's ruling — *even one objection is data* — is what makes that the right shape rather than a bigger empty state.
+- **⚠ ESTABLISH WHICH IT IS BEFORE REWRITING, AND THE ANSWER CHANGES THE SEARCH: a second COPY means there may be a third.** Checked here: two producers, two renderers, no third. **A different module never touched would have meant one fix; a copy means a sweep.**
+- **⚠ AND THE QUEUE ROW SAID IT WAS FIXED.** A row asserting a fix that reached only one of two copies is stale in the wrong direction, and nobody re-opens a row marked done.
+
+### ⚠⚠ A PATCH STEP CHAINED BY A NEWLINE IS NOT A GATE — THE RUN PROCEEDED ON AN UNPATCHED FILE (2026-08-30)
+**`sed … && python3 …` then, on the NEXT LINE, `node harness.js`. The python patch asserted its anchor, failed, and exited non-zero — and node ran anyway, against a half-edited control arm.**
+- **The harness caught it** (its own "expected 4 lines, removed 2" assertion fired), **but only because the harness happened to assert its own precondition.** Without that, the run would have produced a plausible A/B against the wrong control.
+- **THE RULE IS THE ONE ALREADY ON FILE FOR DRAIN CHECKS, IN A NEW PLACE: a check chained to the action it gates is not a check.** Here it was a *build* step rather than a safety check, and a newline instead of `&&` is all it took.
+- **⚠ THE DURABLE FIX WAS TO STOP PATCHING AND REGENERATE.** A harness derived from another harness by string substitution has a silent failure mode; one written out has none.
+
+### ⚠ WHEN A LIST IS PRUNED, VERIFY EACH ROW — AND EXPECT THE VERIFICATION TO FIND FACTS THE LIST DOES NOT CARRY (2026-08-30)
+**Five rows were named as answered or stale. All five were verified before moving — and the queries turned up something more useful than the pruning.**
+```
+Voyage      2,399 knowledge_base rows, 0 missing an embedding      DONE, confirmed
+yazan       181 of 181 Zoom calls marked WITH a reason             ruled, confirmed
+retry       lib/model-retry.js — 8 CALL SITES in the worker        already built
+⚠ NOT ON THE LIST AT ALL:  joshua 52 ungraded of 218 · gabriel 41 of 142
+```
+- **⚠⚠ THE ROW BEING STALE AND THE FACT UNDERNEATH IT BEING STALE ARE DIFFERENT THINGS. "yazan's backlog" was answered; "the backlog" had MOVED to two other people**, and pruning the row without querying would have removed the only pointer to it.
+- **THE HABIT: prune with a QUERY, not with a read.** The verification costs one command per row and is the only thing that distinguishes *answered* from *nobody looked recently*.
+
 ### ⚠⚠⚠ THE CONTROL ARM IS WHAT SEPARATES "MY CHANGE CAUSED THIS" FROM "THIS WAS ALREADY TRUE" (v35, 2026-08-30)
 **A single-run A/B found ONE objection→disqualification flip. I read the transcript, concluded the new boundary was swallowing a genuine objection, and was about to report a regression I had caused. Re-running that one call THREE TIMES PER ARM inverted it:**
 ```
