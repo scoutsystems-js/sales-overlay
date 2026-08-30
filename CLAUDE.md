@@ -4043,6 +4043,36 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ✅ v30's CONTAINER PROOF LANDED 2026-08-30 — AND THE FIRST UNSUPERVISED COACHING TRIPPED NO STOP CONDITION
+**No sync had run since the deploy, which is why the proof did not exist an hour earlier: v30 went live at 03:00Z and the last scheduled cron was 00:04Z — THREE HOURS EARLIER — so the two v29-stamped analyses at 00:05 were pre-deploy and proved nothing either way.** Triggering the existing cron (spend-neutral; it only analyses what the next run would) produced 2 calls at `prompt_version = v30` and took coaching rows **1 → 3**. **The deployed worker runs Phase 7c.**
+- **⚠ THE TIMING CHECK IS THE TRANSFERABLE PART: "no v30 rows yet" and "Phase 7c is broken" are indistinguishable until you establish whether anything has RUN since the deploy.** Comparing the deploy timestamp against the last cron run separated them in one query.
+- **THE FOUR STOP CONDITIONS HELD ON THE FIRST UNATTENDED OUTPUT** — no invention, no prospect named, no internals, no coaching against correct technique — **and every claim was verified against the stored inputs rather than read as plausible**: the coaching's *"you responded by talking about what you did for that third party"* matches a stored reply of *"I even ran the numbers for Paula."*
+- **⚠ THE RULE HELD ON A GENDERED INPUT, WHICH IS THE STRONGER RESULT: the extractor's OBSERVATION says "she" and the coaching still wrote "they".** A downstream rule surviving contaminated upstream text is worth more than one that only holds on clean input.
+- **⚠ Style drift worth watching, not a stop condition:** `Type: logistical —` on its own line reads report-like against the no-headline rule.
+
+### ⚠⚠⚠ A DISCOVERY CRITERION MOVED THE **OUTCOME** — THE GATE'S HARD STOP EARNED ITS KEEP (2026-08-30)
+**Adding GOALS and CURRENT SITUATION and caveating PAIN passed on score and FAILED on outcome.**
+```
+closed     old med 78  ->  new med 81   +3   outcome stable
+follow_up  old med 65  ->  new med 65    0   outcome stable
+lost       old med 58  ->  new med 61   +3   ⚠ OUTCOME MOVED
+then, 3 MORE runs per arm on that sample:
+  OLD  follow_up x6  — never once "lost"      NEW  follow_up x4, lost x2
+```
+- **⚠⚠ THE FLIP IS ATTRIBUTABLE, NOT NOISE, AND THE SIX-RUN RE-TEST IS WHAT ESTABLISHED IT.** A 1-in-3 flip is well inside this project's recorded outcome flicker, so the gate result ALONE could not distinguish "my change" from "a borderline call". **Running the OLD arm to n=6 and finding it perfectly stable is the discriminator** — without it the honest answer would have been "unknown".
+- **⚠⚠ THE SUBSTANTIVE FINDING IS BIGGER THAN THE FLIP: A DISCOVERY CRITERION HAS NO BUSINESS MOVING THE OUTCOME.** Discovery quality belongs in `discovery_score`; whether a deal closed, was lost or is open is a fact about what happened, not about how well the closer explored. **That it moves at all says the grader's outcome judgement is ENTANGLED with its section reading — a pre-existing property this change EXPOSED rather than created.**
+- **⚠⚠ THE VALIDATION I COULD HAVE CLAIMED AND DID NOT.** The stored outcome on that call is `lost`, so the new criterion "agrees with the recorded value more often". **But `outcome_source` is `inferred` — the stored value is an earlier MODEL RUN, not human truth. Agreement with an earlier model is not evidence of correctness**, and presenting it as such would have turned a tripped gate into a false pass.
+- **⚠ THE SCORES ROSE (+3/0/+3), ALL INSIDE THE ~5-POINT THRESHOLD, AND WERE NOT TUNED BACK.** The PAIN caveat is expected to raise logical-sale calls; **that is the grade becoming correct, and tuning it toward the old number to make the delta look small would be tuning a threshold until the output passes.**
+- **⚠ CORROBORATING, AND IT ARGUES FOR THE CHANGE RATHER THAN AGAINST THE GATE:** that call's production `why_outcome` reads *"the prospect never had personal stakes surfaced in discovery — no income goal, no emotional driver, no urgency."* **The grader was already citing missing GOALS as decisive while the criterion never asked for goals.**
+- **NOT PUSHED. Reported instead, per the gate contract.**
+
+### ⚠⚠ A GATE THAT DIES ON ONE BAD RESPONSE MEASURES NOTHING — AND MINE REPORTED EXIT 0 WHILE HAVING RUN 1 OF 18 (2026-08-30)
+**Two failures in one harness, and the second is the dangerous one.**
+- **A single unparseable grader response threw and killed the whole run**, losing the other 17. **A parse failure is DATA ABOUT AN ARM, not a reason to lose the experiment** — it now retries once and records the failure.
+- **⚠⚠ AND A `nohup … &` INSIDE A SHELL THAT EXITS REPORTED `exit code 0` WITH ONE LINE OF OUTPUT.** That is indistinguishable from a clean run that had little to say. **The tell was the absence of the RESULT FILE** — checking for the artefact rather than the exit code is what caught it. Same family as the deadlocked probe that prints nothing and exits 0.
+- **⚠ AND THE DIAGNOSTIC ORDER MATTERED: before assuming the new prompt was too long, I ran it standalone** — `end_turn`, 2198/4500 tokens, parsed fine. **The failure was transient, and treating it as structural would have sent me tuning a prompt that was never the problem.**
+- **⚠ ONE CONFOUND STATED RATHER THAN GLOSSED: both arms were built with an EMPTY selling context**, so neither reproduces the production run exactly. **It affects both arms identically, so the DELTA stands — but neither arm's absolute value should be compared to a stored score.**
+
 ### ✅ v30 SHIPPED 2026-08-29 (`3e2b2f4`, migration 055) — PER-MOMENT COACHING, ONE MODEL CALL PER CALL
 **`call_highlights.coaching`, written by a THIRD model call in Phase 7c, immediately after `persistHighlights` — it needs the row ids the insert created. Read by the What Needs Work panel. Drives no score.**
 - **⚠⚠ ONE CALL PER CALL, COVERING ALL ITS MOMENTS — NEVER ONE PER MOMENT.** Calls average **5.7** coachable moments, so per-moment is a 5.7x error. **A test asserts exactly one `messages.create` in that function**, so a loop fails the suite rather than the invoice.
