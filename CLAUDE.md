@@ -4436,6 +4436,30 @@ rows mentioning "confusion" / "skepticism" 14 / 14         <- in the whole knowl
 - **⚠⚠ AND A SECOND RISK SURFACED IN THE GENERATED OUTPUT THAT THE ANALYSIS DID NOT PREDICT: THE MODEL COLOURS IN THE *WHAT*, NOT ONLY THE *WHY*.** One sample invented *"She said yes with her silence"* — nothing in the transcript says it — and another attributed intent: *"a buried partner objection she'll use later to exit"*. **Grounding the reasoning does nothing for either.** It needs a verbatim constraint on any claim about what the prospect did or meant, which is the rule that fixed quoting in v14. **Asking "can it source the WHY?" is necessary and not sufficient; ask the same question of every factual clause.**
 - **⚠ THE PROCESS HALF WORTH KEEPING: THE HONEST READ WAS DEMANDED BEFORE THE BUILD, AND IT CHANGED THE BUILD.** The prompt was still written and still run — on three adversarially chosen calls, one lost and two won — but with the mechanism block made conditional rather than mandatory. **A gating question that returns "no" does not always cancel the work; sometimes it re-shapes it.**
 
+### ⚠⚠⚠ "LEVEL" IS ONLY A FINDING WHEN THE LEVEL IS ANY GOOD — I REINTRODUCED THE DATA-AS-GOOD-NEWS FAILURE IN A COPY REWRITE (2026-08-30)
+**`even_performance` fires when no objection category is far enough below the others to NAME. That is ALSO true when a closer is failing EVERY type equally — and on the live board three closers handled 0 of 32, 0 of 14 and 0 of 12, and each was told their objection handling was "running level across types".**
+- **⚠⚠ THE STATE MACHINE WAS RIGHT AND THE SENTENCE WAS WRONG.** The classifier correctly said "nothing stands out"; the copy turned that into a clean bill. **A state that means "no ranking is possible" is not the same as a state that means "performance is fine", and one sentence has to serve both.**
+- **⚠ IT IS THE EXACT FAILURE THE FOUR-STATE MODEL EXISTS TO PREVENT, reintroduced by the rewrite that was supposed to improve the copy.** The four states were split apart precisely so a shortage could not read as good news; nothing stopped the good-news wording being re-attached to a state that spans both.
+- **THE FIX IS A MAGNITUDE BRANCH, NOT A WORDING TWEAK: zero handled says so plainly and is named as the place to start; a low rate says it is low ACROSS EVERY TYPE rather than one weak spot; a genuinely level decent rate still reads as a finding.** Every branch names the rate.
+- **⚠⚠ AND THE DEGENERATE CASE HAD NEVER BEEN EXERCISED BECAUSE THE FIXTURE WAS DEGENERATE TOO** — the existing test used `total: 0, handled: 0`, a state `even_performance` cannot reach. **A fixture that cannot occur tests a branch that cannot run.**
+
+### ⚠⚠ "IT ONLY SAYS SOMETHING ABOUT X" WAS A CONTENT COMPLAINT, NOT A MISSING-ROW ONE — AND BOTH OF OUR HYPOTHESES WERE WRONG (2026-08-30)
+**The report read as rows disappearing. The suspicion was the `top` field I had just added. Running the REAL computation against the live board: 7 closers returned, 7 cards rendered, cached and uncached, at 7 days and at 90.**
+- **⚠ NOTHING WAS MISSING. What was missing was MEANING** — five of seven cards said a bland sentence that could be true of anybody, so only the two with real numbers registered as saying anything.
+- **THE INSTRUCTION THAT SAVED IT WAS "DO NOT REASON FROM THE CODE PATH; LOOK AT WHAT THE BOARD PRODUCES."** Reading the code, the `top` hypothesis is entirely plausible and I would have "fixed" it.
+- **⚠ AND THE DECISIVE STEP WAS RENDERING THE CACHED PAYLOAD THROUGH THE REAL RENDERER**, not the live computation — because **the cache is what the user is actually looking at**, and a fresh computation can be right while a stale entry is on screen. Here they agreed, which is itself the finding.
+
+### ⚠⚠ WHEN A REQUEST NAMES SOMETHING YOU CANNOT FIND, SAY SO — SECOND INSTANCE (2026-08-30)
+**"Remove the bar graph on that panel." There is no bar graph on that panel: the objections drilldown renders a grid, the Why panel and the moments feed, with no canvas, no chart and no bar markup in the source OR the rendered output.**
+- **TWO NEAR MATCHES, NEITHER OF THEM IT:** `.breakdown-bar` is CSS **rendered nowhere**, and `team-detail-track` is an inline bar inside each row of a **different page** (`#team-needs-work`) whose renderer is **SHARED with the live personal page**.
+- **⚠⚠ DELETING THE NEAREST MATCH WOULD HAVE REMOVED A WORKING ELEMENT FROM A PAGE NOBODY COMPLAINED ABOUT** — and because that renderer is shared, from a second page as well. **The cost of asking is one sentence; the cost of guessing is a silent removal on two surfaces.**
+- Same as the "Fathom clip unification" instance: **an unfindable name must be reported as unfindable, never bound to the closest thing you can see.**
+
+### ⚠ A RULING CAN BE CORRECTLY REASONED AND STILL EXPIRE WHEN THE WORLD CHANGES AROUND IT (2026-08-30)
+**"A marked call must stay openable or it can never be un-marked from there" was sound, and it stopped being true when a COUNT THIS CALL button appeared on the list row.** The un-mark became reachable without opening the call, so the data-loss argument was gone.
+- **⚠ THE RULING DID NOT BECOME WRONG — ITS PREMISE DID.** Nothing about the reasoning failed; a different feature removed the constraint it depended on. **A ruling should record WHAT IT DEPENDS ON, so a change elsewhere can be recognised as retiring it rather than contradicting it.**
+- **The row still renders with its badge — only the way in closed.** Excluded must stay visible; that half never depended on the premise.
+
 ### ⚠⚠ A COLUMN THAT RENDERS A FOREIGN KEY STATES SOMETHING FALSE ABOUT A REAL PERSON (2026-08-30, admin Company column)
 **The admin users table showed `managed_by` in its Company column. Two symptoms, one cause:**
 ```
