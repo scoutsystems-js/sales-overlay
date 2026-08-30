@@ -9020,15 +9020,52 @@
     scheduleTeamRender();
   }
 
+  /* ⚠⚠ THE QUIET STATES DESCRIBE THE DATA, NEVER OUR BAR. The old copy read
+     cited our own comparison bar in points — identical for
+     every closer with the name swapped, because it is a fact about the
+     THRESHOLD and not about the closer. That is insufficiency dressed as a
+     finding, and it is the same defect already fixed once on the objection
+     FOCUS panel; it survived here because THIS surface is a second copy of the
+     state logic with its own sentences (lib/team-objection-summary re-implements
+     the classification and imports only the two constants).
+     ⚠ JUSTIN'S RULING: EVEN ONE OBJECTION IS DATA — name the type, name the
+     rate, say the sample is small. A genuine empty state is reserved for
+     genuinely no objections in range, which is why every sentence below keys on
+     `top` and only falls back when there is nothing to name.
+     ⚠ NO THRESHOLDS, NO MECHANISM, NOTHING INTERNAL — the customer-language
+     rule. "Average", "rank", "compare" and any number of points are all out. */
+  function objTypeLabel(cat) { return OBJ_DRILL_LABELS[cat] || objectionLabel(cat); }
+
   var OBJ_SUMMARY_STATE_TEXT = {
-    /* ⚠⚠ FOUR STATES, FOUR SENTENCES, AND THEY MUST NOT CONVERGE. "Not enough
-       data to say" and "nothing stands out" reading the same is the failure
-       already fixed once on this surface. A DATA PROBLEM MUST NEVER RENDER AS
-       GOOD NEWS — so no_volume and thin_types describe the WINDOW, and only
-       even_performance is phrased as a result about the closer. */
-    no_volume: function (n) { return n + ' has too few objections in this range to say anything useful yet.'; },
-    thin_types: function (n) { return n + '’s objections are spread across too many types to compare — no single type has enough volume to rank.'; },
-    even_performance: function (n) { return n + '’s objection handling is even across types — no type is more than ' + 5 + ' points below their own average.'; },
+    no_volume: function (n, c) {
+      var t = c && c.top;
+      if (!t) return n + ' had no objections come up in this range.';
+      return n + ' had ' + (c.total === 1 ? 'one objection' : c.total + ' objections')
+        + ' in this range — mostly ' + objTypeLabel(t.category) + ', handled '
+        + t.handled + ' of ' + t.total + '. Too small a sample to read much into.';
+    },
+    thin_types: function (n, c) {
+      var t = c && c.top;
+      if (!t) return n + ' had no objections come up in this range.';
+      return n + '’s objections were spread thinly across types. The most common was '
+        + objTypeLabel(t.category) + ' — handled ' + t.handled + ' of ' + t.total
+        + '. A small sample for any one type.';
+    },
+    even_performance: function (n, c) {
+      /* ⚠ THE CONTRAST CLAUSE IS DROPPED WHEN THE TWO NUMBERS ARE EQUAL — on
+         genuinely level handling they ARE equal after rounding, and "the lowest
+         is X at 30%, against 30% everywhere else" contrasts a number with
+         itself and reads as a mistake. Same rule as the focus panel. */
+      var w = c && c.ranking && c.ranking[0];
+      var lead = n + '’s objection handling is running level across types.';
+      if (!w) return lead;
+      var low = w.rate_pct, other = w.baseline_pct;
+      if (typeof other !== 'number' || low === other) {
+        return lead + ' Every type is close to ' + low + '%.';
+      }
+      return lead + ' The lowest is ' + objTypeLabel(w.category) + ' at ' + low
+        + '%, against ' + other + '% everywhere else.';
+    },
   };
 
   function objSummaryCloserHtml(c) {
@@ -9036,7 +9073,7 @@
     if (c.state !== 'rate_gap') {
       var f = OBJ_SUMMARY_STATE_TEXT[c.state];
       return '<div class="objsum-card objsum-quiet"><div class="objsum-name">' + name + '</div>'
-        + '<div class="objsum-quiet-text">' + escapeHtml(f ? f(c.name || 'This closer') : 'No focus area in this range.') + '</div></div>';
+        + '<div class="objsum-quiet-text">' + escapeHtml(f ? f(c.name || 'This closer', c) : 'No focus area in this range.') + '</div></div>';
     }
     var cat = (c.focus && c.focus.category) || '';
     var label = OBJ_DRILL_LABELS[cat] || objectionLabel(cat);

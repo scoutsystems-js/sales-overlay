@@ -139,13 +139,34 @@ function positionPct(ts, duration) {
  *   rate_gap          — one category is materially below this closer's own
  *                       baseline. The only state that gets a generated WHY.
  */
+/* ⚠⚠ THE MOST COMMON CATEGORY, AT ANY SIZE — the input the quiet states never had.
+   `no_volume` and `thin_types` used to return `ranking: []`, so the renderer had
+   NOTHING to name and fell back to describing our own bar ("no type is more than
+   5 points below their own average"). That is the insufficiency-dressed-as-a-
+   finding defect: a fact about the THRESHOLD rendered as a statement about the
+   closer, identical for every closer with the name swapped.
+   ⚠ JUSTIN'S RULING: EVEN ONE OBJECTION IS DATA. Name the type, name the rate,
+   say the sample is small. A genuine empty state is reserved for total === 0. */
+function topCategory(cats) {
+  var best = null;
+  OBJECTION_CATEGORIES.forEach(function (c) {
+    var b = cats[c];
+    if (!b || !b.total) return;
+    if (!best || b.total > best.total) {
+      var h = (b.handled || 0) + (b.credited || 0);
+      best = { category: c, total: b.total, handled: h, rate_pct: pctWhole(h, b.total) };
+    }
+  });
+  return best;
+}
+
 function classifyCloser(row) {
   var cats = row.by_category || {};
   var total = (row.total && row.total.total) || 0;
   var handled = ((row.total && row.total.handled) || 0) + ((row.total && row.total.credited) || 0);
 
   if (total < MIN_BUCKET) {
-    return { state: 'no_volume', total: total, handled: handled, ranking: [] };
+    return { state: 'no_volume', total: total, handled: handled, ranking: [], top: topCategory(cats) };
   }
 
   var ranked = [], sizeable = 0;
@@ -173,7 +194,7 @@ function classifyCloser(row) {
     });
   });
 
-  if (sizeable === 0) return { state: 'thin_types', total: total, handled: handled, ranking: [] };
+  if (sizeable === 0) return { state: 'thin_types', total: total, handled: handled, ranking: [], top: topCategory(cats) };
 
   ranked.sort(function (a, b) { return b._gap - a._gap; });
   var ranking = ranked.map(function (r) {
@@ -429,7 +450,7 @@ function withoutInternals(c) {
   return {
     user_id: c.user_id, name: c.name, state: c.state,
     total: c.total, handled: c.handled,
-    focus: c.focus || null, ranking: c.ranking || [],
+    focus: c.focus || null, ranking: c.ranking || [], top: c.top || null,
     why: null, what_to_do: null, evidence: [],
   };
 }

@@ -99,28 +99,74 @@ function renderCloser(c) {
   const src = slice('function objSummaryCloserHtml', '\n  }');
   const escapeHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
   const OBJ_DRILL_LABELS = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing', partner: 'Partner / spouse', uncategorized: 'Uncategorised' };
-  const OBJ_SUMMARY_STATE_TEXT = new Function(
-    slice('var OBJ_SUMMARY_STATE_TEXT', '\n  };') + '; return OBJ_SUMMARY_STATE_TEXT;')();
+  // the copy map now calls objTypeLabel, so the slice must cover the helper too
+  const stateSrc = slice('function objTypeLabel', '\n  };');
+  assert.ok(stateSrc.length > 600, 'state-text slice must cover the helper AND the map: ' + stateSrc.length);
+  const OBJ_SUMMARY_STATE_TEXT = new Function('OBJ_DRILL_LABELS', 'objectionLabel',
+    stateSrc + '; return OBJ_SUMMARY_STATE_TEXT;')(OBJ_DRILL_LABELS, (c) => c);
   const fn = new Function('escapeHtml', 'OBJ_DRILL_LABELS', 'OBJ_SUMMARY_STATE_TEXT', 'clipLabelFor',
     src + '; return objSummaryCloserHtml;')(escapeHtml, OBJ_DRILL_LABELS, OBJ_SUMMARY_STATE_TEXT, () => 'Clip');
   return fn(c);
 }
 
 test('⚠⚠ "not enough data" and "nothing stands out" DO NOT RENDER THE SAME', () => {
-  const noVolume = renderCloser({ name: 'Ava', state: 'no_volume' });
-  const thin = renderCloser({ name: 'Ben', state: 'thin_types' });
-  const even = renderCloser({ name: 'Cara', state: 'even_performance' });
+  // ⚠ CONVERTED, NOT REPLACED. The SUBJECT — four states must not converge, and a
+  // data problem must never read as good news — is unchanged. The VEHICLE changed:
+  // the sentences no longer cite our comparison bar, so the old phrase assertions
+  // went with the copy they were pinning.
+  const noVolume = renderCloser({ name: 'Ava', state: 'no_volume', total: 3,
+    top: { category: 'fear', total: 2, handled: 1, rate_pct: 50 } });
+  const thin = renderCloser({ name: 'Ben', state: 'thin_types', total: 9,
+    top: { category: 'timing', total: 4, handled: 1, rate_pct: 25 } });
+  const even = renderCloser({ name: 'Cara', state: 'even_performance',
+    ranking: [{ category: 'partner', rate_pct: 30, baseline_pct: 33 }] });
 
   const texts = [noVolume, thin, even].map((h) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim());
   assert.strictEqual(new Set(texts).size, 3, 'three states must produce three sentences:\n' + texts.join('\n'));
 
-  // ⚠ A DATA PROBLEM MUST NEVER READ AS GOOD NEWS.
-  assert.ok(/too few objections/i.test(texts[0]), 'no_volume states a shortage: ' + texts[0]);
-  assert.ok(/spread across too many types/i.test(texts[1]), 'thin_types states a spread: ' + texts[1]);
-  assert.ok(/even across types/i.test(texts[2]), 'even_performance states a RESULT: ' + texts[2]);
+  // ⚠⚠ JUSTIN'S RULING: EVEN ONE OBJECTION IS DATA. Each quiet state must NAME the
+  // type and the rate — a sentence a reader can check against the grid above.
+  assert.ok(/Fear/.test(texts[0]) && /1 of 2/.test(texts[0]), 'no_volume names type + rate: ' + texts[0]);
+  assert.ok(/Timing/.test(texts[1]) && /1 of 4/.test(texts[1]), 'thin_types names type + rate: ' + texts[1]);
+  assert.ok(/Partner/.test(texts[2]) && /30%/.test(texts[2]), 'even_performance names its lowest type: ' + texts[2]);
+
+  // ⚠ A DATA PROBLEM MUST NEVER READ AS GOOD NEWS — the shortage states say so.
+  assert.ok(/small|thin/i.test(texts[0]), 'no_volume flags the sample size: ' + texts[0]);
+  assert.ok(/small|thin/i.test(texts[1]), 'thin_types flags the sample size: ' + texts[1]);
+  assert.ok(/running level/i.test(texts[2]), 'even_performance states a RESULT: ' + texts[2]);
   [texts[0], texts[1]].forEach((t) => {
-    assert.ok(!/even across types/i.test(t), 'a data shortage must not borrow the good-news wording: ' + t);
+    assert.ok(!/running level/i.test(t), 'a data shortage must not borrow the good-news wording: ' + t);
   });
+});
+
+test('⚠⚠ THE QUIET SENTENCES ARE ABOUT THE CLOSER, NOT ABOUT OUR BAR', () => {
+  // The defect: three closers in a row rendered the identical sentence with only
+  // the name swapped, because the copy described the THRESHOLD. That is a fact
+  // about our comparison bar, not about Godwin.
+  const a = renderCloser({ name: 'Godwin', state: 'even_performance',
+    ranking: [{ category: 'fear', rate_pct: 20, baseline_pct: 24 }] });
+  const b = renderCloser({ name: 'Josh N', state: 'even_performance',
+    ranking: [{ category: 'timing', rate_pct: 40, baseline_pct: 43 }] });
+  const strip = (h) => h.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const ta = strip(a), tb = strip(b);
+  assert.notStrictEqual(ta.replace('Godwin', 'X'), tb.replace('Josh N', 'X'),
+    'two closers with different data must not render the same sentence:\n' + ta + '\n' + tb);
+
+  // ⚠ CUSTOMER-LANGUAGE RULE: no thresholds, no mechanism, nothing internal.
+  [ta, tb].forEach((t) => {
+    assert.ok(!/points below/i.test(t), 'no threshold in customer copy: ' + t);
+    assert.ok(!/their own average|own average/i.test(t), 'no mechanism in customer copy: ' + t);
+    assert.ok(!/\brank\b|\bcompare\b|volume/i.test(t), 'no internal vocabulary: ' + t);
+  });
+});
+
+test('⚠ a GENUINELY empty range is the only place an empty state is allowed', () => {
+  // Reserved for total === 0 — where the server sends no `top` because there is
+  // no type to name. Everything else names a type, however small.
+  const none = renderCloser({ name: 'Dre', state: 'no_volume', total: 0, top: null });
+  const t = none.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  assert.ok(/no objections/i.test(t), 'zero objections says so plainly: ' + t);
+  assert.ok(!/\d+ of \d+/.test(t), 'nothing to name means no counts invented: ' + t);
 });
 
 test('⚠ only a rate_gap card carries a WHY and evidence', () => {
