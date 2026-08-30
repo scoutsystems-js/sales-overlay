@@ -2310,6 +2310,26 @@
       white-space: pre-wrap;
       padding-top: 16px;
     }
+    /* ── the six discovery items (surface ①) ──────────────────────────────
+       ⚠ NO RED AND NO CROSSES. "Not established" is a FACT, not a criticism —
+       an unestablished item on a call the closer ran well must not read as a
+       failure. Both states carry the SAME weight; only the mark differs, and
+       the open one is an outline rather than an absence. */
+    .disc-block { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .disc-title { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--text); opacity: 0.75; margin-bottom: 10px; }
+    .disc-row { padding: 7px 0; }
+    .disc-head { display: flex; align-items: baseline; gap: 8px; }
+    .disc-mark { font-size: 11px; line-height: 1; color: var(--accent); }
+    .disc-row.open .disc-mark { color: var(--text); opacity: 0.45; }
+    .disc-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .disc-quote { margin: 3px 0 0 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
+    /* ⚠ opacity, never a grey token — the no-grey rule bans unreadable body
+       text, not depth cues (the calendar exception). */
+    .disc-none { margin: 3px 0 0 20px; font-size: 13px; line-height: 1.5; color: var(--text); opacity: 0.7; }
+    .review-grade-disc-count { font-size: 11px; font-weight: 600; color: var(--text); opacity: 0.6;
+      white-space: nowrap; margin-left: 8px; }
+
     .review-grade-notes.placeholder { color: var(--text); font-style: italic; }
     .review-grade-card.not-occurred .review-grade-name { color: var(--text); font-style: italic; }
     /* Part 1b — section highlight breakdown inside an expanded grade card. */
@@ -15340,6 +15360,86 @@
     + '</section>';
   }
 
+  /* ── THE SIX DISCOVERY ITEMS (surface ①, 2026-08-30) ──────────────────────
+     Captured on every call since v33 and displayed nowhere. This is the TRUST
+     CHECK: it lets the captured quotes be read across real calls BEFORE anything
+     is built on top of them.
+
+     ⚠⚠ IT LIVES INSIDE THE DISCOVERY CARD, NOT IN A NEW PANEL. Justin's standing
+     ruling on this page — "I just want the call highlights… we keep over
+     complicating things" — removed three panels. These six ARE the discovery
+     criteria, so the section they belong to is the one that already exists, and
+     improving it beats adding to the page.
+
+     ⚠⚠ NOT COVERED IS A FACT, NOT A CRITICISM, AND THE DESIGN CARRIES THAT.
+     No red, no crosses, no "missed". Established ground reads as established;
+     the rest reads as "not established on this call" in the SAME neutral weight.
+     Six red marks on a call the closer ran well is the data-problem-as-bad-news
+     failure inverted, and it would make the page a scold.
+
+     ⚠ PAIN CARRIES THE LOGICAL-SALE CAVEAT EXPLICITLY. Some offers are bought on
+     logic and have no pain to surface, so absent pain is not a miss and must not
+     render as one. */
+  var DISCOVERY_ITEMS = [
+    ['pain', 'Pain'],
+    ['goals', 'Goals'],
+    ['current_situation', 'Current situation'],
+    ['decision_makers', 'Decision makers'],
+    ['why_now', 'Why now'],
+    ['financial_resources', 'Financial resources'],
+  ];
+  var DISCOVERY_KEYS = DISCOVERY_ITEMS.map(function (p) { return p[0]; });
+
+  // The six, in fixed order, from the stored coverage array. Returns null when
+  // this call predates v33 — an empty six-row grid reads as six failures.
+  function discoveryCoverage(analysis) {
+    var cov = analysis && analysis.coverage;
+    if (!Array.isArray(cov) || !cov.length) return null;
+    var byKey = {};
+    cov.forEach(function (c) { if (c && c.area_key) byKey[c.area_key] = c; });
+    var found = DISCOVERY_KEYS.filter(function (k) { return byKey[k]; });
+    if (!found.length) return null;          // derived-areas-only call, pre-v33
+    return DISCOVERY_ITEMS.map(function (pair) {
+      var c = byKey[pair[0]] || null;
+      return {
+        key: pair[0],
+        label: pair[1],
+        present: !!c,
+        covered: !!(c && c.covered),
+        /* ⚠ THE QUOTE IS SHOWN ONLY WHEN IT WAS VERIFIED AGAINST THE TRANSCRIPT.
+           An unverified line is not presented as the prospect's words — the whole
+           point of this surface is that the quotes can be trusted. */
+        evidence: (c && c.evidence_verified && c.evidence) ? c.evidence : null,
+      };
+    });
+  }
+
+  function discoveryCoverageHtml(analysis) {
+    var items = discoveryCoverage(analysis);
+    if (!items) return '';
+    var covered = items.filter(function (i) { return i.covered; }).length;
+    var rows = items.map(function (i) {
+      var state = i.covered ? 'covered' : 'open';
+      var mark = i.covered ? '●' : '○';
+      var line = i.evidence
+        ? '<div class="disc-quote">“' + escapeHtml(i.evidence) + '”</div>'
+        : (i.covered
+            ? '<div class="disc-none">Established on the call.</div>'
+            : '<div class="disc-none">Not established on this call.'
+              + (i.key === 'pain'
+                  ? ' Some offers are bought on logic and have no pain to surface — this is not automatically a miss.'
+                  : '')
+              + '</div>');
+      return '<div class="disc-row ' + state + '">'
+        + '<div class="disc-head"><span class="disc-mark">' + mark + '</span>'
+        + '<span class="disc-label">' + escapeHtml(i.label) + '</span></div>'
+        + line + '</div>';
+    }).join('');
+    return '<div class="disc-block">'
+      + '<div class="disc-title">Discovery ground — ' + covered + ' of ' + items.length + ' established</div>'
+      + rows + '</div>';
+  }
+
   function gradeCardHtml(sectionKey, analysis, highlights, recordingUrl) {
     var label = REVIEW_SECTION_LABELS[sectionKey];
     var grade = analysis[sectionKey + '_grade'];
@@ -15385,7 +15485,10 @@
         var notesClass = hasNotes ? 'review-grade-notes' : 'review-grade-notes placeholder';
         bodyInner = '<div class="' + notesClass + '">' + escapeHtml(notesText) + '</div>';
       }
-      notesHtml = '<div class="review-grade-body">' + bodyInner + '</div>';
+      // ⚠ the six sit ABOVE the notes/groups — they are the criteria the section
+      // is graded against, so they are the context for everything below them.
+      var discHtml = (sectionKey === 'discovery') ? discoveryCoverageHtml(analysis) : '';
+      notesHtml = '<div class="review-grade-body">' + discHtml + bodyInner + '</div>';
     }
 
     var notOccurred = (grade === null && score === null && typeof notes === 'string' && notes.indexOf('did not occur') !== -1);
@@ -15398,6 +15501,16 @@
         + '<div class="review-grade-name">' + escapeHtml(label) + '</div>'
         + letterHtml
         + '<div class="review-grade-score">' + escapeHtml(scoreText) + '</div>'
+        + (function () {
+            /* ⚠ VISIBLE WHILE COLLAPSED. A feature behind a click that nothing
+               hints at is the "complete and unreachable" failure — the merge
+               review page has 4 uses in its lifetime for exactly this reason. */
+            if (sectionKey !== 'discovery') return '';
+            var it = discoveryCoverage(analysis);
+            if (!it) return '';
+            var n = it.filter(function (x) { return x.covered; }).length;
+            return '<div class="review-grade-disc-count">' + n + '/' + it.length + ' ground</div>';
+          })()
         + chevron
       + '</div>'
       + notesHtml

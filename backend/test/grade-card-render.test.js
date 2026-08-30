@@ -16,8 +16,13 @@ function makeGradeCard(breakdownReturn, expanded) {
   const end = html.indexOf('function toggleGradeCard(', start);
   assert.ok(start !== -1 && end > start, 'gradeCardHtml not found');
   const src = html.slice(start, end);
+  /* ⚠ gradeCardHtml now calls discoveryCoverageHtml/discoveryCoverage (the six
+     discovery items, surface ①). These tests EXECUTE the real function, so the
+     new dependency has to be injected — that they failed when it appeared is the
+     harness doing its job, not a reason to weaken it. */
   const factory = new Function(
     'escapeHtml', 'highlightEntryHtml', 'sectionBreakdown', 'REVIEW_SECTION_LABELS', 'state',
+    'discoveryCoverageHtml', 'discoveryCoverage',
     src + '\n return gradeCardHtml;'
   );
   return factory(
@@ -25,7 +30,9 @@ function makeGradeCard(breakdownReturn, expanded) {
     (h) => '[HL:' + h.type + ']',
     () => breakdownReturn,
     { discovery: 'Discovery' },
-    { expandedGradeCards: { discovery: expanded } }
+    { expandedGradeCards: { discovery: expanded } },
+    () => '',      // no six-item block in these fixtures
+    () => null
   );
 }
 
