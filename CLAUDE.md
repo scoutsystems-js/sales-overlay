@@ -4043,6 +4043,38 @@ created_at cluster        2026-08-17         2026-07-21/24 — INSIDE real range
 - **The fix is to start the scope AFTER the implementing line**, not to weaken the assertion.
 - **⚠ Twice in the same block**: a `if 'real-calls' not in s` guard also matched **its own inserted comment**, which mentions `real-calls.js` — so the import it was gating was skipped. **When a guard's needle can appear in the prose you are inserting, it will.**
 
+### ⚠⚠⚠ SCOUT MADE THE CLOSER'S OWN MISTAKE IN ITS ADVICE — IT NORMALISED A FEAR IT NEVER ASKED ABOUT (Justin, 2026-08-29)
+**The Tina coaching criticised the closer for normalising without finding out what the fear was about, and then did precisely that: normalise, reframe, ask for the close — and never ask what the fear IS.**
+- **⚠⚠ GENTLENESS IS THE DELIVERY. FINDING OUT WHAT THE FEAR IS ABOUT IS THE WORK.** The three-move shape mistook the packaging for the content. **Reassurance aimed at an unnamed fear lands on nothing**, and a timing question asked before the fear is named is a pleasantry rather than a close.
+- **THE FEAR SHAPE IS FIVE MOVES, IN ORDER:** normalise → reframe the nerves as evidence they care → **ASK WHAT THE FEAR IS** (*"What's making you scared?"* / *"What would need to happen for you to not be scared?"*) → **handle whatever they name** → **close on timing CONDITIONAL on that fear being removed** (*"If that thing that's scaring you was removed, when would you want to get started?"*).
+- **⚠ THE CONDITION IS WHAT MAKES IT A CLOSE.** *"When would you want to get started?"* on its own is a pleasantry; tied to the named fear being removed it is an ask, and the timing framing is what keeps it from reading as pressure.
+- **⚠⚠ THE GENERAL FORM, AND IT IS WHY THIS RECURS: A COACHING RULE THAT SPECIFIES ONLY TONE WILL PRODUCE ADVICE THAT IS CORRECTLY TONED AND CONTENT-FREE.** Both fear iterations passed every mechanical audit — grounded, invention-free, right register, quotes verbatim. **The missing step was invisible to measurement and obvious to a closer.** Same family as the isolation defect, and the second time the same feature has shipped a well-formed wrong answer.
+- **VERIFIED BY MEASUREMENT AFTER THE FIX, ACROSS FOUR SAMPLES: all five moves present on both FEAR samples, NONE of them on either LOGISTICAL sample**, which kept the blunt register (*"Nothing is secured until money moves."*).
+- **⚠ AND ONE HONEST LIMIT ON THE CONTROL: the closed-call logistical sample found NOTHING TO FIX on this run** and so did not exercise the direct question at all, though a previous run on the same moment did. **The same moment can legitimately produce "here is what to add" or "nothing to fix" across runs** — which is why a second logistical sample on an OPEN call was added rather than claiming the control had passed.
+
+### ⚠⚠⚠ WHAT DISCOVERY IS ACTUALLY GRADED AGAINST — TWO OF JUSTIN'S SIX ITEMS ARE NOT LOOKED FOR AT ALL (measured 2026-08-29)
+**The entire Discovery criterion in the grader is ONE LINE:** *"emotional pain depth (not just surface problem), specific dollar/timeline commitment, decision-maker confirmed present, 'why now' urgency established"*.
+```
+PAIN                 ✅ present — but MANDATORY, with NO logical-sale caveat
+GOALS                ❌ ABSENT ENTIRELY
+CURRENT SITUATION    ❌ ABSENT ENTIRELY
+DECISION MAKERS      ✅ "decision-maker confirmed present"
+WHY NOW              ✅ "'why now' urgency established"
+FINANCIAL RESOURCES  🟡 partial — "dollar/timeline COMMITMENT" is what they agreed to,
+                        not whether they CAN PAY
+```
+- **⚠⚠ THE ABSENT `GOALS` ITEM IS THE UPSTREAM CAUSE OF A DEFECT ALREADY FILED: the prospect's stated goal is stored nowhere BECAUSE THE GRADER IS NEVER ASKED TO ESTABLISH IT.** The missing field and the missing criterion are one gap seen from two ends. **When a value turns out not to be stored, check whether anything ever asked for it before designing a place to put it.**
+- **⚠ "EMOTIONAL PAIN DEPTH" IS MANDATORY, SO A LOGICAL-SALE OFFER IS MARKED DOWN TODAY FOR MISSING PAIN THAT LEGITIMATELY IS NOT THERE.** Justin's caveat — *some offers are a logical sale with no pain* — has no expression in the criterion.
+- **THE CHECKLIST SHOULD INFORM THE SCORE, NOT REPLACE IT — AND INFORMING IS A PREREQUISITE FOR EVER DECIDING TO REPLACE.** They are different instruments: the score is a calibrated 0-100 judgement with an anchored rubric and a do-not-penalise-a-different-route rule, and swapping in six booleans breaks every trend and comparison built on `discovery_score`. **⚠ But the checklist is the better instrument on the merits** — the recorded per-section noise floor is **±14**, so the score is weak, while six transcript-checkable booleans are stable. **Store them, read them, then decide.** The measure-then-read discipline is what made `coverage` / `what_mattered` / `qualification_covered` work.
+- **ONE CHANGE NEEDS NONE OF THAT: add GOALS and CURRENT SITUATION to the criterion and put the logical-sale caveat on PAIN.** The grader is not currently looking for two of the six.
+
+### ⚠⚠ WHY PROSPECTS BUY — PAIN, GOALS, OR BOTH (Justin's definitions, 2026-08-29, FILED)
+- **PAIN**: tired of their situation, ready for change. **His definition: *"pain happens when your current situation doesn't align with your goals."*** — so pain is a RELATION between two of the six checklist items, not a standalone feeling.
+- **GOALS**: something they want to reach, and the driving force.
+- **⚠ BOTH ARE VITAL CLOSING MOMENTS, AND REFERENCING THEM IN THEIR OWN WORDS IS WHAT MAKES A CLOSER IMPACTFUL.** This is the missing half of the fear reframe.
+- **⚠⚠ THE DISCOVERY CHECKLIST IS THE UPSTREAM CAUSE OF THE FIVE OBJECTION TYPES, NOT A SEPARATE THING:** spouse = **DECISION MAKERS** uncovered · timing = **WHY NOW** uncovered · the money gap = **FINANCIAL RESOURCES** uncovered · the fear reframe needs **PAIN** and **GOALS**. **An objection is a discovery item surfacing late.**
+- **Justin's definition of discovery: *"the point of discovery is to discover the things you need to know to DQ the prospect or close the deal."* BOTH OUTCOMES ARE CORRECT** — which is the same principle as the DQ-is-not-a-coaching-failure ruling.
+
 ### ⚠⚠⚠ TONE IS A FUNCTION OF THE OBJECTION TYPE — THE SAME THREE STEPS DELIVERED BLUNTLY MAKE FEAR WORSE (Justin, 2026-08-29)
 **The draft coached a prospect who said *"I'm scared, I'm still scared"* with *"If that were handled, is there anything stopping you from moving forward today?"* — Justin: too aggressive, it reads as pushy and as a closer trying too hard.**
 - **⚠⚠ THE PATTERN IS IDENTICAL AND THE WORDS ARE NOT: isolate → overcome → ask for the sale, in every case.** What changes is delivery. **On a LOGISTICAL or money objection the blunt ask is CORRECT and must not be softened** — a real constraint wants a plan, not reassurance. **On FEAR the same sentence is counterproductive.**
