@@ -470,3 +470,39 @@ test('⚠⚠ the PROMPT VERSION is in the cache key, or a copy change ships noth
     + 'wording and the change looks shipped while rendering the text it replaced. Same '
     + 'lesson as NEEDS_WORK_LANE_VERSION.');
 });
+
+/* ⚠⚠ THE PROSE CAP CUT SIX OF SEVEN REAL CARDS MID-WORD AND SHIPPED THEM.
+   `str(g.what_to_do, 400)` was sized when this surface produced one terse
+   paragraph; the three-beat contract made the note legitimately longer
+   (measured 345-465 chars on live output), so the cap fired on NORMAL output
+   rather than on a runaway and a manager read "...losing it to a link she may
+   never". Same shape as the `str(bk.label, 30)` truncation already on file.
+   ⚠ The guard pins the SHAPE, not the number: a cap that fires must still end
+   on a complete sentence, because the number will drift again the next time
+   the contract changes. */
+test('prose caps sit above the prompt\'s own length rule, and a cut ends cleanly', () => {
+  const raw = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'team-objection-summary.js'), 'utf8');
+  // ⚠ line comments FIRST — a `/*` inside a `//` line is a false opener that
+  //   pairs with the next real closer and swallows everything between.
+  const live = raw.split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(live.length > 4000, 'strip must leave the module: ' + live.length);
+
+  assert.ok(!/str\(\s*g\.why\s*,/.test(live), 'why must not use the generic str() cap');
+  assert.ok(!/str\(\s*g\.what_to_do\s*,/.test(live), 'what_to_do must not use the generic str() cap');
+  assert.ok(/capProse\(\s*g\.why/.test(live), 'why must use capProse');
+  assert.ok(/capProse\(\s*g\.what_to_do/.test(live), 'what_to_do must use capProse');
+
+  // ~60 words a beat is ~350 chars; why is TWO beats, what_to_do is ONE.
+  // The caps must sit ABOVE that so they bound a runaway, not normal output.
+  const why = Number(/const WHY_CAP = (\d+)/.exec(live)[1]);
+  const wtd = Number(/const WHAT_TO_DO_CAP = (\d+)/.exec(live)[1]);
+  assert.ok(why >= 1000, 'WHY_CAP must clear two beats of prose, got ' + why);
+  assert.ok(wtd >= 700, 'WHAT_TO_DO_CAP must clear one beat with headroom, got ' + wtd);
+
+  // and a cut must land on a boundary, never mid-word
+  const capProse = require('../lib/team-objection-summary.js')._capProse;
+  assert.strictEqual(typeof capProse, 'function', '_capProse must be exported for this guard');
+  const cut = capProse('One sentence here. Two sentence here. ' + 'x'.repeat(400), 60);
+  assert.ok(/[.!?\u2026]$/.test(cut), 'a cut must end on a sentence or an ellipsis, got: ' + JSON.stringify(cut.slice(-25)));
+});

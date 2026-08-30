@@ -50,7 +50,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v2-2026-08-30-voice-c';
+const PROMPT_VERSION = 'v8-2026-08-30-coach-everyone';
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -71,8 +71,8 @@ const MAX_CLOSERS_IN_PROMPT = 24;
  * failure on a real team. Found by measuring how the prompt scales rather than
  * by testing the size we happen to have. Pinned by a test.
  */
-const OUT_TOKENS_PER_CLOSER = 350;
-const OUT_TOKENS_MIN = 1200;
+const OUT_TOKENS_PER_CLOSER = 420;
+const OUT_TOKENS_MIN = 1800;
 const OUT_TOKENS_MAX = 8000;
 function outputBudget(n) {
   return Math.min(OUT_TOKENS_MAX, Math.max(OUT_TOKENS_MIN, OUT_TOKENS_PER_CLOSER * n));
@@ -110,6 +110,30 @@ function extractJson(text) {
     else if (ch === '}') { depth--; if (depth === 0) { try { return JSON.parse(cleaned.slice(start, i + 1)); } catch (_) { return null; } } }
   }
   return null;
+}
+
+/* \u26a0\u26a0 THE PROSE CAPS ARE DERIVED FROM THE PROMPT'S OWN LENGTH RULE, AND THEY
+   SIT ABOVE IT ON PURPOSE. The prompt asks for ~60 words a beat: `what_to_do` is
+   ONE beat (~350 chars), `why` is TWO (~700). A cap set AT the intended maximum
+   fires on normal output rather than on a runaway \u2014 which is exactly what
+   happened: measured on seven real cards, what_to_do ran 345-465 against a 400
+   cap, so SIX OF SEVEN were cut mid-word and shipped to a manager that way.
+   These bound a genuine runaway (~1.7x observed max) and are never reached by
+   output that obeys the rule.
+   \u26a0 AND THE SHAPE MATTERS MORE THAN THE NUMBER, because the number will drift
+   again the next time the contract changes: capProse cuts at a SENTENCE boundary,
+   so if it ever does fire the note still ends as a complete thought. A mid-word
+   cut is how "losing it to a link she may never" reached the panel. */
+const WHY_CAP = 1200;
+const WHAT_TO_DO_CAP = 800;
+function capProse(x, cap) {
+  var t = (typeof x === 'string' && x.trim()) ? x.trim() : null;
+  if (!t || t.length <= cap) return t;
+  var cut = t.slice(0, cap);
+  var end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  if (end > cap * 0.5) return cut.slice(0, end + 1);
+  var sp = cut.lastIndexOf(' ');
+  return (sp > 0 ? cut.slice(0, sp) : cut) + '\u2026';
 }
 
 function str(x, cap) {
@@ -169,6 +193,18 @@ function topCategory(cats) {
     }
   });
   return best;
+}
+
+/* THE CATEGORY TO COACH ON. `rate_gap` already names one; every other state has
+   a populated `ranking` sorted weakest-first, so its head is the same answer by
+   the same measure. Returns null only when nothing was rankable at all — which
+   is what keeps a closer with no comparable category out of the prompt rather
+   than sending the model a subject it cannot say anything about. */
+function focusOf(c) {
+  if (!c) return null;
+  if (c.focus) return c.focus;
+  var r = c.ranking;
+  return (Array.isArray(r) && r.length) ? r[0] : null;
 }
 
 function classifyCloser(row) {
@@ -309,18 +345,48 @@ function buildPrompt(subjects) {
     '    about 60 words you are explaining rather than coaching, and the note stops',
     '    being read. "So wordy" is the single most common complaint about this text.',
     '',
-    '⚠⚠ NEVER INVENT, AND HOW TO QUOTE IS AN OPERATION, NOT AN ADJECTIVE: COPY A',
+    '⚠⚠ GIVE THE MOVE AND WHAT IT ACHIEVES — NEVER A LINE TO RECITE.',
+    '   THE TEST, and apply it to your own third paragraph before you finish: STRIP',
+    '   THE QUOTED LINE OUT. If what remains still tells them what to do and why,',
+    '   you have written coaching. If nothing is left, you have written a script.',
+    '   ⚠ A closer who achieves the same thing in different words has done it right.',
+    '   Coaching them to say exact words makes them read a teleprompter, and a rep',
+    '   who is handed a line that is not how they talk stops trusting the note.',
+    '⚠ NAME WHAT THE ANSWER TELLS THEM — both possible replies and what each opens.',
+    '   That is what lets them handle the NEXT one alone rather than the next',
+    '   identical one. ⚠ But do not decay into vagueness: "dig deeper, isolate the',
+    '   objection" with no substance is WORSE than a script. Name the exact',
+    '   information to get.',
+    '⚠⚠ DO NOT STATE A ROLE FOR ANYONE WHO MERELY APPEARS IN A QUOTE. A name being',
+    '   real does not make a claim about that person real: you were told what was',
+    '   said, never who they are. "Henry was the second decision-maker" is exactly',
+    '   the kind of confident invented detail that destroys the whole note.',
+        '⚠⚠ NEVER INVENT, AND HOW TO QUOTE IS AN OPERATION, NOT AN ADJECTIVE: COPY A',
     'CONTIGUOUS RUN OF CHARACTERS FROM ONE LINE BELOW. You may shorten by cutting',
     'from the START or the END. You may NEVER join a beginning to a later ending,',
     'and you may never bridge a gap with a dash or an ellipsis — that produces a',
     'sentence the prospect never said. If the full line is too long, quote LESS of',
     'it, not a stitched-together version of it.',
     '⚠ If a claim is not supported by a moment here, do not make it.',
+    '⚠⚠ YOU DO NOT KNOW HOW ANY CALL ENDED. You are shown ONE exchange per',
+    '   moment and whether that objection was resolved — nothing else. "unhandled"',
+    '   means THAT OBJECTION was not resolved in THAT exchange. It does NOT mean the',
+    '   call was lost, the prospect walked, or the deal died: an unhandled objection',
+    '   happens on calls that close. Never write "you lost the sale", "the call',
+    '   ended without", "they walked", or any other claim about the outcome. Say',
+    '   what happened in the exchange and stop there.',
     '⚠⚠ DO NOT NAME ANYONE — NOT THE PROSPECT AND NOT ANY THIRD PARTY. Write "they",',
     '"the prospect", "their partner". A name may appear inside a quote you were given,',
     'but you have NOT been told who that person is or what role they played, so any',
     'claim about them is a guess. "Henry was the second decision-maker" is exactly the',
     'kind of confident invented detail that destroys the whole note.',
+    '\u26a0\u26a0 YOU DO NOT KNOW THE PROSPECT\u0027S GENDER. Say "they", never "he" or "she"',
+    '   \u2014 AND THE MOMENTS BELOW MAY USE "he" OR "she" FOR THEM. Those observations',
+    '   were written ABOUT the call, not TO the closer. Do not copy their pronouns.',
+    '   \u26a0 THE ONE EXCEPTION IS A THIRD PARTY WHOSE RELATIONSHIP THE PROSPECT',
+    '   THEMSELVES STATED IN A QUOTE \u2014 if they said "my husband", you may write',
+    '   "her husband" is wrong but "their husband" and "him" are fine, because THEY',
+    '   told you that. THE PROSPECT IS STILL "they", even in the same sentence.',
     '⚠ do NOT restate the numbers. The manager is already looking at a grid of',
     'counts and rates. Tell them the MECHANISM — what this closer is actually doing,',
     'or failing to do, that produces that number.',
@@ -370,10 +436,16 @@ function buildPrompt(subjects) {
   });
 
   lines.push('');
+  lines.push('⚠⚠ THE THREE PARAGRAPHS ARE SPLIT ACROSS TWO FIELDS AND EACH APPEARS ONCE.');
+  lines.push('   "why" holds paragraph 1 AND paragraph 2, separated by a blank line.');
+  lines.push('   "what_to_do" holds paragraph 3 and NOTHING ELSE.');
+  lines.push('   ⚠ DO NOT put paragraph 3 in "why" as well — they are rendered one after the');
+  lines.push('   other, so a repeat shows up twice on screen and doubles the length.');
+  lines.push('');
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
   lines.push('{"closers":[{"name":"<exact name as given>",'
-    + '"why":"paragraph 1 then paragraph 2, separated by a blank line: what happened (lead with the timestamp and their words), then the principle",'
-    + '"what_to_do":"paragraph 3: the concrete move for next time, drawn from the framework above"}]}');
+    + '"why":"paragraph 1 (what happened — lead with the timestamp and their words) then a blank line then paragraph 2 (the principle)",'
+    + '"what_to_do":"paragraph 3 ONLY: the concrete move for next time"}]}');
   return lines.join('\n');
 }
 
@@ -436,7 +508,22 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
     classified.push({ user_id: id, name: nm, state: 'no_data', total: 0, handled: 0, ranking: [] });
   });
 
-  var speakable = classified.filter(function (c) { return c.state === 'rate_gap'; });
+  /* ⚠⚠ EVERY CLOSER WITH OBJECTIONS GETS COACHED (Justin's ruling 2026-08-30):
+     "regardless if they handle 0/50 or 50/50 you can still give coaching moments
+     like this." This filter used to be `state === 'rate_gap'`, which withheld
+     evidence and prose from FIVE closers of seven on the live board — not for
+     want of material (pickEvidence has the quotes, timestamps and replies all
+     along) but because the state model decides whether one category stands out
+     from the others, and that is a different question from whether there is
+     anything worth saying.
+     ⚠ THERE IS ALWAYS SOMETHING WORTH SAYING. A rep at 0 of 32 has a specific
+     moment that went wrong and a specific thing to do next time, exactly like a
+     rep at 12 of 30.
+     ⚠ `no_data` is the ONE exception and it survives: genuinely no objections is
+     the only case with nothing to coach from. */
+  var speakable = classified.filter(function (c) {
+    return c.state !== 'no_data' && focusOf(c) !== null;
+  });
 
   if (classified.length === 0) {
     return Object.assign({ available: true, cached: false, state: 'no_volume', closers: [],
@@ -474,10 +561,11 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
 
   // ── one Claude call for the whole board ──
   var subjects = speakable.slice(0, MAX_CLOSERS_IN_PROMPT).map(function (c) {
+    var f = focusOf(c);
     return {
-      user_id: c.user_id, name: c.name, category: c.focus.category,
-      total: c.focus.total, handled: c.focus.handled, baseline_pct: c.focus.baseline_pct,
-      evidence: pickEvidence(data.instances, c.user_id, c.focus.category),
+      user_id: c.user_id, name: c.name, category: f.category,
+      total: f.total, handled: f.handled, baseline_pct: f.baseline_pct,
+      evidence: pickEvidence(data.instances, c.user_id, f.category),
     };
   });
 
@@ -496,8 +584,25 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
       + ': ' + ((apiErr && apiErr.message) || 'unknown') }, base);
   }
 
+  /* \u26a0\u26a0 TRUNCATION AND JUNK REACH THE SAME BRANCH AND ARE OTHERWISE
+     INDISTINGUISHABLE \u2014 a cap grown too small looks exactly like a model
+     returning nonsense, and only one of those is fixed by changing a number.
+     Worse here: extractJson can RECOVER a cut response, so a partial note ships
+     with no signal at all. Log the stop reason so the two are separable. */
+  if (resp && resp.stop_reason === 'max_tokens') {
+    console.error('[team-objection-summary] output hit max_tokens ('
+      + outputBudget(subjects.length) + ') for ' + subjects.length
+      + ' closers \u2014 notes may be cut mid-sentence');
+  }
   var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
   if (!parsed || !Array.isArray(parsed.closers)) {
+    /* \u26a0 A failure that records no reason is a failure nobody can diagnose.
+       Log the shape, never the content (the response carries prospect quotes). */
+    var _raw = (resp.content && resp.content[0] && resp.content[0].text) || '';
+    console.error('[team-objection-summary] unparseable output: stop_reason='
+      + (resp && resp.stop_reason) + ' chars=' + _raw.length
+      + ' out_tokens=' + ((resp && resp.usage && resp.usage.output_tokens) || '?')
+      + '/' + outputBudget(subjects.length) + ' closers=' + subjects.length);
     return Object.assign({ available: false, reason: 'summary returned unparseable output' }, base);
   }
 
@@ -514,10 +619,12 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
 
   var closers = classified.map(function (c) {
     var out = withoutInternals(c);
-    if (c.state !== 'rate_gap') return out;
+    // ⚠ was `c.state !== 'rate_gap'` — the same narrowing, one layer down. Every
+    // subject that reached the model gets its prose and its evidence back.
+    if (speakable.indexOf(c) === -1) return out;
     var g = byName[String(c.name).trim().toLowerCase()] || {};
-    out.why = str(g.why, 700);
-    out.what_to_do = str(g.what_to_do, 400);
+    out.why = capProse(g.why, WHY_CAP);
+    out.what_to_do = capProse(g.what_to_do, WHAT_TO_DO_CAP);
     var subject = subjects.filter(function (s) { return s.user_id === c.user_id; })[0];
     out.evidence = subject ? subject.evidence.failed.slice(0, 3).map(publicMoment) : [];
     return out;
@@ -565,5 +672,6 @@ module.exports = {
   _MIN_BUCKET: MIN_BUCKET,
   _MIN_GAP_PP: MIN_GAP_PP,
   _outputBudget: outputBudget,
+  _capProse: capProse,
   _MAX_CLOSERS_IN_PROMPT: MAX_CLOSERS_IN_PROMPT,
 };
