@@ -85,6 +85,24 @@ test('the six drive NO score — the coverage block carries that prohibition', (
 
 test('the version bump ships with the change', () => {
   const w = read('lib/analysis-worker.js');
-  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v33-2026-08-30'/.test(w));
+  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v34-2026-08-30'/.test(w));
   assert.ok(/NOT A SEVENTH FIELD/.test(w), 'the reasoning must travel with the bump');
+});
+
+/* ── v34: two customer-visible defects, both one-line prompt rules ───────── */
+
+test('⚠ why_outcome may not name the prospect — the "Gary" defect', () => {
+  const w = require('../lib/analysis-worker');
+  const p = w._buildSectionGraderPrompt(
+    { turns: [{ text: 'hi', speaker: 'CLOSER', start_seconds: 0 }], highlights: [] }, 600, '', [], {});
+  assert.ok(/NEVER NAME THE PROSPECT IN `reason`/.test(p), 'the rule must be in the built prompt');
+  assert.ok(/prospect_name` is the field that carries a name contract/.test(p),
+    'and must say WHY — two rules that can disagree is the defect itself');
+});
+
+test('⚠ an observation timestamp must be [HH:MM:SS], never raw seconds', () => {
+  const w = require('../lib/analysis-worker');
+  const e = w._buildHighlightExtractorPrompt({ turns: [{ text: 'hi', speaker: 'CLOSER', start_seconds: 0 }] });
+  assert.ok(/NEVER a raw seconds number/.test(e), 'the format must be pinned');
+  assert.ok(/3598/.test(e), 'and the real observed output is named so the rule is concrete');
 });
