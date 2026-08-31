@@ -344,6 +344,14 @@ function meetingToRow(userId, m) {
     transcript_url:   null,  // Fathom inline-only — see comment above
     duration_seconds: durationSeconds,
     call_date:        startTime || m.created_at || null,
+    /* ⚠⚠ WHO WE FETCHED THIS AS. Migration 058, after the Nathan incident:
+       41 of one closer's calls were ingested into another's account and NOTHING
+       could detect it, because a row carried no record of the identity that
+       pulled it. With this stamped, "calls whose recorder is not the owner's
+       identity" is a one-query audit that must read zero.
+       ⚠ It is Fathom's OWN value for the row, not our filter argument — if the
+       two ever disagree that is itself the thing worth seeing. */
+    recorded_by:      (m.recorded_by && typeof m.recorded_by.email === 'string' && m.recorded_by.email) || null,
     sync_status:      'pending',
   };
 }

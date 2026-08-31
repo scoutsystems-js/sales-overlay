@@ -103,3 +103,50 @@ test('the picker states the consequence and drops the misleading count', () => {
     'the per-suggestion meeting count must not be rendered');
   assert.ok(/this is you/.test(live), 'the exact match must be marked');
 });
+
+/* ⚠⚠⚠ THE REAL ROOT CAUSE, FOUND 2026-08-31 AFTER THE FIRST FIX SHIPPED.
+   The previous block reported "/team_members returns ten members and does not
+   include Nathan". True of what the code FETCHED, and the reason was wrong:
+   the endpoint is PAGINATED (`next_cursor`, `limit`) and holds THIRTY-TWO
+   members across FOUR pages. Nathan is member #11 — page two. He was never
+   absent; the resolver read one page and stopped.
+
+   ⚠ A PAGINATION LIMIT PRESENTING AS AN ABSENCE — the same family as the
+   display cap that looked like missing data, and as my own 1000-row default
+   that reported the analysis rate stopping four days early. */
+test('fetchAllPages follows next_cursor to the end', async () => {
+  const { fetchAllPages } = require('../lib/fathom-identity');
+  const PAGES = {
+    'start':  { items: [{ email: 'a@x.com' }], next_cursor: 'c1' },
+    'c1':     { items: [{ email: 'nathan.m@soberlivingriches.com' }], next_cursor: 'c2' },
+    'c2':     { items: [{ email: 'z@x.com' }], next_cursor: null },
+  };
+  const calls = [];
+  const fake = async (url) => {
+    const m = /cursor=([^&]+)/.exec(url);
+    calls.push(m ? m[1] : 'start');
+    return { ok: true, json: async () => PAGES[m ? m[1] : 'start'] };
+  };
+  const all = await fetchAllPages('https://api/team_members', {}, fake);
+  assert.strictEqual(all.length, 3, 'must collect every page');
+  assert.deepStrictEqual(calls, ['start', 'c1', 'c2']);
+  assert.ok(all.some(m => m.email === 'nathan.m@soberlivingriches.com'),
+    'the member on page two is the whole point');
+});
+
+test('fetchAllPages is bounded, and a failed page keeps what it has', async () => {
+  const { fetchAllPages } = require('../lib/fathom-identity');
+  // a cursor that never terminates must not loop forever
+  const endless = async () => ({ ok: true, json: async () => ({ items: [{ email: 'a@x.com' }], next_cursor: 'always' }) });
+  const all = await fetchAllPages('https://api/x', {}, endless);
+  assert.ok(all.length > 0 && all.length <= 200, 'bounded, got ' + all.length);
+
+  let n = 0;
+  const flaky = async () => {
+    n++;
+    if (n === 1) return { ok: true, json: async () => ({ items: [{ email: 'a@x.com' }], next_cursor: 'c1' }) };
+    return { ok: false, status: 500, json: async () => ({}) };
+  };
+  const partial = await fetchAllPages('https://api/x', {}, flaky);
+  assert.strictEqual(partial.length, 1, 'a mid-page failure returns what was collected, never throws');
+});

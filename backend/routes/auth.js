@@ -377,7 +377,7 @@ const FATHOM_AUTHORIZE_URL = 'https://fathom.video/external/v1/oauth2/authorize'
 const FATHOM_TOKEN_URL     = 'https://fathom.video/external/v1/oauth2/token';
 const FATHOM_SCOPE         = 'public_api';
 const FATHOM_API_BASE_FOR_IDENTITY = 'https://api.fathom.ai/external/v1';
-const { resolveFathomIdentity, identityCandidates } = require('../lib/fathom-identity');
+const { resolveFathomIdentity, identityCandidates, fetchAllPages } = require('../lib/fathom-identity');
 const STATE_TTL_SECONDS    = 600;   // 10 minutes — plenty for a normal OAuth round-trip, short enough to limit replay window
 const TOKEN_EXPIRY_TOLERANCE_SECONDS = 300; // 5 min — matches fathom-typescript SDK; refresh slightly early to dodge clock skew
 
@@ -583,11 +583,14 @@ router.get('/fathom/callback', async function(req, res) {
        ⚠ Best-effort and non-fatal: a failure here must never break a
        successful connection. The picker remains the fallback. */
     try {
-      var tm = await fetch(FATHOM_API_BASE_FOR_IDENTITY + '/team_members', {
-        headers: { Authorization: 'Bearer ' + data.access_token, Accept: 'application/json' },
-      });
-      if (tm.ok) {
-        var tmJson = await tm.json();
+      /* ⚠⚠ EVERY PAGE, NOT THE FIRST. /team_members is paginated ten at a
+         time; this workspace has 32 members across 4 pages and Nathan was #11.
+         Reading page one and answering no_match is what sent him to the
+         picker. */
+      var authHeaders = { Authorization: 'Bearer ' + data.access_token, Accept: 'application/json' };
+      var tmItems = await fetchAllPages(FATHOM_API_BASE_FOR_IDENTITY + '/team_members', authHeaders);
+      {
+        var tmJson = { items: tmItems };
         // The Scout account's own email — the state JWT carries only the id.
         var who = await admin.auth.admin.getUserById(userId);
         var scoutEmail = (who && who.data && who.data.user && who.data.user.email) || null;
@@ -600,9 +603,7 @@ router.get('/fathom/callback', async function(req, res) {
            team_members exactly as before. */
         var meetingItems = [];
         try {
-          var mres = await fetch(FATHOM_API_BASE_FOR_IDENTITY + '/meetings', {
-            headers: { Authorization: 'Bearer ' + data.access_token, Accept: 'application/json' },
-          });
+          var mres = await fetch(FATHOM_API_BASE_FOR_IDENTITY + '/meetings', { headers: authHeaders });
           if (mres.ok) {
             var mjson = await mres.json();
             meetingItems = (mjson && (mjson.items || mjson.data)) || [];
@@ -610,7 +611,7 @@ router.get('/fathom/callback', async function(req, res) {
         } catch (mErr) {
           console.warn('[auth] identity: meetings probe failed for user ' + userId + ': ' + (mErr.message || 'unknown'));
         }
-        var candidates = identityCandidates((tmJson && tmJson.items) || [], meetingItems);
+        var candidates = identityCandidates(tmItems, meetingItems);
         var hit = resolveFathomIdentity(scoutEmail, candidates);
         if (hit.email) {
           await admin.from('fathom_connections')

@@ -103,8 +103,50 @@ function identityCandidates(teamMembers, meetings) {
   return out;
 }
 
+/* ⚠⚠⚠ READ EVERY PAGE. THE ROOT CAUSE OF THE NATHAN INCIDENT.
+   /team_members is PAGINATED — it returns `items`, `next_cursor` and `limit`,
+   ten at a time. This workspace has THIRTY-TWO members across FOUR pages and
+   Nathan is #11, on page two. The resolver read page one, did not find him,
+   and correctly answered no_match from an incomplete input.
+
+   ⚠ IT WAS FIRST DIAGNOSED AS "he is not a listed team member". That was wrong:
+   a PAGINATION LIMIT PRESENTING AS AN ABSENCE. Same family as a display cap
+   that reads as missing data, or a default row limit that reports a rate as
+   stopping days early.
+
+   ⚠ Bounded at MAX_PAGES so a cursor that never terminates cannot hang a
+   connect. A failed page returns what was already collected rather than
+   throwing — an incomplete list degrades to the picker, which is the existing
+   fallback, while an exception would break a successful connection. */
+const MAX_IDENTITY_PAGES = 20;
+
+async function fetchAllPages(url, headers, fetchImpl) {
+  var f = fetchImpl || (typeof fetch === 'function' ? fetch : null);
+  if (!f) return [];
+  var out = [];
+  var cursor = null;
+  for (var i = 0; i < MAX_IDENTITY_PAGES; i++) {
+    var u = url + (cursor ? ((url.indexOf('?') === -1 ? '?' : '&') + 'cursor=' + encodeURIComponent(cursor)) : '');
+    var res;
+    try {
+      res = await f(u, { headers: headers, });
+    } catch (e) { return out; }
+    if (!res || !res.ok) return out;
+    var body;
+    try { body = await res.json(); } catch (e) { return out; }
+    var items = (body && (body.items || body.data)) || [];
+    if (!Array.isArray(items) || !items.length) return out;
+    out = out.concat(items);
+    cursor = (body && body.next_cursor) || null;
+    if (!cursor) return out;
+  }
+  return out;
+}
+
 module.exports = {
   normEmail: normEmail,
   resolveFathomIdentity: resolveFathomIdentity,
   identityCandidates: identityCandidates,
+  fetchAllPages: fetchAllPages,
+  MAX_IDENTITY_PAGES: MAX_IDENTITY_PAGES,
 };
