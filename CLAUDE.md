@@ -5406,3 +5406,33 @@ already gated                             routes/me.js · lib/section-breakdown.
 - **⚠⚠ A GUARD COUNTED `messages.create` INSIDE `coachCallMoments` AND WOULD HAVE SILENTLY STOPPED GUARDING.** After the swap to the seam it counted **ZERO** and passed — the one-call-per-call rule it exists for would have been unprotected. **It now counts BOTH forms.** *A guard that quietly measures nothing is worse than one that fails.*
 - **⚠ AND ADDING AN INDIRECTION MOVED THE TEST STUB EDGE.** `test/team-objection-summary.test.js` stubs the SDK in `require.cache` and re-requires the lane — but the lane now goes through `model-usage`, **which was already cached with the REAL sdk**, so every stubbed call fell through to the live client. **Any module inserted between a lane and the SDK must be evicted from the cache too.**
 - **`routes/proxy.js` IS DELIBERATELY EXEMPT** — its five calls serve the dormant desktop teleprompter, so wiring it would add spend rows for a surface no live user reaches. Recorded in the guard so it reads as a ruling rather than an omission.
+
+### ⚠⚠⚠ A MEASUREMENT OF A PROBE IS NOT A MEASUREMENT OF THE IMPLEMENTATION (2026-08-31, time to price)
+**I reported 98% agreement for a priceless price-detector. The shipping implementation measures 96% — because the probe HAD NO RULE A**, the prospect-first exclusion. **The probe and the product were different algorithms, and the number was quoted as if they were the same.**
+- **⚠ THE TELL WAS AVAILABLE AND I WALKED PAST IT: one of the probe's own "extra" moments was `"The $9,800."` — LITERALLY the verbatim example in Rule A's comment**, sitting in the file I was reusing. A probe that reproduces a documented failure case is not implementing the documented rule.
+- **THE RULE: when a probe justifies a change to a shipped path, the number that ships is the one measured from THE REAL FUNCTION.** Re-measure after wiring, and correct the earlier figure out loud — same discipline as the 16%→13% correction the day before.
+- **⚠ AND THE MEASUREMENT IS AGAINST THE THING BEING REPLACED, USED AS GROUND TRUTH.** 120 real calls: **109 exact, 6 within 60s, 0 DIFFERENT, 5 missed.** The zero is the load-bearing number — **the failure mode is a null, never a wrong minute**, which is the safe direction the module's header asks for.
+
+### ⚠⚠⚠ TWO EXCLUSIONS I ADDED WERE THE MAIN SOURCE OF MISSES — AND MEASUREMENT, NOT REVIEW, FOUND BOTH (2026-08-31)
+**Agreement went 87% → 93% → 96% as each of my own rules came out. Both looked entirely reasonable when written.**
+```
+DISCOUNT_RE  /\b(off|discount|save)\b/   cost FOUR real prices to catch ONE decoy
+   "the total price was $9,800 before the discount"   <- killed the moment it should find
+   "we are a tax write-OFF"                           <- and matched an unrelated phrase
+PER_PERIOD_RE fired on "that's not per year"          <- a NEGATION that CONFIRMS a total
+```
+- **⚠⚠ CLOSERS STATE THE FULL PRICE EXACTLY WHEN THEY MENTION A DISCOUNT.** The exclusion was aimed at the one turn where a discount IS the number, and it caught the four where the discount is mentioned BESIDE the price. **An exclusion written from one bad example will hit the good examples that share its vocabulary.**
+- **THE MODULE'S OWN HEADER ALREADY HELD THE RULE THAT KILLS IT:** *"a threshold that removes exactly one call does not earn its maintenance."* I wrote a new one anyway. **Read the file's own rulings before adding a rule to it.**
+- **THE REPLACEMENT IS A PROPERTY, NOT A RULE: take the LARGEST surviving candidate.** A discount, a deposit and an instalment are all *smaller* than the total they relate to — that is what the numbers mean, not a tuned preference.
+- **⚠ NEGATION IS THE OTHER HALF, AND IT GENERALISES: a phrase and its negation carry OPPOSITE meaning to the same regex.** *"per year"* and *"not per year"* differ by one word and by everything else.
+
+### ⚠⚠ A THINNING RULE FIRED WHERE THERE WAS NOTHING TO THIN — "NO DATES ON THE AXIS", REPORTED THREE TIMES (2026-08-31)
+**Monday-only labelling was applied to EVERY daily range. The team default is SEVEN DAYS, and any seven consecutive days contain exactly ONE Monday — so the axis rendered ONE label out of seven, at 157px of available room each.**
+```
+ 7-day window   1 of 7 labels   <- reads as "no dates"
+30-day window   5 of 30         <- here the thinning is CORRECT (~36px each)
+```
+- **⚠ THE RULE WAS RIGHT AND ITS SCOPE WAS WRONG.** Chart.js genuinely drops labels silently when they collide, and explicit thinning is the right answer to that — **at 30 labels. It was never conditioned on whether collision was actually happening.**
+- **⚠⚠ NEITHER OF THE TWO OBVIOUS DIAGNOSES WAS RIGHT** — not the Monday rule misfiring (measured: it labels exactly the real Mondays) and not the axis rendering nothing. **A third possibility, "the rule is correct and applies too widely", is easy to miss because both named candidates are about the rule being BROKEN.**
+- **THE FIX KEYS ON WIDTH PER LABEL, NOT DAY COUNT**, and the threshold is **derived from the reasoning already written in the comment** (~48px per date label) rather than picked. A narrow chart still thins at 14 days; a wide one does not.
+- **⚠ ALL THREE GRAPHS SHARE ONE BUILDER**, so checking the third — which nobody reported — cost nothing and was part of the same fix.
