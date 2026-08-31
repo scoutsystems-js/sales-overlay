@@ -66,4 +66,45 @@ function resolveFathomIdentity(scoutEmail, members) {
   return { email: null, reason: 'no_match' };
 }
 
-module.exports = { normEmail: normEmail, resolveFathomIdentity: resolveFathomIdentity };
+/* ⚠⚠ TWO SOURCES, NOT ONE — THE NATHAN INCIDENT (2026-08-31).
+   Auto-resolution consulted only /team_members. That endpoint returned TEN
+   members and did not list him, so it correctly answered no_match and fell
+   through to the picker — where the suggestions were ordered by who had
+   recorded most of the last ten WORKSPACE meetings. Dre had recorded 7 of 10,
+   so Dre was offered first and Nathan's own address third. The wrong one was
+   chosen and 41 of Dre's calls were ingested into his account.
+
+   ⚠ HIS OWN ADDRESS WAS AVAILABLE THE WHOLE TIME, in the `recorded_by` values
+   on /meetings. The resolver was reading one source when two existed. Merging
+   them costs one request we already make elsewhere and removes the question.
+
+   ⚠ This does NOT relax the matching rule. resolveFathomIdentity still demands
+   EXACT equality and still refuses on ambiguity — a wrong match syncs a
+   different person's calls, which is precisely the damage being prevented.
+   What widens is the CANDIDATE LIST, never the comparison. */
+function identityCandidates(teamMembers, meetings) {
+  var seen = {};
+  var out = [];
+  function add(email) {
+    if (typeof email !== 'string') return;
+    var k = normEmail(email);
+    if (!k || seen[k]) return;
+    seen[k] = true;
+    // ⚠ keep the STORED form: recorded_by[] is an exact-match filter on
+    // Fathom's side, so we must send back what they gave us.
+    out.push({ email: email });
+  }
+  (Array.isArray(teamMembers) ? teamMembers : []).forEach(function (m) {
+    if (m) add(m.email);
+  });
+  (Array.isArray(meetings) ? meetings : []).forEach(function (m) {
+    if (m && m.recorded_by) add(m.recorded_by.email);
+  });
+  return out;
+}
+
+module.exports = {
+  normEmail: normEmail,
+  resolveFathomIdentity: resolveFathomIdentity,
+  identityCandidates: identityCandidates,
+};

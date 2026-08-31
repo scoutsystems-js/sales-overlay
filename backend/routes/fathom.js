@@ -1118,8 +1118,33 @@ router.get('/identity-options', requireAuth, async function(req, res) {
         }
         byEmail[rb.email].count += 1;
       }
+      /* ⚠⚠ RANK BY WHO IS CONNECTING, NOT BY WHO HAS BEEN BUSIEST.
+         The old order was `count DESC` — how often each person appears in ONE
+         unfiltered page of the last ten WORKSPACE meetings. That is a fact
+         about recent activity with NO relationship to the person choosing.
+         On 2026-08-31 it offered Dre first (7 of the last 10) and Nathan's own
+         address third; the top of the list was picked and 41 of Dre's calls
+         were ingested into his account. Nobody should be blamed for picking
+         the top of a list sorted by the wrong thing.
+         ⚠ An EXACT match on the signed-in address is not a suggestion, it is
+         the answer — it is pinned first and the UI selects it by default.
+         ⚠ Ordering only. Nothing here auto-commits, and no fuzzy rule is used
+         to RESOLVE an identity: a near miss is still just a list position. */
+      var meNorm = String(req.user.email || '').trim().toLowerCase();
+      var meLocal = meNorm.split('@')[0];
+      function affinity(e) {
+        var n = String(e || '').trim().toLowerCase();
+        if (meNorm && n === meNorm) return 3;                       // exact — the answer
+        if (meLocal && n.split('@')[0] === meLocal) return 2;       // same local part
+        if (meLocal && meLocal.length > 2 && n.indexOf(meLocal) === 0) return 1;
+        return 0;
+      }
       suggestions = Object.keys(byEmail).map(function(k) { return byEmail[k]; })
-        .sort(function(a, b) { return b.count - a.count; })
+        .map(function(x) { x.affinity = affinity(x.email); return x; })
+        .sort(function(a, b) {
+          if (b.affinity !== a.affinity) return b.affinity - a.affinity;
+          return b.count - a.count;
+        })
         .slice(0, 8);
       if (suggestions.length === 0) suggestions = scoutFallback;
     } catch (fetchErr) {

@@ -377,7 +377,7 @@ const FATHOM_AUTHORIZE_URL = 'https://fathom.video/external/v1/oauth2/authorize'
 const FATHOM_TOKEN_URL     = 'https://fathom.video/external/v1/oauth2/token';
 const FATHOM_SCOPE         = 'public_api';
 const FATHOM_API_BASE_FOR_IDENTITY = 'https://api.fathom.ai/external/v1';
-const { resolveFathomIdentity } = require('../lib/fathom-identity');
+const { resolveFathomIdentity, identityCandidates } = require('../lib/fathom-identity');
 const STATE_TTL_SECONDS    = 600;   // 10 minutes — plenty for a normal OAuth round-trip, short enough to limit replay window
 const TOKEN_EXPIRY_TOLERANCE_SECONDS = 300; // 5 min — matches fathom-typescript SDK; refresh slightly early to dodge clock skew
 
@@ -591,14 +591,36 @@ router.get('/fathom/callback', async function(req, res) {
         // The Scout account's own email — the state JWT carries only the id.
         var who = await admin.auth.admin.getUserById(userId);
         var scoutEmail = (who && who.data && who.data.user && who.data.user.email) || null;
-        var hit = resolveFathomIdentity(scoutEmail, (tmJson && tmJson.items) || []);
+        /* ⚠⚠ TWO SOURCES. /team_members returned TEN people and did not list
+           Nathan, so this said no_match and the picker asked — and the picker
+           ranked by busiest recorder, offering another closer first. His own
+           address was in `recorded_by` on /meetings all along. Merging the two
+           candidate lists is what stops that question being asked at all.
+           ⚠ Best-effort: if the meetings page fails we still resolve from
+           team_members exactly as before. */
+        var meetingItems = [];
+        try {
+          var mres = await fetch(FATHOM_API_BASE_FOR_IDENTITY + '/meetings', {
+            headers: { Authorization: 'Bearer ' + data.access_token, Accept: 'application/json' },
+          });
+          if (mres.ok) {
+            var mjson = await mres.json();
+            meetingItems = (mjson && (mjson.items || mjson.data)) || [];
+          }
+        } catch (mErr) {
+          console.warn('[auth] identity: meetings probe failed for user ' + userId + ': ' + (mErr.message || 'unknown'));
+        }
+        var candidates = identityCandidates((tmJson && tmJson.items) || [], meetingItems);
+        var hit = resolveFathomIdentity(scoutEmail, candidates);
         if (hit.email) {
           await admin.from('fathom_connections')
             .update({ fathom_email: hit.email, updated_at: new Date().toISOString() })
             .eq('user_id', userId);
-          console.log('[auth] Fathom identity auto-captured for user ' + userId + ' (source=' + hit.source + ')');
+          console.log('[auth] Fathom identity auto-captured for user ' + userId
+            + ' (source=' + hit.source + ', candidates=' + candidates.length + ')');
         } else {
-          console.log('[auth] Fathom identity not auto-resolvable for user ' + userId + ' (' + hit.reason + ') — the picker will ask');
+          console.log('[auth] Fathom identity not auto-resolvable for user ' + userId
+            + ' (' + hit.reason + ', candidates=' + candidates.length + ') — the picker will ask');
         }
       }
     } catch (idErr) {

@@ -5958,20 +5958,37 @@
     var chips = '';
     if (suggestions.length > 0) {
       chips = '<div style="display:flex;flex-wrap:wrap;gap:6px;width:100%;">'
-        + '<span class="fathom-strip-meta" style="width:100%;margin-bottom:2px;">Pick the identity Fathom stamps on your recordings, or type it below:</span>'
+        + '<span class="fathom-strip-meta" style="width:100%;margin-bottom:2px;">Pick the email Fathom puts on <em>your</em> recordings, or type it below:</span>'
+        /* ⚠⚠ THE COUNT IS GONE, DELIBERATELY. It showed how many of the last
+           ten workspace meetings each person recorded — a fact about who has
+           been busiest, which reads as authority and is not about you at all.
+           On 2026-08-31 it put "(7)" beside another closer's address and that
+           address was chosen. What matters is which one is YOURS. */
         + suggestions.map(function(s) {
+            var mine = s.affinity === 3;
             var label = (s.name ? escapeHtml(s.name) + ' · ' : '') + escapeHtml(s.email)
-              + (typeof s.count === 'number' ? ' (' + s.count + ')' : '');
+              + (mine ? ' — this is you' : '');
             return '<button class="btn-fathom-secondary" type="button" data-email="' + escapeHtml(s.email) + '"'
               + ' onclick="selectFathomIdentity(this.getAttribute(\'data-email\'))"'
-              + ' style="border-radius:14px;padding:5px 10px;font-size:12px;"'
+              + ' style="border-radius:14px;padding:5px 10px;font-size:12px;'
+              + (mine ? 'border-color:var(--accent);color:var(--accent);' : '') + '"'
               + (saving ? ' disabled' : '') + '>' + label + '</button>';
           }).join('')
         + '</div>';
     }
 
+    /* ⚠⚠ SAY WHAT PICKING WRONG DOES. Nothing on this screen told anyone
+       that choosing another person's address pulls THEIR calls into YOUR
+       account — and on 2026-08-31 that is exactly what happened, 41 of them.
+       A choice with a consequence that cannot be undone by re-choosing has to
+       say so, in words the person can act on. */
+    var warn = '<span class="fathom-strip-meta" style="width:100%;color:var(--mid);">'
+      + 'Choose the address that is yours. Picking someone else\'s will copy their calls into your account.'
+      + '</span>';
+
     return '<div class="fathom-strip" style="flex-direction:column;align-items:stretch;gap:10px;">'
       + chips
+      + warn
       + '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'
         + '<span class="fathom-strip-text">Which email do you use for Fathom?</span>'
         + '<input id="fathom-identity-input" type="email" value="' + escapeHtml(suggestion) + '" placeholder="you@company.com"'
