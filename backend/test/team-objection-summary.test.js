@@ -332,13 +332,28 @@ test('⚠ evidence comes from the DB row, not from the model', async () => {
 });
 
 test('⚠ a credited-but-unhandled moment is still FAILED evidence', () => {
+  /* ⚠ THE FIXTURE GAINED closer_response_verified 2026-08-31, and the test's
+     SUBJECT is unchanged. `worked` evidence now requires a PROVEN reply — an
+     unproven one is the model's guess at who spoke — so a fixture written
+     before that flag existed no longer expresses "a handled moment with a real
+     reply". Converted, not weakened. */
   const moments = [
-    { closer: { user_id: JOSH }, category: 'timing', resolution: 'unhandled', credited: true, closer_response: 'x' },
-    { closer: { user_id: JOSH }, category: 'timing', resolution: 'handled', credited: false, closer_response: 'y' },
+    { closer: { user_id: JOSH }, category: 'timing', resolution: 'unhandled', credited: true, closer_response: 'x', closer_response_verified: true },
+    { closer: { user_id: JOSH }, category: 'timing', resolution: 'handled', credited: false, closer_response: 'y', closer_response_verified: true },
   ];
   const ev = _pickEvidence(moments, JOSH, 'timing');
   assert.strictEqual(ev.failed.length, 1, 'credited counts in the RATE but is not good handling');
   assert.strictEqual(ev.worked.length, 1);
+});
+
+test('⚠⚠ an UNPROVEN reply cannot become "what worked" evidence', () => {
+  // 13% of showable replies are unproven. Held up as the model to copy, one is
+  // words the rep may never have said — and it would feed the prompt too.
+  const ev = _pickEvidence([
+    { closer: { user_id: JOSH }, category: 'timing', resolution: 'handled', credited: false, closer_response: 'y', closer_response_verified: false },
+    { closer: { user_id: JOSH }, category: 'timing', resolution: 'handled', credited: false, closer_response: 'z' },
+  ], JOSH, 'timing');
+  assert.strictEqual(ev.worked.length, 0, 'unproven and never-assessed must both be withheld');
 });
 
 test('⚠ position in the call is NULL when unknown, never 0%', () => {

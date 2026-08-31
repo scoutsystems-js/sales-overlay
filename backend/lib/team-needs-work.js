@@ -29,7 +29,7 @@ const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
 const { isHandled, outcomeMap } = require('./objection-handled');
 
 const { clipHref } = require('./clip-link');
-const { displayCloserResponse } = require('./closer-side');
+const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
 // ── Guardrails (Phase 1, approved) ──────────────────────────────────────────
 const MIN_BUCKET = 6;        // no "needs work" claim off a tiny bucket
 const MIN_GAP_PP = 5;        // rate must be at least this far below baseline
@@ -457,7 +457,7 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap, na
   var analyses = await w.inChunks('call_analyses', ANALYSIS_COLS,
     function (q) { return q.eq('status', 'done'); });
   var objRowsAll = await w.inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, objection_class, resolution, type',
+    'fathom_call_id, timestamp_seconds, quote, observation, closer_response, closer_response_verified, objection_surface, objection_class, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
 
   /* ⚠⚠ DISQUALIFIED CALLS LEAVE THE BUCKETS. This panel's buckets ARE the
@@ -650,7 +650,7 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
   var w = await loadTeamWindow(admin, userIds, from, to);
   if (!w.callIds.length) return [];
   var rows = await w.inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, quote, closer_response, objection_surface, objection_class, resolution, type',
+    'fathom_call_id, timestamp_seconds, quote, closer_response, closer_response_verified, objection_surface, objection_class, resolution, type',
     function (q) { return q.eq('type', 'objection'); });
   var clip = function (cid, ts) { return clipHref(w.meta[cid] && w.meta[cid].recording_url, ts); };
   // the provider travels WITH the link — a label cannot be derived from a URL
@@ -675,7 +675,7 @@ async function loadBucketEvidence(admin, userIds, surfaces, from, to) {
       surface: r.objection_surface, handled: isHandled(r, evidenceOutcome[r.fathom_call_id]),
       // ⚠ carried through, or the stored class is invisible to the split above
       objection_class: r.objection_class || null,
-      quote: str(r.quote, 400), closer_response: str(displayCloserResponse(r.closer_response), 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
+      quote: str(r.quote, 400), closer_response: str(provenCloserResponse(r), 400), clip_url: clip(r.fathom_call_id, r.timestamp_seconds),
       source: srcOf(r.fathom_call_id) };
   }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
 }
@@ -690,7 +690,7 @@ function toObjs(objRows, w, outcomeByCall) {
       quote: str(r.quote, 300), observation: str(r.observation, 240), rep: null, clip_url: clip(r.fathom_call_id, r.timestamp_seconds), source: srcOf(r.fathom_call_id) };
   });
 }
-var OBJ_COLS = 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, objection_surface, objection_class, resolution, type';
+var OBJ_COLS = 'fathom_call_id, timestamp_seconds, quote, observation, closer_response, closer_response_verified, objection_surface, objection_class, resolution, type';
 // cash_collected dropped 2026-08-17 with the money math — nothing in this
 // module reads it now. `outcome` STAYS: it is what credits an objection on a
 // closed call under the handled ruling.

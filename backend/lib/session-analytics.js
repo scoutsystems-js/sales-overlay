@@ -14,7 +14,7 @@ const { isCredited } = require('./objection-handled');
 var { fetchProspectCloseRates } = require('./prospect-entity');
 
 const { clipHref } = require('./clip-link');
-const { displayCloserResponse } = require('./closer-side');
+const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
 // Prior equal-length window's avg score for `userId`, via the reused team
 // aggregator. Returns a rounded mean, or null when there are no graded calls in
 // the prior window (new user / window predates their first call) → tile shows no
@@ -278,7 +278,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
   for (var c = 0; c < callIds.length; c += 100) {
     var hr = await admin
       .from('call_highlights')
-      .select('fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, resolution, closer_response')
+      .select('fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, resolution, closer_response, closer_response_verified')
       .in('fathom_call_id', callIds.slice(c, c + 100))
       .eq('type', 'objection');
     if (hr.error) throw new Error('call_highlights: ' + hr.error.message);
@@ -325,7 +325,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
       credited: credited,   // 'Credited (call closed)' badge
       quote: r.quote || null,
       observation: r.observation || null,
-      closer_response: displayCloserResponse(r.closer_response),
+      closer_response: provenCloserResponse(r),
     });
   });
   base.metrics.calls_with_objection = Object.keys(callsWith).length;

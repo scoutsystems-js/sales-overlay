@@ -38,7 +38,7 @@ const { OBJECTION_CATEGORIES: CANONICAL_CATEGORIES } = require('./objection-cate
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 
-const { displayCloserResponse } = require('./closer-side');
+const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
 /* The fingerprint of an empty analysis set. Written as the same md5 the loaded
    path produces for 'empty' so an empty window and a populated one can never
    collide on a cache key, and so the empty return is a real fingerprint rather
@@ -388,7 +388,12 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
       credited: credited,
       quote: r.quote || null,
       observation: r.observation || null,
-      closer_response: displayCloserResponse(r.closer_response),
+      /* ⚠⚠ GATED AT THE SOURCE. This lane feeds BOTH the moments feed and the
+         Why panel's prompt, so gating here fixes both and leaves no consumer
+         able to render an unproven reply by forgetting. The FLAG is still
+         emitted below, so a consumer that genuinely needs the distinction
+         between "no reply" and "unproven reply" can still ask. */
+      closer_response: provenCloserResponse(r),
       speaker_verified: r.speaker_verified === true,
       closer_response_verified: r.closer_response_verified === true,
     });

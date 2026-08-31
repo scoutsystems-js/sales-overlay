@@ -69,7 +69,17 @@ test('⚠ each consumer IMPORTS it — a call to an undefined identifier passes 
   // passed a syntax check, because identifier resolution is a RUNTIME fact.
   CONSUMERS.forEach((f) => {
     const src = live(f);
-    assert.ok(/displayCloserResponse \} = require\('\.\/closer-side'\)/.test(src),
-      f + ' calls it without importing it');
+    /* ⚠ ASSERT THE INTENT, NOT A ONE-EXPORT LITERAL. This originally matched
+       `displayCloserResponse } = require(...)`, which went stale the moment a
+       SECOND gate was added to closer-side and the import became a list — a
+       guard failing on exactly the change it polices. It now checks that every
+       closer-side function the file CALLS is also imported. */
+    var imp = /\{([^}]*)\}\s*=\s*require\('\.\/closer-side'\)/.exec(src);
+    assert.ok(imp, f + ' does not import from closer-side at all');
+    var imported = imp[1].split(',').map(function (x) { return x.trim(); });
+    ['displayCloserResponse', 'provenCloserResponse'].forEach(function (fn) {
+      var callsIt = new RegExp(fn + '\\s*\\(').test(src.replace(imp[0], ''));
+      if (callsIt) assert.ok(imported.indexOf(fn) !== -1, f + ' calls ' + fn + ' without importing it');
+    });
   });
 });

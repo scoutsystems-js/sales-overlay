@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 
 const { clipHref } = require('./clip-link');
-const { displayCloserResponse } = require('./closer-side');
+const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
 const OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const SYNTH_MAX_TOKENS = 2500;
 
@@ -141,7 +141,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
 
   // 4) categorized objection highlights → per-category counts + handled examples.
   var rows = await inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, quote, objection_surface, objection_category, resolution, closer_response',
+    'fathom_call_id, timestamp_seconds, quote, objection_surface, objection_category, resolution, closer_response, closer_response_verified',
     function(q) { return q.eq('type', 'objection'); });
   var byCat = {};
   OBJECTION_CATEGORIES.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [] }; });
@@ -159,8 +159,8 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     if (r.resolution === 'handled') {
       /* ⚠ SENTINEL-GATED: an example is EVIDENCE OF GOOD HANDLING shown to a
          closer — a sentinel is not something he said. */
-      if (displayCloserResponse(r.closer_response) && b.examples.length < 3) {
-        b.examples.push({ quote: str(r.quote, 300), closer_response: str(displayCloserResponse(r.closer_response), 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
+      if (provenCloserResponse(r) && b.examples.length < 3) {
+        b.examples.push({ quote: str(r.quote, 300), closer_response: str(provenCloserResponse(r), 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
           source: (meta[r.fathom_call_id] || {}).source || null });
       }
     }

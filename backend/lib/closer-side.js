@@ -61,4 +61,36 @@ function displayCloserResponse(v) {
   return t;
 }
 
-module.exports = { NO_REPLY, MOMENT_IS_CLOSER, SENTINELS, isSentinel, displayCloserResponse };
+/* ⚠⚠⚠ THE PROOF GATE. AN UNPROVEN REPLY IS THE MODEL'S GUESS AT WHO SPOKE, AND
+   IT MUST NEVER BE PRESENTED AS THE REP'S WORDS.
+
+   `closer_response_verified` is stamped true only when the quote locator
+   independently proves the closer said it. Measured 2026-08-31: 544 of 4,263
+   showable replies — 13% — are NOT proven.
+
+   ⚠ TWO lanes already required proof and FIVE did not, which is why this lives
+   here rather than being re-implemented per lane: team-needs-work rendered them
+   to a manager as "Your response:", and objection-synthesis and the Why panel
+   fed them INTO MODEL PROMPTS. That second one is worse — the model then builds
+   coaching prose around words the rep may never have said, and the prose reads
+   as authoritative with nothing on screen to check it against.
+
+   ⚠⚠ THREE-VALUED ON PURPOSE, AND ONLY `true` PASSES. null means never
+   assessed, false means assessed and not provable. Treating null as permission
+   would be the absent-vs-excluded collapse: "we did not check" is not "we
+   checked and it was fine".
+
+   ⚠ THE STANDARD IS OMIT, NOT CAVEAT — a caveat inside a two-line evidence row
+   reads as noise, and this is the 6b defect that already had to be repaired in
+   the knowledge base once.
+
+   ⚠ It is STRICTLY narrower than displayCloserResponse: everything that gate
+   rejects, this rejects too. A consumer wanting the raw text for a non-user
+   purpose still calls displayCloserResponse deliberately. */
+function provenCloserResponse(row) {
+  if (!row || typeof row !== 'object') return null;
+  if (row.closer_response_verified !== true) return null;
+  return displayCloserResponse(row.closer_response);
+}
+
+module.exports = { NO_REPLY, MOMENT_IS_CLOSER, SENTINELS, isSentinel, displayCloserResponse, provenCloserResponse };
