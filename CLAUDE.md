@@ -3282,6 +3282,49 @@ rendered quotes                          118
 - **⚠⚠ I SAMPLED THREE OBSERVATIONS, SAW A PRESCRIPTION, AND WAS WRONG.** Three real rows all contained *"closer needs to…"*, so I nearly reported that the missing coaching already existed and only needed rendering. **Measured: 31 of 537 (5.8%) are prescriptive, and 3 say "should have".** A three-row sample of a 537-row population is an anecdote; the difference between "already there" and "5.8%" is the difference between a render fix and a prompt change.
 - **THE SHAPE THE TARGET NEEDS, and what exists today:** the moment ✓100% · what the prospect revealed ✓100% · what the closer did ✓98.7% · **what they should have asked ✗5.8%** · **why it would have mattered ✗5.8%**. **Three of five are free and unrendered; two need generating.**
 
+### ⚠⚠⚠ THE SPLIT — ONE TEAM PAGE BECAME FIVE (shipped 2026-08-31, `24c6e93`)
+**Daily Digest (default landing) · Performance · Coaching · Objections · People**, behind a dropdown on the company card. `TEAM_PAGES` is the ONE list; the dropdown, the page heading, the scope caption and the hash all derive from it.
+- **⚠⚠ `state.teamRange` -> `state.teamRanges`, KEYED BY PAGE, AND THE RENAME IS THE POINT.** The meaning changed while the type did not, so a stale reader would keep compiling and silently share one window across five pages. Renaming makes every missed call site fail loudly — the same reasoning as `at_or_above` -> `meeting`.
+- **⚠⚠ `Customize View` MIGRATES BY KEEPING THE KEYS STABLE. That IS the migration** — each panel gained a `page` and no key changed, so a set stored before the split still applies, on the panel's new page. **Proven on the real page**, not argued: a stored `['gauges','needswork']` survives and both stay hidden, on Performance and Coaching respectively. **Namespacing the keys would have silently reset every manager's board.**
+- **THREE REAL DEFECTS, ALL FOUND BY RUNNING IT:** the chart mount landed in the Coaching renderer (which has no graphs); `viewToHashPath` had no cases for the new pages so the URL stopped naming the page; and **People's picker silently moved Performance's window** (see its own entry below).
+- **⚠ ONE PAGE PER RANGE, AND EVERY PAGE WITH A PICKER SAYS WHICH PAGE ITS DATES GOVERN** — resolved from `TEAM_PAGES`, so the control and the caption cannot disagree about what the page is called.
+- **⚠ OBSERVATION REPORTED, NOT RESOLVED: the gauges (fixed 7 days) and the graphs (picker-driven) both land on Performance**, so the two-windows-on-one-page contradiction survives the split. The dials' caption states it explicitly. Moving them to Daily Digest would dissolve it — a product call.
+
+### ⚠⚠⚠ THE HASH HAS A READ SIDE AND A WRITE SIDE, AND ONLY ONE OF THEM FAILS LOUDLY (2026-08-31)
+**`TEAM_HASH` teaches the router to READ a path; `viewToHashPath` WRITES it. Adding pages to the read side alone gives a page that opens from a link and, once you are on it, emits an EMPTY hash — so the URL stops naming the page and a refresh drops back to the default.**
+- **⚠⚠ THE READ SIDE FAILS VISIBLY (a link does not work) AND THE WRITE SIDE FAILS INVISIBLY** — everything looks right until someone refreshes, and by then the navigation that caused it is three steps back.
+- **THE GUARD MUST BE A ROUND TRIP, NOT A PRESENCE CHECK.** My first version asserted the read map contained each page — and stayed GREEN when both write cases were deleted. **Assert that what a page WRITES reads back to THAT page.**
+- Generalises to any bidirectional mapping — serialise/deserialise, encode/decode, a to-DTO and a from-DTO. **Checking one direction is checking half a function, and it is always the invisible half that survives.**
+
+### ⚠⚠⚠ A COUNT OVER A WHOLE FILE IS NOT A PER-SITE ASSERTION — MY GUARD PASSED WITH A ROUTER DELETED (2026-08-31)
+**`state.view === 'team-performance'` occurs THREE times: two dispatchers and the URL builder. A guard asserting `>= 2` occurrences therefore SURVIVED the deletion of an entire dispatcher line — satisfied by a third, unrelated occurrence.**
+- **⚠⚠ THE NUMBER LOOKED PRINCIPLED, WHICH IS WHY IT LASTED. "It must appear in both routers, so at least twice"** is sound reasoning about a quantity that is not the quantity being counted.
+- **THE FIX: SLICE EACH SITE AND ASSERT INSIDE IT.** The claim is *"this page is dispatched in BOTH routers"*, so the scope must be each router, never the file.
+- **⚠ AND IT ONLY CAME OUT UNDER THE NON-VACUITY SWEEP.** Restoring the defect is the only thing that distinguishes a guard that holds from one that is satisfied by an accident of the corpus. **Same family as the ordering anchor that passed vacuously and the marker checked against a file that could never contain it.**
+
+### ⚠⚠ A CATCH-ALL `else` MAKES THE MULTIPLE-DISPATCH TRAP INVISIBLE (2026-08-31)
+**One router ended `else renderTeamDigest();` — so a page added to the OTHER router and forgotten here would have rendered the digest, silently, forever. No error, no blank page, just the wrong page under the right name.**
+- **⚠ IT ALSO DEFEATS THE GUARD:** "is this page dispatched here" cannot be answered by name when the answer is *"by falling through"*.
+- **THE RULE: NAME EVERY CASE, INCLUDING THE DEFAULT ONE, AND LET THE FALLBACK CATCH ONLY THE GENUINELY UNKNOWN.** The fallback is still right for an unrecognised hash; what changed is that it is no longer how a *known* page is reached.
+- Same shape as the defensive `||` default that absorbs a wrong argument as readily as a missing one: **a graceful fallback converts a loud failure into a silent behaviour change, and cannot tell the two cases apart.**
+
+### ⚠⚠⚠ A PAGE THAT RENDERS A CONTROL OWNS THAT CONTROL'S STATE — People's PICKER MOVED Performance's WINDOW (2026-08-31)
+**People renders the shared controls row. Its range resolved through the `|| 'performance'` fallback, so touching the dates there SILENTLY MOVED PERFORMANCE'S WINDOW — and People's own caption read "These dates apply to People" while it did not.**
+```
+  set Performance to June -> open People -> touch the dates
+  -> Performance is now somewhere else, and nothing on any screen says so
+```
+- **⚠⚠ A DEFAULT IN A LOOKUP IS FINE UNTIL SOMETHING WRITES THROUGH IT.** `TEAM_RANGE_PAGE[state.view] || 'performance'` is a correct READ default and a catastrophic WRITE default. **Ask, of every fallback, whether the code that uses it ever writes.**
+- **THE CAPTION MADE IT WORSE, NOT BETTER — prose asserting a property nothing enforced**, the stale-load-bearing-comment family rendered on screen for a customer.
+- **⚠ FIXED BY GIVING THE PAGE A KEY, NOT BY REMOVING THE PICKER.** Whether a roster should carry a date picker at all is a product question, and a previous block deliberately RESTORED that picker after a layout split removed it. **Fix the harm the current change introduced; file the question you were not asked.**
+- **FOUND BY DRIVING THE REAL PAGE.** No test would have caught it: every unit passed, the caption was present, and the key was resolved by a fallback that is invisible at the call site.
+
+### ⚠⚠ THE COMMENT STRIPPER IS FOR TEXT MATCHING, NOT FOR EXECUTION — TWICE IN ONE FILE (2026-08-31)
+**Guards here slice `dashboard.html` and run the slice with `new Function`. Feeding it the COMMENT-STRIPPED copy throws `SyntaxError` the moment a comment is added inside the sliced region — because filtering comment LINES can leave a block delimiter unpaired.**
+- **⚠ IT PRESENTS AS THE EDIT BEING BROKEN.** A guard goes red immediately after a correct change, and the change is what gets suspected. **The diagnostic is the standing one: could the assertion be true of the code as written?**
+- **THE RULE: STRIP FOR MATCHING, RUN THE RAW SOURCE. Comments are harmless to `new Function`.**
+- **⚠ IT HAPPENED TWICE IN THE SAME FILE IN ONE BLOCK** — I fixed one execution slice, recorded the lesson, and hit the identical thing in a second slice ten minutes later. **When a defect turns up in one execution slice, GREP FOR EVERY `new Function` IN THE FILE rather than fixing the one that failed.**
+
 ### ⚠⚠ A ROW LISTING WHAT SOMETHING UNIQUELY CARRIES IS A CLAIM, NOT AN INVENTORY (2026-08-29)
 **Recorded as its own rule because it generalises past the one row.** The old objections view was kept for three named reasons; at removal, **two were already stale and the third was never true** — it named a renderer SHARED with a live surface, so acting on the row would have meant either keeping a dead page for nothing or deleting something a working page depends on.
 - **THE ASYMMETRY: a preservation reason is written once, in the past, about a moving codebase — and it is then used to justify an IRREVERSIBLE act.** Every other kind of row gets re-verified before work starts; this kind tends not to, because it reads as settled history rather than as a task.

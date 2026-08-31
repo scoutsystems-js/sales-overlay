@@ -31,6 +31,43 @@
 
 ## 🎯 CURRENT SESSION
 
+### ✅ COMPLETE as of 2026-08-31 — THE SPLIT. It got the whole block, and nothing else was touched.
+
+**One team page became five behind a dropdown: Daily Digest (default landing) · Performance · Coaching · Objections · People.** Shipped `24c6e93`, deploy confirmed by commit hash. **Suite 1916, zero failures.**
+
+| what | detail |
+|---|---|
+| **Five pages, one list** | `TEAM_PAGES` is the single definition — the dropdown, the page heading, the scope caption and the hash all derive from it, so they cannot disagree about what a page is called |
+| **⚠ Page ① is "Daily Digest"** | Justin's mid-block ruling. **Same name in the dropdown, the heading, the hash route and every link.** Still the default landing |
+| **⚠⚠ Each page owns its own range** | `state.teamRange` → `state.teamRanges`, keyed by page. **Renamed deliberately** — the meaning changed while the type did not, so a stale reader would have silently shared one window across five pages. **Proven live: three pages held June, mid-July and early August simultaneously** |
+| **⚠⚠ Customize View MIGRATES** | the panel keys are unchanged and each gained a page — **that IS the migration.** Proven on the real page: a set stored before the split survives and both hidden panels stay hidden **on their new pages**. Namespacing would have reset every manager's board |
+| **Three shared controls, one definition each** | company picker, rep filter, date picker — verified one definition, no dead copy |
+| **Every page says which window it governs** | resolved from `TEAM_PAGES`, so the control and the caption cannot drift |
+
+**⚠⚠ THREE REAL DEFECTS, ALL FOUND BY RUNNING IT RATHER THAN READING IT:**
+1. **the chart mount landed in the Coaching renderer**, which has no graphs — caught by the test that drives the render path, not the one that drives the function
+2. **`viewToHashPath` had no cases for the new pages**, so the URL stopped naming the page and a refresh lost it. **The hash has a read side and a write side and only one fails loudly**
+3. **People's picker silently moved Performance's window** while its own caption said *"These dates apply to People"* — a write through a read-shaped fallback
+
+**⚠⚠ TWO OF MY OWN GUARDS WERE VACUOUS AND WERE REPLACED AFTER BEING PROVEN SO:** *"both routers carry every page"* counted the page name **anywhere in the file** — and it also occurs in the URL builder, so deleting a whole router line still left two; *"every page is reachable by hash"* checked only the **read** side, so deleting both write cases left it green. **Eight defect classes now fail on demand.** A third gap the same sweep exposed: one router reached the digest through a **catch-all `else`**, which made the multiple-dispatch trap invisible there.
+
+**⚠ ONE OBSERVATION FOR JUSTIN, REPORTED NOT RESOLVED:** the **gauges (fixed 7 days) and the graphs (picker-driven) both land on Performance**, so the two-windows-on-one-page contradiction survives the split. The dials' caption states it explicitly. **Moving the dials to Daily Digest would dissolve it — a product call.**
+
+**§4 CARRY DISCHARGED — the first real `model_usage` figures, 23 analyses since it went live:**
+
+| lane | calls | avg input | avg output |
+|---|---|---|---|
+| grader | 23 | 19,995 | 1,787 |
+| extractor | 23 | 19,286 | 635 |
+| coaching | 14 | 3,907 | 408 |
+| team-why-prose | 11 | 266 | 63 |
+| team-synthesis | 3 | 3,046 | 849 |
+| team-needs-work | 2 | 1,306 | 605 |
+
+⚠ **Every call is read twice** — grader and extractor each receive the full transcript, the duplication already measured and refused on quality. ⚠ **The per-moment coaching carries no transcript** (~a twentieth of an analysis) and runs on 14 of 23 because the rest had no coachable moment.
+
+---
+
 ### ✅ COMPLETE as of 2026-08-30 — all five items shipped, deployed and verified
 
 | # | item | shipped |
@@ -51,6 +88,7 @@
 
 | candidate | why it is a candidate |
 |---|---|
+| ✅ **THE SPLIT — SHIPPED 2026-08-31 (`24c6e93`). CLOSED.** | five pages, per-page ranges, Customize View migrated. **One observation carried up to Justin: the gauges and the graphs still share Performance and answer to different windows** |
 | **The six discovery items ② and ③** | ① is shipped and ② was always the next step: **the six are the upstream causes of the five objection types.** ③ is the same feature as *"what is true for the whole team"* — cross-reference, do not duplicate |
 | ✅ **Objection handling % — RULED AND SHIPPED (cached route, v37). CLOSED 2026-08-31.** | **The only open question blocked on him.** Strict is already the standard by his 2026-08-22 ruling, but strict costs a model call the three fast surfaces do not make. **Either they get it, or they say plainly that they count every moment** |
 | 🐛 **A call that cannot be graded looks identical to one merely waiting** | filed 2026-08-29, not built |
