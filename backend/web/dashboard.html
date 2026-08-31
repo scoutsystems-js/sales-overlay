@@ -7229,6 +7229,11 @@
      differently from September. The number is whatever makes "a month" mean one
      thing. February is never near the line. */
   var DAILY_BUCKET_MAX_DAYS = 31;
+  /* ⚠ A date label ("Aug 25", 0 rotation) needs about this much horizontal room.
+     Measured reasoning already recorded on the axis: ~30 labels across ~1100px
+     is ~36px each, which is why Chart.js was silently dropping them. Above this
+     they fit and are all shown; below it, thinning is explicit. */
+  var DATE_LABEL_MIN_PX = 48;
   function bucketForRange(r) {
     if (!r || !r.from || !r.to) return 'week';
     var days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
@@ -8025,6 +8030,22 @@
                 // it marks is a SPAN. Weeks start Monday, which is what the
                 // server's bucket boundary already uses.
                 if (!isDailyBuckets) return 'Week ' + (i + 1);
+                /* ⚠⚠ ONLY THIN WHEN THERE IS SOMETHING TO THIN (2026-08-31).
+                   Monday-only labelling was written for ~30 daily labels at
+                   ~36px each, where they genuinely collide. It was applied to
+                   EVERY daily range — and the team default is SEVEN DAYS, which
+                   contains exactly ONE Monday. So the axis showed 1 label out of
+                   7 and read as having no dates at all, which is what Justin
+                   saw three times.
+                   ⚠ The threshold is DERIVED from the same reasoning the comment
+                   above already gives — a date label needs ~48px — rather than
+                   being a count someone picked. Below that we thin to Mondays;
+                   above it every day is labelled because every day fits. */
+                var count = (this.chart && this.chart.data && this.chart.data.labels)
+                  ? this.chart.data.labels.length : 0;
+                var width = (this.chart && this.chart.width) ? this.chart.width : 0;
+                var roomy = count > 0 && width > 0 && (width / count) >= DATE_LABEL_MIN_PX;
+                if (roomy) return lab;
                 return isMondayLabel(lab, i) ? lab : '';
               },
             },
