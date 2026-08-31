@@ -5336,3 +5336,28 @@ row timestamps: 41 rows at 13:22, 127 at 13:23
 - **⚠ PostgREST REJECTS THE WHOLE SELECT on an unknown column**, so one wrong field name empties the entire result — it does not merely omit that field.
 - **BOTH WERE CAUGHT ONLY BECAUSE THE RESULT CONTRADICTED SOMETHING ALREADY KNOWN** (there were 1,752 analyses yesterday). **In an emergency that contradiction is the only thing standing between a probe bug and a false headline finding.**
 - **THE RULE: `const {data}` without `error` is not a query, it is a guess.** Check `error` on every call, and treat an implausible empty as a statement about the instrument — the same discipline as the opaque-nav-bar probe and the whole-stylesheet grep.
+
+### ⚠⚠⚠ FATHOM HAS NO "WHO AM I" — CLOSED BY PROBE 2026-08-31, DO NOT RE-OPEN
+**Sixteen identity paths 404, `/users` 403, and the three endpoints that answer carry no self-identifying field.** `/teams` is `{name, created_at}`; `/team_members` is `{name, email, created_at}`; `/meeting_types` likewise. **The access token is OPAQUE — one segment, not a JWT — so there is no embedded subject either**, and the grant is `scope=public_api`, not OIDC (no `id_token`, no userinfo).
+- **THE PICKER WORK IS THE ANSWER, NOT A WORKAROUND.** Identity here can only ever be inferred from lists, so the question is settled rather than pending.
+- **⚠ AND THE PROBE PAID FOR ITSELF BY FINDING THE ACTUAL ROOT CAUSE** — see the entry below. **A question worth closing is worth closing with a live probe rather than a citation**, even when a previous probe is on file.
+
+### ⚠⚠⚠ A PAGINATION LIMIT PRESENTING AS AN ABSENCE — AND IT CORRECTED MY OWN DIAGNOSIS (2026-08-31)
+**I reported that `/team_members` "returns ten members and does not include Nathan". TRUE OF WHAT THE CODE FETCHED, AND THE REASON WAS WRONG.**
+```
+/team_members returns items + next_cursor + limit — TEN AT A TIME
+this workspace holds THIRTY-TWO members across FOUR pages
+Nathan is member #11 — PAGE TWO
+```
+- **HE WAS NEVER ABSENT. The resolver read page one, stopped, and correctly answered `no_match` FROM AN INCOMPLETE INPUT** — then the picker offered another closer first and 41 of his calls went into the wrong account.
+- **⚠⚠ THE SHAPE, AND IT IS THE THIRD INSTANCE IN THIS FILE: an incomplete READ is indistinguishable from a genuine ABSENCE, and the natural diagnosis is the wrong one.** Siblings: the display cap that read as missing data, and my own 1,000-row default that reported the analysis rate as stopping four days early. **Whenever a lookup answers "not found", ask whether the thing doing the looking saw everything.**
+- **⚠ THE TELL WAS FREE AND I ALMOST WALKED PAST IT: the response body contains `next_cursor` and `limit`.** A paginated envelope is a statement that what you are holding may not be all of it.
+- **RESULT: paging resolves 3 of 4 (Nathan, Gabriel, AND Nick), up from 2 with the source-merge alone.** Nick is the one the merge could not fix. **`josh@scoutsystems.io` correctly still does not resolve** — his Fathom identity genuinely differs from his Scout login, so exact equality is right to refuse and the picker is the answer for him. **Bounded at 20 pages; a failed page returns what it has rather than throwing, so an incomplete list degrades to the picker instead of breaking a connect.**
+
+### ⚠⚠ DETECTION BEFORE REPAIR — `recorded_by` STAMPED, THE AUDIT BUILT, THE REPAIR DELIBERATELY NOT (2026-08-31, migration 058)
+**The Nathan incident was invisible because `fathom_calls` recorded nothing about WHICH IDENTITY FETCHED A ROW.** No query could say *"these calls do not belong to this user"* — a human had to look.
+- **NEW ROWS ONLY, NO BACKFILL, AND THAT IS THE POINT: the value is not recoverable for historical rows, and A GUESSED STAMP WOULD BE WORSE THAN AN ABSENT ONE** — it would make the audit report clean over rows it never checked.
+- **IT STORES FATHOM'S OWN VALUE FOR THE ROW, NOT OUR FILTER ARGUMENT. If the two ever disagree, that is precisely the thing worth seeing** — stamping what we asked for would only ever confirm what we asked for.
+- **⚠⚠ THE AUDIT KEEPS THREE STATES APART: matching · MISMATCHED · never stamped.** Folding NULL into `matching` reports a clean audit over 1,945 unchecked rows; folding it into `mismatched` invents 1,945 violations. **Both are the absent-vs-excluded collapse**, and a test pins that the three reconcile to the total.
+- **READ-ONLY, PINNED BY A TEST** that forbids `delete`/`update`/`upsert` in that file. **A repair path is separate, explicit and confirmed.**
+- **⚠⚠ DELETING CALLS ON DISCONNECT STAYS REJECTED, AND THE REASONING IS RECORDED IN THE MIGRATION ITSELF so it is not proposed again:** it is the destructive behaviour the preserve-history ruling exists to prevent, and it would fire on **every ordinary disconnect** to catch a rare mistake.
