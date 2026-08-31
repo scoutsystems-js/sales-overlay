@@ -38,37 +38,60 @@ function renderBody() {
   return body;
 }
 
+/* ⚠⚠ ARCHIVED AND REPLACED BY A STRONGER PROPERTY (the split, 2026-08-31).
+
+   These pinned a WITHIN-PAGE ordering: gauges -> digest -> picker -> graphs, so
+   a fixed ET-day panel could never render beneath a control that appears to
+   drive it. That ordering is gone, and NOT because it was abandoned — the
+   digest now has a page of its OWN WITH NO DATE PICKER ON IT AT ALL, which is
+   the same rule enforced by STRUCTURE instead of by sequence.
+
+   Original assertions, kept so nobody reinstates the weaker form:
+     gauges < digest  .  digest < picker  .  picker < graphs
+     digest < each of Team Overview / Closing Score / Objection Handling Score
+*/
 test('the digest renders EXACTLY ONCE — it was moved, not copied', () => {
-  const n = (LIVE.match(/<h2>Manager Daily Digest<\/h2>/g) || []).length;
+  const n = (LIVE.match(/<h2>Daily Digest<\/h2>/g) || []).length;
   assert.strictEqual(n, 1, 'expected one digest section in the render path, got ' + n);
 });
 
-test('⚠⚠ the digest sits ABOVE the date picker, with the gauges — a fixed window', () => {
-  const body = renderBody();
-  const gauges = body.indexOf('avgPanelHtml()');
-  const digest = body.indexOf('Manager Daily Digest');
-  const picker = body.indexOf('teamControlsHtml()');
-  const graphs = body.indexOf('repSeriesSectionHtml()');
-  [['avgPanelHtml', gauges], ['digest', digest], ['teamControlsHtml', picker],
-   ['repSeriesSectionHtml', graphs]].forEach(([n, i]) => {
-    assert.ok(i !== -1, 'stale anchor — ' + n + ' is not in the render body');
-  });
-  assert.ok(gauges < digest, 'gauges come first');
-  assert.ok(digest < picker,
-    'THE RULE: the digest is a fixed ET-day panel and the picker cannot change '
-    + 'it, so it must not render beneath the picker');
-  assert.ok(picker < graphs, 'the graphs DO answer to the picker, so they follow it');
+test('⚠⚠ the digest page has NO date picker — the rule, enforced structurally', () => {
+  const at = LIVE.indexOf('function renderTeamDigest');
+  assert.ok(at !== -1, 'stale anchor — the digest page is gone');
+  const body = LIVE.slice(at, LIVE.indexOf('allPanelsHiddenNoteHtml();', at));
+  assert.ok(body.length > 300 && body.length < 2500, 'slice must cover it: ' + body.length);
+  assert.ok(/teamDigestHtml\(\)/.test(body), 'the digest is what this page is for');
+  assert.ok(!/teamControlsHtml\(\)/.test(body),
+    'a fixed ET-day panel must never sit under a control that appears to drive it');
+  assert.ok(!/repSeriesSectionHtml\(\)/.test(body),
+    'the picker-driven graphs belong to Performance');
 });
 
-test('⚠ the digest is no longer last — it precedes the score lists', () => {
-  const body = renderBody();
-  const digest = body.indexOf('Manager Daily Digest');
-  // ⚠ renamed 2026-08-20: the ranked lists gained the word "Score".
-  ['Team Overview', 'Closing Score', 'Objection Handling Score'].forEach((h) => {
-    const at = body.indexOf('<h2>' + h + '</h2>');
-    assert.ok(at !== -1, 'stale anchor — the "' + h + '" score list is gone');
-    assert.ok(digest < at, 'the digest must now come before the ' + h + ' list');
-  });
+test('⚠ the picker-driven panels live WITH the picker, on Performance', () => {
+  const at = LIVE.indexOf('function renderTeamPerformance');
+  assert.ok(at !== -1, 'stale anchor — the performance page is gone');
+  const fn = LIVE.slice(at, LIVE.indexOf('allPanelsHiddenNoteHtml();', at));
+  assert.ok(fn.length > 300 && fn.length < 4000, 'slice must cover it: ' + fn.length);
+
+  /* ⚠⚠ NARROWED TO THE MAIN BODY ON PURPOSE, AND THE NARROWING IS ASSERTED.
+     This function has an EARLY-RETURN branch for the glance-tile drilldown that
+     renders its own header + controls + detail. A whole-function search finds
+     THAT teamControlsHtml() first and reports the gauges as sitting under the
+     picker — the scope-wider-than-the-claim failure. Pin the branch's existence
+     so narrowing past it can never hide its removal. */
+  assert.ok(/teamDetailHtml\(\)/.test(fn), 'stale anchor — the glance drilldown branch is gone');
+  const bodyAt = fn.lastIndexOf('content.innerHTML =');
+  assert.ok(bodyAt > fn.indexOf('teamDetailHtml()'), 'the main body must follow the drill branch');
+  const body = fn.slice(bodyAt);
+
+  const gauges = body.indexOf('avgPanelHtml()');
+  const picker = body.indexOf('teamControlsHtml()');
+  const graphs = body.indexOf('repSeriesSectionHtml()');
+  [['avgPanelHtml', gauges], ['teamControlsHtml', picker], ['repSeriesSectionHtml', graphs]]
+    .forEach(([n, ix]) => assert.ok(ix !== -1, 'stale anchor — ' + n + ' is not on Performance'));
+  // ⚠ the gauges are STILL a fixed 7 days, so the original rule still binds HERE
+  assert.ok(gauges < picker, 'the fixed-window dials must not sit under the picker');
+  assert.ok(picker < graphs, 'the graphs DO answer to the picker, so they follow it');
 });
 
 /**

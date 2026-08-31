@@ -39,7 +39,7 @@ test('the boot call is stripped and nothing else is', () => {
   // this fails rather than silently testing a truncated script.
   assert.ok(/\n\s*init\(\);\s*$/.test(RAW_SCRIPT), 'expected the script to end with init();');
   assert.strictEqual(RAW_SCRIPT.length - SCRIPT.length < 20, true, 'only the init() call may be removed');
-  assert.ok(SCRIPT.indexOf('function renderTeamView') !== -1, 'renderTeamView must survive intact');
+  assert.ok(SCRIPT.indexOf('function renderTeamPerformance') !== -1, 'the render path must survive intact');
 });
 
 const SERIES = {
@@ -123,7 +123,12 @@ function renderTeam(overrides) {
   };
 
   const runner = new Function('document', 'window', 'Chart', 'localStorage', 'fetch', 'console',
-    SCRIPT + '\n;return { state: state, renderTeamView: renderTeamView, resetTeamData: resetTeamData,'
+    /* ⚠⚠ THE ENTRY POINT MOVED WITH THE SPLIT (2026-08-31). renderTeamView was
+       one page holding every panel; there are now five, dispatched by
+       renderTeamSurface on state.view. Driving the DISPATCHER rather than a
+       named page is what keeps these tests pointed at the real entry point —
+       which is the property this whole file exists for. */
+    SCRIPT + '\n;return { state: state, renderTeamSurface: renderTeamSurface, resetTeamData: resetTeamData,'
            + ' viewToHashPath: viewToHashPath, parseRangeFromHash: parseRangeFromHash,'
            + ' renderOverview: renderOverview };');
 
@@ -132,12 +137,13 @@ function renderTeam(overrides) {
 
   Object.assign(api.state, overrides);
   if (overrides && overrides.__entry === 'overview') api.renderOverview(false);
-  else api.renderTeamView();
+  else api.renderTeamSurface();
   return { html: assigned, charts: charts, events: events, api: api };
 }
 
 const BASE = {
-  view: 'team', teamContext: { teams: [], rep_count: 1 }, teamContextLoading: false,
+  // ⚠ Performance owns six of the nine panels, so it is the default page here.
+  view: 'team-performance', teamContext: { teams: [], rep_count: 1 }, teamContextLoading: false,
   teamOverview: { reps: [], totals: {} }, teamOverviewLoading: false,
   teamNeedsWork: { available: false }, teamNeedsWorkLoading: false,
   teamRecs: { available: false }, teamRecsLoading: false,
@@ -165,16 +171,20 @@ test('the graphs are the FIRST thing on the team view, above the needs-work card
   // Anchor renamed 2026-08-17: the team objection card is now titled
   // "Objection Handling Focus". The ordering property is unchanged — this is
   // the anchor moving, not the claim.
-  const needsWork = out.html.indexOf('Objection Handling Focus');
   const overview = out.html.indexOf('Team Overview');
 
+  /* ⚠ THE needs-work ANCHOR IS GONE FROM THIS PAGE (the split, 2026-08-31) —
+     that card moved to Coaching, so "graphs above needs-work" is no longer an
+     ordering that exists anywhere. The SUBJECT survives and is what is still
+     asserted: the graphs are the first thing under the header, above every
+     score list Performance still owns. */
   assert.notStrictEqual(graphs, -1, 'graph canvas missing');
-  assert.notStrictEqual(needsWork, -1, 'needs-work heading missing — anchor is stale');
   assert.notStrictEqual(overview, -1, 'Team Overview heading missing — anchor is stale');
   assert.notStrictEqual(header, -1, 'page header missing — anchor is stale');
+  assert.strictEqual(out.html.indexOf('Objection Handling Focus'), -1,
+    'needs-work belongs to Coaching now and must not render here');
 
   assert.ok(header < graphs, 'graphs come after the header');
-  assert.ok(graphs < needsWork, 'graphs must come BEFORE the needs-work card');
   assert.ok(graphs < overview, 'graphs must come BEFORE Team Overview');
   assert.strictEqual(out.html.indexOf('team-glance'), -1, 'the glance card must be gone');
 });
@@ -213,7 +223,8 @@ test('the plotted series is the real data, carried through the real render path'
 
 test('NO dead mount: the graph section is never emitted from inside a callback', () => {
   // The exact defect. teamScoreListHtml's callback must be a bare accessor.
-  const fn = HTML.slice(HTML.indexOf('function renderTeamView'), HTML.indexOf('function drawRepSeriesCharts'));
+  const fn = HTML.slice(HTML.indexOf('function renderTeamPerformance'), HTML.indexOf('function drawRepSeriesCharts'));
+  assert.ok(fn.length > 800 && fn.length < 9000, 'slice must cover the render path: ' + fn.length);
   assert.ok(/teamScoreListHtml\(function \(r\) \{ return r\.avg_score; \}\)/.test(fn),
     'the avg_score callback must contain nothing but its return');
   assert.ok(fn.indexOf('insertAdjacentHTML') === -1,
@@ -240,7 +251,7 @@ test('resetTeamData clears the series so a stale team/range cannot linger', () =
 
 test('renderTeamView renders the PICKER and no preset buttons', () => {
   const out = renderTeam(Object.assign({}, BASE, {
-    teamRange: { from: '2026-08-03T00:00:00.000Z', to: '2026-08-10T23:59:59.999Z' }, teamRangeInit: true,
+    teamRanges: { performance: { from: '2026-08-03T00:00:00.000Z', to: '2026-08-10T23:59:59.999Z' } }, teamRangeInit: { performance: true },
   }));
   assert.ok(out.html.indexOf('dp-btn-team') !== -1, 'the picker trigger must be in the rendered markup');
   assert.ok(out.html.indexOf('Aug 3 - Aug 10') !== -1, 'showing the INCLUSIVE label for the custom range');
@@ -251,11 +262,11 @@ test('a CUSTOM range reaches the graphs, the picker label and the hash — all a
   // The three had to be checked together: a label that says one thing while the
   // graphs query another is exactly the kind of disagreement nobody notices.
   const range = { from: '2026-07-20T00:00:00.000Z', to: '2026-08-02T23:59:59.999Z' };
-  const out = renderTeam(Object.assign({}, BASE, { teamRange: range, teamRangeInit: true }));
+  const out = renderTeam(Object.assign({}, BASE, { teamRanges: { performance: range }, teamRangeInit: { performance: true } }));
   assert.ok(out.html.indexOf('Jul 20 - Aug 2') !== -1, 'label');
-  assert.strictEqual(out.api.state.teamRange.from, range.from, 'the view did not mutate the range');
+  assert.strictEqual(out.api.state.teamRanges.performance.from, range.from, 'the view did not mutate the range');
   const hash = out.api.viewToHashPath();
-  assert.strictEqual(hash, 'team?from=2026-07-20&to=2026-08-02', 'hash carries the range');
+  assert.strictEqual(hash, 'team-performance?from=2026-07-20&to=2026-08-02', 'hash carries the range');
   assert.strictEqual(out.charts.length, 3, 'all three graphs still built');
 });
 
@@ -263,8 +274,9 @@ test('the hash round-trips: parse → state → hash gives back the same window'
   const out = renderTeam(BASE);
   const parsed = out.api.parseRangeFromHash('team?from=2026-06-01&to=2026-06-30');
   assert.deepStrictEqual(parsed, { from: '2026-06-01T00:00:00.000Z', to: '2026-06-30T23:59:59.999Z' });
-  out.api.state.teamRange = parsed;
-  assert.strictEqual(out.api.viewToHashPath(), 'team?from=2026-06-01&to=2026-06-30');
+  out.api.state.teamRanges.performance = parsed;
+  // ⚠ the page under test is Performance, so the hash names THAT page
+  assert.strictEqual(out.api.viewToHashPath(), 'team-performance?from=2026-06-01&to=2026-06-30');
 });
 
 test('a malformed or hand-edited hash falls back rather than rendering a bogus window', () => {
@@ -285,7 +297,7 @@ test('TEAM AND COACHING NOW HOLD SEPARATE RANGES', () => {
   // The split starts here. Coaching stays on state.dateRange until stage 3;
   // nothing the team picker does may touch it.
   const out = renderTeam(Object.assign({}, BASE, {
-    teamRange: { from: '2026-08-03T00:00:00.000Z', to: '2026-08-10T23:59:59.999Z' }, teamRangeInit: true,
+    teamRanges: { performance: { from: '2026-08-03T00:00:00.000Z', to: '2026-08-10T23:59:59.999Z' } }, teamRangeInit: { performance: true },
     dateRange: { from: '2026-01-01T00:00:00.000Z', to: '2026-01-31T23:59:59.999Z', days: 30 },
   }));
   assert.ok(out.html.indexOf('Aug 3 - Aug 10') !== -1, 'team renders ITS range');
@@ -294,8 +306,8 @@ test('TEAM AND COACHING NOW HOLD SEPARATE RANGES', () => {
 });
 
 test('the default seed is the last 7 days INCLUSIVE, not a bare now-minus-7', () => {
-  const out = renderTeam(Object.assign({}, BASE, { teamRange: null, teamRangeInit: false }));
-  const r = out.api.state.teamRange;
+  const out = renderTeam(Object.assign({}, BASE, { teamRanges: {}, teamRangeInit: {} }));
+  const r = out.api.state.teamRanges.performance;
   assert.ok(r && r.from.endsWith('T00:00:00.000Z'), 'starts at midnight: ' + (r && r.from));
   assert.ok(r && r.to.endsWith('T23:59:59.999Z'), 'covers the whole end day: ' + (r && r.to));
   const days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
@@ -411,13 +423,22 @@ test('10d loads LAZILY and is cleared when the team or range changes', () => {
   assert.ok(/teamWhy:\s*'both'/.test(scope), 'stale sentences must not survive a team OR a range change');
 });
 
-test('the cards sit between the graphs and the needs-work card', () => {
-  const out = renderCards(REPS);
+/* ⚠ CONVERTED (the split, 2026-08-31): needs-work moved to Coaching, so "the
+   cards sit between the graphs and needs-work" is an ordering that no longer
+   exists on one page. The SUBJECT — rep cards come after the graphs and before
+   the score lists — survives on Performance and is what is asserted now. */
+test('the rep cards sit between the graphs and the score lists', () => {
+  const out = renderTeam(Object.assign({}, BASE, {
+    teamOverview: { reps: [], per_rep: REPS, totals: {} }, teamOverviewLoading: false,
+  }));
   const graphs = out.html.indexOf('repHandleChart');
-  const cards = out.html.indexOf('rep-card-list');
-  const needs = out.html.indexOf('Objection Handling Focus');
-  [graphs, cards, needs].forEach((i) => assert.notStrictEqual(i, -1));
-  assert.ok(graphs < cards && cards < needs, 'graphs → cards → needs work');
+  const cards  = out.html.indexOf('rep-card');
+  const lists  = out.html.indexOf('Team Overview');
+  assert.notStrictEqual(graphs, -1, 'graph canvas missing');
+  assert.notStrictEqual(cards, -1, 'rep cards missing — anchor is stale');
+  assert.notStrictEqual(lists, -1, 'Team Overview missing — anchor is stale');
+  assert.ok(graphs < cards, 'cards come after the graphs');
+  assert.ok(cards < lists, 'and before the score lists');
 });
 
 test('an empty or still-loading team degrades without throwing', () => {

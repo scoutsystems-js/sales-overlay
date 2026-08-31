@@ -3199,6 +3199,12 @@
       margin-left: 0;
     }
     .team-controls-row { margin-bottom: 28px; justify-content: flex-end; }
+    /* ⚠ THE RANGE'S SCOPE, UNDER THE CONTROL IT DESCRIBES. flex-wrap + 100%
+       puts it on its own line beneath the picker rather than beside it, so the
+       controls keep their row at every width. Dimming is a DEPTH cue, not the
+       grey the no-grey rule bans — the colour is still var(--text). */
+    .team-controls-row { flex-wrap: wrap; }
+    .team-range-scope { flex-basis: 100%; text-align: right; margin-top: 6px; opacity: 0.75; }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
        money math. Kept as a note so a stray class name in a future edit does
@@ -4038,8 +4044,13 @@
     // stage 3 splits the rest — every view owning its own range is the ruling.
     teamWhy:        null,   teamWhyLoading: false,   // 10d: one verified sentence per rep
     repGraph:       null,   repGraphLoading: false,  // 10e: the pivoted rep's own series
-    teamRange:      null,   // {from,to} ISO; the team date picker writes only this
-    teamRangeInit:  false,  // team view seeds a 7-day default on first entry
+    /* ⚠⚠ ONE RANGE PER TEAM PAGE (the split, 2026-08-31). Renamed from the
+       single `teamRange` DELIBERATELY: the meaning changed while the type did
+       not, so a stale reader would keep compiling and silently share one window
+       across five pages — the shared-carrier failure this file records twice.
+       The rename makes every site fail loudly instead. */
+    teamRanges:     {},     // { performance|coaching|objections : {from,to} ISO }
+    teamRangeInit:  {},     // per page: has the 7-day default been seeded?
     teamNeedsWork:  null,   teamNeedsWorkLoading: false, // "What needs work" card + detail (B-2)
     // 10b manager board: per-rep weekly series + the objection selector.
     // '' = all objections; otherwise one of Scout's four objection_category values.
@@ -6128,7 +6139,7 @@
   // Date range / user controls
   // ──────────────────────────────────────────────────────────────────
   // ⚠ WHOSE RANGE IS state.dateRange? THE COACHING FAMILY'S (stage 3).
-  // Team moved to state.teamRange in stage 2 and Calls owns state.callLibraryRange.
+  // Team owns state.teamRanges (ONE PER PAGE since the split) and Calls owns state.callLibraryRange.
   // What remains on state.dateRange is coaching AND the surfaces reached FROM it:
   // needs-work, performance, the section drilldown and objections.
   //
@@ -6326,7 +6337,9 @@
     else if (state.view === 'objections-intel') renderObjectionsIntel();
     else if (state.view === 'needs-work') renderNeedsWorkView();
     else if (state.view === 'performance') renderPerformanceView();
-    else if (state.view === 'team') renderTeamView();
+    else if (state.view === 'team') renderTeamDigest();
+    else if (state.view === 'team-performance') renderTeamPerformance();
+    else if (state.view === 'team-coaching') renderTeamCoaching();
     else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
@@ -7239,7 +7252,7 @@
     var days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
     return days <= DAILY_BUCKET_MAX_DAYS ? 'day' : 'week';
   }
-  function repSeriesBucket() { return bucketForRange(state.teamRange); }
+  function repSeriesBucket() { return bucketForRange(teamRange()); }
   var TEAM_PICK_KEY = 'scout_team_pick_v1';
   /* ⚠⚠ VALIDATED AGAINST THE TEAMS THIS PERSON CAN ACTUALLY PICK. A stored key
      for a team that has since gone, or that they no longer manage, would give an
@@ -7364,10 +7377,22 @@
        drilldown while state still said 'team-needs-work' would give a page
        whose controls silently do nothing. */
     if (state.view === 'team-needs-work') { setView('team-objections'); return; }
-    if (state.view === 'team-expanded') renderTeamExpanded();
+    /* ⚠ BOTH DISPATCHERS CARRY THE FULL LIST. A view added to one and not the
+       other is the multiple-dispatch trap this file already records — a page
+       reachable by clicking but not by refresh, or the reverse. */
+    if (state.view === 'team') renderTeamDigest();
+    else if (state.view === 'team-performance') renderTeamPerformance();
+    else if (state.view === 'team-coaching') renderTeamCoaching();
+    else if (state.view === 'team-expanded') renderTeamExpanded();
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
-    else renderTeamView();
+    /* ⚠⚠ EVERY PAGE IS NAMED EXPLICITLY ABOVE, INCLUDING THE DEFAULT ONE. This
+       used to reach the digest through the catch-all, which made the trap
+       INVISIBLE here: a page added to render() and forgotten in this router
+       would have silently rendered the digest instead of failing. The fallback
+       now only catches a genuinely unknown view, and the guard can see every
+       page by name. */
+    else renderTeamDigest();   // unknown team view -> the default landing
   }
   /* ⚠⚠ SUPERSEDED 2026-08-29 — teamAverages IS NO LONGER CLEARED HERE. It is
      declared `'team'` in TEAM_LANE_SCOPE and resetTeamData('team') clears it, so
@@ -7510,9 +7535,9 @@
    * ⚠⚠ WHY THE TEAM PAGE BLINKED 4-5 TIMES (Josh, 2026-08-18) — MEASURED, NOT
    * GUESSED, AND IT WAS NEVER ONE LOAD.
    *
-   * renderTeamView() kicks EIGHT independent lanes (context, overview,
+   * renderTeamSurface() kicks EIGHT independent lanes (context, overview,
    * needsWork, recs, digest, repSeries, teamAverages, why). Each one resolved
-   * on its own schedule and called renderTeamView() again, and that function
+   * on its own schedule and called renderTeamSurface() again, and that function
    * assigns content.innerHTML — a FULL DOM replacement. Measured against the
    * real document with genuine Chart.js: ONE visit produced NINE full renders
    * and created NINETY-NINE `.fade-in` sections.
@@ -7543,7 +7568,7 @@
     teamRenderQueued = true;
     var run = function () {
       teamRenderQueued = false;
-      if (state.view === 'team') renderTeamView();
+      if (state.view === 'team') renderTeamSurface();
       else if (state.view === 'team-expanded') renderTeamExpanded();
       else if (state.view === 'team-objections') renderTeamObjectionsView();
       else if (state.view === 'team-members') renderTeamMembersView();
@@ -7581,7 +7606,7 @@
    *   return rangeToIso(addDays(today, -6), today);
    * }
    * // The gauge lane's own query builder. Separate from teamQP ON PURPOSE: teamQP
-   * // reads state.teamRange, and inheriting it here is the exact bug this panel
+   * // reads the team's own range, and inheriting it here is the exact bug this panel
    * // must not have. It still carries the team selection, which IS shared.
    * function gaugeQP(win) {
    *   var qp = 'from=' + encodeURIComponent(win.from) + '&to=' + encodeURIComponent(win.to) + '&bucket=day';
@@ -7592,26 +7617,51 @@
 
   // Team view defaults to LAST 7 DAYS (Justin's spec) — set once on first entry,
   // then the manager's own preset choices stick.
+  /* ⚠⚠ WHICH PAGE'S RANGE. Daily Digest and People have NO range — the digest is a fixed ET
+     day and People is a roster — so they never reach a picker and are absent
+     here on purpose. Everything else owns its own window per the standing
+     every-view-owns-its-own-range ruling. */
+  var TEAM_RANGE_PAGE = {
+    /* ⚠⚠ PEOPLE HAS ITS OWN KEY EVEN THOUGH IT SHOWS NO WINDOWED DATA — measured
+       on the real page, not reasoned about. It renders the shared controls row,
+       so its picker resolved through the `|| 'performance'` fallback and
+       SILENTLY MOVED PERFORMANCE'S WINDOW: set Performance to June, open People,
+       touch the dates, and Performance is somewhere else with nothing saying so.
+       Worse, the scope caption read "These dates apply to People" while it did
+       not. A page that renders a picker owns a key, full stop.
+       ⚠ FILED, NOT DECIDED HERE: whether a roster should carry a date picker at
+       all is a product question. This removes the HARM the split introduced
+       without removing a control a previous block deliberately restored. */
+    'team-members':     'members',
+    'team-performance': 'performance',
+    'team-coaching':    'coaching',
+    'team-objections':  'objections',
+    'team-expanded':    'coaching',   // the expanded recs page belongs to Coaching
+  };
+  function teamRangePage() { return TEAM_RANGE_PAGE[state.view] || 'performance'; }
+
   function ensureTeamDefaultRange() {
-    if (state.teamRangeInit) return;
-    state.teamRangeInit = true;
+    var pg = teamRangePage();
+    if (state.teamRangeInit[pg]) return;
+    state.teamRangeInit[pg] = true;
     // Seeded through the picker's own converter so the default window has the
     // same inclusive-end shape a hand-picked one does — otherwise the very first
     // load would quietly cover a few hours less than the label claims.
     var today = new Date().toISOString().slice(0, 10);
     var weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
-    state.teamRange = rangeToIso(weekAgo, today);   // last 7 days INCLUSIVE
+    state.teamRanges[pg] = rangeToIso(weekAgo, today);   // last 7 days INCLUSIVE
   }
-  function teamRange() { ensureTeamDefaultRange(); return state.teamRange; }
+  function teamRange() { ensureTeamDefaultRange(); return state.teamRanges[teamRangePage()]; }
 
   // One picker instance for the team view. Registered once; it reads and writes
-  // ONLY state.teamRange, which is what keeps coaching's range independent.
+  // ONLY the CURRENT TEAM PAGE's range, which keeps coaching's independent and
+  // keeps the five team pages independent of each other.
   var teamPickerReady = false;
   function ensureTeamPicker() {
     if (teamPickerReady) return;
     teamPickerReady = true;
     registerDatePicker('team', function () { return teamRange(); }, function (from, to) {
-      state.teamRange = { from: from, to: to };
+      state.teamRanges[teamRangePage()] = { from: from, to: to };
       resetTeamData('range');   // ⚠ the gauges are a fixed 7-day window — see TEAM_LANE_SCOPE
       syncHashFromState(true);      // the range lives in the URL — refreshable, shareable
       renderTeamSurface();
@@ -8724,79 +8774,63 @@
     loadTeam('repSeries');
   }
 
-  function renderTeamView() {
+  function renderTeamDigest() {
     var content = document.getElementById('content');
-    ensureTeamDefaultRange();
+    /* ⚠⚠ THIS PAGE KICKS ONLY WHAT IT SHOWS. The single page kicked EIGHT lanes
+       because it rendered all of them; each page now kicks its own, so landing
+       here no longer starts four syntheses nobody is looking at.
+       ⚠ NO ensureTeamDefaultRange() AND NO CONTROLS ROW: this page has no date
+       picker, because neither panel on it answers to one. Seeding a range here
+       would create a window for a page that cannot show or change it. */
     if (state.teamContext === null) { loadTeam('context'); }
-    // kick the panels this view needs (lazy, once each). Trends removed from the
-    // team view; recs+highlights load lazily but only render on the expanded page.
-    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
-    if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
-    if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamDigest === null && !state.teamDigestLoading) loadTeam('digest');
-    if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
-    if (state.teamAverages === null && !state.teamAveragesLoading) loadTeam('teamAverages');
-    // 10d is lazy and separate: it can spend a model call per rep on a changed
-    // period, and the board must never wait on it.
-    if (state.teamWhy === null && !state.teamWhyLoading) loadTeam('why');
 
-    // Glance-box detail drill: a team-scoped per-rep breakdown of one metric,
-    // reached by clicking a clickable glance box. Replaces the normal team body.
-    if (state.teamDetailMetric) {
-      content.innerHTML = teamHeaderHtml() + teamControlsHtml() + '<div class="section fade-in">' + teamDetailHtml() + '</div>';
-      return;
-    }
+    /* ⚠ THE GLANCE DRILL MOVED TO PERFORMANCE with the gauges that open it.
+       It rendered a controls row, which is the one thing this page must not
+       have — and it was unreachable from here once the boxes moved. */
 
-    // Layout (Justin's live-review spec), top→bottom:
-    //   1. glance stat blocks (at the very top, under the header)
-    //   2. the two rep line graphs — objection handling, then closing rate.
-    //      Justin: "the first thing he wants to see on the manager view", so
-    //      they sit directly under the glance blocks and ABOVE What needs work.
-    //   3. What needs work
-    //   4. Team overview  — each member + avg TOTAL score  (ranked bars)
-    //   5. Closing        — each member + avg CLOSE section score
-    //   6. Objection handling — each member + avg OBJECTION section score
-    //   7. Team recommendations — compact card → dedicated expanded page
-    //   8. Manager daily digest
-    // Trends + the standalone Call Highlights section are REMOVED from this view
-    // (Highlights now live on the expanded recommendations page).
     content.innerHTML =
       teamHeaderHtml()
       /* ⚠ FIRST THING UNDER THE HEADER. It is an exception, so it outranks every
          metric on the page — and it renders '' when nobody is unconnected. */
       + unconnectedBadgeHtml()
-      // Justin's placement: title → gauges → picker → line graphs. The dials sit
-      // ABOVE the picker because they do not answer to it.
-      + (teamPanelVisible('gauges') ? avgPanelHtml() : '')
-      /* MOVED TO THE TOP 2026-08-19 (Justin): the digest was the LAST section on
-         the page, below the three score lists. It now sits directly under the
-         gauges.
+      + (teamPanelVisible('digest')
+          ? '<div class="section fade-in"><div class="section-header"><h2>Daily Digest</h2>'
+            + '<div class="meta">yesterday, Eastern time — this page is not affected by a date range</div>'
+            + '</div>' + teamDigestHtml() + '</div>'
+          : '')
+      + allPanelsHiddenNoteHtml();
+      // (The digest moved to its own page — Daily Digest — in the split.)
+  }
 
-         ⚠ IT SITS **ABOVE THE PICKER**, WHICH IS THE SAME REASON THE DIALS DO —
-         verified, not assumed: GET /team/digest ignores from/to entirely and
-         keys on `date` (default etYesterday), so the range picker cannot change
-         it. Rendering it BELOW the picker would put a fixed ET-day panel under a
-         control that appears to drive it — and the digest carries its OWN date
-         chips, so two adjacent date controls would read as one.
-         The rule this page now follows: everything ABOVE the picker is a fixed
-         window; everything below answers to it. */
-      + (teamPanelVisible('digest') ? '<div class="section fade-in"><div class="section-header"><h2>Manager Daily Digest</h2></div>' + teamDigestHtml() + '</div>' : '')
+  /* ⚠⚠ PERFORMANCE — the picker-driven numbers.
+     ⚠ THE GAUGES ARE STILL A FIXED SEVEN DAYS while the graphs follow the
+     picker, so the caption explaining that stays on THIS page. The split was
+     expected to dissolve that contradiction by separating them; under the
+     agreed page assignment both land here, so it is explained rather than
+     removed. Reported rather than resolved unilaterally — moving the gauges to
+     Daily Digest would dissolve it, and that is a product call. */
+  function renderTeamPerformance() {
+    var content = document.getElementById('content');
+    ensureTeamDefaultRange();
+    if (state.teamContext === null) { loadTeam('context'); }
+    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+    if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
+    if (state.teamAverages === null && !state.teamAveragesLoading) loadTeam('teamAverages');
+
+    // The glance drill replaces the body, exactly as it did on the single page.
+    if (state.teamDetailMetric) {
+      content.innerHTML = teamHeaderHtml() + teamControlsHtml() + '<div class="section fade-in">' + teamDetailHtml() + '</div>';
+      return;
+    }
+    content.innerHTML =
+      teamHeaderHtml()
+      // ⚠ ABOVE the picker, because they do not answer to it — the same reason
+      // they sat above it on the single page.
+      + (teamPanelVisible('gauges') ? avgPanelHtml() : '')
       + teamControlsHtml()
-      /* REMOVED 2026-08-16 — Justin asked twice: the glance stat card between the
-         picker and the graphs is gone. Its Cash Collected / Close Rate /
-         Objection Handle drill-downs went with it; that trade was raised and
-         overruled. openTeamDetail/teamDetailHtml and the TEAM_DETAIL map are
-         LEFT INTACT and still reachable by state (state.teamDetailMetric), so
-         restoring the card is re-adding this one line — nothing else was ripped
-         out. The equivalent numbers now live on the rep cards, per rep.
-      + '<div class="section fade-in">' + teamAggregateHtml() + '</div>' */
       + (teamPanelVisible('graphs') ? repSeriesSectionHtml() : '')
-      // Justin, 2026-08-18: Team Recommendations sits directly UNDER the two
-      // graphs. Layout only — the compact card, its data and its scoping are
-      // untouched, and it still expands to the same dedicated page.
-      + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>' + teamRecsCompactHtml() + '</div>' : '')
       + (teamPanelVisible('reps') ? repCardsHtml() : '')
-      + (teamPanelVisible('needswork') ? '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>' : '')
       + (teamPanelVisible('overview') ? '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
         + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
         + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>' : '')
@@ -8806,21 +8840,36 @@
       + (teamPanelVisible('objection') ? '<div class="section fade-in"><div class="section-header"><h2>Objection Handling Score</h2>'
         + '<div class="meta">avg Objection-section score</div></div>'
         + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>' : '')
-      /* ⚠ HIDING EVERYTHING MUST SAY SO. The controls row still renders, so the
-         page is not blank — it is a header and a toolbar, which reads as a
-         broken page rather than as a choice. Same reason the graph legend says
-         so when every rep is hidden. */
       + allPanelsHiddenNoteHtml();
-      // (Manager Daily Digest was here; moved to the top — see above.)
 
-    // Chart.js draws only after the assignment above has put the canvases in
-    // the DOM. Keep this AFTER content.innerHTML — a canvas that does not exist
-    // yet silently produces no chart.
-    // ⚠ MOUNT BEFORE DRAW. The canvases are preserved nodes now, not markup, so
-    // they have to be re-appended into their slots before the draw step can
-    // find them by id. Ordering ESTABLISHED here rather than described.
+    /* ⚠⚠ THE CHART MOUNT BELONGS TO THE PAGE THAT HAS THE CANVASES. When the
+       single page was split, this tail stayed attached to whatever function
+       ended up wrapping it and landed in Coaching — which has no graphs — while
+       Performance, which has all three, mounted nothing. Nothing threw: the
+       canvases rendered and stayed empty. Caught by a test that executes the
+       real render path and asserts three charts are BUILT.
+       ⚠ MOUNT BEFORE DRAW: the canvases are preserved nodes, not markup, so
+       they must be re-appended into their slots before the draw step can find
+       them by id. Ordering ESTABLISHED here rather than described. */
     mountRepGraphHosts();
     drawRepSeriesCharts();
+  }
+
+  /* ⚠ COACHING — what the team should work on. Both panels answer to the picker,
+     so this page has one window and says so. */
+  function renderTeamCoaching() {
+    var content = document.getElementById('content');
+    ensureTeamDefaultRange();
+    if (state.teamContext === null) { loadTeam('context'); }
+    if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
+    if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
+    content.innerHTML =
+      teamHeaderHtml()
+      + teamControlsHtml()
+      + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>'
+        + teamRecsCompactHtml() + '</div>' : '')
+      + (teamPanelVisible('needswork') ? '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>' : '')
+      + allPanelsHiddenNoteHtml();
   }
 
   // Both graphs, guarded so a missing/failed series simply leaves the empty
@@ -9992,8 +10041,8 @@
   // fmtCash() is NOT dead — the EOD cash field still uses it.
 
   // Open/close a glance-box detail (per-rep breakdown of one team metric).
-  function openTeamDetail(metric) { state.teamDetailMetric = metric; renderTeamView(); }
-  function closeTeamDetail() { state.teamDetailMetric = null; renderTeamView(); }
+  function openTeamDetail(metric) { state.teamDetailMetric = metric; renderTeamSurface(); }
+  function closeTeamDetail() { state.teamDetailMetric = null; renderTeamSurface(); }
 
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -10159,7 +10208,7 @@
       + '</div>';
   }
 
-  function setGaugeMetric(k) { state.teamGaugeMetric = k; renderTeamView(); }
+  function setGaugeMetric(k) { state.teamGaugeMetric = k; renderTeamSurface(); }
 
   function gaugePanelHtml() {
     var metric = state.teamGaugeMetric === 'closing' ? 'closing' : 'objections';
@@ -10398,8 +10447,8 @@
     // converter, so the window the destination shows is the window the server
     // used, not a second definition of "7 days" that differs by a few hours.
     var today = new Date().toISOString().slice(0, 10);
-    state.teamRange = rangeToIso(addDays(today, -6), today);
-    state.teamRangeInit = true;          // do not let the default seeder re-widen it
+    state.teamRanges[teamRangePage()] = rangeToIso(addDays(today, -6), today);
+    state.teamRangeInit[teamRangePage()] = true;   // do not let the default seeder re-widen it
     /* ⚠ RETARGETED 2026-08-22 (Justin: "when you are in Team view and you click
        on anything objection-handling related it should go to this page").
        ⚠ THE LANES CLEARED HERE MUST MATCH THE DESTINATION. This cleared
@@ -10478,7 +10527,7 @@
     // followed by a later disconnect counts as new again
     var ids = unconnectedReps().map(function (r) { return r.user_id; });
     try { localStorage.setItem(UNCONNECTED_KEY, JSON.stringify(ids)); } catch (e) {}
-    renderTeamView();
+    renderTeamSurface();
   }
 
   function unconnectedBadgeHtml() {
@@ -10562,9 +10611,48 @@
        unchanged by the move — and it is enforced server-side regardless. */
     return '<div class="page-header page-header--company fade-in" style="margin-bottom:18px;">'
       + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
-        + '<div class="review-meta-row"><span>Manager view</span></div></div>'
+        + '<div class="review-meta-row">' + teamPageSelectHtml() + '</div></div>'
       + '<div class="page-header-side">' + teamSelectHtml() + '</div>'
     + '</div>';
+  }
+
+  /* ⚠⚠ THE FIVE TEAM PAGES (Justin, 2026-08-29 — the split).
+     One page was carrying gauges, a digest, three graphs, rep cards, three score
+     lists and two coaching panels. Splitting them is not tidying: the 7-day
+     gauges and the picker-driven graphs read as a contradiction while they share
+     a page, and today that is managed with a CAPTION explaining it.
+
+     ⚠ TODAY IS THE DEFAULT LANDING AND IS NOT BEHIND THE DROPDOWN in the sense
+     that matters — if the digest takes two clicks it stops being daily.
+     ⚠ The dropdown is rendered from teamHeaderHtml(), which EVERY team surface
+     already renders, so there is exactly one definition and one call site. A
+     second copy of a team control has been built and left dead on this page
+     once already. */
+  var TEAM_PAGES = [
+    { view: 'team',             label: 'Daily Digest' },
+    { view: 'team-performance', label: 'Performance' },
+    { view: 'team-coaching',    label: 'Coaching' },
+    { view: 'team-objections',  label: 'Objections' },
+    { view: 'team-members',     label: 'People' },
+  ];
+  /* ⚠ The expanded recommendations page is a CHILD of Coaching, not a sixth
+     page — the dropdown must still show where you are when you drill into it. */
+  var TEAM_PAGE_OF_VIEW = { 'team-expanded': 'team-coaching' };
+  function teamPageForView(v) { return TEAM_PAGE_OF_VIEW[v] || v; }
+
+  function teamPageSelectHtml() {
+    var here = teamPageForView(state.view);
+    return '<select class="user-select team-page-select" onchange="goTeamPage(this.value)" '
+      + 'aria-label="Team page">'
+      + TEAM_PAGES.map(function (p) {
+          return '<option value="' + p.view + '"' + (p.view === here ? ' selected' : '') + '>'
+            + escapeHtml(p.label) + '</option>';
+        }).join('')
+      + '</select>';
+  }
+  function goTeamPage(view) {
+    if (!view || view === state.view) return;
+    setView(view);
   }
   // The controls row — picker, team select, buttons. Rendered BELOW the gauge
   // panel so the fixed-window dials read above the filter that does not drive
@@ -10638,10 +10726,18 @@
 
   function teamControlsHtml() {
     ensureTeamPicker();
+    /* ⚠⚠ SAY WHICH PAGE THE DATES GOVERN. Each page owns its own window, so a
+       manager who picks 90 days here and moves to another page finds it back on
+       7 — correct, and inexplicable without this line. Two windows on one board
+       with nothing naming them is the same defect as two numbers under one
+       label. It names the CURRENT page from the same list the dropdown renders
+       from, so the two can never disagree about what this page is called. */
+    var here = (TEAM_PAGES.filter(function (p) { return p.view === teamPageForView(state.view); })[0] || {}).label || 'this page';
     return '<div class="page-header fade-in team-controls-row">'
       + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
         + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewHtml() + '</div>'
+      + '<div class="meta team-range-scope">These dates apply to ' + escapeHtml(here) + '. Each page keeps its own.</div>'
     + '</div>';
   }
 
@@ -10670,9 +10766,16 @@
        top of the page, which this view also renders — keeping it here as well
        would put TWO pickers on the drilldown. The reuse principle the note above
        describes still holds: one function, and now one call site. */
+    /* ⚠ SAME CAPTION AS THE SHARED CONTROLS ROW, SAME SOURCE FOR THE NAME. This
+       page carries its own controls (the picker sits in the card, not the row),
+       so it needs the scope line explicitly or it is the one page with a
+       per-page window that never says so. */
+    var here = (TEAM_PAGES.filter(function (p) { return p.view === teamPageForView(state.view); })[0] || {}).label || 'this page';
     return '<div class="objdrill-controls">'
       + '<span id="repFilterHost">' + repFilterHtml() + '</span>'
-      + '<div class="date-presets">' + datePickerHtml('team') + '</div></div>';
+      + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
+      + '<div class="meta team-range-scope">These dates apply to ' + escapeHtml(here) + '. Each page keeps its own.</div>'
+      + '</div>';
   }
 
   /**
@@ -10715,17 +10818,34 @@
    * already disappears by itself when there is nothing to report — an alert you
    * can permanently switch off is not an alert.
    */
+  /* ⚠⚠ EACH PANEL NOW CARRIES THE PAGE IT LIVES ON (the split, 2026-08-31).
+     ⚠ THE KEYS ARE DELIBERATELY UNCHANGED, and that IS the migration Justin
+     asked for: the stored set is a list of these keys, so a panel a manager
+     hid stays hidden where it now lives, with nothing to convert and nothing
+     that can go wrong halfway. Namespacing per page would have RESET the set
+     and silently un-hidden everything they chose to hide.
+     ⚠ The page is what stops a manager who hid all three Performance panels
+     from arriving at a blank page with no explanation — see
+     allPanelsHiddenNoteHtml, which now asks about THIS page's panels only. */
   var TEAM_PANELS = [
-    { key: 'gauges',    label: 'Team Averages' },
-    { key: 'digest',    label: 'Manager Daily Digest' },
-    { key: 'graphs',    label: 'Performance graphs' },
-    { key: 'recs',      label: 'Team Recommendations' },
-    { key: 'reps',      label: 'Rep cards' },
-    { key: 'needswork', label: 'What needs work' },
-    { key: 'overview',  label: 'Team Overview' },
-    { key: 'closing',   label: 'Closing Score' },
-    { key: 'objection', label: 'Objection Handling Score' }
+    { key: 'gauges',    label: 'Team Averages',           page: 'team-performance' },
+    { key: 'digest',    label: 'Daily Digest',            page: 'team' },
+    { key: 'graphs',    label: 'Performance graphs',      page: 'team-performance' },
+    { key: 'recs',      label: 'Team Recommendations',    page: 'team-coaching' },
+    { key: 'reps',      label: 'Rep cards',               page: 'team-performance' },
+    { key: 'needswork', label: 'What needs work',         page: 'team-coaching' },
+    { key: 'overview',  label: 'Team Overview',           page: 'team-performance' },
+    { key: 'closing',   label: 'Closing Score',           page: 'team-performance' },
+    { key: 'objection', label: 'Objection Handling Score', page: 'team-performance' }
   ];
+  /* Panels belonging to the page being rendered. ⚠ Falls back to ALL panels for
+     a page that owns none, so a caller can never get an empty list and conclude
+     "everything is hidden" from a page that simply has no panels. */
+  function panelsForPage(view) {
+    var here = teamPageForView(view || state.view);
+    var own = TEAM_PANELS.filter(function (p) { return p.page === here; });
+    return own.length ? own : [];
+  }
   var TEAM_PANELS_KEY = 'scout_team_panels_v1';
 
   /* Read once per session, then cached in state. ⚠ Unknown keys are DISCARDED
@@ -10764,7 +10884,7 @@
     var h = teamPanelsHidden();
     if (h[key]) delete h[key]; else h[key] = true;
     saveTeamPanels();
-    renderTeamView();
+    renderTeamSurface();
   }
 
   function teamPanelsAll(show) {
@@ -10772,7 +10892,7 @@
     Object.keys(h).forEach(function (k) { delete h[k]; });
     if (!show) TEAM_PANELS.forEach(function (p) { h[p.key] = true; });
     saveTeamPanels();
-    renderTeamView();
+    renderTeamSurface();
   }
 
   function customizeViewMenuToggle() {
@@ -10780,14 +10900,14 @@
   }
   function customizeViewOpen() {
     state.customizeOpen = true;
-    renderTeamView();
+    renderTeamSurface();
     document.addEventListener('click', customizeViewOutsideClick);
   }
   function customizeViewClose() {
     if (!state.customizeOpen) return;
     state.customizeOpen = false;
     document.removeEventListener('click', customizeViewOutsideClick);
-    renderTeamView();
+    renderTeamSurface();
   }
   /* ⚠ CONTAINMENT, not stopPropagation on every row. Asking WHERE the click
      landed cannot be defeated by phase or ordering — the capture-phase bug the
@@ -10809,7 +10929,15 @@
 
   function allPanelsHiddenNoteHtml() {
     var hidden = teamPanelsHidden();
-    if (TEAM_PANELS.some(function (p) { return !hidden[p.key]; })) return '';
+    /* ⚠⚠ THIS PAGE'S PANELS, NOT ALL OF THEM. Before the split there was one
+       page, so "every panel" and "every panel here" were the same question.
+       They are not any more: a manager who hid the three that land on
+       Performance would arrive at a page with a header, a toolbar and nothing
+       else — and this note would have stayed silent, because panels on OTHER
+       pages were still visible. */
+    var mine = panelsForPage();
+    if (!mine.length) return '';                      // a page with no panels is not "all hidden"
+    if (mine.some(function (p) { return !hidden[p.key]; })) return '';
     return '<div class="section fade-in"><div class="meta">'
       + 'Every panel on this page is hidden. Use Customize View above to bring them back.'
       + '</div></div>';
@@ -11671,7 +11799,7 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dt)) return;
     state.teamDigestDate = dt;
     state.teamDigest = null;
-    renderTeamView();
+    renderTeamSurface();
   }
 
   // ─── URL hash routing ──────────────────────────────────────────────────────
@@ -11684,7 +11812,7 @@
     if (!r || !r.from || !r.to) return '';
     return '?from=' + ymd(r.from) + '&to=' + ymd(r.to);
   }
-  function teamRangeHashSuffix() { return rangeHashSuffix(state.teamRange); }
+  function teamRangeHashSuffix() { return rangeHashSuffix(teamRange()); }
   // The coaching family (overview, needs-work, performance, objections, section)
   // all read state.dateRange, so they all carry the same suffix.
   function coachingRangeHashSuffix() { return rangeHashSuffix(state.dateRange); }
@@ -11721,7 +11849,19 @@
     // The team range travels in the hash so a refresh keeps it and a manager can
     // share the exact window. Days only (not full ISO) — readable, and
     // rangeToIso rebuilds the inclusive window on the way back in.
-    if (state.view === 'team')             return 'team' + teamRangeHashSuffix();
+    /* ⚠ ONE NAME EVERYWHERE, INCLUDING THE URL (Justin, 2026-08-31). The page is
+       "Daily Digest" in the dropdown and in its heading, so the hash says so
+       too — a page called one thing in the control and another in the address
+       bar is the two-things-answering-one-question defect in a new place.
+       ⚠ `#team` STILL ROUTES IN (see TEAM_HASH) because a bookmark is a link
+       too; it simply normalises to this on the next navigation. */
+    if (state.view === 'team')             return 'team-digest' + teamRangeHashSuffix();
+    /* ⚠⚠ THE WRITE SIDE OF THE DEEP LINK. TEAM_HASH taught the router to READ
+       these; without a case here they wrote an EMPTY hash, so the URL did not
+       name the page and a refresh landed back on the default. Both halves are
+       needed and only one of them fails loudly. */
+    if (state.view === 'team-performance') return 'team-performance' + teamRangeHashSuffix();
+    if (state.view === 'team-coaching')    return 'team-coaching' + teamRangeHashSuffix();
     if (state.view === 'team-expanded')    return 'team-recs' + teamRangeHashSuffix();
     if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
     if (state.view === 'team-objections')  return 'team-objections' + teamRangeHashSuffix();
@@ -11757,13 +11897,20 @@
        DIRECTLY rather than through setView, so normalising in setView alone
        would leave a refresh or a pasted URL still opening the archived page.
        Two entry points, both normalised. */
-    var TEAM_HASH = { 'team': 'team', 'team-recs': 'team-expanded',
+    var TEAM_HASH = { 'team-digest': 'team', 'team': 'team', 'team-recs': 'team-expanded',
                       'team-needs-work': 'team-objections', 'team-members': 'team-members',
-                      'team-objections': 'team-objections' };
+                      'team-objections': 'team-objections',
+                      // the split — every page must be reachable by refresh and
+                      // by a pasted URL, not only by clicking the dropdown
+                      'team-performance': 'team-performance',
+                      'team-coaching': 'team-coaching' };
     if (Object.prototype.hasOwnProperty.call(TEAM_HASH, base)) {
+      /* ⚠⚠ ASSIGN THE VIEW FIRST. teamRangePage() reads state.view, so parsing
+         the range before this line would seed the range of the page we were on
+         BEFORE the navigation — a wrong window on the wrong page, silently. */
       state.view = TEAM_HASH[base];
       var hashed = parseRangeFromHash(h);
-      if (hashed) { state.teamRange = hashed; state.teamRangeInit = true; }  // beat the 7d default
+      if (hashed) { state.teamRanges[teamRangePage()] = hashed; state.teamRangeInit[teamRangePage()] = true; }
       return;
     }
     // The coaching family shares one range, so parse it once for all of them.

@@ -33,7 +33,7 @@ test('⚠⚠ no lane may re-render the page directly — that WAS the defect', (
   assert.ok(fn.length > 400 && fn.length < 4000, 'slice suspicious: ' + fn.length);
 
   assert.ok(/scheduleTeamRender\(\)/.test(fn), 'lane completion must go through the coalescer');
-  ['renderTeamView()', 'renderTeamExpanded()', 'renderTeamNeedsWorkView()', 'renderTeamMembersView()']
+  ['renderTeamDigest()', 'renderTeamExpanded()', 'renderTeamNeedsWorkView()', 'renderTeamMembersView()']
     .forEach((call) => {
       assert.ok(fn.indexOf(call) === -1,
         'loadTeam must not call ' + call + ' directly — eight lanes doing that '
@@ -69,7 +69,7 @@ function loadCoalescer(opts) {
   const document = { getElementById: (id) => (id === 'content' ? content : null) };
   const state = { view: opts.view || 'team' };
   const mkSection = () => ({ classList: { remove: (c) => { if (c === 'fade-in') calls.fadeStripped++; } } });
-  const renderTeamView = () => {
+  const renderTeamSurface = () => {
     calls.render++;
     nodes.length = 0;
     for (let i = 0; i < 11; i++) nodes.push(mkSection());   // 11 sections per render, as measured
@@ -79,10 +79,10 @@ function loadCoalescer(opts) {
   const requestAnimationFrame = (f) => frames.push(f);
 
   const fn = new Function(
-    'document', 'state', 'renderTeamView', 'renderTeamExpanded',
+    'document', 'state', 'renderTeamSurface', 'renderTeamExpanded',
     'renderTeamNeedsWorkView', 'renderTeamMembersView', 'requestAnimationFrame', 'setTimeout',
     src + '; return scheduleTeamRender;'
-  )(document, state, renderTeamView, noop, noop, noop, requestAnimationFrame, () => 0);
+  )(document, state, renderTeamSurface, noop, noop, noop, requestAnimationFrame, () => 0);
 
   return { fn, calls, frames, flush: () => { const f = frames.splice(0); f.forEach((x) => x()); } };
 }

@@ -149,14 +149,29 @@ test('the selector uses Scout\'s four categories and offers no "price"', () => {
 
 // ─── range-dependent bucketing (Justin's ruling 2026-08-15) ────────────────
 
+function rangeHelpers() {
+  const pull = (re, what) => { const m = re.exec(HTML); assert.ok(m, what + ' is missing — anchor stale'); return m[0]; };
+  return pull(/var TEAM_RANGE_PAGE = \{[\s\S]*?\};/, 'TEAM_RANGE_PAGE')
+    + '\n' + pull(/function teamRangePage\(\) \{[^\n]*\}/, 'teamRangePage')
+    + '\n' + pull(/function ensureTeamDefaultRange\(\) \{[\s\S]*?\n  \}/, 'ensureTeamDefaultRange')
+    + '\n' + pull(/function teamRange\(\) \{[^\n]*\}/, 'teamRange')
+    + '\nfunction rangeToIso(a, b) { return { from: a, to: b }; }';
+}
+
 test('STAGE 5: bucketing is span-derived — daily up to a month, weekly beyond', () => {
   // "Aug 1 - Aug 12" gives days; "June through August" gives weeks, with no
   // thought required from the user.
   const src = HTML.slice(HTML.indexOf('var DAILY_BUCKET_MAX_DAYS'), HTML.indexOf('function teamQP'));
-  const fn = new Function('state', src + '; return repSeriesBucket();');
-  const span = (days) => ({ teamRange: {
+  /* ⚠ repSeriesBucket() now reads the CURRENT PAGE's range (the split), so the
+     sandbox needs the helpers that resolve it. Extracted from the shipped
+     source rather than reimplemented — a hand-written stand-in would pass while
+     the real resolution changed underneath it. */
+  const fn = new Function('state', src + rangeHelpers() + '; return repSeriesBucket();');
+  // ⚠ teamRangeInit comes along: ensureTeamDefaultRange indexes it per page, and
+  //   the real state initialiser always supplies both objects.
+  const span = (days) => ({ teamRangeInit: { performance: true }, teamRanges: { performance: {
     from: '2026-08-01T00:00:00.000Z',
-    to: new Date(Date.parse('2026-08-01T00:00:00.000Z') + days * 86400000).toISOString() } });
+    to: new Date(Date.parse('2026-08-01T00:00:00.000Z') + days * 86400000).toISOString() } } });
 
   /* ⚠ CONVERTED 2026-08-20: the boundary moved 14 -> 92. Weekly bucketing is
      RETIRED for month-and-longer ranges — Josh asked to see daily movement on a
@@ -173,8 +188,19 @@ test('STAGE 5: bucketing is span-derived — daily up to a month, weekly beyond'
   [1, 5, 7, 14, 21, 28, 30, 31].forEach((d) => assert.strictEqual(fn(span(d)), 'day', d + ' days should be daily'));
   [32, 45, 60, 92, 180, 400].forEach((d) => assert.strictEqual(fn(span(d)), 'week', d + ' days should be weekly'));
 
-  assert.strictEqual(fn({}), 'week', 'no range falls back to weekly, not daily');
-  assert.strictEqual(fn({ teamRange: { from: null, to: null } }), 'week');
+  /* ⚠⚠ CONVERTED BY THE SPLIT (2026-08-31), AND THE CONVERSION IS THE FINDING.
+     This used to assert fn({}) === 'week' — "no range falls back to weekly".
+     Through teamRange() that state is now UNREACHABLE: the per-page seam
+     SELF-SEEDS a 7-day window on first read, so a fresh page is DAILY. Asserting
+     'week' here would pin behaviour the product can no longer produce. */
+  assert.strictEqual(fn({ teamRangeInit: {}, teamRanges: {} }), 'day',
+    'a fresh page seeds 7 days, and 7 days is daily');
+  // ⚠ the weekly fallback still EXISTS and is still reachable — pin it where it
+  //   lives, on bucketForRange, rather than through a seam that seeds past it.
+  assert.strictEqual(fn({ teamRangeInit: { performance: true }, teamRanges: { performance: { from: null, to: null } } }),
+    'week', 'a range with no dates still falls back to weekly, not daily');
+  const raw = new Function('state', src + '; return [bucketForRange(undefined), bucketForRange({})];');
+  assert.deepStrictEqual(raw({}), ['week', 'week'], 'bucketForRange itself must still fall back weekly');
 });
 
 test('the boundary is in CALENDAR DAYS, on ranges the picker actually produces', () => {
@@ -183,10 +209,14 @@ test('the boundary is in CALENDAR DAYS, on ranges the picker actually produces',
   // Testing raw millisecond spans instead of picker output is how I got this
   // boundary wrong the first time.
   const src = HTML.slice(HTML.indexOf('var DAILY_BUCKET_MAX_DAYS'), HTML.indexOf('function teamQP'));
-  const fn = new Function('state', src + '; return repSeriesBucket();');
+  /* ⚠ repSeriesBucket() now reads the CURRENT PAGE's range (the split), so the
+     sandbox needs the helpers that resolve it. Extracted from the shipped
+     source rather than reimplemented — a hand-written stand-in would pass while
+     the real resolution changed underneath it. */
+  const fn = new Function('state', src + rangeHelpers() + '; return repSeriesBucket();');
   // ⚠ the boundary moved to 92, so it is exercised across MONTHS now — but the
   // property is the same one: inclusive picker output, counted in calendar days.
-  const picked = (fromIso, toIso) => fn({ teamRange: { from: fromIso, to: toIso } });
+  const picked = (fromIso, toIso) => fn({ teamRangeInit: { performance: true }, teamRanges: { performance: { from: fromIso, to: toIso } } });
   const d = (m, day) => '2026-' + String(m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
 
   assert.strictEqual(picked(d(8,1) + 'T00:00:00.000Z', d(8,1) + 'T23:59:59.999Z'), 'day', 'a single day');
@@ -222,7 +252,7 @@ test('HEADINGS are title case on this view', () => {
   // both graph titles. The old anchors would have gone on passing as absent-case
   // checks while the present-case checks failed — which is what caught it here.
   ['Objection Handling %', 'Closing %', 'What Needs Work',
-   'Team Overview', 'Team Recommendations', 'Manager Daily Digest'].forEach((h) => {
+   'Team Overview', 'Team Recommendations', 'Daily Digest'].forEach((h) => {
     assert.ok(HTML.indexOf('>' + h + '<') !== -1, 'missing title-cased heading: ' + h);
   });
   ['>Objection handling %<', '>Closing %<'.toLowerCase(), '>What needs work<',

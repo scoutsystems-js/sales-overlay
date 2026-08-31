@@ -546,8 +546,10 @@ test('the router PARSES the range back for the whole team family', () => {
   ['team-recs', 'team-needs-work', 'team-members'].forEach((h) => {
     assert.ok(new RegExp("'" + h + "'").test(fn), h + ' must be in the map');
   });
-  assert.ok(/state\.teamRange = hashed/.test(fn) && /teamRangeInit = true/.test(fn),
-    'and it must beat the 7-day default');
+  // ⚠ one range PER PAGE since the split — the field is keyed, not single
+  assert.ok(/state\.teamRanges\[teamRangePage\(\)\] = hashed/.test(fn)
+    && /teamRangeInit\[teamRangePage\(\)\] = true/.test(fn),
+    'and it must beat the 7-day default, for the page the hash names');
 });
 
 test('the superseded exact-match branches are commented, not left live', () => {

@@ -50,6 +50,16 @@ function registrySrc() {
   return src;
 }
 
+/* Every team render function concatenated — the split turned one page into
+   five, so "the render" is the union of the pages that own panels. */
+function renderPath() {
+  return ['renderTeamDigest', 'renderTeamPerformance', 'renderTeamCoaching'].map(function (f) {
+    const at = HTML.indexOf('function ' + f);
+    if (at === -1) throw new Error('missing render function: ' + f);
+    return HTML.slice(at, HTML.indexOf('\n  }', HTML.indexOf('allPanelsHiddenNoteHtml();', at)));
+  }).join('\n');
+}
+
 function api(stored) {
   const store = {};
   if (stored !== undefined) store['scout_team_panels_v1'] = JSON.stringify(stored);
@@ -61,6 +71,16 @@ function api(stored) {
     grab('saveTeamPanels'),
     grab('teamPanelToggle'),
     grab('teamPanelsAll'),
+    /* ⚠ grab() extracts FUNCTIONS. teamPageForView closes over a const map, so
+       the map is pulled in verbatim beside it — a function lifted without the
+       data it reads is a ReferenceError the syntax check cannot see. */
+    (function () {
+      const m = /var TEAM_PAGE_OF_VIEW = \{[\s\S]*?\};/.exec(HTML);
+      assert.ok(m, 'TEAM_PAGE_OF_VIEW is missing — anchor stale');
+      return m[0];
+    })(),
+    grab('teamPageForView'),
+    grab('panelsForPage'),
     grab('allPanelsHiddenNoteHtml'),
     grab('customizeViewHtml'),
   ].join('\n');
@@ -69,14 +89,15 @@ function api(stored) {
     setItem: (k, v) => { store[k] = v; },
   };
   const st = {};
-  const fn = new Function('state', 'localStorage', 'escapeHtml', 'renderTeamView',
+  const fn = new Function('state', 'localStorage', 'escapeHtml', 'renderTeamSurface',
     src + '\nreturn { hidden: teamPanelsHidden, visible: teamPanelVisible, toggle: teamPanelToggle,'
         + ' all: teamPanelsAll, note: allPanelsHiddenNoteHtml, html: customizeViewHtml,'
-        + ' PANELS: TEAM_PANELS, store: () => store };');
+        + ' PANELS: TEAM_PANELS, forPage: panelsForPage, store: () => store };');
   const out = fn(st, ls, String, () => {});
   /* ⚠ The rows only exist while the menu is OPEN — a closed menu renders the
      button alone, so a fixture that never opens it tests nothing about them. */
   out.open = () => { st.customizeOpen = true; };
+  out.setView = (v) => { st.view = v; };
   return out;
 }
 
@@ -113,7 +134,7 @@ test('unknown keys in storage are discarded, not carried', () => {
 
 test('unreadable storage means nothing hidden, and never throws', () => {
   const store = { 'scout_team_panels_v1': '{not json' };
-  const fn = new Function('state', 'localStorage', 'escapeHtml', 'renderTeamView',
+  const fn = new Function('state', 'localStorage', 'escapeHtml', 'renderTeamSurface',
     registrySrc()
     + grab('teamPanelsHidden') + '\nreturn teamPanelsHidden;');
   const hidden = fn({}, { getItem: k => store[k], setItem: () => {} }, String, () => {});
@@ -123,6 +144,10 @@ test('unreadable storage means nothing hidden, and never throws', () => {
 
 test('hide-all says so on screen rather than leaving a bare toolbar', () => {
   const a = api();
+  /* ⚠ THE NOTE IS NOW PER PAGE (the split): it asks whether every panel on THIS
+     page is hidden, so the fixture has to say which page it is on. Before the
+     split there was one page and the question had no subject to name. */
+  a.setView('team-performance');
   a.all(false);
   a.PANELS.forEach(p => assert.strictEqual(a.visible(p.key), false));
   const note = a.note();
@@ -150,16 +175,18 @@ test('⚠ the controls row and the unconnected badge are NOT hideable', () => {
   assert.ok(keys.indexOf('controls') === -1, 'hiding the controls row would strand the manager');
   assert.ok(keys.indexOf('unconnected') === -1, 'an alert you can permanently switch off is not an alert');
 
-  const at = HTML.indexOf('function renderTeamView');
-  const body = HTML.slice(at, HTML.indexOf('\n  }', at));
-  assert.ok(body.length > 500, 'renderTeamView slice too short: ' + body.length);
+  /* ⚠ THE RENDER PATH IS THREE FUNCTIONS SINCE THE SPLIT. The subject is
+     unchanged — neither the controls row nor the badge may be hideable — but
+     they now live on the pages that own them: the badge is an exception surface
+     and sits on Daily Digest, the controls row on the two picker-driven pages. */
+  const body = renderPath();
+  assert.ok(body.length > 1500, 'render path slice too short: ' + body.length);
   assert.ok(/\+ teamControlsHtml\(\)/.test(body), 'the controls row must render unconditionally');
   assert.ok(/\+ unconnectedBadgeHtml\(\)/.test(body), 'the badge must render unconditionally');
 });
 
 test('every registered panel is actually gated in the render', () => {
-  const at = HTML.indexOf('function renderTeamView');
-  const body = HTML.slice(at, HTML.indexOf('\n  }', at));
+  const body = renderPath();
   const a = api();
   a.PANELS.forEach(p => {
     assert.ok(body.indexOf("teamPanelVisible('" + p.key + "')") !== -1,
