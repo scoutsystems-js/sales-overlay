@@ -8,6 +8,7 @@
 // (same set-hash invalidation, same credit-tolerant unavailable state).
 
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('./model-usage').usageFor('performance-synthesis');
 const { isHandled } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
@@ -257,7 +258,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   // 6) Claude call — credit-tolerant.
   var resp;
   try {
-    resp = await getAnthropic().messages.create({
+    resp = await createWithUsage({
       model: CLAUDE_MODEL, max_tokens: SYNTH_MAX_TOKENS,
       messages: [{ role: 'user', content: buildPrompt(agg, oneThings, candidates, selling.contextText) }],
     });

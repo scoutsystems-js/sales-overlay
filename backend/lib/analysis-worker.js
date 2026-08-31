@@ -52,6 +52,7 @@ const coachingLib = require('./coaching');
 const { withDiscoveryAreas } = require('./discovery-areas');
 const { resolveProspectName } = require('./prospect-name');
 const { findPriceMoment } = require('./price-moment');
+const { createWithUsage, setUsageRecorder } = require('./model-usage');
 const { nameKey } = require('./prospect-entity');
 const { effectiveCloseScore } = require('./outcome-tag');
 const fathomRoutes = require('../routes/fathom');
@@ -1246,6 +1247,11 @@ async function claimAnalysisRun(admin, fathomCallId, userId, nowIso) {
  * @returns {Promise<{status: 'done'|'error', ...}>}
  */
 async function analyzeCall(fathomCallId, userId) {
+  /* ⚠ Hand the usage log a database client. It is INJECTED rather than built
+     inside model-usage because this function already holds one, and creating a
+     second Supabase client per model call would be a real cost for a log line.
+     A lane that never calls this simply does not record — measured absence. */
+  try { setUsageRecorder(getAdminClient()); } catch (e) { /* logging is optional */ }
   var admin = getAdminClient();
   console.log('[analysis] start call ' + fathomCallId + ' (user=' + userId + ', prompt_version=' + ANALYSIS_PROMPT_VERSION + ')');
 
@@ -1614,9 +1620,9 @@ async function analyzeCall(fathomCallId, userId) {
     var coachingAreas = [];
     try {
       var areasOut = await getAreasForUser(admin, userId, async function (prompt) {
-        var ar = await getAnthropic().messages.create({
+        var ar = await createWithUsage({
           model: CLAUDE_MODEL, max_tokens: 1500, messages: [{ role: 'user', content: prompt }],
-        });
+        }, { userId: userId, lane: 'coaching-areas' });
         var txt = ar.content[0] ? ar.content[0].text : '';
         return extractFirstJsonArray(txt);
       });
@@ -1675,16 +1681,21 @@ async function analyzeCall(fathomCallId, userId) {
     var sectionPrompt   = buildSectionGraderPrompt(normalized, callRow.duration_seconds, selling.contextText, coachingAreas, { qualifications: selling.qualifications, voiceBlock: voiceBlock });
     var highlightPrompt = buildHighlightExtractorPrompt(normalized);
 
-    var graderPromise = anthropic.messages.create({
+    /* ⚠ THE GRADER AND THE EXTRACTOR EACH SEND THE FULL TRANSCRIPT — measured
+       49,076-64,405 input tokens apiece, so together they are ~95% of an
+       analysis's input and the coaching pass below is ~5%. Merging them was
+       measured and REFUSED ON QUALITY (fewer objection moments, missing
+       sections); do not re-open that as a cost saving without re-reading it. */
+    var graderPromise = createWithUsage({
       model:      CLAUDE_MODEL,
       max_tokens: GRADER_MAX_TOKENS,
       messages:   [{ role: 'user', content: sectionPrompt }],
-    });
-    var highlighterPromise = anthropic.messages.create({
+    }, { userId: userId, callId: fathomCallId, lane: 'grader' });
+    var highlighterPromise = createWithUsage({
       model:      CLAUDE_MODEL,
       max_tokens: HIGHLIGHT_MAX_TOK,
       messages:   [{ role: 'user', content: highlightPrompt }],
-    });
+    }, { userId: userId, callId: fathomCallId, lane: 'extractor' });
 
     // GUARD: an Anthropic API failure (credit/quota exhaustion, 429, 5xx,
     // timeout) must hard-fail this call to 'error' — NEVER fall through to a
@@ -2134,7 +2145,7 @@ async function analyzeCall(fathomCallId, userId) {
     if (callRow && callRow.not_a_sales_call === true) {
       console.log('[coaching] call=%s skipped — not a sales call', fathomCallId);
     } else
-    coachCallMoments(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection.notes)
+    coachCallMoments(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection.notes, userId)
       .then(function (r) {
         console.log('[coaching] call=%s moments=%d written=%d%s',
           fathomCallId, r.selected, r.written, r.skipped ? ' skipped=' + r.skipped : '');
@@ -2259,7 +2270,7 @@ async function analyzeCall(fathomCallId, userId) {
  * Generate coaching for every coachable moment on a call, in ONE model call.
  * Returns a summary; never throws — the caller treats failure as "no coaching".
  */
-async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNotes) {
+async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNotes, userId) {
   var res = await admin.from('call_highlights')
     .select('id, type, resolution, section, timestamp_seconds, quote, observation, closer_response, closer_response_verified')
     .eq('fathom_call_id', fathomCallId);
@@ -2272,11 +2283,11 @@ async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNo
   var prompt = coachingLib.buildCoachingPrompt(moments, { outcome: outcome, later: later,
     objectionNotes: objectionNotes || null });
 
-  var reply = await getAnthropic().messages.create({
+  var reply = await createWithUsage({
     model: coachingLib.CLAUDE_COACHING_MODEL,
     max_tokens: coachingLib.COACHING_MAX_TOKENS,
     messages: [{ role: 'user', content: prompt }],
-  });
+  }, { userId: userId || null, callId: fathomCallId, lane: 'coaching' });
   var raw = reply.content.map(function (c) { return c.text || ''; }).join('');
   var parsed = extractFirstJsonArray(stripCodeFences(raw));
   if (!Array.isArray(parsed)) return { selected: moments.length, written: 0, skipped: 'unparseable' };

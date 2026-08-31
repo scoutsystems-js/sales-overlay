@@ -128,6 +128,13 @@ async function withModel(reply, fn, admin) {
       return { messages: { create: async (args) => { calls.push(args); return reply(args); } } };
     },
   };
+  /* ⚠⚠ THE STUB EDGE MOVED OUT BY ONE MODULE. Model calls now go through
+     lib/model-usage (spend attribution), which was already loaded with the REAL
+     sdk and cached — so replacing the sdk in require.cache no longer reached it
+     and every stubbed call fell through to the live client. Evicting the seam
+     too is what keeps "stub at the module edge" true.
+     ⚠ Add any new module that sits between a lane and the sdk to this list. */
+  delete require.cache[require.resolve('../lib/model-usage')];
   delete require.cache[require.resolve('../lib/team-objection-summary')];
   const mod = require('../lib/team-objection-summary');
   const prevKey = process.env.ANTHROPIC_API_KEY;
@@ -138,6 +145,7 @@ async function withModel(reply, fn, admin) {
   } finally {
     if (prevKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = prevKey;
     if (saved) require.cache[path] = saved; else delete require.cache[path];
+    delete require.cache[require.resolve('../lib/model-usage')];
     delete require.cache[require.resolve('../lib/team-objection-summary')];
   }
 }

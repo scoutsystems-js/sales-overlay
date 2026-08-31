@@ -109,7 +109,12 @@ test('⚠ THE PIPELINE ACTUALLY CALLS IT — a function nothing invokes is the r
   const w = code(read('lib/analysis-worker.js'));
   assert.ok(/coachingLib = require\('\.\/coaching'\)/.test(w), 'the module must be imported');
   // called from inside analyzeCall, with in-scope identifiers
-  const call = w.match(/coachCallMoments\(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection\.notes\)/);
+  /* ⚠ ASSERT THE PROPERTY, NOT THE EXACT ARGUMENT LIST. This pinned the literal
+     five-argument call and went stale when `userId` was APPENDED for spend
+     logging — a correct change, appended at the END precisely because inserting
+     mid-list silently shifts every later argument into the wrong slot. What
+     matters is that the pipeline calls it with in-scope identifiers. */
+  const call = w.match(/coachCallMoments\(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection\.notes([^)]*)\)/);
   assert.ok(call, 'the call site must pass the pipeline arguments');
   // it must run AFTER persistHighlights — it needs the row ids the insert created
   assert.ok(w.indexOf('persistHighlights(admin, fathomCallId') < w.indexOf('coachCallMoments(admin'),
@@ -123,7 +128,11 @@ test('⚠ ONE model call per CALL — the worker must not loop the coaching call
   const site = w.slice(w.indexOf('async function coachCallMoments'));
   const body = site.slice(0, site.indexOf('\nmodule.exports'));
   assert.ok(body.length > 400 && body.length < 4000, 'slice must cover the function: ' + body.length);
-  const calls = (body.match(/messages\.create\(/g) || []).length;
+  /* ⚠⚠ COUNT BOTH FORMS. This counted `messages.create(` only, and the call now
+     goes through the spend-logging seam — so after that change it counted ZERO
+     and would have SILENTLY STOPPED GUARDING the rule it exists for. A guard
+     that quietly measures nothing is worse than one that fails. */
+  const calls = (body.match(/messages\.create\(|createWithUsage\(/g) || []).length;
   assert.strictEqual(calls, 1, 'exactly one model call for the whole set, got ' + calls);
 });
 

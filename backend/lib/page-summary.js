@@ -13,6 +13,7 @@
 // input = the page payload). It's a manual button, so volume is low either way.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('./model-usage').usageFor('page-summary');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 const { cacheGet, cachePut } = require('./team-synthesis');
@@ -54,7 +55,7 @@ async function computePageSummary(admin, userId, pageLabel, data) {
 
   var text;
   try {
-    var resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: SUMMARY_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] });
+    var resp = await createWithUsage({ model: CLAUDE_MODEL, max_tokens: SUMMARY_MAX_TOKENS, messages: [{ role: 'user', content: prompt }] });
     text = (resp.content && resp.content[0] && resp.content[0].text ? resp.content[0].text : '').trim();
   } catch (e) {
     return { available: false, reason: 'Anthropic API failure' + ((e && e.status) ? ' (HTTP ' + e.status + ')' : '') + ': ' + ((e && e.message) || 'unknown') };

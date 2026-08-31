@@ -19,6 +19,7 @@
 
 const { isDisqualified } = require('./dq-exclusion');
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('./model-usage').usageFor('team-needs-work');
 var objectionCats = require('./objection-categories');
 
 const { displayNameFromEmail } = require('./display-name');
@@ -608,7 +609,7 @@ async function getBucketMapping(objs) {
 
   var mapping = {}, bucketClass = {};
   try {
-    var resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL,
+    var resp = await createWithUsage({ model: CLAUDE_MODEL,
       max_tokens: bucketMaxTokens(distinct.length), messages: [{ role: 'user', content: prompt }] });
     /* ⚠⚠ TRUNCATION AND JUNK ARE DIFFERENT FAILURES AND USED TO LOOK IDENTICAL.
        Both ended at the same unparseable-output branch, so a cap that had become

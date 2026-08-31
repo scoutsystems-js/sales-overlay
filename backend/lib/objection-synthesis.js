@@ -8,6 +8,7 @@
 // objection_synthesis_cache and invalidated by the analysis_set_hash.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('./model-usage').usageFor('objection-synthesis');
 const { isHandled, outcomeMap } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
@@ -172,7 +173,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   // 5) one Claude call. Credit/quota/5xx → unavailable (do NOT cache failures).
   var resp;
   try {
-    resp = await getAnthropic().messages.create({
+    resp = await createWithUsage({
       model: CLAUDE_MODEL, max_tokens: SYNTH_MAX_TOKENS,
       messages: [{ role: 'user', content: buildSynthPrompt(present, byCat) }],
     });

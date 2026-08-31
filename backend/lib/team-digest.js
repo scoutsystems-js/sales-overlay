@@ -25,6 +25,7 @@ const { isDisqualified } = require('./dq-exclusion');
 const crypto = require('crypto');
 const { displayNameFromEmail } = require('./display-name');
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('./model-usage').usageFor('team-digest');
 const { CLAUDE_MODEL } = require('../config');
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
@@ -276,7 +277,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
 
   var synthesis;
   try {
-    var resp = await getAnthropic().messages.create({
+    var resp = await createWithUsage({
       model: CLAUDE_MODEL, max_tokens: DIGEST_MAX_TOKENS,
       messages: [{ role: 'user', content: promptLines.join('\n') }],
     });

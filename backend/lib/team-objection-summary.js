@@ -30,6 +30,7 @@
 
 const crypto = require('crypto');
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('./model-usage').usageFor('team-objection-summary');
 const { CLAUDE_MODEL } = require('../config');
 const { snapCacheWindow } = require('./cache-window');
 const { computeTeamObjections, OBJECTION_CATEGORIES } = require('./team-objections');
@@ -571,7 +572,7 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
 
   var resp;
   try {
-    resp = await getAnthropic().messages.create({
+    resp = await createWithUsage({
       model: CLAUDE_MODEL,
       max_tokens: outputBudget(subjects.length),
       messages: [{ role: 'user', content: buildPrompt(subjects) }],

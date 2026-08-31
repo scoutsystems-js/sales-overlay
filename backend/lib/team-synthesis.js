@@ -11,6 +11,7 @@
 //     quote + clip + why.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('./model-usage').usageFor('team-synthesis');
 const { displayNameFromEmail } = require('./display-name');
 const { isHandled } = require('./objection-handled');
 const { snapCacheWindow } = require('./cache-window');
@@ -247,7 +248,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   var prompt = promptLines.join('\n');
 
   var resp;
-  try { resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: 2600, messages: [{ role: 'user', content: prompt }] }); }
+  try { resp = await createWithUsage({ model: CLAUDE_MODEL, max_tokens: 2600, messages: [{ role: 'user', content: prompt }] }); }
   catch (e) { return apiFail(e); }
   var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
   if (!parsed || !Array.isArray(parsed.working) || !Array.isArray(parsed.improve)) return { available: false, reason: 'synthesis returned unparseable output' };
@@ -307,7 +308,7 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap,
   ]).join('\n');
 
   var resp;
-  try { resp = await getAnthropic().messages.create({ model: CLAUDE_MODEL, max_tokens: 900, messages: [{ role: 'user', content: prompt }] }); }
+  try { resp = await createWithUsage({ model: CLAUDE_MODEL, max_tokens: 900, messages: [{ role: 'user', content: prompt }] }); }
   catch (e) { return apiFail(e); }
   var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
   if (!parsed) return { available: false, reason: 'synthesis returned unparseable output' };

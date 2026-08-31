@@ -1,6 +1,7 @@
 const express = require('express');
 const { normalizeName } = require('../lib/display-name');
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('../lib/model-usage').usageFor('me-extract');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { CLAUDE_MODEL } = require('../config');
@@ -252,7 +253,7 @@ router.post('/sessions/:session_id/extract-outcome', requireAuth, async function
       'SUMMARY:\n' + session.post_call_summary;
 
     var anthropic = getAnthropic();
-    var response = await anthropic.messages.create({
+    var response = await createWithUsage({
       model: CLAUDE_MODEL,
       max_tokens: 100,
       messages: [{ role: 'user', content: prompt }],
@@ -430,7 +431,7 @@ router.post('/sessions/:session_id/extract-objections', requireAuth, async funct
         'CALL WINDOW:\n' + windowTurns;
 
       try {
-        var resp = await anthropic.messages.create({
+        var resp = await createWithUsage({
           model: CLAUDE_MODEL,
           max_tokens: 800,
           messages: [{ role: 'user', content: classifyPrompt }],
@@ -764,7 +765,7 @@ router.post('/sessions/:session_id/extract-prospect-name', requireAuth, async fu
       'TRANSCRIPT:\n' + introText;
 
     var anthropic = getAnthropic();
-    var resp = await anthropic.messages.create({
+    var resp = await createWithUsage({
       model: CLAUDE_MODEL,
       max_tokens: 100,
       messages: [{ role: 'user', content: prompt }],

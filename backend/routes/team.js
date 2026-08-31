@@ -21,6 +21,7 @@ const TA = require('../lib/team-averages');
 const { isHandled, outcomeMap } = require('../lib/objection-handled');
 const { computeWhyProse } = require('../lib/why-prose');
 const Anthropic = require('@anthropic-ai/sdk');
+const createWithUsage = require('../lib/model-usage').usageFor('team-why-prose');
 const { CLAUDE_MODEL } = require('../config');
 // Same lazy shape the synthesis lanes use: never constructed at import time, so
 // a missing key is a clean per-request error rather than a boot failure.
@@ -274,7 +275,7 @@ router.get('/why-prose', teamGate, async function (req, res) {
     var em = await emailMap(admin);
     var analytics = await computeTeamAnalytics(admin, team.memberIds, range.from, range.to, em);
     var ask = async function (prompt) {
-      var r = await getAnthropic().messages.create({
+      var r = await createWithUsage({
         model: CLAUDE_MODEL, max_tokens: 300, messages: [{ role: 'user', content: prompt }],
       });
       return r.content[0] ? r.content[0].text : '';
