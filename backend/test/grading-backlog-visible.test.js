@@ -107,9 +107,17 @@ test('⚠ excluded reps are NAMED, not silently dropped', () => {
   const src = slice(LIVE, 'var allReps = series.reps', 'var datasets =', 400, 4000);
   assert.ok(/dropped/.test(src), 'the dropped set must be computed');
   assert.ok(/Excluded/.test(src), 'and written somewhere the user can read');
-  // The two reasons need different actions and must not be merged.
-  assert.ok(/no offer price saved/.test(src), 'must distinguish "cannot be measured"');
-  assert.ok(/No data in this window/.test(src), 'from "nothing this window"');
+  /* ⚠ THERE IS NOW ONE REASON, NOT TWO (2026-08-31). The two-group split existed
+     because the finder needed the rep's own saved offer price, so a rep without
+     one was permanently UNMEASURABLE — a different fact from "quiet window" and
+     rightly given different words. The finder now reads the moment from
+     total-framing language, so every rep is measurable and the only reason to be
+     absent is having no priced call in the window.
+     ⚠ THE SUBJECT OF THIS TEST — dropped reps are NAMED, never silently gone —
+     is unchanged and is what is still asserted. */
+  assert.ok(/No data in this window/.test(src), 'the one remaining reason must be stated');
+  assert.ok(!/no offer price saved/.test(src),
+    'the unmeasurable group is gone — a rep is no longer invisible for lacking a saved price');
 });
 
 test('the excluded note is its OWN element — a legend click must not wipe it', () => {
@@ -119,10 +127,24 @@ test('the excluded note is its OWN element — a legend click must not wipe it',
   assert.ok(!/Excluded/.test(upd), 'the legend updater must not touch the data note');
 });
 
-test('the price precondition is carried end to end, or the reason cannot be given', () => {
+/* ⚠⚠ ARCHIVED IN PLACE 2026-08-31 — ITS SUBJECT NO LONGER EXISTS, which is a
+   different thing from its scaffolding going. It asserted that the PRICE
+   PRECONDITION was carried route -> series -> chart so the chart could say
+   "cannot be measured". There is no precondition now: findPriceMomentByFraming
+   needs no stored price, so every rep is measurable.
+   Original:
+     assert.ok(/price_pif/.test(RT), 'the route must fetch it');
+     assert.ok(/has_price/.test(RT), 'and stamp it on the rep');
+     assert.ok(/has_price/.test(RS), 'the series must carry it through');
+   ⚠ Inverted rather than deleted, so the retired precondition cannot creep back
+   in and silently make reps invisible again. */
+test('the retired price precondition stays retired', () => {
   const RS = fs.readFileSync(path.join(__dirname, '..', 'lib', 'rep-series.js'), 'utf8');
   const RT = fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8');
-  assert.ok(/price_pif/.test(RT), 'the route must fetch it');
-  assert.ok(/has_price/.test(RT), 'and stamp it on the rep');
-  assert.ok(/has_price/.test(RS), 'the series must carry it through');
+  assert.ok(!/has_price/.test(RT), 'the route must not stamp a price precondition');
+  assert.ok(!/has_price/.test(RS), 'nor the series carry one');
+  // ⚠ price_pif itself is NOT retired — it is still edited via /me and /admin.
+  // Only this one consumer went away.
+  const ME = fs.readFileSync(path.join(__dirname, '..', 'routes', 'me.js'), 'utf8');
+  assert.ok(/price_pif/.test(ME), 'price_pif remains an editable profile field');
 });

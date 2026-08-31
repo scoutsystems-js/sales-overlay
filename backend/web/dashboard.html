@@ -7857,18 +7857,13 @@
       var nameOf = function (r) { return r.name || 'Unnamed'; };
       var parts = [];
       if (dropped.length) {
-        // has_price is only carried for the price series; elsewhere every rep is
-        // measurable in principle, so they all fall into the second group.
-        var noPrice = isMinutes ? dropped.filter(function (r) { return r.has_price === false; }) : [];
-        var noData  = dropped.filter(function (r) { return noPrice.indexOf(r) === -1; });
-        if (noPrice.length) {
-          parts.push('Not measured — no offer price saved: ' + noPrice.map(nameOf).join(', ')
-            + '. Scout finds this moment by looking for the rep&rsquo;s own price in the '
-            + 'transcript, so it needs saving in Account first.');
-        }
-        if (noData.length) {
-          parts.push('No data in this window: ' + noData.map(nameOf).join(', ') + '.');
-        }
+        /* ⚠ THERE IS NO LONGER AN "UNMEASURABLE" GROUP. Time to price used to
+           need the rep's own saved offer price, so a rep without one was
+           permanently invisible and the chart had to say so. It now reads the
+           moment from total-framing language in the transcript, so every rep is
+           measurable and the only remaining reason to be absent is having no
+           priced call in this window — which the chart still states by name. */
+        parts.push('No data in this window: ' + dropped.map(nameOf).join(', ') + '.');
       }
       exEl.innerHTML = parts.join(' ');
       exEl.style.display = parts.length ? '' : 'none';

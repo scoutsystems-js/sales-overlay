@@ -51,7 +51,7 @@ const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
 const coachingLib = require('./coaching');
 const { withDiscoveryAreas } = require('./discovery-areas');
 const { resolveProspectName } = require('./prospect-name');
-const { findPriceMoment } = require('./price-moment');
+const { findPriceMomentByFraming } = require('./price-moment');
 const { createWithUsage, setUsageRecorder } = require('./model-usage');
 const { nameKey } = require('./prospect-entity');
 const { effectiveCloseScore } = require('./outcome-tag');
@@ -1599,13 +1599,24 @@ async function analyzeCall(fathomCallId, userId) {
      * ("a couple hundred bucks", "$300 to $500 a month"). lib/price-moment never
      * sees it.
      */
+    /* ⚠⚠ NO STORED PRICE REQUIRED (2026-08-31, Justin's ruling twice over).
+       This used to run ONLY when the rep had saved price_pif — and only 2 of 13
+       users ever did, both the same person, so every other rep had ZERO price
+       moments across 750+ graded calls and the graph drew one line. An offer
+       also usually has several packages, so matching one stored number is
+       brittle by construction.
+
+       ⚠ The discriminator was never the number: it is total-framing language,
+       measured at 85% of real-price first mentions against 0-1% of round
+       decoys. findPriceMomentByFraming inverts the order and keeps Rule A.
+
+       ⚠ Measured against the stored lookup as ground truth over 120 calls:
+       109 exact, 6 within 60s, 0 DIFFERENT, 5 missed — 96%. The failure mode is
+       a null, never a wrong minute, which is the safe direction. NEW CALLS
+       ONLY: nothing re-analyses, so the graph fills as calls arrive. */
     var priceMoment = null;
     try {
-      var pp = await admin.from('user_profiles').select('price_pif').eq('user_id', userId).maybeSingle();
-      var sellerPrice = (pp && pp.data) ? Number(pp.data.price_pif) : NaN;
-      if (isFinite(sellerPrice) && sellerPrice > 0) {
-        priceMoment = findPriceMoment(normalized.turns, sellerPrice);
-      }
+      priceMoment = findPriceMomentByFraming(normalized.turns);
     } catch (e) {
       console.warn('[analysis] price moment skipped: %s', e.message);
     }

@@ -548,13 +548,16 @@ router.get('/rep-series', teamGate, async function (req, res) {
     // not drawn as a flat zero, and not an empty legend entry implying a line.
     var withCalls = {}; calls.forEach(function (c) { withCalls[c.user_id] = true; });
     var em = await emailMap(admin);
-    /* ⚠ price_pif COMES ALONG BECAUSE ITS ABSENCE IS THE REASON A REP HAS NO
-       PRICE LINE. lib/price-moment only runs when the rep has saved their own
-       offer price, so a rep without one is not "slow to price" — they are
-       UNMEASURED, permanently and silently. Measured on the live board: 8 of 9
-       reps have no price_pif, which is why that graph showed exactly one line
-       while the two above it showed many. The chart names them and says why. */
-    var profs = await admin.from('user_profiles').select('user_id, first_name, last_name, price_pif').in('user_id', candidates);
+    /* ⚠⚠ price_pif IS NO LONGER SELECTED HERE, AND THAT IS THE POINT (2026-08-31).
+       It used to come along because its ABSENCE was the reason a rep had no
+       price line — the finder only ran for a rep who had saved their own offer
+       price, and 8 of 9 had not. The finder now works from total-framing
+       language instead, so EVERY rep is measurable and there is no longer a
+       "cannot be measured" group to name. A dropped rep simply has no priced
+       call in this window, which the chart says.
+       ⚠ price_pif itself is untouched — it is still edited via /me and /admin
+       and stored on the profile. Only this ONE consumer went away. */
+    var profs = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', candidates);
     // Hand the PROFILE ROW to the resolver rather than pre-joining the name here
     // — the join-and-fallback rules live in lib/display-name.js and nowhere else.
     var profOf = {};
@@ -563,13 +566,9 @@ router.get('/rep-series', teamGate, async function (req, res) {
       // ⚠ THE GAUGE PANEL AND THE LINE GRAPHS ARE NAMED FROM HERE. This was a
       // raw local-part, which is why the dials read "josh" and "demo-ava".
       var pf = profOf[id];
-      var pp = pf ? Number(pf.price_pif) : NaN;
       return {
         user_id: id,
         name: resolveDisplayName(pf, em[id] || null, id),
-        // The precondition for the Time-to-Price series, carried so the chart can
-        // distinguish "no priced calls this window" from "cannot be measured".
-        has_price: isFinite(pp) && pp > 0,
       };
     });
 
