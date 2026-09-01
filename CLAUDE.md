@@ -5246,6 +5246,41 @@ sidebar 200 + column 1200 = 1400
 2. **THE COLUMN THEN OVERFLOWED THE VIEWPORT between 900 and 1366** — 24px at 1366, **290px at 1100** — because `max-width` does not shrink to accommodate a margin. **Found by computing the arithmetic across widths BEFORE shipping**, which is the one-width rule applied to a layout rather than a font.
 3. **⚠ A `Range` RECT OVER *WRAPPED* TEXT RETURNS THE LAID-OUT WIDTH, NOT THE WIDTH IT NEEDS.** Measuring how wide the rail must be, the range reported 71px for a label needing 153. **Force `white-space: nowrap` and read `scrollWidth`** — the same family as "a block fills its container, so a width check cannot see overflow".
 
+### ⚠⚠ A GUARD'S PREMISE CAN DECAY IN THE DIRECTION IT WAS WRITTEN TO PREVENT (2026-09-01)
+**`background-motifs.test.js` forbade hiding the mesh above 1000px, and its own comment explains why: a threshold written for a CROPPED-GUTTER treatment survived into a FULL-BLEED one and hid the background on ordinary laptops. It ends "⚠ A REDESIGN INCLUDES ITS GUARDS. This test is the tripwire."**
+- **⚠⚠ IT HAPPENED AGAIN, IN REVERSE, AND THE TRIPWIRE FIRED ON THE CORRECT CHANGE.** Justin ruled the mesh back into a right-hand BAND, so *"a full-bleed mesh covers the viewport, so there is plenty to see at 1280px"* stopped being true — at 1280 the band is **zero** — and a threshold that had been a stale leftover became a genuine necessity.
+- **THE ASSERTION FLIPPED FROM "THE NUMBER MUST BE SMALL" TO "THE NUMBER MUST BE DERIVED."** That is the property surviving BOTH treatments: **a threshold inherited from a retired design is the defect; one computed from the current geometry is not.** It now reads `--sidebar-w` out of the page and fails if the sidebar changes without the threshold moving — proven by widening the rail and by restoring the old hand-picked 1320.
+- **⚠ THE GENERAL FORM: when a guard blocks a change that is right, do not weaken the bound — ask what its PREMISE was and whether the premise still holds.** A guard whose premise has expired should be re-derived, not relaxed, or the next reader inherits a number nobody can defend.
+
+### ⚠⚠ "IT ENCODES STATE" IS A CLAIM ABOUT WHAT ELSE IS ON SCREEN (2026-09-01, the green bars)
+**Justin: the green bars down the left are "a very common Claude design". He named a PATTERN, so the sweep enumerated — 32 left-borders, 14 accent-coloured, 3 on the pages in the pass.**
+- **⚠ ONE OF THE THREE GENUINELY ENCODED SOMETHING: `.team-insight` is GREEN for "working" and AMBER for "improve".** The reflex is to keep it because removing a state encoding loses information.
+- **⚠⚠ IT DID NOT, BECAUSE THOSE ROWS ALREADY SIT UNDER HEADINGS READING "WHAT'S WORKING" AND "WHAT TO IMPROVE".** The colour restated a fact the reader had been told one line earlier. **A visual encoding is only carrying information if nothing else on screen already carries it — check the neighbours before defending it.**
+- **THE TEST: strip the encoding and ask what the reader no longer knows.** Here: nothing.
+- **⚠ AND THE SWEEP'S SCOPE WAS STATED: the other eleven are on the CALL REVIEW page, where `.review-why.loss/.win/.pending` genuinely encode outcome and no heading repeats it.** Reported, not touched — a pattern ruling does not license removing a bar that is doing work on a page nobody looked at.
+
+### ⚠⚠ A CARD THAT LINKS TO A NAVIGATION ITEM IS A DUPLICATE — AND ITS "ONLY PLACE" CLAIM WAS STALE (2026-09-01)
+**`openTeamNeedsWork()` is literally `openTeamObjections()`. The Objection Handling Focus card on Coaching was a teaser linking to a page that is already in the sidebar.**
+- **⚠⚠ A GUARD SAID IT WAS "THE ONLY PLACE ITS CONTEXT LINE RENDERS" AND THAT WAS A CLAIM, NOT AN INVENTORY.** Verified before removing: the drilldown renders its own exclusion line (its own comment records having had it since 2026-08-22) and `nwContextLineHtml` still has a SECOND call site on the personal rep page. **Nothing was lost.** Same shape as the objections-panel retirement where two of three stated differences were already stale.
+- **⚠ THE HEADING IS RENDERED BY FOUR BUILDERS.** Only one was this card. **Removing by heading rather than by call site would have hit three live surfaces.**
+- **⚠ AND REMOVING A SECTION CAN REMOVE A MODEL CALL:** `needsWork` was one of the page's two Claude syntheses and its kick went with it. **When deleting a panel, check whether it was the only consumer of a lane — the saving is real and belongs in the report.**
+- **⚠⚠ THE CONSTRAINT THAT NEARLY GOT MISSED: `openTeamExpanded()` had exactly ONE caller — the card being replaced — and that page also holds Call Highlights of the Week.** Replacing the card without a link would have stranded it, the merge-review-page failure. **Before replacing any control, grep what it is the sole caller of.**
+
+### ⚠ TWO NAMED EXCEPTIONS LANDED ON THE SAME VALUE — SAY SO RATHER THAN MERGE THEM (2026-09-01)
+`--fs-gauge-value: 24px` and `--fs-company: 24px`. The scale has nothing between 20 and 48, so "slightly bigger than the page title" has no step to take.
+- **THEY ARE DELIBERATELY NOT SHARED.** The gauge token is scoped to the dials by ruling; merging would couple a dial's readability to a page heading, so a future change to one would silently move the other.
+- **⚠⚠ BUT TWO EXCEPTIONS AT ONE VALUE IS EXACTLY THE ARGUMENT FOR AN EIGHTH STEP, AND IT IS RECORDED AT BOTH TOKENS RATHER THAN LEFT TO BE DISCOVERED.** **A THIRD landing on 24 is the point to re-open the scale — not the point to declare a fourth carve-out.** Written down because the alternative is three exceptions and nobody noticing they agree.
+
+### ⚠⚠ CONFIRM THE DEGRADED STATE BY LOOKING — A 2.5px BAND IS A LINE, NOT ARTWORK (2026-09-01)
+**Justin ruled the mesh a wide-screen flourish and asked what it does between 1366 and 1440 — "a 3px sliver would look like a defect where zero looks like a choice".**
+```
+band = (100vw − 200px sidebar − 1200px column) / 4
+  1920 → 130px    1512 → 28px    1440 → 10px    1400 and below → 0
+```
+- **AT 1410 IT IS 2.5px AND RENDERS AS A STRAY GREEN VERTICAL LINE.** Zoomed in and looked; no measurement would have said "this reads as a fault".
+- **SO A FLOOR IS THE HONEST ANSWER**, and it goes FURTHER than the accepted "zero at 1366 and below": absent under 1496, because **0–24px is the range that looks broken.** ⚠ That means no mesh at 1440, stated plainly rather than discovered.
+- **⚠ THE 24px THRESHOLD IS PROVISIONAL AND LABELLED AS SUCH IN THE CODE.** The browser became unresponsive before 1512-against-1440 could be compared. **A number that has not had its look gets said so, not presented as derived.**
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

@@ -48,6 +48,32 @@
 
 ---
 
+### ✅ 2026-09-01 (`f285d9d`) — DROPDOWN · GREEN BARS · DIGEST HEADER · COACHING · MESH FLOOR
+
+**1 · THE TEAM DROPDOWN DROPS IN PLACE.** `position: static`, inside the rail, pushing the items below it — measured: opening it moves Knowledge Base down 165px. Border and shadow went with the float; the items are indented instead. Below 900px it floats again.
+
+**2 · THE GREEN LEFT BARS ARE SWEPT AS A PATTERN.** 32 left-borders, 14 accent-coloured, 3 on the pages in the pass — digest notable moments, recommendation insights, objections summary. ⚠ **The insight bars encoded working-vs-improve and still lost nothing: those rows sit under headings that say WHAT'S WORKING and WHAT TO IMPROVE.** ⚠ The other eleven are on the **call review** page, where the colour genuinely encodes outcome — **reported, not touched.**
+
+**3 · THE DIGEST HEADER IS OPTION A.** Closes alone at the display step; calls / follow-ups / lost / reps-active step down to a quiet row with labels beneath. Same builder as Performance. ⚠ Company name needed **`--fs-company: 24px`**, a second named exception. ⚠⚠ **It lands on the same value as `--fs-gauge-value` and is deliberately not merged — a THIRD at 24 is the point to re-open the scale.** ⚠ `reps_active` kept and flagged, not dropped.
+
+**4 · COACHING.** Objection Handling Focus removed — its click handler is literally `openTeamObjections()`. ⚠ **Its "only place this renders" guard was stale and was verified before removing.** ⚠ **It removed one of the page's two Claude syntheses.** Team Recommendations now renders the **six insights the page was already loading and discarding five of**, with quotes and clips — content 704px → 1559px, no extra model call. ⚠ **The expanded page keeps its door: its only caller was the card, and Call Highlights lives there.**
+
+**5 · THE MESH HAS A FLOOR.** At 1410 the band is 2.5px and renders as a stray green line — looked at, zoomed. Absent below **1496px**. ⚠ Further than the accepted "zero at 1366", deliberately: 0–24px is the range that looks broken. ⚠ **24px is provisional** — the 1512-vs-1440 look did not happen (browser unresponsive) and the code says so.
+
+### 🔴 NEEDS JUSTIN — three things flagged rather than decided this block
+- **The expanded page now duplicates the recommendations.** Coaching renders them inline; `#team-expanded` still shows recs *and* Call Highlights. **The clean answer is probably that the expanded page becomes Call Highlights only — but that restructures a page nobody has looked at.**
+- **`reps_active` in the digest quiet row.** Justin named calls, follow-ups and lost. The fourth stayed because dropping an unmentioned number is a bigger change than the one asked for.
+- **The eleven green left-bars on the call review page.** They encode outcome (loss / win / pending) and no heading repeats it, so the pattern ruling does not obviously reach them.
+
+### 📐 THE MESH IS A WIDE-SCREEN FLOURISH — A DECISION, NOT A LIMITATION (Justin's ruling 2026-09-01)
+```
+band = (100vw − 200px sidebar − 1200px column) / 4
+  1920 → 130px    1600 → 50px    1512 → 28px    1440 → 10px → HIDDEN    ≤1400 → 0
+```
+**Do not narrow the content column. Do not shorten the sidebar labels.** The rail is already as narrow as it goes — the "soon" tags drop onto their own line, taking the widest item 185 → 153 and the rail 225 → 200, and **that 25px is the only space the band has.**
+⚠ **A missing mesh at 1366 is a choice, not a rendering fault.** Recorded here so nobody "fixes" it.
+⚠ **The ground is unaffected and must stay that way** — text sits on the ground, never on the artwork. 0 exposed across ten views.
+
 ### ✅ 2026-09-01 (`1e0daa9`, `d08f941`) — THE DIGEST OUTAGE · GAUGES · MESH · SIDEBAR
 
 **1 · THE DIGEST WAS THROWING FOR TWO DAYS, AND IT WAS A CODE BUG.** `301defc` (2026-08-30 20:34 UTC) spliced the DQ filter INSIDE the callback passed to `inChunks`, after its `return` — `var objections` unreachable, `ReferenceError` on every call. Last good digest 19:16; first failure the 05:15 cron. **Both missing days regenerated with real content (2 managers each, 0 errors).**
