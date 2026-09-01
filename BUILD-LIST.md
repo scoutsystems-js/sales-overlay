@@ -95,7 +95,7 @@ one rep / month, at real August volumes
 | block | state |
 |---|---|
 | **① type scale** | ✅ **LIVE `131a12b`.** 7 sizes, 3 weights, 3 radii. On Performance: **23 size/weight pairs → 11**, weights `400,450,500,600,700 → 400,500`. **The 115 semibolds are gone from that page** |
-| **② borders → space** | ⚠ **BUILT, COMMITTED (`146eb47`), NOT PUSHED — see the blocker** |
+| **② borders → space + THE GROUND** | ⚠ **BUILT, COMMITTED (`146eb47`, `f396fa5`), NOT PUSHED — awaiting Justin's look.** The blocker is RESOLVED: he ruled option 2 and the ground is in. **Exposed text 95 of 105 → 0 of 102; contrast measured per line against the ground each line sits on — worst 11.09:1, none below AA.** ⚠⚠ **SAFETY IS LAYOUT, NOT FAINTNESS** — recorded at the code as a standing rule re-applied, so nobody later dims the raster instead. A SURFACE not a card (no border/radius/nesting, verified on the rendered page), in the page's OWN `--bg`, at the content column's width so the artwork keeps the gutters (360px at 1920 → 0 at ≤1200, the column filling the screen). ⚠ **THE GROUND IS THE PATTERN THE REST OF THE PASS DEPENDS ON** — every page that loses its cards inherits the same exposure. ⚠ **PROPOSED NOT TAKEN: a bigger dial.** The ground did not change the gauge answer — the tightness is between the number and the dial's inner edge, so a backdrop could never move it |
 | **③ the other four pages · ④ sidebar + logo** | not started |
 
 **RULINGS APPLIED:** page title takes the 20px step (it must outrank a section heading) · the 10px caret and 9px dial ticks are a **NAMED EXEMPTION**, recorded in the code and a test so a sweep finds a decision not a stray · the gauges take the display step.

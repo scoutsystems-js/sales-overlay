@@ -3282,6 +3282,31 @@ rendered quotes                          118
 - **⚠⚠ I SAMPLED THREE OBSERVATIONS, SAW A PRESCRIPTION, AND WAS WRONG.** Three real rows all contained *"closer needs to…"*, so I nearly reported that the missing coaching already existed and only needed rendering. **Measured: 31 of 537 (5.8%) are prescriptive, and 3 say "should have".** A three-row sample of a 537-row population is an anecdote; the difference between "already there" and "5.8%" is the difference between a render fix and a prompt change.
 - **THE SHAPE THE TARGET NEEDS, and what exists today:** the moment ✓100% · what the prospect revealed ✓100% · what the closer did ✓98.7% · **what they should have asked ✗5.8%** · **why it would have mattered ✗5.8%**. **Three of five are free and unrendered; two need generating.**
 
+### ⚠⚠⚠ SAFETY IS LAYOUT, NOT FAINTNESS — THE STANDING RULE, RE-APPLIED (ruled 2026-09-01)
+**Block 2 removed the cards from Performance and took exposed text from 0 to 95 of 105. The fix was NOT to dim the raster. It was to give the page a GROUND — a solid plane behind the content column.**
+- **⚠⚠ THIS IS THE SAME RULE THE WHOLE MESH ARC PRODUCED, AND IT IS WRITTEN AT THE CODE SO NOBODY "SIMPLIFIES" IT LATER: text is protected by an OPAQUE SURFACE, never by turning the artwork down.** Dimming is faintness, and **faintness is the mechanism behind every legibility defect this project has had** — the invisible mark, the unreadable muted text, the mesh nobody could see.
+- **A SURFACE, NOT A CARD.** The block that preceded it existed to remove 52 drawn boxes; a ground with a border or a panel radius would have put one back. No border, no radius, no nesting — **verified on the rendered page, not asserted.**
+- **⚠ IT IS THE PAGE'S OWN `--bg`, NOT A NEW ELEVATED COLOUR.** It adds no surface to the palette; it restores the floor where content sits, so the artwork reads as something happening BEYOND the page rather than behind the text.
+- **⚠ WIDTH IS THE WHOLE DESIGN: the content column and no wider.** Edge-to-edge would DELETE the artwork rather than frame it. Gutters measured 360px at 1920, 120px at 1440, 40px at 1280 — **and ZERO at ≤1200, which is the column filling the screen rather than a defect, and is stated rather than hidden.**
+- **⚠⚠ THE PATTERN, NOT A PAGE FIX: EVERY PAGE THAT LOSES ITS CARDS INHERITS THE SAME EXPOSURE.** The ground is what the rest of the design pass depends on.
+
+### ⚠⚠ MEASURE THE REGION THE CLAIM IS ABOUT — A CONTRAST PROBE, DONE WRONG THEN RIGHT (2026-09-01)
+```
+WRONG   brightest pixel ANYWHERE in the source image, composited once
+        -> 1.15:1, contradicting a screenshot showing readable white text
+RIGHT   walk EACH text node to its opaque ancestor, measure against THAT
+        -> 102 lines, worst 11.09:1, best 18.88:1, none below AA
+```
+- **⚠⚠ THE WRONG VERSION IS NOT A WEAK MEASUREMENT, IT IS A DIFFERENT QUESTION** — "what is the brightest thing in this image" versus "what is behind this line of text". Both are computable; only one is the claim.
+- **THE DIVISION THAT SAVED IT: the COUNT was reported as solid and the RATIO as unreliable.** An exposure count is a property of the DOM and was trustworthy; the ratio depended on sampling the right region and was not. **Reporting a mixed result honestly beats withholding both or quoting both.**
+- **⚠ AND THE TELL WAS FREE, AGAIN: the number contradicted a screenshot already in hand.** Third instance of *a result that contradicts something you can already see is a statement about the instrument.*
+
+### ⚠ A SCALE'S FIRST REAL PRESSURE IS WHEN IT DIES — THIS ONE HELD (2026-09-01)
+**The gauges needed to dominate. Compared at 48 / 34 / 28 / 20 side by side, 34 sat best inside the dial — and 34 IS NOT ON THE SCALE.**
+- **AN EIGHTH SIZE IS EXACTLY WHAT "SEVEN SIZES, NOTHING BETWEEN THEM, EVER" FORBIDS**, so 48 shipped and **the real fix was named as a BIGGER DIAL** — a layout change — rather than a new type step.
+- **⚠ THE GENERAL FORM: WHEN A CLOSED SET DOES NOT FIT, THE ANSWER IS USUALLY THAT SOMETHING ELSE SHOULD MOVE.** A scale that gains a value every time it is inconvenient is a list, not a scale. **Record the caveat at the code so the pressure is visible next time rather than re-discovered.**
+- **CONFIRMED AFTERWARDS: the ground did NOT change the answer.** The tightness is between the number and the dial's inner edge, not between the number and what is behind it — **so a new backdrop could never have moved it**, and checking that took one look.
+
 ### ⚠⚠⚠ NO GREP FINDS A RULE THAT DOES NOT EXIST — TWO HEADINGS HAD NO CSS AT ALL (2026-09-01)
 **The loudest text on the Performance page was 21px bold, and NOTHING DECIDED IT: two `<h2>`s had no matching rule, so they rendered at the BROWSER'S OWN DEFAULT.**
 - **THE METHOD IS THE FILING: ask the RENDERED PAGE which rule governs an element, and be ready for the answer NONE.** Iterating `document.styleSheets` and testing `el.matches(rule.selectorText)` returned an empty list — twice, with two different parents. **A search of the stylesheet cannot find an absent rule, because there is nothing to match.**
