@@ -5656,6 +5656,24 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **v1.1.0 build plan:** Features built one at a time in this order: (1) Role system, (2) Role-based dashboard system on website (`/dashboard` for users + redesigned `/admin` for admins+owners with user management; the original raw log viewer remains as Sections B+C of the admin page), (3) Script upload in app, (4) Call boundary detection, (5) Post-call summary. Each feature fully committed and approved before the next starts. Justin receives one feature prompt at a time from the architect — Claude Code never plans ahead.
 - **Session start:** cd into the project root at the start of every session: cd '/Users/justinschmidt/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay'. Note: Supabase MCP is not currently configured — migrations must be run manually via the Supabase dashboard SQL editor. To enable Supabase MCP in future, add it to .mcp.json and start a fresh session.
 
+### ⚠⚠⚠ A NEW VIEW INHERITS NOTHING — AND THE PAIRING GUARD STRUCTURALLY CANNOT SEE IT (2026-09-01)
+**`team-dashboard` rendered with a bordered section and a bordered page-header on a page whose own cards deliberately have none. The design pass, undone on one page by adding a page after it.**
+- **⚠⚠ THE GUARD COULD NOT HAVE CAUGHT IT, AND THE REASON GENERALISES: it asserts that a view with its cards OFF also has a GROUND. A view in NEITHER list is not a mismatch** — it is simply absent from both, which is exactly what a new view is. **A pairing guard polices consistency between two lists; it says nothing about membership.**
+- **FOUND BY LOOKING AT THE FIRST RENDER.** Fifth time on this pass that looking has found what a check could not.
+- **THE HABIT: when a design rule is implemented as a PER-VIEW LIST, adding a view means adding it to every list — and the lists must be enumerated, not remembered.** Here there were five (`.page`, `.section`, `.page-header`, `.page-header--company`, `.team-controls-row`).
+
+### ⚠⚠ A GUARD THAT PERMITS EXACTLY ONE EXEMPTION IS DOING REAL WORK — DO NOT BECOME THE SECOND (2026-09-01)
+**I set a new lane's cache-invalidation scope to `'team'` and the guard failed on the first run, correctly.** `TEAM_LANE_SCOPE` allows one exemption — the gauges — and it earns it by **promising on screen** that the date filter does not affect them.
+- **⚠ MY REASONING WAS SOUND AND STILL WRONG: the layout is keyed on the VIEWER, so a range change genuinely cannot alter it, which made `'team'` look harmless.** The guard is not asking whether the exemption is *harmless*; it is asking whether it is **DECLARED and EARNED**. A second undeclared exemption is how a one-exemption rule becomes a list.
+- **THE TEST TO APPLY BEFORE CLAIMING AN EXEMPTION: what does the SURFACE promise the reader?** The gauges say "not affected by the date filter" in words. Nothing else does.
+- **AND THE COST OF BEING WRONG DECIDES IT:** a cheap refetch of a ~350-byte payload, against a stale board rendered under a new window.
+
+### ⚠⚠ VERIFY A DEFAULT-PATH FEATURE WITH THE DEFAULT PATH — ZERO STORED ROWS IS THE TEST, NOT A COINCIDENCE (2026-09-01)
+**"Store the deviation, not the default" is only true if the read path never writes one.** The check is two things, and both are cheap:
+- **THE TABLE IS EMPTY** — asserted in SQL before the render check, because a single stored row would make the whole verification measure a different path.
+- **THE READ PATH CONTAINS NO `insert`/`upsert`/`update`** — asserted statically, because the failure mode is a convenience someone adds later ("create a default board on first load") that looks helpful and permanently breaks new-widget delivery.
+- **⚠ AND THE PAYLOAD MUST SAY WHICH PATH IT TOOK.** `is_default: true` distinguishes *never customised* from *customised to look like the default* — only one of those should inherit a new widget, and nothing else in the response can tell them apart.
+
 ### ⚠⚠⚠ "COMPUTABLE" AND "AVAILABLE" ARE DIFFERENT ANSWERS, AND A CATALOG THAT CONFLATES THEM OFFERS A METRIC IT CANNOT DRAW (2026-09-01)
 **Talk ratio was carried as "known absent". It is COMPUTABLE — I computed it, 66% closer across 200 real calls — and it is still NOT AVAILABLE.**
 ```

@@ -1075,6 +1075,23 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
 
+## 2026-09-01 — WIDGET CATALOG block 2: storage + render path (`6721795`, `53e1301`)
+Deployed, verified by commit hash. Suite **2019**. **No editor, no drag, no resize, no picker, no pinning.**
+
+**MIGRATION 060 `dashboards` APPLIED — 7 columns, 3 indexes, RLS on with no policies, and ZERO ROWS, which is the design rather than a coincidence.** A manager with no row inherits `DEFAULT_LAYOUT` from code. ⚠⚠ **The default must never be MATERIALISED** — the moment it is, adding a widget stops reaching anyone who already has a board. **Guarded: the read path is asserted to contain no insert/upsert/update.**
+
+**Decisions recorded with their reasoning:** a server table (localStorage is per-device; a manager expects their board on their phone) · **ten boards enforced in CODE** (a DB constraint would surface as an error rather than "you have ten") · **pinning made UNREPRESENTABLE** by a partial unique index · **no FK to auth.users**, because the purge path enumerates what it removes and a silent cascade would hide a table from it.
+
+**MISSING-METRIC BEHAVIOUR proven on the two metrics actually removed this week:** a board naming `close_rate` and `reps_active` renders 1 card, names both, leaves the stored row **identical**, and says *"Your saved board is unchanged."* A stored view the metric cannot support falls back to `number` **and the card says it changed**.
+
+**⚠⚠ THE DEFAULT RENDERS, VERIFIED BOTH SIDES WITH ZERO STORED ROWS** — server over real HTTP with a forged manager (the signed-in session is not one and 403s), and client-side: 6 cards, 3 gauges, **2 trend charts that actually drew**, `MAX 60 MIN` on the ceiling metric. The three hard cases all hold: **"top 5 of 6 · 1 not enough data to measure"**, an **"Other (1) — 15 objections"** bucket that still reconciles, and *"Not enough to measure"* rather than a zero.
+
+**⚠⚠ TWO PROCESS FINDINGS.** A guard caught a real over-reach on its first run — I gave the new lane a `'team'` scope and `TEAM_LANE_SCOPE` permits exactly ONE exemption, earned by a promise on screen. And **a new view inherits NOTHING from the design pass**: `team-dashboard` kept its boxes because the ground and cards-off lists are per-view, **found by LOOKING**, and the pairing guard structurally could not see it (a view in neither list is not a mismatch).
+
+⚠ **FILED: `#team-dashboard` has no dropdown entry** — reachable only by hash until the picker exists. **That is the merge-review failure if it stays**, and it is noted at the code as deliberate for one block. ⚠ **Talk ratio not built** — the one-column proposal stands.
+
+---
+
 ## 2026-09-01 — WIDGET CATALOG block 1: the data layer (`1517486`)
 Deployed, verified by commit hash. Suite **2011**. **No UI, no grid, no picker, no storage schema.**
 
