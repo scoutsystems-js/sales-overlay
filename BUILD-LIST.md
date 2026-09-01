@@ -48,6 +48,40 @@
 
 ---
 
+### ✅ 2026-09-01 (`075d34f`) — FOUR LIVE-PAGE ITEMS
+
+**1 · THE DIGEST — the navigation was not the bug.** Both symptoms (31 Aug → 29 Aug, Next disabled) have ONE cause and it is upstream: **the newest digest in the database is 2026-08-29**, so the landing day is not in the list at all. The walk is bounded to days that HAVE a digest, deliberately. **⚠ A REAL INVERSION IN THE SAME BRANCH WAS FIXED**: `idx === -1` fell back to `days[0]`, so a date OLDER than the list walked FORWARD. It steps by date now. **⚠ THIS DOES NOT CHANGE WHAT JUSTIN SEES** and the guard says so.
+
+**2 · THE COACHING PAGE — reported, nothing changed.** Neither empty containers nor missing data: **704px in a 900px viewport with COMPLETE data**, two panels, each a one-line teaser. **Two of its four lanes are Claude syntheses** — two model calls to render two sentences. Not a dispatcher relative (checked).
+
+**3 · THE GAUGES.** Dial back to **290**; the number on a **NAMED EXCEPTION** token (`--fs-gauge-value: 34px`, declared after the scale, pinned by a test) rather than an eighth scale size. `41.7min` 118.5px → **90.6px**, no overlap, worst clearance 24px. **The target notch is labelled with its own number**, drawn from the notch's own angle, same style as the "0", full strength against the dimmed ends. ⚠ The notch tip moved to `rOuter + 7` — it had to clear the **ring band** (`.avg-seg` is stroke-width 12 at `rOuter`), not just the label.
+
+**4 · PEOPLE — Offer price and Plan removed**, with their caption (the seat sentence too: a seat is a billing concept). ⚠ **Verified first: the stored price DRIVES NOTHING** — `findPriceMomentByFraming(turns)` reads the transcript. ⚠ **A managed rep now has no route to set one at all**; costs nothing while the field drives nothing, recorded in code and test.
+
+**5 · THE 11TH AND 12TH CAPTIONS**, in the same voice as the ten. Both copies — `lib/kb-counter.js` is mirrored inline and the mirror guard caught a one-sided edit. A re-sweep for mechanism vocabulary in customer strings now returns nothing.
+
+### 🔴 NEEDS JUSTIN — THE DAILY DIGEST HAS NOT GENERATED FOR TWO DAYS
+
+**No digest row exists for 2026-08-30 or 2026-08-31**, days on which the team took **9 and 39 calls**. The cron is green (six consecutive successes); a zero-call day still writes a quiet row, so **generation did not reach its write**. No code change explains the window. It is error-isolated with a single `console.error` and the log buffer was cleared by a later deploy.
+- **This is the default landing page.** It currently reads *"No digest for 2026-08-31 — it generates after the morning sync"*, which has been untrue for two days.
+- **Not regenerated — that is model spend and it is Justin's to approve.** The log line to look for is `[fathom] sync-all digest pass threw (isolated)`.
+
+### ⏳ BLOCK ④ — SIDEBAR + LOGO. SHAPE APPROVED 2026-09-01, NOT BUILT
+```
+SIDEBAR (where you go)              TOP RIGHT (who you are)
+  Coaching Dashboard · Calls          Admin       owner only, gate UNTOUCHED
+  EOD Report · Team ▾ · Knowledge     My Account  NAVIGATES to #account
+  Base · 3 "soon" tabs                            (the email link already does this)
+                                    ACCOUNT PAGE — 7 existing sections
+                                      + Sign out, its own full-width card, at the bottom
+```
+- **My Account NAVIGATES, it is not a menu.** The page already exists — nothing is rebuilt, only the label changes from the raw email.
+- **The five team pages live in the sidebar ONLY**, never in both.
+- ⚠ **Sign out becomes two clicks and a scroll** — the account page is seven full-width cards. Its own bordered card at the bottom, the only destructive-looking control on the page.
+- ⚠ **The relabel loses one thing**: the raw email is the only place on screen saying which account you are signed into. Not lost (Profile → Email) but one click deeper.
+- **THE LOGO IS BLOCKED ON A REDRAWN MARK** — smallest dot 0.56px at a 24px nav. An asset task, not a code task. There is no logo in the nav today; it is the plain word `Scout`.
+- **Measured**: the nav is in ONE live file, 30 lines of markup, 22 CSS rules, 6 JS touchpoints. It wraps just under **1366**, not 1440.
+
 ### ✅ 2026-09-01 (`19233bf`) — CAPTIONS WIRED · THE DIAL FIXED · BLOCK ④ SHAPE REPORTED
 
 **CAPTIONS — all ten, verified on production with comments stripped.** Removed: our roadmap ("until the billing block adds an account entity"), our mechanism ("the figure Scout listens for", "Scout caps grading so a big import cannot fire hundreds of analyses"), and captions phrased as a negation of our own controls ("not affected by the date filter above"). Kept: everything a reader can act on.

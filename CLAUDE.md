@@ -5156,6 +5156,46 @@ The smallest dot is `r=0.2` in a 17.105-unit viewBox:
 ```
 **No CSS change reaches this.** It needs a redrawn small mark — thicker stroke, fewer and larger dots — exactly as the wordmark needed a real export rather than an upscale. **⚠ There is no logo in the nav today at all: it is the plain word `Scout` in a `<span>`.**
 
+### ⚠⚠⚠ THE DIGEST NAVIGATION WAS NOT THE BUG — GENERATION HAD STOPPED (2026-09-01)
+**Justin, live: "31 Aug jumps to 29 Aug, and Next Day cannot be pressed." Two symptoms, ONE cause, and it was upstream of the control.**
+```
+newest digest in the DB   2026-08-29        the page lands on ET-yesterday = 2026-08-31
+30 Aug and 31 Aug         NO DIGEST         yet 39 and 9 calls were taken on them
+the cron                  SIX GREEN RUNS    and a zero-call day still WRITES a quiet row
+```
+- **THE WALK IS BOUNDED TO DAYS THAT HAVE A DIGEST, deliberately** (an unbounded walk reaches 28 stale days that read "quiet day · 0 calls" for days the closer worked). **So stepping 31 → 29 is the walk skipping a day with nothing on it, and Next being disabled is correct because nothing newer exists.**
+- **⚠⚠ THE REAL FINDING IS THAT GENERATION DID NOT REACH ITS WRITE FOR TWO DAYS, AND NOTHING SAID SO.** The pass is error-isolated inside `/fathom/sync-all` with one `console.error`, and the log buffer had been cleared by a later deploy. **A silently-isolated background pass whose only symptom is an empty page is indistinguishable from a UI bug** — which is exactly how it was reported.
+- **⚠ AND THE PAGE TELLS THE MANAGER TO WAIT FOR SOMETHING THAT IS NOT COMING:** *"it generates after the morning sync"* — true when written, untrue for two days.
+- **WHAT WAS ACTUALLY FIXED IS A DIFFERENT, REAL INVERSION IN THE SAME BRANCH:** `idx === -1` fell back to `days[0]` — the NEWEST day — so on a date OLDER than the whole list, **"Prev Day" walked FORWARD**. It steps by date comparison now, which is right whether or not the current day is in the list. **⚠ IT DOES NOT CHANGE WHAT JUSTIN SEES, and the guard says so** — otherwise the next reader "fixes" the skip and re-creates the stale-day exposure.
+
+### ⚠⚠⚠ AN OPTIONAL COMMENT PREFIX IN A REGEX DELETED 7,255 LINES (2026-09-01)
+**`(?:/\*.*?\*/)?` before an anchor, with DOTALL, matches from ANY earlier `/*` in the file.** Removing one 14-line function, the pattern started at a comment thousands of lines above and took everything between.
+```
+16503 -> 9248 lines.  It PARSED.  node -c passed.
+```
+- **⚠⚠ I HAD COMPUTED THE BEFORE/AFTER LINE COUNT AND ONLY *PRINTED* IT.** The rule was already on file — *a generator that CAN emit an impossible value should REFUSE to* — and printing is not refusing. **It is now an ASSERTION wrapping every scripted edit, and it has since refused two edits that were reaching too far.**
+- **THE SHAPE: `edit(fn, label, max_shrink)` — compute both counts, assert the loss is within a stated cap, and only then write.** The cap is per-edit and measured (a 29-line function removal declares 30), so a runaway cannot hide inside a generous global allowance.
+- **AND DO NOT USE AN OPTIONAL PREFIX AT ALL.** Match the anchor exactly, slice from it to its own closing token, and **assert the span's length** before replacing — a 1619-char span for a 29-line function is checkable; "whatever the regex found" is not.
+
+### ⚠⚠ NEITHER FAULT THE BRIEF NAMED — THE PAGE IS SHORT BY CONSTRUCTION (2026-09-01)
+**"Slow, and a lot of blank space, looks incomplete." Asked to establish whether it was empty containers or missing data: it is a THIRD thing.** With complete data the coaching page is **704px in a 900px viewport**, and its two panels are **one-line teasers** that link elsewhere.
+- **⚠⚠ THE MISMATCH IS THE FINDING: TWO OF ITS FOUR LANES ARE CLAUDE SYNTHESES.** The page makes two model calls and waits on them **to render two sentences.**
+- **⚠ AND I NEARLY FILED A DEFECT THAT WAS MY OWN FIXTURE.** An incomplete `teamNeedsWork` made the card render a heading with nothing under it; the server emits `card_text` on every branch, so the empty body was mine. **Checking the producer before reporting is what separated it** — the latent form (`card_text || ''` renders an empty div) is real but not live.
+- **RULED OUT EXPLICITLY, because the brief asked:** it is not a relative of the dispatcher defect. The renderer is dispatched, the lanes arrive, the page repaints.
+
+### ⚠⚠ A LABEL ON A MARK MUST BE DRAWN FROM THE MARK'S OWN ANGLE (2026-09-01, the gauge target)
+**The white notch is the TARGET — confirmed from `avgAngle(target, scale)` before labelling it, because the instruction was not to label an assumption.**
+- **THE LABEL USES THE SAME `ta` THE NOTCH USES**, so the two cannot drift. Deriving the angle from `target` a second time would be two computations of one thing.
+- **⚠ THE NOTCH GAVE WAY, NOT THE LABEL.** At `rOuter + 19` the label **CLIPPED the viewBox** at the top of the arc, and growing the viewBox would change the dial's aspect with the HTML readout sitting over it.
+- **⚠⚠ AND THE TIP HAD TO CLEAR THE RING BAND, NOT THE OLD TIP: `.avg-seg` is stroke-width 12 drawn AT `rOuter`, so the band spans `rOuter ± 6`.** A tip at `+3` stops INSIDE it and reads as a mark that fails to cross. **Read the stroke width before shortening anything drawn on a ring.**
+- **THE NUMBER IS A NAMED EXCEPTION (`--fs-gauge-value: 34px`), DECLARED AFTER THE SCALE AND PINNED THERE BY A TEST.** Justin's ruling, having looked at it. **A scale that grows whenever it is inconvenient stops being a scale** — this is the second time that pressure has come up, and the first time it was refused outright. The carve-out is named, confined to the gauges, and `--fs-display` still governs everything else.
+
+### ⚠ VERIFY WHAT A COLUMN DRIVES BEFORE REMOVING IT — AND SAY WHAT ROUTE DISAPPEARS (2026-09-01)
+Offer price and Plan left the People page by ruling. **Verified rather than assumed: `analysis-worker` calls `findPriceMomentByFraming(normalized.turns)` — no stored price — so Time to Price finds the figure in the transcript.** `price_pif` is now only stored, validated and returned.
+- **⚠ THE CAPTION WENT WITH THEM, INCLUDING THE SEAT SENTENCE.** A seat is a BILLING concept, so the ruling that removes Plan removes the sentence explaining seats. **A consequence caption for a column that no longer exists is worse than none** — and this is the same caption a guard had made me restore a block earlier, for a reason that has now expired.
+- **⚠⚠ A ROUTE DID DISAPPEAR AND IT IS RECORDED RATHER THAN DISCOVERED LATER: a MANAGED rep now has no way to set an offer price at all** (`priceFieldHtml` returns `''` when `is_managed`). That costs nothing while the field drives nothing; it is in the code and the test so it is found if it ever drives something again.
+- **⚠ AND A STALE SENTENCE WAS FOUND, NOT FIXED:** the account page still says the price is what *"Scout uses to find the moment you quote the price on a call"*. Untrue since the detector went transcript-only. **Reported rather than reworded unasked.**
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
