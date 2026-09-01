@@ -101,7 +101,14 @@ test('⚠⚠ isTeamView covers every page in the dropdown, and says no to others
   const pages = [...H.matchAll(/\{ view: '([a-z-]+)',\s+label:/g)].map(m => m[1]);
   assert.strictEqual(pages.length, 5, 'expected five pages, found ' + pages.length);
   pages.forEach(v => assert.ok(is(v), v + ' is in the dropdown but isTeamView says no'));
-  ['team-expanded', 'team-needs-work'].forEach(v =>
+  /* ⚠ `team-expanded` left this list 2026-09-01 — RETIRED with Call Highlights
+     of the Week, normalised away at BOTH entry points, so it can never be the
+     live view and has nothing to repaint.
+     ⚠ `team-needs-work` STAYS HERE and that is deliberate: it is retired too,
+     but isTeamView answering `true` for a name that never arrives costs nothing,
+     whereas answering `false` would mean a stale bookmark's repaint is skipped
+     in the window between the hash landing and the normalisation. */
+  ['team-needs-work'].forEach(v =>
     assert.ok(is(v), v + ' is a team sub-view and must still repaint'));
   ['overview', 'kb', 'eod', 'call-library', 'account'].forEach(v =>
     assert.ok(!is(v), v + ' is not a team page — the coalescer must not repaint it'));
@@ -217,8 +224,17 @@ test('⚠ each page resolves to its OWN range, and the drilldown rides coaching\
   assert.strictEqual(label({ view: 'team-performance' }), 'Performance');
   assert.strictEqual(label({ view: 'team-coaching' }), 'Coaching');
   assert.strictEqual(label({ view: 'team-objections' }), 'Objections');
-  // the drilldown rides coaching's window, so it must SAY coaching
-  assert.strictEqual(label({ view: 'team-expanded' }), 'Coaching');
+  /* ⚠⚠ ARCHIVED 2026-09-01, AND THE REASON IS THAT THERE ARE NO LIVE SUB-VIEWS
+     LEFT. `team-expanded` was retired with Call Highlights of the Week, and
+     `team-needs-work` was already retired — BOTH normalise away in
+     ARCHIVED_VIEWS and TEAM_HASH, so neither can ever be `state.view`.
+     ⚠ I first re-pointed these at `team-needs-work` and they still failed, which
+     is what surfaced that it is retired too — a conversion aimed at another dead
+     view is not a conversion. The assertions are kept commented so a revival
+     brings its guard back with it.
+     ⚠ The five REAL pages are still asserted above/below; only the sub-view
+     rows are archived. */
+  // assert.strictEqual(label({ view: 'team-expanded' }), 'Coaching');
 });
 
 /* ⚠⚠ REGRESSION — FOUND ON THE REAL PAGE, NOT BY READING. People renders the
@@ -278,9 +294,18 @@ test('⚠⚠ teamRangePage() really READS the view — run it, do not grep it', 
   });
   assert.strictEqual(Object.keys(seen).length, 3,
     'three pages resolved to fewer than three range keys — they are sharing a window');
-  // ⚠ the expanded drilldown deliberately RIDES coaching's window, not its own.
-  assert.strictEqual(pageFor({ view: 'team-expanded' }), 'coaching',
-    'the drilldown must stay on the window of the page it was opened from');
+  /* ⚠⚠ ARCHIVED 2026-09-01, AND THE REASON IS THAT THERE ARE NO LIVE SUB-VIEWS
+     LEFT. `team-expanded` was retired with Call Highlights of the Week, and
+     `team-needs-work` was already retired — BOTH normalise away in
+     ARCHIVED_VIEWS and TEAM_HASH, so neither can ever be `state.view`.
+     ⚠ I first re-pointed these at `team-needs-work` and they still failed, which
+     is what surfaced that it is retired too — a conversion aimed at another dead
+     view is not a conversion. The assertions are kept commented so a revival
+     brings its guard back with it.
+     ⚠ The five REAL pages are still asserted above/below; only the sub-view
+     rows are archived. */
+  // assert.strictEqual(pageFor({ view: 'team-expanded' }), 'coaching',
+  //   'the drilldown must stay on the window of the page it was opened from');
 });
 
 test('⚠ each page owns its own range — one shared window is the carrier bug', () => {

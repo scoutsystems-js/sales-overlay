@@ -19,40 +19,53 @@ function slice(start, end, floor) {
   return t;
 }
 
-test('the expanded page renders Call Highlights and NOT the recommendations', () => {
-  const ex = slice('function renderTeamExpanded', 'function teamRecsCompactHtml', 300);
-  assert.ok(ex.indexOf('teamHighlightsHtml()') !== -1, 'Highlights is what the page is for');
-  assert.ok(ex.indexOf('Call Highlights of the Week') !== -1, 'and it is the heading');
-  assert.strictEqual(ex.indexOf('teamRecsHtml()'), -1, 'the recommendations came off');
-  assert.strictEqual(ex.indexOf('Team Recommendations'), -1, 'including the heading');
-});
+/* ⚠⚠⚠ CALL HIGHLIGHTS OF THE WEEK WAS RETIRED 2026-09-01 (Justin's ruling), so
+   FIVE of this file's six tests lost their subject with it. They are archived
+   below rather than deleted, so a revival brings its guards back the way its CSS
+   must — and the one whose subject SURVIVES is converted, not archived.
 
+   THE REASON IT WENT, because a commented block with no reason gets uncommented
+   by someone who assumes it was tidying: UNUSEFUL, HARD TO REACH, AND 87% OF ITS
+   QUOTES WERE THE PROSPECT RATHER THAN THE CLOSER — 1,004 of 1,160 candidate
+   moments carried no closer reply at all.
+
+test('the expanded page renders Call Highlights and NOT the recommendations', ...)
+test('⚠ a page that renders nothing from a lane must not pay for it', ...)
+test('⚠⚠ "Back to Team" survived the section that housed it', ...)
+test('the entry point names what is actually through the door', ...)
+*/
+
+/* ⚠⚠ CONVERTED, NOT ARCHIVED — THIS ONE'S SUBJECT OUTLIVES THE FEATURE, and it
+   is the assertion that made the removal safe in the first place: COACHING
+   RENDERS THE FULL RECOMMENDATIONS, through `teamRecsHtml()`. Verified before
+   the expanded page was stripped, and verified again now that the expanded page
+   is gone entirely — because "the other half still works" is exactly the claim
+   nobody re-checks after a removal. */
 test('⚠⚠ COACHING STILL CARRIES THE RECOMMENDATIONS — removing the wrong half is how a feature becomes unreachable', () => {
-  const co = slice('function renderTeamCoaching', 'function renderTeamExpanded', 300);
+  const co = slice('function renderTeamCoaching', 'function drawRepSeriesCharts', 300);
   assert.ok(co.indexOf('teamRecsHtml()') !== -1,
-    'the SAME full renderer — this is what made the removal safe, and it was checked BEFORE removing');
+    'the SAME full renderer — this is what made both removals safe');
+  assert.ok(co.indexOf("loadTeam('recs')") !== -1,
+    'and Coaching must still kick the lane it renders');
 });
 
-test('⚠ a page that renders nothing from a lane must not pay for it', () => {
-  const ex = slice('function renderTeamExpanded', 'function teamRecsCompactHtml', 300);
-  assert.strictEqual(ex.indexOf("loadTeam('recs')"), -1, 'the recs lane is no longer kicked here');
-  assert.ok(ex.indexOf("loadTeam('highlights')") !== -1, 'the lane it DOES render is still kicked');
-});
-
-test('⚠⚠ "Back to Team" survived the section that housed it', () => {
-  const ex = slice('function renderTeamExpanded', 'function teamRecsCompactHtml', 300);
-  assert.ok(ex.indexOf('Back to Team') !== -1,
-    'it lived inside the recommendations header — deleting the section would have stranded the page');
-});
-
-test('the entry point names what is actually through the door', () => {
-  const co = slice('function renderTeamCoaching', 'function renderTeamExpanded', 300);
-  const at = co.indexOf('openTeamExpanded()');
-  assert.ok(at !== -1, 'the door still exists');
-  const link = co.slice(at, at + 400);
-  assert.ok(link.indexOf('Call Highlights of the Week') !== -1,
-    'the label must name Highlights alone now that the recs are gone');
-  assert.strictEqual(/Recommendations/.test(link), false, 'and must not promise recommendations');
+/* ⚠⚠ THE DOOR WENT WITH THE DESTINATION, AND THAT IS THE POINT. The link was
+   added days earlier precisely so Highlights would not become unreachable; the
+   right move when the destination is retired is to REMOVE the door, not leave it
+   pointing at a dead page. Asserting its ABSENCE is what stops it being restored
+   by someone who finds the archived renderer and assumes the link was lost. */
+test('⚠⚠ nothing in the product offers the trip to the retired page', () => {
+  const code = live;
+  assert.strictEqual(/openTeamExpanded\(\)/.test(code), false,
+    'the opener is archived — a live caller would reach an archived renderer');
+  assert.strictEqual(/Call Highlights of the Week/.test(code), false,
+    'no live label may promise it');
+  /* ⚠ BUT A BOOKMARK IS A LINK TOO: the view must still normalise somewhere
+     rather than rendering nothing. */
+  assert.ok(/'team-expanded': 'team-coaching'/.test(code),
+    'setView must normalise the retired view');
+  assert.ok(/'team-recs': 'team-coaching'/.test(code),
+    'and so must the hash, which assigns state.view DIRECTLY');
 });
 
 test('⚠⚠⚠ THE VERDICT BORDER SURVIVES THE CALL-REVIEW SWEEP — a RULED exemption', () => {

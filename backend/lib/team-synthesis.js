@@ -23,7 +23,7 @@ const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
-const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
+const { provenCloserResponse } = require('./closer-side');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const MAX_CANDIDATES = 20;
@@ -377,8 +377,41 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-// ── Call Highlights of the Week ──────────────────────────────────────────────
+/* ⚠⚠⚠ CALL HIGHLIGHTS OF THE WEEK — RETIRED 2026-09-01 (Justin's ruling).
+   ARCHIVED IN PLACE, NOT DELETED, in case it returns.
+
+   THE ONE-LINE REASON, because a commented block with no reason gets
+   uncommented by someone who assumes it was tidying:
+   ⚠⚠ UNUSEFUL, HARD TO REACH, AND 87% OF ITS QUOTES WERE THE PROSPECT RATHER
+      THAN THE CLOSER. Justin's words: "while cool they're unuseful and
+      difficult to navigate to."
+
+   THE MEASUREMENT THAT MADE SCRAPPING BETTER THAN FIXING:
+     candidate moments (strong_moment + handled objections)   1160
+       ...carrying a real closer_response                      156   (13%)
+       ...of those, UNPROVEN (no closer_response_verified)      19   (12% of 156)
+   So a section called CALL HIGHLIGHTS was showing what the PROSPECT said on
+   1,004 of 1,160 candidates, and quoting an unproven closer reply on 19 more.
+   The open question was what fallback to design; removing the feature removed
+   the question — this was the SIXTH unproven-reply lane and the only one that
+   both fed a model prompt AND rendered to a manager. Closed by REMOVAL, not by
+   a gate. Do not read the BUGS row as "the proven gate was applied here".
+
+   ⚠⚠ IF THIS EVER RETURNS, ITS CSS MUST RETURN WITH IT. Three hours before this
+   was written, `.review-kb-btn` was found rendering as a BROWSER-DEFAULT button
+   for three days because its rule was archived with an earlier removal and the
+   control was re-added without it. REMOVING A CONTROL ARCHIVES ITS STYLING, AND
+   RE-ADDING THE CONTROL DOES NOT BRING THE STYLING BACK. The rules to revive
+   live in web/dashboard.html under `body[data-view="team-expanded"]` and
+   `.team-lane`, and the renderer is archived beside them.
+
+   ⚠ AND IF IT RETURNS, IT NEEDS `closer_response_verified` IN ITS SELECT — the
+   column is absent below, which is why the proven gate could not have worked
+   here even if it had been called, and why a per-file grep reported this file
+   as already fixed.
+
 var LANES = ['objection_handling', 'challenging', 'pain_excavation'];
+// ── Call Highlights of the Week ──────────────────────────────────────────────
 async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap, nameMap) {
   if (!repIds || repIds.length === 0) return { available: true, lanes: {}, generated_at: new Date().toISOString() };
   var w = await loadTeamWindow(admin, repIds, from, to);
@@ -436,12 +469,14 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap,
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
+*/
+
 module.exports = {
   _spokeOf: spokeOf,
   _evidenceMismatch: evidenceMismatch,
   _proseNamesRep: proseNamesRep,
   computeTeamRecommendations: computeTeamRecommendations,
-  computeWeeklyHighlights: computeWeeklyHighlights,
+  /* computeWeeklyHighlights — RETIRED 2026-09-01, archived above. */
   // shared with lib/team-digest.js (same cache table + window loader)
   loadTeamWindow: loadTeamWindow,
   cacheGet: cacheGet,

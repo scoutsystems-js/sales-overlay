@@ -63,12 +63,17 @@ test("⚠ NO RATE LANE STILL COMPARES resolution TO 'handled' BY HAND", () => {
     // that is exactly why the `credited` bucket had to be added, so the two
     // reconcile instead of quietly disagreeing.
     'lib/session-analytics.js': 1,
-    // ⚠ THIS FILE IS IN BOTH LISTS, and that is not a mistake. It computes an
-    // objection RATE for its prompt (predicate) *and* picks highlight-of-the-week
-    // candidates (moment's own resolution). One file, both questions — which is
-    // precisely why the distinction has to be enforced per CALL SITE rather than
-    // per file.
-    'lib/team-synthesis.js': 1,
+    /* ⚠⚠ 1 -> 0 on 2026-09-01, AND THE REASON MATTERS MORE THAN THE NUMBER.
+       This file used to be in BOTH lists — a RATE for its prompt (predicate)
+       AND highlight-of-the-week candidates (the moment's own resolution) — and
+       it was the worked example for why the split is enforced per CALL SITE
+       rather than per file. Call Highlights of the Week was RETIRED by ruling,
+       so the moment-judging call site went with it and only the rate lane
+       remains, which uses the shared predicate and needs no allowance.
+       ⚠ THE PER-CALL-SITE RULE IS UNCHANGED AND STILL LOAD-BEARING —
+       `lib/objection-synthesis.js` and `lib/session-analytics.js` are still in
+       both lists. Do not read this zero as the distinction going away. */
+    'lib/team-synthesis.js': 0,
   };
   RATE_LANES.forEach(function (lane) {
     const hits = (read(lane[0]).match(/resolution\s*===\s*'handled'/g) || []).length;
@@ -83,7 +88,12 @@ test("⚠ NO RATE LANE STILL COMPARES resolution TO 'handled' BY HAND", () => {
 const MOMENT_LANES = [
   ['lib/highlight-section.js', "good/bad grouping of a moment"],
   ['lib/section-breakdown.js', 'the "what worked" lane'],
+  /* ⚠ ARCHIVED 2026-09-01 — Call Highlights of the Week was retired by ruling,
+     so this lane no longer exists to judge a moment. The SUBJECT survives in the
+     three lanes below and is asserted there; this row is kept commented so a
+     revival brings its guard back with it, the same way its CSS must.
   ['lib/team-synthesis.js', 'highlight-of-the-week candidates'],
+  */
   ['lib/analysis-worker.js', 'the mig-012 write-time boolean'],
 ];
 

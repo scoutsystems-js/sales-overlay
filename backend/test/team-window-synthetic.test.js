@@ -119,8 +119,13 @@ test('⚠⚠ THERE IS ONE FILTER, AND EVERY CONSUMER GOES THROUGH IT', () => {
       .replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
     callSites += (src.match(/await loadTeamWindow\(/g) || []).length;
   });
-  assert.ok(callSites >= 6,
-    'expected at least the six known call sites; found ' + callSites
+  /* ⚠ 6 -> 5 on 2026-09-01: `computeWeeklyHighlights` was RETIRED, not broken,
+     so a consumer legitimately went. The floor moves WITH the population and
+     never below it — and the message below is the reason this conversion was a
+     30-second job rather than an investigation: it says out loud that a drop
+     means a consumer was removed and asks whether it was deliberate. */
+  assert.ok(callSites >= 5,
+    'expected at least the five known call sites; found ' + callSites
     + '. If this dropped, a consumer was removed — confirm it was deliberate.');
 
   // ⚠ and NO consumer may re-implement the rule downstream: one definition only

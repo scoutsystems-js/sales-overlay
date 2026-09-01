@@ -112,7 +112,13 @@ test('the prose lanes prefer the PROFILE name over the email-derived one', () =>
   assert.ok(/\(nameMap && nameMap\[rid\]\) \|\|/.test(nw),
     'and prefer it over the email-derived name');
 
-  ['computeTeamRecommendations', 'computeWeeklyHighlights'].forEach(fn => {
+  /* ⚠ `computeWeeklyHighlights` REMOVED from this list 2026-09-01 — Call
+     Highlights of the Week was retired by ruling, not by a name-map defect. The
+     SUBJECT (a lane that names people must be handed the disambiguated map)
+     survives on every remaining lane and is asserted below across routes/team.js.
+     ⚠ The raw-email assertion two lines down covers the WHOLE FILE and therefore
+     still guards the retired lane if it ever returns. */
+  ['computeTeamRecommendations'].forEach(fn => {
     assert.ok(new RegExp(fn + '\\(admin, keyId, repIds, from, to, emailMap, nameMap\\)').test(syn),
       fn + ' must accept a name map');
   });
@@ -122,5 +128,8 @@ test('the prose lanes prefer the PROFILE name over the email-derived one', () =>
 
   const team = strip(fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8'));
   const calls = (team.match(/await nameMapFor\(admin, team\.memberIds, em\)/g) || []).length;
-  assert.ok(calls >= 5, 'every lane that names people must be passed the map, found ' + calls);
+  /* ⚠ 5 -> 4 on 2026-09-01: the /highlights route was retired and archived, so
+     one call site legitimately went. The floor moves WITH the population and
+     never below it. */
+  assert.ok(calls >= 4, 'every lane that names people must be passed the map, found ' + calls);
 });

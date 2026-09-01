@@ -31,8 +31,13 @@ test('⚠ BOTH dispatchers still normalise the old hash — a bookmark must land
   /* Two entry points: setView (via ARCHIVED_VIEWS) and the hash map, which
      assigns state.view DIRECTLY. Normalising only one leaves a pasted URL or a
      refresh opening a page that no longer exists. */
-  assert.ok(/ARCHIVED_VIEWS = \{ 'team-needs-work': 'team-objections' \}/.test(LIVE),
+  /* ⚠ The literal was pinned to a ONE-ENTRY map and went stale the moment a
+     SECOND view was retired (`team-expanded`, 2026-09-01) — a guard anchored on
+     the exact shape of a list fails on the very change it is meant to police.
+     Asserting the ENTRY rather than the whole map survives the next retirement. */
+  assert.ok(/'team-needs-work': 'team-objections'/.test(LIVE),
     'setView must normalise');
+  assert.ok(/ARCHIVED_VIEWS = \{/.test(LIVE), 'and the map must still exist');
   assert.ok(/'team-needs-work': 'team-objections'[\s\S]{0,120}TEAM_HASH|TEAM_HASH[\s\S]{0,200}'team-needs-work': 'team-objections'/.test(LIVE),
     'the hash map must normalise too');
 });

@@ -51,7 +51,11 @@ test('every catch in the file routes through it', () => {
   const code = SRC.split('\n').filter(l => l.trim().indexOf('//') !== 0).join('\n')
                   .replace(/\/\*[\s\S]*?\*\//g, '');
   const calls = (code.match(/logTeamError\(/g) || []).length;
-  assert.ok(calls >= 14, 'expected every log site plus the definition, found ' + calls);
+  /* ⚠ 14 -> 13 on 2026-09-01: GET /team/highlights was RETIRED and archived, so
+     a log site legitimately went with it. The floor moves WITH the population and
+     never below it — if it ever reaches the definition alone, this check is
+     measuring nothing and should fail rather than pass. */
+  assert.ok(calls >= 13, 'expected every log site plus the definition, found ' + calls);
   /* ⚠ The old shape must not come back — it is the one that hid a permanently
      broken endpoint for weeks. */
   assert.ok(!/console\.error\('\[team\] [a-z/-]+:', err\.message\)/.test(code),

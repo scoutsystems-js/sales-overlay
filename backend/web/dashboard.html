@@ -5051,7 +5051,7 @@
        matches and the lane never speaks. */
     teamWaitLong:   {},
     teamRecs:       null,   teamRecsLoading: false,
-    teamHighlights: null,   teamHighlightsLoading: false,
+    /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
     teamDetailMetric: null, // glance-box detail drill: null | 'close' | 'objection' (cash removed 2026-08-25)
     // ⚠ TEAM OWNS ITS OWN RANGE (stage 2). state.dateRange stays COACHING's until
@@ -5199,7 +5199,7 @@
     // team-scoped lanes — a rep pivot does not change the selected team
     teamContext: 1, teamSelected: 1, teamOverview: 1, teamOverviewLoading: 1,
     teamTrends: 1, teamTrendsLoading: 1, teamRecs: 1, teamRecsLoading: 1,
-    teamHighlights: 1, teamHighlightsLoading: 1, teamDigest: 1,
+    teamDigest: 1,   // teamHighlights retired 2026-09-01
     teamDigestLoading: 1, teamDigestDate: 1, teamDetailMetric: 1,
     teamWhy: 1, teamWhyLoading: 1, teamNeedsWork: 1, teamNeedsWorkLoading: 1,
     teamRepSeries: 1, teamRepSeriesLoading: 1, teamObjectionCategory: 1,
@@ -7365,7 +7365,8 @@
     else if (state.view === 'team') renderTeamDigest();
     else if (state.view === 'team-performance') renderTeamPerformance();
     else if (state.view === 'team-coaching') renderTeamCoaching();
-    else if (state.view === 'team-expanded') renderTeamExpanded();
+    /* team-expanded — RETIRED 2026-09-01; normalised away in ARCHIVED_VIEWS
+       and TEAM_HASH, so nothing can reach the archived renderer. */
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
     else if (state.view === 'kb') renderKbView();
@@ -8377,7 +8378,7 @@
      SO THE SCOPE IS A PROPERTY OF THE LANE, NOT OF THE CALL SITE. Adding a lane
      means declaring what invalidates it, once, here. */
   var TEAM_LANE_SCOPE = {
-    teamOverview: 'both', teamTrends: 'both', teamRecs: 'both', teamHighlights: 'both',
+    teamOverview: 'both', teamTrends: 'both', teamRecs: 'both',
     teamDigest: 'both', teamNeedsWork: 'both', teamRepSeries: 'both', teamWhy: 'both',
     teamObjections: 'both', teamObjSummary: 'both',
     // ⚠ TEAM-ONLY: a fixed 7-day window that must survive a range change.
@@ -8456,7 +8457,8 @@
     if (state.view === 'team') renderTeamDigest();
     else if (state.view === 'team-performance') renderTeamPerformance();
     else if (state.view === 'team-coaching') renderTeamCoaching();
-    else if (state.view === 'team-expanded') renderTeamExpanded();
+    /* team-expanded — RETIRED 2026-09-01; normalised away in ARCHIVED_VIEWS
+       and TEAM_HASH, so nothing can reach the archived renderer. */
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
     /* ⚠⚠ EVERY PAGE IS NAMED EXPLICITLY ABOVE, INCLUDING THE DEFAULT ONE. This
@@ -8545,7 +8547,7 @@
       trends:   { flag: 'teamTrendsLoading',     set: 'teamTrends',     url: '/team/trends?' + teamQP('bucket=' + state.teamTrendBucket) },
       recs:     { flag: 'teamRecsLoading',       set: 'teamRecs',       url: '/team/recommendations?' + teamQP() },
       needsWork:{ flag: 'teamNeedsWorkLoading',  set: 'teamNeedsWork',  url: '/team/needs-work?' + teamQP() },
-      highlights:{flag: 'teamHighlightsLoading', set: 'teamHighlights', url: '/team/highlights?' + teamQP() },
+      /* highlights — RETIRED 2026-09-01, see the archived renderer. */
       digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP(state.teamDigestDate ? 'date=' + state.teamDigestDate : '') },
       // 10b: per-rep weekly series for the two line graphs. Deterministic and
       // model-free, so it is cheap to refetch when the selector changes.
@@ -8728,7 +8730,8 @@
     'team-performance': 'performance',
     'team-coaching':    'coaching',
     'team-objections':  'objections',
-    'team-expanded':    'coaching',   // Call Highlights of the Week — still reached from Coaching
+    /* 'team-expanded' — retired 2026-09-01; it normalises to team-coaching
+       before any nav state is computed, so it needs no entry here. */
   };
   function teamRangePage() { return TEAM_RANGE_PAGE[state.view] || 'performance'; }
 
@@ -10018,15 +10021,12 @@
          state.teamRecs this page already fetched. */
       + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>'
         + teamRecsHtml() + '</div>' : '')
-      /* ⚠ THE EXPANDED PAGE KEEPS A DOOR. openTeamExpanded() had exactly ONE
-         caller — the compact card's onclick — and that page also holds Call
-         Highlights of the Week. Replacing the card without this link would have
-         made Highlights unreachable, which is the same defect as a merge-review
-         page nobody can navigate to. The label now names what is actually
-         through the door rather than saying "expand". */
-      + '<div class="section fade-in"><a class="date-preset" onclick="openTeamExpanded(); return false;" '
-        + 'href="#" title="Best objection handling, challenger moments and pain excavation this week">'
-        + 'Call Highlights of the Week →</a></div>'
+      /* ⚠⚠ THE "Call Highlights of the Week →" LINK WENT WITH THE FEATURE
+         (2026-09-01). It was added days earlier precisely so Highlights would not
+         become unreachable — and the right move when the destination is retired
+         is to remove the door, NOT to leave it pointing at a dead page. The
+         view redirects (ARCHIVED_VIEWS) so an old bookmark still lands
+         somewhere; nothing in the product now offers the trip. */
       + allPanelsHiddenNoteHtml();
   }
 
@@ -10073,6 +10073,16 @@
 
   // The dedicated (hidden, no-nav-tab) expanded page: full recommendations +
   // Call Highlights of the Week. Reachable only from the compact recs card.
+/* ⚠⚠ THE team-expanded VIEW — RETIRED 2026-09-01 with Call Highlights of the
+   Week, which was the only thing left on it. Archived, not deleted.
+   ⚠ THE PAGE WAS RULED "CALL HIGHLIGHTS ONLY" EARLIER THE SAME DAY, so removing
+   Highlights emptied it. A route that renders nothing is worse than no route,
+   so the view is RETIRED AND REDIRECTED the way `team-needs-work` was — see
+   ARCHIVED_VIEWS. A bookmark is a link too.
+   ⚠ Its CSS is deliberately left live and inert; see the archived renderer for
+   why (removing a control archives its styling and re-adding does not bring it
+   back).
+
   function openTeamExpanded() { setView('team-expanded'); }
   function renderTeamExpanded() {
     var content = document.getElementById('content');
@@ -10080,7 +10090,7 @@
     if (state.teamContext === null) { loadTeam('context'); }
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
-    /* ⚠⚠ CALL HIGHLIGHTS ONLY (Justin's ruling, 2026-09-01). Team Recommendations
+    (* ⚠⚠ CALL HIGHLIGHTS ONLY (Justin's ruling, 2026-09-01). Team Recommendations
        came off: COACHING ALREADY RENDERS THEM, through the SAME `teamRecsHtml()`
        — verified before removing, because removing the wrong half is how a
        working feature becomes unreachable. This page was partly a longer copy of
@@ -10088,7 +10098,7 @@
        ⚠ THE `recs` LANE IS NO LONGER KICKED HERE — a page that renders nothing
        from a lane must not pay for it. Coaching still kicks it.
        ⚠ "← Back to Team" MOVED rather than being deleted with the section that
-       housed it: it was the only way back from this page. */
+       housed it: it was the only way back from this page. *)
     content.innerHTML =
       teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>Call Highlights of the Week</h2>'
@@ -10096,6 +10106,16 @@
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamHighlightsHtml() + '</div>';
   }
+
+*/
+
+/* ⚠⚠ teamRecsCompactHtml — ALREADY DEAD BEFORE THIS BLOCK, and archived here
+   rather than left as an orphan builder. Its only caller was removed when the
+   Coaching page started rendering the full recommendations inline; measured
+   before touching it, the name occurred exactly ONCE in live code — its own
+   definition. ⚠ A function whose only occurrence is its own declaration is dead,
+   and a dead builder reads as working code, which is how one sat unnoticed here.
+   It is archived with the team-expanded view it opened.
 
   // Compact recommendations card on the main team view: a one/two-line teaser +
   // "click to expand" affordance → opens the dedicated expanded page.
@@ -10115,6 +10135,8 @@
       + '<div class="team-recs-expand">' + sub + '</div>'
     + '</div>';
   }
+
+*/
 
   // Ranked-bar list of every rep by one 0–100 score (name · bar · value), sorted
   // high→low, each row click-through to the rep's coaching dashboard. Bar width =
@@ -11869,7 +11891,7 @@
   ];
   /* ⚠ The expanded recommendations page is a CHILD of Coaching, not a sixth
      page — the dropdown must still show where you are when you drill into it. */
-  var TEAM_PAGE_OF_VIEW = { 'team-expanded': 'team-coaching' };
+  var TEAM_PAGE_OF_VIEW = { /* team-expanded — retired 2026-09-01 */ };
   function teamPageForView(v) { return TEAM_PAGE_OF_VIEW[v] || v; }
 
   /* ⚠⚠⚠ THE ONE LIST OF TEAM VIEWS, AND IT EXISTS BECAUSE TWO STALE COPIES OF
@@ -11881,7 +11903,7 @@
      same two pages.
      ⚠ DERIVED FROM TEAM_PAGES so a sixth page cannot be forgotten here, plus
      the two sub-views that have no dropdown entry of their own. */
-  var TEAM_SUBVIEWS = ['team-expanded', 'team-needs-work'];
+  var TEAM_SUBVIEWS = ['team-needs-work'];   // team-expanded retired 2026-09-01
   function isTeamView(v) {
     for (var i = 0; i < TEAM_PAGES.length; i++) if (TEAM_PAGES[i].view === v) return true;
     return TEAM_SUBVIEWS.indexOf(v) !== -1;
@@ -12371,7 +12393,7 @@
   function currentSummaryPage() {
     if (state.view === 'team') return { key: state.teamDetailMetric ? 'detail' : 'team' };
     if (state.view === 'team-needs-work') return { key: 'needs-work' };
-    if (state.view === 'team-expanded') return { key: 'team-recs' };
+    /* team-expanded — retired 2026-09-01. */
     if (state.view === 'overview' && hasManagerContext() && !isSelf()) return { key: 'rep-coaching' };
     return null;
   }
@@ -12403,6 +12425,9 @@
         headline: d.card_text, bucket: d.bucket, extra: d.extra,
         buckets: d.detail && d.detail.buckets, linkage: d.detail && d.detail.linkage } };
     }
+    /* ⚠ The 'team-recs' payload is unreachable from 2026-09-01: it was only ever
+       produced for the team-expanded view, which is retired. Archived rather than
+       deleted so a revival brings its Generate-summary support with it.
     if (p.key === 'team-recs') {
       var r = state.teamRecs, h = state.teamHighlights;
       var data = {};
@@ -12411,6 +12436,7 @@
       if (!data.recommendations && !data.highlights) return null;
       return { label: _summaryTeamLabel() + ' — recommendations & highlights', data: data };
     }
+    */
     if (p.key === 'rep-coaching') {
       var a = state.analytics2; if (!a || !a.calls) return null;
       var u = (state.users || []).filter(function (x) { return x.user_id === state.viewingUserId; })[0];
@@ -13106,6 +13132,29 @@
       + (i.length ? i.map(function (x) { return teamInsightHtml(x, 'improve'); }).join('') : '<div class="empty"><p>—</p></div>');
   }
 
+/* ⚠⚠⚠ CALL HIGHLIGHTS OF THE WEEK — RETIRED 2026-09-01 (Justin's ruling).
+   ARCHIVED IN PLACE, NOT DELETED, in case it returns.
+
+   THE ONE-LINE REASON, because a commented block with no reason gets
+   uncommented by someone who assumes it was tidying:
+   ⚠⚠ UNUSEFUL, HARD TO REACH, AND 87% OF ITS QUOTES WERE THE PROSPECT RATHER
+      THAN THE CLOSER. Justin: "while cool they're unuseful and difficult to
+      navigate to." Measured: of 1,160 candidate moments only 156 carried a
+      closer reply at all, and 19 of those were unproven.
+
+   ⚠⚠ ITS CSS IS DELIBERATELY LEFT LIVE, NOT ARCHIVED — read this before tidying
+   it away. `body[data-view="team-expanded"] …` and the `.team-lane*` rules are
+   now unreachable (the view is retired) and therefore INERT, and leaving them
+   is what makes a revival a one-file job. Three hours before this was written,
+   `.review-kb-btn` was found rendering as a BROWSER-DEFAULT button for three
+   days because its rule had been archived with an earlier removal and the
+   control was re-added without it: REMOVING A CONTROL ARCHIVES ITS STYLING, AND
+   RE-ADDING THE CONTROL DOES NOT BRING THE STYLING BACK. Keeping the rules is
+   the cheapest way to make that impossible here.
+
+   ⚠ THE SERVER HALF is archived in lib/team-synthesis.js and routes/team.js
+   with the same reason and the full measurement.
+
   function teamHighlightsHtml() {
     var h = state.teamHighlights;
     if (!h) return '<div class="skeleton" style="height:80px;"></div>';
@@ -13127,6 +13176,8 @@
       + '</div>';
     }).join('') + '</div>';
   }
+
+*/
 
   function teamDigestHtml() {
   /* ⚠⚠ THE WALK IS BOUNDED TO `recent_dates`, AND THAT IS THE LOAD-BEARING PART.
@@ -13327,7 +13378,7 @@
        needed and only one of them fails loudly. */
     if (state.view === 'team-performance') return 'team-performance' + teamRangeHashSuffix();
     if (state.view === 'team-coaching')    return 'team-coaching' + teamRangeHashSuffix();
-    if (state.view === 'team-expanded')    return 'team-recs' + teamRangeHashSuffix();
+    /* team-expanded — retired 2026-09-01; unreachable, so it writes no hash. */
     if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
     if (state.view === 'team-objections')  return 'team-objections' + teamRangeHashSuffix();
     if (state.view === 'team-members')     return 'my-team' + teamRangeHashSuffix();
@@ -13362,7 +13413,12 @@
        DIRECTLY rather than through setView, so normalising in setView alone
        would leave a refresh or a pasted URL still opening the archived page.
        Two entry points, both normalised. */
-    var TEAM_HASH = { 'team-digest': 'team', 'team': 'team', 'team-recs': 'team-expanded',
+    /* ⚠⚠ `team-recs` NOW LANDS ON COACHING, not on the retired team-expanded.
+       This map assigns state.view DIRECTLY rather than going through setView, so
+       normalising in ARCHIVED_VIEWS alone would still let a pasted URL or a
+       refresh reach an archived renderer — the same reason `team-needs-work`
+       is normalised in BOTH places, one line below. */
+    var TEAM_HASH = { 'team-digest': 'team', 'team': 'team', 'team-recs': 'team-coaching',
                       'team-needs-work': 'team-objections',
                       /* ⚠ ONE NAME EVERYWHERE, INCLUDING THE URL. The page is
                          "My Team" in the dropdown and in its heading, so the hash
@@ -15243,7 +15299,12 @@
      scheduleTeamRender() — and boot goes through render(). The page kept
      rendering, and the guard passed because it sliced renderTeamSurface alone.
      One rename at the entry point cannot be half-applied. */
-  var ARCHIVED_VIEWS = { 'team-needs-work': 'team-objections' };
+  /* ⚠ `team-expanded` joins the retired list 2026-09-01. Call Highlights of the
+     Week was its only remaining section, and a route that renders nothing is
+     worse than no route. It lands on Coaching, which is the page that used to
+     link to it. ⚠ REDIRECT RATHER THAN DELETE — a bookmark is a link too. */
+  var ARCHIVED_VIEWS = { 'team-needs-work': 'team-objections',
+                         'team-expanded': 'team-coaching' };
 
   function setView(view) {
     view = ARCHIVED_VIEWS[view] || view;

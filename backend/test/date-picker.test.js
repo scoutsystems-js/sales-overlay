@@ -528,7 +528,14 @@ test('EVERY team-family hash carries the range, not just #team', () => {
   const fn = HTML.slice(at, HTML.indexOf('function syncHashFromState', at));
   assert.ok(fn.length > 400 && fn.length < 3000, 'slice must cover the function: ' + fn.length);
 
-  ['team-recs', 'team-needs-work', 'team-members'].forEach((h) => {
+  /* ⚠ `team-recs` came out of the WRITE list 2026-09-01: it was the hash of the
+     team-expanded view, RETIRED with Call Highlights of the Week, so nothing
+     writes it any more and there is no path for it to carry a range on. The
+     SUBJECT — every team-family hash carries its range — is unchanged and still
+     asserted on every path that survives.
+     ⚠ IT STAYS IN THE READ LIST BELOW. A bookmark is a link too, and the router
+     must still parse an old #team-recs and land somewhere. */
+  ['team-needs-work', 'team-members'].forEach((h) => {
     const line = fn.split('\n').find((l) => l.indexOf("'" + h + "'") !== -1);
     assert.ok(line, 'no path for ' + h);
     assert.ok(/teamRangeHashSuffix\(\)/.test(line), h + ' must carry the range: ' + line.trim());

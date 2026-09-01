@@ -32,7 +32,7 @@ function getAnthropic() {
   if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   return _anthropic;
 }
-const { computeTeamRecommendations, computeWeeklyHighlights } = require('../lib/team-synthesis');
+const { computeTeamRecommendations } = require('../lib/team-synthesis');
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
@@ -643,6 +643,13 @@ router.get('/needs-work', teamGate, async function (req, res) {
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('needs-work', err); res.status(500).json({ error: 'Failed to load what-needs-work' }); }
 });
 
+/* ⚠⚠ GET /team/highlights — RETIRED 2026-09-01 (Justin's ruling), archived in
+   place. THE REASON, so nobody uncomments this as tidying: UNUSEFUL, HARD TO
+   REACH, AND 87% OF ITS QUOTES WERE THE PROSPECT RATHER THAN THE CLOSER —
+   1,004 of 1,160 candidate moments carried no closer reply at all.
+   ⚠ The compute is archived in lib/team-synthesis.js with the full measurement
+   and the CSS-revival warning. Nothing else calls it; the recommendations lane
+   in that file is INDEPENDENT (its own select, its own cache type) and stays.
 // Call Highlights of the Week. ?week=<ISO monday> optional; default = this week.
 router.get('/highlights', teamGate, async function (req, res) {
   try {
@@ -657,6 +664,7 @@ router.get('/highlights', teamGate, async function (req, res) {
     res.json(Object.assign({ week_from: weekFrom.toISOString(), week_to: weekTo.toISOString() }, data));
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('highlights', err); res.status(500).json({ error: 'Failed to load highlights' }); }
 });
+*/
 
 // Manager daily digest — cache read. Generation is the sync cron's post-sync
 // pass (lib/team-digest.js) or the owner-only manual trigger below. Default

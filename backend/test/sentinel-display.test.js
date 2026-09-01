@@ -44,7 +44,13 @@ test('⚠⚠ every text consumer goes through the gate', () => {
   const bad = [];
   CONSUMERS.forEach((f) => {
     const src = live(f);
-    if (!/displayCloserResponse/.test(src)) bad.push(f + ' never gates');
+    /* ⚠ EITHER GATE COUNTS, and that is stronger than removing a file from the
+       list. `provenCloserResponse` is STRICTLY NARROWER — everything the display
+       gate rejects it rejects too, plus anything the locator could not prove the
+       closer said. `lib/team-synthesis.js` moved to it when Call Highlights of
+       the Week was retired; asserting only the display gate would have read that
+       TIGHTENING as a violation. */
+    if (!/displayCloserResponse|provenCloserResponse/.test(src)) bad.push(f + ' never gates');
     // the raw field must not be turned into text without the gate
     const raw = src.match(/str\(\s*[a-z]\.closer_response/g) || [];
     if (raw.length) bad.push(f + ' still stringifies closer_response raw (' + raw.length + ')');
@@ -55,13 +61,17 @@ test('⚠⚠ every text consumer goes through the gate', () => {
 test('⚠⚠ the synthesis quote fallback cannot be won by a sentinel', () => {
   // This is the exact line that leaked. A sentinel is non-empty, so an ungated
   // `str(closer_response) || str(quote)` prefers it over the real quote.
+  /* ⚠ CONVERTED 2026-09-01. `lib/team-synthesis.js` carried the second gated
+     fallback INSIDE Call Highlights of the Week, which Justin retired. The
+     SUBJECT survives in performance-synthesis and is asserted there; the
+     ungated-fallback half is asserted for BOTH files, because that is the shape
+     that must never come back anywhere. */
   ['lib/performance-synthesis.js', 'lib/team-synthesis.js'].forEach((f) => {
-    const src = live(f);
-    assert.ok(!/quote: str\(r\.closer_response/.test(src),
+    assert.ok(!/quote: str\(r\.closer_response/.test(live(f)),
       f + ': the ungated fallback is the defect');
-    assert.ok(/quote: str\(displayCloserResponse\(r\.closer_response\)/.test(src),
-      f + ': the fallback must be gated');
   });
+  assert.ok(/quote: str\(displayCloserResponse\(r\.closer_response\)/.test(live('lib/performance-synthesis.js')),
+    'performance-synthesis: the fallback must be gated');
 });
 
 test('⚠ each consumer IMPORTS it — a call to an undefined identifier passes `node -c`', () => {
