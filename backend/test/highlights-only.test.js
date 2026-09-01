@@ -54,3 +54,21 @@ test('the entry point names what is actually through the door', () => {
     'the label must name Highlights alone now that the recs are gone');
   assert.strictEqual(/Recommendations/.test(link), false, 'and must not promise recommendations');
 });
+
+test('⚠⚠⚠ THE VERDICT BORDER SURVIVES THE CALL-REVIEW SWEEP — a RULED exemption', () => {
+  /* Justin ruled it stays: red on a loss, GREEN ON A CLOSE, amber on a follow-up.
+     It is the ONLY place in the product where the semantic colour is correct.
+     ⚠⚠ AND IT WAS SILENTLY DESTROYED ONCE, IN THE SAME EDIT THAT SPARED IT: the
+     `.section` sweep uses `border: 0` — a SHORTHAND, which kills border-LEFT too
+     — and `.review-why.loss` is only (0,2,0), so it loses to a body[data-view]
+     selector and cannot restore it. Nothing failed; the border just went to 0px.
+     A shorthand does not respect an intent about one side. */
+  const css = HTML.slice(HTML.indexOf('<style>'), HTML.indexOf('</style>'));
+  ['loss', 'win', 'pending'].forEach((k) => {
+    const re = new RegExp('body\\[data-view="call-review"\\] \\.review-why\\.' + k + '\\s*\\{[^}]*border-left:\\s*3px');
+    assert.ok(re.test(css), 'the ' + k + ' border must be re-declared at a specificity that survives the sweep');
+  });
+  // and the card around it must be gone
+  const re = /body\[data-view="call-review"\] \.review-why\s*\{[^}]*background:\s*none/;
+  assert.ok(re.test(css), 'the card is stripped');
+});

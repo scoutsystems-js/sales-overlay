@@ -3074,6 +3074,55 @@
     body[data-view="call-library"] .library-card:hover {
       background: var(--bg-elevated); border-color: var(--border);
     }
+
+    /* ⚠⚠⚠ THE VERDICT BORDER IS A RULED EXEMPTION FROM THE GREEN-BAR SWEEP
+       (Justin, 2026-09-01). DO NOT "FINISH THE SWEEP" AND REMOVE IT.
+       `.review-why` is red on a loss, GREEN ON A CLOSE, amber on a follow-up —
+       and this is THE ONLY PLACE IN THE PRODUCT WHERE THE SEMANTIC COLOUR IS
+       CORRECT. Every other bar removed this pass was encoding nothing, or was
+       encoding the WRONG THING: `.srk-why` put a NEGATIVE finding in an 18%
+       green fill, the objection category renders green while naming a closer's
+       WEAKEST area, and the score badges render 52/100 in the same green as 75.
+       ⚠ HERE RED MEANS BAD AND GREEN MEANS GOOD. A pattern removal must not be
+       applied where the pattern is right. The rule below therefore strips the
+       CARD off this section and deliberately leaves `border-left` alone. */
+    body[data-view="call-review"] .review-why {
+      background: none; border-top: 0; border-right: 0; border-bottom: 0;
+      border-radius: 0; padding: 20px 0 20px 18px;
+    }
+    /* ⚠⚠ THE COLOUR MUST BE RE-DECLARED HERE, AND I FOUND THAT BY MEASURING
+       RATHER THAN BY READING. The `.section` sweep above uses the `border: 0`
+       SHORTHAND, which kills border-LEFT too — and the colour rules
+       (`.review-why.loss` etc.) are only (0,2,0), so they lose to a
+       body[data-view] selector and cannot restore it.
+       ⚠⚠ SO THE RULED EXEMPTION WAS SILENTLY DESTROYED BY THE SWEEP THAT WAS
+       SUPPOSED TO SPARE IT — in the same edit, with nothing failing. Exactly the
+       "somebody later finishes the sweep" failure, except it happened
+       immediately and invisibly. A shorthand does not respect your intent about
+       one side.
+       ⚠ A guard asserts the rendered border is 3px and coloured. */
+    body[data-view="call-review"] .review-why.loss    { border-left: 3px solid var(--bad); }
+    body[data-view="call-review"] .review-why.win     { border-left: 3px solid var(--good); }
+    body[data-view="call-review"] .review-why.pending { border-left: 3px solid var(--mid); }
+
+    /* the rest of the page: boxes become space */
+    body[data-view="call-review"] .review-highlight,
+    body[data-view="call-review"] .review-grade-card,
+    body[data-view="call-review"] .review-why-quote,
+    body[data-view="call-review"] .review-one-thing,
+    body[data-view="call-review"] .review-followup-box,
+    body[data-view="call-review"] .review-grade-letter {
+      background: none; border: 0; border-radius: 0;
+    }
+    body[data-view="call-review"] .review-highlight { padding: 16px 0; border-top: 1px solid var(--border); }
+    body[data-view="call-review"] .review-highlight:first-of-type { border-top: 0; }
+    body[data-view="call-review"] .review-why-quote { padding: 0; font-style: italic; }
+    /* ⚠ `.review-one-thing` was a GREEN box nested INSIDE a red "didn't close"
+       verdict — the corrective action wearing the colour that means good. Losing
+       the box resolves that; its label keeps the emphasis. */
+    body[data-view="call-review"] .review-one-thing { padding: 12px 0 0; }
+    body[data-view="call-review"] .review-followup-box { padding: 0; }
+    body[data-view="call-review"] .review-grade-card { padding: 12px 0; border-top: 1px solid var(--border); }
     /* ⚠ OPTION A — the attribution is BOUND to the quote it names, above it.
        The pair sits in one container so they cannot drift apart in a reflow. */
     .team-insight-ev { margin-top: 8px; }
@@ -3782,6 +3831,8 @@
 
        ⚠ Space does the grouping. One accent, sparingly. Hairlines only where a
        boundary genuinely has to be read as a boundary. */
+    body[data-view="call-review"] .section,
+    body[data-view="call-review"] .review-page-header,
     body[data-view="call-library"] .section,
     body[data-view="call-library"] .page-header,
     body[data-view="team-expanded"] .section,
@@ -4011,6 +4062,7 @@
        WAS BUILT BY PAGE NAME, NOT BY REACHABILITY — so it kept its boxes while
        the page linking to it lost them, and clicking through read as a
        regression. Ground first, as always. */
+    body[data-view="call-review"] .page ,
     body[data-view="call-library"] .page ,
     body[data-view="team-expanded"] .page ,
     body[data-view="overview"] .page ,
