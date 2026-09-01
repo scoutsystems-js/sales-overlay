@@ -2849,6 +2849,7 @@
     .team-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin-top: 6px; }
     /* Manager daily digest */
     .digest-summary { font-size: 14px; line-height: 1.55; color: var(--text); margin: 12px 0; }
+    .digest-notable-who { margin-bottom: 6px; }
     .digest-notable { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0; background: var(--bg-elevated); border-radius: 0 var(--radius) var(--radius) 0; }
     .digest-notable .meta { margin-top: 4px; }
     .digest-focus { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-left: 3px solid var(--good); border-radius: var(--radius); background: var(--bg-elevated); }
@@ -13196,12 +13197,24 @@
       (s.lost || 0) + ' lost'].join(' \u00B7 ');
     var stats = leadNumberHtml(s.closed || 0, statLine);
 
+    /* ⚠⚠ THE ATTRIBUTION LEADS. It used to sit BELOW the moment, so a reader met
+       the observation before anything said whose call it was — the same defect
+       fixed on Team Recommendations, on a different surface. Nothing was
+       missing; it was in the wrong place. Order is now
+       ATTRIBUTION → MOMENT, which is what the recommendations lane settled on.
+       ⚠ AND THE CLIP LABEL IS PROVIDER-AWARE. It was a hardcoded "Play Clip",
+       which on a Zoom call promises a moment and opens at 00:00 — Zoom share
+       links carry no timestamp. clipLabelFor() is the ONE place that decides
+       the word; a missing `source` gets the cautious label, because claiming a
+       seek we cannot deliver is the failure mode and claiming less than we
+       deliver is merely modest. */
     var notable = (d.notable || []).map(function (n) {
       var attribution = [n.rep ? escapeHtml(n.rep) : null, n.call_title ? '\u201C' + escapeHtml(n.call_title) + '\u201D' : null]
         .filter(Boolean).join(' \u00B7 ');
-      var clip = n.clip ? ' <a class="review-why-clip" href="' + escapeHtml(n.clip) + '" target="_blank" rel="noopener">\u25B6 Play Clip</a>' : '';
-      return '<div class="digest-notable"><div>' + escapeHtml(n.text || '') + '</div>'
-        + (attribution || clip ? '<div class="meta">' + attribution + clip + '</div>' : '') + '</div>';
+      var clip = n.clip ? ' <a class="review-why-clip" href="' + escapeHtml(n.clip) + '" target="_blank" rel="noopener">\u25B6 ' + escapeHtml(clipLabelFor(n.source)) + '</a>' : '';
+      return '<div class="digest-notable">'
+        + (attribution || clip ? '<div class="meta digest-notable-who">' + attribution + clip + '</div>' : '')
+        + '<div>' + escapeHtml(n.text || '') + '</div></div>';
     }).join('');
 
     return chips

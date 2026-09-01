@@ -104,7 +104,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v3-2026-09-01-focus-leads';
+var DIGEST_PROMPT_VERSION = 'v3-2026-09-01-focus-leads-and-source';
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -321,6 +321,17 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
         rep: c ? repName(c.user_id) : null,
         call_title: c ? (c.title || null) : null,
         clip: c ? clipUrl(c.recording_url, ts) : null,
+        /* ⚠⚠ THE PROVIDER RIDES WITH THE LINK, ALWAYS. A Zoom share link carries
+           NO timestamp parameter, so it opens at 00:00 — labelling it "Play
+           Clip" promises a moment and delivers the top of the call. The label is
+           chosen from this field by clipLabelFor(); without it the renderer has
+           to hardcode one, which is how six other surfaces came to say the wrong
+           word. `source` is already in loadTeamWindow's select, so this costs a
+           field and no query.
+           ⚠ THE TRIGGER FOR THIS HAS FIRED: the deferral said "thread `source`
+           through when real Zoom traffic starts being analysed". It has —
+           48 analysed Zoom calls on one account. */
+        source: c ? (c.source || null) : null,
       });
     });
     synthesis = {

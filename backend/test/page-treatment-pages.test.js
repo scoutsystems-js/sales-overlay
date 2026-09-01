@@ -97,3 +97,40 @@ test('the prospects lead count is suppressed while loading and at zero', () => {
   assert.ok(/state\.mergeLoading \|\| !cands\.length \? ''/.test(fn),
     'a 0 flashing during the fetch is a wrong answer, not a slow one');
 });
+
+/* ⚠⚠ THE DIGEST'S NOTABLE MOMENTS. Two properties, both of them rulings this
+   product arrived at on OTHER surfaces and then failed to apply here:
+     · attribution BEFORE the moment (Team Recommendations, Option A) — a reader
+       must not meet a quote before anything says whose call it is;
+     · the clip label chosen from `source` (the provider-blind clip ruling) — a
+       Zoom share link has no timestamp, so "Play Clip" promises a seek it
+       cannot deliver. */
+test('the digest names the rep BEFORE the moment, not after', () => {
+  const at = CODE.indexOf('var notable = (d.notable || []).map');
+  assert.ok(at > 0, 'the notable builder was not found');
+  const fn = CODE.slice(at, CODE.indexOf('}).join(\'\');', at) + 12);
+  assert.ok(fn.length > 300 && fn.length < 2000, 'slice must cover the builder: ' + fn.length);
+  const who = fn.indexOf('digest-notable-who');
+  const text = fn.indexOf("escapeHtml(n.text");
+  assert.ok(who > 0 && text > 0, 'both parts must be present');
+  assert.ok(who < text,
+    'the attribution must be emitted BEFORE the moment text — a reader meets the quote first otherwise');
+});
+
+test('the digest clip label is chosen from the provider, never hardcoded', () => {
+  const at = CODE.indexOf('var notable = (d.notable || []).map');
+  const fn = CODE.slice(at, CODE.indexOf('}).join(\'\');', at) + 12);
+  assert.ok(/clipLabelFor\(n\.source\)/.test(fn),
+    'must call clipLabelFor(n.source)');
+  assert.ok(!/Play Clip/.test(fn),
+    'a hardcoded clip label reads wrongly on a Zoom call');
+});
+
+test('the digest payload carries the provider beside the link', () => {
+  const lib = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-digest.js'), 'utf8');
+  const at = lib.indexOf('clip: c ? clipUrl(');
+  assert.ok(at > 0, 'the notable entry builder was not found');
+  const entry = lib.slice(at, at + 900);
+  assert.ok(/source: c \? \(c\.source \|\| null\) : null/.test(entry),
+    'clip_url and source must be emitted together, or the renderer has to guess the label');
+});

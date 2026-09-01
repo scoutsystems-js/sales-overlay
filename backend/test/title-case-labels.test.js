@@ -103,7 +103,16 @@ function anchorButtonLabels() {
 
 test('ANCHORS styled as buttons are Title Case too', () => {
   const labels = anchorButtonLabels();
-  assert.ok(labels.length >= 3, 'expected to actually find anchor-buttons, got ' + labels.length);
+  /* ⚠ THE FLOOR MOVED 3 -> 2 ON 2026-09-01, AND IT IS NOT A WEAKENING — the
+     POPULATION shrank for a good reason. The digest's clip anchor stopped being
+     a literal ("▶ Play Clip") and became clipLabelFor(n.source), so the
+     interpolation filter above correctly drops it. That label is pinned harder
+     elsewhere: clip-link-mirror.test.js asserts the exact strings ('Clip' /
+     'Open Recording', both Title Case) AND that they come from the provider.
+     ⚠ The floor is what stops this passing over an empty set, so it must move
+     WITH the population and never below it — if it reaches 0 the check is
+     measuring nothing and should fail loudly instead. */
+  assert.ok(labels.length >= 2, 'expected to actually find anchor-buttons, got ' + labels.length);
   const bad = labels.filter((t) => !isSentence(t)).filter((t) => offendingWords(t).length);
   assert.deepStrictEqual(bad, [], 'lowercase words in anchor-buttons: ' + JSON.stringify(bad));
 });
