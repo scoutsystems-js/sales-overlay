@@ -337,7 +337,9 @@ sizes                 12 distinct, including half-pixels (12.5 / 10.5 / 13.5)
 
 ## 🔴 NEEDS JUSTIN — decisions and spend, nothing else
 
-**⚠⚠ WARM THE TEAM-RECOMMENDATIONS LANE ON THE CRON — measured, proposed, NOT BUILT (2026-09-01).**
+**✅ WARM THE TEAM-RECOMMENDATIONS LANE ON THE CRON — APPROVED AND SHIPPED 2026-09-01 (`74f6c36`). Row closed in the same edit as the ruling, per the standing rule. The measurement is kept because it is the justification.**
+
+~~⚠⚠ measured, proposed, NOT BUILT.~~
 ```
 COLD (miss, one model call)   25,855 ms     Josh's board, 9 reps
 WARM (hit)                     4,418 ms     same board
@@ -686,6 +688,8 @@ So **"at least 10 characters" is already the rule and is already enforced** — 
 | item | ruling | what would reopen it |
 |---|---|---|
 | **Prospect name-variation merges** | RULED 2026-08-29 — **LEAVE IT EXACTLY AS IT IS.** No nav entry, nothing built. The page works and is reachable by hash if anyone ever needs it. | The reasoning, so this is CLOSED rather than parked: **cross-provider duplicates are ALREADY SOLVED** by the overlap suppression that shipped, and one-source-per-user closes that path further. What remains is **name variation on a single provider** — real, but it inflates a close rate **nobody has complained about**, and 355 hand-reviewable proposals is not work worth creating. ⚠⚠ **AND MY OWN FRAMING WAS WRONG, CORRECTED HERE:** I ranked it by consequence and called it blocking follow-up awareness. **That was my framing and Josh's concern from days ago, not Justin's priority — Justin has ruled follow-up awareness is not needed.** **REOPENS ONLY IF inflated close rates become an actual complaint.** |
+
+**✅ THE FIVE UNCONFIRMED LOGIN RENDERS — DISCHARGED 2026-09-01.** Carried for four blocks while Chrome was down. Three confirmed on the rendered page (mark box, ink fit, mark at the top); **two SUPERSEDED rather than confirmed** — Montserrat is gone and the wordmark is a PNG, so the faux-bold and nowrap claims describe a lockup that no longer exists. The owed ink sweep is done and **0.21 stands** (ceiling 0.221, `--muted` 4.64:1). ⚠ **Remaining, unchanged: the wordmark renders at native 1038px, so it is 2x upscaled on retina — and the source is a screenshot, so there is no 2x to export from.** That is an asset task, not a code one.
 
 ## ⏳ TRIGGERED — deferred with the condition that makes them due
 
@@ -1059,6 +1063,20 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Drilldown refinements (Justin's six)** | Routing, in-card controls, reused picker, team-average row, no Manage Members / Customize View, bare labels | shipped `3c1e3a5`. **Verified by clicking on production, 3 clicks delivered:** the averages gauge and the focus card both land on `#team-objections` (the gauge carrying its fixed 7-day window); the picker is the SAME component and its selection survives leaving and returning; controls sit inside the card; the two team-only buttons are gone; badges elsewhere in the app kept their fills. ⚠ The personal objection surfaces are **deliberately not retargeted** — the drilldown is manager-only, so retargeting them would 403 every closer. ⚠ Team average is **omitted with a stated reason below two closers** ("with one, it would just repeat the row above") |
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
+
+## 2026-09-01 — the cron warm-up, call-review, and the login debt (`74f6c36`, `eb4fc7f`)
+Deployed, verified by commit hash. Suite **2008**.
+
+**1 · THE TEAM RECOMMENDATIONS LANE IS WARMED ON THE CRON** — approved after measuring (26s cold, 1.5-4.4s warm, one synthesis). One model call per manager per day, riding the pass that already writes the digest. **No content removed; the warm floor left alone.**
+⚠⚠ **The entire risk was the KEY, and it is confirmed three ways** — a mirror test that transpiles the client's own window derivation, exactly one cache row at the snapped key, and both paths returning `cached:true` (a hit IS proof, since `cacheGet` is an exact `.eq` on all five columns). ⚠ **The property that makes it possible: the client window is DAY-anchored, not click-time-anchored.**
+⚠ `nameMapFor` moved to `lib/team-name-map.js` — the names go into the **cached prose**, and the digest's own map does not apply `disambiguateNames`, so reusing it would have cached "Josh" where the page says "Josh P". Isolated **separately** from the digest; a total failure says `NOTHING WARMED` in words.
+
+**2 · ⚠⚠ call-review — A CONTROL WITH NO CSS AT ALL.** `.review-kb-btn` rendered as the **browser's default button** (light grey, 2px outset black, black text) on a near-black page **for three days**: its rule was archived with the 18 Aug removal and the manager control was re-added on 29 Aug without it. **No guard could have caught it** — the removal guard's assertions are both still true, and a check on PRESENCE cannot see a missing STYLE. Found by enumerating computed style on a real render. **The rest of the page was already treated** — 12 drawn elements, and `.review-why` renders `border 0/0/0/3`, the ruled exemption intact.
+
+**3 · THE FIVE LOGIN RENDERS ARE DISCHARGED.** Two are **superseded rather than confirmed** — Montserrat is gone (Saira ships site-wide) and the wordmark is a PNG, so the faux-bold test and the nowrap test describe a lockup that no longer exists. The other three are confirmed on the rendered page. **The owed ink sweep is done: 10 text leaves, 4 exposed, `--muted` at 4.64:1, ceiling 0.221 — 0.21 stands for the fourth time**, and my prediction that it might rise was wrong (the mark still crosses muted text).
+⚠ **Nearly reported a defect that was a measurement artefact:** `canvas.getImageData` gave 83 distinct RGB for the wordmark against a recorded "1"; decoding the PNG directly gives **1** — canvas premultiplies alpha. It would have sent someone to re-export a perfect asset.
+
+---
 
 ## 2026-09-01 — digest Treatment B, nine pages, a loading state (`e6dbd6e`, `6f1c752`)
 Both deployed, verified by commit hash. Suite **2001**.

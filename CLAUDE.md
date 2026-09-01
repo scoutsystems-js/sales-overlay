@@ -5656,6 +5656,42 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **v1.1.0 build plan:** Features built one at a time in this order: (1) Role system, (2) Role-based dashboard system on website (`/dashboard` for users + redesigned `/admin` for admins+owners with user management; the original raw log viewer remains as Sections B+C of the admin page), (3) Script upload in app, (4) Call boundary detection, (5) Post-call summary. Each feature fully committed and approved before the next starts. Justin receives one feature prompt at a time from the architect — Claude Code never plans ahead.
 - **Session start:** cd into the project root at the start of every session: cd '/Users/justinschmidt/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay'. Note: Supabase MCP is not currently configured — migrations must be run manually via the Supabase dashboard SQL editor. To enable Supabase MCP in future, add it to .mcp.json and start a fresh session.
 
+### ⚠⚠⚠ REMOVING A CONTROL REMOVES ITS CSS — AND RE-ADDING THE CONTROL DOES NOT BRING IT BACK (2026-09-01)
+**`.review-kb-btn` rendered as the BROWSER'S DEFAULT BUTTON for three days — `background rgb(239,239,239)`, `border 2px outset black`, black text, on a near-black page, on every call review, for every manager.**
+```
+matchedRules for the rendered button:  ["*", "button"]      <- NONE OF OURS
+```
+- **THE CAUSE IS A SEQUENCE, NOT A TYPO.** The rule was archived in place on 2026-08-18 when both Add-to-KB controls were removed — correctly. The MANAGER control was re-added to the render path on 2026-08-29 and **nobody un-archived its CSS.**
+- **⚠⚠ NO GUARD COULD HAVE CAUGHT IT, AND THAT IS THE POINT. The removal guard asserts the rep control is gone and the manager control is role-gated — BOTH TRUE.** A check on a control's **PRESENCE** cannot see that it has no **STYLE**, and in a codebase that archives removed code in place **a stylesheet grep finds an archived block rather than nothing** — so the search that would normally answer "is this styled?" returns a false yes.
+- **THE RULE: WHENEVER A CONTROL IS REVIVED, ASK WHAT WAS ARCHIVED WITH IT.** Same family as *removing a section can remove a consequence* and *removing a control does not remove its effects* — this is the third direction of that shape, and the only one where the artefact left behind is a **missing** rule rather than a stale one.
+- **FOUND ONLY BY ENUMERATING COMPUTED STYLE ON A REAL RENDER** — the fourth time that method has found what predicting the classes could not.
+
+### ⚠⚠ A CASCADE RESOLVER THAT IGNORES SPECIFICITY REPORTS THE OPPOSITE OF THE TRUTH (2026-09-01)
+**Guarding the call-review verdict border on the RENDERED result, my first resolver cascaded in SOURCE ORDER only and reported the border as CLEARED. The browser draws it at 3px.**
+```
+body[data-view="call-review"] .section          (0,2,1)   LATER in the file, border: 0
+body[data-view="call-review"] .review-why.loss  (0,3,1)   EARLIER, border-left: 3px
+CSS resolves SPECIFICITY FIRST -> the .loss rule wins wherever it sits
+```
+- **⚠ THE TELL WAS THAT THE VERDICT CONTRADICTED A MEASUREMENT ALREADY IN HAND** — the rendered element had been enumerated minutes earlier as `border 0/0/0/3`. **A result that disagrees with something you can already see is a statement about the instrument**, for the fourth time on this pass.
+- **⚠ AND THE SELECTOR TEXT CARRIED THE PRECEDING COMMENT.** `([^{}]+)\{` grabs everything since the last `}`, comments included, so an exact selector match never fired and the resolver silently returned `null` for a rule plainly there. **Comments out first, line before block — and that trap bit INSIDE a guard written to enforce a different rule.**
+- **THE GENERAL FORM: if a guard models a platform behaviour, it must model the part that DECIDES.** Source order is the tie-break, not the rule.
+
+### ⚠⚠ `canvas.getImageData` DOES NOT RETURN THE FILE'S BYTES — DECODE THE SOURCE (2026-09-01)
+**Reading the login wordmark through `drawImage` + `getImageData` gave 83 DISTINCT RGB VALUES, contradicting the recorded, previously-verified "1 distinct RGB". Decoding the PNG directly: 1, `93,198,77`, corners fully transparent, no baked plate. THE ASSET IS EXACTLY AS RECORDED.**
+- **THE MECHANISM: canvas PREMULTIPLIES alpha on the way in and UNPREMULTIPLIES on the way out.** For low-alpha pixels — which is most of a glow — that rounding amplifies into dozens of RGB values. **The recorded note had even predicted it** (*"un-premultiplying noisy source data amplifies its noise ~50x"*), one measurement away from being rediscovered as a defect.
+- **⚠⚠ REPORTING IT WOULD HAVE SENT SOMEONE TO RE-EXPORT A PERFECT ASSET**, and the "evidence" would have been a real number from a real measurement.
+- **THE RULE, and it is the ink-colour lesson one layer down: READ THE SOURCE OF TRUTH, NOT A NEIGHBOURING REPRESENTATION.** There it was the data URI instead of an inherited property; here it is the PNG bytes instead of a canvas round-trip.
+- **⚠ AND WHEN A MEASUREMENT CONTRADICTS A RECORDED, PREVIOUSLY-VERIFIED ONE, THE NEW MEASUREMENT IS THE SUSPECT** until it has been reproduced by a different instrument.
+
+### ⚠⚠⚠ A WARM-UP KEYED DIFFERENTLY FROM THE READ IS INDISTINGUISHABLE FROM NO WARM-UP (2026-09-01, `74f6c36`)
+**The team recommendations lane is now generated on the cron that already writes the digest — 26s cold, 1.5-4.4s warm, one model call per manager per day. THE ENTIRE RISK IS THE CACHE KEY:** the cron burns a model call, writes a row nobody hits, and the first manager still waits, with **no error, no failed write and nothing to notice.**
+- **⚠⚠ THE PROPERTY THAT MAKES WARMING POSSIBLE AT ALL: the client's window is DAY-ANCHORED, not click-time-anchored** (`(today-29)T00:00:00.000Z` → `todayT23:59:59.999Z`). Were either end `new Date()` at click time, the cron and the page would compute different windows on every single load — **the DATA query uses the exact from/to, so hours of difference can include a call the other excludes**, and the hash could never match. **Check this property before proposing to warm ANY keyed-by-data cache.**
+- **CONFIRMED THREE WAYS, because one is not enough for a silent failure mode:** a mirror test that **transpiles the client's own derivation** and compares across five instants including both sides of a UTC midnight; the live cache table holding **exactly one row at the snapped key**; and both paths returning `cached:true` — **a hit IS proof the key matched, since `cacheGet` is an exact `.eq` on all five columns.**
+- **⚠ A MISS BECAUSE THE DATA CHANGED IS CORRECT, NOT A FAILURE.** Say which misses are expected, or the first one gets investigated as a bug.
+- **⚠⚠ AND THE NAME MAP HAD TO MOVE, WHICH IS THE NON-OBVIOUS HALF: the rep names go into the CACHED PROSE.** A warm-up built with a different map writes an entry the page then serves **with the wrong names in it**. The half that would have diverged is `disambiguateNames` — the digest's own map does not apply it — so reusing it would have cached "Josh" where the page says "Josh P", on the one board with two Joshes. **When warming a cache, every input that reaches the OUTPUT must match, not merely every input that reaches the KEY.**
+- **ISOLATED SEPARATELY FROM THE DIGEST, DELIBERATELY.** Sharing its `try` would report a warm-up failure as a digest failure — **and the digest's isolation is exactly what hid two days of missing digests.** A total failure says `NOTHING WARMED` in words; an unestablished manager set says `SKIPPED` rather than warming a guess.
+
 ### ⚠⚠ A MEASUREMENT OF THE MOCK'S PROPERTIES CANNOT SEE A DEFECT OUTSIDE THE MOCK — THE SCREENSHOT FOUND BOTH (2026-09-01)
 **Treatment B was verified property by property — eyebrow 11px uppercase accent at 1.1px tracking, claim 18px on its own line, detail 14px at 0.75, the loud number 48px/300, one quiet stat line. Every one matched. Then I looked at the picture and the panel had TWO defects, both in the part the mock does not cover.**
 - **THE ATTRIBUTION SAT BELOW THE MOMENT** — *"Named the total, then filled the silence himself"*, and only afterwards, smaller, *"Godwin"*. **The same defect fixed on Team Recommendations earlier the same day**, on a different surface. Nothing was missing; it was in the wrong place.
