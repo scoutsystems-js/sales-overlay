@@ -48,6 +48,48 @@
 
 ---
 
+### ✅ RULED 2026-09-01 — THE LOUD NUMBER IS FIXED PER PAGE
+
+**Fixed per page, NOT weakest-against-target. Daily Digest leads with TOTAL CLOSES THAT DAY.**
+⚠ **NOT CASH — Scout does not track it** (the cash column is EOD-only by standing ruling, and a
+loud number nobody trusts is worse than none). **When the real Customize View is built, the
+manager picks which number leads.** Recorded, not built.
+
+---
+
+### 💷 WHAT IT COSTS TO RUN — MEASURED 2026-09-01, NOT ESTIMATED
+
+**38 real analysed calls through `model_usage`. The first real numbers Justin has had.**
+
+```
+one analysed call     17.6c measured  ->  ~19.6c corrected
+   grader     9.2c   every call     the two large lanes are 93% OF THE MONEY,
+   extractor  7.1c   every call     because each receives the FULL transcript
+   coaching   1.3c   71% of calls   (merging them was measured and REFUSED on quality)
+
+one rep / month, at real August volumes
+   lightest  54 calls  $10.60    5% of a $199 seat
+   typical  126 calls  $24.74   12%
+   heaviest 269 calls  $52.82   27%
+   the nine-rep team: 1,203 calls = $236/mo against $1,791 of seats = 13%
+```
+
+- **⚠ THE MEASURED FIGURE UNDERSTATES IT AND THE CORRECTION IS THE HONEST PART.** The 38 sampled
+  calls have a **43-minute median against the corpus's 48**, and cost tracks length almost
+  exactly — so the headline is ~20c, not 17.6c. **A sample that is unrepresentative in a
+  measurable way must be corrected for, not quoted raw.**
+- **$199 IS COMFORTABLE, NOT TIGHT.** A rep would need **~1,000 calls a month** to consume a
+  seat. ⚠ **This is the AI cost ONLY** — hosting, database and embeddings are extra, small and
+  fixed rather than per-rep, and unmeasured.
+- **⚠⚠ THE ONE LEVER, REPORTED AND DELIBERATELY NOT TESTED: whether the two large lanes need the
+  largest model.** The smaller model's published price is a third, so a call would go ~20c → ~7c
+  and a typical rep $25 → ~$9. **The risk is real and specific:** the grader produces every
+  number Scout shows and already moves ±14 points per section run-to-run on one model, so a
+  cheaper one cannot be validated by watching scores; and the extractor's verbatim-quote contract
+  went 67% → 93% only after careful work, which a weaker model may not hold. **Justin rules.**
+
+---
+
 ### 📐 THE DESIGN PASS — SIZED, NOT STARTED (2026-08-31)
 
 **Three to five blocks, and it cannot share a session.**
@@ -144,10 +186,13 @@ sizes                 12 distinct, including half-pixels (12.5 / 10.5 / 13.5)
 | ✅ **THE SPLIT — SHIPPED 2026-08-31 (`24c6e93`). CLOSED.** | five pages, per-page ranges, Customize View migrated. **One observation carried up to Justin: the gauges and the graphs still share Performance and answer to different windows** |
 | **The six discovery items ② and ③** | ① is shipped and ② was always the next step: **the six are the upstream causes of the five objection types.** ③ is the same feature as *"what is true for the whole team"* — cross-reference, do not duplicate |
 | ✅ **Objection handling % — RULED AND SHIPPED (cached route, v37). CLOSED 2026-08-31.** | **The only open question blocked on him.** Strict is already the standard by his 2026-08-22 ruling, but strict costs a model call the three fast surfaces do not make. **Either they get it, or they say plainly that they count every moment** |
-| 🐛 **A call that cannot be graded looks identical to one merely waiting** | filed 2026-08-29, not built |
-| 🐛 **Blank graphs — the silence is fixed, the cause is not** | still open |
-| 🐛 **The two "What Needs Work" surfaces hold different proof standards** | found while fixing the other one |
-| ▪ **Admin view rebuild part 2, first-time password page, Zoom's ordered fix list** | the named MINOR keeps, unbuilt and unblocked |
+| ✅ ~~**A call that cannot be graded looks identical to one merely waiting**~~ | **SHIPPED — row was stale, verified 2026-09-01.** The Calls page splits `can be retried` from `cannot be graded` with its own styling and title (`1af6cd1`) |
+| 🐛 **Blank graphs — the silence is fixed, the cause is not** | **STILL OPEN, verified.** `04bfc13` stopped the render path swallowing it; **the failure has never been REPRODUCED.** Needs a reproduction before a fix — not a fix |
+| ✅ ~~**The two "What Needs Work" surfaces hold different proof standards**~~ | **SHIPPED — row was stale, verified 2026-09-01.** `30d4d43`: `provenCloserResponse` is defined once and imported by **six** modules; the sweep found FIVE lanes, not the two compared |
+| ✅ ~~**Admin view rebuild part 2**~~ | **SHIPPED — and this row contradicted its own section, which had said so since 2026-08-29.** ⚠ Two places asserting opposite things about one item is the defect this file records most |
+| ▪ **First-time password page · Zoom's ordered fix list** | **BOTH STILL OPEN, verified.** No forced-change mechanism exists anywhere (`must_change_password` / `force_password` / `first_login` all absent), so a welcome email still hands over a permanent credential. Zoom: 445 calls, 185 graded; the long-call highlight loss is diagnosed and **its cause is not recoverable from stored data** |
+
+⚠⚠ **FIVE ITEMS REMAIN, NOT TWO** — and only two of them are waiting on time. **THREE ARE WORKABLE NOW:** blank graphs (needs a reproduction), the first-time password page, and Zoom's fix list.
 
 ⚠ **Three BUGS rows are environmental or deliberate and are NOT candidates:** the date-picker focus trap (held on purpose), bare-domain HTTPS (needs a Cloudflare migration) and the DMG notarization gap.
 

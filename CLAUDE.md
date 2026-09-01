@@ -3282,6 +3282,33 @@ rendered quotes                          118
 - **⚠⚠ I SAMPLED THREE OBSERVATIONS, SAW A PRESCRIPTION, AND WAS WRONG.** Three real rows all contained *"closer needs to…"*, so I nearly reported that the missing coaching already existed and only needed rendering. **Measured: 31 of 537 (5.8%) are prescriptive, and 3 say "should have".** A three-row sample of a 537-row population is an anecdote; the difference between "already there" and "5.8%" is the difference between a render fix and a prompt change.
 - **THE SHAPE THE TARGET NEEDS, and what exists today:** the moment ✓100% · what the prospect revealed ✓100% · what the closer did ✓98.7% · **what they should have asked ✗5.8%** · **why it would have mattered ✗5.8%**. **Three of five are free and unrendered; two need generating.**
 
+### ⚠⚠ WHAT SCOUT COSTS TO RUN — MEASURED 2026-09-01, AND THE SAMPLE HAD TO BE CORRECTED FOR
+**38 real analysed calls through `model_usage`. Carry these rather than re-deriving them.**
+```
+one analysed call   17.6c MEASURED  ->  ~19.6c corrected for sample length
+   grader     9.2c  every call    93% OF THE MONEY is these two, because each
+   extractor  7.1c  every call    receives the FULL transcript (merging: refused on quality)
+   coaching   1.3c  71% of calls
+one rep/month  54 calls $10.60 (5%) · 126 calls $24.74 (12%) · 269 calls $52.82 (27%)
+the nine-rep team  1,203 calls = $236/mo against $1,791 of seats = 13%
+```
+- **⚠⚠ THE CORRECTION IS THE TRANSFERABLE PART: THE SAMPLE WAS UNREPRESENTATIVE IN A MEASURABLE WAY.** The 38 calls have a **43-minute median against the corpus's 48**, and cost tracks transcript length almost exactly — so quoting 17.6c would have understated it by ~11%. **Before publishing a per-unit figure, check the sample against the population on the variable that DRIVES it.** Here that was call length; it is rarely the variable you sampled on.
+- **⚠ AND SAY WHICH NUMBER IS MEASURED AND WHICH IS A PUBLISHED RATE.** The token counts are ours; the per-token price is Anthropic's published figure and is **not recorded anywhere in the repo** — so it is stated explicitly in the report rather than folded silently into a total.
+- **$199 A SEAT IS COMFORTABLE:** a rep would need **~1,000 calls a month** to consume one. ⚠ **AI cost only** — hosting, database and embeddings are unmeasured (small, fixed, not per-rep).
+- **⚠ THE UNEXPLORED LEVER IS THE MODEL TIER, AND IT IS A QUALITY DECISION WEARING A COST ONE.** The smaller model is a third the price and the two large lanes are 93% of spend, so ~20c → ~7c. **The risk is specific: the grader already moves ±14 points per section run-to-run on the CURRENT model, so a cheaper one cannot be validated by watching scores**, and the extractor's verbatim contract went 67% → 93% only after deliberate work. **Reported, not tested.**
+
+### ⚠⚠⚠ A STATUS SUMMARY AND ITS OWN DETAIL SECTION DISAGREED ABOUT THREE ITEMS (2026-09-01)
+**Asked to confirm "only two items remain", I verified each row instead of reading it. FIVE remain — and THREE rows listed as open had already shipped.**
+```
+"two What Needs Work surfaces differ"   SHIPPED 30d4d43 — 6 modules import the shared rule
+"a call that cannot be graded..."       SHIPPED 1af6cd1 — the Calls page splits the two states
+"admin view rebuild part 2"             SHIPPED — and ITS OWN SECTION SAID SO since 2026-08-29
+                                        while the summary table still listed it as a candidate
+```
+- **⚠⚠ THE THIRD IS THE WORST: ONE FILE ASSERTED BOTH ANSWERS AT ONCE.** The detail section carried *"PART 2 IS ALSO SHIPPED — THIS ROW WAS STALE, VERIFIED"* while the summary listed it as unbuilt. **A reader who hits the summary first gets the opposite of the truth, stated confidently** — and the summary is what gets read.
+- **THE RULE, already on file for rulings, now shown to apply to SHIPPED WORK: when something lands, EVERY place that states it as open closes in the SAME edit.** Recording it in one section and leaving the other is how a file comes to hold two live answers.
+- **⚠ AND THE BRIEF'S OWN READING WAS WRONG IN THE SAME DIRECTION** — it said two remained and both were waiting on time. **Three of the five are workable now.** Verifying beat trusting either the file or the brief.
+
 ### ⚠⚠⚠ A CLAIM I MADE IN A REPORT CAME BACK AS AN ESTABLISHED CONSTRAINT — AND IT WAS FALSE (2026-08-31)
 **My own closing sentence — *"the nav is hand-written markup shared by every page and already has a filed wrapping problem at 1440"* — was quoted back to me in the next brief as a filed row, and it would have blocked the work if I had accepted it.**
 ```
