@@ -1091,3 +1091,27 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 - **Green bars survive on the PERSONAL coaching dashboard** — "What's Working / What to Improve / Evidence" and the coaching quote blocks. The sweep was scoped to team views; **extending it is a ruling**. ⚠ One of these (`.team-insight`) does encode good/improve — though the headings above it already say the same thing.
 - **Section score bars are amber on every row** regardless of score, with only WEAKEST in red. Amber appears nowhere else in the product and the WEAKEST/STRONGEST chips already carry the meaning.
 - **"1000 chunks" on the Knowledge Base entry** — internal vocabulary on a customer surface.
+
+## 2026-09-01 — design pass PART 2: the Objections page (`a60f1c3`)
+
+**LIVE**
+- **(a) Borders become space** on `#team-objections` — the Why section was nested boxes (a card per closer, each evidence row boxed inside). Now hairlines + space. ⚠ The ground was already on this view, so part 1's sequencing rule held. **Scoped**, because `.objsum-*` and `.nw-context` are shared with the personal coaching surfaces.
+- **(d) Four facts, four treatments** — who by weight, what-they-said by italic, which-kind by uppercase eyebrow, the outcome as the only coloured item. ⚠ Caused by this pass's own chip un-filling; the risk was flagged at the time and materialised.
+- **(e) A timestamp replaces "57% through the call"** — `hh:mm:ss` was already built for the model's prompt and the payload never carried it. One helper now serves both. The percentage survives only as the fallback when duration is unknown. `PROMPT_VERSION v8 → v9` (the shape change is baked in before the cache write).
+
+**⚠ BLOCKED ON A RULING — (b) THE "WHY" INCONSISTENCY**
+Six of eight closers get coaching and evidence; the two skipped are both `thin_types`. The filter is `c.state !== 'no_data' && focusOf(c) !== null`, and **`focusOf` is a second, undeclared exception** — the comment above it says `no_data` is the only one. It contradicts the 2026-08-30 ruling that every closer with objections gets coached. **The fix is one line** (`focusOf` falls back to `c.top`, which `thin_types` already carries) but it changes who gets coached and forces a regeneration. **Justin's call.**
+
+**⚠⚠ NEEDS ITS OWN BLOCK — (c) COACHING AGAINST ISOLATION**
+- **Source identified from the data: it is a `call_highlights.observation` from the EXTRACTOR**, not any objections lane.
+- ⚠ **The extractor already forbids commentary** and that observation is commentary — a breach of an existing rule, not a missing one.
+- **Scale: 1 real instance in 8,998 observations** (nine of ten sweep hits are legitimate). Across 400 cached syntheses, 4 matches and **1** arguably the defect.
+- ⚠ **Structurally: 9 of 9 model lanes lack the constraint**, including `objection-synthesis`, which asks for ISOLATE → REFRAME → OVERCOME coaching with no rule saying isolation is correct.
+- **Fix = extractor prompt + `ANALYSIS_PROMPT_VERSION` bump (reaches no existing call) + a prompt edit and cache bump per lane. Spend decisions, not design.**
+
+**FILED, NOT ACTED ON**
+- Green bars on the personal Coaching Dashboard; eleven on call review where colour encodes outcome (needs a ruling, not a sweep).
+- Section score bars amber on every row regardless of score.
+- "1000 chunks" on the Knowledge Base entry.
+- ⚠ **NEW:** the objection category renders **green** on the Why cards, while green means *good*/*clickable* everywhere else — here it labels the closer's **weakest** category.
+- The digest summary sentence — filed for options.

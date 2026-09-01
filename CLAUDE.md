@@ -5864,3 +5864,37 @@ A probe that worked standalone failed inside a `'use strict'` test file: `let f;
 **"Manage Members" was removed because the My Team page does that now — and the precondition was CHECKED, not assumed: its only action was `setView('team-members')`, the IDENTICAL destination the dropdown reaches.** A second route to the same page, so nothing became unreachable.
 - **⚠ HAD IT OPENED SOMETHING THE PAGE DOES NOT OFFER, THE RIGHT ANSWER WAS TO SAY SO** rather than remove the only route to it. The check takes one grep and is the difference between a tidy-up and a capability deletion — the merge-review-page failure in miniature.
 - **⚠ AND A GUARD ASSERTED THE BUTTON MUST REMAIN** (from the drilldown-refinements block). **Converted, not deleted:** its subject was *"removing a button from ONE page must not remove it from the app"*, which still holds for `summaryBtnHtml`; the removed one moved to an **app-wide absence** assertion, which is the check that can actually fail now.
+
+### ⚠⚠⚠ THE ANTI-ISOLATION COACHING CAME FROM THE **EXTRACTOR**, NOT ANY COACHING LANE — AND IT BREACHES A RULE THAT ALREADY EXISTS (2026-09-01)
+**Justin's line — *"closer repeatedly set the money aside rather than testing whether funds genuinely did not exist"* — was found IN THE DATA rather than guessed at: it is a `call_highlights.observation`, written by the highlight extractor at analysis time and rendered verbatim.**
+- **⚠⚠ THE EXTRACTOR ALREADY FORBIDS IT:** *"observation: one factual sentence… **No commentary**, no validation, no 'great job' or 'should have done X'."* That sentence IS commentary. **So the first defect is a BREACH OF AN EXISTING RULE, not a missing one** — and adding the isolation constraint to the extractor would be treating a symptom of that.
+- **THE SCALE, MEASURED: ONE observation in 8,998.** A sweep found ten candidates and **nine are legitimate** (conceded, disengaged, never probed, and one where the PROSPECT moved past something). **A keyword sweep is a floor, not a rate** — say so.
+- **⚠⚠ THE LANE GAP IS STRUCTURAL AND THE MISFIRE IS RARE, AND BOTH HALVES MUST BE REPORTED. NINE lanes call a model; ZERO carry the constraint** (`lib/coaching.js` is the only place it exists, and **`lib/objection-synthesis.js` asks for coaching "structured as ISOLATE → REFRAME → OVERCOME" with no rule saying isolation is correct**). **But across 400 cached syntheses there are 4 matches and only ONE is arguably the defect.** Reporting "the lanes are producing anti-isolation coaching" would have been false.
+- **IT CANNOT BE A DESIGN BLOCK: the extractor needs a prompt change + an `ANALYSIS_PROMPT_VERSION` bump that REACHES NO EXISTING CALL, and the nine lanes need a prompt edit plus a cache bump each.** Both are spend decisions.
+
+### ⚠⚠ A SECOND, UNDECLARED EXCEPTION IN A FILTER WHOSE COMMENT SAYS THERE IS ONLY ONE (2026-09-01)
+**The Why panel gives six of eight closers coaching and evidence; the two it skips are both `thin_types`.**
+```js
+return c.state !== 'no_data' && focusOf(c) !== null;   // focusOf is null when `ranking` is empty
+```
+- **⚠⚠ THE COMMENT DIRECTLY ABOVE IT SAYS `no_data` IS "the ONE exception and it survives".** `focusOf(c) !== null` is a second one nobody declared, and it withholds coaching from closers who **do** have objections — contradicting the 2026-08-30 ruling *"regardless if they handle 0/50 or 50/50 you can still give coaching moments"*. Stale-load-bearing-comment family, in a predicate.
+- **THE MATERIAL IS ALREADY THERE:** `thin_types` carries `top: {total, handled, category}`, added by the very block that made quiet states speak. **The fix is `focusOf` falling back to `c.top`** — one line, but it changes who gets coached, so it is a ruling.
+
+### ⚠⚠ A PAYLOAD-SHAPE CHANGE EARNS A CACHE BUMP EXACTLY AS A PROMPT CHANGE DOES (2026-09-01)
+`publicMoment` gained a `ts` field — **and it runs BEFORE the cache write**, so every cached window would have gone on rendering *"57% through the call"* while the change looked shipped. `PROMPT_VERSION v8 → v9`.
+- **THE GENERALISATION: it is not "a PROMPT edit needs a bump", it is "anything that changes what is STORED needs a bump".** Prompt, caps, field shape — the test is whether the cached payload would differ, not whether you edited a prompt string.
+- Third instance of this family in two days (`NEEDS_WORK_LANE_VERSION`, `RECS_LANE_VERSION`, now this).
+
+### ⚠ THE SCANNABILITY RISK I FLAGGED WHEN UN-FILLING THE CHIPS MATERIALISED (2026-09-01)
+*"Dre Wisam upfront cost Fear partial"* read as one sentence because an earlier change in this pass stripped those chips' fills to raise contrast. **The note written at the time said exactly this would be the risk** — *"the pills were doing the CHUNKING, and whether weight and letter-spacing are enough is a perception question a ratio cannot answer: LOOK AT IT."* Justin looked; they were not.
+- **⚠ THE FIX IS NOT PUTTING THE BOXES BACK — that is what the pass removes.** Four facts get four different signals: **who** by weight, **what they said** by italic, **which kind** by uppercase eyebrow, **the outcome** as the only coloured item.
+- **THE TRANSFERABLE PART: a flagged-but-unresolved perception risk is a PREDICTION, and it should be checked the next time that surface is looked at** rather than waiting for the user to report it.
+
+### ⚠⚠ MY FIXTURE PRODUCED "undefined of undefined" ON SCREEN AND I ALMOST FILED IT (2026-09-01)
+Probing the Why panel with an invented `top` of `{key,label}` — the real shape is `{total, handled, category, rate_pct}` — rendered *"The most common was Other — handled **undefined** of **undefined**"*.
+- **⚠ IT LOOKS EXACTLY LIKE A CUSTOMER-FACING DEFECT, and it is the fixture.** With the true shape the copy reads *"The most common was Fear — handled 0 of 4."* **Reporting it would have sent someone chasing a bug that does not exist.**
+- **THE DISCRIMINATOR IS CHEAP: dump the REAL shape from the live cache before believing anything a synthetic payload renders.** Same rule already recorded for the glance tiles; it recurs because an invented shape is quicker than a queried one.
+
+### ⚠ A GUARD THAT ANCHORS ON THE FIRST MATCH BREAKS WHEN YOU ADD AN EARLIER ONE (2026-09-01)
+Adding a **scoped** `body[data-view="team-objections"] .obj-card-head .badge` rule earlier in the stylesheet made an existing guard — `LIVE.indexOf('.obj-card-head .badge')` — read **a different rule** and fail claiming a fill had come back when it had not.
+- **SELECT BY CONTENT, NOT BY POSITION**: the guard now matches the UNSCOPED rule specifically, and asserts its slice length. **Same family as the `all[0]`/`.pop()` prompt selectors** — and it is the third time position-based selection has misfired here.
