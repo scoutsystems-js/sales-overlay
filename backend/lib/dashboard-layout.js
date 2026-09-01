@@ -90,6 +90,9 @@ function resolveLayout(stored) {
       w: clampSpan(c.w, 4), h: clampSpan(c.h, 3),
       target: (typeof m.target === 'number') ? m.target : null,
       targetDirection: m.targetDirection || 'higher_is_better',
+      // ⚠ A stored card keeps its band, or a reload drops the ranked list back
+      // to a direction the metric does not have.
+      band: m.band || null,
       categories: m.categories || null,
     });
   });

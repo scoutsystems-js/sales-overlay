@@ -95,7 +95,10 @@ test('⚠⚠⚠ the render coalescer holds NO view list of its own', () => {
 test('⚠⚠ isTeamView covers every page in the dropdown, and says no to others', () => {
   const at = H.indexOf('var TEAM_PAGES');
   const src = H.slice(at, H.indexOf('function teamPageSelectHtml', at));
-  assert.ok(src.length > 200 && src.length < 4200, 'slice must cover it: ' + src.length);
+  /* ⚠ CEILING RAISED, cause named: `teamPagesWithBoard` gained the comment
+     explaining why the nav entry names the board it OPENS rather than requiring
+     a pin. Raising a bound is the mirror of lowering a floor. */
+  assert.ok(src.length > 200 && src.length < 5400, 'slice must cover it: ' + src.length);
   const is = new Function(src + '; return isTeamView;')();
 
   const pages = [...H.matchAll(/\{ view: '([a-z-]+)',\s+label:/g)].map(m => m[1]);
@@ -223,7 +226,10 @@ test('⚠ each page resolves to its OWN range, and the drilldown rides coaching\
      matching; running its output can throw, because filtering comment LINES can
      leave a block delimiter unpaired. Comments are harmless to new Function. */
   const src = H.slice(H.indexOf('var TEAM_PAGES'), H.indexOf('function teamPageSelectHtml'));
-  assert.ok(src.length > 200 && src.length < 4200, 'slice must cover it: ' + src.length);
+  /* ⚠ CEILING RAISED, cause named: `teamPagesWithBoard` gained the comment
+     explaining why the nav entry names the board it OPENS rather than requiring
+     a pin. Raising a bound is the mirror of lowering a floor. */
+  assert.ok(src.length > 200 && src.length < 5400, 'slice must cover it: ' + src.length);
   const label = new Function('state', src +
     '; return (TEAM_PAGES.filter(function (p) { return p.view === teamPageForView(state.view); })[0] || {}).label;');
   assert.strictEqual(label({ view: 'team-performance' }), 'Performance');
@@ -368,7 +374,10 @@ test('⚠⚠ the page dropdown is the NAV TAB, and there is exactly one of it', 
 
   const wAt = LIVE.indexOf('function teamPagesWithBoard');
   const helper = LIVE.slice(wAt, LIVE.indexOf('\n  }', wAt));
-  assert.ok(helper.length > 150 && helper.length < 900, 'helper slice: ' + helper.length);
+  /* ⚠ CEILING RAISED, cause named: `teamPagesWithBoard` gained the comment
+     explaining why the nav entry names the board it OPENS rather than requiring
+     a pin. Raising a bound is the mirror of lowering a floor. */
+  assert.ok(helper.length > 150 && helper.length < 2200, 'helper slice: ' + helper.length);
   assert.ok(/TEAM_PAGES\.filter/.test(helper), 'the helper must derive from TEAM_PAGES');
   ['Daily Digest', 'Performance', 'Coaching', 'Objections', 'My Team'].forEach((n) =>
     assert.ok(!helper.includes(n),

@@ -45,6 +45,11 @@ const OBJECTION_SCALE_MAX = 100;
  * when 46 minutes is good. It was reviewed and approved as correct, because the
  * NUMBER was right — only its meaning was upside down. Corrected 2026-08-18.
  */
+/* ⚠⚠ THE BAND IS IMPORTED, NOT REDECLARED. This file and lib/widget-catalog.js
+   each declared call time's direction separately — they agreed, which is exactly
+   how a shared-carrier failure hides until one of them moves. */
+const METRIC_BAND = require('./metric-band.js');
+
 const HIGHER_IS_BETTER = 'higher_is_better';
 const LOWER_IS_BETTER = 'lower_is_better';
 
@@ -93,16 +98,19 @@ const METRICS = {
     targetCaption: 'Target ' + OBJECTION_TARGET_PCT + '%',
     thresholdPhrase: 'at or above target',
   },
+  /* ⚠⚠ THE BANDED ONE. Neither direction was true: a ceiling awards first place
+     to the shortest call, and it was ALREADY doing that — the rep ranked best on
+     call time had 13 of 27 calls under twenty minutes. There is a SWEET SPOT,
+     so `band` replaces `direction` here and the caption names both edges. */
   calltime: {
     key: 'calltime', label: 'Avg Call Time',
     target: CALLTIME_TARGET_MIN, scale: CALLTIME_SCALE_MAX,
     unit: 'min', unitName: 'call', numeratorName: null,
-    // ⚠ THE INVERTED ONE. Under 60 is good.
-    direction: LOWER_IS_BETTER,
-    // "Max", not "Target" — the caption has to say which way it points, or the
-    // dial is the only thing carrying that and a screenshot loses it.
-    targetCaption: 'Max ' + CALLTIME_TARGET_MIN + ' min',
-    thresholdPhrase: 'at or below ' + CALLTIME_TARGET_MIN + ' min',
+    band: METRIC_BAND.bandFor('avg_call_time'),
+    // "Sweet spot", not "Max" — the caption has to say which way it points, and
+    // a band points BOTH ways. A screenshot has to carry that too.
+    targetCaption: 'Sweet spot 35\u201345 min',
+    thresholdPhrase: 'in the 35\u201345 min sweet spot',
   },
 };
 
@@ -138,9 +146,13 @@ function fixedWindow(now) {
  * render and a 95-minute team average would still read as a warning. An
  * unreachable band is the same defect as a one-sided guard.
  */
-function band(value, target, direction) {
+function band(value, target, direction, metricBand) {
   var v = num(value);
   if (v === null) return null;
+  /* ⚠ A BANDED METRIC IGNORES target/direction ENTIRELY — it has two edges and
+     neither direction is true of it. Checked FIRST so a band can never be
+     silently scored against a threshold it does not have. */
+  if (metricBand) return METRIC_BAND.classify(v, metricBand);
   if (direction === LOWER_IS_BETTER) {
     if (v <= target) return 'good';
     if (v <= target * (2 - MID_BAND_FRACTION)) return 'mid';
@@ -153,9 +165,12 @@ function band(value, target, direction) {
 
 // Does one value clear its metric's bar? The ONLY place the comparison is
 // written, so "clearing the bar" cannot mean two different things on one page.
-function meetsThreshold(value, target, direction) {
+function meetsThreshold(value, target, direction, metricBand) {
   var v = num(value);
   if (v === null) return false;
+  // ⚠ "Clearing the bar" on a banded metric means INSIDE the sweet spot — not
+  // above an edge and not below one.
+  if (metricBand) return METRIC_BAND.meets(v, metricBand);
   return (direction === LOWER_IS_BETTER) ? (v <= target) : (v >= target);
 }
 
@@ -281,7 +296,7 @@ function repCounts(reps, metricKey) {
     measured++;
     // ⚠ Direction comes from the METRIC, not from a `>=` written here. On a
     // ceiling metric this counts reps who stay UNDER the bar.
-    if (meetsThreshold(v, m.target, m.direction)) at++;
+    if (meetsThreshold(v, m.target, m.direction, m.band)) at++;
   });
   // `meeting` — deliberately NOT `at_or_above`, which was the old name and was
   // a lie on a ceiling metric. A field name that states one direction cannot

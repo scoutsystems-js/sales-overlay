@@ -37,9 +37,16 @@ test('⚠ the label is drawn from the notch\'s OWN angle, never a second computa
   const a = H.indexOf('  function avgGaugeSvg');
   const fn = H.slice(a, H.indexOf('\n  }', H.indexOf('avg-notch-label', a)));
   assert.ok(fn.length > 400, 'slice: ' + fn.length);
-  assert.ok(/var ta = avgAngle\(target, scale\)/.test(fn), 'ta is the notch angle');
-  assert.ok(/avgPoint\(cx, cy, rOuter \+ \d+, ta\)/.test(fn),
-    'the label must be positioned from ta — deriving the angle again is two computations of one thing');
+  /* ⚠⚠ CONVERTED 2026-09-01: the notch became a LOOP when `avg_call_time` became a
+     BAND — a metric with two edges gets two notches, because one mark on a metric
+     whose rule is "35-45" marks a bar that does not exist. THE SUBJECT SURVIVES
+     UNCHANGED: each label must come from the SAME angle its own notch uses, so the
+     two cannot drift apart. Deriving the angle a second time is two computations
+     of one thing whether there is one mark or two. */
+  assert.ok(/marks\.map\(function \(mk\)/.test(fn), 'the notches are drawn per edge');
+  assert.ok(/var a = avgAngle\(mk, scale\)/.test(fn), 'each notch derives its own angle');
+  assert.ok(/avgPoint\(cx, cy, rOuter \+ \d+, avgAngle\(mk, scale\)\)/.test(fn),
+    'the label must be positioned from the SAME edge value its notch uses');
 });
 
 test('⚠ the label clears the notch AND stays inside the viewBox', () => {
@@ -69,7 +76,9 @@ test('⚠ the notch still CROSSES the ring band — .avg-seg is stroke-width 12 
   assert.ok(css, 'stale anchor — .avg-seg stroke-width');
   const half = Number(css[1]) / 2;
   const fn = H.slice(H.indexOf('  function avgGaugeSvg'), H.indexOf('\n  function avgCardHtml'));
-  const tip = fn.match(/var t0 = avgPoint\(cx, cy, rOuter - 10, ta\), t1 = avgPoint\(cx, cy, rOuter \+ (\d+), ta\)/);
+  /* ⚠ CONVERTED with the loop — the endpoints are now computed per edge. The
+     property is unchanged: the tip must clear the ring band's outer edge. */
+  const tip = fn.match(/avgPoint\(cx, cy, rOuter - 10, a\), p1 = avgPoint\(cx, cy, rOuter \+ (\d+), a\)/);
   assert.ok(tip, 'stale anchor — the notch endpoints');
   assert.ok(Number(tip[1]) > half, 'the notch tip (+' + tip[1] + ') must clear the band edge (+' + half + ')');
 });

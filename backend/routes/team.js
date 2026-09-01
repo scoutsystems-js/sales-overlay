@@ -600,7 +600,13 @@ router.get('/averages', teamGate, async function (req, res) {
         // Direction travels WITH the metric to the browser, so the render can
         // never re-derive it from a comparison of its own.
         direction: m.direction, target_caption: m.targetCaption,
-        band: TA.band(pooled.value, m.target, m.direction),
+        /* ⚠⚠ TWO DIFFERENT THINGS, DELIBERATELY NOT BOTH CALLED `band`. `band` is
+           the CLASSIFICATION (good/mid/bad) and has meant that since the panel
+           shipped; `sweet_spot` carries the EDGES so the dial can draw a ZONE
+           rather than a notch. Reusing one name for both would be a shared
+           carrier inside a single payload. */
+        band: TA.band(pooled.value, m.target, m.direction, m.band),
+        sweet_spot: m.band ? { good: m.band.good, ok: m.band.ok } : null,
         counts: counts, count_sentence: TA.countSentence(counts, key),
       };
     });
@@ -624,7 +630,8 @@ function emptyMetrics() {
       value: null, numerator: 0, total: 0, enough: false,
       reason: 'no reps on this team', unit_name: m.unitName, numerator_name: m.numeratorName,
       direction: m.direction, target_caption: m.targetCaption,
-      band: null, counts: counts, count_sentence: TA.countSentence(counts, key),
+      band: null, sweet_spot: m.band ? { good: m.band.good, ok: m.band.ok } : null,
+      counts: counts, count_sentence: TA.countSentence(counts, key),
     };
   });
   return out;

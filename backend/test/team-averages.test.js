@@ -71,10 +71,21 @@ test('⚠ the call-time scale keeps the LIVE rep-week band inside the readable a
 test('⚠⚠ every metric DECLARES its direction — none is implied by position', () => {
   assert.strictEqual(A.METRICS.closing.direction, A.HIGHER_IS_BETTER);
   assert.strictEqual(A.METRICS.objections.direction, A.HIGHER_IS_BETTER);
-  assert.strictEqual(A.METRICS.calltime.direction, A.LOWER_IS_BETTER,
-    '60 minutes is a CEILING — under it is good');
+  /* ⚠⚠ CONVERTED 2026-09-01 — `calltime` IS A BAND NOW, and the ceiling is gone.
+     Justin: "a good sales call lasts anywhere from 20 min to over an hour, it
+     just depends on the prospect, but typically 35-45 min is the sweet spot."
+     NEITHER DIRECTION WAS TRUE, and the ceiling was already awarding first place
+     to the shortest-calling rep. THE SUBJECT SURVIVES AND WIDENS: every metric
+     must declare HOW IT IS JUDGED — a direction or a band — and none may leave
+     it implied. That is the property the old assertion was protecting. */
+  assert.ok(!A.METRICS.calltime.direction,
+    'a banded metric must not ALSO carry a direction — two rules, one metric');
+  assert.deepStrictEqual(A.METRICS.calltime.band.good, [35, 45], 'the sweet spot');
+  assert.deepStrictEqual(A.METRICS.calltime.band.ok, [20, 60], 'the acceptable band');
   A.METRIC_ORDER.forEach(function (k) {
-    assert.ok(A.METRICS[k].direction, k + ' has no declared direction');
+    const m = A.METRICS[k];
+    assert.ok(m.direction || m.band, k + ' declares neither a direction nor a band');
+    assert.ok(!(m.direction && m.band), k + ' declares BOTH — which one decides?');
   });
 });
 
@@ -114,12 +125,18 @@ test('the two directions are MIRROR IMAGES — the mid band is the same width ei
 test('⚠ the ceiling metric\'s BAD band is reachable on its own scale', () => {
   // A mid band defined multiplicatively (C / 0.6 = 100) would put "bad" beyond
   // the 0-90 scale entirely, so a 95-minute team average would still render mid.
+  /* ⚠ CONVERTED with the band. The PROPERTY is unchanged and is the one that
+     matters: a band you cannot reach is not a band. Under the old ceiling the
+     risk was a multiplicative mid edge landing off the scale; under a band it is
+     the outer edge landing off it. */
   const m = A.METRICS.calltime;
-  assert.ok(m.target * 1.4 < m.scale,
-    'bad must start inside the scale: 1.4 x ' + m.target + ' = ' + (m.target * 1.4)
-    + ' against scale ' + m.scale);
-  assert.strictEqual(A.band(m.scale, m.target, m.direction), 'bad',
-    'a value at full scale must read as bad on a ceiling metric');
+  assert.ok(m.band.ok[1] < m.scale,
+    'bad must start inside the scale: ok ends at ' + m.band.ok[1] + ' against scale ' + m.scale);
+  assert.strictEqual(A.band(m.scale, m.target, m.direction, m.band), 'bad',
+    'a value at full scale must read as bad');
+  assert.strictEqual(A.band(5, m.target, m.direction, m.band), 'bad',
+    'and so must a value below the band — a band is bad in BOTH directions, which '
+    + 'is the entire reason it replaced the ceiling');
 });
 
 // ── the segmented arc ─────────────────────────────────────────────────────
@@ -239,16 +256,22 @@ test('the count SENTENCE names the unmeasured group in words', () => {
     'no reps with enough calls to measure yet');
 });
 
-test('⚠⚠ the CEILING metric says "at or BELOW 60 min", not "at or above target"', () => {
+test('⚠⚠ the BANDED metric names BOTH edges — a caption must say which way it points', () => {
+  /* ⚠ CONVERTED: "at or below 60 min" was true of a ceiling and is false of a
+     band. THE SUBJECT IS THE SAME ONE THAT CAUGHT THE ORIGINAL DEFECT — the
+     caption has to carry the rule, because the dial is the only other thing that
+     does and a screenshot loses it. A band points BOTH ways, so it names both. */
   assert.strictEqual(
     A.countSentence({ meeting: 4, measured: 4, unmeasured: 1, total: 5 }, 'calltime'),
-    '4 of 4 reps at or below 60 min · 1 not enough calls');
-  // The wording is a property of the metric, so it cannot drift from the maths.
-  assert.strictEqual(A.METRICS.calltime.thresholdPhrase, 'at or below 60 min');
+    '4 of 4 reps in the 35\u201345 min sweet spot · 1 not enough calls');
+  assert.strictEqual(A.METRICS.calltime.thresholdPhrase, 'in the 35\u201345 min sweet spot');
+  assert.strictEqual(A.METRICS.calltime.targetCaption, 'Sweet spot 35\u201345 min');
+  assert.ok(!/max|below|above/i.test(A.METRICS.calltime.thresholdPhrase),
+    'a one-directional word on a banded metric is the caption lying again');
   assert.strictEqual(A.METRICS.closing.thresholdPhrase, 'at or above target');
 });
 
-test('⚠⚠ THE LIVE CASE — 46 min is GOOD, and all four reps CLEAR the ceiling', () => {
+test('⚠⚠ THE LIVE CASE, RE-READ UNDER THE BAND — three of four sit in the sweet spot', () => {
   // The exact numbers that shipped reading "0 of 4 reps at or above target" —
   // a manager being told the team was failing at 46 minutes. Under the ceiling
   // they all clear it, which is what the data actually says.
@@ -258,23 +281,33 @@ test('⚠⚠ THE LIVE CASE — 46 min is GOOD, and all four reps CLEAR the ceili
     { calltime: { seconds: 42.8 * 60 * 12, calls: 12 } },
     { calltime: { seconds: 43.1 * 60 * 11, calls: 11 } },
   ];
+  /* ⚠⚠ THE LIVE CASE MOVED, AND THAT IS THE POINT OF THE BAND. Under the ceiling
+     all four "cleared" it. Under the sweet spot, 49.4 and 39.4 and 42.8 and 43.1
+     are not all the same thing: three sit inside 35-45 and one is above it. A
+     metric that called them identical is what the band replaced. */
   const c = A.repCounts(reps, 'calltime');
-  assert.strictEqual(c.meeting, 4, 'every rep averages under 60 minutes');
+  assert.strictEqual(c.meeting, 3, 'three of the four sit inside 35-45; 49.4 does not');
   assert.strictEqual(c.measured, 4);
-  assert.strictEqual(A.countSentence(c, 'calltime'), '4 of 4 reps at or below 60 min');
+  assert.strictEqual(A.countSentence(c, 'calltime'), '3 of 4 reps in the 35\u201345 min sweet spot');
   const pooled = A.poolDuration(reps);
   assert.strictEqual(A.band(pooled.value, 60, A.LOWER_IS_BETTER), 'good',
     'the team average of ~46 min renders GREEN');
 });
 
-test('a rep OVER the ceiling does not count toward the meeting group', () => {
+test('⚠⚠ a rep OUTSIDE the band does not count — and BOTH sides are outside', () => {
+  /* ⚠ CONVERTED 2026-09-01. This asserted that only the HIGH side fails, which is
+     what a ceiling means. Under a band the short call is a miss too — and that is
+     the entire finding that produced the band: the rep ranked BEST on call time
+     had 13 of 27 calls under twenty minutes. A test that only ever checks the
+     high side cannot see that. */
   const reps = [
-    { calltime: { seconds: 46 * 60 * 20, calls: 20 } },   // under → counts
-    { calltime: { seconds: 75 * 60 * 20, calls: 20 } },   // over  → does not
+    { calltime: { seconds: 40 * 60 * 20, calls: 20 } },   // inside 35-45 → counts
+    { calltime: { seconds: 75 * 60 * 20, calls: 20 } },   // too long     → does not
+    { calltime: { seconds: 18 * 60 * 20, calls: 20 } },   // too SHORT    → does not
   ];
   const c = A.repCounts(reps, 'calltime');
-  assert.strictEqual(c.meeting, 1);
-  assert.strictEqual(c.measured, 2);
+  assert.strictEqual(c.meeting, 1, 'only the rep inside the sweet spot counts');
+  assert.strictEqual(c.measured, 3);
 });
 
 // ── the window is the SERVER's, not the caller's ──────────────────────────

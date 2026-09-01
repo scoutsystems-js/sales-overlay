@@ -145,7 +145,9 @@ test('⚠ the picker sits BELOW the confirm modal, so a confirm from it is never
 
 test('⚠⚠ the pinned board is TOP of the Team menu, and Customize otherwise', () => {
   const src = HTML.slice(HTML.indexOf('var TEAM_PAGES'), HTML.indexOf('function teamPageSelectHtml'));
-  assert.ok(src.length > 200 && src.length < 4200, 'slice: ' + src.length);
+  /* ⚠ CEILING RAISED with its cause: the helper gained the comment explaining
+     why the label names the board it OPENS rather than requiring a pin. */
+  assert.ok(src.length > 200 && src.length < 5400, 'slice: ' + src.length);
   const make = new Function('state', src + '; return teamPagesWithBoard;');
 
   const noLane = make({ teamDashboard: null })().map((p) => p.label);
@@ -157,9 +159,20 @@ test('⚠⚠ the pinned board is TOP of the Team menu, and Customize otherwise',
   assert.strictEqual(pinned[0].view, 'team-dashboard');
   assert.strictEqual(pinned.length, noLane.length, 'it REPLACES the entry, never adds one');
 
+  /* ⚠⚠ CONVERTED 2026-09-01 — JUSTIN HIT THIS AS A BUG. He saved and renamed a
+     board and the dropdown still read "Customize", so he concluded the save had
+     not worked. IT HAD: the row was in the database, named, with its cards. The
+     entry required `pinned` for its LABEL while the server returns boards[0]
+     ordered pinned-first then most-recent — so the entry ALWAYS opened that
+     board and refused to say its name.
+     ⚠ THE POSITION STILL FOLLOWS THE PIN, which is what was specified, and there
+     is still exactly ONE entry. Only the label stopped requiring a pin. */
   const unpinned = make({ teamDashboard: { board: { name: 'Morning board', pinned: false } } })();
-  assert.strictEqual(unpinned[unpinned.length - 1].label, 'Customize',
-    'an UNPINNED board does not take the top slot or lend its name');
+  assert.strictEqual(unpinned[unpinned.length - 1].label, 'Morning board',
+    'an unpinned board still LENDS ITS NAME — the entry opens it, so it names it');
+  assert.strictEqual(unpinned[0].label, 'Daily Digest',
+    'but it does NOT take the top slot — position follows the pin, as specified');
+  assert.strictEqual(unpinned.length, noLane.length, 'and it still REPLACES, never adds');
 
   /* ⚠ NEVER A GUESS AT A NAME. The nav renders on every page in the product,
      including ones with no business asking the server about dashboards. */

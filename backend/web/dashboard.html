@@ -4078,6 +4078,18 @@
        `min-width: 0` then let the name collapse to ONE WORD PER LINE, overlapping
        its own views. Every row extracted correctly and read correctly; only the
        screenshot showed it. The list WRAPS rather than refusing to shrink. */
+    /* ⚠ THE SIDE, ON EVERY BANDED ROW. `opacity`, never a grey token — the
+       no-grey rule is about unreadable body text, and this recedes without
+       becoming grey. Uppercase and tracked so it reads as a tag rather than as
+       part of the number beside it. */
+    .dash-side {
+      font-style: normal; font-size: 10px; font-weight: 600; opacity: 0.7;
+      text-transform: uppercase; letter-spacing: 0.06em; margin-left: 6px;
+    }
+    /* ⚠ THE TWO BAND STATES, using the product's own semantic tokens — this is
+       exactly what they are for: good means in the sweet spot, bad means out. */
+    .dash-barh-fill--good { background: var(--good); }
+    .dash-barh-fill--out  { background: var(--bad); }
     .dash-pick-item i { font-style: normal; font-size: var(--fs-secondary); opacity: 0.65;
       flex: 0 1 38%; min-width: 130px; text-align: right; padding-top: 2px;
       white-space: normal; line-height: 1.5; }
@@ -11844,8 +11856,17 @@
   // this never guesses it from the value. The first build hard-coded `>=` here
   // and told a manager the team was failing at a 46-minute average.
   var AVG_LOWER_IS_BETTER = 'lower_is_better';
-  function avgBand(value, target, direction) {
+  /* ⚠⚠ MIRRORS lib/metric-band.js classify() FOR THE BANDED CASE. A banded
+     metric ignores target/direction entirely — it has two edges and neither
+     direction is true of it — so the band is checked FIRST and a band can never
+     be silently scored against a threshold it does not have. */
+  function avgBand(value, target, direction, sweet) {
     if (typeof value !== 'number' || !isFinite(value)) return null;
+    if (sweet && sweet.good) {
+      if (value >= sweet.good[0] && value <= sweet.good[1]) return 'good';
+      if (sweet.ok && value >= sweet.ok[0] && value <= sweet.ok[1]) return 'mid';
+      return 'bad';
+    }
     if (direction === AVG_LOWER_IS_BETTER) {
       if (value <= target) return 'good';
       if (value <= target * 1.4) return 'mid';   // mirror of 0.6 on the other side
@@ -11861,7 +11882,11 @@
    * than one arc with a dash pattern — a dash array would tie block size to the
    * radius and drift between the outer ring and the inner echo.
    */
-  function avgGaugeSvg(value, target, scale, band) {
+  /* ⚠ `sweet` IS APPENDED AT THE END OF THE SIGNATURE, never inserted — removing
+     or inserting a parameter anywhere but the end silently shifts every later
+     argument into the wrong slot, and a stale 4-argument call still works here
+     (no band, one notch, exactly as before). */
+  function avgGaugeSvg(value, target, scale, band, sweet) {
     var W = 230, H = 168, cx = 115, cy = 108;
     var rOuter = 84, rEcho = 62, rSpokeIn = 40, rSpokeOut = 47;
     var lit = avgLitCount(value, scale);
@@ -11906,14 +11931,23 @@
 
     // The target notch, crossing the ring. White on purpose: it marks where the
     // BAR is, which is a different statement from how the team is doing.
-    var ta = avgAngle(target, scale);
+    /* ⚠⚠ A BANDED METRIC HAS TWO EDGES AND GETS TWO NOTCHES. One notch on a
+       metric whose rule is "35-45" would mark a bar that does not exist — the
+       same class of defect as the caption that read "Target 60 min" on a ceiling.
+       ⚠ THE EDGES COME FROM THE SERVER'S `sweet_spot`, never re-derived here:
+       the dial and the classification must not disagree about where the band is. */
+    var marks = (sweet && sweet.good) ? sweet.good : [target];
+    var ta = avgAngle(marks[0], scale);
     /* ⚠ THE NOTCH STILL CROSSES THE WHOLE RING BAND. `.avg-seg` is stroke-width
        12 and is drawn AT rOuter, so the band spans rOuter ± 6 — a tip at +3 would
        have stopped INSIDE it and read as a mark that fails to cross. +7 clears
        the band's outer edge by 1 and leaves the label its room. */
-    var t0 = avgPoint(cx, cy, rOuter - 10, ta), t1 = avgPoint(cx, cy, rOuter + 7, ta);
-    var notch = '<line class="avg-notch" x1="' + t0.x.toFixed(1) + '" y1="' + t0.y.toFixed(1)
-      + '" x2="' + t1.x.toFixed(1) + '" y2="' + t1.y.toFixed(1) + '"/>';
+    var notch = marks.map(function (mk) {
+      var a = avgAngle(mk, scale);
+      var p0 = avgPoint(cx, cy, rOuter - 10, a), p1 = avgPoint(cx, cy, rOuter + 7, a);
+      return '<line class="avg-notch" x1="' + p0.x.toFixed(1) + '" y1="' + p0.y.toFixed(1)
+        + '" x2="' + p1.x.toFixed(1) + '" y2="' + p1.y.toFixed(1) + '"/>';
+    }).join('');
 
     /* ⚠ THE NOTCH IS LABELLED WITH ITS OWN NUMBER (Justin, 2026-09-01). A white
        mark on a ring says "a bar exists here" and not WHAT the bar is, so the
@@ -11933,9 +11967,11 @@
        ⚠ Not further: at rOuter + 19 the label CLIPS the viewBox at the top of the
        arc (measured y=8 on a 9px font), and growing the viewBox would change the
        dial's aspect with the HTML readout sitting over it. */
-    var tl = avgPoint(cx, cy, rOuter + 15, ta);
-    var tLabel = '<text class="avg-scale-label avg-notch-label" x="' + tl.x.toFixed(1)
-      + '" y="' + (tl.y + 3).toFixed(1) + '">' + target + '</text>';
+    var tLabel = marks.map(function (mk) {
+      var pl = avgPoint(cx, cy, rOuter + 15, avgAngle(mk, scale));
+      return '<text class="avg-scale-label avg-notch-label" x="' + pl.x.toFixed(1)
+        + '" y="' + (pl.y + 3).toFixed(1) + '">' + mk + '</text>';
+    }).join('');
 
     return '<svg class="avg-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-hidden="true">'
       + segs + echo + spokes + ends + notch + tLabel + '</svg>';
@@ -11943,7 +11979,7 @@
 
   function avgCardHtml(m) {
     if (!m) return '';
-    var band = avgBand(m.value, m.target, m.direction);
+    var band = avgBand(m.value, m.target, m.direction, m.sweet_spot);
     // ⚠ THE CAPTION COMES FROM THE SERVER, because it has to say which WAY the
     // number should go: "Max 60 min" on the ceiling metric, "Target 25%" on the
     // rates. Rebuilding it here from m.target alone is what produced "Target 60
@@ -11980,7 +12016,7 @@
 
     return '<div class="avg-card' + (clickable ? ' avg-card-link' : '') + '"' + open + '>'
       + '<div class="avg-name">' + escapeHtml(m.label) + '</div>'
-      + '<div class="avg-dial">' + avgGaugeSvg(m.value, m.target, m.scale, band)
+      + '<div class="avg-dial">' + avgGaugeSvg(m.value, m.target, m.scale, band, m.sweet_spot)
       + '<div class="avg-readout"><div class="avg-value avg-value-' + band + '">' + valueText + '</div>'
       + '<div class="avg-target-cap">' + targetCap + '</div></div></div>'
       + '<div class="avg-counts">' + escapeHtml(counts) + '</div>'
@@ -12168,13 +12204,13 @@
       objection_handle_rate: function (r) { return r.obj_handle_rate; },
       calls_analyzed: function (r) { return r.calls_analyzed; },
       prospects: function (r) { return r.prospect_close_total; },
-      /* ⚠⚠ `time_to_price` IS DELIBERATELY ABSENT. Ranking asserts better-and-
-         worse, and nobody has ruled whether a faster time to price is better —
-         with no direction it would sort SLOWEST FIRST and the longest bar would
-         read as the best rep. A wrong direction has no wrong number, so nothing
-         on screen would look off. The catalog refuses the ranked views for it;
-         this is the second half of that refusal. */
+      /* ⚠ BOTH MINUTE METRICS ARE RANKABLE NOW, and only because they have a
+         BAND. While `time_to_price` had neither a band nor a direction it was
+         refused: it would have sorted slowest-first with the longest bar reading
+         as the best rep. Justin ruled the late edge; the early one came from the
+         coverage table. */
       avg_call_time: function (r) { return r.avg_call_time; },
+      time_to_price: function (r) { return r.time_to_price; },
     }[card.metric];
     if (!pickVal) return { error: 'no per-rep card can show this metric yet' };
 
@@ -12183,6 +12219,27 @@
     var measured = rows.filter(function (r) { return r.v !== null && r.v !== undefined; });
     if (!measured.length) return { error: 'no rep has a measurable value in this range' };
 
+    /* ⚠⚠ A BANDED METRIC RANKS BY DISTANCE FROM THE BAND, FURTHEST FIRST, so the
+       reps who need attention lead — consistent with every other by-rep list,
+       which already sorts worst-first.
+       ⚠⚠ AND DISTANCE ALONE REPRODUCES THE DEFECT THE BAND WAS BUILT TO FIX. A
+       rep at 28.8 and one at 67.1 are both ~16 minutes outside and need OPPOSITE
+       coaching — one is rushing, one is rambling — so every row carries its SIDE.
+       Without it the band buys nothing over the direction.
+       ⚠ REPS INSIDE THE BAND ARE NOT RANKED AGAINST EACH OTHER: their distance is
+       zero, so they tie and are listed. There is no honest ordering between 38
+       and 42 minutes, and inventing one would be a verdict on a rep.
+       ⚠ MIRRORS lib/metric-band.js — guarded by test/metric-band-mirror.test.js. */
+    var sw = card.band && card.band.good;
+    if (sw) {
+      measured.forEach(function (x) {
+        x.side = (x.v < sw[0]) ? 'under' : (x.v > sw[1]) ? 'over' : 'in';
+        x.dist = (x.v < sw[0]) ? (sw[0] - x.v) : (x.v > sw[1]) ? (x.v - sw[1]) : 0;
+      });
+      measured.sort(function (a, b) { return b.dist - a.dist; });
+      return { measured: measured, unmeasured: rows.length - measured.length,
+               banded: true, band: card.band };
+    }
     var lowerIsBetter = card.targetDirection === 'lower_is_better';
     measured.sort(function (a, b) { return lowerIsBetter ? a.v - b.v : b.v - a.v; });
     return { measured: measured, unmeasured: rows.length - measured.length, lowerIsBetter: lowerIsBetter };
@@ -12196,6 +12253,10 @@
     if (r.measured.length > shown.length) note.push('top ' + shown.length + ' of ' + r.measured.length);
     if (r.unmeasured > 0) note.push(r.unmeasured + ' not enough data to measure');
     if (r.lowerIsBetter) note.push('lower is better');
+    /* ⚠ THE NOTE NAMES THE BAND. "Furthest from the sweet spot first" without
+       saying WHERE the sweet spot is leaves the reader unable to check a row. */
+    if (r.banded) note.push(r.band.good[0] + '\u2013' + r.band.good[1]
+      + ' min is the sweet spot \u00B7 furthest out first');
     return note.length ? '<div class="dash-card-note">' + escapeHtml(note.join(' \u00B7 ')) + '</div>' : '';
   }
 
@@ -12208,8 +12269,13 @@
     var unit = DASH_UNIT[card.metric] || '';
     return '<div class="dash-list">'
       + shown.map(function (x) {
+          /* ⚠ THE SIDE RIDES WITH THE VALUE, not in a separate column — a rep at
+             28.8 and one at 67.1 sit adjacent in this list and the row is the
+             only thing that can tell them apart. */
+          var side = x.side && x.side !== 'in'
+            ? '<em class="dash-side">' + x.side + '</em>' : '';
           return '<div class="dash-list-row"><span>' + escapeHtml(String(x.name)) + '</span>'
-            + '<b>' + escapeHtml(String(x.v)) + unit + '</b></div>';
+            + '<b>' + escapeHtml(String(x.v)) + unit + side + '</b></div>';
         }).join('')
       + '</div>' + dashRepNote(shown, r);
   }
@@ -12241,10 +12307,19 @@
     return '<div class="dash-barh">'
       + shown.map(function (x) {
           var pct = Math.max(1, Math.round((x.v / max) * 100));   // 1% floor: a real zero must still be a visible row
+          /* ⚠⚠ ON A BANDED METRIC THE BAR IS COLOURED BY THE BAND, and this is the
+             load-bearing part rather than decoration. Bar LENGTH encodes
+             magnitude, and under a band magnitude is not goodness — a 67-minute
+             bar is the longest and the WORST. Length says how much; colour says
+             whether it is in the sweet spot. Without it the longest bar reads as
+             the best rep, which is the exact defect the band was built to fix. */
+          var cls = x.side ? ' dash-barh-fill--' + (x.side === 'in' ? 'good' : 'out') : '';
+          var side = x.side && x.side !== 'in'
+            ? '<em class="dash-side">' + x.side + '</em>' : '';
           return '<div class="dash-barh-row">'
             + '<span class="dash-barh-name">' + escapeHtml(String(x.name)) + '</span>'
-            + '<span class="dash-barh-track"><span class="dash-barh-fill" style="width:' + pct + '%"></span></span>'
-            + '<b class="dash-barh-val">' + escapeHtml(String(x.v)) + unit + '</b>'
+            + '<span class="dash-barh-track"><span class="dash-barh-fill' + cls + '" style="width:' + pct + '%"></span></span>'
+            + '<b class="dash-barh-val">' + escapeHtml(String(x.v)) + unit + side + '</b>'
             + '</div>';
         }).join('')
       + '</div>' + dashRepNote(shown, r);
@@ -12626,6 +12701,10 @@
                    w: view === 'gauge' ? 1 : 2, h: view === 'number' ? 1 : 2,
                    target: (typeof m.target === 'number') ? m.target : null,
                    targetDirection: m.targetDirection || 'higher_is_better',
+                   /* ⚠ THE BAND TRAVELS WITH THE CARD, or the ranked list falls
+                      back to a DIRECTION for a metric that has none — which is
+                      how the longest bar comes to read as the best rep. */
+                   band: m.band || null,
                    categories: m.categories || null });
     e.dirty = true;
     dashClosePicker();
@@ -13211,7 +13290,19 @@
     /* ⚠ THE ENTRY IS THE LIST'S OWN OBJECT WITH ONE FIELD OVERRIDDEN, never a
        fresh literal. A literal repeats the view id — a second copy of a name
        the one list already owns — and it is what made the page COUNT read 7. */
-    var entry = { view: base.view, label: (b && b.pinned && b.name) ? b.name : base.label };
+    /* ⚠⚠ THE LABEL NAMES THE BOARD THE ENTRY ACTUALLY OPENS — it used to require
+       `b.pinned`, so a manager who saved and named a board saw "Customize" and
+       reasonably concluded the save had not worked. IT HAD: the row was in the
+       database, named, with its cards. The server returns `boards[0]` ordered
+       pinned-first then most-recent, and `d.board` IS that board, so naming it
+       is naming the destination rather than guessing.
+       ⚠ THE POSITION STILL FOLLOWS THE PIN, which is what was specified — only
+       the LABEL stopped requiring it. Still ONE entry: two pointing at the same
+       view would make the "you are here" mark ambiguous, which is why the one
+       entry was ruled in the first place.
+       ⚠ With no boards at all `b` is null and it reads "Customize" — absent,
+       never a guess at a name. */
+    var entry = { view: base.view, label: (b && b.name) ? b.name : base.label };
     return (b && b.pinned) ? [entry].concat(rest) : rest.concat([entry]);
   }
   /* ⚠ The expanded recommendations page is a CHILD of Coaching, not a sixth

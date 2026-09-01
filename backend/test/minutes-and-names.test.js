@@ -50,22 +50,35 @@ test('⚠⚠⚠ both minute metrics get a NUMBER; only the RULED one gets a rank
      and nobody has ruled whether a faster time to price is better — with no
      direction it would sort SLOWEST FIRST and the longest bar would read as the
      best rep. A wrong direction has no wrong number, so nothing would look off. */
+  /* ⚠⚠ CONVERTED 2026-09-01 — `time_to_price` IS RANKED NOW, and the reason is
+     exactly the one this test recorded. It was refused because it had NEITHER a
+     direction NOR a band, so a ranked list would have sorted slowest-first with
+     the longest bar reading as the best rep. IT NOW HAS A BAND: Justin ruled the
+     late edge ("if you're price dropping after 45 min you're moving slow") and
+     the early edge came from the coverage table. THE SUBJECT SURVIVES: a ranked
+     view is offered only where the ORDER IS WELL DEFINED — by a direction or by
+     a band — and never by default. */
   assert.deepStrictEqual(C._viewsFor(C.byKey('avg_call_time')),
     ['number', 'gauge', 'trend', 'by_rep', 'bar_rep']);
-  assert.deepStrictEqual(C._viewsFor(C.byKey('time_to_price')), ['number', 'trend']);
+  assert.deepStrictEqual(C._viewsFor(C.byKey('time_to_price')),
+    ['number', 'trend', 'by_rep', 'bar_rep']);
 
-  // the direction that makes the ranking safe is DECLARED, not assumed
-  assert.strictEqual(C.byKey('avg_call_time').targetDirection, 'lower_is_better',
-    'the ranked views are only safe because Justin ruled 60 is a ceiling');
-  assert.ok(!C.byKey('time_to_price').targetDirection,
-    'if this ever gains a direction, the ranked views become offerable — by ruling, not by default');
+  const BAND = require('../lib/metric-band.js');
+  ['avg_call_time', 'time_to_price'].forEach((k) => {
+    const m = C.byKey(k);
+    assert.ok(BAND.bandFor(k), k + ' is ranked, so its order must be defined by a band');
+    assert.ok(!m.targetDirection || !BAND.bandFor(k) === false,
+      k + ' must not be judged by a direction AND a band');
+  });
 
-  // and the page half of the same refusal
+  // and the page half: both rankable, and every row states its side
   const rank = CODE.slice(CODE.indexOf('function dashRepRanking'), CODE.indexOf('function dashRepNote'));
-  assert.ok(rank.length > 300 && rank.length < 4000, 'slice: ' + rank.length);
-  assert.ok(/avg_call_time: function \(r\)/.test(rank), 'the ranking must be able to read call time');
-  assert.ok(!/time_to_price: function \(r\)/.test(rank),
-    'time to price must NOT be rankable until its direction is ruled');
+  assert.ok(rank.length > 300 && rank.length < 5000, 'slice: ' + rank.length);
+  assert.ok(/avg_call_time: function \(r\)/.test(rank) && /time_to_price: function \(r\)/.test(rank),
+    'both minute metrics must be rankable now that both have a band');
+  assert.ok(/x\.side = /.test(rank) && /b\.dist - a\.dist/.test(rank),
+    'a banded metric ranks by DISTANCE and every row carries its SIDE — distance '
+    + 'alone puts a rep who rushes next to one who rambles with nothing saying which');
 });
 
 test('⚠⚠ ONE unit table, every card builder — no builder inlines its own', () => {

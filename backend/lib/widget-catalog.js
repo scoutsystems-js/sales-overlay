@@ -235,6 +235,11 @@ const CATALOG = [
  * A renderer gaining a metric and this list not following is a test failure,
  * never a silently broken card.
  */
+/* ⚠⚠ THE BAND IS IMPORTED, NOT DECLARED HERE. `lib/team-averages.js` and this
+   file each declared call time's DIRECTION separately; they agreed, which is
+   exactly how a shared-carrier failure hides. One definition, both consumers. */
+var METRIC_BAND = require('./metric-band.js');
+
 const RENDERABLE = {
   /* ⚠⚠ BOTH MINUTE METRICS REACH THE NUMBER CARD, AND ONLY ONE REACHES THE
      RANKED VIEWS. A number states a value and implies NO ORDERING, so it is
@@ -259,14 +264,22 @@ const RENDERABLE = {
      no direction it would default to higher-is-better and rank the SLOWEST rep
      first — a wrong direction has no wrong number, so nothing on screen would
      look off. Left refused until it is ruled. */
+  /* ⚠⚠ `time_to_price` JOINS THE RANKED VIEWS — a BAND gives it the order a
+     direction could not. It was refused while it had neither: with no direction
+     it would have sorted SLOWEST FIRST and the longest bar would have read as
+     the best rep. Justin ruled the late edge ("if you're price dropping after 45
+     min you're moving slow") and the early edge came from the coverage table, so
+     ranking by distance from the band is now well defined — and each row states
+     WHICH SIDE, because a rep pricing at 15 minutes and one pricing at 60 are
+     both outside and need opposite coaching. */
   by_rep:    ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
-              'avg_call_time'],
+              'avg_call_time', 'time_to_price'],
   breakdown: ['objection_handle_rate'],
   /* ⚠ THE BARS DRAW THE SAME DATA THE LIST VIEWS ALREADY READ, so their
      renderable sets are identical by construction rather than by coincidence —
      a test asserts that, so a metric cannot gain one and not the other. */
   bar_rep:   ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
-              'avg_call_time'],
+              'avg_call_time', 'time_to_price'],
   bar_cat:   ['objection_handle_rate'],
 };
 
@@ -317,11 +330,18 @@ function byKey(k) { return catalog().filter(function (m) { return m.key === k; }
    manager placing a card needs the numerator, the denominator and the unit.
    It is customer-facing prose and belongs on the wire; the `measured` and
    `note` fields stay OFF it, because those are our engineering record. */
-var PUBLIC_FIELDS = ['key', 'label', 'description', 'views', 'target', 'targetDirection', 'history', 'categories'];
+/* ⚠ `band` REACHES THE BROWSER because the ranked list and the card both need
+   its edges to say which side a rep is on. A band with no edges on the wire
+   would leave the client guessing, which is the direction model again. */
+var PUBLIC_FIELDS = ['key', 'label', 'description', 'views', 'target', 'targetDirection', 'band', 'history', 'categories'];
 
 function publicMetric(m) {
   var out = {};
   PUBLIC_FIELDS.forEach(function (f) { if (m[f] !== undefined) out[f] = m[f]; });
+  /* ⚠ READ FROM THE ONE BAND MODULE rather than duplicated onto each metric —
+     a second copy on the catalog entry is the drift this file exists to stop. */
+  var b = METRIC_BAND.bandFor(m.key);
+  if (b) out.band = b;
   return out;
 }
 
