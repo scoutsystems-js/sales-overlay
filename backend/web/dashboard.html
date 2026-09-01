@@ -89,6 +89,11 @@
       --fs-secondary: 13px;  /* supporting copy */
       --fs-label:     12px;  /* field and row labels */
       --fs-eyebrow:   11px;  /* uppercase section markers */
+      /* ⚠ AN EXCEPTION TO THE SCALE ABOVE, NOT A MEMBER OF IT (ruling 2026-09-01).
+         The gauge number ONLY — see .avg-value for the reasoning. The scale is
+         seven sizes with nothing between them; this is a named carve-out so the
+         exception is visible and confined, never an eighth step. */
+      --fs-gauge-value: 34px;
     
       /* ⚠⚠ THREE WEIGHTS, NOT SEVEN. The 115 semibolds were the single
          cheapest-looking thing in the app — heavy text at 11-12px is close to the
@@ -989,7 +994,6 @@
     .srk-coach { margin-top:10px; padding:10px 12px; border-left:2px solid var(--accent); background:rgba(var(--accent-rgb),0.06); border-radius:0 6px 6px 0; line-height:1.55; }
     .sec-note { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin-bottom: 7px; }
     .acct-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
-    .members-price { width: 92px; padding: 5px 7px; font-size: 13px; background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; }
     .members-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); padding: 8px 10px; border-bottom: 1px solid var(--border); }
     .members-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .members-table tr.inactive td { opacity: 0.6; }
@@ -2972,7 +2976,10 @@
     .avg-card-link:hover { background: var(--bg-field); }
     .avg-name { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-bottom: 4px; }
     .avg-dial { position: relative; }
-    .avg-svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
+    /* ⚠ BACK TO 290 (Justin, 2026-09-01: the dials are too big). It went 290 -> 320
+       to buy room for "41.7min" at the display step; the number now carries a
+       smaller named step instead, so the extra width is no longer needed. */
+    .avg-svg { width: 100%; max-width: 290px; height: auto; display: block; margin: 0 auto; }
 
     /* ⚠ LEVELS RAISED 2026-08-18 — Justin: "not quite as sharp and bright as
        Scout green." MEASURED BEFORE CHANGING ANYTHING, and the measurement moved
@@ -3013,6 +3020,10 @@
        team is doing, and colouring it would blend the two. */
     .avg-notch { stroke: #ffffff; stroke-width: 2.5; stroke-linecap: round; }
     .avg-scale-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: 0.55; }
+    /* ⚠ The target reads at full strength while the scale ENDS stay dimmed. Same
+       size, same weight, same family — it is the one number on the ring a reader
+       is meant to compare against, and the ends are furniture. */
+    .avg-notch-label { opacity: 1; }
 
     .avg-readout { position: absolute; left: 0; right: 0; bottom: 6px; pointer-events: none; }
     /* ⚠⚠ THE DISPLAY STEP (ruled 2026-09-01: the gauges should dominate).
@@ -3025,7 +3036,13 @@
        suffix, not just digits) is the tightest case. If it reads cramped, the
        fix is a LARGER DIAL in block 2 — where layout changes belong — never an
        eighth type size. */
-    .avg-value { font-size: var(--fs-display); font-weight: var(--fw-display); line-height: 1; letter-spacing: -0.01em; }
+    /* ⚠⚠ A NAMED EXCEPTION, GRANTED BY RULING — NOT AN EIGHTH SCALE SIZE.
+       Justin, 2026-09-01, having looked at it: the dials go back to 290 and the
+       number comes down so it cannot crowd the ring. 34px sat best of 48/34/28/20
+       compared side by side, so the value is measured rather than picked.
+       ⚠ --fs-display still governs every other display number on the site. Do not
+       promote this token, and do not reuse it outside the gauges. */
+    .avg-value { font-size: var(--fs-gauge-value); font-weight: var(--fw-display); line-height: 1; letter-spacing: -0.01em; }
     .avg-value-good { color: var(--good); }
     .avg-value-mid  { color: var(--mid); }
     .avg-value-bad  { color: var(--bad); }
@@ -10783,12 +10800,38 @@
     // The target notch, crossing the ring. White on purpose: it marks where the
     // BAR is, which is a different statement from how the team is doing.
     var ta = avgAngle(target, scale);
-    var t0 = avgPoint(cx, cy, rOuter - 10, ta), t1 = avgPoint(cx, cy, rOuter + 9, ta);
+    /* ⚠ THE NOTCH STILL CROSSES THE WHOLE RING BAND. `.avg-seg` is stroke-width
+       12 and is drawn AT rOuter, so the band spans rOuter ± 6 — a tip at +3 would
+       have stopped INSIDE it and read as a mark that fails to cross. +7 clears
+       the band's outer edge by 1 and leaves the label its room. */
+    var t0 = avgPoint(cx, cy, rOuter - 10, ta), t1 = avgPoint(cx, cy, rOuter + 7, ta);
     var notch = '<line class="avg-notch" x1="' + t0.x.toFixed(1) + '" y1="' + t0.y.toFixed(1)
       + '" x2="' + t1.x.toFixed(1) + '" y2="' + t1.y.toFixed(1) + '"/>';
 
+    /* ⚠ THE NOTCH IS LABELLED WITH ITS OWN NUMBER (Justin, 2026-09-01). A white
+       mark on a ring says "a bar exists here" and not WHAT the bar is, so the
+       reader had to find it in the caption underneath and map it back.
+       ⚠ IT IS DRAWN FROM `ta` — THE SAME ANGLE THE NOTCH USES — so the label and
+       the mark cannot drift apart. Deriving it from `target` a second time would
+       be two computations of one thing.
+       ⚠ SAME STYLE AND SAME RADIUS AS THE "0" and the scale maximum: it is the
+       same kind of statement about the dial's own scale, and giving it its own
+       treatment would make it read as a different sort of thing.
+       ⚠ IT SITS OUTSIDE THE RING, clear of the notch (which stops at rOuter + 9).
+       Collision with the end labels is not possible at the live targets — they
+       sit at 0.50, 0.35 and 0.67 of scale, and the ends are at 0 and 1. */
+    /* ⚠ TWO UNITS FURTHER OUT THAN THE SCALE ENDS (rOuter + 13), and only because
+       this one has the notch beneath it. Same class, same size, same weight — the
+       instruction was "the same style as the 0", and style is what it shares.
+       ⚠ Not further: at rOuter + 19 the label CLIPS the viewBox at the top of the
+       arc (measured y=8 on a 9px font), and growing the viewBox would change the
+       dial's aspect with the HTML readout sitting over it. */
+    var tl = avgPoint(cx, cy, rOuter + 15, ta);
+    var tLabel = '<text class="avg-scale-label avg-notch-label" x="' + tl.x.toFixed(1)
+      + '" y="' + (tl.y + 3).toFixed(1) + '">' + target + '</text>';
+
     return '<svg class="avg-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-hidden="true">'
-      + segs + echo + spokes + ends + notch + '</svg>';
+      + segs + echo + spokes + ends + notch + tLabel + '</svg>';
   }
 
   function avgCardHtml(m) {
@@ -11708,25 +11751,31 @@
         + '<td><div class="members-name">' + escapeHtml(name) + '</div><div class="members-email">' + escapeHtml(m.email || '') + '</div></td>'
         + '<td>' + escapeHtml(m.role || 'user') + '</td>'
         + '<td>' + (active ? '<span class="member-badge on">● active</span>' : '<span class="member-badge off">○ inactive</span>') + '</td>'
-        + '<td>' + escapeHtml(m.billing_plan || '—') + '</td>'
-        + '<td>' + priceCellHtml(m) + '</td>'
         + '<td>' + moveSel + '</td>'
         + '<td class="members-actions">' + acts + '</td>'
         + '</tr>';
     }).join('');
     return head + '<div style="overflow-x:auto;"><table class="members-table"><thead><tr>'
-      + '<th>Rep</th><th>Role</th><th>Status</th><th>Plan</th><th>Offer price</th><th>Manager</th><th></th></tr></thead><tbody>'
+      + '<th>Rep</th><th>Role</th><th>Status</th><th>Manager</th><th></th></tr></thead><tbody>'
       + rows + '</tbody></table></div>'
-      /* ⚠⚠ THIS CAPTION LOST ONE CLAUSE AND KEEPS TWO, AND THE SPLIT IS THE POINT.
-         GONE: "Plan is per-user until the billing block adds an account entity" —
-         our own ROADMAP on a customer's screen, and nothing they can act on.
-         KEPT: the seat rule, and the consequence of a blank price. A rep with no
-         price is UNMEASURED on the time-to-price graph, and unmeasured and flat
-         look identical there — so the blank field has a cost, and the manager is
-         the only person who can fix it. Reworded out of mechanism voice ("the
-         figure Scout listens for"); the FACT is what the guard protects. */
-      + '<div class="meta" style="margin-top:10px;">Seat = an active user. Deactivating frees a seat; adding or reactivating adds one. '
-      + 'A rep with no offer price gets no time-to-price measurement at all.</div>';
+      /* ⚠⚠ THE CAPTION WENT WITH THE COLUMNS IT EXPLAINED (2026-09-01 ruling).
+         It read: "Seat = an active user. Deactivating frees a seat; adding or
+         reactivating adds one. A rep with no offer price gets no time-to-price
+         measurement at all." Plan and Offer price are ADMIN information and have
+         left this page, and a consequence caption for a column that no longer
+         exists is worse than none.
+         ⚠ THE SEAT SENTENCE WENT TOO, DELIBERATELY — a seat is a BILLING concept,
+         so the same ruling that removes Plan removes the sentence explaining
+         seats. Status, Deactivate and Reactivate stay and are self-describing.
+         ⚠ VERIFIED BEFORE REMOVING, because the block asked: THE STORED PRICE
+         DRIVES NOTHING. analysis-worker calls findPriceMomentByFraming(turns) —
+         no stored price — so Time to Price finds the figure in the transcript.
+         price_pif is now only stored, validated and returned.
+         ⚠ WHERE IT IS SET AFTERWARDS: Account -> Offer -> "Your price" for an
+         UNMANAGED user, and /admin for an owner. A MANAGED rep now has no route
+         at all (priceFieldHtml returns '' when is_managed). That costs nothing
+         while the field drives nothing — stated here so it is found rather than
+         rediscovered if it ever drives something again. */
 
   }
   /**
@@ -11741,41 +11790,9 @@
    * price is not a cosmetic gap: it is the reason that rep is UNMEASURED, and
    * unmeasured and flat look identical on a graph.
    */
-  function priceCellHtml(m) {
-    var v = (m.price_pif != null) ? String(m.price_pif) : '';
-    return '<input class="members-price" type="number" min="1" step="1" value="' + escapeHtml(v) + '"'
-      + ' placeholder="not set" aria-label="Offer price for ' + escapeHtml(personName(m, m.email, m.user_id)) + '"'
-      + ' onchange="setMemberPrice(\'' + m.user_id + '\', this.value, this)">';
-  }
+  // priceCellHtml removed 2026-09-01 with the Offer price column.
 
-  async function setMemberPrice(userId, raw, el) {
-    var val = String(raw == null ? '' : raw).trim();
-    /* '' CLEARS the price — a manager removing one is a real action, and it
-       must not be confused with "not supplied". The server treats both '' and
-       null as a clear, so the two paths cannot disagree. */
-    if (val !== '' && (!isFinite(Number(val)) || Number(val) <= 0)) {
-      alert('Enter a whole number of dollars, or clear it.');
-      if (el) {
-        var cur = (state.users || []).filter(function (x) { return x.user_id === userId; })[0];
-        el.value = (cur && cur.price_pif != null) ? String(cur.price_pif) : '';
-      }
-      return;
-    }
-    /* No success message, deliberately: this fires on every edit and the page
-       reports with alert(). A modal on each keystroke-commit would be worse
-       than silence, and memberAction still alerts on failure. */
-    var r = await memberAction('/admin/users/' + encodeURIComponent(userId) + '/price',
-      { method: 'PATCH', body: JSON.stringify({ price_pif: val === '' ? null : Number(val) }) });
-    if (r && r.ok) {
-      /* Keep local state in step so a re-render does not show the old value —
-         the members table re-renders from state.users, not from the input. */
-      var u = (state.users || []).filter(function (x) { return x.user_id === userId; })[0];
-      if (u) u.price_pif = val === '' ? null : Number(val);
-    } else if (el) {
-      var back = (state.users || []).filter(function (x) { return x.user_id === userId; })[0];
-      el.value = (back && back.price_pif != null) ? String(back.price_pif) : '';
-    }
-  }
+  // setMemberPrice removed 2026-09-01 with the Offer price column.
 
   // Re-fetch users (+ team roster when membership changed) and re-render.
   async function refreshMembers(rosterChanged) {
@@ -12303,11 +12320,20 @@
      structurally a day behind. */
   function digestDayNavHtml(recentDates, current) {
     var days = Array.isArray(recentDates) ? recentDates.slice() : [];   // newest first
-    var idx = days.indexOf(current);
-    // An unknown current date (never in the list) degrades to "newest": you can
-    // still see where you are and step back, rather than getting a dead control.
-    var prevDay = (idx === -1) ? days[0] : days[idx + 1];
-    var nextDay = (idx === -1) ? null    : days[idx - 1];
+    /* ⚠⚠ STEP BY DATE, NOT BY INDEX — 2026-09-01. The current day is very often
+       NOT in this list: it holds only days that HAVE a digest, and the landing
+       day (ET-yesterday) has none until the morning pass writes it. The old code
+       fell back to days[0] for that case — the NEWEST day — so on a date OLDER
+       than the whole list, "Prev Day" walked you FORWARD. Comparing dates is
+       right whether or not the current day is in the list, with no special case.
+       ⚠ THIS DOES NOT CHANGE WHAT A READER SEES WHEN A DAY IS SIMPLY MISSING.
+       Landing on 31 Aug with digests only to 29 Aug still steps to 29 Aug,
+       because 30 Aug has none to show. The walk is bounded to real days on
+       purpose; missing days are a GENERATION problem. Do not "fix" the skip. */
+    var older = days.filter(function (d) { return d < current; });   // ISO sorts
+    var newer = days.filter(function (d) { return d > current; });
+    var prevDay = older.length ? older[0] : null;                    // newest older
+    var nextDay = newer.length ? newer[newer.length - 1] : null;     // oldest newer
     function btn(day, label, arrow) {
       var on = !!day;
       return '<button type="button" class="digest-day-btn"'
@@ -13513,9 +13539,15 @@
       detail: 'From ' + closed + ' closed ' + (closed === 1 ? 'call' : 'calls') + ' of ' + analysed + ' analysed today.',
       needsAttention: false };
     if (analysed === 0) return { state: 'no_calls', headline: '\u2014', label: 'No Calls Analysed Today',
-      detail: 'Scout collects from calls as they are analysed. Nothing has come in yet today.', needsAttention: false };
+      /* ⚠ 11th of the caption pass. It read "Scout collects from calls as they
+         are analysed. Nothing has come in yet today." — the first half is how we
+         work, and the label directly above already says no calls were analysed. */
+      detail: 'Nothing yet today.', needsAttention: false };
     if (closed === 0) return { state: 'none_eligible', headline: '0', label: 'Data Points Collected Today',
-      detail: analysed + ' ' + (analysed === 1 ? 'call' : 'calls') + ' analysed, none closed yet \u2014 Scout only collects from calls that close.',
+      /* ⚠ 12th. It ended "— Scout only collects from calls that close", which
+         is our rule, and the panel's own caption already says "From calls you
+         closed" a few lines up. The numbers are the part they can read. */
+      detail: analysed + ' ' + (analysed === 1 ? 'call' : 'calls') + ' analysed, none closed yet.',
       needsAttention: false };
     return { state: 'unexplained_zero', headline: '\u2014', label: 'Nothing Collected Today',
       detail: closed + ' closed ' + (closed === 1 ? 'call' : 'calls') + ' analysed but nothing was collected. This could not be confirmed either way \u2014 worth a check.',

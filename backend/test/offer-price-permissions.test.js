@@ -98,49 +98,51 @@ test('⚠ price_pif is re-picked explicitly by /admin/users, not just selected u
     '/admin/users must re-pick price_pif onto its response object');
 });
 
-test('the members table shows and edits it, and names the consequence of a blank', () => {
-  const html = code('web/dashboard.html');
-  assert.ok(/<th>Offer price<\/th>/.test(html), 'the column header is missing');
-  assert.ok(/priceCellHtml\(m\)/.test(html), 'the cell must be rendered per member');
-  assert.ok(/setMemberPrice\(/.test(html), 'and be editable');
-  /* ⚠ An empty price is not a cosmetic gap — it is the reason that rep is
-     UNMEASURED, and unmeasured and flat look identical on a graph. */
-  /* ⚠⚠ THIS GUARD CAUGHT A REAL OVER-REMOVAL, 2026-09-01. A caption sweep took
-     the whole sentence out because part of it named our roadmap; the CONSEQUENCE
-     of a blank price went with it. Anchor on the consequence alone, so the copy
-     can be rewritten again without the fact going missing a second time. */
-  assert.ok(!/until the billing block/.test(html),
-    'and must not explain our own roadmap while doing it');
+/* ⚠⚠ THE MEMBERS-TABLE TEST WAS CONVERTED, NOT DELETED (2026-09-01 ruling).
+   It used to assert the People page SHOWS and EDITS the offer price and NAMES the
+   consequence of leaving it blank. Justin ruled Offer price and Plan off that
+   page: they are ADMIN information and do not belong on a team surface.
 
-  /* ⚠⚠⚠ ASSERT IT IN THE BUILDER'S OUTPUT, NEVER IN THE FILE — 2026-09-01, AND
-     THIS EXACT DEFECT IS WHY. A caption edit left a stray `;` on the line above,
-     which TERMINATED the return; the two lines that follow became `+ '...'`
-     expression statements — valid JavaScript, unreachable, and never returned.
-     The file-level grep that used to live here PASSED THE WHOLE TIME, because
-     the string was still in the file. Only rendering the builder found it.
-     ⚠ "grep for the string" and "the string reaches the screen" are the same
-     check twice: both confirm it EXISTS, neither confirms it RUNS. */
-  /* ⚠ ANCHOR ON THE BOUNDARY, NOT ON `return`. A first version sliced from
-     fn.lastIndexOf('return ') — which finds the INNER return inside rows.map(),
-     not the builder's final one — so it read a region full of unrelated `;` and
-     failed on correct code. The scope was wider than the claim, again. */
+   ⚠ WHAT THE OLD TEST PROTECTED IS GONE ON PURPOSE, so asserting it would pin a
+   removed feature. What replaces it is the inverse — the columns must STAY gone,
+   so they cannot drift back in — plus the reason, which was verified rather than
+   assumed before anything was deleted:
+
+     THE STORED PRICE DRIVES NOTHING. analysis-worker calls
+     findPriceMomentByFraming(turns); no stored price reaches it. Time to Price
+     finds the figure in the transcript. price_pif is stored, validated, returned.
+
+   ⚠ AND THE ROUTE THAT REMAINS: Account -> Offer -> "Your price" for an UNMANAGED
+   user, /admin for an owner. A MANAGED rep has NO route at all now. That costs
+   nothing while the field drives nothing — recorded so it is found rather than
+   rediscovered if it ever drives something again.
+   ⚠ EVERY TEST ABOVE SURVIVES UNCHANGED: the validator, the role gate, the scope
+   predicate and the self-route's structural inability to name another user are
+   properties of the API, and the API is untouched. */
+test('⚠ the admin-only columns stay OFF the People page', () => {
+  const html = code('web/dashboard.html');
   const at = html.indexOf('function teamMembersBodyHtml');
+  assert.ok(at !== -1, 'stale anchor — the members table is gone');
   const fn = html.slice(at, html.indexOf('\n  }', at));
-  assert.ok(fn.length > 1500 && fn.length < 9000, 'slice must cover the builder: ' + fn.length);
-  const tableEnd = fn.indexOf("</tbody></table></div>");
-  const capAt = fn.indexOf('no time-to-price measurement at all');
-  assert.ok(tableEnd !== -1 && capAt > tableEnd, 'the caption must follow the table in the same builder');
-  /* ⚠ AND CHECK THE TOKEN, NOT THE CHARACTER. A second version searched the whole
-     span for ';' and matched the one inside the caption's own prose ("frees a
-     seat; adding or reactivating adds one") — a semicolon in a STRING is not a
-     statement terminator. The property is narrow: the next thing after the table
-     literal must be a `+` continuation. */
-  const between = fn.slice(tableEnd, capAt)
-    .replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');   // comments are not code
-  const nextToken = between.replace(/^<\/tbody><\/table><\/div>'/, '').trim()[0];
-  assert.strictEqual(nextToken, '+',
-    'the caption must continue the return expression; a `;` here strands it as dead code — '
-    + 'it parses, it stays in the file, and it never renders (got: ' + nextToken + ')');
+  assert.ok(fn.length > 1200 && fn.length < 9000, 'slice must cover the builder: ' + fn.length);
+
+  assert.ok(!/<th>Offer price<\/th>/.test(fn), 'the Offer price column must not come back');
+  assert.ok(!/<th>Plan<\/th>/.test(fn), 'the Plan column must not come back');
+  assert.ok(!/price_pif|billing_plan/.test(fn), 'and neither field belongs in this builder');
+
+  // ⚠ a removal guard needs a positive companion, or it passes over an empty slice
+  assert.ok(/<th>Rep<\/th>/.test(fn) && /<th>Status<\/th>/.test(fn) && /<th>Manager<\/th>/.test(fn),
+    'the columns that stayed must still be here — otherwise this passes over a gutted table');
+});
+
+test('⚠ the price editors that REMAIN are the account page and /admin, not this one', () => {
+  const html = code('web/dashboard.html');
+  // the rep's own account page still owns the field
+  assert.ok(/function priceFieldHtml/.test(html), 'the account-page editor must survive');
+  assert.ok(/acctPricePif/.test(html), 'and its input');
+  // the People-table editor and its helper are gone
+  assert.strictEqual((html.match(/setMemberPrice/g) || []).length, 0, 'the members-table editor is gone');
+  assert.strictEqual((html.match(/priceCellHtml/g) || []).length, 0, 'and its cell builder');
 });
 
 test('it calls a helper that exists — showToast does not', () => {

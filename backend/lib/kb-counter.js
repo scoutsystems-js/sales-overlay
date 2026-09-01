@@ -98,7 +98,12 @@ function buildCounter(input) {
       state: 'no_calls',
       headline: '—',                       // ⚠ NOT "0": nothing was measured
       label: 'No Calls Analysed Today',
-      detail: 'Scout collects from calls as they are analysed. Nothing has come in yet today.',
+      /* ⚠ 11th of the caption pass (2026-09-01). It read "Scout collects from
+         calls as they are analysed. Nothing has come in yet today." — the first
+         half is how we work, and the label above already says none were
+         analysed. ⚠ MIRRORED INLINE IN dashboard.html; kb-counter-mirror.test.js
+         fails if the two ever disagree. Change both or neither. */
+      detail: 'Nothing yet today.',
       needsAttention: false,
     };
   }
@@ -107,8 +112,10 @@ function buildCounter(input) {
       state: 'none_eligible',
       headline: '0',                       // a real zero, and it is explainable
       label: 'Data Points Collected Today',
-      detail: analysed + ' ' + (analysed === 1 ? 'call' : 'calls') + ' analysed, none closed yet — '
-              + 'Scout only collects from calls that close.',
+      /* ⚠ 12th. It ended "— Scout only collects from calls that close", which is
+         our rule; the panel's own caption already says "From calls you closed".
+         The numbers are the part a reader can use. */
+      detail: analysed + ' ' + (analysed === 1 ? 'call' : 'calls') + ' analysed, none closed yet.',
       needsAttention: false,
     };
   }
