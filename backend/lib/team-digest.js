@@ -101,7 +101,10 @@ function digestCacheKey(dateStr) {
    bucket labels lived inside the cached payload.
    ⚠ Bumping this invalidates cached digests so they regenerate under the new
    prompt. That is the intent, not a side effect. */
-var DIGEST_PROMPT_VERSION = 'v2-2026-08-29-compliance-suppression';
+/* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
+   without a bump every stored digest keeps rendering the old wording and the
+   change looks shipped while changing nothing on screen. */
+var DIGEST_PROMPT_VERSION = 'v3-2026-09-01-focus-leads';
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -255,6 +258,18 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     'Respond with ONLY a JSON object:',
     '{',
     '  "summary": "2-3 sentences. The story of the day — factual, specific, film-coach tone. No cheerleading, no generic filler.",',
+    /* ⚠⚠ THREE COPY RULES (Justin, 2026-09-01 — he has said three times the
+       focus sentence blends in, and these are what made it read as generated). */
+    'WRITING THE SUMMARY AND THE FOCUS:',
+    '- Do NOT open by restating the header. The call count and the number of closes are printed directly above your text; repeating "31 calls, 3 closes" wastes the first sentence a manager reads.',
+    '- Do NOT use the phrase "the day\'s real story is structural", or any variant that announces what kind of story it is. State the finding; do not narrate that you are about to.',
+    '- The FOCUS must LEAD WITH THE CLAIM in its own short first sentence — the coaching point itself, e.g. "You\'re closing the pitch, not the deal." Put the evidence in the sentences AFTER it. The first sentence is rendered on its own line and is what a manager reads first.',
+    /* ⚠⚠ "FOLLOW-UP" IS AN OUTCOME, NOT A BOOKED CALL. It means a call that did
+       not close — Scout records no scheduled callbacks at all, so any sentence
+       treating a follow-up as an appointment asserts something that is not in
+       the data. */
+    '- "Follow-up" is an OUTCOME meaning the call did not close. It is NOT a scheduled callback and Scout does not record scheduled calls. Never write "6 of yesterday\'s follow-ups" to mean six upcoming appointments — say "yesterday\'s calls".',
+    '- Name prospects consistently, or give a count instead. Do not mix forms in one sentence ("Nick\'s Michelle Raquino, Dre\'s lost call") — "Dre\'s lost call" is not a name.',
     '  "notable": [ { "call_id": "<id from CALLS>", "timestamp_seconds": <int or null>, "text": "one specific notable moment, pattern, or risk — cite the rep by the name used above" } ],  // 0-3 items, only genuinely notable ones',
     '  "focus": "ONE clear coaching focus for the team today — the single highest-leverage thing, specific enough to act on this morning. If one rep needs it most, say who."',
     '}',

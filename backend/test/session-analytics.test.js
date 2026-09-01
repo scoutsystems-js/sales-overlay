@@ -58,12 +58,18 @@ test('computeCallAnalytics counts only DONE analyses', async () => {
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
 });
 
-test('computeCallAnalytics close_rate = closed/(closed+lost), follow_up excluded', async () => {
+  /* ⚠ CONVERTED 2026-09-01, NOT DELETED. `close_rate` was the DECIDED-ONLY
+     ratio superseded by Justin's 2026-08-03 ruling and rendered nowhere; it has
+     been removed. THE SUBJECT SURVIVES and is what these now assert: a
+     `follow_up` must NOT enter the decided counts — only closed and lost do. */
+test('the decided counts exclude follow_up — closed and lost only', async () => {
   var admin = fakeAdmin({ fathom_calls: CALLS, call_analyses: ANALYSES, call_highlights: [] });
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
   assert.strictEqual(out.close_wins, 2);
   assert.strictEqual(out.close_decided, 3);
-  assert.strictEqual(out.close_rate, 67);
+  assert.strictEqual(out.close_wins, 2, 'two closed');
+  assert.strictEqual(out.close_decided, 3, 'closed + lost, follow_up NOT counted');
+  assert.strictEqual(out.close_rate, undefined, 'the decided-only rate is gone');
 });
 
 test('only DONE analyses are counted; held/processing excluded', async () => {
@@ -76,7 +82,7 @@ test('only DONE analyses are counted; held/processing excluded', async () => {
   assert.strictEqual(out.close_decided, 3);      // c5's closed excluded from decided
 });
 
-test('close_rate is null when nothing is decided (never 0)', async () => {
+test('nothing decided means zero decided — never a fabricated rate', async () => {
   var calls = [{ id: 'd1', call_date: '2026-07-10T00:00:00Z', title: 'X' }, { id: 'd2', call_date: '2026-07-11T00:00:00Z', title: 'Y' }];
   var analyses = [
     { fathom_call_id: 'd1', status: 'done', outcome: 'follow_up', overall_score: 60, cash_collected: '0' },
@@ -84,12 +90,14 @@ test('close_rate is null when nothing is decided (never 0)', async () => {
   ];
   var admin = fakeAdmin({ fathom_calls: calls, call_analyses: analyses, call_highlights: [] });
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
-  assert.strictEqual(out.close_rate, null); // 0 decided calls
+  assert.strictEqual(out.close_decided, 0);
+  assert.strictEqual(out.close_rate, undefined);
   assert.strictEqual(out.close_decided, 0);
 });
 
-test('empty range → close_rate null', async () => {
+test('empty range → zero decided, no rate', async () => {
   var admin = fakeAdmin({ fathom_calls: [], call_analyses: [], call_highlights: [] });
   var out = await sa.computeCallAnalytics(admin, 'U', FROM, TO);
-  assert.strictEqual(out.close_rate, null);
+  assert.strictEqual(out.close_decided, 0);
+  assert.strictEqual(out.close_rate, undefined);
 });

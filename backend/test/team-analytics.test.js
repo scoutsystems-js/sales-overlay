@@ -73,34 +73,44 @@ test('per-rep totals come from done analyses', async () => {
   var out = await ta.computeTeamAnalytics(admin, ['A', 'B'], '2026-07-15T00:00:00Z', '2026-07-25T00:00:00Z', { A: 'ava@x.co', B: 'ben@x.co' });
 });
 
-test('per-rep close_rate = closed/(closed+lost), follow_up excluded', async () => {
+/* ⚠ CONVERTED 2026-09-01, NOT DELETED. `close_rate` was the DECIDED-ONLY ratio
+   superseded by the 2026-08-03 prospects ruling and rendered nowhere; it is
+   removed. THE SUBJECT SURVIVES: a follow_up must never enter the decided
+   counts, and a rep with nothing decided must not produce a fabricated rate. */
+test('per-rep decided counts exclude follow_up — closed and lost only', async () => {
   var admin = fakeAdmin({ fathom_calls: CALLS, call_analyses: ANALYSES, call_highlights: [], user_profiles: [] });
   var out = await ta.computeTeamAnalytics(admin, ['A', 'B'], '2026-07-15T00:00:00Z', '2026-07-25T00:00:00Z', {});
   var a = repOf(out, 'A');
-  assert.strictEqual(a.close_rate, 50);      // 1 closed / (1 closed + 1 lost); follow_up ignored
+  assert.strictEqual(a.close_wins, 1);
+  assert.strictEqual(a.close_decided, 2, '1 closed + 1 lost; the follow_up is NOT counted');
+  assert.strictEqual(a.close_rate, undefined, 'the decided-only rate is gone');
   assert.strictEqual(a.close_wins, 1);
   assert.strictEqual(a.close_decided, 2);
   var b = repOf(out, 'B');
-  assert.strictEqual(b.close_rate, 100);     // 2 / (2 + 0)
+  assert.strictEqual(b.close_wins, 2);
+  assert.strictEqual(b.close_decided, 2);
   assert.strictEqual(b.close_decided, 2);
 });
 
-test('close_rate is null when a rep has no decided calls', async () => {
+test('a rep with nothing decided has zero decided, not a fabricated rate', async () => {
   var calls = [{ id: 'c1', user_id: 'C', call_date: '2026-07-20T00:00:00Z' }];
   var analyses = [{ fathom_call_id: 'c1', analyzed_at: '2026-07-20T01:00:00Z', overall_score: 60, outcome: 'follow_up', cash_collected: 0 }];
   var admin = fakeAdmin({ fathom_calls: calls, call_analyses: analyses, call_highlights: [], user_profiles: [] });
   var out = await ta.computeTeamAnalytics(admin, ['C'], '2026-07-15T00:00:00Z', '2026-07-25T00:00:00Z', {});
   var c = repOf(out, 'C');
-  assert.strictEqual(c.close_rate, null);
+  assert.strictEqual(c.close_decided, 0);
+  assert.strictEqual(c.close_rate, undefined);
   assert.strictEqual(c.close_decided, 0);
 });
 
-test('team totals: close_rate over the whole team', async () => {
+test('team totals accumulate the decided counts across reps', async () => {
   var admin = fakeAdmin({ fathom_calls: CALLS, call_analyses: ANALYSES, call_highlights: [], user_profiles: [] });
   var out = await ta.computeTeamAnalytics(admin, ['A', 'B'], '2026-07-15T00:00:00Z', '2026-07-25T00:00:00Z', {});
   assert.strictEqual(out.totals.close_wins, 3);
   assert.strictEqual(out.totals.close_decided, 4);
-  assert.strictEqual(out.totals.close_rate, 75); // round(3/4*100)
+  assert.strictEqual(out.totals.close_wins, 3);
+  assert.strictEqual(out.totals.close_decided, 4);
+  assert.strictEqual(out.totals.close_rate, undefined);
 });
 
 test('numeric-as-string from PostgREST is coerced', async () => {

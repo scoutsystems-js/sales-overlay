@@ -224,7 +224,13 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
        unrendered, so it cannot quietly reappear on a tile later. */
       close_wins: c.close_won,
       close_decided: c.close_decided,
-      close_rate: c.close_decided > 0 ? Math.round((c.close_won / c.close_decided) * 100) : null,
+      /* ⚠ `close_rate` DELETED 2026-09-01. It was `close_won / close_decided` —
+         the DECIDED-ONLY formula superseded by Justin's 2026-08-03 ruling
+         (closed PROSPECTS / TOTAL prospects, with open prospects counting as
+         not-closed). It was emitted for compatibility and rendered NOWHERE, so
+         it was a number nobody could reach and nobody could defend.
+         ⚠ `close_won`/`close_decided` remain and are now unread too — filed
+         with the other dead computations rather than swept one at a time. */
       // 3d-3: the RENDERED rate — closed PROSPECTS / TOTAL prospects, from the
       // one shared computation in lib/prospect-entity.
       prospect_close_rate:  (prospectRates[id] || {}).pct != null ? prospectRates[id].pct : null,
@@ -280,7 +286,6 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     win_n: t.win_n,
     close_wins: t.close_won,
     close_decided: t.close_decided,
-    close_rate: t.close_decided > 0 ? Math.round((t.close_won / t.close_decided) * 100) : null,
     prospect_close_wins:  teamProspect.closed,
     prospect_close_total: teamProspect.total,
     prospect_close_rate:  teamProspect.pct,
