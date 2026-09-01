@@ -1168,3 +1168,21 @@ The part-2 list was built by **page name, not reachability**. Six views treated,
 Confirmed on the live page: `team-expanded` renders **Team Recommendations** *and* **Call Highlights of the Week**, while Coaching already carries the recommendations. **The clean answer may be that this page becomes Call Highlights only.** Reported, not decided.
 
 **FILED, UNCHANGED** — amber section bars · "1000 chunks" · the green objection category · call review's eleven bars.
+
+## 2026-09-01 — Call Highlights only; call-library (`9eb6b0b`, `32e413a`)
+
+**LIVE**
+- **The expanded page is Call Highlights of the Week ONLY.** Recommendations came off — Coaching renders the same `teamRecsHtml()`, verified before removing. The `recs` lane is no longer kicked here. ⚠ "← Back to Team" moved rather than being deleted with the section that housed it.
+- **call-library** — ground first, then rows become a hairline-separated list. ⚠ The hover is load-bearing: a row opens the call review.
+- **Loud number for call-library: NONE**, same as My Team. A library is for finding, not for learning a number.
+
+**⚠⚠ BLOCKED ON A RULING — call-review, and the premise was WRONG**
+I filed "eleven green bars encoding outcome". **The rendered count is TWO** (3px red on `.review-why`, 1px on the outcome dropdown), and **ZERO** on a call with no `why_outcome`. I had counted 18 CSS *rules* across the whole product, three of which belong to panels removed from the render path on 2026-08-14.
+**The real question is one section — red on a loss, green on a close, amber on a follow-up.** ⚠ **Recommendation: KEEP.** It is the only place in the product where the semantic colour is correct — green appears on a win, unlike `.srk-why`, the objection category and the score badges.
+
+**FILED — NEW**
+- **Score badges render green at every score**: 52/100, 55/100 and 60/100 in the same green fill as 75/100. On call-library and the call review header.
+
+**FILED — UNCHANGED:** amber section bars (on `section`, next) · "1000 chunks" (kb) · the green objection category.
+
+**REMAINING, in reachability order:** ① call-review (blocked) · ② call-library ✅ · ③ section · ④ performance · ⑤ objections-intel, team-needs-work · ⑥ eod, kb, account, prospects, needs-work, team-members.

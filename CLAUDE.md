@@ -5999,3 +5999,33 @@ reached by ONE CLICK from a treated page: call-library, objections-intel, sectio
 ### ⚠ TWO IMPLEMENTATIONS OF ONE FORMAT MAY BE CORRECT — WHAT MUST NOT DRIFT IS THE FORMAT (2026-09-01)
 `hmsOf` (server, takes seconds) and `tsFromClipUrl` (browser, takes a URL) both render `hh:mm:ss`. **They are deliberately NOT merged: different runtime, different input, and a browser file cannot `require()` the lib.**
 - **A MIRROR GUARD PINS THE FORMAT** across `0 / 42 / 2022 / 3600 / 7660 / 36000`, the same pattern as the SQL/JS scope mirror. **"One function" is not always available; "one format, asserted" always is.**
+
+### ⚠⚠⚠ I COUNTED CSS RULES AND REPORTED THEM AS THINGS ON SCREEN — "ELEVEN BARS" WAS TWO (2026-09-01)
+**I filed that call review "carries the eleven green bars that ENCODE OUTCOME", and it became the premise for a ruling Justin was asked to make.**
+```
+what I did      grepped the stylesheet for border-left with a semantic colour  -> 18 RULES
+                (across the WHOLE product, and several on other pages)
+what renders    enumerated computed style on a real `lost` call                -> 2 INSTANCES
+                3px red on .review-why · 1px red on the outcome dropdown
+on a call with no why_outcome                                                  -> 0
+```
+- **⚠⚠ THREE OF THE RULES I COUNTED ARE `.review-trace`, `.review-risk`, `.review-mattered` — THE THREE PANELS REMOVED FROM THE RENDER PATH ON 2026-08-14.** They have not drawn a pixel since. **A stylesheet keeps rules for code that no longer runs, so a rule count is an upper bound on a dead set.**
+- **THE RULE, and it is the same one three blocks running: A STYLESHEET GREP ANSWERS "WHAT RULES EXIST", NOT "WHAT IS ON SCREEN".** Enumerate computed style over the live page. Predicting has been wrong twice; grepping has now been wrong once in the more expensive direction — **it produced a NUMBER, and a number gets quoted.**
+- **⚠ AND THE COST WAS NOT A WASTED CHECK — IT WAS A RULING REQUESTED ON A FALSE PREMISE.** Correcting it before the ruling is made is worth more than the sweep it delayed.
+
+### ⚠⚠ THE ONE PLACE THE SEMANTIC COLOUR IS CORRECT — AND THAT IS THE ARGUMENT FOR KEEPING IT (2026-09-01)
+`.review-why` is a single verdict section: **red on a loss, green on a close, amber on a follow-up.**
+- **Every other green bar this pass removed was either encoding nothing, or encoding the WRONG THING** — `.srk-why` put a NEGATIVE finding in an 18% green fill; the objection category renders green while naming a closer's WEAKEST area; the score badges render 52/100 in the same green as 75/100.
+- **⚠ HERE RED MEANS BAD AND GREEN MEANS GOOD.** The usual test (strip it, what is no longer known?) says the heading already carries it — but what is lost is SPEED, and this is the only place the colour is not lying. **A pattern removal should not be applied where the pattern is correct.**
+
+### ⚠ A PAGE THAT RENDERS NOTHING FROM A LANE MUST NOT PAY FOR IT (2026-09-01)
+Making the expanded page Highlights-only, `loadTeam('recs')` came out with the section. **That lane is a Claude synthesis** — leaving the kick would have paid for a model call whose output the page no longer displays.
+- **⚠ AND THE CONVERSE IS THE REAL TRAP: "← Back to Team" LIVED INSIDE THE SECTION BEING DELETED**, and it was the only way back from that page. **When removing a section, enumerate what it CONTAINED — not what you came to remove.** Second instance of this exact shape (the first cost the reanalyze controls when the Fathom card was removed).
+
+### ⚠ A HOVER STATE CAN BE LOAD-BEARING RATHER THAN DECORATIVE (2026-09-01)
+Un-carding the call library, each row **opens the call review** — and the border was carrying its clickability. Removing the box without replacing that affordance leaves twenty lines of text that happen to be buttons.
+- **THE TEST BEFORE REMOVING A BOX: is anything about this element's BEHAVIOUR being communicated by the box?** For a static panel, no. For a row that navigates, yes — and the replacement is a hover, not nothing.
+
+### ⚠ SOME PAGES HONESTLY HAVE NO LOUD NUMBER — SAY SO (2026-09-01)
+**Call Library: NONE**, the same answer as My Team. **A library is a place you go to FIND something, not to learn a number.** "20 calls shown" is volume; Closed 6 / Not Closed 18 are FILTER CONTROLS, and promoting a control to a headline makes a control look like a finding.
+- **⚠ THE PATTERN IS "ONE LOUD NUMBER PER PAGE, FIXED" — NOT "EVERY PAGE GETS ONE".** Manufacturing one for a list page is the same failure as a rate with no counts: it puts prominence where there is no claim.
