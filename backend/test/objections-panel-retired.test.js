@@ -41,14 +41,29 @@ test('⚠⚠ THE SHARED PIECES SURVIVED — removing them would break a LIVE sur
   /* needsWorkDetailBodyHtml is used by the personal rep page. openBucketEvidence
      is reachable only through it. teamNeedsWorkCardHtml is the team-page card,
      which stays by ruling — it is the only place its context line renders. */
-  ['needsWorkDetailBodyHtml', 'openBucketEvidence', 'teamNeedsWorkCardHtml'].forEach(f => {
+  /* ⚠⚠ CONVERTED 2026-09-01 — THE TEAM CARD IS GONE AND ITS UNIQUE CLAIM WAS
+     STALE. This used to require teamNeedsWorkCardHtml to be called, on the
+     stated grounds that the card was "the only place its context line renders".
+     ⚠ VERIFIED BEFORE REMOVING, because a claim about what something uniquely
+     carries is a claim and not an inventory: the drilldown renders its own
+     exclusion line ("— not counted as coachable objections", and its own comment
+     records having had both since 2026-08-22), and nwContextLineHtml still has a
+     SECOND call site on the personal rep page. Nothing was lost.
+     ⚠ Justin's reason for removing it: there is a whole Objections page in the
+     sidebar and the card linked straight to it — openTeamNeedsWork() is literally
+     openTeamObjections(). A card that duplicates a navigation item. */
+  ['needsWorkDetailBodyHtml', 'openBucketEvidence'].forEach(f => {
     assert.ok((LIVE.match(new RegExp(f, 'g')) || []).length >= 2,
       f + ' must still be defined AND called');
   });
   assert.ok(/needsWorkDetailBodyHtml\(state\.needsWork\)/.test(LIVE),
     'the personal rep-page call site must remain');
-  assert.ok(/teamPanelVisible\('needswork'\) \? .*teamNeedsWorkCardHtml\(\)/.test(LIVE),
-    'the team-page card must still render');
+  /* the context line must survive SOMEWHERE, which is the property the old
+     assertion was really protecting */
+  assert.ok((LIVE.match(/nwContextLineHtml\(/g) || []).length >= 2,
+    'the disqualification/logistical context line must still render on the rep page');
+  assert.ok(/not counted as coachable objections/.test(LIVE),
+    'and the drilldown must state its own exclusion — this is what made the card safe to drop');
 });
 
 test('the drilldown genuinely carries what the retired view had', () => {

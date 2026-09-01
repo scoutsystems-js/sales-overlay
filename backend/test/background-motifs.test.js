@@ -453,16 +453,41 @@ test('⚠⚠ the generator REFUSES to write when any variant fails AA', () => {
  * written for the old one survived invisibly, exactly like the one-sided opacity
  * cap that once held the motif below visibility. This test is the tripwire.
  */
-test('⚠⚠ the mesh is not display:none on ordinary laptop widths', () => {
+/* ⚠⚠ CONVERTED 2026-09-01, AND THE GUARD'S OWN COMMENT PREDICTED IT: "A REDESIGN
+   INCLUDES ITS GUARDS." It has happened again, in the other direction.
+   ⚠ THE PREMISE ABOVE IS NOW FALSE. The mesh is NO LONGER FULL-BLEED — Justin
+   ruled it a right-hand band half a gutter wide, so "it covers the viewport, so
+   there is plenty to see at 1280px" is not true any more: at 1280 the band is
+   ZERO. A threshold that was a leftover for the cropped treatment became a
+   necessity for the banded one.
+   ⚠⚠ SO THE ASSERTION FLIPS FROM "the number must be small" TO "the number must
+   be DERIVED". That is the property that actually survives both treatments: a
+   threshold inherited from a retired design is the defect; one computed from the
+   current geometry is not. If the sidebar or the column changes, this fails —
+   which is correct, because the threshold would genuinely need to move. */
+test('⚠⚠ the hide threshold is DERIVED from the band, not inherited from a retired treatment', () => {
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
   const m = live.match(/@media \(max-width: (\d+)px\) \{ body\[data-view\]::before \{ display: none/);
   assert.ok(m, 'stale anchor — the width media query moved');
   const px = Number(m[1]);
-  assert.ok(px <= 1000,
-    'the layer is hidden below ' + px + 'px. A full-bleed mesh covers the whole '
-    + 'viewport, so there is plenty to see at 1280px — this threshold belongs to '
-    + 'the retired cropped-shape treatment and hides the background on ordinary '
-    + 'laptops.');
+
+  // the geometry the threshold must follow, read from the page itself
+  const sb = live.match(/--sidebar-w:\s*(\d+)px/);
+  assert.ok(sb, 'stale anchor — the sidebar width token');
+  const sidebar = Number(sb[1]);
+  const COLUMN = 1200;          // .page max-width, the band's own denominator
+  const MIN_BAND = 24;          // below this the band renders as a line, measured at 1410 = 2.5px
+
+  assert.strictEqual(px, MIN_BAND * 4 + sidebar + COLUMN - 1,
+    'the threshold must be the width at which the band reaches ' + MIN_BAND + 'px — '
+    + 'got ' + px + ', expected ' + (MIN_BAND * 4 + sidebar + COLUMN - 1)
+    + '. A hand-picked number here is how the last one went stale.');
+
+  /* ⚠ AND IT MUST NOT SILENTLY BECOME A FULL-BLEED THRESHOLD AGAIN. If the mesh
+     ever returns to covering the viewport, the band maths stops applying and
+     this whole guard needs re-deriving rather than the number nudging. */
+  assert.ok(/linear-gradient\(to left/.test(live),
+    'the horizontal band mask must still exist — without it this threshold means nothing');
 });
 
 test('⚠ edges stay DOMINANT over nodes at any weight — that ratio fixed "green stars"', () => {

@@ -21,6 +21,13 @@
      exception is visible and confined, never an eighth step. */
   --fs-gauge-value: 24px;
 
+  /* ⚠ A SECOND NAMED EXCEPTION, NOT AN EIGHTH STEP — the company heading. The
+     scale has nothing between 20 and 48. ⚠ It lands on the SAME 24px as the
+     gauge value and deliberately does NOT share the token: that one is scoped
+     to the dials by ruling. Two exceptions at one value is the argument for a
+     step; a THIRD would be the point to re-open the scale. */
+  --fs-company: 24px;
+
   /* ⚠⚠ THREE WEIGHTS, NOT SEVEN. The 115 semibolds were the single
      cheapest-looking thing in the app — heavy text at 11-12px is close to the
      definition of it — and almost all of them become 400. 500 is for emphasis

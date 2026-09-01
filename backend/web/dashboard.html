@@ -101,6 +101,18 @@
          not lost rather than silently forgotten.) */
       --fs-gauge-value: 24px;
 
+      /* ⚠ A SECOND NAMED EXCEPTION, NOT AN EIGHTH STEP (Justin, 2026-09-01: the
+         company name should be slightly bigger and bold). The scale has nothing
+         between 20 and 48, so "slightly bigger" than the page-title step has no
+         step to take — this is the same carve-out shape as the gauge value.
+         ⚠⚠ AND IT LANDS ON THE SAME 24px, WHICH IS WORTH SAYING OUT LOUD: two
+         independent exceptions at one value is the argument someone will make
+         for adding a step. They are NOT shared deliberately — the gauge token is
+         scoped to the gauges by ruling, and merging them would couple a dial's
+         readability to a page heading. If a third lands on 24, that is the point
+         to re-open the scale rather than declare a fourth. */
+      --fs-company: 24px;
+
       /* ⚠ THE SIDEBAR'S WIDTH IS A LAYOUT CONSTANT READ IN TWO PLACES — the
          page's left margin AND the mesh band's gutter maths. One token, or the
          artwork is sized against a gutter the sidebar has already taken.
@@ -679,6 +691,28 @@
 
        900px is kept as a floor because below it the layout itself changes and a
        dense background behind dense mobile content is a separate question. */
+    /* ⚠⚠ A FLOOR, SO IT DEGRADES CLEANLY RATHER THAN PARTIALLY (Justin's ruling
+       2026-09-01: the mesh is accepted as a WIDE-SCREEN FLOURISH, and "a 3px
+       sliver would look like a defect where zero looks like a choice").
+       ⚠ MEASURED, NOT ASSUMED: at 1410 the band is 2.5px and renders as a stray
+       green VERTICAL LINE down the page edge — looked at, zoomed. It is not
+       artwork at that width, it is an artefact.
+         band = (100vw - 200px sidebar - 1200px column) / 4
+         1920 -> 130px   1512 -> 28px   1440 -> 10px   1400 and below -> 0
+       ⚠⚠ SO THE MESH IS ABSENT AT 1440, WHICH IS FURTHER THAN "zero at 1366 and
+       below". That is deliberate and it is the point of a floor: between 1400
+       and 1496 the band exists but is 0-24px, which is the range that looks
+       broken. Better absent than a line.
+       ⚠ 24px IS PROVISIONAL. It is the width below which a slice cannot show
+       more than a stroke or two of the artwork; the exact threshold wants one
+       look at 1512 vs 1440 and has not had it — the browser became unresponsive
+       before that check. Say so rather than present it as derived.
+       ⚠ THE GROUND IS UNAFFECTED. This hides a flourish, never the floor text
+       sits on — 0 exposed across ten views, unchanged. */
+    @media (max-width: 1495px) { body[data-view]::before { display: none; } }
+    /* ⚠ Kept though the rule above already covers it: it records that the layer
+       was ALWAYS meant to be absent on small screens, independently of the band
+       maths, so a future change to the floor does not accidentally revive it. */
     @media (max-width: 900px) { body[data-view]::before { display: none; } }
     /* A decorative layer must not survive a contrast preference. */
     @media (prefers-contrast: more) { body[data-view]::before { display: none; } }
@@ -946,7 +980,24 @@
     .sidebar .nav-caret { float: right; margin-left: 0; }
     /* ⚠ the Team menu anchors to the wrap, which is now a full-width block —
        open it to the RIGHT of the sidebar rather than under it. */
-    .sidebar .nav-team-menu { left: 100%; top: 0; margin-left: 6px; }
+    /* ⚠⚠ IT DROPS IN PLACE, IT DOES NOT FLY OUT (Justin, 2026-09-01). A flyout
+       is a different interaction from the one this control had in the top nav,
+       and a menu that appears beside the rail reads as a submenu of something
+       else. `position: static` puts it back in the flow, so it PUSHES the items
+       below it exactly as a dropdown should.
+       ⚠ Static also drops the shadow's purpose — it is no longer floating over
+       anything — and the border would draw a box inside a rail that has none.
+       The items are indented instead, which is what says "these belong to Team". */
+    .sidebar .nav-team-menu {
+      position: static;
+      min-width: 0;
+      margin: 2px 0 2px 10px;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+    .sidebar .nav-team-item { padding: 6px 10px; font-size: var(--fs-secondary); }
     /* ⚠ THE "soon" TAG DROPS BENEATH ITS LABEL, and that is what keeps the
        sidebar narrow. Inline, the three coming-soon items need 183-185px — they
        are the WIDEST things in the nav, and they are inert placeholders. On its
@@ -967,7 +1018,13 @@
       }
       .sidebar .nav-link, .sidebar .nav-soon { width: auto; display: inline-block; }
       .sidebar .nav-team-wrap { display: inline-flex; width: auto; }
-      .sidebar .nav-team-menu { left: 0; top: 100%; margin-left: 0; }
+      /* ⚠ below 900 the rail is a horizontal strip again, so the menu goes back
+         to floating — an inline drop would push the strip's own items apart. */
+      .sidebar .nav-team-menu {
+        position: absolute; left: 0; top: 100%; margin: 0; min-width: 190px;
+        background: var(--bg-elevated); border: 1px solid var(--border-strong);
+        padding: 6px; box-shadow: 0 10px 28px rgba(0,0,0,0.55);
+      }
       .page { margin-left: 0; }
     }
 
@@ -3584,6 +3641,26 @@
     body[data-view="team"] .page-header--company ,
     body[data-view="team-performance"] .page-header--company { margin-bottom: 28px; }
 
+    /* ⚠ THE COMPANY NAME, BIGGER AND BOLDER (Justin, 2026-09-01). --fs-company
+       is a NAMED EXCEPTION declared after the scale, not a new step — see the
+       token for why, and for the fact that it shares 24px with the gauge value
+       without sharing the token.
+       ⚠ --fw-emphasis (500) is the heaviest weight the scale carries. "Bold"
+       here means the boldest available, not a new weight token. */
+    .page-header--company h1 {
+      font-size: var(--fs-company);
+      font-weight: var(--fw-emphasis);
+    }
+
+    /* ⚠⚠ THE QUIET ROW. These stopped being display numbers when closes took
+       the lead — that IS the fix for "four numbers side by side and one is
+       bigger". They sit at the supporting step with their labels beneath, and
+       nothing here competes with the number above it. */
+    body[data-view="team"] .digest-quiet-row { margin-top: -12px; }
+    body[data-view="team"] .digest-quiet-row .team-stat-val {
+      font-size: var(--fs-number); font-weight: var(--fw-normal);
+    }
+
     /* ⚠⚠ NO NESTED CONTAINERS. The rep cards were boxes INSIDE a box; they are
        now rows separated by a hairline — a boundary you read rather than a
        frame you see. The last row draws none: a trailing rule is a line with
@@ -3655,13 +3732,44 @@
     body[data-view="team"] .team-stat {
       background: transparent; border: 0; border-radius: 0; padding: 0 24px 0 0;
     }
+    /* ⚠⚠ NO GREEN BAR DOWN THE LEFT (Justin, 2026-09-01: "that's a very common
+       Claude design"). He named a PATTERN, not an instance, so every accent
+       left-border on the pages in this pass goes with it — see the two rules
+       below. The design pass ADDED this one; it is being taken back out.
+       ⚠ Nothing is lost: these are already separated by space, which is what
+       Treatment C uses instead of drawn edges everywhere else on the page. */
     body[data-view="team-members"] .digest-notable ,
     body[data-view="team-objections"] .digest-notable ,
     body[data-view="team-coaching"] .digest-notable ,
-    body[data-view="team"] .digest-notable {
+    body[data-view="team"] .digest-notable ,
+    body[data-view="team-performance"] .digest-notable ,
+    body[data-view="team-expanded"] .digest-notable {
       background: transparent; border-radius: 0;
-      border-left: 2px solid var(--accent);      /* the one accent, sparingly */
+      border-left: 0; padding-left: 0;
     }
+    /* ⚠ THE INSIGHT BARS GO TOO, AND THEY LOSE NOTHING. green = working,
+       amber = improve — but these rows already sit under headings that say
+       "WHAT'S WORKING" and "WHAT TO IMPROVE", so the colour encoded a fact the
+       reader had just been told. A bar that repeats its own heading is
+       decoration, which is exactly the pattern Justin named. */
+    body[data-view="team-members"] .team-insight ,
+    body[data-view="team-objections"] .team-insight ,
+    body[data-view="team-coaching"] .team-insight ,
+    body[data-view="team"] .team-insight ,
+    body[data-view="team-performance"] .team-insight ,
+    body[data-view="team-expanded"] .team-insight {
+      border-left: 0; padding-left: 0;
+    }
+    /* ⚠ The green bar on the objections summary's "what to do" line, same rule. */
+    body[data-view="team-members"] .objsum-do ,
+    body[data-view="team-objections"] .objsum-do ,
+    body[data-view="team-coaching"] .objsum-do ,
+    body[data-view="team"] .objsum-do ,
+    body[data-view="team-performance"] .objsum-do ,
+    body[data-view="team-expanded"] .objsum-do {
+      border-left: 0; padding-left: 0;
+    }
+
     body[data-view="team-members"] .digest-focus ,
     body[data-view="team-objections"] .digest-focus ,
     body[data-view="team-coaching"] .digest-focus ,
@@ -9474,7 +9582,13 @@
        a page that renders a number must ask for it, or it shows nothing for
        ever and looks like an empty state. */
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
-    if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
+    /* ⚠⚠ THE needsWork KICK WENT WITH ITS SECTION (2026-09-01). Objection
+       Handling Focus is off this page — there is a whole Objections page in the
+       sidebar and the teaser linked straight to it, so it was a card that
+       duplicated a navigation item. ⚠ AND IT WAS ONE OF THIS PAGE'S TWO CLAUDE
+       SYNTHESES: removing the section removes the model call, not just the
+       markup. The lane itself stays — 13 other references across the objections
+       drilldown and the coaching tile still use it. */
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     /* ⚠ COACHING LEADS WITH THE TEAM'S AVERAGE SCORE (ruled). Performance shows
        the RANKING; this shows the ONE number — different granularity, not a
@@ -9484,9 +9598,25 @@
       teamHeaderHtml()
       + teamControlsHtml()
       + leadNumberHtml(avg, 'Team average score')
+      /* ⚠⚠ THE FULL RECOMMENDATIONS, INLINE — NOT A ONE-LINE TEASER. Measured
+         before changing anything: the lane this page ALREADY LOADS holds THREE
+         "working" and THREE "improve" insights, each with a ~220-character
+         claim, a verbatim quote and a clip link. The compact card rendered ONE
+         claim and threw the other five away along with every quote and clip.
+         ⚠ NOTHING IS INVENTED AND NO EXTRA MODEL CALL IS MADE: teamRecsHtml is
+         the builder the expanded page already uses, reading the same
+         state.teamRecs this page already fetched. */
       + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>'
-        + teamRecsCompactHtml() + '</div>' : '')
-      + (teamPanelVisible('needswork') ? '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>' : '')
+        + teamRecsHtml() + '</div>' : '')
+      /* ⚠ THE EXPANDED PAGE KEEPS A DOOR. openTeamExpanded() had exactly ONE
+         caller — the compact card's onclick — and that page also holds Call
+         Highlights of the Week. Replacing the card without this link would have
+         made Highlights unreachable, which is the same defect as a merge-review
+         page nobody can navigate to. The label now names what is actually
+         through the door rather than saying "expand". */
+      + '<div class="section fade-in"><a class="date-preset" onclick="openTeamExpanded(); return false;" '
+        + 'href="#" title="Best objection handling, challenger moments and pain excavation this week">'
+        + 'Call Highlights of the Week →</a></div>'
       + allPanelsHiddenNoteHtml();
   }
 
@@ -9596,6 +9726,10 @@
   // ── "What needs work" (B-2) — compact card + hidden detail page ────────────
   // Compact card directly under the glance boxes: the money paragraph (or the
   // rate-gap sentence, or the insufficient message) + click → detail page.
+  /* ⚠ ORPHANED 2026-09-01 — its ONE call site (the Coaching page) removed the
+     section. Kept rather than deleted because the same heading is rendered by
+     three OTHER builders and a future reader searching for it needs to find
+     this one marked dead rather than mistake a live one for it. */
   function teamNeedsWorkCardHtml() {
     var d = state.teamNeedsWork;
     if (!d) return '<div class="skeleton" style="height:70px;"></div>';
@@ -11621,7 +11755,11 @@
     { key: 'graphs',    label: 'Performance graphs',      page: 'team-performance' },
     { key: 'recs',      label: 'Team Recommendations',    page: 'team-coaching' },
     { key: 'reps',      label: 'Rep cards',               page: 'team-performance' },
-    { key: 'needswork', label: 'What needs work',         page: 'team-coaching' },
+    /* ⚠ 'needswork' REMOVED 2026-09-01 with the section it toggled. A panel
+       offered in the chooser that nothing gates in the render is a control that
+       does nothing — the guard caught it the moment the section came off.
+       ⚠ Stored hidden-sets are unaffected: unknown keys are discarded on read,
+       which is exactly why the HIDDEN set is stored rather than the visible one. */
     { key: 'overview',  label: 'Team Overview',           page: 'team-performance' },
     { key: 'closing',   label: 'Closing Score',           page: 'team-performance' },
     { key: 'objection', label: 'Objection Handling Score', page: 'team-performance' }
@@ -12559,13 +12697,26 @@
     }
 
     var s = d.stats || {};
-    var stats = '<div class="team-stat-row">'
+    /* ⚠⚠ OPTION A (Justin picked from three mocks, 2026-09-01). THE PROBLEM WAS
+       FOUR DISPLAY NUMBERS SIDE BY SIDE WITH ONE BIGGER — which reads as an
+       inconsistency rather than a hierarchy. This removes it by making the other
+       three STOP BEING display numbers: closes leads on its own at the display
+       step, the rest step down to a quiet row with their labels beneath.
+       ⚠ SAME TREATMENT AS PERFORMANCE, which he approved — and it is the SAME
+       BUILDER (leadNumberHtml), so the two pages cannot drift apart.
+       ⚠ THE LOUD NUMBER IS `closed`, already ruled: fixed per page, never
+       weakest-against-target. */
+    var stats = leadNumberHtml(s.closed || 0, 'Closes')
+      + '<div class="team-stat-row digest-quiet-row">'
       + '<div class="team-stat"><div class="team-stat-val">' + (s.calls || 0) + '</div><div class="team-stat-label">Calls</div></div>'
       /* ⚠⚠ THE PAGE'S LOUD NUMBER (ruled: FIXED PER PAGE, never weakest-against-
          target). Daily Digest leads with TOTAL CLOSES THAT DAY — and NOT cash,
          which Scout does not track. The class is the only thing distinguishing
          it; without one there is no way to make one tile the lead. */
-      + '<div class="team-stat team-stat--lead"><div class="team-stat-val">' + (s.closed || 0) + '</div><div class="team-stat-label">Closed</div></div>'
+      /* ⚠ `closed` moved OUT of this row and above it — see leadNumberHtml.
+         ⚠ `reps_active` STAYS in the quiet row: Justin named calls, follow-ups
+         and lost, and dropping a number he did not ask to drop would be a
+         bigger change than the one he asked for. Flagged rather than decided. */
       + '<div class="team-stat"><div class="team-stat-val">' + (s.follow_up || 0) + '</div><div class="team-stat-label">Follow-ups</div></div>'
       + '<div class="team-stat"><div class="team-stat-val">' + (s.lost || 0) + '</div><div class="team-stat-label">Lost</div></div>'
       + '<div class="team-stat"><div class="team-stat-val">' + (s.reps_active || 0) + '</div><div class="team-stat-label">Reps active</div></div>'

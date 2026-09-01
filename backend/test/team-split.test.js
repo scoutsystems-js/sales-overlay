@@ -23,8 +23,13 @@ function panels() {
 
 test('every panel is assigned to exactly one page', () => {
   const ps = panels();
-  assert.strictEqual(ps.length, 9, 'all nine panels must carry a page, got ' + ps.length);
-  assert.strictEqual(new Set(ps.map(p => p.key)).size, 9, 'no duplicate keys');
+  /* ⚠ 9 -> 8 on 2026-09-01: 'needswork' went with the Objection Handling Focus
+     section (Justin — there is a whole Objections page in the sidebar and the
+     card linked straight to it). A panel offered in the chooser that nothing
+     gates in the render is a control that does nothing, and this guard's sibling
+     below caught exactly that the moment the section came off. */
+  assert.strictEqual(ps.length, 8, 'every panel must carry a page, got ' + ps.length);
+  assert.strictEqual(new Set(ps.map(p => p.key)).size, 8, 'no duplicate keys');
   ps.forEach(p => assert.ok(/^team(-\w+)?$/.test(p.page), p.key + ' has no valid page'));
 });
 
@@ -34,9 +39,15 @@ test('every panel is assigned to exactly one page', () => {
    everything they chose to hide. */
 test('⚠ the panel KEYS are unchanged — that is the Customize View migration', () => {
   const keys = panels().map(p => p.key).sort();
+  /* ⚠ REMOVING a retired panel is not RENAMING a live one, and only the second
+     would orphan a stored choice. A key whose section no longer exists is
+     discarded on read — which is why the HIDDEN set is stored rather than the
+     visible one. The eight that remain keep their names, which is the property. */
   assert.deepStrictEqual(keys,
-    ['closing', 'digest', 'gauges', 'graphs', 'needswork', 'objection', 'overview', 'recs', 'reps'],
-    'renaming a key would orphan what a manager hid');
+    ['closing', 'digest', 'gauges', 'graphs', 'objection', 'overview', 'recs', 'reps'],
+    'renaming a surviving key would orphan what a manager hid');
+  assert.ok(!keys.includes('needswork'),
+    'the retired panel must not linger in the chooser — it would toggle nothing');
   assert.ok(/scout_team_panels_v1/.test(LIVE), 'the storage key must not be namespaced per page');
 });
 
