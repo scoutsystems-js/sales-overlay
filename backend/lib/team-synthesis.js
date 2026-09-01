@@ -70,7 +70,63 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v2-attributed-2026-09-01';
+const RECS_LANE_VERSION = 'v3-speaker-and-binding-2026-09-01';
+/* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
+   THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
+   back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
+   definitionally the closer, but `quote` is EITHER, so the fallback carries no
+   information at all about who spoke. Measured: 1,548 of 8,998 moments are
+   CLOSER-spoken (17%), so roughly one in six quote-fallback insights could
+   carry the wrong label — and one did, rendering "The prospect, on Josh P's
+   call" over "I'll give you $1,000 off for doing that, for doing cash."
+   ⚠ SCOUT HAD RECORDED THE ANSWER: that row reads speaker='CLOSER',
+   speaker_verified=true. The database knew; the derivation ignored it.
+   ⚠⚠ AN UNVERIFIED SPEAKER RETURNS null, WHICH RENDERS UNLABELLED. That is the
+   fallback's entire purpose — it previously defaulted to 'prospect', i.e. to a
+   CLAIM, which is the opposite of a fallback. `speaker_verified` is three-valued
+   (null = never assessed, false = assessed and not provable), and only `true`
+   may attribute. */
+function spokeOf(row, provenReply, quoteText) {
+  if (provenReply) return 'closer';          // definitionally the closer
+  if (!quoteText) return null;               // nothing to attribute
+  if (!row || row.speaker_verified !== true) return null;   // unverified -> UNLABELLED
+  if (row.speaker === 'CLOSER') return 'closer';
+  if (row.speaker === 'PROSPECT') return 'prospect';
+  return null;
+}
+
+/* ⚠⚠ THE EVIDENCE MUST BELONG TO A REP THE CLAIM IS ABOUT (2026-09-01).
+   The model makes TWO independent choices — the prose, and an evidence_id — and
+   only the prose was ever validated (a model-invented NAME is dropped). The id
+   was looked up blindly. Measured on the live board: 2 of 6 insights cited a rep
+   the prose never named, and all three mismatches were in `improve` — the
+   what-to-improve prose names whoever did badly and the id is unconstrained.
+   Live example: a claim naming Godwin and Nick, evidenced by a GABRIEL quote
+   about money under a claim about next steps.
+   ⚠⚠ MISMATCHED EVIDENCE IS DROPPED, NOT RE-SELECTED, and that is the ruling.
+   Re-selecting would pick some other moment belonging to a named rep — but
+   nothing would make that moment SUPPORT the claim, so it manufactures a
+   binding rather than verifying one. A quote that contradicts the claim above it
+   is worse than no quote; an INVENTED binding is worse than both.
+   ⚠ THE CONSTRAINT ONLY APPLIES WHEN THE PROSE NAMES SOMEONE. A team-level
+   claim that names nobody is legitimately evidenced by any rep's moment. */
+function firstToken(name) {
+  return String(name || '').trim().split(/\s+/)[0].toLowerCase();
+}
+function proseNamesRep(text, rep) {
+  var t = firstToken(rep);
+  if (!t || t.length < 3) return false;   // never match on an initial
+  return new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(String(text || ''));
+}
+/** null when the evidence may stand; a reason string when it must be dropped. */
+function evidenceMismatch(claimText, evRep, allReps) {
+  if (!evRep) return null;
+  var named = (allReps || []).filter(function (r) { return proseNamesRep(claimText, r); });
+  if (!named.length) return null;                       // names nobody -> unconstrained
+  var ok = named.some(function (n) { return firstToken(n) === firstToken(evRep); });
+  return ok ? null : 'evidence rep "' + evRep + '" is not named in the claim';
+}
+
 const CLAIM_CAP = 520;   // the prompt asks for <= 45 words (~290 chars)
 const DATA_CAP  = 520;
 function capAtSentence(x, cap) {
@@ -246,7 +302,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   // contradict the rate rendered next to it.
   objRows.forEach(function (r) { var bk = obj[r.objection_category]; if (bk) { bk.total++; if (isHandled(r, outcomeByCall[r.fathom_call_id])) bk.handled++; } });
 
-  var hlRows = await w.inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, closer_response, closer_response_verified, type');
+  var hlRows = await w.inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type');
   function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
   var candidates = hlRows.map(function (r) {
     var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
@@ -260,7 +316,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
          that defect and the only one that BOTH feeds a model prompt AND renders
          to a manager. An unproven reply is now neither quoted nor attributed. */
       quote: reply || str(r.quote, 200) || '',
-      spoke: reply ? 'closer' : (str(r.quote, 200) ? 'prospect' : null),
+      spoke: spokeOf(r, reply, str(r.quote, 200)),
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
       source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
       call_id: r.fathom_call_id,
@@ -305,9 +361,14 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   catch (e) { return apiFail(e); }
   var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
   if (!parsed || !Array.isArray(parsed.working) || !Array.isArray(parsed.improve)) return { available: false, reason: 'synthesis returned unparseable output' };
+  var allRepNames = [];
+  candidates.forEach(function (c) { if (c.rep && allRepNames.indexOf(c.rep) === -1) allRepNames.push(c.rep); });
   function resolve(arr) {
     return arr.slice(0, 3).map(function (it) {
       var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
+      /* ⚠ BIND THE EVIDENCE TO THE CLAIM, or drop it. See evidenceMismatch. */
+      var mism = ev ? evidenceMismatch(String((it && it.claim) || '') + ' ' + String((it && it.data) || ''), ev.rep, allRepNames) : null;
+      if (mism) { console.warn('[team-synthesis] evidence dropped: ' + mism); ev = null; }
       return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null };
     }).filter(function (it) { return it.claim; });
   }
@@ -376,6 +437,9 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap,
 }
 
 module.exports = {
+  _spokeOf: spokeOf,
+  _evidenceMismatch: evidenceMismatch,
+  _proseNamesRep: proseNamesRep,
   computeTeamRecommendations: computeTeamRecommendations,
   computeWeeklyHighlights: computeWeeklyHighlights,
   // shared with lib/team-digest.js (same cache table + window loader)

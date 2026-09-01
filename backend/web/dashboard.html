@@ -12773,7 +12773,18 @@
   function tsFromClipUrl(u) {
     var m = /[?&]t=(\d+)/.exec(u || ''); if (!m) return '';
     var t = parseInt(m[1], 10); if (!isFinite(t) || t < 0) return '';
-    return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+    /* ⚠⚠ hh:mm:ss — THE FORM THE REST OF THE PRODUCT USES. This returned
+       `mm:ss` with minutes running past sixty, so a moment at 7,660s rendered
+       "127:40". The note left at the time said "for >60 min: 66:40. Acceptable."
+       It was not: `hmsOf` in lib/team-objection-summary.js already did it
+       correctly, in the same session — two implementations of one thing, and
+       the newer one was wrong.
+       ⚠ THE TWO ARE DELIBERATELY NOT ONE FUNCTION: this runs in the BROWSER and
+       takes a URL; hmsOf runs on the SERVER and takes seconds. A browser file
+       cannot require() it. What must not drift is the FORMAT, and a mirror
+       guard pins that — the same pattern as the SQL/JS scope mirror. */
+    var hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = t % 60;
+    return [hh, mm, ss].map(function (n) { return String(n).padStart(2, '0'); }).join(':');
   }
   function teamInsightHtml(it, kind) {
     var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(it.source)) + '</a>' : '';
