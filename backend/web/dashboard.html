@@ -3366,6 +3366,33 @@
     }
     body[data-view="team-performance"] .team-controls-row { margin-bottom: 32px; }
 
+    /* ═══ THE GROUND (ruled 2026-09-01, and it is a STANDING RULING re-applied)
+       ⚠⚠ SAFETY IS LAYOUT, NOT FAINTNESS. This is the same rule the whole mesh
+       arc produced — text is protected by an OPAQUE SURFACE, never by making
+       the artwork behind it dimmer. Dimming is faintness, and faintness is the
+       mechanism behind every legibility defect this project has had. If a
+       future pass is tempted to "simplify" this by turning the raster down,
+       that is the rule being undone, not tidied.
+
+       WHY IT IS NEEDED HERE: block 2 removed the cards, and the cards were the
+       only opaque ground under the text. Exposure went from ZERO to 95 of 105
+       text elements sitting on a FULL-BRIGHTNESS raster — and the raster runs
+       at full brightness precisely because an earlier sweep found almost
+       nothing exposed. Removing the cards inverted that premise.
+
+       ⚠ A SURFACE, NOT A CARD. Block 2 existed to remove 52 drawn boxes; a
+       ground that reintroduced one would undo it. No border, no radius, no
+       nesting — a plane the content sits on.
+       ⚠ AND IT IS THE PAGE'S OWN --bg, not a new elevated colour. It does not
+       add a surface; it restores the floor where content sits, so the mesh
+       reads as something happening BEYOND the page rather than behind the text.
+       ⚠ WIDTH: the content column (1200px) and no wider, so the artwork keeps
+       the gutters — 120px each side at 1440, 360px at 1920. Edge to edge would
+       delete the mesh rather than frame it. */
+    body[data-view="team-performance"] .page {
+      background: var(--bg);
+    }
+
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
        money math. Kept as a note so a stray class name in a future edit does
        not silently render unstyled. */
