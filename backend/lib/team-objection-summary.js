@@ -51,7 +51,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v8-2026-08-30-coach-everyone';
+const PROMPT_VERSION = 'v9-2026-09-01-timestamps';   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -150,6 +150,16 @@ function pctWhole(n, d) { return d > 0 ? Math.round((n / d) * 100) : null; }
  * through the call" would tell the model every objection arrived in the opening
  * seconds — a fabricated mechanism, stated confidently, from absent data.
  */
+/* hh:mm:ss, or null. ⚠ ONE definition — the prompt builder and the client
+   payload both call it, so the time a manager reads is the same time the model
+   was given. */
+function hmsOf(ts) {
+  if (typeof ts !== 'number' || !isFinite(ts) || ts < 0) return null;
+  var t = Math.floor(ts);
+  return [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60]
+    .map(function (n) { return String(n).padStart(2, '0'); }).join(':');
+}
+
 function positionPct(ts, duration) {
   if (typeof ts !== 'number' || typeof duration !== 'number' || duration <= 0) return null;
   if (ts < 0) return null;
@@ -291,12 +301,7 @@ function evidenceLine(m) {
   var where = (pos === null) ? 'position in call unknown' : (pos + '% through the call');
   // ⚠ THE CLOCK TIME, not just the position — the copy must LEAD with a timestamp
   // and the model cannot write one it was never given.
-  var hms = null;
-  if (typeof m.timestamp_seconds === 'number' && isFinite(m.timestamp_seconds) && m.timestamp_seconds >= 0) {
-    var t = Math.floor(m.timestamp_seconds);
-    hms = [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60]
-      .map(function (n) { return String(n).padStart(2, '0'); }).join(':');
-  }
+  var hms = hmsOf(m.timestamp_seconds);   // ⚠ the SAME helper the payload uses
   var parts = ['    - at ' + (hms || 'time unknown') + ' (' + where + ') prospect: "'
     + (m.quote || m.surface || '').slice(0, 220) + '"'];
   var shown = provenCloserResponse(m);   // ⚠ never a sentinel, never unproven, in a prompt
@@ -649,6 +654,13 @@ function publicMoment(m) {
     observation: str(m.observation, 300), clip_url: m.clip_url || null,
     source: m.source || null, call_date: m.call_date || null,
     resolution: m.resolution || null,
+    /* ⚠⚠ THE TIMESTAMP, NOT A PERCENTAGE. "57% through the call" is not a place
+       in a conversation — a closer cannot go there, and the rest of the product
+       says 00:41:08. The hh:mm:ss was ALREADY being built for the model's own
+       prompt a few hundred lines up; the payload simply never carried it.
+       ⚠ position_pct STAYS: the model still reads it, and it is the honest
+       fallback for a call with no usable duration. */
+    ts: hmsOf(m.timestamp_seconds),
     position_pct: positionPct(m.timestamp_seconds, m.duration_seconds),
   };
 }
@@ -668,6 +680,7 @@ module.exports = {
   _PROMPT_VERSION: PROMPT_VERSION,
   _classifyCloser: classifyCloser,
   _positionPct: positionPct,
+  _hmsOf: hmsOf,
   _pickEvidence: pickEvidence,
   _buildPrompt: buildPrompt,
   _MIN_BUCKET: MIN_BUCKET,

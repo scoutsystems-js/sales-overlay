@@ -245,9 +245,16 @@ test('⚠ the average row is not clickable, and shares the grid\'s cell renderer
 /* ── 7 · the labels lose their boxes, keep their words and colour ──────────── */
 
 test('⚠⚠ MOMENT-CARD LABELS HAVE NO FILL, AND THE RULE IS SCOPED TO THAT CARD', () => {
-  const at = LIVE.indexOf('.obj-card-head .badge');
-  assert.ok(at > -1, 'the un-filling rule must exist');
+  /* ⚠ SELECT BY CONTENT, NOT BY POSITION. This used to take the FIRST
+     `.obj-card-head .badge` in the file, and the 2026-09-01 objections pass
+     added a SCOPED rule (`body[data-view="team-objections"] .obj-card-head
+     .badge`) earlier in the stylesheet — so the guard silently started reading
+     a different rule and failed claiming the fill was back when it was not.
+     The rule this test is about is the UNSCOPED one. */
+  const at = LIVE.search(/\n\s*\.obj-card-head \.badge,/);
+  assert.ok(at > -1, 'the un-filling rule must exist (unscoped)');
   const rule = LIVE.slice(at, LIVE.indexOf('}', at) + 1);
+  assert.ok(rule.length > 40 && rule.length < 400, 'rule slice sane: ' + rule.length);
   assert.ok(/background:\s*none/.test(rule), 'the fill must be removed');
 
   /* ⚠ SCOPED, DELIBERATELY. .badge and .scope-pill are used across the app —

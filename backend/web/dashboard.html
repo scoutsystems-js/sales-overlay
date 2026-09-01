@@ -3564,6 +3564,55 @@
     /* ⚠ A QUIET CARD IS STILL A CARD. A closer with no focus area must look like
        a reported result, not like a rendering failure or a missing row. */
     .objsum-quiet { border-style: dashed; }
+
+    /* ⚠⚠ (a) BORDERS BECOME SPACE ON THE OBJECTIONS PAGE (Justin: "it just
+       seems messy"). The ground is ALREADY on this view, so the sequencing rule
+       from part 1 — the ground goes on BEFORE the cards come off — is satisfied
+       and the text never lands on the artwork.
+       ⚠ SCOPED, because .objsum-* and .nw-context are SHARED with the personal
+       coaching surfaces, which are not in this pass. Unscoping would restyle
+       pages nobody has looked at.
+       ⚠ THE CARD BECOMES A RULE + SPACE, not nothing: with four closers stacked,
+       removing the box entirely leaves no boundary at all and the panel reads as
+       one long column. A hairline does the separating a box was doing. */
+    body[data-view="team-objections"] .objsum-card {
+      border: 0; border-radius: 0; background: none;
+      padding: 18px 0 22px; margin-bottom: 0;
+      border-top: 1px solid var(--border);
+    }
+    body[data-view="team-objections"] .objsum-card:first-of-type { border-top: 0; padding-top: 4px; }
+    body[data-view="team-objections"] .objsum-quiet { border-style: solid; }
+    /* the evidence was a box INSIDE a box — the nesting is what read as clutter */
+    body[data-view="team-objections"] .objsum-ev { border-left: 0; padding-left: 0; }
+    body[data-view="team-objections"] .objsum-evs { gap: 14px; margin-top: 14px; }
+    /* the exclusion note is a SENTENCE, not a panel */
+    body[data-view="team-objections"] .nw-context {
+      border: 0; background: none; padding: 0; margin-top: 18px; opacity: 0.75;
+    }
+
+    /* ⚠⚠ (d) FOUR FACTS, FOUR TREATMENTS. "Dre Wisam upfront cost Fear partial"
+       ran as one line because a PREVIOUS change stripped these chips' fills to
+       raise contrast — and the risk flagged at the time was exactly this:
+       "the pills were doing the CHUNKING, and whether weight and letter-spacing
+       are enough is a perception question a ratio cannot answer: LOOK AT IT."
+       Justin looked. They were not enough.
+       ⚠ THE FIX IS NOT TO PUT THE FOUR BOXES BACK — that is what the pass is
+       removing. Each fact gets a different WEIGHT, CASE and COLOUR instead, so
+       they separate without a border between them. */
+    body[data-view="team-objections"] .obj-card-head { gap: 12px; }
+    body[data-view="team-objections"] .obj-card-head .obj-closer-chip {
+      font-weight: var(--fw-emphasis); color: var(--text);          /* WHO */
+    }
+    body[data-view="team-objections"] .obj-card-head .obj-surface {
+      font-style: italic; opacity: 0.9;                              /* WHAT they said */
+    }
+    body[data-view="team-objections"] .obj-card-head .scope-pill {
+      text-transform: uppercase; letter-spacing: .06em;
+      font-size: var(--fs-eyebrow); opacity: 0.7;                    /* WHICH KIND */
+    }
+    /* ⚠ the outcome is the ONLY coloured item in the row — it is the one fact
+       that carries a verdict, and colour is what a manager scans for. */
+    body[data-view="team-objections"] .obj-card-head .badge { font-weight: var(--fw-emphasis); }
     .objsum-quiet-text { line-height: 1.5; }
     .obj-grid-head { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text); opacity: .8; }
     .obj-grid-row, .obj-grid-head { display: flex; align-items: center; gap: 8px; }
@@ -10008,7 +10057,15 @@
        exists. If the why ever reads like a restatement of these numbers, the
        feature has failed and the prose is the thing to fix — not this line. */
     var ev = (c.evidence || []).slice(0, 2).map(function (m) {
-      var where = (typeof m.position_pct === 'number') ? (m.position_pct + '% through the call') : null;
+      /* ⚠⚠ A TIMESTAMP, NOT A PERCENTAGE. "57% through the call" is not a
+         place in a conversation — a closer cannot go there, and every other
+         surface in the product says 00:41:08. The raw-seconds defect in a new
+         costume, and the data was there all along.
+         ⚠ THE PERCENTAGE SURVIVES ONLY AS THE HONEST FALLBACK for a call whose
+         duration is unknown; `ts` is null exactly then. Saying "position in
+         call unknown" would be worse than the rough answer we do have. */
+      var where = m.ts ? m.ts
+        : ((typeof m.position_pct === 'number') ? (m.position_pct + '% through the call') : null);
       var clip = m.clip_url
         ? '<a class="obj-btn" href="' + escapeHtml(m.clip_url) + '" target="_blank" rel="noopener" style="padding:2px 8px;">▶ ' + escapeHtml(clipLabelFor(m.source)) + '</a>'
         : '';
