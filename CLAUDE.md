@@ -6029,3 +6029,37 @@ Un-carding the call library, each row **opens the call review** — and the bord
 ### ⚠ SOME PAGES HONESTLY HAVE NO LOUD NUMBER — SAY SO (2026-09-01)
 **Call Library: NONE**, the same answer as My Team. **A library is a place you go to FIND something, not to learn a number.** "20 calls shown" is volume; Closed 6 / Not Closed 18 are FILTER CONTROLS, and promoting a control to a headline makes a control look like a finding.
 - **⚠ THE PATTERN IS "ONE LOUD NUMBER PER PAGE, FIXED" — NOT "EVERY PAGE GETS ONE".** Manufacturing one for a list page is the same failure as a rate with no counts: it puts prominence where there is no claim.
+
+### ⚠⚠⚠ A `border: 0` SHORTHAND DESTROYED A RULED EXEMPTION IN THE EDIT THAT WAS SPARING IT (2026-09-01)
+**Justin ruled the call-review verdict border stays. The same commit removed it, invisibly.**
+```
+body[data-view="call-review"] .section { border: 0 }   (0,2,1)  <- SHORTHAND kills border-LEFT
+.review-why.loss { border-left: 3px solid var(--bad) } (0,2,0)  <- LOWER, cannot restore it
+rendered result: borderLeftWidth = 0px
+```
+- **⚠⚠ NOTHING FAILED. The card looked correctly un-boxed and the border was simply gone** — and it was found by MEASURING the rendered border, not by reading the CSS I had just written.
+- **THE RULE: A SHORTHAND DOES NOT RESPECT AN INTENT ABOUT ONE SIDE.** `border: 0` is not "remove the box"; it is "remove all four". Where one side is deliberate, re-declare it at a specificity that survives the sweep — and guard the RENDERED value, not the source.
+- **⚠ THE PROMPT WARNED ABOUT SOMEBODY LATER "FINISHING THE SWEEP". IT HAPPENED IMMEDIATELY, IN THE SAME EDIT.** A ruled exception is most fragile in the change that creates it.
+
+### ⚠⚠⚠ THE CLOSING RATES WERE CORRECT AND THE WINDOW WAS THE FAULT (2026-09-01)
+**"2 reps show 0-3% closing rate which is way off." The computation is right at every level, and the two reps are two DIFFERENT things.**
+```
+        7 days        30 days        90 days
+Godwin   0% (0/25)    16% (16/98)    15% (17/115)   <- a good closer reading ZERO
+Josh N   0% (0/11)     0% (0/11)      0% (0/11)     <- genuinely zero, every window
+```
+- **RULED OUT IN ORDER, not stopping at the first that fit:** the rep cards DO call the shared `fetchProspectCloseRates` (they render `closeRateDisplay` → `prospect_close_rate`); no_show DOES leave the denominator (27 prospects → 25 on exactly two no-shows); and Godwin genuinely had **0 closed of 29 calls** that week.
+- **⚠⚠ THE CAUSE IS THAT CLOSING RATE IS A LOW-FREQUENCY METRIC AND THE TEAM PAGE DEFAULTS TO SEVEN DAYS.** A rep closes a handful a month, so a week is frequently zero. **A 7-day close rate is mostly noise.**
+- **⚠⚠ AND THE STANDING "ONE DEFINITION, EVERY SURFACE" RULING IS BREACHED THROUGH THE WINDOW RATHER THAN THE MATHS: the personal dashboard defaults to 30 DAYS, the team pages to 7, and the gauge is FIXED at 7.** For Godwin that is **0% on one screen and 16% on another, both correct, both labelled "closing rate"**. **One computation is not sufficient for one number — the WINDOW is part of the definition.**
+- **THE PROPOSED FIX HAS TWO HALVES: align the default window, AND suppress the rate below a minimum prospect count** — a rep with 25 prospects and no closes in a week is **unmeasured at that window**, not 0%. Same absent-versus-excluded rule this codebase applies everywhere else.
+
+### ⚠⚠ `const { data }` WITHOUT `error` — TWICE IN ONE INVESTIGATION, AND IT NEARLY BECAME THE FINDING (2026-09-01)
+Probing the close rates I selected `is_duplicate`, **which is a DERIVED API FIELD AND NOT A COLUMN**. PostgREST rejects the whole select on an unknown column, so the query returned `[]` — and I had destructured the error away.
+- **⚠⚠ I REPORTED "ZERO CALLS IN THE WINDOW" FOR A REP WITH 141 CALLS, AND ALMOST FILED IT AS THE FAULT.** The only thing that caught it was the shared computation returning 25 prospects for the same rep and window — **a contradiction between two readings of the same data.**
+- **THE RULE, already on file and worth restating because it recurred: an implausible empty result is a statement about the instrument.** Check `error` on every call, and be specific about which fields are COLUMNS versus fields the API derives.
+
+### ⚠ SCORE → COLOUR: A COLOUR THAT CANNOT VARY SHOULD NOT BE A COLOUR (proposed 2026-09-01)
+Three instances of one defect: **score badges** (52/100 in the same green as 75/100), **the amber section bars** (all five identical regardless of score), **the objection category** (green while naming the WEAKEST area).
+- **ONE RULE: a score is coloured only when it crosses a band, using the product's existing `--good` / `--mid` / `--bad`.** 75 green, 52 amber, sub-40 red.
+- **⚠ THE COROLLARY IS WHAT FIXES THE OTHER TWO: if the colour is identical at every value, it encodes nothing and should be neutral.** The WEAKEST/STRONGEST chips already carry the meaning.
+- **⚠ ONE EXCEPTION, ALREADY RULED: `.review-why` is an OUTCOME, not a score**, and its colour is correct.

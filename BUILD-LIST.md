@@ -1186,3 +1186,26 @@ I filed "eleven green bars encoding outcome". **The rendered count is TWO** (3px
 **FILED — UNCHANGED:** amber section bars (on `section`, next) · "1000 chunks" (kb) · the green objection category.
 
 **REMAINING, in reachability order:** ① call-review (blocked) · ② call-library ✅ · ③ section · ④ performance · ⑤ objections-intel, team-needs-work · ⑥ eod, kb, account, prospects, needs-work, team-members.
+
+## 2026-09-01 — call review treated; the closing-rate fault is the WINDOW (`ba2a273`)
+
+**LIVE**
+- **call-review** — ground first, boxes off (header, sections, highlight rows, grade cards, quote fill, follow-up box, and `.review-one-thing`, a green box nested inside a red verdict).
+- **⚠⚠ The verdict border is a RULED EXEMPTION and is now guarded.** It was destroyed by the `border: 0` shorthand in the sweep that was supposed to spare it — same edit, nothing failing, found by measuring the rendered border. Colours re-declared at surviving specificity.
+
+**⚠⚠ INVESTIGATED, NOT FIXED — the rep-card closing rates**
+**The computation is correct.** Rep cards DO call the shared `fetchProspectCloseRates`; no_show DOES leave the denominator (27 → 25 on two no-shows); Godwin genuinely closed 0 of 29 calls that week.
+```
+        7d           30d            90d
+Godwin   0% (0/25)   16% (16/98)    15% (17/115)   window artefact
+Josh N   0% (0/11)    0% (0/11)      0% (0/11)     genuinely zero
+```
+**⚠ THE FAULT IS THE WINDOW: closing rate is low-frequency and the team page defaults to 7 DAYS, while the personal dashboard (where it is the loud number) defaults to 30 and the gauge is fixed at 7.** One computation, three default windows — the one-definition ruling breached through the window rather than the maths.
+**Proposed: (a) align the team default to 30 days, AND (c) suppress below a minimum prospect count** — 25 prospects and no closes in a week is *unmeasured*, not 0%.
+
+**⚠ PROPOSED, NOT BUILT — score → colour, one answer for three instances**
+Score badges · amber section bars · the green objection category. **A score is coloured only when it crosses a band (`--good`/`--mid`/`--bad`); a colour identical at every value encodes nothing and should be neutral.** `.review-why` is exempt — it is an outcome, not a score.
+
+**FILED** — EOD is OUT of scope (cash-collected proposal withdrawn) · `teamRecsCompactHtml` dead code · the legacy `close_rate` still emitted and rendered nowhere. **Fourth and fifth dead computations this pass; worth one sweep.**
+
+**Remaining:** `section` · `performance` · `objections-intel` · `team-needs-work` · `kb` · `account` · `prospects` · `needs-work` · `team-members`.
