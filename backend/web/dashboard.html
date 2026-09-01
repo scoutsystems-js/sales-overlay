@@ -2840,6 +2840,9 @@
                        line-height: 1; letter-spacing: -0.01em; color: var(--text); }
     .lead-number-label { font-size: var(--fs-eyebrow); font-weight: var(--fw-normal);
                          letter-spacing: .1em; text-transform: uppercase; margin-top: 6px; opacity: 0.75; }
+    /* ⚠ THE COUNTS RIDE WITH THE RATE — house rule: a rate always renders with
+       the counts behind it, so a reader can check it rather than trust it. */
+    .lead-number-sub { font-size: var(--fs-secondary); color: var(--text); opacity: 0.7; margin-top: 4px; }
     .team-stat-sub { font-size: 13px; font-weight: 500; color: var(--text); }
     .team-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin-top: 6px; }
     /* Manager daily digest */
@@ -3005,6 +3008,26 @@
     }
     body[data-view="overview"] .nw-chip { margin-right: 18px; opacity: 0.85; }
     body[data-view="overview"] .nw-context { margin-top: 14px; opacity: 0.75; }
+
+    /* ⚠⚠ THREE MORE GREEN ELEMENTS THE FIRST SWEEP MISSED (2026-09-01). Found by
+       enumerating COMPUTED colour over the live page rather than grepping the
+       stylesheet — the same method that found the inline-style bar, and the
+       reason "the sweep is done" was an over-claim the first time.
+       ⚠⚠ AND `.srk-why` WAS THE SHARPEST: it renders a NEGATIVE finding — the
+       ground a rep repeatedly fails to cover — in an 18% GREEN fill, the colour
+       that means GOOD everywhere else in the product. Same collision as the
+       objection category rendering green for a closer's WEAKEST category.
+       ⚠ THE TEST APPLIED: strip the encoding, ask what is no longer known.
+       Nothing — the panel is headed "What Needs Work" and already says
+       "Weakest of 5". The fill was emphasis, and it was emphasis in the wrong
+       colour. It keeps its prominence through weight and space instead. */
+    body[data-view="overview"] .srk-why {
+      background: none; border: 0; border-radius: 0; padding: 0; margin-top: 14px;
+    }
+    body[data-view="overview"] .srk-coach {
+      background: none; border-left: 0; border-radius: 0; padding: 10px 0 0;
+    }
+    body[data-view="overview"] .srk-reply { border-left: 0; padding-left: 0; }
     /* ⚠ OPTION A — the attribution is BOUND to the quote it names, above it.
        The pair sits in one container so they cannot drift apart in a reflow. */
     .team-insight-ev { margin-top: 8px; }
@@ -7513,7 +7536,12 @@
     // already-loaded needs-work classification; "—" until it's available (never
     // falls back to counting all moments).
     var ohr = objectionHandleRate(state.needsWork);
-    var tiles = '<div class="glance-row fade-in">'
+    /* ⚠ ONE LOUD NUMBER PER PAGE, FIXED — never weakest-against-target. On the
+       personal Coaching Dashboard that is CLOSING %: the only one of the four
+       a closer is actually paid on, and a count ratio rather than a judgement. */
+    var cr = closeRateDisplay(a);
+    var tiles = leadNumberHtml(cr.value, 'Closing %', cr.sub)
+      + '<div class="glance-row fade-in">'
       /* ⚠ "19 of 149" with no explanation reads as broken to a trial customer.
          It is not: grading is capped when calls first arrive. Say so, and say
          where to fix it, rather than leaving a number that looks like a fault. */
@@ -7523,6 +7551,18 @@
             : ('of ' + a.calls.total_in_range + ' in range'),
           "drillCalls('analyzed',null)")
       + glanceTileHtml('Avg score', avgBig, avgScoreSubstat(a.avg_score), "drillCalls('analyzed','score')")
+      /* ⚠⚠ CLOSING % IS THE LOUD NUMBER ON THIS PAGE (Justin's ruling,
+         2026-09-01) and it now leads ABOVE these tiles rather than sitting as
+         the fourth of four at equal weight.
+         ⚠⚠ AVG SCORE WAS THE OBVIOUS CANDIDATE AND WAS ARGUED AGAINST FOR A
+         MEASURED REASON, recorded here so it is not re-opened: the grader
+         drifts ~6 POINTS RUN-TO-RUN ON BYTE-IDENTICAL INPUT (and ±14 per
+         section). Making a number that moves on its own the loudest thing on
+         the most-used page in the product would give enormous prominence to
+         movement that is not real — the trend chip beside it is INSIDE that
+         drift. Closing % is a count ratio with no model in it.
+         ⚠ The counts ride with it: the house rule is that a rate always renders
+         with the counts behind it. */
       + glanceTileHtml('Objection handle rate', ohr ? ohr.rate + '%' : '—', ohr ? (ohr.handled + ' of ' + ohr.total + ' handled') : 'true objections', "goObjections()")
       /* REMOVED 2026-08-17 — Justin: cash comes off the cards. This was the ONLY
          live "Cash collected" card; the team glance tile went with the glance
@@ -7530,7 +7570,6 @@
          The DATA is untouched — call_analyses.cash_collected is still extracted
          and still drives the EOD report and the needs-work money argument.
       + glanceTileHtml('Cash collected', fmtCash(a.cash_collected), 'closed-call cash', "drillCalls('analyzed',null)") */
-      + glanceTileHtml('Close rate', closeRateDisplay(a).value, closeRateDisplay(a).sub, "drillCalls('analyzed',null)")
     + '</div>';
 
     // A-2.2 layout: tiles → What-needs-work card → Coach summary (OPEN inline) →
@@ -9684,11 +9723,17 @@
      ⚠ Returns '' when the number is not there yet — a lead number that reads 0
      while its data is still loading is worse than no lead number, because 0 is
      a valid value and "not loaded" is not. */
-  function leadNumberHtml(value, label) {
+  /* ⚠ `sub` IS APPENDED AT THE END OF THE SIGNATURE, deliberately. Removing or
+     inserting a parameter anywhere but the end silently shifts every later
+     argument into the wrong slot — a failure that surfaces as MISSING BEHAVIOUR
+     rather than an error. The three existing callers pass two arguments and are
+     unaffected. */
+  function leadNumberHtml(value, label, sub) {
     if (value === null || value === undefined) return '';
     return '<div class="lead-number">'
       + '<div class="lead-number-val">' + escapeHtml(String(value)) + '</div>'
       + '<div class="lead-number-label">' + escapeHtml(label) + '</div>'
+      + (sub ? '<div class="lead-number-sub">' + escapeHtml(sub) + '</div>' : '')
     + '</div>';
   }
 
