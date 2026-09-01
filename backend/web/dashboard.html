@@ -3028,6 +3028,35 @@
       background: none; border-left: 0; border-radius: 0; padding: 10px 0 0;
     }
     body[data-view="overview"] .srk-reply { border-left: 0; padding-left: 0; }
+
+    /* the inner boxes this page shares with the surfaces already treated */
+    body[data-view="team-expanded"] .team-recs-card,
+    body[data-view="team-expanded"] .pattern-card,
+    body[data-view="team-expanded"] .glance-tile,
+    body[data-view="team-expanded"] .nw-chip,
+    body[data-view="team-expanded"] .nw-context {
+      background: none; border: 0; border-radius: 0; padding: 0;
+    }
+    body[data-view="team-expanded"] .team-recs-card,
+    body[data-view="team-expanded"] .pattern-card { padding: 12px 0 14px; }
+    body[data-view="team-expanded"] .team-recs-card + .team-recs-card,
+    body[data-view="team-expanded"] .pattern-card + .pattern-card { border-top: 1px solid var(--border); }
+    body[data-view="team-expanded"] .nw-context { margin-top: 14px; opacity: 0.75; }
+    body[data-view="team-expanded"] .srk-why { background: none; border: 0; padding: 0; margin-top: 14px; }
+    body[data-view="team-expanded"] .srk-coach { background: none; border-left: 0; padding: 10px 0 0; }
+    body[data-view="team-expanded"] .srk-reply { border-left: 0; padding-left: 0; }
+    body[data-view="team-expanded"] .perf-feature-point { border-left: 0; padding-left: 0; }
+    /* ⚠ the two the first pass missed — found by enumerating computed style over
+       the LIVE page, not by predicting which classes this view uses.
+       ⚠ `.review-why-quote` is ALSO on call review, and `.team-lane` on the team
+       page, so both are scoped rather than un-boxed globally. */
+    body[data-view="team-expanded"] .team-lane,
+    body[data-view="team-expanded"] .review-why-quote {
+      background: none; border: 0; border-radius: 0;
+    }
+    body[data-view="team-expanded"] .review-why-quote { padding: 0; font-style: italic; }
+    body[data-view="team-expanded"] .team-lane { padding: 0 0 18px; }
+    body[data-view="team-expanded"] .team-lane + .team-lane { border-top: 1px solid var(--border); padding-top: 18px; }
     /* ⚠ OPTION A — the attribution is BOUND to the quote it names, above it.
        The pair sits in one container so they cannot drift apart in a reflow. */
     .team-insight-ev { margin-top: 8px; }
@@ -3736,6 +3765,8 @@
 
        ⚠ Space does the grouping. One accent, sparingly. Hairlines only where a
        boundary genuinely has to be read as a boundary. */
+    body[data-view="team-expanded"] .section,
+    body[data-view="team-expanded"] .page-header,
     body[data-view="overview"] .section,
     body[data-view="overview"] .page-header,
     body[data-view="team-members"] .section,
@@ -3956,6 +3987,12 @@
        the product — and it is added HERE, to the GROUND, before anything below
        removes its cards. Part 1 removed cards first and put 95 of 105 text
        elements onto the artwork. Never that order again. */
+    /* ⚠⚠ team-expanded IS "CALL HIGHLIGHTS OF THE WEEK", reached by clicking
+       through from Coaching. It was never in part 1's scope because THE LIST
+       WAS BUILT BY PAGE NAME, NOT BY REACHABILITY — so it kept its boxes while
+       the page linking to it lost them, and clicking through read as a
+       regression. Ground first, as always. */
+    body[data-view="team-expanded"] .page ,
     body[data-view="overview"] .page ,
     body[data-view="team-members"] .page ,
     body[data-view="team-objections"] .page ,
