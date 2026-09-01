@@ -5662,6 +5662,46 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **FOUND BY LOOKING AT THE FIRST RENDER.** Fifth time on this pass that looking has found what a check could not.
 - **THE HABIT: when a design rule is implemented as a PER-VIEW LIST, adding a view means adding it to every list — and the lists must be enumerated, not remembered.** Here there were five (`.page`, `.section`, `.page-header`, `.page-header--company`, `.team-controls-row`).
 
+### ⚠⚠⚠ A PAYLOAD THAT RENDERS NOWHERE IS STILL IN THE CUSTOMER'S BROWSER — AND THAT IS THE WHOLE POINT (2026-09-01)
+**The widget catalog served every metric's `measured` and `note` fields to the picker: *"USE close_score_earned, NEVER close_score"*, *"migration 027"*, *"transcript_stored.turns[]"*, row counts. The picker renders NONE of it.**
+```
+wire shape before   6,482 bytes   engineering notes on every one of 13 metrics
+wire shape after    1,786 bytes   an allowlist of the SEVEN fields the picker reads
+```
+- **⚠⚠ "IT RENDERS NOWHERE" IS THE ARGUMENT FOR FIXING IT, NOT AGAINST.** It is **one `innerHTML` from being on screen**, and the customer-language ruling is about what a customer CAN see — not what they happen to be shown this week. A field nobody renders today is a field somebody renders next month, in a debug panel, an error dump, or a "show details" toggle.
+- **THE FIX IS AN ALLOWLIST, NEVER A DELETION.** The notes stay in the catalog where they belong — they are the measured justification for every `available` flag — and the wire shape picks out what the consumer needs. **Deleting them would have destroyed the evidence; sending them was the defect.**
+- **⚠ AND AN UNAVAILABLE METRIC GETS ITS NAME AND NOTHING MORE.** `measured` reads *"coverage on 683 of 1,585 — SPLIT ACROSS TWO VOCABULARIES"*: a fact about our schema that no manager can act on. **The surface supplies the one sentence they can act on.**
+- **THE HABIT: when serialising an internal structure, ask what ELSE is on the object.** An object built for engineers and handed to a route is the commonest way internal prose reaches a browser, and it never appears in a diff of the page.
+
+### ⚠⚠⚠ THE MENU SYNTHESISED THE ENTRY AND THE VIEW LEFT EVERY LIST — THE DEAD-DISPATCHER DEFECT, REINTRODUCED BY THE FIX THAT MADE THE PAGE REACHABLE (2026-09-01)
+**`team-dashboard` had no dropdown entry. My first attempt had `teamPagesWithBoard()` APPEND one and dropped the view from `TEAM_PAGES` and `TEAM_SUBVIEWS` — which silently makes `isTeamView('team-dashboard')` FALSE.**
+```
+isTeamView false  ->  scheduleTeamRender returns early
+                  ->  a lane's data ARRIVES and NOTHING REPAINTS
+                  ->  shells on screen, forever, with no error
+```
+- **⚠⚠ IT IS THE EXACT DEFECT THE ONE LIST EXISTS TO PREVENT**, and it arrived through the change that closed an unrelated gap. **A list that is the single source of truth is at its most fragile in the commit that adds a member to it.**
+- **THE SHAPE THAT IS CORRECT: THE MENU REORDERS AND RELABELS, IT NEVER ADDS.** The view lives in `TEAM_PAGES`; a pinned board takes the top slot and lends its name; everything else is untouched. **One list, one membership.**
+- **⚠ AND THE ENTRY IS THE LIST'S OWN OBJECT WITH ONE FIELD OVERRIDDEN, NEVER A FRESH LITERAL.** A literal repeats the view id — a second copy of a name the one list already owns — and it made a page COUNT read 7 where the list holds 6.
+- **CAUGHT BY THE GUARD, ON ITS FIRST RUN.** The `isTeamView` test names every page in the dropdown; it went red immediately. **A guard that fires on the author's own attempt is worth more than one that never fires.**
+
+### ⚠⚠ TWO STEPS OF A PICKER, AND ONLY THE SECOND CAN LIE (2026-09-01)
+**A metric list can only be incomplete. A VIEW list can be WRONG — it can offer a gauge for a metric with no target, and the resulting dial points at nothing.**
+- **SO THE SECOND STEP MAPS OVER THE SERVER'S `viewsFor()` OUTPUT AND NOTHING ELSE.** The derivation IS the honesty rule: a gauge is **structurally unofferable** rather than merely discouraged, and a hand-written list in the client is how that guarantee dies quietly.
+- **⚠ AND THE ABSENCE IS EXPLAINED RATHER THAN LEFT AS A HOLE.** *"No gauge — this metric has no target to point at."* A missing option with no explanation reads as a bug; a fact about the metric reads as a fact. **Same rule as naming the unavailable metrics instead of hiding them.**
+- **⚠ THE CLIENT RE-CHECKS THE SERVER'S LIST BEFORE PUSHING A CARD, AND THE SAVE PATH SANITISES AGAIN.** Three layers for one rule, because a board is stored for a long time and read by a renderer that trusts it.
+
+### ⚠⚠ PROVE A "NO DEFAULTS FOUND" PROBE CAN FIND ONE — PLANT THE DEFECT (2026-09-01)
+**`.review-kb-btn` rendered as a grey browser button on a near-black page for three days. Enumerating computed style on the new editor found 35 of 40 classes with NO CSS rule at all — the same failure, at scale, before anyone saw it.**
+- **⚠⚠ A PROBE REPORTING "NOTHING UNSTYLED" IS WORTHLESS UNTIL IT HAS FLAGGED SOMETHING.** A genuinely unstyled `<button>` was appended to the toolbar and the probe returned it with the exact signature — `rgb(239,239,239)` fill, black text, no class rule. **Of 21 real interactive elements, only the planted control came back bare.**
+- **⚠ MY FIRST HEURISTIC OVER-REPORTED AND THE TELL WAS FREE: it flagged the Save button because `rgb(9,224,70)` matched a "near-black text" regex.** A result that contradicts something already visible in a screenshot is a statement about the instrument. **The corrected test is structural — does ANY class or id rule of ours match this element — rather than colour-guessing.**
+- **THE GENERAL FORM: for anything about RENDERED APPEARANCE, enumerate computed style over the live page.** A stylesheet grep cannot show you a style that does not live in it, and a predicted class list cannot show you a class you did not think of. **Both have now been wrong here; the enumeration has not.**
+
+### ⚠ RAISING A BOUND IS THE MIRROR OF LOWERING A FLOOR (2026-09-01)
+**Three slice guards failed because adding one entry to `TEAM_PAGES` took the slice from 2,500 to 3,710 characters. Raising the ceiling was correct — and it is the one edit that turns a real slice check into a vacuous one.**
+- **SO THE REASON GOES AT THE ASSERTION, exactly as it must when a floor moves.** Without it the next reader sees a widened bound and cannot tell a legitimate growth from a silenced failure.
+- **⚠ AND CHECK WHAT ELSE THE SLICE NOW CONTAINS.** The same edit made a `{ view: ..., label: ... }` count read **7** against a list of 6, because a helper's own entry literal fell inside the slice. **A widened slice does not just measure more; it can measure something new.**
+
 ### ⚠⚠ A GUARD THAT PERMITS EXACTLY ONE EXEMPTION IS DOING REAL WORK — DO NOT BECOME THE SECOND (2026-09-01)
 **I set a new lane's cache-invalidation scope to `'team'` and the guard failed on the first run, correctly.** `TEAM_LANE_SCOPE` allows one exemption — the gauges — and it earns it by **promising on screen** that the date filter does not affect them.
 - **⚠ MY REASONING WAS SOUND AND STILL WRONG: the layout is keyed on the VIEWER, so a range change genuinely cannot alter it, which made `'team'` look harmless.** The guard is not asking whether the exemption is *harmless*; it is asking whether it is **DECLARED and EARNED**. A second undeclared exemption is how a one-exemption rule becomes a list.

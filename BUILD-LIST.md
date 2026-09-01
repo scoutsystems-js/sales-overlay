@@ -1075,6 +1075,31 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
 
+## 2026-09-01 — WIDGET CATALOG block 3: THE EDITOR (`2eda78b`)
+Deployed, verified by commit hash **and** by the served page being byte-identical to local (1,040,447). Every new route answers **401** while a route that does not exist answers **404** — two different values, which is evidence rather than a smoke test. Suite **2033**.
+
+**Edit mode (a pencil), a two-step picker, drag to move, a corner handle to resize, ten named boards, pin, and — closing the filed gap — THE `Customize` ENTRY IN THE TEAM DROPDOWN.**
+
+**⚠⚠ (e) AND (f) ARE ONE ENTRY, NOT TWO.** A pinned board takes the TOP of the dropdown carrying its own name; `Customize` is the entry otherwise. Two entries pointing at one view would make the nav's "you are here" mark ambiguous, and this nav marks the current page. **It reads the name from an already-loaded lane and NEVER fetches** — the nav renders on every page in the product — so before the lane lands it simply reads `Customize`. **Absent, never a guessed name.**
+
+**⚠⚠ MY FIRST ATTEMPT REINTRODUCED THE DEAD-DISPATCHER DEFECT, AND THE GUARD CAUGHT IT.** I had the MENU synthesise the `team-dashboard` entry and dropped the view from every list — which silently makes `isTeamView` **false**, and a false there means the coalescer returns early, **a lane's data arrives and nothing repaints**. Shells on screen, forever. It is the exact defect the one list exists to prevent, reintroduced by the change that made the page reachable. **The view is now IN `TEAM_PAGES`; the menu REORDERS and RELABELS and may not name a page itself.**
+
+**⚠⚠ THE EDITOR'S CHROME INHERITED NOTHING — 35 OF 40 CLASSES HAD NO CSS RULE AT ALL.** Every button would have been a grey browser default on a near-black page: `.review-kb-btn` at scale. **Enumerated on the rendered editor, not predicted** — and the probe was PROVEN able to find one before it was believed, by planting a genuinely unstyled button and confirming it came back with the `rgb(239,239,239)`/black signature. Of **21** real interactive elements, only the planted control was bare.
+
+**⚠⚠ THE CATALOG WAS SENDING ENGINEERING NOTES TO A CUSTOMER'S BROWSER.** Every entry carried `measured` and `note` — *"USE close_score_earned, NEVER close_score"*, *"migration 027"*, *"transcript_stored.turns[]"*, row counts. **It rendered nowhere, which is exactly the problem: that is one `innerHTML` from being on screen**, and the customer-language ruling is about what a customer CAN see, not what they happen to be shown this week. The wire shape is now an **allowlist** of the seven fields the picker reads — **6,482 bytes → 1,786** — and an unavailable metric is NAMED and nothing more.
+
+**THE HONESTY RULE IS STRUCTURAL, AND VISIBLE:** step two maps over the server's `viewsFor()` list, so a gauge is unofferable for a targetless metric rather than merely discouraged — and the picker SAYS so (*"No gauge — this metric has no target to point at"*) instead of leaving a hole. Verified on the render: `avg_score` offers Number and By rep, with both absences explained.
+
+**A CARD STRETCHES, IT NEVER CHANGES KIND.** Driven end to end in a browser against the real functions: a card moved 0 → 2, another went w1 → w2, **every view unchanged**; Cancel on a dirty board confirmed and restored the saved layout byte-identically. **Pointer capture** keeps a fast drag alive past the 14px handle, and the preview writes the style directly — a re-render replaces the node the pointer is captured on, which is how the rep dropdown came to close after one pick.
+
+**§3 — THE EMPTY BOARD:** a new board opens **straight into edit mode** (landing in view mode is an empty page with no way to put anything on it) and the empty state says it is empty, names the four groups, and offers ONE primary action. **Not a blank grid with a small plus.**
+
+**Guards:** `test/dashboard-editor.test.js` (14), **proven non-vacuous by restoring six of this block's own defects — six of six caught.** Three existing guards **converted, not deleted**: two slice ceilings moved with their populations (**raising a bound is the mirror of lowering a floor** and is the one edit that turns a real check into a vacuous one — reason recorded at the assertion), and the menu guard now asserts the derivation one step further back.
+
+⚠ **REPORTED, NOT ACTED ON:** a `number` card in a tall row stretches to the row height, so in edit mode its outline is a tall mostly-empty box (invisible in view mode, where there is no box). A fix is a masonry grid or letting `h` shrink the row — both layout decisions. ⚠ **Fifth fixture-not-product catch this session**: `undefined of undefined undefineds undefined` under all three gauges was my fixture, not `avgCardHtml`.
+
+---
+
 ## 2026-09-01 — WIDGET CATALOG block 2: storage + render path (`6721795`, `53e1301`)
 Deployed, verified by commit hash. Suite **2019**. **No editor, no drag, no resize, no picker, no pinning.**
 
@@ -1088,7 +1113,7 @@ Deployed, verified by commit hash. Suite **2019**. **No editor, no drag, no resi
 
 **⚠⚠ TWO PROCESS FINDINGS.** A guard caught a real over-reach on its first run — I gave the new lane a `'team'` scope and `TEAM_LANE_SCOPE` permits exactly ONE exemption, earned by a promise on screen. And **a new view inherits NOTHING from the design pass**: `team-dashboard` kept its boxes because the ground and cards-off lists are per-view, **found by LOOKING**, and the pairing guard structurally could not see it (a view in neither list is not a mismatch).
 
-⚠ **FILED: `#team-dashboard` has no dropdown entry** — reachable only by hash until the picker exists. **That is the merge-review failure if it stays**, and it is noted at the code as deliberate for one block. ⚠ **Talk ratio not built** — the one-column proposal stands.
+⚠ ~~**FILED: `#team-dashboard` has no dropdown entry**~~ — **CLOSED by block 3 (`2eda78b`): it is `Customize` in the Team dropdown, or the pinned board's own name at the top.** The row is struck rather than deleted so the gap and its closure are both visible. ⚠ **Talk ratio not built** — the one-column proposal stands.
 
 ---
 
