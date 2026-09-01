@@ -81,8 +81,14 @@ test('an insight with no quote still names the call it came from', () => {
 
 test('the timestamp is parsed from the clip URL, so OLD cached rows get one too', () => {
   const { tsFromClipUrl } = renderer();
-  assert.strictEqual(tsFromClipUrl('https://x/y?t=2022'), '33:42');
-  assert.strictEqual(tsFromClipUrl('https://x/y?t=0'), '0:00');
+  /* ⚠ CONVERTED 2026-09-01: this pinned `mm:ss`, which let minutes run past
+     sixty — a moment at 7,660s rendered "127:40" on a live page. The rest of
+     the product uses hh:mm:ss and hmsOf already did. The SUBJECT survives: a
+     timestamp is derived from the clip URL so old cached rows get one too. */
+  assert.strictEqual(tsFromClipUrl('https://x/y?t=2022'), '00:33:42');
+  assert.strictEqual(tsFromClipUrl('https://x/y?t=0'), '00:00:00');
+  assert.strictEqual(tsFromClipUrl('https://x/y?t=7660'), '02:07:40',
+    '⚠ minutes must never run past sixty — this is the regression');
   assert.strictEqual(tsFromClipUrl('https://x/y'), '', 'no t= -> no time, not a fake one');
   assert.strictEqual(tsFromClipUrl(null), '');
 });
@@ -103,7 +109,18 @@ test('⚠⚠ the SIXTH unproven-reply lane is closed: this lane uses the VERIFIE
 
 test('⚠ who spoke is RECORDED where the || decides it — nothing downstream can recover it', () => {
   const live = stripComments(LIB);
-  assert.ok(/spoke:\s*reply\s*\?\s*'closer'\s*:/.test(live), 'the speaker is derived from the same branch');
+  /* ⚠⚠ CONVERTED 2026-09-01, AND THIS GUARD PINNED THE DEFECT AS CORRECT.
+     It asserted `spoke: reply ? 'closer' : ...` — deriving the speaker from
+     WHICH FIELD the code fell back to. `closer_response` is definitionally the
+     closer, but `quote` is EITHER, so that branch carried no information about
+     who spoke, and a closer's line was rendered as the prospect's on a live
+     page. The recorded `call_highlights.speaker` is now read instead.
+     ⚠ THE SUBJECT SURVIVES: who spoke must be captured at the producer, because
+     nothing downstream can recover it. Only the SOURCE changed. */
+  assert.ok(/spoke:\s*spokeOf\(r, reply, /.test(live),
+    'the speaker is READ from the row, not inferred from the branch taken');
+  assert.strictEqual(/spoke:\s*reply\s*\?\s*'closer'\s*:/.test(live), false,
+    'the which-field-did-I-use derivation must not come back');
   assert.ok(/spoke:\s*ev\s*\?\s*\(ev\.spoke/.test(live), 'and carried through resolve() to the payload');
 });
 
