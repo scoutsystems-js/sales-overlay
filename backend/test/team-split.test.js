@@ -95,11 +95,16 @@ test('⚠⚠⚠ the render coalescer holds NO view list of its own', () => {
 test('⚠⚠ isTeamView covers every page in the dropdown, and says no to others', () => {
   const at = H.indexOf('var TEAM_PAGES');
   const src = H.slice(at, H.indexOf('function teamPageSelectHtml', at));
-  assert.ok(src.length > 200 && src.length < 3000, 'slice must cover it: ' + src.length);
+  assert.ok(src.length > 200 && src.length < 4200, 'slice must cover it: ' + src.length);
   const is = new Function(src + '; return isTeamView;')();
 
   const pages = [...H.matchAll(/\{ view: '([a-z-]+)',\s+label:/g)].map(m => m[1]);
-  assert.strictEqual(pages.length, 5, 'expected five pages, found ' + pages.length);
+  /* ⚠ SIX SINCE 2026-09-01: `team-dashboard` joined the ONE list rather than
+     being synthesised by the menu builder. My first attempt did synthesise it
+     and dropped the view from every list — which makes isTeamView FALSE for it,
+     and a false there means a lane's data arrives and NOTHING REPAINTS. That is
+     the dead-dispatcher defect this very test exists to catch, and it caught it. */
+  assert.strictEqual(pages.length, 6, 'expected six pages, found ' + pages.length);
   pages.forEach(v => assert.ok(is(v), v + ' is in the dropdown but isTeamView says no'));
   /* ⚠ `team-expanded` left this list 2026-09-01 — RETIRED with Call Highlights
      of the Week, normalised away at BOTH entry points, so it can never be the
@@ -218,7 +223,7 @@ test('⚠ each page resolves to its OWN range, and the drilldown rides coaching\
      matching; running its output can throw, because filtering comment LINES can
      leave a block delimiter unpaired. Comments are harmless to new Function. */
   const src = H.slice(H.indexOf('var TEAM_PAGES'), H.indexOf('function teamPageSelectHtml'));
-  assert.ok(src.length > 200 && src.length < 2500, 'slice must cover it: ' + src.length);
+  assert.ok(src.length > 200 && src.length < 4200, 'slice must cover it: ' + src.length);
   const label = new Function('state', src +
     '; return (TEAM_PAGES.filter(function (p) { return p.view === teamPageForView(state.view); })[0] || {}).label;');
   assert.strictEqual(label({ view: 'team-performance' }), 'Performance');
@@ -352,8 +357,22 @@ test('⚠⚠ the page dropdown is the NAV TAB, and there is exactly one of it', 
   const mAt = LIVE.indexOf('function navTeamMenuHtml');
   const menu = LIVE.slice(mAt, LIVE.indexOf('\n  }', mAt));
   assert.ok(menu.length > 200 && menu.length < 1800, 'menu slice: ' + menu.length);
-  assert.ok(/TEAM_PAGES\.map/.test(menu),
-    'the menu must render from TEAM_PAGES — never a second copy of the page names');
+  /* ⚠⚠ CONVERTED, NOT WEAKENED (2026-09-01). The menu now maps over
+     `teamPagesWithBoard()` rather than TEAM_PAGES directly, because a PINNED
+     board goes to the TOP of the dropdown and its entry carries the board's
+     name. The SUBJECT survives exactly — "never a second copy of the page
+     names" — and is now asserted one step further back: the helper REORDERS and
+     RELABELS the one list and may not contain a page name of its own. */
+  assert.ok(/teamPagesWithBoard\(\)\.map/.test(menu),
+    'the menu must render from the one list — never a second copy of the page names');
+
+  const wAt = LIVE.indexOf('function teamPagesWithBoard');
+  const helper = LIVE.slice(wAt, LIVE.indexOf('\n  }', wAt));
+  assert.ok(helper.length > 150 && helper.length < 900, 'helper slice: ' + helper.length);
+  assert.ok(/TEAM_PAGES\.filter/.test(helper), 'the helper must derive from TEAM_PAGES');
+  ['Daily Digest', 'Performance', 'Coaching', 'Objections', 'My Team'].forEach((n) =>
+    assert.ok(!helper.includes(n),
+      'the helper must not name a page itself — that is the second copy: ' + n));
 });
 
 /* ⚠⚠ THE MENU MUST BE ABLE TO ESCAPE THE PAGE. The nav tied with

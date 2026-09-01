@@ -3872,6 +3872,173 @@
     @media (max-width: 1100px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 700px)  { .dash-grid { grid-template-columns: 1fr; } }
 
+    /* ═══ THE EDITOR'S OWN CHROME ═══════════════════════════════════════════
+       ⚠⚠ NEW MARKUP INHERITS NOTHING. A `<button>` with no rule renders as the
+       BROWSER DEFAULT — light grey fill, black text, an outset border — on a
+       near-black page. `.review-kb-btn` sat like that for three days because
+       its rule was archived with a removal and the control came back without
+       it, and a stylesheet grep could not find the gap because the ARCHIVED
+       rule matched. Enumerated on the RENDERED editor: 35 of 40 classes here
+       had no rule at all before this block.
+
+       ⚠ EVERY COLOUR IS A TOKEN AND NOTHING IS GREY. Depth is opacity, which
+       is a DEPTH CUE and is explicitly allowed; low-contrast grey body text is
+       the thing the no-grey rule bans. */
+
+    /* ── the toolbar ── */
+    .dash-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 24px;
+    }
+    .dash-bar-name {
+      display: flex; align-items: center; gap: 10px;
+      font-size: var(--fs-title); font-weight: var(--fw-emphasis); color: var(--text);
+    }
+    .dash-bar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .dash-bar-btn {
+      padding: 7px 13px; border-radius: 6px; cursor: pointer;
+      font-size: var(--fs-secondary); font-weight: var(--fw-normal); font-family: inherit;
+      background: var(--bg-elevated); color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+    .dash-bar-btn:hover { border-color: var(--text); }
+    .dash-bar-btn:disabled { opacity: 0.5; cursor: default; }
+    .dash-bar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* ⚠ ONE PRIMARY. Save is the only action with a coloured border, so "the
+       green one" is unambiguous in edit mode. */
+    .dash-bar-primary { border-color: var(--accent); color: var(--accent); }
+    .dash-bar-link {
+      background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+      font-size: var(--fs-secondary); color: var(--text); opacity: 0.7;
+      text-decoration: underline; text-underline-offset: 3px;
+    }
+    .dash-bar-link:hover { opacity: 1; }
+    .dash-board-select { min-width: 150px; }
+    .dash-pin-badge, .dash-default-badge {
+      font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text); opacity: 0.65; font-weight: var(--fw-normal);
+    }
+    .dash-pin-badge { color: var(--accent); opacity: 0.9; }
+    .dash-edit-hint {
+      font-size: var(--fs-secondary); color: var(--text); opacity: 0.7;
+      margin: -12px 0 22px;
+    }
+    /* ⚠ THE MESSAGE ROW IS ABSENT UNTIL THERE IS A MESSAGE. An always-present
+       empty strip is furniture, and it clears itself so a stale failure cannot
+       sit beside a board that saved. */
+    .dash-toast {
+      display: none; margin: 14px 0 0; padding: 10px 12px; border-radius: 6px;
+      font-size: var(--fs-secondary); color: var(--text);
+      background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    }
+
+    /* ── cards in edit mode ── */
+    .dash-grid-edit { gap: 28px 24px; }
+    /* ⚠ THE ONLY BOXES IN THE PRODUCT, AND THEY EXIST ONLY WHILE EDITING. The
+       design pass took the boxes off; a card you are about to DRAG has to show
+       where it begins and ends, and the outline disappears the moment you save. */
+    .dash-card-edit {
+      position: relative; padding: 14px; border-radius: 8px;
+      border: 1px dashed var(--border-strong); cursor: grab;
+    }
+    .dash-card-edit:hover { border-color: var(--text); }
+    .dash-card-dragging { opacity: 0.4; cursor: grabbing; }
+    .dash-card-over { border-color: var(--accent); border-style: solid; }
+    .dash-card-remove {
+      position: absolute; top: 6px; right: 6px; width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg-elevated); color: var(--text); font-family: inherit;
+      border: 1px solid var(--border-strong); border-radius: 5px;
+      font-size: var(--fs-secondary); line-height: 1; cursor: pointer; padding: 0;
+    }
+    .dash-card-remove:hover { border-color: var(--bad); color: var(--bad); }
+    .dash-card-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* ⚠ 14px IS THE TARGET, NOT THE GLYPH. A handle smaller than this is a
+       pointer-accuracy problem, and the pointer capture is what keeps a fast
+       drag alive once it leaves the box. */
+    .dash-card-handle {
+      position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px;
+      cursor: nwse-resize; touch-action: none;
+      background: linear-gradient(135deg, transparent 45%, var(--border-strong) 45%,
+                  var(--border-strong) 60%, transparent 60%);
+    }
+    .dash-card-handle:hover, .dash-card-handle-active {
+      background: linear-gradient(135deg, transparent 45%, var(--accent) 45%,
+                  var(--accent) 60%, transparent 60%);
+    }
+
+    /* ── the empty board ── */
+    /* ⚠⚠ NOT A BLANK GRID WITH A SMALL PLUS. A manager cannot tell an empty
+       board from a page that failed to load, so this SAYS it is empty, says
+       what the page is for, and offers one obvious action. */
+    .dash-empty { padding: 56px 20px 64px; text-align: center; }
+    .dash-empty-title {
+      font-size: var(--fs-title); font-weight: var(--fw-emphasis); color: var(--text);
+      margin-bottom: 8px;
+    }
+    .dash-empty-sub {
+      font-size: var(--fs-body); color: var(--text); opacity: 0.75;
+      max-width: 460px; margin: 0 auto 22px;
+    }
+
+    /* ── the picker ── */
+    /* ⚠ z-index 9998 — BELOW scout-modal's 9999, so a confirm raised from the
+       picker is never drawn behind it. Ordering is the thing that decides, and
+       equal values are a loss for whichever came first. */
+    .dash-picker-backdrop {
+      position: fixed; inset: 0; z-index: 9998; display: flex;
+      align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.62); padding: 20px;
+    }
+    .dash-picker-backdrop.hidden { display: none; }
+    .dash-picker {
+      background: var(--bg-elevated); color: var(--text);
+      border: 1px solid var(--border-strong); border-radius: 10px;
+      width: 100%; max-width: 520px; max-height: 78vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    }
+    .dash-picker-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px 12px; border-bottom: 1px solid var(--border-strong);
+    }
+    .dash-picker-title { font-size: var(--fs-title); font-weight: var(--fw-emphasis); }
+    .dash-picker-x {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      background: none; border: 1px solid var(--border-strong); border-radius: 6px;
+      color: var(--text); font-size: var(--fs-secondary); cursor: pointer;
+      font-family: inherit; padding: 0;
+    }
+    .dash-picker-x:hover { border-color: var(--text); }
+    .dash-picker-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .dash-picker-body { padding: 8px 18px 18px; overflow-y: auto; }
+    .dash-pick-group {
+      font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: 0.09em;
+      color: var(--text); opacity: 0.6; margin: 16px 0 6px;
+    }
+    .dash-pick-list { display: flex; flex-direction: column; gap: 4px; }
+    .dash-pick-item {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      width: 100%; text-align: left; padding: 10px 12px; border-radius: 6px;
+      background: none; border: 1px solid transparent; cursor: pointer;
+      color: var(--text); font-size: var(--fs-body); font-family: inherit;
+    }
+    .dash-pick-item:hover { border-color: var(--border-strong); background: var(--bg-field); }
+    .dash-pick-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .dash-pick-item i { font-style: normal; font-size: var(--fs-secondary); opacity: 0.65; }
+    .dash-pick-back {
+      background: none; border: 0; padding: 0; margin: 6px 0 2px; cursor: pointer;
+      color: var(--text); opacity: 0.75; font-size: var(--fs-secondary); font-family: inherit;
+    }
+    .dash-pick-back:hover { opacity: 1; }
+    /* ⚠ NAMED, NOT HIDDEN. A manager who wonders where talk ratio went is told;
+       an unexplained absence reads as a product that lost something. */
+    .dash-pick-absent {
+      font-size: var(--fs-secondary); color: var(--text); opacity: 0.7;
+      padding: 6px 12px 2px; line-height: 1.6;
+    }
+    .dash-pick-absent b { font-weight: var(--fw-emphasis); opacity: 0.9; }
+
     /* ═══ TREATMENT C — SPACE INSTEAD OF LINES (design pass block 2, Performance only)
        Justin approved a full-page mock. The audit's finding, made concrete by
        MEASURING the live page: 52 drawn boxes in 15 kinds, nested THREE deep —
@@ -5100,6 +5267,14 @@
     teamRecs:       null,   teamRecsLoading: false,
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
     teamDashboard: null,    teamDashboardLoading: false,
+    teamCatalog: null,      teamCatalogLoading: false,
+    /* ⚠ THE EDITOR'S WORKING COPY. `null` = view mode; an object = edit mode.
+       Cancel restores by DISCARDING this, never by replaying moves — a replay
+       has to be right about every step, a discard only has to be right once. */
+    dashEdit: null,
+    dashDragFrom: null,
+    dashResize: null,
+    dashBoardId: null,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
     teamDetailMetric: null, // glance-box detail drill: null | 'close' | 'objection' (cash removed 2026-08-25)
     // ⚠ TEAM OWNS ITS OWN RANGE (stage 2). state.dateRange stays COACHING's until
@@ -8437,6 +8612,11 @@
        guard exists to refuse — and the cost of being wrong is a cheap refetch of
        a ~350-byte payload against a stale board under a new window. */
     teamDashboard: 'both',
+    /* ⚠ 'both' though the catalog is neither team- nor range-scoped: it is a
+       STATIC capability list. Declaring the safe scope costs one refetch and
+       keeps the default failing toward a visible reload, which is why the map
+       defaults to clearing rather than to keeping. */
+    teamCatalog: 'both',
     teamDigest: 'both', teamNeedsWork: 'both', teamRepSeries: 'both', teamWhy: 'both',
     teamObjections: 'both', teamObjSummary: 'both',
     // ⚠ TEAM-ONLY: a fixed 7-day window that must survive a range change.
@@ -8610,7 +8790,8 @@
       /* ⚠ The dashboard lane returns the LAYOUT ONLY — every card reads a lane
          already loaded above, so a board and the page beside it cannot disagree
          about the same metric. */
-      dashboard:{flag: 'teamDashboardLoading', set: 'teamDashboard', url: '/team/dashboard?' + teamQP() },
+      dashboard:{flag: 'teamDashboardLoading', set: 'teamDashboard', url: '/team/dashboard?' + teamQP(state.dashBoardId ? 'board=' + encodeURIComponent(state.dashBoardId) : '') },
+      catalog:  {flag: 'teamCatalogLoading',   set: 'teamCatalog',   url: '/team/catalog' },
       digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP(state.teamDigestDate ? 'date=' + state.teamDigestDate : '') },
       // 10b: per-rep weekly series for the two line graphs. Deterministic and
       // model-free, so it is cheap to refetch when the selector changes.
@@ -8667,6 +8848,11 @@
     }
     state[c.set] = payload;
     if (c.flag) state[c.flag] = false;
+    /* ⚠ THE PICKER IS OUTSIDE #content, so scheduleTeamRender() below cannot
+       repaint it. Opened before its lane lands it shows a skeleton, and without
+       this the skeleton is what it shows forever — a modal that never resolves
+       is indistinguishable from one that is broken. */
+    if (which === 'catalog' && typeof dashRenderPicker === 'function') dashRenderPicker();
     /* ⚠⚠ RESTORED HERE AND NOWHERE ELSE: /team/context is the only response that
        says which teams this person may pick, and the saved key is validated
        against it. Restoring earlier would either skip validation or race the
@@ -11915,7 +12101,7 @@
       + '</div>';
   }
 
-  function dashCardHtml(card) {
+  function dashCardHtml(card, index) {
     var body =
         card.view === 'gauge'     ? dashGaugeHtml(card)
       : card.view === 'trend'     ? dashTrendHtml(card)
@@ -11928,9 +12114,483 @@
     var fell = card.requestedView
       ? '<div class="dash-card-note">Shown as a number \u2014 this metric has no target to gauge against.</div>'
       : '';
-    return '<div class="dash-card" style="grid-column:span ' + card.w + ';">'
+    /* ⚠ THE HANDLES EXIST ONLY IN EDIT MODE. A drag handle on a view-mode card
+       is an invitation to an accidental drag, which is the whole reason this is
+       an edit mode rather than live dragging. */
+    var editing = dashEditing();
+    return '<div class="dash-card' + (editing ? ' dash-card-edit' : '') + '"'
+      + (editing ? ' draggable="true" data-idx="' + index + '"' : '')
+      + ' style="grid-column:span ' + card.w + ';">'
+      + (editing
+          ? '<button type="button" class="dash-card-remove" data-idx="' + index + '" '
+            + 'onclick="dashRemoveCard(' + index + ')" aria-label="Remove this card" title="Remove this card">✕</button>'
+          : '')
       + (card.view === 'number' ? '' : '<div class="dash-card-title">' + escapeHtml(card.label) + '</div>')
-      + body + fell + '</div>';
+      + body + fell
+      + (editing ? '<div class="dash-card-handle" data-idx="' + index + '" '
+                 + 'title="Drag to resize" aria-hidden="true"></div>' : '')
+      + '</div>';
+  }
+
+  /* ═══ THE EDITOR (block 3) ═══════════════════════════════════════════════
+     ⚠⚠ AN EDIT MODE, NOT LIVE DRAGGING. A pencil toggles view <-> edit and cards
+     only move or resize inside it — the shape GHL uses, which is the product
+     Justin's customers already know, and it removes accidental drags entirely.
+     ⚠ CANCEL MUST ACTUALLY RESTORE. The working copy is a DEEP COPY taken on
+     entry; cancel throws it away rather than replaying the edits backwards,
+     because an undo built from a replay is wrong the first time an edit is not
+     invertible. */
+
+  function dashEditing() { return !!state.dashEdit; }
+
+  function dashEnterEdit() {
+    var d = state.teamDashboard;
+    if (!d || d._error) return;
+    state.dashEdit = {
+      cards: JSON.parse(JSON.stringify(d.cards || [])),
+      name: (d.board && d.board.name) || 'My board',
+      id: (d.board && d.board.id) || null,
+      dirty: false,
+    };
+    renderTeamDashboard();
+  }
+
+  /* ⚠ `await`, and the guard is per call site: a promise is always truthy, so
+     `if (!scoutConfirm(...))` never returns and the discard happens anyway. */
+  async function dashCancelEdit() {
+    var e = state.dashEdit;
+    if (e && e.dirty) {
+      var ok = await scoutConfirm({
+        title: 'Discard your changes?',
+        body: 'This board goes back to how it was. Nothing you changed is kept.',
+        confirmText: 'Discard', danger: true,
+      });
+      if (!ok) return;
+    }
+    /* ⚠ NOTHING TO RESTORE — the live layout was never mutated. That is the
+       whole reason the working copy is a copy: a discard has to be right once,
+       where replaying moves backwards has to be right about every step. */
+    state.dashEdit = null;
+    renderTeamDashboard();
+  }
+
+  /* ⚠⚠ A NEW BOARD OPENS STRAIGHT INTO EDIT MODE WITH NO CARDS. A manager who
+     asks for a new board and lands in VIEW mode is looking at an empty page with
+     no way to put anything on it — and an empty page reads as broken. Edit mode
+     plus the empty state is the pair that says what the page is for. */
+  function dashNewBoard() {
+    state.dashEdit = { cards: [], name: 'New board', id: null, dirty: true };
+    renderTeamDashboard();
+  }
+
+  async function dashSaveEdit() {
+    var e = state.dashEdit;
+    if (!e) return;
+    if (!e.cards.length) { dashToast('A board needs at least one card.'); return; }
+    var btn = document.getElementById('dashSaveBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+    try {
+      var res = await fetch('/team/dashboard?' + teamQP(), {
+        method: 'PUT',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ id: e.id, name: e.name, layout: e.cards.map(function (c) {
+          return { metric: c.metric, view: c.view, w: c.w, h: c.h };
+        }) }),
+      });
+      var j = await res.json();
+      /* ⚠ THE SERVER'S MESSAGE IS SHOWN VERBATIM, because the one that matters
+         reads "You already have 10 boards" — a cap stated in words, never a
+         database error. Rewriting it here would be a second copy of the rule. */
+      if (!res.ok) { dashToast(j.error || 'Could not save your board.'); return; }
+      state.dashEdit = null;
+      state.teamDashboard = null;      // refetch: the server is the authority on what was stored
+      loadTeam('dashboard');
+      renderTeamDashboard();
+    } catch (err) {
+      dashToast('Could not save your board.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+    }
+  }
+
+  /* ⚠ IT CLEARS ITSELF. A message that stays after the thing it describes has
+     passed is worse than none — the next failure looks like the same one, and a
+     stale "Could not save" beside a saved board is a lie about state. */
+  var dashToastTimer = null;
+  function dashToast(msg) {
+    var el = document.getElementById('dashToast');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+    if (dashToastTimer) clearTimeout(dashToastTimer);
+    dashToastTimer = setTimeout(function () {
+      var n = document.getElementById('dashToast');
+      if (n) { n.style.display = 'none'; n.textContent = ''; }
+    }, 6000);
+  }
+
+  /* ── moving and resizing ────────────────────────────────────────────────
+     ⚠⚠ A CARD STRETCHES, IT NEVER CHANGES KIND (ruled). Resizing only ever
+     changes w/h; `view` is untouched here and a test asserts it. */
+  function dashMoveCard(from, to) {
+    var e = state.dashEdit; if (!e) return;
+    if (from === to || from < 0 || to < 0 || from >= e.cards.length || to >= e.cards.length) return;
+    var c = e.cards.splice(from, 1)[0];
+    e.cards.splice(to, 0, c);
+    e.dirty = true;
+    renderTeamDashboard();
+  }
+
+  function dashResizeCard(i, w, h) {
+    var e = state.dashEdit; if (!e) return;
+    var c = e.cards[i]; if (!c) return;
+    c.w = Math.max(1, Math.min(4, Math.round(w)));
+    c.h = Math.max(1, Math.min(3, Math.round(h)));
+    e.dirty = true;
+    renderTeamDashboard();
+  }
+
+  function dashRemoveCard(i) {
+    var e = state.dashEdit; if (!e) return;
+    e.cards.splice(i, 1);
+    e.dirty = true;
+    renderTeamDashboard();
+  }
+
+  /* ⚠ `await`, NOT `.then()`. The guard is mechanical per call site because a
+     promise is ALWAYS TRUTHY — the `.then()` form is correct today and is one
+     refactor away from `if (!scoutPrompt(...)) return;`, which silently never
+     guards anything. Keeping every call site in one shape is what makes that
+     unrepresentable rather than merely unlikely. */
+  async function dashRename() {
+    var e = state.dashEdit; if (!e) return;
+    var v = await scoutPrompt({ title: 'Name this board', value: e.name, confirmText: 'Rename' });
+    if (v === null) return;
+    e.name = String(v).trim().slice(0, 60) || 'My board';
+    e.dirty = true;
+    renderTeamDashboard();
+  }
+
+  /* ── the picker, two steps ──────────────────────────────────────────────
+     ⚠⚠ STEP TWO OFFERS ONLY WHAT `viewsFor()` RETURNED — the SERVER's list, not
+     a hand-written one. That derivation IS the honesty rule, and a gauge is
+     STRUCTURALLY unofferable for a metric with no target rather than merely
+     discouraged. */
+  var dashPick = { step: 1, metric: null };
+
+  /* ⚠⚠ THE MODAL IS MOUNTED ON <body>, NEVER INSIDE #content — AND THAT IS THE
+     WHOLE REASON IT WORKS. Eight lanes each call renderTeamDashboard() when
+     they land, and that reassigns content.innerHTML; a picker living inside it
+     would be DESTROYED UNDER THE POINTER mid-choice. The rep dropdown shipped
+     that exact defect once (a re-render detached the node the second click
+     landed on, so the menu closed after one pick) and the welcome overlay is
+     mounted this way for the same reason.
+
+     ⚠ AND IT IS CREATED ONCE, IDEMPOTENTLY. Building it per open leaks a node
+     per open; building it at boot means a page that never opens the picker
+     still carries it. */
+  function dashEnsurePicker() {
+    var m = document.getElementById('dashPickerModal');
+    if (m) return m;
+    m = document.createElement('div');
+    m.id = 'dashPickerModal';
+    m.className = 'dash-picker-backdrop hidden';
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-modal', 'true');
+    m.setAttribute('aria-label', 'Add a card');
+    m.innerHTML =
+        '<div class="dash-picker">'
+      +   '<div class="dash-picker-head">'
+      +     '<div class="dash-picker-title">Add a card</div>'
+      +     '<button type="button" class="dash-picker-x" onclick="dashClosePicker()" aria-label="Close">✕</button>'
+      +   '</div>'
+      +   '<div class="dash-picker-body" id="dashPickerBody"></div>'
+      + '</div>';
+    /* ⚠ A BACKDROP CLICK CLOSES; A CLICK INSIDE MUST NOT. Testing the TARGET
+       rather than relying on propagation is what makes that immune to the
+       capture/bubble ordering that defeated the rep dropdown's outside-click. */
+    m.addEventListener('click', function (ev) { if (ev.target === m) dashClosePicker(); });
+    document.body.appendChild(m);
+    return m;
+  }
+
+  function dashOpenPicker() {
+    dashPick = { step: 1, metric: null };
+    if (state.teamCatalog === null && !state.teamCatalogLoading) loadTeam('catalog');
+    var m = dashEnsurePicker();
+    dashRenderPicker();
+    m.classList.remove('hidden');
+    document.addEventListener('keydown', dashPickerEscape);
+    var first = m.querySelector('.dash-pick-item, .dash-picker-x');
+    if (first) first.focus();
+  }
+  function dashClosePicker() {
+    var m = document.getElementById('dashPickerModal');
+    if (m) m.classList.add('hidden');
+    document.removeEventListener('keydown', dashPickerEscape);
+  }
+  function dashPickerEscape(ev) { if (ev.key === 'Escape') dashClosePicker(); }
+  function dashPickMetric(key) {
+    var cat = state.teamCatalog;
+    var all = [];
+    ((cat && cat.groups) || []).forEach(function (g) { all = all.concat(g.metrics); });
+    dashPick.metric = all.filter(function (m) { return m.key === key; })[0] || null;
+    if (!dashPick.metric) return;
+    dashPick.step = 2;
+    dashRenderPicker();
+  }
+  function dashPickView(view) {
+    var e = state.dashEdit, m = dashPick.metric;
+    if (!e || !m) return;
+    /* ⚠ THE SERVER'S LIST IS THE AUTHORITY EVEN HERE. A crafted click cannot add
+       a gauge to a targetless metric — and the save path sanitises again. */
+    if (m.views.indexOf(view) === -1) return;
+    e.cards.push({ metric: m.key, label: m.label, view: view, requestedView: null,
+                   w: view === 'gauge' ? 1 : 2, h: view === 'number' ? 1 : 2,
+                   target: (typeof m.target === 'number') ? m.target : null,
+                   targetDirection: m.targetDirection || 'higher_is_better',
+                   categories: m.categories || null });
+    e.dirty = true;
+    dashClosePicker();
+    renderTeamDashboard();
+  }
+
+  var DASH_VIEW_LABEL = {
+    number: 'Number', gauge: 'Gauge', trend: 'Trend over time',
+    by_rep: 'By rep', breakdown: 'Breakdown',
+  };
+  var DASH_VIEW_WHY = {
+    number: 'One figure with its counts.',
+    gauge: 'A dial against its target.',
+    trend: 'How it has moved, week by week.',
+    by_rep: 'Every rep, ranked.',
+    breakdown: 'Split by category.',
+  };
+
+  function dashRenderPicker() {
+    var host = document.getElementById('dashPickerBody');
+    if (!host) return;
+    var cat = state.teamCatalog;
+    if (cat === null) { host.innerHTML = '<div class="skeleton" style="height:160px;"></div>'; return; }
+    if (cat._error) { host.innerHTML = '<div class="error">Could not load the metrics.</div>'; return; }
+
+    if (dashPick.step === 1) {
+      host.innerHTML = (cat.groups || []).map(function (g) {
+        return '<div class="dash-pick-group">' + escapeHtml(g.label) + '</div>'
+          + '<div class="dash-pick-list">' + g.metrics.map(function (m) {
+              return '<button type="button" class="dash-pick-item" onclick="dashPickMetric(\'' + escapeHtml(m.key) + '\')">'
+                + '<span>' + escapeHtml(m.label) + '</span>'
+                + '<i>' + m.views.length + ' view' + (m.views.length === 1 ? '' : 's') + '</i></button>';
+            }).join('') + '</div>';
+        }).join('')
+        /* ⚠⚠ THE ABSENT ONES ARE NAMED, NOT HIDDEN. A manager who wonders where
+           talk ratio went must be told; an unexplained absence reads as a
+           product that lost something. */
+        + ((cat.unavailable || []).length
+            ? '<div class="dash-pick-group">Not available yet</div>'
+              + '<div class="dash-pick-absent">' + cat.unavailable.map(function (u) {
+                  return '<div><b>' + escapeHtml(u.label) + '</b> \u2014 Scout cannot measure this across your team yet.</div>';
+                }).join('') + '</div>'
+            : '');
+      return;
+    }
+
+    var m = dashPick.metric;
+    host.innerHTML = '<button type="button" class="dash-pick-back" onclick="dashPick.step=1;dashRenderPicker();">← All Metrics</button>'
+      + '<div class="dash-pick-group">' + escapeHtml(m.label) + '</div>'
+      + '<div class="dash-pick-list">' + m.views.map(function (v) {
+          return '<button type="button" class="dash-pick-item" onclick="dashPickView(\'' + escapeHtml(v) + '\')">'
+            + '<span>' + escapeHtml(DASH_VIEW_LABEL[v] || v) + '</span>'
+            + '<i>' + escapeHtml(DASH_VIEW_WHY[v] || '') + '</i></button>';
+        }).join('') + '</div>'
+      /* ⚠ SAY WHY A VIEW IS NOT ON OFFER. "Gauge" missing with no explanation
+         reads as a bug; "this metric has no target" is a fact about the metric. */
+      + (typeof m.target !== 'number'
+          ? '<div class="dash-pick-absent"><div>No gauge \u2014 this metric has no target to point at.</div></div>' : '')
+      + (!m.history
+          ? '<div class="dash-pick-absent"><div>No trend \u2014 Scout does not keep a history for this one.</div></div>' : '');
+  }
+
+  /* ⚠⚠ THE TOOLBAR. In VIEW mode it is a pencil and the board name; in EDIT mode
+     it is Save / Cancel / Add card / Rename, and the pencil is gone — a control
+     that means "start editing" while you are editing is a control that has
+     stopped meaning anything. */
+  function dashToolbarHtml(d) {
+    var e = state.dashEdit;
+    var boards = (d && d.boards) || [];
+    var name = e ? e.name : ((d && d.board && d.board.name) || 'Team Performance');
+    var pinned = !!(d && d.board && d.board.pinned);
+
+    if (e) {
+      return '<div class="dash-bar">'
+        + '<div class="dash-bar-name">' + escapeHtml(name)
+          + '<button type="button" class="dash-bar-link" onclick="dashRename()">Rename</button></div>'
+        + '<div class="dash-bar-actions">'
+          + '<button type="button" class="dash-bar-btn" onclick="dashOpenPicker()">+ Add card</button>'
+          + '<button type="button" class="dash-bar-btn" onclick="dashCancelEdit()">Cancel</button>'
+          + '<button type="button" class="dash-bar-btn dash-bar-primary" id="dashSaveBtn" onclick="dashSaveEdit()">Save</button>'
+        + '</div></div>'
+        + '<div class="dash-edit-hint">Drag a card to move it. Drag the corner to resize it. '
+          + 'A card always keeps its kind \u2014 only its size changes.</div>'
+        + '<div class="dash-toast" id="dashToast"></div>';
+    }
+
+    return '<div class="dash-bar">'
+      + '<div class="dash-bar-name">' + escapeHtml(name)
+        + (pinned ? '<span class="dash-pin-badge">Pinned</span>' : '')
+        + (d && d.is_default ? '<span class="dash-default-badge">Default</span>' : '') + '</div>'
+      + '<div class="dash-bar-actions">'
+        + (boards.length > 1 ? dashBoardSelectHtml(boards, d.board) : '')
+        + (d && d.board && !pinned
+            ? '<button type="button" class="dash-bar-btn" onclick="dashPin(\'' + escapeHtml(d.board.id) + '\')">Pin</button>' : '')
+        + '<button type="button" class="dash-bar-btn" onclick="dashNewBoard()">+ New Board</button>'
+        + '<button type="button" class="dash-bar-btn" onclick="dashEnterEdit()" title="Edit this board">✎ Edit</button>'
+      + '</div></div>'
+      + '<div class="dash-toast" id="dashToast"></div>';
+  }
+
+  function dashBoardSelectHtml(boards, current) {
+    return '<select class="user-select dash-board-select" onchange="dashOpenBoard(this.value)">'
+      + boards.map(function (b) {
+          return '<option value="' + escapeHtml(b.id) + '"' + (current && current.id === b.id ? ' selected' : '') + '>'
+            + escapeHtml(b.name) + (b.pinned ? ' \u2022' : '') + '</option>';
+        }).join('') + '</select>';
+  }
+
+  function dashOpenBoard(id) {
+    state.dashBoardId = id || null;
+    state.teamDashboard = null;
+    loadTeam('dashboard');
+    renderTeamDashboard();
+  }
+
+  async function dashPin(id) {
+    try {
+      var res = await fetch('/team/dashboard/' + encodeURIComponent(id) + '/pin', { method: 'POST', headers: authHeader() });
+      var j = await res.json();
+      if (!res.ok) { dashToast(j.error || 'Could not pin that board.'); return; }
+      state.teamDashboard = null; loadTeam('dashboard'); renderTeamDashboard();
+    } catch (e) { dashToast('Could not pin that board.'); }
+  }
+
+  /* ⚠⚠ THE EMPTY BOARD. A blank grid with one small plus reads as broken — the
+     manager cannot tell an empty board from a page that failed to load. So a new
+     board opens ALREADY IN EDIT MODE and the empty state says what the page is
+     FOR, names what can go on it, and offers one obvious primary action. */
+  function dashEmptyHtml() {
+    var cat = state.teamCatalog;
+    var groups = (cat && cat.groups) ? cat.groups.map(function (g) { return g.label.toLowerCase(); }) : [];
+    return '<div class="dash-empty">'
+      + '<div class="dash-empty-title">This board is empty</div>'
+      + '<div class="dash-empty-sub">Add the numbers you want to see first thing'
+        + (groups.length ? ' \u2014 ' + escapeHtml(groups.join(', ')) : '') + '.</div>'
+      + '<button type="button" class="dash-bar-btn dash-bar-primary" onclick="dashOpenPicker()">Add Your First Card</button>'
+      + '</div>';
+  }
+
+  /* ── drag to move, corner handle to resize ────────────────────────────────
+     ⚠⚠ A CARD STRETCHES, IT NEVER CHANGES KIND. Resizing writes `w` and NOTHING
+     ELSE — the view is the manager's choice and a size is not a reason to
+     overrule it. `sanitizeLayout` clamps `w` server-side as well, so a hand-made
+     request cannot store a span the grid cannot render.
+
+     ⚠ LISTENERS ARE BOUND AFTER EVERY RENDER, NOT ONCE AT BOOT. The grid is
+     rebuilt by `innerHTML` on every change, so any listener attached to a card
+     dies with the node it was attached to — the same reason the welcome overlay
+     holds its open state in `state` rather than in the DOM. */
+
+  function dashCardsEditing() {
+    return state.dashEdit ? state.dashEdit.cards : null;
+  }
+
+  /* ⚠ MEASURED FROM THE RENDERED GRID, NEVER ASSUMED. The column count is a
+     media-query result; hard-coding 3 makes a resize on a narrow window clamp
+     against a width the grid does not have. */
+  function dashColumnCount() {
+    var g = document.querySelector('.dash-grid');
+    if (!g) return 3;
+    var cols = getComputedStyle(g).gridTemplateColumns;
+    var n = cols ? cols.trim().split(/\s+/).length : 3;
+    return (n >= 1 && n <= 6) ? n : 3;
+  }
+
+  function dashBindDragHandles() {
+    var cards = dashCardsEditing();
+    if (!cards) return;
+    var grid = document.querySelector('.dash-grid');
+    if (!grid) return;
+
+    /* ── move ── */
+    grid.querySelectorAll('.dash-card-edit').forEach(function (el) {
+      el.addEventListener('dragstart', function (ev) {
+        state.dashDragFrom = Number(el.getAttribute('data-idx'));
+        el.classList.add('dash-card-dragging');
+        try { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', String(state.dashDragFrom)); } catch (e) {}
+      });
+      el.addEventListener('dragend', function () {
+        state.dashDragFrom = null;
+        grid.querySelectorAll('.dash-card-over').forEach(function (n) { n.classList.remove('dash-card-over'); });
+        el.classList.remove('dash-card-dragging');
+      });
+      el.addEventListener('dragover', function (ev) {
+        if (state.dashDragFrom === null) return;
+        ev.preventDefault();
+        el.classList.add('dash-card-over');
+      });
+      el.addEventListener('dragleave', function () { el.classList.remove('dash-card-over'); });
+      el.addEventListener('drop', function (ev) {
+        ev.preventDefault();
+        el.classList.remove('dash-card-over');
+        var from = state.dashDragFrom;
+        var to = Number(el.getAttribute('data-idx'));
+        state.dashDragFrom = null;
+        if (from === null || from === to || isNaN(from) || isNaN(to)) return;
+        dashMoveCard(from, to);
+      });
+    });
+
+    /* ── resize ──
+       ⚠ POINTER EVENTS, AND THE CAPTURE IS WHAT MAKES IT WORK. Without
+       `setPointerCapture` the pointer leaves the 14px handle on the first frame
+       of a fast drag and every later move is delivered to whatever is underneath
+       — the drag simply stops, which reads as a broken handle. */
+    grid.querySelectorAll('.dash-card-handle').forEach(function (h) {
+      h.addEventListener('pointerdown', function (ev) {
+        var idx = Number(h.getAttribute('data-idx'));
+        var card = cards[idx];
+        if (!card) return;
+        ev.preventDefault();
+        var cols = dashColumnCount();
+        var cell = (grid.getBoundingClientRect().width + 16) / cols;   /* 16px gap */
+        state.dashResize = { idx: idx, startX: ev.clientX, startW: card.w, cell: cell, cols: cols };
+        try { h.setPointerCapture(ev.pointerId); } catch (e) {}
+        h.classList.add('dash-card-handle-active');
+      });
+      h.addEventListener('pointermove', function (ev) {
+        var r = state.dashResize;
+        if (!r) return;
+        var w = r.startW + Math.round((ev.clientX - r.startX) / r.cell);
+        w = Math.max(1, Math.min(r.cols, w));
+        var card = cards[r.idx];
+        if (!card || card.w === w) return;
+        card.w = w;
+        /* ⚠ THE PREVIEW WRITES THE STYLE DIRECTLY RATHER THAN RE-RENDERING.
+           A re-render replaces the node the pointer is captured on, and every
+           later move goes nowhere — the same defect that made the rep dropdown
+           close after one pick. */
+        var el = h.closest('.dash-card');
+        if (el) el.style.gridColumn = 'span ' + w;
+      });
+      function endResize() {
+        if (!state.dashResize) return;
+        state.dashResize = null;
+        h.classList.remove('dash-card-handle-active');
+        state.dashEdit.dirty = true;
+        renderTeamDashboard();
+      }
+      h.addEventListener('pointerup', endResize);
+      h.addEventListener('pointercancel', endResize);
+    });
   }
 
   function renderTeamDashboard() {
@@ -11941,36 +12601,50 @@
     if (state.teamAverages === null && !state.teamAveragesLoading) loadTeam('teamAverages');
     if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
     if (state.teamDashboard === null && !state.teamDashboardLoading) loadTeam('dashboard');
+    if (state.teamCatalog === null && !state.teamCatalogLoading) loadTeam('catalog');
 
     var d = state.teamDashboard;
+    var e = state.dashEdit;
     var body;
-    if (d === null) body = '<div class="skeleton" style="height:220px;"></div>';
-    else if (d._error) body = '<div class="error">Could not load your dashboard: ' + escapeHtml(d._error) + '</div>';
+    if (d === null && !e) body = '<div class="skeleton" style="height:220px;"></div>';
+    else if (d && d._error && !e) body = '<div class="error">Could not load your dashboard: ' + escapeHtml(d._error) + '</div>';
     else {
+      var cards = e ? e.cards : ((d && d.cards) || []);
       /* ⚠⚠ THE BOARD SAYS A CARD WAS DROPPED, ONCE. A board that quietly shrinks
          is indistinguishable from a manager mis-remembering what they put there
          — and the stored row is NOT pruned, because a metric can come back. */
-      var dropped = (d.dropped || []).length
+      var dropped = (!e && d && (d.dropped || []).length)
         ? '<div class="dash-dropped">' + (d.dropped.length === 1 ? '1 card is not shown' : d.dropped.length + ' cards are not shown')
           + ' \u2014 ' + escapeHtml(d.dropped.map(function (x) { return x.metric; }).join(', '))
           + ' ' + (d.dropped.length === 1 ? 'is' : 'are') + ' no longer available. Your saved board is unchanged.</div>'
         : '';
-      body = dropped + '<div class="dash-grid">' + (d.cards || []).map(dashCardHtml).join('') + '</div>';
+      body = dropped
+        + (cards.length
+            ? '<div class="dash-grid' + (e ? ' dash-grid-edit' : '') + '">'
+              + cards.map(function (c, i) { return dashCardHtml(c, i); }).join('') + '</div>'
+            : dashEmptyHtml());
     }
 
     content.innerHTML = teamHeaderHtml() + teamControlsHtml()
-      + '<div class="section fade-in">' + body + '</div>';
+      + '<div class="section fade-in">' + dashToolbarHtml(d) + body + '</div>';
     mountRepGraphHosts();
     drawDashboardCharts();
+    if (dashEditing()) dashBindDragHandles();
   }
+
 
   /* ⚠ SAME ORDER AS THE PERFORMANCE PAGE: render, then mount the hosts, then
      draw. The draw step looks a canvas up by id, so a host that has not been
      mounted yet produces no chart, silently. */
   function drawDashboardCharts() {
-    if (!state.teamDashboard || state.teamDashboard._error) return;
+    /* ⚠ THE WORKING COPY WHEN EDITING, THE SAVED BOARD OTHERWISE. Reading the
+       saved board in edit mode draws the charts the manager had BEFORE their
+       edits — the canvas is there, the line is right, and it is the wrong
+       card's data. Silently correct-looking is the expensive failure. */
+    var src = state.dashEdit || state.teamDashboard;
+    if (!src || src._error) return;
     if (!state.teamRepSeries || state.teamRepSeries._error || state.teamRepSeries._forbidden) return;
-    (state.teamDashboard.cards || []).forEach(function (c) {
+    (src.cards || []).forEach(function (c) {
       if (c.view !== 'trend') return;
       var pick = DASH_CANVAS[c.metric];
       if (!pick) return;
@@ -12157,7 +12831,38 @@
     { view: 'team-coaching',    label: 'Coaching' },
     { view: 'team-objections',  label: 'Objections' },
     { view: 'team-members',     label: 'My Team' },
+    /* ⚠⚠ IN THE ONE LIST, NOT APPENDED BY THE MENU BUILDER. My first attempt
+       had the menu synthesise this entry and dropped the view from every list —
+       which silently makes `isTeamView('team-dashboard')` FALSE, and a false
+       there means `scheduleTeamRender` returns early and a lane's data ARRIVES
+       AND NOTHING REPAINTS. That is the exact dead-dispatcher defect this list
+       exists to prevent, reintroduced by the change that made the page
+       reachable. One list; the menu REORDERS and RELABELS, it never adds. */
+    { view: 'team-dashboard',   label: 'Customize' },
   ];
+
+  /* ⚠⚠ (e)+(f) IN ONE ENTRY, NOT TWO. A pinned board goes to the TOP of the
+     dropdown and a way in to build one must exist at all — and the honest way
+     to satisfy both is ONE entry whose LABEL and POSITION follow the pin,
+     rather than two entries pointing at the same view. Two would make the
+     "you are here" mark ambiguous, and this nav marks the current page.
+
+     ⚠ IT READS THE BOARD NAME FROM AN ALREADY-LOADED LANE AND NEVER FETCHES.
+     The nav is rendered on every page in the product, including ones that have
+     no business asking the server about dashboards; before the lane has landed
+     the entry is simply "Customize", which is what it says for a manager with
+     no pinned board anyway. Absent, never a guess at a name. */
+  function teamPagesWithBoard() {
+    var d = state.teamDashboard;
+    var b = (d && !d._error && d.board) ? d.board : null;
+    var rest = TEAM_PAGES.filter(function (p) { return p.view !== 'team-dashboard'; });
+    var base = TEAM_PAGES.filter(function (p) { return p.view === 'team-dashboard'; })[0];
+    /* ⚠ THE ENTRY IS THE LIST'S OWN OBJECT WITH ONE FIELD OVERRIDDEN, never a
+       fresh literal. A literal repeats the view id — a second copy of a name
+       the one list already owns — and it is what made the page COUNT read 7. */
+    var entry = { view: base.view, label: (b && b.pinned && b.name) ? b.name : base.label };
+    return (b && b.pinned) ? [entry].concat(rest) : rest.concat([entry]);
+  }
   /* ⚠ The expanded recommendations page is a CHILD of Coaching, not a sixth
      page — the dropdown must still show where you are when you drill into it. */
   var TEAM_PAGE_OF_VIEW = { /* team-expanded — retired 2026-09-01 */ };
@@ -12172,11 +12877,7 @@
      same two pages.
      ⚠ DERIVED FROM TEAM_PAGES so a sixth page cannot be forgotten here, plus
      the two sub-views that have no dropdown entry of their own. */
-  /* ⚠ team-dashboard is a SUB-VIEW in this block: it has no dropdown entry
-     yet (the picker is not built), so it is reachable only by hash. That is
-     deliberate for one block and is FILED — an unreachable surface is the
-     merge-review failure, and it must not stay that way. */
-  var TEAM_SUBVIEWS = ['team-needs-work', 'team-dashboard'];
+  var TEAM_SUBVIEWS = ['team-needs-work'];
   function isTeamView(v) {
     for (var i = 0; i < TEAM_PAGES.length; i++) if (TEAM_PAGES[i].view === v) return true;
     return TEAM_SUBVIEWS.indexOf(v) !== -1;
@@ -12213,7 +12914,7 @@
   function navTeamMenuHtml() {
     var here = teamPageForView(state.view);
     return '<div class="nav-team-menu" role="menu" id="navTeamMenu">'
-      + TEAM_PAGES.map(function (p) {
+      + teamPagesWithBoard().map(function (p) {
           return '<a class="nav-team-item' + (p.view === here ? ' is-here' : '') + '"'
             + ' role="menuitem" tabindex="0"'
             + ' aria-current="' + (p.view === here ? 'page' : 'false') + '"'

@@ -82,7 +82,31 @@ function resolveLayout(stored) {
   return { cards: cards, dropped: dropped, isDefault: !(Array.isArray(stored) && stored.length) };
 }
 
+/**
+ * ⚠⚠ SANITISE ON THE WAY IN, NOT ONLY ON THE WAY OUT. `resolveLayout` already
+ * refuses an unknown metric and clamps a span at READ time — but a board is
+ * stored for a long time and read by code that trusts it, so letting a bad entry
+ * into the row means every future reader depends on the reader's own guard.
+ * ⚠ THE CLIENT IS A SUGGESTION. A 99-column span or a made-up view name must not
+ * reach the database in the first place.
+ * ⚠ AN UNSUPPORTED VIEW IS COERCED TO `number` HERE TOO, so the stored row says
+ * what will actually be rendered rather than a request that silently degrades on
+ * every read.
+ */
+function sanitizeLayout(input) {
+  if (!Array.isArray(input)) return [];
+  var out = [];
+  input.slice(0, MAX_CARDS).forEach(function (c) {
+    var m = c && c.metric ? byKey(c.metric) : null;
+    if (!m || !m.available) return;
+    var view = (c.view && m.views.indexOf(c.view) !== -1) ? c.view : VIEWS.NUMBER;
+    out.push({ metric: m.key, view: view, w: clampSpan(c.w, 4), h: clampSpan(c.h, 3) });
+  });
+  return out;
+}
+
 module.exports = {
+  sanitizeLayout: sanitizeLayout,
   DEFAULT_LAYOUT: DEFAULT_LAYOUT,
   MAX_BOARDS: MAX_BOARDS,
   MAX_CARDS: MAX_CARDS,

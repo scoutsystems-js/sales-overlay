@@ -22,6 +22,19 @@
  * ruling. Its absence is asserted by a test so it cannot drift back in.
  */
 
+/**
+ * ⚠ THE PICKER GROUPS. Ten offerable metrics is enough that a flat list is worse
+ * than categories — a manager scanning for "how are we closing" should not read
+ * past objection handling to find it. The order is the order they are asked
+ * about: what happened, then why, then how well it was run, then who.
+ */
+const GROUPS = [
+  { key: 'outcomes',   label: 'Outcomes' },
+  { key: 'objections', label: 'Objections' },
+  { key: 'quality',    label: 'Call quality' },
+  { key: 'people',     label: 'People' },
+];
+
 /** The view kinds a card can be. A card STRETCHES; it never changes kind. */
 const VIEWS = {
   NUMBER: 'number',        // one figure now, with its counts
@@ -41,7 +54,7 @@ const VIEWS = {
  */
 const CATALOG = [
   {
-    key: 'avg_score', label: 'Average call score',
+    key: 'avg_score', group: 'quality', label: 'Average call score',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: false, categories: null,
     measured: '1,551 of 1,585 done analyses carry overall_score',
@@ -49,7 +62,7 @@ const CATALOG = [
         + 'value for a trend ARROW — which is not the same as a time series.',
   },
   {
-    key: 'closing_rate', label: 'Closing rate',
+    key: 'closing_rate', group: 'outcomes', label: 'Closing rate',
     source: 'aggregate', cost: 'aggregate', lane: 'prospect-entity',
     available: true, perRep: true, target: 25, history: true, categories: null,
     measured: 'prospect_id on 1,534 of 2,052 real calls; rep-series serves a '
@@ -58,7 +71,7 @@ const CATALOG = [
         + 'no_show and disqualified leave the denominator (hadAConversation).',
   },
   {
-    key: 'objection_handle_rate', label: 'Objection handling rate',
+    key: 'objection_handle_rate', group: 'objections', label: 'Objection handling rate',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: 35, history: true, categories: 'objection_category',
     measured: '1,417 objection moments, all 4 categories present '
@@ -70,7 +83,7 @@ const CATALOG = [
         + 'comparison is not.',
   },
   {
-    key: 'avg_call_time', label: 'Average call time',
+    key: 'avg_call_time', group: 'quality', label: 'Average call time',
     source: 'column', cost: 'aggregate', lane: 'team-averages',
     available: true, perRep: true, target: 60, targetDirection: 'lower_is_better',
     history: false, categories: null,
@@ -79,7 +92,7 @@ const CATALOG = [
         + '"at or below 60 min", never "at or above target".',
   },
   {
-    key: 'calls_analyzed', label: 'Calls analyzed',
+    key: 'calls_analyzed', group: 'people', label: 'Calls analyzed',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: false, categories: null,
     measured: '1,585 done analyses',
@@ -87,7 +100,7 @@ const CATALOG = [
         + 'weakest-against-target shape the loud-number ruling already refuses.',
   },
   {
-    key: 'outcome_mix', label: 'Outcome mix',
+    key: 'outcome_mix', group: 'outcomes', label: 'Outcome mix',
     source: 'column', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: false,
     categories: 'outcome',
@@ -97,7 +110,7 @@ const CATALOG = [
         + 'cannot reconcile the total.',
   },
   {
-    key: 'section_scores', label: 'Section scores',
+    key: 'section_scores', group: 'quality', label: 'Section scores',
     source: 'column', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: false,
     categories: 'section',
@@ -108,7 +121,7 @@ const CATALOG = [
         + 'difference on a real board.',
   },
   {
-    key: 'moment_mix', label: 'Call moment mix',
+    key: 'moment_mix', group: 'quality', label: 'Call moment mix',
     source: 'column', cost: 'aggregate', lane: 'call_highlights',
     available: true, perRep: true, target: null, history: false, categories: 'type',
     measured: 'buying_signal 2,620 · risk_signal 1,854 · objection 1,417 · '
@@ -118,7 +131,7 @@ const CATALOG = [
         + 'which every team lane already loads.',
   },
   {
-    key: 'time_to_price', label: 'Time to price',
+    key: 'time_to_price', group: 'quality', label: 'Time to price',
     source: 'column', cost: 'aggregate', lane: 'rep-series',
     available: true, perRep: true, target: null, history: true, categories: null,
     measured: 'price_stated_at_seconds on 426 of 1,585 (27%)',
@@ -128,7 +141,7 @@ const CATALOG = [
         + 'on a chart. Already handled by the graph, and any new view inherits it.',
   },
   {
-    key: 'prospects', label: 'Prospects',
+    key: 'prospects', group: 'people', label: 'Prospects',
     source: 'aggregate', cost: 'aggregate', lane: 'prospect-entity',
     available: true, perRep: true, target: null, history: false, categories: null,
     measured: 'prospect_id on 1,534 of 2,052 real calls',
@@ -138,7 +151,7 @@ const CATALOG = [
 
   // ── NOT OFFERABLE TODAY, and each says why ───────────────────────────────
   {
-    key: 'talk_ratio', label: 'Talk ratio',
+    key: 'talk_ratio', group: 'quality', label: 'Talk ratio',
     source: 'scan', cost: 'scan', lane: null,
     available: false, perRep: true, target: null, history: false, categories: null,
     measured: 'COMPUTABLE, and I computed it: 66% closer on average across 200 '
@@ -156,7 +169,7 @@ const CATALOG = [
         + 'is the sounder measure. Offerable after a stored per-call column.',
   },
   {
-    key: 'discovery_coverage', label: 'Discovery coverage',
+    key: 'discovery_coverage', group: 'quality', label: 'Discovery coverage',
     source: 'column', cost: 'aggregate', lane: null,
     available: false, perRep: true, target: null, history: false, categories: 'area_key',
     measured: 'coverage on 683 of 1,585 — but SPLIT ACROSS TWO VOCABULARIES: 626 '
@@ -168,7 +181,7 @@ const CATALOG = [
         + 'the fixed six — a due date, not a dependency.',
   },
   {
-    key: 'coaching_volume', label: 'Coached moments',
+    key: 'coaching_volume', group: 'quality', label: 'Coached moments',
     source: 'column', cost: 'aggregate', lane: null,
     available: false, perRep: true, target: null, history: false, categories: null,
     measured: 'call_highlights.coaching on 197 of 8,998 (2%) — v30, new calls only',
@@ -196,8 +209,56 @@ function catalog() {
 function offerable() { return catalog().filter(function (m) { return m.available; }); }
 function byKey(k) { return catalog().filter(function (m) { return m.key === k; })[0] || null; }
 
+/** ⚠ DERIVED FROM THE CATALOG, so a metric cannot be added and left ungrouped —
+    an ungrouped metric would simply vanish from the picker, which is the silent
+    kind of absence this product keeps having to fix. */
+/* ⚠⚠ THE CATALOG'S `measured` AND `note` FIELDS ARE INTERNAL AND MUST NOT BE
+   SERIALISED. They are engineering notes — "USE close_score_earned, NEVER
+   close_score", "migration 027", "transcript_stored.turns[]", row counts — and
+   sending the WHOLE entry puts every one of them in a customer's browser. It
+   renders nowhere today, which is exactly the problem: it is one innerHTML away
+   from being on screen, and the customer-language ruling is about what a
+   customer CAN see, not what they happen to be shown this week.
+
+   ⚠ SO THE WIRE SHAPE IS AN ALLOWLIST, NOT A DELETION. The notes stay in
+   CATALOG where they belong — they are the measured justification for every
+   `available` flag — and this picks out the seven fields the picker reads. */
+var PUBLIC_FIELDS = ['key', 'label', 'views', 'target', 'targetDirection', 'history', 'categories'];
+
+function publicMetric(m) {
+  var out = {};
+  PUBLIC_FIELDS.forEach(function (f) { if (m[f] !== undefined) out[f] = m[f]; });
+  return out;
+}
+
+function grouped() {
+  var all = catalog();
+  return GROUPS.map(function (g) {
+    return { key: g.key, label: g.label,
+             metrics: all.filter(function (m) { return m.group === g.key && m.available; })
+                         .map(publicMetric) };
+  }).filter(function (g) { return g.metrics.length; });
+}
+
+/** ⚠⚠ NOT HIDDEN. A manager who wonders where talk ratio went must be told, not
+    left guessing — an unexplained absence reads as a product that lost it.
+    ⚠ AND THE NAME IS ALL THEY GET. `measured` reads "coverage on 683 of 1,585 —
+    SPLIT ACROSS TWO VOCABULARIES"; that is a fact about our schema, not
+    something a manager can act on, and the customer-language ruling says a
+    message that cannot say WHAT HAPPENED and WHAT TO DO does not belong on
+    screen. The picker supplies the one sentence they can act on. */
+function unavailable() {
+  return catalog().filter(function (m) { return !m.available; })
+                  .map(function (m) { return { key: m.key, label: m.label }; });
+}
+
 module.exports = {
   VIEWS: VIEWS,
+  GROUPS: GROUPS,
+  grouped: grouped,
+  _publicMetric: publicMetric,
+  _PUBLIC_FIELDS: PUBLIC_FIELDS,
+  unavailable: unavailable,
   catalog: catalog,
   offerable: offerable,
   byKey: byKey,

@@ -86,7 +86,12 @@ function loadCoalescer(opts) {
      source: the comment stripper is for matching, not for execution. */
   const pAt = HTML.indexOf('var TEAM_PAGES');
   const pSrc = HTML.slice(pAt, HTML.indexOf('function teamPageSelectHtml', pAt));
-  assert.ok(pSrc.length > 200 && pSrc.length < 3000, 'predicate slice: ' + pSrc.length);
+  /* ⚠ THE CEILING MOVED 3000 -> 4200 when `team-dashboard` joined TEAM_PAGES.
+     Raising a bound is the mirror of lowering a floor and deserves the same
+     suspicion: it is the one edit that turns a real slice check into a vacuous
+     one. It is raised because the SLICE GREW LEGITIMATELY — the reason is here
+     so the next reader can tell a legitimate growth from a silenced failure. */
+  assert.ok(pSrc.length > 200 && pSrc.length < 4200, 'predicate slice: ' + pSrc.length);
   const isTeamView = new Function(pSrc + '; return isTeamView;')();
 
   const fn = new Function(

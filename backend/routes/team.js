@@ -33,7 +33,8 @@ function getAnthropic() {
   return _anthropic;
 }
 const { computeTeamRecommendations } = require('../lib/team-synthesis');
-const { resolveLayout, MAX_BOARDS } = require('../lib/dashboard-layout');
+const { resolveLayout, sanitizeLayout, MAX_BOARDS, MAX_CARDS } = require('../lib/dashboard-layout');
+const { grouped: catalogGrouped, unavailable: catalogUnavailable } = require('../lib/widget-catalog');
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
@@ -357,6 +358,87 @@ router.get('/dashboard', teamGate, async function (req, res) {
       dropped: resolved.dropped,
     });
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard', err); res.status(500).json({ error: 'Failed to load the dashboard layout' }); }
+});
+
+/* ⚠ THE CATALOG THE PICKER READS. Served rather than duplicated in the browser:
+   `viewsFor()` IS the honesty rule and a second copy in the client is how a
+   gauge comes to be offered for a metric with no target. The unavailable list is
+   sent DELIBERATELY — a manager who wonders where talk ratio went must be told,
+   not left guessing. */
+router.get('/catalog', teamGate, function (_req, res) {
+  res.json({ groups: catalogGrouped(), unavailable: catalogUnavailable() });
+});
+
+/* ⚠⚠ SAVE. The cap is enforced HERE and reads as words, never as a database
+   error — a manager who has ten boards is told they have ten, not shown a 23505.
+   ⚠ AND THE LAYOUT IS SANITISED SERVER-SIDE. The client is a suggestion: a board
+   is stored for a long time and read by a renderer that trusts it, so an unknown
+   view or a 99-column span must not reach the row in the first place. */
+router.put('/dashboard', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    var body = req.body || {};
+    var name = (typeof body.name === 'string' && body.name.trim()) ? body.name.trim().slice(0, 60) : 'My board';
+    var layout = sanitizeLayout(body.layout);
+    if (!layout.length) return res.status(400).json({ error: 'A board needs at least one card.' });
+
+    var existing = await admin.from('dashboards').select('id').eq('user_id', req.user.id);
+    if (existing.error) throw new Error('dashboards: ' + existing.error.message);
+    var rows = existing.data || [];
+
+    if (body.id) {
+      if (!rows.some(function (r) { return r.id === body.id; })) {
+        /* ⚠ 404, NOT 403 — a board id that is not yours is indistinguishable
+           from one that does not exist, and saying which is a disclosure. */
+        return res.status(404).json({ error: 'That board no longer exists.' });
+      }
+      var up = await admin.from('dashboards')
+        .update({ name: name, layout: layout, updated_at: new Date().toISOString() })
+        .eq('id', body.id).eq('user_id', req.user.id).select('id, name, pinned').maybeSingle();
+      if (up.error) throw new Error('dashboards update: ' + up.error.message);
+      return res.json({ board: up.data });
+    }
+
+    if (rows.length >= MAX_BOARDS) {
+      return res.status(400).json({ error: 'You already have ' + MAX_BOARDS
+        + ' boards. Rename or delete one to make room.' });
+    }
+    var ins = await admin.from('dashboards')
+      .insert({ user_id: req.user.id, name: name, layout: layout })
+      .select('id, name, pinned').maybeSingle();
+    if (ins.error) throw new Error('dashboards insert: ' + ins.error.message);
+    res.json({ board: ins.data });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard-save', err); res.status(500).json({ error: 'Could not save your board.' }); }
+});
+
+/* ⚠⚠ PIN. A partial unique index makes two pinned boards UNREPRESENTABLE, so the
+   unpin-then-pin has to happen in that order or the insert collides — the
+   constraint is the authority and this code obeys it rather than assuming. */
+router.post('/dashboard/:id/pin', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    var mine = await admin.from('dashboards').select('id').eq('user_id', req.user.id).eq('id', req.params.id).maybeSingle();
+    if (mine.error) throw new Error('dashboards: ' + mine.error.message);
+    if (!mine.data) return res.status(404).json({ error: 'That board no longer exists.' });
+
+    var clear = await admin.from('dashboards').update({ pinned: false }).eq('user_id', req.user.id).eq('pinned', true);
+    if (clear.error) throw new Error('unpin: ' + clear.error.message);
+    var set = await admin.from('dashboards').update({ pinned: true }).eq('id', req.params.id).eq('user_id', req.user.id);
+    if (set.error) throw new Error('pin: ' + set.error.message);
+    res.json({ ok: true, pinned: req.params.id });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard-pin', err); res.status(500).json({ error: 'Could not pin that board.' }); }
+});
+
+router.delete('/dashboard/:id', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    var del = await admin.from('dashboards').delete().eq('id', req.params.id).eq('user_id', req.user.id).select('id');
+    if (del.error) throw new Error('dashboards delete: ' + del.error.message);
+    if (!(del.data || []).length) return res.status(404).json({ error: 'That board no longer exists.' });
+    /* ⚠ DELETING THE LAST BOARD IS NOT AN ERROR — the manager simply returns to
+       the code default, which is the whole point of storing the deviation. */
+    res.json({ ok: true });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard-delete', err); res.status(500).json({ error: 'Could not delete that board.' }); }
 });
 
 router.get('/averages', teamGate, async function (req, res) {
