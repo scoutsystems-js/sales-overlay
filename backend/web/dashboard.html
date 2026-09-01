@@ -3057,6 +3057,23 @@
     body[data-view="team-expanded"] .review-why-quote { padding: 0; font-style: italic; }
     body[data-view="team-expanded"] .team-lane { padding: 0 0 18px; }
     body[data-view="team-expanded"] .team-lane + .team-lane { border-top: 1px solid var(--border); padding-top: 18px; }
+
+    /* ⚠⚠ THE CALL LIBRARY IS A LIST, and a list of twenty bordered cards is the
+       clearest case for borders-become-space in the product. Rows become
+       hairline-separated instead.
+       ⚠ THE HOVER STATE IS LOAD-BEARING HERE, not decoration: a row OPENS the
+       call review, and the border was carrying its clickability. Removing the
+       box without replacing that affordance would leave twenty lines of text
+       that happen to be buttons. */
+    body[data-view="call-library"] .library-card {
+      background: none; border: 0; border-radius: 0;
+      padding: 14px 12px; margin-bottom: 0;
+      border-top: 1px solid var(--border);
+    }
+    body[data-view="call-library"] .library-card:first-of-type { border-top: 0; }
+    body[data-view="call-library"] .library-card:hover {
+      background: var(--bg-elevated); border-color: var(--border);
+    }
     /* ⚠ OPTION A — the attribution is BOUND to the quote it names, above it.
        The pair sits in one container so they cannot drift apart in a reflow. */
     .team-insight-ev { margin-top: 8px; }
@@ -3765,6 +3782,8 @@
 
        ⚠ Space does the grouping. One accent, sparingly. Hairlines only where a
        boundary genuinely has to be read as a boundary. */
+    body[data-view="call-library"] .section,
+    body[data-view="call-library"] .page-header,
     body[data-view="team-expanded"] .section,
     body[data-view="team-expanded"] .page-header,
     body[data-view="overview"] .section,
@@ -3992,6 +4011,7 @@
        WAS BUILT BY PAGE NAME, NOT BY REACHABILITY — so it kept its boxes while
        the page linking to it lost them, and clicking through read as a
        regression. Ground first, as always. */
+    body[data-view="call-library"] .page ,
     body[data-view="team-expanded"] .page ,
     body[data-view="overview"] .page ,
     body[data-view="team-members"] .page ,
@@ -8529,7 +8549,7 @@
     'team-performance': 'performance',
     'team-coaching':    'coaching',
     'team-objections':  'objections',
-    'team-expanded':    'coaching',   // the expanded recs page belongs to Coaching
+    'team-expanded':    'coaching',   // Call Highlights of the Week — still reached from Coaching
   };
   function teamRangePage() { return TEAM_RANGE_PAGE[state.view] || 'performance'; }
 
@@ -9869,14 +9889,22 @@
     ensureTeamDefaultRange();
     if (state.teamContext === null) { loadTeam('context'); }
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
-    if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamHighlights === null && !state.teamHighlightsLoading) loadTeam('highlights');
+    /* ⚠⚠ CALL HIGHLIGHTS ONLY (Justin's ruling, 2026-09-01). Team Recommendations
+       came off: COACHING ALREADY RENDERS THEM, through the SAME `teamRecsHtml()`
+       — verified before removing, because removing the wrong half is how a
+       working feature becomes unreachable. This page was partly a longer copy of
+       the page that links to it; now Highlights has a page of its own.
+       ⚠ THE `recs` LANE IS NO LONGER KICKED HERE — a page that renders nothing
+       from a lane must not pay for it. Coaching still kicks it.
+       ⚠ "← Back to Team" MOVED rather than being deleted with the section that
+       housed it: it was the only way back from this page. */
     content.innerHTML =
       teamHeaderHtml() + teamControlsHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Team Recommendations</h2>'
-        + '<div class="meta">grounded in the team\'s calls</div></div>'
-        + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>' + teamRecsHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Call Highlights of the Week</h2></div>' + teamHighlightsHtml() + '</div>';
+      + '<div class="section fade-in"><div class="section-header"><div><h2>Call Highlights of the Week</h2>'
+        + '<div class="meta">best objection handling, challenger moments and pain excavation</div></div>'
+        + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
+        + teamHighlightsHtml() + '</div>';
   }
 
   // Compact recommendations card on the main team view: a one/two-line teaser +
