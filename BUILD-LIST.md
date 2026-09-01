@@ -1136,3 +1136,18 @@ A control wherever coaching appears, manager and above, capturing a manager's co
 - "1000 chunks" on the Knowledge Base entry.
 - The objection category renders **green** on the Why cards while labelling the **weakest** category.
 - **Call review** — eleven bars encode outcome there; needs a ruling, not a sweep.
+
+## 2026-09-01 — Closing % ships; three faults filed on the team Coaching page (`28034e4`)
+
+**LIVE**
+- **Closing % is the loud number** on the personal Coaching Dashboard, counts beneath it, leaving three supporting tiles. ⚠ The argument against Avg Score is recorded at the code: it drifts ~6 points run-to-run on identical input, and the live page shows it at −15% today, inside that drift.
+- **Green sweep finished on this page** — `.srk-why`, `.srk-coach`, `.srk-reply`. ⚠ My previous "done" was an over-claim; these were found by enumerating computed colour, not by grepping the stylesheet. `.srk-why` rendered a **negative** finding in an 18% **green** fill.
+
+**⚠⚠ ESTABLISHED, NOT FIXED — the team Coaching page (report-before-fixing)**
+- **(a) The quote is not bound to the claim.** 2 of 6 insights cite evidence from a rep the prose never names. `resolve()` looks up `byId[it.evidence_id]` blindly; nothing checks the evidence rep against the names in the claim. All three mismatches are in `improve`.
+- **(b) ⚠⚠ `spoke` is WRITTEN wrong, not read wrong.** It is inferred from which field the code fell back to; `closer_response` is definitionally the closer but **`quote` is either**, and `call_highlights.speaker` records which — **1,548 of 8,998 moments (17%) are CLOSER-spoken.** Fix: read `speaker`, require `speaker_verified === true`, and fall to **unlabelled** otherwise (today an unverified speaker is labelled "prospect").
+- **(c) Timestamps render "127:40".** `tsFromClipUrl` does `mm:ss` with minutes past sixty; `hmsOf` in `lib/team-objection-summary.js` already does `hh:mm:ss`. Two implementations, the newer one wrong.
+
+**MAJORS FILED FOR AFTER THE DESIGN SESSION**
+- **"Fine Tune Coaching"** — captures a manager's correction and stores the concept in the KB. The fix for the isolation defect **at source**.
+- **Closer/Manager tag** — admin-granted flag unlocking the Coaching Dashboard and a recording source for a manager who also takes calls. **Josh is that case, currently an exception.**

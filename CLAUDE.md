@@ -5932,3 +5932,32 @@ A test asserted `no_focus` for a board where every closer is `thin_types`. **The
 **A control wherever coaching appears, manager and above, that captures a manager's correction and stores THE CONCEPT BEHIND IT in the Knowledge Base.**
 - **⚠⚠ IT IS ADD-TO-KNOWLEDGE-BASE FROM THE OTHER END — one teaches by example, the other by correction — AND IT IS THE THING THAT WOULD FIX THE ISOLATION DEFECT AT SOURCE** rather than by editing nine prompts and bumping nine caches.
 - Recorded now so it is not rediscovered, and so the isolation work is not started as nine prompt edits when the durable fix is one feature.
+
+### ⚠⚠⚠ I INFERRED THE SPEAKER FROM *WHICH FIELD I FELL BACK TO*, AND SCOUT HAD RECORDED IT ALL ALONG (2026-09-01)
+**`spoke` was written `'prospect'` on a line the closer plainly said — *"I'll give you $1,000 off for doing that, for doing cash."*** The source row:
+```
+speaker = "CLOSER"   speaker_verified = true   closer_response = "__moment_is_closer__"
+```
+- **THE DERIVATION WAS THE BUG:** `spoke: reply ? 'closer' : (r.quote ? 'prospect' : null)`. `closer_response` is definitionally the closer — **but `quote` is EITHER**, and `call_highlights.speaker` says which. **1,548 of 8,998 moments (17%) are CLOSER-spoken**, so ~1 in 6 quote-fallback insights could carry the wrong label.
+- **⚠⚠ THE FALLBACK WAS NOT INVERTED, AND ESTABLISHING THAT MATTERED: a pre-change cached row shows `spoke=undefined` rendering UNLABELLED, correctly.** So the B path works and the VALUE is wrong — a completely different fix from the one the symptom suggests.
+- **⚠ AND AN UNVERIFIED SPEAKER MUST FALL TO UNLABELLED, NOT TO "prospect".** Labelling on an unverified value is guessing, which is the exact thing `spoke` was added to prevent.
+- **THE GENERAL RULE: WHEN A VALUE IS RECORDED, READ IT — DO NOT RE-DERIVE IT FROM THE CONTROL FLOW.** "Which branch did I take" is a fact about my code; "who spoke" is a fact about the call, and only one of them is in the database.
+
+### ⚠⚠ THE MODEL PICKS THE PROSE AND THE EVIDENCE INDEPENDENTLY, AND ONLY ONE IS VALIDATED (2026-09-01)
+**Measured on the live team synthesis: 2 of 6 insights cite evidence from a rep the prose never names** — a claim naming Godwin and Nick, evidenced by a Gabriel quote about money.
+```
+resolve():  var ev = byId[it.evidence_id]      <- looked up BLINDLY
+```
+- **Nothing checks that the cited moment belongs to a rep the claim is about.** The names live in free prose; the evidence is a separate id. **Two independent choices by the same model, one of them unvalidated.**
+- **⚠ ALL THREE MISMATCHES WERE IN `improve`** — the what-to-improve prose names whoever did badly and the evidence id is not constrained to them. **A model-supplied name is already dropped when it matches no closer; a model-supplied EVIDENCE ID is not checked against the names at all.**
+
+### ⚠⚠ "127:40" — I WROTE THE BUG AND I WROTE DOWN THAT IT WAS ACCEPTABLE (2026-09-01)
+`tsFromClipUrl` does `Math.floor(t/60) + ':' + ss`, and the note I left said *"for >60 min: 66:40. Acceptable."* **It is not** — the rest of the product renders `hh:mm:ss`, and `lib/team-objection-summary.js hmsOf` already did it correctly **in the same session**.
+- **⚠ TWO IMPLEMENTATIONS OF ONE THING AND THE NEWER ONE IS WRONG.** The raw-value defect, in the surface that had just had it fixed elsewhere.
+- **THE TELL I IGNORED: I noticed the >60-minute case and reasoned it away instead of checking what the rest of the product does.** A note saying "acceptable" about a case you have just identified is a decision, and it should be made against the existing convention rather than in isolation.
+
+### ⚠⚠ "THE SWEEP IS DONE" WAS AN OVER-CLAIM, AND THE METHOD THAT CAUGHT IT IS THE FILING (2026-09-01)
+Three more green elements sat on the page I had just declared swept — `.srk-why`, `.srk-coach`, `.srk-reply`.
+- **THEY WERE FOUND BY ENUMERATING COMPUTED COLOUR OVER THE LIVE PAGE**, not by grepping the stylesheet — **the same method that found the inline-style bar**, and the reason the first claim was wrong is that I went back to grepping.
+- **⚠⚠ `.srk-why` RENDERED A NEGATIVE FINDING IN AN 18% GREEN FILL** — the ground a rep repeatedly fails to cover, in the colour that means *good* everywhere else. Same collision as the objection category rendering green for a closer's WEAKEST category. **A colour that means one thing globally and the opposite locally is worse than no colour.**
+- **THE RULE, restated because it keeps paying: for anything about RENDERED APPEARANCE, enumerate from `getComputedStyle` over the live page. A stylesheet cannot show you a style that does not live in it.**
