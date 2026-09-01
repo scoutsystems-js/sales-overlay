@@ -3282,6 +3282,47 @@ rendered quotes                          118
 - **⚠⚠ I SAMPLED THREE OBSERVATIONS, SAW A PRESCRIPTION, AND WAS WRONG.** Three real rows all contained *"closer needs to…"*, so I nearly reported that the missing coaching already existed and only needed rendering. **Measured: 31 of 537 (5.8%) are prescriptive, and 3 say "should have".** A three-row sample of a 537-row population is an anecdote; the difference between "already there" and "5.8%" is the difference between a render fix and a prompt change.
 - **THE SHAPE THE TARGET NEEDS, and what exists today:** the moment ✓100% · what the prospect revealed ✓100% · what the closer did ✓98.7% · **what they should have asked ✗5.8%** · **why it would have mattered ✗5.8%**. **Three of five are free and unrendered; two need generating.**
 
+### ⚠⚠⚠ A CLAIM I MADE IN A REPORT CAME BACK AS AN ESTABLISHED CONSTRAINT — AND IT WAS FALSE (2026-08-31)
+**My own closing sentence — *"the nav is hand-written markup shared by every page and already has a filed wrapping problem at 1440"* — was quoted back to me in the next brief as a filed row, and it would have blocked the work if I had accepted it.**
+```
+grep for a filed nav-wrap row      NOTHING. The only related note says the OPPOSITE
+                                   ("no nav collision at 1920", from the font row)
+.top-bar-left                      display:flex, DEFAULT flex-wrap: nowrap — it CANNOT wrap
+measured clearance at 1440         116px, and 108px with the caret added
+the real tight point               ~1324px, moving to ~1334px
+```
+- **⚠⚠ THE MECHANISM IS THE DANGEROUS PART: A REPORT IS AN ARTEFACT, AND ANYTHING IN IT CAN BE READ BACK AS FACT.** An offhand caveat written to be helpful becomes a constraint someone plans around — and it arrives in the next brief with the authority of a filed decision rather than the tentativeness it was written with.
+- **THE RULE: A CAVEAT IN A REPORT MUST CARRY ITS EVIDENCE OR ITS UNCERTAINTY.** *"The nav may wrap at narrow widths — not measured"* would have been honest and would have cost nothing. Stating it as filed made it load-bearing.
+- **⚠ AND WHEN A BRIEF CITES A FILED ROW, CHECK THE ROW EXISTS** — the same discipline as *when a request names something you cannot find, say so*. Here the thing named was my own sentence.
+- Sits with the row-that-goes-stale family, from the other end: **that one is a true statement decaying; this is an unverified one hardening.**
+
+### ⚠⚠⚠ A POPUP THAT RENDERS BEHIND THE PAGE IS A STACKING CONTEXT — AND A LAYER THAT *TIES* LOSES (2026-08-31)
+**Two of five menu items rendered BEHIND the company card. Every measurement passed; the screenshot is what found it.**
+```
+.top-bar          position: sticky;  z-index: 50
+.page-header      position: relative; z-index: 50   <- LATER in the document, so it WINS
+the menu          z-index: 60 — but SCOPED INSIDE the nav's context, so it can never
+                  rise above a sibling context that outranks its parent
+```
+- **⚠⚠ EQUAL z-index IS NOT A TIE, IT IS A LOSS FOR WHOEVER COMES FIRST.** Both were 50 deliberately and independently, and neither author was wrong; the collision only exists because a *third* thing — a menu — needed to escape one of them.
+- **⚠ IT WAS INVISIBLE UNTIL THE FEATURE ARRIVED. The nav had held only links for months**, and a link has nothing to project over the page. **A latent stacking bug detonates on the first descendant that needs to overflow its parent** — the same shape as the comment-stripper that was wrong for months until someone added a docblock.
+- **THE DIAGNOSTIC IS `elementFromPoint`, NOT READING THE CSS** — it named the `<h1>` in one call. **Do not reason about z-index; ask the browser what is on top.** (Already recorded for the date picker; this is the second instance, and the first where the occluder was the page's own heading.)
+- **THE FIX IS ON THE ANCESTOR:** the nav moved to 70 — above page content, still below modals (100) and the welcome overlay (9999). **Raising the menu itself could never have worked.**
+- **⚠ THE GUARD ASSERTS THE ORDERING, NOT THE NUMBER:** `nav > .page-header` and `nav < modal`, read from the stylesheet — so a future re-layer fails rather than silently re-hiding a menu.
+
+### ⚠⚠ AN `<a>` WITH NO `href` IS NOT FOCUSABLE — TOLERABLE FOR A LINK, DISQUALIFYING FOR A MENU (2026-08-31)
+**Every tab in this nav is `<a class="nav-link" onclick=...>` with no `href`, so none of them is in the tab order and `.focus()` on one does nothing.** Pre-existing and harmless for years.
+- **⚠ IT STOPPED BEING HARMLESS THE MOMENT ONE BECAME A DROPDOWN: Escape had nothing to return focus to, and the control could not be opened from a keyboard at all.** `tabindex="0"` plus Enter/Space/ArrowDown, and a visible focus ring because the nav suppresses the default outline.
+- **PROVEN BY MEASURING FOCUS RETURN, NOT BY READING THE MARKUP** — `focusReturned: false` before, `true` after. **An accessibility property is a runtime fact; the attribute list only tells you what was intended.**
+- **THE GENERAL FORM: A PRE-EXISTING SHORTCUT BECOMES A DEFECT WHEN THE ELEMENT'S ROLE CHANGES.** When promoting an element from passive to interactive, re-derive what its new role requires rather than inheriting what the old one tolerated.
+
+### ⚠⚠⚠ `Customize View` EDITED EVERY PAGE FROM WHEREVER YOU STOOD — AND REMOVING IT COULD HAVE STRANDED PEOPLE (2026-08-31)
+**Justin: *"it carries over to every page and should not."* Asked to establish whether it merely SHOWED everywhere or ACTED everywhere, it was the second.**
+- **`customizeViewHtml()` iterated `TEAM_PANELS` (all nine) rather than `panelsForPage()`** — which the split had introduced and used elsewhere. So the control on ANY page toggled EVERY page's panels: **hiding the digest from Performance hid it on Daily Digest, where the manager could not see what they had done.** On People — which owns no panels — it edited three other pages exclusively.
+- **⚠⚠ THE REMOVAL'S LOAD-BEARING HALF IS NOT THE REMOVAL. Deleting the stored sets would be data loss; leaving them APPLIED with no control on screen would leave anyone who had hidden a panel with it hidden FOREVER and no route back.** So the sets are **kept and no longer read** — one line restores the behaviour if a chooser ever returns.
+- **⚠ THE GENERAL RULE: REMOVING A CONTROL DOES NOT REMOVE ITS EFFECTS.** Whenever a control goes, ask what state it wrote, who is still living under that state, and how they would undo it now. **A setting with no surface that can change it is a trap, not a preference.**
+- **⚠ AND THE TESTS WERE CONVERTED PER TEST, NOT DELETED WITH THE FEATURE.** The storage ruling — *store the HIDDEN set, never the visible one* — **outlives the control** and is now asserted on the reader that still encodes it; the toggle-behaviour tests were archived in place as the behaviour to restore.
+
 ### ⚠⚠⚠ A THIRD DISPATCHER SHIPPED THE SPLIT BROKEN — AND MY GUARD COVERED THE TWO I KNEW ABOUT (2026-08-31, `506c539`)
 **Justin, live: *"nothing is populating on the pages just empty cards."* Performance and Coaching rendered their shells, every lane resolved, and NOTHING REPAINTED.**
 ```

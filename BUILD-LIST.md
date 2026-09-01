@@ -31,6 +31,45 @@
 
 ## 🎯 CURRENT SESSION
 
+### ✅ 2026-08-31 (`7a12303`) — THE NAV TAB IS THE PAGE DROPDOWN · CUSTOMIZE VIEW REMOVED
+
+| what | detail |
+|---|---|
+| **The "Team" tab IS the dropdown** | the company-card `<select>` is gone — one control, one place. The tab keeps its `nav-link` class, so type/size/weight/colour/spacing/underline are unchanged; **the only addition is a 9px caret** |
+| **⚠ MEASURED BEFORE BUILDING** | tab **33px → 41px** · clearance at 1440 **116 → 108px** · squeeze point **1324 → 1334px** · nothing clips or overlaps at 1280 |
+| **⚠⚠ THE "already wraps at 1440" PREMISE WAS FALSE — AND IT WAS MY OWN SENTENCE** | quoted back from last block's report as a filed row. No such row exists (the only related note says the opposite). `.top-bar-left` is **flex-NOWRAP and cannot wrap** |
+| **What a click does** | from OUTSIDE the team area it navigates (as every other tab does) **and** opens the menu; from INSIDE it only opens the menu, because navigating would throw a manager off the page they are on |
+| **⚠⚠ A DEFECT ONLY THE SCREENSHOT FOUND** | two of five menu items rendered **behind the company card** — nav and card both `z-index: 50`, and at a tie the later element wins, so the menu's own 60 was scoped inside a context that could never escape. Nav → **70** (above content, below modals 100 and the welcome overlay 9999) |
+| **⚠ Keyboard access ADDED, not adjusted** | every nav tab is an `<a>` with no `href`, so none was focusable — fine for a link, disqualifying for a menu. `tabindex`, Enter/Space/ArrowDown, visible focus ring. **Proven by measuring focus return** |
+| **Customize View removed — AND IT WAS A BUG** | it iterated `TEAM_PANELS` (all nine) rather than `panelsForPage()`, so the control on **any** page toggled **every** page's panels. On People — which owns no panels — it edited three other pages exclusively |
+| **⚠⚠ THE STORED SETS ARE KEPT AND NO LONGER APPLIED** | deleting them is data loss; still applying them with no control on screen strands anyone who hid a panel — **hidden forever, no way back**. One line restores it if the Widget Catalog brings a chooser back |
+
+**Tests converted per test, not deleted with the feature:** the storage ruling (*store the HIDDEN set*) **outlives the control** and is asserted on the reader that still encodes it; toggle behaviour archived in place. Every new guard proven by restoring the defect. **Suite 1921.**
+
+---
+
+### 📐 THE DESIGN PASS — SIZED, NOT STARTED (2026-08-31)
+
+**Three to five blocks, and it cannot share a session.**
+
+```
+where style lives     13 files — and 9 of them load the shared stylesheet
+dashboard.html alone  374 font-size · 183 font-weight · 85 border-radius
+type tokens           NONE. every one of those 374 sizes is a literal
+radius tokens         3 exist — and 94 declarations IGNORE them vs 76 that use them,
+                      at values the tokens do not offer (3,4,5,6,10,14px)
+weights               115 share ONE value; 7 distinct in total
+sizes                 12 distinct, including half-pixels (12.5 / 10.5 / 13.5)
+```
+
+**⚠ TWO CORRECTIONS TO THE AUDIT:** the app and login do **NOT** run different typefaces — they were unified when Saira shipped; what diverges is **`admin.html` on monospace**. And there are **THREE** blacks, not two: dashboard `#0a0a0a`, `css/style.css` `#080b0d`, login `#000`.
+
+**⚠⚠ SWEEP OR REBUILD — IT IS BOTH, WHICH IS THE REASON FOR THE BLOCK COUNT.** **Radii are a sweep** (the tokens exist; map ~94 literals onto 3, each a judgement). **Type is a REBUILD** — there is nothing to sweep *onto*, so a scale must be created first and 374 declarations each assigned a step; that is the bulk. **Weights are a decision then a sweep** (115 on one value is too FEW distinctions, not too many). **Blacks and the admin typeface are small.** **Separation-by-border-vs-space is a LAYOUT change, not a token change**, and the likeliest to look wrong in ways only a screenshot shows.
+
+**⚠ Every decision in it is visual, so it needs pages looked at rather than declarations counted.**
+
+---
+
 ### 🚨 URGENT FIX 2026-08-31 (`506c539`) — two split pages never repainted. LIVE and verified.
 
 **Justin, live: *"nothing is populating on the pages just empty cards."*** Performance and Coaching drew their shells, every lane resolved, **and nothing repainted** — so the gauges, the three graphs, the rep cards, the three score lists, recommendations and needs-work were all blank.
