@@ -48,6 +48,38 @@
 
 ---
 
+### ✅ 2026-09-01 (`19233bf`) — CAPTIONS WIRED · THE DIAL FIXED · BLOCK ④ SHAPE REPORTED
+
+**CAPTIONS — all ten, verified on production with comments stripped.** Removed: our roadmap ("until the billing block adds an account entity"), our mechanism ("the figure Scout listens for", "Scout caps grading so a big import cannot fire hundreds of analyses"), and captions phrased as a negation of our own controls ("not affected by the date filter above"). Kept: everything a reader can act on.
+- ⚠⚠ **ONE REMOVAL TOOK A CONSEQUENCE WITH IT.** The People caption was THREE clauses; only one was roadmap. The clause saying **a rep with no offer price goes unmeasured** is a fact the manager is the only person who can fix — restored, reworded out of mechanism voice. A guard caught it.
+- ⚠⚠ **AND THE RESTORED CAPTION WAS DEAD CODE FOR AN HOUR** — a stray `;` terminated the return. `node -c`, the suite and the guard all passed, because the string was still in the file. **Only rendering the builder found it.** The guard now asserts the token after the table is a `+`.
+- ⚠ **AN ELEVENTH CANDIDATE ON THE KB PANEL WAS FOUND AND DELIBERATELY NOT CHANGED** — ten were approved, and quietly extending an approved sweep is scope creep.
+- **The per-page range caption went by ruling.** Its guard now records what that cost: it was the only thing explaining why 90 days on one page shows 7 on the next. **That behaviour is now unexplained** — if it reads as a bug, the fixes are a shared range or a real explanation, not a quieter apology.
+
+**THE DIAL — the value renders `41.7min`, not `46min`** (one decimal, from `lib/team-averages.js`). Fixed as **layout, never an eighth type size**: suffix to the existing label step, dial 290→320. Measured by hit-testing the TEXT (not its container): worst clearance **45px**, no contact at the text's top, centre or bottom. Then looked at.
+
+### ⏳ BLOCK ④ — SIDEBAR + LOGO. SHAPE REPORTED, NOTHING BUILT (2026-09-01)
+
+⚠⚠ **ONE RULING OUTSTANDING: where Sign out sits.** Justin's first message said Admin · My Profile · Sign Out all stay top right; the later one said Sign out moves to the bottom of the account page. The more specific governs, so the plan below is the second — **but nothing is built until he confirms.**
+
+**MEASURED, AND IT CORRECTS TWO PREMISES OF MY OWN:**
+- The nav is **NOT "shared by every page"**. It is in **ONE live file** (`dashboard.html`). `coaching.html` has one but is the archived v1 page linked from nowhere; **the other 11 served pages have no nav at all.** Size: **30 lines of markup · 22 CSS rules · 6 JS touchpoints** — *not* the largest change in this pass.
+- The nav does **NOT wrap at 1440** — it wraps just under **1366** (left 1016px + right 263px = 1279px). It does wrap on a 1280 laptop, just not where I said. ⚠ **The argument for a sidebar is not the wrap point — a vertical list has no width limit, and three of the eight tabs are "soon" items that will become real.**
+
+```
+SIDEBAR (where you go)              TOP RIGHT (who you are)
+  Coaching Dashboard · Calls          Admin       owner only, gate untouched
+  EOD Report · Team ▾ · Knowledge     My Account  -> NAVIGATES to #account
+  Base · 3 "soon" tabs                            (the email link already does exactly this)
+                                    ACCOUNT PAGE — 7 existing sections + Sign out at the bottom
+```
+- **"My Account" navigates; it is not a menu.** Same behaviour as today, only the label changes. **The page already exists — nothing is rebuilt.**
+- **The five team pages live in the sidebar ONLY**, never in both.
+- ⚠ **THE RISK JUSTIN NAMED IS REAL: sign out becomes two clicks and a scroll.** The account page is seven full-width cards, so its bottom is below the fold on a laptop. If it goes inside, recommendation is its own bordered card at the bottom — the only destructive-looking control on the page.
+- ⚠ **THE RELABEL LOSES ONE THING:** the raw email is the only place on screen saying which account you are signed into. Not lost (Profile → Email) but one click deeper — matters on a shared machine.
+
+**THE LOGO IS BLOCKED, BY MEASUREMENT — AND THERE IS NO LOGO IN THE NAV TODAY** (it is the plain word `Scout` in a `<span>`). The mark's smallest dot is `r=0.2` in a 17.105-unit viewBox: **0.56px at a 24px nav, 0.75px at 32px**; stroke 0.04–0.06px. **Sub-pixel at every plausible size — no CSS change reaches it.** It needs a redrawn small mark (thicker stroke, fewer/larger dots): an **asset task, not a code task**, exactly like the wordmark export.
+
 ### ✅ RULED 2026-09-01 — THE LOUD NUMBER IS FIXED PER PAGE
 
 **Fixed per page, NOT weakest-against-target. Daily Digest leads with TOTAL CLOSES THAT DAY.**
