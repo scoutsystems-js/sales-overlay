@@ -3895,6 +3895,10 @@
     body[data-view="call-library"] .section,
     body[data-view="team-expanded"] .section,
     body[data-view="overview"] .section,
+    /* ⚠ A NEW VIEW INHERITS NOTHING — both of these lists are per-view, so a
+       page added after the design pass keeps its boxes unless it is named.
+       Found by LOOKING at the first render, not by a test. */
+    body[data-view="team-dashboard"] .section,
     body[data-view="team-members"] .section,
     body[data-view="team-objections"] .section,
     body[data-view="team-coaching"] .section,
@@ -3913,6 +3917,7 @@
     body[data-view="call-library"] .page-header,
     body[data-view="team-expanded"] .page-header,
     body[data-view="overview"] .page-header,
+    body[data-view="team-dashboard"] .page-header,
     body[data-view="team-members"] .page-header,
     body[data-view="team-objections"] .page-header,
     body[data-view="team-coaching"] .page-header,
@@ -3933,6 +3938,7 @@
       padding-right: 0;
       margin-bottom: 40px;          /* the grouping the borders used to do */
     }
+    body[data-view="team-dashboard"] .page-header--company ,
     body[data-view="team-members"] .page-header--company ,
     body[data-view="team-objections"] .page-header--company ,
     body[data-view="team-coaching"] .page-header--company ,
@@ -4014,6 +4020,7 @@
       background: transparent; border: 0; border-radius: 0;
       border-bottom: 1px solid var(--border);
     }
+    body[data-view="team-dashboard"] .team-controls-row ,
     body[data-view="team-members"] .team-controls-row ,
     body[data-view="team-objections"] .team-controls-row ,
     body[data-view="team-coaching"] .team-controls-row ,
@@ -4143,6 +4150,7 @@
     body[data-view="call-library"] .page,
     body[data-view="team-expanded"] .page,
     body[data-view="overview"] .page,
+    body[data-view="team-dashboard"] .page,
     body[data-view="team-members"] .page,
     body[data-view="team-objections"] .page,
     body[data-view="team-coaching"] .page,
