@@ -1070,3 +1070,24 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 
 **⚠ NEW DEFECT FOUND WHILE INVESTIGATING — NOT FIXED**
 - **`lib/team-synthesis.js` is a SIXTH lane using the sentinel gate (`displayCloserResponse`) rather than the verified gate (`provenCloserResponse`).** The five-lane sweep in `30d4d43` missed it, and this lane **both feeds a model prompt and renders to a manager** — the two separate concerns of that sweep. Fixing it falls out of recommendations option (a).
+
+## 2026-09-01 — Option A, My Team, and the design pass CLOSES (`4b4a033`)
+
+**LIVE**
+- **Team Recommendations — Option A.** Attribution above the quote and bound to it (claim → evidence → quote). `spoke: 'closer'|'prospect'` recorded at candidate-build time; closer branch gated on `provenCloserResponse`. **B is the fallback for rows with no `spoke`** — quote inline, unlabelled. ⚠ **No wrong label is ever shown**; two guards fail if that is weakened.
+- **The sixth unproven-reply lane closed** — `lib/team-synthesis.js` was on the sentinel gate and is the only lane that both feeds a model prompt and renders to a manager.
+- **The claim/data caps** — a length rule added to the prompt, caps raised above it (520), `capAtSentence` cuts at a sentence boundary. Five of six data fields had been landing exactly on the old 200.
+- **`RECS_LANE_VERSION` in the cache key** — without it the whole change is invisible on every cached window.
+- **"Manage Members" removed everywhere.** ⚠ Precondition checked first: its only action was `setView('team-members')`, the same page the dropdown reaches.
+- **"People" → "My Team"** — dropdown, heading, title map and hash (`#my-team`). `#team-members` still routes in; round trip asserted both ways.
+
+**⚠ THE DESIGN PASS IS COMPLETE.** Everything approved in it is shipped and deployed.
+
+**BLOCKED — asset tasks, not code, and not scheduled**
+- **Nav logo** — sub-pixel at nav size (0.56px dots at 24px). Needs a redrawn small mark.
+- **Wordmark at 2x** — the source is a screenshot; an upscale measures 2.7× the bytes and *softer*. Needs a render from the original artwork at ≥2076px.
+
+**FILED, NOT ACTED ON (2026-09-01)**
+- **Green bars survive on the PERSONAL coaching dashboard** — "What's Working / What to Improve / Evidence" and the coaching quote blocks. The sweep was scoped to team views; **extending it is a ruling**. ⚠ One of these (`.team-insight`) does encode good/improve — though the headings above it already say the same thing.
+- **Section score bars are amber on every row** regardless of score, with only WEAKEST in red. Amber appears nowhere else in the product and the WEAKEST/STRONGEST chips already carry the meaning.
+- **"1000 chunks" on the Knowledge Base entry** — internal vocabulary on a customer surface.

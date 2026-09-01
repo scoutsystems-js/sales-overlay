@@ -5833,3 +5833,34 @@ the defect        a statement that runs AFTERWARDS and replaces it
 **A CSS splice left the new rule unclosed — which silently swallows the NEXT rule, killing both.** Line count was unchanged, so the shrink guard passed cleanly.
 - **THE COMPLEMENT IS CHEAP: count braces in the `<style>` block after any CSS edit** (110/110 here). A structural check catches what a size check cannot.
 - Same shape as *a file can be syntactically valid and still be half a file*: **form and integrity are different questions, and a guard usually answers only one of them.**
+
+### ⚠⚠⚠ TEAM RECOMMENDATIONS — OPTION A: THE ATTRIBUTION IS BOUND TO THE QUOTE, AND NO WRONG LABEL IS EVER SHOWN (2026-09-01, `4b4a033`)
+**The rep and the clip sat in a FOOTER BELOW the quote, so a reader met the quote before anything saying whose it was.** Nothing was missing — it was in the wrong place. Now: **claim → evidence → attribution → quote**, the same three beats as the coaching.
+- **⚠⚠ `spoke` IS RECORDED AT THE `||` THAT ALREADY DECIDES IT, because nothing downstream can recover it.** `quote: reply || r.quote` — the quote is either the closer's PROVEN reply or the prospect's line, and **`rep` on its own means "whose CALL", not "who SPOKE".** Labelling every quote with the rep's name files the prospect's words as the rep's own.
+- **⚠⚠ B IS THE FALLBACK AND IS THE POINT, NOT A CONCESSION: a row with no `spoke` — every row cached before this — runs the quote INLINE, unlabelled.** So the feature degrades to *no attribution*, never to *a wrong one*. **Two guards fail if that is weakened, proven by restoring the label-everything behaviour.**
+- **⚠⚠ IT CLOSED THE SIXTH UNPROVEN-REPLY LANE.** `lib/team-synthesis.js` used the sentinel gate, and is **the only lane that BOTH feeds a model prompt AND renders to a manager** — the two separate concerns of that sweep. `closer_response_verified` had to be added to the select, **without which the gate could never pass**.
+- **THE TIMESTAMP IS PARSED FROM `clip_url`, NOT STORED.** Old cached rows carry a clip URL and no timestamp, so parsing works for **both**; a stored field would have left every pre-existing insight timeless.
+
+### ⚠⚠ A CAP NEEDS A RULE TO SIT ABOVE — AND THIS PROMPT HAD NONE (2026-09-01)
+**Five of six `data` fields landed on EXACTLY 200 and one `claim` on EXACTLY 400.** Ours, not the model's, for the second time after the digest coaching.
+- **⚠ THE DIGEST FIX DERIVED ITS CAP FROM THE PROMPT'S OWN LENGTH RULE. THIS PROMPT HAD NO LENGTH RULE AT ALL**, so there was nothing to derive from and the cap was a number nobody could defend. **The rule was added first** (*one sentence, ≤45 words, never trail off mid-clause*), then the caps set to 520 — above ~290 chars — so **a cap you can reach in normal use is a truncator, not a guard.**
+- `capAtSentence` cuts at a sentence end, falling back to a word boundary **with a visible ellipsis** only when there is none.
+- **⚠ MY OWN ASSERTION FOR THAT FALLBACK WAS WRONG, NOT THE CODE: `/\w…$/` is ALWAYS true when you cut at a word boundary**, because the character before the ellipsis is the last letter of a complete word. The real property is that the kept text is a prefix of the original **ending where the original has a space** — no word sliced through.
+
+### ⚠⚠ THE BUMP IS PART OF THE CHANGE — AND THE CONTRAST WITH THE LINE ABOVE IT IS THE REASONING (2026-09-01)
+**`RECS_LANE_VERSION` is folded INTO the cache key. `EVIDENCE_RULE_VERSION`, six lines above it in the same file, is deliberately NOT.** They are not inconsistent:
+```
+the evidence rule   MEASURED not to change the output (67% -> 75%)  -> regenerating buys nothing
+Option A            changes the PROMPT, the CAPS and the PAYLOAD SHAPE -> without a bump it
+                    ships NOTHING on any cached window, indefinitely
+```
+- **⚠ THREE THINGS THAT LIVE INSIDE THE CACHED PAYLOAD CHANGED**, and the third is decisive: with no `spoke`, every insight falls back to the unattributed form **forever**. Same failure already recorded for `NEEDS_WORK_LANE_VERSION`.
+- **THE RULE: a prompt edit and its lane version bump are ONE atomic change** — and the guard asserts the version is **in the hash**, not merely declared beside it.
+
+### ⚠ A STRICT `eval` SCOPES FUNCTION DECLARATIONS TO ITSELF — RETURN THEM FROM A TRAILING EXPRESSION (2026-09-01)
+A probe that worked standalone failed inside a `'use strict'` test file: `let f; eval(src);` leaves `f` **undefined**, because in strict mode the declaration never reaches the enclosing scope. **`return eval(src + '\n({ f: f })')`.** Cost four failing guards that looked like a broken renderer and were a broken harness.
+
+### ⚠ REMOVING A CONTROL: CHECK WHERE IT WENT BEFORE DELETING IT (2026-09-01)
+**"Manage Members" was removed because the My Team page does that now — and the precondition was CHECKED, not assumed: its only action was `setView('team-members')`, the IDENTICAL destination the dropdown reaches.** A second route to the same page, so nothing became unreachable.
+- **⚠ HAD IT OPENED SOMETHING THE PAGE DOES NOT OFFER, THE RIGHT ANSWER WAS TO SAY SO** rather than remove the only route to it. The check takes one grep and is the difference between a tidy-up and a capability deletion — the merge-review-page failure in miniature.
+- **⚠ AND A GUARD ASSERTED THE BUTTON MUST REMAIN** (from the drilldown-refinements block). **Converted, not deleted:** its subject was *"removing a button from ONE page must not remove it from the app"*, which still holds for `summaryBtnHtml`; the removed one moved to an **app-wide absence** assertion, which is the check that can actually fail now.
