@@ -39,9 +39,27 @@ const GROUPS = [
 const VIEWS = {
   NUMBER: 'number',        // one figure now, with its counts
   GAUGE: 'gauge',          // needs a target
-  TREND: 'trend',          // needs history
+  TREND: 'trend',          // needs history — this IS the line graph
   BY_REP: 'by_rep',        // needs per-rep values
   BREAKDOWN: 'breakdown',  // needs categories
+  /* ⚠⚠ A NEW CHART TYPE IS A NEW CAPABILITY REQUIREMENT, NOT A NEW ENTRY ON A
+     LIST. Both bars below reuse a requirement that already exists — per-rep
+     values and categories — so `viewsFor` decides who gets them exactly as it
+     decides everything else, and a metric with no categories is STRUCTURALLY
+     unable to be offered a category bar chart.
+
+     ⚠ ORIENTATION IS FIXED PER DATA SHAPE, AND IT IS A MEASURED DECISION rather
+     than a restriction: rep names run 8-13 characters and there can be nine of
+     them, which is unreadable rotated; category names run 4-10 and there are
+     four or five, which is exactly what vertical columns are for. If the
+     orientation should become a free choice, the drawing already takes it as a
+     parameter — that is a small follow-up, not a rebuild.
+
+     ⚠ AND NEITHER USES A CANVAS. `trend` needs one because it draws axes and
+     several series over time; four-to-nine bars do not, and plain elements
+     avoid the whole mount/destroy/rebuild lifecycle a canvas drags in. */
+  BAR_REP: 'bar_rep',      // needs per-rep values — horizontal
+  BAR_CAT: 'bar_cat',      // needs categories — vertical
 };
 
 /**
@@ -223,6 +241,11 @@ const RENDERABLE = {
   trend:     ['closing_rate', 'objection_handle_rate', 'time_to_price'],
   by_rep:    ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects'],
   breakdown: ['objection_handle_rate'],
+  /* ⚠ THE BARS DRAW THE SAME DATA THE LIST VIEWS ALREADY READ, so their
+     renderable sets are identical by construction rather than by coincidence —
+     a test asserts that, so a metric cannot gain one and not the other. */
+  bar_rep:   ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects'],
+  bar_cat:   ['objection_handle_rate'],
 };
 
 function canRender(view, key) {
@@ -238,7 +261,9 @@ function viewsFor(metric) {
   if (typeof metric.target === 'number') wanted.push(VIEWS.GAUGE);
   if (metric.history) wanted.push(VIEWS.TREND);
   if (metric.perRep) wanted.push(VIEWS.BY_REP);
+  if (metric.perRep) wanted.push(VIEWS.BAR_REP);
   if (metric.categories) wanted.push(VIEWS.BREAKDOWN);
+  if (metric.categories) wanted.push(VIEWS.BAR_CAT);
   return wanted.filter(function (v) { return canRender(v, metric.key); });
 }
 

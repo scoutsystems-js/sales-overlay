@@ -3869,6 +3869,43 @@
       padding: 0 0 20px; margin-bottom: 4px;
     }
     .dash-gauge { margin: 0; }
+
+    /* ── bar charts ───────────────────────────────────────────────────────────
+       ⚠⚠ NEW MARKUP INHERITS NOTHING. Every class here is styled from tokens
+       because an unstyled element on a near-black page renders as a browser
+       default — `.review-kb-btn` sat as a grey button for three days, and 35 of
+       40 editor classes had no rule at all when they were enumerated.
+       ⚠ NOTHING IS GREY. Depth is opacity, which is a DEPTH CUE and allowed;
+       low-contrast grey body text is what the no-grey rule bans. */
+
+    /* horizontal — one row per rep, because rep names run 8-13 characters and
+       there can be nine of them, which is unreadable rotated */
+    .dash-barh { display: flex; flex-direction: column; gap: 10px; }
+    .dash-barh-row { display: flex; align-items: center; gap: 12px; font-size: var(--fs-body); }
+    .dash-barh-name { flex: 0 0 34%; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                      white-space: nowrap; color: var(--text); }
+    .dash-barh-track { flex: 1 1 auto; height: 14px; border-radius: 3px;
+                       background: rgba(var(--accent-rgb), 0.10); overflow: hidden; }
+    .dash-barh-fill { display: block; height: 100%; border-radius: 3px;
+                      background: rgba(var(--accent-rgb), 0.55); }
+    .dash-barh-val { flex: 0 0 auto; min-width: 46px; text-align: right;
+                     font-weight: var(--fw-emphasis); color: var(--text); }
+
+    /* vertical — one column per category, because there are four or five of them
+       and their labels run 4-10 characters */
+    .dash-barv { display: flex; align-items: flex-end; gap: 14px; padding-top: 6px; }
+    .dash-barv-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+                     align-items: center; gap: 6px; }
+    .dash-barv-val { font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); }
+    .dash-barv-track { width: 100%; height: 120px; border-radius: 3px;
+                       background: rgba(var(--accent-rgb), 0.10);
+                       display: flex; align-items: flex-end; overflow: hidden; }
+    .dash-barv-fill { width: 100%; border-radius: 3px 3px 0 0;
+                      background: rgba(var(--accent-rgb), 0.55); }
+    .dash-barv-name { font-size: var(--fs-secondary); color: var(--text);
+                      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dash-barv-sub { font-size: var(--fs-eyebrow); color: var(--text); opacity: 0.65; }
+
     @media (max-width: 1100px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 700px)  { .dash-grid { grid-template-columns: 1fr; } }
 
@@ -12041,20 +12078,20 @@
   /* ⚠⚠ A TOP-5 BY-REP VIEW MUST SAY IT IS A TOP 5, or it reads as the whole
      team — the same rule as the excluded-reps note on the graphs. The count is
      stated whenever anyone is left out, never silently truncated. */
-  function dashByRepHtml(card) {
+  /* ⚠⚠ ONE RANKING, TWO VIEWS. The list and the horizontal bar draw the SAME
+     data, so they read it through the SAME function — two copies would let the
+     order or the top-N note drift between them, which is the shape this file
+     records under two `rankSections` meaning opposite directions.
+
+     ⚠ AND THE SORT FOLLOWS THE METRIC'S DIRECTION. Descending is right for a
+     rate and WRONG for a ceiling metric like average call time, where the best
+     rep is the lowest — and a bar chart makes that far worse than a list,
+     because the longest bar reads as the best. No inverted metric reaches this
+     today (avg_call_time has no per-rep card), so this is the defect being
+     closed BEFORE it can appear rather than after. */
+  function dashRepRanking(card) {
     var reps = (state.teamOverview && state.teamOverview.per_rep) || null;
-    if (!reps) return dashNoValueHtml('the team overview has not loaded');
-    /* ⚠⚠⚠ IT REFUSES. IT DOES NOT FALL BACK.
-       This map used to end `|| function (r) { return r.avg_score; }`, so ANY
-       metric it did not know rendered AVERAGE SCORE under that metric's own
-       title. Measured on the live editor: five cards — Outcome mix, Average
-       call time, Section scores, Call moment mix and Time to price, all in the
-       by-rep view — showed the identical Josh 64 / Godwin 60 / Yazan 58.
-       ⚠⚠ A CARD HEADED "TIME TO PRICE" SHOWING 64 READS AS MINUTES, and nothing
-       on screen says otherwise. That is far worse than an empty card: an empty
-       card is a question, a wrong one is an answer.
-       ⚠ AND IT IS THE PROBABLE SOURCE OF THE "bare number, needs min" REPORT —
-       the number that was missing a unit was not time to price at all. */
+    if (!reps) return { error: 'the team overview has not loaded' };
     var pickVal = {
       avg_score: function (r) { return r.avg_score; },
       closing_rate: function (r) { return r.prospect_close_rate; },
@@ -12062,41 +12099,114 @@
       calls_analyzed: function (r) { return r.calls_analyzed; },
       prospects: function (r) { return r.prospect_close_total; },
     }[card.metric];
-    if (!pickVal) return dashNoValueHtml('no per-rep card can show this metric yet');
+    if (!pickVal) return { error: 'no per-rep card can show this metric yet' };
 
     var rows = reps.filter(function (r) { return r.active !== false; })
                    .map(function (r) { return { name: r.display_name || r.email || r.user_id, v: pickVal(r) }; });
     var measured = rows.filter(function (r) { return r.v !== null && r.v !== undefined; });
-    if (!measured.length) return dashNoValueHtml('no rep has a measurable value in this range');
-    measured.sort(function (a, b) { return b.v - a.v; });
+    if (!measured.length) return { error: 'no rep has a measurable value in this range' };
 
+    var lowerIsBetter = card.targetDirection === 'lower_is_better';
+    measured.sort(function (a, b) { return lowerIsBetter ? a.v - b.v : b.v - a.v; });
+    return { measured: measured, unmeasured: rows.length - measured.length, lowerIsBetter: lowerIsBetter };
+  }
+
+  /* ⚠ THE SAME NOTE FOR BOTH VIEWS. A top-5 that does not say it is a top 5
+     reads as the whole team — and the count is stated whenever anyone is left
+     out, never silently truncated. */
+  function dashRepNote(shown, r) {
+    var note = [];
+    if (r.measured.length > shown.length) note.push('top ' + shown.length + ' of ' + r.measured.length);
+    if (r.unmeasured > 0) note.push(r.unmeasured + ' not enough data to measure');
+    if (r.lowerIsBetter) note.push('lower is better');
+    return note.length ? '<div class="dash-card-note">' + escapeHtml(note.join(' \u00B7 ')) + '</div>' : '';
+  }
+
+  function dashByRepHtml(card) {
+    var r = dashRepRanking(card);
+    if (r.error) return dashNoValueHtml(r.error);
     /* h is the card's height in grid rows; a taller card shows more rows. The
        KIND does not change — it is the same list, longer. */
-    var limit = card.h >= 2 ? measured.length : 5;
-    var shown = measured.slice(0, limit);
-    var hiddenBySize = measured.length - shown.length;
-    var unmeasured = rows.length - measured.length;
-
-    var note = [];
-    if (hiddenBySize > 0) note.push('top ' + shown.length + ' of ' + measured.length);
-    if (unmeasured > 0) note.push(unmeasured + ' not enough data to measure');
-
-    /* ⚠⚠ A UNITLESS NUMBER IS A NUMBER WHOSE MEANING LIVES ONLY IN THE READER'S
-       HEAD — the raw-seconds defect's cousin. Every by-rep row rendered bare,
-       so closing rate showed "25" where it means 25%, and it would have shown
-       a duration as "31" where it means 31 minutes. Justin found the missing
-       unit on ONE card; it was missing on ALL of them.
-       ⚠ THE UNIT COMES FROM THE METRIC, not from the view — a second table here
-       is how the gauge's inverted-direction defect came back once already. */
+    var shown = r.measured.slice(0, card.h >= 2 ? r.measured.length : 5);
     var unit = DASH_UNIT[card.metric] || '';
     return '<div class="dash-list">'
-      + shown.map(function (r) {
-          return '<div class="dash-list-row"><span>' + escapeHtml(String(r.name)) + '</span>'
-            + '<b>' + escapeHtml(String(r.v)) + unit + '</b></div>';
+      + shown.map(function (x) {
+          return '<div class="dash-list-row"><span>' + escapeHtml(String(x.name)) + '</span>'
+            + '<b>' + escapeHtml(String(x.v)) + unit + '</b></div>';
         }).join('')
-      + '</div>'
-      + (note.length ? '<div class="dash-card-note">' + escapeHtml(note.join(' \u00B7 ')) + '</div>' : '');
+      + '</div>' + dashRepNote(shown, r);
   }
+
+  /* ── the bars ─────────────────────────────────────────────────────────────
+     ⚠⚠ NO CANVAS, DELIBERATELY. `trend` needs one because it draws axes and
+     several series over time; four-to-nine bars do not. Plain elements avoid
+     the whole mount/destroy/rebuild lifecycle a chart library drags in — the
+     one that made the team graphs rebuild fifteen times on a single visit — and
+     they resize with the card for free.
+
+     ⚠ THE SCALE IS THE LARGEST VALUE PRESENT, NOT THE METRIC'S RANGE. A set of
+     rates in the teens against a 0-100 axis draws five slivers and says
+     nothing; scaled to the data, the comparison between reps is the thing the
+     eye reads, which is what a by-rep chart is FOR. The value is printed on
+     every bar, so the absolute figure is never lost to the scaling. */
+  function dashBarScale(values) {
+    var max = 0;
+    values.forEach(function (v) { if (typeof v === 'number' && v > max) max = v; });
+    return max > 0 ? max : 1;      // never divide by zero; an all-zero set draws empty bars
+  }
+
+  function dashBarRepHtml(card) {
+    var r = dashRepRanking(card);
+    if (r.error) return dashNoValueHtml(r.error);
+    var shown = r.measured.slice(0, card.h >= 2 ? r.measured.length : 5);
+    var unit = DASH_UNIT[card.metric] || '';
+    var max = dashBarScale(shown.map(function (x) { return x.v; }));
+    return '<div class="dash-barh">'
+      + shown.map(function (x) {
+          var pct = Math.max(1, Math.round((x.v / max) * 100));   // 1% floor: a real zero must still be a visible row
+          return '<div class="dash-barh-row">'
+            + '<span class="dash-barh-name">' + escapeHtml(String(x.name)) + '</span>'
+            + '<span class="dash-barh-track"><span class="dash-barh-fill" style="width:' + pct + '%"></span></span>'
+            + '<b class="dash-barh-val">' + escapeHtml(String(x.v)) + unit + '</b>'
+            + '</div>';
+        }).join('')
+      + '</div>' + dashRepNote(shown, r);
+  }
+
+  /* ⚠ CATEGORIES, VERTICAL. Four or five short labels is exactly what columns
+     are for — and it reads the SAME source as the breakdown list, so the two
+     cannot disagree about what the categories are or how many there are. */
+  function dashBarCatHtml(card) {
+    var src = null;
+    if (card.metric === 'objection_handle_rate') src = (state.teamOverview || {}).objection_categories;
+    if (!src) return dashNoValueHtml('this breakdown has no data in this range');
+    var keys = Object.keys(src);
+    if (!keys.length) return dashNoValueHtml('no categories in this range');
+
+    var rows = keys.map(function (k) {
+      var c = src[k] || {};
+      var total = c.total || 0, handled = c.handled || 0;
+      return { k: k, total: total, handled: handled,
+               rate: total > 0 ? Math.round(handled / total * 100) : null };
+    }).sort(function (a, b) { return b.total - a.total; });
+
+    /* ⚠ A CATEGORY WITH NO OBJECTIONS IS UNMEASURED, NOT ZERO — a bar at zero
+       claims the team handled none of them, which is a different statement from
+       "there were none to handle". It draws no bar and says so under the label. */
+    var max = dashBarScale(rows.map(function (x) { return x.rate; }));
+    return '<div class="dash-barv">'
+      + rows.map(function (x) {
+          var pct = x.rate === null ? 0 : Math.max(1, Math.round((x.rate / max) * 100));
+          return '<div class="dash-barv-col">'
+            + '<span class="dash-barv-val">' + (x.rate === null ? '—' : x.rate + '%') + '</span>'
+            + '<span class="dash-barv-track"><span class="dash-barv-fill" style="height:' + pct + '%"></span></span>'
+            + '<span class="dash-barv-name">' + escapeHtml(objectionLabel(x.k)) + '</span>'
+            + '<span class="dash-barv-sub">' + (x.total ? x.handled + ' of ' + x.total : 'none') + '</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
 
   /* ⚠⚠ AN "OTHER" BUCKET CARRIES ITS OWN COUNT. A reader adds up what is on
      screen, so a breakdown that collapses the tail without saying how much is
@@ -12136,7 +12246,9 @@
         card.view === 'gauge'     ? dashGaugeHtml(card)
       : card.view === 'trend'     ? dashTrendHtml(card)
       : card.view === 'by_rep'    ? dashByRepHtml(card)
+      : card.view === 'bar_rep'   ? dashBarRepHtml(card)
       : card.view === 'breakdown' ? dashBreakdownHtml(card)
+      : card.view === 'bar_cat'   ? dashBarCatHtml(card)
       :                             dashNumberHtml(card);
     /* ⚠ A CARD WHOSE VIEW FELL BACK SAYS SO. The manager chose a gauge and is
        looking at a number; silently differing from what they picked is the
@@ -12430,6 +12542,9 @@
     /* ⚠ THE SERVER'S LIST IS THE AUTHORITY EVEN HERE. A crafted click cannot add
        a gauge to a targetless metric — and the save path sanitises again. */
     if (m.views.indexOf(view) === -1) return;
+    /* ⚠ A BAR CHART NEEDS ROOM: a horizontal bar in a one-column card leaves a
+       track barely wider than its own label, and vertical columns need width per
+       category. Both open at 2 columns like the other charts. */
     e.cards.push({ metric: m.key, label: m.label, view: view, requestedView: null,
                    w: view === 'gauge' ? 1 : 2, h: view === 'number' ? 1 : 2,
                    target: (typeof m.target === 'number') ? m.target : null,
@@ -12440,21 +12555,29 @@
     renderTeamDashboard();
   }
 
+  /* ⚠ `trend` IS THE LINE GRAPH. Justin asked for "line graphs" alongside the
+     bars — it is already built and this is its name. A second line view would be
+     two things answering one question, which is the most repeated defect in this
+     codebase, so the LABEL says what it is instead. */
   var DASH_VIEW_LABEL = {
-    number: 'Number', gauge: 'Gauge', trend: 'Trend over time',
+    number: 'Number', gauge: 'Gauge', trend: 'Line graph over time',
     by_rep: 'By rep', breakdown: 'Breakdown',
+    bar_rep: 'Bar chart by rep', bar_cat: 'Bar chart by category',
   };
   /* ⚠ SHORT FORMS FOR THE SCANNING LIST. "Trend over time" four times across ten
      rows is noise; "Trend" is the word a manager is looking for. */
   var DASH_VIEW_SHORT = {
-    number: 'Number', gauge: 'Gauge', trend: 'Trend', by_rep: 'By rep', breakdown: 'Breakdown',
+    number: 'Number', gauge: 'Gauge', trend: 'Line', by_rep: 'By rep', breakdown: 'Breakdown',
+    bar_rep: 'Bar by rep', bar_cat: 'Bar by category',
   };
   var DASH_VIEW_WHY = {
     number: 'One figure with its counts.',
     gauge: 'A dial against its target.',
-    trend: 'How it has moved, week by week.',
-    by_rep: 'Every rep, ranked.',
-    breakdown: 'Split by category.',
+    trend: 'A line per rep, week by week.',
+    by_rep: 'Every rep, ranked, as a list.',
+    breakdown: 'Split by category, as a list.',
+    bar_rep: 'Every rep, ranked, as horizontal bars.',
+    bar_cat: 'Split by category, as vertical bars.',
   };
 
   function dashRenderPicker() {

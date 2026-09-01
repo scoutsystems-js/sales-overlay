@@ -41,12 +41,19 @@ function slice(name, min, max) {
 function actualCoverage() {
   const num = [...slice('dashNumberHtml', 400, 3000).matchAll(/card\.metric === '([a-z_]+)'/g)].map((m) => m[1]);
   const gau = [...slice('dashGaugeHtml', 200, 2000).matchAll(/([a-z_]+): '[a-z]+'/g)].map((m) => m[1]);
-  const rep = [...slice('dashByRepHtml', 800, 5000).matchAll(/^      ([a-z_]+): function \(r\)/gm)].map((m) => m[1]);
+  /* ⚠ THE PER-REP LOOKUP MOVED into `dashRepRanking`, which the LIST and the BAR
+     both read — one ranking, two views, so the order and the top-N note cannot
+     drift between them. The mirror follows it there rather than being weakened. */
+  const rep = [...slice('dashRepRanking', 600, 4000).matchAll(/^      ([a-z_]+): function \(r\)/gm)].map((m) => m[1]);
   const brk = [...slice('dashBreakdownHtml', 400, 3000).matchAll(/card\.metric === '([a-z_]+)'/g)].map((m) => m[1]);
+  const bcat = [...slice('dashBarCatHtml', 400, 3000).matchAll(/card\.metric === '([a-z_]+)'/g)].map((m) => m[1]);
   const canvas = /var DASH_CANVAS = \{([^}]+)\}/.exec(HTML);
   assert.ok(canvas, 'DASH_CANVAS must exist — it is what the trend view looks a chart up by');
   const tre = [...canvas[1].matchAll(/([a-z_]+):/g)].map((m) => m[1]);
-  return { number: num, gauge: gau, trend: tre, by_rep: rep, breakdown: brk };
+  /* ⚠ bar_rep reads the SAME ranking as by_rep, so its coverage is that set BY
+     CONSTRUCTION — the test below asserts the two stay identical rather than
+     letting a metric gain one view and not the other. */
+  return { number: num, gauge: gau, trend: tre, by_rep: rep, bar_rep: rep, breakdown: brk, bar_cat: bcat };
 }
 
 test('⚠⚠ RENDERABLE mirrors what the real card builders branch on', () => {
@@ -68,7 +75,7 @@ test('⚠⚠ RENDERABLE mirrors what the real card builders branch on', () => {
 });
 
 test('⚠⚠ the by-rep view REFUSES an unknown metric — it does not fall back', () => {
-  const body = slice('dashByRepHtml', 800, 5000);
+  const body = slice('dashRepRanking', 600, 4000);
   /* This shipped as `}[card.metric] || function (r) { return r.avg_score; };` and
      rendered AVERAGE SCORE under five other metrics' titles. Measured on the live
      editor: Outcome mix, Average call time, Section scores, Call moment mix and
@@ -77,8 +84,61 @@ test('⚠⚠ the by-rep view REFUSES an unknown metric — it does not fall back
      a question; a wrong one is an answer. */
   assert.ok(!/\}\[card\.metric\] \|\|/.test(body),
     'no fallback: an unknown metric must refuse, never render another metric\'s values');
-  assert.ok(/if \(!pickVal\) return dashNoValueHtml/.test(body),
+  assert.ok(/if \(!pickVal\) return \{ error:/.test(body),
     'and it must say it cannot show this metric, rather than showing something else');
+  /* ⚠ AND BOTH CONSUMERS MUST SURFACE THE REFUSAL. The ranking returning an
+     error object is useless if a view ignores it — the compute-a-check-and-
+     ignore-its-result shape. */
+  ['dashByRepHtml', 'dashBarRepHtml'].forEach((n) => {
+    const v = slice(n, 200, 2500);
+    assert.ok(/if \(r\.error\) return dashNoValueHtml\(r\.error\)/.test(v),
+      n + ' must render the refusal, not ignore it');
+  });
+});
+
+test('⚠⚠ ONE ranking, two views — the list and the bar cannot disagree', () => {
+  ['dashByRepHtml', 'dashBarRepHtml'].forEach((n) => {
+    const v = slice(n, 200, 2500);
+    assert.ok(/dashRepRanking\(card\)/.test(v), n + ' must read the shared ranking');
+    assert.ok(!/prospect_close_rate/.test(v), n + ' must not carry its own metric lookup');
+    assert.ok(/dashRepNote\(shown, r\)/.test(v), n + ' must state the same top-N / unmeasured note');
+  });
+  /* ⚠⚠ AND THE SORT FOLLOWS THE METRIC'S DIRECTION. Descending is right for a
+     rate and WRONG for a ceiling metric, where the best rep is the lowest — and
+     a bar chart makes that far worse than a list, because the longest bar reads
+     as best. No inverted metric reaches this today, so it is closed BEFORE it
+     can appear rather than after. */
+  const rank = slice('dashRepRanking', 600, 4000);
+  assert.ok(/lowerIsBetter \? a\.v - b\.v : b\.v - a\.v/.test(rank),
+    'the sort must invert for a lower-is-better metric');
+  assert.ok(/card\.targetDirection === 'lower_is_better'/.test(rank),
+    'and it must take the direction from the METRIC, not from the view');
+  const note = slice('dashRepNote', 150, 900);
+  assert.ok(/lower is better/.test(note), 'and the card must say so');
+});
+
+test('⚠ the bars draw with plain elements — no canvas, no chart library', () => {
+  ['dashBarRepHtml', 'dashBarCatHtml'].forEach((n) => {
+    const v = slice(n, 300, 3000);
+    assert.ok(!/canvas/i.test(v) && !/Chart/.test(v),
+      n + ': trend needs a canvas because it draws axes and several series; four to '
+      + 'nine bars do not, and a canvas drags in the mount/destroy lifecycle that '
+      + 'made the team graphs rebuild fifteen times on one visit');
+  });
+  /* ⚠ THE SCALE IS THE LARGEST VALUE PRESENT, and a zero-safe denominator —
+     rates in the teens against a 0-100 axis draw five slivers and say nothing. */
+  const sc = slice('dashBarScale', 100, 700);
+  assert.ok(/max > 0 \? max : 1/.test(sc), 'never divide by zero');
+  /* ⚠⚠ AND THE CALL SITES, NOT JUST THE HELPER — FIFTH TIME THIS SHAPE HAS BITTEN.
+     Restoring `var max = 100` in the bar renderer left this assertion GREEN,
+     because a helper being correct says nothing about whether anything calls it.
+     Testing a function in isolation and grepping for its name are the same check
+     twice: both confirm it EXISTS, neither confirms it RUNS. */
+  ['dashBarRepHtml', 'dashBarCatHtml'].forEach((n) => {
+    const v = slice(n, 300, 3000);
+    assert.ok(/dashBarScale\(/.test(v), n + ' must scale to the data, not to a fixed axis');
+    assert.ok(!/var max = \d/.test(v), n + ' must not hard-code a maximum');
+  });
 });
 
 test('⚠ every by-rep row carries its unit, and the bare ones are bare ON PURPOSE', () => {
@@ -100,13 +160,22 @@ test('⚠ every by-rep row carries its unit, and the bare ones are bare ON PURPO
   ['avg_score', 'calls_analyzed', 'prospects'].forEach((k) =>
     assert.strictEqual(unit[k], '', k + ' is bare on purpose'));
 
-  // every metric the by-rep view can draw must have an entry, bare or not
+  // every metric EITHER per-rep view can draw must have an entry, bare or not
+  assert.deepStrictEqual([...C._RENDERABLE.bar_rep].sort(), [...C._RENDERABLE.by_rep].sort(),
+    'the bar draws the same data the list reads — they cannot diverge');
   C._RENDERABLE.by_rep.forEach((k) =>
     assert.ok(Object.prototype.hasOwnProperty.call(unit, k),
       k + ' can be drawn by rep and has no declared unit — bare must be a CHOICE'));
 
-  assert.ok(/String\(r\.v\)\) \+ unit/.test(HTML),
-    'and the row must actually append it');
+  /* ⚠ THIS ANCHORED ON THE LOOP VARIABLE NAME (`r.v`) and broke when the shared
+     ranking took `r` for the ranking object and the row became `x`. A guard
+     pinned to a NAME breaks on a rename that changes nothing it cares about —
+     anchor on the CLAIM: both per-rep views append the unit to the value. */
+  ['dashByRepHtml', 'dashBarRepHtml'].forEach((n) => {
+    const v = slice(n, 200, 2500);
+    assert.ok(/DASH_UNIT\[card\.metric\]/.test(v), n + ' must read the metric\'s unit');
+    assert.ok(/\.v\)\) \+ unit/.test(v), n + ' must actually append it to the value');
+  });
 });
 
 test('⚠⚠ a stored board naming a metric nothing can draw DROPS and says so', () => {
