@@ -47,9 +47,16 @@ function actualCoverage() {
   const rep = [...slice('dashRepRanking', 600, 4000).matchAll(/^      ([a-z_]+): function \(r\)/gm)].map((m) => m[1]);
   const brk = [...slice('dashBreakdownHtml', 400, 3000).matchAll(/card\.metric === '([a-z_]+)'/g)].map((m) => m[1]);
   const bcat = [...slice('dashBarCatHtml', 400, 3000).matchAll(/card\.metric === '([a-z_]+)'/g)].map((m) => m[1]);
-  const canvas = /var DASH_CANVAS = \{([^}]+)\}/.exec(HTML);
-  assert.ok(canvas, 'DASH_CANVAS must exist — it is what the trend view looks a chart up by');
-  const tre = [...canvas[1].matchAll(/([a-z_]+):/g)].map((m) => m[1]);
+  /* ⚠ DASH_CANVAS IS NOW A TABLE OF OBJECTS — `{ key, label, unit }` per metric —
+     because those three have to agree and a ternary chain is how they came apart:
+     the unit was inferred from the axis label, and that inference selected the
+     CLOSING team average for the objection-handling card. So the keys of the
+     table are the metrics, and the inner `key:` fields are not. */
+  const cAt = HTML.indexOf('var DASH_CANVAS = {');
+  assert.ok(cAt !== -1, 'DASH_CANVAS must exist — it is what the trend view looks a chart up by');
+  const canvasSrc = HTML.slice(cAt, HTML.indexOf('\n  };', cAt));
+  assert.ok(canvasSrc.length > 200 && canvasSrc.length < 2500, 'DASH_CANVAS slice: ' + canvasSrc.length);
+  const tre = [...canvasSrc.matchAll(/^    ([a-z_]+):\s*\{/gm)].map((m) => m[1]);
   /* ⚠ bar_rep reads the SAME ranking as by_rep, so its coverage is that set BY
      CONSTRUCTION — the test below asserts the two stay identical rather than
      letting a metric gain one view and not the other. */
@@ -219,7 +226,13 @@ test('⚠ the fell-back note names what it BECAME, not what it used to always be
 test('⚠⚠ step one NAMES the views rather than counting them', () => {
   const at = HTML.indexOf('function dashRenderPicker');
   const body = HTML.slice(at, HTML.indexOf('\n  }', at));
-  assert.ok(body.length > 800 && body.length < 5000, 'slice: ' + body.length);
+  /* ⚠ CEILING RAISED 5000 -> 7000, and the reason belongs here rather than in a
+     commit message: step two now GROUPS the views into "Over time" and "Right
+     now" with a sentence for each absent group, which is real added markup. A
+     ceiling is the mirror of a floor — raising one is the single edit that can
+     turn a real check vacuous, so it is only ever moved with its cause named.
+     The lower bound is what still makes this non-vacuous. */
+  assert.ok(body.length > 800 && body.length < 7000, 'slice: ' + body.length);
   /* This read "4 views" — a number that says nothing about WHICH, so the only
      way to find the three metrics with a trend was to open all ten in turn.
      Justin reported "no graphs appear as options" while the picker was offering
@@ -229,4 +242,48 @@ test('⚠⚠ step one NAMES the views rather than counting them', () => {
     'a count tells a manager nothing about which views a metric offers');
   assert.ok(/m\.views\.map\(function \(v\) \{ return escapeHtml\(DASH_VIEW_SHORT/.test(body),
     'step one must name them, so a trend is findable without opening every metric');
+});
+
+test('⚠⚠⚠ a line graph is only OFFERED where the data layer actually emits a series', () => {
+  /* ⚠⚠ THIS GUARD EXISTS BECAUSE RESTORING `history: false` ON FOUR METRICS
+     PRODUCED ZERO FAILURES. The whole point of the history work is that a
+     metric with a line graph has a line behind it — and nothing asserted the
+     chain. A metric could silently lose its trend, or claim one it cannot draw,
+     and the suite would stay green.
+
+     THE CHAIN IS THREE LINKS AND ALL THREE MUST AGREE:
+       catalog says `history: true`  ->  DASH_CANVAS maps it to a series key
+                                     ->  rep-series EMITS that key per rep AND on team
+     Break any link and the card draws an empty chart, which reads as "this rep
+     had no calls" rather than as a missing feature. */
+  const REP = fs.readFileSync(path.join(__dirname, '..', 'lib', 'rep-series.js'), 'utf8');
+
+  const withHistory = C._CATALOG.filter((m) => m.history).map((m) => m.key);
+  assert.ok(withHistory.length >= 3, 'non-vacuity: some metric must claim history');
+
+  const cAt = HTML.indexOf('var DASH_CANVAS = {');
+  const canvasSrc = HTML.slice(cAt, HTML.indexOf('\n  };', cAt));
+
+  withHistory.forEach((key) => {
+    const row = new RegExp('^    ' + key + ':\\s*\\{([^}]+)\\}', 'm').exec(canvasSrc);
+    assert.ok(row, key + ' claims history but DASH_CANVAS has no chart for it — '
+      + 'the trend view would render an empty canvas');
+    const sk = /key:\s*'([a-z_]+)'/.exec(row[1]);
+    assert.ok(sk, key + ' has no series key in DASH_CANVAS');
+
+    /* per-rep AND team: the team baseline is what the closer is read against,
+       and it is selected by this same key — see the label-match defect, where
+       the objection card drew the CLOSING team average. */
+    assert.ok(new RegExp('^      ' + sk[1] + ': keys\\.map', 'm').test(REP),
+      key + ' -> series "' + sk[1] + '" is never emitted per rep by rep-series');
+    assert.ok(new RegExp('^      ' + sk[1] + ': teamLine\\(', 'm').test(REP),
+      key + ' -> series "' + sk[1] + '" has no TEAM line');
+  });
+
+  /* and the other direction: a RENDERABLE.trend entry for a metric with no
+     history is dead weight that reads as a supported view. */
+  C._RENDERABLE.trend.forEach((key) => {
+    const m = C._CATALOG.find((x) => x.key === key);
+    assert.ok(m && m.history, key + ' is listed as trend-renderable but claims no history');
+  });
 });

@@ -74,7 +74,7 @@ const CATALOG = [
   {
     key: 'avg_score', group: 'quality', label: 'Average call score',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
-    available: true, perRep: true, target: null, history: false, categories: null,
+    available: true, perRep: true, target: null, history: true, categories: null,
     measured: '1,551 of 1,585 done analyses carry overall_score',
     note: 'per_rep.avg_score and totals.avg_score both exist, with a prior-window '
         + 'value for a trend ARROW — which is not the same as a time series.',
@@ -104,7 +104,7 @@ const CATALOG = [
     key: 'avg_call_time', group: 'quality', label: 'Average call time',
     source: 'column', cost: 'aggregate', lane: 'team-averages',
     available: true, perRep: true, target: 60, targetDirection: 'lower_is_better',
-    history: false, categories: null,
+    history: true, categories: null,
     measured: 'duration_seconds on 2,046 of 2,052 real calls, 2,005 of them > 0',
     note: '⚠ THE ONLY INVERTED TARGET — 60 is a CEILING. A gauge must say so; '
         + '"at or below 60 min", never "at or above target".',
@@ -112,7 +112,7 @@ const CATALOG = [
   {
     key: 'calls_analyzed', group: 'people', label: 'Calls analyzed',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
-    available: true, perRep: true, target: null, history: false, categories: null,
+    available: true, perRep: true, target: null, history: true, categories: null,
     measured: '1,585 done analyses',
     note: 'A volume count. It has no target and inventing one would be the '
         + 'weakest-against-target shape the loud-number ruling already refuses.',
@@ -161,7 +161,7 @@ const CATALOG = [
   {
     key: 'prospects', group: 'people', label: 'Prospects',
     source: 'aggregate', cost: 'aggregate', lane: 'prospect-entity',
-    available: true, perRep: true, target: null, history: false, categories: null,
+    available: true, perRep: true, target: null, history: true, categories: null,
     measured: 'prospect_id on 1,534 of 2,052 real calls',
     note: '⚠ Merge quality drives this directly — 355 unreviewed merge proposals '
         + 'on one account, each missed merge worth ~0.9 points of close rate.',
@@ -238,7 +238,12 @@ const CATALOG = [
 const RENDERABLE = {
   number:    ['avg_score', 'calls_analyzed', 'closing_rate', 'objection_handle_rate', 'prospects'],
   gauge:     ['closing_rate', 'objection_handle_rate', 'avg_call_time'],
-  trend:     ['closing_rate', 'objection_handle_rate', 'time_to_price'],
+  /* ⚠ FOUR HISTORIES ADDED 2026-09-01. Seven of ten metrics were snapshots, so
+     seven of ten could never have a line — and a bar chart of a snapshot is the
+     same number in a different outline. Three of these cost NOTHING (the rows
+     were already fetched and bucketed by rep and week) and one cost a column. */
+  trend:     ['closing_rate', 'objection_handle_rate', 'time_to_price',
+              'avg_score', 'calls_analyzed', 'prospects', 'avg_call_time'],
   by_rep:    ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects'],
   breakdown: ['objection_handle_rate'],
   /* ⚠ THE BARS DRAW THE SAME DATA THE LIST VIEWS ALREADY READ, so their

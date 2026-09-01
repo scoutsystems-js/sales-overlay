@@ -13,7 +13,12 @@ const path = require('node:path');
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
 const SRC = HTML.slice(HTML.indexOf('var REP_LINE_COLORS'), HTML.indexOf('function repSeriesSectionHtml'));
 
-function buildChart(series, pick, yLabel) {
+/* ⚠ THE HARNESS IS A CALL SITE TOO. repSeriesChart gained `seriesKey` and `unit`
+   — the team line is now selected BY KEY rather than by matching the axis label,
+   because that match drew the closing average on the objection card — so a
+   harness that omits them gets no team line and the guard fails for a reason
+   that has nothing to do with what it is testing. */
+function buildChart(series, pick, yLabel, seriesKey, unit) {
   let cfg = null;
   const Chart = function (ctx, c) { cfg = c; this.destroy = () => {}; };
   /* ⚠ A REAL ELEMENT ALWAYS HAS .style AND .innerHTML. The stub returned an
@@ -22,7 +27,7 @@ function buildChart(series, pick, yLabel) {
      making production guard for a shape no browser produces. */
   const doc = { getElementById: () => ({ getContext: () => ({}), style: {}, innerHTML: '', textContent: '' }) };
   const fn = new Function('Chart', 'document', 'window', SRC + '; return repSeriesChart;')(Chart, doc, { Chart });
-  fn('canvas', series, pick, yLabel);
+  fn('canvas', series, pick, yLabel, false, seriesKey || 'handle', unit || '%');
   return cfg;
 }
 
@@ -315,10 +320,13 @@ test('⚠ THE TEAM AVERAGE NEVER TOGGLES — it is the baseline, not a rep', () 
 });
 
 test('the toggle is OPT-IN — the single-rep graph does not share the hidden set', () => {
-  assert.ok(/repSeriesChart\('repOwnChart',[^\n]*, false\)/.test(HTML),
+  /* ⚠ SAME REASON AS THE PARITY GUARD: anchored on the ARGUMENT, not on the end
+     of the call, so appending `seriesKey` and `unit` cannot break a check about
+     toggling. */
+  assert.ok(/repSeriesChart\('repOwnChart',[^\n]*, false, '/.test(HTML),
     "the pivoted rep's own graph must pass toggleable=false");
-  assert.ok(/repSeriesChart\('repHandleChart',[^\n]*, true\)/.test(HTML)
-    && /repSeriesChart\('repCloseChart',[^\n]*, true\)/.test(HTML),
+  assert.ok(/repSeriesChart\('repHandleChart',[^\n]*, true, '/.test(HTML)
+    && /repSeriesChart\('repCloseChart',[^\n]*, true, '/.test(HTML),
     'both team graphs must pass toggleable=true');
 });
 
@@ -425,7 +433,11 @@ test('⚠⚠ all three graphs are built by the SAME function — parity by const
   const draws = HTML.match(/repSeriesChart\('rep(Handle|Close|Price)Chart'[^\n]*/g) || [];
   assert.strictEqual(draws.length, 3, 'expected three repSeriesChart calls, got ' + draws.length);
   draws.forEach((d) => {
-    assert.ok(/, true\)/.test(d), 'every team graph must be toggleable=true: ' + d.slice(0, 80));
+    /* ⚠ ANCHORED ON THE ARGUMENT, NOT ON THE END OF THE CALL. This matched
+       `, true)` and broke when two arguments were appended — a guard pinned to a
+       call's LAST character breaks on any addition, which trains people to edit
+       the guard rather than read it. */
+    assert.ok(/, true, '/.test(d), 'every team graph must be toggleable=true: ' + d.slice(0, 80));
   });
   // No graph may construct its own Chart directly — that is how parity dies.
   const direct = (HTML.match(/new Chart\(/g) || []).length;
@@ -442,14 +454,36 @@ test('⚠ every toggle-capable chart shares the hidden set', () => {
   });
 });
 
-test('⚠ the MINUTES graph does not inherit the percentage axis', () => {
-  // The one place the three legitimately differ, and it is unit-driven rather
-  // than a parity break. Pinned so a "tidy-up" cannot re-share the axis.
-  assert.ok(/var isMinutes = \/minutes\/i\.test\(yLabel/.test(HTML),
-    'the unit flag must be derived from the axis label, in one place');
-  assert.ok(/max: isMinutes \? undefined : 100/.test(HTML),
-    'a shared 0-100 max would render "38%" for a 38-minute call');
-  assert.ok(/isMinutes \? \(v \+ 'm'\) : \(v \+ '%'\)/.test(HTML), 'ticks must carry the right unit');
+/* ⚠⚠⚠ CONVERTED 2026-09-01, AND ITS SUBJECT WAS REVERSED BY A BUG FIX — which is
+   worth stating, because a guard that has to be inverted looks like a weakening.
+   It asserted the unit is DERIVED FROM THE AXIS LABEL, "in one place". That
+   inference is exactly what drew the WRONG TEAM LINE in production: the team
+   baseline was chosen by `yLabel === 'Handle Rate' ? team.handle : team.close`,
+   so the dashboard's objection-handling trend card — passing "Objection
+   handling %" — got team.CLOSE. One chart, two metrics, no error.
+   ⚠ THE PROPERTY THAT SURVIVES IS THE ONE THAT MATTERED: the unit is decided
+   ONCE, from an explicit argument rather than a string match, and a duration or
+   a count is never squeezed onto a 0-100 percentage axis. */
+test('⚠⚠ the unit is PASSED, not inferred — and only a percentage is capped at 100', () => {
+  assert.ok(/function repSeriesChart\(canvasId, series, pick, yLabel, toggleable, seriesKey, unit\)/.test(HTML),
+    'the series key and the unit must be arguments');
+  /* ⚠ COMMENT-STRIPPED, because the note in dashboard.html EXPLAINING the removal
+     quotes the removed expression — the documentation of a rule reported as a
+     violation of it. Line comments first, then block: a `/*` inside a `//` line
+     is a false opener that pairs with the next real closer. */
+  const CODE = HTML.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/yLabel === 'Handle Rate'/.test(CODE),
+    'the label-match team-line selection must be GONE, not kept as a fallback — '
+    + 'leaving it beside an explicit key is how the next caller inherits the defect');
+  assert.ok(/var teamPts = \(series\.team && seriesKey && series\.team\[seriesKey\]\)/.test(HTML),
+    'the team line is selected by KEY');
+  assert.ok(/var isMinutes = unit === 'min'/.test(HTML) && /var isCount = unit === 'count'/.test(HTML),
+    'three units, not two — a count is neither a percentage nor a duration');
+  assert.ok(/max: \(isMinutes \|\| isCount\) \? undefined : 100/.test(HTML),
+    'a shared 0-100 max would render "38%" for a 38-minute call, and would flatten '
+    + 'a rep with 98 calls against one with 140');
+  assert.ok(/isMinutes \? \(v \+ 'm'\) : isCount \? String\(v\) : \(v \+ '%'\)/.test(HTML),
+    'ticks must carry the right unit, including none');
 });
 
 // ── (ff) nav separators ───────────────────────────────────────────────────

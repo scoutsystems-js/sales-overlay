@@ -4053,6 +4053,13 @@
       font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: 0.09em;
       color: var(--text); opacity: 0.6; margin: 16px 0 6px;
     }
+    /* ⚠ QUIETER THAN THE METRIC HEADING ABOVE IT — these are two groups WITHIN
+       one metric, so they must not read as a second level of metrics. Sentence
+       case rather than the eyebrow's uppercase, for the same reason. */
+    .dash-pick-sub {
+      font-size: var(--fs-secondary); color: var(--text); opacity: 0.55;
+      margin: 12px 0 2px; padding-left: 12px;
+    }
     .dash-pick-list { display: flex; flex-direction: column; gap: 4px; }
     .dash-pick-item {
       display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
@@ -9231,11 +9238,24 @@
     }
   }
 
-  function repSeriesChart(canvasId, series, pick, yLabel, toggleable) {
-    // ⚠ One flag, derived from the axis label, so the unit cannot be set in one
-    // place and forgotten in another (the ticks, the tooltip and the max all
-    // need it).
-    var isMinutes = /minutes/i.test(yLabel || '');
+  /* ⚠⚠⚠ THE SERIES KEY AND THE UNIT ARE PASSED, NOT INFERRED FROM THE AXIS LABEL.
+     They used to be, and it drew the WRONG TEAM LINE in production: the team
+     baseline was chosen by `yLabel === 'Handle Rate' ? team.handle : team.close`,
+     so the dashboard's objection-handling trend card — which passes
+     "Objection handling %" — fell through to team.CLOSE. One chart, two
+     different metrics, the closing average drawn as the objection baseline and
+     labelled "Team average".
+     ⚠⚠ NOTHING ERRORED AND NOTHING LOOKED WRONG. A plausible dashed line on a
+     plausible chart is the silently-wrong-data shape, and it was found by asking
+     what a NEW series would select rather than by anything failing.
+     ⚠ THE INFERENCE IS REMOVED, NOT SUPPLEMENTED. Leaving it as a fallback beside
+     an explicit key is how the next caller inherits the same defect. */
+  function repSeriesChart(canvasId, series, pick, yLabel, toggleable, seriesKey, unit) {
+    /* ⚠ THREE UNITS, NOT TWO. A COUNT is neither a percentage nor a duration, and
+       the old code capped every non-minutes axis at 100 — which would flatten a
+       rep taking 98 calls against a 0-100 axis and print "98%". */
+    var isMinutes = unit === 'min';
+    var isCount = unit === 'count';
     /* ⚠⚠ GREEN IS CONTESTED — THIS IS THE LEVER, AND IT IS ONE LINE.
        Justin asked for Scout green on the team-average line, the current-period
        marker AND the week labels. That is three jobs for one colour, and when
@@ -9352,9 +9372,8 @@
       };
     });
 
-    var teamPts = (series.team && (isMinutes ? series.team.price
-                                 : yLabel === 'Handle Rate' ? series.team.handle
-                                 : series.team.close)) || [];
+    /* ⚠ THE KEY, NOT A LABEL MATCH. See the note on the signature. */
+    var teamPts = (series.team && seriesKey && series.team[seriesKey]) || [];
     if (teamPts.some(function (p) { return p && p.rate !== null; })) {
       datasets.push({
         label: 'Team average',
@@ -9440,8 +9459,12 @@
             // axis would render "38%" for a 38-minute call — a number that is
             // correct and means something else entirely. The unit is decided
             // here, once, from the series being drawn.
-            max: isMinutes ? undefined : 100,
-            ticks: { color: '#ededed', callback: function (v) { return isMinutes ? (v + 'm') : (v + '%'); } },
+            /* ⚠ ONLY A PERCENTAGE IS CAPPED AT 100. A duration and a count are
+               unbounded, and capping a count would draw a rep with 98 calls at
+               the same height as one with 140. */
+            max: (isMinutes || isCount) ? undefined : 100,
+            ticks: { color: '#ededed', callback: function (v) {
+              return isMinutes ? (v + 'm') : isCount ? String(v) : (v + '%'); } },
             grid: { color: 'rgba(255,255,255,0.08)' },
             title: { display: true, text: yLabel, color: '#ededed' },
           },
@@ -10131,7 +10154,7 @@
     mountRepGraphHosts();   // parity: this graph's canvas is preserved too
     var series = repOwnSeries();
     if (!series) return;
-    repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle Rate', false);
+    repSeriesChart('repOwnChart', series, function (x) { return x.handle; }, 'Handle Rate', false, 'handle', '%');
   }
 
   function repSeriesSectionHtml() {
@@ -10335,9 +10358,9 @@
        key), and BEFORE repSeriesChart builds datasets (it reads
        state.repLineHidden[user_id] while constructing them). */
     loadRepFilter();
-    repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate', true);
-    repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate', true);
-    repSeriesChart('repPriceChart', state.teamRepSeries, function (r) { return r.price; }, 'Minutes to Price', true);
+    repSeriesChart('repHandleChart', state.teamRepSeries, function (r) { return r.handle; }, 'Handle Rate', true, 'handle', '%');
+    repSeriesChart('repCloseChart', state.teamRepSeries, function (r) { return r.close; }, 'Closing Rate', true, 'close', '%');
+    repSeriesChart('repPriceChart', state.teamRepSeries, function (r) { return r.price; }, 'Minutes to Price', true, 'price', 'min');
     /* ⚠⚠ THE FILTER RENDERS HERE, AND THE PLACE IS THE WHOLE FIX.
        renderRepFilterControls() had exactly ONE call site — inside the
        toggle-apply path — so the control that lets you change the filter only
@@ -12015,7 +12038,22 @@
      never transforming. Larger sizes add DETAIL, never a different kind.
      ═══════════════════════════════════════════════════════════════════════ */
 
-  var DASH_CANVAS = { objection_handle_rate: 'handle', closing_rate: 'close', time_to_price: 'price' };
+  /* ⚠⚠ ONE TABLE PER TREND METRIC — the series key, its axis label and its UNIT
+     together, because the three have to agree and a ternary chain is how they
+     came apart. The old code inferred the team line from the label and drew the
+     CLOSING average on the objection-handling card. */
+  var DASH_CANVAS = {
+    closing_rate:          { key: 'close',     label: 'Closing %',         unit: '%' },
+    objection_handle_rate: { key: 'handle',    label: 'Objection handling %', unit: '%' },
+    time_to_price:         { key: 'price',     label: 'Minutes to price',  unit: 'min' },
+    /* ⚠ THE FOUR NEW HISTORIES. Seven of ten metrics were snapshots, so seven of
+       ten could never have a line — that, not the chart list, is why the catalog
+       felt thin. These cost one column each on queries already being made. */
+    avg_score:             { key: 'score',     label: 'Average score',     unit: 'count' },
+    calls_analyzed:        { key: 'calls',     label: 'Calls graded',      unit: 'count' },
+    prospects:             { key: 'prospects', label: 'People talked to',  unit: 'count' },
+    avg_call_time:         { key: 'duration',  label: 'Minutes per call',  unit: 'min' },
+  };
 
   /* ⚠ THE UNIT IS A PROPERTY OF THE METRIC. A score out of 100 and a count of
      calls are correctly bare; a rate is a percentage and a duration is minutes,
@@ -12071,7 +12109,7 @@
 
   function dashTrendHtml(card) {
     var pick = DASH_CANVAS[card.metric];
-    if (!pick) return dashNoValueHtml('this metric has no history');
+    if (!pick) return dashNoValueHtml('Scout does not keep a history for this one');
     return repGraphBodyHtml('dash_' + card.metric);
   }
 
@@ -12637,19 +12675,36 @@
     }
 
     var m = dashPick.metric;
+    /* ⚠⚠ TWO GROUPS, AND THIS IS THE DISTINCTION JUSTIN COULD NOT SEE. He asked
+       for bar charts and a scatter, then ruled that "any graph should be metric
+       against time" — the two only reconcile if "graph" means A LINE OVER TIME,
+       and the picker gave him no way to tell which was which.
+       ⚠ A manager choosing between "Line graph over time" and "Bar by rep"
+       should not have to work out that one moves and one does not. */
+    var OVER_TIME = { trend: 1 };
+    var timed = m.views.filter(function (v) { return OVER_TIME[v]; });
+    var nowV  = m.views.filter(function (v) { return !OVER_TIME[v]; });
+
+    function viewList(list) {
+      return '<div class="dash-pick-list">' + list.map(function (v) {
+        return '<button type="button" class="dash-pick-item" onclick="dashPickView(\'' + escapeHtml(v) + '\')">'
+          + '<span>' + escapeHtml(DASH_VIEW_LABEL[v] || v) + '</span>'
+          + '<i>' + escapeHtml(DASH_VIEW_WHY[v] || '') + '</i></button>';
+      }).join('') + '</div>';
+    }
+
     host.innerHTML = '<button type="button" class="dash-pick-back" onclick="dashPick.step=1;dashRenderPicker();">← All Metrics</button>'
       + '<div class="dash-pick-group">' + escapeHtml(m.label) + '</div>'
-      + '<div class="dash-pick-list">' + m.views.map(function (v) {
-          return '<button type="button" class="dash-pick-item" onclick="dashPickView(\'' + escapeHtml(v) + '\')">'
-            + '<span>' + escapeHtml(DASH_VIEW_LABEL[v] || v) + '</span>'
-            + '<i>' + escapeHtml(DASH_VIEW_WHY[v] || '') + '</i></button>';
-        }).join('') + '</div>'
-      /* ⚠ SAY WHY A VIEW IS NOT ON OFFER. "Gauge" missing with no explanation
-         reads as a bug; "this metric has no target" is a fact about the metric. */
+      + (timed.length ? '<div class="dash-pick-sub">Over time</div>' + viewList(timed) : '')
+      /* ⚠ SAY WHY THERE IS NO LINE, where the choice is made. Seven of ten
+         metrics now have a history; the three that do not are a fact about the
+         metric, not a gap in the picker. */
+      + (timed.length ? '' : '<div class="dash-pick-absent"><div>No line graph — Scout does not keep a history for this one.</div></div>')
+      + (nowV.length ? '<div class="dash-pick-sub">Right now</div>' + viewList(nowV) : '')
+      /* ⚠ AND WHY THERE IS NO GAUGE. A missing option with no explanation reads
+         as a bug; a fact about the metric reads as a fact. */
       + (typeof m.target !== 'number'
-          ? '<div class="dash-pick-absent"><div>No gauge \u2014 this metric has no target to point at.</div></div>' : '')
-      + (!m.history
-          ? '<div class="dash-pick-absent"><div>No trend \u2014 Scout does not keep a history for this one.</div></div>' : '');
+          ? '<div class="dash-pick-absent"><div>No gauge — this metric has no target to point at.</div></div>' : '');
   }
 
   /* ⚠⚠ THE TOOLBAR. In VIEW mode it is a pencil and the board name; in EDIT mode
@@ -12897,12 +12952,10 @@
     if (!state.teamRepSeries || state.teamRepSeries._error || state.teamRepSeries._forbidden) return;
     (src.cards || []).forEach(function (c) {
       if (c.view !== 'trend') return;
-      var pick = DASH_CANVAS[c.metric];
-      if (!pick) return;
+      var spec = DASH_CANVAS[c.metric];
+      if (!spec) return;
       repSeriesChart('dash_' + c.metric, state.teamRepSeries,
-        function (r) { return r[pick]; },
-        pick === 'price' ? 'Minutes to price' : (pick === 'close' ? 'Closing %' : 'Objection handling %'),
-        false);
+        function (r) { return r[spec.key]; }, spec.label, false, spec.key, spec.unit);
     });
   }
 

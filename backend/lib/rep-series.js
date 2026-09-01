@@ -193,6 +193,52 @@ function buildRepSeries(input) {
     cell.secs += secs; cell.calls++;
   });
 
+  /* ── volume, score and call length ────────────────────────────────────────
+     ⚠⚠ THE REAL ANSWER TO "VERY CUSTOMIZABLE" IS HISTORY, NOT MORE CHART TYPES.
+     Seven of ten metrics were snapshots, so seven of ten could never have a
+     line — and a bar chart of a snapshot is the same number in a different
+     outline. These three cost one column between them because the rows were
+     ALREADY fetched and ALREADY bucketed here.
+
+     ⚠⚠ AND EACH ONE MATCHES ITS NUMBER CARD'S DEFINITION EXACTLY, because a
+     graph and the figure beside it disagreeing is the defect this codebase has
+     paid for most often:
+       calls    — analysed calls, DQ INCLUDED. `team-analytics` says so in its
+                  own words: "calls_analyzed above is UNTOUCHED — the work
+                  happened", and that is Justin's ruling on DQ calls.
+       score    — mean overall_score over the same set.
+       prospects— the CLOSING DENOMINATOR (`cAcc.total`), which is what the
+                  number card reads, so DQ and no-show prospects leave it. It is
+                  free: already computed above.
+       duration — mean minutes. ⚠ A DURATION, NOT A RATE — it must never share
+                  an axis with the rate lines, exactly like the price series. */
+  var scoreOf = {};
+  analyses.forEach(function (a) {
+    if (a && a.fathom_call_id && typeof a.overall_score === 'number') scoreOf[a.fathom_call_id] = a.overall_score;
+  });
+  var analysedIds = {};
+  analyses.forEach(function (a) { if (a && a.fathom_call_id) analysedIds[a.fathom_call_id] = true; });
+
+  var vAcc = {};   // user -> bucketIndex -> {calls, scoreSum, scoreN, secs, durN}
+  calls.forEach(function (c) {
+    if (!c || !c.call_date) return;
+    if (!analysedIds[c.id]) return;               // "calls graded", not "calls synced"
+    var i = index[bucketStart(c.call_date, bucket).getTime()];
+    if (i === undefined) return;
+    var byUser = vAcc[c.user_id] || (vAcc[c.user_id] = {});
+    var cell = byUser[i] || (byUser[i] = { calls: 0, scoreSum: 0, scoreN: 0, secs: 0, durN: 0 });
+    cell.calls++;
+    var sc = scoreOf[c.id];
+    if (typeof sc === 'number') { cell.scoreSum += sc; cell.scoreN++; }
+    /* ⚠ A ZERO-LENGTH CALL IS EXCLUDED, NOT AVERAGED IN. 2,005 of 2,052 real
+       calls have a duration above zero; the rest are artefacts, and averaging a
+       zero in drags the line toward "instant call" for a call that never
+       happened. Same rule as a NULL price moment. */
+    if (typeof c.duration_seconds === 'number' && c.duration_seconds > 0) {
+      cell.secs += c.duration_seconds; cell.durN++;
+    }
+  });
+
   var repSeries = reps.map(function (r) {
     var u = r && r.user_id;
     return {
@@ -218,6 +264,35 @@ function buildRepSeries(input) {
           rate: cell.calls ? Math.round((cell.secs / cell.calls / 60) * 10) / 10 : null,
           calls: cell.calls, total: cell.calls,
         };
+      }),
+      /* ⚠ A COUNT, NOT A RATE — `rate` is the field name the chart reads, and it
+         carries whatever the series measures. The axis label is what says which,
+         and it is the only place that knows. */
+      calls: keys.map(function (k, i) {
+        var cell = (vAcc[u] || {})[i] || { calls: 0 };
+        /* ⚠ ZERO IS A REAL WEEK HERE, NOT AN ABSENCE — a rep who took no calls
+           took no calls, which is exactly what a volume line should show. That
+           is the opposite of the rate lines, where an empty week is unmeasured
+           and must stay null. Same distinction, opposite answer, because the
+           question is different. */
+        return { rate: cell.calls, calls: cell.calls, total: cell.calls };
+      }),
+      score: keys.map(function (k, i) {
+        var cell = (vAcc[u] || {})[i] || { scoreSum: 0, scoreN: 0 };
+        return { rate: cell.scoreN ? Math.round(cell.scoreSum / cell.scoreN) : null,
+                 calls: cell.scoreN, total: cell.scoreN };
+      }),
+      duration: keys.map(function (k, i) {
+        var cell = (vAcc[u] || {})[i] || { secs: 0, durN: 0 };
+        return { rate: cell.durN ? Math.round((cell.secs / cell.durN / 60) * 10) / 10 : null,
+                 calls: cell.durN, total: cell.durN };
+      }),
+      prospects: keys.map(function (k, i) {
+        /* ⚠ THE CLOSING DENOMINATOR, REUSED — the number card reads
+           `prospect_close_total`, so the graph must read the same thing or the
+           card and the line beside it disagree about the same word. Free. */
+        var cell = (cAcc[u] || {})[i] || { closed: 0, total: 0 };
+        return { rate: cell.total, calls: cell.total, total: cell.total };
       }),
     };
   });
@@ -254,6 +329,14 @@ function buildRepSeries(input) {
       handle: teamLine(function (r) { return r.handle; }),
       close: teamLine(function (r) { return r.close; }),
       price: teamLine(function (r) { return r.price; }),
+      /* ⚠ THE TEAM LINE ON A COUNT IS A MEAN PER REP, NOT A TOTAL — teamLine
+         averages the reps who have data, so "calls" reads as calls per rep and
+         "prospects" as prospects per rep. A team TOTAL would tower over every
+         rep line and flatten the comparison the chart exists for. */
+      calls: teamLine(function (r) { return r.calls; }),
+      score: teamLine(function (r) { return r.score; }),
+      duration: teamLine(function (r) { return r.duration; }),
+      prospects: teamLine(function (r) { return r.prospects; }),
     },
   };
 }

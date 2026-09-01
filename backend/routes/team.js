@@ -650,7 +650,10 @@ router.get('/rep-series', teamGate, async function (req, res) {
 
     var calls = [], start = 0;
     for (;;) {
-      var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, call_date, prospect_id')
+      /* ⚠ `duration_seconds` ADDED FOR THE CALL-LENGTH SERIES. The column already
+         exists and is populated on 2,052 of 2,058 real calls — this is one field
+         on a query that was already being made, not new stored data. */
+      var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, call_date, prospect_id, duration_seconds')
         .in('user_id', candidates).gte('call_date', range.from).lte('call_date', range.to)
         .not('not_a_sales_call', 'is', true)
         .is('duplicate_of', null)
@@ -671,7 +674,9 @@ router.get('/rep-series', teamGate, async function (req, res) {
       // price_stated_at_seconds drives the third graph (item j). Selecting it
       // here is the same class of omission that made the Part-1b section tags
       // invisible — the component was fine, the SELECT did not fetch the column.
-      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome, price_stated_at_seconds').in('fathom_call_id', slice).eq('status', 'done');
+      /* ⚠ `overall_score` ADDED FOR THE SCORE SERIES — populated on 1,555 of
+         1,589 done analyses. Same shape: one field on an existing query. */
+      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome, price_stated_at_seconds, overall_score').in('fathom_call_id', slice).eq('status', 'done');
       if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
       analyses = analyses.concat(aq.data || []);
       var oq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')

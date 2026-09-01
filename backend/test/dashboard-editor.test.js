@@ -240,10 +240,25 @@ test('⚠⚠ the unavailable list is NOT sent and NOT shown — but the catalog 
      — this metric has no target to point at" is about a metric the manager has
      ALREADY CHOSEN, so it explains a gap they are looking at rather than
      advertising something they cannot have. */
-  assert.ok(/No gauge \\u2014 this metric has no target to point at/.test(LIVE),
+  /* ⚠⚠ THE DASH MATCHES EITHER FORM, AND THAT IS THE POINT. This read
+     `\\u2014` — the ESCAPE, which is what the file happened to contain — and it
+     went red when the copy was rewritten with a literal em dash. Both render
+     the identical sentence to a customer, so the guard was pinned to an
+     ENCODING while its claim is about the WORDS. (The file's own convention is
+     the literal: 1095 against 16.) Same family as pinning a literal value that
+     goes stale on the very change it polices. */
+  const DASH = '(?:\\\\u2014|\\u2014)';
+  assert.ok(new RegExp('No gauge ' + DASH + ' this metric has no target to point at').test(LIVE),
     'a missing VIEW on a chosen metric is still explained');
-  assert.ok(/No trend \\u2014 Scout does not keep a history for this one/.test(LIVE),
+  /* ⚠ THE COPY MOVED WITH THE GROUPING: step two is now split into "Over time"
+     and "Right now", so the absence reads "No line graph" — the word a manager
+     used. The SUBJECT is unchanged: a missing view on a CHOSEN metric is still
+     explained where the choice is made. */
+  assert.ok(new RegExp('No line graph ' + DASH + ' Scout does not keep a history for this one').test(LIVE),
     'both of them');
+  assert.ok(/dash-pick-sub">Over time/.test(LIVE) && /dash-pick-sub">Right now/.test(LIVE),
+    'and step two must SAY which views move and which are a snapshot — that is the '
+    + 'distinction Justin could not see when he ruled that a graph is metric x time');
 });
 
 // ────────────────────────────────────────────────── the cap, and the empty board
