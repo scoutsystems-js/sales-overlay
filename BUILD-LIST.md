@@ -1075,6 +1075,27 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
 
+## 2026-09-01 — THE CATALOG WAS ASSERTING 13 BROKEN COMBINATIONS (`3a20408`)
+Deployed, verified by commit hash and by served-page parity. Suite **2041**. **Justin's three findings on the live editor: two were defects and one was a discoverability failure.**
+
+**⚠⚠ HE FOUND ONE CARD; RENDERING EVERY OFFERED COMBINATION FOUND THIRTEEN OF THIRTY.** 8 rendered *"Not enough to measure — no data in this range"* (a **FALSE reason**: the data is there, nothing reads it in that view) and **5 rendered ANOTHER METRIC'S NUMBERS** — `dashByRepHtml` fell back to `avg_score`, so Outcome mix, Average call time, Section scores, Call moment mix and Time to price **all showed the identical Josh 64 / Godwin 60 / Yazan 58**. ⚠⚠ **A card headed "Time to price" showing 64 reads as minutes. An empty card is a question; a wrong one is an answer.**
+
+**⚠⚠ AND IT EXPLAINED HIS THIRD REPORT.** *"Time to price shows a bare number, it needs min"* — **the number was not time to price.** It was average score under the wrong title. **A report about a UNIT was a report about the WRONG METRIC.**
+
+**THE FIX: THE OFFER IS DATA CAPABILITY ∩ RENDER CAPABILITY.** Two different questions, and conflating them produced this. The data gate is unchanged and still first; the render gate only removes. `RENDERABLE` is a claim about `dashboard.html` the library cannot verify, so it is **mirrored against the real builders in both directions** — too wide ships a wrong card, too narrow withholds a working one. **30 offered → 17, and all 17 render.**
+
+**⚠ THREE METRICS MOVED TO THE NAMED LIST — AND NEEDED A SECOND SENTENCE.** *"Scout cannot measure this"* is true of talk ratio and **false of outcome mix**, which is measured fine and has no card. One sentence for both would send a manager to wait for data that already exists.
+
+**§2 — "no graphs as options": THE PICKER WAS OFFERING TREND THE WHOLE TIME.** Step one said *"4 views"* — a count, never which — so the only way to find the three metrics with a graph was to open all ten, and the honest explanation lives on step two, reachable only after picking wrong. **An explanation only reachable after the choice cannot inform the choice.** Step one now names them.
+
+**§3 — units were missing on EVERY by-rep row**, not one: closing rate read `25` where it means 25%. The metrics that are correctly bare are **named**, so the absence is a decision rather than an oversight.
+
+**⚠ SHARED CARRIER, CAUGHT BEFORE IT SHIPPED:** `number` used to be offered by every available metric and is no longer. `resolveLayout` and `sanitizeLayout` both coerced an unsupported view to `number`, **which would have put `avg_call_time` and `time_to_price` straight back into the broken card**. Both now fall back to the first offered view, and the note names what it BECAME rather than always saying "shown as a number", which had quietly become false.
+
+**Guards:** `widget-render-mirror` (7), **proven non-vacuous by restoring all seven defects — 7 of 7 caught.** Two converted: the data/views **equivalence** became a one-way implication (**the offer must never EXCEED the data — still absolute**) plus its new render half, and the unavailable guard gained the reason and asserts **both kinds exist**.
+
+---
+
 ## 2026-09-01 — WIDGET CATALOG block 3: THE EDITOR (`2eda78b`)
 Deployed, verified by commit hash **and** by the served page being byte-identical to local (1,040,447). Every new route answers **401** while a route that does not exist answers **404** — two different values, which is evidence rather than a smoke test. Suite **2033**.
 

@@ -5662,6 +5662,31 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **FOUND BY LOOKING AT THE FIRST RENDER.** Fifth time on this pass that looking has found what a check could not.
 - **THE HABIT: when a design rule is implemented as a PER-VIEW LIST, adding a view means adding it to every list — and the lists must be enumerated, not remembered.** Here there were five (`.page`, `.section`, `.page-header`, `.page-header--company`, `.team-controls-row`).
 
+### ⚠⚠⚠ A CATALOG THAT CONFLATES "THE DATA EXISTS" WITH "SOMETHING CAN DRAW IT" OFFERS CARDS THAT LIE (2026-09-01)
+**Justin reported one card showing no data. Rendering EVERY offered combination through the real builder — the CATALOG'S CLAIM being the thing under test, not that one card — found 13 of 30 broken.**
+```
+30 offered combinations
+   8  rendered "Not enough to measure — NO DATA IN THIS RANGE"   <- a FALSE reason: the data is there
+   5  rendered ANOTHER METRIC'S NUMBERS                          <- far worse
+```
+- **⚠⚠ THE FIVE ARE THE FINDING. `dashByRepHtml` ended `}[card.metric] || function (r) { return r.avg_score; }`, so any metric it did not know rendered AVERAGE SCORE UNDER THAT METRIC'S OWN TITLE.** Five different cards — Outcome mix, Average call time, Section scores, Call moment mix, Time to price — all showed the identical `Josh 64 / Godwin 60 / Yazan 58`. **A card headed "Time to price" showing 64 reads as MINUTES.** ⚠ **AN EMPTY CARD IS A QUESTION; A WRONG ONE IS AN ANSWER.**
+- **⚠⚠ AND IT EXPLAINED A SECOND REPORT: "time to price shows a bare number, it needs min". The number missing a unit WAS NOT TIME TO PRICE.** A defect report about a UNIT was really a report about the WRONG METRIC — **when a user reports something small about a value, check the value is the one they think it is.**
+- **THE FIX IS AN INTERSECTION, AND THE TWO GATES ARE DIFFERENT QUESTIONS: does the DATA support this view, and can anything DRAW it.** The data gate is unchanged and still first (a gauge stays unofferable for a targetless metric); the render gate only ever REMOVES. **Dropping either one re-opens one of the two failures.**
+- **⚠ A RENDER-CAPABILITY LIST IS A CLAIM ABOUT A FILE THE LIBRARY CANNOT READ, so it is MIRRORED against the real builders — BOTH DIRECTIONS, because the failures are not symmetric: too WIDE ships a wrong card to a manager, too NARROW withholds a working one and nobody knows why.**
+- **⚠ A METRIC WITH NO OFFERABLE VIEW IS NAMED, NOT HIDDEN — but it needed a SECOND SENTENCE.** *"Scout cannot measure this"* is TRUE of talk ratio and **FALSE of outcome mix**, which is measured perfectly well and simply has no card. **One sentence for both sends a manager to wait for data that already exists.** A closed vocabulary (`no_data` | `no_card`) on the wire; the surface owns the wording.
+
+### ⚠⚠ "NO GRAPHS AS OPTIONS" — THE PICKER WAS OFFERING THEM, ON THE STEP YOU REACH ONLY AFTER PICKING WRONG (2026-09-01)
+**Three metrics offer a trend and the picker offered it correctly the whole time. Step ONE said `"4 views"` — a COUNT, never WHICH.**
+- **SO THE ONLY WAY TO FIND A GRAPH WAS TO OPEN ALL TEN METRICS IN TURN**, and the honest explanation — *"No trend — Scout does not keep a history for this one"* — lives on step TWO. **The explanation was correct and in the wrong place.**
+- **⚠⚠ THE GENERAL FORM: AN EXPLANATION THAT IS ONLY REACHABLE AFTER THE CHOICE CANNOT INFORM THE CHOICE.** A count summarises; it does not inform. **Name the options where the decision is made** — step one now reads `Number · Gauge · Trend · By rep`.
+- **⚠ AND THE REPORT WAS "IT IS MISSING" WHEN IT WAS "IT IS UNFINDABLE".** Those need completely different fixes, and only rendering the picker and reading it separated them.
+
+### ⚠⚠ A UNIT IS A PROPERTY OF THE METRIC, AND ONE MISSING UNIT MEANS NONE WERE EVER CHECKED (2026-09-01)
+**The by-rep view rendered EVERY value bare. Closing rate read `25` where it means 25%; a duration would have read `31` where it means 31 minutes.**
+- **⚠ THE REPORT NAMED ONE CARD. THE DEFECT WAS THE VIEW.** When a formatting fault is found on one instance, ask whether the thing that formats it is shared — here a single `<b>' + String(r.v) + '</b>` served all of them.
+- **⚠⚠ AND THE METRICS THAT ARE CORRECTLY BARE ARE NAMED, NOT OMITTED.** A score out of 100 and a count of calls need no unit — **but an entry that says `''` is a DECISION and an absent entry is an oversight, and they are indistinguishable unless the decision is written down.** A test requires every drawable metric to have an entry, bare or not.
+- **⚠ THE UNIT LIVES WITH THE METRIC, NOT THE VIEW.** A second table per view is how the gauge's inverted-direction defect came back once already.
+
 ### ⚠⚠⚠ A PAYLOAD THAT RENDERS NOWHERE IS STILL IN THE CUSTOMER'S BROWSER — AND THAT IS THE WHOLE POINT (2026-09-01)
 **The widget catalog served every metric's `measured` and `note` fields to the picker: *"USE close_score_earned, NEVER close_score"*, *"migration 027"*, *"transcript_stored.turns[]"*, row counts. The picker renders NONE of it.**
 ```
