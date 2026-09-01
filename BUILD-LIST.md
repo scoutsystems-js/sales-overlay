@@ -1168,6 +1168,29 @@ Deployed, verified by commit hash and served-page parity. Suite **2051**.
 
 ---
 
+## 2026-09-01 — THE CATALOG IS FINISHED: FOUR MORE LINE GRAPHS, AND STEP TWO SAYS WHICH VIEWS MOVE (`d49a631`)
+Deployed, verified by commit hash **and** served-page byte parity. Suite **2052**. **Looked at, signed in, on a real board.**
+
+**§1 — THE BAR CHARTS STAYED, AND THE DISTINCTION IS NOW ON SCREEN.** *"Every graph is metric against time"* was read as *"when I say GRAPH I mean a line over time"*, not as a mandate to retire `bar_rep` and `bar_cat`. **Nothing was deleted on an inference.** Step two is grouped into **Over time** and **Right now**, so a manager choosing between a line graph and a bar by rep does not have to work out that one moves and one does not. Confirmed by clicking, 4 mousedowns delivered.
+
+**§2 — HISTORY WAS THE ANSWER, NOT MORE CHART TYPES. TREND-CAPABLE METRICS 3 → 7.** Seven of ten metrics were snapshots, so seven of ten could never have a line — that, and not the chart list, is why the catalog felt thin. **Cost measured before anything was built:** `calls_analyzed` and `prospects` cost **nothing** (rows already fetched and bucketed), `avg_score` and `avg_call_time` cost **one column each** on selects already being made. **No new stored columns, no migration.** The three breakdown metrics are filed: `outcome_mix` and `section_scores` are five series not one, and `moment_mix` is a **6.3x row cost** (9,022 highlights against 1,424 objections).
+- ⚠ **`prospects` REUSES THE CLOSING DENOMINATOR** — people who had a real conversation, no-shows and DQs dropped — because the number card reads that, and a graph beside a card must not disagree about the same word.
+- ⚠ **A GAP IN THE DATA IS A GAP IN THE LINE, NEVER A ZERO.** A rep with no calls that day breaks the line; 0 would read as "scored zero".
+- **A LIVE DEFECT FELL OUT OF IT:** the team baseline was selected by MATCHING THE AXIS LABEL, so the objection-handling card drew the **CLOSING** team average. Unit and series key are now passed; the inference is **removed rather than kept as a fallback**.
+
+**⚠⚠ AND THE GUARD THAT SHOULD HAVE EXISTED DID NOT — restoring `history:false` on four metrics produced ZERO failures.** Three links now asserted in both directions: catalog claims history → `DASH_CANVAS` maps a series key → `rep-series` emits it **per rep AND on the team line**. Break any one and the card draws an empty chart, which reads as *"this rep had no calls"* rather than as a missing feature.
+
+**§3 — METRIC NAMES: PROPOSED, NOTHING WIRED. ⚠ AWAITING JUSTIN.** Every description read out of the code that computes it — numerator, denominator, unit. The seven live ones plus the three he removed, renamed so he rules on what they ARE rather than what they were called (*"Call moment mix"* → *"What Scout flagged"*). Full table in the findings report.
+
+**§4 — SCATTER: FILED, GENUINELY STRUCTURAL.** Two metrics on one card against **38 places that assume one** — it is a second dimension through the spine, not a chart type. **§5 — ORIENTATION: FIXED, FILED.**
+
+**§6 — THE CATALOG IS FINISHED, WITH ONE HOLE NAMED.**
+
+| `▰ MINOR` **THE NUMBER CARD AND THE BY-REP LIST CANNOT RENDER MINUTES** (measured 2026-09-01 — **NOT BUILT**) | `avg_call_time` offers only Gauge · Line; `time_to_price` offers only Line. **Six missing combinations**, refused honestly rather than drawn wrong — but *"minutes per call, per rep"* is a thing a manager asks for. **Teaching `dashNumberHtml` and `dashByRepHtml` the `min` unit is the cheapest remaining win in the catalog.** Both already carry a `DASH_UNIT` concept. |
+| `▱ OBSERVATION` **A 30-DAY WINDOW BUCKETS DAILY** — a 9-rep chart is 270 points. Legible (the axis thins its own labels) but dense; weekly buckets above ~14 days would read better. **Pre-existing, reported not acted on.** |
+
+**STILL OUTSTANDING, NOT IN THIS BLOCK:** rep-card widget, save-as-new, rename-a-board, the metric audit, the stale-bundle nudge, the design pass, the site sweep, Scout AI.
+
 ## 2026-09-01 — THE "NOT AVAILABLE YET" LIST REMOVED; THE GRAPHS ARE THERE (`3418197`)
 Deployed, verified by commit hash and served-page parity. Suite **2049**.
 

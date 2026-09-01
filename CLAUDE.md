@@ -5281,6 +5281,29 @@ band = (100vw − 200px sidebar − 1200px column) / 4
 - **SO A FLOOR IS THE HONEST ANSWER**, and it goes FURTHER than the accepted "zero at 1366 and below": absent under 1496, because **0–24px is the range that looks broken.** ⚠ That means no mesh at 1440, stated plainly rather than discovered.
 - **⚠ THE 24px THRESHOLD IS PROVISIONAL AND LABELLED AS SUCH IN THE CODE.** The browser became unresponsive before 1512-against-1440 could be compared. **A number that has not had its look gets said so, not presented as derived.**
 
+### ⚠⚠⚠ RESTORING THREE DEFECTS PRODUCED TWO FAILURES — THE THIRD WAS THE POINT OF THE BLOCK (2026-09-01)
+**Setting `history: false` on four metrics — which silently removes their line graph, the entire deliverable — broke NOTHING. 2052 tests, all green.**
+- **⚠⚠ THE GUARDS ALL EXISTED AND ALL AIMED ONE LEVEL AWAY.** The catalog test checked the catalog, the mirror checked the page, the series test checked the series. **Nobody asserted the CHAIN**, so a metric could lose its trend, or claim one it cannot draw, and the suite stayed green.
+- **THE CHAIN IS THREE LINKS AND ALL THREE MUST AGREE:** catalog says `history: true` → `DASH_CANVAS` maps it to a series key → `rep-series` emits that key **per rep AND on the team line**. Break any one and the card draws an **empty chart, which reads as "this rep had no calls"** rather than as a missing feature.
+- **⚠ THE TEAM LINE IS A SEPARATE ASSERTION FROM THE PER-REP ONE, and that is not belt-and-braces:** the team baseline is what a closer is read against, and it is selected by the same key — which is exactly how the objection card came to draw the CLOSING team average.
+- **THE ONLY REASON THE GAP WAS FOUND IS THE RESTORE-AND-COUNT DISCIPLINE.** Three defects restored, two failures reported — **the arithmetic is the signal.** A defect that produces no failure is a guard that does not exist, and it is invisible from a green run.
+
+### ⚠⚠ A GUARD PINNED TO AN ENCODING FAILS ON A CHANGE THAT ALTERS NO WORDS (2026-09-01)
+**A test asserted `/No gauge \\u2014 this metric has no target/` — the ESCAPE, which is what the file happened to contain. Rewriting that copy with a LITERAL em dash turned it red, and the sentence a customer reads did not change by one character.**
+- **THE GUARD'S CLAIM WAS ABOUT THE WORDS AND ITS ANCHOR WAS ABOUT THE BYTES.** Both forms render identically; only one was pinned.
+- **⚠ AND THE FILE'S OWN CONVENTION SETTLED WHICH WAY TO FIX IT: 1095 literal em dashes against 16 escapes.** The new copy was the consistent one and the guard was the outlier — **so measure the convention before "fixing" the code to match a test.**
+- **THE FIX IS A DASH-AGNOSTIC MATCHER**, not a re-pinned literal. Same family as *derive a guard from the source of truth, never pin a literal* — here the literal was an encoding rather than a value.
+
+### ⚠⚠ SERVED == LOCAL IS WHAT SEPARATES "MY MARKER IS WRONG" FROM "THE DEPLOY FAILED" (2026-09-01)
+**Four post-deploy markers read 0 in both raw and comment-stripped code. That is exactly what a failed deploy looks like.** The byte-length comparison said the served page was **identical to local**, so the deploy was provably current and the markers were mine — I had grepped for the **series** key (`score:`) where the table is keyed by **metric** (`avg_score:`).
+- **⚠ IT COST ONE COMMAND TO TELL THEM APART, and without it the next step is investigating the platform.** A marker check answers "is this string present"; only a whole-artefact comparison answers "is this the code I pushed".
+- **THE HABIT: fetch the served page ONCE, and report `raw bytes / code bytes / served==local` beside every marker count.** The comment percentage (45% here) is part of the same line — a raw grep on this page is not evidence of anything.
+
+### ⚠ A CANVAS MEASUREMENT IS NOT A LOOK — `getImageData` READ 0 ON A CHART THAT WAS PLAINLY DRAWN (2026-09-01)
+Verifying a new line graph, the painted-pixel count came back **0** while Chart.js held 9 datasets, 30 buckets, real values and an auto-scaled axis. **The first cause was real and mundane — the canvas was 1559px down the page, offscreen — and scrolling it into view did not change the reading either.**
+- **THE AXIS WAS THE TELL: `max: 80` with ticks 0/10/20.** An empty dataset gives a default 0-1 axis, so the data had demonstrably arrived. **A result contradicting something already visible in the same output is a statement about the instrument.**
+- **A screenshot settled it in one call.** File beside *measurement is not a composition test*: **for anything about what is PAINTED, look — and treat a pixel count as a weaker instrument than an eye.**
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
