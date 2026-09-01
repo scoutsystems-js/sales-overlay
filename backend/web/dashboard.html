@@ -4062,14 +4062,27 @@
     }
     .dash-pick-list { display: flex; flex-direction: column; gap: 4px; }
     .dash-pick-item {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      /* ⚠ `flex-start`, not `baseline` — the left side is now two lines (name and
+         description) and baseline would hang the view list off the FIRST of them
+         while the description ran on beneath, reading as unrelated text. */
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
       width: 100%; text-align: left; padding: 10px 12px; border-radius: 6px;
       background: none; border: 1px solid transparent; cursor: pointer;
       color: var(--text); font-size: var(--fs-body); font-family: inherit;
     }
     .dash-pick-item:hover { border-color: var(--border-strong); background: var(--bg-field); }
     .dash-pick-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-    .dash-pick-item i { font-style: normal; font-size: var(--fs-secondary); opacity: 0.65; }
+    .dash-pick-item i { font-style: normal; font-size: var(--fs-secondary); opacity: 0.65;
+      flex: 0 0 auto; text-align: right; padding-top: 2px; }
+    /* ⚠ THE DESCRIPTION GETS THE ROOM. It is the part that makes a metric
+       placeable, so the left column takes the slack and the view list keeps only
+       what it needs. `opacity`, never a grey token — the no-grey rule is about
+       unreadable body text, and this recedes without becoming grey. */
+    .dash-pick-item span { display: block; min-width: 0; flex: 1 1 auto; }
+    .dash-pick-item span em {
+      display: block; margin-top: 3px; font-style: normal;
+      font-size: var(--fs-secondary); opacity: 0.7; line-height: 1.4;
+    }
     .dash-pick-back {
       background: none; border: 0; padding: 0; margin: 6px 0 2px; cursor: pointer;
       color: var(--text); opacity: 0.75; font-size: var(--fs-secondary); font-family: inherit;
@@ -12077,15 +12090,28 @@
   function dashNumberHtml(card) {
     var t = (state.teamOverview && state.teamOverview.totals) || null;
     if (!t) return dashNoValueHtml('the team overview has not loaded');
-    var v = null, sub = '';
-    if (card.metric === 'avg_score')      { v = t.avg_score; sub = t.calls_analyzed + ' calls'; }
-    else if (card.metric === 'calls_analyzed') { v = t.calls_analyzed; sub = t.reps + ' reps'; }
-    else if (card.metric === 'closing_rate')   { v = t.prospect_close_rate == null ? null : t.prospect_close_rate + '%';
+    /* ⚠⚠ THE UNIT COMES FROM DASH_UNIT, NOT FROM A LITERAL HERE. It used to
+       inline '%' on two branches while the by-rep list and the bar chart both
+       read the table — two sources for one concept, and units have now been the
+       fault twice in this catalog. One table, every builder. */
+    var raw = null, sub = '';
+    if (card.metric === 'avg_score')      { raw = t.avg_score; sub = t.calls_analyzed + ' calls'; }
+    else if (card.metric === 'calls_analyzed') { raw = t.calls_analyzed; sub = t.reps + ' reps'; }
+    else if (card.metric === 'closing_rate')   { raw = t.prospect_close_rate;
                                                  sub = t.prospect_close_wins + ' of ' + t.prospect_close_total + ' prospects'; }
-    else if (card.metric === 'objection_handle_rate') { v = t.obj_handle_rate == null ? null : t.obj_handle_rate + '%';
+    else if (card.metric === 'objection_handle_rate') { raw = t.obj_handle_rate;
                                                  sub = t.objections_handled + ' of ' + t.objections_total + ' objections'; }
-    else if (card.metric === 'prospects') { v = t.prospect_close_total; sub = 'in range'; }
-    if (v === null || v === undefined) return dashNoValueHtml('no data in this range');
+    else if (card.metric === 'prospects') { raw = t.prospect_close_total; sub = 'in range'; }
+    /* ⚠ BOTH MINUTE METRICS SAY WHAT THEY AVERAGED OVER, and time-to-price says
+       it counted only the calls where a price was actually said — ~1 in 5 closed
+       calls has no price drop, and a caption of "across N calls" would imply the
+       other four were instant. */
+    else if (card.metric === 'avg_call_time') { raw = t.avg_call_time;
+                                                 sub = 'across ' + (t.avg_call_time_n || 0) + ' calls'; }
+    else if (card.metric === 'time_to_price') { raw = t.time_to_price;
+                                                 sub = 'on ' + (t.time_to_price_n || 0) + ' calls where a price was said'; }
+    if (raw === null || raw === undefined) return dashNoValueHtml('no data in this range');
+    var v = String(raw) + (DASH_UNIT[card.metric] || '');
     /* ⚠ THE SAME BUILDER AS EVERY OTHER LOUD NUMBER, so a figure cannot be
        styled one way here and another way on the page it sits beside. */
     return leadNumberHtml(v, card.label, sub);
@@ -12136,6 +12162,13 @@
       objection_handle_rate: function (r) { return r.obj_handle_rate; },
       calls_analyzed: function (r) { return r.calls_analyzed; },
       prospects: function (r) { return r.prospect_close_total; },
+      /* ⚠⚠ `time_to_price` IS DELIBERATELY ABSENT. Ranking asserts better-and-
+         worse, and nobody has ruled whether a faster time to price is better —
+         with no direction it would sort SLOWEST FIRST and the longest bar would
+         read as the best rep. A wrong direction has no wrong number, so nothing
+         on screen would look off. The catalog refuses the ranked views for it;
+         this is the second half of that refusal. */
+      avg_call_time: function (r) { return r.avg_call_time; },
     }[card.metric];
     if (!pickVal) return { error: 'no per-rep card can show this metric yet' };
 
@@ -12654,8 +12687,16 @@
                  was offering Trend the whole time, on step TWO, which is
                  reachable only after you have already picked. The explanation
                  was correct and in the wrong place. */
+              /* ⚠⚠ THE DESCRIPTION SITS IN THE READING PATH, UNDER THE NAME. The
+                 complaint was "I don't know what those metrics do", and that is
+                 not answered by a better name — a manager placing a card needs
+                 the numerator, the denominator and the unit. ⚠ The VIEW LIST
+                 stays on the right, where the previous block put it after he
+                 could not find the graphs; naming the views is what fixed that,
+                 and moving them now would undo it. */
               return '<button type="button" class="dash-pick-item" onclick="dashPickMetric(\'' + escapeHtml(m.key) + '\')">'
-                + '<span>' + escapeHtml(m.label) + '</span>'
+                + '<span>' + escapeHtml(m.label)
+                + (m.description ? '<em>' + escapeHtml(m.description) + '</em>' : '') + '</span>'
                 + '<i>' + m.views.map(function (v) { return escapeHtml(DASH_VIEW_SHORT[v] || v); }).join(' \u00B7 ') + '</i></button>';
             }).join('') + '</div>';
         }).join('');

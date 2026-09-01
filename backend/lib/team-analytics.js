@@ -22,7 +22,8 @@ function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 async function aggregateWindow(admin, repIds, from, to) {
   var rep = {};
   repIds.forEach(function (id) {
-    rep[id] = { calls_analyzed: 0, score_sum: 0, score_n: 0, win_sum: 0, win_n: 0, cash_sum: 0, close_won: 0, close_decided: 0, obj_total: 0, obj_handled: 0, sec_sum: {}, sec_n: {}, obj_by_cat: {}, close_earned_sum: 0, close_earned_n: 0 };
+    rep[id] = { calls_analyzed: 0, score_sum: 0, score_n: 0, win_sum: 0, win_n: 0, cash_sum: 0, close_won: 0, close_decided: 0, obj_total: 0, obj_handled: 0, sec_sum: {}, sec_n: {}, obj_by_cat: {}, close_earned_sum: 0, close_earned_n: 0,
+                 dur_sum: 0, dur_n: 0, price_sum: 0, price_n: 0 };
     SECTIONS.forEach(function (s) { rep[id].sec_sum[s] = 0; rep[id].sec_n[s] = 0; });
   });
   if (repIds.length === 0) return { rep: rep, doneCallIds: [] };
@@ -30,7 +31,10 @@ async function aggregateWindow(admin, repIds, from, to) {
   // calls in window for these reps
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
-    var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, call_date')
+    /* ⚠ `duration_seconds` — ONE COLUMN on a select already being made, the same
+       cost shape as the trend work. It is what lets the number card and the
+       by-rep list show minutes; without it the views were refused honestly. */
+    var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, call_date, duration_seconds')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
       .is('duplicate_of', null)
@@ -45,18 +49,21 @@ async function aggregateWindow(admin, repIds, from, to) {
      copied rows are counted as real people's performance. Ava Mitchell read
      "39 calls, 13% closing" on the live board while owning ZERO real calls. */
   calls = realCallsOnly(calls);
-  var callRep = {}, callIds = [];
+  var callRep = {}, callIds = [], callDuration = {};
   // Ruling 2026-08-17: the objection loop needs the CALL's outcome, to credit
   // objections on calls that closed. `outcome` is already selected below, so
   // this is a map build and not a new query.
   var callOutcome = {};
-  calls.forEach(function (c) { callRep[c.id] = c.user_id; callIds.push(c.id); });
+  calls.forEach(function (c) {
+    callRep[c.id] = c.user_id; callIds.push(c.id);
+    callDuration[c.id] = c.duration_seconds;
+  });
   if (callIds.length === 0) return { rep: rep, doneCallIds: [] };
 
   var doneCallIds = [];
   for (var i = 0; i < callIds.length; i += 100) {
     var aq = await admin.from('call_analyses')
-      .select('fathom_call_id, analyzed_at, overall_score, outcome, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned')
+      .select('fathom_call_id, analyzed_at, overall_score, outcome, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned, price_stated_at_seconds')
       .in('fathom_call_id', callIds.slice(i, i + 100)).eq('status', 'done');
     if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
     (aq.data || []).forEach(function (a) {
@@ -81,6 +88,18 @@ async function aggregateWindow(admin, repIds, from, to) {
       // 027 forces close_score to 100 on closed calls, so "weakest section" must
       // not read it — the section drilldown already reads earned for this reason.
       if (typeof a.close_score_earned === 'number') { r.close_earned_sum += a.close_score_earned; r.close_earned_n++; }
+      /* ⚠⚠ BOTH MINUTE METRICS MIRROR lib/rep-series EXACTLY, and that is the
+         point rather than a coincidence: the number card and the line beside it
+         must not disagree about the same word. A ZERO-LENGTH call is excluded,
+         not averaged in (it drags the mean toward an instant call that never
+         happened), and a NULL price moment is excluded, never counted as zero
+         (~1 in 5 closed calls genuinely has no price drop). Accumulated HERE,
+         in the analyses loop, so both count GRADED calls — 'calls graded', not
+         'calls synced', which is the denominator rep-series uses. */
+      var dsec = callDuration[a.fathom_call_id];
+      if (typeof dsec === 'number' && dsec > 0) { r.dur_sum += dsec; r.dur_n++; }
+      var psec = a.price_stated_at_seconds;
+      if (typeof psec === 'number' && isFinite(psec)) { r.price_sum += psec; r.price_n++; }
     });
   }
   for (var j = 0; j < callIds.length; j += 100) {
@@ -213,6 +232,11 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       connected: connectedSet[id] === true,
       calls_analyzed: c.calls_analyzed,
       avg_score: curAvg,
+      /* ⚠ MINUTES, ROUNDED TO ONE PLACE. NULL when the rep has nothing to
+         measure — unmeasured and fast are opposite meanings, and a 0 here
+         would say a rep quotes instantly. */
+      avg_call_time: c.dur_n > 0 ? Math.round((c.dur_sum / c.dur_n / 60) * 10) / 10 : null,
+      time_to_price: c.price_n > 0 ? Math.round((c.price_sum / c.price_n / 60) * 10) / 10 : null,
       prior_avg_score: priAvg,
       trend: trend,
       win_mean: avg(c.win_sum, c.win_n),
@@ -252,12 +276,15 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
   // sort: most calls first, then score
   per_rep.sort(function (a, b) { return (b.calls_analyzed - a.calls_analyzed) || ((b.avg_score || 0) - (a.avg_score || 0)); });
 
-  var t = { calls_analyzed: 0, score_sum: 0, score_n: 0, win_sum: 0, win_n: 0, cash_sum: 0, close_won: 0, close_decided: 0, obj_total: 0, obj_handled: 0 };
+  var t = { calls_analyzed: 0, score_sum: 0, score_n: 0, win_sum: 0, win_n: 0, cash_sum: 0, close_won: 0, close_decided: 0, obj_total: 0, obj_handled: 0,
+           dur_sum: 0, dur_n: 0, price_sum: 0, price_n: 0 };
   repIds.forEach(function (id) {
     var c = cur.rep[id];
     t.calls_analyzed += c.calls_analyzed; t.score_sum += c.score_sum; t.score_n += c.score_n;
     t.win_sum += c.win_sum; t.win_n += c.win_n; t.obj_total += c.obj_total; t.obj_handled += c.obj_handled;
     t.cash_sum += c.cash_sum; t.close_won += c.close_won; t.close_decided += c.close_decided;
+    t.dur_sum += c.dur_sum; t.dur_n += c.dur_n;
+    t.price_sum += c.price_sum; t.price_n += c.price_n;
   });
   // Team prospect totals: sum the per-rep prospect counts. Summing counts (not
   // averaging percentages) keeps the team rate consistent with the rep rates —
@@ -292,6 +319,13 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     objections_total: t.obj_total,
     objections_handled: t.obj_handled,
     obj_handle_rate: t.obj_total > 0 ? Math.round((t.obj_handled / t.obj_total) * 100) : null,
+    /* ⚠ POOLED, never the mean of per-rep means — the counts printed beneath a
+       figure are the pooled ones, so a mean-of-means would put a different
+       number on screen from the counts under it. */
+    avg_call_time: t.dur_n > 0 ? Math.round((t.dur_sum / t.dur_n / 60) * 10) / 10 : null,
+    avg_call_time_n: t.dur_n,
+    time_to_price: t.price_n > 0 ? Math.round((t.price_sum / t.price_n / 60) * 10) / 10 : null,
+    time_to_price_n: t.price_n,
   };
   return { from: from, to: to, totals: totals, per_rep: per_rep, objection_categories: teamByCat };
 }

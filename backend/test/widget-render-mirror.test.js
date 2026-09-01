@@ -199,18 +199,29 @@ test('⚠⚠ a stored board naming a metric nothing can draw DROPS and says so',
 
 test('⚠⚠ a withdrawn view falls back to the metric\'s FIRST OFFERED view, not to `number`', () => {
   const L = require('../lib/dashboard-layout.js');
-  const r = L.resolveLayout([
-    { metric: 'avg_call_time', view: 'number', w: 1, h: 1 },
-    { metric: 'time_to_price', view: 'number', w: 1, h: 1 },
-  ]);
-  /* `number` used to be offered by every available metric and IS NO LONGER.
-     Hard-coding it here would coerce these two straight back into the broken
-     card this change removed — the shared-carrier shape, where viewsFor() changed
-     what it holds and the risk was in its other readers. */
-  assert.deepStrictEqual(r.cards.map((c) => c.metric + '/' + c.view),
-    ['avg_call_time/gauge', 'time_to_price/trend']);
-  r.cards.forEach((c) => assert.strictEqual(c.requestedView, 'number',
-    'and the card records that it changed, so it can say so'));
+  /* ⚠⚠ CONVERTED 2026-09-01, AND THE REASON IS THE POINT. This drove the two
+     MINUTE metrics, because they were the only ones that did not offer `number`
+     — and closing the minutes hole gave both of them a number card, so the
+     fixture can no longer tell "falls back to the first offered view" apart from
+     "always falls back to number". THE SUBJECT SURVIVES AND THE FIXTURE DIED:
+     every offerable metric now offers `number` first, so no catalog entry can
+     prove this behaviourally any more. Asserted at the SOURCE instead, which
+     cannot go vacuous however the catalog moves. */
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'dashboard-layout.js'), 'utf8');
+  const code = src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const falls = [...code.matchAll(/\?\s*(?:want|c\.view)\s*:\s*([A-Za-z0-9_.\[\]']+)/g)].map((x) => x[1]);
+  assert.ok(falls.length >= 2, 'non-vacuity: the fallback expressions must be found — ' + falls.length);
+  falls.forEach((f) => assert.strictEqual(f, 'm.views[0]',
+    "the fallback must be the metric's FIRST OFFERED view, never a literal: got " + f));
+
+  /* and behaviourally: a view the metric does not offer still lands on one it
+     DOES, and the card records that it changed so it can say so. */
+  const r = L.resolveLayout([{ metric: 'closing_rate', view: 'breakdown', w: 1, h: 1 }]);
+  const cat = require('../lib/widget-catalog.js');
+  const offered = cat.byKey('closing_rate').views;
+  assert.ok(offered.indexOf('breakdown') === -1, 'fixture: the asked-for view must be unofferable');
+  assert.strictEqual(r.cards[0].view, offered[0]);
+  assert.strictEqual(r.cards[0].requestedView, 'breakdown');
 });
 
 test('⚠ the fell-back note names what it BECAME, not what it used to always become', () => {

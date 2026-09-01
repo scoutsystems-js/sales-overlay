@@ -72,7 +72,7 @@ const VIEWS = {
  */
 const CATALOG = [
   {
-    key: 'avg_score', group: 'quality', label: 'Average call score',
+    key: 'avg_score', description: "Scout's grade for each call, averaged. Points out of 100.", group: 'quality', label: 'Average call grade',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: true, categories: null,
     measured: '1,551 of 1,585 done analyses carry overall_score',
@@ -80,7 +80,7 @@ const CATALOG = [
         + 'value for a trend ARROW — which is not the same as a time series.',
   },
   {
-    key: 'closing_rate', group: 'outcomes', label: 'Closing rate',
+    key: 'closing_rate', description: 'People who bought \u00f7 people you actually spoke to, as a percent. No-shows and disqualified prospects are left out, and one person counts once however many calls it took.', group: 'outcomes', label: 'Closing rate',
     source: 'aggregate', cost: 'aggregate', lane: 'prospect-entity',
     available: true, perRep: true, target: 25, history: true, categories: null,
     measured: 'prospect_id on 1,534 of 2,052 real calls; rep-series serves a '
@@ -89,7 +89,7 @@ const CATALOG = [
         + 'no_show and disqualified leave the denominator (hadAConversation).',
   },
   {
-    key: 'objection_handle_rate', group: 'objections', label: 'Objection handling rate',
+    key: 'objection_handle_rate', description: 'Objections you got past \u00f7 objections raised, as a percent. Half-handled counts as not handled.', group: 'objections', label: 'Objection handling rate',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: 35, history: true, categories: 'objection_category',
     measured: '1,417 objection moments, all 4 categories present '
@@ -101,7 +101,7 @@ const CATALOG = [
         + 'comparison is not.',
   },
   {
-    key: 'avg_call_time', group: 'quality', label: 'Average call time',
+    key: 'avg_call_time', description: 'Total call minutes \u00f7 calls, in minutes. 60 is a ceiling, not a target \u2014 under is good.', group: 'quality', label: 'Average call time',
     source: 'column', cost: 'aggregate', lane: 'team-averages',
     available: true, perRep: true, target: 60, targetDirection: 'lower_is_better',
     history: true, categories: null,
@@ -110,7 +110,7 @@ const CATALOG = [
         + '"at or below 60 min", never "at or above target".',
   },
   {
-    key: 'calls_analyzed', group: 'people', label: 'Calls analyzed',
+    key: 'calls_analyzed', description: 'How many calls Scout has finished grading, as a count.', group: 'people', label: 'Calls graded',
     source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: true, categories: null,
     measured: '1,585 done analyses',
@@ -118,7 +118,7 @@ const CATALOG = [
         + 'weakest-against-target shape the loud-number ruling already refuses.',
   },
   {
-    key: 'outcome_mix', group: 'outcomes', label: 'Outcome mix',
+    key: 'outcome_mix', description: 'Every call split into closed, follow-up, lost and no-show. A breakdown, not a rate.', group: 'outcomes', label: 'Outcome mix',
     source: 'column', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: false,
     categories: 'outcome',
@@ -128,7 +128,7 @@ const CATALOG = [
         + 'cannot reconcile the total.',
   },
   {
-    key: 'section_scores', group: 'quality', label: 'Section scores',
+    key: 'section_scores', description: 'The grade for each part of a call \u2014 intro, discovery, pitch, objections, close \u2014 side by side. Five numbers out of 100.', group: 'quality', label: 'Section scores',
     source: 'column', cost: 'aggregate', lane: 'team-analytics',
     available: true, perRep: true, target: null, history: false,
     categories: 'section',
@@ -139,7 +139,7 @@ const CATALOG = [
         + 'difference on a real board.',
   },
   {
-    key: 'moment_mix', group: 'quality', label: 'Call moment mix',
+    key: 'moment_mix', description: 'Every moment Scout flagged, split by kind \u2014 objection, buying signal, risk, missed opportunity. A count breakdown.', group: 'quality', label: 'Call moment mix',
     source: 'column', cost: 'aggregate', lane: 'call_highlights',
     available: true, perRep: true, target: null, history: false, categories: 'type',
     measured: 'buying_signal 2,620 · risk_signal 1,854 · objection 1,417 · '
@@ -149,7 +149,7 @@ const CATALOG = [
         + 'which every team lane already loads.',
   },
   {
-    key: 'time_to_price', group: 'quality', label: 'Time to price',
+    key: 'time_to_price', description: 'Minutes from the start of the call to the price being said. Calls where no price came up are left out, not counted as zero.', group: 'quality', label: 'Minutes to price',
     source: 'column', cost: 'aggregate', lane: 'rep-series',
     available: true, perRep: true, target: null, history: true, categories: null,
     measured: 'price_stated_at_seconds on 426 of 1,585 (27%)',
@@ -159,7 +159,7 @@ const CATALOG = [
         + 'on a chart. Already handled by the graph, and any new view inherits it.',
   },
   {
-    key: 'prospects', group: 'people', label: 'Prospects',
+    key: 'prospects', description: 'How many people had a real conversation with you, as a count. These are the people your closing rate is out of.', group: 'people', label: 'People talked to',
     source: 'aggregate', cost: 'aggregate', lane: 'prospect-entity',
     available: true, perRep: true, target: null, history: true, categories: null,
     measured: 'prospect_id on 1,534 of 2,052 real calls',
@@ -169,7 +169,7 @@ const CATALOG = [
 
   // ── NOT OFFERABLE TODAY, and each says why ───────────────────────────────
   {
-    key: 'talk_ratio', group: 'quality', label: 'Talk ratio',
+    key: 'talk_ratio', description: 'Share of the words on a call that were yours, as a percent.', group: 'quality', label: 'Talk ratio',
     source: 'scan', cost: 'scan', lane: null,
     available: false, perRep: true, target: null, history: false, categories: null,
     measured: 'COMPUTABLE, and I computed it: 66% closer on average across 200 '
@@ -187,7 +187,7 @@ const CATALOG = [
         + 'is the sounder measure. Offerable after a stored per-call column.',
   },
   {
-    key: 'discovery_coverage', group: 'quality', label: 'Discovery coverage',
+    key: 'discovery_coverage', description: 'How often each discovery area was actually established, as a percent.', group: 'quality', label: 'Discovery coverage',
     source: 'column', cost: 'aggregate', lane: null,
     available: false, perRep: true, target: null, history: false, categories: 'area_key',
     measured: 'coverage on 683 of 1,585 — but SPLIT ACROSS TWO VOCABULARIES: 626 '
@@ -199,7 +199,7 @@ const CATALOG = [
         + 'the fixed six — a due date, not a dependency.',
   },
   {
-    key: 'coaching_volume', group: 'quality', label: 'Coached moments',
+    key: 'coaching_volume', description: 'How many moments Scout wrote coaching for, as a count.', group: 'quality', label: 'Coached moments',
     source: 'column', cost: 'aggregate', lane: null,
     available: false, perRep: true, target: null, history: false, categories: null,
     measured: 'call_highlights.coaching on 197 of 8,998 (2%) — v30, new calls only',
@@ -236,7 +236,12 @@ const CATALOG = [
  * never a silently broken card.
  */
 const RENDERABLE = {
-  number:    ['avg_score', 'calls_analyzed', 'closing_rate', 'objection_handle_rate', 'prospects'],
+  /* ⚠⚠ BOTH MINUTE METRICS REACH THE NUMBER CARD, AND ONLY ONE REACHES THE
+     RANKED VIEWS. A number states a value and implies NO ORDERING, so it is
+     safe for a metric whose direction nobody has ruled on. A ranked list or a
+     bar chart asserts better-and-worse, and that is a different claim. */
+  number:    ['avg_score', 'calls_analyzed', 'closing_rate', 'objection_handle_rate', 'prospects',
+              'avg_call_time', 'time_to_price'],
   gauge:     ['closing_rate', 'objection_handle_rate', 'avg_call_time'],
   /* ⚠ FOUR HISTORIES ADDED 2026-09-01. Seven of ten metrics were snapshots, so
      seven of ten could never have a line — and a bar chart of a snapshot is the
@@ -244,12 +249,24 @@ const RENDERABLE = {
      were already fetched and bucketed by rep and week) and one cost a column. */
   trend:     ['closing_rate', 'objection_handle_rate', 'time_to_price',
               'avg_score', 'calls_analyzed', 'prospects', 'avg_call_time'],
-  by_rep:    ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects'],
+  /* ⚠⚠ `avg_call_time` JOINS THE RANKED VIEWS AND `time_to_price` DOES NOT, and
+     the difference is a RULING, not an oversight. Justin ruled the call-time
+     direction outright — "60min is the max, anything less than that is good" —
+     so `targetDirection: 'lower_is_better'` sorts the fastest rep first and the
+     longest bar is correctly the worst. NOBODY HAS RULED WHETHER A FASTER TIME
+     TO PRICE IS BETTER, and this project's own record warns the other way (a
+     price question deflected before the pitch is CORRECT technique, v20). With
+     no direction it would default to higher-is-better and rank the SLOWEST rep
+     first — a wrong direction has no wrong number, so nothing on screen would
+     look off. Left refused until it is ruled. */
+  by_rep:    ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
+              'avg_call_time'],
   breakdown: ['objection_handle_rate'],
   /* ⚠ THE BARS DRAW THE SAME DATA THE LIST VIEWS ALREADY READ, so their
      renderable sets are identical by construction rather than by coincidence —
      a test asserts that, so a metric cannot gain one and not the other. */
-  bar_rep:   ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects'],
+  bar_rep:   ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
+              'avg_call_time'],
   bar_cat:   ['objection_handle_rate'],
 };
 
@@ -295,7 +312,12 @@ function byKey(k) { return catalog().filter(function (m) { return m.key === k; }
    ⚠ SO THE WIRE SHAPE IS AN ALLOWLIST, NOT A DELETION. The notes stay in
    CATALOG where they belong — they are the measured justification for every
    `available` flag — and this picks out the seven fields the picker reads. */
-var PUBLIC_FIELDS = ['key', 'label', 'views', 'target', 'targetDirection', 'history', 'categories'];
+/* ⚠⚠ `description` IS THE FIELD THAT ANSWERED THE COMPLAINT, not `label`.
+   "I don't know what those metrics do" is not fixed by a better name — a
+   manager placing a card needs the numerator, the denominator and the unit.
+   It is customer-facing prose and belongs on the wire; the `measured` and
+   `note` fields stay OFF it, because those are our engineering record. */
+var PUBLIC_FIELDS = ['key', 'label', 'description', 'views', 'target', 'targetDirection', 'history', 'categories'];
 
 function publicMetric(m) {
   var out = {};

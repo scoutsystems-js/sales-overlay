@@ -185,8 +185,22 @@ test('⚠⚠ the catalog payload carries NO engineering notes', () => {
      NEVER close_score", "migration 027", row counts. They render nowhere, which
      is exactly the problem: that is one innerHTML from being on screen, and the
      customer-language ruling is about what a customer CAN see. */
-  ['measured', 'close_score', 'migration', 'transcript_stored', 'prompt_version', 'lane']
+  /* ⚠⚠ THE FIELD FORM, NOT THE BARE WORD. This banned `measured` as a string and
+     duly fired on a customer-facing DESCRIPTION containing the ordinary English
+     word — the claim is about a FIELD carrying engineering notes, and the scope
+     was every occurrence anywhere. `"measured":` cannot appear in prose. */
+  ['"measured"', '"note"', 'close_score', 'migration', 'transcript_stored', 'prompt_version']
     .forEach((w) => assert.ok(!wire.includes(w), 'internal text on the wire: ' + w));
+  /* ⚠ AND THE DESCRIPTIONS ARE CUSTOMER PROSE, so they are held to the customer
+     -language rule rather than merely being allowed through. */
+  cat.grouped().forEach((g) => g.metrics.forEach((m) => {
+    assert.ok(m.description && m.description.length > 20,
+      m.key + ' has no description — the description is what makes a metric placeable');
+    ['chunk', 'embedding', 'cache', 'query', 'column', 'null', 'row '].forEach((w) => {
+      assert.ok(m.description.toLowerCase().indexOf(w) === -1,
+        m.key + ' description uses mechanism vocabulary: ' + w);
+    });
+  }));
   // sanity: the payload is not empty, or the assertions above pass over nothing
   assert.ok(cat.grouped().length >= 3 && wire.length > 800, 'wire: ' + wire.length);
   // and every offered metric still carries what the picker needs
