@@ -2,6 +2,28 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  /* ⚠⚠⚠ THE TYPE SCALE (design pass block 1, 2026-09-01). SEVEN SIZES AND
+     NOTHING BETWEEN THEM, EVER. Before this there were no size or weight tokens
+     at all — 374 literal sizes across twelve distinct values including
+     half-pixels (12.5, 10.5, 13.5), and 115 declarations sharing one semibold.
+     A new value here is a decision, not a convenience: if something needs a
+     size that is not one of these seven, the answer is one of these seven. */
+  --fs-display:   48px;  /* the ONE loud number on a page */
+  --fs-number:    20px;  /* supporting stats */
+  --fs-title:     18px;  /* page and section headings */
+  --fs-body:      14px;  /* default */
+  --fs-secondary: 13px;  /* supporting copy */
+  --fs-label:     12px;  /* field and row labels */
+  --fs-eyebrow:   11px;  /* uppercase section markers */
+
+  /* ⚠⚠ THREE WEIGHTS, NOT SEVEN. The 115 semibolds were the single
+     cheapest-looking thing in the app — heavy text at 11-12px is close to the
+     definition of it — and almost all of them become 400. 500 is for emphasis
+     and is meant to be rare; 300 is the display number and nothing else. */
+  --fw-display:   300;
+  --fw-normal:    400;
+  --fw-emphasis:  500;
+
   --green:       #09e046;
   --green-dark:  #07af37;
   /* ⚠ THE CHANNEL SPELLING OF THE SAME GREEN. rgba() cannot read a hex token,

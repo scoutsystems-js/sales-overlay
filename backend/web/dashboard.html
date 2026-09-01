@@ -76,6 +76,37 @@
        ────────────────────────────────────────────────────────────────── */
 
     :root {
+      /* ⚠⚠⚠ THE TYPE SCALE (design pass block 1, 2026-09-01). SEVEN SIZES AND
+         NOTHING BETWEEN THEM, EVER. Before this there were no size or weight tokens
+         at all — 374 literal sizes across twelve distinct values including
+         half-pixels (12.5, 10.5, 13.5), and 115 declarations sharing one semibold.
+         A new value here is a decision, not a convenience: if something needs a
+         size that is not one of these seven, the answer is one of these seven. */
+      --fs-display:   48px;  /* the ONE loud number on a page */
+      --fs-number:    20px;  /* supporting stats */
+      --fs-title:     18px;  /* page and section headings */
+      --fs-body:      14px;  /* default */
+      --fs-secondary: 13px;  /* supporting copy */
+      --fs-label:     12px;  /* field and row labels */
+      --fs-eyebrow:   11px;  /* uppercase section markers */
+    
+      /* ⚠⚠ THREE WEIGHTS, NOT SEVEN. The 115 semibolds were the single
+         cheapest-looking thing in the app — heavy text at 11-12px is close to the
+         definition of it — and almost all of them become 400. 500 is for emphasis
+         and is meant to be rare; 300 is the display number and nothing else. */
+      --fw-display:   300;
+      --fw-normal:    400;
+      --fw-emphasis:  500;
+
+    /* ⚠⚠ THIS IS A SECOND COPY, AND IT IS FORCED BY THE ARCHITECTURE, NOT A
+       CHOICE. dashboard.html links NO stylesheet — it carries ~197KB of inline
+       CSS — so tokens defined in css/style.css (which SEVEN other pages do
+       link) cannot reach it. The two copies are pinned identical by
+       test/type-scale.test.js so they cannot drift; that guard is the only
+       thing making the duplication safe.
+       ⚠ An earlier report of mine claimed "nine pages load the shared
+       stylesheet". They do not — that count came from grepping a string that
+       also appears in COMMENTS here. Seven link it; the dashboard is not one. */
       --bg:           #0a0a0a;
       --bg-elevated:  #131313;
       --bg-hover:     #1a1a1a;
@@ -173,7 +204,7 @@
          it was. 500 was rejected because it competes with the 600 labels that
          sit beside body copy everywhere here. 450 exists only because this is a
          variable font; no static cut set contains it. */
-      font-weight: 450;
+      font-weight: var(--fw-normal);
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
@@ -840,8 +871,8 @@
       border-radius: var(--radius-lg); padding: 14px 18px;
     }
     .page-header h1 {
-      font-size: 28px;
-      font-weight: 600;
+      font-size: var(--fs-title);
+      font-weight: var(--fw-normal);
       letter-spacing: -0.02em;
       margin: 0;
     }
@@ -1080,13 +1111,20 @@
       margin-bottom: 18px;
       gap: 12px;
     }
+    /* ⚠⚠ A FLOOR FOR EVERY HEADING IN A CARD, because two of them had NO RULE
+       AT ALL and were rendering at the BROWSER'S default <h2> — 21px/700, the
+       loudest text on the page, arrived at by nobody deciding anything. Asking
+       the browser which rule matched returned none, twice, with two different
+       parents. A base rule means an unstyled heading is now impossible rather
+       than merely unlikely; the more specific rules below still win. */
+    .section h2 { font-size: var(--fs-title); font-weight: var(--fw-normal); margin: 0; }
     .section-header h2 {
-      font-size: 18px;
-      font-weight: 600;
+      font-size: var(--fs-title);
+      font-weight: var(--fw-normal);
       letter-spacing: -0.01em;
       margin: 0;
     }
-    .section-header .meta { font-size: 12px; font-weight: 400; color: var(--text); }
+    .section-header .meta { font-size: var(--fs-label); font-weight: var(--fw-normal); color: var(--text); }
 
     /* ── Coach summary patterns ─────────────────────────────────────── */
     .patterns-list { display: flex; flex-direction: column; gap: 12px; }
@@ -1685,7 +1723,7 @@
       border: 1px solid var(--border);
       padding: 7px 14px;
       border-radius: var(--radius-sm);
-      font-size: 12px;
+      font-size: var(--fs-label);
       font-weight: 500;
       font-family: inherit;
       cursor: pointer;
@@ -2080,17 +2118,17 @@
                 padding: 16px; cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease); }
     .rep-card:hover { border-color: var(--accent); transform: translateY(-1px); }
     .rep-card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
-    .rep-card-name { font-size: 16px; font-weight: 600; color: var(--text); }
+    .rep-card-name { font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); }
     .rep-card-calls { font-size: 12px; color: var(--text); }
     .rep-card-stats { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 10px; }
     .rep-stat { min-width: 150px; }
-    .rep-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
-    .rep-stat-val { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.2; margin-top: 3px; }
+    .rep-stat-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
+    .rep-stat-val { font-size: var(--fs-number); font-weight: var(--fw-normal); color: var(--text); line-height: 1.2; margin-top: 3px; }
     .rep-stat-sub { font-size: 12px; color: var(--text); margin-top: 1px; }
     .rep-weak { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; padding-top: 8px;
                 border-top: 1px solid var(--border); font-size: 13px; color: var(--text); }
-    .rep-weak-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; min-width: 132px; }
-    .rep-weak-val { font-weight: 600; }
+    .rep-weak-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .04em; min-width: 132px; }
+    .rep-weak-val { font-weight: var(--fw-normal); }
     .rep-weak-sub, .rep-weak-cmp, .rep-weak-none { color: var(--text); }
     .rep-weak-cmp { margin-left: auto; }
     /* Unmeasured: the sentence IS the value, so there is no dash to misread. */
@@ -2107,7 +2145,7 @@
        .dp so the rest of the dark theme is untouched. */
     .dp { --dp-bg: #ffffff; --dp-fg: #111111; --dp-line: #d6d8dc; --dp-muted: #4a4d52; }
     .dp-label { background: var(--dp-bg); border: 1px solid var(--dp-line); border-radius: var(--radius);
-                color: var(--dp-fg); padding: 6px 12px; font-size: 13px; cursor: pointer; font-weight: 600; }
+                color: var(--dp-fg); padding: 6px 12px; font-size: var(--fs-secondary); cursor: pointer; font-weight: var(--fw-emphasis); }
     .dp-label:hover { border-color: var(--accent); }
     .dp-cal { font-size: 10px; }
     .dp-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: 268px; padding: 10px;
@@ -2137,7 +2175,7 @@
     .rep-graph-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
     .rep-graph-select {
       background: var(--bg-field); color: var(--text); border: 1px solid var(--border-strong);
-      border-radius: 6px; padding: 7px 10px; font-size: 13px; font-weight: 600;
+      border-radius: var(--radius-sm); padding: 7px 10px; font-size: var(--fs-secondary); font-weight: var(--fw-emphasis);
     }
     .review-type-badge {
       /* Justin 2026-08-13: the type read small, grey and messy. Bigger and
@@ -2685,11 +2723,20 @@
     .team-detail-list { display: flex; flex-direction: column; gap: 4px; }
     .team-detail-row { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); cursor: pointer; transition: border-color 0.15s var(--ease); }
     .team-detail-row:hover { border-color: var(--accent); }
-    .team-detail-name { width: 130px; font-size: 14px; font-weight: 600; color: var(--text); text-transform: capitalize; flex-shrink: 0; }
+    .team-detail-name { width: 130px; font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); text-transform: capitalize; flex-shrink: 0; }
     .team-detail-track { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
     .team-detail-fill { height: 100%; background: var(--accent); border-radius: 5px; }
-    .team-detail-val { width: 150px; text-align: right; font-size: 15px; font-weight: 600; color: var(--text); flex-shrink: 0; }
-    .team-detail-sub { display: block; font-size: 11px; font-weight: 500; color: var(--text); margin-top: 2px; }
+    /* ⚠⚠ THIS HEADING HAD NO RULE AT ALL. It rendered at 21px/700 — the
+       BROWSER'S DEFAULT <h2> — so the loudest heading on the page was an
+       absence of a decision rather than one. Found by asking the browser which
+       rule matched and getting back none. */
+    .rep-graph-head h2 { font-size: var(--fs-title); font-weight: var(--fw-normal); margin: 0; }
+    /* ⚠ JUDGEMENT: the per-rep score in a ranked list. `number` (20) is the
+       token for a stat, but at 20 it would tower over the 14px name beside it
+       in the same row, so it takes `body` with emphasis instead. If the ranked
+       lists should read as stats rather than rows, this is the one to revisit. */
+    .team-detail-val { width: 150px; text-align: right; font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); flex-shrink: 0; }
+    .team-detail-sub { display: block; font-size: var(--fs-eyebrow); font-weight: var(--fw-normal); color: var(--text); margin-top: 2px; }
     /* B-1 redesign: compact recommendations card → dedicated expanded page */
     .team-recs-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px 18px; cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
     .team-recs-card:hover { border-color: var(--accent); transform: translateY(-1px); }
@@ -2756,7 +2803,7 @@
 
     /* (n) The promoted Performance Summary card. Visual weight only — it is
        still a link, and the synthesis lane still fires on the page it opens. */
-    .perf-feature .section-header h2 { font-size: 20px; }
+    .perf-feature .section-header h2 { font-size: var(--fs-title); }
     .perf-feature-card { padding: 20px 22px; }
     .perf-feature-lead { font-size: 15px; line-height: 1.55; max-width: 62ch; }
     .perf-feature-points { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-top: 16px; }
@@ -2870,15 +2917,15 @@
        deliberately absent — accent-palette.test.js fails if they ever mix. */
     .avg-section { padding-top: 16px; }
     .avg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-    .avg-title { font-size: 15px; font-weight: 600; }
-    .avg-window { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+    .avg-title { font-size: var(--fs-title); font-weight: var(--fw-normal); }
+    .avg-window { font-size: var(--fs-eyebrow); font-weight: var(--fw-normal); text-transform: uppercase; letter-spacing: 0.06em; }
     .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
     .avg-card { text-align: center; padding: 4px 4px 12px; border-radius: var(--radius-md); }
     /* Only the gauge with a real destination is clickable, and it says so —
        a card that looks interactive and is not is worse than a plain one. */
     .avg-card-link { cursor: pointer; transition: background 0.15s var(--ease); }
     .avg-card-link:hover { background: var(--bg-field); }
-    .avg-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .avg-name { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-bottom: 4px; }
     .avg-dial { position: relative; }
     .avg-svg { width: 100%; max-width: 230px; height: auto; display: block; margin: 0 auto; }
 
@@ -2923,18 +2970,18 @@
     .avg-scale-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: 0.55; }
 
     .avg-readout { position: absolute; left: 0; right: 0; bottom: 6px; pointer-events: none; }
-    .avg-value { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+    .avg-value { font-size: var(--fs-number); font-weight: var(--fw-normal); line-height: 1; letter-spacing: -0.01em; }
     .avg-value-good { color: var(--good); }
     .avg-value-mid  { color: var(--mid); }
     .avg-value-bad  { color: var(--bad); }
-    .avg-value-unit { font-size: 15px; font-weight: 600; margin-left: 1px; }
-    .avg-target-cap { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; margin-top: 3px; }
+    .avg-value-unit { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-left: 1px; }
+    .avg-target-cap { font-size: var(--fs-eyebrow); font-weight: var(--fw-normal); text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; margin-top: 3px; }
     /* Raw counts under every rate — house rule. */
-    .avg-counts { font-size: 12px; margin-top: 6px; }
+    .avg-counts { font-size: var(--fs-label); margin-top: 6px; }
     /* ⚠ The three-group count sentence. This is the part that makes the panel
        work at 20+ reps, and it is why the unmeasured group is named in words
        rather than folded into the denominator. */
-    .avg-reps { font-size: 12px; font-weight: 600; margin-top: 2px; }
+    .avg-reps { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-top: 2px; }
     .avg-card-empty { display: flex; flex-direction: column; justify-content: center; min-height: 180px; }
     .avg-empty { font-size: 12px; font-weight: 600; }
     .avg-empty span { display: block; font-size: 11px; font-weight: 400; margin-top: 4px; opacity: 0.85; }
