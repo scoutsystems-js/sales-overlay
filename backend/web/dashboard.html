@@ -4441,9 +4441,22 @@
     }
     .kb-promote-btn.is-team:hover { color: var(--text); border-color: var(--border-strong); background: none; }
     .kb-promote-btn:disabled { opacity: 0.5; cursor: wait; }
-    /* REMOVED 2026-08-18 with the Add-to-KB buttons (see addSectionMomentToKb).
+    /* ⚠⚠ UN-ARCHIVED 2026-09-01, AND THE GAP IT LEAVES IS THE LESSON. This rule
+       was archived on 2026-08-18 when both Add-to-KB controls were removed —
+       correctly. The MANAGER control was RE-ADDED to the render path on
+       2026-08-29 and NOBODY UN-ARCHIVED ITS CSS, so for three days every call
+       review rendered a BROWSER-DEFAULT button: `background rgb(239,239,239)`,
+       `border 2px outset black`, black text, on a near-black page.
+       ⚠ NOTHING FAILED, and no guard could have caught it. The removal guard
+       asserts the rep control is gone and the manager control is role-gated —
+       both true. A check on a control's PRESENCE cannot see that it has no
+       STYLE, and a stylesheet grep finds an archived block rather than nothing.
+       ⚠ THE RULE: REMOVING A CONTROL REMOVES ITS CSS, AND RE-ADDING THE CONTROL
+       DOES NOT BRING THE CSS BACK. Whenever a control is revived, ask what was
+       archived WITH it. Found by enumerating computed style on the rendered
+       page — `matchedRules` came back as ["*", "button"], i.e. none of ours.
        Add-to-KB on a section-breakdown moment row (Part 2b). Sits with the
-       speaker/type badges, pushed right so it never crowds the quote.
+       speaker/type badges, pushed right so it never crowds the quote. */
     .review-kb-btn {
       margin-left: auto;
       flex-shrink: 0;
@@ -4460,7 +4473,7 @@
     }
     .review-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
     .review-kb-btn.is-saved { color: var(--accent); border-color: var(--accent); opacity: 1; cursor: default; }
-    .review-kb-btn:disabled:not(.is-saved) { opacity: 0.5; cursor: wait; } */
+    .review-kb-btn:disabled:not(.is-saved) { opacity: 0.5; cursor: wait; }
     .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
     .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
 
