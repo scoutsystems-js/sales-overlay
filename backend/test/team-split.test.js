@@ -54,6 +54,70 @@ test('⚠ the all-hidden note asks about THIS page, not every panel', () => {
    the string also occurs in viewToHashPath, so deleting a whole dispatcher line
    still left two and the guard passed. Proven by restoring that exact defect.
    Slice each router and require the view inside BOTH. */
+/* ⚠⚠⚠ THE THIRD DISPATCHER — THE ONE THAT SHIPPED BROKEN TO PRODUCTION.
+   scheduleTeamRender() is what EVERY lane calls when its data arrives. It
+   carried its OWN list of four views and `return`ed on the rest, so on
+   Performance and Coaching the data landed and NOTHING REPAINTED: shells on
+   screen, content never drawn. Justin saw empty cards.
+   ⚠ The guard written the day before covered the two dispatchers I KNEW about.
+   A third existed. So this asserts the SHAPE — the coalescer must not hold a
+   view list of its own — rather than enumerating dispatchers I can think of. */
+test('⚠⚠⚠ the render coalescer holds NO view list of its own', () => {
+  const at = LIVE.indexOf('function scheduleTeamRender');
+  assert.ok(at !== -1, 'stale anchor — the coalescer is gone');
+  const body = LIVE.slice(at, LIVE.indexOf('\n  }', at));
+  assert.ok(body.length > 200 && body.length < 2000, 'slice must cover it: ' + body.length);
+
+  assert.ok(/isTeamView\(state\.view\)/.test(body),
+    'the coalescer must ask ONE shared predicate whether this is a team page');
+  assert.ok(/renderTeamSurface\(\)/.test(body),
+    'and route through the one team dispatcher');
+  const named = (body.match(/state\.view === '/g) || []).length;
+  assert.strictEqual(named, 0,
+    'the coalescer names ' + named + ' view(s) directly — a third copy of the list, '
+    + 'and a page missing from it repaints NEVER while looking merely slow');
+});
+
+/* ⚠ isTeamView IS DERIVED FROM TEAM_PAGES, not hand-written, so adding a sixth
+   page cannot leave the coalescer or the nav behind. Executed, because a text
+   check cannot see the list going stale. */
+test('⚠⚠ isTeamView covers every page in the dropdown, and says no to others', () => {
+  const at = H.indexOf('var TEAM_PAGES');
+  const src = H.slice(at, H.indexOf('function teamPageSelectHtml', at));
+  assert.ok(src.length > 200 && src.length < 3000, 'slice must cover it: ' + src.length);
+  const is = new Function(src + '; return isTeamView;')();
+
+  const pages = [...H.matchAll(/\{ view: '([a-z-]+)',\s+label:/g)].map(m => m[1]);
+  assert.strictEqual(pages.length, 5, 'expected five pages, found ' + pages.length);
+  pages.forEach(v => assert.ok(is(v), v + ' is in the dropdown but isTeamView says no'));
+  ['team-expanded', 'team-needs-work'].forEach(v =>
+    assert.ok(is(v), v + ' is a team sub-view and must still repaint'));
+  ['overview', 'kb', 'eod', 'call-library', 'account'].forEach(v =>
+    assert.ok(!is(v), v + ' is not a team page — the coalescer must not repaint it'));
+});
+
+/* ⚠ THE NAV'S ACTIVE STATE READS THE SAME LIST. It had gone stale in exactly
+   the same way and lost its underline on Performance and Coaching. */
+test('⚠ the Team tab stays underlined on every team page', () => {
+  const at = LIVE.indexOf('function updateNavActiveStates');
+  const body = LIVE.slice(at, LIVE.indexOf('\n  }', at));
+  assert.ok(body.length > 300 && body.length < 3000, 'slice must cover it: ' + body.length);
+  assert.ok(/navTeam\.classList\.toggle\('nav-active', isTeamView\(state\.view\)\)/.test(body),
+    'the nav must use the shared predicate, not its own list of team views');
+});
+
+/* ⚠ THE LANE EVERY REP CARD READS. The split dropped this kick entirely — no
+   renderer asked for it — so each card's one-line summary was blank forever. */
+test('⚠ the page whose cards read teamWhy actually kicks that lane', () => {
+  const at = LIVE.indexOf('function renderTeamPerformance');
+  const body = LIVE.slice(at, LIVE.indexOf('content.innerHTML', at));
+  assert.ok(body.length > 200 && body.length < 2500, 'slice must cover it: ' + body.length);
+  assert.ok(/loadTeam\('why'\)/.test(body), 'rep cards read state.teamWhy — the lane must be kicked');
+  // every lane a page's panels read must be kicked BY that page
+  ['overview', 'repSeries', 'teamAverages', 'why'].forEach(l =>
+    assert.ok(body.indexOf("loadTeam('" + l + "')") !== -1, 'Performance must kick ' + l));
+});
+
 test('⚠⚠ BOTH dispatchers carry all five pages', () => {
   const ROUTERS = ['function render()', 'function renderTeamSurface()'];
   const bodies = ROUTERS.map((sig) => {

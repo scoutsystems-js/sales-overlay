@@ -78,11 +78,23 @@ function loadCoalescer(opts) {
   const frames = [];
   const requestAnimationFrame = (f) => frames.push(f);
 
+  /* ⚠⚠ THE REAL isTeamView, NOT A STUB. The coalescer used to carry its own
+     list of four views and silently returned on the rest — which is how
+     Performance and Coaching shipped never repainting when their data landed.
+     It now asks one shared predicate, and a stand-in here would test the
+     stand-in rather than the list that actually decides. Taken from the raw
+     source: the comment stripper is for matching, not for execution. */
+  const pAt = HTML.indexOf('var TEAM_PAGES');
+  const pSrc = HTML.slice(pAt, HTML.indexOf('function teamPageSelectHtml', pAt));
+  assert.ok(pSrc.length > 200 && pSrc.length < 3000, 'predicate slice: ' + pSrc.length);
+  const isTeamView = new Function(pSrc + '; return isTeamView;')();
+
   const fn = new Function(
     'document', 'state', 'renderTeamSurface', 'renderTeamExpanded',
     'renderTeamNeedsWorkView', 'renderTeamMembersView', 'requestAnimationFrame', 'setTimeout',
+    'isTeamView',
     src + '; return scheduleTeamRender;'
-  )(document, state, renderTeamSurface, noop, noop, noop, requestAnimationFrame, () => 0);
+  )(document, state, renderTeamSurface, noop, noop, noop, requestAnimationFrame, () => 0, isTeamView);
 
   return { fn, calls, frames, flush: () => { const f = frames.splice(0); f.forEach((x) => x()); } };
 }

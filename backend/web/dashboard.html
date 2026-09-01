@@ -6370,7 +6370,9 @@
       navOverview.classList.toggle('nav-active', !!OVERVIEW_VIEWS[state.view] || state.view === 'objections-intel' || state.view === 'needs-work' || state.view === 'performance');
     }
     var navTeam = document.getElementById('navTeam');
-    if (navTeam) navTeam.classList.toggle('nav-active', state.view === 'team' || state.view === 'team-expanded' || state.view === 'team-needs-work' || state.view === 'team-objections' || state.view === 'team-members');
+    // ⚠ SAME LIST AS THE COALESCER. Hand-written, this one had gone stale too:
+    //   the tab lost its underline on Performance and Coaching.
+    if (navTeam) navTeam.classList.toggle('nav-active', isTeamView(state.view));
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
     if (navCallLibrary) {
@@ -7568,11 +7570,13 @@
     teamRenderQueued = true;
     var run = function () {
       teamRenderQueued = false;
-      if (state.view === 'team') renderTeamSurface();
-      else if (state.view === 'team-expanded') renderTeamExpanded();
-      else if (state.view === 'team-objections') renderTeamObjectionsView();
-      else if (state.view === 'team-members') renderTeamMembersView();
-      else return;
+      /* ⚠⚠ ONE DISPATCHER, NOT A THIRD COPY OF THE LIST. This used to name four
+         views and fall through to `return` — so team-performance and
+         team-coaching never repainted when their data landed. renderTeamSurface
+         already routes every team page by name; the only question left here is
+         whether the user is on one at all. */
+      if (!isTeamView(state.view)) return;
+      renderTeamSurface();
       // ⚠ SYNCHRONOUS, in the same task as the innerHTML that created these
       // nodes. A CSS `animation: none` toggled around the render would re-arm
       // the entrance the moment it was removed; removing the class before the
@@ -8816,6 +8820,10 @@
     if (state.teamContext === null) { loadTeam('context'); }
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
+    // ⚠ repCardHtml() reads state.teamWhy for each rep's one-line summary. The
+    //   split dropped this kick entirely — no renderer asked for it, so the
+    //   line was blank on every card no matter how long you waited.
+    if (state.teamWhy === null && !state.teamWhyLoading) loadTeam('why');
     if (state.teamAverages === null && !state.teamAveragesLoading) loadTeam('teamAverages');
 
     // The glance drill replaces the body, exactly as it did on the single page.
@@ -10639,6 +10647,21 @@
      page — the dropdown must still show where you are when you drill into it. */
   var TEAM_PAGE_OF_VIEW = { 'team-expanded': 'team-coaching' };
   function teamPageForView(v) { return TEAM_PAGE_OF_VIEW[v] || v; }
+
+  /* ⚠⚠⚠ THE ONE LIST OF TEAM VIEWS, AND IT EXISTS BECAUSE TWO STALE COPIES OF
+     IT SHIPPED BROKEN. scheduleTeamRender() — a THIRD dispatcher nobody had
+     enumerated — named four views and silently `return`ed on the rest, so on
+     Performance and Coaching a lane's data ARRIVED AND NOTHING REPAINTED:
+     shells on screen, content never drawn. Empty cards, in production. The
+     nav's active state had the same stale list and lost its underline on the
+     same two pages.
+     ⚠ DERIVED FROM TEAM_PAGES so a sixth page cannot be forgotten here, plus
+     the two sub-views that have no dropdown entry of their own. */
+  var TEAM_SUBVIEWS = ['team-expanded', 'team-needs-work'];
+  function isTeamView(v) {
+    for (var i = 0; i < TEAM_PAGES.length; i++) if (TEAM_PAGES[i].view === v) return true;
+    return TEAM_SUBVIEWS.indexOf(v) !== -1;
+  }
 
   function teamPageSelectHtml() {
     var here = teamPageForView(state.view);
