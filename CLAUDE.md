@@ -5662,6 +5662,31 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **FOUND BY LOOKING AT THE FIRST RENDER.** Fifth time on this pass that looking has found what a check could not.
 - **THE HABIT: when a design rule is implemented as a PER-VIEW LIST, adding a view means adding it to every list — and the lists must be enumerated, not remembered.** Here there were five (`.page`, `.section`, `.page-header`, `.page-header--company`, `.team-controls-row`).
 
+### ⚠⚠⚠ A NEW CHART TYPE IS A NEW CAPABILITY REQUIREMENT, NOT A NEW ENTRY ON A LIST (2026-09-01)
+**Asked for bar charts, a scatter and line graphs. The honest way to add one is to say WHAT DATA SHAPE IT NEEDS and let the derivation decide who gets it — a hand-written list of which metrics may have a bar chart is how a gauge came to be offered for a metric with no target.**
+- **BOTH BARS REUSED AN EXISTING REQUIREMENT** — `bar_rep` needs per-rep values, `bar_cat` needs categories — **so a metric with no categories is STRUCTURALLY unable to be offered a category bar chart.** Verified on the render, not asserted.
+- **⚠⚠ AND THE SORT DIRECTION IS PART OF THE CAPABILITY, NOT A DETAIL OF THE DRAWING.** Descending is right for a rate and WRONG for a ceiling metric, where the best rep is the lowest — **and a bar chart makes that far worse than a list, because THE LONGEST BAR READS AS THE BEST.** No inverted metric reaches it today, so it was closed BEFORE it could appear rather than after; the inverted-direction defect has already put a wrong reading on screen once.
+- **⚠ ORIENTATION IS A PROPERTY OF THE DATA, AND IT IS MEASURABLE:** rep names run 8-13 characters with up to nine of them (unreadable rotated); category names run 4-10 with four or five (what columns are for). **A measured reason survives the next reader; "it looked better" does not.**
+- **⚠⚠ AND NOT EVERY CHART NEEDS A CANVAS. Four to nine bars are plain elements** — a canvas drags in the mount/destroy/rebuild lifecycle that made the team graphs rebuild fifteen times on one visit, and it has to be re-measured on every resize. **Reach for the library when you need AXES AND SEVERAL SERIES, not because the thing is called a chart.**
+- **⚠ THE SCALE IS THE LARGEST VALUE PRESENT, NOT THE METRIC'S RANGE.** Rates in the teens against a 0-100 axis draw five slivers and say nothing; the comparison BETWEEN rows is what a by-rep chart is for. **The value is printed on every bar so the absolute figure is never lost to the scaling** — which is what makes the choice safe rather than merely flattering.
+
+### ⚠⚠ WHEN A REQUEST NAMES SOMETHING YOU ALREADY HAVE, RENAME IT — DO NOT BUILD A SECOND (2026-09-01)
+**"Bar graphs, scatter plot, LINE GRAPHS" — and the line graph was already built. It was called `trend`.**
+- **⚠⚠ THE LABEL WAS THE WHOLE DEFECT.** A manager scanning for "line" finds "Trend over time" and reads it as something else. **Renamed to "Line graph over time"; nothing else changed.**
+- **BUILDING A SECOND WOULD HAVE BEEN TWO THINGS ANSWERING ONE QUESTION** — the most repeated defect in this file — **and it would have looked like delivery.** A second line view would have shipped, demoed well, and left two code paths for one chart forever.
+- **THE HABIT: before building anything from a list of requested features, check the list against what EXISTS UNDER ANOTHER NAME.** And say so explicitly, because "we already have that" is only useful if it names where.
+
+### ⚠⚠ TESTING A HELPER IS NOT TESTING THAT ANYTHING CALLS IT — FIFTH INSTANCE, AND IT SLIPPED THROUGH THE NON-VACUITY RUN (2026-09-01)
+**A guard asserted `dashBarScale` never divides by zero. Restoring a hard-coded `var max = 100` in the renderer — deleting the CALL — left it GREEN.**
+- **⚠ IT WAS ONLY CAUGHT BECAUSE THE RESTORED-DEFECT COUNT DID NOT MATCH THE FAILURE COUNT.** Five defects restored, four guards failed. **A mismatch there is the signal, and it is the second time this session that arithmetic has found a guard aimed one level too low.**
+- **THE FIX IS ALWAYS THE SAME SHAPE: assert the CALL SITE, and assert the absence of the thing that replaces it** — here `dashBarScale(` present AND `var max = <digit>` absent, in every renderer that draws a bar.
+- Same family as the guard that located `laneProblem(d)` in a dead assignment, the `spoke` guards that passed against a restored defect, and the `evidenceMismatch` one. **Testing a function in isolation and grepping for its name are the same check twice.**
+
+### ⚠ A GUARD ANCHORED ON A LOOP VARIABLE NAME BREAKS ON A RENAME THAT CHANGES NOTHING IT CARES ABOUT (2026-09-01)
+**`/String\(r\.v\)\) \+ unit/` broke when a shared ranking took `r` for the ranking object and the row variable became `x`. The claim — every per-rep row appends its unit — was untouched.**
+- **⚠ A GUARD THAT FAILS ON A CORRECT REFACTOR TRAINS PEOPLE TO EDIT THE GUARD**, and the edit that makes it pass again is usually a weakening. **Anchor on the CLAIM (`DASH_UNIT[card.metric]` is read, and `.v)) + unit` is emitted), never on an identifier the refactor is free to rename.**
+- Sits with the position-based selector rules (`all[0]`, `.pop()`) and the stale-anchor rules: **select by content, and pin the property rather than the spelling.**
+
 ### ⚠⚠⚠ A PIXEL COUNT CANNOT TELL A CHART FROM AN AXIS — 27,260 PAINTED PIXELS AND NO DATA LINE (2026-09-01)
 **Verifying that a trend card draws, I read the canvas back: 27,260 non-transparent pixels. That reads as "it drew". IT HAD DRAWN THE FRAME — axis labels and gridlines — and not one data line.**
 - **⚠⚠ THE MEASUREMENT WAS SOUND AND ANSWERED THE WRONG QUESTION.** "Is anything painted" and "is the DATA painted" are different, and a chart's own chrome is easily the larger share of the ink. **The screenshot found it, as it has all week.**

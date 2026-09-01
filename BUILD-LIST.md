@@ -1097,6 +1097,29 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 
 ---
 
+## 2026-09-01 — TWO NEW CHART TYPES, DERIVED NOT LISTED (`4433ba2`)
+Deployed, verified by commit hash and served-page parity. Suite **2051**.
+
+**⚠ THE BRIEF'S PREMISE WAS WRONG AND IT WAS CHECKED: `by_rep` does NOT already draw bars** — it is a plain name/value list; the bars-per-rep component is `team-detail-track` on another surface. So horizontal bar is a genuinely new drawing, still cheap.
+
+**(a)+(b) `bar_rep` (horizontal, per rep) and `bar_cat` (vertical, per category).** A new chart type is a **new capability requirement**, not a new list entry — both reuse requirements that already existed, so `viewsFor` decides who gets them and **a metric with no categories is structurally unable to be offered a category bar chart** (verified on the render).
+
+**⚠ ORIENTATION IS FIXED PER DATA SHAPE AND MEASURED:** rep names 8-13 chars, up to nine (unreadable rotated); category names 4-10, four or five (what columns are for). **The drawing takes orientation as a parameter if it should become a free choice — a small follow-up, and it is Justin's call.**
+
+**⚠⚠ NO CANVAS.** `trend` needs one for axes and several series over time; four to nine bars do not, and a canvas drags in the mount/destroy lifecycle that made the team graphs rebuild fifteen times on one visit.
+
+**⚠⚠ THE SORT NOW FOLLOWS THE METRIC'S DIRECTION** — descending is wrong for a ceiling metric, and **a bar chart makes it far worse than a list because the longest bar reads as best.** No inverted metric reaches it today; closed before it can appear, and the card says "lower is better". **One ranking, two views**, so the list and the bar cannot drift. **A category with no objections draws no bar and says "none"** — a bar at zero is a different claim.
+
+**⚠ LINE IS ALREADY BUILT — RENAMED, NOT REBUILT.** `trend` is now "Line graph over time". Two things answering one question is the most repeated defect here.
+
+**(c) SCATTER — REPORTED, NOT BUILT.** It needs TWO metrics on one card: **38 references to a card's single `metric`**, `viewsFor(metric)` takes ONE object where a scatter needs the intersection of two, and the stored layout, both sanitisers, the picker flow and the unit table all assume one. **5 metrics qualify as an axis → 10 unordered pairs**; the shape that earns it is closing rate against calls taken, one point per rep. **Structural, not a drawing routine.**
+
+**⚠ OPEN FOR JUSTIN, ONE LINE: the removal took SIX, not three** — his three plus outcome mix, section scores and call moment mix, which Scout CAN measure and has no card for. **Not restored unasked.**
+
+**Guards:** three CONVERTED (the ranking moved to a shared function; both consumers must surface its refusal), plus one-ranking / no-canvas / scale-to-data. **5 of 5 restored defects caught.** ⚠ One was anchored on a LOOP VARIABLE NAME and broke on a rename it should not have cared about. ⚠⚠ And the scale guard tested the HELPER, not its call site — **fifth instance**, caught only because five restored defects produced four failures.
+
+---
+
 ## 2026-09-01 — THE "NOT AVAILABLE YET" LIST REMOVED; THE GRAPHS ARE THERE (`3418197`)
 Deployed, verified by commit hash and served-page parity. Suite **2049**.
 
