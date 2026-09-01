@@ -31,6 +31,20 @@
 
 ## 🎯 CURRENT SESSION
 
+### 🚨 URGENT FIX 2026-08-31 (`506c539`) — two split pages never repainted. LIVE and verified.
+
+**Justin, live: *"nothing is populating on the pages just empty cards."*** Performance and Coaching drew their shells, every lane resolved, **and nothing repainted** — so the gauges, the three graphs, the rep cards, the three score lists, recommendations and needs-work were all blank.
+
+- **⚠⚠ CAUSE: `scheduleTeamRender` is a THIRD DISPATCHER** — what every lane calls when its data lands — **and it kept its own list of four views, falling through to `return` on the other two.**
+- **⚠⚠ MY MULTIPLE-DISPATCH GUARD, WRITTEN THE DAY BEFORE, COVERED THE TWO DISPATCHERS I KNEW ABOUT.** The replacement asserts a **shape** (*the coalescer may hold no view list of its own*) rather than enumerating dispatchers I can think of.
+- **⚠ IT LOOKS LIKE A SLOW PAGE, NOT A BROKEN ONE** — an un-repainted shell is identical to one still waiting, which is how it survived a full block of verification.
+- **FIX: one shared `isTeamView()`, DERIVED FROM `TEAM_PAGES`**, so a sixth page cannot be forgotten by the coalescer or the nav.
+- **⚠ TWO MORE STALE LISTS FROM THE SPLIT, SAME ROOT:** the **Team tab lost its underline** on those two pages, and **`loadTeam('why')` was kicked by no renderer** so every rep card's summary line was blank and always would have been.
+- **⚠ `Customize View` WAS THE FIRST SUSPECT AND IS INNOCENT** — verified before anything changed. **No stored settings were touched.**
+- **Verified on the deployed page**: all six team views repaint, a non-team view correctly does not, Performance shows real data, the Team tab is underlined on all five. **Suite 1920.**
+
+---
+
 ### ✅ COMPLETE as of 2026-08-31 — THE SPLIT. It got the whole block, and nothing else was touched.
 
 **One team page became five behind a dropdown: Daily Digest (default landing) · Performance · Coaching · Objections · People.** Shipped `24c6e93`, deploy confirmed by commit hash. **Suite 1916, zero failures.**

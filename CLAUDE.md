@@ -3282,6 +3282,37 @@ rendered quotes                          118
 - **⚠⚠ I SAMPLED THREE OBSERVATIONS, SAW A PRESCRIPTION, AND WAS WRONG.** Three real rows all contained *"closer needs to…"*, so I nearly reported that the missing coaching already existed and only needed rendering. **Measured: 31 of 537 (5.8%) are prescriptive, and 3 say "should have".** A three-row sample of a 537-row population is an anecdote; the difference between "already there" and "5.8%" is the difference between a render fix and a prompt change.
 - **THE SHAPE THE TARGET NEEDS, and what exists today:** the moment ✓100% · what the prospect revealed ✓100% · what the closer did ✓98.7% · **what they should have asked ✗5.8%** · **why it would have mattered ✗5.8%**. **Three of five are free and unrendered; two need generating.**
 
+### ⚠⚠⚠ A THIRD DISPATCHER SHIPPED THE SPLIT BROKEN — AND MY GUARD COVERED THE TWO I KNEW ABOUT (2026-08-31, `506c539`)
+**Justin, live: *"nothing is populating on the pages just empty cards."* Performance and Coaching rendered their shells, every lane resolved, and NOTHING REPAINTED.**
+```
+scheduleTeamRender()'s run() — what EVERY lane calls when its data lands:
+    if      state.view === 'team'             renderTeamSurface();
+    else if state.view === 'team-expanded'    ...
+    else if state.view === 'team-objections'  ...
+    else if state.view === 'team-members'     ...
+    else return;        ⚠⚠ team-performance and team-coaching LAND HERE
+```
+- **⚠⚠ I HAD WRITTEN THE MULTIPLE-DISPATCH GUARD THE DAY BEFORE AND IT COVERED `render()` AND `renderTeamSurface()` — THE TWO DISPATCHERS I KNEW ABOUT. A THIRD EXISTED.** ⚠ **THE LESSON IS NOT "ENUMERATE HARDER": a guard that lists the dispatchers you can think of is a guard against the ones you already remembered.** The replacement asserts a **SHAPE** — *the coalescer may hold NO view list of its own* — which catches a fourth dispatcher nobody has met.
+- **⚠⚠ IT LOOKS LIKE A SLOW PAGE, NOT A BROKEN ONE**, which is why it survived a full block of verification: an un-repainted shell is pixel-identical to one still waiting on its request. **A missing repaint has no error, no empty state and no timeout — it just never finishes.**
+- **THE FIX IS ONE SHARED PREDICATE, NOT A FOURTH COPY.** `isTeamView()` is **derived from `TEAM_PAGES`**, so a sixth page cannot be forgotten; the coalescer asks only *"is this a team page"* and routes through the one dispatcher that already names them all.
+- **⚠ TWO MORE STALE-LIST DEFECTS FROM THE SAME SPLIT, FOUND BY THE SAME QUESTION:** the nav's active state had its own hand-written list (the Team tab lost its underline on the same two pages), and **`loadTeam('why')` was kicked by NO renderer** — `repCardHtml` reads `state.teamWhy`, so every rep card's summary line was blank and always would have been. **Ask, of every list of views in a codebase, whether it is derived or typed.**
+- **⚠ THE FIRST SUSPECT WAS INNOCENT AND CHECKING IT FIRST WAS STILL RIGHT.** The `Customize View` migration was the obvious candidate — it shipped the same block and assigns panels to pages — and it was verified correct before anything was changed. **No stored settings were touched.** Clearing them would have been data loss wearing a fix's clothes.
+
+### ⚠⚠⚠ A PROBE THAT RETURNS THE SAME ANSWER FOR EVERY CASE IS BLIND — THREE TIMES IN ONE INVESTIGATION (2026-08-31)
+**Hunting the defect above, my probe reported `false` for ALL FIVE pages — including the ones that demonstrably worked. Three different causes, one presentation.**
+```
+1  requestAnimationFrame is THROTTLED in a background iframe, so the coalescer's
+   run() never executed for ANY view — the thing under test never ran
+2  MutationObserver callbacks are MICROTASKS; disconnecting synchronously after a
+   render means the callback never fires
+3  the first version had no control at all, so "false everywhere" was indistinguishable
+   from "the feature is broken everywhere"
+```
+- **⚠⚠ THE TELL IS UNIFORMITY. A result that does not VARY across cases you know differ is a statement about the instrument**, not about the code — the same shape as the opaque-nav-bar probe and the white-ink contrast read.
+- **THE FIX IS A CONTROL THAT MUST COME BACK POSITIVE, ASSERTED BEFORE ANY RESULT IS TRUSTED.** Here: *"can this probe see a repaint I KNOW happens?"* — and it threw if not. That one line converted three silent blind runs into a measurement.
+- **⚠ AND WHEN A LIBRARY CALLBACK IS IN THE WAY, REPLACE ONLY THE SCHEDULER.** Stubbing `requestAnimationFrame` to run synchronously kept `scheduleTeamRender` and its `run()` as the real shipped code; stubbing the dispatch itself would have tested the stub.
+- **⚠ THE FINAL PROBE WAS A SPY ON WHICH RENDERER GETS CALLED, NOT A DOM DIFF.** It asks the question directly — *which function does a lane arrival reach?* — instead of inferring it from what changed on screen. **When a DOM observation keeps failing, ask whether the thing you want to know can be observed at the call instead.**
+
 ### ⚠⚠⚠ THE SPLIT — ONE TEAM PAGE BECAME FIVE (shipped 2026-08-31, `24c6e93`)
 **Daily Digest (default landing) · Performance · Coaching · Objections · People**, behind a dropdown on the company card. `TEAM_PAGES` is the ONE list; the dropdown, the page heading, the scope caption and the hash all derive from it.
 - **⚠⚠ `state.teamRange` -> `state.teamRanges`, KEYED BY PAGE, AND THE RENAME IS THE POINT.** The meaning changed while the type did not, so a stale reader would keep compiling and silently share one window across five pages. Renaming makes every missed call site fail loudly — the same reasoning as `at_or_above` -> `meeting`.
