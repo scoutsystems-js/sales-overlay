@@ -5805,3 +5805,31 @@ PER_PERIOD_RE fired on "that's not per year"          <- a NEGATION that CONFIRM
 - **⚠⚠ NEITHER OF THE TWO OBVIOUS DIAGNOSES WAS RIGHT** — not the Monday rule misfiring (measured: it labels exactly the real Mondays) and not the axis rendering nothing. **A third possibility, "the rule is correct and applies too widely", is easy to miss because both named candidates are about the rule being BROKEN.**
 - **THE FIX KEYS ON WIDTH PER LABEL, NOT DAY COUNT**, and the threshold is **derived from the reasoning already written in the comment** (~48px per date label) rather than picked. A narrow chart still thins at 14 days; a wide one does not.
 - **⚠ ALL THREE GRAPHS SHARE ONE BUILDER**, so checking the third — which nobody reported — cost nothing and was part of the same fix.
+
+### ⚠⚠⚠ A PRESENCE CHECK CANNOT SEE A LATER WRITE — AND MY HARNESS WAS BLIND TO THE ONE FUNCTION AT FAULT (2026-09-01)
+**"My Account" shipped twice and never rendered. The markup said it; `init()` overwrote it with the email at boot, on every load.**
+```
+the check I ran   "is the label in the served page?"   -> YES, it was
+the defect        a statement that runs AFTERWARDS and replaces it
+```
+- **⚠⚠ NO STRING SEARCH CAN SEE THIS.** The label was genuinely present in the markup — grepping confirms the edit shipped and says nothing about what happens at boot. **Same family as the dead call site, INVERTED: there the code existed and never ran; here it ran and was undone.**
+- **⚠⚠ AND THE HARNESS COULD NOT SEE IT BY CONSTRUCTION: the unauthenticated iframe recipe loads the real page WITH `init();` SUPPRESSED, and the overwrite lives inside `init()`.** The one tool available was blind to the one function at fault. **A recipe that disables a function cannot verify anything that function does — say so whenever it is used.**
+- **THE CHECK THAT WORKS IS A CAPABILITY ENUMERATION: *what can write to this element?*** Three statements touch it in live code; **zero write its text**. That question has an answer; "is the label present" does not distinguish the two states.
+- **⚠ THE ELEMENT'S ID WAS THE CARRIER: `id="signedInEmail"` on a link now labelled "My Account".** The name still describes the old job, which is how the next person reintroduces the write in good faith.
+
+### ⚠⚠ MEASURE THE BASELINE, DO NOT ASSUME IT — MY COST ANALYSIS WAS AGAINST A COLOUR NOTHING USED (2026-09-01)
+**"Three blacks" was TWO.** `dashboard.html` `#0a0a0a` and `style.css` `#080b0d` are the page backgrounds; **the "plain black on login" is a BUTTON**, and login has always inherited `style.css`.
+- **I reported the unification as COSTING login contrast (5.142 -> 4.639). Against the true baseline it IMPROVES it: 4.595 -> 4.639.** The `#000` I measured against was never login's background.
+- **⚠ THE FAILURE IS THAT A COST ANALYSIS READS AS DILIGENCE.** A wrong number inside a careful-looking comparison is more persuasive than no number — and it went into a code comment, where the next reader would have inherited it as fact.
+- **`#0a0a0a` WINS BECAUSE IT IS THE MEASURED SURFACE** — the ground, the exposure sweeps and the mesh contrast were all derived against it. **Moving the measured surface to match an unmeasured one invalidates every derivation made against it.**
+
+### ⚠⚠ ASK WHETHER A "LEFTOVER" IS DOING A JOB — THE ADMIN MONOSPACE WAS FUNCTIONAL (2026-09-01)
+**Instructed to remove the admin console's monospace as "the one surface still on a different typeface". It is already on Saira** (it links `style.css`), and the two mono spans hold **a temp password** and **an 8-char hex support reference**.
+- **⚠⚠ BOTH ARE TRANSCRIPTION SURFACES. `referenceFor` chose hex precisely so there is no 0/O ambiguity when the code is READ ALOUD on a call; fixed pitch does the same job on screen.** Removing it would make both harder to read accurately — which is their entire purpose.
+- **WHAT WAS ACTUALLY WRONG: ONE CLASS DOING TWO JOBS** — the same selector also dressed the CATEGORY chip, an ordinary word, as an identifier. **The fix is a split, not a removal.**
+- **THE HABIT: before removing a deviation, ask what it is FOR.** A deviation that survives a redesign is often load-bearing, and an instruction to remove it is usually written from outside the reason it exists.
+
+### ⚠ A SHRINK ASSERTION PROTECTS AGAINST DELETION, NOT AGAINST MALFORMED OUTPUT (2026-09-01)
+**A CSS splice left the new rule unclosed — which silently swallows the NEXT rule, killing both.** Line count was unchanged, so the shrink guard passed cleanly.
+- **THE COMPLEMENT IS CHEAP: count braces in the `<style>` block after any CSS edit** (110/110 here). A structural check catches what a size check cannot.
+- Same shape as *a file can be syntactically valid and still be half a file*: **form and integrity are different questions, and a guard usually answers only one of them.**

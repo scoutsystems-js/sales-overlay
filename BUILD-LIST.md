@@ -1047,3 +1047,26 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Drilldown refinements (Justin's six)** | Routing, in-card controls, reused picker, team-average row, no Manage Members / Customize View, bare labels | shipped `3c1e3a5`. **Verified by clicking on production, 3 clicks delivered:** the averages gauge and the focus card both land on `#team-objections` (the gauge carrying its fixed 7-day window); the picker is the SAME component and its selection survives leaving and returning; controls sit inside the card; the two team-only buttons are gone; badges elsewhere in the app kept their fills. ⚠ The personal objection surfaces are **deliberately not retargeted** — the drilldown is manager-only, so retargeting them would 403 every closer. ⚠ Team average is **omitted with a stated reason below two closers** ("with one, it would just repeat the row above") |
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
+
+## 2026-09-01 — design pass close-out (`683602c`)
+
+**LIVE**
+- **"My Account" nav label** — the relabel had shipped twice and been overwritten by `init()` at boot. Markup owns the label; the address moved to the link's `title`. Guarded (`test/nav-label-not-overwritten.test.js`).
+- **One page black** — `style.css --bg` `#080b0d` → `#0a0a0a`, unifying the two page backgrounds. ⚠ There were TWO, not three: login's `#000` is a button. Improves login's AA margin (4.595 → 4.639).
+- **Admin monospace narrowed** — kept on the temp password and the support reference (both transcription surfaces); removed from the category chip, which is an ordinary word.
+
+**BLOCKED — asset tasks, not code**
+- **Nav logo** — the mark is sub-pixel at nav size (0.56px dots at 24px). Needs a redrawn small mark; no CSS change reaches it.
+- **Wordmark at 2x** — the source is a macOS screenshot, so no higher-resolution original exists to export from. Needs a render from the original artwork.
+
+**AWAITING A RULING**
+- **Team Recommendations reformat** — three options reported in findings (2026-09-01), not built. (a) attribute structurally + record the speaker + gate on `provenCloserResponse`; (b) fold the quote inline; (c) drop unattributable quotes. **A recommended.**
+- **The `data`/`claim` caps** — measured as OUR cap, not a generation defect (5 of 6 `data` fields land exactly on 200). ⚠ Unlike the digest case there is **no prompt length rule to derive from**; recommended fix is to add one, then set the cap above it and cut at a sentence boundary.
+
+**FILED, NOT ACTED ON**
+- `reps_active` sits in the digest quiet row as if it were an outcome; it is a headcount.
+- Recommendations render on both Coaching and the expanded page — two entry points, one payload; needs a ruling on which owns it.
+- The eleven green bars on call review — the team-view sweep was deliberately scoped and did not reach them.
+
+**⚠ NEW DEFECT FOUND WHILE INVESTIGATING — NOT FIXED**
+- **`lib/team-synthesis.js` is a SIXTH lane using the sentinel gate (`displayCloserResponse`) rather than the verified gate (`provenCloserResponse`).** The five-lane sweep in `30d4d43` missed it, and this lane **both feeds a model prompt and renders to a manager** — the two separate concerns of that sweep. Fixing it falls out of recommendations option (a).
