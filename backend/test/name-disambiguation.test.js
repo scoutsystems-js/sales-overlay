@@ -59,13 +59,26 @@ test('total on junk — a naming helper must never throw', () => {
 /* ── applied once, where the maps are built ───────────────────────────────── */
 
 test('it is applied where a name map is PRODUCED, not at each render site', () => {
+  /* ⚠ CONVERTED 2026-09-01 — nameMapFor MOVED to lib/team-name-map.js so the
+     cron warm-up could use the identical map. The subject is unchanged and the
+     assertion is now STRONGER: it pins the single implementation as well as the
+     disambiguation, because a second copy is exactly what would put "Josh" in a
+     cached synthesis where the page says "Josh P". */
+  const nameMapSrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-name-map.js'), 'utf8');
   const team = fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8');
+  const warm = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-warm.js'), 'utf8');
   const analytics = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-analytics.js'), 'utf8');
   /* ⚠ Disambiguation needs to see EVERY member at once, so it cannot be done
      per row — and doing it at each surface is how two screens come to disagree
      about what one person is called. */
-  assert.ok(/return disambiguateNames\(nameMap\)/.test(team),
+  assert.ok(/return disambiguateNames\(nameMap\)/.test(nameMapSrc),
     'nameMapFor must disambiguate before returning');
+  assert.ok(!/async function nameMapFor/.test(team),
+    'nameMapFor must have exactly one implementation — routes/team.js consumes it');
+  for (const [label, src] of [['routes/team.js', team], ['lib/team-warm.js', warm]]) {
+    assert.ok(/require\('\.\.?\/(lib\/)?team-name-map'\)/.test(src),
+      label + ' must consume the shared name map, not build its own');
+  }
   assert.ok(/nameOf = disambiguateNames\(nameOf\)/.test(analytics),
     'the board must disambiguate across the whole team');
   assert.ok(/display_name: nameOf\[id\]/.test(analytics),

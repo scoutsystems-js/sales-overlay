@@ -357,7 +357,12 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
 // block the sync cron that hosts it).
 async function generateDailyDigests(admin, opts) {
   var dateStr = (opts && opts.date && /^\d{4}-\d{2}-\d{2}$/.test(opts.date)) ? opts.date : etYesterday(new Date());
-  var summary = { date: dateStr, managers: 0, generated: 0, cached: 0, quiet: 0, unavailable: 0, errors: 0 };
+  /* ⚠ `managers` and `emailMap` are RETURNED, not just used. The cron's
+     recommendations warm-up needs the same manager set and the same emails, and
+     re-deriving them would be a second answer to "who is a manager" — the rule
+     this codebase has already got wrong nine times. One query, two consumers. */
+  var summary = { date: dateStr, managers: 0, generated: 0, cached: 0, quiet: 0, unavailable: 0, errors: 0,
+                  managerMap: null, emailMap: null };
   try {
     var profs = await admin.from('user_profiles').select('user_id, managed_by, first_name, last_name');
     if (profs.error) throw new Error('user_profiles: ' + profs.error.message);
@@ -377,6 +382,7 @@ async function generateDailyDigests(admin, opts) {
     var repsByManager = membersByManager(profs.data || []);
     var managerIds = Object.keys(repsByManager); // has-reps, NOT role — owner-with-reps included
     summary.managers = managerIds.length;
+    summary.managerMap = repsByManager;
     if (managerIds.length === 0) return summary;
 
     var emailMap = {};
@@ -384,6 +390,7 @@ async function generateDailyDigests(admin, opts) {
       var list = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
       ((list.data && list.data.users) || []).forEach(function (u) { if (u && u.id) emailMap[u.id] = u.email || null; });
     } catch (e) { console.warn('[team-digest] emailMap failed (names degrade): ' + (e.message || 'unknown')); }
+    summary.emailMap = emailMap;
 
     for (var i = 0; i < managerIds.length; i++) {
       var keyId = managerIds[i];

@@ -11,7 +11,8 @@ const { isDisqualified } = require('./../lib/dq-exclusion');
 const { strictObjections } = require('./../lib/objection-strict');
 const { closeRateForCalls } = require('./../lib/prospect-entity');
 const express = require('express');
-const { resolveDisplayName, disambiguateNames } = require('../lib/display-name');
+const { resolveDisplayName } = require('../lib/display-name');
+const { nameMapFor } = require('../lib/team-name-map');
 var { withBoardOwner } = require('../lib/team-membership');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
@@ -744,20 +745,11 @@ function logTeamError(tag, err) {
   else console.error('[team] ' + tag + ':', err && err.message);
 }
 
-async function nameMapFor(admin, memberIds, em) {
-  var profOf = {};
-  if (memberIds.length > 0) {
-    var pr = await admin.from('user_profiles').select('user_id, first_name, last_name').in('user_id', memberIds);
-    if (!pr.error) (pr.data || []).forEach(function (x) { profOf[x.user_id] = x; });
-  }
-  var nameMap = {};
-  memberIds.forEach(function (id) { nameMap[id] = resolveDisplayName(profOf[id], em[id] || null, id); });
-  /* ⚠ TWO PEOPLE SHARING A FIRST NAME GET A SURNAME INITIAL — "Josh P" (Justin,
-     2026-08-29; live: Josh Pinner and Josh Niebloom). Applied HERE so every lane
-     fed by this map is consistent, rather than each surface disambiguating on
-     its own and disagreeing. Only colliding names change. */
-  return disambiguateNames(nameMap);
-}
+/* ⚠⚠ MOVED TO lib/team-name-map.js (2026-09-01). The cron warm-up needs the
+   IDENTICAL map — the names go into the cached prose, so a warm-up built with a
+   different one writes an entry this page then serves with the wrong names in
+   it, silently. `disambiguateNames` is the part that would have diverged: the
+   digest's own name map does not apply it. One implementation, two callers. */
 
 router.get('/objections', teamGate, async function (req, res) {
   var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });

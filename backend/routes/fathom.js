@@ -638,11 +638,39 @@ router.post('/sync-all', async function(req, res) {
     // keyed per (manager, ET-yesterday, analysis-set+kb hash), so repeat runs
     // in the same day are cache hits with zero Claude spend.
     (async function () {
+      var digest = null;
       try {
         var generateDailyDigests = require('../lib/team-digest').generateDailyDigests;
-        await generateDailyDigests(admin);
+        digest = await generateDailyDigests(admin);
       } catch (digestErr) {
         console.error('[fathom] sync-all digest pass threw (isolated): ' + (digestErr.message || 'unknown'));
+      }
+      /* ⚠⚠ THE RECOMMENDATIONS WARM-UP (approved 2026-09-01 after measuring:
+         26s cold, 1.5-4.4s warm, and it is ONE synthesis now). The first manager
+         to open Scout each morning was paying the entire cold cost; everyone
+         after paid nothing. This is a warming problem, not a rendering one.
+         ⚠ ONE MODEL CALL PER MANAGER PER DAY — the same shape and the same cost
+         as the digest already riding this job, and idempotent for the same
+         reason: a repeat run in the same day is a cache hit with no spend.
+         ⚠⚠ ISOLATED SEPARATELY FROM THE DIGEST, DELIBERATELY. If it shared the
+         digest's try, a warm-up failure would be reported as a digest failure —
+         and the digest's isolation is exactly what hid two days of missing
+         digests. Two passes, two summaries, two failure reports.
+         ⚠ It REUSES the digest's manager map and emailMap rather than
+         re-deriving them: "who is a manager" has been got wrong nine times and
+         must not have a second answer here. If the digest pass failed before
+         building them, this is skipped and says so — warming a manager set we
+         could not establish is worse than not warming. */
+      try {
+        if (digest && digest.managerMap) {
+          var warmTeamRecommendations = require('../lib/team-warm').warmTeamRecommendations;
+          await warmTeamRecommendations(admin, { managers: digest.managerMap, emailMap: digest.emailMap || {} });
+        } else {
+          console.error('[team-warm] SKIPPED — the digest pass did not produce a manager set, '
+            + 'so the first manager of the day will pay the full cold cost.');
+        }
+      } catch (warmErr) {
+        console.error('[fathom] sync-all recommendations warm-up threw (isolated): ' + (warmErr.message || 'unknown'));
       }
     })();
 
