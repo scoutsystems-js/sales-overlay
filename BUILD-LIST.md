@@ -1075,6 +1075,25 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
 
+## 2026-09-01 — WIDGET CATALOG block 1: the data layer (`1517486`)
+Deployed, verified by commit hash. Suite **2011**. **No UI, no grid, no picker, no storage schema.**
+
+**⚠⚠ THE TABLE IS THE HONESTY RULE, SO THE VIEWS ARE DERIVED, NEVER LISTED.** `lib/widget-catalog.js` computes the offerable views from what each metric HAS — a gauge needs a target, a trend needs history, a breakdown needs categories, a by-rep needs per-rep values — and a guard asserts the equivalence in **both** directions.
+
+**10 offerable of 13, and every row was MEASURED against the live database with the count stored on the row.** ⚠ **Only three metrics have a target and only three have history** — that, not the metric count, is what constrains the catalog. **Every available metric is available per-rep; none is team-only.**
+
+⚠⚠ **TALK RATIO IS COMPUTABLE AND WAS COMPUTED — 66% closer across 200 real calls — which CORRECTS "known absent".** It is still **not available**: nothing stores or serves it, so producing it means unpacking ~719 turns / 33 kB per call (50 MB total) per render. ⚠ Its min 0 / max 100 are REAL (one-speaker calls), and turns carry `start_seconds` with **no end**, so word share is the sounder measure. **One stored column away.**
+
+⚠ **Discovery coverage is not offerable as one breakdown** — 683 of 1,585 carry coverage across **two vocabularies** (626 derived, 65 fixed-six). A chart whose columns change when you switch rep cannot be read. Rolls forward on its own.
+
+⚠ **Three traps recorded ON the rows a builder reads:** section scores must use `close_score_earned` (027 forces displayed close to 100 — 8 points on a real board); `avg_call_time`'s 60 is a **ceiling** and the row says so; time-to-price's 27% is **unmeasured, not slow**.
+
+⚠⚠ **CASH COLLECTED IS ABSENT BY RULING AND ITS ABSENCE IS ASSERTED**, with a non-vacuity check that the guard could still see a cash metric if one appeared.
+
+**Storage established, NOT built:** a dashboard is ~354 bytes and ~2 MB at 1,000 managers — **size is not the issue.** It cannot live in `localStorage` where preferences live today (per browser, per device; a manager expects their board on their phone too), so it needs a new table. **⚠ Store the DEVIATION — a manager who never customised has NO ROW and inherits what Performance renders today, or every future widget is invisible to every existing manager, silently and permanently.** ⚠ **An unknown metric key is DROPPED ON READ, said once on screen, and LEFT IN THE ROW** — never pruned, because a metric can come back. **The migration is not written: one table vs a column, boards per manager, and whether pinning is per-manager or per-company are Justin's.**
+
+---
+
 ## 2026-09-01 — Call Highlights of the Week RETIRED (`6432a0e`)
 Deployed, verified by commit hash **and by the route contrast**: `GET /team/highlights` → **404** while `GET /team/recommendations` → **401** (mounted and gated). A 404 on both would have proved nothing. Suite **2005**.
 

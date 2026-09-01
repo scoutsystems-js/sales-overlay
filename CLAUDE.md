@@ -5656,6 +5656,29 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **v1.1.0 build plan:** Features built one at a time in this order: (1) Role system, (2) Role-based dashboard system on website (`/dashboard` for users + redesigned `/admin` for admins+owners with user management; the original raw log viewer remains as Sections B+C of the admin page), (3) Script upload in app, (4) Call boundary detection, (5) Post-call summary. Each feature fully committed and approved before the next starts. Justin receives one feature prompt at a time from the architect — Claude Code never plans ahead.
 - **Session start:** cd into the project root at the start of every session: cd '/Users/justinschmidt/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay'. Note: Supabase MCP is not currently configured — migrations must be run manually via the Supabase dashboard SQL editor. To enable Supabase MCP in future, add it to .mcp.json and start a fresh session.
 
+### ⚠⚠⚠ "COMPUTABLE" AND "AVAILABLE" ARE DIFFERENT ANSWERS, AND A CATALOG THAT CONFLATES THEM OFFERS A METRIC IT CANNOT DRAW (2026-09-01)
+**Talk ratio was carried as "known absent". It is COMPUTABLE — I computed it, 66% closer across 200 real calls — and it is still NOT AVAILABLE.**
+```
+transcript_stored.turns[]   speaker + text on 1,585 of 1,585 done analyses
+the cost of asking          ~719 turns and 33 kB PER CALL, 50 MB total, per render
+what stores or serves it    NOTHING
+```
+- **⚠⚠ THE THREE-WAY DISTINCTION IS THE USEFUL PART: absent · computable-but-unserved · available.** Collapsing the middle case into either end is wrong in both directions — calling it absent loses a metric that is one stored column away; calling it available ships a card that unpacks 50 MB to draw.
+- **THE HABIT: record the SOURCE and the COST on the row, not just a boolean.** `column` / `aggregate` / `scan` answers "what does asking for this cost" at the moment someone is choosing whether to offer it.
+- **⚠ AND MEASURING IT SURFACED TWO THINGS NO SKETCH WOULD HAVE: the min 0 / max 100 are REAL** (one-speaker calls, the collapsed-transcript case) so the metric needs that exclusion or it reports 100% for a broken recording; **and the turns carry `start_seconds` with NO END**, so a time-based ratio must infer duration from the next turn and the last turn has none. **Word share is the sounder measure, and only the data says so.**
+
+### ⚠⚠ WHERE A CAPABILITY TABLE EXISTS, DERIVE THE OFFER FROM IT — NEVER LIST THE OFFER (2026-09-01)
+**`viewsFor(metric)` computes which views a metric may offer from what it HAS: a target → gauge, history → trend, categories → breakdown, per-rep → by-rep. The list is never written down.**
+- **⚠ A HAND-WRITTEN LIST IS EXACTLY HOW A CATALOG COMES TO OFFER A GAUGE FOR A METRIC WITH NO TARGET** — and that failure renders perfectly: a dial pointing at nothing, with a number on it.
+- **THE GUARD ASSERTS THE EQUIVALENCE IN BOTH DIRECTIONS** (`hasGauge === hasTarget`), not merely that gauges have targets. One direction catches an over-offer; the other catches a metric that quietly stopped offering something it can support.
+- **⚠ AND AN UNAVAILABLE METRIC OFFERS NOTHING — not even a number.** "Show it greyed out" is the tempting middle, and it is the absent-vs-excluded collapse: a card that cannot draw is not a card.
+
+### ⚠⚠ STORE THE DEVIATION, NOT THE DEFAULT — AND KEEP THE DEFAULT IN CODE (2026-09-01, third application)
+**A manager who has never customised anything must have NO ROW.** Otherwise every future widget is invisible to every existing manager, silently and permanently.
+- **⚠⚠ THE COROLLARY IS THE HALF THAT GETS LOST: THE DEFAULT MUST LIVE IN CODE, NEVER MATERIALISED INTO ROWS.** The moment a default is written out per manager, adding a widget stops reaching anyone who already has a row — which is the same defect wearing a migration's clothes.
+- **⚠ AND SAY WHAT HAPPENS WHEN A STORED LAYOUT NAMES SOMETHING THAT NO LONGER EXISTS.** Not hypothetical: `reps_active` and `close_rate` were both removed in one week. **Drop the unknown key ON READ, say once on screen that a card was dropped, and LEAVE IT IN THE ROW** — a board that quietly shrinks is indistinguishable from a manager mis-remembering, and pruning storage on read makes a metric's return unrecoverable. **Drop it from the RENDER, never from the ROW.**
+- **⚠ THE EXISTING PRECEDENT IS PER-BROWSER AND THAT IS THE TRAP:** `Customize View` stores its hidden set in `localStorage`. That is right for a panel toggle and wrong for a dashboard — a manager expects their board on their phone. **Check WHERE a preference lives before reusing its shape.**
+
 ### ⚠⚠⚠ SCRAPPING A FEATURE CAN BE A BETTER ANSWER THAN FIXING IT — AND THE MEASUREMENT IS WHAT SHOWS WHICH (2026-09-01)
 **Call Highlights of the Week was retired rather than gated. The open question was what FALLBACK to design for the unproven closer replies; the measurement made the question disappear.**
 ```
