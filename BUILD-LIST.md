@@ -1168,6 +1168,25 @@ Deployed, verified by commit hash and served-page parity. Suite **2051**.
 
 ---
 
+## 2026-09-01 — FOUR RENAMES, A DESCRIPTION ON EVERY METRIC, AND THE MINUTES HOLE (`ad0af6e`, `5111b28`)
+Live, verified by commit hash and served-page parity. Suite **2057**. Five restored defects → 8 failures.
+
+**§1 — THE FOUR APPROVED RENAMES (labels only; keys are join keys and never move).** Average call score → **Average call grade** · Calls analyzed → **Calls graded** · Prospects → **People talked to** · Time to price → **Minutes to price**. Closing rate, Objection handling rate and Average call time keep their names by ruling. **⚠⚠ AND EVERY METRIC NOW CARRIES A DESCRIPTION WITH ITS NUMERATOR, DENOMINATOR AND UNIT** — that, not the name, is what answered *"I don't know what those metrics do"*. Guarded: a metric with no description, or a description stating no unit, fails.
+
+**§2 — THE THREE REMOVED METRICS STAY REMOVED, as a decision.** Justin was shown *"How calls ended"*, *"Grade by part of the call"* and *"What Scout flagged"* and did not ask for them back. They keep descriptions in the catalog for the record and are offered nowhere. **Do not re-propose.**
+
+**§3 — THE MINUTES HOLE: 4 OF 6 CLOSED.** ⚠ It was **not a rendering gap** — neither minute value was in the payload at all. One column each (`duration_seconds`, `price_stated_at_seconds`) on selects already being made; no migration. Both mirror `lib/rep-series` exactly. Live: **51.1 min across 656 calls**, **34.7 min on 112 calls where a price was said**, and by-rep ranked fastest-first 28.8 → 67.1.
+
+| `▰ MINOR` **DOES A FASTER "MINUTES TO PRICE" MEAN BETTER?** (**NEEDS JUSTIN**, 2026-09-01) | The ranked views (`by_rep`, `bar_rep`) are **refused** for it. A number implies no ordering; a ranked list asserts better-and-worse, and with no `targetDirection` it would sort the **slowest rep first** with the **longest bar reading as best**. This file's own record warns the other way (a price question deflected before the pitch is correct technique, v20). **One line and both views open — but it is a ruling, not an implementation detail.** |
+
+**UNIT AUDIT.** The number card inlined `'%'` on two branches while the by-rep list and the bar chart read `DASH_UNIT`. One table, every builder. `breakdown` and `bar_cat` still inline `%`, and **a guard now asserts they are only renderable for percent metrics**, so a count-based breakdown fails rather than rendering "12%" over a count.
+
+**⚠⚠ A DEFECT ONLY A SCREENSHOT FOUND (`5111b28`).** The picker row **collapsed to one word per line and overlapped its own view list** on the metric with seven views. Every measurement said it was correct. Fixed and re-verified on the deployed page.
+
+**§4 — THE CATALOG IS FINISHED.** Built: ten metrics, seven views, honest offers, seven line graphs, grouped picker, descriptions, minutes on the number card and the ranked list, ten named boards, drag/resize/pin, 403 handled. **Filed:** scatter (38 call sites) · orientation · history for the three breakdown metrics · weekly bucketing above ~14 days. **Needs Justin:** the Minutes-to-price direction.
+
+**STILL OUTSTANDING:** rep-card widget · save-as-new · rename-a-board · stale-bundle nudge · **the design pass (Josh: generic and too black-and-white)** · site sweep · Scout AI.
+
 ## 2026-09-01 — THE CATALOG IS FINISHED: FOUR MORE LINE GRAPHS, AND STEP TWO SAYS WHICH VIEWS MOVE (`d49a631`)
 Deployed, verified by commit hash **and** served-page byte parity. Suite **2052**. **Looked at, signed in, on a real board.**
 

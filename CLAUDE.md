@@ -5304,6 +5304,31 @@ Verifying a new line graph, the painted-pixel count came back **0** while Chart.
 - **THE AXIS WAS THE TELL: `max: 80` with ticks 0/10/20.** An empty dataset gives a default 0-1 axis, so the data had demonstrably arrived. **A result contradicting something already visible in the same output is a statement about the instrument.**
 - **A screenshot settled it in one call.** File beside *measurement is not a composition test*: **for anything about what is PAINTED, look — and treat a pixel count as a weaker instrument than an eye.**
 
+### ⚠⚠⚠ A NUMBER IMPLIES NO ORDERING; A RANKED LIST ASSERTS BETTER-AND-WORSE — SO THEY NEED DIFFERENT EVIDENCE (2026-09-01)
+**Closing the minutes hole, `avg_call_time` got the number card AND the ranked views while `time_to_price` got only the number. The asymmetry is a RULING, not an oversight, and it is recorded at the code so nobody "finishes the job".**
+- **`avg_call_time` HAS A DECLARED DIRECTION** — Justin ruled *"60min is the max, anything less than that is good"* — so `targetDirection: 'lower_is_better'` sorts the fastest rep first and the longest bar is correctly the worst. **Verified live: 28.8 min first, 67.1 last.**
+- **⚠⚠ `time_to_price` HAS NONE, AND THE DEFAULT IS THE DANGEROUS DIRECTION.** With no `targetDirection` it falls back to higher-is-better, ranks the **SLOWEST rep first**, and **the longest bar reads as the best**. This project's own record warns the other way — a price question deflected before the pitch is CORRECT technique (v20) — so *faster is better* is not a safe assumption to encode.
+- **THE GENERAL RULE: A VIEW THAT ORDERS THINGS NEEDS A RULED DIRECTION; A VIEW THAT STATES ONE VALUE DOES NOT.** That is what let 4 of the 6 missing combinations ship while 2 stayed refused, rather than all six shipping with one of them silently inverted. **A wrong direction has no wrong number** — every figure on screen would have been individually correct.
+- **⚠ AND THE MACHINERY WAS ALREADY THERE, WHICH IS WHY CHECKING BEAT ASSUMING:** `dashRepRanking` has honoured `lowerIsBetter` all along and `targetDirection` was already on the wire allowlist. The gap was one metric never declaring a value, not missing code.
+
+### ⚠⚠ THE MINUTES HOLE WAS NOT A RENDERING GAP — THE DATA WAS NEVER FETCHED (2026-09-01)
+**Filed as "teach the two card builders the `min` unit". Measured, neither minute value was in the overview payload at all:** `fathom_calls` did not select `duration_seconds` and `call_analyses` did not select `price_stated_at_seconds`.
+- **⚠ SO "TEACH THE BUILDER A UNIT" WOULD HAVE BUILT A CARD WITH NOTHING TO RENDER.** The builders were refusing honestly and the gate was doing its job; the missing thing was upstream of both. **Establish what a builder RECEIVES before deciding a render gap is a render gap.**
+- The fix was **one column each on selects already being made** — the same cheap shape as the history work, no migration. **A gap that reads as expensive from the symptom can be cheap at the cause, and only reading the query tells you which.**
+- **⚠ BOTH MIRROR `lib/rep-series` EXACTLY, deliberately:** a zero-length call excluded rather than averaged in, a null price moment excluded rather than zeroed, both counting GRADED calls. **A number card and the line beside it must not disagree about the same word** — the same rule that made `prospects` reuse the closing denominator. Live proof that it matters: only **112 of 656** calls carry a price moment, so the caption says *"on 112 calls where a price was said"* rather than implying the other 544 were instant.
+
+### ⚠⚠ A GUARD THAT BANS A WORD WHEN ITS CLAIM IS ABOUT A FIELD WILL FIRE ON CUSTOMER PROSE (2026-09-01)
+**A guard forbade the string `measured` anywhere on the catalog wire, because the CATALOG carries a `measured` FIELD full of engineering notes. It duly failed on a customer-facing DESCRIPTION containing the ordinary English word.**
+- **THE CLAIM WAS ABOUT A FIELD AND THE SCOPE WAS EVERY OCCURRENCE ANYWHERE.** `"measured":` — with the quote and colon — cannot appear in prose, and asserts the actual property.
+- **⚠ AND THE RIGHT RESPONSE WAS BOTH: tighten the guard AND reword the description**, because *"the same people the closing rate is measured against"* is jargon for a sales manager anyway. **A guard firing on your prose is sometimes telling you the prose is wrong too.**
+- Same family as the encoding-pinned dash: **scope narrower than claim, and claim narrower than scope, are the same failure from opposite sides.**
+
+### ⚠⚠ CLOSING A GAP CAN KILL THE ONLY FIXTURE THAT PROVED A GUARD (2026-09-01)
+**A test asserted *"a withdrawn view falls back to the metric's FIRST OFFERED view, not to `number`"* — and it drove the two MINUTE metrics, because they were the only ones that did not offer `number`. Giving both a number card meant the fixture could no longer tell the two behaviours apart.**
+- **⚠⚠ EVERY OFFERABLE METRIC NOW OFFERS `number` FIRST, so NO catalog entry can prove that property behaviourally any more.** The test would have passed whether the fallback was `m.views[0]` or the literal `'number'`.
+- **THE SUBJECT SURVIVED AND THE FIXTURE DIED, so it was asserted at the SOURCE** — the fallback expression must be `m.views[0]` and never a literal — **which cannot go vacuous however the catalog moves**, plus a behavioural case built from a view the metric provably does not offer.
+- **THE HABIT: when a change makes a class of input disappear, grep the tests that RELIED on that class existing.** A guard whose fixture has become unrepresentative still passes, and passing is exactly what hides it.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
