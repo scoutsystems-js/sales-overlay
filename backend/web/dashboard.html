@@ -2588,7 +2588,10 @@
     .page-header-side { }
     .team-stat-row { display: flex; flex-wrap: wrap; gap: 14px; }
     .team-stat { flex: 1; min-width: 120px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); }
-    .team-stat-val { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1.1; }
+    .team-stat-val { font-size: var(--fs-number); font-weight: var(--fw-normal); color: var(--text); line-height: 1.1; }
+    /* ⚠ THE ONE LOUD NUMBER ON THIS PAGE — the display step, and nothing else
+       on the page takes it. That is what "fixed per page" means. */
+    .team-stat--lead .team-stat-val { font-size: var(--fs-display); font-weight: var(--fw-display); }
     .team-stat-sub { font-size: 13px; font-weight: 500; color: var(--text); }
     .team-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin-top: 6px; }
     /* Manager daily digest */
@@ -2648,7 +2651,7 @@
       0%, 100% { box-shadow: 0 0 0 0 rgba(9, 224, 70, 0); background: transparent; }
       15%, 55% { box-shadow: 0 0 0 2px rgba(9, 224, 70, 0.55); background: rgba(9, 224, 70, 0.06); }
     }
-    .digest-focus-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: 600; margin-bottom: 6px; }
+    .digest-focus-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: 0.05em; color: var(--good); font-weight: var(--fw-normal); margin-bottom: 6px; }
     /* EOD Report */
     .eod-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
     /* REMOVED 2026-08-18 (dd/ee) — the native date input is gone; the toolbar
@@ -2784,12 +2787,12 @@
     .digest-day-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
     .digest-day-btn {
       background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text);
-      padding: 6px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+      padding: 6px 12px; border-radius: var(--radius-sm); font-size: var(--fs-label); font-weight: var(--fw-normal);
       font-family: inherit; cursor: pointer;
     }
     .digest-day-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
     .digest-day-btn:disabled { opacity: .45; cursor: default; }
-    .digest-day-current { font-size: 13px; font-weight: 700; letter-spacing: .01em; }
+    .digest-day-current { font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); letter-spacing: .01em; }
 
     /* Grading-backlog control (2026-08-25). Shared by the Calls page and
        Account -> Connections; both mount it inside `.grade-backlog-host`. */
@@ -2929,7 +2932,16 @@
     .avg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
     .avg-title { font-size: var(--fs-title); font-weight: var(--fw-normal); }
     .avg-window { font-size: var(--fs-eyebrow); font-weight: var(--fw-normal); text-transform: uppercase; letter-spacing: 0.06em; }
-    .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
+    /* ⚠⚠ 290, NOT 230 (approved 2026-09-01) — AND IT IS THE LAYOUT FIX FOR A
+       TYPE CONSTRAINT, WHICH IS THE RIGHT WAY ROUND. The gauges were ruled to
+       dominate, 48px is the scale's answer for that, and at a 230px dial the
+       number had nowhere to sit. The alternative was an eighth type size, and
+       a scale that grows whenever it is inconvenient is a list, not a scale.
+       ⚠ SIZED AGAINST "46min", NOT "24%" — the binding case carries a SUFFIX,
+       not just digits, and it was the one visibly touching the ring.
+       ⚠ Compared at 230 / 290 / 340 and chosen by LOOKING: at 340 the dial
+       becomes the subject rather than the number it contains. */
+    .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px; }
     .avg-card { text-align: center; padding: 4px 4px 12px; border-radius: var(--radius-md); }
     /* Only the gauge with a real destination is clickable, and it says so —
        a card that looks interactive and is not is worse than a plain one. */
@@ -2937,7 +2949,7 @@
     .avg-card-link:hover { background: var(--bg-field); }
     .avg-name { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-bottom: 4px; }
     .avg-dial { position: relative; }
-    .avg-svg { width: 100%; max-width: 230px; height: auto; display: block; margin: 0 auto; }
+    .avg-svg { width: 100%; max-width: 290px; height: auto; display: block; margin: 0 auto; }
 
     /* ⚠ LEVELS RAISED 2026-08-18 — Justin: "not quite as sharp and bright as
        Scout green." MEASURED BEFORE CHANGING ANYTHING, and the measurement moved
@@ -3317,7 +3329,8 @@
        MEASURING the live page: 52 drawn boxes in 15 kinds, nested THREE deep —
        a bordered section containing a bordered card containing a bordered row.
 
-       ⚠⚠ SCOPED TO body[data-view="team-performance"] AND THAT IS DELIBERATE.
+       ⚠⚠ SCOPED TO body[data-view="team"] AND THAT IS DELIBERATE.,
+    body[data-view="team-performance"] AND THAT IS DELIBERATE.
        `.section` and `.page-header` are rendered by EVERY page in the product;
        restyling them unscoped would silently re-lay-out a dozen pages that had
        nothing to do with this block — the shared-carrier failure in CSS, which
@@ -3326,7 +3339,9 @@
 
        ⚠ Space does the grouping. One accent, sparingly. Hairlines only where a
        boundary genuinely has to be read as a boundary. */
+    body[data-view="team"] .section,
     body[data-view="team-performance"] .section,
+    body[data-view="team"] .page-header ,
     body[data-view="team-performance"] .page-header {
       background: transparent;
       border: 0;
@@ -3335,36 +3350,61 @@
       padding-right: 0;
       margin-bottom: 40px;          /* the grouping the borders used to do */
     }
+    body[data-view="team"] .page-header--company ,
     body[data-view="team-performance"] .page-header--company { margin-bottom: 28px; }
 
     /* ⚠⚠ NO NESTED CONTAINERS. The rep cards were boxes INSIDE a box; they are
        now rows separated by a hairline — a boundary you read rather than a
        frame you see. The last row draws none: a trailing rule is a line with
        nothing on the other side of it. */
+    body[data-view="team"] .rep-card ,
     body[data-view="team-performance"] .rep-card {
       background: transparent; border: 0; border-radius: 0;
       border-bottom: 1px solid var(--border);
       padding: 20px 0;
     }
+    body[data-view="team"] .rep-card:last-child ,
     body[data-view="team-performance"] .rep-card:last-child { border-bottom: 0; padding-bottom: 0; }
+    body[data-view="team"] .rep-weak,
     body[data-view="team-performance"] .rep-weak,
+    body[data-view="team"] .rep-why ,
     body[data-view="team-performance"] .rep-why { border: 0; padding-left: 0; padding-right: 0; }
 
     /* ⚠ THE RANKED LISTS: hairlines, not boxes. The thin bar stays — it is the
        one drawn shape here that carries information rather than decoration. */
+    body[data-view="team"] .team-detail-row ,
     body[data-view="team-performance"] .team-detail-row {
       background: transparent; border: 0; border-radius: 0;
       border-bottom: 1px solid var(--border);
       padding: 12px 0;
     }
+    body[data-view="team"] .team-detail-row:last-child ,
     body[data-view="team-performance"] .team-detail-row:last-child { border-bottom: 0; }
 
     /* ⚠ GRAPHS SIT ON THE PAGE WITH A HAIRLINE BASELINE, NOT IN A CARD. */
+    body[data-view="team"] .rep-graph-skeleton ,
     body[data-view="team-performance"] .rep-graph-skeleton {
       background: transparent; border: 0; border-radius: 0;
       border-bottom: 1px solid var(--border);
     }
+    body[data-view="team"] .team-controls-row ,
     body[data-view="team-performance"] .team-controls-row { margin-bottom: 32px; }
+
+    /* ⚠ THE DIGEST'S OWN CONTAINERS. Treatment C's first pass named the
+       Performance page's boxes and reached none of these — the box count on
+       Daily Digest came back 12 before and 12 after, which is what exposed it.
+       A treatment is not applied until the thing it targets is on the page. */
+    body[data-view="team"] .team-stat {
+      background: transparent; border: 0; border-radius: 0; padding: 0 24px 0 0;
+    }
+    body[data-view="team"] .digest-notable {
+      background: transparent; border-radius: 0;
+      border-left: 2px solid var(--accent);      /* the one accent, sparingly */
+    }
+    body[data-view="team"] .digest-focus {
+      background: transparent; border: 0; border-radius: 0;
+      border-top: 1px solid var(--border); padding-left: 0; padding-right: 0;
+    }
 
     /* ═══ THE GROUND (ruled 2026-09-01, and it is a STANDING RULING re-applied)
        ⚠⚠ SAFETY IS LAYOUT, NOT FAINTNESS. This is the same rule the whole mesh
@@ -3389,8 +3429,20 @@
        ⚠ WIDTH: the content column (1200px) and no wider, so the artwork keeps
        the gutters — 120px each side at 1440, 360px at 1920. Edge to edge would
        delete the mesh rather than frame it. */
+    body[data-view="team"] .page ,
+    body[data-view="team"] .page,
     body[data-view="team-performance"] .page {
       background: var(--bg);
+      /* ⚠⚠ THE GROUND MUST REACH THE BOTTOM OF THE VIEWPORT, NOT THE BOTTOM OF
+         THE CONTENT. `.page` is only as tall as what is in it, so on a SHORT
+         page the ground stopped partway down and the artwork took over below —
+         a hard horizontal edge with bright mesh beneath it, reading as a
+         torn-off sheet rather than a floor. INVISIBLE on Performance, which is
+         tall enough to fill the screen; obvious on Daily Digest, which is not.
+         ⚠ Every short page inherits this, so it belongs on the ground itself
+         rather than being re-discovered per page.
+         61px is the nav's own height; the ground begins beneath it. */
+      min-height: calc(100vh - 61px);
     }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
@@ -12112,7 +12164,11 @@
     var s = d.stats || {};
     var stats = '<div class="team-stat-row">'
       + '<div class="team-stat"><div class="team-stat-val">' + (s.calls || 0) + '</div><div class="team-stat-label">Calls</div></div>'
-      + '<div class="team-stat"><div class="team-stat-val">' + (s.closed || 0) + '</div><div class="team-stat-label">Closed</div></div>'
+      /* ⚠⚠ THE PAGE'S LOUD NUMBER (ruled: FIXED PER PAGE, never weakest-against-
+         target). Daily Digest leads with TOTAL CLOSES THAT DAY — and NOT cash,
+         which Scout does not track. The class is the only thing distinguishing
+         it; without one there is no way to make one tile the lead. */
+      + '<div class="team-stat team-stat--lead"><div class="team-stat-val">' + (s.closed || 0) + '</div><div class="team-stat-label">Closed</div></div>'
       + '<div class="team-stat"><div class="team-stat-val">' + (s.follow_up || 0) + '</div><div class="team-stat-label">Follow-ups</div></div>'
       + '<div class="team-stat"><div class="team-stat-val">' + (s.lost || 0) + '</div><div class="team-stat-label">Lost</div></div>'
       + '<div class="team-stat"><div class="team-stat-val">' + (s.reps_active || 0) + '</div><div class="team-stat-label">Reps active</div></div>'
