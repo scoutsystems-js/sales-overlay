@@ -5961,3 +5961,41 @@ Three more green elements sat on the page I had just declared swept — `.srk-wh
 - **THEY WERE FOUND BY ENUMERATING COMPUTED COLOUR OVER THE LIVE PAGE**, not by grepping the stylesheet — **the same method that found the inline-style bar**, and the reason the first claim was wrong is that I went back to grepping.
 - **⚠⚠ `.srk-why` RENDERED A NEGATIVE FINDING IN AN 18% GREEN FILL** — the ground a rep repeatedly fails to cover, in the colour that means *good* everywhere else. Same collision as the objection category rendering green for a closer's WEAKEST category. **A colour that means one thing globally and the opposite locally is worse than no colour.**
 - **THE RULE, restated because it keeps paying: for anything about RENDERED APPEARANCE, enumerate from `getComputedStyle` over the live page. A stylesheet cannot show you a style that does not live in it.**
+
+### ⚠⚠⚠ I WROTE GUARDS FOR "A GUARD ON THE CONSUMER CANNOT SEE A BROKEN PRODUCER" AND MADE THE SAME MISTAKE IN THEM (2026-09-01)
+**Fixing the `spoke` defect, I wrote four non-vacuity checks. TWO PASSED WITH THE DEFECT FULLY RESTORED.**
+```
+reverted `spoke: spokeOf(r, reply, q)` -> `spoke: reply ? 'closer' : 'prospect'`
+  every unit test on _spokeOf        STILL GREEN   (the helper is still defined and correct)
+  the producer                       IGNORES IT
+```
+- **⚠⚠ EXERCISING A HELPER AND ASSERTING THE CALLER USES IT ARE DIFFERENT CHECKS, and the first is the one that feels like testing.** The original `spoke` guards proved *"no wrong label is ever shown"* by driving the RENDERER; these proved the DERIVATION in isolation. **Both are one level away from the thing that was broken.**
+- **THE FIX IS A CALL-SITE ASSERTION**: `/spoke:\s*spokeOf\(r, reply, /` present AND the old inline form absent; `evidenceMismatch(` called inside `resolve` AND `if (mism) … ev = null` present. **Computing a check and ignoring its result is worse than not checking**, so the guard asserts the CONSEQUENCE, not just the call.
+- **⚠ THE ONLY REASON I FOUND IT IS THE REVERT-AND-COUNT DISCIPLINE.** Green tests after restoring a defect is the single unambiguous signal that a guard is aimed one level too low.
+
+### ⚠⚠ A GUARD CAN ENSHRINE THE DEFECT IT WAS WRITTEN TO PREVENT (2026-09-01)
+**The `spoke` guard asserted `/spoke:\s*reply\s*\?\s*'closer'\s*:/` — the exact which-field-did-I-use derivation that rendered a closer's line as the prospect's on a live page.**
+- It was written to protect *"who spoke is captured at the producer, because nothing downstream can recover it"* — **a correct subject, pinned to the wrong SOURCE.** So the guard was green, the property was false, and the guard was what would have blocked the fix.
+- **THE TELL: a guard that pins an IMPLEMENTATION rather than a PROPERTY will fail on the correct fix.** When that happens, ask whether the subject survives (here it did) and re-pin it to the property — then assert the old form is ABSENT, so it cannot come back.
+- Sits with *derive a guard from the source of truth, never pin a literal* — this is that rule for logic rather than for values.
+
+### ⚠⚠ PREDICTING WHICH CLASSES A VIEW USES HAS NOW BEEN WRONG TWICE — ENUMERATE COMPUTED STYLE (2026-09-01)
+Treating `team-expanded` I listed the classes I expected and missed **`.review-why-quote`** (a 3% fill with a 12px radius around every quote) and **`.team-lane`** (the whole Call Highlights lane, a full card).
+- **THE METHOD THAT WORKS, THIRD TIME: walk `#content *`, read `getComputedStyle`, and report anything with a border or a background.** It found the inline-style green bar, the three `srk-*` elements, and now these two.
+- **⚠ A STYLESHEET GREP CANNOT SHOW YOU A STYLE THAT DOES NOT LIVE IN IT, AND A PREDICTED CLASS LIST CANNOT SHOW YOU A CLASS YOU DID NOT THINK OF.** Both failures are the same shape: the scope of the check is narrower than the claim.
+
+### ⚠⚠⚠ THE PART-2 LIST WAS BUILT BY PAGE NAME, NOT BY REACHABILITY — AND EVERY UNTREATED VIEW IS ONE CLICK AWAY (2026-09-01)
+**"Call Highlights of the Week" kept its boxes while the page linking to it lost them, so clicking through read as a regression.** Enumerated:
+```
+TREATED    overview · team · team-coaching · team-members · team-objections · team-performance · team-expanded
+UNTREATED  account · call-library · call-review · eod · kb · needs-work · objections-intel
+           performance · prospects · section · team-needs-work
+reached by ONE CLICK from a treated page: call-library, objections-intel, section,
+           performance, call-review, team-needs-work, prospects, account, eod, kb
+```
+- **⚠⚠ ANY DESTINATION LINKED FROM A REDESIGNED PAGE READS AS A REGRESSION THE MOMENT SOMEONE CLICKS THROUGH.** A redesign scoped by page NAME leaves exactly the surfaces a user reaches next.
+- **THE RULE: scope a visual pass by REACHABILITY — enumerate `setView` destinations from the pages in scope — not by a list of page names.**
+
+### ⚠ TWO IMPLEMENTATIONS OF ONE FORMAT MAY BE CORRECT — WHAT MUST NOT DRIFT IS THE FORMAT (2026-09-01)
+`hmsOf` (server, takes seconds) and `tsFromClipUrl` (browser, takes a URL) both render `hh:mm:ss`. **They are deliberately NOT merged: different runtime, different input, and a browser file cannot `require()` the lib.**
+- **A MIRROR GUARD PINS THE FORMAT** across `0 / 42 / 2022 / 3600 / 7660 / 36000`, the same pattern as the SQL/JS scope mirror. **"One function" is not always available; "one format, asserted" always is.**

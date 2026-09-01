@@ -1151,3 +1151,20 @@ A control wherever coaching appears, manager and above, capturing a manager's co
 **MAJORS FILED FOR AFTER THE DESIGN SESSION**
 - **"Fine Tune Coaching"** — captures a manager's correction and stores the concept in the KB. The fix for the isolation defect **at source**.
 - **Closer/Manager tag** — admin-granted flag unlocking the Coaching Dashboard and a recording source for a manager who also takes calls. **Josh is that case, currently an exception.**
+
+## 2026-09-01 — all three faults fixed; Call Highlights of the Week (`27c24e6`, `4cdc9b5`, `9eb6b0b`)
+
+**LIVE**
+- **(b) `spoke` is READ from `call_highlights.speaker`** and requires `speaker_verified === true`; an unverified speaker falls to **unlabelled** (it previously defaulted to "prospect"). ⚠ Guards moved to the DERIVATION — the originals tested the renderer and passed while the producer read the wrong field.
+- **(a) Evidence is bound to the claim.** Mismatched evidence is **dropped, not re-selected** — re-selecting manufactures a binding rather than verifying one. Only constrains claims that name someone.
+- **(c) `hh:mm:ss`** — 7660s reads `02:07:40`. Deliberately not merged with `hmsOf` (different runtime and input); a mirror guard pins the format.
+- **`team-expanded` (Call Highlights of the Week)** — ground first, then cards off, including the quote fill and the highlight lanes.
+- `RECS_LANE_VERSION v2 → v3`.
+
+**⚠ THE REACHABILITY GAP — the finding behind team-expanded**
+The part-2 list was built by **page name, not reachability**. Six views treated, **eleven still untreated, and every one is a single click from a treated page**: call-library, objections-intel, section, performance, call-review, team-needs-work, prospects, account, eod, kb. **Any destination linked from a redesigned page reads as a regression the moment someone clicks through.**
+
+**⚠ AWAITING A RULING — Team Recommendations render twice**
+Confirmed on the live page: `team-expanded` renders **Team Recommendations** *and* **Call Highlights of the Week**, while Coaching already carries the recommendations. **The clean answer may be that this page becomes Call Highlights only.** Reported, not decided.
+
+**FILED, UNCHANGED** — amber section bars · "1000 chunks" · the green objection category · call review's eleven bars.
