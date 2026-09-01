@@ -196,26 +196,54 @@ test('⚠⚠ the catalog payload carries NO engineering notes', () => {
   }));
 });
 
-test('⚠ an unavailable metric is NAMED but not explained in our words', () => {
+/* ⚠⚠ CONVERTED 2026-09-01 BY RULING, NOT WEAKENED. This asserted that the
+   picker NAMES the metrics it cannot offer — "tell them rather than let them
+   wonder", which is sound for a metric a manager might EXPECT and wrong for six
+   they have never heard of. Justin: a picker that lists what it cannot do
+   spends a manager's attention on things they cannot have.
+   ⚠ THE SUBJECT THAT SURVIVES IS THE RECORD: the catalog still knows what is
+   unavailable and why — that is what it would take to build them. What changed
+   is that it is neither SENT nor SHOWN. */
+test('⚠⚠ the unavailable list is NOT sent and NOT shown — but the catalog keeps it', () => {
   const cat = require('../lib/widget-catalog.js');
+
+  // the record survives, with its reasons — the positive companion, without
+  // which the three absence assertions below could pass over nothing
   const un = cat.unavailable();
-  assert.ok(un.length >= 1, 'there are unavailable metrics to name');
-  un.forEach((u) => {
-    assert.deepStrictEqual(Object.keys(u).sort(), ['key', 'label', 'reason'],
-      'the wire shape is the name and WHICH KIND of unavailable — `measured` reads '
-      + '"coverage on 683 of 1,585, SPLIT ACROSS TWO VOCABULARIES", which no manager can act on');
-    assert.ok(u.reason === 'no_data' || u.reason === 'no_card', 'a closed vocabulary: ' + u.reason);
-  });
-  /* ⚠⚠ TWO REASONS, TWO SENTENCES. "Scout cannot measure this" is TRUE of talk
-     ratio and FALSE of outcome mix — that one is measured perfectly well and has
-     no card yet. One sentence for both would send a manager to wait for data
-     that already exists, which is the wrong-reason failure. */
-  assert.ok(/Scout cannot measure this across your team yet/.test(LIVE),
-    'the no-DATA case says so, rather than hiding the metric');
-  assert.ok(/there is no card that can show it yet/.test(LIVE),
-    'and the no-CARD case must NOT claim we cannot measure it');
-  assert.ok(un.some((u) => u.reason === 'no_data') && un.some((u) => u.reason === 'no_card'),
-    'both kinds exist today — a test over one kind proves nothing about the other');
+  assert.ok(un.length >= 3, 'the catalog must still record what it cannot offer: ' + un.length);
+  un.forEach((u) => assert.ok(u.reason === 'no_data' || u.reason === 'no_card',
+    'and why, in a closed vocabulary: ' + u.reason));
+
+  // it is not on the wire
+  const routes = fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8');
+  const at = routes.indexOf("router.get('/catalog'");
+  /* ⚠ `'});'` FIRST MATCHES INSIDE `catalogGrouped() });`, so slicing to it stops
+     one character short of the payload and the assertion below never sees it.
+     Anchor on the handler's own closing line, and assert the length — a slice
+     that is too short tests a fragment, and a backwards one tests ''. */
+  const route = routes.slice(at, routes.indexOf('\n});', at));
+  assert.ok(route.length > 60 && route.length < 400, 'route slice: ' + route.length);
+  assert.ok(/res\.json\(\{ groups: catalogGrouped\(\) \}\)/.test(route),
+    'the payload is groups only');
+  assert.ok(!/unavailable/.test(route),
+    'a payload nothing renders is one innerHTML from being back on screen — dropping '
+    + 'it from the WIRE is what makes the ruling structural');
+
+  // and it is not in the picker
+  assert.ok(!/Scout cannot measure this across your team yet/.test(LIVE),
+    'the no-data sentence must be gone');
+  assert.ok(!/there is no card that can show it yet/.test(LIVE),
+    'and so must the no-card one');
+  assert.ok(!/Not available yet/.test(LIVE), 'and the section heading');
+
+  /* ⚠ STEP TWO'S EXPLANATIONS ARE A DIFFERENT THING AND MUST SURVIVE. "No gauge
+     — this metric has no target to point at" is about a metric the manager has
+     ALREADY CHOSEN, so it explains a gap they are looking at rather than
+     advertising something they cannot have. */
+  assert.ok(/No gauge \\u2014 this metric has no target to point at/.test(LIVE),
+    'a missing VIEW on a chosen metric is still explained');
+  assert.ok(/No trend \\u2014 Scout does not keep a history for this one/.test(LIVE),
+    'both of them');
 });
 
 // ────────────────────────────────────────────────── the cap, and the empty board

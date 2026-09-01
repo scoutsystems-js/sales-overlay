@@ -12478,7 +12478,7 @@
       /* ⚠ AN EMPTY CATALOG IS A THIRD STATE, distinct from loading and from
          refused. It cannot happen today, and a dialog that renders nothing when
          it does is the same silence in a new costume. */
-      if (!(cat.groups || []).length && !(cat.unavailable || []).length) {
+      if (!(cat.groups || []).length) {
         host.innerHTML = '<div class="dash-card-empty">No metrics are available'
           + '<span>Nothing can be added to a board right now.</span></div>';
         return;
@@ -12497,24 +12497,19 @@
                 + '<span>' + escapeHtml(m.label) + '</span>'
                 + '<i>' + m.views.map(function (v) { return escapeHtml(DASH_VIEW_SHORT[v] || v); }).join(' \u00B7 ') + '</i></button>';
             }).join('') + '</div>';
-        }).join('')
-        /* ⚠⚠ THE ABSENT ONES ARE NAMED, NOT HIDDEN. A manager who wonders where
-           talk ratio went must be told; an unexplained absence reads as a
-           product that lost something. */
-        + ((cat.unavailable || []).length
-            ? '<div class="dash-pick-group">Not available yet</div>'
-              /* ⚠⚠ TWO REASONS, AND ONE SENTENCE CANNOT SERVE BOTH. "Scout
-                 cannot measure this" is TRUE of talk ratio and FALSE of outcome
-                 mix — that one is measured perfectly well and simply has no card
-                 yet. A wrong reason sends a manager to wait for data that
-                 already exists. */
-              + '<div class="dash-pick-absent">' + cat.unavailable.map(function (u) {
-                  var why = u.reason === 'no_card'
-                    ? 'Scout measures this, but there is no card that can show it yet.'
-                    : 'Scout cannot measure this across your team yet.';
-                  return '<div><b>' + escapeHtml(u.label) + '</b> \u2014 ' + why + '</div>';
-                }).join('') + '</div>'
-            : '');
+        }).join('');
+        /* ⚠⚠ THE UNAVAILABLE LIST IS GONE FROM THE PICKER — Justin's ruling,
+           2026-09-01. It named six metrics with a sentence explaining why each
+           could not be had, and the reasoning that put it there ("tell them
+           rather than let them wonder") is sound for a metric a manager might
+           EXPECT and wrong for ones they have never heard of.
+           ⚠⚠ A PICKER THAT LISTS WHAT IT CANNOT DO SPENDS A MANAGER'S ATTENTION
+           ON THINGS THEY CANNOT HAVE — a metric list is a menu, not an inventory.
+           ⚠ THE CATALOG KEEPS THEM. `available: false` and every measurement stay
+           in lib/widget-catalog.js: they are the record of what it would take,
+           and `viewsFor()` already returns nothing for them. This is a DISPLAY
+           change, and it is also why `unavailable` stopped being SERIALISED — a
+           payload nothing renders is one innerHTML from being on screen. */
       return;
     }
 

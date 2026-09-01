@@ -365,8 +365,19 @@ router.get('/dashboard', teamGate, async function (req, res) {
    gauge comes to be offered for a metric with no target. The unavailable list is
    sent DELIBERATELY — a manager who wonders where talk ratio went must be told,
    not left guessing. */
+/* ⚠⚠ `unavailable` IS NO LONGER SENT (Justin's ruling, 2026-09-01). The picker
+   listed six metrics it could not offer, each with a sentence explaining why —
+   and a picker that lists what it cannot do spends a manager's attention on
+   things they cannot have.
+   ⚠ IT IS DROPPED FROM THE WIRE, NOT JUST FROM THE RENDER, and that is the
+   point: a payload nothing renders is one `innerHTML` from being back on
+   screen, so removing it here makes the ruling structural rather than a display
+   choice the next person undoes by accident.
+   ⚠ THE CATALOG KEEPS THE RECORD. `catalogUnavailable()` still exists and still
+   carries every `available: false` row and its measurement — that is what it
+   would take to build them, and it belongs in the catalog, not in a browser. */
 router.get('/catalog', teamGate, function (_req, res) {
-  res.json({ groups: catalogGrouped(), unavailable: catalogUnavailable() });
+  res.json({ groups: catalogGrouped() });
 });
 
 /* ⚠⚠ SAVE. The cap is enforced HERE and reads as words, never as a database
