@@ -48,6 +48,31 @@
 
 ---
 
+### ✅ 2026-09-01 (`1e0daa9`, `d08f941`) — THE DIGEST OUTAGE · GAUGES · MESH · SIDEBAR
+
+**1 · THE DIGEST WAS THROWING FOR TWO DAYS, AND IT WAS A CODE BUG.** `301defc` (2026-08-30 20:34 UTC) spliced the DQ filter INSIDE the callback passed to `inChunks`, after its `return` — `var objections` unreachable, `ReferenceError` on every call. Last good digest 19:16; first failure the 05:15 cron. **Both missing days regenerated with real content (2 managers each, 0 errors).**
+- ⚠⚠ **I HAD REPORTED "no code change explains the window" — WRONG, because `git log --since` filters on AUTHOR date and this commit's author date fell outside it.**
+- ⚠ **THE SILENCE IS FIXED:** a `ReferenceError`/`TypeError` is logged as `BUG` **with its stack**; an operational failure is not. When nothing at all is written the pass says so in words.
+- ⚠ **`team-digest-runs.test.js` EXECUTES `computeDailyDigest`.** A first version returned no calls, took the quiet path, and **passed against the real defect**.
+
+**2 · THE GAUGES: 290 → 220, 34 → 24**, chosen from four sizes compared side by side on the real `41.7min`. **220 is a floor with a measured reason** — the dial's own labels fall 11.3 → 8.6px between 290 and 220, and 7.4px at 190. The exception stays an exception. ⚠ **At 20px it would coincide with `--fs-number` and the carve-out could retire — recorded, not taken, because it costs the labels.**
+
+**3 · THE MESH: right side only, half a gutter, hard edge, not dimmed.** Done on the mesh rather than by widening the ground because **the ground exists on 5 of 12 views** and `<html>` is already `--bg`. Exposure re-counted on ten views: **0**. Below 1200 the artwork disappears entirely rather than becoming a sliver. ⚠ **My edit deleted the derived smoothstep top-fade and my own guard caught it — the browser had said so and I explained it away.**
+
+**4 · THE SIDEBAR IS LIVE.** Pages left, `Admin · My Account` top right, My Account navigates, five team pages in the dropdown only, Admin's gate untouched, **Sign Out in its own full-width card at the bottom of the account page**. Items/ids/handlers moved verbatim; the separator spans are kept and hidden because `init()` writes to them with no null guard. ⚠ **The stale account price hint is corrected.**
+
+### 🔴 NEEDS JUSTIN — THE SIDEBAR AND THE MESH COMPETE FOR THE SAME PIXELS
+```
+sidebar 200 + column 1200 = 1400
+  vw 1920  band 130px      vw 1440  band  10px   <- half a gutter was asked for; this is a sliver
+  vw 1512  band  28px      vw 1366  band   0px
+```
+The rail is already as narrow as it can be — the three "soon" tags drop onto their own line, taking the widest item 185 → 153 and the rail 225 → 200. **Those 25px are the only space the band has.**
+**The levers:** narrow the content column (a design constant), shorten the long labels, or accept the mesh as a wide-screen flourish. **Not picked — a measured trade goes to Justin.**
+
+### 📋 FILED — THE OFFER PRICE IS SET AT ONBOARDING (Justin's ruling, 2026-09-01)
+Closes the gap left when Offer price left the People page: **a MANAGED rep had no route to set one at all**. A manager sets it at onboarding. ⚠ Belongs with the onboarding row; until that lands, an unmanaged user sets their own at Account → Offer and an owner sets anyone's at `/admin`. **The field currently drives nothing** (`findPriceMomentByFraming` reads the transcript), so nothing is broken while it waits.
+
 ### ✅ 2026-09-01 (`075d34f`) — FOUR LIVE-PAGE ITEMS
 
 **1 · THE DIGEST — the navigation was not the bug.** Both symptoms (31 Aug → 29 Aug, Next disabled) have ONE cause and it is upstream: **the newest digest in the database is 2026-08-29**, so the landing day is not in the list at all. The walk is bounded to days that HAVE a digest, deliberately. **⚠ A REAL INVERSION IN THE SAME BRANCH WAS FIXED**: `idx === -1` fell back to `days[0]`, so a date OLDER than the list walked FORWARD. It steps by date now. **⚠ THIS DOES NOT CHANGE WHAT JUSTIN SEES** and the guard says so.

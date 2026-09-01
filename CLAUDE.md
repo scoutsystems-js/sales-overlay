@@ -5196,6 +5196,56 @@ Offer price and Plan left the People page by ruling. **Verified rather than assu
 - **⚠⚠ A ROUTE DID DISAPPEAR AND IT IS RECORDED RATHER THAN DISCOVERED LATER: a MANAGED rep now has no way to set an offer price at all** (`priceFieldHtml` returns `''` when `is_managed`). That costs nothing while the field drives nothing; it is in the code and the test so it is found if it ever drives something again.
 - **⚠ AND A STALE SENTENCE WAS FOUND, NOT FIXED:** the account page still says the price is what *"Scout uses to find the moment you quote the price on a call"*. Untrue since the detector went transcript-only. **Reported rather than reworded unasked.**
 
+### ⚠⚠⚠ `git log --since` FILTERS ON **AUTHOR** DATE, AND THAT HID THE COMMIT THAT CAUSED A TWO-DAY OUTAGE (2026-09-01)
+**I searched the failure window for code changes, found none, and reported "no code change explains the window". The commit that caused it was IN that window by commit date and OUTSIDE it by author date.**
+```
+301defc   author date  (outside my window)      commit date 2026-08-30 20:34 UTC
+last good digest        2026-08-30 19:16 UTC    first failure  2026-08-31 05:15 UTC
+```
+- **⚠⚠ THE WRONG ANSWER WAS CONFIDENT AND SENT THE DIAGNOSIS AWAY FROM THE CODE.** "No code change explains this" is a strong claim that redirects a search toward the platform, the data, the environment — everywhere except the diff that did it.
+- **THE FIX IS ONE FLAG: `--since` / `--until` take `--date-order` on author dates by default; use `git log --pretty=%cd` or filter on committer date.** When a window matters, print BOTH dates and say which you filtered on.
+- **⚠ AND A SECOND SEARCH SAVED IT: enumerating commits that touched THE FILE, with no date filter, found it immediately.** When a date-bounded search returns nothing, re-run it unbounded on the artefact before concluding absence.
+
+### ⚠⚠⚠ THE DIGEST BUG — A SPLICE INTO A CALLBACK, THE THIRD INSTANCE OF ONE MECHANISM (2026-09-01)
+```js
+var objectionsAll = await w.inChunks('call_highlights', '...',
+  function (q) { return q.eq('type', 'objection');   // the callback's return
+  var objections = objectionsAll.filter(...);        // SPLICED INSIDE, unreachable
+ });
+var objLines = objections.slice(0, 20)               // ReferenceError, every call
+```
+**An edit adding the DQ exclusion put three lines inside the callback passed to `inChunks`. It parsed. `node -c` passed. Every manager's digest threw for two days and the landing page read "No digest".**
+- **⚠⚠ IT IS THE SAME MECHANISM AS THE DEAD MOUNT LINE AND AS MY OWN 7,255-LINE DELETION, AND ALL THREE WERE SCRIPTED EDITS.** A splice that lands one brace off is invisible to every syntax check and to review, because the result is valid code that simply never runs.
+- **THE EXISTING TESTS COVERED THE HELPERS.** ET-date maths, the cache-key convention, the quiet shape — all real properties, none of which CALLS the function. **"Testing a function in isolation and grepping for its name are the same check twice."**
+- **⚠⚠ AND MY FIRST EXECUTING TEST PASSED AGAINST THE DEFECT.** With no calls in the fake, the run took the quiet-day path and returned BEFORE the broken block. **A check that can pass by never running the line is not a check** — the minimum-sample rule, in a test written for exactly this bug. The fake now returns a call, and the assertion is on the error's TYPE so an expected operational failure stays distinguishable from ours.
+
+### ⚠⚠ AN ERROR-ISOLATED PASS WITH ONE `console.error` IS INVISIBLE BY DESIGN — MAKE A PROGRAMMER ERROR LOUD (2026-09-01)
+**Two days of a missing landing page was the cost.** The per-manager catch printed one line, no stack, into a buffer nobody reads — and a `ReferenceError` and a database timeout produced the IDENTICAL output.
+- **A `ReferenceError`/`TypeError` IS OUR BUG and now gets its stack, logged as `BUG`. An operational failure does not.** The class is in the message so a search finds it.
+- **⚠ AND THE SUMMARY LINE SAYS SO IN WORDS WHEN NOTHING WAS WRITTEN** — *"NOTHING WRITTEN for <date> — all N manager(s) failed. The landing page will be empty."* **A JSON blob with `generated:0, errors:2` is technically complete and reads as normal.**
+- **The generalisation: wherever a background pass is deliberately error-isolated, the isolation is a decision about BLAST RADIUS, never about VISIBILITY.** Swallowing the failure is right; swallowing the evidence is not.
+
+### ⚠⚠ MY OWN GUARD CAUGHT ME DELETING THE DERIVED SMOOTHSTEP — AND THE BROWSER HAD ALREADY SAID SO (2026-09-01)
+Adding a horizontal mask to the mesh, my replacement string began at the gradient's **final** stop and **consumed every intermediate one**, deleting the smoothstep top-fade whose slope is zero at both ends (the Mach-banding entry).
+- **⚠⚠ THE BROWSER TOLD ME AND I EXPLAINED IT AWAY.** A probe returned `vertStillThere: false`; I reasoned that computed styles resolve percentages and dismissed it. **It was right.** A failing signal explained away without checking is worse than no signal — it converts evidence into false confidence.
+- **THE GUARD IS WHAT CAUGHT IT**, because it asserted the vertical stops survive rather than only that the new layer exists. **When adding to a composite value, assert the EXISTING part survives — not just that yours arrived.**
+- **`mask-composite: intersect`, never a second `mask-image`.** Overwriting silently deletes the first layer.
+
+### ⚠⚠ A FIXED SIDEBAR AND A BACKGROUND BAND COMPETE FOR THE SAME PIXELS — MEASURE THE COUPLING, DO NOT PICK (2026-09-01)
+```
+sidebar 200 + column 1200 = 1400
+  vw 1920  band 130px      vw 1440  band  10px
+  vw 1512  band  28px      vw 1366  band   0px
+```
+- **THE BAND IS HALF A GUTTER, AND THE SIDEBAR TOOK THE GUTTER.** Left on `(100vw - 1200px)/4` the artwork would have been sized against a gutter that no longer exists and slid under the content. **ONE token feeds the page margin and the band.**
+- **⚠ THE RAIL WAS NARROWED TO PAY FOR THE BAND:** dropping the three "soon" tags onto their own line takes the widest item 185 → 153 and the rail 225 → **200**. **Those 25px are the only space the band has.**
+- **REPORTED, NOT PICKED.** Narrowing the column, shortening labels, or accepting the mesh as a wide-screen flourish are design calls. **A measured trade goes to the architect; silently making the artwork vanish after he asked for it at half width does not.**
+
+### ⚠⚠ THREE LAYOUT DEFECTS MEASUREMENT CAUGHT AND READING WOULD NOT (2026-09-01, the sidebar)
+1. **THE PAGE RENDERED UNDER THE FIXED SIDEBAR.** My `margin-left` sat ABOVE `.page { margin: 0 auto }` — the shorthand resets margin-left and CSS is last-wins. **The declaration looked perfectly correct in the file.** Same trap as the duplicated `background-position`.
+2. **THE COLUMN THEN OVERFLOWED THE VIEWPORT between 900 and 1366** — 24px at 1366, **290px at 1100** — because `max-width` does not shrink to accommodate a margin. **Found by computing the arithmetic across widths BEFORE shipping**, which is the one-width rule applied to a layout rather than a font.
+3. **⚠ A `Range` RECT OVER *WRAPPED* TEXT RETURNS THE LAID-OUT WIDTH, NOT THE WIDTH IT NEEDS.** Measuring how wide the rail must be, the range reported 71px for a label needing 153. **Force `white-space: nowrap` and read `scrollWidth`** — the same family as "a block fills its container, so a width check cannot see overflow".
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
