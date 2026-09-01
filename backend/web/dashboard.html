@@ -2971,6 +2971,40 @@
     .team-insight-claim { font-size: 14px; color: var(--text); line-height: 1.55; }
     .team-insight-data { font-size: 12.5px; color: var(--text); margin-top: 4px; }
     .team-insight-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+
+    /* ⚠⚠ THE PERSONAL COACHING DASHBOARD — part 2 (Justin, 2026-09-01).
+       The ground is added to `.page` ABOVE, before any of this, so no text
+       lands on the artwork. */
+    body[data-view="overview"] .glance-tile,
+    body[data-view="overview"] .team-recs-card,
+    body[data-view="overview"] .pattern-card {
+      background: none; border: 0; border-radius: 0;
+    }
+    /* ⚠ the tiles were four equal boxes in a row; without the boxes they need a
+       rule between them or they run together as one strip. */
+    body[data-view="overview"] .glance-tile { padding: 4px 0 4px 18px; border-left: 1px solid var(--border); }
+    body[data-view="overview"] .glance-tile:first-child { border-left: 0; padding-left: 0; }
+    body[data-view="overview"] .pattern-card { padding: 10px 0 12px; }
+    body[data-view="overview"] .pattern-card + .pattern-card { border-top: 1px solid var(--border); }
+
+    /* ⚠⚠ THE GREEN BARS. Justin named a PATTERN and the part-1 sweep was scoped
+       to team views; this extends it to the page he was actually looking at.
+       ⚠ THE TEST APPLIED, and it is the one that matters: strip the encoding and
+       ask what the reader no longer knows. Here — NOTHING. These bars sit under
+       headings that already read "WHAT'S WORKING" and "WHAT TO IMPROVE", so the
+       colour restates a fact the reader was told one line earlier.
+       ⚠ perfInsightHtml's bar is an INLINE STYLE, so CSS alone cannot reach it —
+       it is removed in the JS. This rule covers the class-based one. */
+    body[data-view="overview"] .perf-feature-point { border-left: 0; padding-left: 0; }
+    /* the last two boxes on this page — the objection-focus chips and its
+       exclusion note. ⚠ SCOPED: both classes are shared with the team surfaces,
+       where they already have their own treatment. */
+    body[data-view="overview"] .nw-chip,
+    body[data-view="overview"] .nw-context {
+      background: none; border: 0; border-radius: 0; padding: 0;
+    }
+    body[data-view="overview"] .nw-chip { margin-right: 18px; opacity: 0.85; }
+    body[data-view="overview"] .nw-context { margin-top: 14px; opacity: 0.75; }
     /* ⚠ OPTION A — the attribution is BOUND to the quote it names, above it.
        The pair sits in one container so they cannot drift apart in a reflow. */
     .team-insight-ev { margin-top: 8px; }
@@ -3679,6 +3713,8 @@
 
        ⚠ Space does the grouping. One accent, sparingly. Hairlines only where a
        boundary genuinely has to be read as a boundary. */
+    body[data-view="overview"] .section,
+    body[data-view="overview"] .page-header,
     body[data-view="team-members"] .section,
     body[data-view="team-objections"] .section,
     body[data-view="team-coaching"] .section,
@@ -3893,6 +3929,11 @@
        ⚠ WIDTH: the content column (1200px) and no wider, so the artwork keeps
        the gutters — 120px each side at 1440, 360px at 1920. Edge to edge would
        delete the mesh rather than frame it. */
+    /* ⚠⚠ overview IS THE PERSONAL COACHING DASHBOARD — the most-used page in
+       the product — and it is added HERE, to the GROUND, before anything below
+       removes its cards. Part 1 removed cards first and put 95 of 105 text
+       elements onto the artwork. Never that order again. */
+    body[data-view="overview"] .page ,
     body[data-view="team-members"] .page ,
     body[data-view="team-objections"] .page ,
     body[data-view="team-coaching"] .page ,
@@ -7889,8 +7930,15 @@
     var review = it.call_id ? ' <button class="obj-btn" type="button" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')" style="padding:2px 8px;">Call</button>' : '';
     var data = it.data ? '<span style="color:var(--text);"> · ' + escapeHtml(it.data) + '</span>' : '';
     var quote = it.quote ? '<div class="obj-response" style="display:block;margin-top:6px;"><span style="color:var(--text);">“</span>' + escapeHtml(it.quote) + '<span style="color:var(--text);">”</span></div>' : '';
-    var accent = kind === 'working' ? 'var(--good)' : 'var(--mid, #fbbf24)';
-    return '<div class="pattern-card" style="border-left:2px solid ' + accent + ';">'
+    /* ⚠⚠ THE COLOURED BAR IS GONE (Justin, 2026-09-01 — the green-bar pattern,
+       extended from the team views to this page).
+       ⚠ IT ENCODED NOTHING THE READER DID NOT ALREADY HAVE: these cards sit
+       under headings that literally read "WHAT'S WORKING" and "WHAT TO
+       IMPROVE". Strip the encoding and ask what is no longer known — nothing.
+       ⚠ IT WAS AN INLINE STYLE, WHICH IS WHY A CSS SWEEP COULD NOT REACH IT.
+       The `kind` argument is kept: it still selects which block a card belongs
+       to, and a future treatment may need it. */
+    return '<div class="pattern-card">'
       + '<div class="pattern-detail">' + escapeHtml(it.claim || '') + data + '</div>'
       + quote
       + ((clip || review) ? '<div class="obj-footer" style="margin-top:8px;">' + clip + review + '</div>' : '')
