@@ -465,8 +465,19 @@ test('⚠ the MINUTES graph does not inherit the percentage axis', () => {
  * would be the tidier fix, but it is a bigger change than this item asked for
  * — recorded here rather than done.
  */
-test('⚠ every adjacent nav link pair has a separator between them', () => {
-  const bar = HTML.slice(HTML.indexOf('<div class="top-bar-left"'), HTML.indexOf('<div class="top-bar-right"'));
+/* ⚠⚠ CONVERTED 2026-09-01 — THE SEPARATORS ARE NOW HIDDEN, AND THAT IS EXACTLY
+   WHY THIS TEST STILL MATTERS. The page tabs moved to a sidebar, where a
+   dot between items is a horizontal-nav idiom and is hidden in CSS. They were
+   NOT deleted, because init() does getElementById('navTeamSep').style.display
+   = '' with no null guard — removing them throws at boot.
+   ⚠ So the assertion below no longer protects the LOOK of the nav; it protects
+   the fact that every separator the JS may write to is still in the markup.
+   The original reason it was written (a dot was simply never typed, because the
+   nav is hand-written and nothing generates them) still applies to whoever adds
+   the next item. */
+test('⚠ every adjacent nav link pair still HAS its separator element', () => {
+  const navAt = HTML.indexOf('<aside class="sidebar"');
+  const bar = HTML.slice(navAt, HTML.indexOf('</aside>', navAt));   // ⚠ fromIndex
   assert.ok(bar.length > 200 && bar.length < 4000, 'nav slice suspicious: ' + bar.length);
 
   // Strip comments so an archived link cannot answer for a live one.
@@ -484,7 +495,8 @@ test('⚠ every adjacent nav link pair has a separator between them', () => {
 });
 
 test('⚠ NON-VACUITY — the nav check catches a removed separator', () => {
-  const bar = HTML.slice(HTML.indexOf('<div class="top-bar-left"'), HTML.indexOf('<div class="top-bar-right"'));
+  const navAt = HTML.indexOf('<aside class="sidebar"');
+  const bar = HTML.slice(navAt, HTML.indexOf('</aside>', navAt));   // ⚠ fromIndex
   const live = bar.replace(/<!--[\s\S]*?-->/g, '');
   // ⚠ Remove EVERY separator rather than "the first one" — the first sits
   // between the "Scout" wordmark and the first link, so removing it creates no

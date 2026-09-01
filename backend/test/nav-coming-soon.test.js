@@ -25,9 +25,12 @@ const LIVE = PAGE.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
 const LABELS = ['Follow Up Strategy', 'Scout AI', 'Marketing Insights'];
 
 function navBlock() {
-  const at = LIVE.indexOf('<div class="top-bar-left">');
+  /* ⚠ ANCHOR MOVED 2026-09-01: the page tabs left the top bar for a sidebar.
+     The PROPERTY is unchanged — what this test protects lives in .sidebar now,
+     so the anchor moves and the assertions do not. */
+  const at = LIVE.indexOf('<aside class="sidebar"');
   assert.ok(at !== -1, 'stale anchor — the nav block moved');
-  const block = LIVE.slice(at, LIVE.indexOf('<div class="top-bar-right">', at));
+  const block = LIVE.slice(at, LIVE.indexOf('</aside>', at));   // ⚠ fromIndex
   assert.ok(block.length > 400 && block.length < 4000, 'slice suspicious: ' + block.length);
   return block;
 }

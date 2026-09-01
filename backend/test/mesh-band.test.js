@@ -41,8 +41,13 @@ test('the band is derived from the column, not a picked pixel value', () => {
   const r = meshRule().code;
   /* half a gutter: the column is 1200, each gutter (100vw - 1200px)/2, half of
      one is /4. A hard-coded px band would be wrong at every other viewport. */
-  assert.ok(/calc\(\(100vw - 1200px\) \/ 4\)/.test(r),
-    'the band must be calc((100vw - 1200px) / 4) — half a gutter');
+  /* ⚠ THE FORMULA GAINED THE SIDEBAR (2026-09-01) AND HAD TO. The band is half
+     a gutter, and the gutter is the space the COLUMN sits in — which a fixed
+     190px sidebar has just narrowed. Left on (100vw - 1200px)/4 the band would
+     be sized against a gutter that no longer exists and slide artwork under the
+     content. ONE token feeds both the page margin and this. */
+  assert.ok(/calc\(\(100vw - var\(--sidebar-w\) - 1200px\) \/ 4\)/.test(r),
+    'the band must subtract the sidebar — half of the gutter that is actually left');
   assert.ok(/max\(0px,/.test(r),
     'below 1200px the gutter is negative — the band must clamp to 0, not invert');
 });
@@ -54,7 +59,7 @@ test('⚠ it is a HARD EDGE, not a fade — the mesh is not being dimmed', () =>
   const horiz = r.slice(at, r.indexOf(');', at));
   /* the same offset appears twice — opaque up to it, transparent from it — which
      is what makes the boundary a cut rather than a ramp. */
-  const stops = (horiz.match(/max\(0px, calc\(\(100vw - 1200px\) \/ 4\)\)/g) || []).length;
+  const stops = (horiz.match(/max\(0px, calc\(\(100vw - var\(--sidebar-w\) - 1200px\) \/ 4\)\)/g) || []).length;
   assert.strictEqual(stops, 2, 'both stops must sit at the same offset, or the edge fades');
 });
 

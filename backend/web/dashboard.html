@@ -100,6 +100,17 @@
          dial's scale labels at 7.4px, below readable. Recorded so the option is
          not lost rather than silently forgotten.) */
       --fs-gauge-value: 24px;
+
+      /* ⚠ THE SIDEBAR'S WIDTH IS A LAYOUT CONSTANT READ IN TWO PLACES — the
+         page's left margin AND the mesh band's gutter maths. One token, or the
+         artwork is sized against a gutter the sidebar has already taken.
+         ⚠ 200px, MEASURED not chosen: with the "soon" tags dropped onto their
+         own line the widest LIVE label is "Coaching Dashboard" at 153px, plus
+         20px of item padding and 40px of rail padding = 193. 200 gives it 7px.
+         ⚠⚠ AND IT IS AS NARROW AS IT IS FOR THE MESH'S SAKE. The sidebar and the
+         artwork compete for the same horizontal space: at 1440 the band is
+         (1440 - 200 - 1200)/4 = 10px. Every pixel here comes off the band. */
+      --sidebar-w: 200px;
     
       /* ⚠⚠ THREE WEIGHTS, NOT SEVEN. The 115 semibolds were the single
          cheapest-looking thing in the app — heavy text at 11-12px is close to the
@@ -535,8 +546,8 @@
            ⚠ max(0px, ...) because below 1200px the gutter is negative; the band
            collapses to nothing, which is what was already visible there. */
       linear-gradient(to left, rgba(0,0,0,1) 0px,
-        rgba(0,0,0,1) max(0px, calc((100vw - 1200px) / 4)),
-        rgba(0,0,0,0) max(0px, calc((100vw - 1200px) / 4)));
+        rgba(0,0,0,1) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)),
+        rgba(0,0,0,0) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)));
       /* ⚠ INTERSECT, NEVER REPLACE. The vertical gradient above is the derived
          smoothstep top-fade — its slope is zero at both ends so the ramp has no
          corner to catch (Mach banding). Overwriting mask-image would delete it. */
@@ -561,8 +572,8 @@
            ⚠ max(0px, ...) because below 1200px the gutter is negative; the band
            collapses to nothing, which is what was already visible there. */
       linear-gradient(to left, rgba(0,0,0,1) 0px,
-        rgba(0,0,0,1) max(0px, calc((100vw - 1200px) / 4)),
-        rgba(0,0,0,0) max(0px, calc((100vw - 1200px) / 4)));
+        rgba(0,0,0,1) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)),
+        rgba(0,0,0,0) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)));
       /* ⚠ INTERSECT, NEVER REPLACE. The vertical gradient above is the derived
          smoothstep top-fade — its slope is zero at both ends so the ramp has no
          corner to catch (Mach banding). Overwriting mask-image would delete it. */
@@ -889,8 +900,116 @@
     .signout { cursor: pointer; }
     .signout:hover { color: var(--text); }
 
+
+    /* ═══ THE SIDEBAR (2026-09-01) ══════════════════════════════════════════
+       ⚠ IT IS A GROUND, NOT A PANEL — var(--bg), no border, no elevated
+       surface. The design pass spent a block removing 52 drawn boxes; a
+       navigation with a rule down its edge puts one back. It reads as part of
+       the page because it is the same floor the content sits on. */
+    .sidebar {
+      position: fixed;
+      top: 61px;                      /* the nav's own height */
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-w);
+      background: var(--bg);
+      padding: 28px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      font-weight: 600;
+      font-size: var(--fs-body);
+      overflow-y: auto;
+      z-index: 60;                    /* under the nav (70), over the page */
+    }
+    /* ⚠ THE SEPARATORS ARE HIDDEN, NOT REMOVED — init() writes to them by id
+       with no null guard, so they must exist. See the markup comment. */
+    .sidebar .sep { display: none; }
+    .sidebar .nav-link,
+    .sidebar .nav-soon {
+      display: block;
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: var(--radius-sm);
+      border-bottom: 0;               /* the underline was a horizontal-nav idiom */
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .sidebar .nav-link:hover { background: rgba(var(--accent-rgb), 0.10); }
+    .sidebar .nav-link.nav-active {
+      background: rgba(var(--accent-rgb), 0.14);
+      color: var(--text);
+      border-bottom: 0;               /* ⚠ the horizontal rule would read as a divider here */
+    }
+    .sidebar .nav-team-wrap { display: block; width: 100%; }
+    .sidebar .nav-caret { float: right; margin-left: 0; }
+    /* ⚠ the Team menu anchors to the wrap, which is now a full-width block —
+       open it to the RIGHT of the sidebar rather than under it. */
+    .sidebar .nav-team-menu { left: 100%; top: 0; margin-left: 6px; }
+    /* ⚠ THE "soon" TAG DROPS BENEATH ITS LABEL, and that is what keeps the
+       sidebar narrow. Inline, the three coming-soon items need 183-185px — they
+       are the WIDEST things in the nav, and they are inert placeholders. On its
+       own line the widest LIVE item is "Coaching Dashboard" at 153px, so the
+       rail fits every real label on one line at 200px instead of 225.
+       ⚠ THAT 25px MATTERS: it is the only space the mesh band has left. */
+    .sidebar .nav-soon { line-height: 1.25; }
+    .sidebar .nav-soon-tag { display: block; float: none; width: max-content; margin: 3px 0 0 0; }
+
+
+    @media (max-width: 900px) {
+      /* ⚠ At this width the sidebar would eat the column. It becomes a
+         horizontal strip above the content rather than disappearing — a
+         navigation that vanishes is worse than one that changes shape. */
+      .sidebar {
+        position: static; width: auto; flex-direction: row; flex-wrap: wrap;
+        padding: 10px 16px; bottom: auto; gap: 2px;
+      }
+      .sidebar .nav-link, .sidebar .nav-soon { width: auto; display: inline-block; }
+      .sidebar .nav-team-wrap { display: inline-flex; width: auto; }
+      .sidebar .nav-team-menu { left: 0; top: 100%; margin-left: 0; }
+      .page { margin-left: 0; }
+    }
+
+    /* ⚠ SIGN OUT'S CARD — the one destructive control on the account page, and
+       the only reason it is styled at all is that it moved a level deeper. A
+       user who cannot find how to sign out is a support ticket. */
+    .acct-signout-card { display: flex; justify-content: center; }
+    .acct-signout {
+      width: 100%;
+      padding: 14px;
+      background: transparent;
+      border: 1px solid var(--bad);
+      border-radius: var(--radius);
+      color: var(--bad);
+      font-family: inherit;
+      font-size: var(--fs-body);
+      font-weight: var(--fw-emphasis);
+      cursor: pointer;
+    }
+    .acct-signout:hover { background: rgba(var(--bad-rgb), 0.12); }
+    .acct-signout:focus-visible { outline: 2px solid var(--bad); outline-offset: 3px; }
+
     /* ── Page layout ────────────────────────────────────────────────── */
     .page { max-width: 1200px; margin: 0 auto; padding: 36px 32px 100px; }
+    /* ⚠⚠ AFTER THE RULE IT OVERRIDES, NOT BEFORE. A first version sat above and
+       did nothing: `.page`'s `margin: 0 auto` SHORTHAND resets margin-left, and
+       CSS is last-wins — so the content rendered UNDER the fixed sidebar while
+       the declaration looked perfectly correct in the file.
+       ⚠ max() keeps the column CENTRED in the viewport wherever there is room
+       (at 1920 the gutter is 360 and the 190px sidebar overlays nothing), and
+       packs it against the sidebar only when there is not (at 1440 it starts at
+       190 instead of 120). */
+    .page {
+      margin-left: max(var(--sidebar-w), calc((100vw - 1200px) / 2));
+      margin-right: auto;
+      /* ⚠⚠ THE COLUMN MUST FIT WHAT IS LEFT, OR THE PAGE SCROLLS SIDEWAYS.
+         max-width:1200 does not shrink for a 190px margin, so between 900 and
+         1366 the page overflowed — by 24px at 1366 and 290px at 1100. Measured
+         across widths before shipping, not noticed afterwards. */
+      max-width: min(1200px, calc(100vw - var(--sidebar-w) - 64px));
+    }
+    @media (max-width: 900px) { .page { margin-left: auto; } }
 
     /* ⚠ STACKING CONTEXT, NOT z-index ON THE PANEL. `.fade-in` animates a
        transform with `both` fill, so EVERY .page-header and .section keeps a
@@ -4227,9 +4346,39 @@
   </div>
 </div>
 
+<!-- ⚠⚠ THE SPLIT IS DELIBERATE, AND THE REASON IS WORTH RECORDING RATHER THAN
+     JUST THE INSTRUCTION (Justin, 2026-09-01): THE SIDEBAR IS WHERE YOU GO —
+     the pages of the product. THE TOP RIGHT IS WHO YOU ARE — your account,
+     your access, your way out. Different kinds of thing, different places.
+     ⚠ NOTHING APPEARS IN BOTH. A page in two navigations is the
+     two-things-answering-one-question defect, applied to a navigation. -->
 <nav class="top-bar">
   <div class="top-bar-left">
     <span>Scout</span>
+  </div>
+  <div class="top-bar-right">
+    <!-- ⚠ Admin's visibility rule is UNTOUCHED: init() reveals it for role
+         'owner' and nothing here changes who sees it. -->
+    <a href="/admin" id="adminLink" style="display:none">Admin</a>
+    <!-- ⚠⚠ A LABEL WHERE A VALUE USED TO BE. This printed the raw signed-in
+         email — the same defect as an admin dropdown printing a manager's
+         address where a company name belongs. It NAVIGATES to the account page,
+         exactly as the email link already did; only the label changed.
+         ⚠ SIGN OUT MOVED INSIDE that page, at the bottom. The one cost: the raw
+         email was the only place on screen naming the signed-in account. It is
+         still there, under Profile — one click deeper. -->
+    <a id="signedInEmail" onclick="goAccount(); return false;" title="Account settings" style="cursor:pointer">My Account</a>
+  </div>
+</nav>
+
+<!-- ⚠ THE SIDEBAR CARRIES THE PAGES. Items, ids, handlers and the Team dropdown
+     are moved VERBATIM — a relocation, not a rewrite — so every gate (Team =
+     manager|owner, Knowledge Base, Marketing Insights) still works untouched.
+     ⚠⚠ THE SEPARATOR SPANS ARE KEPT AND HIDDEN IN CSS, NOT DELETED. init() does
+     getElementById('navTeamSep').style.display = '' with NO null guard, so
+     removing them would throw at boot. Hiding them in CSS means that write still
+     lands and still resolves to hidden. -->
+<aside class="sidebar" id="sidebar" aria-label="Pages">
     <span class="sep">·</span>
     <a class="nav-link" id="navOverview" onclick="goOwnCoaching(); return false;">Coaching Dashboard</a>
     <span class="sep">·</span>
@@ -4282,13 +4431,8 @@
          viewer will not be allowed to open. -->
     <span class="sep nav-mgr-soon" id="navMktSep" style="display:none">·</span>
     <span class="nav-link nav-soon nav-mgr-soon" id="navMkt" style="display:none" aria-disabled="true">Marketing Insights<span class="nav-soon-tag">soon</span></span>
-  </div>
-  <div class="top-bar-right">
-    <a href="/admin" id="adminLink" style="display:none">Admin</a>
-    <a id="signedInEmail" onclick="goAccount(); return false;" title="Account settings" style="cursor:pointer"></a>
-    <span class="signout" onclick="signOut()">Sign out</span>
-  </div>
-</nav>
+</aside>
+
 
 <main class="page" id="page">
   <div id="content"><div class="load-state"><div class="spinner"></div></div></div>
@@ -12935,8 +13079,13 @@
       + ' placeholder="9800" style="width:130px;">'
       + '<button class="btn-fathom-secondary" type="button" onclick="saveAccountPrice()">Save</button>'
       + '<span id="acctPriceMsg"></span></div>'
-      + '<div class="acct-hint">The full price you charge, paid in full. Scout uses it to find the moment you quote '
-      + 'the price on a call — it is not shown to anyone else.</div></div>';
+      /* ⚠ THE OLD HINT STOPPED BEING TRUE AND SAID SO CONFIDENTLY. It read
+         "Scout uses it to find the moment you quote the price on a call" —
+         accurate until the detector went transcript-only: analysis-worker calls
+         findPriceMomentByFraming(turns) and no stored price reaches it.
+         ⚠ A stale sentence about what a field DOES is worse than no sentence:
+         someone fills it in expecting an effect that will not happen. */
+      + '<div class="acct-hint">Your full price, paid in full. Not shown to anyone else.</div></div>';
   }
 
   async function saveAccountPrice() {
@@ -13076,7 +13225,25 @@
          ACCOUNT and on a shared company account that is not automatically
          theirs to read. */
       + '<div class="section fade-in"><div class="section-header"><h2>Your Reports</h2></div>'
-        + '<div id="supportMine"></div></div>';
+        + '<div id="supportMine"></div></div>'
+      /* ⚠⚠ SIGN OUT LIVES HERE NOW (Justin, 2026-09-01). It left the top bar
+         when the page tabs became a sidebar: the top right is WHO YOU ARE, and
+         signing out is the last thing that belongs to that.
+         ⚠ THE RISK JUSTIN NAMED, AND IT IS REAL: this is a long page, so sign
+         out is now a click and a scroll rather than a click. That is why it gets
+         its OWN full-width card at the very bottom with a visible border and the
+         only destructive colour on the page — it has to read as a deliberate
+         end-of-page action, not a link to hunt for.
+         ⚠ IT IS THE ONLY --bad ELEMENT HERE. Everything else on this page is
+         neutral, so the eye lands on it. If a second red control is ever added
+         to this page, this stops working and needs re-thinking.
+         ⚠ "Sign Out", not "Sign out" — it was a <span> in the nav and is a
+         BUTTON here, and every button on this site is Title Case. The guard
+         caught the inconsistency the moment the element type changed; the label
+         follows the convention rather than the old markup. */
+      + '<div class="section fade-in acct-signout-card">'
+        + '<button class="acct-signout" type="button" onclick="signOut()">Sign Out</button>'
+      + '</div>';
 
     // Arrived via /connect → bring the Connections section (Zoom Connect button)
     // into view and briefly highlight the Zoom row. Runs once, on the first
