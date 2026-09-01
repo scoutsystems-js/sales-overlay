@@ -148,7 +148,11 @@ test('the panel renders, states its SCOPE, and explains an empty state', () => {
 
   /* ⚠ EVERY OTHER PANEL ON THIS PAGE IS WINDOWED AND THIS ONE IS NOT. Two
      scopes on one screen reads as a bug unless the scope is on screen. */
-  assert.ok(/not affected by the date filter above/.test(fn), 'it must state its scope');
+  /* ⚠ THE ANCHOR MOVED, THE PROPERTY DID NOT (2026-09-01). The scope used to be
+     stated as a negation of our own control ("not affected by the date filter
+     above"); it now states the scope positively, in the reader's terms. Both say
+     which calls this counts — assert the PROPERTY, not the old sentence. */
+  assert.ok(/From every call you|all time/.test(fn), 'it must state its scope');
   assert.ok(/Nothing captured yet/.test(fn), 'the empty state must explain where moments come from');
   assert.ok(/clipLabelFor\(m\.source\)/.test(fn), 'the clip label must be provider-aware');
   // and it is actually called

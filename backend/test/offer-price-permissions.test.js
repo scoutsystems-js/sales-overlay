@@ -105,8 +105,42 @@ test('the members table shows and edits it, and names the consequence of a blank
   assert.ok(/setMemberPrice\(/.test(html), 'and be editable');
   /* ⚠ An empty price is not a cosmetic gap — it is the reason that rep is
      UNMEASURED, and unmeasured and flat look identical on a graph. */
-  assert.ok(/no time-to-price measurement at all/.test(html),
-    'the page must say what a missing price costs');
+  /* ⚠⚠ THIS GUARD CAUGHT A REAL OVER-REMOVAL, 2026-09-01. A caption sweep took
+     the whole sentence out because part of it named our roadmap; the CONSEQUENCE
+     of a blank price went with it. Anchor on the consequence alone, so the copy
+     can be rewritten again without the fact going missing a second time. */
+  assert.ok(!/until the billing block/.test(html),
+    'and must not explain our own roadmap while doing it');
+
+  /* ⚠⚠⚠ ASSERT IT IN THE BUILDER'S OUTPUT, NEVER IN THE FILE — 2026-09-01, AND
+     THIS EXACT DEFECT IS WHY. A caption edit left a stray `;` on the line above,
+     which TERMINATED the return; the two lines that follow became `+ '...'`
+     expression statements — valid JavaScript, unreachable, and never returned.
+     The file-level grep that used to live here PASSED THE WHOLE TIME, because
+     the string was still in the file. Only rendering the builder found it.
+     ⚠ "grep for the string" and "the string reaches the screen" are the same
+     check twice: both confirm it EXISTS, neither confirms it RUNS. */
+  /* ⚠ ANCHOR ON THE BOUNDARY, NOT ON `return`. A first version sliced from
+     fn.lastIndexOf('return ') — which finds the INNER return inside rows.map(),
+     not the builder's final one — so it read a region full of unrelated `;` and
+     failed on correct code. The scope was wider than the claim, again. */
+  const at = html.indexOf('function teamMembersBodyHtml');
+  const fn = html.slice(at, html.indexOf('\n  }', at));
+  assert.ok(fn.length > 1500 && fn.length < 9000, 'slice must cover the builder: ' + fn.length);
+  const tableEnd = fn.indexOf("</tbody></table></div>");
+  const capAt = fn.indexOf('no time-to-price measurement at all');
+  assert.ok(tableEnd !== -1 && capAt > tableEnd, 'the caption must follow the table in the same builder');
+  /* ⚠ AND CHECK THE TOKEN, NOT THE CHARACTER. A second version searched the whole
+     span for ';' and matched the one inside the caption's own prose ("frees a
+     seat; adding or reactivating adds one") — a semicolon in a STRING is not a
+     statement terminator. The property is narrow: the next thing after the table
+     literal must be a `+` continuation. */
+  const between = fn.slice(tableEnd, capAt)
+    .replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');   // comments are not code
+  const nextToken = between.replace(/^<\/tbody><\/table><\/div>'/, '').trim()[0];
+  assert.strictEqual(nextToken, '+',
+    'the caption must continue the return expression; a `;` here strands it as dead code — '
+    + 'it parses, it stays in the file, and it never renders (got: ' + nextToken + ')');
 });
 
 test('it calls a helper that exists — showToast does not', () => {

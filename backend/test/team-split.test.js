@@ -174,31 +174,26 @@ test('the hash assigns the view BEFORE seeding that page\'s range', () => {
    bug the split exists to remove. Proven: that mutation tripped NOTHING until
    this test ran the real function. Different pages must resolve to different
    range keys, or five pages silently share one window again. */
-/* ⚠⚠ EACH PAGE SAYS WHICH WINDOW IT SHOWS. Five pages each own a range, so a
-   manager who picks 90 days on one and moves to another finds it back on 7 —
-   correct, and inexplicable without this. The label is resolved from the SAME
-   TEAM_PAGES list the dropdown renders from, so the control and the caption can
-   never disagree about what the page is called. */
-test('⚠ the date range says WHICH PAGE it governs, from the dropdown\'s own list', () => {
-  const at = LIVE.indexOf('function teamControlsHtml');
-  const body = LIVE.slice(at, LIVE.indexOf('\n  }', at));
-  assert.ok(body.length > 300 && body.length < 2000, 'slice must cover it: ' + body.length);
-  assert.ok(/team-range-scope/.test(body), 'the controls row must name the range\'s scope');
+/* ⚠⚠ THE CAPTION WENT, THE MACHINERY STAYED — CONVERTED 2026-09-01, AND THE
+   TRADE IS RECORDED RATHER THAN LOST. This test used to require an on-screen
+   line reading "These dates apply to Coaching. Each page keeps its own." It was
+   removed in the caption pass: it explained OUR OWN STATE MODEL, which is not
+   something a reader can act on.
 
-  /* ⚠ THE DRILLDOWN CARRIES ITS OWN CONTROLS — the picker sits inside its card,
-     not in the shared row — so it needs the caption explicitly or it is the one
-     page with a per-page window that never says which page it governs. */
-  const dAt = LIVE.indexOf('function objDrillControlsHtml');
-  assert.ok(dAt !== -1, 'stale anchor — the drilldown controls are gone');
-  const drill = LIVE.slice(dAt, LIVE.indexOf('\n  }', dAt));
-  assert.ok(drill.length > 200 && drill.length < 1600, 'drill slice: ' + drill.length);
-  assert.ok(/team-range-scope/.test(drill), 'the drilldown must name its range\'s scope too');
-  assert.ok(/TEAM_PAGES\.filter/.test(drill),
-    'and from the dropdown\'s own list — never a second copy of the page names');
-  assert.ok(/TEAM_PAGES\.filter/.test(body),
-    'the label must come from the dropdown\'s own list, not a second copy of the names');
-  assert.ok(/teamPageForView\(state\.view\)/.test(body),
-    'teamPageForView takes no default — calling it bare silently yields the fallback on every page');
+   ⚠ SAYING WHAT THAT COST, PLAINLY, BECAUSE THE ORIGINAL REASONING WAS SOUND:
+   five pages each own a window, so a manager who picks 90 days on one page and
+   arrives at another finds it back on 7. That is correct behaviour and it is now
+   UNEXPLAINED. The picker sits in each page's own controls row under that page's
+   own heading, which is the argument that it needs no caption — but proximity is
+   weaker than a sentence, and the surprise happens on ARRIVAL at the second page,
+   where proximity says nothing. If this ever reads as a bug, the honest fixes are
+   a shared range or an explanation, NOT a quieter version of the old apology.
+
+   ⚠ WHAT REMAINS PINNED IS THE PART A READER CANNOT SEE AND CANNOT WORK AROUND:
+   that each page genuinely resolves to its OWN range key. teamPageForView still
+   has six call sites doing exactly that, so the executed check below is the live
+   mechanism, not a leftover from the caption. */
+test('⚠ each page resolves to its OWN range, and the drilldown rides coaching\'s', () => {
 
   /* ⚠ EXECUTED: a text check cannot see the label resolving to the wrong page.
      ⚠⚠ FROM THE RAW SOURCE, NOT `LIVE`. The comment stripper exists for TEXT

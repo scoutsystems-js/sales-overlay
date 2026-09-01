@@ -2959,9 +2959,12 @@
        a scale that grows whenever it is inconvenient is a list, not a scale.
        ⚠ SIZED AGAINST "46min", NOT "24%" — the binding case carries a SUFFIX,
        not just digits, and it was the one visibly touching the ring.
-       ⚠ Compared at 230 / 290 / 340 and chosen by LOOKING: at 340 the dial
-       becomes the subject rather than the number it contains. */
-    .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px; }
+       ⚠ 290 -> 320 (2026-09-01): 290 was sized against "46min" and the real
+       value renders "41.7min" — a decimal the formatter adds and the example
+       did not have. A bigger dial ALONE could not fix it (the ring would need
+       ~358px, past the 340 already judged too large), so the suffix takes the
+       label step as well. */
+    .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
     .avg-card { text-align: center; padding: 4px 4px 12px; border-radius: var(--radius-md); }
     /* Only the gauge with a real destination is clickable, and it says so —
        a card that looks interactive and is not is worse than a plain one. */
@@ -2969,7 +2972,7 @@
     .avg-card-link:hover { background: var(--bg-field); }
     .avg-name { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-bottom: 4px; }
     .avg-dial { position: relative; }
-    .avg-svg { width: 100%; max-width: 290px; height: auto; display: block; margin: 0 auto; }
+    .avg-svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
 
     /* ⚠ LEVELS RAISED 2026-08-18 — Justin: "not quite as sharp and bright as
        Scout green." MEASURED BEFORE CHANGING ANYTHING, and the measurement moved
@@ -3026,7 +3029,15 @@
     .avg-value-good { color: var(--good); }
     .avg-value-mid  { color: var(--mid); }
     .avg-value-bad  { color: var(--bad); }
-    .avg-value-unit { font-size: var(--fs-number); font-weight: var(--fw-normal); margin-left: 1px; }
+    /* ⚠⚠ THE SUFFIX IS THE LABEL STEP, NOT THE NUMBER STEP. Measured on the
+       REAL value — "41.7min", not the "46min" the dial was first sized against
+       — the text ran 131px against a 60px ring radius, so the leading digit and
+       the suffix BOTH overlapped the ring by 6px. A percentage is 76px and
+       never had the problem.
+       ⚠ MEASURED AS TEXT, NOT AS ITS CONTAINER: `.avg-value` is a block, so its
+       box is the card width (357px) for all three dials — which is exactly why
+       290px looked sufficient last time and was not. */
+    .avg-value-unit { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-left: 2px; }
     .avg-target-cap { font-size: var(--fs-eyebrow); font-weight: var(--fw-normal); text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; margin-top: 3px; }
     /* Raw counts under every rate — house rule. */
     .avg-counts { font-size: var(--fs-label); margin-top: 6px; }
@@ -3342,7 +3353,6 @@
        controls keep their row at every width. Dimming is a DEPTH cue, not the
        grey the no-grey rule bans — the colour is still var(--text). */
     .team-controls-row { flex-wrap: wrap; }
-    .team-range-scope { flex-basis: 100%; text-align: right; margin-top: 6px; opacity: 0.75; }
 
     /* ═══ TREATMENT C — SPACE INSTEAD OF LINES (design pass block 2, Performance only)
        Justin approved a full-page mock. The audit's finding, made concrete by
@@ -7010,9 +7020,15 @@
          the grading button already live there together; a second control here
          would be a second option list to keep in step. */
       s2 = stepHtml(false, 'Get your calls graded',
+        /* ⚠ THE NUMBERS AND THE INVITATION STAY; THE MECHANISM GOES (2026-09-01).
+           It used to explain our own capping rule — "Scout caps grading when calls
+           first arrive so a big import cannot fire hundreds of analyses at once".
+           That is why WE behave this way, not anything the reader can do. What they
+           can act on is both numbers and the button beneath. ⚠ A SECOND COPY of
+           this sentence lived on the Calls page and was removed in the same pass;
+           this one survived the first sweep because it is worded differently. */
         blGraded + ' of your ' + blTotal + ' calls are graded. The other ' + blWaiting
-          + ' are waiting — Scout caps grading when calls first arrive so a big import '
-          + 'cannot fire hundreds of analyses at once. You choose when to grade the rest.',
+          + ' are waiting — grade them whenever you\'re ready.',
         '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="goCallLibrary()">'
           + 'Grade the other ' + blWaiting + ' →</button>');
     } else if (fathomConnected) {
@@ -9157,7 +9173,7 @@
       + unconnectedBadgeHtml()
       + (teamPanelVisible('digest')
           ? '<div class="section fade-in"><div class="section-header"><h2>Daily Digest</h2>'
-            + '<div class="meta">yesterday, Eastern time — this page is not affected by a date range</div>'
+            + '<div class="meta">Yesterday\'s calls</div>'
             + '</div>' + teamDigestHtml() + '</div>'
           : '')
       + allPanelsHiddenNoteHtml();
@@ -10627,7 +10643,7 @@
     }
     return '<div class="section fade-in gauge-section">'
       + '<div class="gauge-head">' + sel
-      + '<div class="gauge-window">Last 7 days · fixed — not affected by the date filter below</div></div>'
+      + '<div class="gauge-window">Last 7 days</div></div>'
       + body + '</div>';
   }
 
@@ -10889,7 +10905,7 @@
     }
     return '<div class="section fade-in avg-section">'
       + '<div class="avg-head"><div class="avg-title">Team Averages</div>'
-      + '<div class="avg-window">Last 7 days · fixed — not affected by the date filter below</div></div>'
+      + '<div class="avg-window">Last 7 days</div></div>'
       + body + '</div>';
   }
 
@@ -11271,7 +11287,6 @@
            see what they had done. On People — which owns no panels at all — it
            edited three other pages exclusively. */
         + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + '</div>'
-      + '<div class="meta team-range-scope">These dates apply to ' + escapeHtml(here) + '. Each page keeps its own.</div>'
     + '</div>';
   }
 
@@ -11308,7 +11323,6 @@
     return '<div class="objdrill-controls">'
       + '<span id="repFilterHost">' + repFilterHtml() + '</span>'
       + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
-      + '<div class="meta team-range-scope">These dates apply to ' + escapeHtml(here) + '. Each page keeps its own.</div>'
       + '</div>';
   }
 
@@ -11703,8 +11717,17 @@
     return head + '<div style="overflow-x:auto;"><table class="members-table"><thead><tr>'
       + '<th>Rep</th><th>Role</th><th>Status</th><th>Plan</th><th>Offer price</th><th>Manager</th><th></th></tr></thead><tbody>'
       + rows + '</tbody></table></div>'
-      + '<div class="meta" style="margin-top:10px;">Seat = an active user. Deactivating frees a seat; adding or reactivating adds one. Plan is per-user until the billing block adds an account entity.'
-      + ' Offer price is the pay-in-full figure Scout listens for — a rep without one gets no time-to-price measurement at all.</div>';
+      /* ⚠⚠ THIS CAPTION LOST ONE CLAUSE AND KEEPS TWO, AND THE SPLIT IS THE POINT.
+         GONE: "Plan is per-user until the billing block adds an account entity" —
+         our own ROADMAP on a customer's screen, and nothing they can act on.
+         KEPT: the seat rule, and the consequence of a blank price. A rep with no
+         price is UNMEASURED on the time-to-price graph, and unmeasured and flat
+         look identical there — so the blank field has a cost, and the manager is
+         the only person who can fix it. Reworded out of mechanism voice ("the
+         figure Scout listens for"); the FACT is what the guard protects. */
+      + '<div class="meta" style="margin-top:10px;">Seat = an active user. Deactivating frees a seat; adding or reactivating adds one. '
+      + 'A rep with no offer price gets no time-to-price measurement at all.</div>';
+
   }
   /**
    * THE OFFER PRICE, SET BY THE MANAGER (Justin's ruling 2026-08-26).
@@ -12776,8 +12799,6 @@
       + '<div class="conn-right">'
         + '<span class="conn-state">' + work + ' call' + (work === 1 ? '' : 's') + ' not graded yet</span>'
         + '<span class="grade-backlog-host">' + gradeBacklogControlHtml() + '</span>'
-        + '<span class="meta">Grading is capped when calls first arrive so a large import '
-          + 'cannot fire hundreds of analyses at once. You choose when to grade the rest.</span>'
       + '</div></div>';
   }
 
@@ -13306,7 +13327,7 @@
 
     content.innerHTML = '<div class="section fade-in">'
       + '<div class="section-header"><h2>EOD Report</h2>'
-      + '<div class="meta">your calls for the day — edit inline, then copy for Slack</div></div>'
+      + '<div class="meta">Your calls for the day</div></div>'
       // (u2) On the page as well as in the paste, from the one helper.
       + (daySummary ? '<div class="eod-summary">' + escapeHtml(daySummary) + '</div>' : '')
       // ⚠ ABOVE the toolbar and the list: a caveat under the calls is a caveat
@@ -13468,7 +13489,7 @@
       + '<div class="kbc-num">' + escapeHtml(c.headline) + '</div>'
       + '<div class="kbc-head">' + escapeHtml(c.label) + '</div>'
       + '<div class="kbc-sub">' + escapeHtml(c.detail) + '</div>'
-      + '<div class="kbc-note">Counts moments Scout kept from calls that CLOSED \u2014 it does not collect from calls still open.</div></div>';
+      + '<div class="kbc-note">From calls you closed</div></div>';
   }
   async function loadKbCounter() {
     if (state.kbCounterLoading) return;
@@ -13849,8 +13870,7 @@
     var lower = String(label || '').toLowerCase();
     if (!lib.length) {
       return '<div class="sec-group"><h2>Your best ' + escapeHtml(lower) + ' moments</h2>'
-        + '<div class="meta">Nothing captured yet. Scout saves your strongest lines from calls you close, '
-        + 'so these build up as you close more.</div></div>';
+        + '<div class="meta">Nothing captured yet.</div></div>';
     }
     var rows = lib.map(function (m) {
       var when = m.call_date ? formatDate(m.call_date) : '';
@@ -13874,7 +13894,7 @@
       + '</div>';
     }).join('');
     return '<div class="sec-group"><h2>Your best ' + escapeHtml(lower) + ' moments</h2>'
-      + '<div class="meta">From calls you closed, all time — not affected by the date filter above.</div>'
+      + '<div class="meta">From every call you\'ve closed</div>'
       + rows
     + '</div>';
   }
