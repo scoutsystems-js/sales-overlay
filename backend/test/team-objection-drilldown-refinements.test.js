@@ -17,6 +17,14 @@ const fs = require('fs');
 const path = require('path');
 
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+
+/* ⚠ LINE COMMENTS FIRST, THEN BLOCK. A block-comment opener inside a `//` line
+   is a FALSE opener that pairs with the next real closer and swallows whatever
+   lies between — this file's own prose routinely contains both. Stripping in
+   the other order has produced a confident wrong answer here three times. */
+function stripComments(src) {
+  return src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
 /* ⚠ LINE comments before BLOCK comments. This file archives removed code in
    place and explains its own rules in prose, so a raw match reports the
    explanation as the code — and a `/*` inside a `//` line is a false opener
@@ -126,7 +134,11 @@ test('⚠⚠ the drilldown renders its controls IN the card, and drops the team-
     'the drilldown must NOT render its own picker — the company card above it does');
   assert.ok(ctrl.indexOf("datePickerHtml('team')") !== -1, 'the SAME date picker id as the team page');
   assert.ok(ctrl.indexOf('ensureTeamPicker()') !== -1, 'registered, or the calendar has no setter');
-  ['manageMembersBtnHtml', 'customizeViewHtml'].forEach((b) => {
+  // ⚠ manageMembersBtnHtml DROPPED from this list 2026-09-01 — it is gone from
+  //   the PRODUCT, so "not here" is now trivially true and says nothing. The
+  //   app-wide absence is asserted in the test below instead, which is the
+  //   check that can actually fail.
+  ['customizeViewHtml'].forEach((b) => {
     assert.strictEqual(ctrl.indexOf(b), -1, b + ' belongs on the team page, not here');
   });
 });
@@ -138,9 +150,33 @@ test('⚠ the buttons still exist on the MAIN team controls row', () => {
   //   gone from the product (Justin), not merely from this row. The property
   //   this test protects — removing a button from ONE page must not remove it
   //   from the app — is unchanged for the two that remain.
-  ['manageMembersBtnHtml()', 'summaryBtnHtml()'].forEach((b) => {
+  // ⚠ manageMembersBtnHtml() REMOVED from this list 2026-09-01, for the same
+  //   reason customizeViewHtml was: the control is gone from the PRODUCT
+  //   (Justin — the My Team page does this now), not merely from this row.
+  //   ⚠ NOTHING WAS LOST — checked before deleting: its only action was
+  //   setView('team-members'), the identical destination the dropdown reaches.
+  ['summaryBtnHtml()'].forEach((b) => {
     assert.ok(main.indexOf(b) !== -1, b + ' must remain on the team page');
   });
+});
+
+test('⚠ the Manage Members BUTTON is gone from the whole page, and My Team is its one name', () => {
+  const live = stripComments(HTML);
+  assert.strictEqual(live.indexOf('manageMembersBtnHtml'), -1,
+    'the builder is archived — a live reference means it came back');
+  assert.strictEqual(live.indexOf('openTeamMembers'), -1,
+    'and so is its handler');
+  assert.strictEqual(live.indexOf('Manage Members'), -1,
+    'ONE NAME: no surface may still say "Manage Members"');
+  // ...and the page is still reachable, by its one name, in all four places
+  assert.ok(live.indexOf("{ view: 'team-members',     label: 'My Team' }") !== -1, 'dropdown');
+  assert.ok(live.indexOf("'team-members': 'My Team'") !== -1, 'page-title map');
+  assert.ok(live.indexOf('<h2>My Team</h2>') !== -1, 'page heading');
+  assert.ok(live.indexOf("'my-team': 'team-members'") !== -1, 'hash reads the new route');
+  assert.ok(live.indexOf("'team-members': 'team-members'") !== -1,
+    '⚠ AND THE OLD ROUTE STILL READS IN — a bookmark is a link too');
+  assert.ok(live.indexOf("return 'my-team' + teamRangeHashSuffix()") !== -1,
+    'the WRITE side, or the URL stops naming the page');
 });
 
 /* ── 4 · the picker is REUSED, not reimplemented ───────────────────────────── */

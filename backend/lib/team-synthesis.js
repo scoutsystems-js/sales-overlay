@@ -23,7 +23,7 @@ const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
-const { displayCloserResponse } = require('./closer-side');
+const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const MAX_CANDIDATES = 20;
@@ -55,6 +55,33 @@ function extractJson(text) {
   return null;
 }
 function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().slice(0, cap || 500) : null; }
+
+/* ⚠⚠ THE CAP MUST BOUND A RUNAWAY, NOT NORMAL OUTPUT (2026-09-01).
+   Measured on a live board: FIVE OF SIX `data` fields landed EXACTLY on the old
+   200-char cap and one `claim` exactly on 400 — so every one of them was cut by
+   US, mid-phrase, while the model was fine throughout. Same defect as the digest
+   coaching.
+   ⚠ THE DIGEST FIX DERIVED ITS CAP FROM THE PROMPT'S OWN LENGTH RULE. This
+   prompt had NO length rule, so there was nothing to derive from — the rule is
+   added there (see buildPrompt) and these caps sit ABOVE it, which is the whole
+   point: a cap you can reach in normal use is a truncator, not a guard.
+   ⚠ AND IT CUTS AT A SENTENCE BOUNDARY, so if it ever does fire the text still
+   ends as a complete thought rather than on a conjunction. */
+/* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
+   insight changes — the generated text lives inside the cached payload, so a
+   key that does not move means the change is invisible indefinitely. */
+const RECS_LANE_VERSION = 'v2-attributed-2026-09-01';
+const CLAIM_CAP = 520;   // the prompt asks for <= 45 words (~290 chars)
+const DATA_CAP  = 520;
+function capAtSentence(x, cap) {
+  const v = (typeof x === 'string' && x.trim()) ? x.trim() : null;
+  if (!v || v.length <= cap) return v;
+  const cut = v.slice(0, cap);
+  const m = cut.match(/^[\s\S]*[.!?](?=\s|$)/);        // greedy -> the LAST sentence end
+  if (m && m[0].length >= Math.floor(cap * 0.5)) return m[0].trim();
+  const sp = cut.lastIndexOf(' ');                       // no usable sentence end: word boundary
+  return (sp > 0 ? cut.slice(0, sp) : cut).trim() + '\u2026';
+}
 // ⚠ delegates to lib/clip-link.js — the ONE place a deep link is built.
 // Building it here would mean labelling it here, and this module does not
 // know the provider. Pinned by test/clip-link-single-source.test.js.
@@ -180,7 +207,20 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
        version bump is how you make a change take effect; spending on one for a
        change that does not help would be paying to look busy.
        ⚠ New syntheses pick the rule up naturally. Put the version back the day a
-       fix demonstrably moves the number. */).digest('hex');
+       fix demonstrably moves the number. */
+    /* ⚠⚠ RECS_LANE_VERSION *IS* IN THE KEY, AND THE CONTRAST WITH THE RULE
+       ABOVE IS THE WHOLE REASONING — the two are not inconsistent.
+       The evidence rule was measured NOT to change the output, so paying to
+       regenerate would have bought nothing. Option A changes THREE things that
+       live INSIDE the cached payload:
+         · the prompt gained a LENGTH RULE, so the text itself differs
+         · the caps moved, so the stored text is no longer cut mid-phrase
+         · the payload gained `spoke`, and WITHOUT IT EVERY INSIGHT FALLS BACK
+           TO THE UNATTRIBUTED FORM FOREVER
+       ⚠ So with no bump this change ships NOTHING on any cached window — the
+       exact failure already recorded for NEEDS_WORK_LANE_VERSION. A prompt edit
+       and its lane version bump are ONE atomic change. */
+    + '||recs:' + RECS_LANE_VERSION).digest('hex');
   var cached = await cacheGet(admin, keyId, 'team', from, to, hash);
   if (cached) return Object.assign({ available: true, cached: true }, cached);
 
@@ -206,12 +246,21 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   // contradict the rate rendered next to it.
   objRows.forEach(function (r) { var bk = obj[r.objection_category]; if (bk) { bk.total++; if (isHandled(r, outcomeByCall[r.fathom_call_id])) bk.handled++; } });
 
-  var hlRows = await w.inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, closer_response, type');
+  var hlRows = await w.inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, closer_response, closer_response_verified, type');
   function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
   var candidates = hlRows.map(function (r) {
     var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
+    var reply = capAtSentence(provenCloserResponse(r), 200);   // null unless PROVEN to be the closer
     return { cls: c, type: r.type, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
-      quote: str(displayCloserResponse(r.closer_response), 200) || str(r.quote, 200) || '',   // sentinel-gated
+      /* ⚠⚠ WHO SPOKE IS RECORDED HERE, BECAUSE THIS `||` IS WHERE IT IS DECIDED
+         and nothing downstream can recover it. Without it `rep` means "whose
+         CALL", not "who SPOKE" — and labelling a prospect's line with the rep's
+         name is the misattribution this project has spent whole blocks on.
+         ⚠ THE VERIFIED GATE, NOT THE SENTINEL ONE. This lane was the SIXTH with
+         that defect and the only one that BOTH feeds a model prompt AND renders
+         to a manager. An unproven reply is now neither quoted nor attributed. */
+      quote: reply || str(r.quote, 200) || '',
+      spoke: reply ? 'closer' : (str(r.quote, 200) ? 'prospect' : null),
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
       source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
       call_id: r.fathom_call_id,
@@ -238,6 +287,10 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   ]).concat(candidates.map(function (c) { return '  [' + c.id + '] (' + c.cls.toUpperCase() + ', rep ' + c.rep + ') ' + c.type + ': "' + c.quote + '"'; })).concat([
     '',
     'Produce: WHATS WORKING (2-3 team strengths, each grounded in an evidence_id + a number), WHAT TO IMPROVE (2-3 team gaps: the team-wide weakest section, the most-lost objection category, and the synthesized one-thing theme; cite the rep(s) it most applies to and a representative evidence_id).',
+    /* ⚠ THE LENGTH RULE THE CAPS SIT ABOVE. Without one there was nothing to
+       derive a cap from, so the cap was a number nobody could defend — and it
+       cut five of six data fields off mid-phrase. */
+    'LENGTH: keep each "claim" to ONE sentence of at most 45 words, and each "data" to at most two sentences totalling 45 words. Finish your sentences — never trail off mid-clause.',
     'Respond with ONLY this JSON — no markdown: {"working":[{"claim":"...","data":"...","evidence_id":"m1"}],"improve":[{"claim":"...","data":"...","evidence_id":"m2"}]}',
   ]);
   if (selling.contextText && selling.contextText.trim()) {
@@ -255,7 +308,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   function resolve(arr) {
     return arr.slice(0, 3).map(function (it) {
       var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
-      return { claim: str(it && it.claim, 400), data: str(it && it.data, 200), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null };
+      return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null };
     }).filter(function (it) { return it.claim; });
   }
   var synthesis = { working: resolve(parsed.working), improve: resolve(parsed.improve), generated_at: new Date().toISOString() };

@@ -2971,6 +2971,18 @@
     .team-insight-claim { font-size: 14px; color: var(--text); line-height: 1.55; }
     .team-insight-data { font-size: 12.5px; color: var(--text); margin-top: 4px; }
     .team-insight-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    /* ⚠ OPTION A — the attribution is BOUND to the quote it names, above it.
+       The pair sits in one container so they cannot drift apart in a reflow. */
+    .team-insight-ev { margin-top: 8px; }
+    .team-insight-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: var(--fs-eyebrow); color: var(--text); opacity: 0.7; margin-bottom: 4px; }
+    /* ⚠ opacity, NOT a grey token — the no-grey rule bans unreadable grey BODY
+       text; a depth cue on an attribution line is what it explicitly allows. */
+    .team-insight-ts { font-variant-numeric: tabular-nums; opacity: 0.85; }
+    /* B — the fallback for rows with no recorded speaker: the quote runs inline
+       as evidence inside the claim rather than standing alone as a pull-quote
+       nobody can attribute. */
+    .team-insight-inline-q { font-style: italic; }
     .team-rep-tag { font-size: 11px; font-weight: 600; color: var(--accent); background: rgba(var(--accent-rgb), 0.10); padding: 2px 8px; border-radius: 10px; text-transform: capitalize; }
     /* B-1: clickable team glance box + Coach-Summary-styled rep rows + glance-box detail */
     .team-glance { cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
@@ -6147,7 +6159,7 @@
     var names = {
       overview: 'Coaching Dashboard', 'call-library': 'Calls', 'call-review': 'Call Review',
       team: 'Team', 'team-objections': 'Team Objections', 'team-needs-work': 'Objection Focus',
-      'team-members': 'Manage Members', eod: 'EOD Report', kb: 'Knowledge Base',
+      'team-members': 'My Team', eod: 'EOD Report', kb: 'Knowledge Base',
       account: 'Account', 'objections-intel': 'Objections', performance: 'Performance',
       section: 'Section Detail', prospects: 'Prospects', 'needs-work': 'What Needs Work',
     };
@@ -11448,7 +11460,7 @@
     { view: 'team-performance', label: 'Performance' },
     { view: 'team-coaching',    label: 'Coaching' },
     { view: 'team-objections',  label: 'Objections' },
-    { view: 'team-members',     label: 'People' },
+    { view: 'team-members',     label: 'My Team' },
   ];
   /* ⚠ The expanded recommendations page is a CHILD of Coaching, not a sixth
      page — the dropdown must still show where you are when you drill into it. */
@@ -11669,7 +11681,7 @@
            from Performance hid it on Daily Digest, where the manager could not
            see what they had done. On People — which owns no panels at all — it
            edited three other pages exclusively. */
-        + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + '</div>'
+        + objectionsDrillBtnHtml() + summaryBtnHtml() + '</div>'
     + '</div>';
   }
 
@@ -11927,11 +11939,16 @@
     + '</div>';
   }
 
-  // "Manage members" opens the hidden #team-members page (not on the page itself).
-  function manageMembersBtnHtml() {
-    return state.view !== 'team-members' ? '<button class="btn-fathom-secondary" type="button" onclick="openTeamMembers()">Manage Members</button>' : '';
-  }
-  function openTeamMembers() { setView('team-members'); }
+  /* ⚠ THE "MANAGE MEMBERS" BUTTON IS REMOVED (Justin, 2026-09-01): the My Team
+     page in the dropdown does this now.
+     ⚠ NOTHING WAS LOST, and that was CHECKED BEFORE DELETING: the button's only
+     action was setView('team-members') — the IDENTICAL destination the dropdown
+     reaches. A second route to the same page, not a route to anything else.
+     Archived rather than deleted so the check is on record:
+       function manageMembersBtnHtml() {
+         return state.view !== 'team-members' ? '<button ... onclick="openTeamMembers()">Manage Members</button>' : '';
+       }
+       function openTeamMembers() { setView('team-members'); }  */
 
   // ── C-1: "Generate summary" — page-agnostic executive summary ──────────────
   // One button across the manager-view pages. It summarizes the page's ALREADY-
@@ -12041,7 +12058,7 @@
     if (state.teamContext === null) loadTeam('context');
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     content.innerHTML = teamHeaderHtml() + teamControlsHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Manage Members</h2>'
+      + '<div class="section fade-in"><div class="section-header"><div><h2>My Team</h2>'
         + '<div class="meta">add, deactivate, move, reset password, or update a rep\'s email</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamMembersBodyHtml() + '</div>';
@@ -12600,14 +12617,52 @@
     return head + '<div class="team-detail-list">' + rows + '</div>';
   }
 
+  /* ⚠ mm:ss FROM THE CLIP URL, not from a stored field. Old cached rows carry a
+     clip_url but no timestamp, so parsing it works for BOTH — a stored field
+     would have left every pre-existing insight without a time. */
+  function tsFromClipUrl(u) {
+    var m = /[?&]t=(\d+)/.exec(u || ''); if (!m) return '';
+    var t = parseInt(m[1], 10); if (!isFinite(t) || t < 0) return '';
+    return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+  }
   function teamInsightHtml(it, kind) {
     var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(it.source)) + '</a>' : '';
-    var repTag = it.rep ? '<span class="team-rep-tag">' + escapeHtml(displayNameFromEmail(String(it.rep), String(it.rep))) + '</span>' : '';
+    var repName = it.rep ? displayNameFromEmail(String(it.rep), String(it.rep)) : '';
+    var repTag = repName ? '<span class="team-rep-tag">' + escapeHtml(repName) + '</span>' : '';
+    var ts = tsFromClipUrl(it.clip_url);
+    /* ⚠⚠ OPTION A — CLAIM -> EVIDENCE -> QUOTE, with the attribution ABOVE the
+       quote and BOUND to it. The same three beats the coaching uses. Previously
+       the rep and the clip sat in a FOOTER BELOW the quote, so the reader met
+       the quote before anything saying whose it was and it read as a fragment.
+       ⚠⚠ ONLY WHEN WE KNOW WHO SPOKE. `rep` on its own means "whose CALL", not
+       "who SPOKE" — the quote is either the closer's proven reply or the
+       prospect's line. Labelling every quote with the rep's name would file
+       prospect words as the rep's own, which is the misattribution this
+       codebase has spent whole blocks preventing.
+       ⚠ WITHOUT `spoke` (every row cached before this shipped) WE FALL BACK TO
+       B: the quote runs INLINE, unlabelled, and the footer keeps the rep tag.
+       NO WRONG LABEL IS EVER SHOWN — do not weaken that. */
+    var attributed = !!(it.quote && it.spoke && repName);
+    var quoteHtml = '';
+    if (attributed) {
+      var who = it.spoke === 'closer'
+        ? escapeHtml(repName)
+        : 'The prospect, on ' + escapeHtml(repName) + '\u2019s call';
+      quoteHtml = '<div class="team-insight-ev">'
+        + '<div class="team-insight-who">' + who
+          + (ts ? '<span class="team-insight-ts">' + escapeHtml(ts) + '</span>' : '')
+          + clipBtn
+        + '</div>'
+        + '<div class="review-why-quote">\u201C' + escapeHtml(it.quote) + '\u201D</div>'
+      + '</div>';
+    } else if (it.quote) {
+      quoteHtml = '<div class="team-insight-data team-insight-inline-q">\u201C' + escapeHtml(it.quote) + '\u201D</div>';
+    }
     return '<div class="team-insight ' + kind + '">'
       + '<div class="team-insight-claim">' + escapeHtml(it.claim || '') + '</div>'
       + (it.data ? '<div class="team-insight-data">' + escapeHtml(it.data) + '</div>' : '')
-      + (it.quote ? '<div class="review-why-quote">“' + escapeHtml(it.quote) + '”</div>' : '')
-      + '<div class="team-insight-foot">' + repTag + clipBtn + '</div>'
+      + quoteHtml
+      + (attributed ? '' : '<div class="team-insight-foot">' + repTag + clipBtn + '</div>')
     + '</div>';
   }
   function teamRecsHtml() {
@@ -12820,7 +12875,7 @@
     if (state.view === 'team-expanded')    return 'team-recs' + teamRangeHashSuffix();
     if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
     if (state.view === 'team-objections')  return 'team-objections' + teamRangeHashSuffix();
-    if (state.view === 'team-members')     return 'team-members' + teamRangeHashSuffix();
+    if (state.view === 'team-members')     return 'my-team' + teamRangeHashSuffix();
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     // Overview has no path of its own, but still carries its range so a
     // refresh or a shared link lands on the same window.
@@ -12853,7 +12908,12 @@
        would leave a refresh or a pasted URL still opening the archived page.
        Two entry points, both normalised. */
     var TEAM_HASH = { 'team-digest': 'team', 'team': 'team', 'team-recs': 'team-expanded',
-                      'team-needs-work': 'team-objections', 'team-members': 'team-members',
+                      'team-needs-work': 'team-objections',
+                      /* ⚠ ONE NAME EVERYWHERE, INCLUDING THE URL. The page is
+                         "My Team" in the dropdown and in its heading, so the hash
+                         says so too. `#team-members` STILL ROUTES IN because a
+                         bookmark is a link — it normalises on the next nav. */
+                      'my-team': 'team-members', 'team-members': 'team-members',
                       'team-objections': 'team-objections',
                       // the split — every page must be reachable by refresh and
                       // by a pasted URL, not only by clicking the dropdown
