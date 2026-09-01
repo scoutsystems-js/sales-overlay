@@ -526,7 +526,11 @@ test('EVERY team-family hash carries the range, not just #team', () => {
   // correctly — this is the other reader of the same carrier.
   const at = HTML.indexOf('function viewToHashPath');
   const fn = HTML.slice(at, HTML.indexOf('function syncHashFromState', at));
-  assert.ok(fn.length > 400 && fn.length < 3000, 'slice must cover the function: ' + fn.length);
+  /* ⚠ 3000 -> 3600 on 2026-09-01: `viewToHashPath` gained a path for the
+     dashboard view. The bound exists to catch a BACKWARDS or truncated slice,
+     not to pin the function's size — but it must stay a real bound, so it moves
+     with the function rather than being removed. */
+  assert.ok(fn.length > 400 && fn.length < 3600, 'slice must cover the function: ' + fn.length);
 
   /* ⚠ `team-recs` came out of the WRITE list 2026-09-01: it was the hash of the
      team-expanded view, RETIRED with Call Highlights of the Week, so nothing

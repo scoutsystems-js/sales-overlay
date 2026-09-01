@@ -3833,6 +3833,45 @@
        grey the no-grey rule bans — the colour is still var(--text). */
     .team-controls-row { flex-wrap: wrap; }
 
+    /* ═══ THE WIDGET DASHBOARD (block 2 — render path only) ═══════════════
+       ⚠ FOUR COLUMNS, AND A CARD'S `w` IS A SPAN. A card STRETCHES; it never
+       changes kind, so the grid only ever changes how much room a card has.
+       ⚠ NO CARD BOXES — the design pass took the boxes off every other surface
+       and a new page must not reintroduce them. Space does the grouping. */
+    .dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px 32px; }
+    .dash-card { min-width: 0; }
+    .dash-card-title {
+      font-size: var(--fs-label); text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text); opacity: 0.75; margin-bottom: 12px;
+    }
+    /* ⚠ A WITHHELD VALUE IS NOT A ZERO. It reads as an absence with its reason,
+       never as a figure — unmeasured and flat look identical otherwise. */
+    .dash-card-empty { font-size: var(--fs-body); color: var(--text); opacity: 0.75; padding: 10px 0; }
+    .dash-card-empty span { display: block; font-size: var(--fs-secondary); opacity: 0.8; margin-top: 4px; }
+    .dash-card-note { font-size: var(--fs-secondary); color: var(--text); opacity: 0.7; margin-top: 10px; }
+    .dash-list { display: flex; flex-direction: column; }
+    .dash-list-row {
+      display: flex; align-items: baseline; gap: 10px; padding: 8px 0;
+      border-top: 1px solid var(--border); font-size: var(--fs-body);
+    }
+    .dash-list-row:first-child { border-top: 0; }
+    .dash-list-row span { flex: 1; min-width: 0; }
+    .dash-list-row b { font-weight: var(--fw-emphasis); }
+    .dash-list-row i { font-style: normal; font-size: var(--fs-secondary); opacity: 0.7; }
+    /* ⚠ The "other" bucket is a row like any other and carries its own count,
+       so a reader can still add the breakdown up. */
+    .dash-list-other span { opacity: 0.75; }
+    /* ⚠ THE DROPPED-CARD NOTICE. Said ONCE, at the top — a board that quietly
+       shrinks is indistinguishable from a manager mis-remembering. Not an error
+       colour: nothing has failed and there is nothing for them to fix. */
+    .dash-dropped {
+      font-size: var(--fs-secondary); color: var(--text); opacity: 0.8;
+      padding: 0 0 20px; margin-bottom: 4px;
+    }
+    .dash-gauge { margin: 0; }
+    @media (max-width: 1100px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px)  { .dash-grid { grid-template-columns: 1fr; } }
+
     /* ═══ TREATMENT C — SPACE INSTEAD OF LINES (design pass block 2, Performance only)
        Justin approved a full-page mock. The audit's finding, made concrete by
        MEASURING the live page: 52 drawn boxes in 15 kinds, nested THREE deep —
@@ -5052,6 +5091,7 @@
     teamWaitLong:   {},
     teamRecs:       null,   teamRecsLoading: false,
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
+    teamDashboard: null,    teamDashboardLoading: false,
     teamDigest:     null,   teamDigestLoading: false,   teamDigestDate: null,
     teamDetailMetric: null, // glance-box detail drill: null | 'close' | 'objection' (cash removed 2026-08-25)
     // ⚠ TEAM OWNS ITS OWN RANGE (stage 2). state.dateRange stays COACHING's until
@@ -7369,6 +7409,7 @@
        and TEAM_HASH, so nothing can reach the archived renderer. */
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
+    else if (state.view === 'team-dashboard') renderTeamDashboard();
     else if (state.view === 'kb') renderKbView();
     else if (state.view === 'prospects') renderProspectsView();
     else if (state.view === 'section') renderSectionView();
@@ -8379,6 +8420,15 @@
      means declaring what invalidates it, once, here. */
   var TEAM_LANE_SCOPE = {
     teamOverview: 'both', teamTrends: 'both', teamRecs: 'both',
+    /* ⚠⚠ 'both', NOT 'team' — I set this to 'team' first and the guard caught it
+       on the first run, correctly. The layout is keyed on the VIEWER, so a range
+       change genuinely cannot alter it and a 'team' scope looked harmless. But
+       `teamAverages` is the ONE declared exemption and it earns it by PROMISING
+       ON SCREEN that the date filter does not affect it. Nothing here makes that
+       promise, so a second exemption would be exactly the incidental kind the
+       guard exists to refuse — and the cost of being wrong is a cheap refetch of
+       a ~350-byte payload against a stale board under a new window. */
+    teamDashboard: 'both',
     teamDigest: 'both', teamNeedsWork: 'both', teamRepSeries: 'both', teamWhy: 'both',
     teamObjections: 'both', teamObjSummary: 'both',
     // ⚠ TEAM-ONLY: a fixed 7-day window that must survive a range change.
@@ -8461,6 +8511,7 @@
        and TEAM_HASH, so nothing can reach the archived renderer. */
     else if (state.view === 'team-objections') renderTeamObjectionsView();
     else if (state.view === 'team-members') renderTeamMembersView();
+    else if (state.view === 'team-dashboard') renderTeamDashboard();
     /* ⚠⚠ EVERY PAGE IS NAMED EXPLICITLY ABOVE, INCLUDING THE DEFAULT ONE. This
        used to reach the digest through the catch-all, which made the trap
        INVISIBLE here: a page added to render() and forgotten in this router
@@ -8548,6 +8599,10 @@
       recs:     { flag: 'teamRecsLoading',       set: 'teamRecs',       url: '/team/recommendations?' + teamQP() },
       needsWork:{ flag: 'teamNeedsWorkLoading',  set: 'teamNeedsWork',  url: '/team/needs-work?' + teamQP() },
       /* highlights — RETIRED 2026-09-01, see the archived renderer. */
+      /* ⚠ The dashboard lane returns the LAYOUT ONLY — every card reads a lane
+         already loaded above, so a board and the page beside it cannot disagree
+         about the same metric. */
+      dashboard:{flag: 'teamDashboardLoading', set: 'teamDashboard', url: '/team/dashboard?' + teamQP() },
       digest:   { flag: 'teamDigestLoading',     set: 'teamDigest',     url: '/team/digest?' + teamQP(state.teamDigestDate ? 'date=' + state.teamDigestDate : '') },
       // 10b: per-rep weekly series for the two line graphs. Deterministic and
       // model-free, so it is cheap to refetch when the selector changes.
@@ -11712,6 +11767,212 @@
     state.teamObjSummary = null;
     setView('team-objections');
   }
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE WIDGET DASHBOARD — RENDER PATH ONLY (block 2, 2026-09-01).
+     No editor, no drag, no resize, no picker, no pinning, no dropdown entry.
+
+     ⚠⚠ EVERY CARD READS A LANE THE PERFORMANCE PAGE ALREADY LOADS. The layout
+     route returns the LAYOUT and never the numbers, so a board and the page
+     beside it cannot disagree about the same metric — a second source for a
+     number that already exists is how one screen comes to contradict another,
+     which this product has had to fix twice.
+
+     ⚠⚠ A CARD STRETCHES, IT NEVER CHANGES KIND (Justin's ruling). A card that
+     silently became a different chart when dragged would be a page that changes
+     its own meaning — and it collides with the honesty rule, because a metric
+     with no target would have to REFUSE to become a gauge, which is worse than
+     never transforming. Larger sizes add DETAIL, never a different kind.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  var DASH_CANVAS = { objection_handle_rate: 'handle', closing_rate: 'close', time_to_price: 'price' };
+
+  /* ⚠⚠ UNMEASURED AND FLAT LOOK IDENTICAL ON A CHART, AND A ZERO IS A CLAIM.
+     Time-to-price is only computed for reps who saved an offer price, so a rep
+     with none is UNMEASURED rather than fast — and a line at zero would say
+     they quote instantly. Every card routes a missing value through here rather
+     than defaulting, and the reason is shown, not just the absence. */
+  function dashNoValueHtml(reason) {
+    return '<div class="dash-card-empty">Not enough to measure'
+      + (reason ? '<span>' + escapeHtml(reason) + '</span>' : '') + '</div>';
+  }
+
+  function dashNumberHtml(card) {
+    var t = (state.teamOverview && state.teamOverview.totals) || null;
+    if (!t) return dashNoValueHtml('the team overview has not loaded');
+    var v = null, sub = '';
+    if (card.metric === 'avg_score')      { v = t.avg_score; sub = t.calls_analyzed + ' calls'; }
+    else if (card.metric === 'calls_analyzed') { v = t.calls_analyzed; sub = t.reps + ' reps'; }
+    else if (card.metric === 'closing_rate')   { v = t.prospect_close_rate == null ? null : t.prospect_close_rate + '%';
+                                                 sub = t.prospect_close_wins + ' of ' + t.prospect_close_total + ' prospects'; }
+    else if (card.metric === 'objection_handle_rate') { v = t.obj_handle_rate == null ? null : t.obj_handle_rate + '%';
+                                                 sub = t.objections_handled + ' of ' + t.objections_total + ' objections'; }
+    else if (card.metric === 'prospects') { v = t.prospect_close_total; sub = 'in range'; }
+    if (v === null || v === undefined) return dashNoValueHtml('no data in this range');
+    /* ⚠ THE SAME BUILDER AS EVERY OTHER LOUD NUMBER, so a figure cannot be
+       styled one way here and another way on the page it sits beside. */
+    return leadNumberHtml(v, card.label, sub);
+  }
+
+  /* ⚠ THE GAUGE REUSES avgCardHtml — the SAME builder the Team Averages panel
+     uses. It already withholds rather than zeroing ("Not enough to measure"),
+     it already takes its caption from the server so a CEILING metric reads
+     "Max 60 min" rather than "Target 60 min", and rebuilding it here is how the
+     inverted-direction defect would come back. */
+  function dashGaugeHtml(card) {
+    var d = state.teamAverages;
+    if (d === null) return '<div class="skeleton" style="height:150px;"></div>';
+    if (d && d._error) return '<div class="error">Could not load team averages.</div>';
+    var key = ({ closing_rate: 'closing', objection_handle_rate: 'objections', avg_call_time: 'calltime' })[card.metric];
+    var m = key && d.metrics ? d.metrics[key] : null;
+    if (!m) return dashNoValueHtml('this metric has no 7-day figure yet');
+    return '<div class="avg-grid dash-gauge">' + avgCardHtml(m) + '</div>';
+  }
+
+  function dashTrendHtml(card) {
+    var pick = DASH_CANVAS[card.metric];
+    if (!pick) return dashNoValueHtml('this metric has no history');
+    return repGraphBodyHtml('dash_' + card.metric);
+  }
+
+  /* ⚠⚠ A TOP-5 BY-REP VIEW MUST SAY IT IS A TOP 5, or it reads as the whole
+     team — the same rule as the excluded-reps note on the graphs. The count is
+     stated whenever anyone is left out, never silently truncated. */
+  function dashByRepHtml(card) {
+    var reps = (state.teamOverview && state.teamOverview.per_rep) || null;
+    if (!reps) return dashNoValueHtml('the team overview has not loaded');
+    var pickVal = {
+      avg_score: function (r) { return r.avg_score; },
+      closing_rate: function (r) { return r.prospect_close_rate; },
+      objection_handle_rate: function (r) { return r.obj_handle_rate; },
+      calls_analyzed: function (r) { return r.calls_analyzed; },
+      prospects: function (r) { return r.prospect_close_total; },
+    }[card.metric] || function (r) { return r.avg_score; };
+
+    var rows = reps.filter(function (r) { return r.active !== false; })
+                   .map(function (r) { return { name: r.display_name || r.email || r.user_id, v: pickVal(r) }; });
+    var measured = rows.filter(function (r) { return r.v !== null && r.v !== undefined; });
+    if (!measured.length) return dashNoValueHtml('no rep has a measurable value in this range');
+    measured.sort(function (a, b) { return b.v - a.v; });
+
+    /* h is the card's height in grid rows; a taller card shows more rows. The
+       KIND does not change — it is the same list, longer. */
+    var limit = card.h >= 2 ? measured.length : 5;
+    var shown = measured.slice(0, limit);
+    var hiddenBySize = measured.length - shown.length;
+    var unmeasured = rows.length - measured.length;
+
+    var note = [];
+    if (hiddenBySize > 0) note.push('top ' + shown.length + ' of ' + measured.length);
+    if (unmeasured > 0) note.push(unmeasured + ' not enough data to measure');
+
+    return '<div class="dash-list">'
+      + shown.map(function (r) {
+          return '<div class="dash-list-row"><span>' + escapeHtml(String(r.name)) + '</span>'
+            + '<b>' + escapeHtml(String(r.v)) + '</b></div>';
+        }).join('')
+      + '</div>'
+      + (note.length ? '<div class="dash-card-note">' + escapeHtml(note.join(' \u00B7 ')) + '</div>' : '');
+  }
+
+  /* ⚠⚠ AN "OTHER" BUCKET CARRIES ITS OWN COUNT. A reader adds up what is on
+     screen, so a breakdown that collapses the tail without saying how much is
+     in it stops reconciling — the same reason the objections view had to add a
+     visible `credited` bucket. */
+  function dashBreakdownHtml(card) {
+    var src = null;
+    if (card.metric === 'objection_handle_rate') src = (state.teamOverview || {}).objection_categories;
+    if (!src) return dashNoValueHtml('this breakdown has no data in this range');
+    var keys = Object.keys(src);
+    if (!keys.length) return dashNoValueHtml('no categories in this range');
+    var rows = keys.map(function (k) {
+      var c = src[k] || {};
+      return { k: k, total: c.total || 0, handled: c.handled || 0 };
+    }).sort(function (a, b) { return b.total - a.total; });
+
+    var limit = card.h >= 2 ? rows.length : 3;
+    var shown = rows.slice(0, limit);
+    var rest = rows.slice(limit);
+    var restTotal = rest.reduce(function (a, r) { return a + r.total; }, 0);
+
+    return '<div class="dash-list">'
+      + shown.map(function (r) {
+          var pct = r.total > 0 ? Math.round(r.handled / r.total * 100) + '%' : '\u2014';
+          return '<div class="dash-list-row"><span>' + escapeHtml(objectionLabel(r.k)) + '</span>'
+            + '<b>' + pct + '</b><i>' + r.handled + ' of ' + r.total + '</i></div>';
+        }).join('')
+      + (rest.length
+          ? '<div class="dash-list-row dash-list-other"><span>Other (' + rest.length + ')</span>'
+            + '<b>\u2014</b><i>' + restTotal + ' objection' + (restTotal === 1 ? '' : 's') + '</i></div>'
+          : '')
+      + '</div>';
+  }
+
+  function dashCardHtml(card) {
+    var body =
+        card.view === 'gauge'     ? dashGaugeHtml(card)
+      : card.view === 'trend'     ? dashTrendHtml(card)
+      : card.view === 'by_rep'    ? dashByRepHtml(card)
+      : card.view === 'breakdown' ? dashBreakdownHtml(card)
+      :                             dashNumberHtml(card);
+    /* ⚠ A CARD WHOSE VIEW FELL BACK SAYS SO. The manager chose a gauge and is
+       looking at a number; silently differing from what they picked is the
+       quiet-shrink failure one level down. */
+    var fell = card.requestedView
+      ? '<div class="dash-card-note">Shown as a number \u2014 this metric has no target to gauge against.</div>'
+      : '';
+    return '<div class="dash-card" style="grid-column:span ' + card.w + ';">'
+      + (card.view === 'number' ? '' : '<div class="dash-card-title">' + escapeHtml(card.label) + '</div>')
+      + body + fell + '</div>';
+  }
+
+  function renderTeamDashboard() {
+    var content = document.getElementById('content');
+    ensureTeamDefaultRange();
+    if (state.teamContext === null) loadTeam('context');
+    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
+    if (state.teamAverages === null && !state.teamAveragesLoading) loadTeam('teamAverages');
+    if (state.teamRepSeries === null && !state.teamRepSeriesLoading) loadTeam('repSeries');
+    if (state.teamDashboard === null && !state.teamDashboardLoading) loadTeam('dashboard');
+
+    var d = state.teamDashboard;
+    var body;
+    if (d === null) body = '<div class="skeleton" style="height:220px;"></div>';
+    else if (d._error) body = '<div class="error">Could not load your dashboard: ' + escapeHtml(d._error) + '</div>';
+    else {
+      /* ⚠⚠ THE BOARD SAYS A CARD WAS DROPPED, ONCE. A board that quietly shrinks
+         is indistinguishable from a manager mis-remembering what they put there
+         — and the stored row is NOT pruned, because a metric can come back. */
+      var dropped = (d.dropped || []).length
+        ? '<div class="dash-dropped">' + (d.dropped.length === 1 ? '1 card is not shown' : d.dropped.length + ' cards are not shown')
+          + ' \u2014 ' + escapeHtml(d.dropped.map(function (x) { return x.metric; }).join(', '))
+          + ' ' + (d.dropped.length === 1 ? 'is' : 'are') + ' no longer available. Your saved board is unchanged.</div>'
+        : '';
+      body = dropped + '<div class="dash-grid">' + (d.cards || []).map(dashCardHtml).join('') + '</div>';
+    }
+
+    content.innerHTML = teamHeaderHtml() + teamControlsHtml()
+      + '<div class="section fade-in">' + body + '</div>';
+    mountRepGraphHosts();
+    drawDashboardCharts();
+  }
+
+  /* ⚠ SAME ORDER AS THE PERFORMANCE PAGE: render, then mount the hosts, then
+     draw. The draw step looks a canvas up by id, so a host that has not been
+     mounted yet produces no chart, silently. */
+  function drawDashboardCharts() {
+    if (!state.teamDashboard || state.teamDashboard._error) return;
+    if (!state.teamRepSeries || state.teamRepSeries._error || state.teamRepSeries._forbidden) return;
+    (state.teamDashboard.cards || []).forEach(function (c) {
+      if (c.view !== 'trend') return;
+      var pick = DASH_CANVAS[c.metric];
+      if (!pick) return;
+      repSeriesChart('dash_' + c.metric, state.teamRepSeries,
+        function (r) { return r[pick]; },
+        pick === 'price' ? 'Minutes to price' : (pick === 'close' ? 'Closing %' : 'Objection handling %'),
+        false);
+    });
+  }
+
   function avgPanelHtml() {
     var d = state.teamAverages;
     var body;
@@ -11903,7 +12164,11 @@
      same two pages.
      ⚠ DERIVED FROM TEAM_PAGES so a sixth page cannot be forgotten here, plus
      the two sub-views that have no dropdown entry of their own. */
-  var TEAM_SUBVIEWS = ['team-needs-work'];   // team-expanded retired 2026-09-01
+  /* ⚠ team-dashboard is a SUB-VIEW in this block: it has no dropdown entry
+     yet (the picker is not built), so it is reachable only by hash. That is
+     deliberate for one block and is FILED — an unreachable surface is the
+     merge-review failure, and it must not stay that way. */
+  var TEAM_SUBVIEWS = ['team-needs-work', 'team-dashboard'];
   function isTeamView(v) {
     for (var i = 0; i < TEAM_PAGES.length; i++) if (TEAM_PAGES[i].view === v) return true;
     return TEAM_SUBVIEWS.indexOf(v) !== -1;
@@ -13382,6 +13647,7 @@
     if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
     if (state.view === 'team-objections')  return 'team-objections' + teamRangeHashSuffix();
     if (state.view === 'team-members')     return 'my-team' + teamRangeHashSuffix();
+    if (state.view === 'team-dashboard')   return 'team-dashboard' + teamRangeHashSuffix();
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     // Overview has no path of its own, but still carries its range so a
     // refresh or a shared link lands on the same window.
@@ -13425,6 +13691,7 @@
                          says so too. `#team-members` STILL ROUTES IN because a
                          bookmark is a link — it normalises on the next nav. */
                       'my-team': 'team-members', 'team-members': 'team-members',
+                      'team-dashboard': 'team-dashboard',
                       'team-objections': 'team-objections',
                       // the split — every page must be reachable by refresh and
                       // by a pasted URL, not only by clicking the dropdown

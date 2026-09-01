@@ -33,6 +33,7 @@ function getAnthropic() {
   return _anthropic;
 }
 const { computeTeamRecommendations } = require('../lib/team-synthesis');
+const { resolveLayout, MAX_BOARDS } = require('../lib/dashboard-layout');
 const { computeTeamNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
@@ -317,6 +318,47 @@ router.get('/why-prose', teamGate, async function (req, res) {
  * shaped for time-bucketed per-rep series driven by the picker; this is a
  * single-window team aggregate. They are different questions.
  */
+/* ⚠⚠ THE DASHBOARD LAYOUT — READ ONLY IN THIS BLOCK. No editor, no save path.
+   ⚠ IT RETURNS THE LAYOUT, NEVER THE NUMBERS. Every card reads from a lane the
+   Performance page ALREADY loads (averages, rep-series, overview), so a board
+   and the page it sits beside cannot disagree about the same metric. A second
+   source for a number that already exists is how one screen comes to contradict
+   another, which this product has already had to fix twice.
+   ⚠ A MANAGER WITH NO ROW GETS THE CODE DEFAULT, and `is_default` says so — the
+   caller must be able to tell "never customised" from "customised to look like
+   the default", because only one of those should inherit a new widget later. */
+router.get('/dashboard', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    /* ⚠ KEYED ON THE VIEWER, NOT THE BOARD. A board belongs to the manager who
+       built it; an owner pivoting to another company sees THEIR OWN layout over
+       that company's data, which is the same shape as the date picker. */
+    var q = await admin.from('dashboards')
+      .select('id, name, layout, pinned, updated_at')
+      .eq('user_id', req.user.id)
+      .order('pinned', { ascending: false })
+      .order('updated_at', { ascending: false })
+      .limit(MAX_BOARDS);
+    if (q.error) throw new Error('dashboards: ' + q.error.message);
+
+    var boards = q.data || [];
+    var wanted = req.query.board
+      ? boards.filter(function (b) { return b.id === req.query.board; })[0]
+      : boards[0];
+    var resolved = resolveLayout(wanted ? wanted.layout : null);
+
+    res.json({
+      team: { key: team.keyId },
+      board: wanted ? { id: wanted.id, name: wanted.name, pinned: wanted.pinned } : null,
+      boards: boards.map(function (x) { return { id: x.id, name: x.name, pinned: x.pinned }; }),
+      is_default: resolved.isDefault,
+      cards: resolved.cards,
+      dropped: resolved.dropped,
+    });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard', err); res.status(500).json({ error: 'Failed to load the dashboard layout' }); }
+});
+
 router.get('/averages', teamGate, async function (req, res) {
   try {
     var admin = getAdmin();
