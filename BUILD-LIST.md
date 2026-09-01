@@ -1097,6 +1097,54 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 
 ---
 
+## NEEDS JUSTIN 2026-09-01 — "ANY GRAPH SHOULD BE METRIC AGAINST TIME" IS IN TENSION WITH LAST BLOCK
+**⚠⚠ NOTHING WAS DELETED ON THE INFERENCE, AND THAT IS THE POINT.** One block ago Justin asked for *"bar graphs (horizontal and vertical), SCATTER PLOT, line graphs"*; this block, *"any graph should be metric against time"*. **A bar chart by rep is not metric-against-time, and a scatter is metric against METRIC** — so the two cannot both be read literally.
+
+| reading | means | consequence |
+|---|---|---|
+| **A** — a graph's x-axis is always time | `bar_rep`/`bar_cat` are not graphs and go; scatter never gets built | **seven of ten metrics can have NO graph at all** |
+| **B** — "graph" means a line over time; bars and lists are different things | nothing retired; the ask is MORE things plotted over time | the work is giving the other seven a history |
+
+**Reading B is the likelier one** (he asked for bar charts one block ago, and a scatter is explicitly metric-vs-metric) — **but it is a one-word ruling and the wrong guess deletes two card types that shipped yesterday.**
+
+**⚠⚠ THE MEASURED PART, AND IT IS THE ANSWER TO "VERY CUSTOMIZABLE": giving the other seven a history is far cheaper than it looks.** `rep-series` already fetches calls (with `call_date` and `prospect_id`), analyses (with `outcome`) and objection highlights, bucketed per rep per week:
+```
+Calls graded              NOTHING — count the calls already in the bucket
+People talked to          NOTHING — distinct prospect_id; the closing series already groups them
+How calls ended           NOTHING — count by `outcome`, already fetched
+Average call score        ONE COLUMN   overall_score        (1,555 of 1,589)
+Average call length       ONE COLUMN   duration_seconds     (2,052 of 2,058)
+Scores by part of call    FIVE COLUMNS
+What Scout flagged        ⚠ 6.3x THE ROWS — 9,022 highlights vs the 1,424 objections fetched today
+```
+**Three are free, two are one column, one is five, one is a real cost.** ⚠ **A bar chart of a snapshot is not what he is asking for; a history is.**
+
+⚠ **ONE CONSTRAINT THAT IS NOT A COST:** *Scores by part of the call* is FIVE series per rep — five lines × nine reps is unreadable, so it wants a different shape (one line per section, team-wide). **A design question, not a data one.**
+
+---
+
+## NEEDS JUSTIN 2026-09-01 — METRIC NAMES AND DESCRIPTIONS (proposed, NOT wired)
+**Justin: *"I don't know what those metrics do."* ⚠⚠ FIFTH INSTANCE OF A VALUE WHERE A LABEL BELONGS** — after `follow_up` on the EOD chip, "1000 chunks" on the KB, a manager's email in the admin dropdown, and raw seconds on the objections page. **`outcome_mix`, `moment_mix` and `section_scores` are INTERNAL FIELD NAMES PROMOTED TO A CUSTOMER-FACING PICKER.**
+
+**Every metric gets a name AND a one-line description carrying its denominator and unit.** The full table is in the findings report. **⚠ THE FOUR DESCRIPTIONS DOING REAL WORK, none of them visible from the name:**
+- **Closing rate** — the denominator is **PROSPECTS, not calls**, and no-shows and DQs leave it entirely;
+- **People talked to** — **follow-up calls with the same person count once**;
+- **Average call length** — **lower is better**, which on a bar chart is exactly backwards;
+- **Time to price** — **only measured for reps who saved an offer price**; 27% coverage and NOT random.
+
+⚠ **AND ONE DESIGN POINT FOR JUSTIN: where the description goes.** Step one reads `Closing rate — Number · Gauge · Line · By rep`. **The tempting option is the worst: replacing the view list would UNDO the fix for "no graphs appear as options"**, which is what the view names exist for. Recommend description under the name, views on the right.
+
+**⚠ THE THREE REMOVED METRICS STAY REMOVED UNTIL HE RULES — and they are renamed in the proposal so he rules on WHAT THEY ARE rather than what they were called.** The irony is worth recording: **they may have been removed BECAUSE their names told him nothing.** `outcome mix` → **How calls ended** · `section scores` → **Scores by part of the call** · `call moment mix` → **What Scout flagged**.
+
+---
+
+## FILED 2026-09-01 — ORIENTATION AS A FREE CHOICE (not now)
+`bar_rep` is horizontal and `bar_cat` is vertical, and each orientation was **measured** against its data: rep names run **8-13 characters with up to nine of them** (unreadable rotated); category names run **4-10 with four or five** (what columns are for).
+
+⚠ **A manager choosing vertical for nine rep names would produce exactly the unreadable labels that measurement predicts** — so "let them pick" is a worse product, not a more customizable one, unless the control also warns. **The drawing already takes orientation as a parameter, so it is a small build whenever it is wanted.** Not now.
+
+---
+
 ## 2026-09-01 — TWO NEW CHART TYPES, DERIVED NOT LISTED (`4433ba2`)
 Deployed, verified by commit hash and served-page parity. Suite **2051**.
 

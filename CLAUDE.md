@@ -5662,6 +5662,26 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **FOUND BY LOOKING AT THE FIRST RENDER.** Fifth time on this pass that looking has found what a check could not.
 - **THE HABIT: when a design rule is implemented as a PER-VIEW LIST, adding a view means adding it to every list — and the lists must be enumerated, not remembered.** Here there were five (`.page`, `.section`, `.page-header`, `.page-header--company`, `.team-controls-row`).
 
+### ⚠⚠⚠ A RULING CAN CONTRADICT A REQUEST THE SAME PERSON MADE ONE BLOCK AGO — SURFACE THE TENSION, DO NOT PICK (2026-09-01)
+**Block N: *"bar graphs (horizontal and vertical), SCATTER PLOT, line graphs."* Block N+1: *"any graph should be metric against time."* A bar chart by rep is not metric-against-time, and a scatter is metric against METRIC — so the two cannot both be read literally.**
+- **⚠⚠ NEITHER IS FRAMED AS A REVERSAL, WHICH IS WHAT MAKES THIS DIFFERENT FROM THE STANDING "grep for the previous ruling" RULE.** That one covers a definition being re-decided. **Here a RULING lands on top of a REQUEST, both live, and nothing signals that acting on the second undoes the first.**
+- **THE COST OF GUESSING IS ASYMMETRIC AND THAT DECIDES IT: reading it literally DELETES TWO CARD TYPES THAT SHIPPED THE DAY BEFORE.** Asking costs one word. **Deleting on an inference is unrecoverable in the sense that matters — the architect never sees what was removed or why.**
+- **THE SHAPE THAT WORKS: state BOTH readings, name the consequence of each, say which you believe and why, and change NOTHING.** *"I think you mean B, because you asked for bar charts one block ago — but I have not deleted anything on that inference"* is a sentence that settles it in one round.
+- **⚠ AND LOOK FOR THE EVIDENCE INSIDE THEIR OWN WORDS.** The scatter request is the tell: a scatter is metric-vs-metric, so a literal metric-against-time rule would forbid the thing they asked for in the same breath. **The contradiction is usually visible in the request itself if you go back and read it.**
+
+### ⚠⚠ "MORE WAYS TO DRAW THE SAME SNAPSHOT" IS NOT MORE CUSTOMIZABLE — IT IS ONE NUMBER IN MORE SHAPES (2026-09-01)
+**Asked to make the catalog "feel VERY customizable", the literal answer was more chart types. Measured, the real constraint was that ONLY THREE OF TEN METRICS HAVE ANY HISTORY — everything else is a snapshot, so a bar chart of it is the same figure wearing a different outline.**
+- **⚠⚠ AND CHECKING WHAT THE EXISTING QUERY ALREADY HAS IN HAND CHANGED THE PRICE BY AN ORDER OF MAGNITUDE.** `rep-series` already fetches calls with their dates and prospect ids, analyses with their outcomes, and highlights — bucketed per rep per week. Against that:
+```
+THREE cost NOTHING     calls graded · people talked to · how calls ended
+                       — pure computation over rows already fetched and bucketed
+TWO cost ONE COLUMN    average call score · average call length
+ONE costs FIVE         scores by part of the call
+ONE is a real cost     what Scout flagged — 6.3x the rows (9,022 vs 1,424)
+```
+- **THE HABIT: BEFORE PRICING A FEATURE AS "we do not have that data", READ WHAT THE EXISTING QUERY SELECTS.** It is the fixture-from-the-producer rule applied to estimation — **the answer came from four `.select(` lines, not from reasoning about the schema.**
+- **⚠ AND ONE CONSTRAINT THAT IS NOT A COST IS WORTH SEPARATING OUT: five section scores × nine reps is forty-five lines, which is unreadable however cheap the data is.** A cheap series is not automatically a legible chart, and conflating the two makes an estimate look better than it is.
+
 ### ⚠⚠⚠ A NEW CHART TYPE IS A NEW CAPABILITY REQUIREMENT, NOT A NEW ENTRY ON A LIST (2026-09-01)
 **Asked for bar charts, a scatter and line graphs. The honest way to add one is to say WHAT DATA SHAPE IT NEEDS and let the derivation decide who gets it — a hand-written list of which metrics may have a bar chart is how a gauge came to be offered for a metric with no target.**
 - **BOTH BARS REUSED AN EXISTING REQUIREMENT** — `bar_rep` needs per-rep values, `bar_cat` needs categories — **so a metric with no categories is STRUCTURALLY unable to be offered a category bar chart.** Verified on the render, not asserted.
