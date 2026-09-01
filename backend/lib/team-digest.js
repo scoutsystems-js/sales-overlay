@@ -202,15 +202,23 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
 
   var objectionsAll = await w.inChunks('call_highlights',
     'fathom_call_id, timestamp_seconds, speaker, quote, observation, type, objection_category, resolution',
-    function (q) { return q.eq('type', 'objection');
+    function (q) { return q.eq('type', 'objection'); });
   /* ⚠ A DQ CALL'S OBJECTIONS DO NOT REACH THE DIGEST'S FIGURES. Its prospect was
      never closeable, so counting them would put a rate in front of a manager
      that marks a rep down for a call that could not be won. The call itself is
-     still analysed and still appears everywhere a COUNT is shown. */
+     still analysed and still appears everywhere a COUNT is shown.
+
+     ⚠⚠ THESE THREE LINES WERE SPLICED INSIDE THE inChunks CALLBACK BY THE EDIT
+     THAT ADDED THEM (301defc, 2026-08-30) — after its `return`, with no closing
+     brace between. They parsed, they were unreachable, and `objections` was then
+     undefined at the read below. EVERY DIGEST THREW FROM THE NEXT CRON ONWARD:
+     two days, no landing page, and the only trace was one console.error in a log
+     buffer nobody reads. Same mechanism as the dead mount line already on file.
+     ⚠ team-digest-runs.test.js now EXECUTES computeDailyDigest and fails against
+     exactly this shape. */
   var dqDigest = {};
   (analyses || []).forEach(function (a2) { if (isDisqualified(a2)) dqDigest[a2.fathom_call_id] = 1; });
   var objections = objectionsAll.filter(function (r) { return !dqDigest[r.fathom_call_id]; });
- });
   var objLines = objections.slice(0, 20).map(function (h) {
     return '- [' + h.fathom_call_id + ' @' + h.timestamp_seconds + 's] ' + (h.objection_category || 'uncategorized')
       + ' / ' + (h.resolution || 'unknown') + ': "' + str(h.quote, 150) + '"';
@@ -360,12 +368,33 @@ async function generateDailyDigests(admin, opts) {
         else { summary.generated++; if (d.quiet) summary.quiet++; }
       } catch (perErr) {
         summary.errors++;
-        console.error('[team-digest] failed for ' + keyId + ' (' + dateStr + '): ' + (perErr.message || 'unknown'));
+        /* ⚠⚠ A PROGRAMMER ERROR AND AN OPERATIONAL ONE ARE NOT THE SAME EVENT,
+           AND THIS CATCH USED TO PRINT THEM IDENTICALLY. On 2026-08-30 a spliced
+           edit left an identifier out of scope; every manager's digest threw a
+           ReferenceError for TWO DAYS, and the only trace was one line — no
+           stack, no location — in a buffer nobody reads. A missing landing page
+           was the first anyone knew.
+           ⚠ A ReferenceError/TypeError is OUR BUG and gets its stack. A database
+           timeout or a model failure is an operational fact and does not. The
+           class is in the message so a search finds it. */
+        var bug = (perErr instanceof ReferenceError) || (perErr instanceof TypeError);
+        console.error('[team-digest] ' + (bug ? 'BUG' : 'failed') + ' for ' + keyId
+          + ' (' + dateStr + '): ' + (perErr.message || 'unknown'));
+        if (bug) console.error((perErr.stack || '').split('\n').slice(0, 4).join('\n'));
       }
     }
   } catch (outerErr) {
     summary.errors++;
     console.error('[team-digest] generation pass failed (' + dateStr + '): ' + (outerErr.message || 'unknown'));
+  }
+  /* ⚠ THE SUMMARY IS THE LINE A HUMAN WOULD SCAN, so it must not read as normal
+     when nothing was written. errors>0 with generated=0 is a total outage —
+     exactly the two days above — and it now says so in words rather than leaving
+     it to be inferred from a JSON blob. */
+  var wrote = summary.generated + summary.cached;
+  if (summary.errors > 0 && wrote === 0) {
+    console.error('[team-digest] NOTHING WRITTEN for ' + dateStr + ' — all '
+      + summary.managers + ' manager(s) failed. The landing page will be empty.');
   }
   console.log('[team-digest] pass done: ' + JSON.stringify(summary));
   return summary;

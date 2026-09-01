@@ -19,7 +19,7 @@
      The gauge number ONLY — see .avg-value for the reasoning. The scale is
      seven sizes with nothing between them; this is a named carve-out so the
      exception is visible and confined, never an eighth step. */
-  --fs-gauge-value: 34px;
+  --fs-gauge-value: 24px;
 
   /* ⚠⚠ THREE WEIGHTS, NOT SEVEN. The 115 semibolds were the single
      cheapest-looking thing in the app — heavy text at 11-12px is close to the

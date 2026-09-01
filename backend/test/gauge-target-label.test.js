@@ -83,5 +83,8 @@ test('⚠ the gauge number is a NAMED EXCEPTION, not an eighth scale size', () =
   assert.ok(!/--fs-gauge-value/.test(scale.slice(0, scale.indexOf('--fs-eyebrow'))),
     'the exception must sit AFTER the scale, never inside it');
   // and the dial is back to its pre-2026-09-01 width
-  assert.ok(/\.avg-svg \{ width: 100%; max-width: 290px;/.test(H), 'the dial is back to 290');
+  /* ⚠ 320 -> 290 -> 220, two reductions by ruling. The guard pins the CURRENT
+     value so a silent drift shows up, and the reasoning for the floor lives at
+     the CSS: below ~220 the dial's own scale labels fall under 8px. */
+  assert.ok(/\.avg-svg \{ width: 100%; max-width: 220px;/.test(H), 'the dial is 220');
 });
