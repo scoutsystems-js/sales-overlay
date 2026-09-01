@@ -104,7 +104,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v3-2026-09-01-focus-leads-and-source';
+var DIGEST_PROMPT_VERSION = 'v4-2026-09-01-no-reps-active';
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -143,7 +143,7 @@ function quietDigest(dateStr) {
   return {
     date: dateStr,
     quiet: true,
-    stats: { calls: 0, closed: 0, follow_up: 0, lost: 0, no_show: 0, reps_active: 0 },
+    stats: { calls: 0, closed: 0, follow_up: 0, lost: 0, no_show: 0 },
     summary: 'Quiet day — no team calls were recorded on ' + dateStr + '.',
     notable: [],
     focus: 'No calls to review. A good day to check pipeline coverage and confirm the team’s calendars are filling.',
@@ -187,13 +187,11 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     return (nameMap && nameMap[uid]) || (emailMap && emailMap[uid] ? displayNameFromEmail(emailMap[uid], 'rep') : 'rep');
   };
   var byOutcome = { closed: 0, follow_up: 0, lost: 0, no_show: 0 };
-  var activeReps = {};
   var callLines = [];
   var analysisByCall = {};
   analyses.forEach(function (a) { analysisByCall[a.fathom_call_id] = a; });
   w.callIds.forEach(function (cid) {
     var c = w.meta[cid];
-    activeReps[c.user_id] = true;
     var a = analysisByCall[cid];
     if (a && a.outcome && byOutcome.hasOwnProperty(a.outcome)) byOutcome[a.outcome]++;
     callLines.push('- [' + cid + '] ' + repName(c.user_id) + ' — "' + (c.title || 'untitled') + '"'
@@ -231,7 +229,16 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     calls: w.callIds.length,
     closed: byOutcome.closed, follow_up: byOutcome.follow_up,
     lost: byOutcome.lost, no_show: byOutcome.no_show,
-    reps_active: Object.keys(activeReps).length,
+    /* ⚠⚠ `reps_active` REMOVED 2026-09-01 (Justin's ruling). It was a HEADCOUNT
+       sitting in a row of OUTCOMES a reader adds up — flagged twice and kept,
+       correctly, because dropping an unmentioned number unasked is a bigger
+       change than the one asked for. Now it is asked.
+       ⚠ IT WAS ALREADY GONE FROM THE RENDER (Treatment B's stat line is closed ·
+       calls · follow-ups · lost) and read by NOTHING — but it was still reaching
+       the MODEL, inside a block labelled "already displayed", which had stopped
+       being true of this one field. A false statement in a prompt invites the
+       model to reference a number the reader cannot see. That is why the field
+       comes out rather than merely the tile. */
   };
 
   var promptLines = [

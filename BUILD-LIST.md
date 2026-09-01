@@ -352,7 +352,11 @@ WARM, another board            3,425 / 1,730 / 1,505 ms
 
 **Everything here is blocked on him, not on work.**
 
-### 🎯 THE WHY PANEL SHOULD COACH REGARDLESS OF THE RATE — RECON DONE, NOT BUILT
+### ✅ THE WHY PANEL COACHES REGARDLESS OF THE RATE — SHIPPED
+<!-- ⚠ THE HEADING SAID "RECON DONE, NOT BUILT" while the row beneath it said
+     SHIPPED `ca4da64`. Corrected 2026-09-01 in the NEEDS-JUSTIN sweep. A heading
+     and its row asserting opposite states is the same defect as a stale row, one
+     level up — and the heading is what a scanner reads. -->
 
 | item | state |
 |---|---|
@@ -363,13 +367,13 @@ WARM, another board            3,425 / 1,730 / 1,505 ms
 
 | item | state | the question |
 |---|---|---|
-| **Objection handling % means TWO things on six surfaces — which one is THE definition?** | ⚠ **RECON DONE 2026-08-30, NEEDS A RULING** | **LOOSE** (every objection moment): team gauge, rep cards, manager graph. **STRICT** (true objections only, disqualifications and logistical barriers removed): per-closer grid + feed, focus panel + coaching tile. **Measured on Josh: 20% (35/177) loose vs 17% (26/155) strict** — a rep reads two different numbers under one name. ⚠⚠ **THE DIVERGENCE IS AN UNSTATED TRADE, NOT A COPY-PASTE, WHICH IS WHY IT IS YOURS: strict requires an LLM classification of the distinct objection phrases (cold ~20s, non-deterministic across cold runs), and the three loose surfaces are the ones that must render fast.** ⚠ Your 2026-08-22 ruling already says strict is the standard — so either the fast surfaces get it (and something pays for the classification, e.g. a cached bucket map they can read), **or they say plainly that they count every objection moment.** ⚠ `lib/objection-handled.js` centralised the NUMERATOR and the denominator was never shared — the split is in the question nobody centralised |
+| ~~**Objection handling % means TWO things on six surfaces**~~ | ✅ **RULED AND SHIPPED IN v37 — ROW CLOSED 2026-09-01. THE TENTH STALE ROW OF THE WEEK.** The answer was the CACHED ROUTE: classify once at analysis time into `call_highlights.objection_class`, store it, every surface reads it — so STRICT became affordable on the fast surfaces and the trade the row was asking about stopped existing. ⚠ **VERIFIED BEFORE CLOSING, not taken on the ruling:** all six read it — `routes/team.js` gauge via `strictObjections()`, `lib/team-analytics.js` rep cards and `lib/rep-series.js` graph via `countsAsObjection()`, `lib/team-objections.js` grid+feed and `lib/team-needs-work.js` focus+tile off the stored column. ⚠⚠ **THE STANDING RULE EXISTS FOR EXACTLY THIS: A RULING AND THE CLOSURE OF THE ROW IT ANSWERS ARE ONE EDIT, NEVER TWO.** An open list is read as the list of undecided things, so a decided question sitting in one is indistinguishable from an undecided one — and the only person who can tell is the one who already answered it. |
 
 ### 🔍 CARRIED — cannot be answered yet
 
 | item | state |
 |---|---|
-| **Does `why_now` cite the CLOSER's question rather than the prospect's answer?** | ⚠ **CANNOT BE CHECKED YET — n=2.** v33 shipped 2026-08-30 and nothing re-analyses, so only 2 calls carry the six items. **If `why_now` consistently cites the closer, the area is being established by the QUESTION rather than the ANSWER — a different thing from the prospect having a reason.** Re-check once real calls accumulate. ⚠ A first attempt to measure this returned a clean zero across 1,520 analyses and was an artefact: `coverage` is an ARRAY and the query used an object-key test. **A uniform zero is more often a wrong question than a real absence** |
+| ~~**Does `why_now` cite the CLOSER's question rather than the prospect's answer?**~~ | ✅ **ANSWERED 2026-09-01 — NO. Row closed.** It was filed as unanswerable at n=2; the corpus has rolled forward on its own, exactly as the surface-② recon predicted. **65 analyses now carry the six items; `why_now` is covered on 37, and only 2 of those 37 evidences contain a question mark at all.** The samples are unambiguously the prospect ANSWERING — *"Yeah, as soon as possible."* · *"I'd do it now."* · *"now my wife is pregnant, I'm going to have my second child."* ⚠ **Honest limit: 32 of 65 carry verified evidence**, so this answers the question that was asked (is it citing the closer's question?) and not the broader one about evidence quality. ⚠ **The row became answerable by TIME rather than by work — which is the argument for re-measuring a carried row before assuming it is still carried.** |
 
 ### 💰 SPEND — unapproved
 
@@ -393,6 +397,19 @@ WARM, another board            3,425 / 1,730 / 1,505 ms
 
 
 ## 🐛 BUGS — ordered by consequence
+
+**⚠⚠ `computeWeeklyHighlights` QUOTES AN UNPROVEN CLOSER REPLY — the sixth lane, and it feeds a MODEL PROMPT (filed 2026-09-01, NOT FIXED).**
+The 30d4d43 sweep closed five lanes onto `provenCloserResponse`. `lib/team-synthesis.js` has TWO call sites and only one was fixed: the recommendations lane (line 309) is proven; **Call Highlights of the Week (line 398) still builds its candidate quote with `displayCloserResponse`** — the SENTINEL gate, which only rejects `__no_reply__` / `__moment_is_closer__` and says nothing about whether the closer actually said the words.
+```
+candidate moments (strong_moment + handled objections)   1160
+  ...carrying a real closer_response                      156
+  ...PROVEN  (closer_response_verified = true)            137
+  ...UNPROVEN                                              19   = 12% of the ones with a reply
+```
+⚠⚠ **IT IS THE WORSE OF THE TWO CATEGORIES IN THAT SWEEP: the candidates go straight into a model prompt AND are rendered to a manager as the week's best moments.** A model builds celebratory prose around words the closer may never have said, and it reads as authoritative with nothing on screen to check it against.
+⚠ **THE SELECT AT LINE 387 DOES NOT FETCH `closer_response_verified`**, so the proven gate could not work there even if it were called — the same missing-column shape as the earlier lanes, which is why a per-file grep reports this file as already fixed.
+⚠ **Filed, not fixed, per the ruling.** The fix is one column in the select and one gate swap; what needs deciding is the fallback, since 1,004 of 1,160 candidates have no reply at all and fall through to the prospect's quote.
+
 
 **⚠ Ordered by what breaks, not by date.** Anything needing a ruling is in NEEDS JUSTIN instead.
 
@@ -690,6 +707,9 @@ So **"at least 10 characters" is already the rule and is already enforced** — 
 | **Prospect name-variation merges** | RULED 2026-08-29 — **LEAVE IT EXACTLY AS IT IS.** No nav entry, nothing built. The page works and is reachable by hash if anyone ever needs it. | The reasoning, so this is CLOSED rather than parked: **cross-provider duplicates are ALREADY SOLVED** by the overlap suppression that shipped, and one-source-per-user closes that path further. What remains is **name variation on a single provider** — real, but it inflates a close rate **nobody has complained about**, and 355 hand-reviewable proposals is not work worth creating. ⚠⚠ **AND MY OWN FRAMING WAS WRONG, CORRECTED HERE:** I ranked it by consequence and called it blocking follow-up awareness. **That was my framing and Josh's concern from days ago, not Justin's priority — Justin has ruled follow-up awareness is not needed.** **REOPENS ONLY IF inflated close rates become an actual complaint.** |
 
 **✅ THE FIVE UNCONFIRMED LOGIN RENDERS — DISCHARGED 2026-09-01.** Carried for four blocks while Chrome was down. Three confirmed on the rendered page (mark box, ink fit, mark at the top); **two SUPERSEDED rather than confirmed** — Montserrat is gone and the wordmark is a PNG, so the faux-bold and nowrap claims describe a lockup that no longer exists. The owed ink sweep is done and **0.21 stands** (ceiling 0.221, `--muted` 4.64:1). ⚠ **Remaining, unchanged: the wordmark renders at native 1038px, so it is 2x upscaled on retina — and the source is a screenshot, so there is no 2x to export from.** That is an asset task, not a code one.
+
+**⏸ THE GREEN OBJECTION CATEGORY — DEFERRED BY JUSTIN 2026-09-01, NOT DONE.** His words: **not an issue right now.** The category name on the drilldown renders in `--accent` green while naming a closer's WEAKEST area, so the colour says "good" about the thing that is worst.
+⚠ **RECORDED AS DEFERRED WITH HIS REASON, NOT AS FIXED — it is a real inconsistency and he has judged it not worth a block.** ⚠ **The score-band rule did not reach it and could not: that rule bands a NUMBER against thresholds, and this is a category NAME with no number to band.** So a future session finding green-on-worst here should not assume the band rule missed a case — the rule never applied.
 
 ## ⏳ TRIGGERED — deferred with the condition that makes them due
 

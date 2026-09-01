@@ -13189,15 +13189,12 @@
     }
 
     var s = d.stats || {};
-    /* ⚠⚠ OPTION A (Justin picked from three mocks, 2026-09-01). THE PROBLEM WAS
-       FOUR DISPLAY NUMBERS SIDE BY SIDE WITH ONE BIGGER — which reads as an
-       inconsistency rather than a hierarchy. This removes it by making the other
-       three STOP BEING display numbers: closes leads on its own at the display
-       step, the rest step down to a quiet row with their labels beneath.
-       ⚠ SAME TREATMENT AS PERFORMANCE, which he approved — and it is the SAME
-       BUILDER (leadNumberHtml), so the two pages cannot drift apart.
-       ⚠ THE LOUD NUMBER IS `closed`, already ruled: fixed per page, never
-       weakest-against-target. */
+    /* ⚠ THE "OPTION A" COMMENT THAT SAT HERE IS GONE (2026-09-01). It described
+       a DIFFERENT mock — four numbers stepping down to a quiet row with labels
+       beneath — and Treatment B superseded it the same day. Two comments
+       describing two designs, only one of them live, is the unamended-predecessor
+       failure this file records: a reader who hits the first one gets a
+       confident description of something that is not on screen. */
     /* ⚠⚠ TREATMENT B (Justin's pick from three mocks, 2026-09-01). The four
        tiles become ONE QUIET LINE beneath the loud number — `3` then
        "closed · 31 calls · 12 follow-ups · 8 lost".
@@ -14940,7 +14937,14 @@
       var scopeBadge = it.scope
         ? '<span class="kb-badge kb-scope-' + escapeHtml(it.scope) + '">' + escapeHtml(it.scope) + '</span>'
         : '';
-      var chunkText = it.chunk_count + ' chunk' + (it.chunk_count === 1 ? '' : 's');
+      /* ⚠⚠ THE CHUNK COUNT IS GONE (Justin's ruling, 2026-09-01). "1000 chunks"
+         is INTERNAL VOCABULARY on a customer surface: a chunk is an artefact of
+         how the text was split for retrieval, and there is nothing a reader can
+         do with the number.
+         ⚠ REMOVED, NOT TRANSLATED. "1000 moments" would be a guess at what a
+         chunk maps to, and a chunk is not a moment — a smaller, more confident
+         lie than the number it replaced. What survives is the fact a reader can
+         use: when it was added. */
       var rel = relativeTime(it.created_at);
       // Only learned_pattern uploads get the expand affordance — other
       // categories are bulk text whose chunks aren't independently useful
@@ -14965,7 +14969,7 @@
         '<div class="kb-item">'
           + '<div class="kb-item-main">'
             + '<div class="kb-item-title">' + typeBadge + catBadge + scopeBadge + escapeHtml(it.source_label || '(unlabeled)') + '</div>'
-            + '<div class="kb-item-sub">' + chunkText + ' · added ' + rel + '</div>'
+            + '<div class="kb-item-sub">added ' + rel + '</div>'
           + '</div>'
           + viewBtn
           + promoteBtn
@@ -15011,7 +15015,7 @@
 
   async function deleteKbItem(sourceLabel) {
     if (!sourceLabel) return;
-    var ok = await scoutConfirm({ title: 'Delete "' + sourceLabel + '"?', body: 'This removes all chunks for this resource. Cannot be undone.', confirmText: 'Delete', danger: true });
+    var ok = await scoutConfirm({ title: 'Delete "' + sourceLabel + '"?', body: 'This removes it from your knowledge base. Cannot be undone.', confirmText: 'Delete', danger: true });
     if (!ok) return;
 
     var res;

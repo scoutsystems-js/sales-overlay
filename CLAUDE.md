@@ -5656,6 +5656,29 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **v1.1.0 build plan:** Features built one at a time in this order: (1) Role system, (2) Role-based dashboard system on website (`/dashboard` for users + redesigned `/admin` for admins+owners with user management; the original raw log viewer remains as Sections B+C of the admin page), (3) Script upload in app, (4) Call boundary detection, (5) Post-call summary. Each feature fully committed and approved before the next starts. Justin receives one feature prompt at a time from the architect — Claude Code never plans ahead.
 - **Session start:** cd into the project root at the start of every session: cd '/Users/justinschmidt/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay'. Note: Supabase MCP is not currently configured — migrations must be run manually via the Supabase dashboard SQL editor. To enable Supabase MCP in future, add it to .mcp.json and start a fresh session.
 
+### ⚠⚠ A FIELD DROPPED FROM THE RENDER CAN STILL BE REACHING THE MODEL — AND THE LABEL AROUND IT THEN LIES (2026-09-01)
+**`reps_active` was removed from the digest's stat line when Treatment B shipped. It was still computed, still in the payload, read by no renderer — and still going into the prompt inside a block labelled `TEAM STATS (already displayed — reference, don't enumerate)`.**
+- **⚠⚠ THE LABEL HAD STOPPED BEING TRUE OF THAT ONE FIELD, WHICH IS WORSE THAN THE FIELD BEING UNUSED.** "Already displayed" invites the model to reference a number **the reader cannot see** — so an unread field in a prompt is not dead weight, it is a false premise handed to a generator.
+- **THE RULE: when a field leaves the RENDER, check whether it also leaves the PROMPT.** They are different consumers and only one of them is visible in the diff.
+- **⚠ A prompt-content change needs its lane version bump** or cached output keeps the old context — `DIGEST_PROMPT_VERSION` v3 → v4 here.
+- **⚠ AND THE SUPERSEDED "OPTION A" COMMENT WAS STILL SITTING ABOVE THE LIVE "TREATMENT B" ONE**, describing a different mock from the same day. Two comments, two designs, one of them live — the unamended-predecessor failure, in a code comment rather than in this file.
+
+### ⚠⚠ REMOVE INTERNAL VOCABULARY, NEVER TRANSLATE IT (Justin, 2026-09-01)
+**The Knowledge Base list printed `1000 chunks` as a row subtitle, and the delete dialog said *"This removes all chunks for this resource."* FIFTH instance of the customer-language class, and it kept returning in new places.**
+- **⚠⚠ THE TEMPTING FIX IS A TRANSLATION AND IT IS WRONG. "1000 moments" would be a GUESS at what a chunk maps to, and a chunk is not a moment** — a smaller, more confident lie than the number it replaced. **A chunk is an artefact of how text was split for retrieval; there is nothing a reader can do with the count.** What survives is the fact they can use: when it was added.
+- **BAN THE WORD, NOT THE SENTENCE.** A vocabulary that keeps coming back in new places is a class, so `chunk` / `embedding` / `vector` / `set hash` / `cache key` / `fingerprint` went into `customer-language.test.js`'s `MECHANISM` list.
+- **⚠ AND STATE WHAT THE GUARD CANNOT SEE: it matches QUOTED SENTENCES of five or more words, so it could never have caught `it.chunk_count + ' chunk'`** — a concatenated label. That half needed its own assertion. **A vocabulary ban covers prose, not string-building.**
+
+### ⚠⚠ A CARRIED ROW CAN BECOME ANSWERABLE BY TIME ALONE — RE-MEASURE BEFORE ASSUMING IT IS STILL CARRIED (2026-09-01)
+**"Does `why_now` cite the CLOSER's question rather than the prospect's answer?" was filed as unanswerable at n=2. Two days later: 65 analyses carry the six discovery items, `why_now` is covered on 37, and only 2 of those 37 evidences contain a question mark at all.** The samples are the prospect answering — *"Yeah, as soon as possible."*, *"I'd do it now."* **Answer: NO. Row closed.**
+- **⚠ NOBODY DID ANY WORK TO MAKE IT ANSWERABLE. A coaching corpus ROLLS FORWARD** — new calls arrive under the current prompt version — so a row blocked on data has a due date rather than a dependency, and the cost of re-checking is one query.
+- **⚠ SAY WHICH QUESTION THE MEASUREMENT ANSWERS.** 32 of 65 carry verified evidence, so this settles *is it citing the closer's question* and NOT the broader question about evidence quality. **A row closed on a measurement that answers a neighbouring question is a stale row with a number attached.**
+
+### ⚠⚠⚠ TENTH STALE ROW OF THE WEEK — AND THE SWEEP FOUND A HEADING CONTRADICTING ITS OWN ROW (2026-09-01)
+**"Objection handling % means TWO things — which is THE definition?" sat in NEEDS JUSTIN as an open question after it had been ruled and shipped in v37.** The answer was the cached route — classify once at analysis time, store it, every surface reads it — which made STRICT affordable on the fast surfaces and **dissolved the trade the row was asking about** rather than picking a side.
+- **⚠ VERIFIED BEFORE CLOSING, not taken on the ruling: all six surfaces read the stored class.** A row closed on a claim nobody checked is the same defect pointed the other way.
+- **⚠⚠ AND SWEEPING THE SECTION FOUND A SUB-HEADING ASSERTING THE OPPOSITE OF ITS OWN ROW** — *"RECON DONE, NOT BUILT"* above a row reading *SHIPPED `ca4da64`*. **A heading and its row in contradiction is the stale-row failure one level up, and the heading is what a scanner reads.** When sweeping for stale rows, read the headings too.
+
 ### ⚠⚠⚠ REMOVING A CONTROL REMOVES ITS CSS — AND RE-ADDING THE CONTROL DOES NOT BRING IT BACK (2026-09-01)
 **`.review-kb-btn` rendered as the BROWSER'S DEFAULT BUTTON for three days — `background rgb(239,239,239)`, `border 2px outset black`, black text, on a near-black page, on every call review, for every manager.**
 ```

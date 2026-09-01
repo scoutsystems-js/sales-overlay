@@ -83,7 +83,10 @@ test('quietDigest: zero-call day yields a complete renderable digest, never an e
   const q = digest._quietDigest('2026-07-21');
   assert.strictEqual(q.date, '2026-07-21');
   assert.strictEqual(q.quiet, true);
-  assert.deepStrictEqual(q.stats, { calls: 0, closed: 0, follow_up: 0, lost: 0, no_show: 0, reps_active: 0 });
+  /* ⚠ `reps_active` REMOVED 2026-09-01 — a headcount among outcomes, ruled out
+     by Justin. The SUBJECT of this assertion survives unchanged: a quiet day
+     must report zeros for every outcome rather than an absent stats object. */
+  assert.deepStrictEqual(q.stats, { calls: 0, closed: 0, follow_up: 0, lost: 0, no_show: 0 });
   assert.ok(typeof q.summary === 'string' && q.summary.length > 0, 'quiet digest has a human summary');
   assert.deepStrictEqual(q.notable, []);
   assert.ok(typeof q.focus === 'string' && q.focus.length > 0, 'quiet digest still gives the day a focus');
