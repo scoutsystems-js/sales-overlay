@@ -15,12 +15,16 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 /* Bumped ONLY for a correctness defect in what the cache already holds —
    never for a speculative improvement. See the key comment below. */
-const SYNTH_RULE_VERSION = 'v2-2026-08-29-sentinel-gate';
+const SYNTH_RULE_VERSION = 'v3-2026-09-01-never-diminish';
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
 const { displayCloserResponse } = require('./closer-side');
+/* ⚠ ONE tone rule, four lanes — see lib/coaching-tone.js. Four copies drift, and a
+   drifted tone rule is INVISIBLE: nothing fails, the wording just softens in one
+   lane and not another. */
+const TONE = require('./coaching-tone.js');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const SYNTH_MAX_TOKENS = 2600;
@@ -79,6 +83,8 @@ function candidateScore(type, cls) {
 function buildPrompt(agg, oneThings, candidates, sellingContext) {
   var lines = [
     'You are a sales coach writing a Performance Summary for one high-ticket closer, comparing their WIN-class calls (outcome=closed) vs LOSS-class calls (outcome=lost) over this period. Be specific and grounded — cite real moments, tie claims to the numbers. No generic praise.',
+    '',
+    TONE.NEVER_DIMINISH,
     '',
     'SECTION AVERAGES (0-100): ' + SECTIONS.map(function (s) { return s + ' ' + (agg.sections[s] == null ? 'n/a' : agg.sections[s]); }).join(', ') + '. Strongest: ' + (agg.strongest || 'n/a') + '. Weakest: ' + (agg.weakest || 'n/a') + '.',
     'OVERALL: win-class avg ' + (agg.win_avg == null ? 'n/a' : agg.win_avg) + ' (' + agg.win_n + '), loss-class avg ' + (agg.loss_avg == null ? 'n/a' : agg.loss_avg) + ' (' + agg.loss_n + '), all done ' + (agg.blended == null ? 'n/a' : agg.blended) + ' (' + agg.done_n + ').',

@@ -58,6 +58,14 @@ test('⚠⚠ the comment no longer claims a single exception above a filter with
 });
 
 test('⚠ the lane version moved — who gets coached is cached', () => {
-  assert.ok(/^v10-/.test(lane._PROMPT_VERSION),
-    'a change to WHO is coached must invalidate the cache, or it ships nothing: ' + lane._PROMPT_VERSION);
+  /* ⚠⚠ CONVERTED 2026-09-01 — THIS PINNED THE LITERAL `v10-` AND WENT RED ON THE
+     VERY NEXT BUMP, which is the change it exists to encourage. A guard that
+     encodes today's value has a shelf life; the PROPERTY is that the version is
+     folded into the key and MOVES when the prompt does. */
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-objection-summary.js'), 'utf8');
+  const code = src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(/\.update\(PROMPT_VERSION/.test(code),
+    'the version must be IN the cache key — declaring it beside one ships nothing');
+  assert.ok(/^v\d+-/.test(lane._PROMPT_VERSION),
+    'and it must be a versioned string: ' + lane._PROMPT_VERSION);
 });

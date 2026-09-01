@@ -425,6 +425,33 @@ router.put('/dashboard', teamGate, async function (req, res) {
 /* ⚠⚠ PIN. A partial unique index makes two pinned boards UNREPRESENTABLE, so the
    unpin-then-pin has to happen in that order or the insert collides — the
    constraint is the authority and this code obeys it rather than assuming. */
+/* ⚠⚠ UNPIN. There was no way to undo a pin — the button only rendered when a
+   board was NOT pinned, so pinning was a one-way door: a manager with a single
+   board could pin it and never get back. A capability with no inverse is the
+   same shape as a capability with no control.
+   ⚠ NO INDEX PROBLEM IN THIS DIRECTION: clearing a pin can never collide with
+   the partial unique index, so this is a single write where pinning needs two. */
+router.delete('/dashboard/:id/pin', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    /* ⚠ SCOPED TO THE CALLER'S OWN BOARD, exactly as the pin route is — a board
+       belongs to the manager who built it, and `user_id` is on the update rather
+       than checked separately so a crafted id cannot reach someone else's row. */
+    var mine = await admin.from('dashboards').select('id').eq('user_id', req.user.id).eq('id', req.params.id).maybeSingle();
+    if (mine.error) throw new Error('dashboards: ' + mine.error.message);
+    if (!mine.data) return res.status(404).json({ error: 'That board no longer exists.' });
+    var clear = await admin.from('dashboards').update({ pinned: false })
+      .eq('id', req.params.id).eq('user_id', req.user.id);
+    if (clear.error) throw new Error('unpin: ' + clear.error.message);
+    /* ⚠ WHAT UNPINNING DOES, stated because a manager is entitled to know: the
+       dashboard route orders `pinned DESC, updated_at DESC` and returns
+       boards[0], so with nothing pinned the MOST RECENTLY UPDATED board is what
+       opens — and the nav entry names it, because that label follows the board
+       it opens rather than requiring a pin. Never an empty entry. */
+    res.json({ ok: true, pinned: null });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard-unpin', err); res.status(500).json({ error: 'Could not unpin that board.' }); }
+});
+
 router.post('/dashboard/:id/pin', teamGate, async function (req, res) {
   try {
     var admin = getAdmin();

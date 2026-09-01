@@ -24,6 +24,10 @@ const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
 const { clipHref } = require('./clip-link');
 const { provenCloserResponse } = require('./closer-side');
+/* ⚠ ONE tone rule, four lanes — see lib/coaching-tone.js. Four copies drift, and a
+   drifted tone rule is INVISIBLE: nothing fails, the wording just softens in one
+   lane and not another. */
+const TONE = require('./coaching-tone.js');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
 const MAX_CANDIDATES = 20;
@@ -70,7 +74,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v3-speaker-and-binding-2026-09-01';
+const RECS_LANE_VERSION = 'v4-2026-09-01-never-diminish';
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -327,6 +331,8 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
 
   var promptLines = [
     'You are a sales manager coach. Synthesize a TEAM performance review across ' + repIds.length + ' reps for this period. Be specific, grounded, and cite reps by name where relevant. No generic praise.',
+    '',
+    TONE.NEVER_DIMINISH,
     'TEAM SECTION AVERAGES (0-100): ' + SECTIONS.map(function (s) { return s + ' ' + (sections[s] == null ? 'n/a' : sections[s]); }).join(', ') + '. Strongest: ' + (strongest || 'n/a') + '. Weakest: ' + (weakest || 'n/a') + '.',
     'WIN-class avg ' + (avg(winSum, winN) || 'n/a') + ' (' + winN + '), LOSS-class avg ' + (avg(lossSum, lossN) || 'n/a') + ' (' + lossN + ').',
     'OBJECTIONS by category (handled/total): ' + OBJ_CATEGORIES.map(function (c) { return c + ' ' + obj[c].handled + '/' + obj[c].total; }).join(', ') + '.',

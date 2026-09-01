@@ -113,8 +113,14 @@ test('⚠⚠ the browser and the server render the SAME hh:mm:ss', () => {
 
 test('⚠ the lane version moved — both values live inside the cached payload', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
-  assert.ok(/RECS_LANE_VERSION = 'v3-/.test(src),
-    'a change to `spoke` or to the binding is invisible on every cached window without a bump');
+  /* ⚠⚠ CONVERTED 2026-09-01 — pinned `v3-` and went red on the next bump. The
+     property is that the version is IN THE KEY and moves with the prompt, not
+     that it holds any particular value. */
+  const code = src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(/\|\|recs:' \+ RECS_LANE_VERSION/.test(code),
+    'a change to `spoke` or to the binding is invisible on every cached window '
+    + 'unless the version is folded into the key');
+  assert.ok(/RECS_LANE_VERSION = 'v\d+-/.test(code), 'and it must be a versioned string');
 });
 
 /* ── ⚠⚠ AND THE CALL SITES — WITHOUT THESE, TWO OF THE GUARDS ABOVE PASS WITH

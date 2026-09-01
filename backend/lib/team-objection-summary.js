@@ -40,6 +40,10 @@ const { computeTeamObjections, OBJECTION_CATEGORIES } = require('./team-objectio
 const { _MIN_BUCKET: MIN_BUCKET, _MIN_GAP_PP: MIN_GAP_PP } = require('./team-needs-work');
 
 const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
+/* ⚠ ONE tone rule, four lanes — see lib/coaching-tone.js. Four copies drift, and a
+   drifted tone rule is INVISIBLE: nothing fails, the wording just softens in one
+   lane and not another. */
+const TONE = require('./coaching-tone.js');
 const SYNTHESIS_TYPE = 'team_objections';
 
 /* ⚠⚠ THE PROMPT VERSION IS PART OF THE CACHE KEY, AND IT IS LOAD-BEARING.
@@ -51,7 +55,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v10-2026-09-01-coach-thin-types';   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
+const PROMPT_VERSION = 'v11-2026-09-01-never-diminish';   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -345,6 +349,8 @@ function buildPrompt(subjects) {
     'already the heading above your text, so write in the SECOND PERSON — "you",',
     'not their name and not "the closer". A manager should be able to forward what',
     'you write, unchanged, to the person it is about.',
+    '',
+    TONE.NEVER_DIMINISH,
     '',
     'WRITE EXACTLY THREE SHORT PARAGRAPHS, in this order.',
     '',

@@ -32,6 +32,10 @@ const { loadTeamWindow, cacheGet, cachePut } = require('./team-synthesis');
 const { membersByManager } = require('./team-membership');
 
 const { clipHref } = require('./clip-link');
+/* ⚠ ONE tone rule, four lanes — see lib/coaching-tone.js. Four copies drift, and a
+   drifted tone rule is INVISIBLE: nothing fails, the wording just softens in one
+   lane and not another. */
+const TONE = require('./coaching-tone.js');
 const DIGEST_MAX_TOKENS = 1200;
 
 var _anthropic = null;
@@ -104,7 +108,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v4-2026-09-01-no-reps-active';
+var DIGEST_PROMPT_VERSION = 'v5-2026-09-01-never-diminish';
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -268,6 +272,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     /* ⚠⚠ THREE COPY RULES (Justin, 2026-09-01 — he has said three times the
        focus sentence blends in, and these are what made it read as generated). */
     'WRITING THE SUMMARY AND THE FOCUS:',
+    TONE.NEVER_DIMINISH,
     '- Do NOT open by restating the header. The call count and the number of closes are printed directly above your text; repeating "31 calls, 3 closes" wastes the first sentence a manager reads.',
     '- Do NOT use the phrase "the day\'s real story is structural", or any variant that announces what kind of story it is. State the finding; do not narrate that you are about to.',
     '- The FOCUS must LEAD WITH THE CLAIM in its own short first sentence — the coaching point itself, e.g. "You\'re closing the pitch, not the deal." Put the evidence in the sentences AFTER it. The first sentence is rendered on its own line and is what a manager reads first.',

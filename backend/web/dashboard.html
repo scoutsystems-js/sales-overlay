@@ -12869,8 +12869,21 @@
         + (d && d.is_default ? '<span class="dash-default-badge">Default</span>' : '') + '</div>'
       + '<div class="dash-bar-actions">'
         + (boards.length > 1 ? dashBoardSelectHtml(boards, d.board) : '')
-        + (d && d.board && !pinned
-            ? '<button type="button" class="dash-bar-btn" onclick="dashPin(\'' + escapeHtml(d.board.id) + '\')">Pin</button>' : '')
+        /* ⚠⚠ A TOGGLE, AND IT RENDERS IN BOTH STATES. It used to render only when
+           the board was NOT pinned, so pinning was a ONE-WAY DOOR — a manager
+           with a single board could pin it and had no way back, and the control
+           vanishing on success reads as the button having broken itself.
+           ⚠ IT SITS IMMEDIATELY AFTER THE BOARD SELECTOR, which already names
+           every board and marks the pinned one with a bullet: the mark and the
+           control belong together, where a manager is already looking at the list.
+           ⚠ THE LABEL IS THE ACTION, NOT THE STATE. "Unpin" implies the board is
+           pinned without restating the badge beside the name — one element states
+           the status, the other offers the change, and neither repeats the other. */
+        + (d && d.board
+            ? '<button type="button" class="dash-bar-btn" onclick="dashTogglePin(\''
+              + escapeHtml(d.board.id) + '\', ' + (pinned ? 'true' : 'false') + ')" title="'
+              + (pinned ? 'Stop opening this board first' : 'Open this board first from the Team menu')
+              + '">' + (pinned ? 'Unpin' : 'Pin') + '</button>' : '')
         + '<button type="button" class="dash-bar-btn" onclick="dashNewBoard()">+ New Board</button>'
         + '<button type="button" class="dash-bar-btn" onclick="dashEnterEdit()" title="Edit this board">✎ Edit</button>'
       + '</div></div>'
@@ -12892,13 +12905,26 @@
     renderTeamDashboard();
   }
 
-  async function dashPin(id) {
+  /* ⚠⚠ ONE HANDLER, TWO DIRECTIONS — never two functions that can drift about
+     what a pin means. The server does the work in both: pinning clears the old
+     pin FIRST because a partial unique index makes two pinned boards
+     unrepresentable, and unpinning is a single write that cannot collide.
+     ⚠ WHAT UNPINNING DOES, and a manager is entitled to know: with nothing
+     pinned the dashboard route falls back to the MOST RECENTLY UPDATED board,
+     and the Team menu names it — the label follows the board it opens rather
+     than requiring a pin. Never an empty entry. */
+  async function dashTogglePin(id, isPinned) {
+    var verb = isPinned ? 'unpin' : 'pin';
     try {
-      var res = await fetch('/team/dashboard/' + encodeURIComponent(id) + '/pin', { method: 'POST', headers: authHeader() });
+      var res = await fetch('/team/dashboard/' + encodeURIComponent(id) + '/pin',
+        { method: isPinned ? 'DELETE' : 'POST', headers: authHeader() });
       var j = await res.json();
-      if (!res.ok) { dashToast(j.error || 'Could not pin that board.'); return; }
+      if (!res.ok) { dashToast(j.error || 'Could not ' + verb + ' that board.'); return; }
+      /* ⚠ REFETCH RATHER THAN FLIPPING LOCALLY. The server is the authority on
+         which board is pinned — it is the thing that cleared the other one — and
+         an optimistic flip lies whenever the write did not land. */
       state.teamDashboard = null; loadTeam('dashboard'); renderTeamDashboard();
-    } catch (e) { dashToast('Could not pin that board.'); }
+    } catch (e) { dashToast('Could not ' + verb + ' that board.'); }
   }
 
   /* ⚠⚠ THE EMPTY BOARD. A blank grid with one small plus reads as broken — the
