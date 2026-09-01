@@ -4072,13 +4072,19 @@
     }
     .dash-pick-item:hover { border-color: var(--border-strong); background: var(--bg-field); }
     .dash-pick-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    /* ⚠⚠ BOTH COLUMNS ARE GIVEN A SHARE AND A FLOOR, and the reason is a defect
+       that measurement could not see: with the view list at `flex: 0 0 auto` the
+       longest one (seven views, ~72 characters) took the whole row, and
+       `min-width: 0` then let the name collapse to ONE WORD PER LINE, overlapping
+       its own views. Every row extracted correctly and read correctly; only the
+       screenshot showed it. The list WRAPS rather than refusing to shrink. */
     .dash-pick-item i { font-style: normal; font-size: var(--fs-secondary); opacity: 0.65;
-      flex: 0 0 auto; text-align: right; padding-top: 2px; }
-    /* ⚠ THE DESCRIPTION GETS THE ROOM. It is the part that makes a metric
-       placeable, so the left column takes the slack and the view list keeps only
-       what it needs. `opacity`, never a grey token — the no-grey rule is about
+      flex: 0 1 38%; min-width: 130px; text-align: right; padding-top: 2px;
+      white-space: normal; line-height: 1.5; }
+    /* ⚠ THE DESCRIPTION GETS THE LARGER SHARE. It is the part that makes a metric
+       placeable. `opacity`, never a grey token — the no-grey rule is about
        unreadable body text, and this recedes without becoming grey. */
-    .dash-pick-item span { display: block; min-width: 0; flex: 1 1 auto; }
+    .dash-pick-item span { display: block; flex: 1 1 62%; min-width: 200px; }
     .dash-pick-item span em {
       display: block; margin-top: 3px; font-style: normal;
       font-size: var(--fs-secondary); opacity: 0.7; line-height: 1.4;
