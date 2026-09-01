@@ -1075,6 +1075,35 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
 
+
+## FILED 2026-09-01 — THE DESIGN PASS NEEDS ANOTHER PASS (Josh, via Justin) — DO NOT TOUCH UNTIL THE WIDGET CATALOG IS DONE
+**Josh HATES it: it looks GENERIC, just black and white, and HE LIKED SEEING MORE OF THE BACKGROUND MESH.** ⚠⚠ **That is the real user of this product saying the pass went too far in one direction, and it outranks any internal preference about it.** Justin wants a **HAPPY MEDIUM, not a reversal.**
+
+**⚠⚠ THE CONSTRAINT THAT MUST TRAVEL WITH IT, OR THE FIX RE-CREATES A DEFECT THAT WAS ALREADY MEASURED: SAFETY IS LAYOUT, NOT FAINTNESS.** Text sits on the GROUND and never on the artwork. **More mesh must come from GEOMETRY, never from dimming the ground or exposing text.**
+
+**Why the mesh is scarce today, measured rather than assumed:** the ground was introduced because removing the cards put **95 of 105 text elements onto the artwork**, and the mesh was then **floored below 1496px** because a 0-24px band renders as a stray green line rather than as artwork. **Between them it is absent on most screens** — so this is two decisions compounding, and a fix has to address both rather than reverting one.
+
+⚠ **NOT ACTED ON. Do not touch it until the widget catalog is finished.**
+
+---
+
+## 2026-09-01 — "ADD CARD DOES NOTHING": `_forbidden` WENT UNHANDLED (`4914a61`)
+Deployed, verified by commit hash, served-page parity and the ordering fix on the deployed page. Suite **2049**.
+
+**⚠⚠⚠ IT IS THE ROLE PATH.** A `user` gets **403 on every team lane** (confirmed over HTTP with a forged actor), and `fetchTeamJSON` turns a 403 into `{ _forbidden: true }` — **not `_error`**. Four functions tested `_error` and reached their success branch, so a closer saw **"This board is empty — Add the numbers you want to see first thing"**, with a **working Edit button**, and "+ Add card" opened **a modal containing nothing but its own header**.
+
+**RULED OUT FIRST, WITH EVIDENCE:** the mount point (deployed `dashEnsurePicker` appends to `document.body` — ⚠ the brief had this backwards, inside `#content` was the DEFECT restored to prove the guard fires) · the handler (all 12 inline-onclick globals resolve) · **a real click (1 mousedown delivered, picker OPENS on the manager path)** · occlusion (`elementFromPoint` returns the picker item, z 9998) · a silent 403 for a manager (`requireRole` answers a DB error with **500**) · an account-specific board (**0 rows in `dashboards`**).
+
+**⚠ THE ORDERING FAULT: the picker rendered INTO the modal before revealing it**, so any throw in the render meant it never appeared — the symptom is "nothing happens" and the cause is a function nobody would suspect from it. **Reveal first, render second**, with the render in a `try/catch`.
+
+**ONE PREDICATE, TWO WORDS.** `laneProblem` → `null | 'forbidden' | 'error'`; the board says it, the toolbar renders no controls (**but keeps the message host**, or the refusal has nowhere to go), edit mode refuses out loud, the picker has four states and four answers, the gauge distinguishes them. **And `undefined` is not `null` to a `=== null` guard** — the next line read a property off it and threw.
+
+**⚠ WHAT COULD NOT BE ESTABLISHED, STATED PLAINLY: WHICH JOSH.** Three exist — a `user`, a `manager` and an `owner`. There is evidence for a role-shaped failure producing exactly this symptom, the manager path works under a real click, and **I cannot log in as Josh**. If it was the manager, his report is unexplained; asking him to try again is the cheap discriminator, because a closer now gets a sentence rather than silence.
+
+**Guards:** `dashboard-forbidden` (8), **six of six restored defects caught.** ⚠ One passed for the WRONG REASON first — it located `laneProblem(d)` anywhere, including a dead assignment, so it survived the branch being deleted. **5 failures against 6 restored defects is the signal**; it now asserts the branch.
+
+---
+
 ## 2026-09-01 — THE CATALOG WAS ASSERTING 13 BROKEN COMBINATIONS (`3a20408`)
 Deployed, verified by commit hash and by served-page parity. Suite **2041**. **Justin's three findings on the live editor: two were defects and one was a discoverability failure.**
 

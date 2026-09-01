@@ -5662,6 +5662,31 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **FOUND BY LOOKING AT THE FIRST RENDER.** Fifth time on this pass that looking has found what a check could not.
 - **THE HABIT: when a design rule is implemented as a PER-VIEW LIST, adding a view means adding it to every list — and the lists must be enumerated, not remembered.** Here there were five (`.page`, `.section`, `.page-header`, `.page-header--company`, `.team-controls-row`).
 
+### ⚠⚠⚠ A 403 IS NOT AN ERROR AND NEITHER IS "EMPTY" — `_forbidden` WENT UNHANDLED ON A WHOLE SURFACE (2026-09-01)
+**Reported as "Add card does nothing". `fetchTeamJSON` turns a 403 into `{ _forbidden: true }`, which is NOT `_error` — so FOUR functions tested `_error` and sailed past a permission failure into their SUCCESS branch.**
+```
+what a closer saw on the deployed page, with 403 on every team lane:
+  "This board is empty — Add the numbers you want to see first thing"   + a WORKING Edit button
+  "+ Add card"  ->  a modal containing NOTHING but its own header
+```
+- **⚠⚠ TWO RULES BROKEN AT ONCE, AND THEY COMPOUND.** A permission failure rendering as an empty board is *a data problem must never render as good news*; a dialog with no content is indistinguishable from a control that does nothing. **The outcome must be one of three: it works, it is not on screen, or it says why.**
+- **⚠⚠ THE MECHANISM IS THE ABSENT-VS-EXCLUDED COLLAPSE WEARING A NEW FIELD NAME.** Every reader knew about `_error` and nothing knew about `_forbidden`, so a refusal and an empty result became the same thing. **Whenever a fetch layer can produce more than one failure shape, GREP EVERY CONSUMER FOR EACH SHAPE — a consumer that handles one and not the other does not fail, it succeeds wrongly.**
+- **ONE PREDICATE, TWO WORDS.** `laneProblem(d)` returns `null | 'forbidden' | 'error'`: **the two need DIFFERENT SENTENCES and the SAME GATE**, which is why a shared predicate rather than four hand-written checks. ⚠ And a `null` lane must return `null` — a lane that has not landed is not a failure, or every skeleton becomes an error message.
+- **⚠ THE CONTROLS COME OFF, BUT THE MESSAGE HOST STAYS.** Removing the toolbar over a failed lane also removes the toast host — and then the refusal has nowhere to go and **the silence comes straight back**. The stripped toolbar returns the host and nothing else.
+- **⚠ AND THE PROBLEM BRANCH MUST COME BEFORE THE SUCCESS BRANCH.** Placed after it, it is unreachable — which is literally how the 403 reached the empty-board invitation.
+
+### ⚠⚠⚠ REVEAL BEFORE RENDER — RENDERING INTO A HIDDEN DIALOG MAKES EVERY ERROR SILENT (2026-09-01)
+**`dashOpenPicker` ran `dashRenderPicker()` and THEN removed `hidden`. So ANY throw inside the render meant the modal never appeared at all.**
+- **⚠⚠ THE SYMPTOM IS "NOTHING HAPPENS", AND THE CAUSE IS IN A FUNCTION NOBODY WOULD SUSPECT FROM THAT SYMPTOM.** A user presses a button and the page does not move; the console error is in a renderer, one call down, in a file 18,000 lines long.
+- **THE RULE: MAKE THE CONTAINER VISIBLE FIRST, THEN FILL IT.** Revealed first, a render failure is a VISIBLE EMPTY DIALOG rather than an invisible one — and a `try/catch` around the render then turns that into a sentence. **Two cheap changes convert an unfalsifiable symptom into a legible one.**
+- **⚠ IT GENERALISES TO ANY DEFERRED-REVEAL UI:** modals, popovers, drawers, tooltips, lazy panels. **Wherever the reveal is downstream of the content, a content failure deletes the whole feature rather than degrading it.**
+
+### ⚠⚠ A GUARD THAT LOCATES A CALL RATHER THAN A BRANCH SURVIVES THE BRANCH BEING DELETED (2026-09-01)
+**My own guard asserted `laneProblem(d)` appears before `dashEmptyHtml()` in `renderTeamDashboard`. Restoring the defect — deleting the `else if` branch and leaving the dead `var problem = laneProblem(d)` assignment — LEFT IT GREEN.**
+- **⚠ IT IS THE COMPUTE-A-CHECK-AND-IGNORE-ITS-RESULT SHAPE, POINTED AT A GUARD.** The call is present, the result is discarded, and a search for the call cannot tell the difference.
+- **THE FIX IS TO ANCHOR ON THE BRANCH, NOT THE MENTION** — and then re-prove by deleting the branch while deliberately LEAVING the assignment, which is the case that fooled it.
+- **⚠⚠ IT WAS ONLY FOUND BECAUSE THE NON-VACUITY RUN RESTORED SIX DEFECTS AND ONLY FIVE FAILED.** A count that does not match the number of defects restored is the signal — **5 of 6 is not a pass, it is a guard aimed one level too low.**
+
 ### ⚠⚠⚠ A CATALOG THAT CONFLATES "THE DATA EXISTS" WITH "SOMETHING CAN DRAW IT" OFFERS CARDS THAT LIE (2026-09-01)
 **Justin reported one card showing no data. Rendering EVERY offered combination through the real builder — the CATALOG'S CLAIM being the thing under test, not that one card — found 13 of 30 broken.**
 ```
