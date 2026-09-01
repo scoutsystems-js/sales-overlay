@@ -108,23 +108,39 @@ test('by default every panel is visible and nothing is stored', () => {
   assert.strictEqual(a.note(), '', 'no note when nothing is hidden');
 });
 
-test('toggling hides one panel and leaves the rest alone', () => {
-  const a = api();
-  a.toggle('digest');
-  assert.strictEqual(a.visible('digest'), false);
-  assert.strictEqual(a.visible('gauges'), true);
-  a.toggle('digest');
-  assert.strictEqual(a.visible('digest'), true, 'toggling again restores it');
+/* ⚠⚠ ARCHIVED 2026-08-31 — THE CONTROL IS GONE (Justin: "it carries over to
+   every page and should not"), so there is nothing to toggle. Kept, not
+   deleted, because it is the behaviour to restore if the Widget Catalog brings
+   a panel chooser back:
+     toggle('digest') hides only digest · toggling again restores it
+   ⚠ The STORAGE tests below still run and still pass — teamPanelsHidden is
+   unchanged. What stopped is teamPanelVisible APPLYING it. */
+/* ⚠⚠ THE RULING SURVIVES THE CONTROL. Storing the HIDDEN set rather than the
+   visible one is why a panel added later shows up for a manager who customised
+   earlier; storing the visible set would leave every new panel silently absent
+   for them forever. The control is gone, so this is asserted on
+   teamPanelsHidden — the reader that still encodes it — rather than through
+   visibility, which is now constant. */
+test('⚠⚠ the STORED set is the HIDDEN one, so a NEW panel is visible by default', () => {
+  const a = api(['digest']);
+  const hidden = a.hidden();
+  assert.deepStrictEqual(Object.keys(hidden), ['digest'], 'only the explicit choice is stored');
+  a.PANELS.filter(p => p.key !== 'digest').forEach(p =>
+    assert.ok(!hidden[p.key], p.key + ' was never hidden, so it must not be in the stored set'));
 });
 
-test('⚠⚠ the STORED set is the HIDDEN one, so a NEW panel is visible by default', () => {
-  /* Replay storage written when the list was shorter: only 'digest' was hidden.
-     Every panel added since must still show. If the visible set were stored,
-     each of these would be silently absent for this manager forever. */
-  const a = api(['digest']);
-  assert.strictEqual(a.visible('digest'), false, 'the explicit choice survives');
-  a.PANELS.filter(p => p.key !== 'digest')
-    .forEach(p => assert.strictEqual(a.visible(p.key), true, p.key + ' must be visible by default'));
+/* ⚠⚠ THE STORED SETS ARE KEPT AND NO LONGER APPLIED, AND BOTH HALVES MATTER.
+   Deleting them would be data loss wearing a fix's clothes. Still APPLYING them
+   with no control on screen would leave a manager who had hidden a panel with
+   it hidden forever and no way back — worse than a cluttered page. */
+test('⚠⚠ a stored hidden set is preserved but no longer hides anything', () => {
+  const a = api(['digest', 'gauges']);
+  assert.deepStrictEqual(Object.keys(a.hidden()).sort(), ['digest', 'gauges'],
+    'the manager\'s choices must still be in storage, untouched');
+  a.PANELS.forEach(p => assert.strictEqual(a.visible(p.key), true,
+    p.key + ' must be visible — nobody may be stranded with a hidden panel and no control'));
+  assert.strictEqual(a.note(), '',
+    'and the all-hidden note must never fire when nothing can be hidden');
 });
 
 test('unknown keys in storage are discarded, not carried', () => {
@@ -142,21 +158,9 @@ test('unreadable storage means nothing hidden, and never throws', () => {
   assert.deepStrictEqual(hidden(), {});
 });
 
-test('hide-all says so on screen rather than leaving a bare toolbar', () => {
-  const a = api();
-  /* ⚠ THE NOTE IS NOW PER PAGE (the split): it asks whether every panel on THIS
-     page is hidden, so the fixture has to say which page it is on. Before the
-     split there was one page and the question had no subject to name. */
-  a.setView('team-performance');
-  a.all(false);
-  a.PANELS.forEach(p => assert.strictEqual(a.visible(p.key), false));
-  const note = a.note();
-  assert.match(note, /Every panel/i, 'an empty page must explain itself');
-  assert.match(note, /Customize View/, 'and must say how to undo it');
-  a.all(true);
-  assert.strictEqual(a.note(), '');
-});
-
+/* ⚠ ARCHIVED with the control 2026-08-31 — there is no hide-all, so there is
+   no bare toolbar to explain. The property it protected (an empty page must say
+   why rather than looking broken) is worth restoring with any future chooser. */
 test('the button counts what is shown, and rows stay listed when hidden', () => {
   const a = api(['digest', 'reps']);
   a.open();
@@ -194,8 +198,14 @@ test('every registered panel is actually gated in the render', () => {
   });
 });
 
-test('the inert coming-soon marker is gone and the real control took its place', () => {
+/* ⚠ CONVERTED 2026-08-31. Half of this survives: the inert placeholder must
+   still never come back. The other half — that the real control sits where the
+   marker promised — is retired with the control itself. */
+test('the inert coming-soon placeholder never returns, and neither does the control', () => {
   assert.strictEqual(HTML.indexOf('customizeViewSoonHtml'), -1, 'the placeholder must not survive');
-  assert.ok(/\+ summaryBtnHtml\(\) \+ customizeViewHtml\(\)/.test(HTML),
-    'the real control must sit where the marker promised');
+  const at = HTML.indexOf('function teamControlsHtml');
+  const row = HTML.slice(at, HTML.indexOf('\n  }', at));
+  assert.ok(row.length > 300 && row.length < 2500, 'row slice: ' + row.length);
+  assert.ok(!/\+ customizeViewHtml\(\)/.test(row),
+    'the control was removed from the product, not just from one page');
 });

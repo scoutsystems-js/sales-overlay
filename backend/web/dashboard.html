@@ -659,7 +659,17 @@
       backdrop-filter: blur(8px);
       position: sticky;
       top: 0;
-      z-index: 50;
+      /* ⚠⚠ 70, NOT 50 — AND THE MENU IS WHY. The nav used to tie with
+         .page-header (also 50, position:relative for the date panel), and at
+         equal z-index the LATER element wins, so the company card painted over
+         the nav. That was invisible until the Team tab became a dropdown: the
+         menu's own z-index:60 is scoped INSIDE this stacking context and can
+         never rise above a sibling context at 50, so two of its five items
+         rendered BEHIND the card's <h1>. A popup rendering behind the page is a
+         stacking context, not a z-index value.
+         ⚠ Still below modals (100) and the welcome overlay (9999), which must
+         both cover the nav. Found by looking at it — every measurement passed. */
+      z-index: 70;
     }
     .top-bar-left { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; }
     .top-bar-left .sep { color: var(--text); font-weight: 400; }
@@ -715,6 +725,35 @@
     /* ⚠ THE PANEL IS ABSOLUTE INSIDE A RELATIVE WRAP, so it overlays the charts
        instead of reflowing the controls row every time it opens. */
     .rep-filter-wrap { position: relative; display: inline-block; }
+    /* ⚠⚠ THE TEAM TAB IS THE PAGE DROPDOWN (Justin, 2026-08-31). The wrapper
+       exists ONLY to anchor the menu — it adds no padding, no margin and no
+       font of its own, so the tab's own box is unchanged. Measured before and
+       after: the tab is 33px wide, 41px with the caret, and the nav's clearance
+       at 1440 goes 116px -> 108px. The nav is flex-NOWRAP, so it cannot wrap;
+       the point where the two groups touch moves 1324px -> 1334px, and nothing
+       clips or overlaps even at 1280. */
+    .nav-team-wrap { position: relative; display: inline-flex; align-items: center; }
+    /* ⚠ THE ONLY COSMETIC ADDITION. Type, size, weight, colour, spacing and the
+       active underline are untouched — this is a 9px glyph and 4px of space. */
+    .nav-caret { margin-left: 4px; font-size: 9px; vertical-align: 1px; opacity: 0.7; }
+    /* ⚠ The tab is focusable now, so it needs a visible ring — the browser's
+       default outline is suppressed by the nav's own styling elsewhere. */
+    .top-bar-left .nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+    .nav-team-menu {
+      position: absolute; top: calc(100% + 10px); left: 0; z-index: 60;
+      min-width: 190px;
+      /* ⚠ OPAQUE, like every other panel — it sits over the raster. */
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong); border-radius: var(--radius);
+      padding: 6px; box-shadow: 0 10px 28px rgba(0,0,0,0.55);
+    }
+    .nav-team-item {
+      display: block; padding: 7px 9px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap;
+    }
+    .nav-team-item:hover { background: rgba(var(--accent-rgb), 0.10); }
+    .nav-team-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .nav-team-item.is-here { background: rgba(var(--accent-rgb), 0.14); }
     .rep-filter-caret { margin-left: 6px; font-size: 10px; opacity: 0.7; }
     .rep-filter-menu {
       position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
@@ -3822,7 +3861,21 @@
     <span class="sep">·</span>
     <a class="nav-link" id="navEod" onclick="goEod(); return false;">EOD Report</a>
     <span class="sep" id="navTeamSep" style="display:none">·</span>
-    <a class="nav-link" id="navTeam" onclick="goTeam(); return false;" style="display:none">Team</a>
+    <!-- ⚠⚠ THE TEAM TAB IS THE FIVE-PAGE DROPDOWN. The wrapper is an anchor for
+         the menu and nothing else; the <a> keeps its class, its onclick shape
+         and every cosmetic property it had. The separator stays hand-placed
+         above, per the (ff) note. -->
+    <span class="nav-team-wrap" id="navTeamWrap" style="display:none">
+      <!-- ⚠⚠ tabindex IS REQUIRED, NOT DECORATION. Every tab in this nav is an
+           <a> with NO href, which means none of them is focusable or in the tab
+           order — pre-existing, and tolerable for a plain link. It is not
+           tolerable for a MENU: without this, Escape has nothing to return
+           focus to and a keyboard user cannot open the thing at all. -->
+      <a class="nav-link" id="navTeam" tabindex="0"
+         onclick="navTeamClick(event); return false;"
+         onkeydown="navTeamButtonKeydown(event);"
+         aria-haspopup="true" aria-expanded="false">Team<span class="nav-caret">▾</span></a>
+    </span>
     <!-- Prospects nav link REMOVED 2026-08-04 (Justin: distracting). The page,
          its routes and merge review all remain — reachable at #prospects. Merge
          quality still moves the close rate, so SQL must not become the only way
@@ -4648,7 +4701,9 @@
       document.getElementById('adminLink').style.display = '';
     }
     if (state.me.role === 'manager' || state.me.role === 'owner') {
-      document.getElementById('navTeam').style.display = '';
+      // ⚠ THE WRAPPER carries the gate now, not the <a> — hiding only the link
+      //   would leave an empty inline-flex box and its separator in the nav.
+      document.getElementById('navTeamWrap').style.display = '';
       document.getElementById('navTeamSep').style.display = '';
       // the manager-only coming-soon tabs ride the SAME gate as Team
       /* ⚠ Reps removed 2026-08-20 (Justin's call). Marketing Insights shares this
@@ -10618,8 +10673,10 @@
        ⚠ teamSelectHtml() returns '' for a non-owner, so the admin-only gate is
        unchanged by the move — and it is enforced server-side regardless. */
     return '<div class="page-header page-header--company fade-in" style="margin-bottom:18px;">'
-      + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1>'
-        + '<div class="review-meta-row">' + teamPageSelectHtml() + '</div></div>'
+      /* ⚠ THE PAGE DROPDOWN MOVED INTO THE NAV TAB (Justin, 2026-08-31) and is
+         NOT rendered here any more — a second copy on the card would be two
+         controls for one thing, which is the defect this file records most. */
+      + '<div class="page-header-main"><h1>' + escapeHtml(label) + '</h1></div>'
       + '<div class="page-header-side">' + teamSelectHtml() + '</div>'
     + '</div>';
   }
@@ -10663,6 +10720,12 @@
     return TEAM_SUBVIEWS.indexOf(v) !== -1;
   }
 
+  /* ⚠ DEAD SINCE 2026-08-31 — the page dropdown moved into the nav's Team tab
+     and this has NO call sites (its only occurrence is its own declaration,
+     which is this codebase's definition of dead). Kept, not deleted, because it
+     is the exact markup to restore if the nav menu is ever reverted — and
+     marked, because a live-looking builder nothing calls is the orphaned-strip
+     shape this file records. */
   function teamPageSelectHtml() {
     var here = teamPageForView(state.view);
     return '<select class="user-select team-page-select" onchange="goTeamPage(this.value)" '
@@ -10673,6 +10736,96 @@
         }).join('')
       + '</select>';
   }
+  /* ⚠⚠ THE NAV TAB *IS* THE PAGE DROPDOWN (Justin, 2026-08-31). It replaced a
+     <select> on the company card, which is gone — one control, one place.
+
+     ⚠ WHAT A CLICK DOES, and it is a choice worth stating: every other tab in
+     this nav NAVIGATES, so a tab that only opened a menu would behave unlike
+     its neighbours. From OUTSIDE the team area a click does what it has always
+     done — goes to the team area (Daily Digest) — and opens the menu as well.
+     From INSIDE it only opens the menu, because navigating would throw the
+     manager off the page they are standing on to show them a list.
+
+     ⚠ Built fresh on every open, so the current page is always marked without
+     anything having to keep the menu in step with the view. */
+  function navTeamMenuHtml() {
+    var here = teamPageForView(state.view);
+    return '<div class="nav-team-menu" role="menu" id="navTeamMenu">'
+      + TEAM_PAGES.map(function (p) {
+          return '<a class="nav-team-item' + (p.view === here ? ' is-here' : '') + '"'
+            + ' role="menuitem" tabindex="0"'
+            + ' aria-current="' + (p.view === here ? 'page' : 'false') + '"'
+            + ' onclick="event.stopPropagation(); navTeamPick(\'' + p.view + '\');"'
+            + ' onkeydown="navTeamKeydown(event, \'' + p.view + '\');">'
+            + escapeHtml(p.label) + '</a>';
+        }).join('')
+    + '</div>';
+  }
+
+  function navTeamMenuClose() {
+    if (!state.navTeamOpen) return;
+    state.navTeamOpen = false;
+    var m = document.getElementById('navTeamMenu'); if (m) m.remove();
+    var a = document.getElementById('navTeam');
+    if (a) a.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', navTeamOutside);
+    document.removeEventListener('keydown', navTeamEscape);
+  }
+
+  function navTeamMenuOpen() {
+    if (state.navTeamOpen) return;
+    var wrap = document.getElementById('navTeamWrap'); if (!wrap) return;
+    state.navTeamOpen = true;
+    wrap.insertAdjacentHTML('beforeend', navTeamMenuHtml());
+    var a = document.getElementById('navTeam');
+    if (a) a.setAttribute('aria-expanded', 'true');
+    /* ⚠ ARMED ON OPEN AND REMOVED ON CLOSE. Armed at boot it runs for a control
+       that is usually shut; armed per open without removal it stacks one
+       listener per open. Same shape as the rep filter. */
+    document.addEventListener('click', navTeamOutside);
+    document.addEventListener('keydown', navTeamEscape);
+  }
+
+  /* ⚠⚠ CONTAINMENT, NOT PROPAGATION. The rep filter shipped this bug once: an
+     outside-click closer registered in the CAPTURE phase runs BEFORE the row's
+     own handler, so stopPropagation() on the row could not save it and the menu
+     shut before the click was processed. Asking where the click LANDED cannot
+     be defeated by phase or ordering. */
+  function navTeamOutside(e) {
+    if (e.target && e.target.closest && e.target.closest('.nav-team-wrap')) return;
+    navTeamMenuClose();
+  }
+  function navTeamEscape(e) {
+    if (e.key !== 'Escape') return;
+    navTeamMenuClose();
+    var a = document.getElementById('navTeam'); if (a) a.focus();   // never strand focus
+  }
+  /* ⚠ Space must be preventDefault'ed or the page scrolls under the open menu. */
+  function navTeamButtonKeydown(e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navTeamClick(e); }
+    else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!state.navTeamOpen) navTeamMenuOpen();
+      var first = document.querySelector('.nav-team-item'); if (first) first.focus();
+    }
+  }
+  function navTeamKeydown(e, view) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();          // or Space scrolls the page under the open menu
+      navTeamPick(view);
+    }
+  }
+  function navTeamPick(view) {
+    navTeamMenuClose();
+    if (view && view !== state.view) setView(view);
+  }
+  function navTeamClick(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (state.navTeamOpen) { navTeamMenuClose(); return; }
+    if (!isTeamView(state.view)) goTeam();   // the tab still navigates, as every other tab does
+    navTeamMenuOpen();
+  }
+
   function goTeamPage(view) {
     if (!view || view === state.view) return;
     setView(view);
@@ -10759,7 +10912,14 @@
     return '<div class="page-header fade-in team-controls-row">'
       + '<div class="page-header-side" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         + '<div class="date-presets">' + datePickerHtml('team') + '</div>'
-        + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + customizeViewHtml() + '</div>'
+        /* ⚠⚠ CUSTOMIZE VIEW REMOVED (Justin, 2026-08-31): "it carries over to
+           every page and should not." ⚠ IT WAS A BUG, NOT ONLY CLUTTER — it
+           listed TEAM_PANELS (all nine) rather than panelsForPage(), so the
+           control on ANY page toggled EVERY page's panels. Hiding the digest
+           from Performance hid it on Daily Digest, where the manager could not
+           see what they had done. On People — which owns no panels at all — it
+           edited three other pages exclusively. */
+        + objectionsDrillBtnHtml() + manageMembersBtnHtml() + summaryBtnHtml() + '</div>'
       + '<div class="meta team-range-scope">These dates apply to ' + escapeHtml(here) + '. Each page keeps its own.</div>'
     + '</div>';
   }
@@ -10892,7 +11052,18 @@
     return h;
   }
 
-  function teamPanelVisible(key) { return !teamPanelsHidden()[key]; }
+  /* ⚠⚠ EVERY PANEL IS VISIBLE WHILE THERE IS NO CONTROL TO UN-HIDE IT.
+     The stored sets are NOT deleted — they survived the split intact and were
+     verified against real data — but they are no longer APPLIED, and that is
+     the load-bearing half. Removing the control while still reading them would
+     leave any manager who had hidden a panel with it hidden FOREVER and no way
+     back: a hidden panel with no route to un-hide it is worse than a cluttered
+     page. Nothing is lost either way — if the control returns (the Widget
+     Catalog row), their preferences are still in storage exactly as they left
+     them, and this one line restores the behaviour.
+     ⚠ Deleting the storage would have been data loss wearing a fix's clothes. */
+  function teamPanelVisible(key) { return true; }
+  // superseded while the control is gone: return !teamPanelsHidden()[key];
 
   function saveTeamPanels() {
     try {

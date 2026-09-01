@@ -289,13 +289,96 @@ test('⚠ Daily Digest has no date picker — nothing on it answers to one', () 
   assert.ok(/teamDigestHtml\(\)/.test(body), 'the digest is the page');
 });
 
-test('the page dropdown has ONE definition and renders from the shared header', () => {
-  assert.strictEqual((LIVE.match(/function teamPageSelectHtml/g) || []).length, 1);
-  assert.strictEqual((LIVE.match(/teamPageSelectHtml\(\)/g) || []).length, 2,
-    'one definition, one call site — a second copy has been built and left dead here before');
-  const at = LIVE.indexOf('function teamHeaderHtml');
-  const body = LIVE.slice(at, LIVE.indexOf('\n  }', LIVE.indexOf('return ', at)));
-  assert.ok(/teamPageSelectHtml\(\)/.test(body), 'the dropdown rides the header every page renders');
+/* ⚠⚠ CONVERTED 2026-08-31 — THE DROPDOWN MOVED INTO THE NAV'S "Team" TAB
+   (Justin: he disliked its placement on the company card). The SUBJECT of this
+   test survives exactly: there must be ONE page control, in ONE place. Only its
+   home changed. The old <select> builder is kept but is now DEAD — asserted
+   below, so a second copy cannot be quietly revived on the card. */
+test('⚠⚠ the page dropdown is the NAV TAB, and there is exactly one of it', () => {
+  // it is gone from the company card
+  const hAt = LIVE.indexOf('function teamHeaderHtml');
+  const header = LIVE.slice(hAt, LIVE.indexOf('\n  }', LIVE.indexOf('return ', hAt)));
+  assert.ok(!/teamPageSelectHtml\(\)/.test(header),
+    'the card must not carry a second page control');
+
+  // the retired <select> builder has no call sites at all
+  // ⚠ the DEFINITION matches this pattern too, so count only invocations
+  const invocations = (LIVE.match(/(?<!function )teamPageSelectHtml\(\)/g) || []).length;
+  assert.strictEqual(invocations, 0,
+    'the retired builder must have no call sites — a live-looking builder nothing '
+    + 'calls is the orphaned-strip shape');
+  assert.strictEqual((LIVE.match(/function teamPageSelectHtml/g) || []).length, 1,
+    'and it is KEPT, archived, as the markup to restore if the nav menu is reverted');
+
+  // the nav tab is the control, and it lists every page from the one list
+  assert.ok(/id="navTeamWrap"/.test(LIVE), 'the Team tab must anchor the menu');
+  assert.ok(/onclick="navTeamClick\(event\)/.test(LIVE), 'the tab opens it');
+  const mAt = LIVE.indexOf('function navTeamMenuHtml');
+  const menu = LIVE.slice(mAt, LIVE.indexOf('\n  }', mAt));
+  assert.ok(menu.length > 200 && menu.length < 1800, 'menu slice: ' + menu.length);
+  assert.ok(/TEAM_PAGES\.map/.test(menu),
+    'the menu must render from TEAM_PAGES — never a second copy of the page names');
+});
+
+/* ⚠⚠ THE MENU MUST BE ABLE TO ESCAPE THE PAGE. The nav tied with
+   .page-header at z-index 50, and at equal z-index the LATER element wins — so
+   the company card painted over the nav. Harmless while the nav held only
+   links; the moment the Team tab became a dropdown, two of its five items
+   rendered BEHIND the card's <h1>. The menu's own z-index is scoped INSIDE the
+   nav's stacking context and cannot rescue it. Found by LOOKING — every
+   measurement passed. */
+test('⚠⚠ the nav outranks page content, and still yields to modals', () => {
+  const z = (sel) => {
+    const at = LIVE.indexOf(sel + ' {');
+    assert.ok(at !== -1, 'stale anchor — ' + sel + ' is gone');
+    const rule = LIVE.slice(at, LIVE.indexOf('}', at));
+    const m = /z-index:\s*(\d+)/.exec(rule);
+    assert.ok(m, sel + ' must declare a z-index');
+    return parseInt(m[1], 10);
+  };
+  const bar = z('.top-bar'), header = z('.page-header'), modal = z('.support-modal');
+  assert.ok(bar > header,
+    'the nav (' + bar + ') must outrank .page-header (' + header + ') or a menu '
+    + 'opened from it renders behind the page');
+  assert.ok(bar < modal,
+    'but stay below modals (' + modal + '), which must cover the nav');
+});
+
+/* ⚠ COSMETICS ARE THE CONSTRAINT HERE, NOT A PREFERENCE (Justin: "do not change
+   its cosmetics"). The tab keeps its class, and the ONLY addition is the caret.
+   Measured: the tab is 33px -> 41px, the nav's clearance at 1440 is 108px, and
+   the point where the two nav groups touch moves 1324px -> 1334px. */
+test('⚠ the Team tab keeps every cosmetic property — only a caret is added', () => {
+  // ⚠ ANCHOR ON THE ELEMENT, NOT A FIXED WINDOW. A 500-char slice stopped
+  //   reaching the caret the moment a comment was added above the tag.
+  const at = LIVE.indexOf('<a class="nav-link" id="navTeam"');
+  assert.ok(at !== -1, 'stale anchor — the Team tab is gone');
+  const block = LIVE.slice(at, LIVE.indexOf('</a>', at) + 4);
+  assert.ok(block.length > 80 && block.length < 500, 'tag slice: ' + block.length);
+  assert.ok(/class="nav-link" id="navTeam"/.test(block),
+    'the tab must keep the shared nav-link class — its type, size, weight, colour, '
+    + 'spacing and active underline all come from it');
+  assert.ok(/<span class="nav-caret">/.test(block), 'the caret is the one addition');
+
+  /* ⚠⚠ KEYBOARD ACCESS IS REQUIRED, NOT OPTIONAL. Every tab in this nav is an
+     <a> with NO href, so none of them is focusable — pre-existing, and fine for
+     a plain link. For a MENU it is not: without tabindex, Escape has nothing to
+     return focus to and the control cannot be opened from the keyboard at all.
+     Proven by measuring it: focus return failed before this was added. */
+  assert.ok(/tabindex="0"/.test(block), 'the menu tab must be reachable by keyboard');
+  assert.ok(/onkeydown="navTeamButtonKeydown/.test(block), 'and openable from it');
+  assert.ok(/aria-haspopup="true"/.test(block) && /aria-expanded=/.test(block),
+    'and it must announce itself as a menu');
+  // the wrapper must add no box of its own
+  // ⚠ SLICE TO THE RULE'S OWN CLOSING BRACE. A fixed-length slice ran into the
+  //   NEXT rule (.nav-caret, which legitimately has margin and font-size) and
+  //   reported the wrapper as changing the box — scope wider than the claim.
+  const cAt = LIVE.indexOf('.nav-team-wrap {');
+  const css = LIVE.slice(cAt, LIVE.indexOf('}', cAt) + 1);
+  assert.ok(css.length > 20 && css.length < 160, 'rule slice: ' + css.length);
+  assert.ok(/position: relative/.test(css), 'the wrapper must anchor the menu');
+  assert.ok(!/padding|margin|font-size|font-weight|color/.test(css),
+    'and must not change the tab\'s box: ' + css);
 });
 
 /* ⚠⚠ ONE NAME EVERYWHERE (Justin, mid-block 2026-08-31). Page ① is "Daily

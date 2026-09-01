@@ -134,7 +134,11 @@ test('⚠⚠ the drilldown renders its controls IN the card, and drops the team-
 test('⚠ the buttons still exist on the MAIN team controls row', () => {
   // removing them from one page must not remove them from the app
   const main = slice('function teamControlsHtml', '\n  }');
-  ['manageMembersBtnHtml()', 'customizeViewHtml()', 'summaryBtnHtml()'].forEach((b) => {
+  // ⚠ customizeViewHtml() REMOVED from this list 2026-08-31 — the control is
+  //   gone from the product (Justin), not merely from this row. The property
+  //   this test protects — removing a button from ONE page must not remove it
+  //   from the app — is unchanged for the two that remain.
+  ['manageMembersBtnHtml()', 'summaryBtnHtml()'].forEach((b) => {
     assert.ok(main.indexOf(b) !== -1, b + ' must remain on the team page');
   });
 });
