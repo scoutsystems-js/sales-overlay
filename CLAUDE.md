@@ -5113,6 +5113,49 @@ josh    filed 180 `synced_unanalyzed`  ->  THAT STATUS DOES NOT EXIST IN THE TAB
 - **THE HABIT: when a ruling unblocks a row, CHECK THE CODE BEFORE RECORDING THE RULING.** *"Ruled buildable"* and *"not built"* are independent facts and the second is the one that decays.
 - **⚠ AND A ROW MOVED TO A DONE SECTION BEFORE THE USER HAS CONFIRMED IS THE SAME BUG POINTED FORWARD.** The team-picker row had been filed under LIVE while Justin had not yet refreshed. **A gesture-verified fix is not closed until the gesture has been made** — the picker has caught this twice.
 
+### ⚠⚠⚠ A CAPTION EDIT LEFT THE CAPTION AS DEAD CODE, AND EVERY CHECK PASSED (2026-09-01)
+**A stray `;` terminated the `return`, so the two lines after it became `+ '...'` expression statements — valid JavaScript, unreachable, never rendered. The People caption was in the file and never on the screen for an hour.**
+```
+node -c            passes    it parses
+the suite          passes    1926/1926
+the guard          passes    it grepped the FILE, and the string was still in the file
+rendering it       FAILS     2 rows, caption absent   <- the only check that could see it
+```
+- **⚠⚠ THE GUARD WAS THE THING PROTECTING THAT SENTENCE, AND IT WAS SATISFIED BY THE DEFECT.** Same family as the dead mount line and the orphaned strip builder — **grepping for a string and rendering it are the same check twice: both confirm it EXISTS, neither confirms it RUNS.**
+- **THE FIX IS TO ASSERT THE TOKEN, NOT THE STRING: the thing after the table literal must be a `+`.** Proven by restoring the exact defect and watching it fail.
+- **⚠ THAT GUARD TOOK THREE ATTEMPTS, EACH WRONG IN THE SCOPE-VS-CLAIM WAY:** `lastIndexOf('return ')` finds the **inner** return inside `rows.map()`, not the builder's final one; then a bare `;` search matched the semicolon **inside the caption's own prose** ("frees a seat; adding or reactivating adds one"). **A semicolon in a string literal is not a statement terminator.**
+- **⚠ AND THE PROBE THAT MEASURED THE NAV HIT THE COMMENT-AS-CODE TRAP IN THE SAME BLOCK:** `indexOf('<nav class="top-bar">')` found the string inside a COMMENT at line 13 and reported the nav as **1,158 lines**. Anchored to column 0 (`/^<nav class="top-bar">/m`) it is **61**. In a file that is 43% comment, an unanchored `indexOf` is a guess.
+
+### ⚠⚠ REMOVING A CAPTION CAN REMOVE A CONSEQUENCE — CUT THE MECHANISM, KEEP THE FACT (2026-09-01)
+**The People caption was THREE clauses and a sweep took all three. Only one was roadmap.**
+```
+GONE      "Plan is per-user until the billing block adds an account entity"   our own roadmap
+RESTORED  the seat rule
+RESTORED  "a rep with no offer price gets no time-to-price measurement at all"
+```
+- **⚠⚠ THE RESTORED CLAUSE IS A CONSEQUENCE THE READER CAN ACT ON, and the manager is the only person who can fix it.** A rep with no price is **UNMEASURED** on the time-to-price graph, and unmeasured and flat look identical there — the absent-vs-excluded rule, in a caption.
+- **THE TEST: does the sentence tell them something they can DO, or something about how WE work?** *"Scout caps grading when calls first arrive so a big import cannot fire hundreds of analyses"* is the second; **both numbers and the button beside it** are the first, and they stayed.
+- **⚠ A SECOND COPY OF THE SAME SENTENCE, WORDED DIFFERENTLY, SURVIVED THE FIRST SWEEP** and was found by re-reading the served page. **Sweep by the CLAIM the sentence makes, not by the string.**
+- **⚠ AND AN ELEVENTH CANDIDATE WAS FOUND AND DELIBERATELY NOT CHANGED** — ten were approved, and quietly extending an approved sweep is the scope creep the guardrails exist to stop.
+
+### ⚠⚠ "SHARED BY EVERY PAGE" WAS FALSE — THE NAV IS IN **ONE** LIVE FILE (measured 2026-09-01)
+**Before deferring a change as large, count what it touches.** Across all 13 served pages:
+```
+dashboard.html   the live nav        30 lines of markup · 22 CSS rules · 6 JS touchpoints
+coaching.html    a nav — but the ARCHIVED v1 page, routed at /coaching, linked from nowhere
+the other 11     NO NAV AT ALL       admin, login, index, docs, privacy, terms, support, ...
+```
+- **⚠ AND THE WRAP POINT I HAD REPORTED WAS WRONG: the nav does NOT wrap at 1440, it wraps just under 1366** (one row at 1366 with 23px spare, two rows at 1280). Left 1016px + right 263px = **1279px**. It genuinely wraps on a 1280 laptop — just not where I said.
+- **THE ARGUMENT FOR A SIDEBAR IS NOT THE WRAP POINT: a vertical list has no width limit**, and three of the eight tabs are "soon" items that will become real.
+
+### ⚠ THE MARK IS SUB-PIXEL AT NAV SIZE — AN ASSET TASK, NOT A CODE TASK (measured 2026-09-01)
+The smallest dot is `r=0.2` in a 17.105-unit viewBox:
+```
+24px tall   dot 0.56px   stroke 0.04px
+32px tall   dot 0.75px   stroke 0.06px
+```
+**No CSS change reaches this.** It needs a redrawn small mark — thicker stroke, fewer and larger dots — exactly as the wordmark needed a real export rather than an upscale. **⚠ There is no logo in the nav today at all: it is the plain word `Scout` in a `<span>`.**
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**
