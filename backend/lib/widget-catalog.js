@@ -1,0 +1,206 @@
+'use strict';
+/**
+ * ⚠⚠ THE WIDGET CATALOG'S DATA LAYER — AND THIS TABLE *IS* THE HONESTY RULE.
+ *
+ * Which views a metric may offer is not a design preference; it falls out of
+ * what the metric HAS. A gauge without a target has nothing to point at. A trend
+ * without a time series has nothing to plot. A breakdown without categories has
+ * nothing to break down. A by-rep view without per-rep data draws one line.
+ *
+ * So the offerable views are DERIVED here, never listed by hand — a hand-written
+ * list is how a catalog comes to offer a gauge for a metric that has no target.
+ *
+ * ⚠⚠ EVERY ROW BELOW WAS MEASURED AGAINST THE LIVE DATABASE ON 2026-09-01, not
+ * taken from a sketch. Counts are of REAL rows (seed/demo excluded where it
+ * matters) and are recorded so the next reader can see WHY a metric is or is not
+ * offerable, rather than trusting the flag.
+ *
+ * ⚠ CASH COLLECTED IS ABSENT BY STANDING RULING (Justin: "we don't track cash
+ * collected at all, it's too finicky right now. The only time it's needed is on
+ * the EOD report"). It is extracted and it drives EOD, and it must NOT appear in
+ * this catalog — a catalog that offers every column would quietly overturn a
+ * ruling. Its absence is asserted by a test so it cannot drift back in.
+ */
+
+/** The view kinds a card can be. A card STRETCHES; it never changes kind. */
+const VIEWS = {
+  NUMBER: 'number',        // one figure now, with its counts
+  GAUGE: 'gauge',          // needs a target
+  TREND: 'trend',          // needs history
+  BY_REP: 'by_rep',        // needs per-rep values
+  BREAKDOWN: 'breakdown',  // needs categories
+};
+
+/**
+ * ⚠ `source` is where the value comes from TODAY. `cost` says what asking for it
+ * costs, because "computable" and "available" are different things and a catalog
+ * that conflates them will offer a metric that takes ten seconds to draw.
+ *   column     — a stored column, read directly
+ *   aggregate  — computed by an existing lane from stored columns
+ *   scan       — would require unpacking transcript JSON per call (see talk_ratio)
+ */
+const CATALOG = [
+  {
+    key: 'avg_score', label: 'Average call score',
+    source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
+    available: true, perRep: true, target: null, history: false, categories: null,
+    measured: '1,551 of 1,585 done analyses carry overall_score',
+    note: 'per_rep.avg_score and totals.avg_score both exist, with a prior-window '
+        + 'value for a trend ARROW — which is not the same as a time series.',
+  },
+  {
+    key: 'closing_rate', label: 'Closing rate',
+    source: 'aggregate', cost: 'aggregate', lane: 'prospect-entity',
+    available: true, perRep: true, target: 25, history: true, categories: null,
+    measured: 'prospect_id on 1,534 of 2,052 real calls; rep-series serves a '
+            + '`close` line per rep and for the team',
+    note: 'Denominator is PROSPECTS by the 2026-08-03 ruling, not calls. '
+        + 'no_show and disqualified leave the denominator (hadAConversation).',
+  },
+  {
+    key: 'objection_handle_rate', label: 'Objection handling rate',
+    source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
+    available: true, perRep: true, target: 35, history: true, categories: 'objection_category',
+    measured: '1,417 objection moments, all 4 categories present '
+            + '(fear 634 · partner 398 · timing 288 · logistical 97)',
+    note: '⚠ objection_class (the strict true-objection split, v37) is on only 52 '
+        + 'of 1,417 — new calls only. NULL counts by design, so the strict and '
+        + 'loose rates are near-identical TODAY and will diverge as the corpus '
+        + 'turns over. A breakdown by category is honest now; a strict-vs-loose '
+        + 'comparison is not.',
+  },
+  {
+    key: 'avg_call_time', label: 'Average call time',
+    source: 'column', cost: 'aggregate', lane: 'team-averages',
+    available: true, perRep: true, target: 60, targetDirection: 'lower_is_better',
+    history: false, categories: null,
+    measured: 'duration_seconds on 2,046 of 2,052 real calls, 2,005 of them > 0',
+    note: '⚠ THE ONLY INVERTED TARGET — 60 is a CEILING. A gauge must say so; '
+        + '"at or below 60 min", never "at or above target".',
+  },
+  {
+    key: 'calls_analyzed', label: 'Calls analyzed',
+    source: 'aggregate', cost: 'aggregate', lane: 'team-analytics',
+    available: true, perRep: true, target: null, history: false, categories: null,
+    measured: '1,585 done analyses',
+    note: 'A volume count. It has no target and inventing one would be the '
+        + 'weakest-against-target shape the loud-number ruling already refuses.',
+  },
+  {
+    key: 'outcome_mix', label: 'Outcome mix',
+    source: 'column', cost: 'aggregate', lane: 'team-analytics',
+    available: true, perRep: true, target: null, history: false,
+    categories: 'outcome',
+    measured: 'follow_up 1,061 · closed 283 · lost 142 · no_show 89 · disqualified 0',
+    note: '⚠ `disqualified` is MANUAL-ONLY and currently 0 — a breakdown must '
+        + 'render the empty category rather than omitting it, or the reader '
+        + 'cannot reconcile the total.',
+  },
+  {
+    key: 'section_scores', label: 'Section scores',
+    source: 'column', cost: 'aggregate', lane: 'team-analytics',
+    available: true, perRep: true, target: null, history: false,
+    categories: 'section',
+    measured: 'intro 1,528 · discovery 1,478 · pitch 1,436 · objection 1,292 · '
+            + 'close(earned) 1,401 of 1,585',
+    note: '⚠ USE close_score_earned, NEVER close_score — migration 027 forces the '
+        + 'DISPLAYED close score to 100 on a closed call. Measured 8 points of '
+        + 'difference on a real board.',
+  },
+  {
+    key: 'moment_mix', label: 'Call moment mix',
+    source: 'column', cost: 'aggregate', lane: 'call_highlights',
+    available: true, perRep: true, target: null, history: false, categories: 'type',
+    measured: 'buying_signal 2,620 · risk_signal 1,854 · objection 1,417 · '
+            + 'strong_moment 1,012 · missed_opportunity 1,006 · barrier 795 · '
+            + 'rapport_moment 161 · disqualify_signal 133',
+    note: 'No lane serves this today — it is a group-by on call_highlights.type, '
+        + 'which every team lane already loads.',
+  },
+  {
+    key: 'time_to_price', label: 'Time to price',
+    source: 'column', cost: 'aggregate', lane: 'rep-series',
+    available: true, perRep: true, target: null, history: true, categories: null,
+    measured: 'price_stated_at_seconds on 426 of 1,585 (27%)',
+    note: '⚠⚠ THE 27% IS NOT RANDOM AND A CARD MUST SAY SO. It is only computed '
+        + 'for reps who have saved an offer price, so a rep with none is '
+        + 'UNMEASURED rather than slow — and unmeasured and flat look identical '
+        + 'on a chart. Already handled by the graph, and any new view inherits it.',
+  },
+  {
+    key: 'prospects', label: 'Prospects',
+    source: 'aggregate', cost: 'aggregate', lane: 'prospect-entity',
+    available: true, perRep: true, target: null, history: false, categories: null,
+    measured: 'prospect_id on 1,534 of 2,052 real calls',
+    note: '⚠ Merge quality drives this directly — 355 unreviewed merge proposals '
+        + 'on one account, each missed merge worth ~0.9 points of close rate.',
+  },
+
+  // ── NOT OFFERABLE TODAY, and each says why ───────────────────────────────
+  {
+    key: 'talk_ratio', label: 'Talk ratio',
+    source: 'scan', cost: 'scan', lane: null,
+    available: false, perRep: true, target: null, history: false, categories: null,
+    measured: 'COMPUTABLE, and I computed it: 66% closer on average across 200 '
+            + 'real calls (min 0, max 100). transcript_stored.turns[] carries '
+            + 'speaker + text on 1,585 of 1,585, speaker matched on 1,556.',
+    note: '⚠⚠ COMPUTABLE IS NOT AVAILABLE, AND THAT DISTINCTION IS THE WHOLE '
+        + 'POINT OF THIS ROW. Nothing stores or serves it: producing it means '
+        + 'unpacking ~719 turns × 33 kB per call (50 MB total) on every render. '
+        + 'That is a different cost class from reading a column. '
+        + '⚠ AND THE min 0 / max 100 ARE REAL: one-speaker calls, the collapsed-'
+        + 'transcript case already on file. A talk-ratio metric needs that '
+        + 'exclusion or it will report 100% for a broken recording. '
+        + '⚠ Turns carry start_seconds and NO END, so a TIME ratio must infer '
+        + 'duration from the next turn and the last turn has none — word share '
+        + 'is the sounder measure. Offerable after a stored per-call column.',
+  },
+  {
+    key: 'discovery_coverage', label: 'Discovery coverage',
+    source: 'column', cost: 'aggregate', lane: null,
+    available: false, perRep: true, target: null, history: false, categories: 'area_key',
+    measured: 'coverage on 683 of 1,585 — but SPLIT ACROSS TWO VOCABULARIES: 626 '
+            + 'rows carry one rep\'s DERIVED areas, only 65 carry the fixed six '
+            + '(v33, new calls only)',
+    note: '⚠⚠ NOT OFFERABLE AS ONE BREAKDOWN YET: the categories differ per rep. '
+        + 'A chart whose columns change when you switch rep is one a manager '
+        + 'cannot read. It becomes offerable as the corpus rolls forward onto '
+        + 'the fixed six — a due date, not a dependency.',
+  },
+  {
+    key: 'coaching_volume', label: 'Coached moments',
+    source: 'column', cost: 'aggregate', lane: null,
+    available: false, perRep: true, target: null, history: false, categories: null,
+    measured: 'call_highlights.coaching on 197 of 8,998 (2%) — v30, new calls only',
+    note: 'Too thin to chart. Same roll-forward shape as discovery coverage.',
+  },
+];
+
+/** ⚠ DERIVED, NEVER LISTED. This function IS the honesty rule. */
+function viewsFor(metric) {
+  if (!metric || !metric.available) return [];
+  const out = [VIEWS.NUMBER];
+  if (typeof metric.target === 'number') out.push(VIEWS.GAUGE);
+  if (metric.history) out.push(VIEWS.TREND);
+  if (metric.perRep) out.push(VIEWS.BY_REP);
+  if (metric.categories) out.push(VIEWS.BREAKDOWN);
+  return out;
+}
+
+function catalog() {
+  return CATALOG.map(function (m) {
+    return Object.assign({}, m, { views: viewsFor(m) });
+  });
+}
+
+function offerable() { return catalog().filter(function (m) { return m.available; }); }
+function byKey(k) { return catalog().filter(function (m) { return m.key === k; })[0] || null; }
+
+module.exports = {
+  VIEWS: VIEWS,
+  catalog: catalog,
+  offerable: offerable,
+  byKey: byKey,
+  _viewsFor: viewsFor,
+  _CATALOG: CATALOG,
+};
