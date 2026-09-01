@@ -283,8 +283,20 @@ test('⚠ a board where nobody clears the bar reports PER CLOSER, not one board 
   delete require.cache[require.resolve('../lib/team-objection-summary')];
   try {
     const mod = require('../lib/team-objection-summary');
-    const out = await mod.computeTeamObjectionSummary(fakeAdmin(), [JOSH], FROM, TO, OPTS);
-    assert.strictEqual(out.state, 'no_focus');
+    /* ⚠⚠ CONVERTED 2026-09-01, NOT DELETED. This asserted `no_focus` for a board
+       where every closer is `thin_types` — because focusOf returned null for
+       that state and NOBODY was speakable. That was the second, undeclared
+       exception, and it withheld coaching from closers who plainly had
+       objections (Josh N at 0 of 4 on fear).
+       ⚠ THE SUBJECT OF THIS TEST SURVIVES AND IS NOW STRONGER: the per-closer
+       state must not collapse into one board sentence. It still does not — and
+       the closer now gets coached as well. Only the board state changed.
+       ⚠ It needs the model stub now, because a speakable board makes a call. */
+    const { out } = await withModel(
+      () => ({ content: [{ text: JSON.stringify({ closers: [{ name: 'Josh', why: 'w', what_to_do: 'd' }] }) }] }),
+      () => mod.computeTeamObjectionSummary(fakeAdmin(), [JOSH], FROM, TO, OPTS));
+    assert.strictEqual(out.state, 'per_closer',
+      'a thin_types closer is now SPEAKABLE — every closer with objections gets coached');
     assert.strictEqual(out.closers.length, 1, 'the closer is still named and still reported');
     assert.strictEqual(out.closers[0].state, 'thin_types',
       'the per-closer state survives — collapsing it into one board sentence is the '

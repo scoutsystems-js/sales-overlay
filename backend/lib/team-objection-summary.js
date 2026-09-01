@@ -51,7 +51,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v9-2026-09-01-timestamps';   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
+const PROMPT_VERSION = 'v10-2026-09-01-coach-thin-types';   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -215,7 +215,28 @@ function focusOf(c) {
   if (!c) return null;
   if (c.focus) return c.focus;
   var r = c.ranking;
-  return (Array.isArray(r) && r.length) ? r[0] : null;
+  if (Array.isArray(r) && r.length) return r[0];
+  /* ⚠⚠ THE `top` FALLBACK (Justin, 2026-09-01). Without it this returned null
+     for `thin_types` — no single category is big enough to RANK — and that
+     silently withheld coaching from closers who plainly have objections.
+     Josh N sat at 0 of 4 on fear and got nothing.
+     ⚠ It contradicted a standing ruling: "regardless if they handle 0/50 or
+     50/50 you can still give coaching moments like this." Ranking is about
+     whether one category STANDS OUT; that is a different question from whether
+     there is anything worth saying.
+     ⚠⚠ AND baseline_pct IS NORMALISED TO null DELIBERATELY. `top` has no such
+     field, and the prompt builder tests `s.baseline_pct === null` STRICTLY — so
+     an `undefined` here would emit "undefined% across their other categories"
+     INTO A MODEL PROMPT. A placeholder that is a valid value of its own type is
+     exactly what that check cannot see. */
+  var t = c.top;
+  if (t && t.category && t.total) {
+    return {
+      category: t.category, total: t.total, handled: t.handled,
+      baseline_pct: (typeof t.baseline_pct === 'number') ? t.baseline_pct : null,
+    };
+  }
+  return null;   // genuinely no categories at all — nothing to point at
 }
 
 function classifyCloser(row) {
@@ -525,8 +546,20 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
      ⚠ THERE IS ALWAYS SOMETHING WORTH SAYING. A rep at 0 of 32 has a specific
      moment that went wrong and a specific thing to do next time, exactly like a
      rep at 12 of 30.
-     ⚠ `no_data` is the ONE exception and it survives: genuinely no objections is
-     the only case with nothing to coach from. */
+     ⚠ `no_data` is the ONE exception BY INTENT: genuinely no objections is the
+     only case with nothing to coach from.
+     ⚠⚠ AND IT WAS NOT THE ONLY ONE IN PRACTICE UNTIL 2026-09-01. `focusOf(c)
+     !== null` on the next line was a SECOND exception nobody declared, and it
+     withheld coaching from every `thin_types` closer. Fixed by giving focusOf a
+     `top` fallback — see focusOf. Do not re-narrow it. */
+  /* ⚠⚠ TWO CONDITIONS, AND BOTH ARE DECLARED — the comment above used to claim
+     `no_data` was "the ONE exception" while this filter had a second, silent
+     one: focusOf returned null whenever `ranking` was empty, which is exactly
+     what `thin_types` MEANS. A comment asserting a single exception above a
+     filter with two is how the next reader inherits the wrong model.
+     ⚠ NOW: focusOf falls back to `top`, so the only closers still excluded are
+     `no_data` (no objections at all) and the vanishing case of a closer whose
+     categories are all empty. Both genuinely have nothing to coach from. */
   var speakable = classified.filter(function (c) {
     return c.state !== 'no_data' && focusOf(c) !== null;
   });
@@ -679,6 +712,7 @@ module.exports = {
   SYNTHESIS_TYPE: SYNTHESIS_TYPE,
   _PROMPT_VERSION: PROMPT_VERSION,
   _classifyCloser: classifyCloser,
+  _focusOf: focusOf,
   _positionPct: positionPct,
   _hmsOf: hmsOf,
   _pickEvidence: pickEvidence,
