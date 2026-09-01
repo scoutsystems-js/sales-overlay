@@ -6063,3 +6063,33 @@ Three instances of one defect: **score badges** (52/100 in the same green as 75/
 - **ONE RULE: a score is coloured only when it crosses a band, using the product's existing `--good` / `--mid` / `--bad`.** 75 green, 52 amber, sub-40 red.
 - **⚠ THE COROLLARY IS WHAT FIXES THE OTHER TWO: if the colour is identical at every value, it encodes nothing and should be neutral.** The WEAKEST/STRONGEST chips already carry the meaning.
 - **⚠ ONE EXCEPTION, ALREADY RULED: `.review-why` is an OUTCOME, not a score**, and its colour is correct.
+
+### ⚠⚠⚠ A NEW RULING THAT REVERSES AN OLD ONE MUST BE SHOWN THE OLD ONE — CLOSING %'s DENOMINATOR (2026-09-01, NOT CHANGED)
+**Justin ruled today: *"CLOSING % IS BASED ON CALLS TAKEN IN THE SELECTED DATE RANGE. Calls taken — not prospects."* That is the OPPOSITE of a ruling he made on 2026-08-03, in his own words:**
+> *"if 1 prospect takes 3 calls to close that SHOULDN'T count as 3 calls, it's 1 prospect getting closed — if it's multiple follow ups it doesn't matter."*
+- **⚠⚠ THE SHIPPED PROSPECTS DENOMINATOR IS NOT AN OVERSIGHT — IT IS WHAT THAT RULING ASKED FOR**, and it shipped as `fetchProspectCloseRates`. **NOT CHANGED**, because a reversal should be deliberate rather than by implication.
+- **MEASURED BOTH WAYS BEFORE REPORTING, and they barely differ — 0 to 5 points across eight reps.** Which corroborates the August note: *"per-prospect 40% vs per-call 39% — grouping is NOT what fixed the close rate."*
+- **⚠ THE LEGACY `close_rate` IS NOT A THIRD OPTION**: `close_won / close_decided` drops every OPEN call from the denominator — the "decided-only" formula the August ruling explicitly superseded. Rendered nowhere; delete it whichever way this lands.
+- **⚠ ONE REAL ARGUMENT FOR CALLS, worth recording either way: under a calls denominator the 355 unreviewed merges stop mattering entirely**, because calls are not grouped. Today each missed merge costs ~0.9 points.
+- **THE GENERAL RULE: before implementing a ruling that changes a definition, GREP THIS FILE FOR THE PREVIOUS RULING ON THAT DEFINITION.** A architect restating something in new words is not always aware they are reversing themselves, and the reversal is invisible unless someone puts the two sentences side by side.
+
+### ⚠⚠ THE WINDOW IS PART OF THE DEFINITION — 7 DAYS vs 30 MADE ONE REP READ 0% AND 16% (fixed 2026-09-01)
+**Godwin read 0% (0/25) on the team page and 16% (16/98) on the personal dashboard. Both correct.** The team pages defaulted to 7 days, the personal one to 30.
+- **⚠ CLOSING RATE IS A LOW-FREQUENCY METRIC.** A rep closes a handful a month, so a seven-day rate is frequently zero for someone doing fine — **and it reads as a verdict.**
+- **ONE DEFINITION AND ONE COMPUTATION ARE NOT SUFFICIENT FOR ONE NUMBER.** The standing ruling was breached through the WINDOW rather than the maths, and nothing about the shared computation could have caught it.
+- Team default now 30, matching Coaching. **The fixed 7-day gauge stays and says its own window.**
+
+### ⚠⚠ NO VOLUME SUPPRESSION ON A CLOSING RATE — AND THE `MIN_BUCKET` PRECEDENT DOES NOT TRANSFER (Justin, 2026-09-01)
+**His words: *"I don't care if he takes 1 call, grade it."*** I proposed suppressing the rate below a minimum prospect count and it was rejected outright.
+- **⚠⚠ WHY THE PRECEDENT DOES NOT TRANSFER, AND THIS IS THE PART TO KEEP: `MIN_BUCKET` stops Scout CLAIMING one objection category is weaker than another on three data points — it guards a COMPARISON. A closing rate makes no comparison. It is a COUNT OF WHAT HAPPENED.** 0 of 25 is not an unmeasurable estimate; it is a fact about twenty-five prospects.
+- **He has ruled this shape once already — "even one objection is data"** — when a panel declined to rank and dressed the refusal as a finding. **Suppressing a real zero is the same defect.**
+
+### ⚠ THE AMBER BARS WERE ALREADY BANDED — MY PREMISE WAS WRONG (corrected 2026-09-01)
+I reported the Coach Summary bars as *"identical amber regardless of score"* and proposed banding them. **`scoreColor` has banded since it was written: `>= 70` good, `>= 50` mid, else bad.**
+- **THE FIVE BARS WERE AMBER BECAUSE ALL FIVE SCORES WERE 51-65 — INSIDE ONE BAND.** The colour can vary; it did not on that rep's data. **No change was needed on that surface**, and the rule the architect approved was already implemented there.
+- **⚠ THE TELL I MISSED: I read "all five identical" off ONE SCREENSHOT OF ONE REP.** A colour that is constant across five values from one sample is not evidence it is constant across its range. **Check the function before proposing to change the behaviour it already has.**
+
+### ⚠⚠ FOURTH INSTANCE — A GUARD THAT CHECKS THE FUNCTION *CONTAINS* A STRING CANNOT SEE A DEAD VARIABLE (2026-09-01)
+My score-band guard asserted `libraryStatusBadgeHtml` contained `score-good`. Reverting the return to the un-banded form **left `var band = …` computing a value nobody used**, so the guard stayed green.
+- **THE FIX IS TO RUN THE BUILDER**: `new Function` it, call it with 75 / 52 / 38, and assert **52 does not come back green**. That check cannot be satisfied by a dead assignment.
+- **Fourth time in this session** — after the two `spoke` guards and the `evidenceMismatch` one. **The pattern is always the same: the assertion is one level above the thing that broke.**

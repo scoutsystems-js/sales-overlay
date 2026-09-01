@@ -1209,3 +1209,19 @@ Score badges · amber section bars · the green objection category. **A score is
 **FILED** — EOD is OUT of scope (cash-collected proposal withdrawn) · `teamRecsCompactHtml` dead code · the legacy `close_rate` still emitted and rendered nowhere. **Fourth and fifth dead computations this pass; worth one sweep.**
 
 **Remaining:** `section` · `performance` · `objections-intel` · `team-needs-work` · `kb` · `account` · `prospects` · `needs-work` · `team-members`.
+
+## 2026-09-01 — window, score bands, and a denominator ruling held for review (`c480606`)
+
+**LIVE**
+- **Team default window 7 → 30 days**, matching the personal Coaching Dashboard. The fixed 7-day gauge stays.
+- **Score badge banded** — was green at every score; now uses `scoreColor`'s own thresholds (≥70 / ≥50 / else), not a second set.
+- **Objection category neutral** — it names the weakest area and was rendering green. Not red either; a label is not a verdict.
+
+**⚠⚠⚠ BLOCKED ON JUSTIN — the closing-% denominator reverses his own 2026-08-03 ruling**
+Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 calls to close that SHOULDN'T count as 3 calls."* **The shipped prospects denominator is what the August ruling asked for.** Measured both ways over 30 days across eight reps: **they differ by 0–5pp.** Not changed. The legacy `close_rate` (`close_won / close_decided`) is *not* a third option — it is the decided-only formula August superseded. **One real argument for calls: the 355 unreviewed merges stop mattering, since calls are not grouped.**
+
+**⚠ CORRECTED — the amber bars were never the defect.** `scoreColor` has banded since it was written; the five bars were amber because all five scores were 51–65, inside one band. My premise came from one screenshot of one rep. No change was needed there.
+
+**WITHDRAWN** — the volume-suppression proposal. *"I don't care if he takes 1 call, grade it."* `MIN_BUCKET` guards a comparison; a closing rate is a count.
+
+**Remaining:** `section` · `performance` · `objections-intel` · `team-needs-work` · `kb` · `account` · `prospects` · `needs-work` · `team-members`. EOD out of scope.
