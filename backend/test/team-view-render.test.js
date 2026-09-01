@@ -305,13 +305,19 @@ test('TEAM AND COACHING NOW HOLD SEPARATE RANGES', () => {
     "coaching's range must be untouched by rendering team");
 });
 
-test('the default seed is the last 7 days INCLUSIVE, not a bare now-minus-7', () => {
+test('the default seed is the last 30 days INCLUSIVE, not a bare now-minus-30', () => {
   const out = renderTeam(Object.assign({}, BASE, { teamRanges: {}, teamRangeInit: {} }));
   const r = out.api.state.teamRanges.performance;
   assert.ok(r && r.from.endsWith('T00:00:00.000Z'), 'starts at midnight: ' + (r && r.from));
   assert.ok(r && r.to.endsWith('T23:59:59.999Z'), 'covers the whole end day: ' + (r && r.to));
   const days = Math.round((Date.parse(r.to) - Date.parse(r.from)) / 86400000);
-  assert.strictEqual(days, 7, 'seven inclusive days');
+  /* ⚠ CONVERTED 2026-09-01, NOT DELETED. The subject is unchanged — the seed
+     must be an INCLUSIVE window through the picker's own converter, not a bare
+     now-minus-N — and that is still what the two assertions above check.
+     ⚠ ONLY THE LENGTH MOVED, 7 -> 30, to match the personal Coaching Dashboard:
+     Godwin read 0% on the team page and 16% on the personal one, both correct,
+     because the two defaulted to different windows. */
+  assert.strictEqual(days, 30, 'thirty inclusive days');
 });
 
 // ─── 10c-2: the rep cards, driven through the real render path ────────────

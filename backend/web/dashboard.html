@@ -3703,7 +3703,19 @@
     .objsum-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; background: var(--bg-elevated); }
     .objsum-card:last-child { margin-bottom: 0; }
     .objsum-name { font-weight: 600; margin-bottom: 8px; }
-    .objsum-cat { color: var(--accent); }
+    /* ⚠⚠ THE OBJECTION CATEGORY NAMES THE CLOSER'S *WEAKEST* AREA, and it was
+       rendering in --accent — the colour that means good, or clickable,
+       everywhere else in the product. A negative finding must never be green.
+       ⚠ IT IS NOT RE-COLOURED TO RED EITHER: the category is a LABEL, not a
+       verdict — the rate beside it carries the judgement. Neutral, with weight
+       doing the separating. */
+    .objsum-cat { color: var(--text); font-weight: var(--fw-emphasis); }
+
+    /* ⚠ SCORE BANDS — one set of thresholds, shared with scoreColor(): >=70
+       good, >=50 mid, else bad. The tint mirrors the badge's existing 12%. */
+    .library-status-badge.done.score-good { background: rgba(var(--good-rgb), 0.12); color: var(--good); }
+    .library-status-badge.done.score-mid  { background: rgba(var(--mid-rgb), 0.12);  color: var(--mid); }
+    .library-status-badge.done.score-bad  { background: rgba(var(--bad-rgb), 0.12);  color: var(--bad); }
     .objsum-counts { font-size: 12px; font-weight: 400; margin-left: 10px; }
     .objsum-why { line-height: 1.55; margin-bottom: 10px; }
     .objsum-do { border-left: 2px solid var(--accent); padding-left: 10px; line-height: 1.5; }
@@ -8613,8 +8625,19 @@
     // same inclusive-end shape a hand-picked one does — otherwise the very first
     // load would quietly cover a few hours less than the label claims.
     var today = new Date().toISOString().slice(0, 10);
-    var weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
-    state.teamRanges[pg] = rangeToIso(weekAgo, today);   // last 7 days INCLUSIVE
+    /* ⚠⚠ 30 DAYS, MATCHING THE PERSONAL COACHING DASHBOARD (Justin, 2026-09-01).
+       IT WAS 7, AND THAT WAS THE FAULT BEHIND "2 reps show 0-3% closing rate":
+       Godwin read 0% (0 of 25) on the team page and 16% (16 of 98) on the
+       personal one — BOTH CORRECT, both labelled "closing rate", because the two
+       pages defaulted to different windows.
+       ⚠ CLOSING RATE IS A LOW-FREQUENCY METRIC. A rep closes a handful a month,
+       so a SEVEN-DAY rate is frequently zero for someone doing fine. One
+       definition and one computation are not sufficient for one number — THE
+       WINDOW IS PART OF THE DEFINITION.
+       ⚠ THE FIXED 7-DAY GAUGE IS DELIBERATE AND STAYS: it is a separate,
+       explicitly-labelled window and does not follow this picker. */
+    var monthAgo = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+    state.teamRanges[pg] = rangeToIso(monthAgo, today);   // last 30 days INCLUSIVE
   }
   function teamRange() { ensureTeamDefaultRange(); return state.teamRanges[teamRangePage()]; }
 
@@ -16020,7 +16043,17 @@
     }
     if (analysisStatus === 'done') {
       var scoreText = (typeof overallScore === 'number') ? overallScore + '/100' : 'Done';
-      return '<span class="library-status-badge done">' + escapeHtml(scoreText) + '</span>';
+      /* ⚠⚠ A SCORE IS COLOURED ONLY WHEN IT CROSSES A BAND (Justin, 2026-09-01).
+         This badge was GREEN AT EVERY SCORE — 52/100, 55 and 60 rendered in the
+         same fill as 75 — so the colour said "graded", not "good", while looking
+         exactly like a verdict.
+         ⚠ THE BANDS ARE `scoreColor`'s OWN, NOT NEW ONES: >=70 good, >=50 mid,
+         else bad. A second set of thresholds for the same quantity is how two
+         surfaces come to disagree about what a 69 means. */
+      var band = (typeof overallScore === 'number')
+        ? (overallScore >= 70 ? 'score-good' : (overallScore >= 50 ? 'score-mid' : 'score-bad'))
+        : 'score-none';
+      return '<span class="library-status-badge done ' + band + '">' + escapeHtml(scoreText) + '</span>';
     }
     if (analysisStatus === 'error') {
       return '<span class="library-status-badge error">Error</span>';

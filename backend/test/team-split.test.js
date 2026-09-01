@@ -261,7 +261,12 @@ test('⚠⚠ teamRangePage() really READS the view — run it, do not grep it', 
      exactly what happened here. Comments are harmless to new Function. */
   const at = H.indexOf('var TEAM_RANGE_PAGE');
   const src = H.slice(at, H.indexOf('function teamRange()', at));
-  assert.ok(src.length > 200 && src.length < 1800, 'slice must cover it: ' + src.length);
+  /* ⚠ BOUND RAISED 1800 -> 3200 (2026-09-01): the default-window comment grew
+     the function. The bound exists so a BACKWARDS or truncated slice fails
+     loudly — it is not a pin on the function's length, and raising it for a
+     genuine growth is correct where loosening it to silence a real defect is
+     not. */
+  assert.ok(src.length > 200 && src.length < 3200, 'slice must cover it: ' + src.length);
   const pageFor = new Function('state', src + '; return teamRangePage();');
 
   const seen = {};
