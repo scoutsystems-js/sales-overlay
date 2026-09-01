@@ -975,7 +975,8 @@
     .members-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
     .members-seats { font-size: 14px; color: var(--text); }
     .members-seats b { color: var(--text); }
-    .members-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    /* ⚠ 13.5px was a half-pixel — one of the twelve sizes the scale replaced. */
+    .members-table { width: 100%; border-collapse: collapse; font-size: var(--fs-secondary); }
     /* ⚠ NOT --muted: the no-grey ruling forbids grey BODY TEXT and the guard
        enforces it by reference, not just by definition. Dimming with opacity is
        the approved exception (it is a depth cue, not unreadable body text), so
@@ -992,10 +993,10 @@
     .members-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); padding: 8px 10px; border-bottom: 1px solid var(--border); }
     .members-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .members-table tr.inactive td { opacity: 0.6; }
-    .members-name { font-weight: 600; color: var(--text); }
+    .members-name { font-weight: var(--fw-emphasis); color: var(--text); }
     .members-email { font-size: 12px; color: var(--text); }
-    .member-badge.on { color: var(--good); font-weight: 600; font-size: 12px; }
-    .member-badge.off { color: var(--text); font-weight: 600; font-size: 12px; }
+    .member-badge.on { color: var(--good); font-weight: var(--fw-normal); font-size: var(--fs-label); }
+    .member-badge.off { color: var(--text); font-weight: var(--fw-normal); font-size: var(--fs-label); }
     .members-actions { white-space: nowrap; }
     .members-act { background: var(--bg-field); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 9px; font-size: 12px; cursor: pointer; margin-left: 4px; }
     .members-act:hover { border-color: var(--accent); }
@@ -1122,6 +1123,17 @@
        parents. A base rule means an unstyled heading is now impossible rather
        than merely unlikely; the more specific rules below still win. */
     .section h2 { font-size: var(--fs-title); font-weight: var(--fw-normal); margin: 0; }
+    /* ⚠ INLINE EMPHASIS TAKES THE SCALE'S 500, NOT THE BROWSER'S 700. Same
+       class as the two headings that had no rule: <b> and <strong> carry a UA
+       default, so leaving them unstyled is a weight decided by the browser.
+       700 is not on the scale, and 115 semibolds were the complaint. */
+    #content b, #content strong { font-weight: var(--fw-emphasis); }
+    /* ⚠ AND h3 FOR THE SAME REASON THE h2 FLOOR EXISTS — an unstyled heading is
+       a weight and a size decided by the browser, not by anyone. */
+    #content h3 { font-size: var(--fs-body); font-weight: var(--fw-emphasis); margin: 0; }
+    /* ⚠ TABLE HEADS TOO. <th> is bold by UA default, so an unstyled column
+       header is a weight nobody chose — the same class as the <h2>s and <b>. */
+    #content th { font-weight: var(--fw-normal); }
     .section-header h2 {
       font-size: var(--fs-title);
       font-weight: var(--fw-normal);
@@ -1231,8 +1243,8 @@
     .call-head-right { display: flex; align-items: center; gap: 14px; }
 
     .badge {
-      font-size: 10.5px;
-      font-weight: 600;
+      font-size: var(--fs-eyebrow);
+      font-weight: var(--fw-normal);
       padding: 4px 10px;
       border-radius: 4px;
       text-transform: uppercase;
@@ -2549,8 +2561,8 @@
     .back-to-teams:hover { background: rgba(var(--accent-rgb), 0.28); }
 
     .scope-pill {
-      font-size: 10.5px;
-      font-weight: 600;
+      font-size: var(--fs-eyebrow);
+      font-weight: var(--fw-normal);
       padding: 4px 10px;
       border-radius: 4px;
       background: rgba(var(--accent-rgb), 0.10);
@@ -2573,7 +2585,7 @@
     .synth-block .body { font-size: 13px; color: var(--text); }
     .obj-group-header { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin: 24px 0 10px; font-weight: 700; }
     .obj-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .obj-surface { font-weight: 700; font-size: 14px; }
+    .obj-surface { font-weight: var(--fw-emphasis); font-size: var(--fs-body); }
     .obj-callmeta { margin-left: auto; font-size: 12px; color: var(--text); }
     .obj-quote { font-size: 14px; margin: 8px 0 4px; }
     .obj-quote.clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -2592,6 +2604,14 @@
     /* ⚠ THE ONE LOUD NUMBER ON THIS PAGE — the display step, and nothing else
        on the page takes it. That is what "fixed per page" means. */
     .team-stat--lead .team-stat-val { font-size: var(--fs-display); font-weight: var(--fw-display); }
+    /* ⚠ THE SHARED LEAD NUMBER. No box — the ground already gives it a surface,
+       and block 2 existed to remove boxes rather than add one back for the
+       loudest thing on the page. */
+    .lead-number { margin: 0 0 36px; }
+    .lead-number-val { font-size: var(--fs-display); font-weight: var(--fw-display);
+                       line-height: 1; letter-spacing: -0.01em; color: var(--text); }
+    .lead-number-label { font-size: var(--fs-eyebrow); font-weight: var(--fw-normal);
+                         letter-spacing: .1em; text-transform: uppercase; margin-top: 6px; opacity: 0.75; }
     .team-stat-sub { font-size: 13px; font-weight: 500; color: var(--text); }
     .team-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin-top: 6px; }
     /* Manager daily digest */
@@ -2754,7 +2774,7 @@
     .team-recs-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 16px 18px; cursor: pointer; transition: border-color 0.15s var(--ease), transform 0.1s var(--ease); }
     .team-recs-card:hover { border-color: var(--accent); transform: translateY(-1px); }
     .team-recs-teaser { font-size: 14px; color: var(--text); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .team-recs-expand { font-size: 12px; font-weight: 600; color: var(--accent); margin-top: 8px; }
+    .team-recs-expand { font-size: var(--fs-label); font-weight: var(--fw-normal); color: var(--accent); margin-top: 8px; }
     /* B-2 "What needs work" card + detail */
     .nw-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .nw-chip { font-size: 12px; color: var(--text); background: var(--bg-field); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; }
@@ -3257,7 +3277,7 @@
        so it must not look like a footnote. */
     .obj-grid-loose { color: var(--mid); border-left: 2px solid var(--mid); padding-left: 10px; margin-bottom: 10px; }
     .obj-grid-avg { border-top: 1px solid var(--border-strong); margin-top: 4px; }
-    .obj-grid-avg .obj-grid-name { font-weight: 400; opacity: .9; }
+    .obj-grid-avg .obj-grid-name { font-weight: var(--fw-normal); opacity: .9; }
     /* The coaching summary. One card per closer — never a team paragraph. */
     .objsum-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; background: var(--bg-elevated); }
     .objsum-card:last-child { margin-bottom: 0; }
@@ -3278,7 +3298,7 @@
     .objsum-quiet-text { line-height: 1.5; }
     .obj-grid-head { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text); opacity: .8; }
     .obj-grid-row, .obj-grid-head { display: flex; align-items: center; gap: 8px; }
-    .obj-grid-name { flex: 1 1 150px; min-width: 110px; font-weight: 600; }
+    .obj-grid-name { flex: 1 1 150px; min-width: 110px; font-weight: var(--fw-emphasis); }
     .obj-grid-cell { flex: 0 0 84px; text-align: center; display: flex; flex-direction: column; gap: 1px; }
     .obj-grid-sub { font-size: 11px; opacity: .75; }
     .obj-grid-empty { opacity: .45; }
@@ -3329,7 +3349,10 @@
        MEASURING the live page: 52 drawn boxes in 15 kinds, nested THREE deep —
        a bordered section containing a bordered card containing a bordered row.
 
-       ⚠⚠ SCOPED TO body[data-view="team"] AND THAT IS DELIBERATE.,
+       ⚠⚠ SCOPED TO body[data-view="team-members"] AND THAT IS DELIBERATE.,
+    body[data-view="team-objections"] AND THAT IS DELIBERATE.,
+    body[data-view="team-coaching"] AND THAT IS DELIBERATE.,
+    body[data-view="team"] AND THAT IS DELIBERATE.,
     body[data-view="team-performance"] AND THAT IS DELIBERATE.
        `.section` and `.page-header` are rendered by EVERY page in the product;
        restyling them unscoped would silently re-lay-out a dozen pages that had
@@ -3339,8 +3362,14 @@
 
        ⚠ Space does the grouping. One accent, sparingly. Hairlines only where a
        boundary genuinely has to be read as a boundary. */
+    body[data-view="team-members"] .section,
+    body[data-view="team-objections"] .section,
+    body[data-view="team-coaching"] .section,
     body[data-view="team"] .section,
     body[data-view="team-performance"] .section,
+    body[data-view="team-members"] .page-header ,
+    body[data-view="team-objections"] .page-header ,
+    body[data-view="team-coaching"] .page-header ,
     body[data-view="team"] .page-header ,
     body[data-view="team-performance"] .page-header {
       background: transparent;
@@ -3350,6 +3379,9 @@
       padding-right: 0;
       margin-bottom: 40px;          /* the grouping the borders used to do */
     }
+    body[data-view="team-members"] .page-header--company ,
+    body[data-view="team-objections"] .page-header--company ,
+    body[data-view="team-coaching"] .page-header--company ,
     body[data-view="team"] .page-header--company ,
     body[data-view="team-performance"] .page-header--company { margin-bottom: 28px; }
 
@@ -3357,36 +3389,60 @@
        now rows separated by a hairline — a boundary you read rather than a
        frame you see. The last row draws none: a trailing rule is a line with
        nothing on the other side of it. */
+    body[data-view="team-members"] .rep-card ,
+    body[data-view="team-objections"] .rep-card ,
+    body[data-view="team-coaching"] .rep-card ,
     body[data-view="team"] .rep-card ,
     body[data-view="team-performance"] .rep-card {
       background: transparent; border: 0; border-radius: 0;
       border-bottom: 1px solid var(--border);
       padding: 20px 0;
     }
+    body[data-view="team-members"] .rep-card:last-child ,
+    body[data-view="team-objections"] .rep-card:last-child ,
+    body[data-view="team-coaching"] .rep-card:last-child ,
     body[data-view="team"] .rep-card:last-child ,
     body[data-view="team-performance"] .rep-card:last-child { border-bottom: 0; padding-bottom: 0; }
+    body[data-view="team-members"] .rep-weak,
+    body[data-view="team-objections"] .rep-weak,
+    body[data-view="team-coaching"] .rep-weak,
     body[data-view="team"] .rep-weak,
     body[data-view="team-performance"] .rep-weak,
+    body[data-view="team-members"] .rep-why ,
+    body[data-view="team-objections"] .rep-why ,
+    body[data-view="team-coaching"] .rep-why ,
     body[data-view="team"] .rep-why ,
     body[data-view="team-performance"] .rep-why { border: 0; padding-left: 0; padding-right: 0; }
 
     /* ⚠ THE RANKED LISTS: hairlines, not boxes. The thin bar stays — it is the
        one drawn shape here that carries information rather than decoration. */
+    body[data-view="team-members"] .team-detail-row ,
+    body[data-view="team-objections"] .team-detail-row ,
+    body[data-view="team-coaching"] .team-detail-row ,
     body[data-view="team"] .team-detail-row ,
     body[data-view="team-performance"] .team-detail-row {
       background: transparent; border: 0; border-radius: 0;
       border-bottom: 1px solid var(--border);
       padding: 12px 0;
     }
+    body[data-view="team-members"] .team-detail-row:last-child ,
+    body[data-view="team-objections"] .team-detail-row:last-child ,
+    body[data-view="team-coaching"] .team-detail-row:last-child ,
     body[data-view="team"] .team-detail-row:last-child ,
     body[data-view="team-performance"] .team-detail-row:last-child { border-bottom: 0; }
 
     /* ⚠ GRAPHS SIT ON THE PAGE WITH A HAIRLINE BASELINE, NOT IN A CARD. */
+    body[data-view="team-members"] .rep-graph-skeleton ,
+    body[data-view="team-objections"] .rep-graph-skeleton ,
+    body[data-view="team-coaching"] .rep-graph-skeleton ,
     body[data-view="team"] .rep-graph-skeleton ,
     body[data-view="team-performance"] .rep-graph-skeleton {
       background: transparent; border: 0; border-radius: 0;
       border-bottom: 1px solid var(--border);
     }
+    body[data-view="team-members"] .team-controls-row ,
+    body[data-view="team-objections"] .team-controls-row ,
+    body[data-view="team-coaching"] .team-controls-row ,
     body[data-view="team"] .team-controls-row ,
     body[data-view="team-performance"] .team-controls-row { margin-bottom: 32px; }
 
@@ -3394,17 +3450,57 @@
        Performance page's boxes and reached none of these — the box count on
        Daily Digest came back 12 before and 12 after, which is what exposed it.
        A treatment is not applied until the thing it targets is on the page. */
+    body[data-view="team-members"] .team-stat ,
+    body[data-view="team-objections"] .team-stat ,
+    body[data-view="team-coaching"] .team-stat ,
     body[data-view="team"] .team-stat {
       background: transparent; border: 0; border-radius: 0; padding: 0 24px 0 0;
     }
+    body[data-view="team-members"] .digest-notable ,
+    body[data-view="team-objections"] .digest-notable ,
+    body[data-view="team-coaching"] .digest-notable ,
     body[data-view="team"] .digest-notable {
       background: transparent; border-radius: 0;
       border-left: 2px solid var(--accent);      /* the one accent, sparingly */
     }
+    body[data-view="team-members"] .digest-focus ,
+    body[data-view="team-objections"] .digest-focus ,
+    body[data-view="team-coaching"] .digest-focus ,
     body[data-view="team"] .digest-focus {
       background: transparent; border: 0; border-radius: 0;
       border-top: 1px solid var(--border); padding-left: 0; padding-right: 0;
     }
+
+    /* ⚠ COACHING'S OWN CONTAINERS. Each page names its own — Treatment C's
+       first pass named Performance's and reached none of the digest's, which
+       is how a treatment can read as applied and change nothing. */
+    body[data-view="team-members"] .team-recs-card ,
+    body[data-view="team-objections"] .team-recs-card ,
+    body[data-view="team-coaching"] .team-recs-card {
+      background: transparent; border: 0; border-radius: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 18px 0;
+    }
+    body[data-view="team-members"] .team-recs-card:last-child ,
+    body[data-view="team-objections"] .team-recs-card:last-child ,
+    body[data-view="team-coaching"] .team-recs-card:last-child { border-bottom: 0; }
+
+    /* ⚠ OBJECTIONS' OWN CONTAINERS. Named per page, because a treatment that
+       reaches nothing reads as applied — the 12 -> 12 lesson. */
+    body[data-view="team-members"] .pattern-card ,
+    body[data-view="team-objections"] .pattern-card {
+      background: transparent; border: 0; border-radius: 0;
+      border-bottom: 1px solid var(--border); padding: 16px 0;
+    }
+    body[data-view="team-members"] .pattern-card:last-child ,
+    body[data-view="team-objections"] .pattern-card:last-child { border-bottom: 0; }
+    body[data-view="team-members"] .obj-response ,
+    body[data-view="team-objections"] .obj-response {
+      background: transparent; border: 0; border-radius: 0;
+      border-left: 2px solid var(--border); padding-left: 12px;
+    }
+    body[data-view="team-members"] .objdrill-controls ,
+    body[data-view="team-objections"] .objdrill-controls { border: 0; background: transparent; }
 
     /* ═══ THE GROUND (ruled 2026-09-01, and it is a STANDING RULING re-applied)
        ⚠⚠ SAFETY IS LAYOUT, NOT FAINTNESS. This is the same rule the whole mesh
@@ -3429,7 +3525,13 @@
        ⚠ WIDTH: the content column (1200px) and no wider, so the artwork keeps
        the gutters — 120px each side at 1440, 360px at 1920. Edge to edge would
        delete the mesh rather than frame it. */
+    body[data-view="team-members"] .page ,
+    body[data-view="team-objections"] .page ,
+    body[data-view="team-coaching"] .page ,
     body[data-view="team"] .page ,
+    body[data-view="team-members"] .page,
+    body[data-view="team-objections"] .page,
+    body[data-view="team-coaching"] .page,
     body[data-view="team"] .page,
     body[data-view="team-performance"] .page {
       background: var(--bg);
@@ -9120,15 +9222,38 @@
 
   /* ⚠ COACHING — what the team should work on. Both panels answer to the picker,
      so this page has one window and says so. */
+  /* ⚠⚠ ONE LOUD NUMBER PER PAGE, FIXED — never weakest-against-target. Each
+     page names its own; this renders whichever it names. ONE definition, so
+     four pages cannot drift into four different treatments of the same idea.
+     ⚠ Returns '' when the number is not there yet — a lead number that reads 0
+     while its data is still loading is worse than no lead number, because 0 is
+     a valid value and "not loaded" is not. */
+  function leadNumberHtml(value, label) {
+    if (value === null || value === undefined) return '';
+    return '<div class="lead-number">'
+      + '<div class="lead-number-val">' + escapeHtml(String(value)) + '</div>'
+      + '<div class="lead-number-label">' + escapeHtml(label) + '</div>'
+    + '</div>';
+  }
+
   function renderTeamCoaching() {
     var content = document.getElementById('content');
     ensureTeamDefaultRange();
     if (state.teamContext === null) { loadTeam('context'); }
+    /* ⚠ THE LEAD NUMBER NEEDS THE OVERVIEW LANE, which this page did not kick —
+       a page that renders a number must ask for it, or it shows nothing for
+       ever and looks like an empty state. */
+    if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
     if (state.teamNeedsWork === null && !state.teamNeedsWorkLoading) loadTeam('needsWork');
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
+    /* ⚠ COACHING LEADS WITH THE TEAM'S AVERAGE SCORE (ruled). Performance shows
+       the RANKING; this shows the ONE number — different granularity, not a
+       repeat. It is the figure the coaching on this page exists to move. */
+    var avg = (state.teamOverview && state.teamOverview.totals) ? state.teamOverview.totals.avg_score : null;
     content.innerHTML =
       teamHeaderHtml()
       + teamControlsHtml()
+      + leadNumberHtml(avg, 'Team average score')
       + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>'
         + teamRecsCompactHtml() + '</div>' : '')
       + (teamPanelVisible('needswork') ? '<div class="section fade-in">' + teamNeedsWorkCardHtml() + '</div>' : '')
@@ -9350,6 +9475,16 @@
         + '<div class="meta">how each closer is dealing with each objection</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + objDrillControlsHtml()
+      /* ⚠ OBJECTIONS LEADS WITH THE TEAM'S HANDLE RATE (ruled) — the number the
+         whole page is about, and it already exists in this view's own payload.
+         ⚠ FROM `state.teamObjections`, NOT the overview lane: reading another
+         page's lane is how a figure appears only if you arrived by clicking and
+         vanishes on a deep link, which this very view was fixed for once. */
+      + (function () {
+          var t = state.teamObjections && state.teamObjections.totals;
+          var rate = (t && typeof t.rate === 'number') ? t.rate + '%' : null;
+          return leadNumberHtml(rate, 'Objections handled');
+        })()
         + teamObjGridHtml() + '</div>'
       /* ⚠ THE SUMMARY SITS BETWEEN THE GRID AND THE MOMENTS DELIBERATELY. It
          explains the grid directly above it and is evidenced by the moments
@@ -10683,7 +10818,23 @@
       + '<div class="avg-readout"><div class="avg-value avg-value-' + band + '">' + valueText + '</div>'
       + '<div class="avg-target-cap">' + targetCap + '</div></div></div>'
       + '<div class="avg-counts">' + escapeHtml(counts) + '</div>'
-      + '<div class="avg-reps">' + escapeHtml(m.count_sentence || '') + '</div>'
+      /* ⚠⚠ THE REPS SUB-LINE IS REMOVED (Justin, live 2026-09-01). It read
+         "3 of 7 reps at or above target · 2 not enough calls" — Scout
+         describing its own sample-size rule on a customer's screen, which is
+         the same defect as the three captions: it explains our thresholds
+         rather than telling a manager anything they can act on. It also worked
+         against the ruling that the gauges dominate — a two-clause line
+         directly under the loud number competes with it.
+         ⚠ THE COUNT LINE ABOVE STAYS. "18 of 74 prospects" is the raw count
+         beside the rate, which is a standing ruling and a different thing.
+         ⚠ `count_sentence` IS STILL COMPUTED AND STILL IN THE PAYLOAD — only
+         the render is gone, so nothing is destroyed and it can be surfaced
+         properly if the exclusion fact earns its own place.
+         ⚠ WHAT IS GENUINELY LOST, STATED RATHER THAN GLOSSED: this was the
+         ONLY place a manager was told a rep is excluded from a gauge for thin
+         volume. The three-group accounting — measured + unmeasured = total —
+         is no longer visible anywhere. FILED, not preserved by keeping a line
+         that should not be there. */
       + '</div>';
   }
 
