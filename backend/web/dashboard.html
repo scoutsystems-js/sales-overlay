@@ -11980,6 +11980,15 @@
 
   var DASH_CANVAS = { objection_handle_rate: 'handle', closing_rate: 'close', time_to_price: 'price' };
 
+  /* ⚠ THE UNIT IS A PROPERTY OF THE METRIC. A score out of 100 and a count of
+     calls are correctly bare; a rate is a percentage and a duration is minutes,
+     and neither is guessable from the number. Anything absent here is bare ON
+     PURPOSE and a test names which. */
+  var DASH_UNIT = {
+    closing_rate: '%', objection_handle_rate: '%', avg_call_time: ' min', time_to_price: ' min',
+    avg_score: '', calls_analyzed: '', prospects: '',
+  };
+
   /* ⚠⚠ UNMEASURED AND FLAT LOOK IDENTICAL ON A CHART, AND A ZERO IS A CLAIM.
      Time-to-price is only computed for reps who saved an offer price, so a rep
      with none is UNMEASURED rather than fast — and a line at zero would say
@@ -12034,13 +12043,25 @@
   function dashByRepHtml(card) {
     var reps = (state.teamOverview && state.teamOverview.per_rep) || null;
     if (!reps) return dashNoValueHtml('the team overview has not loaded');
+    /* ⚠⚠⚠ IT REFUSES. IT DOES NOT FALL BACK.
+       This map used to end `|| function (r) { return r.avg_score; }`, so ANY
+       metric it did not know rendered AVERAGE SCORE under that metric's own
+       title. Measured on the live editor: five cards — Outcome mix, Average
+       call time, Section scores, Call moment mix and Time to price, all in the
+       by-rep view — showed the identical Josh 64 / Godwin 60 / Yazan 58.
+       ⚠⚠ A CARD HEADED "TIME TO PRICE" SHOWING 64 READS AS MINUTES, and nothing
+       on screen says otherwise. That is far worse than an empty card: an empty
+       card is a question, a wrong one is an answer.
+       ⚠ AND IT IS THE PROBABLE SOURCE OF THE "bare number, needs min" REPORT —
+       the number that was missing a unit was not time to price at all. */
     var pickVal = {
       avg_score: function (r) { return r.avg_score; },
       closing_rate: function (r) { return r.prospect_close_rate; },
       objection_handle_rate: function (r) { return r.obj_handle_rate; },
       calls_analyzed: function (r) { return r.calls_analyzed; },
       prospects: function (r) { return r.prospect_close_total; },
-    }[card.metric] || function (r) { return r.avg_score; };
+    }[card.metric];
+    if (!pickVal) return dashNoValueHtml('no per-rep card can show this metric yet');
 
     var rows = reps.filter(function (r) { return r.active !== false; })
                    .map(function (r) { return { name: r.display_name || r.email || r.user_id, v: pickVal(r) }; });
@@ -12059,10 +12080,18 @@
     if (hiddenBySize > 0) note.push('top ' + shown.length + ' of ' + measured.length);
     if (unmeasured > 0) note.push(unmeasured + ' not enough data to measure');
 
+    /* ⚠⚠ A UNITLESS NUMBER IS A NUMBER WHOSE MEANING LIVES ONLY IN THE READER'S
+       HEAD — the raw-seconds defect's cousin. Every by-rep row rendered bare,
+       so closing rate showed "25" where it means 25%, and it would have shown
+       a duration as "31" where it means 31 minutes. Justin found the missing
+       unit on ONE card; it was missing on ALL of them.
+       ⚠ THE UNIT COMES FROM THE METRIC, not from the view — a second table here
+       is how the gauge's inverted-direction defect came back once already. */
+    var unit = DASH_UNIT[card.metric] || '';
     return '<div class="dash-list">'
       + shown.map(function (r) {
           return '<div class="dash-list-row"><span>' + escapeHtml(String(r.name)) + '</span>'
-            + '<b>' + escapeHtml(String(r.v)) + '</b></div>';
+            + '<b>' + escapeHtml(String(r.v)) + unit + '</b></div>';
         }).join('')
       + '</div>'
       + (note.length ? '<div class="dash-card-note">' + escapeHtml(note.join(' \u00B7 ')) + '</div>' : '');
@@ -12111,8 +12140,16 @@
     /* ⚠ A CARD WHOSE VIEW FELL BACK SAYS SO. The manager chose a gauge and is
        looking at a number; silently differing from what they picked is the
        quiet-shrink failure one level down. */
+    /* ⚠⚠ SAY WHAT IT BECAME, NOT WHAT IT USED TO ALWAYS BECOME. This read
+       "Shown as a number — this metric has no target to gauge against", which
+       was true while `number` was the only fallback and is FALSE now that a card
+       can fall back to a gauge or a trend instead. A note that names the wrong
+       replacement is the wrong-reason failure inside the message written to
+       explain a change. */
     var fell = card.requestedView
-      ? '<div class="dash-card-note">Shown as a number \u2014 this metric has no target to gauge against.</div>'
+      ? '<div class="dash-card-note">Shown as a ' + escapeHtml(DASH_VIEW_SHORT[card.view] || card.view).toLowerCase()
+        + ' \u2014 this metric no longer offers a '
+        + escapeHtml(DASH_VIEW_SHORT[card.requestedView] || card.requestedView).toLowerCase() + '.</div>'
       : '';
     /* ⚠ THE HANDLES EXIST ONLY IN EDIT MODE. A drag handle on a view-mode card
        is an invitation to an accidental drag, which is the whole reason this is
@@ -12359,6 +12396,11 @@
     number: 'Number', gauge: 'Gauge', trend: 'Trend over time',
     by_rep: 'By rep', breakdown: 'Breakdown',
   };
+  /* ⚠ SHORT FORMS FOR THE SCANNING LIST. "Trend over time" four times across ten
+     rows is noise; "Trend" is the word a manager is looking for. */
+  var DASH_VIEW_SHORT = {
+    number: 'Number', gauge: 'Gauge', trend: 'Trend', by_rep: 'By rep', breakdown: 'Breakdown',
+  };
   var DASH_VIEW_WHY = {
     number: 'One figure with its counts.',
     gauge: 'A dial against its target.',
@@ -12378,9 +12420,16 @@
       host.innerHTML = (cat.groups || []).map(function (g) {
         return '<div class="dash-pick-group">' + escapeHtml(g.label) + '</div>'
           + '<div class="dash-pick-list">' + g.metrics.map(function (m) {
+              /* ⚠⚠ NAME THE VIEWS, DO NOT COUNT THEM. This read "4 views" — a
+                 number that tells a manager nothing about WHICH, so the only way
+                 to find the three metrics with a trend was to open all ten in
+                 turn. Justin reported "no graphs appear as options": the picker
+                 was offering Trend the whole time, on step TWO, which is
+                 reachable only after you have already picked. The explanation
+                 was correct and in the wrong place. */
               return '<button type="button" class="dash-pick-item" onclick="dashPickMetric(\'' + escapeHtml(m.key) + '\')">'
                 + '<span>' + escapeHtml(m.label) + '</span>'
-                + '<i>' + m.views.length + ' view' + (m.views.length === 1 ? '' : 's') + '</i></button>';
+                + '<i>' + m.views.map(function (v) { return escapeHtml(DASH_VIEW_SHORT[v] || v); }).join(' \u00B7 ') + '</i></button>';
             }).join('') + '</div>';
         }).join('')
         /* ⚠⚠ THE ABSENT ONES ARE NAMED, NOT HIDDEN. A manager who wonders where
@@ -12388,8 +12437,16 @@
            product that lost something. */
         + ((cat.unavailable || []).length
             ? '<div class="dash-pick-group">Not available yet</div>'
+              /* ⚠⚠ TWO REASONS, AND ONE SENTENCE CANNOT SERVE BOTH. "Scout
+                 cannot measure this" is TRUE of talk ratio and FALSE of outcome
+                 mix — that one is measured perfectly well and simply has no card
+                 yet. A wrong reason sends a manager to wait for data that
+                 already exists. */
               + '<div class="dash-pick-absent">' + cat.unavailable.map(function (u) {
-                  return '<div><b>' + escapeHtml(u.label) + '</b> \u2014 Scout cannot measure this across your team yet.</div>';
+                  var why = u.reason === 'no_card'
+                    ? 'Scout measures this, but there is no card that can show it yet.'
+                    : 'Scout cannot measure this across your team yet.';
+                  return '<div><b>' + escapeHtml(u.label) + '</b> \u2014 ' + why + '</div>';
                 }).join('') + '</div>'
             : '');
       return;

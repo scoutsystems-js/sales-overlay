@@ -59,15 +59,30 @@ function resolveLayout(stored) {
   raw.slice(0, MAX_CARDS).forEach(function (c) {
     var key = c && c.metric;
     var m = key ? byKey(key) : null;
-    if (!m || !m.available) { dropped.push({ metric: key || '(unnamed)', reason: 'no longer available' }); return; }
+    /* ⚠⚠ `available` IS NOT ENOUGH — A METRIC WITH NO OFFERABLE VIEW CANNOT BE
+       DRAWN AT ALL. `outcome_mix` is available (the data exists) and has no card
+       that can show it, so a stored board naming it must DROP and SAY SO, exactly
+       as it does for a metric that has gone entirely. Keeping it and coercing the
+       view produced "Not enough to measure — no data in this range", which is a
+       FALSE REASON: the data is there, nothing draws it. */
+    if (!m || !m.available || !m.views.length) {
+      dropped.push({ metric: key || '(unnamed)', reason: 'no longer available' }); return;
+    }
 
     /* ⚠ A STORED VIEW A METRIC NO LONGER SUPPORTS FALLS BACK TO `number`, which
        every available metric offers — a target can be withdrawn, and a gauge
        with nothing to point at is worse than a plain figure. The fallback is
        recorded so the card can say it changed rather than silently differing
        from what the manager chose. */
+    /* ⚠⚠ FALL BACK TO THE METRIC'S FIRST OFFERED VIEW, NOT TO `number`.
+       `number` used to be offered by every available metric and IS NO LONGER —
+       `avg_call_time` offers only `gauge`, `time_to_price` only `trend`, because
+       the offer is now data-capability INTERSECTED with render-capability. A
+       hard-coded `number` here would coerce those straight back into the broken
+       card this change removed. The shared-carrier shape: viewsFor() changed
+       what it holds, and the risk was in its other readers. */
     var want = c.view;
-    var view = (m.views.indexOf(want) !== -1) ? want : VIEWS.NUMBER;
+    var view = (m.views.indexOf(want) !== -1) ? want : m.views[0];
 
     cards.push({
       metric: m.key, label: m.label, view: view,
@@ -99,7 +114,8 @@ function sanitizeLayout(input) {
   input.slice(0, MAX_CARDS).forEach(function (c) {
     var m = c && c.metric ? byKey(c.metric) : null;
     if (!m || !m.available) return;
-    var view = (c.view && m.views.indexOf(c.view) !== -1) ? c.view : VIEWS.NUMBER;
+    /* ⚠ SAME REASON AS THE READ PATH: `number` is no longer universal. */
+    var view = (c.view && m.views.indexOf(c.view) !== -1) ? c.view : m.views[0];
     out.push({ metric: m.key, view: view, w: clampSpan(c.w, 4), h: clampSpan(c.h, 3) });
   });
   return out;

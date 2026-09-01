@@ -201,13 +201,21 @@ test('⚠ an unavailable metric is NAMED but not explained in our words', () => 
   const un = cat.unavailable();
   assert.ok(un.length >= 1, 'there are unavailable metrics to name');
   un.forEach((u) => {
-    assert.deepStrictEqual(Object.keys(u).sort(), ['key', 'label'],
-      'the wire shape is the name only — `measured` reads "coverage on 683 of 1,585, '
-      + 'SPLIT ACROSS TWO VOCABULARIES", which no manager can act on');
+    assert.deepStrictEqual(Object.keys(u).sort(), ['key', 'label', 'reason'],
+      'the wire shape is the name and WHICH KIND of unavailable — `measured` reads '
+      + '"coverage on 683 of 1,585, SPLIT ACROSS TWO VOCABULARIES", which no manager can act on');
+    assert.ok(u.reason === 'no_data' || u.reason === 'no_card', 'a closed vocabulary: ' + u.reason);
   });
-  // the picker supplies the one sentence they CAN act on
+  /* ⚠⚠ TWO REASONS, TWO SENTENCES. "Scout cannot measure this" is TRUE of talk
+     ratio and FALSE of outcome mix — that one is measured perfectly well and has
+     no card yet. One sentence for both would send a manager to wait for data
+     that already exists, which is the wrong-reason failure. */
   assert.ok(/Scout cannot measure this across your team yet/.test(LIVE),
-    'and the picker says so, rather than hiding the metric');
+    'the no-DATA case says so, rather than hiding the metric');
+  assert.ok(/there is no card that can show it yet/.test(LIVE),
+    'and the no-CARD case must NOT claim we cannot measure it');
+  assert.ok(un.some((u) => u.reason === 'no_data') && un.some((u) => u.reason === 'no_card'),
+    'both kinds exist today — a test over one kind proves nothing about the other');
 });
 
 // ────────────────────────────────────────────────── the cap, and the empty board

@@ -18,12 +18,34 @@ test('⚠⚠ a gauge is offered ONLY where a target exists — the honesty rule'
   });
 });
 
-test('⚠ a trend needs history, a breakdown needs categories, a by-rep needs per-rep', () => {
+/* ⚠⚠ CONVERTED 2026-09-01, AND THE DIRECTION IS THE WHOLE POINT. This asserted
+   an EQUIVALENCE — a view is offered IF AND ONLY IF the data supports it — which
+   was right while the offer was data-only. The offer is now data capability
+   INTERSECTED with render capability, so it may legitimately be NARROWER: five
+   metrics have per-rep data and no per-rep card.
+   ⚠ THE SUBJECT SURVIVES AND IS THE HALF THAT MATTERS: the offer must never
+   EXCEED what the data supports. That is the honesty rule, and it is still an
+   absolute. What was dropped is the reverse implication, which now has its own
+   test below — a view is offered only if something can DRAW it. */
+test('⚠ the offer never EXCEEDS the data — a trend needs history, a breakdown needs categories', () => {
   C.catalog().forEach((m) => {
     if (!m.available) return;
-    assert.strictEqual(m.views.indexOf(C.VIEWS.TREND) !== -1, !!m.history, m.key + ': trend/history');
-    assert.strictEqual(m.views.indexOf(C.VIEWS.BREAKDOWN) !== -1, !!m.categories, m.key + ': breakdown/categories');
-    assert.strictEqual(m.views.indexOf(C.VIEWS.BY_REP) !== -1, !!m.perRep, m.key + ': by_rep/perRep');
+    if (m.views.indexOf(C.VIEWS.TREND) !== -1) assert.ok(m.history, m.key + ': trend without history');
+    if (m.views.indexOf(C.VIEWS.BREAKDOWN) !== -1) assert.ok(m.categories, m.key + ': breakdown without categories');
+    if (m.views.indexOf(C.VIEWS.BY_REP) !== -1) assert.ok(m.perRep, m.key + ': by_rep without per-rep values');
+    if (m.views.indexOf(C.VIEWS.GAUGE) !== -1) assert.ok(typeof m.target === 'number', m.key + ': gauge without a target');
+  });
+  // sanity, or the four conditionals above pass over an empty list
+  const offered = C.catalog().filter((m) => m.views.length);
+  assert.ok(offered.length >= 5, 'offered metrics: ' + offered.length);
+  assert.ok(offered.some((m) => m.views.indexOf(C.VIEWS.TREND) !== -1), 'at least one trend is offered');
+});
+
+test('⚠⚠ a view is offered ONLY if something can DRAW it', () => {
+  C.catalog().forEach((m) => {
+    m.views.forEach((v) => assert.ok(C._canRender(v, m.key),
+      m.key + '/' + v + ' is offered and nothing renders it — that is a card that '
+      + 'shows nothing, or worse, another metric\'s numbers'));
   });
 });
 

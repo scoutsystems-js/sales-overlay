@@ -190,14 +190,56 @@ const CATALOG = [
 ];
 
 /** ⚠ DERIVED, NEVER LISTED. This function IS the honesty rule. */
+/**
+ * ⚠⚠⚠ WHICH VIEWS A RENDERER CAN ACTUALLY DRAW — AND IT IS A DIFFERENT FACT
+ * FROM WHETHER THE DATA EXISTS. Conflating those two is what shipped a catalog
+ * asserting 30 offerable combinations of which THIRTEEN were broken.
+ *
+ * Measured on the deployed page by rendering every offered combination through
+ * the real dashCardHtml and reading what a manager would SEE:
+ *
+ *     8 rendered "Not enough to measure — NO DATA IN THIS RANGE", which is a
+ *       FALSE REASON: there is data, we simply do not read it here;
+ *     5 rendered ANOTHER METRIC'S NUMBERS. dashByRepHtml fell back to avg_score
+ *       for any key it did not know, so "Outcome mix — by rep", "Time to price
+ *       — by rep" and three others all showed Josh 64 / Godwin 60 / Yazan 58.
+ *       ⚠⚠ THAT IS WORSE THAN AN EMPTY CARD BY A LONG WAY — a card headed "Time
+ *       to price" showing 64 reads as minutes, and nothing on screen says
+ *       otherwise. Silently wrong, confidently labelled.
+ *
+ * ⚠ SO THE OFFER IS THE INTERSECTION OF *DATA* CAPABILITY AND *RENDER*
+ * CAPABILITY. Neither alone is the answer, and dropping either gate re-opens
+ * one of the two failures above.
+ *
+ * ⚠⚠ THIS IS A FACT ABOUT web/dashboard.html, WHICH THIS FILE CANNOT READ — so
+ * it is declared here and MIRRORED against the real renderers by
+ * test/widget-render-mirror.test.js, the same shape as the SQL/JS scope mirror.
+ * A renderer gaining a metric and this list not following is a test failure,
+ * never a silently broken card.
+ */
+const RENDERABLE = {
+  number:    ['avg_score', 'calls_analyzed', 'closing_rate', 'objection_handle_rate', 'prospects'],
+  gauge:     ['closing_rate', 'objection_handle_rate', 'avg_call_time'],
+  trend:     ['closing_rate', 'objection_handle_rate', 'time_to_price'],
+  by_rep:    ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects'],
+  breakdown: ['objection_handle_rate'],
+};
+
+function canRender(view, key) {
+  return (RENDERABLE[view] || []).indexOf(key) !== -1;
+}
+
 function viewsFor(metric) {
   if (!metric || !metric.available) return [];
-  const out = [VIEWS.NUMBER];
-  if (typeof metric.target === 'number') out.push(VIEWS.GAUGE);
-  if (metric.history) out.push(VIEWS.TREND);
-  if (metric.perRep) out.push(VIEWS.BY_REP);
-  if (metric.categories) out.push(VIEWS.BREAKDOWN);
-  return out;
+  /* ⚠ THE DATA GATE IS UNCHANGED AND STILL FIRST — a gauge is unofferable for a
+     metric with no target whether or not a renderer exists. The render gate
+     only ever REMOVES; it can never add a view the data cannot support. */
+  const wanted = [VIEWS.NUMBER];
+  if (typeof metric.target === 'number') wanted.push(VIEWS.GAUGE);
+  if (metric.history) wanted.push(VIEWS.TREND);
+  if (metric.perRep) wanted.push(VIEWS.BY_REP);
+  if (metric.categories) wanted.push(VIEWS.BREAKDOWN);
+  return wanted.filter(function (v) { return canRender(v, metric.key); });
 }
 
 function catalog() {
@@ -231,11 +273,17 @@ function publicMetric(m) {
   return out;
 }
 
+/* ⚠⚠ A METRIC WITH NO OFFERABLE VIEW IS NOT OFFERED — it is NAMED in the
+   unavailable list instead. An entry in the picker that leads only to cards
+   which render nothing is worse than an absence a manager was told about, and
+   this is the same rule the unavailable section already follows. */
+function isOfferable(m) { return m.available && m.views.length > 0; }
+
 function grouped() {
   var all = catalog();
   return GROUPS.map(function (g) {
     return { key: g.key, label: g.label,
-             metrics: all.filter(function (m) { return m.group === g.key && m.available; })
+             metrics: all.filter(function (m) { return m.group === g.key && isOfferable(m); })
                          .map(publicMetric) };
   }).filter(function (g) { return g.metrics.length; });
 }
@@ -247,9 +295,23 @@ function grouped() {
     something a manager can act on, and the customer-language ruling says a
     message that cannot say WHAT HAPPENED and WHAT TO DO does not belong on
     screen. The picker supplies the one sentence they can act on. */
+/* ⚠⚠ TWO KINDS OF UNAVAILABLE, AND ONE SENTENCE CANNOT SERVE BOTH. "Scout
+   cannot measure this across your team yet" is TRUE of talk ratio and FALSE of
+   outcome mix — Scout measures that perfectly well; there is simply no card
+   that draws it. A wrong reason is worse than no reason: it sends a manager to
+   wait for data that already exists.
+
+   ⚠ A CLOSED VOCABULARY, NOT PROSE. The surface owns the wording; this owns
+   which of the two it is, so the sentence cannot drift per caller. */
+var UNAVAILABLE_REASON = { NO_DATA: 'no_data', NO_CARD: 'no_card' };
+
 function unavailable() {
-  return catalog().filter(function (m) { return !m.available; })
-                  .map(function (m) { return { key: m.key, label: m.label }; });
+  return catalog().filter(function (m) { return !isOfferable(m); })
+                  .map(function (m) {
+                    return { key: m.key, label: m.label,
+                             reason: m.available ? UNAVAILABLE_REASON.NO_CARD
+                                                 : UNAVAILABLE_REASON.NO_DATA };
+                  });
 }
 
 module.exports = {
@@ -261,6 +323,9 @@ module.exports = {
   unavailable: unavailable,
   catalog: catalog,
   offerable: offerable,
+  UNAVAILABLE_REASON: UNAVAILABLE_REASON,
+  _RENDERABLE: RENDERABLE,
+  _canRender: canRender,
   byKey: byKey,
   _viewsFor: viewsFor,
   _CATALOG: CATALOG,
