@@ -398,19 +398,10 @@ WARM, another board            3,425 / 1,730 / 1,505 ms
 
 ## 🐛 BUGS — ordered by consequence
 
-**⚠⚠ `computeWeeklyHighlights` QUOTES AN UNPROVEN CLOSER REPLY — the sixth lane, and it feeds a MODEL PROMPT (filed 2026-09-01, NOT FIXED).**
-The 30d4d43 sweep closed five lanes onto `provenCloserResponse`. `lib/team-synthesis.js` has TWO call sites and only one was fixed: the recommendations lane (line 309) is proven; **Call Highlights of the Week (line 398) still builds its candidate quote with `displayCloserResponse`** — the SENTINEL gate, which only rejects `__no_reply__` / `__moment_is_closer__` and says nothing about whether the closer actually said the words.
-```
-candidate moments (strong_moment + handled objections)   1160
-  ...carrying a real closer_response                      156
-  ...PROVEN  (closer_response_verified = true)            137
-  ...UNPROVEN                                              19   = 12% of the ones with a reply
-```
-⚠⚠ **IT IS THE WORSE OF THE TWO CATEGORIES IN THAT SWEEP: the candidates go straight into a model prompt AND are rendered to a manager as the week's best moments.** A model builds celebratory prose around words the closer may never have said, and it reads as authoritative with nothing on screen to check it against.
-⚠ **THE SELECT AT LINE 387 DOES NOT FETCH `closer_response_verified`**, so the proven gate could not work there even if it were called — the same missing-column shape as the earlier lanes, which is why a per-file grep reports this file as already fixed.
-⚠ **Filed, not fixed, per the ruling.** The fix is one column in the select and one gate swap; what needs deciding is the fallback, since 1,004 of 1,160 candidates have no reply at all and fall through to the prospect's quote.
-
-
+**✅ ~~`computeWeeklyHighlights` QUOTES AN UNPROVEN CLOSER REPLY~~ — CLOSED 2026-09-01 BY REMOVAL, NOT BY FIX.**
+⚠⚠ **SAY THAT PLAINLY, OR A FUTURE READER THINKS THE PROVEN GATE WAS APPLIED HERE. IT WAS NOT.** Justin retired **Call Highlights of the Week** entirely — *"while cool they're unuseful and difficult to navigate to."* The lane, its route, its renderer and its page are archived in place (`6432a0e`), so the sixth unproven-reply lane and its 19 unproven quotes went with the feature.
+⚠ **THE MEASUREMENT IS KEPT BECAUSE IT IS WHY SCRAPPING BEAT FIXING**, not as history: of **1,160** candidate moments only **156** carried a closer reply at all and **19** of those were unproven — so a section called *Call Highlights* was showing **what the PROSPECT said on 1,004 of 1,160**. The open question was what fallback to design; removing the feature removed the question.
+⚠ **IF IT EVER RETURNS IT NEEDS `closer_response_verified` IN ITS SELECT** — the column was absent, which is why the proven gate could not have worked there even if called, and why a per-file grep reported that file as already fixed. Noted at the archived block.
 **⚠ Ordered by what breaks, not by date.** Anything needing a ruling is in NEEDS JUSTIN instead.
 
 **⚠⚠ PRUNED 2026-08-30 — this section had become mostly REPORTS. A bug section that is mostly measured findings is not a bug section.** Everything shipped, and every measured-finding write-up, moved to history with its reasoning intact. **What remains is genuinely open and unbuilt.**
@@ -1083,6 +1074,23 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Drilldown refinements (Justin's six)** | Routing, in-card controls, reused picker, team-average row, no Manage Members / Customize View, bare labels | shipped `3c1e3a5`. **Verified by clicking on production, 3 clicks delivered:** the averages gauge and the focus card both land on `#team-objections` (the gauge carrying its fixed 7-day window); the picker is the SAME component and its selection survives leaving and returning; controls sit inside the card; the two team-only buttons are gone; badges elsewhere in the app kept their fills. ⚠ The personal objection surfaces are **deliberately not retargeted** — the drilldown is manager-only, so retargeting them would 403 every closer. ⚠ Team average is **omitted with a stated reason below two closers** ("with one, it would just repeat the row above") |
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
+
+## 2026-09-01 — Call Highlights of the Week RETIRED (`6432a0e`)
+Deployed, verified by commit hash **and by the route contrast**: `GET /team/highlights` → **404** while `GET /team/recommendations` → **401** (mounted and gated). A 404 on both would have proved nothing. Suite **2005**.
+
+**Justin's ruling:** *"while cool they're unuseful and difficult to navigate to."* Archived in place, not deleted.
+
+⚠ **THE DECISION BEAT THE FIX IT REPLACED.** The open question was the fallback for **1,004 of 1,160 candidates having no closer reply at all** — a section called *Call Highlights* mostly showing what the **prospect** said. Scrapping it removes the **sixth unproven-reply lane** entirely rather than gating it.
+
+⚠⚠ **THE PAGE WAS RULED "CALL HIGHLIGHTS ONLY" EARLIER THE SAME DAY**, so removing Highlights emptied `team-expanded`. **A route that renders nothing is worse than no route:** the view is retired and redirected to Coaching at **both** entry points — `ARCHIVED_VIEWS` for `setView`, `TEAM_HASH` for the hash path, which assigns `state.view` directly. **And the door went with the destination**, with a new guard asserting its absence so nobody restores it after finding the archived renderer.
+
+⚠⚠ **ITS CSS IS DELIBERATELY LEFT LIVE AND INERT, WITH A NOTE SAYING WHY** — three hours earlier `.review-kb-btn` was found rendering as a browser-default button for three days because its rule had been archived with an earlier removal. Keeping the unreachable rules is the cheapest way to make that impossible here.
+
+**Tests: ten failed, none deleted.** One converted and strengthened (*Coaching still carries the recommendations* — the assertion that made the removal safe), four archived in place, and five floors/lists moved **with** their populations, each with the reason at the assertion. ⚠ **A conversion aimed at another dead view is not a conversion** — three sub-view assertions were re-pointed at `team-needs-work`, still failed, and that is what surfaced it is retired too. **There are no live sub-views left.**
+
+⚠ Also archived: **`teamRecsCompactHtml`, already dead before this block** — its name occurred exactly once in live code, its own definition.
+
+---
 
 ## 2026-09-01 — the cron warm-up, call-review, and the login debt (`74f6c36`, `eb4fc7f`)
 Deployed, verified by commit hash. Suite **2008**.

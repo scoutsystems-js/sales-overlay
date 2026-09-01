@@ -5656,6 +5656,39 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **v1.1.0 build plan:** Features built one at a time in this order: (1) Role system, (2) Role-based dashboard system on website (`/dashboard` for users + redesigned `/admin` for admins+owners with user management; the original raw log viewer remains as Sections B+C of the admin page), (3) Script upload in app, (4) Call boundary detection, (5) Post-call summary. Each feature fully committed and approved before the next starts. Justin receives one feature prompt at a time from the architect — Claude Code never plans ahead.
 - **Session start:** cd into the project root at the start of every session: cd '/Users/justinschmidt/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay'. Note: Supabase MCP is not currently configured — migrations must be run manually via the Supabase dashboard SQL editor. To enable Supabase MCP in future, add it to .mcp.json and start a fresh session.
 
+### ⚠⚠⚠ SCRAPPING A FEATURE CAN BE A BETTER ANSWER THAN FIXING IT — AND THE MEASUREMENT IS WHAT SHOWS WHICH (2026-09-01)
+**Call Highlights of the Week was retired rather than gated. The open question was what FALLBACK to design for the unproven closer replies; the measurement made the question disappear.**
+```
+candidate moments                       1160
+  ...carrying a closer reply at all      156   (13%)
+  ...of those, UNPROVEN                   19
+so a section called CALL HIGHLIGHTS showed what the PROSPECT said on 1,004 of 1,160
+```
+- **⚠⚠ THE NUMBER THAT DECIDED IT WAS NOT THE DEFECT COUNT, IT WAS THE COVERAGE.** 19 unproven quotes is a bug to fix; **87% of a "call highlights" section quoting the prospect is a feature that does not do what its name says.** The same measurement answers both questions and only one of them is worth acting on.
+- **THE HABIT: when filing a defect, report the SHAPE of the population, not only the size of the fault.** The fault was the reason to look; the coverage was the reason to stop.
+- **⚠ AND SAY "CLOSED BY REMOVAL" IN THE ROW, NOT JUST "CLOSED".** A future reader of a closed unproven-reply row will otherwise assume the proven gate was applied there, and go looking for a gate that does not exist.
+
+### ⚠⚠ A CONVERSION AIMED AT ANOTHER DEAD THING IS NOT A CONVERSION (2026-09-01)
+**Retiring `team-expanded` broke three sub-view assertions. I re-pointed all three at `team-needs-work` — the other sub-view — and they still failed. That is what surfaced that `team-needs-work` is retired too: BOTH normalise away in `ARCHIVED_VIEWS` and `TEAM_HASH`, so neither can ever be `state.view`. THERE ARE NO LIVE SUB-VIEWS LEFT.**
+- **⚠ THE CONVERSION LOOKED PERFECTLY REASONABLE AND WOULD HAVE BEEN A LIE.** *"The subject survives on the other one"* is the right instinct and it needs the same check as any other claim: **is the thing you are re-pointing at still alive?**
+- **THE TELL WAS THAT THE CONVERTED TEST STILL FAILED.** A conversion that does not go green is not a fixture problem to nudge — it is the code telling you the replacement subject is wrong.
+- **They were archived in place instead, with the reason**, so a revival brings its guard back the way its CSS must.
+
+### ⚠⚠ A GUARD PINNED TO THE SHAPE OF A LIST FAILS ON THE VERY CHANGE IT POLICES (2026-09-01)
+**`assert(/ARCHIVED_VIEWS = \{ 'team-needs-work': 'team-objections' \}/)` — a guard whose job is "retired views must normalise" — went red the moment a SECOND view was retired.**
+- **It pinned a ONE-ENTRY MAP LITERAL.** Adding the second entry is exactly the event the guard exists to encourage, and the guard treated it as a regression.
+- **THE FIX IS TO ASSERT THE ENTRY, NOT THE CONTAINER:** `/'team-needs-work': 'team-objections'/` plus a separate check that the map exists at all. **Same family as *derive a guard from the source of truth, never pin a literal*, and as the ordering anchors — a guard that encodes today's shape has a shelf life.**
+
+### ⚠ A SCRIPT THAT NEVER WRITES REPORTS NOTHING AND LOOKS LIKE IT WORKED (2026-09-01)
+**An edit script asserted all three of its anchors, mutated the string, and had NO `io.open(p,'w')` and no print. It exited 0. The tests then failed with the ORIGINAL messages — which reads as the edit being wrong rather than absent.**
+- **⚠ THE TELL: an assertion message that still names the OLD value after an edit you believe landed.** Not "my replacement was wrong" — "my replacement never reached the disk".
+- **THE HABIT THAT MAKES IT IMPOSSIBLE: every edit script ends with a WRITE and a PRINT of the before/after line count.** The other scripts in the same session all did; this one did not, and that asymmetry was the only thing distinguishing them. **A silent success and a silent no-op are the same output.**
+
+### ⚠ VERIFY A RETIREMENT BY CONTRAST, NOT BY A SINGLE 404 (2026-09-01)
+**`GET /team/highlights` → 404 proves the route is gone ONLY if a route that should still exist answers differently.** Checked together: `/team/highlights` **404**, `/team/recommendations` **401** (mounted and gated).
+- **⚠ A 404 ON BOTH would mean the router failed to mount, the deploy did not land, or the path prefix changed — and it looks identical to a successful retirement.** One request each, and the pair is self-explaining where either alone is ambiguous.
+- Same shape as printing RAW and CODE counts side by side: **a single number is a verdict, a pair is evidence.**
+
 ### ⚠⚠ A FIELD DROPPED FROM THE RENDER CAN STILL BE REACHING THE MODEL — AND THE LABEL AROUND IT THEN LIES (2026-09-01)
 **`reps_active` was removed from the digest's stat line when Treatment B shipped. It was still computed, still in the payload, read by no renderer — and still going into the prompt inside a block labelled `TEAM STATS (already displayed — reference, don't enumerate)`.**
 - **⚠⚠ THE LABEL HAD STOPPED BEING TRUE OF THAT ONE FIELD, WHICH IS WORSE THAN THE FIELD BEING UNUSED.** "Already displayed" invites the model to reference a number **the reader cannot see** — so an unread field in a prompt is not dead weight, it is a false premise handed to a generator.
