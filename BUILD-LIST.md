@@ -90,6 +90,26 @@ one rep / month, at real August volumes
 
 ---
 
+### 🎨 THE DESIGN PASS — BLOCK ① LIVE, BLOCK ② BLOCKED ON A RULING (2026-09-01)
+
+| block | state |
+|---|---|
+| **① type scale** | ✅ **LIVE `131a12b`.** 7 sizes, 3 weights, 3 radii. On Performance: **23 size/weight pairs → 11**, weights `400,450,500,600,700 → 400,500`. **The 115 semibolds are gone from that page** |
+| **② borders → space** | ⚠ **BUILT, COMMITTED (`146eb47`), NOT PUSHED — see the blocker** |
+| **③ the other four pages · ④ sidebar + logo** | not started |
+
+**RULINGS APPLIED:** page title takes the 20px step (it must outrank a section heading) · the 10px caret and 9px dial ticks are a **NAMED EXEMPTION**, recorded in the code and a test so a sweep finds a decision not a stray · the gauges take the display step.
+
+**⚠ THE DISPLAY SIZE WAS COMPARED BEFORE IT WAS CHOSEN — 48/34/28/20 side by side.** 34 sits most comfortably in the dial; **34 is not on the scale and an eighth size is what "nothing between them, ever" forbids**, so 48 ships with the caveat stated at the code: the number's width approaches the dial's inner edge and `46min` is the tightest case. **If it reads cramped the fix is a BIGGER DIAL, never an eighth size.**
+
+**⚠⚠ TWO HEADINGS HAD NO CSS RULE AT ALL** and rendered at the browser's default (21px bold — the loudest text on the page, decided by nobody). Found by asking the rendered page which rule matched and getting back **none**, twice. A `.section h2` floor makes an unstyled heading impossible.
+
+**⚠⚠ THE BLOCKER ON ②, AND IT IS JUSTIN'S:** removing the cards removed the only opaque ground between the text and the background raster — **95 of 105 text elements on Performance are now exposed, where it was ZERO** — and the raster runs at **full brightness** on the strength of a sweep that found 13 of 15 views had no exposed text. **Visible, not theoretical:** the graph headings sit on a bright band of the mesh. **Two fixes, both design calls: dim/drop the raster on this view, or give the page a solid ground so "no cards" ≠ "no surface".** Recommendation is the second; not taken.
+
+⚠ **The contrast probe was unreliable and is not quoted** — it read the brightest pixel anywhere in the source image and returned a figure contradicting the screenshot. **The count is solid; the ratio is not.**
+
+---
+
 ### 📐 THE DESIGN PASS — SIZED, NOT STARTED (2026-08-31)
 
 **Three to five blocks, and it cannot share a session.**

@@ -3282,6 +3282,40 @@ rendered quotes                          118
 - **⚠⚠ I SAMPLED THREE OBSERVATIONS, SAW A PRESCRIPTION, AND WAS WRONG.** Three real rows all contained *"closer needs to…"*, so I nearly reported that the missing coaching already existed and only needed rendering. **Measured: 31 of 537 (5.8%) are prescriptive, and 3 say "should have".** A three-row sample of a 537-row population is an anecdote; the difference between "already there" and "5.8%" is the difference between a render fix and a prompt change.
 - **THE SHAPE THE TARGET NEEDS, and what exists today:** the moment ✓100% · what the prospect revealed ✓100% · what the closer did ✓98.7% · **what they should have asked ✗5.8%** · **why it would have mattered ✗5.8%**. **Three of five are free and unrendered; two need generating.**
 
+### ⚠⚠⚠ NO GREP FINDS A RULE THAT DOES NOT EXIST — TWO HEADINGS HAD NO CSS AT ALL (2026-09-01)
+**The loudest text on the Performance page was 21px bold, and NOTHING DECIDED IT: two `<h2>`s had no matching rule, so they rendered at the BROWSER'S OWN DEFAULT.**
+- **THE METHOD IS THE FILING: ask the RENDERED PAGE which rule governs an element, and be ready for the answer NONE.** Iterating `document.styleSheets` and testing `el.matches(rule.selectorText)` returned an empty list — twice, with two different parents. **A search of the stylesheet cannot find an absent rule, because there is nothing to match.**
+- **THE FIX IS A FLOOR, NOT A PATCH:** a base `.section h2` rule makes an unstyled heading **impossible** rather than merely unlikely. Patching the two found would have left the third.
+- **⚠ THE GENERAL FORM: WHEREVER STYLING IS OPTIONAL, ABSENCE IS A SILENT DESIGN DECISION MADE BY THE BROWSER** — and it is invisible to every audit that counts declarations, because the defect is that there is nothing to count.
+
+### ⚠⚠⚠ A NUMBER IN A REPORT IS A CLAIM UNTIL SOMEONE RE-DERIVES IT — SECOND INSTANCE IN TWO DAYS (2026-09-01)
+**"Nine pages load the shared stylesheet" was MY OWN audit line. It came back in the next brief as an established fact, and it was false: `dashboard.html` links NO stylesheet at all (~197KB inline), and `css/style.css` is linked by SEVEN pages, none of them the one in scope.**
+```
+what produced it   grep -l "css/style.css" *.html
+what it matched    the string INSIDE COMMENTS in dashboard.html
+what was true      <link ...css/style.css> exists in 7 files; the dashboard is not one
+```
+- **⚠⚠ THIS IS THE SECOND TIME, AFTER "the nav already wraps at 1440".** Both were my own unverified sentences, quoted back as settled, and both would have driven a wrong decision — here, defining tokens in a stylesheet the target page cannot see.
+- **THE RULE: QUOTING A NUMBER BACK DOES NOT MAKE IT TRUE.** A figure in a report carries the authority of a finding and the evidence of an aside. **Re-derive it before building on it — especially when it is your own.**
+- **⚠ AND IT WAS THE COMMENT-AS-CODE TRAP AGAIN**, in an audit rather than a guard. **A `grep -l` over a codebase that archives removed code in place is a search of prose as much as of code.**
+
+### ⚠⚠ WHERE AN ARCHITECTURE FORCES DUPLICATION, PIN THE COPIES WITH A TEST (2026-09-01)
+**The dashboard links no stylesheet, so type tokens must be defined TWICE — in `css/style.css` for the seven pages that link it, and inline for the dashboard.** That is not a choice and cannot be refactored away without restructuring the page.
+- **`test/type-scale.test.js` asserts the two copies are identical**, the same shape as the SQL/JS mirror guard. **The guard is the only thing that makes the duplication safe**, and it is what turns "two copies" from a defect into a stated constraint.
+
+### ⚠⚠⚠ REMOVING THE CARDS REMOVED THE ONLY THING PROTECTING THE TEXT — 0 EXPOSED BECAME 95 OF 105 (2026-09-01)
+**Treatment C takes borders and card fills off Performance so space does the grouping. It also inverted the premise that let the background raster run at FULL brightness.**
+```
+the exposure sweep that allowed opacity 1   13 of 15 views had ZERO exposed text —
+                                            every panel was an OPAQUE CARD
+after removing the cards, Performance       95 of 105 text leaves exposed
+visible result                              the graph headings sit on a bright band
+                                            of the mesh and are harder to read
+```
+- **⚠⚠ THE RECORDED WARNING PREDICTED THIS EXACTLY** — *"a new view whose text sits outside an opaque container would land on a full-brightness photograph with no test catching it"* — **and no test caught it. A screenshot did.**
+- **⚠ THE LESSON FOR ANY VISUAL SIMPLIFICATION: A CARD IS NOT ONLY DECORATION. It is also the OPAQUE GROUND a contrast guarantee was derived against.** Before removing a container, ask what else was resting on it.
+- **⚠ MY CONTRAST PROBE WAS UNRELIABLE AND WAS REPORTED AS SUCH RATHER THAN QUOTED.** It took the brightest pixel ANYWHERE in the source image — not what sits behind any particular text — and returned 1.15:1, which contradicts a screenshot showing plainly readable white text. **A result that contradicts something already visible is a statement about the instrument.** The COUNT is solid; the ratio was discarded.
+
 ### ⚠⚠ WHAT SCOUT COSTS TO RUN — MEASURED 2026-09-01, AND THE SAMPLE HAD TO BE CORRECTED FOR
 **38 real analysed calls through `model_usage`. Carry these rather than re-deriving them.**
 ```
