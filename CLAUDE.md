@@ -5898,3 +5898,37 @@ Probing the Why panel with an invented `top` of `{key,label}` — the real shape
 ### ⚠ A GUARD THAT ANCHORS ON THE FIRST MATCH BREAKS WHEN YOU ADD AN EARLIER ONE (2026-09-01)
 Adding a **scoped** `body[data-view="team-objections"] .obj-card-head .badge` rule earlier in the stylesheet made an existing guard — `LIVE.indexOf('.obj-card-head .badge')` — read **a different rule** and fail claiming a fill had come back when it had not.
 - **SELECT BY CONTENT, NOT BY POSITION**: the guard now matches the UNSCOPED rule specifically, and asserts its slice length. **Same family as the `all[0]`/`.pop()` prompt selectors** — and it is the third time position-based selection has misfired here.
+
+### ⚠⚠⚠ A `top` FALLBACK ALMOST PUT "undefined%" INTO A MODEL PROMPT — THE `=== null` CHECK CANNOT SEE IT (2026-09-01)
+**Fixing the withheld-coaching bug meant `focusOf` falling back to `c.top`. `top` carries no `baseline_pct`, and the prompt builder branches on `s.baseline_pct === null` STRICTLY.**
+```
+undefined === null   ->  FALSE  ->  takes the else branch
+                     ->  "undefined% across their other categories"  INTO A MODEL PROMPT
+```
+- **⚠⚠ THE FALLBACK MUST NORMALISE, NOT PASS THROUGH.** `baseline_pct: (typeof t.baseline_pct === 'number') ? t.baseline_pct : null`. **A placeholder that is a valid value of its own type is exactly what a strict-null check is blind to** — the same family as the truthy error object and the `'__no_reply__'` sentinel.
+- **THE HABIT: when adding a fallback shape, diff its FIELDS against the shape it stands in for, and check every consumer that branches on one of the missing ones.** A missing field is `undefined`, and `undefined` survives most guards written for `null`.
+- **⚠ AND THE DEFECT WAS ONLY VISIBLE BY READING THE CONSUMER.** The fallback itself looks perfectly correct; nothing at the call site says a downstream `=== null` exists.
+
+### ⚠⚠ WHO STARTS GETTING COACHED — REPORT THE DELTA BY NAME, NOT THE MECHANISM (2026-09-01)
+**A one-line change to `focusOf` changed who receives coaching. The useful report is not "thin_types is now speakable" — it is the eight closers with before/after beside each name.**
+- **Measured: 2 of 8 newly coached (Josh N fear 0/4, Nick O'Neal fear 1/5), NOBODY loses coaching.** That last clause is the one that makes it safe to ship, and it is invisible unless you compute both arms.
+- **THE SHAPE: run the OLD predicate and the NEW one over the SAME live rows and print both columns.** It costs one script and turns "the behaviour changed" into a list somebody can check.
+
+### ⚠⚠ AN INLINE STYLE IS UNREACHABLE BY A CSS SWEEP — AND THAT IS HOW A PATTERN REMOVAL MISSES A PAGE (2026-09-01)
+**The green bars on the team views were CSS classes, so a scoped stylesheet rule removed them. The SAME visual pattern on the personal Coaching Dashboard is `style="border-left:2px solid var(--good)"` built in `perfInsightHtml` — no CSS rule can reach it.**
+- **⚠ SO "EXTEND THE SWEEP TO THIS PAGE" IS NOT THE SAME EDIT TWICE.** One is a stylesheet rule; the other is a JS change. **Enumerate by RENDERED PROPERTY (`getComputedStyle` over the live page), never by grepping the stylesheet** — the stylesheet cannot show you a bar that does not live in it.
+- **THE TEST FOR WHETHER A BAR MAY GO, restated because it decided this one: strip the encoding and ask what the reader no longer knows.** Here the cards sit under headings reading **"WHAT'S WORKING"** and **"WHAT TO IMPROVE"** — the colour restated a fact given one line earlier, so nothing was lost.
+
+### ⚠ THE GROUND EDIT GOES *ABOVE* THE CARD REMOVAL IN THE DIFF (2026-09-01)
+Part 1's rule is *the ground goes on before the cards come off*. **The personal Coaching Dashboard had NO ground**, so the wrong order would have repeated the 95-of-105-exposed failure exactly.
+- **Making the ordering visible IN THE DIFF is cheap and worth doing** — the ground selector was added to the existing ground rule, which sits above the card-removal rule, so a reviewer sees the sequence rather than having to trust it.
+
+### ⚠ CONVERT A GUARD WHOSE BEHAVIOUR YOU DELIBERATELY CHANGED — AND EXPECT IT TO NEED A STUB IT DID NOT BEFORE (2026-09-01)
+A test asserted `no_focus` for a board where every closer is `thin_types`. **The fix makes those closers speakable, so the state is now `per_closer` — the test failed BECAUSE the change worked.**
+- **Its subject survives and is stronger:** *the per-closer state must not collapse into one board sentence.* Still true, and now they get coached too.
+- **⚠ A SPEAKABLE BOARD MAKES A MODEL CALL, so the converted test needed the model stub the old one never required.** When a conversion moves a case from a short-circuit into the main path, check what the main path DOES before assuming the fixture still suffices.
+
+### ⚠⚠ "FINE TUNE COACHING" — FILED AS A MAJOR (Justin, 2026-09-01)
+**A control wherever coaching appears, manager and above, that captures a manager's correction and stores THE CONCEPT BEHIND IT in the Knowledge Base.**
+- **⚠⚠ IT IS ADD-TO-KNOWLEDGE-BASE FROM THE OTHER END — one teaches by example, the other by correction — AND IT IS THE THING THAT WOULD FIX THE ISOLATION DEFECT AT SOURCE** rather than by editing nine prompts and bumping nine caches.
+- Recorded now so it is not rediscovered, and so the isolation work is not started as nine prompt edits when the durable fix is one feature.

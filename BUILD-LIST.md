@@ -1115,3 +1115,24 @@ Six of eight closers get coaching and evidence; the two skipped are both `thin_t
 - "1000 chunks" on the Knowledge Base entry.
 - ⚠ **NEW:** the objection category renders **green** on the Why cards, while green means *good*/*clickable* everywhere else — here it labels the closer's **weakest** category.
 - The digest summary sentence — filed for options.
+
+## 2026-09-01 — (b) fixed, personal Coaching Dashboard (`c95595d`, `5e1f2b1`)
+
+**LIVE**
+- **(b) Every closer with objections gets coached.** `focusOf` falls back to `c.top`; the comment claiming a single exception is corrected alongside. **Newly coached: Josh N (fear 0/4), Nick O'Neal (fear 1/5) — 2 of 8, nobody loses coaching.** `PROMPT_VERSION v9 → v10`. ⚠ `baseline_pct` normalised to `null` — the prompt tests `=== null` strictly, so passing `undefined` would have written *"undefined% across their other categories"* into a model prompt.
+- **Personal Coaching Dashboard — ground first, then cards off.** Page header, four glance tiles (now hairline-separated), sections, pattern cards, objection-focus chips and exclusion note all un-carded, scoped to `overview`. ⚠ This page had no ground at all.
+- **Green bars extended to this page.** ⚠ The one in `perfInsightHtml` is an INLINE STYLE and needed a JS change — no CSS sweep reaches it. Removed because the headings above already read "WHAT'S WORKING" / "WHAT TO IMPROVE".
+
+**⚠ AWAITING A RULING — the loud number for the personal Coaching Dashboard**
+Four numbers currently sit at equal weight. **Proposed: CLOSE RATE** — the only one a closer is paid on, and a stable count ratio. ⚠ **Argued against Avg Score deliberately:** it carries a ±14-per-section noise floor and ~6 points of run-to-run drift, so it would give enormous prominence to movement that is not real. ⚠ **Honest counter:** close rate depends on prospect grouping, and **355 merge proposals are unreviewed** on one account. **Not built.**
+
+**⚠⚠ NEEDS ITS OWN BLOCK — (c) coaching against isolation** (unchanged from the previous entry: extractor breach = 1 in 8,998 and a violation of an existing rule; nine lanes with no constraint ≈ 2 actual misfires; `objection-synthesis` the sharpest exposure. Both spend decisions.)
+
+**⚠⚠ NEW MAJOR — "Fine Tune Coaching"**
+A control wherever coaching appears, manager and above, capturing a manager's correction and storing **the concept behind it** in the Knowledge Base. **It is Add-to-Knowledge-Base from the other end**, and it is the thing that would fix the isolation defect **at source** rather than by editing nine prompts. Filed for the end of the session.
+
+**FILED, NOT ACTED ON**
+- ⚠ **Amber section bars** — confirmed by looking and starker than described: 58/51/65/64/57 all render **identical amber**, the loudest thing on the page. Amber appears nowhere else in the product.
+- "1000 chunks" on the Knowledge Base entry.
+- The objection category renders **green** on the Why cards while labelling the **weakest** category.
+- **Call review** — eleven bars encode outcome there; needs a ruling, not a sweep.
