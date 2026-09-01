@@ -5329,6 +5329,37 @@ Verifying a new line graph, the painted-pixel count came back **0** while Chart.
 - **THE SUBJECT SURVIVED AND THE FIXTURE DIED, so it was asserted at the SOURCE** — the fallback expression must be `m.views[0]` and never a literal — **which cannot go vacuous however the catalog moves**, plus a behavioural case built from a view the metric provably does not offer.
 - **THE HABIT: when a change makes a class of input disappear, grep the tests that RELIED on that class existing.** A guard whose fixture has become unrepresentative still passes, and passing is exactly what hides it.
 
+### ⚠⚠⚠ A THIRD SHAPE: SOME METRICS HAVE A SWEET SPOT, AND THE TWO-DIRECTION MODEL CANNOT HOLD ONE (Justin, 2026-09-01)
+**His words: *"not necessarily — a good sales call lasts anywhere from 20 min to over an hour, it just depends on the prospect, but typically 35–45 min is the sweet spot."*** The catalog has `higher_is_better` and `lower_is_better` and **NEITHER IS TRUE** for call length.
+- **⚠⚠ THE CEILING IS ALREADY RANKING A REP FIRST FOR THE THING THE RULING WARNS AGAINST — measured, on the live board:**
+```
+Nathan   28.8 min avg   13 of 27 calls UNDER 20 MINUTES (48%)   <- ranks FIRST today
+Gabriel  67.1 min avg                                            <- the only one "failing"
+excluding no-shows moves them 28.8->29.9 and 67.1->67.7 — the cheap fix is ruled OUT
+1,546 real graded calls: median 48.5, p10 8.9, p90 97.3; 292 (19%) under 20 min
+and short calls are mostly NOT no-shows — 129 of the 167 sub-10-minute calls are real
+```
+- **⚠⚠ THE RULING CONTAINS TWO BANDS AND ONE PAIR OF NUMBERS LOSES THAT:** *"20 min to over an hour"* (acceptable) and *"35–45 the sweet spot"* (ideal). **A strict 35–45 puts 6 of 8 reps outside**, which is an alarm that fires on everyone and is therefore ignored. **Two edges map onto the three colour zones `band()` already returns** — good inside the sweet spot, mid inside acceptable, bad outside — so it is a third branch rather than a new mechanism.
+- **⚠⚠ THE TRAP IN THE OBVIOUS RANKING: DISTANCE FROM THE BAND REPRODUCES THE DEFECT IT FIXES.** A rep at 28.8 and one at 67.1 are both ~16 minutes out and need **OPPOSITE** coaching — one is rushing, one is rambling — so a pure distance sort puts them adjacent **with nothing saying which way**. Each row must state its side, or the band buys nothing over the direction. **Reps INSIDE the band are not ranked against each other**: there is no honest ordering between 38 and 42 minutes.
+- **⚠ THE DIRECTION MODEL HAS ONLY FIVE CONSUMERS, and one is a shared carrier: `lib/team-averages.js` DECLARES CALL-TIME'S DIRECTION SEPARATELY from the catalog.** They agree today; a band must move both or the gauge and the card disagree about one metric.
+- **⚠ AND REFUSING WAS RIGHT: both available answers were wrong.** A wrong direction has no wrong number — the fastest or the slowest rep would have led the list with nothing on screen looking off.
+
+### ⚠⚠ I TESTED MY OWN SUSPICION BEFORE REPORTING IT AND IT WAS WRONG (2026-09-01)
+**`pct_through_call` looked flat at 56-67% across every bucket, which reads as "time-to-price is just call length restated" — and that would have argued the metric does not deserve its own band.** Measured on 427 calls:
+```
+corr(price time, call length)      0.523    moderate — NOT a proxy
+corr(price time, discovery score)  0.367    <- price time predicts discovery BETTER
+corr(call length, discovery score) 0.268       than call length does
+mean 61.6% through the call, SD 18.4 — real spread, not a constant fraction
+```
+- **THE SUSPICION WAS PLAUSIBLE, CHEAP TO CHECK, AND FALSE.** Reporting it would have argued against a metric that carries independent signal. **A flat-looking derived ratio is a hypothesis, not a finding — compute the correlation before drawing a conclusion from a table of means.**
+- **⚠ AND THE FIRST CUT'S SMALLEST BUCKET HELD THREE CALLS.** I widened to a 32-call bucket before reporting anything. **A monotonic trend whose end point is n=3 is an anecdote with a slope.**
+
+### ⚠ AN EARLY PRICE DOES MEAN SKIPPED DISCOVERY — AND THE CAVEAT IS PART OF THE FINDING (measured 2026-09-01)
+**Discovery items established (of 6), by when the price was stated, 427 calls: 2.4 → 3.3 → 3.3 → 3.9 → 5.2.** Monotonic.
+- **⚠ IT IS PARTLY MECHANICAL AND MUST BE REPORTED THAT WAY: a call that prices at minute 10 has had ten minutes to do discovery.** The relationship is real and it is not evidence of causation.
+- **⚠⚠ THERE IS NO VISIBLE UPPER END WHERE A LATER PRICE STOPS HELPING, AND THE SAMPLE CANNOT SHOW ONE — the buckets above 55 minutes hold 13 calls between them.** That is a limit of the data, not a result, so **no upper edge was proposed.** Same discipline as refusing a threshold justified by n=2.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

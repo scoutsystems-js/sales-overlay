@@ -1168,6 +1168,16 @@ Deployed, verified by commit hash and served-page parity. Suite **2051**.
 
 ---
 
+## 2026-09-01 — A TARGET BAND: REPORTED, NOT BUILT (no commit — the model change is Justin's to rule on)
+Justin ruled that neither faster nor slower is better for call length: *"a good sales call lasts anywhere from 20 min to over an hour… typically 35–45 min is the sweet spot."* **The catalog has only `higher_is_better` and `lower_is_better`, and neither is true.**
+
+| `▰ MAJOR` **A TARGET BAND — a third shape for the direction model** (**NEEDS JUSTIN**, reported 2026-09-01) | ⚠⚠ **THE CEILING IS ALREADY RANKING A REP FIRST FOR RUSHING: Nathan reads BEST on call time at 28.8 min with 13 of 27 calls under 20 minutes.** Excluding no-shows moves it 28.8→29.9, so the cheap fix is ruled out. ⚠ **The ruling contains TWO bands** — acceptable 20–60, ideal 35–45 — and one pair of numbers loses that; a strict 35–45 puts **6 of 8 reps outside**. Two edges map onto the three colour zones `band()` already returns. ⚠⚠ **Ranking by distance alone REPRODUCES the defect**: 28.8 and 67.1 are both ~16 min out and need opposite coaching, so each row must state its side; reps inside the band are listed, not ranked. ⚠ **Five consumers, one of them a shared carrier — `lib/team-averages.js` declares call-time's direction separately from the catalog and must move with it.** |
+| `▰ MINOR` **IS A LATE "MINUTES TO PRICE" ALSO A PROBLEM?** (**NEEDS JUSTIN**, 2026-09-01) | Ranked views stay refused. **No band was inferred from the call-length ruling** — that ruling is about call length and says nothing about when a price should land. Measured (n=427): price time correlates with call length only **0.523**, and **predicts discovery better than length does (0.367 vs 0.268)** — so it is its own metric, not a proxy. Discovery items rise monotonically 2.4 → 5.2 with a later price, **with no visible upper end — and the sample cannot show one, since the buckets above 55 min hold 13 calls between them.** The question: *is there a point where pricing too late is a problem, or is later always better?* |
+
+**§3 — an early price DOES mean skipped discovery, with the caveat as part of the finding.** Items established of six, by price time: **2.4 (<20 min) → 3.3 → 3.3 → 3.9 → 5.2 (55–75 min)**. ⚠ Partly mechanical — a call that prices at minute 10 has had ten minutes to do discovery — so it is a real relationship and not evidence of causation. ⚠ Close-rate-by-duration was **deliberately not offered** as evidence: it is a recorded refused inference (a call runs long *because* it closed).
+
+**Nothing was built or pushed.**
+
 ## 2026-09-01 — FOUR RENAMES, A DESCRIPTION ON EVERY METRIC, AND THE MINUTES HOLE (`ad0af6e`, `5111b28`)
 Live, verified by commit hash and served-page parity. Suite **2057**. Five restored defects → 8 failures.
 
