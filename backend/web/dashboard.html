@@ -871,7 +871,11 @@
       border-radius: var(--radius-lg); padding: 14px 18px;
     }
     .page-header h1 {
-      font-size: var(--fs-title);
+      /* ⚠ RULED 2026-09-01: the page title takes the NUMBER step, not TITLE. With
+         both on 18 there was no hierarchy between a page and its own sections —
+         "Sober Living Riches" and "Reps" read as peers. The scale already had
+         the step; nothing new was invented for it. */
+      font-size: var(--fs-number);
       font-weight: var(--fw-normal);
       letter-spacing: -0.02em;
       margin: 0;
@@ -2147,6 +2151,12 @@
     .dp-label { background: var(--dp-bg); border: 1px solid var(--dp-line); border-radius: var(--radius);
                 color: var(--dp-fg); padding: 6px 12px; font-size: var(--fs-secondary); cursor: pointer; font-weight: var(--fw-emphasis); }
     .dp-label:hover { border-color: var(--accent); }
+    /* ⚠⚠ NAMED EXEMPTION FROM THE TYPE SCALE (ruled 2026-09-01) — NOT AN
+       OVERSIGHT, AND NOT TO BE SWEPT LATER. This caret and the dial tick
+       labels in avgCardHtml are ICONOGRAPHY AND CHART FURNITURE, not text.
+       Forcing them to the 11px floor changes the geometry of a control and of
+       a dial, which is a layout change, not a type change. The scale is
+       otherwise closed: these two are the only things below it. */
     .dp-cal { font-size: 10px; }
     .dp-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: 268px; padding: 10px;
                 background: var(--dp-bg); border: 1px solid var(--dp-line); border-radius: var(--radius);
@@ -2970,11 +2980,21 @@
     .avg-scale-label { fill: var(--text); font-size: 9px; font-weight: 600; text-anchor: middle; opacity: 0.55; }
 
     .avg-readout { position: absolute; left: 0; right: 0; bottom: 6px; pointer-events: none; }
-    .avg-value { font-size: var(--fs-number); font-weight: var(--fw-normal); line-height: 1; letter-spacing: -0.01em; }
+    /* ⚠⚠ THE DISPLAY STEP (ruled 2026-09-01: the gauges should dominate).
+       ⚠ COMPARED AT 48 / 34 / 28 / 20 SIDE BY SIDE BEFORE CHOOSING, because
+       three side-by-side numbers is not the case 48 was scaled for. 34 sits
+       most comfortably inside the dial — but 34 IS NOT ON THE SCALE, and an
+       eighth size is exactly what "nothing between them, ever" forbids. So 48
+       it is, and the one caveat is stated rather than designed around: the
+       number's width approaches the dial's inner diameter, and "46min" (a
+       suffix, not just digits) is the tightest case. If it reads cramped, the
+       fix is a LARGER DIAL in block 2 — where layout changes belong — never an
+       eighth type size. */
+    .avg-value { font-size: var(--fs-display); font-weight: var(--fw-display); line-height: 1; letter-spacing: -0.01em; }
     .avg-value-good { color: var(--good); }
     .avg-value-mid  { color: var(--mid); }
     .avg-value-bad  { color: var(--bad); }
-    .avg-value-unit { font-size: var(--fs-label); font-weight: var(--fw-normal); margin-left: 1px; }
+    .avg-value-unit { font-size: var(--fs-number); font-weight: var(--fw-normal); margin-left: 1px; }
     .avg-target-cap { font-size: var(--fs-eyebrow); font-weight: var(--fw-normal); text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; margin-top: 3px; }
     /* Raw counts under every rate — house rule. */
     .avg-counts { font-size: var(--fs-label); margin-top: 6px; }
@@ -3291,6 +3311,60 @@
        grey the no-grey rule bans — the colour is still var(--text). */
     .team-controls-row { flex-wrap: wrap; }
     .team-range-scope { flex-basis: 100%; text-align: right; margin-top: 6px; opacity: 0.75; }
+
+    /* ═══ TREATMENT C — SPACE INSTEAD OF LINES (design pass block 2, Performance only)
+       Justin approved a full-page mock. The audit's finding, made concrete by
+       MEASURING the live page: 52 drawn boxes in 15 kinds, nested THREE deep —
+       a bordered section containing a bordered card containing a bordered row.
+
+       ⚠⚠ SCOPED TO body[data-view="team-performance"] AND THAT IS DELIBERATE.
+       `.section` and `.page-header` are rendered by EVERY page in the product;
+       restyling them unscoped would silently re-lay-out a dozen pages that had
+       nothing to do with this block — the shared-carrier failure in CSS, which
+       this file already records happening once. Blocks 3 and 4 widen it page by
+       page, and this selector is where they unwind it.
+
+       ⚠ Space does the grouping. One accent, sparingly. Hairlines only where a
+       boundary genuinely has to be read as a boundary. */
+    body[data-view="team-performance"] .section,
+    body[data-view="team-performance"] .page-header {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding-left: 0;
+      padding-right: 0;
+      margin-bottom: 40px;          /* the grouping the borders used to do */
+    }
+    body[data-view="team-performance"] .page-header--company { margin-bottom: 28px; }
+
+    /* ⚠⚠ NO NESTED CONTAINERS. The rep cards were boxes INSIDE a box; they are
+       now rows separated by a hairline — a boundary you read rather than a
+       frame you see. The last row draws none: a trailing rule is a line with
+       nothing on the other side of it. */
+    body[data-view="team-performance"] .rep-card {
+      background: transparent; border: 0; border-radius: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+    }
+    body[data-view="team-performance"] .rep-card:last-child { border-bottom: 0; padding-bottom: 0; }
+    body[data-view="team-performance"] .rep-weak,
+    body[data-view="team-performance"] .rep-why { border: 0; padding-left: 0; padding-right: 0; }
+
+    /* ⚠ THE RANKED LISTS: hairlines, not boxes. The thin bar stays — it is the
+       one drawn shape here that carries information rather than decoration. */
+    body[data-view="team-performance"] .team-detail-row {
+      background: transparent; border: 0; border-radius: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 0;
+    }
+    body[data-view="team-performance"] .team-detail-row:last-child { border-bottom: 0; }
+
+    /* ⚠ GRAPHS SIT ON THE PAGE WITH A HAIRLINE BASELINE, NOT IN A CARD. */
+    body[data-view="team-performance"] .rep-graph-skeleton {
+      background: transparent; border: 0; border-radius: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    body[data-view="team-performance"] .team-controls-row { margin-bottom: 32px; }
 
     /* .nw-chip-cash styled the +$X at-stake chip — removed 2026-08-17 with the
        money math. Kept as a note so a stray class name in a future edit does

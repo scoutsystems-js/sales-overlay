@@ -49,3 +49,27 @@ test('⚠ there are three radius tokens and the scale offers no fourth', () => {
     assert.ok(new RegExp(t + ':\\s*' + v).test(DASH), t + ' must be ' + v);
   });
 });
+
+/* ⚠⚠ THE TWO NAMED EXEMPTIONS (ruled 2026-09-01). They are recorded here so a
+   later sweep finds a DECISION rather than two stray values that look like an
+   oversight — and so that removing them is a deliberate act. The caret and the
+   dial ticks are iconography and chart furniture; forcing them to the 11px
+   floor changes the geometry of a control and of a dial, which is a layout
+   change rather than a type one. */
+test('⚠ the two sub-scale values are NAMED exemptions, not strays', () => {
+  const at = DASH.indexOf('.dp-cal {');
+  assert.ok(at !== -1, 'stale anchor — the date-picker caret is gone');
+  const before = DASH.slice(Math.max(0, at - 700), at);
+  assert.ok(/NAMED EXEMPTION FROM THE TYPE SCALE/.test(before),
+    'the caret sits below the scale and must say WHY, or it reads as an oversight');
+  assert.ok(/font-size: 10px/.test(DASH.slice(at, at + 60)), 'and it stays at 10px');
+});
+
+/* ⚠ A PAGE TITLE MUST OUTRANK A SECTION HEADING. Both were 18px after the first
+   pass and the page read flat between itself and its own sections. */
+test('⚠ the page title outranks a section heading', () => {
+  const h1 = DASH.slice(DASH.indexOf('.page-header h1 {'), DASH.indexOf('}', DASH.indexOf('.page-header h1 {')));
+  assert.ok(/font-size: var\(--fs-number\)/.test(h1), 'the page title takes the number step');
+  const h2 = DASH.slice(DASH.indexOf('.section h2 {'), DASH.indexOf('}', DASH.indexOf('.section h2 {')));
+  assert.ok(/font-size: var\(--fs-title\)/.test(h2), 'section headings stay on title');
+});
