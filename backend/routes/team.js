@@ -411,8 +411,12 @@ router.put('/dashboard', teamGate, async function (req, res) {
     }
 
     if (rows.length >= MAX_BOARDS) {
+      /* ⚠ "Rename or delete one" WAS WRONG — renaming makes no room, and telling
+         a manager at the cap to rename something sends them to do a thing that
+         cannot work. Forking is the fastest route to this message, so it has to
+         name the one action that helps. */
       return res.status(400).json({ error: 'You already have ' + MAX_BOARDS
-        + ' boards. Rename or delete one to make room.' });
+        + ' boards. Delete one to make room for another.' });
     }
     var ins = await admin.from('dashboards')
       .insert({ user_id: req.user.id, name: name, layout: layout })
@@ -465,6 +469,34 @@ router.post('/dashboard/:id/pin', teamGate, async function (req, res) {
     if (set.error) throw new Error('pin: ' + set.error.message);
     res.json({ ok: true, pinned: req.params.id });
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard-pin', err); res.status(500).json({ error: 'Could not pin that board.' }); }
+});
+
+/* ⚠⚠ RENAME HAS ITS OWN ROUTE AND MUST NOT GO THROUGH PUT — this is required by
+   an existing ruling, not fastidiousness. `resolveLayout` DROPS a card whose
+   metric no longer exists and deliberately DOES NOT WRITE: "the unknown entry
+   stays in the stored row untouched", so a removed metric's return is
+   recoverable. A rename routed through PUT would send back the RESOLVED layout
+   the client is holding and permanently destroy that entry — silent data loss
+   that looks exactly like a successful rename.
+   ⚠ SO THIS TOUCHES `name` AND NOTHING ELSE. A guard asserts it never writes
+   `layout`. */
+router.patch('/dashboard/:id/name', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    var raw = (req.body && typeof req.body.name === 'string') ? req.body.name.trim() : '';
+    /* ⚠ THE SAME 60-CHARACTER CAP AND THE SAME FALLBACK AS THE SAVE PATH, because
+       two places that name a board must not disagree about what a name may be. */
+    var name = raw ? raw.slice(0, 60) : 'My board';
+    var up = await admin.from('dashboards')
+      .update({ name: name, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id).eq('user_id', req.user.id)
+      .select('id, name, pinned').maybeSingle();
+    if (up.error) throw new Error('dashboards rename: ' + up.error.message);
+    /* ⚠ 404, NOT 403 — a board id that is not yours is indistinguishable from one
+       that does not exist, and saying which is a disclosure. Same as PUT. */
+    if (!up.data) return res.status(404).json({ error: 'That board no longer exists.' });
+    res.json({ board: up.data });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('dashboard-rename', err); res.status(500).json({ error: 'Could not rename that board.' }); }
 });
 
 router.delete('/dashboard/:id', teamGate, async function (req, res) {

@@ -3956,6 +3956,14 @@
       color: var(--text); opacity: 0.65; font-weight: var(--fw-normal);
     }
     .dash-pin-badge { color: var(--accent); opacity: 0.9; }
+    /* ⚠ A GAP, NOT A LINE. The row already carries four buttons; a rule between
+       them would read as another element. This just holds delete apart. */
+    .dash-bar-sep { display: inline-block; width: 18px; }
+    /* ⚠ OUTLINED, NEVER FILLED — the standing ruling. A solid red control reads
+       as "something is wrong with this board"; an outline reads as "a
+       destructive action is available here", which is what is true. */
+    .dash-bar-danger { color: var(--bad); border-color: rgba(var(--bad-rgb), 0.45); }
+    .dash-bar-danger:hover { border-color: var(--bad); background: rgba(var(--bad-rgb), 0.12); }
     .dash-edit-hint {
       font-size: var(--fs-secondary); color: var(--text); opacity: 0.7;
       margin: -12px 0 22px;
@@ -12520,17 +12528,27 @@
     renderTeamDashboard();
   }
 
-  async function dashSaveEdit() {
+  /* ⚠ `asNew` IS APPENDED, never inserted — a stale zero-argument call still
+     means "overwrite", which is what every existing call site intends. */
+  async function dashSaveEdit(asNew) {
     var e = state.dashEdit;
     if (!e) return;
     if (!e.cards.length) { dashToast('A board needs at least one card.'); return; }
-    var btn = document.getElementById('dashSaveBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+    var btn = document.getElementById(asNew ? 'dashSaveNewBtn' : 'dashSaveBtn');
+    var busyLabel = asNew ? 'Saving\u2026' : 'Saving\u2026';
+    if (btn) { btn.disabled = true; btn.textContent = busyLabel; }
     try {
       var res = await fetch('/team/dashboard?' + teamQP(), {
         method: 'PUT',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ id: e.id, name: e.name, layout: e.cards.map(function (c) {
+        /* ⚠⚠ A FORK SENDS NO id, WHICH IS THE WHOLE MECHANISM — the save route
+           inserts when there is none, and the ORIGINAL IS NEVER TOUCHED. It also
+           means the fork hits the ten-board cap check, so a manager at the cap
+           gets the server's worded message rather than a database error.
+           ⚠ AND THE COPY IS NEVER PINNED: `pinned` defaults to false on insert,
+           so forking a pinned board leaves the pin where it was. There is exactly
+           one pin and the partial unique index enforces it. */
+        body: JSON.stringify({ id: asNew ? null : e.id, name: e.name, layout: e.cards.map(function (c) {
           return { metric: c.metric, view: c.view, w: c.w, h: c.h };
         }) }),
       });
@@ -12546,7 +12564,9 @@
     } catch (err) {
       dashToast('Could not save your board.');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+      /* ⚠ RESTORE THE LABEL THAT WAS THERE — a shared "Save" would silently
+         rename "Save as new" the first time it was pressed and failed. */
+      if (btn) { btn.disabled = false; btn.textContent = asNew ? 'Save as New' : 'Save'; }
     }
   }
 
@@ -12856,6 +12876,12 @@
         + '<div class="dash-bar-actions">'
           + '<button type="button" class="dash-bar-btn" onclick="dashOpenPicker()">+ Add card</button>'
           + '<button type="button" class="dash-bar-btn" onclick="dashCancelEdit()">Cancel</button>'
+          /* ⚠ TWO SAVES, AND THE LABELS SAY WHICH IS WHICH. Justin: "if you create
+             dashboard 1, only change a few things you should be able to save as
+             new so you don't have to recreate it all over again." Save overwrites
+             THIS board; Save as new forks it and leaves the original untouched. */
+          + (e.id ? '<button type="button" class="dash-bar-btn" id="dashSaveNewBtn" '
+              + 'onclick="dashSaveEdit(true)" title="Keep this board and save the changes as a separate one">Save as New</button>' : '')
           + '<button type="button" class="dash-bar-btn dash-bar-primary" id="dashSaveBtn" onclick="dashSaveEdit()">Save</button>'
         + '</div></div>'
         + '<div class="dash-edit-hint">Drag a card to move it. Drag the corner to resize it. '
@@ -12884,8 +12910,19 @@
               + escapeHtml(d.board.id) + '\', ' + (pinned ? 'true' : 'false') + ')" title="'
               + (pinned ? 'Stop opening this board first' : 'Open this board first from the Team menu')
               + '">' + (pinned ? 'Unpin' : 'Pin') + '</button>' : '')
+        /* ⚠ RENAME WORKS ON A SAVED BOARD, not only inside the editor. It goes
+           through its own route and never through Save — see dashRenameSaved. */
+        + (d && d.board
+            ? '<button type="button" class="dash-bar-btn" onclick="dashRenameSaved()">Rename</button>' : '')
         + '<button type="button" class="dash-bar-btn" onclick="dashNewBoard()">+ New Board</button>'
         + '<button type="button" class="dash-bar-btn" onclick="dashEnterEdit()" title="Edit this board">✎ Edit</button>'
+        /* ⚠⚠ DELETE IS SEPARATED FROM THE REST, and that is the point rather than
+           styling. Pin, Rename, New Board and Edit are all reversible; delete is
+           not, and a destructive control sitting flush against four safe ones
+           invites the press it must never get by accident. */
+        + (d && d.board
+            ? '<span class="dash-bar-sep" aria-hidden="true"></span>'
+              + '<button type="button" class="dash-bar-btn dash-bar-danger" onclick="dashDeleteBoard()">Delete</button>' : '')
       + '</div></div>'
       + '<div class="dash-toast" id="dashToast"></div>';
   }
@@ -12913,6 +12950,69 @@
      pinned the dashboard route falls back to the MOST RECENTLY UPDATED board,
      and the Team menu names it — the label follows the board it opens rather
      than requiring a pin. Never an empty entry. */
+  /* ⚠⚠ RENAME A SAVED BOARD — its own route, never Save. `resolveLayout` DROPS a
+     card whose metric no longer exists and deliberately does not write, so the
+     cards this client is holding are the RESOLVED set. Renaming through the save
+     route would post that set back and permanently destroy the dropped entry —
+     silent data loss that looks exactly like a successful rename. */
+  async function dashRenameSaved() {
+    var b = state.teamDashboard && state.teamDashboard.board;
+    if (!b) return;
+    var v = await scoutPrompt({ title: 'Rename this board', value: b.name, confirmText: 'Rename' });
+    if (v === null) return;
+    var name = String(v).trim().slice(0, 60);
+    if (!name || name === b.name) return;
+    try {
+      var res = await fetch('/team/dashboard/' + encodeURIComponent(b.id) + '/name?' + teamQP(), {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ name: name }),
+      });
+      var j = await res.json();
+      if (!res.ok) { dashToast(j.error || 'Could not rename that board.'); return; }
+      /* ⚠ REFETCH. The Team menu names the board it opens, so a rename that did
+         not refresh state would leave the nav listing the OLD name — the
+         label-that-would-not-say-its-name defect, returning by a different road. */
+      state.teamDashboard = null; loadTeam('dashboard'); renderTeamDashboard();
+    } catch (e) { dashToast('Could not rename that board.'); }
+  }
+
+  /* ⚠⚠ DELETE IS DESTRUCTIVE AND THERE IS NO UNDO. It follows the rules this
+     project already has for destructive acts: a MODAL (native confirm() was
+     removed from this product deliberately, and replaced once by a promise that
+     is always truthy sitting on a delete button — do not reintroduce either),
+     the board NAMED rather than "this board", and the cost stated plainly rather
+     than softened. */
+  async function dashDeleteBoard() {
+    var d = state.teamDashboard;
+    var b = d && d.board;
+    if (!b) return;
+    var n = (d.cards || []).length;
+    var ok = await scoutConfirm({
+      /* ⚠ THE NAME, NEVER "this board". A manager with ten boards must not have
+         to trust which one is selected. */
+      title: 'Delete \u201c' + b.name + '\u201d?',
+      body: 'This board and its ' + n + ' card' + (n === 1 ? '' : 's') + ' are removed for good. '
+        + 'There is no undo.\nYour calls, grades and everything else are untouched.',
+      confirmText: 'Delete board', danger: true,
+    });
+    if (!ok) return;
+    try {
+      var res = await fetch('/team/dashboard/' + encodeURIComponent(b.id) + '?' + teamQP(),
+        { method: 'DELETE', headers: authHeader() });
+      var j = await res.json();
+      if (!res.ok) { dashToast(j.error || 'Could not delete that board.'); return; }
+      /* ⚠⚠ CLEAR THE SELECTION, OR THE NEXT FETCH ASKS FOR A BOARD THAT NO LONGER
+         EXISTS. The load route matches `?board=` against the manager's rows and
+         falls through to the CODE DEFAULT when nothing matches — so a stale id
+         would show the default even though other boards remain, and read as
+         "delete wiped my other boards". Cleared, the route returns boards[0]:
+         the pinned one, else the most recently updated. */
+      state.dashBoardId = null;
+      state.teamDashboard = null; loadTeam('dashboard'); renderTeamDashboard();
+    } catch (e) { dashToast('Could not delete that board.'); }
+  }
+
   async function dashTogglePin(id, isPinned) {
     var verb = isPinned ? 'unpin' : 'pin';
     try {

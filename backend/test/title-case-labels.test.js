@@ -58,7 +58,17 @@ function isSentence(t) {
 // LOWERCASE HANDLES like "josh" and a button that just read "call". It was not
 // aimed at connectives; "Call Highlights Of The Week" was built, shown to him,
 // and ruled against (2026-08-17). The literal reading is the wrong one.
-const CONNECTIVES = new Set(['of', 'the', 'to', 'for', 'and', 'a', 'in', 'on']);
+/* ⚠ 'as' ADDED 2026-09-01, AND IT IS NOT A WEAKENING — THE LIST WAS INCOMPLETE.
+   The diagnostic that settles it: could the assertion be TRUE of the code as
+   written? "Save as New" follows this guard's OWN stated convention — content
+   words capitalised, small connectives lowercase inside a label — exactly as
+   "Back to Calls" and "Call Highlights of the Week" already do. 'as' is the
+   same part of speech as 'to', 'for', 'in' and 'on', and its absence would
+   equally have fired on "Mark as Read" or "Save as Draft".
+   ⚠ THE ALTERNATIVE WAS TO RENAME THE BUTTON TO DODGE THE WORD, which is the
+   trap this file warns about: making a failure go away rather than asking
+   whether the check is right. The check was incomplete. */
+const CONNECTIVES = new Set(['of', 'the', 'to', 'for', 'and', 'a', 'in', 'on', 'as']);
 
 function offendingWords(t) {
   return t.split(/\s+/).filter((w, i) => {
