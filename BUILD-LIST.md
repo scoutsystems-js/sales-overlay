@@ -337,6 +337,17 @@ sizes                 12 distinct, including half-pixels (12.5 / 10.5 / 13.5)
 
 ## 🔴 NEEDS JUSTIN — decisions and spend, nothing else
 
+**⚠⚠ WARM THE TEAM-RECOMMENDATIONS LANE ON THE CRON — measured, proposed, NOT BUILT (2026-09-01).**
+```
+COLD (miss, one model call)   25,855 ms     Josh's board, 9 reps
+WARM (hit)                     4,418 ms     same board
+WARM, another board            3,425 / 1,730 / 1,505 ms
+```
+**Confirmed it is ONE synthesis now** — removing Objection Handling Focus removed its model call, not just its markup. **So the slow case IS a cold cache and the first manager of the day pays all of it.**
+⚠⚠ **The warm floor is NOT the cache being slow: three awaited loads run BEFORE `cacheGet`** (`loadTeamWindow`, `inChunks('call_analyses')`, `fetchSellingContext`) because **the key is a fingerprint OF THE DATA**. The cache saves the model call and nothing else — the same shape as `performance-synthesis`.
+**PROPOSAL: generate this lane in the 2-hourly sync pass that already iterates every manager for the digest.** One model call per manager per day, the same shape and cost as the digest already riding that cron. ⚠ **It is a warming problem, not a rendering one — and NO CONTENT IS REMOVED.** **Spend + scheduling, so it is Justin's.**
+
+
 **Everything here is blocked on him, not on work.**
 
 ### 🎯 THE WHY PANEL SHOULD COACH REGARDLESS OF THE RATE — RECON DONE, NOT BUILT
@@ -681,6 +692,7 @@ So **"at least 10 characters" is already the rule and is already enforced** — 
 | item | trigger |
 |---|---|
 | **Exposure-sweep guard** | ⚠ **See OPEN below — currently unguarded.** Due before another full-bleed/brightness change |
+| ~~Provider-blind clip labels~~ **✅ FIRED AND DISCHARGED for the digest 2026-09-01 (`6f1c752`)** | Real Zoom traffic is analysed (48 calls). `source` now rides with `clip`; `clipLabelFor` picks the word. ⚠ **Discharged for THIS surface only** — re-run the capability sweep (`indexOf('?') === -1 ? '?' : '&'`) before claiming the class is closed |
 | Zoom VTT adapter validation on a real call | Josh records a cloud call with transcription on |
 | Zoom 3301 requeue live-exercise | A transcript fetch actually races |
 | Non-English prospect-name handling | A non-English account is onboarded |
@@ -1047,6 +1059,27 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 | **Drilldown refinements (Justin's six)** | Routing, in-card controls, reused picker, team-average row, no Manage Members / Customize View, bare labels | shipped `3c1e3a5`. **Verified by clicking on production, 3 clicks delivered:** the averages gauge and the focus card both land on `#team-objections` (the gauge carrying its fixed 7-day window); the picker is the SAME component and its selection survives leaving and returning; controls sit inside the card; the two team-only buttons are gone; badges elsewhere in the app kept their fills. ⚠ The personal objection surfaces are **deliberately not retargeted** — the drilldown is manager-only, so retargeting them would 403 every closer. ⚠ Team average is **omitted with a stated reason below two closers** ("with one, it would just repeat the row above") |
 | **Coaching summary (drilldown step 3)** | Per-closer "Why", named at any team size, explaining the MECHANISM behind the rate — not restating it | shipped `991b597`, output budget `966d963`. One Claude call for the whole board; state model from `team-needs-work` so a data shortage never reads as good news; reads through `computeTeamObjections` so the grid and the paragraph cannot disagree and the not-a-sales-call/synthetic filters are inherited rather than rebuilt. **Verified on production by looking at the panel**, and the cache proven both directions: mark → `cached:false`, 55→53, text regenerated; un-mark → `cached:true`, 55 back with the original text byte-identical. **Cost: miss ~10.6s, cached ~1.8s, of which ~1.8s is the query the cache cannot skip** — ~1,360 input tokens for one closer, ~960 more per additional closer |
 | **Login body weight 450** | Login was the last surface still at 300; it now matches the site | shipped `31c446d`. **Edited in place, not overridden** — one weight declaration per selector, so the file cannot acquire a third contradiction. Verified on production: **57 elements compute 450, zero offenders**, 450 comes from Saira's real axis (inside the declared `100 900`, ink mass distinct from 300 and 900), advance unchanged so nothing reflows. The trailing `.brand-name` 700 was removed as **redundant** — it holds 700 by specificity `(0,2,0)` vs the catch-all's `(0,1,0)`, confirmed in the browser after removal |
+
+## 2026-09-01 — digest Treatment B, nine pages, a loading state (`e6dbd6e`, `6f1c752`)
+Both deployed, verified by commit hash. Suite **2001**.
+
+**1 · TREATMENT B, as mocked and screenshotted.** Company name loud with a quiet date; ONE number, not four tiles; `closed · 31 calls · 12 follow-ups · 8 lost`; **TODAY'S FOCUS as an eyebrow** — 11px, uppercase, accent `#09e046`, 1.1px tracking — with the claim at 18px on its own line and the detail quieter beneath. Every property measured against the mock, not eyeballed.
+
+**2 · ⚠⚠ THE SCREENSHOT FOUND TWO DEFECTS THE MEASUREMENTS COULD NOT**, both outside the mock's scope and both rulings already made elsewhere: the **attribution sat BELOW the moment** (fixed the same day on Team Recommendations), and the **clip label was a hardcoded `▶ Play Clip`** which on Zoom promises a moment and opens at 00:00. ⚠ **The Zoom clip-label trigger has FIRED** (48 analysed Zoom calls) — `source` now rides with `clip` and `clipLabelFor` chooses the word. Verified live: Fathom → `Clip`, Zoom → `Open Recording`.
+
+**3 · COPY + THE FOLLOW-UP CORRECTION.** Cut *"the day's real story is structural"*; the claim leads; prospects named or counted. ⚠ **"Follow-up" is an OUTCOME, not a booked call** — corrected in the prompt and **swept**: no static copy anywhere treats it as a scheduled call, so the defect was model-generated. `DIGEST_PROMPT_VERSION` v2 → v3, in the set hash.
+
+**4 · ⚠⚠ PROSPECTS STANDS; THE LEGACY `close_rate` IS DELETED.** It was still computed and carried in two payloads while rendering nowhere — a second answer to a settled question, one edit from a screen. Six tests **converted, not deleted**: their subject survives in `close_wins`/`close_decided`.
+
+**5 · NINE PAGES.** `section` · `performance` · `objections-intel` · `kb` · `account` · `prospects` · `needs-work` · `team-members`. **Ground first, then cards off, in one commit.** ⚠ The fills on section and prospects **were** the motif protection and their comments said so — that stops being true once the ground lands, and both comments are rewritten rather than left asserting a moved property. **KB was three boxes deep → one hairline.** The **merge proposal keeps its two inner boxes** and loses the outer one: it is a comparison, so that boundary is one a reader has to read. ⚠ `team-needs-work` is **retired, not skipped** — it redirects and its renderer is archived in place. Lead numbers where honest: needs-work (**pooled**, from its own payload), prospects (how much is waiting); performance, kb, account and team-members have none.
+
+**6 · THE LOADING STATE.** Team Recommendations says it is working **in words, where the content will be**, escalating after the shared threshold so a warm cache never shows the longer sentence. A failing lane says so; blank is not a state it can end on.
+
+**7 · GUARDS.** `page-treatment-pages.test.js`, 8 tests. The load-bearing one asserts the **pairing** — cards off implies a painted ground. **Proven non-vacuous twice (5/5 and 3/3 fail with the defects restored), and it caught two real defects on its first run.**
+
+⚠ A scripted selector edit had **corrupted a comment** by matching the view name inside the prose describing it — the comment-as-code trap writing rather than reading. ⚠ The Title-Case floor moved **3 → 2 with its reason at the assertion**: the population shrank, not the coverage.
+
+---
 
 ## 2026-09-01 — design pass close-out (`683602c`)
 

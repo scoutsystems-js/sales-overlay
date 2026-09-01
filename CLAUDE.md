@@ -5656,6 +5656,40 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **v1.1.0 build plan:** Features built one at a time in this order: (1) Role system, (2) Role-based dashboard system on website (`/dashboard` for users + redesigned `/admin` for admins+owners with user management; the original raw log viewer remains as Sections B+C of the admin page), (3) Script upload in app, (4) Call boundary detection, (5) Post-call summary. Each feature fully committed and approved before the next starts. Justin receives one feature prompt at a time from the architect — Claude Code never plans ahead.
 - **Session start:** cd into the project root at the start of every session: cd '/Users/justinschmidt/Library/Mobile Documents/com~apple~CloudDocs/sales-overlay'. Note: Supabase MCP is not currently configured — migrations must be run manually via the Supabase dashboard SQL editor. To enable Supabase MCP in future, add it to .mcp.json and start a fresh session.
 
+### ⚠⚠ A MEASUREMENT OF THE MOCK'S PROPERTIES CANNOT SEE A DEFECT OUTSIDE THE MOCK — THE SCREENSHOT FOUND BOTH (2026-09-01)
+**Treatment B was verified property by property — eyebrow 11px uppercase accent at 1.1px tracking, claim 18px on its own line, detail 14px at 0.75, the loud number 48px/300, one quiet stat line. Every one matched. Then I looked at the picture and the panel had TWO defects, both in the part the mock does not cover.**
+- **THE ATTRIBUTION SAT BELOW THE MOMENT** — *"Named the total, then filled the silence himself"*, and only afterwards, smaller, *"Godwin"*. **The same defect fixed on Team Recommendations earlier the same day**, on a different surface. Nothing was missing; it was in the wrong place.
+- **THE CLIP LABEL WAS A HARDCODED `▶ Play Clip`**, which on a Zoom call promises a moment and opens at 00:00.
+- **⚠⚠ THE GENERAL FORM: A MOCK DEFINES A SCOPE, AND VERIFYING AGAINST IT INHERITS THAT SCOPE.** Every property you were given is a property you will check; the defects live in what nobody wrote down. **A per-property pass and a look are different instruments, and the look is the one that covers the parts of the surface the spec forgot.**
+- **⚠ AND A FIXTURE ARTEFACT WAS CAUGHT BEFORE IT WAS REPORTED:** the probe passed `clip_url` where the client reads `clip`, so the missing clip link was mine. **Read the builder before writing up a missing element** — the fixture is a suspect before the product is.
+
+### ⚠⚠ THE ZOOM CLIP-LABEL TRIGGER HAS FIRED — DISCHARGED FOR THE DIGEST (2026-09-01)
+**The standing deferral read: thread `source` through those payloads WHEN REAL ZOOM TRAFFIC STARTS BEING ANALYSED. It has — 48 analysed Zoom calls on one account — so the item is due, not deferred.**
+- `lib/team-digest.js` emits `source` beside `clip`; the renderer calls `clipLabelFor(n.source)`. **`source` was ALREADY in `loadTeamWindow`'s select**, so it costs a field and no query — worth checking before assuming a threading job needs a schema or a query change.
+- **⚠ THE MODULE'S OWN COMMENT HAD RECORDED THE GAP HONESTLY** — *"building it here would mean labelling it here, and this module does not know the provider"* — which is what made the fix a one-line change rather than an investigation. **A limitation written down at the code is what lets the trigger be discharged cheaply when it fires.**
+- **⚠ A MISSING `source` GETS THE CAUTIOUS LABEL**, because claiming a seek we cannot deliver is the failure mode and claiming less than we deliver is merely modest.
+
+### ⚠⚠ THE CACHE SAVES THE MODEL CALL AND NOTHING ELSE — SO A WARM PAGE IS AS FAST AS ITS QUERIES (re-measured 2026-09-01, team recommendations)
+```
+COLD (miss, one model call)   25,855 ms     Josh's board, 9 reps
+WARM (hit)                     4,418 ms     same board
+WARM, another board            3,425 / 1,730 / 1,505 ms   first run includes connection warm-up
+```
+- **⚠⚠ THREE AWAITED LOADS RUN BEFORE `cacheGet`** — `loadTeamWindow`, `inChunks('call_analyses')`, `fetchSellingContext` — because **the key is a fingerprint OF THE DATA, so the data must be read before the key can exist.** Identical to the `performance-synthesis` finding, in a second lane.
+- **SO "why is the cached path still slow" HAS A STRUCTURAL ANSWER AND NO CACHE DEFECT TO FIND.** Measure the equivalent model-free lane first and see whether the hit is already sitting on that floor.
+- **⚠ THE FIX THAT FOLLOWS IS WARMING, NOT RENDERING: generate the lane on the cron that already iterates every manager for the digest**, so the first manager of the day arrives warm — one model call per manager per day, the same shape and cost as the digest already riding it. **Reported, not built: it is a spend and scheduling decision.**
+- **⚠ QUOTE WARM AS A RANGE AND NAME THE BOARD.** Two boards and a cold process give 1.5–4.4 s; a single number would be a measurement whose scope you cannot state.
+
+### ⚠⚠ A SCRIPTED SELECTOR EDIT WROTE INTO THE PROSE DESCRIBING THE SELECTOR (2026-09-01)
+**Expanding a per-view CSS selector list by string substitution ALSO matched the view name inside the COMMENT above it, and spliced four copies of a sentence into the explanation.** The comment-as-code trap running the other way — a **WRITE** into prose rather than a **READ** of it.
+- Harmless (it stayed inside `/* */`) and **unreadable**, and it left the comment asserting a scope that was no longer legible.
+- **THE RULE: name views in prose in a form no selector edit can match** — say "scoped per view, see the list below" rather than spelling out `body[data-view="x"]` in the sentence. And **strip comments before a scripted replacement**, exactly as a guard does before a check.
+
+### ⚠ A GUARD'S FLOOR MOVES WITH ITS POPULATION, NEVER BELOW IT — AND THE REASON GOES AT THE ASSERTION (2026-09-01)
+**The Title-Case guard's `labels.length >= 3` failed because a digest clip anchor stopped being a literal and became `clipLabelFor(n.source)` — which that guard's own interpolation filter correctly drops.**
+- **THE POPULATION SHRANK, NOT THE COVERAGE.** The label is pinned harder in `clip-link-mirror.test.js`, which asserts the exact strings AND that they come from the provider.
+- **⚠ SO LOWERING A FLOOR IS SOMETIMES CORRECT AND ALWAYS SUSPICIOUS.** It is the one edit that turns a real check into a vacuous one, so **the reason belongs beside the number** — otherwise the next reader sees a weakened guard and cannot tell a legitimate move from a silenced failure. **If it ever reaches 0 the check is measuring nothing and must fail loudly instead.**
+
 ### ⚠⚠⚠ A CAP SIZED FOR AN OLD CONTRACT FIRES ON NORMAL OUTPUT UNDER A NEW ONE — AND THE MODEL GETS THE BLAME (2026-08-30)
 **Six of seven coaching notes reached a manager cut mid-word — *"…losing it to a link she may never"*. The model was never truncated. `str(g.what_to_do, 400)` was.**
 ```
