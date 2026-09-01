@@ -12024,7 +12024,8 @@
   function dashGaugeHtml(card) {
     var d = state.teamAverages;
     if (d === null) return '<div class="skeleton" style="height:150px;"></div>';
-    if (d && d._error) return '<div class="error">Could not load team averages.</div>';
+    var problem = laneProblem(d);
+    if (problem) return laneProblemHtml('team averages', problem);
     var key = ({ closing_rate: 'closing', objection_handle_rate: 'objections', avg_call_time: 'calltime' })[card.metric];
     var m = key && d.metrics ? d.metrics[key] : null;
     if (!m) return dashNoValueHtml('this metric has no 7-day figure yet');
@@ -12178,11 +12179,46 @@
      because an undo built from a replay is wrong the first time an edit is not
      invertible. */
 
+  /* ⚠⚠⚠ A 403 AND AN ERROR ARE DIFFERENT FACTS AND NEITHER IS "EMPTY".
+     `fetchTeamJSON` turns a 403 into `{ _forbidden: true }` — which is NOT
+     `_error`, so four functions on this surface tested `_error` and sailed
+     straight past a permission failure into the "no cards" branch. Measured on
+     the deployed page with a closer's real state (403 on every team lane):
+
+         the page read "This board is empty — Add the numbers you want to see
+         first thing", with a working Edit button, and "+ Add card" opened a
+         modal containing NOTHING.
+
+     ⚠⚠ A PERMISSION FAILURE RENDERING AS AN EMPTY BOARD IS THE PRODUCT'S OLDEST
+     FAILURE — a data problem must never render as good news — and an empty modal
+     is indistinguishable from a control that does nothing. Both are ruled out:
+     either it works, or it is not on screen, or it says why.
+
+     ⚠ ONE GATE, TWO WORDS. The two need different sentences and the SAME check,
+     which is why this is a predicate rather than a condition repeated per site. */
+  function laneProblem(d) {
+    if (!d) return null;
+    if (d._forbidden) return 'forbidden';
+    if (d._error) return 'error';
+    return null;
+  }
+  function laneProblemHtml(what, kind) {
+    return kind === 'forbidden'
+      ? '<div class="dash-card-empty">You do not have access to ' + what
+        + '<span>This is a manager view. Ask whoever manages your team if you need it.</span></div>'
+      : '<div class="error">Could not load ' + what + '.</div>';
+  }
+
   function dashEditing() { return !!state.dashEdit; }
 
   function dashEnterEdit() {
     var d = state.teamDashboard;
-    if (!d || d._error) return;
+    /* ⚠ A SILENT `return` IS THE ONE OUTCOME RULED OUT. This tested `_error` only,
+       so a 403 walked past it into edit mode on a board that had never loaded. */
+    var problem = laneProblem(d);
+    if (problem) { dashToast(problem === 'forbidden'
+      ? 'You do not have access to this board.' : 'That board could not be loaded.'); return; }
+    if (!d) return;
     state.dashEdit = {
       cards: JSON.parse(JSON.stringify(d.cards || [])),
       name: (d.board && d.board.name) || 'My board',
@@ -12355,8 +12391,20 @@
     dashPick = { step: 1, metric: null };
     if (state.teamCatalog === null && !state.teamCatalogLoading) loadTeam('catalog');
     var m = dashEnsurePicker();
-    dashRenderPicker();
+    /* ⚠⚠⚠ REVEAL FIRST, RENDER SECOND. This ran dashRenderPicker() BEFORE
+       removing `hidden`, so ANY throw inside the render — a lane in a shape it
+       did not expect, a missing element, anything — meant the modal never
+       appeared at all. The user presses a button and NOTHING HAPPENS, which is
+       the one outcome ruled out, and the console error is in a function nobody
+       would think to suspect from that symptom.
+       ⚠ Revealed first, a render failure is a visible EMPTY DIALOG rather than
+       an invisible one; the catch below then turns that into a sentence. */
     m.classList.remove('hidden');
+    try { dashRenderPicker(); }
+    catch (err) {
+      var h = document.getElementById('dashPickerBody');
+      if (h) h.innerHTML = '<div class="error">Something went wrong opening this. Try again.</div>';
+    }
     document.addEventListener('keydown', dashPickerEscape);
     var first = m.querySelector('.dash-pick-item, .dash-picker-x');
     if (first) first.focus();
@@ -12413,10 +12461,28 @@
     var host = document.getElementById('dashPickerBody');
     if (!host) return;
     var cat = state.teamCatalog;
-    if (cat === null) { host.innerHTML = '<div class="skeleton" style="height:160px;"></div>'; return; }
-    if (cat._error) { host.innerHTML = '<div class="error">Could not load the metrics.</div>'; return; }
+    /* ⚠ `undefined` IS NOT `null` TO A `=== null` GUARD, and the line below reads
+       a property off it. A lane that is undefined rather than null fell straight
+       through to `cat._error` and THREW — which, before the reveal was moved
+       above the render, meant the modal never opened. Both halves are fixed;
+       this is the belt. */
+    if (cat === null || cat === undefined) { host.innerHTML = '<div class="skeleton" style="height:160px;"></div>'; return; }
+    /* ⚠⚠ A 403 IS NOT AN ERROR AND NEITHER IS "EMPTY". A closer's catalog is
+       `{ _forbidden: true }`, which has no `groups`, so this rendered a header
+       and NOTHING ELSE — a dialog a manager would fairly describe as nothing
+       popping up. */
+    var problem = laneProblem(cat);
+    if (problem) { host.innerHTML = laneProblemHtml('the metrics', problem); return; }
 
     if (dashPick.step === 1) {
+      /* ⚠ AN EMPTY CATALOG IS A THIRD STATE, distinct from loading and from
+         refused. It cannot happen today, and a dialog that renders nothing when
+         it does is the same silence in a new costume. */
+      if (!(cat.groups || []).length && !(cat.unavailable || []).length) {
+        host.innerHTML = '<div class="dash-card-empty">No metrics are available'
+          + '<span>Nothing can be added to a board right now.</span></div>';
+        return;
+      }
       host.innerHTML = (cat.groups || []).map(function (g) {
         return '<div class="dash-pick-group">' + escapeHtml(g.label) + '</div>'
           + '<div class="dash-pick-list">' + g.metrics.map(function (m) {
@@ -12474,6 +12540,12 @@
      stopped meaning anything. */
   function dashToolbarHtml(d) {
     var e = state.dashEdit;
+    /* ⚠⚠ NO CONTROLS ON A BOARD YOU CANNOT LOAD. Edit, New Board and Add card
+       all rendered over a 403, and pressing Edit WORKED — a closer could enter
+       edit mode on a board they have no access to and then press a button that
+       opened an empty box. A control that cannot do its job must not be on
+       screen; the state above already says why. */
+    if (!e && laneProblem(d)) return '<div class="dash-toast" id="dashToast"></div>';
     var boards = (d && d.boards) || [];
     var name = e ? e.name : ((d && d.board && d.board.name) || 'Team Performance');
     var pinned = !!(d && d.board && d.board.pinned);
@@ -12663,8 +12735,12 @@
     var d = state.teamDashboard;
     var e = state.dashEdit;
     var body;
+    var problem = laneProblem(d);
     if (d === null && !e) body = '<div class="skeleton" style="height:220px;"></div>';
-    else if (d && d._error && !e) body = '<div class="error">Could not load your dashboard: ' + escapeHtml(d._error) + '</div>';
+    /* ⚠ THE PROBLEM BRANCH COMES BEFORE THE CARDS BRANCH, and it covers
+       `_forbidden` as well as `_error`. Without it a 403 fell through to
+       `cards = []` and rendered the EMPTY-BOARD invitation. */
+    else if (problem && !e) body = laneProblemHtml('your dashboard', problem);
     else {
       var cards = e ? e.cards : ((d && d.cards) || []);
       /* ⚠⚠ THE BOARD SAYS A CARD WAS DROPPED, ONCE. A board that quietly shrinks
