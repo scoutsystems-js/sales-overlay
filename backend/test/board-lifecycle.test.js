@@ -68,6 +68,12 @@ test('⚠⚠ SAVE AS NEW forks by sending NO id — the original is never touche
   /* ⚠ FORKING IS THE FASTEST ROUTE TO THE TEN-BOARD CAP, so it must surface the
      server's worded message rather than a database error. */
   assert.ok(/j\.error \|\|/.test(s), "the server's message is shown verbatim");
+  /* ⚠⚠ AND THE FORK OPENS THE BOARD IT CREATED. Without this the refetch returns
+     boards[0] — the pinned one — so a manager who adds a card and forks is sent
+     back to the ORIGINAL without their card, which reads as the changes being
+     lost. Found by exercising it live, not by reading it. */
+  assert.ok(/if \(asNew && j\.board && j\.board\.id\) state\.dashBoardId = j\.board\.id;/.test(s),
+    'a fork must open the copy, or the changes appear to have vanished');
   assert.ok(/Delete one to make room/.test(RCODE),
     'and the cap message must name an action that WORKS — renaming makes no room');
   assert.ok(!/Rename or delete one/.test(RCODE), 'the old message told them to do something useless');

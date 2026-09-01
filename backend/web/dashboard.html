@@ -12558,6 +12558,12 @@
          database error. Rewriting it here would be a second copy of the rule. */
       if (!res.ok) { dashToast(j.error || 'Could not save your board.'); return; }
       state.dashEdit = null;
+      /* ⚠⚠ A FORK OPENS THE BOARD IT JUST CREATED. Without this the refetch asks
+         for boards[0] — the pinned one — so a manager who adds a card and presses
+         Save as New is returned to the ORIGINAL, WITHOUT their card, and it reads
+         exactly like the changes were lost. The whole point of the action is to
+         keep working on the copy. */
+      if (asNew && j.board && j.board.id) state.dashBoardId = j.board.id;
       state.teamDashboard = null;      // refetch: the server is the authority on what was stored
       loadTeam('dashboard');
       renderTeamDashboard();
