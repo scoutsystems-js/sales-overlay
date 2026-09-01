@@ -5662,6 +5662,33 @@ The (d) deploy check read **163 → 0** across the boundary once stripped — un
 - **FOUND BY LOOKING AT THE FIRST RENDER.** Fifth time on this pass that looking has found what a check could not.
 - **THE HABIT: when a design rule is implemented as a PER-VIEW LIST, adding a view means adding it to every list — and the lists must be enumerated, not remembered.** Here there were five (`.page`, `.section`, `.page-header`, `.page-header--company`, `.team-controls-row`).
 
+### ⚠⚠⚠ A PIXEL COUNT CANNOT TELL A CHART FROM AN AXIS — 27,260 PAINTED PIXELS AND NO DATA LINE (2026-09-01)
+**Verifying that a trend card draws, I read the canvas back: 27,260 non-transparent pixels. That reads as "it drew". IT HAD DRAWN THE FRAME — axis labels and gridlines — and not one data line.**
+- **⚠⚠ THE MEASUREMENT WAS SOUND AND ANSWERED THE WRONG QUESTION.** "Is anything painted" and "is the DATA painted" are different, and a chart's own chrome is easily the larger share of the ink. **The screenshot found it, as it has all week.**
+- **⚠ AND THE CAUSE WAS MY FIXTURE — SIXTH TIME THIS SESSION.** The real payload is `buckets[{key,label}]` and `reps[].close[] / handle[] / price[]`; my hand-written one had buckets as STRINGS and `reps[].points[]`, so every rep was dropped as having no series. **Rebuilt FROM the producer (`buildRepSeries`) and the lines drew.**
+- **THE RULE, and it is the fixture rule pointed at a canvas: DERIVE THE FIXTURE FROM THE PRODUCER, and assert on the CHART OBJECT rather than the pixels** — `chart.data.datasets.map(d => d.data.length)` says whether a series exists; a pixel count never can.
+- **⚠ THE NEAR-MISS IS THE POINT: I was one step from reporting "the trend card draws no line" as a product defect**, which would have sent someone to debug a working chart.
+
+### ⚠⚠ A SINGLE-PAGE APP CANNOT TELL "THE FIX DID NOT LAND" FROM "YOUR TAB IS OLD" (2026-09-01)
+**A fix shipped, was verified on the served page, and was reported as still broken. The dashboard is an SPA: the HTML is `no-cache`, but A TAB THAT NEVER NAVIGATED NEVER RE-FETCHED, and `setView` only changes the hash.**
+- **⚠⚠ THE TWO ARE INDISTINGUISHABLE TO THE USER AND TO US, which is why the useful deliverable is not a re-explanation — it is A ONE-GLANCE DISCRIMINATOR.** Diff the OLD bundle against the new one and name a visible difference the user can check in a second:
+```
+stale bundle   10 metric rows · each reads "4 views" · "Outcome mix" is pickable
+current         7 rows · each NAMES its views · no absent section
+```
+- **THE HABIT: when a shipped fix is reported as absent, `git show <old-sha>:<file>` AND STATE WHAT THE OLD VERSION LOOKS LIKE.** It costs one command, it is falsifiable, and it removes a whole class of round trips.
+- **⚠ AND IT IS A REAL PRODUCT GAP, FILED NOT BUILT:** Scout has no way to tell a browser a newer build exists. A version marker plus a *"Scout has updated — reload"* prompt is the fix, and it is a ruling rather than a tidy-up.
+
+### ⚠⚠ MEASURE WHETHER YOUR FIX EXPLAINS THE SYMPTOM — DO NOT LET TWO ITEMS IN ONE BLOCK LOOK LIKE CAUSE AND CURE (2026-09-01)
+**Removing six rows from the picker shortened the list, and it was tempting to present that as the reason a manager could not find the graph option. Measured, it explains nothing:**
+```
+list WITH the six rows      674px of content in a 674px body   DOES NOT SCROLL
+list WITHOUT them           502px in 502px                     does not scroll
+the first row offering Trend   "Closing rate" — FIRST in both, visible without scrolling
+```
+- **⚠ TWO CHANGES IN ONE BLOCK INVITE A CAUSAL STORY THAT NOBODY TESTED.** The report says plainly that they are separate items, because the alternative is a false explanation that closes the question and leaves the real cause running.
+- **THE CHECK IS CHEAP: measure the mechanism you are about to claim.** Here it was two `scrollHeight` reads and a bounding rect.
+
 ### ⚠⚠⚠ A 403 IS NOT AN ERROR AND NEITHER IS "EMPTY" — `_forbidden` WENT UNHANDLED ON A WHOLE SURFACE (2026-09-01)
 **Reported as "Add card does nothing". `fetchTeamJSON` turns a 403 into `{ _forbidden: true }`, which is NOT `_error` — so FOUR functions tested `_error` and sailed past a permission failure into their SUCCESS branch.**
 ```

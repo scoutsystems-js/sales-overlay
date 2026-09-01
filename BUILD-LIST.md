@@ -1087,6 +1087,33 @@ Since Josh connected Zoom, Zoom calls appear in the call library **alongside** F
 
 ---
 
+
+## FILED 2026-09-01 — A STALE-BUNDLE NUDGE (not built, needs a ruling)
+**Scout has no way to tell a browser that a newer build exists.** The dashboard is a single-page app: the HTML is `no-cache`, but **a tab that never navigated never re-fetched**, and `setView` only changes the hash. ⚠⚠ **So "the fix did not land" and "your tab is old" are INDISTINGUISHABLE to a user and to us** — and this is the second report that may be exactly that.
+
+**The fix is a version marker plus a *"Scout has updated — reload"* prompt.** ⚠ It is a product decision (how insistent, whether it can force a reload, what it does mid-edit on an unsaved board) rather than a tidy-up. **Not built.**
+
+⚠ **The interim workaround is a one-glance discriminator, and it should be produced every time a shipped fix is reported as absent:** `git show <old-sha>:<file>` and state what the OLD version looks like. It costs one command and removes a whole class of round trips.
+
+---
+
+## 2026-09-01 — THE "NOT AVAILABLE YET" LIST REMOVED; THE GRAPHS ARE THERE (`3418197`)
+Deployed, verified by commit hash and served-page parity. Suite **2049**.
+
+**§1 — REMOVED FROM THE PICKER AND FROM THE WIRE (Justin's ruling).** A picker that lists what it cannot do spends a manager's attention on things they cannot have; a metric list is a menu, not an inventory. **⚠ Dropped from the WIRE, not just the render** — a payload nothing renders is one `innerHTML` from being back on screen, so removing it from the route makes the ruling structural. **The catalog keeps the record** (`available:false` + every measurement). ⚠ It removed **SIX, not three** — the three named plus the three carrying the *"no card yet"* copy; flagged for Justin. ⚠ Step TWO's *"No gauge — this metric has no target"* **survives**: that explains a gap in a metric already CHOSEN.
+
+**§2 — THE GRAPHS ARE THERE, ESTABLISHED ON THE DEPLOYED PAGE.** Step one names Trend; step two offers *"Trend over time"*, visible and on top by `elementFromPoint`; picking it draws a real chart (3 datasets, 4 points each). **⚠⚠ AND I NEARLY FILED A DEFECT THAT WAS MY OWN FIXTURE — SIXTH TIME:** the first card drew AXES AND NO LINES at **27,260 painted pixels**, which reads as "it drew". **A pixel count cannot tell a chart from an axis.** The real shape is `reps[].close[]`, not `reps[].points[]`; rebuilt from `buildRepSeries` and the lines drew.
+
+**⚠ REMOVING THE SIX ROWS IS NOT THE FIX FOR §2, AND IT WAS MEASURED RATHER THAN ASSUMED:** neither list scrolls, and "Closing rate" — which offers Trend — is the FIRST row in both. **Two changes in one block invite a causal story nobody tested.**
+
+**⚠⚠ THE ONE CONCRETE EXPLANATION LEFT IS A STALE PAGE, and it is checkable at a glance rather than by debugging:** stale = 10 rows, each reading *"4 views"*, with Outcome mix pickable; current = 7 rows, each naming its views, no absent section.
+
+**§3 — all three of last block's fixes verified on the SERVED page.** ⚠ `canRender` reads 0 there because it is SERVER-side — a marker checked against a file that could never contain it is indistinguishable from a failed deploy, so it is named rather than reported.
+
+**Guards:** one CONVERTED by ruling (the subject that survives is that the CATALOG records it; what changed is that it is neither sent nor shown), proven non-vacuous by sending and rendering it again. ⚠ Its route slice stopped one character short because `'});'` first matches inside `catalogGrouped() });`.
+
+---
+
 ## 2026-09-01 — "ADD CARD DOES NOTHING": `_forbidden` WENT UNHANDLED (`4914a61`)
 Deployed, verified by commit hash, served-page parity and the ordering fix on the deployed page. Suite **2049**.
 
