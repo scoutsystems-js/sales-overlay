@@ -5384,6 +5384,37 @@ mean 61.6% through the call, SD 18.4 — real spread, not a constant fraction
 ### ⚠ A CONVERTED TEST'S TITLE IS PART OF THE CONVERSION (2026-09-01)
 `⚠⚠ THE LIVE CASE — 46 min is GOOD, and all four reps CLEAR the ceiling` passed with a body I had rewritten to assert three of four sit inside the band. **A green test whose NAME states the superseded rule is a stale load-bearing comment with a tick beside it** — the next reader trusts the title and never opens the body.
 
+### ⚠⚠⚠ STANDING RULE — NEVER DIMINISH THE CLOSER'S WORK (Justin, 2026-09-01)
+**The Daily Digest line that produced it:** *"Three closes from 29 calls, **but** two of those closes arrived pre-sold — Whitlow told Josh 'I'm tired of being a W-2' before the pitch started."*
+- **⚠⚠ THE INFORMATION IS GOOD AND HE SAID SO — *"Josh getting that info is a great pain point."*** Knowing which prospects arrived ready separates a deal a rep CREATED from one that walked in sold. **WHAT IS WRONG IS THE FRAMING:** the word *but* turns three closes into a caveat, and **a rep reading it hears "your closes don't really count."**
+- **THE FIX IS THE SAME FACT WITHOUT THE DEDUCTION.** Context is stated as its OWN fact, never subtracted from a number the rep earned.
+- **⚠⚠ IT IS THE SAME CLASS AS TWO DEFECTS ALREADY FIXED — Scout coaching a rep OUT of isolating, and Scout marking a rep down for a call that was never closeable. A PRODUCT THAT COACHES SALESPEOPLE CANNOT SOUND LIKE IT IS TAKING POINTS OFF.**
+- **MEASURED ACROSS THE CACHED LANES BEFORE THE RULE WAS WRITTEN**, and the contrast is what shows the shape is not inevitable:
+```
+digest      24/76     performance  20/79     team  19/131     team_objections 11/44
+why_prose    0/274   <- carries none
+worst observed: "TECHNICALLY posted two closes, but both wins were pre-sold before he
+opened his mouth — a setter and prior conviction did the work, NOT HIM"
+                "closed 1 — but ... MEANING IT DOESN'T VALIDATE JOSH'S PROCESS"
+```
+- **⚠⚠ THE RAW `but`-AFTER-A-NUMBER PROXY OVER-REPORTS BADLY AND MUST NOT BE USED AS THE MEASURE.** Most instances introduce a MORE favourable fact — *"avg 59 overall, but meaningfully higher in closed calls"*. **The population had to be READ, and narrowing to "a count of wins followed by a qualification of those wins" is what separated 24 real cases from 76 rows of noise.** Same discipline as the closer_response audit.
+- **⚠ THE RULE IS AN OPERATION, NOT AN ADJECTIVE** (`lib/coaching-tone.js`): it names the TELL — *but / however / though / technically / on paper* directly after a count of closes — and carries a worked WRONG/RIGHT pair. *"Never diminish"* is something a model can agree with and still violate.
+- **⚠ AND IT SAYS WHAT IT IS NOT: *"not a rule about softening criticism."*** Without that line it becomes a licence to flatter, and a weak call must still be coached plainly.
+- **ONE DEFINITION, FOUR LANES, AND ALL FOUR CACHE VERSIONS BUMPED IN THE SAME COMMIT.** A prompt edit without a key bump ships nothing — recorded four times now — so a guard asserts each version is **IN its key**, not merely declared beside one. **⚠ The wording changes on the NEXT generation, never retroactively.**
+
+### ⚠⚠ A CONTROL THAT DISAPPEARS THE MOMENT IT WORKS READS AS HAVING BROKEN ITSELF (2026-09-01)
+**The Pin button rendered only when a board was NOT pinned, and there was no unpin route at all — so pinning was a ONE-WAY DOOR and a manager with a single board could pin it and never get back.**
+- **⚠⚠ AND THE REPORTED BUG WAS NOT THE REAL ONE. "There is no way to pin" was filed, and by the time it was investigated the board was ALREADY PINNED — the previous block's nav fix had made it findable.** The gap was the one beside it: no inverse. **Check the live state before building to a report; the report describes the world at the moment it was written.**
+- **A CAPABILITY WITH NO INVERSE IS THE SAME SHAPE AS ONE WITH NO CONTROL** — the merge-review failure, in miniature.
+- **THE BADGE STATES THE STATUS; THE BUTTON STATES THE ACTION.** *"Unpin"* implies the board is pinned without restating the badge inches away — **one element says what IS, the other offers the CHANGE, and neither repeats the other.** That is how to add a toggle beside an existing status without duplicating it.
+- **ONE HANDLER, TWO DIRECTIONS** (`dashTogglePin(id, isPinned)`), never two functions that can drift about what a pin means. **⚠ The write ORDER is the constraint on one side only:** a partial unique index `(user_id) WHERE pinned` makes two pinned boards unrepresentable, so pinning must CLEAR THE OLD PIN FIRST or the index rejects it; unpinning cannot collide and is a single write.
+- **⚠ WHAT UNPINNING DOES WAS CONFIRMED LIVE, NOT REASONED: the most recently updated board opens and the nav NAMES it — never an empty entry.** Verified by a full round trip on the real board, restored to its original pinned state and checked against the database.
+
+### ⚠ A GUARD THAT PINS A VERSION LITERAL GOES RED ON THE BUMP IT EXISTS TO ENCOURAGE (2026-09-01, twice)
+`/^v10-/` and `/RECS_LANE_VERSION = 'v3-/` both failed the moment their prompts were edited — **the exact change the guards exist to enforce.**
+- **THE PROPERTY IS THAT THE VERSION IS FOLDED INTO THE CACHE KEY AND MOVES WITH THE PROMPT**, not that it holds any particular value. Both converted to assert the key membership plus a `v\d+-` shape.
+- Same family as the encoding-pinned dash and every other *derive a guard from the source of truth, never pin a literal*. **A guard that encodes today's value has a shelf life measured in one commit.**
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

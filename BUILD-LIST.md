@@ -1168,6 +1168,17 @@ Deployed, verified by commit hash and served-page parity. Suite **2051**.
 
 ---
 
+## 2026-09-01 — NEVER DIMINISH THE CLOSER'S WORK; AND PINNING GETS AN INVERSE (`a735fd5`)
+Verified by commit hash and served-page parity. Suite **2066**. Five restored defects → 4 failures.
+
+**§2 — JUSTIN'S STANDING RULE, now in `lib/coaching-tone.js` and in four prompts.** *"Three closes from 29 calls, BUT two arrived pre-sold"* — the information is good and he said so; the word *but* is what turns three closes into a caveat. **Measured before writing it: digest 24/76 · performance 20/79 · team 19/131 · team_objections 11/44, against why_prose 0/274.** ⚠ **The raw `but`-after-a-number proxy over-reports badly** — most instances introduce a MORE favourable fact — so the population was read and narrowed to *a count of wins followed by a qualification of those wins*. **The rule is an OPERATION** (it names the tell and carries a worked WRONG/RIGHT pair) and **says what it is NOT**, so it cannot be read as a licence to flatter. **All four cache versions bumped in the same commit**, and a guard asserts each is IN its key.
+
+**§1 — THE PIN IS A TOGGLE.** ⚠ **The reported bug was not the real one: the board was already pinned by the time it was investigated** — the previous block's nav fix made it findable. **The gap beside it was that there was no way to UNPIN**: the button rendered only when a board was not pinned and no unpin route existed, so pinning was a one-way door. Now `DELETE /team/dashboard/:id/pin`, one handler for both directions, rendered beside the board selector that already marks the pinned one. **The badge states the STATUS, the button states the ACTION** so neither restates the other. ⚠ **Unpinning falls back to the most recently updated board and the nav names it — confirmed by a live round trip, restored to the original state and checked against the database.**
+
+**§3 — time to price CLOSED by ruling.** The 20–45 band is live; no further tuning. **§4 — the non-monotonic bars are FILED, not chosen** — nothing on screen is wrong and both alternatives lose something.
+
+**STILL OUTSTANDING:** rep-card widget · save-as-new · rename-a-board · stale-bundle nudge · **the design pass (Josh: generic and too black-and-white)** · site sweep · Scout AI.
+
 ## 2026-09-01 — BOTH BANDS LIVE, AND THE DROPDOWN BUG WAS A LABEL (`3d03a0b`)
 Verified by commit hash and served-page parity. Suite **2062**. Five restored defects → 6 failures.
 
