@@ -1168,6 +1168,17 @@ Deployed, verified by commit hash and served-page parity. Suite **2051**.
 
 ---
 
+## 2026-09-01 — BOTH BANDS LIVE, AND THE DROPDOWN BUG WAS A LABEL (`3d03a0b`)
+Verified by commit hash and served-page parity. Suite **2062**. Five restored defects → 6 failures.
+
+**THE BAND SHIPPED.** `avg_call_time` ideal **35–45**, acceptable **20–60** (both edges RULED). `time_to_price` **20–45** — ⚠ **lower MEASURED** (discovery items by price minute: 15–20 → 2.60, 20–25 → 3.23; the step sits at 20, derived here and **not** copied from call time; **partly mechanical** and the code says so), **upper RULED, not measured** (the data could not show one — 13 calls above 55 minutes). **Proof on the live board: Nathan moved from FIRST to FOURTH with the row reading UNDER**, and the gauge went from *"at or below 60 min"* to **"2 of 8 reps in the 35–45 min sweet spot"**. `time_to_price` gains the ranked views — a band supplies the order a direction could not, so **all six originally-missing combinations are open**.
+
+**⚠⚠ THE SIDE WENT IN THREE PLACES.** Rows state it; reps inside the band tie and are listed rather than ranked; **and the bar is coloured by the band, which is the one that matters most** — bar length encodes magnitude, and under a band magnitude is not goodness. **One definition in `lib/metric-band.js`, both consumers importing, guarded so neither can redeclare the edges.**
+
+| `▱ OBSERVATION` **THE BANDED BAR CHART'S BARS ARE NOT MONOTONIC** (2026-09-01) | Rows are ordered by DISTANCE from the band; bars are drawn from the VALUE. Nothing on screen is wrong — colour and side both read correctly — but a bar chart whose bars do not descend is unusual. **Sorting bars by value loses the urgency order; drawing length as distance loses the value.** Neither is obviously right. **Reported, not fixed.** |
+
+**§4 — THE DROPDOWN BUG: THE SAVE WORKED.** Not a refresh problem (the menu rebuilds on every open) and not a wiring one — the row was in the database, named, six cards, `pinned = false`. **The entry required `pinned` for its LABEL** while the server returns `boards[0]` pinned-first-then-most-recent, so it always OPENED that board and refused to name it. Now the label names its destination; **position still follows the pin and there is still exactly one entry**. ⚠ **Unpinned boards were never unreachable** — the Customize page has its own selector listing every board by name.
+
 ## 2026-09-01 — A TARGET BAND: REPORTED, NOT BUILT (no commit — the model change is Justin's to rule on)
 Justin ruled that neither faster nor slower is better for call length: *"a good sales call lasts anywhere from 20 min to over an hour… typically 35–45 min is the sweet spot."* **The catalog has only `higher_is_better` and `lower_is_better`, and neither is true.**
 
