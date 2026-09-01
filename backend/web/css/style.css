@@ -48,7 +48,23 @@
   --green-rgb:   9, 224, 70;
   --green-dim:   rgba(var(--green-rgb), 0.12);
   --green-glow:  rgba(var(--green-rgb), 0.25);
-  --bg:          #080b0d;
+  /* ⚠⚠ ONE BLACK ACROSS THE PRODUCT (Justin, 2026-09-01: unify the three).
+     ⚠ THERE WERE TWO, NOT THREE. The dashboard's #0a0a0a and this stylesheet's
+     #080b0d. The "plain black on login" is a BUTTON (`background: #000` on the
+     login primary button) — login has no body background of its own and has
+     always inherited this token. One edit therefore unified both pages.
+     ⚠ #0a0a0a WINS because it is the surface every measurement in the design
+     pass was made against — the ground, the exposure sweeps, the mesh contrast.
+     Moving the measured surface to match an unmeasured one would invalidate all
+     of it.
+     ⚠⚠ AND IT IMPROVES LOGIN RATHER THAN COSTING IT, which is the opposite of
+     what I first reported: #0a0a0a is marginally darker in the green channel, so
+     the binding case (--muted #8a9aaa over the mark at opacity 0.21) goes
+     4.595 -> 4.639. The margin is still THIN — the AA ceiling here is 0.222 and
+     the mark sits at 0.21 — but it was thinner before, and nothing regressed.
+     ⚠ The first version of this note claimed a 5.142 -> 4.639 drop. That was
+     measured against #000, which login never used. */
+  --bg:          #0a0a0a;
   --bg2:         #0f1417;
   --bg3:         #161d22;
   --border:      rgba(255,255,255,0.08);

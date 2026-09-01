@@ -5325,7 +5325,16 @@
       } else { pdiag('page-init-redirect', { reason: 'no-valid-session-no-refresh-token' }, true); window.location.replace('/login'); return; }
     }
     var cur = getSession();
-    document.getElementById('signedInEmail').textContent = (cur && cur.email) || '';
+    /* ⚠⚠ THIS LINE WAS OVERWRITING THE LABEL WITH THE EMAIL (fixed 2026-09-01).
+       The nav markup was changed to say "My Account" and this write replaced it
+       at boot, on every load — so the relabel shipped, verified as present in
+       the served markup, and never appeared on screen.
+       ⚠ THE MARKUP OWNS THE LABEL NOW. The email moves to the TITLE, which
+       keeps the one thing the relabel otherwise cost: the raw address was the
+       only place on screen naming the signed-in account, and on a shared machine
+       that matters. Hovering still answers it; Profile → Email still holds it. */
+    var em = document.getElementById('signedInEmail');
+    if (em && cur && cur.email) em.title = 'Signed in as ' + cur.email;
 
     state.me = await fetchMe();
     if (!state.me) { pdiag('page-init-redirect', { reason: 'fetchMe-null' }, true); window.location.replace('/login'); return; }

@@ -48,7 +48,20 @@ test('⚠ every surface that TITLES a person goes through the one resolver', () 
 test('⚠ the email SURVIVES where it is the subject, not a title', () => {
   // Deliberately untouched: the signed-in address, the Account field, and the
   // line UNDER a name in the members table. Those are not people-titles.
-  assert.ok(/signedInEmail'\)\.textContent/.test(LIVE), 'the signed-in address must remain');
+  /* ⚠⚠ CONVERTED 2026-09-01 — THIS ASSERTION PINNED THE WRITE THAT BROKE THE NAV.
+     It required `signedInEmail').textContent` to exist, and that write was
+     replacing the markup's "My Account" label with the raw email at every boot:
+     the relabel shipped, verified in the served markup, and never reached the
+     screen. The PROPERTY here is right and unchanged — the signed-in address
+     must remain discoverable — but its MECHANISM moved from the link's text to
+     the link's title.
+     ⚠ AND THIS DOES NOT CONTRADICT THE ASSERTION ABOVE IT. That one forbids
+     titling OTHER PEOPLE with their email address; this is the viewer's own
+     address on their own account link, where the address IS the subject. */
+  assert.ok(/em\.title = 'Signed in as ' \+ cur\.email/.test(LIVE),
+    'the signed-in address must remain discoverable from the nav');
+  assert.ok(!/signedInEmail'\)\.textContent\s*=/.test(LIVE),
+    'and it must NOT be written back into the label — that is what undid the relabel');
   assert.ok(/acctRow\('Email'/.test(LIVE), 'the Account email field must remain');
   assert.ok(/members-email/.test(LIVE), 'the members table still shows the email under the name');
 });

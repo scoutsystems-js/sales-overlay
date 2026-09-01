@@ -6,9 +6,17 @@
   <title>Admin — Scout Systems</title>
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
-    .support-ref-admin { font-family: ui-monospace, Menlo, monospace; font-size: 13px;
+    /* ⚠ MONOSPACE IS FUNCTIONAL HERE, NOT A LEFTOVER (checked 2026-09-01).
+       A support reference is an 8-char hex READ ALOUD on a call — referenceFor
+       chose hex precisely so there is no 0/O ambiguity when spoken, and a fixed
+       pitch does the same job on screen. Same for the temp password below.
+       ⚠ WHAT WAS WRONG: this class also dressed the CATEGORY chip, which is an
+       ordinary word ("Grading", "Sync"). Monospace made a label look like an
+       identifier. The category now has its own class. */
+    .support-cat-admin, .support-ref-admin { font-size: 13px;
       background: var(--bg-field); border: 1px solid var(--border-strong);
       border-radius: 4px; padding: 1px 6px; }
+    .support-ref-admin { font-family: ui-monospace, Menlo, monospace; }
     /* Three-section admin layout:
          A — user management (top, full width)
          B — session list    (bottom left)
@@ -650,7 +658,7 @@
       attach += '<div style="margin:6px 0;"><a class="nav-link" href="' + escapeHtml(t.link_url)
         + '" target="_blank" rel="noopener noreferrer">Open video link →</a></div>';
     }
-    var cat = t.category ? '<span class="support-ref-admin">' + escapeHtml(TICKET_CATEGORY_LABELS[t.category] || t.category) + '</span> ' : '';
+    var cat = t.category ? '<span class="support-cat-admin">' + escapeHtml(TICKET_CATEGORY_LABELS[t.category] || t.category) + '</span> ' : '';
     return '<div class="user-row" style="display:block; padding:14px 0;">'
       /* ⚠ THE REFERENCE LEADS. It is what the person quotes, so it is the first
          thing to scan for — it was previously shown nowhere at all. */
