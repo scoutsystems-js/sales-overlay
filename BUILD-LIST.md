@@ -31,6 +31,22 @@
 
 ## 🎯 CURRENT SESSION
 
+### 🔎 SWEEP BLOCK 6 (2026-09-02) — CLASS ③: ONE QUESTION, MANY ANSWERS. NO FIXES.
+
+Detector 5/5 · 0/5 (lists as SETS with order reported, named thresholds, directions; copies imported from their module and pairs pinned by a mirror guard are excluded). The 124 strippers are counted in block 5. Detail: `~/Desktop/scout-findings.md` (block 6), H671. **Pulse: ⑥ one block, ⑦ one to two — two blocks, three at most.**
+
+| tag | finding | evidence |
+|---|---|---|
+| `🐛 BUG` **③-1 "what counts as an objection" has THREE answers** | `objection-strict.js countsAsObjection` (NULL counts) is used by `team-analytics` and `rep-series`; **`team-objections.js:281` re-implements it inline** with a bucket-classifier fallback for NULL rows; **`session-analytics.js:293` (personal Objections page) selects no `objection_class` and applies none.** | For pre-v37 rows (525 of 608 on Josh's board, 4 Aug–2 Sep) the team Objections page can exclude what the Performance cards include; the personal page counts everything. Two handling rates for one team and window — the H450 shape. Stacks with ④a-1. Fix shape: every site calls `countsAsObjection` and selects the column; pin per call site like `handled-carrier`. |
+| `🐛 BUG` **③-2 average call time is a BAND in two files and a CEILING in the widget catalog — and the wrong one is pinned** | `metric-band.js` + `team-averages.js:109` say band (ruled, H518); `widget-catalog.js:111` says `target: 60, targetDirection: 'lower_is_better'`, no `band`; `widget-catalog.test.js:88` asserts exactly that. `dashboard.html:12448` sorts `a.v - b.v` for a card with no band. | The ranked `by_rep` widget (avg_call_time is in its list) puts the SHORTEST call first. Latent: `dashboards` has 0 rows today; one click from live. Fix shape: carry `band` on the catalog entry (the by_rep path already ranks by band distance when one exists) and re-pin the test to the ruling. |
+| `🐛 BUG` **③-3 the ruled objection categories exist in eight places; five are unpinned; the order already differs** | canonical `objection-categories.js` + literals in `analysis-worker:114`, `objection-synthesis:19`, `performance-synthesis:29`, `rep-series:48`, `session-analytics:247`, `team-objections:48` (requires the module AND keeps a literal), `team-synthesis:32`, the dashboard. Mirror pins four. | Set agrees today; order does not (`rep-series`). A category added by ruling reaches the extractor and never reaches the two synthesis prompts or the personal page — Scout coaches on an incomplete set, nothing fails. Fix shape: `require` the module everywhere; mirror the dashboard only. |
+| `▪ MINOR` **③-4 the v37 objection classes typed twice** | `objection-strict.js:26` vs `team-needs-work.js:534` | needs-work sets a rate from them; drift is substitution. Import one. |
+| `▪ MINOR` **③-5 highlight-type sets typed twice** | `PROSPECT_POSITION_TYPES` (worker :939) vs `HANDLING_TYPES` (dashboard :18783); `COACHABLE_TYPES` (coaching.js:26) vs `NEGATIVE_TYPES` (evidence-rule.js:29) | sets agree, order differs, nothing pins. A new type coached on but refused as evidence, or anchored but not rendered. |
+| `▪ MINOR` **③-6 the chunk size is the literal 100 at 22 sites** | 13 files, no constant | one edit to 500 fails at the measured ~395 ceiling. One `CHUNK` in `lib/`. |
+| `▪ MINOR` **③-7 `by_rep` and `bar_rep` lists typed twice under a comment claiming "identical by construction"** | `widget-catalog.js:292` and `:298` | a comment asserting a parity the code does not enforce (H551). Derive one from the other. |
+| `📋 LOW` route paging constants (`admin.js`/`me.js`), token tolerance (`auth.js`/`fathom.js`), averages order (`team-averages:82`/dashboard `:13472`), desktop outcomes (`log.js`, `me.js:271`) | agree today, unpinned | cosmetic or dormant. |
+| `🗄 NOT FINDINGS` | the four duplicated headings (both read one function or are different content by design); zero closing-rate divisions outside `prospect-entity`; same-name per-lane budgets; `VALID_OUTCOMES` (deliberately different questions); the three pinned good-type lists. | reviewed, evidence in the report. |
+
 ### 🔎 SWEEP BLOCK 5 (2026-09-02) — CLASS ②: CHECKS THAT PASS WHILE MEASURING NOTHING. NO FIXES.
 
 Two scored detectors (strippers vs killers 5/5 · 0/6; source-test mutation 5/5 · 0/5). Detail: `~/Desktop/scout-findings.md` (block 5), H670.

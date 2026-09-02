@@ -1,0 +1,10 @@
+'use strict';
+const CATS2 = ['alpha', 'beta', 'gamma', 'delta'];
+const MAX_ROWS = 500;
+const CHUNK = 100;
+const PINNED2 = ['pin1', 'pin2', 'pin3'];
+const PINNED_MAX = 42;
+const METRICS = { call_time: { direction: 'ceiling' } };
+const OTHER = ['shared', 'y1', 'y2'];
+const TWICE_A = ['one', 'two', 'three']; const TWICE_B = ['one', 'two', 'three'];
+module.exports = { CATS2, MAX_ROWS, CHUNK, PINNED2, PINNED_MAX, METRICS, OTHER, TWICE_A, TWICE_B };
