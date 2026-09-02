@@ -36,8 +36,15 @@ async function computeCallAnalytics(admin, userId, from, to) {
   // 3d-3: the ONE shared prospect close-rate computation (lib/prospect-entity).
   // Degrades to {pct:null} on any failure so a close-rate problem renders "—"
   // rather than breaking the analytics response.
-  var _pcr = await fetchProspectCloseRates(admin, [userId], from, to);
-  var prospectRate = _pcr[userId] || { closed: 0, total: 0, pct: null };
+  /* ⚠⚠ STARTED NOW, AWAITED WITH THE REST. The prospect rate and the prior
+     window depend on nothing computed below, and the Coaching lead number
+     waited on them one after another (~6s on production with every cache
+     hit). The no-op catch keeps a rejection from becoming an unhandled
+     rejection while the calls query is still in flight; the real await below
+     still throws it. */
+  var _pcrP = fetchProspectCloseRates(admin, [userId], from, to);
+  _pcrP.catch(function () {});
+  var _priorP = priorWindowAvgScore(admin, userId, from, to);
   // 1) fathom_calls in the date window — paginated to dodge the 1000-row cap.
   var calls = [];
   var PAGE = 1000;
@@ -82,23 +89,31 @@ async function computeCallAnalytics(admin, userId, from, to) {
   // under the row cap; scopes child rows to the in-window calls without a huge
   // IN list or fetching the user's entire all-time history.
   async function fetchByCallIds(table, columns, refine) {
-    var out = [];
+    var qs = [];
     for (var c = 0; c < callIds.length; c += 100) {
-      var chunk = callIds.slice(c, c + 100);
-      var qb = admin.from(table).select(columns).in('fathom_call_id', chunk);
+      var qb = admin.from(table).select(columns).in('fathom_call_id', callIds.slice(c, c + 100));
       if (refine) qb = refine(qb);
-      var r = await qb;
+      qs.push(qb);
+    }
+    var rs = await Promise.all(qs);   // every chunk at once; concatenated in chunk order
+    var out = [];
+    rs.forEach(function (r) {
       if (r.error) throw new Error(table + ': ' + r.error.message);
       out = out.concat(r.data || []);
-    }
+    });
     return out;
   }
 
   // 2) call_analyses for those calls — status, overall + section scores, one_thing.
-  var analyses = await fetchByCallIds(
-    'call_analyses',
-    'fathom_call_id, status, outcome, overall_score, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, one_thing'
-  );
+  var _both = await Promise.all([
+    fetchByCallIds('call_analyses',
+      'fathom_call_id, status, outcome, overall_score, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, one_thing'),
+    fetchByCallIds('call_highlights', 'fathom_call_id', function(qb) { return qb.eq('type', 'objection'); }),
+    _pcrP,
+  ]);
+  var analyses = _both[0];
+  var _pcr = _both[2];
+  var prospectRate = _pcr[userId] || { closed: 0, total: 0, pct: null };
 
   var statusCounts = { done: 0, processing: 0, error: 0 };
   var scoreSum = 0, scoreN = 0;
@@ -163,9 +178,7 @@ async function computeCallAnalytics(admin, userId, from, to) {
   var latestOneThings = oneThings.slice(0, 5);
 
   // 3) objection highlights — distinct calls + total count.
-  var objRowsAll = await fetchByCallIds('call_highlights', 'fathom_call_id', function(qb) {
-    return qb.eq('type', 'objection');
-  });
+  var objRowsAll = _both[1];
   /* ⚠⚠ DISQUALIFIED CALLS LEAVE THE OBJECTION FIGURES AND STAY IN `analyzed`.
      That split is the whole ruling: the work happened, so the call counts as
      work; the prospect was never closeable, so their objections do not count
@@ -211,7 +224,7 @@ async function computeCallAnalytics(admin, userId, from, to) {
   // Avg-score tile trend baseline (period-over-period). Attached to avg_score so
   // the client can render the arrow + delta % next to the mean; null when there's
   // no prior-window data (→ no arrow).
-  result.avg_score.prior_mean = await priorWindowAvgScore(admin, userId, from, to);
+  result.avg_score.prior_mean = await _priorP;
   return result;
 }
 

@@ -5447,10 +5447,10 @@
     teamOverview:   null,   teamOverviewLoading: false,
     teamTrends:     null,   teamTrendsLoading: false,
     /* ⚠ DECLARED WITH THE EXACT SHAPE ITS READERS TEST — an object, never
-       undefined. `state.teamWaitLong[which] = false` throws on undefined, and a
+       undefined. `state.laneWaitLong[which] = false` throws on undefined, and a
        missing key is the recorded lazy-load failure: the guard silently never
        matches and the lane never speaks. */
-    teamWaitLong:   {},
+    laneWaitLong:   {},
     teamRecs:       null,   teamRecsLoading: false,
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
     teamDashboard: null,    teamDashboardLoading: false,
@@ -7697,6 +7697,7 @@
        ⚠ The overview's OWN skeleton is unaffected — when the view IS
        'overview' this still fires, so this does not trade a wrong-page
        flash for a blank page. Verified by probe, not assumed. */
+    armLaneWait('analytics2', function () { return !state.analytics2; }, function () { if (state.view === 'overview' && !state.analytics2) renderOverview(true); });
     if (state.view === 'overview') renderOverview(true /* loading */);
     try {
       // Fathom status fetch is wrapped in a .catch so a stale token or
@@ -7735,6 +7736,7 @@
       ]);
       state.fathomStatus   = results[0];
       state.analytics2     = results[1];
+      clearLaneWait('analytics2');
       state.zoomStatus     = results[2];
       state.gradingBacklog = results[3];
       render();
@@ -7877,10 +7879,14 @@
         + renderFathomNoticeHtml()
         + renderFathomSectionHtml()
         + renderZoomSectionHtml()
+        /* ⚠ The lead number waits IN ITS OWN SLOT, in words — it was blank for
+           9s on production, which reads as a page with no number on it. Three
+           tile skeletons: the row has three tiles. */
+        + '<div class="lead-number">' + laneWaitHtml('analytics2', 'Counting your closed prospects\u2026', null, 96) + '</div>'
         + '<div class="glance-row">'
-          + '<div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div>'
+          + '<div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div><div class="skeleton glance-skeleton"></div>'
         + '</div>'
-        + '<div class="section"><div class="skeleton" style="height:44px;"></div></div>';
+        + '<div class="section">' + laneWaitHtml('analytics2', 'Reading your graded calls\u2026', null, 44) + '</div>';
       return;
     }
 
@@ -8296,9 +8302,11 @@
   async function loadNeedsWork() {
     if (state.needsWorkLoading) return;
     state.needsWorkLoading = true;
+    armLaneWait('needsWork', function () { return state.needsWorkLoading; }, function () { if (state.view === 'overview') renderOverview(false); });
     try { state.needsWork = await fetchNeedsWork(); }
     catch (err) { if (err.message === 'unauth') return; state.needsWork = { _error: err.message || 'unknown' }; }
     state.needsWorkLoading = false;
+    clearLaneWait('needsWork');
     if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'needs-work') renderNeedsWorkView();
   }
@@ -8319,6 +8327,7 @@
   async function loadSectionRank() {
     if (state.sectionRankLoading) return;
     state.sectionRankLoading = true;
+    armLaneWait('sectionRank', function () { return state.sectionRankLoading; }, function () { if (state.view === 'overview') renderOverview(false); });
     try {
       var qs = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
       /* ⚠ SCOPED LIKE EVERY SIBLING LANE. This fetched /me/... unconditionally
@@ -8330,6 +8339,7 @@
       state.sectionRank = res.ok ? await res.json() : { _error: 'HTTP ' + res.status };
     } catch (e) { state.sectionRank = { _error: (e && e.message) || 'unknown' }; }
     state.sectionRankLoading = false;
+    clearLaneWait('sectionRank');
     if (state.view === 'overview') renderOverview(false);
   }
   function cycleSectionRank(delta) {
@@ -8416,7 +8426,7 @@
     var d = state.sectionRank;
     var head = '<div class="section-header"><h2>What Needs Work</h2>'
       + '<div class="meta">Across the Whole Sales Process</div></div>';
-    if (d === null) return head + '<div class="skeleton" style="height:120px;"></div>';
+    if (d === null) return head + laneWaitHtml('sectionRank', 'Ranking the sections of your calls\u2026', null, 120);
     if (d._error) return head + '<div class="error">Could not load the section ranking: ' + escapeHtml(d._error) + '</div>';
     var list = d.sections || [];
     if (!list.length) return head + '<div class="empty"><p>No graded calls in this range yet.</p></div>';
@@ -8485,7 +8495,7 @@
     var d = state.needsWork;
     var head = '<div class="section-header"><h2>Objection Handling Focus</h2><div class="meta">'
       + escapeHtml(needsWorkWindowLabel()) + '</div></div>';
-    if (!d) return head + '<div class="skeleton" style="height:70px;"></div>';
+    if (!d) return head + laneWaitHtml('needsWork', 'Finding your toughest objection\u2026', 'Still working \u2014 the first look at this range groups every objection from scratch and takes a moment.', 70);
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     /* SHARED-CARRIER UPDATE 2026-08-20: `insufficient` was SPLIT into
@@ -8965,7 +8975,39 @@
      reset, and a response carrying an old epoch is dropped instead of stored. */
   var teamEpoch = 0;
 
-  var teamWaitTimers = {};
+  /* ⚠⚠ ONE WAITING SHAPE FOR EVERY LANE (Justin, 2026-09-02). A page that is
+     loading and a page that is broken looked identical: the Objections grid was
+     an EMPTY DARK BOX for 4s warm / 23s cold, the Coaching lead number was
+     blank for 9s, the digest a lone spinner. The Recommendations panel had the
+     right shape — a spinner with honest words WHERE THE CONTENT GOES, and a
+     longer sentence only after a real wait — so that shape is now the helper
+     every lane renders through. `minHeight` holds the space the content will
+     take, so the page does not jump when it lands.
+     ⚠ THE ESCALATION IS TIME-GATED on state.laneWaitLong[which], armed by
+     armLaneWait when the fetch starts and cleared when it answers. A cached
+     lane returns inside the gate and never shows the longer sentence, which
+     would be a lie the other way. */
+  function laneWaitHtml(which, copy, longCopy, minHeight) {
+    var long = !!(state.laneWaitLong && state.laneWaitLong[which]);
+    var text = long ? (longCopy || 'Still working \u2014 this is taking longer than usual.') : copy;
+    return '<div class="load-state lane-wait" style="padding:14px 4px;' + (minHeight ? 'min-height:' + minHeight + 'px;' : '') + '">'
+      + '<div class="spinner"></div> <span>' + escapeHtml(text) + '</span></div>';
+  }
+  var laneWaitTimers = {};
+  function armLaneWait(which, stillWaiting, rerender) {
+    state.laneWaitLong[which] = false;
+    if (laneWaitTimers[which]) clearTimeout(laneWaitTimers[which]);
+    laneWaitTimers[which] = setTimeout(function () {
+      laneWaitTimers[which] = null;
+      if (stillWaiting && !stillWaiting()) return;      // already answered
+      state.laneWaitLong[which] = true;
+      if (rerender) rerender();
+    }, PERF_LONG_WAIT_MS);
+  }
+  function clearLaneWait(which) {
+    state.laneWaitLong[which] = false;
+    if (laneWaitTimers[which]) { clearTimeout(laneWaitTimers[which]); laneWaitTimers[which] = null; }
+  }
   async function loadTeam(which) {
     var map = {
       context:  { flag: null,                    set: 'teamContext',    url: '/team/context' },
@@ -9010,13 +9052,7 @@
        so in words. Same shape as PERF_LONG_WAIT_MS, and the threshold is shared
        rather than a second number — a cached lane returns well inside it and
        never shows the escalated copy, which would be a lie the other way. */
-    state.teamWaitLong[which] = false;
-    if (teamWaitTimers[which]) clearTimeout(teamWaitTimers[which]);
-    teamWaitTimers[which] = setTimeout(function () {
-      if (c.flag && !state[c.flag]) return;      // already answered
-      state.teamWaitLong[which] = true;
-      if (isTeamView(state.view)) renderTeamSurface();
-    }, PERF_LONG_WAIT_MS);
+    armLaneWait(which, function () { return !(c.flag && !state[c.flag]); }, function () { if (isTeamView(state.view)) renderTeamSurface(); });
     /* The epoch this request belongs to. If a reset happens while it is in
        flight, the answer describes a team nobody is looking at any more. */
     var epoch = teamEpoch;
@@ -9035,6 +9071,7 @@
     }
     state[c.set] = payload;
     if (c.flag) state[c.flag] = false;
+    clearLaneWait(which);
     /* ⚠ THE PICKER IS OUTSIDE #content, so scheduleTeamRender() below cannot
        repaint it. Opened before its lane lands it shows a skeleton, and without
        this the skeleton is what it shows forever — a modal that never resolves
@@ -10595,7 +10632,7 @@
   // the score itself (absolute out of 100), colored by scoreColor. null → "—", last.
   function teamScoreListHtml(scoreFn) {
     var o = state.teamOverview;
-    if (!o) return '<div class="skeleton" style="height:80px;"></div>';
+    if (!o) return laneWaitHtml('overview', 'Adding up the team\'s calls\u2026', null, 80);
     if (o._forbidden) return '<div class="error">Not authorized for this team.</div>';
     if (o._error) return '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
     var reps = visibleReps(o.per_rep).slice();
@@ -10624,7 +10661,7 @@
      this one marked dead rather than mistake a live one for it. */
   function teamNeedsWorkCardHtml() {
     var d = state.teamNeedsWork;
-    if (!d) return '<div class="skeleton" style="height:70px;"></div>';
+    if (!d) return laneWaitHtml('needsWork', 'Working out where the team gets stuck\u2026', 'Still working \u2014 the first look at this range groups every objection from scratch and takes a moment.', 70);
     var head = '<div class="section-header"><h2>Objection Handling Focus</h2></div>';
     if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
@@ -10709,7 +10746,15 @@
     ensureTeamDefaultRange();
     if (state.teamContext === null) loadTeam('context');
     if (state.teamObjections === null && !state.teamObjectionsLoading) loadTeam('objections');
-    if (state.teamObjSummary === null && !state.teamObjSummaryLoading) loadTeamObjSummary();
+    /* ⚠⚠ THE SUMMARY STARTS AFTER THE GRID LANDS (2026-09-02). Fired together,
+       both lanes computed the same data and on a cold window BOTH ran the
+       ~20s bucketing model call — the 60-second load, and double spend. Run
+       second, the summary finds the grid's bucket cache already written and
+       pays only for its own synthesis. The grid's landing re-renders this view
+       (loadTeam → scheduleTeamRender), which is what starts the summary; a
+       grid that failed does not start it — the Why panel says so instead. */
+    var gridLanded = !!(state.teamObjections && !state.teamObjections._error);
+    if (gridLanded && state.teamObjSummary === null && !state.teamObjSummaryLoading) loadTeamObjSummary();
 
     /* ⚠⚠ READ THE SAVED REP FILTER HERE — this is the drilldown's equivalent of
        the read inside drawRepSeriesCharts, and it is required for the same
@@ -10966,7 +11011,7 @@
   /* The per-closer x per-category grid. Clicking a cell filters the feed. */
   function teamObjGridHtml() {
     var d = state.teamObjections;
-    if (!d) return '<div class="skeleton" style="height:150px;"></div>';
+    if (!d) return laneWaitHtml('objections', 'Counting objections across the team\'s calls\u2026', 'Still working \u2014 the first look at this range sorts every objection from scratch and takes a moment.', 150);
     if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     var all = d.grid || [];
     if (!all.length) {
@@ -11147,7 +11192,7 @@
   /* The instance list — the SAME row the personal objections feed uses. */
   function teamObjFeedHtml() {
     var d = state.teamObjections;
-    if (!d) return '<div class="skeleton" style="height:200px;"></div>';
+    if (!d) return laneWaitHtml('objections', 'Gathering the moments\u2026', 'Still working \u2014 the first look at this range sorts every objection from scratch and takes a moment.', 200);
     if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     /* ⚠ THE REP FILTER APPLIES HERE TOO. Filtering the grid but not the moments
        would leave a manager reading a hidden rep's calls under a table that
@@ -11205,7 +11250,7 @@
   */
 
   function needsWorkDetailBodyHtml(d) {
-    if (!d) return '<div class="skeleton" style="height:200px;"></div>';
+    if (!d) return laneWaitHtml('needsWork', 'Pulling the moments together\u2026', null, 200);
     if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
     if (d.available === false) return '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     var det = d.detail || {};
@@ -12278,7 +12323,7 @@
      inverted-direction defect would come back. */
   function dashGaugeHtml(card) {
     var d = state.teamAverages;
-    if (d === null) return '<div class="skeleton" style="height:150px;"></div>';
+    if (d === null) return laneWaitHtml('teamAverages', 'Measuring the last 7 days\u2026', null, 150);
     var problem = laneProblem(d);
     if (problem) return laneProblemHtml('team averages', problem);
     var key = ({ closing_rate: 'closing', objection_handle_rate: 'objections', avg_call_time: 'calltime' })[card.metric];
@@ -12875,7 +12920,7 @@
        through to `cat._error` and THREW — which, before the reveal was moved
        above the render, meant the modal never opened. Both halves are fixed;
        this is the belt. */
-    if (cat === null || cat === undefined) { host.innerHTML = '<div class="skeleton" style="height:160px;"></div>'; return; }
+    if (cat === null || cat === undefined) { host.innerHTML = laneWaitHtml('catalog', 'Listing the widgets\u2026', null, 160); return; }
     /* ⚠⚠ A 403 IS NOT AN ERROR AND NEITHER IS "EMPTY". A closer's catalog is
        `{ _forbidden: true }`, which has no `groups`, so this rendered a header
        and NOTHING ELSE — a dialog a manager would fairly describe as nothing
@@ -13271,7 +13316,7 @@
     var e = state.dashEdit;
     var body;
     var problem = laneProblem(d);
-    if (d === null && !e) body = '<div class="skeleton" style="height:220px;"></div>';
+    if (d === null && !e) body = laneWaitHtml('dashboard', 'Laying out your dashboard\u2026', null, 220);
     /* ⚠ THE PROBLEM BRANCH COMES BEFORE THE CARDS BRANCH, and it covers
        `_forbidden` as well as `_error`. Without it a 403 fell through to
        `cards = []` and rendered the EMPTY-BOARD invitation. */
@@ -13324,7 +13369,7 @@
   function avgPanelHtml() {
     var d = state.teamAverages;
     var body;
-    if (d === null) body = '<div class="skeleton" style="height:180px;"></div>';
+    if (d === null) body = laneWaitHtml('teamAverages', 'Measuring the last 7 days\u2026', null, 180);
     else if (d && d._error) body = '<div class="error">Could not load team averages: ' + escapeHtml(d._error) + '</div>';
     else {
       var m = (d && d.metrics) || {};
@@ -14177,11 +14222,11 @@
     return { key: key, members: (state.users || []).filter(function (u) { return u.managed_by === key; }) };
   }
   function teamMembersBodyHtml() {
-    if (!state.users) return '<div class="skeleton" style="height:120px;"></div>';
+    if (!state.users) return laneWaitHtml('users', 'Listing the team\u2026', null, 120);
     var isOwner = state.me.role === 'owner';
     var sc = teamMembersScope();
     // an unresolved company shows a skeleton, never another company's members
-    if (!sc.key) return '<div class="skeleton" style="height:120px;"></div>';
+    if (!sc.key) return laneWaitHtml('users', 'Listing the team\u2026', null, 120);
     var members = sc.members.slice().sort(function (a, b) {
       // active first, then by email
       if ((a.active !== false) !== (b.active !== false)) return (a.active !== false) ? -1 : 1;
@@ -14421,7 +14466,7 @@
     var o = state.teamOverview;
     if (o && o._forbidden) return '<div class="error">Not authorized for this team.</div>';
     if (o && o._error) return '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
-    if (!o) return '<div class="skeleton" style="height:80px;"></div>';
+    if (!o) return laneWaitHtml('overview', 'Adding up the team\'s calls\u2026', null, 80);
     var t = o.totals;
     function stat(label, val, extra) {
       return '<div class="team-stat"><div class="team-stat-val">' + val + (extra || '') + '</div><div class="team-stat-label">' + label + '</div></div>';
@@ -14476,7 +14521,7 @@
     }).join('');
     var head = '<div class="section-header"><h2>Trends</h2><div class="date-presets">' + toggle + '</div></div>';
     var tr = state.teamTrends;
-    if (!tr) return head + '<div class="skeleton" style="height:120px;"></div>';
+    if (!tr) return head + laneWaitHtml('trends', 'Charting the trend\u2026', null, 120);
     if (tr._error) return head + '<div class="error">Could not load trends: ' + escapeHtml(tr._error) + '</div>';
     var b = tr.buckets || [];
     if (!b.length) return head + '<div class="empty"><p>No analyzed calls in this range yet.</p></div>';
@@ -14638,8 +14683,11 @@
   function repCardsHtml() {
     var o = state.teamOverview;
     if (o === null) return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
-      + '<div class="skeleton" style="height:120px;"></div></div>';
-    if (o._forbidden || o._error) return '';
+      + laneWaitHtml('overview', 'Adding up each rep\'s calls\u2026', null, 120) + '</div>';
+    /* ⚠ A LANE THAT FAILS SAYS SO. This returned '' — the Reps section simply
+       vanished on an error, indistinguishable from a team with no reps. */
+    if (o._forbidden || o._error) return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
+      + laneProblemHtml('the reps', laneProblem(o)) + '</div>';
     var reps = sortRepsWorstFirst(o.per_rep || []);
     if (!reps.length) {
       return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
@@ -14782,13 +14830,7 @@
        ⚠ THE ESCALATION IS TIME-GATED: on a warm cache this returns fast and the
        reader never sees the longer sentence, which would be a lie in the other
        direction. */
-    if (!r) {
-      return '<div class="load-state" style="padding:14px 4px;"><div class="spinner"></div> '
-        + (state.teamWaitLong && state.teamWaitLong.recs
-            ? 'Still working — the first load of the day writes these from scratch and takes a moment.'
-            : 'Reading the team\'s calls\u2026')
-        + '</div>';
-    }
+    if (!r) return laneWaitHtml('recs', 'Reading the team\'s calls\u2026', 'Still working \u2014 the first load of the day writes these from scratch and takes a moment.', 120);
     if (r._error) return '<div class="error">Could not load recommendations: ' + escapeHtml(r._error) + '</div>';
     if (!r.available) return '<div class="empty"><h3>Recommendations unavailable</h3><p>' + escapeHtml(r.reason || 'Could not generate right now.') + '</p></div>';
     var w = r.working || [], i = r.improve || [];
@@ -14894,7 +14936,7 @@
   }
 
     var d = state.teamDigest;
-    if (!d) return '<div class="skeleton" style="height:80px;"></div>';
+    if (!d) return laneWaitHtml('digest', 'Reading yesterday\'s calls\u2026', null, 80);
     if (d._error) return '<div class="error">Could not load digest: ' + escapeHtml(d._error) + '</div>';
 
     /* Day navigation. Replaced the chip row 2026-08-26 — Justin: "the dates
@@ -15545,7 +15587,7 @@
     var content = document.getElementById('content');
     if (state.account === null && !state.accountLoading) loadAccount();
     var a = state.account;
-    if (!a) { content.innerHTML = '<div class="section fade-in"><div class="skeleton" style="height:160px;"></div></div>'; return; }
+    if (!a) { content.innerHTML = '<div class="section fade-in">' + laneWaitHtml('account', 'Loading your account\u2026', null, 160) + '</div>'; return; }
     if (a._error) { content.innerHTML = '<div class="section fade-in"><div class="error">Could not load account: ' + escapeHtml(a._error) + '</div></div>'; return; }
 
     var managedNotice = '<div class="acct-notice">Your account is managed by your admin — ask them to make changes.</div>';
@@ -15913,7 +15955,7 @@
       + '</div>';
 
     var body;
-    if (!d) body = '<div class="skeleton" style="height:120px;"></div>';
+    if (!d) body = laneWaitHtml('eod', 'Building today\'s report\u2026', null, 120);
     else if (d._error) body = '<div class="error">Could not load EOD report: ' + escapeHtml(d._error) + '</div>';
     else if (!d.calls || d.calls.length === 0) {
       // FD-3 (Option A): a never-synced user (no recording source connected → no
@@ -17453,7 +17495,7 @@
     // Reachable only via the Objections donut — provide an explicit way back.
     var header = '<button class="back-btn" onclick="backToOverview()" style="margin-bottom:14px;">← Back to Dashboard</button>' + renderHeaderHtml();
     if (state.objectionsIntel === null) {
-      content.innerHTML = header + '<div class="section"><div class="skeleton" style="height:90px;"></div></div>';
+      content.innerHTML = header + '<div class="section">' + laneWaitHtml('objectionsIntel', 'Sorting your objections\u2026', null, 90) + '</div>';
       return;
     }
     if (state.objectionsIntel.error) {

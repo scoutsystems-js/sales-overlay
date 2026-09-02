@@ -89,7 +89,10 @@ test('the cron reuses the digest manager set and skips loudly without one', () =
   const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8');
   const at = src.indexOf('warmTeamRecommendations');
   assert.ok(at > 0, 'the warm-up is not wired into the cron');
-  const seg = src.slice(Math.max(0, at - 2200), at + 800);
+  /* ⚠ Widened 2026-09-02 from +800: the post-sync pass grew a dispatched-gate
+     and its explanation between the call and its catch. The PROPERTY is that
+     the warm-up has its own catch, not a distance. */
+  const seg = src.slice(Math.max(0, at - 2200), at + 2000);
   assert.ok(/digest\.managerMap/.test(seg),
     '"who is a manager" must not have a second answer here');
   assert.ok(/SKIPPED/.test(seg),

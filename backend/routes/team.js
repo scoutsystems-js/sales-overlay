@@ -13,6 +13,7 @@ const { closeRateForCalls } = require('./../lib/prospect-entity');
 const express = require('express');
 const { resolveDisplayName } = require('../lib/display-name');
 const { nameMapFor } = require('../lib/team-name-map');
+const { emailMapFor } = require('../lib/email-map');
 var { withBoardOwner } = require('../lib/team-membership');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
@@ -63,12 +64,9 @@ function rangeFrom(req) {
   return { from: from, to: to };
 }
 
-async function emailMap(admin) {
-  var list = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (list.error) throw new Error('listUsers: ' + list.error.message);
-  var m = {}; (list.data.users || []).forEach(function (u) { if (u && u.id) m[u.id] = u.email || null; });
-  return m;
-}
+/* ⚠ ONE SHARED MAP, READ AT MOST ONCE PER MINUTE PER PROCESS — lib/email-map.js.
+   This used to call auth.admin.listUsers on EVERY team request (~1s each). */
+async function emailMap(admin) { return emailMapFor(admin); }
 async function repIdsFor(admin, keyId) {
   var r = await admin.from('user_profiles').select('user_id').eq('managed_by', keyId);
   if (r.error) throw new Error('reps lookup: ' + r.error.message);

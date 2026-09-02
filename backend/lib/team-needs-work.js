@@ -575,7 +575,26 @@ function canonicalKeyForLabel(raw) {
   return 'other';
 }
 
-async function getBucketMapping(objs) {
+/* ⚠⚠ ONE MODEL CALL PER PHRASE SET IN FLIGHT. The Objections page fired the
+   grid and the summary together, and on a cold window BOTH reached here with
+   the same phrases before either had written the bucket cache — two ~20s
+   bucketing calls for one answer, double spend. Concurrent callers with the
+   same phrase set now share the one call; the entry is dropped the moment it
+   settles, so this is not a second cache (the DB cache stays the cache). */
+var _bucketInflight = {};
+function getBucketMapping(objs) {
+  var key = crypto.createHash('md5').update(
+    (objs || []).map(function (o) { return String(o && o.surface == null ? '' : o.surface).trim(); })
+      .filter(Boolean).sort().join('\n')).digest('hex');
+  if (_bucketInflight[key]) return _bucketInflight[key];
+  var p = getBucketMappingNow(objs).then(
+    function (r) { delete _bucketInflight[key]; return r; },
+    function (e) { delete _bucketInflight[key]; throw e; });
+  _bucketInflight[key] = p;
+  return p;
+}
+
+async function getBucketMappingNow(objs) {
   var counts = {};
   objs.forEach(function (o) { var k = String(o.surface == null ? '' : o.surface).trim(); if (k) counts[k] = (counts[k] || 0) + 1; });
   var distinct = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });

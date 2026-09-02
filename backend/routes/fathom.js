@@ -513,6 +513,11 @@ async function syncUserCalls(admin, userId, conn, opts) {
             console.error('[fathom] analyzeCall failed for call ' + newCallIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown'));
           }
         }
+        /* ⚠⚠ WARM AFTER THE DRAIN. The recommendations warm-up used to run
+           inside sync-all right after these calls were DISPATCHED, so it
+           warmed a key these analyses then changed. The last loop to finish
+           (no live claim left) warms; the others step aside. lib/warm-after-drain.js */
+        await require('../lib/warm-after-drain').warmWhenDrained(admin);
       } catch (outerErr) {
         console.error('[fathom] background analysis loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
       }
@@ -662,9 +667,15 @@ router.post('/sync-all', async function(req, res) {
          building them, this is skipped and says so — warming a manager set we
          could not establish is worse than not warming. */
       try {
-        if (digest && digest.managerMap) {
+        if (summary.dispatched_total === 0 && digest && digest.managerMap) {
           var warmTeamRecommendations = require('../lib/team-warm').warmTeamRecommendations;
           await warmTeamRecommendations(admin, { managers: digest.managerMap, emailMap: digest.emailMap || {} });
+        } else if (summary.dispatched_total !== 0) {
+          /* ⚠ Analyses were dispatched this cycle: they will change the key this
+             warm-up would write, so the warm-up moved to the END of the analyze
+             loop (routes: the loop calls warmWhenDrained). Warming here was the
+             evidenced miss of 2026-09-01. */
+          console.log('[team-warm] deferred — ' + summary.dispatched_total + ' analysis(es) dispatched this cycle; the analyze loop warms when the drain finishes');
         } else {
           console.error('[team-warm] SKIPPED — the digest pass did not produce a manager set, '
             + 'so the first manager of the day will pay the full cold cost.');

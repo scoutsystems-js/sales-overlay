@@ -61,10 +61,23 @@ async function aggregateWindow(admin, repIds, from, to) {
   if (callIds.length === 0) return { rep: rep, doneCallIds: [] };
 
   var doneCallIds = [];
-  for (var i = 0; i < callIds.length; i += 100) {
-    var aq = await admin.from('call_analyses')
+  /* ⚠⚠ EVERY CHUNK AT ONCE, BOTH TABLES AT ONCE. This awaited each 100-id
+     chunk in turn, analyses then highlights — on production that was the
+     warm floor: ~6s of ordinary round trips with every cache hit. The
+     highlights loop reads `callOutcome`, which the analyses loop fills, so
+     the FETCHES are parallel and the PROCESSING keeps its order: analyses
+     first, then highlights. Same rows, same order, same answer
+     (test/lane-parallel.test.js deep-equals the sequential result). */
+  var aChunks = [], hChunks = [];
+  for (var c0 = 0; c0 < callIds.length; c0 += 100) {
+    aChunks.push(admin.from('call_analyses')
       .select('fathom_call_id, analyzed_at, overall_score, outcome, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned, price_stated_at_seconds')
-      .in('fathom_call_id', callIds.slice(i, i + 100)).eq('status', 'done');
+      .in('fathom_call_id', callIds.slice(c0, c0 + 100)).eq('status', 'done'));
+    hChunks.push(admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')
+      .in('fathom_call_id', callIds.slice(c0, c0 + 100)).eq('type', 'objection'));
+  }
+  var both = await Promise.all([Promise.all(aChunks), Promise.all(hChunks)]);
+  both[0].forEach(function (aq) {
     if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
     (aq.data || []).forEach(function (a) {
       callOutcome[a.fathom_call_id] = a.outcome || null;
@@ -101,10 +114,8 @@ async function aggregateWindow(admin, repIds, from, to) {
       var psec = a.price_stated_at_seconds;
       if (typeof psec === 'number' && isFinite(psec)) { r.price_sum += psec; r.price_n++; }
     });
-  }
-  for (var j = 0; j < callIds.length; j += 100) {
-    var hq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')
-      .in('fathom_call_id', callIds.slice(j, j + 100)).eq('type', 'objection');
+  });
+  both[1].forEach(function (hq) {
     if (hq.error) throw new Error('call_highlights: ' + hq.error.message);
     (hq.data || []).forEach(function (h) {
       var r = rep[callRep[h.fathom_call_id]]; if (!r) return;
@@ -130,7 +141,7 @@ async function aggregateWindow(admin, repIds, from, to) {
       if (!r.obj_by_cat[cat]) r.obj_by_cat[cat] = { total: 0, handled: 0 };
       r.obj_by_cat[cat].total++; if (handled) r.obj_by_cat[cat].handled++;
     });
-  }
+  });
   return { rep: rep, doneCallIds: doneCallIds };
 }
 
@@ -138,12 +149,27 @@ async function aggregateWindow(admin, repIds, from, to) {
 // window) + team totals. emailMap: { user_id: email }.
 async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
   // 3d-3: one shared prospect close-rate computation for the whole team.
-  var prospectRates = await fetchProspectCloseRates(admin, repIds, from, to);
-  var cur = await aggregateWindow(admin, repIds, from, to);
-  // prior window = same length immediately before `from`
   var span = new Date(to).getTime() - new Date(from).getTime();
   var priorFrom = new Date(new Date(from).getTime() - span).toISOString();
-  var prior = await aggregateWindow(admin, repIds, priorFrom, from);
+  /* ⚠⚠ FIVE INDEPENDENT READS, ONE AWAIT. Prospect rates, this window, the
+     prior window, the connection lookup and the profiles depend on nothing
+     but `repIds` — they ran one after another (~12 round trips deep with the
+     chunks inside) and that sequence WAS the warm floor of /team/overview.
+     Promise.all, not five dangling promises: a rejection while another read
+     is still pending must be handled, never left to the process. */
+  var all = await Promise.all([
+    fetchProspectCloseRates(admin, repIds, from, to),
+    aggregateWindow(admin, repIds, from, to),
+    aggregateWindow(admin, repIds, priorFrom, from),
+    repIds.length > 0 ? Promise.all([
+      admin.from('fathom_connections').select('user_id').in('user_id', repIds),
+      admin.from('call_connections').select('user_id').in('user_id', repIds),
+    ]) : null,
+    repIds.length > 0 ? admin.from('user_profiles').select('user_id, first_name, last_name, active').in('user_id', repIds) : null,
+  ]);
+  var prospectRates = all[0], cur = all[1];
+  // prior window = same length immediately before `from`
+  var prior = all[2];
 
   // Names for the rep cards — resolved through the shared helper (real name when
   // set, email prefix fallback otherwise), so the fallback lives in one place.
@@ -158,10 +184,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
      and this drives a badge that accuses someone by name. */
   var connectedSet = {};
   if (repIds.length > 0) {
-    var conns = await Promise.all([
-      admin.from('fathom_connections').select('user_id').in('user_id', repIds),
-      admin.from('call_connections').select('user_id').in('user_id', repIds),
-    ]);
+    var conns = all[3];
     var connErr = conns.some(function (c) { return !!c.error; });
     if (connErr) {
       console.error('[team-analytics] connection lookup failed — nobody will be reported unconnected');
@@ -175,7 +198,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
 
   var profileMap = {};
   if (repIds.length > 0) {
-    var profs = await admin.from('user_profiles').select('user_id, first_name, last_name, active').in('user_id', repIds);
+    var profs = all[4];
     if (!profs.error) (profs.data || []).forEach(function (p) { profileMap[p.user_id] = p; });
   }
 

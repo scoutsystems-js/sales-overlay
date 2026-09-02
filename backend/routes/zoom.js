@@ -237,6 +237,8 @@ async function syncZoomCalls(admin, userId, conn) {
           try { await analyzeCall(dispatchIds[i], userId); }
           catch (innerErr) { console.error('[zoom] analyzeCall failed for call ' + dispatchIds[i] + ' (user=' + userId + '): ' + (innerErr.message || 'unknown')); }
         }
+        /* ⚠ warm after the drain — same as the Fathom loop; lib/warm-after-drain.js */
+        await require('../lib/warm-after-drain').warmWhenDrained(admin);
       } catch (outerErr) {
         console.error('[zoom] background analysis loop error (user=' + userId + '): ' + (outerErr.message || 'unknown'));
       }
