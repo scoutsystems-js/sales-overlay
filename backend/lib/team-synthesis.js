@@ -74,7 +74,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v6-2026-09-02-never-diminish-highlight-id';   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v7-2026-09-02-never-diminish-manager-notes';   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -260,7 +260,10 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   // KB-grounded: the manager/owner's team selling context (cap 3000), folded into
   // the set-hash so a KB upload invalidates the cached team recommendations.
   var selling = await fetchSellingContext(admin, keyId, 3000, SYNTHESIS_CATEGORIES);
-  var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash
+  /* FINE TUNE COACHING (2026-09-02): this team's corrections join the KEY (a new
+     note invalidates the next load) and the PROMPT, through the one shared lane. */
+  var corr = await require('./coaching-corrections').loadCorrectionsSafe(admin, keyId, 'team-synthesis');
+  var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash + '||notes:' + corr.hash
     /* ⚠⚠ THE RULE VERSION IS DELIBERATELY *NOT* IN THIS KEY — see CLAUDE.md.
        Adding it forces every cached synthesis to regenerate at real cost, and
        the rule was MEASURED not to work: 67% mismatched before, 75% after. A
@@ -364,6 +367,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
       'SELLING CONTEXT (the team\'s actual offer / sales approach — ground your assessment in it; judge against THIS offer and selling style, do not penalize approaches it endorses):',
       selling.contextText.trim(), '');
   }
+  if (corr.text) promptLines.splice(1, 0, require('./coaching-corrections').promptLane(corr.text), '');
   var prompt = promptLines.join('\n');
 
   var resp;

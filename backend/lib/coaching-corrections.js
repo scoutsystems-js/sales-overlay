@@ -176,9 +176,40 @@ async function extractConcept(o) {
   }
 }
 
+/* ⚠⚠ ONE WORDING FOR EVERY LANE THAT READS THE NOTES (2026-09-02). Five copies
+   of a prompt lane is the two-things-answering-one-question defect waiting to
+   happen. The 7c coaching pass adds one sentence (`applied: true`) asking
+   which notes were applied, because it stores that as a checkable field. */
+function promptLane(text, opts) {
+  var t = (text || '').trim();
+  if (!t) return '';
+  var lines = [
+    '\u26a0\u26a0 MANAGER NOTES \u2014 THIS TEAM\'S OWN CORRECTIONS. This team\'s sales manager corrected',
+    'earlier coaching, and these are the concepts behind those corrections:',
+    t,
+    'These notes outrank your defaults: on this team they are what good looks like.',
+    'Treat each one as a heavily weighted example, not a hard rule \u2014 if a specific',
+    'moment was genuinely different, say so in one sentence rather than silently',
+    'ignoring the note. Never coach against a note without naming which one and why.',
+  ];
+  if (opts && opts.applied) {
+    lines.push('For each moment, list the numbers of the notes you applied in',
+               '"applied_manager_notes" (an empty list if none applied).');
+  }
+  return lines.join('\n');
+}
+
+/* The loader every lane should call: a read failure means "coach without
+   notes, and say so in the log" — never a failed page. */
+async function loadCorrectionsSafe(admin, teamKey, laneTag) {
+  try { return await loadCorrections(admin, teamKey); }
+  catch (e) { console.warn('[' + (laneTag || 'coaching-corrections') + '] manager notes unavailable (' + ((e && e.message) || 'unknown') + ') \u2014 continuing without them'); return { rows: [], text: '', hash: 'none' }; }
+}
+
 module.exports = {
   CATEGORY: CATEGORY, METADATA_CATEGORY: METADATA_CATEGORY, LABEL: LABEL,
   EXTRACTION_PROMPT_VERSION: EXTRACTION_PROMPT_VERSION,
   conceptHash: conceptHash, teamKeyFor: teamKeyFor, loadCorrections: loadCorrections,
   buildCorrectionRow: buildCorrectionRow, extractConcept: extractConcept, _extractionPrompt: extractionPrompt,
+  promptLane: promptLane, loadCorrectionsSafe: loadCorrectionsSafe,
 };

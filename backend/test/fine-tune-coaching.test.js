@@ -250,3 +250,67 @@ test('⚠ the Call Review loading state waits in words, not three bare boxes', (
   assert.ok(/laneWaitHtml\(/.test(body), 'the one helper');
   assert.ok(!/review-skeleton-section/.test(body), 'no bare boxes');
 });
+
+/* ── THE LANES (2026-09-02): three coaching lanes read the notes through ONE
+   shared wording. Needs-work is deliberately NOT one of them: its only model
+   call classifies objection phrases into buckets, which sets the handle RATE
+   — a note there would let a manager move a metric by correcting coaching. */
+const laneSrc = (f) => stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', f), 'utf8'));
+
+test('⚠⚠ ONE WORDING, THREE COACHING LANES + 7c; the classifier, the grader and the extractor never see a note', () => {
+  const cc = require('../lib/coaching-corrections');
+  assert.strictEqual(typeof cc.promptLane, 'function', 'the lane text is lifted into one place');
+  const lane = cc.promptLane('1. On this team, isolating is correct.');
+  assert.ok(/MANAGER NOTES/.test(lane) && /outrank/.test(lane) && /genuinely different/.test(lane), 'weighted example, not a hard rule');
+  assert.strictEqual(cc.promptLane(''), '', 'no notes, no lane');
+  assert.ok(/applied_manager_notes/.test(cc.promptLane('1. x', { applied: true })) && !/applied_manager_notes/.test(lane), 'only 7c asks which notes were applied');
+  ['team-synthesis.js', 'team-objection-summary.js', 'performance-synthesis.js', 'coaching.js'].forEach((f) => assert.ok(/promptLane\(/.test(laneSrc(f)), f + ' renders the shared lane'));
+  ['team-synthesis.js', 'team-objection-summary.js', 'performance-synthesis.js'].forEach((f) => assert.ok(/loadCorrections(Safe)?\(/.test(laneSrc(f)), f + ' loads the team notes'));
+  assert.ok(!/MANAGER NOTES/.test(laneSrc('coaching.js')), 'coaching.js no longer carries its own copy of the wording');
+  assert.ok(!/loadCorrections(Safe)?\(|promptLane\(|managerNotes/.test(laneSrc('team-needs-work.js')), 'needs-work: the bucket classifier sets a RATE — a note must not reach it');
+  assert.ok(!/loadCorrections(Safe)?\(|promptLane\(/.test(laneSrc('selling-context.js')), 'the grader/extractor context never carries a note');
+  const w = laneSrc('analysis-worker.js');
+  assert.ok(!/loadCorrections(Safe)?\(|managerNotes|promptLane\(/.test(w.slice(0, w.indexOf('async function coachCallMoments'))), 'grader and extractor untouched');
+});
+
+test('⚠⚠ EACH LANE\'S CACHE KEY MOVES WITH THE NOTES, and its version moved with the prompt', () => {
+  const ts = laneSrc('team-synthesis.js');
+  assert.ok(/\|\|notes:' \+ corr\.hash/.test(ts) && /RECS_LANE_VERSION = 'v7-/.test(ts), 'recommendations');
+  const os = laneSrc('team-objection-summary.js');
+  assert.ok(/\|notes:' \+ corr\.hash/.test(os) && /PROMPT_VERSION = 'v12-/.test(os), 'objections Why');
+  const ps = laneSrc('performance-synthesis.js');
+  assert.ok(/\|\|notes:' \+ corr\.hash/.test(ps) && /SYNTH_RULE_VERSION = 'v4-/.test(ps), 'performance summary');
+  const nw = laneSrc('team-needs-work.js');
+  assert.ok(!/notes:/.test(nw), 'needs-work: no bump, nothing regenerates, nothing changed');
+});
+
+test('⚠ the objections and performance prompts CARRY the note when there is one, and omit the lane when there is none (executed)', () => {
+  const os = require('../lib/team-objection-summary');
+  const withNote = os._buildPrompt([], '1. On this team, isolating is correct.');
+  assert.ok(/MANAGER NOTES/.test(withNote) && /isolating is correct/.test(withNote));
+  assert.ok(withNote.indexOf('MANAGER NOTES') < withNote.indexOf('Respond with ONLY'), 'the lane sits before the answer format');
+  assert.ok(!/MANAGER NOTES/.test(os._buildPrompt([], '')), 'no lane without notes');
+  const ps = require('../lib/performance-synthesis');
+  const obj = {}; ['fear', 'timing', 'partner', 'logistical', 'uncategorized', 'price', 'money', 'think', 'spouse', 'time', 'trust', 'other'].forEach((c) => { obj[c] = { handled: 0, total: 0 }; });
+  const agg = { sections: {}, strongest: null, weakest: null, win_avg: null, win_n: 0, loss_avg: null, loss_n: 0, blended: null, done_n: 0, obj: new Proxy(obj, { get: (o, k) => o[k] || { handled: 0, total: 0 } }) };
+  assert.ok(/MANAGER NOTES/.test(ps._buildPrompt(agg, [], [], '', '1. On this team, isolating is correct.')));
+  assert.ok(!/MANAGER NOTES/.test(ps._buildPrompt(agg, [], [], '', '')));
+});
+
+test('⚠ JUSTIN, LIVE: a multi-line box tall enough to read a paragraph, and ONE green button style with the login\'s hover pair', () => {
+  const modal = fs.readFileSync(path.join(__dirname, '..', 'web', 'js', 'scout-modal.js'), 'utf8');
+  assert.ok(/o\.multiline/.test(modal) && /textarea/.test(modal), 'the prompt dialog can be a textarea');
+  assert.ok(/min-height:\s*1[6-9]\dpx|min-height:\s*2\d\dpx/.test(modal), 'tall enough to read a paragraph without scrolling');
+  assert.ok(/TEXTAREA/.test(modal) && /(metaKey|ctrlKey)/.test(modal), 'Enter writes a newline in the textarea; Cmd/Ctrl+Enter confirms');
+  const fn = fnBody(LIVE, 'fineTuneCoaching');
+  assert.strictEqual((fn.match(/multiline: true/g) || []).length, 2, 'both dialogs — the correction and the concept — are multi-line');
+  const rest = /\.review-ft-btn\s*\{([^}]*)\}/.exec(LIVE);
+  assert.ok(rest && /color:\s*var\(--accent\)/.test(rest[1]) && /border-color:\s*var\(--accent\)/.test(rest[1]), 'at rest: green text, green border');
+  const hover = /\.review-ft-btn:hover:not\(:disabled\)\s*\{([^}]*)\}/.exec(LIVE);
+  assert.ok(hover && /background:\s*var\(--accent\)/.test(hover[1]) && /color:\s*#000/.test(hover[1]), 'on hover: solid Scout green, black text — the login button\'s pair');
+  const accent = /--accent:\s*(#[0-9a-fA-F]{6})/.exec(HTML)[1];
+  const lin = (c) => { const v = parseInt(c, 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(accent.slice(1, 3)) + 0.7152 * lin(accent.slice(3, 5)) + 0.0722 * lin(accent.slice(5, 7));
+  const ratio = (L + 0.05) / 0.05;
+  assert.ok(ratio >= 7, 'black on ' + accent + ' must clear AAA (7:1), measured ' + ratio.toFixed(2));
+});

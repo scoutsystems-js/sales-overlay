@@ -284,17 +284,7 @@ function buildCoachingPrompt(moments, opts) {
        hard rule: a moment that was genuinely different may be said to be so,
        in a sentence, never silently. Substitution, not suppression — the
        grader never sees these (lib/coaching-corrections.js). */
-    notes
-      ? ['\u26a0\u26a0 MANAGER NOTES \u2014 THIS TEAM\'S OWN CORRECTIONS. Your sales manager corrected earlier',
-         'coaching on this team, and these are the concepts behind those corrections:',
-         notes,
-         'These notes outrank your defaults: on this team they are what good looks like.',
-         'Treat each one as a heavily weighted example, not a hard rule \u2014 if a specific',
-         'moment below was genuinely different, say so in one sentence rather than',
-         'silently ignoring the note. Never coach against a note without naming which',
-         'one and why. For each moment, list the numbers of the notes you applied in',
-         '"applied_manager_notes" (an empty list if none applied).'].join('\n')
-      : '',
+    notes ? require('./coaching-corrections').promptLane(notes, { applied: true }) : '',
     '',
     'Return ONLY a JSON array, one entry per moment, in the same order:',
     notes

@@ -45,6 +45,7 @@
     '.scout-modal-input{width:100%;box-sizing:border-box;margin:4px 0 2px;padding:9px 10px;',
     'background:var(--bg-field,#0d0d0d);color:var(--text,#ededed);',
     'border:1px solid var(--border-strong,#333);border-radius:6px;font-size:14px;}',
+    '.scout-modal-textarea{min-height:190px;resize:vertical;line-height:1.5;font-family:inherit;}',
     '.scout-modal-err{color:var(--bad,#f87171);font-size:13px;margin:6px 0 0;}',
     '.scout-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}',
     '.scout-modal-btn{padding:8px 14px;border-radius:6px;font-size:13.5px;cursor:pointer;',
@@ -112,8 +113,11 @@
 
       var input = null;
       if (isPrompt) {
-        input = el('input', 'scout-modal-input');
-        input.type = 'text';
+        /* ⚠ MULTI-LINE WHEN ASKED (Justin, 2026-09-02, on Fine Tune Coaching: "a
+           manager will want to see what they wrote before they add it"). A
+           one-line field makes a manager write less than they mean to. */
+        if (o.multiline) { input = el('textarea', 'scout-modal-input scout-modal-textarea'); input.rows = o.rows || 8; }
+        else { input = el('input', 'scout-modal-input'); input.type = 'text'; }
         input.value = o.value || '';
         if (o.placeholder) input.placeholder = o.placeholder;
         input.setAttribute('aria-label', o.inputLabel || o.title || 'Value');
@@ -189,6 +193,8 @@
       function onKey(e) {
         if (e.key === 'Escape') { e.preventDefault(); close(isPrompt ? null : false); return; }
         if (e.key === 'Enter' && (!isPrompt || document.activeElement === input)) {
+          /* In a TEXTAREA, Enter writes a newline; Cmd/Ctrl+Enter confirms. */
+          if (input && input.tagName === 'TEXTAREA' && !(e.metaKey || e.ctrlKey)) return;
           e.preventDefault(); accept(); return;
         }
         if (e.key !== 'Tab') return;

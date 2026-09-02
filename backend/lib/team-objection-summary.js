@@ -55,7 +55,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v11-2026-09-01-never-diminish';   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
+const PROMPT_VERSION = 'v12-2026-09-02-never-diminish-manager-notes';   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -337,7 +337,7 @@ function evidenceLine(m) {
   return parts.join('\n');
 }
 
-function buildPrompt(subjects) {
+function buildPrompt(subjects, managerNotes) {
   var lines = [
     'You are a high-ticket sales coach writing to ONE closer at a time.',
     '',
@@ -475,6 +475,11 @@ function buildPrompt(subjects) {
   lines.push('   ⚠ DO NOT put paragraph 3 in "why" as well — they are rendered one after the');
   lines.push('   other, so a repeat shows up twice on screen and doubles the length.');
   lines.push('');
+  /* FINE TUNE COACHING (2026-09-02): the team's corrections, through the one
+     shared lane. This lane carried NO knowledge-base context before, so the
+     notes are ADDED here, not appended: +~150 tokens of header when any note
+     exists, +~40 tokens per note, nothing when the team has none. */
+  if (managerNotes && String(managerNotes).trim()) { lines.push(require('./coaching-corrections').promptLane(managerNotes)); lines.push(''); }
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
   lines.push('{"closers":[{"name":"<exact name as given>",'
     + '"why":"paragraph 1 (what happened — lead with the timestamp and their words) then a blank line then paragraph 2 (the principle)",'
@@ -591,8 +596,9 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
   // comes from computeTeamObjections, computed over the already-filtered call
   // list — see the note there for why the placement is the mechanism.
   var ck = snapCacheWindow(from, to);
+  var corr = await require('./coaching-corrections').loadCorrectionsSafe(admin, keyId, 'team-objection-summary');
   var hash = crypto.createHash('md5')
-    .update(PROMPT_VERSION + '|' + data.analysis_fingerprint + '|' + memberIds.slice().sort().join(','))
+    .update(PROMPT_VERSION + '|' + data.analysis_fingerprint + '|' + memberIds.slice().sort().join(',') + '|notes:' + corr.hash)
     .digest('hex');
 
   if (!opts.force) {
@@ -619,7 +625,7 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
     resp = await createWithUsage({
       model: CLAUDE_MODEL,
       max_tokens: outputBudget(subjects.length),
-      messages: [{ role: 'user', content: buildPrompt(subjects) }],
+      messages: [{ role: 'user', content: buildPrompt(subjects, corr.text) }],
     });
   } catch (apiErr) {
     // ⚠ NEVER CACHE A FAILURE. A cached "unavailable" would persist until the

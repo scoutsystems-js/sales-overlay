@@ -4891,6 +4891,12 @@
     .review-kb-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
     .review-kb-btn.is-saved { color: var(--accent); border-color: var(--accent); opacity: 1; cursor: default; }
     .review-kb-btn:disabled:not(.is-saved) { opacity: 0.5; cursor: wait; }
+    /* ⚠ FINE TUNE COACHING (Justin, 2026-09-02, live): green border and green text at
+       rest, filling to solid Scout green with black text on hover — the login
+       button's pair (#000 on #09e046 is 11.76:1, past AAA). One control, one
+       style, on both surfaces; not a third button style. */
+    .review-ft-btn { color: var(--accent); border-color: var(--accent); }
+    .review-ft-btn:hover:not(:disabled) { background: var(--accent); color: #000; border-color: var(--accent); }
     .kb-delete-btn:hover { color: #fca5a5; border-color: rgba(252,165,165,0.4); }
     .kb-delete-btn:disabled { opacity: 0.5; cursor: wait; }
 
@@ -18842,7 +18848,7 @@
       + '\nHow would your team prefer this handled? Scout will learn the idea behind it and coach this team that way from now on.';
     var feedback = await scoutPrompt({
       title: 'Fine Tune Coaching', body: context, placeholder: 'e.g. Isolating the objection is right \u2014 don\u2019t coach them away from it',
-      inputLabel: 'How you would prefer it handled', confirmText: 'Continue', cancelText: 'Cancel',
+      inputLabel: 'How you would prefer it handled', confirmText: 'Continue', cancelText: 'Cancel', multiline: true,
     });
     if (feedback === null || !String(feedback).trim()) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Reading\u2026'; }
@@ -18861,7 +18867,7 @@
         ? 'Your words will be saved exactly as written and used as this team\u2019s note. Edit them here if you like.'
         : 'This is what Scout will learn for your team. Edit it if it isn\u2019t quite right \u2014 your wording wins.',
       value: failed ? feedback : first.concept,
-      inputLabel: 'The note Scout will keep', confirmText: 'Save for my team', cancelText: 'Cancel',
+      inputLabel: 'The note Scout will keep', confirmText: 'Save for my team', cancelText: 'Cancel', multiline: true,
     });
     if (concept === null) { reset(); return; }
     try {

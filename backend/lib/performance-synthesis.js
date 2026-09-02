@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 /* Bumped ONLY for a correctness defect in what the cache already holds —
    never for a speculative improvement. See the key comment below. */
-const SYNTH_RULE_VERSION = 'v3-2026-09-01-never-diminish';
+const SYNTH_RULE_VERSION = 'v4-2026-09-02-never-diminish-manager-notes';   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
@@ -80,7 +80,7 @@ function candidateScore(type, cls) {
   return 1;
 }
 
-function buildPrompt(agg, oneThings, candidates, sellingContext) {
+function buildPrompt(agg, oneThings, candidates, sellingContext, managerNotes) {
   var lines = [
     'You are a sales coach writing a Performance Summary for one high-ticket closer, comparing their WIN-class calls (outcome=closed) vs LOSS-class calls (outcome=lost) over this period. Be specific and grounded — cite real moments, tie claims to the numbers. No generic praise.',
     '',
@@ -97,6 +97,8 @@ function buildPrompt(agg, oneThings, candidates, sellingContext) {
       'SELLING CONTEXT (this closer\'s actual offer / sales approach — ground your assessment in it; judge against THIS offer and selling style, do not penalize approaches it endorses):',
       sellingContext.trim(), '');
   }
+  /* FINE TUNE COACHING (2026-09-02): the closer's TEAM notes, through the one shared lane. */
+  if (managerNotes && String(managerNotes).trim()) lines.splice(2, 0, require('./coaching-corrections').promptLane(managerNotes), '');
   oneThings.forEach(function (t) { lines.push('  - ' + t.slice(0, 220)); });
   lines.push('');
   // ⚠ The rule immediately above the list it governs — same placement as the
@@ -171,7 +173,9 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   // KB-grounded: fetch the closer's selling context (offer/scripts, cap 3000) and
   // fold its hash into the set-hash so a KB upload invalidates the cached synthesis.
   var selling = await fetchSellingContext(admin, userId, 3000, SYNTHESIS_CATEGORIES);
-  var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash
+  var cc = require('./coaching-corrections');
+  var corr = await cc.loadCorrectionsSafe(admin, await cc.teamKeyFor(admin, userId).catch(function () { return null; }), 'performance-synthesis');
+  var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash + '||notes:' + corr.hash
     /* ⚠⚠ A VERSION IS IN THIS KEY AGAIN, AND THE DISTINCTION IS THE POINT.
 
        It was deliberately LEFT OUT for the v1 evidence RULE, because that rule
@@ -266,7 +270,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   try {
     resp = await createWithUsage({
       model: CLAUDE_MODEL, max_tokens: SYNTH_MAX_TOKENS,
-      messages: [{ role: 'user', content: buildPrompt(agg, oneThings, candidates, selling.contextText) }],
+      messages: [{ role: 'user', content: buildPrompt(agg, oneThings, candidates, selling.contextText, corr.text) }],
     });
   } catch (apiErr) {
     return { available: false, reason: 'Anthropic API failure' + ((apiErr && apiErr.status) ? ' (HTTP ' + apiErr.status + ')' : '') + ': ' + ((apiErr && apiErr.message) || 'unknown') };
@@ -299,4 +303,4 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-module.exports = { computePerformanceSynthesis: computePerformanceSynthesis };
+module.exports = { computePerformanceSynthesis: computePerformanceSynthesis, _buildPrompt: buildPrompt };
