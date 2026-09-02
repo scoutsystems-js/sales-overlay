@@ -239,7 +239,11 @@
        background. With `html, body { background }` the motifs rendered NOTHING,
        at any opacity, including 1. Restoring a background here hides them again
        with no error and no visual clue other than their absence. */
-    html { background: var(--bg); }
+    /* ⚠ overscroll-behavior: on macOS the rubber-band at the top edge moves the
+       WHOLE viewport — sticky and fixed elements included — which is the other
+       thing that presents as a bar "bouncing". Disabling the chain at the root
+       stops the elastic bounce; in-page scrolling is untouched. */
+    html { background: var(--bg); overscroll-behavior-y: none; }
     html, body {
       margin: 0;
       padding: 0;
@@ -828,7 +832,18 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      backdrop-filter: blur(8px);
+      /* ⚠ NO backdrop-filter. The background above is an OPAQUE gradient, so a
+         blur behind it changed nothing visible — and a sticky element carrying
+         backdrop-filter is a known one-frame lag in Chrome that reads as the bar
+         "bouncing" while the page scrolls. Measured before removing (2026-09-02):
+         sticky held top:0 at seven scroll positions, sampled at 0/50/300ms after
+         each jump — the bar never scrolls away, so the symptom was a
+         during-scroll artefact, and this was the only candidate in our CSS.
+         ⚠ STICKY, NOT FIXED, DELIBERATELY: on a direct child of <body> sticky at
+         top:0 is pinned to the viewport exactly as fixed is, and it STAYS IN
+         FLOW — so the rail's top (51px nav + inset) and the ground's min-height
+         (100vh − 61px) keep their derivation. Fixed would remove the bar's height
+         from the flow and every one of those would need re-deriving. */
       position: sticky;
       top: 0;
       /* ⚠⚠ 70, NOT 50 — AND THE MENU IS WHY. The nav used to tie with
@@ -844,6 +859,8 @@
       z-index: 70;
     }
     .top-bar-left { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; }
+    .top-bar-left .brand-link { display: block; line-height: 0; }
+    .top-bar-left .brand-wordmark { height: 22px; width: auto; display: block; }
     .top-bar-left .sep { color: var(--text); font-weight: 400; }
     .top-bar-left .sub { color: var(--text); font-weight: 500; font-size: 13px; }
     /* Primary-nav items in the top-left. Hover lights up the text; the active
@@ -5161,7 +5178,14 @@
      two-things-answering-one-question defect, applied to a navigation. -->
 <nav class="top-bar">
   <div class="top-bar-left">
-    <span>Scout</span>
+    <!-- ⚠ THE LOGO IS THE WORDMARK (Justin, 2026-09-02) — the same image the
+         login screen and the welcome overlay already carry. It REPLACES the
+         "Scout" text; a logo beside a text logo is two things answering one
+         question. Sized by HEIGHT so the bar's own height (51px) is unchanged:
+         22px CSS = 44 device px on retina, a 3.1× DOWNSCALE of the 138px
+         source, which is why it is sharp here while the login lockup is soft
+         at 2× — never upscale this asset. -->
+    <a href="/dashboard" class="brand-link" aria-label="Scout Systems — dashboard"><img class="brand-wordmark" src="/scout-wordmark.png" alt="Scout Systems" width="1038" height="138"></a>
   </div>
   <div class="top-bar-right">
     <!-- ⚠ Admin's visibility rule is UNTOUCHED: init() reveals it for role
