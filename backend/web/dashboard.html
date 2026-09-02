@@ -13600,10 +13600,13 @@
     state.navTeamOpen = true;
     var stale = document.getElementById('navTeamMenu'); if (stale) stale.remove();   // a re-open during the closing animation
     wrap.insertAdjacentHTML('beforeend', navTeamMenuHtml());
-    /* Open from 0fr: insert collapsed, then release on the next frame so the
-       transition has a start state to animate from. */
+    /* Open from 0fr: insert collapsed, FORCE a reflow so the 0fr start state is
+       computed, then release. ⚠ NOT requestAnimationFrame — verified live: the
+       double-rAF release never fired inside a frame, so the menu sat at 0fr
+       with the class still on and the card grew 4px. A forced reflow is
+       synchronous and cannot be throttled. */
     var fresh = document.getElementById('navTeamMenu');
-    if (fresh) { fresh.classList.add('is-collapsed'); requestAnimationFrame(function () { requestAnimationFrame(function () { fresh.classList.remove('is-collapsed'); }); }); }
+    if (fresh) { fresh.classList.add('is-collapsed'); void fresh.offsetHeight; fresh.classList.remove('is-collapsed'); }
     var a = document.getElementById('navTeam');
     if (a) a.setAttribute('aria-expanded', 'true');
     /* ⚠ ARMED ON OPEN AND REMOVED ON CLOSE. Armed at boot it runs for a control
