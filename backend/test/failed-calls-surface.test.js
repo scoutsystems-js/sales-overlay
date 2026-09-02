@@ -25,7 +25,7 @@ const RLIVE = stripComments(ROUTE);
 test('the two counts render where the ungraded count already is', () => {
   assert.match(LIVE, /oc\.failed_retryable/, 'retryable count must render');
   assert.match(LIVE, /oc\.failed_permanent/, 'permanent count must render');
-  const at = LIVE.indexOf('not graded yet — in neither group');
+  const at = LIVE.indexOf("not graded yet — ' + (gradeAllowed()");   // the line branches on the role since 2026-09-02
   assert.ok(at !== -1, 'stale anchor: the ungraded note moved');
   const after = LIVE.slice(at, at + 900);
   assert.match(after, /failed_retryable/, 'the failed counts belong beside the ungraded one, not elsewhere');

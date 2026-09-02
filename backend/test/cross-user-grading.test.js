@@ -60,9 +60,9 @@ test('⚠ ADMIN-ONLY — a rep must not grade a peer, and since 2026-09-02 neith
      (spend on someone else's account). test/reanalyse-admin-only.test.js drives
      the real handler; this keeps the source-level pin. */
   const src = route("router.post('/update-analyses/:user_id'");
-  assert.ok(/role !== 'owner'/.test(src), 'everyone but an owner refused');
+  assert.ok(/ownerOnlyGrading\(req, res\)/.test(src), 'everyone but an owner refused — through the one gate (2026-09-02)');
   assert.ok(!/role !== 'manager'/.test(src), 'no manager grant');
-  assert.ok(/403/.test(src));
+  assert.ok(/403/.test(FATHOM.slice(FATHOM.indexOf('function ownerOnlyGrading'), FATHOM.indexOf('function ownerOnlyGrading') + 500)), 'the gate answers 403');
 });
 
 test('⚠⚠ THE BOUNDARY IS NOW THE ROLE ITSELF — no dead team check left behind (converted 2026-09-02)', () => {
@@ -71,22 +71,27 @@ test('⚠⚠ THE BOUNDARY IS NOW THE ROLE ITSELF — no dead team check left beh
      with the grant. An owner is unrestricted, as before. */
   const src = route("router.post('/update-analyses/:user_id'");
   assert.ok(!/managed_by !== req\.user\.id/.test(src), 'the team lookup is gone with the manager grant');
-  assert.ok(/role !== 'owner'/.test(src), 'an owner is unrestricted');
+  assert.ok(/ownerOnlyGrading\(req, res\)/.test(src), 'an owner is unrestricted; everyone else is refused by the one gate');
 });
 
-test('⚠⚠ ALL-TIME STAYS OWNER-ONLY, AND ON THE ACTOR\'S ROLE — no second cap', () => {
+test('⚠⚠ ALL-TIME IS OWNER-ONLY BECAUSE EVERYTHING IS — the cap inside the runner is gone, not dead (converted 2026-09-02)', () => {
+  /* Since 2026-09-02 every route that reaches runUpdateAnalyses gates on owner
+     first, so a role cap inside the runner could never fire. A dead check is a
+     promise the code does not keep; it was removed. The property survives one
+     level up: no non-owner reaches the runner with ANY scope. */
   const src = route('async function runUpdateAnalyses');
-  assert.ok(/scopeAsked === 'all' && actorRole !== 'owner'/.test(src),
-    'it must key on the SIGNED-IN role, or a manager inherits an owner rep\'s allowance');
-  // The cap is reused, never duplicated. Two caps that disagree is the same
-  // defect class as two panels answering about different populations.
-  assert.strictEqual((FATHOM.match(/max_scope/g) || []).length, 1, 'exactly one cap definition');
+  assert.ok(!/scopeAsked === 'all'/.test(src) && !/actorRole/.test(src), 'no second cap inside the runner');
+  assert.strictEqual((FATHOM.match(/max_scope/g) || []).length, 0, 'no cap definition left behind');
+  assert.ok(/ownerOnlyGrading\(req, res\)/.test(route("router.post('/update-analyses', requireAuth")), 'the self route gates first');
+  assert.ok(/ownerOnlyGrading\(req, res\)/.test(route("router.post('/update-analyses/:user_id'")), 'the cross-user route gates first');
 });
 
 test('⚠ FAIL CLOSED — requireAuth fails OPEN, so an undefined role must refuse', () => {
   const src = route("router.post('/update-analyses/:user_id'");
   /* Converted 2026-09-02 with the admin-only ruling: the positive check is now `!== 'owner'`. */
-  assert.ok(/role !== 'owner'/.test(src),
+  assert.ok(/ownerOnlyGrading\(req, res\)/.test(src), 'refused through the one gate');
+  const gate = FATHOM.slice(FATHOM.indexOf('function ownerOnlyGrading'), FATHOM.indexOf('function ownerOnlyGrading') + 500);
+  assert.ok(/=== 'owner'/.test(gate),
     'a positive check refuses on undefined; a negative one would grant');
 });
 
@@ -110,7 +115,7 @@ test('⚠ THE CONTROL RENDERS ON A PIVOT ONLY FOR OWNERS (converted 2026-09-02);
   const at = LIVE.indexOf('function canGradeViewedUser');
   assert.ok(at !== -1, 'stale anchor');
   const src = LIVE.slice(at, LIVE.indexOf('\n  }', at));
-  assert.ok(/isSelf\(\)/.test(src) && /owner/.test(src) && !/manager/.test(src));
+  assert.ok(!/isSelf/.test(src) && /owner/.test(src) && !/manager/.test(src), 'owner only — self is no longer a reason (2026-09-02)');
   assert.ok(/canGradeViewedUser\(\) && gradeBacklogWorkCount\(\) > 0/.test(LIVE),
     'and the render gate must use it');
 });

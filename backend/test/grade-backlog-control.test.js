@@ -43,6 +43,7 @@ function fnSource(name, endMarker, minLen) {
 /** Run the extracted control against a fake state. */
 function control(role, over) {
   const src = [
+    fnSource('gradeAllowed', '\n  function gradingHandledByText', 40),   // owner-only gate, 2026-09-02
     fnSource('gradeAllTimeAllowed', '\n  function gradeBacklogWorkCount', 80),
     fnSource('gradeBacklogWorkCount', '\n  function gradeCostText', 100),
     fnSource('gradeCostText', '\n  function gradeScopeLabel', 60),
@@ -77,23 +78,22 @@ function control(role, over) {
   return g(state, (x) => String(x), () => true, () => 'this rep');
 }
 
-test('a non-owner is NOT offered all time; an owner is', () => {
+test('a non-owner is offered NOTHING; an owner is offered every window (converted 2026-09-02)', () => {
+  /* Was: everyone gets 7d/30d, only an owner all-time. Since 2026-09-02 every
+     grading act is owner-only, so a non-owner gets no control at all. */
   const user = control('user');
   const mgr = control('manager');
   const owner = control('owner');
-  assert.ok(!/value="all"/.test(user), 'a plain user must not see the all-time option');
-  assert.ok(!/value="all"/.test(mgr), 'a MANAGER must not see it — the trial account is a manager');
-  assert.ok(/value="all"/.test(owner), 'an owner must see it');
-  // every role still gets the two uncapped windows
-  [user, mgr, owner].forEach((h) => {
-    assert.ok(/value="7d"/.test(h) && /value="30d"/.test(h), '7d and 30d are available to everyone');
-  });
+  assert.strictEqual(user, '', 'a plain user gets no grading control');
+  assert.strictEqual(mgr, '', 'a MANAGER gets none — the trial account is a manager');
+  assert.ok(/value="7d"/.test(owner) && /value="30d"/.test(owner) && /value="all"/.test(owner), 'an owner keeps every window');
 });
 
-test('a capped user is TOLD WHY, not just given fewer options', () => {
-  const user = control('user');
-  assert.match(user, /limited to admins/i, 'fewer options with no reason reads as broken');
-  assert.ok(!/limited to admins/i.test(control('owner')), 'an owner needs no cap note');
+test('a user with no control is TOLD WHO grades — on the count line, not a cap note (converted 2026-09-02)', () => {
+  const live = stripComments(HTML);
+  assert.ok(!/grade-cap-note/.test(live), 'the cap note is gone with the control it explained');
+  assert.ok(!/limited to admins/i.test(control('owner')), 'an owner needs no note');
+  assert.ok((live.match(/gradingHandledByText\(\)/g) || []).length >= 3, 'the Calls line, the Connections row and the Get Started step all say who handles grading');
 });
 
 test('EXACTLY ONE option list — neither render site inlines its own', () => {

@@ -706,6 +706,9 @@ router.post('/sync-all', async function(req, res) {
 // IIFE pattern as /sync so the caller never waits.
 router.post('/reanalyze', requireAuth, async function(req, res) {
   var userId = req.user.id;
+  /* ⚠ OWNER-ONLY (2026-09-02). No live control reaches this route — its button
+     lives in the archived Fathom strip — but a route is a capability. */
+  if (ownerOnlyGrading(req, res)) return;
   try {
     var admin = getAdminClient();
 
@@ -839,39 +842,29 @@ function callIdsToAnalyze(newRows, lastSyncAt, cap) {
 
    ⚠ `actorRole` is the SIGNED-IN user's role, never the target's. All-time is
    owner-only, and a manager must not inherit an owner rep's allowance. */
-async function runUpdateAnalyses(req, res, userId, actorRole) {
+/* ⚠⚠ EVERY GRADING ACT IS OWNER-ONLY (Justin, 2026-09-02): "no I DON'T want
+   closers or anyone but admins be able to touch reanalyze." This overrules the
+   block before, which had kept a rep's own grading as a different act — it is
+   not a different act to him. Self-serve, cross-user, reanalyze, every window:
+   one gate, called first at every route, before any lookup (pricing a run you
+   may not start is not a loophole worth leaving). Server-side, because a
+   hidden button is a suggestion and this one spends money.
+   ⚠ FAIL CLOSED: requireAuth fails OPEN on a DB blip and leaves the role
+   undefined — undefined is not 'owner', so a missing role refuses exactly as a
+   wrong one does. The refusal names who can, so the client says the same. */
+function ownerOnlyGrading(req, res) {
+  if (req.userProfileRole === 'owner') return false;
+  console.warn('[fathom] grading refused: actor=%s role=%s path=%s', req.user && req.user.id, req.userProfileRole, req.path);
+  res.status(403).json({ error: 'Grading is limited to admins.' });
+  return true;
+}
+async function runUpdateAnalyses(req, res, userId) {
 
-  /* ⚠⚠ ALL-TIME IS OWNER-ONLY (Justin's ruling 2026-08-25, reason: API cost).
-     "just for Josh he has the ability to go back all time but everyone else
-     moving forward only gets 30 days."
-
-     ROLE answers this — there is no per-user flag and one must not be invented.
-     `owner` is this codebase's platform-admin role (the Admin nav is owner-only
-     for the same reason). ⚠ The check is POSITIVELY `=== 'owner'`, not
-     `!== 'user'`: measured on live data the trial account this ruling caps is a
-     `manager`, so a negative phrasing would have handed it exactly what it may
-     not have.
-
-     ⚠ FAIL CLOSED. requireAuth stamps req.userProfileRole from user_profiles and
-     FAILS OPEN on a DB error, leaving it undefined. Undefined is not 'owner', so
-     a blip refuses all-time rather than granting it — the safe direction when the
-     thing being gated is spend.
-
-     ⚠ REFUSE, NEVER TRUNCATE. Answering an all-time request with 30 days would
-     spend less than asked and report success, leaving the user believing their
-     whole history was graded.
-
-     ⚠ THIS RUNS BEFORE ANY LOOKUP, including dry_run — pricing a window you may
-     not run is not a loophole worth leaving, and it means the refusal costs no
-     database work. */
-  var scopeAsked = (req.body && typeof req.body.scope === 'string') ? req.body.scope : null;
-  if (scopeAsked === 'all' && actorRole !== 'owner') {
-    return res.status(403).json({
-      error: 'All-time grading is limited to admins. Choose the last 7 or 30 days.',
-      max_scope: '30d',
-    });
-  }
-
+  /* ⚠ The all-time cap that lived here (owner-only, 2026-08-25) is now
+     enforced by ownerOnlyGrading at EVERY route that reaches this runner —
+     since 2026-09-02 no non-owner can call it with any scope, so a role check
+     inside it could never fire. A dead check is a promise the code does not
+     keep; it was removed, not left as decoration. */
   try {
     var admin = getAdminClient();
     var worker = require('../lib/analysis-worker');
@@ -1065,7 +1058,9 @@ async function runUpdateAnalyses(req, res, userId, actorRole) {
 // Self-serve: grades YOUR OWN calls. Unchanged — it has never been able to
 // name another user and still cannot.
 router.post('/update-analyses', requireAuth, async function(req, res) {
-  return runUpdateAnalyses(req, res, req.user.id, req.userProfileRole);
+  /* ⚠ OWNER-ONLY since 2026-09-02 — a rep no longer grades their own calls. */
+  if (ownerOnlyGrading(req, res)) return;
+  return runUpdateAnalyses(req, res, req.user.id);
 });
 
 /* ── POST /fathom/update-analyses/:user_id ───────────────────────────────────
@@ -1110,12 +1105,9 @@ router.post('/update-analyses/:user_id', requireAuth, async function(req, res) {
      can, so the client can say the same thing.
      ⚠ FAIL CLOSED. requireAuth fails OPEN on a DB error, leaving the role
      undefined — which is not 'owner', so a blip refuses rather than grants. */
-  if (role !== 'owner') {
-    console.warn('[fathom] update-analyses scope violation: actor=%s (role=%s) target=%s', req.user.id, role, target);
-    return res.status(403).json({ error: 'Grading another user\'s calls is limited to admins. Ask an admin, or they can grade their own calls from their Calls page.' });
-  }
-
-  return runUpdateAnalyses(req, res, target, role);
+  if (ownerOnlyGrading(req, res)) return;
+  void role;
+  return runUpdateAnalyses(req, res, target);
 });
 
 // ── GET /fathom/identity-options ──────────────────────────────────────────────

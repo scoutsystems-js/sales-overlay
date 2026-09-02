@@ -48,32 +48,23 @@ test('⚠ AN OWNER PASSES THE GATE (whatever happens next is not the gate)', asy
   assert.notStrictEqual(r.code, 403, 'an owner must not be refused by the role gate: ' + JSON.stringify(r));
 });
 
-test('⚠⚠ THE MATRIX, PINNED: self-serve any user · cross-user owner only · all-time owner only', () => {
+test('⚠⚠ THE MATRIX IS ONE ROW (2026-09-02): every grading act, every window, every user — owner only', () => {
   const at = FATHOM.indexOf("router.post('/update-analyses/:user_id'");
   const cross = FATHOM.slice(at, FATHOM.indexOf('\n});', at));
-  assert.ok(/role !== 'owner'/.test(cross), 'cross-user: owner only');
-  assert.ok(!/role !== 'manager'/.test(cross), 'no manager grant remains');
-  assert.ok(!/managed_by/.test(cross), 'no team boundary is needed once only owners pass — a dead check is a false promise');
+  assert.ok(/ownerOnlyGrading\(req, res\)/.test(cross), 'cross-user: the one gate');
+  assert.ok(!/managed_by/.test(cross), 'no team boundary — a dead check is a promise the code does not keep');
   const selfAt = FATHOM.indexOf("router.post('/update-analyses', requireAuth");
   const self = FATHOM.slice(selfAt, FATHOM.indexOf('\n});', selfAt));
-  assert.ok(/runUpdateAnalyses\(req, res, req\.user\.id/.test(self), 'self-serve untouched: any authenticated user, own calls');
-  assert.ok(!/role/.test(self), 'self-serve has no role gate of its own');
-  assert.ok(/scopeAsked === 'all' && actorRole !== 'owner'/.test(FATHOM), 'all-time owner only, on the actor\'s role, inside the shared runner');
+  assert.ok(/ownerOnlyGrading\(req, res\)/.test(self), 'self-serve: the same gate — a rep no longer grades their own');
+  assert.ok(/runUpdateAnalyses\(req, res, req\.user\.id\)/.test(self), 'and it still names only the caller');
+  assert.ok(!/scopeAsked === 'all'/.test(FATHOM), 'the all-time cap inside the runner is gone — every caller is already an owner');
 });
 
-test('⚠⚠ WHAT A MANAGER SEES: the control is gone AND the page says why and what to do', () => {
+test('⚠⚠ WHAT EVERYONE BUT AN OWNER SEES: no control, and the line that names the backlog says who handles it', () => {
   const gate = fnBody(LIVE, 'canGradeViewedUser');
-  assert.ok(/isSelf\(\)/.test(gate) && /=== 'owner'/.test(gate) && !/manager/.test(gate), 'on a pivot only an owner gets the control');
+  assert.ok(/=== 'owner'/.test(gate) && !/manager/.test(gate) && !/isSelf/.test(gate), 'owner only, self or pivot');
   const site = LIVE.slice(LIVE.indexOf('var gradeHost ='), LIVE.indexOf('var outcomeControl ='));
-  assert.ok(/gradeAdminOnlyNoteHtml\(\)/.test(site), 'the site renders the note where the control was');
-  const src = fnBody(LIVE, 'gradeAdminOnlyNoteHtml') + '\nreturn gradeAdminOnlyNoteHtml;';
-  const mk = (self, role, work) => new Function('isSelf', 'state', 'gradeBacklogWorkCount', 'viewedUserLabel', 'escapeHtml', src)(
-    () => self, { me: { role: role } }, () => work, () => 'Godwin Ona', (s) => String(s));
-  const note = mk(false, 'manager', 95)();
-  assert.ok(/admin/i.test(note), 'says it is an admin action: ' + note);
-  assert.ok(/Godwin Ona/.test(note) && /own Calls page/i.test(note), 'names the route that still exists — the rep grades their own');
-  assert.ok(!/95/.test(note), 'does not restate a count the line already carries');
-  assert.strictEqual(mk(true, 'manager', 95)(), '', 'nothing on self — the self-serve control is there');
-  assert.strictEqual(mk(false, 'owner', 95)(), '', 'nothing for an owner — they have the control');
-  assert.strictEqual(mk(false, 'manager', 0)(), '', 'nothing when there is no backlog to speak of');
+  assert.ok(/: ''/.test(site) && !/gradeAdminOnlyNoteHtml/.test(site), 'no host and no separate note — the sentence rides on the count line');
+  const text = new Function(fnBody(LIVE, 'gradingHandledByText') + '\nreturn gradingHandledByText();')();
+  assert.ok(/handled by an admin/i.test(text), 'the sentence: ' + text);
 });

@@ -3337,7 +3337,6 @@
        Account -> Connections; both mount it inside `.grade-backlog-host`. */
     .grade-wrap { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .grade-select { font-size: 12px; }
-    .grade-cap-note { font-size: 11px; color: var(--text); opacity: 0.85; }
     .grade-confirm {
       display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
       background: var(--bg-elevated); border: 1px solid var(--border-strong);
@@ -6621,6 +6620,16 @@
      gate in routes/fathom.js. ⚠ POSITIVELY `=== 'owner'`: the trial account this
      ruling caps is a `manager` on live data, so `!== 'user'` would grant it.
      Hiding the option is NOT the restriction — the server is. */
+  /* ⚠⚠ EVERY GRADING ACT IS OWNER-ONLY (Justin, 2026-09-02): "no I DON'T want
+     closers or anyone but admins be able to touch reanalyze." The control
+     comes off the page for everyone else — a rep's OWN Calls page included —
+     and the line that names the backlog says who handles it. Mirrors the
+     server gate (ownerOnlyGrading); the server is the enforcement. */
+  function gradeAllowed() { return !!(state.me && state.me.role === 'owner'); }
+  /* ⚠ THE STATE SAYS SO. A count of undone work with no button and no
+     statement of who can is the worst version of a missing control. One
+     sentence, one place, three sites (Calls line, Connections row, Get Started). */
+  function gradingHandledByText() { return 'grading is handled by an admin'; }
   function gradeAllTimeAllowed() { return !!(state.me && state.me.role === 'owner'); }
 
   /* ONE source for the option list. Both render sites use it. */
@@ -6713,6 +6722,7 @@
   }
 
   function gradeBacklogControlHtml() {
+    if (!gradeAllowed()) return '';          // owner-only, 2026-09-02 — nothing to draw for anyone else
     var work = gradeBacklogWorkCount();
     /* ⚠ BEFORE reading state.gradeRun — this is what stops the button being
        offered while a run is live. */
@@ -6782,13 +6792,11 @@
 
     /* ⚠ A CAPPED USER MUST SEE WHY. "Last 30 days" with no explanation reads as
        broken rather than as a rule. */
-    var cap = gradeAllTimeAllowed() ? ''
-      : '<span class="grade-cap-note">Grading further back than 30 days is limited to admins.</span>';
     return '<span class="grade-wrap">'
       + '<select class="role-select grade-select" aria-label="Grade ungraded calls from"'
         + ' onchange="if(this.value){var v=this.value;this.selectedIndex=0;gradeBacklogAsk(v);}">'
         + gradeScopeOptionsHtml()
-      + '</select>' + cap + '</span>';
+      + '</select></span>';
   }
 
   /* ⚠ REPAINT ONLY THE CONTROL, NOT THE PAGE. The poll runs every 15s, and a
@@ -7022,21 +7030,8 @@
      server gate on POST /fathom/update-analyses/:user_id, which is the
      enforcement; this only decides what to draw. */
   function canGradeViewedUser() {
-    if (isSelf()) return true;
     var r = state.me && state.me.role;
-    return r === 'owner';
-  }
-  /* ⚠ A CONTROL THAT DISAPPEARS WITH NO EXPLANATION IS THE STATE-MUST-SAY-SO
-     RULE BROKEN — and this is the gap the August ruling was built to close.
-     Where the control was, the page says what to do: ask an admin, or the rep
-     grades their own calls (the self-serve route, unchanged). ⚠ No count here:
-     the line above already carries "N not graded yet". */
-  function gradeAdminOnlyNoteHtml() {
-    if (isSelf()) return '';
-    if (state.me && state.me.role === 'owner') return '';
-    if (gradeBacklogWorkCount() <= 0) return '';
-    return '<span class="calls-outcome-note grade-admin-note">Grading another closer\u2019s calls is limited to admins \u2014 ask an admin, or '
-      + escapeHtml(viewedUserLabel() || 'they') + ' can grade them from their own Calls page.</span>';
+    return r === 'owner';                    // self or pivot — owner only (2026-09-02)
   }
 
   async function gradeBacklogAsk(scope) {
@@ -8154,9 +8149,11 @@
            this sentence lived on the Calls page and was removed in the same pass;
            this one survived the first sweep because it is worded differently. */
         blGraded + ' of your ' + blTotal + ' calls are graded. The other ' + blWaiting
-          + ' are waiting — grade them whenever you\'re ready.',
-        '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="goCallLibrary()">'
-          + 'Grade the other ' + blWaiting + ' →</button>');
+          + (gradeAllowed() ? ' are waiting — grade them whenever you\'re ready.' : ' are waiting — ' + gradingHandledByText() + '.'),
+        gradeAllowed()
+          ? '<button class="btn-fathom-primary" type="button" style="margin-top:10px;" onclick="goCallLibrary()">'
+            + 'Grade the other ' + blWaiting + ' →</button>'
+          : '');
     } else if (fathomConnected) {
       s2 = state.fathomSyncing
         ? stepHtml(false, 'Get your calls graded', 'Syncing your calls now — this usually takes a few minutes. Your grades appear up top as each one finishes.', '')
@@ -15581,8 +15578,8 @@
        two would come to offer different windows. */
     return '<div class="eod-row conn-row"><div class="eod-label">UNGRADED</div>'
       + '<div class="conn-right">'
-        + '<span class="conn-state">' + work + ' call' + (work === 1 ? '' : 's') + ' not graded yet</span>'
-        + '<span class="grade-backlog-host">' + gradeBacklogControlHtml() + '</span>'
+        + '<span class="conn-state">' + work + ' call' + (work === 1 ? '' : 's') + ' not graded yet' + (gradeAllowed() ? '' : ' \u00b7 ' + gradingHandledByText()) + '</span>'
+        + (gradeAllowed() ? '<span class="grade-backlog-host">' + gradeBacklogControlHtml() + '</span>' : '')
       + '</div></div>';
   }
 
@@ -17893,13 +17890,13 @@
        a manager sees the note instead — never a control that silently vanished. */
     var gradeHost = (canGradeViewedUser() && gradeBacklogWorkCount() > 0)
       ? '<span class="grade-backlog-host">' + gradeBacklogControlHtml() + '</span>'
-      : gradeAdminOnlyNoteHtml();
+      : '';
     var outcomeControl = '<div class="calls-outcome">'
       + outBtn('closed', 'Closed', oc.closed)
       + outBtn('not_closed', 'Not Closed', oc.not_closed)
       + (f ? '<button class="calls-outcome-clear" type="button" onclick="clearCallsFilter()">Clear</button>' : '')
       + (typeof oc.ungraded === 'number' && oc.ungraded > 0
-          ? '<span class="calls-outcome-note">' + oc.ungraded + ' not graded yet — in neither group</span>' : '')
+          ? '<span class="calls-outcome-note">' + oc.ungraded + ' not graded yet — ' + (gradeAllowed() ? 'in neither group' : gradingHandledByText()) + '</span>' : '')
       /* ⚠⚠ FAILED CALLS WERE INVISIBLE HERE. They are not 'done', so they were in
          no count at all — the only way to know a call had failed was to open it
          and see the red banner. ⚠ SPLIT IN TWO, because they mean different

@@ -93,12 +93,16 @@ test('an OWNER asking for all-time is not refused by the role check', async () =
   assert.notStrictEqual(r.status, 403, 'an owner must pass the all-time gate');
 });
 
-test('a plain user asking for 30d is not refused — only all-time is capped', async () => {
+test('a plain user asking for 30d is REFUSED too — every grading act is owner-only (converted 2026-09-02)', async () => {
+  /* Justin: "no I DON'T want closers or anyone but admins be able to touch
+     reanalyze." The window no longer matters; the role does. */
   const r = await callAs('user', { scope: '30d', dry_run: true });
-  assert.notStrictEqual(r.status, 403, '30d must remain available to everyone');
+  assert.strictEqual(r.status, 403, 'a rep must be refused for any window');
+  assert.match(String(r.body && r.body.error), /admin/i);
 });
 
-test('a plain user asking for 7d is not refused', async () => {
-  const r = await callAs('user', { scope: '7d', dry_run: true });
-  assert.notStrictEqual(r.status, 403, '7d must remain available to everyone');
+test('a plain user asking for 7d is REFUSED too; an owner asking for 7d is not refused by the role check (converted 2026-09-02)', async () => {
+  assert.strictEqual((await callAs('user', { scope: '7d', dry_run: true })).status, 403);
+  assert.strictEqual((await callAs('manager', { scope: '7d', dry_run: true })).status, 403);
+  assert.notStrictEqual((await callAs('owner', { scope: '7d', dry_run: true })).status, 403);
 });

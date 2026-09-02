@@ -81,6 +81,8 @@ test('labels are Title Case and counts render with raw numbers', () => {
   assert.ok(/>Closed</.test(LIVE) || /'Closed'/.test(LIVE));
   assert.ok(/'Not Closed'/.test(LIVE));
   assert.ok(/calls-outcome-n/.test(LIVE), 'each option shows its own count');
-  assert.ok(/not graded yet — in neither group/.test(LIVE),
-    'the ungraded count must be stated, not hidden');
+  /* The line branches on the role since 2026-09-02: an owner reads "in neither
+     group" beside the control; everyone else reads who handles grading. */
+  assert.ok(/not graded yet — ' \+ \(gradeAllowed\(\) \? 'in neither group' : gradingHandledByText\(\)\)/.test(LIVE),
+    'the ungraded count must be stated, not hidden — and say who handles it');
 });
