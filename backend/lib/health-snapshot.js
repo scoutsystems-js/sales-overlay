@@ -43,8 +43,10 @@ function visibleState(o) {
        arrive, so a large import legitimately leaves most calls ungraded — and
        until 2026-08-26 the setup card removed itself after ONE graded call and
        said "your recent calls are graded". */
+    /* ⚠ Grading is OWNER-ONLY since 2026-09-02: the count is shown to everyone,
+       the control only to an owner. */
     out.push(o.waiting + ' are waiting. They see this on the Calls page and in '
-      + 'Account -> Connections, with a control to grade them.');
+      + 'Account -> Connections; grading is handled by an admin (owner-only since 2026-09-02).');
     if (o.first_sync_capped) {
       out.push('⚠ Their FIRST sync brought in ' + o.last_sync.inserted + ' calls and graded '
         + o.last_sync.analyzed + ' — the cap. The rest have always needed a manual run.');

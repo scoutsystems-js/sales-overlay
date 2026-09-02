@@ -5588,6 +5588,7 @@
        auto-harvest (313 auto vs 0 manual). A manager marking the standard is a
        correction mechanism, and there is no way to do it at all today. */
     savedMomentIds: {},
+    correctedMomentIds: {},   // highlight ids on the open call that carry a team coaching note (Fine Tune Coaching)
     selectedSection: null,     // 4a: which section the drilldown is showing
     sectionExpanded: {},       // which moment groups are expanded past the first 5
     sectionData: null,
@@ -16809,6 +16810,7 @@
         // Part 2b: moments harvested from call reviews. Deliberately NOT a
         // grader/synthesis category (ruling 1) — see lib/kb-entry.js.
         call_moment: 'Call moment',
+        coaching_correction: 'Team coaching notes',
       };
       var catBadge = (it.category && catLabels[it.category])
         ? '<span class="kb-badge kb-cat-' + escapeHtml(it.category) + '">' + escapeHtml(catLabels[it.category]) + '</span>'
@@ -16834,8 +16836,8 @@
       // to surface in a side panel.
       var viewBtn = '';
       var expandPanel = '';
-      if (it.category === 'learned_pattern' || it.category === 'call_moment') {
-        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">View Patterns</button>';
+      if (it.category === 'learned_pattern' || it.category === 'call_moment' || it.category === 'coaching_correction') {
+        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">' + (it.category === 'coaching_correction' ? 'View notes' : 'View Patterns') + '</button>';
         expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
       }
       // Promotion affordance (KB Part 2, sub-stage 2a). Manager/owner only — a
@@ -17097,6 +17099,18 @@
       // in metadata. Pre-feature uploads or any entry missing those fields
       // fall back to showing raw content text — keeps the panel useful
       // even on legacy data.
+      if (meta.category === 'coaching_correction') {
+        /* A team coaching note: the concept Scout keeps, and the manager's own
+           words beneath it \u2014 so a closer can see WHY Scout's advice changed. */
+        var who = kbCanManage() ? 'You wrote' : 'Your manager wrote';
+        parts.push('<div class="kb-pattern-card">'
+          + '<div class="kb-pattern-row"><span class="kb-pattern-text">' + escapeHtml(e.content || '') + '</span></div>'
+          + (meta.feedback && meta.feedback !== e.content ? '<div class="kb-pattern-row"><b>' + who + ':</b> <span class="kb-pattern-text">' + escapeHtml(meta.feedback) + '</span></div>' : '')
+          + (meta.concept ? '' : '<div class="kb-pattern-row"><span class="kb-pattern-text">Saved as written \u2014 Scout could not summarise it.</span></div>')
+          + '<div class="kb-pattern-row"><span class="kb-pattern-text">' + escapeHtml(relativeTime(e.created_at)) + '</span></div>'
+          + '</div>');
+        continue;
+      }
       if (meta.situation || meta.response || meta.outcome) {
         var typeRaw = String(meta.type || '');
         var typeLabel = typeRaw.replace(/_/g, ' ');
@@ -18182,6 +18196,7 @@
        request whose result nobody renders. Fire-and-forget: it re-renders when
        it lands, and every row is correctly "unsaved" until then. */
     if (canMarkStandard()) loadSavedMoments(callId);
+    if (canMarkStandard()) loadCorrectedMoments(callId);   // Fine Tune Coaching — which moments already carry a team note
   }
 
   /*
@@ -18763,6 +18778,72 @@
   /* Which moments are already in the KB. Fire-and-forget and fully degradable:
      on any failure every row renders as unsaved, and adding again is idempotent
      server-side anyway. */
+  async function loadCorrectedMoments(callId) {
+    try {
+      var res = await fetch('/kb/corrected-moments/' + encodeURIComponent(callId), { headers: authHeader() });
+      if (!res.ok) return;
+      var data = await res.json();
+      if (state.selectedCallId !== callId) return;
+      var map = {};
+      ((data && data.corrected_highlight_ids) || []).forEach(function (id) { map[id] = true; });
+      state.correctedMomentIds = map;
+      if (state.view === 'call-review') renderCallReview();
+    } catch (err) { /* "not yet noted" is the safe default */ }
+  }
+  function findReviewHighlight(id) {
+    var list = (state.callReview && (state.callReview.highlights || (state.callReview.analysis && state.callReview.analysis.highlights))) || [];
+    for (var i = 0; i < list.length; i++) if (list[i] && String(list[i].id) === String(id)) return list[i];
+    return null;
+  }
+  /* ⚠⚠ FINE TUNE COACHING (Justin, 2026-09-02) — Add-to-KB from the other end.
+     The manager says how their team would rather this were handled; Scout
+     extracts the concept; the manager SEES IT AND CONFIRMS before anything is
+     stored (their edit wins — a manager's words are never silently
+     reinterpreted); if Scout could not summarise it, their words are stored as
+     written and the page says so. Stored per TEAM in the knowledge base as
+     "Team coaching notes", which reps can read. The coaching lane reads it on
+     NEW calls; nothing already written is rewritten. */
+  async function fineTuneCoaching(highlightId, btn) {
+    if (!highlightId || !state.selectedCallId) return;
+    var h = findReviewHighlight(highlightId) || {};
+    var context = (h.quote ? 'Prospect: \u201c' + h.quote + '\u201d\n' : '')
+      + (h.coaching ? 'Scout coached: ' + h.coaching + '\n' : '')
+      + '\nHow would your team prefer this handled? Scout will learn the idea behind it and coach this team that way from now on.';
+    var feedback = await scoutPrompt({
+      title: 'Fine Tune Coaching', body: context, placeholder: 'e.g. Isolating the objection is right \u2014 don\u2019t coach them away from it',
+      inputLabel: 'How you would prefer it handled', confirmText: 'Continue', cancelText: 'Cancel',
+    });
+    if (feedback === null || !String(feedback).trim()) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Reading\u2026'; }
+    var reset = function () { if (btn) { btn.disabled = false; btn.textContent = 'Fine Tune Coaching'; } };
+    var first = null;
+    try {
+      var r1 = await fetch('/kb/fine-tune', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ fathom_call_id: state.selectedCallId, highlight_id: highlightId, feedback: feedback }) });
+      try { first = await r1.json(); } catch (e) {}
+      if (!r1.ok) { alert((first && first.error) || 'Could not read that.'); reset(); return; }
+    } catch (err) { alert('Could not reach the server.'); reset(); return; }
+    var failed = !first || first.extraction_failed || !first.concept;
+    var concept = await scoutPrompt({
+      title: failed ? 'Scout couldn\u2019t summarise that' : 'Scout understood it as',
+      body: failed
+        ? 'Your words will be saved exactly as written and used as this team\u2019s note. Edit them here if you like.'
+        : 'This is what Scout will learn for your team. Edit it if it isn\u2019t quite right \u2014 your wording wins.',
+      value: failed ? feedback : first.concept,
+      inputLabel: 'The note Scout will keep', confirmText: 'Save for my team', cancelText: 'Cancel',
+    });
+    if (concept === null) { reset(); return; }
+    try {
+      var r2 = await fetch('/kb/fine-tune', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ fathom_call_id: state.selectedCallId, highlight_id: highlightId, feedback: feedback, confirm: true,
+          concept: failed ? '' : String(concept).trim(), subject: first && first.subject, direction: first && first.direction,
+          objection_category: first && first.objection_category, extraction: first && first.extraction }) });
+      var d = null; try { d = await r2.json(); } catch (e) {}
+      if (!r2.ok) { alert((d && d.error) || 'Could not save that note.'); reset(); return; }
+      state.correctedMomentIds[highlightId] = true;
+      if (btn) { btn.className = 'review-kb-btn is-saved'; btn.textContent = d && d.duplicate ? 'Already noted \u2713' : 'Noted \u2713'; btn.title = 'Your team has a coaching note from this moment'; }
+    } catch (err) { alert('Could not reach the server.'); reset(); }
+  }
   async function loadSavedMoments(callId) {
     try {
       var res = await fetch('/kb/saved-moments/' + encodeURIComponent(callId), { headers: authHeader() });
@@ -18891,6 +18972,18 @@
     // ONLY moments the prospect raised against the deal are badged. A buying
     // signal or a rapport moment gets none — badging everything alike is what
     // made the removed panel feel cluttered.
+    /* FINE TUNE COACHING — the correction control, beside Add-to-KB, same gate
+       (manager and above), same row renderer. Surface \u2460 only (2026-09-02);
+       the team surfaces call this helper when they are wired. */
+    var ftBtn = '';
+    if (canMarkStandard() && h.id) {
+      var corrected = !!(state.correctedMomentIds && state.correctedMomentIds[h.id]);
+      ftBtn = corrected
+        ? '<button class="review-kb-btn is-saved" disabled title="Your team has a coaching note from this moment">Noted \u2713</button>'
+        : '<button class="review-kb-btn review-ft-btn" data-hid="' + escapeHtml(String(h.id)) + '"'
+          + ' onclick="fineTuneCoaching(this.getAttribute(\'data-hid\'), this)"'
+          + ' title="Tell Scout how your team would handle this \u2014 it learns the idea behind it">Fine Tune Coaching</button>';
+    }
     var handlingBadge = '';
     if (HANDLING_TYPES.indexOf(h.type) !== -1 && h.handling) {
       var hLabel = { addressed: 'Engaged with', deflected: 'Moved past', ignored: 'No response' }[h.handling];
@@ -18909,7 +19002,7 @@
     return '<div class="review-highlight">'
       + timeHtml
       + '<div class="review-highlight-body">'
-        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + handlingBadge + kbBtn + '</div>'
+        + '<div class="review-highlight-row1">' + speakerBadge + typeBadge + handlingBadge + kbBtn + ftBtn + '</div>'
         + '<div class="review-quote">' + escapeHtml(quote) + '</div>'
         + replyHtml
         + '<div class="review-observation">' + escapeHtml(observation) + '</div>'

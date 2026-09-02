@@ -2291,8 +2291,20 @@ async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNo
   if (!coachable.length) return { selected: 0, written: 0, skipped: 'no_coachable_moments' };
 
   var moments = coachable.map(coachingLib.toMoment);
+  /* ⚠⚠ FINE TUNE COACHING (2026-09-02): the team's own corrections join THIS
+     prompt and no other — the grader and the extractor above never load them
+     (substitution, not suppression). A read failure coaches without notes and
+     says so, rather than failing the whole pass. Numbered in the prompt so the
+     model can say which it applied; the numbers map back to row ids below. */
+  var corrections = { rows: [], text: '', hash: 'none' };
+  try {
+    var cc = require('./coaching-corrections');
+    corrections = await cc.loadCorrections(admin, await cc.teamKeyFor(admin, userId));
+  } catch (ccErr) {
+    console.warn('[coaching] call=%s manager notes unavailable (%s) \u2014 coaching without them', fathomCallId, (ccErr && ccErr.message) || 'unknown');
+  }
   var prompt = coachingLib.buildCoachingPrompt(moments, { outcome: outcome, later: later,
-    objectionNotes: objectionNotes || null });
+    objectionNotes: objectionNotes || null, managerNotes: corrections.text || null });
 
   var reply = await createWithUsage({
     model: coachingLib.CLAUDE_COACHING_MODEL,
@@ -2318,7 +2330,15 @@ async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNo
        timestamp of its own, the strip deleted the ONLY timestamp on the surface. The
        anchor now belongs to the CARD, rendered from timestamp_seconds, where neither
        a model nor a de-duplicator can remove it. */
-    var up = await admin.from('call_highlights').update({ coaching: entry.coaching.trim() }).eq('id', m.id);
+    var patch = { coaching: entry.coaching.trim() };
+    if (corrections.rows.length) {
+      /* The checkable field: WHICH notes shaped this coaching, as row ids. */
+      var applied = Array.isArray(entry.applied_manager_notes) ? entry.applied_manager_notes : [];
+      patch.coaching_applied_notes = applied
+        .map(function (n) { return (Number.isInteger(n) && n >= 1 && n <= corrections.rows.length) ? corrections.rows[n - 1].id : null; })
+        .filter(Boolean);
+    }
+    var up = await admin.from('call_highlights').update(patch).eq('id', m.id);
     if (!up.error) written++;
   }
   return { selected: moments.length, written: written, skipped: null };

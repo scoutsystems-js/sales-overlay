@@ -10,6 +10,7 @@ const {
   quoteHash, resolveEntryTarget, buildMomentRow, insertMoment,
 } = require('../lib/kb-entry');
 const { getVoyageEmbedding, getVoyageEmbeddings } = require('../lib/voyage');
+const corrections = require('../lib/coaching-corrections');
 
 var router = express.Router();
 
@@ -954,6 +955,89 @@ router.post('/from-highlight', protect, async function(req, res) {
 // Hashing happens server-side on purpose: the alternative — returning hashes and
 // having the browser recompute them — would mean a fifth mirrored copy of
 // normalizeQuote, exactly the duplication 2a spent its budget retiring.
+/* ── POST /kb/fine-tune ──────────────────────────────────────────────────────
+ * FINE TUNE COACHING (Justin, 2026-09-02). Managers and above, on a moment of a
+ * call they can see. Two steps, both here:
+ *   without `confirm`: read the moment, run ONE extraction call, return the
+ *     concept — STORE NOTHING. The manager sees it and approves or edits it.
+ *   with `confirm: true`: store the row per TEAM with the manager's wording
+ *     (their words win; a null concept stores the verbatim feedback), deduped
+ *     on the concept hash, embedded, joinable via metadata.given_on.
+ * The SAME scope checks as /from-highlight; the same KB table; a different
+ * category. Add-to-KB from the other end. */
+router.post('/fine-tune', protect, async function(req, res) {
+  var b = req.body || {};
+  var fathomCallId = b.fathom_call_id, highlightId = b.highlight_id;
+  var feedback = (typeof b.feedback === 'string') ? b.feedback.trim().slice(0, 1000) : '';
+  if (!fathomCallId || !highlightId || !feedback) return res.status(400).json({ error: 'fathom_call_id, highlight_id and feedback required' });
+  try {
+    var admin = getAdminClient();
+    var scope = await resolveUserScope(admin, req.user.id);
+    if (scope.role !== 'manager' && scope.role !== 'owner') return res.status(403).json({ error: 'Fine Tune Coaching is for managers and admins.' });
+    if (!scope.p_admin_id) return res.status(403).json({ error: 'You have no team to add this to.' });
+    var hl = await admin.from('call_highlights')
+      .select('id, fathom_call_id, user_id, type, section, quote, observation, closer_response, closer_response_verified, coaching')
+      .eq('id', highlightId).maybeSingle();
+    if (hl.error) { console.error('[kb] fine-tune read failed:', hl.error.message); return res.status(500).json({ error: 'Could not load that moment' }); }
+    if (!hl.data) return res.status(404).json({ error: 'Moment not found' });
+    if (hl.data.fathom_call_id !== fathomCallId) return res.status(400).json({ error: 'Moment does not belong to that call' });
+    var allowedOwners = await getVisibleUploaderIds(admin, req.user.id, scope.role);
+    if (allowedOwners !== null && allowedOwners.indexOf(hl.data.user_id) === -1) {
+      console.warn('[kb] fine-tune scope violation: actor=%s call_owner=%s', req.user.id, hl.data.user_id);
+      return res.status(403).json({ error: 'You do not have access to that call' });
+    }
+    var moment = Object.assign({}, hl.data, { closer_response: (hl.data.closer_response_verified === true) ? hl.data.closer_response : null });
+    if (!b.confirm) {
+      var x = await corrections.extractConcept({ feedback: feedback, moment: moment, coaching: hl.data.coaching || null, userId: req.user.id });
+      return res.json({ ok: true, stored: false, concept: x.concept, subject: x.subject, direction: x.direction,
+                        objection_category: x.objection_category, extraction_failed: !x.ok, extraction: x.usage || null });
+    }
+    var target = { scope: 'team', team_owner_id: scope.p_admin_id, uploaded_by: req.user.id };
+    var row = corrections.buildCorrectionRow({
+      target: target,
+      concept: (typeof b.concept === 'string' && b.concept.trim()) ? b.concept.trim().slice(0, 600) : null,
+      feedback: feedback,
+      subject: (typeof b.subject === 'string') ? b.subject.slice(0, 40) : null,
+      direction: (typeof b.direction === 'string') ? b.direction.slice(0, 20) : null,
+      objectionCategory: (typeof b.objection_category === 'string') ? b.objection_category.slice(0, 40) : null,
+      givenOn: { surface: 'call_review_moment', fathomCallId: fathomCallId, highlightId: hl.data.id, repUserId: hl.data.user_id,
+                 momentType: hl.data.type || null, section: sanitizeSectionValue(hl.data.section), coachingSnapshot: hl.data.coaching || null, quote: hl.data.quote || null },
+      addedBy: req.user.id,
+      extraction: (b.extraction && typeof b.extraction === 'object') ? b.extraction : null,
+    });
+    var existing = await admin.from('knowledge_base').select('id, metadata').eq('category', corrections.CATEGORY).eq('team_owner_id', target.team_owner_id);
+    if (!existing.error && (existing.data || []).some(function (r) { return r.metadata && r.metadata.concept_hash === row.metadata.concept_hash; })) {
+      return res.json({ ok: true, stored: false, duplicate: true });
+    }
+    row.embedding = await getVoyageEmbedding(row.content, 'fine-tune');
+    var ins = await admin.from('knowledge_base').insert(row);
+    if (ins.error) { console.error('[kb] fine-tune insert failed:', ins.error.message); return res.status(500).json({ error: 'Could not save that note' }); }
+    console.log('[kb] Coaching note added: actor=%s call=%s highlight=%s team=%s concept=%s', req.user.email, fathomCallId, hl.data.id, target.team_owner_id, row.metadata.concept ? 'yes' : 'verbatim');
+    return res.json({ ok: true, stored: true, duplicate: false, concept: row.metadata.concept, verbatim: !row.metadata.concept });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[kb] fine-tune error:', err.message);
+    return res.status(500).json({ error: 'Could not save that note' });
+  }
+});
+
+/* Which moments of a call already carry a team coaching note (button state). */
+router.get('/corrected-moments/:fathom_call_id', protect, async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var scope = await resolveUserScope(admin, req.user.id);
+    if (!scope.p_admin_id) return res.json({ corrected_highlight_ids: [] });
+    var q = await admin.from('knowledge_base').select('metadata')
+      .eq('category', corrections.CATEGORY).eq('team_owner_id', scope.p_admin_id).eq('source_fathom_call_id', req.params.fathom_call_id);
+    if (q.error) return res.status(500).json({ error: 'Could not load notes' });
+    var ids = (q.data || []).map(function (r) { return r.metadata && r.metadata.given_on && r.metadata.given_on.highlight_id; }).filter(Boolean);
+    return res.json({ corrected_highlight_ids: ids });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    return res.status(500).json({ error: 'Could not load notes' });
+  }
+});
+
 router.get('/saved-moments/:fathom_call_id', protect, async function(req, res) {
   var fathomCallId = req.params.fathom_call_id;
   if (!fathomCallId) return res.status(400).json({ error: 'fathom_call_id required' });
@@ -1122,6 +1206,8 @@ router.delete('/:source_label', manage, async function(req, res) {
 router.resolvePromotion = resolvePromotion;
 
 module.exports = router;
+/* Test seam — the same shape routes/me.js exposes; swaps the module-level admin. */
+module.exports._setAdminClientForTests = function (factory) { _admin = factory(); };
 
 /* Shared with routes/me.js's section library, so the caller-scope rule has ONE
    definition. A second copy would be free to drift from the visibility

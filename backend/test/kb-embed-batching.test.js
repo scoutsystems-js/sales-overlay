@@ -34,8 +34,11 @@ test('no per-item embed loop survives in kb.js', () => {
   const singles = CODE.split('\n')
     .map((l, i) => ({ l, i }))
     .filter(x => /await getVoyageEmbedding\(/.test(x.l));
-  assert.strictEqual(singles.length, 2,
-    'expected exactly two single-text embed calls (search query, manual add), found ' + singles.length);
+  /* 2 → 3 on 2026-09-02: Fine Tune Coaching stores ONE row per confirmed
+     correction (a single-text embed, like the manual add). The loop check
+     below is the property; the count is the inventory. */
+  assert.strictEqual(singles.length, 3,
+    'expected exactly three single-text embed calls (search query, manual add, fine-tune), found ' + singles.length);
 
   singles.forEach(x => {
     // look back 25 lines for a loop header enclosing this call
