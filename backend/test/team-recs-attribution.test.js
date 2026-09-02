@@ -35,7 +35,7 @@ function renderer() {
   /* Fixture, not product: the renderer now asks whether the viewer may fine-tune
      (2026-09-02). A real page has these; the harness supplies them. */
   const canMarkStandard = () => false;
-  const state = { correctedMomentIds: {} };
+  const state = { notedHighlightIds: {} };
   void canMarkStandard; void state;
   const displayNameFromEmail = (a) => (a === 'Joshua Pinner' ? 'Josh P' : a);
   const clipLabelFor = (s) => (s === 'zoom' ? 'Open Recording' : 'Clip');

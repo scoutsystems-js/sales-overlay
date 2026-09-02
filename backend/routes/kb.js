@@ -13,7 +13,7 @@ const { getVoyageEmbedding, getVoyageEmbeddings } = require('../lib/voyage');
 const corrections = require('../lib/coaching-corrections');
 /* Where a correction can be given. A closed set: a harvest that cannot tell a
    single-moment correction from one given on a team insight is built on prose. */
-const SURFACES = ['call_review_moment', 'team_coaching_insight'];
+const SURFACES = ['call_review_moment', 'team_coaching_insight', 'team_objections_why'];
 
 var router = express.Router();
 
@@ -1026,17 +1026,27 @@ router.post('/fine-tune', protect, async function(req, res) {
   }
 });
 
-/* Which moments of a call already carry a team coaching note (button state). */
-router.get('/corrected-moments/:fathom_call_id', protect, async function(req, res) {
+/* ── POST /kb/noted-moments ─────────────────────────────────────────────────
+ * Which of the moments on THIS PAGE already carry a team coaching note. ONE
+ * query per page, keyed on the highlight ids being rendered — never a query
+ * per moment. TEAM-scoped: a correction belongs to the team, so a second
+ * manager (and a rep) sees it as noted. This is what makes "Noted ✓" survive
+ * a reload; the per-call lookup it replaces was not kept beside it. */
+router.post('/noted-moments', protect, async function(req, res) {
+  var ids = (req.body && Array.isArray(req.body.highlight_ids)) ? req.body.highlight_ids.filter(function (x) { return typeof x === 'string' && x.length <= 64; }).slice(0, 200) : null;
+  if (!ids) return res.status(400).json({ error: 'highlight_ids required' });
+  if (!ids.length) return res.json({ noted_highlight_ids: [] });
   try {
     var admin = getAdminClient();
     var scope = await resolveUserScope(admin, req.user.id);
-    if (!scope.p_admin_id) return res.json({ corrected_highlight_ids: [] });
+    if (!scope.p_admin_id) return res.json({ noted_highlight_ids: [] });
     var q = await admin.from('knowledge_base').select('metadata')
-      .eq('category', corrections.CATEGORY).eq('team_owner_id', scope.p_admin_id).eq('source_fathom_call_id', req.params.fathom_call_id);
+      .eq('category', corrections.CATEGORY).eq('team_owner_id', scope.p_admin_id)
+      .in('metadata->given_on->>highlight_id', ids);
     if (q.error) return res.status(500).json({ error: 'Could not load notes' });
-    var ids = (q.data || []).map(function (r) { return r.metadata && r.metadata.given_on && r.metadata.given_on.highlight_id; }).filter(Boolean);
-    return res.json({ corrected_highlight_ids: ids });
+    var seen = {};
+    (q.data || []).forEach(function (r) { var h = r.metadata && r.metadata.given_on && r.metadata.given_on.highlight_id; if (h) seen[h] = true; });
+    return res.json({ noted_highlight_ids: ids.filter(function (id) { return seen[id]; }) });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     return res.status(500).json({ error: 'Could not load notes' });

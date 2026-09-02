@@ -18,6 +18,11 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html')
 const LIVE = stripComments(HTML);
 
 /* A chainable fake admin: rows per table, eq() filters, writes recorded. */
+function pathGet(row, col) {
+  const parts = String(col).split(/->>|->/); let v = row;
+  for (const p of parts) { if (v == null) return undefined; v = v[p]; }
+  return v;
+}
 function fakeAdmin(tables) {
   const writes = [];
   const admin = {
@@ -27,8 +32,9 @@ function fakeAdmin(tables) {
       const f = [];
       let pendingUpdate = null, pendingInsert = null;
       const chain = {
-        select() { return chain; }, order() { return chain; }, limit() { return chain; }, in() { return chain; },
-        eq(c, v) { f.push((r) => r[c] === v); return chain; },
+        select() { return chain; }, order() { return chain; }, limit() { return chain; },
+        in(c, vals) { f.push((r) => vals.indexOf(pathGet(r, c)) !== -1); return chain; },
+        eq(c, v) { f.push((r) => pathGet(r, c) === v); return chain; },
         update(patch) { pendingUpdate = patch; return chain; },
         insert(row) { pendingInsert = row; return chain; },
         maybeSingle() { const out = rows().filter((r) => f.every((p) => p(r))); return Promise.resolve({ data: out[0] || null, error: null }); },
@@ -241,7 +247,7 @@ test('⚠⚠ SURFACE ②: the SAME helper, called from the insight with surface 
   const row = fnBody(LIVE, 'highlightEntryHtml');
   assert.ok(/fineTuneFromRow\(/.test(row) || /fineTuneCoaching\(\{/.test(row), 'surface ① calls the same helper');
   const kb = stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'kb.js'), 'utf8'));
-  assert.ok(/SURFACES = \['call_review_moment', 'team_coaching_insight'\]/.test(kb), 'a closed set of surfaces on the server');
+  assert.ok(/SURFACES = \['call_review_moment', 'team_coaching_insight', 'team_objections_why'\]/.test(kb), 'a closed set of surfaces on the server (three since surface \u2462)');
   assert.ok(/surface: surface/.test(kb), 'given_on.surface is what the client said, validated');
 });
 
@@ -277,7 +283,7 @@ test('⚠⚠ EACH LANE\'S CACHE KEY MOVES WITH THE NOTES, and its version moved 
   const ts = laneSrc('team-synthesis.js');
   assert.ok(/\|\|notes:' \+ corr\.hash/.test(ts) && /RECS_LANE_VERSION = 'v7-/.test(ts), 'recommendations');
   const os = laneSrc('team-objection-summary.js');
-  assert.ok(/\|notes:' \+ corr\.hash/.test(os) && /PROMPT_VERSION = 'v12-/.test(os), 'objections Why');
+  assert.ok(/\|notes:' \+ corr\.hash/.test(os) && /PROMPT_VERSION = 'v1[3-9]-/.test(os), 'objections Why (v13: the payload gained the moment ids)');
   const ps = laneSrc('performance-synthesis.js');
   assert.ok(/\|\|notes:' \+ corr\.hash/.test(ps) && /SYNTH_RULE_VERSION = 'v4-/.test(ps), 'performance summary');
   const nw = laneSrc('team-needs-work.js');
@@ -313,4 +319,70 @@ test('⚠ JUSTIN, LIVE: a multi-line box tall enough to read a paragraph, and ON
   const L = 0.2126 * lin(accent.slice(1, 3)) + 0.7152 * lin(accent.slice(3, 5)) + 0.0722 * lin(accent.slice(5, 7));
   const ratio = (L + 0.05) / 0.05;
   assert.ok(ratio >= 7, 'black on ' + accent + ' must clear AAA (7:1), measured ' + ratio.toFixed(2));
+});
+
+
+/* ── FINISHING THE FEATURE (2026-09-02): "Noted ✓" survives a reload; surface ③ ── */
+test('⚠⚠ "Noted ✓" SURVIVES A RELOAD — one TEAM-scoped lookup per page, keyed on the ids on it, never a query per moment', async () => {
+  const kb = require('../routes/kb');
+  const rows = [
+    { id: 'k1', category: 'coaching_correction', team_owner_id: 'mgr', metadata: { given_on: { highlight_id: 'h1' } } },
+    { id: 'k2', category: 'coaching_correction', team_owner_id: 'other-team', metadata: { given_on: { highlight_id: 'h2' } } },
+    { id: 'k3', category: 'learned_pattern', team_owner_id: 'mgr', metadata: { given_on: { highlight_id: 'h3' } } },
+  ];
+  const tables = { knowledge_base: rows, user_profiles: [{ user_id: 'mgr', role: 'manager', managed_by: null }, { user_id: 'mgr2', role: 'manager', managed_by: null }, { user_id: 'rep', role: 'user', managed_by: 'mgr' }] };
+  let kbQueries = 0;
+  const admin = fakeAdmin(tables); const realFrom = admin.from.bind(admin);
+  admin.from = (t) => { if (t === 'knowledge_base') kbQueries++; return realFrom(t); };
+  kb._setAdminClientForTests(() => admin);
+  const l = kb.stack.find((x) => x.route && x.route.path === '/noted-moments');
+  assert.ok(l && l.route.methods.post, 'POST /kb/noted-moments exists');
+  const handler = l.route.stack[l.route.stack.length - 1].handle;
+  const call = (user, body) => new Promise((resolve) => { const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } }; Promise.resolve().then(() => handler({ user, body, headers: {} }, res)).catch((e) => resolve({ code: 'threw', body: { error: String(e && e.message) } })); });
+  const r = await call({ id: 'mgr' }, { highlight_ids: ['h1', 'h2', 'h3', 'h4'] });
+  assert.strictEqual(r.code, 200, JSON.stringify(r));
+  assert.deepStrictEqual(r.body.noted_highlight_ids, ['h1'], 'only this team\'s notes, only correction rows');
+  assert.strictEqual(kbQueries, 1, 'ONE query for the page, however many ids');
+  const rep = await call({ id: 'rep' }, { highlight_ids: ['h1'] });
+  assert.deepStrictEqual(rep.body.noted_highlight_ids, ['h1'], 'team-scoped, not per manager — a rep on the team sees it noted too');
+  assert.strictEqual((await call({ id: 'mgr' }, {})).code, 400, 'ids are required');
+  assert.ok(!kb.stack.some((x) => x.route && x.route.path === '/corrected-moments/:fathom_call_id'), 'the per-call lookup is replaced, not kept beside — two answers to one question');
+  // client
+  assert.strictEqual(LIVE.indexOf('correctedMomentIds'), -1, 'the per-call carrier is renamed, not aliased');
+  assert.ok(/notedHighlightIds:\s*\{\}/.test(LIVE), 'state.notedHighlightIds');
+  const loader = fnBody(LIVE, 'loadNotedMoments');
+  assert.ok(/\/kb\/noted-moments/.test(loader) && /highlight_ids/.test(loader), 'one POST with the ids on the page');
+  ['renderCallReview', 'renderTeamCoaching', 'renderTeamObjectionsView'].forEach((f) => assert.ok(/loadNotedMoments\(/.test(fnBody(LIVE, f)), f + ' asks once per render'));
+  ['highlightEntryHtml', 'teamInsightHtml', 'objSummaryCloserHtml'].forEach((f) => assert.ok(/notedHighlightIds/.test(fnBody(LIVE, f)), f + ' reads the page-level state'));
+});
+
+test('⚠⚠ SURFACE ③: the Why evidence carries its moment; the SAME helper; the closed set gains one value and refuses the rest', async () => {
+  const os = require('../lib/team-objection-summary');
+  const pm = os._publicMoment({ id: 'h9', fathom_call_id: 'c9', quote: 'q', timestamp_seconds: 10 });
+  assert.strictEqual(pm.highlight_id, 'h9'); assert.strictEqual(pm.fathom_call_id, 'c9');
+  assert.ok(/PROMPT_VERSION = 'v13-/.test(laneSrc('team-objection-summary.js')), 'a payload-shape change bumps the version in the key');
+  const card = fnBody(LIVE, 'objSummaryCloserHtml');
+  assert.ok(/fineTuneFromWhy\(/.test(card) && /canMarkStandard\(\)/.test(card) && /m\.highlight_id/.test(card), 'the control on each evidence moment, behind the gate, only when the moment is named');
+  const bridge = fnBody(LIVE, 'fineTuneFromWhy');
+  assert.ok(/fineTuneCoaching\(\{/.test(bridge) && /surface: 'team_objections_why'/.test(bridge), 'the one helper, with its surface');
+  assert.strictEqual((LIVE.match(/async function fineTuneCoaching\(/g) || []).length, 1, 'still one control, three callers');
+  const kbSrc = stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'kb.js'), 'utf8'));
+  assert.ok(/SURFACES = \['call_review_moment', 'team_coaching_insight', 'team_objections_why'\]/.test(kbSrc));
+  const kb = require('../routes/kb');
+  kb._setAdminClientForTests(() => fakeAdmin({ call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'mgr', role: 'manager', managed_by: null }, { user_id: 'rep', role: 'user', managed_by: 'mgr' }], knowledge_base: [] }));
+  const l = kb.stack.find((x) => x.route && x.route.path === '/fine-tune'); const handler = l.route.stack[l.route.stack.length - 1].handle;
+  const bad = await new Promise((resolve) => { const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } }; Promise.resolve().then(() => handler({ user: { id: 'mgr' }, body: { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'x', surface: 'somewhere_else' }, headers: {} }, res)).catch((e) => resolve({ code: 'threw' })); });
+  assert.strictEqual(bad.code, 400, 'an unknown surface is refused before any work');
+});
+
+test('⚠ the loop is sound, not circular: notes are written only by a confirmed manager action; the lanes only read them', () => {
+  const files = fs.readdirSync(path.join(__dirname, '..', 'lib')).filter((f) => f.endsWith('.js'));
+  files.forEach((f) => {
+    if (f === 'coaching-corrections.js') return;
+    const src = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', f), 'utf8'));
+    assert.ok(!/buildCorrectionRow\(/.test(src) && !/category: 'coaching_correction'/.test(src), f + ' must never write a note');
+  });
+  const kbSrc = stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'kb.js'), 'utf8'));
+  assert.strictEqual((kbSrc.match(/buildCorrectionRow\(/g) || []).length, 1, 'exactly one writer, behind confirm');
+  assert.ok(/if \(!b\.confirm\)/.test(kbSrc), 'and it is gated on the manager\'s confirmation');
 });

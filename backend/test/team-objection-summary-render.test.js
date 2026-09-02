@@ -96,6 +96,11 @@ test('⚠⚠ the summary is MOUNTED and KICKED by the real view function', () =>
 /* ── the four states must not converge on screen ──────────────────────────── */
 
 function renderCloser(c) {
+  /* Fixture, not product: the card now asks whether the viewer may fine-tune and
+     which moments are already noted (2026-09-02). A real page has these. */
+  const canMarkStandard = () => false;
+  const state = { notedHighlightIds: {} };
+  void canMarkStandard; void state;
   const src = slice('function objSummaryCloserHtml', '\n  }');
   const escapeHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[x]));
   const OBJ_DRILL_LABELS = { fear: 'Fear', logistical: 'Logistical', timing: 'Timing', partner: 'Partner / spouse', uncategorized: 'Uncategorised' };
@@ -104,8 +109,8 @@ function renderCloser(c) {
   assert.ok(stateSrc.length > 600, 'state-text slice must cover the helper AND the map: ' + stateSrc.length);
   const OBJ_SUMMARY_STATE_TEXT = new Function('OBJ_DRILL_LABELS', 'objectionLabel',
     stateSrc + '; return OBJ_SUMMARY_STATE_TEXT;')(OBJ_DRILL_LABELS, (c) => c);
-  const fn = new Function('escapeHtml', 'OBJ_DRILL_LABELS', 'OBJ_SUMMARY_STATE_TEXT', 'clipLabelFor',
-    src + '; return objSummaryCloserHtml;')(escapeHtml, OBJ_DRILL_LABELS, OBJ_SUMMARY_STATE_TEXT, () => 'Clip');
+  const fn = new Function('escapeHtml', 'OBJ_DRILL_LABELS', 'OBJ_SUMMARY_STATE_TEXT', 'clipLabelFor', 'canMarkStandard', 'state',
+    src + '; return objSummaryCloserHtml;')(escapeHtml, OBJ_DRILL_LABELS, OBJ_SUMMARY_STATE_TEXT, () => 'Clip', canMarkStandard, state);
   return fn(c);
 }
 

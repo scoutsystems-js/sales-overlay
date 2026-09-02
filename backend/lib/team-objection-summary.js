@@ -55,7 +55,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v12-2026-09-02-never-diminish-manager-notes';   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
+const PROMPT_VERSION = 'v13-2026-09-02-never-diminish-manager-notes-moment-ids';   /* payload shape: each evidence moment now carries highlight_id + fathom_call_id (Fine Tune Coaching surface ③) */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -695,6 +695,9 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
 /** Evidence as the client sees it — resolved from the DB row, never the model. */
 function publicMoment(m) {
   return {
+    /* FINE TUNE COACHING surface ③ (2026-09-02): the moment itself, so the control
+       can record what it was given on. Ids only — nothing else about the row. */
+    highlight_id: m.id || null, fathom_call_id: m.fathom_call_id || null,
     quote: str(m.quote, 300), closer_response: str(provenCloserResponse(m), 400),
     observation: str(m.observation, 300), clip_url: m.clip_url || null,
     source: m.source || null, call_date: m.call_date || null,
@@ -723,6 +726,7 @@ module.exports = {
   computeTeamObjectionSummary: computeTeamObjectionSummary,
   SYNTHESIS_TYPE: SYNTHESIS_TYPE,
   _PROMPT_VERSION: PROMPT_VERSION,
+  _publicMoment: publicMoment,
   _classifyCloser: classifyCloser,
   _focusOf: focusOf,
   _positionPct: positionPct,

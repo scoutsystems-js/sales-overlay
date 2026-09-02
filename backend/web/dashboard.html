@@ -5594,7 +5594,7 @@
        auto-harvest (313 auto vs 0 manual). A manager marking the standard is a
        correction mechanism, and there is no way to do it at all today. */
     savedMomentIds: {},
-    correctedMomentIds: {},   // highlight ids on the open call that carry a team coaching note (Fine Tune Coaching)
+    notedHighlightIds: {},   // highlight ids ON THIS PAGE that carry a team coaching note — one team-scoped lookup per page (Fine Tune Coaching)
     selectedSection: null,     // 4a: which section the drilldown is showing
     sectionExpanded: {},       // which moment groups are expanded past the first 5
     sectionData: null,
@@ -10544,6 +10544,7 @@
        markup. The lane itself stays — 13 other references across the objections
        drilldown and the coaching tile still use it. */
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
+    if (state.teamRecs && !state.teamRecs._error) loadNotedMoments(((state.teamRecs.working || []).concat(state.teamRecs.improve || [])).map(function (i) { return i && i.highlight_id; }));
     /* ⚠ COACHING LEADS WITH THE TEAM'S AVERAGE SCORE (ruled). Performance shows
        the RANKING; this shows the ONE number — different granularity, not a
        repeat. It is the figure the coaching on this page exists to move. */
@@ -10788,6 +10789,7 @@
        grid that failed does not start it — the Why panel says so instead. */
     var gridLanded = !!(state.teamObjections && !state.teamObjections._error);
     if (gridLanded && state.teamObjSummary === null && !state.teamObjSummaryLoading) loadTeamObjSummary();
+    if (state.teamObjSummary && state.teamObjSummary.closers) loadNotedMoments([].concat.apply([], state.teamObjSummary.closers.map(function (c) { return (c.evidence || []).map(function (m) { return m && m.highlight_id; }); })));
 
     /* ⚠⚠ READ THE SAVED REP FILTER HERE — this is the drilldown's equivalent of
        the read inside drawRepSeriesCharts, and it is required for the same
@@ -10960,7 +10962,7 @@
        can be checked against the grid above; the WHY is the reason the panel
        exists. If the why ever reads like a restatement of these numbers, the
        feature has failed and the prose is the thing to fix — not this line. */
-    var ev = (c.evidence || []).slice(0, 2).map(function (m) {
+    var ev = (c.evidence || []).slice(0, 2).map(function (m, evIdx) {
       /* ⚠⚠ A TIMESTAMP, NOT A PERCENTAGE. "57% through the call" is not a
          place in a conversation — a closer cannot go there, and every other
          surface in the product says 00:41:08. The raw-seconds defect in a new
@@ -10978,6 +10980,15 @@
         + '<div class="objsum-ev-quote">“' + escapeHtml(m.quote || '') + '”</div>'
         + (m.closer_response ? '<div class="objsum-ev-resp">You said: “' + escapeHtml(m.closer_response) + '”</div>' : '')
         + (clip ? '<div class="obj-footer" style="margin-top:6px;">' + clip + '</div>' : '')
+        /* FINE TUNE COACHING surface \u2462 (2026-09-02): the control on each evidence
+           moment \u2014 a specific moment with a call behind it \u2014 same helper, same gate. */
+        + ((canMarkStandard() && m.highlight_id && m.fathom_call_id)
+            ? '<div class="obj-footer" style="margin-top:6px;">' + (state.notedHighlightIds[m.highlight_id]
+                ? '<button class="review-kb-btn is-saved" disabled title="Your team has a coaching note from this moment">Noted \u2713</button>'
+                : '<button class="review-kb-btn review-ft-btn" data-uid="' + escapeHtml(String(c.user_id)) + '" data-ev="' + evIdx + '"'
+                  + ' onclick="fineTuneFromWhy(this.getAttribute(\'data-uid\'), this.getAttribute(\'data-ev\'), this)"'
+                  + ' title="Tell Scout how your team would handle this \u2014 it learns the idea behind it">Fine Tune Coaching</button>') + '</div>'
+            : '')
         + '</div>';
     }).join('');
 
@@ -14912,7 +14923,7 @@
        broken one). */
     var ftBtn = '';
     if (canMarkStandard() && it && it.highlight_id && it.call_id && Number.isInteger(idx)) {
-      var noted = !!(state.correctedMomentIds && state.correctedMomentIds[it.highlight_id]);
+      var noted = !!(state.notedHighlightIds && state.notedHighlightIds[it.highlight_id]);
       ftBtn = noted
         ? '<button class="review-kb-btn is-saved" disabled title="Your team has a coaching note from this moment">Noted \u2713</button>'
         : '<button class="review-kb-btn review-ft-btn" data-kind="' + escapeHtml(kind) + '" data-idx="' + idx + '"'
@@ -18217,7 +18228,6 @@
        request whose result nobody renders. Fire-and-forget: it re-renders when
        it lands, and every row is correctly "unsaved" until then. */
     if (canMarkStandard()) loadSavedMoments(callId);
-    if (canMarkStandard()) loadCorrectedMoments(callId);   // Fine Tune Coaching — which moments already carry a team note
   }
 
   /*
@@ -18317,6 +18327,7 @@
       return;
     }
 
+    if (review && review.highlights && canMarkStandard()) loadNotedMoments(review.highlights.map(function (h) { return h && h.id; }));
     if (!review) {
       // Loading state — three section-sized skeletons under the header.
       content.innerHTML = header + notice
@@ -18798,16 +18809,26 @@
   /* Which moments are already in the KB. Fire-and-forget and fully degradable:
      on any failure every row renders as unsaved, and adding again is idempotent
      server-side anyway. */
-  async function loadCorrectedMoments(callId) {
+  /* ⚠⚠ "Noted ✓" SURVIVES A RELOAD (2026-09-02). One POST per page with the
+     highlight ids being rendered; TEAM-scoped on the server, so a second
+     manager — or a rep — sees a moment as noted. Ids already asked about are
+     not asked again; a repaint happens only when something new came back. */
+  var notedChecked = {};
+  async function loadNotedMoments(ids) {
+    if (!canMarkStandard()) return;
+    var ask = (ids || []).filter(function (id) { return id && !notedChecked[id]; });
+    if (!ask.length) return;
+    ask.forEach(function (id) { notedChecked[id] = true; });
     try {
-      var res = await fetch('/kb/corrected-moments/' + encodeURIComponent(callId), { headers: authHeader() });
+      var res = await fetch('/kb/noted-moments', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ highlight_ids: ask.slice(0, 200) }) });
       if (!res.ok) return;
       var data = await res.json();
-      if (state.selectedCallId !== callId) return;
-      var map = {};
-      ((data && data.corrected_highlight_ids) || []).forEach(function (id) { map[id] = true; });
-      state.correctedMomentIds = map;
+      var got = (data && data.noted_highlight_ids) || [];
+      if (!got.length) return;
+      got.forEach(function (id) { state.notedHighlightIds[id] = true; });
       if (state.view === 'call-review') renderCallReview();
+      else if (isTeamView(state.view)) renderTeamSurface();
     } catch (err) { /* "not yet noted" is the safe default */ }
   }
   function findReviewHighlight(id) {
@@ -18828,6 +18849,13 @@
     if (!highlightId || !state.selectedCallId) return;
     var h = findReviewHighlight(highlightId) || {};
     return fineTuneCoaching({ callId: state.selectedCallId, highlightId: highlightId, surface: 'call_review_moment', quote: h.quote, coaching: h.coaching }, btn);
+  }
+  /* Surface \u2462: an evidence moment under a closer's Objections "Why". */
+  function fineTuneFromWhy(userId, evIdx, btn) {
+    var c = (((state.teamObjSummary || {}).closers) || []).filter(function (x) { return x.user_id === userId; })[0];
+    var m = c && (c.evidence || [])[Number(evIdx)];
+    if (!m || !m.highlight_id || !m.fathom_call_id) return;
+    return fineTuneCoaching({ callId: m.fathom_call_id, highlightId: m.highlight_id, surface: 'team_objections_why', quote: m.quote, coaching: c.what_to_do || c.why }, btn);
   }
   /* Surface \u2461: a Team \u2192 Coaching insight, which names a rep and cites a moment. */
   function fineTuneFromInsight(kind, idx, btn) {
@@ -18877,7 +18905,7 @@
           objection_category: first && first.objection_category, extraction: first && first.extraction }) });
       var d = null; try { d = await r2.json(); } catch (e) {}
       if (!r2.ok) { alert((d && d.error) || 'Could not save that note.'); reset(); return; }
-      state.correctedMomentIds[highlightId] = true;
+      state.notedHighlightIds[highlightId] = true;
       if (btn) { btn.className = 'review-kb-btn is-saved'; btn.textContent = d && d.duplicate ? 'Already noted \u2713' : 'Noted \u2713'; btn.title = 'Your team has a coaching note from this moment'; }
     } catch (err) { alert('Could not reach the server.'); reset(); }
   }
@@ -19014,7 +19042,7 @@
        the team surfaces call this helper when they are wired. */
     var ftBtn = '';
     if (canMarkStandard() && h.id) {
-      var corrected = !!(state.correctedMomentIds && state.correctedMomentIds[h.id]);
+      var corrected = !!(state.notedHighlightIds && state.notedHighlightIds[h.id]);
       ftBtn = corrected
         ? '<button class="review-kb-btn is-saved" disabled title="Your team has a coaching note from this moment">Noted \u2713</button>'
         : '<button class="review-kb-btn review-ft-btn" data-hid="' + escapeHtml(String(h.id)) + '"'
