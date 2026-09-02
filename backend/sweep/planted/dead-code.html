@@ -31,3 +31,12 @@
   document.body.classList.add('lc-classlist');
   var tpl = `<i class="lc-template"></i>`;
 </script>
+<style>
+  .dc-six { color: red; }      /* P6: referenced ONLY inside an archived comment below — dead */
+  .dyn-good { color: green; }  /* N6: used through a string-built prefix */
+  .lc-admin { color: blue; }   /* N7: used only in admin.html markup */
+</style>
+<script>
+  /* <div class="dc-six"></div> archived */
+  function band(b) { return '<span class="dyn-' + b + '">x</span>'; }
+</script>

@@ -31,6 +31,19 @@
 
 ## 🎯 CURRENT SESSION
 
+### 🔎 SWEEP BLOCK 4 (2026-09-02) — CLASS ⑤ DEAD CODE AND DEAD CSS, GROUPED BY WHY. NOTHING DELETED.
+
+14 dead functions (11.6 KB) and 129 dead classes (23.5 KB) — **35 KB, 3.2% of a 1,097 KB file that is 45.8% comment; served raw.** A rounding error: rows, not a fix. 43 further classes are built from string prefixes and are NOT dead. **No control is missing its style** (every unstyled live class is a wrapper hook that never had a rule — history checked). Detector 5/5 · 0/5 and 6/6 · 0/7. Detail: `~/Desktop/scout-findings.md` (block 4), H668.
+
+| tag | family | why dead · what to do when approved |
+|---|---|---|
+| `▪ MINOR` **⑤-1 Live-Sessions subsystem CSS (~60 classes)** | `call-card`/`calls-list`/`call-head*`, `obj-event*`, `verdict-*`, `coaching-note*`, `compare-*`, `drill-*`, `breakdown-*`, `event-card*`, `framework-ref*`, `type-stat*`, `pattern-*`/`medium` | RETIRED — panels removed 2026-07-29 (`c00a5ec`). Remove. |
+| `▪ MINOR` **⑤-2 Donut / overview accordion (16 classes + 3 functions)** | `donut-*`, `skeleton-donut`, `overview-acc*`, `acc-chevron`, `team-score`, `obj-metrics`, `glance-value`; `drawCallsDonut2`, `drawScoreDonut`, `drawObjDonut2` | RETIRED — collapsed 2026-07-27 (`ea7b789`). Remove. |
+| `🔴 NEEDS JUSTIN` **⑤-3 Call-review panels removed from the render path by ruling (H097) — 30 classes** | `review-trace`/`trace-*`, `review-risk`/`rs-*`/`is-deflected`/`muted`, `review-mattered*`/`inverted` | RETIRED BY RULING, **data still written** (7d, 8b, 8c/8d fields). Deleting the rules makes a revival a rebuild. Keep or remove is a product decision. |
+| `▪ MINOR` **⑤-4 Replaced surfaces (~30 classes + 5 functions)** | old gauges (`gauge-readout/counts/target`), v1.4 rep cards/lanes (`team-rep-*`, `team-lane*`, `avg-reps`; `teamAggregateHtml`, `teamTrendsHtml`), digest header (`digest-stat*`, `digest-quiet-row`, `team-stat--lead`), skeleton (`review-skeleton-section`), needs-work map (`nw-*`; `teamNeedsWorkCardHtml`), KB v1 (`kb-section`, `kb-header`, `section-heading`), `rep-why`, `fathom-strip-sep`, `not-sales-flag` (renamed), `reanalyzeFathomNow` (never called since 2026-06-27), `dashResizeCard` (duplicate of the inline handler) | REPLACED. Remove. |
+| `▪ MINOR` **⑤-5 Retired controls (6 functions)** | `overviewLinkCardHtml` (H507), `teamPageSelectHtml` + `customizeViewHtml` (`7a12303`), `areaLabelFor` (9a does not fire), `fmtCash` (H182), `goProspects` + `.merge-src.grader` + the `team-expanded` selectors | RETIRED. `goProspects`/`grader` go with the merge-route retirement row (H664). Remove. |
+| `📋 FILED` **the byte lever is comments, not dead code** | 502 KB of the served page is comment; dead code is 35 KB | if transfer size ever matters, strip comments at serve time (14× the saving). Not a sweep item. |
+
 ### 🔎 SWEEP BLOCK 3 (2026-09-02) — CLASS ④ BOTH HALVES. ONE UNFETCHED READ (ALREADY FILED), ONE CLASS NAME CARRYING TWO DESIGNS. NO FIXES.
 
 ④(a) across all 234 column-listed selects (four shapes, 10/10 · 0/10): the ONE hit is `objection_class` (④a-1 above, arithmetic 606 vs 608). Blind spots hand-reviewed clean: three destructured selects (auth/billing), one `Promise.all([…])` literal (profiles). ④(b) media-aware (6/6 · 0/6): 12 same-context conflicts, all reproduced on the live page; 0 shorthand-after-longhand in declaration order; cross-selector overrides (the H267 shape) are outside the detector. Detail: `~/Desktop/scout-findings.md` (block 3), H667. **The standing rule from block 2 is in CLAUDE.md §6 (H666).**
