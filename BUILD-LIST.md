@@ -1723,3 +1723,10 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - **Surface ③:** the Objections "Why" evidence moments (each carries `highlight_id` + `fathom_call_id` now — PROMPT_VERSION v13, every board's Why regenerates once, ~11–20s) → the same helper, `surface: 'team_objections_why'`, validated server-side (400 otherwise). The loop is sound: notes are written only by the one route behind the manager's confirmation; the lanes only read.
 - **Built:** ①②③ + 7c + three coaching syntheses reading the notes. **Deliberately OFF:** needs-work (its classifier sets a rate), the digest, the Coach Summary tile, the section-rank card, the Performance Summary control. **Filed:** nothing further on this feature.
 - **NEXT (Justin's order): the full site sweep, then Scout AI.**
+
+
+## 2026-09-02 — THE FULL SITE SWEEP: PLAN REPORTED, NOTHING RUN (awaiting scope approval)
+- Plan in `~/Desktop/scout-findings.md`: eight defect classes, each a detector that can fail plus a review with evidence; sized against measured numbers (595k chars of dashboard code, 549 functions, 1,234 CSS rules, 242 test files of which 53 are source-only, 97 unbounded Supabase reads, one user at 3,650 highlights and one uploader at 1,102 KB rows). **Full sweep 10–12 blocks; first pass (⑧ growing-table reads · ① spend/permission/scope guards · ④ selected-vs-read + CSS duplicates · ⑤ 14 dead functions + 172 dead classes) 4 blocks.**
+- Detector discipline: proven on ≥5 planted positives and ≥5 planted negatives before any hit is reviewed (the first dead-function counter was 61% wrong until bare references were counted). Findings land here with evidence; Justin decides what is built.
+- Candidates surfaced while sizing, untouched: KB and highlight reads already past the 1,000-row cap for one account; `objection_class` possibly read but not selected in `team-analytics`; 14 zero-reference dashboard functions; 172 stylesheet-only classes; objection-category literals in 10 files; 4 headings with two renderers; 123 private comment-strippers in tests.
+- **🔴 NEEDS JUSTIN: full or first pass, and the order.**
