@@ -1662,3 +1662,12 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - **FILED, AFTER THE SESSION — re-analysing another user's calls becomes ADMIN-ONLY.** Narrows the 2026-08-28 managers-and-above ruling: WHO changes, not WHAT (30 days stays). Reason: spend on someone else's account once onboarding exists. Self-serve grading of one's own calls is unaffected (it is how Godwin's backlog was cleared).
 - **Filed:** rep photos (storage + privacy line).
 - **Design session status:** built — rail/mesh, content-sized rail, sticky bar + wordmark, lane waits, deep-link paint, speed ×4; awaiting a pick — rep cards; with Justin — ground cast; ruled — column width unchanged.
+
+
+## 2026-09-02 — TRADING-CARD REP CARDS, TREATMENT C — LIVE `370dcf5` (04:13Z). THE DESIGN SESSION IS FINISHED.
+- Card: name band + movement chip (beside the grade), closing rate at `--fs-gauge-value` with counts (Justin reversed "go big"; `--fs-display` untouched), objections handled, avg call time with its side, five section bars with the weakest lit (Close draws `close_earned`), weakest objection + avg grade in the foot. Unmeasured in words, never a dash/zero. Guard `test/rep-card.test.js`.
+- Placement measured live: Reps at 616px (was 1800, 2.1 screens down); page 3598px (was 6559). Gauges → cards → graphs. Team Overview / Closing Score / Objection Handling Score retired (only `teamScoreListHtml` drew them; nothing else linked in). Performance no longer fetches the `why` model lane.
+- Widget: catalog `person` entry `rep_card` → same `repCardHtml`, unchanged; **minimum slot two columns** (a column is ~276px, the card needs ~360) — a constraint, no narrower variant. Picker step two = which closer. Bands ride on `/team/overview`.
+- 17 older guards converted (row card, lists, panel keys, catalog units, picker ceiling), none deleted. Suite 2103/0.
+- ⚠ Cron: TWO slots missed now (02:00Z, 04:00Z); nothing since 23:57Z. GitHub Actions scheduling.
+- **🔴 NEXT — Justin picks, from the three filed for the end of the session:** the Fine Tune Coaching control · the Coaching Dashboard dropdown (Performance/Coaching/Objections, for closers) · the Closer/Manager tag. Also filed: re-analyse-others admin-only; rep photos.
