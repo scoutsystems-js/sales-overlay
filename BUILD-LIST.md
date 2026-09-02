@@ -1634,3 +1634,12 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - Guard: `test/rail-height.test.js` (bottom auto, derived cap, animated menu, reduced motion, non-vacuous). Suite 2076/0.
 - ⚠ **The 02:00Z cron has not fired at all** as of 02:40Z — 2h43m after the 23:57 run, past the longest observed gap (2h25). No `[team-warm]` line to report yet; if the 04:00 slot also slips, that is a GitHub Actions scheduling question, not ours.
 - **Filed for the END of this session (Justin): trading-card rep cards** — one card design placed by BOTH the Performance page and the catalog's rep-card widget; the per-closer cards currently sit below the gauges and graphs and are being scrolled past.
+
+
+## 2026-09-02 — TOP BAR: CAUSE ESTABLISHED, STICKY KEPT; THE WORDMARK IS THE NAV LOGO — LIVE `fc58af7`
+- Measured first: the sticky bar held `top 0 / h 51` at every scroll position on the live page, so it was never scrolling away. Removed the `backdrop-filter` on the sticky element (a one-frame compositor lag on fast scroll; the gradient is opaque) and the macOS rubber-band (`overscroll-behavior-y: none` on `html`). **Sticky kept** — the rail (51+16=67) and the ground (`100vh - 61px`) are derived from the bar in flow.
+- The wordmark REPLACES the "Scout" text (Justin: not both). `height: 22px`, intrinsic `1038×138` declared, never upscaled, alt "Scout Systems", linked to `/dashboard` (the span was never a link — an addition, stated). Nav height unchanged at 51; rail at 67 verified live.
+- **Retina verdict: crisp.** 44 device px tall on DPR 2 = a 3.14× DOWNscale; the 1×/2× softness finding was about drawing at 2× native. No re-export needed for the nav.
+- Served markers (comment-stripped): backdrop 0 · overscroll 1 · wordmark 1 · text span 0. Suite 2076/0.
+- ⚠ Cron still not fired since 23:57Z as of 02:50Z. No `[team-warm]` line yet.
+- ⚠ Honest limit: the harness cannot reproduce a scroll bounce (hidden document, no animated scroll). Justin's scroll is the closing check.
