@@ -31,6 +31,19 @@
 
 ## 🎯 CURRENT SESSION
 
+### 🔎 SWEEP BLOCK 1 (2026-09-02) — FIVE DETECTORS SCORED · CLASS ⑧ REVIEWED · `objection_class` VERIFIED. NO FIXES.
+
+Tooling in `backend/sweep/` (one shared stripper, planted fixtures, raw-line mapper). Scores recorded before any candidate was read: **⑧ 5/5 · 0/7 · ④a 8/8 · 0/8 · ④b 5/5 · 0/5 · ⑤ 5/5 · 0/5 · ① 5/5 · 0/5.** Full evidence in `~/Desktop/scout-findings.md` (block 1) and H663.
+
+| tag | finding | evidence |
+|---|---|---|
+| `🐛 BUG` **⑧-1 merge-candidates fails for the owner** | `routes/me.js:943→953` `GET /me/prospects/merge-candidates` puts every one of a user's prospect-attached call ids into ONE `.in('fathom_call_id', …)`. | Owner: **586 ids**. Probe with the owner's real ids: **390 succeed, 400 `fetch failed`** (~8 s, no error object). Route throws → 500. Second-largest user 305 (fine). Fix shape when approved: chunk at 100 like the 21 chunked sites. |
+| `🐛 BUG` **⑧-2 owner KB list shows 1,000 of 2,272** | `routes/kb.js:739` `GET /kb/list` owner branch: `not('uploaded_by','is',null)`, no range. | **2,272 rows today** (1,644 created in August by the harvest). PostgREST returns 1,000 silently; which 1,000 is storage order. Fix shape: page with `.range` in a loop like `team-analytics.js:37`. |
+| `🐛 BUG` **⑧-3 section breakdown at 90 days fails within days** | `routes/me.js:1176→1187/1190` `computeSectionBreakdown` (`/me/sections/:section`, `/admin/sections/:user/:section`): range ids into two unchunked `.in()`s. | Owner at 90 days: **390 ids today**, ceiling 391–399, ~5 calls/day. Prior-period query (`:1226→1231`) at 210. |
+| `🐛 BUG` **④a `objection_class` never selected on the team pages** | `lib/team-analytics.js:76` selects `fathom_call_id, resolution, objection_category`; `lib/objection-strict.js:33` reads `row.objection_class` and counts NULL as an objection → every highlight counts. | **Zero effect on screen today**: Josh's board 4 Aug–2 Sep strict 606/62 vs unfiltered 608/62, rate 10% either way; 525 rows pre-v37. Diverges as v37 rows accumulate (rate reads slightly LOW). `rep-series.js` rides the same rows. Fix: add the column to the select (and pin it — column-list guard family H448). |
+| `▪ MINOR` **⑧ thresholds — near the cap, not over** | `lib/prospect-entity.js:181` team close-rate calls: Sober Living **935 all-time / 930 at 90 d / 642 at 30 d** (team logs ~1,047 calls/month, ~640 with a prospect → 90 d crosses in ~1 month). `:245` prospects per team **869**. `routes/kb.js:730` manager KB list **834** visible to Josh. Per-user all-time reads (`duplicate-calls.js:145`, `me.js:935`, `me.js:943`): owner **634**, +188/month → ~Nov 2026. | Same fix shapes as above; order by distance to the cap. **The earlier "1,061 at 30 days" figure used the wrong filter and is retracted.** |
+| `📋 NEXT BLOCKS` **candidates counted, unreviewed** | **①** 9 source-only guard files with a spend/permission/scope claim word (`admin-companies-render`, `board-lifecycle`, `call-review-scope`, `company-picker-placement`, `cross-user-grading`, `customer-language`, `failed-calls-surface`, `rep-page-scope`, `team-epoch`) of 44 source-only files · **④b** 25 same-selector conflicts + 14 shorthand-after-longhand · **⑤** 14 unreferenced functions, 172 unreferenced classes. | Each is a candidate until its review attaches evidence. Order stands: ① next, then ④, then ⑤, then ②③⑥⑦. |
+
 ### ✅ 2026-08-31 (`7a12303`) — THE NAV TAB IS THE PAGE DROPDOWN · CUSTOMIZE VIEW REMOVED
 
 | what | detail |

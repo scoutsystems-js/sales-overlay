@@ -1,0 +1,33 @@
+<style>
+  .dc-one { color: red; }
+  .dc-two { color: red; }
+  .dc-three { color: red; }
+  .dc-four { color: red; }
+  .dc-five { color: red; }
+  .lc-markup { color: red; }
+  .lc-string { color: red; }
+  .lc-classlist { color: red; }
+  .lc-template { color: red; }
+  .lc-attr { color: red; }
+</style>
+<div class="lc-markup">x</div>
+<button onclick="viaOnclick()">go</button>
+<script>
+  function deadOne() {}
+  function deadTwo() {}
+  async function deadThree() {}
+  function deadFour() {}
+  function deadFive() {}
+  function viaOnclick() {}
+  function viaTimeout() {}
+  function viaMap(x) { return x; }
+  function viaWindow() {}
+  function viaDirect() {}
+  setTimeout(viaTimeout, 10);
+  [1].map(viaMap);
+  window.viaWindow = viaWindow;
+  viaDirect();
+  var html = '<span class="lc-string ' + (true ? 'lc-attr' : '') + '">';
+  document.body.classList.add('lc-classlist');
+  var tpl = `<i class="lc-template"></i>`;
+</script>
