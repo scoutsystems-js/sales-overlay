@@ -5415,6 +5415,35 @@ opened his mouth — a setter and prior conviction did the work, NOT HIM"
 - **THE PROPERTY IS THAT THE VERSION IS FOLDED INTO THE CACHE KEY AND MOVES WITH THE PROMPT**, not that it holds any particular value. Both converted to assert the key membership plus a `v\d+-` shape.
 - Same family as the encoding-pinned dash and every other *derive a guard from the source of truth, never pin a literal*. **A guard that encodes today's value has a shelf life measured in one commit.**
 
+### ⚠⚠⚠ AN `indexOf` ORDERING CHECK PASSES VACUOUSLY WHEN ITS ANCHOR IS ABSENT — `-1 < ANYTHING` IS TRUE (2026-09-01)
+**My own guard: `bar.indexOf('dash-bar-sep') < bar.indexOf('dashDeleteBoard')`. Remove the separator and `indexOf` returns -1, so the comparison is TRUE and the guard reports success OVER THE EXACT DEFECT IT EXISTS TO CATCH.**
+- **CAUGHT ONLY BY THE RESTORE-AND-COUNT ARITHMETIC: six restored defects produced FIVE failures.** The mismatch is the signal — a green result after restoring a defect is the one unambiguous sign a guard is aimed wrong.
+- **THE FIX IS THE STANDING SHAPE: assert the anchor is PRESENT before comparing it.** Already on file as *"every ordering anchor is asserted present before it is compared"* — **and I wrote a new one without it**, which is why the rule is restated here rather than assumed learned.
+- **⚠ THE FAMILY IS BIGGER THAN ORDERING: any comparison where a missing operand yields a value that satisfies the test.** `indexOf` returning -1, an empty string matching a negative assertion, an absent key reading as falsy.
+
+### ⚠⚠ EDITING A GUARD TO MAKE YOUR OWN CODE PASS — THE DIAGNOSTIC THAT SEPARATES A FIX FROM A WEAKENING (2026-09-01)
+**`Save as New` failed the Title Case guard because `as` was missing from a connective list containing `to, for, in, on`.**
+- **THE QUESTION IS NOT "IS MY LABEL FINE" — IT IS: COULD THE ASSERTION BE TRUE OF THE CODE AS WRITTEN?** By that guard's OWN stated convention — content words capitalised, small connectives lowercase inside a label — **"Save as New" is correct exactly as "Back to Calls" and "Call Highlights of the Week" already are.** So the LIST was incomplete, not the label.
+- **⚠ THE TEMPTING ALTERNATIVE WAS TO RENAME THE BUTTON TO DODGE THE WORD**, which is the trap this file records: making a failure go away rather than asking whether the check is right.
+- **AND PROVE IT STILL BITES.** After adding `as` the guard was run against `Save as new`, `Add card` and `call` — all still flagged. **An edit to a guard is only defensible with a demonstration that it did not blunt it.**
+- **⚠ A PRE-EXISTING SCOPE GAP FOUND IN THE SAME GUARD, FILED NOT FIXED: it drops any label containing `+`** — intended for interpolated labels, but `+` is also a literal glyph — **so "+ Add card", "+ New Board" and "+ Add rep" are structurally invisible to it.** Fixing it surfaces three copy changes, which is a ruling.
+
+### ⚠⚠⚠ A RENAME THAT ROUTES THROUGH SAVE DESTROYS WHAT THE READ PATH DELIBERATELY PRESERVED (2026-09-01)
+**`resolveLayout` DROPS a card whose metric no longer exists and its own comment says NOTHING HERE WRITES — "the unknown entry stays in the stored row untouched" — so a removed metric's return is recoverable.**
+- **⚠⚠ SO RENAMING VIA THE SAVE ROUTE WOULD POST THE *RESOLVED* LAYOUT BACK AND PERMANENTLY DESTROY THAT ENTRY.** Silent data loss that looks exactly like a successful rename: no error, no warning, and the board comes back with the right name.
+- **THE RULE: WHEN A READ PATH DELIBERATELY DISCARDS SOMETHING WITHOUT WRITING, ANY WRITE BUILT FROM THAT READ INHERITS THE DISCARD.** A dedicated route that touches ONE field is not fastidiousness — it is the only shape that cannot lose the rest.
+- **⚠ AND THE GUARD ASSERTS THE ABSENCE: the rename route must never mention `layout`.** A route that merely *happens* not to write it today is one edit from writing it.
+
+### ⚠⚠ A FORK THAT LEAVES YOU ON THE ORIGINAL READS AS "MY CHANGES WERE LOST" (2026-09-01)
+**Save as New inserted correctly and then refetched `boards[0]` — the PINNED board — so a manager who adds a card and forks is returned to the ORIGINAL, without their card.**
+- **THE WRITE WAS PERFECT AND THE OUTCOME WAS INDISTINGUISHABLE FROM FAILURE**, which is the same family as the label that would not say its name and the control that vanished on success. **Every one of these is a correct action whose visible result contradicts it.**
+- **⚠ FOUND BY EXERCISING IT, NOT BY READING IT.** The code is obviously right on the page; only running the flow shows where you end up.
+- **THE HABIT: after any CREATE, ask WHERE THE USER ENDS UP.** Creating a thing and not opening it is the default behaviour of a refetch, and it is almost never what was wanted.
+
+### ⚠ WHEN A DESTRUCTIVE FEATURE NEEDS LIVE PROOF, FORK THE SUBJECT — DO NOT SPEND THE USER'S DATA (2026-09-01)
+Delete needed both edge cases proven live on a manager who owned **one** board. **The board was FORKED, the copy renamed, pinned, and deleted while pinned** — proving the pin swap, the no-orphan-pin fallback and the nav following — **and the original pin restored and checked against the database.**
+- **⚠ THE ONE CASE THAT COULD NOT BE FORKED WAS SAID SO PLAINLY.** "Deleting the LAST board" would have meant destroying his only board, so the identical code path was exercised instead (a board id matching nothing → `is_default: true`, six default cards, not an empty grid) **and the report says that is what was done.** A verification that quietly substitutes a weaker one is worse than an admitted gap.
+
 ### 📋 BUILD-LIST.md IS THE BUILD LIST — `/BUILD-LIST.md` IN THE iCLOUD REPO ROOT (created 2026-08-20)
 **⚠⚠ IT DID NOT EXIST UNTIL NOW. Justin had been working from a list that lived nowhere**, and `BUILD-PLAN.md` (19 April) is four months stale — **treat that file as history, never as the plan.** BUILD-LIST.md was seeded from the live-site audit and the current repo.
 - Sections: **LIVE · IN FLIGHT · BLOCKED ON JUSTIN · AGREED NOT STARTED · QUEUED · SCOPED NOT STARTED · TRIGGERED · OPEN.**

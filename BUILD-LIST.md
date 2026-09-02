@@ -1168,6 +1168,23 @@ Deployed, verified by commit hash and served-page parity. Suite **2051**.
 
 ---
 
+## 2026-09-01 — DELETE, SAVE AS NEW, RENAME — **CUSTOMIZE VIEW IS FINISHED** (`a32b3a5`, `2940bc5`)
+Verified by commit hash and served-page parity. Suite **2071**. Six restored defects → 6 failures.
+
+`new test board  PINNED   [Unpin] [Rename] [+ New Board] [✎ Edit]   [Delete]`
+
+**DELETE.** The route existed and had no control — the pin's shape again. Confirmation **NAMES the board**, modal and awaited, no undo stated plainly with the card count. ⚠⚠ **The deleted id is cleared from state**: the load route falls through to the CODE DEFAULT when `?board=` matches nothing, so a stale id would show the default *even though other boards remain* — and read as "delete wiped my other boards". **Both edge cases proven LIVE on a FORK of Justin's board, never his own**: pinning the copy swapped the pin with no index collision; deleting it while pinned left no orphan pin, fell back to his board, and the nav named it; his pin was restored and checked against the database. ⚠ **The last-board case was NOT tested by deleting his only board** — the identical code path was exercised instead (an id matching nothing → `is_default: true`, six default cards, not an empty grid) **and the report says so.**
+
+**SAVE AS NEW** forks by sending NO id; the copy is never pinned. ⚠ The cap message said *"Rename or delete one to make room"* — **renaming makes no room**, so it now names the action that works. ⚠⚠ **And the fork left the manager on the ORIGINAL** — a refetch of `boards[0]` — so adding a card and forking returned them to the board WITHOUT it, reading exactly as the changes being lost. **Found by exercising it, not reading it.**
+
+**RENAME HAS ITS OWN ROUTE, REQUIRED BY AN EXISTING RULING.** `resolveLayout` drops an unknown card and deliberately does not write, so a rename through the save path would post the RESOLVED layout back and **permanently destroy the dropped entry** — silent loss that looks like success. `PATCH /dashboard/:id/name` touches `name` only; a guard asserts it never writes `layout`.
+
+**FINISHED — BUILT:** ten metrics · seven views · honest offers · seven line graphs · two banded metrics with sides and band-coloured bars · grouped picker with a description on every metric · ten named boards · drag/resize · pin & unpin · rename · save-as-new · delete · 403 handled.
+**FILED, NOT BUILT:** scatter · orientation · history for the three breakdown metrics · weekly bucketing above ~14 days · non-monotonic bars · rep-card widget · stale-bundle nudge · the `+`-label guard gap.
+**NEEDS JUSTIN:** nothing on Customize View.
+
+| `▰ MAJOR` **THE DESIGN PASS — SECOND ROUND, NOT A FIRST** (**NEXT**, Josh: *"generic and too black-and-white"*) | ⚠⚠ **READ THIS BEFORE STARTING: A DESIGN PASS ALREADY RAN AND CLOSED TODAY** (`683602c`, `4b4a033`) — the entries are in this file above. **Josh's complaint is FEEDBACK ON THAT PASS.** A session reading only the outstanding list would start one believing none had happened and redo shipped work. **ALREADY SHIPPED BY IT:** the opaque GROUND behind the content column (this is what makes text safe over the full-brightness raster — **do NOT solve exposure by dimming the artwork**, that is the recorded rule), cards removed on Performance/Coaching/Team, the green-bar pattern removed where it encoded nothing, one page black (`#0a0a0a`), the seven-size type scale, "My Account", admin monospace narrowed to transcription surfaces. **STANDING CONSTRAINTS A SECOND PASS MUST NOT VIOLATE:** the palette's three jobs (semantic / interactive / categorical, and the categorical ramp may borrow none of the reserved hues); **green deliberately means good AND brand AND interactive — that overlap is the design and is not to be re-raised**; the no-grey rule targets unreadable body text and **explicitly permits opacity as a depth cue** (the calendar exception); the type scale is CLOSED at seven sizes with two named exceptions (`--fs-gauge-value`, `--fs-company`) and **a third landing on 24px is the point to re-open the scale, not to add a fourth carve-out**; and every rule lives in `dashboard.html` inline plus `css/style.css`, **which are pinned identical by `test/type-scale.test.js` because the dashboard links no stylesheet**. ⚠ **A NEW VIEW INHERITS NOTHING** — the ground and cards-off lists are per-view and the pairing guard cannot see a view absent from both. |
+
 ## 2026-09-01 — NEVER DIMINISH THE CLOSER'S WORK; AND PINNING GETS AN INVERSE (`a735fd5`)
 Verified by commit hash and served-page parity. Suite **2066**. Five restored defects → 4 failures.
 
