@@ -20,6 +20,7 @@ const LANE_RENDERERS = [
   'teamTrendsHtml', 'repCardsHtml', 'teamDigestHtml', 'dashGaugeHtml', 'avgPanelHtml', 'renderTeamDashboard',
   'sectionRankCardHtml', 'needsWorkCardHtml', 'needsWorkDetailBodyHtml', 'renderOverview', 'renderEodView',
   'renderAccountView', 'renderObjectionsIntel', 'dashRenderPicker', 'teamMembersBodyHtml', 'teamRecsHtml',
+  'renderTeamObjectionsView',   // the page's lead number waits in its own slot, like Coaching's
 ];
 
 function liveLaneWait() {

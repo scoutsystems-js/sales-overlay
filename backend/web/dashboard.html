@@ -10792,6 +10792,10 @@
          page's lane is how a figure appears only if you arrived by clicking and
          vanishes on a deep link, which this very view was fixed for once. */
       + (function () {
+          /* ⚠ The lead number waits IN ITS OWN SLOT, in words (2026-09-02) — the
+             same defect as the Coaching lead number: a blank where the loudest
+             figure on the page will be reads as a page with no number. */
+          if (!state.teamObjections) return '<div class="lead-number">' + laneWaitHtml('objections', 'Working out the handle rate\u2026', null, 96) + '</div>';
           var t = state.teamObjections && state.teamObjections.totals;
           var rate = (t && typeof t.rate === 'number') ? t.rate + '%' : null;
           return leadNumberHtml(rate, 'Objections handled');
