@@ -74,3 +74,20 @@ test('⚠⚠ OBJECTIONS: the summary starts only after the grid has landed — n
   assert.ok(/gridLanded/.test(m[0]), 'the summary start is gated on the grid: ' + m[0].trim());
   assert.ok(/var gridLanded = !!\(state\.teamObjections && !state\.teamObjections\._error\)/.test(body), 'gridLanded is derived from the grid lane itself');
 });
+
+/* ⚠⚠ THE BOOT SPINNER WAS THE "LONE SPINNER ON A BLACK PAGE". A deep link to
+   any team page sat on the page-level spinner until the PERSONAL analytics
+   lane returned (2.3–2.9s warm, more cold) — a lane the team page never
+   renders — and only then painted the team view and STARTED its own lanes.
+   The comment above reloadAll had measured it: t=2038 hash applied, t=5050
+   Team paints. The view you are on paints at once, with its lanes' own
+   waiting words, and the boot spinner itself says what it is doing. */
+test('⚠⚠ A DEEP-LINKED TEAM / EOD / ACCOUNT VIEW PAINTS BEFORE THE PERSONAL LANES RETURN', () => {
+  const body = fnBody(LIVE, 'reloadAll');
+  const paint = body.indexOf('else if (isTeamView(state.view) || state.view === \'eod\' || state.view === \'account\') render();');
+  const wait = body.indexOf('fetchAnalytics2()');
+  assert.ok(paint > 0, 'the early paint for non-overview views is missing');
+  assert.ok(wait > paint, 'the early paint must come BEFORE the personal lanes are awaited');
+  const boot = HTML.match(/<div id="content">([\s\S]*?)<\/div><\/div>/);
+  assert.ok(boot && /Loading your dashboard/.test(boot[1]), 'the boot state says what it is doing: ' + (boot && boot[1]));
+});

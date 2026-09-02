@@ -5266,7 +5266,7 @@
 
 
 <main class="page" id="page">
-  <div id="content"><div class="load-state"><div class="spinner"></div></div></div>
+  <div id="content"><div class="load-state"><div class="spinner"></div> Loading your dashboard…</div></div>
 </main>
 
 <!-- KB upload modal — identical to dashboard.html. Three tabs share a
@@ -7699,6 +7699,16 @@
        flash for a blank page. Verified by probe, not assumed. */
     armLaneWait('analytics2', function () { return !state.analytics2; }, function () { if (state.view === 'overview' && !state.analytics2) renderOverview(true); });
     if (state.view === 'overview') renderOverview(true /* loading */);
+    /* ⚠⚠ PAINT THE VIEW YOU ARE ON NOW (2026-09-02). The measurement above
+       (t=2038 hash applied, t=5050 Team paints) was read as a wrong-page flash
+       and fixed by not painting the overview — which left a deep link to any
+       team page on the page-level spinner until the PERSONAL analytics lane
+       returned, a lane the team page never renders, and only then started the
+       team lanes. Team, EOD and Account own their lanes and their waiting
+       words (test/lane-wait.test.js), so they paint at once and their fetches
+       start ~3s earlier. render() runs again below when the personal lanes
+       land, which is a repaint of the same view, not a different page. */
+    else if (isTeamView(state.view) || state.view === 'eod' || state.view === 'account') render();
     try {
       // Fathom status fetch is wrapped in a .catch so a stale token or
       // misconfigured FATHOM_* env vars don't break the whole dashboard
