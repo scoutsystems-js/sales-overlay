@@ -11,6 +11,9 @@ const {
 } = require('../lib/kb-entry');
 const { getVoyageEmbedding, getVoyageEmbeddings } = require('../lib/voyage');
 const corrections = require('../lib/coaching-corrections');
+/* Where a correction can be given. A closed set: a harvest that cannot tell a
+   single-moment correction from one given on a team insight is built on prose. */
+const SURFACES = ['call_review_moment', 'team_coaching_insight'];
 
 var router = express.Router();
 
@@ -970,6 +973,8 @@ router.post('/fine-tune', protect, async function(req, res) {
   var fathomCallId = b.fathom_call_id, highlightId = b.highlight_id;
   var feedback = (typeof b.feedback === 'string') ? b.feedback.trim().slice(0, 1000) : '';
   if (!fathomCallId || !highlightId || !feedback) return res.status(400).json({ error: 'fathom_call_id, highlight_id and feedback required' });
+  var surface = (typeof b.surface === 'string') ? b.surface : 'call_review_moment';
+  if (SURFACES.indexOf(surface) === -1) return res.status(400).json({ error: 'unknown surface' });
   try {
     var admin = getAdminClient();
     var scope = await resolveUserScope(admin, req.user.id);
@@ -1000,7 +1005,7 @@ router.post('/fine-tune', protect, async function(req, res) {
       subject: (typeof b.subject === 'string') ? b.subject.slice(0, 40) : null,
       direction: (typeof b.direction === 'string') ? b.direction.slice(0, 20) : null,
       objectionCategory: (typeof b.objection_category === 'string') ? b.objection_category.slice(0, 40) : null,
-      givenOn: { surface: 'call_review_moment', fathomCallId: fathomCallId, highlightId: hl.data.id, repUserId: hl.data.user_id,
+      givenOn: { surface: surface, fathomCallId: fathomCallId, highlightId: hl.data.id, repUserId: hl.data.user_id,
                  momentType: hl.data.type || null, section: sanitizeSectionValue(hl.data.section), coachingSnapshot: hl.data.coaching || null, quote: hl.data.quote || null },
       addedBy: req.user.id,
       extraction: (b.extraction && typeof b.extraction === 'object') ? b.extraction : null,

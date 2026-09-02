@@ -74,7 +74,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v4-2026-09-01-never-diminish';
+const RECS_LANE_VERSION = 'v5-2026-09-02-never-diminish-highlight-id';   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -324,6 +324,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
       clip_url: clipUrl(w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].recording_url, r.timestamp_seconds),
       source: (w.meta[r.fathom_call_id] && w.meta[r.fathom_call_id].source) || null,
       call_id: r.fathom_call_id,
+      highlight_id: r.id,   // the moment itself — Fine Tune Coaching on the insight records what it was given on
       _s: (c === 'win' && (r.type === 'strong_moment' || r.type === 'buying_signal')) ? 5 : (c === 'loss' && (r.type === 'objection' || r.type === 'missed_opportunity')) ? 4 : (r.type === 'strong_moment') ? 3 : 1 };
   }).filter(function (c) { return c.quote; }).sort(function (a, b) { return b._s - a._s; }).slice(0, MAX_CANDIDATES);
   candidates.forEach(function (c, i) { c.id = 'm' + (i + 1); });
@@ -375,7 +376,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
       /* ⚠ BIND THE EVIDENCE TO THE CLAIM, or drop it. See evidenceMismatch. */
       var mism = ev ? evidenceMismatch(String((it && it.claim) || '') + ' ' + String((it && it.data) || ''), ev.rep, allRepNames) : null;
       if (mism) { console.warn('[team-synthesis] evidence dropped: ' + mism); ev = null; }
-      return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null };
+      return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null, highlight_id: ev ? ev.highlight_id : null };
     }).filter(function (it) { return it.claim; });
   }
   var synthesis = { working: resolve(parsed.working), improve: resolve(parsed.improve), generated_at: new Date().toISOString() };

@@ -199,7 +199,7 @@ test('⚠⚠ THE ROUTE: managers and above only; first call extracts and stores 
 
 test('⚠ THE CONTROL: on the Call Review moment rows, beside Add to KB, same gate; confirm-before-store in the client; the KB page names the notes', () => {
   const row = fnBody(LIVE, 'highlightEntryHtml');
-  assert.ok(/fineTuneCoaching\(/.test(row) && /canMarkStandard\(\)/.test(row), 'the button sits in the shared row renderer behind the manager gate');
+  assert.ok(/fineTuneFromRow\(/.test(row) && /canMarkStandard\(\)/.test(row), 'the button sits in the shared row renderer behind the manager gate');
   const fn = fnBody(LIVE, 'fineTuneCoaching');
   assert.ok((fn.match(/scoutPrompt\(/g) || []).length >= 2, 'ask for the correction, then show the concept back');
   assert.ok(/value:/.test(fn), 'the concept is prefilled so the manager can edit it');
@@ -212,4 +212,40 @@ test('⚠ THE CONTROL: on the Call Review moment rows, beside Add to KB, same ga
 test('⚠ the health-snapshot line no longer promises a control to everyone', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'health-snapshot.js'), 'utf8');
   assert.ok(!/with a control to grade them/.test(src) && /handled by an admin/.test(src));
+});
+
+/* ── SURFACE ② — Team → Coaching "What to improve" insights (2026-09-02) ──────
+   Same helper, same gate, same confirm-then-store flow. The one shape change
+   is in the DATA: an insight now carries the highlight id it cites (it always
+   carried the call id), because the control needs a moment to record what it
+   was given on — and that is a payload change, so the lane version bumps. */
+test('⚠⚠ SURFACE ②: an insight carries its moment (highlight id + call id), and the lane version moved with the shape', () => {
+  const ts = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8'));
+  assert.ok(/highlight_id: r\.id/.test(ts), 'the candidate keeps the highlight row id');
+  assert.ok(/highlight_id: ev \? ev\.highlight_id : null/.test(ts), 'the rendered item carries it');
+  assert.ok(/call_id: ev \? ev\.call_id : null/.test(ts), 'and the call id');
+  const v = /RECS_LANE_VERSION = '([^']+)'/.exec(ts);
+  assert.ok(v && v[1] !== 'v4-2026-09-01-never-diminish', 'a payload-shape change bumps the lane version in the cache key');
+});
+
+test('⚠⚠ SURFACE ②: the SAME helper, called from the insight with surface recorded; the route keeps the surface', () => {
+  const insight = fnBody(LIVE, 'teamInsightHtml');
+  assert.ok(/canMarkStandard\(\)/.test(insight) && /it\.highlight_id/.test(insight) && /it\.call_id/.test(insight), 'the control renders only where the insight names a moment, behind the manager gate');
+  assert.ok(/fineTuneFromInsight\(/.test(insight), 'the insight calls the bridge');
+  const bridge = fnBody(LIVE, 'fineTuneFromInsight');
+  assert.ok(/fineTuneCoaching\(\{/.test(bridge) && /surface: 'team_coaching_insight'/.test(bridge), 'the bridge calls the one helper with its surface');
+  const helper = fnBody(LIVE, 'fineTuneCoaching');
+  assert.ok(/surface: target\.surface/.test(helper) || /surface: t\.surface/.test(helper), 'the helper posts the surface it was given');
+  assert.strictEqual((LIVE.match(/async function fineTuneCoaching\(/g) || []).length, 1, 'one control, two callers');
+  const row = fnBody(LIVE, 'highlightEntryHtml');
+  assert.ok(/fineTuneFromRow\(/.test(row) || /fineTuneCoaching\(\{/.test(row), 'surface ① calls the same helper');
+  const kb = stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'kb.js'), 'utf8'));
+  assert.ok(/SURFACES = \['call_review_moment', 'team_coaching_insight'\]/.test(kb), 'a closed set of surfaces on the server');
+  assert.ok(/surface: surface/.test(kb), 'given_on.surface is what the client said, validated');
+});
+
+test('⚠ the Call Review loading state waits in words, not three bare boxes', () => {
+  const body = fnBody(LIVE, 'renderCallReview');
+  assert.ok(/laneWaitHtml\(/.test(body), 'the one helper');
+  assert.ok(!/review-skeleton-section/.test(body), 'no bare boxes');
 });

@@ -32,6 +32,11 @@ function renderer() {
   const src = slice('function tsFromClipUrl', '\n  }', 150) + '\n'
             + slice('function teamInsightHtml', '\n  }', 1200);
   const escapeHtml = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+  /* Fixture, not product: the renderer now asks whether the viewer may fine-tune
+     (2026-09-02). A real page has these; the harness supplies them. */
+  const canMarkStandard = () => false;
+  const state = { correctedMomentIds: {} };
+  void canMarkStandard; void state;
   const displayNameFromEmail = (a) => (a === 'Joshua Pinner' ? 'Josh P' : a);
   const clipLabelFor = (s) => (s === 'zoom' ? 'Open Recording' : 'Clip');
   /* ⚠ THE FILE IS STRICT, AND A STRICT eval SCOPES FUNCTION DECLARATIONS TO

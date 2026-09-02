@@ -14898,7 +14898,21 @@
     var hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = t % 60;
     return [hh, mm, ss].map(function (n) { return String(n).padStart(2, '0'); }).join(':');
   }
-  function teamInsightHtml(it, kind) {
+  function teamInsightHtml(it, kind, idx) {
+    /* FINE TUNE COACHING, surface \u2461 (2026-09-02): an insight names a rep and
+       cites a moment \u2014 exactly the condition the control needs. Same helper,
+       same gate. Rendered only when the payload carries the moment (rows cached
+       before the highlight id shipped do not, and get no button rather than a
+       broken one). */
+    var ftBtn = '';
+    if (canMarkStandard() && it && it.highlight_id && it.call_id && Number.isInteger(idx)) {
+      var noted = !!(state.correctedMomentIds && state.correctedMomentIds[it.highlight_id]);
+      ftBtn = noted
+        ? '<button class="review-kb-btn is-saved" disabled title="Your team has a coaching note from this moment">Noted \u2713</button>'
+        : '<button class="review-kb-btn review-ft-btn" data-kind="' + escapeHtml(kind) + '" data-idx="' + idx + '"'
+          + ' onclick="fineTuneFromInsight(this.getAttribute(\'data-kind\'), this.getAttribute(\'data-idx\'), this)"'
+          + ' title="Tell Scout how your team would handle this \u2014 it learns the idea behind it">Fine Tune Coaching</button>';
+    }
     var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(it.source)) + '</a>' : '';
     var repName = it.rep ? displayNameFromEmail(String(it.rep), String(it.rep)) : '';
     var repTag = repName ? '<span class="team-rep-tag">' + escapeHtml(repName) + '</span>' : '';
@@ -14936,6 +14950,7 @@
       + (it.data ? '<div class="team-insight-data">' + escapeHtml(it.data) + '</div>' : '')
       + quoteHtml
       + (attributed ? '' : '<div class="team-insight-foot">' + repTag + clipBtn + '</div>')
+      + (ftBtn ? '<div class="team-insight-foot">' + ftBtn + '</div>' : '')
     + '</div>';
   }
   function teamRecsHtml() {
@@ -14953,9 +14968,9 @@
     var w = r.working || [], i = r.improve || [];
     if (!w.length && !i.length) return '<div class="empty"><p>Not enough analyzed team calls yet.</p></div>';
     return '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
-      + (w.length ? w.map(function (x) { return teamInsightHtml(x, 'working'); }).join('') : '<div class="empty"><p>—</p></div>')
+      + (w.length ? w.map(function (x, k) { return teamInsightHtml(x, 'working', k); }).join('') : '<div class="empty"><p>—</p></div>')
       + '<div class="obj-group-header" style="color:var(--mid);margin-top:18px;">What to improve</div>'
-      + (i.length ? i.map(function (x) { return teamInsightHtml(x, 'improve'); }).join('') : '<div class="empty"><p>—</p></div>');
+      + (i.length ? i.map(function (x, k) { return teamInsightHtml(x, 'improve', k); }).join('') : '<div class="empty"><p>—</p></div>');
   }
 
 /* ⚠⚠⚠ CALL HIGHLIGHTS OF THE WEEK — RETIRED 2026-09-01 (Justin's ruling).
@@ -18300,9 +18315,8 @@
       // Loading state — three section-sized skeletons under the header.
       content.innerHTML = header + notice
         + '<div class="fade-in">'
-          + '<div class="review-skeleton-section"></div>'
-          + '<div class="review-skeleton-section"></div>'
-          + '<div class="review-skeleton-section"></div>'
+          /* \u26a0 One wait in words, not three bare boxes \u2014 missed by the lane sweep (2026-09-02). */
+          + '<div class="section fade-in">' + laneWaitHtml('callReview', 'Reading this call\u2019s review\u2026', 'Still working \u2014 this call is taking longer than usual to load.', 220) + '</div>'
         + '</div>';
       return;
     }
@@ -18803,9 +18817,26 @@
      written and the page says so. Stored per TEAM in the knowledge base as
      "Team coaching notes", which reps can read. The coaching lane reads it on
      NEW calls; nothing already written is rewritten. */
-  async function fineTuneCoaching(highlightId, btn) {
+  /* Surface \u2460: a Call Review moment row. */
+  function fineTuneFromRow(highlightId, btn) {
     if (!highlightId || !state.selectedCallId) return;
     var h = findReviewHighlight(highlightId) || {};
+    return fineTuneCoaching({ callId: state.selectedCallId, highlightId: highlightId, surface: 'call_review_moment', quote: h.quote, coaching: h.coaching }, btn);
+  }
+  /* Surface \u2461: a Team \u2192 Coaching insight, which names a rep and cites a moment. */
+  function fineTuneFromInsight(kind, idx, btn) {
+    var list = (state.teamRecs && state.teamRecs[kind]) || [];
+    var it = list[Number(idx)];
+    if (!it || !it.highlight_id || !it.call_id) return;
+    return fineTuneCoaching({ callId: it.call_id, highlightId: it.highlight_id, surface: 'team_coaching_insight', quote: it.quote, coaching: it.claim }, btn);
+  }
+  /* ONE control, two callers. `target` says which call, which moment, which
+     surface (recorded in the note as given_on.surface) and what to show. */
+  async function fineTuneCoaching(target, btn) {
+    var t = target || {};
+    var highlightId = t.highlightId, callId = t.callId;
+    if (!highlightId || !callId) return;
+    var h = { quote: t.quote, coaching: t.coaching };
     var context = (h.quote ? 'Prospect: \u201c' + h.quote + '\u201d\n' : '')
       + (h.coaching ? 'Scout coached: ' + h.coaching + '\n' : '')
       + '\nHow would your team prefer this handled? Scout will learn the idea behind it and coach this team that way from now on.';
@@ -18819,7 +18850,7 @@
     var first = null;
     try {
       var r1 = await fetch('/kb/fine-tune', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ fathom_call_id: state.selectedCallId, highlight_id: highlightId, feedback: feedback }) });
+        body: JSON.stringify({ fathom_call_id: callId, highlight_id: highlightId, feedback: feedback, surface: t.surface }) });
       try { first = await r1.json(); } catch (e) {}
       if (!r1.ok) { alert((first && first.error) || 'Could not read that.'); reset(); return; }
     } catch (err) { alert('Could not reach the server.'); reset(); return; }
@@ -18835,7 +18866,7 @@
     if (concept === null) { reset(); return; }
     try {
       var r2 = await fetch('/kb/fine-tune', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ fathom_call_id: state.selectedCallId, highlight_id: highlightId, feedback: feedback, confirm: true,
+        body: JSON.stringify({ fathom_call_id: callId, highlight_id: highlightId, feedback: feedback, confirm: true, surface: t.surface,
           concept: failed ? '' : String(concept).trim(), subject: first && first.subject, direction: first && first.direction,
           objection_category: first && first.objection_category, extraction: first && first.extraction }) });
       var d = null; try { d = await r2.json(); } catch (e) {}
@@ -18981,7 +19012,7 @@
       ftBtn = corrected
         ? '<button class="review-kb-btn is-saved" disabled title="Your team has a coaching note from this moment">Noted \u2713</button>'
         : '<button class="review-kb-btn review-ft-btn" data-hid="' + escapeHtml(String(h.id)) + '"'
-          + ' onclick="fineTuneCoaching(this.getAttribute(\'data-hid\'), this)"'
+          + ' onclick="fineTuneFromRow(this.getAttribute(\'data-hid\'), this)"'
           + ' title="Tell Scout how your team would handle this \u2014 it learns the idea behind it">Fine Tune Coaching</button>';
     }
     var handlingBadge = '';
