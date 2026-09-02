@@ -999,12 +999,25 @@
          mesh above the fade is black. */
       top: calc(51px + var(--rail-inset));
       left: var(--rail-inset);
-      bottom: var(--rail-inset);
+      /* ⚠⚠ SIZED BY ITS CONTENT, NOT THE VIEWPORT (Justin, 2026-09-02, having
+         looked at it live): the card ends ~16px below the last nav item — with
+         the Team menu EXPANDED that is 16px below "Marketing Insights" — and
+         the mesh shows beneath it at every width, including 1366 where there is
+         otherwise none. `bottom: auto`, never a bottom inset.
+         ⚠ COLLAPSED, THE CARD IS SHORTER. It does not jump: the menu opens and
+         closes on a 180ms grid-row transition (below), so the card's own height
+         follows smoothly. The alternative — holding the expanded height while
+         collapsed — leaves a blank where the items were; ruled against.
+         ⚠ A SHORT WINDOW: max-height is derived from the viewport (nav 51px +
+         the inset above and below), and overflow-y scrolls INSIDE the card, so
+         a window shorter than the expanded menu keeps its navigation. */
+      bottom: auto;
+      max-height: calc(100vh - 51px - var(--rail-inset) * 2);
       width: var(--sidebar-w);
       background: var(--bg-elevated);
       border-radius: var(--radius-lg);
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-      padding: 28px 20px;
+      padding: 28px 20px 16px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -1055,6 +1068,15 @@
       box-shadow: none;
     }
     .sidebar .nav-team-item { padding: 6px 10px; font-size: var(--fs-secondary); }
+    /* ⚠ THE MENU'S HEIGHT ANIMATES (grid-template-rows 0fr → 1fr) so the rail
+       card — which is content-sized — grows and shrinks smoothly rather than
+       jumping as Team opens and closes. `display: none` cannot animate and a
+       fixed max-height guesses; a 0fr→1fr row is exact at any item count. The
+       inner wrapper carries overflow:hidden because the ROW clips, not the
+       menu. Reduced-motion turns the transition off (see the media rule). */
+    .sidebar .nav-team-menu { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 180ms ease; }
+    .sidebar .nav-team-menu.is-collapsed { grid-template-rows: 0fr; }
+    .sidebar .nav-team-menu > .nav-team-menu-inner { overflow: hidden; min-height: 0; }
     /* ⚠ THE "soon" TAG DROPS BENEATH ITS LABEL, and that is what keeps the
        sidebar narrow. Inline, the three coming-soon items need 183-185px — they
        are the WIDEST things in the nav, and they are inert placeholders. On its
@@ -1071,7 +1093,7 @@
          navigation that vanishes is worse than one that changes shape. */
       .sidebar {
         position: static; width: auto; flex-direction: row; flex-wrap: wrap;
-        padding: 10px 16px; bottom: auto; gap: 2px;
+        padding: 10px 16px; bottom: auto; gap: 2px; max-height: none;
       }
       .sidebar .nav-link, .sidebar .nav-soon { width: auto; display: inline-block; }
       .sidebar .nav-team-wrap { display: inline-flex; width: auto; }
@@ -3741,6 +3763,7 @@
       .wel-kicker, .wel-title { opacity: 1; animation: none; letter-spacing: var(--wel-track); }
       .wel-out { animation: welFadeOut var(--wel-swipe) ease-out forwards; }
       @keyframes welFadeOut { to { opacity: 0; } }
+      .sidebar .nav-team-menu { transition: none; }
     }
 
     /* ── the objection drilldown grid ────────────────────────────────────── */
@@ -13544,7 +13567,7 @@
      anything having to keep the menu in step with the view. */
   function navTeamMenuHtml() {
     var here = teamPageForView(state.view);
-    return '<div class="nav-team-menu" role="menu" id="navTeamMenu">'
+    return '<div class="nav-team-menu" role="menu" id="navTeamMenu"><div class="nav-team-menu-inner">'
       + teamPagesWithBoard().map(function (p) {
           return '<a class="nav-team-item' + (p.view === here ? ' is-here' : '') + '"'
             + ' role="menuitem" tabindex="0"'
@@ -13553,13 +13576,18 @@
             + ' onkeydown="navTeamKeydown(event, \'' + p.view + '\');">'
             + escapeHtml(p.label) + '</a>';
         }).join('')
-    + '</div>';
+    + '</div></div>';
   }
 
   function navTeamMenuClose() {
     if (!state.navTeamOpen) return;
     state.navTeamOpen = false;
-    var m = document.getElementById('navTeamMenu'); if (m) m.remove();
+    /* Animate shut, then remove — the rail card is content-sized, so removing
+       the menu outright would make it jump. The timer matches the CSS
+       transition; a remove on transitionend alone would strand the element if
+       reduced-motion made the transition instant. */
+    var m = document.getElementById('navTeamMenu');
+    if (m) { m.classList.add('is-collapsed'); setTimeout(function () { if (m.parentNode) m.remove(); }, 200); }
     var a = document.getElementById('navTeam');
     if (a) a.setAttribute('aria-expanded', 'false');
     document.removeEventListener('click', navTeamOutside);
@@ -13570,7 +13598,12 @@
     if (state.navTeamOpen) return;
     var wrap = document.getElementById('navTeamWrap'); if (!wrap) return;
     state.navTeamOpen = true;
+    var stale = document.getElementById('navTeamMenu'); if (stale) stale.remove();   // a re-open during the closing animation
     wrap.insertAdjacentHTML('beforeend', navTeamMenuHtml());
+    /* Open from 0fr: insert collapsed, then release on the next frame so the
+       transition has a start state to animate from. */
+    var fresh = document.getElementById('navTeamMenu');
+    if (fresh) { fresh.classList.add('is-collapsed'); requestAnimationFrame(function () { requestAnimationFrame(function () { fresh.classList.remove('is-collapsed'); }); }); }
     var a = document.getElementById('navTeam');
     if (a) a.setAttribute('aria-expanded', 'true');
     /* ⚠ ARMED ON OPEN AND REMOVED ON CLOSE. Armed at boot it runs for a control
