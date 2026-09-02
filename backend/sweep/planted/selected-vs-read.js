@@ -34,6 +34,13 @@ async function planted(admin, id) {
   var both = await Promise.all([Promise.all(xa), Promise.all(xb)]);
   both[0].forEach(function (r) { (r.data || []).forEach(function (o) { console.log(o.n_eight); }); });   // N8: n_eight selected by xa — cross-attribution to xb would flag it
   both[1].forEach(function (r) { (r.data || []).forEach(function (o) { console.log(o.p_eight); }); });   // P8: p_eight not selected by xb
-  return [a, b, c, d, e, f, g, h, i, j, k, l, res, both];
+  var cols = 'id, name, ' + 'n_nine';
+  var vc = await admin.from('t').select(cols).eq('x', 1);
+  (vc.data || []).forEach(function (r) { console.log(r.n_nine, r.p_nine); });          // P9 p_nine unselected via a VARIABLE column list; N9 n_nine selected
+  var bq = admin.from('t').select('id, n_ten').eq('x', 1);
+  if (id) bq = bq.eq('id', id);
+  var brows = await bq;
+  (brows.data || []).forEach(function (r) { console.log(r.n_ten, r.p_ten); });         // P10 p_ten unselected on the BUILDER shape; N10 n_ten selected
+  return [a, b, c, d, e, f, g, h, i, j, k, l, res, both, vc, brows];
 }
 module.exports = planted;

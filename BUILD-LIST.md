@@ -31,6 +31,17 @@
 
 ## 🎯 CURRENT SESSION
 
+### 🔎 SWEEP BLOCK 3 (2026-09-02) — CLASS ④ BOTH HALVES. ONE UNFETCHED READ (ALREADY FILED), ONE CLASS NAME CARRYING TWO DESIGNS. NO FIXES.
+
+④(a) across all 234 column-listed selects (four shapes, 10/10 · 0/10): the ONE hit is `objection_class` (④a-1 above, arithmetic 606 vs 608). Blind spots hand-reviewed clean: three destructured selects (auth/billing), one `Promise.all([…])` literal (profiles). ④(b) media-aware (6/6 · 0/6): 12 same-context conflicts, all reproduced on the live page; 0 shorthand-after-longhand in declaration order; cross-selector overrides (the H267 shape) are outside the detector. Detail: `~/Desktop/scout-findings.md` (block 3), H667. **The standing rule from block 2 is in CLAUDE.md §6 (H666).**
+
+| tag | finding | evidence |
+|---|---|---|
+| `🐛 BUG` **④b-1 `.sec-note` is two designs under one class name** | `dashboard.html:1316` (13px, accent left border, 9px padding, 7px gap) and `:4752` (12px, italic, 18px gap) both apply; the later wins where they collide and the rest MERGES. | Rendered on the Close section drill-down: **12px, italic, bordered, 18px margin-bottom** — neither author's note. Fix shape when approved: rename one (which surface owns which is the review's call). |
+| `▪ MINOR` **④b cleanup — earlier declarations that are dead weight** | `.obj-card-head` gap 8px (2936; 14px at 3940 wins, 12px on the team page by specificity) · `.sidebar .nav-soon` line-height 1.3 (1051; 1.25 at 1103 wins) · `.page` max-width 1200px (1147; `var(--page-w)` at 1156 is the ruled geometry) · `.dash-pin-badge` in the group rule at 4073 (4077 restyles it) · `.kb-tab-panel` group values for input/textarea (5080–5081 specialise them, deliberately). | All measured live; none changes what a customer sees today. Remove the dead declarations, not the winners. |
+| `📋 CANDIDATE` **④b `.page { margin-left }` inside `@media (max-width: 900px)`** | `:1124` sets 0, `:1166` sets auto, same media block. | Not reproduced at desktop; the 900px cut is below any supported layout. Unmeasured. |
+| `→ ⑤` **dead CSS for the retired `team-expanded` view** | `body[data-view="team-expanded"] .team-recs-card` and `.pattern-card` — two rules each; the view normalises to `team-coaching` so no element can match. | Handed to class ⑤. |
+
 ### 🔎 SWEEP BLOCK 2 (2026-09-02) — CLASS ① REVIEWED: EIGHT GUARDS ARE TEXT-ONLY. NO FIXES.
 
 Check as specified: plant the defect (A: call site removed · B: call site kept, effect removed), run only that test, then the full suite. **Every A failed its guard; every B passed its guard AND the full suite, 2132/2132, eight times.** Plants on record in `backend/sweep/planted/guard-plants.md`; all reverted and the revert asserted. Detail and ranking: `~/Desktop/scout-findings.md` (block 2), H665. **Fix shape for every row (filed, not applied):** forge the actor below the credential (`test/not-sales-http.test.js`), execute the route, assert the CONSEQUENCE, beside the existing text guard.

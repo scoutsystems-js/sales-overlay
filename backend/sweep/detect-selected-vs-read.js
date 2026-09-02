@@ -44,6 +44,19 @@ function importedReads(src, name, file) {
 function analyse(src, ctx) {
   ctx = ctx || {}; const rawLine = ctx.raw ? mapper(ctx.raw, src) : (l) => l;
   const hits = [];
+  /* Variable column lists (`var cols = 'a, b'; …select(cols)`) — 11 sites — are
+     resolved by inlining the ONE literal assignment of that name in the file
+     (concatenations `'a, ' + 'b'` are joined); a name assigned twice or from
+     a non-literal is left as-is and stays outside the scope. Builder shape
+     (`var cq = admin…select('cols'); … var calls = await cq;`) — 8 sites —
+     is rewritten to the awaited form on the rows variable. */
+  src = src.replace(/\.select\(([A-Za-z_]\w*)\)/g, (all, name) => {
+    const defs = [...src.matchAll(new RegExp('(?:var|let|const)\\s+' + name + '\\s*=\\s*((?:\'[^\']*\'\\s*\\+?\\s*)+);', 'g'))];
+    if (defs.length !== 1) return all;
+    return ".select('" + defs[0][1].replace(/'\s*\+\s*'/g, '').replace(/^'|'$/g, '').replace(/'/g, '') + "')";
+  });
+  src = src.replace(/(?:var|let|const)\s+([A-Za-z_]\w*)\s*=\s*(admin[^;]*?\.select\('[^']*'\)[^;]*);([\s\S]{0,1200}?)(?:var|let|const)\s+([A-Za-z_]\w*)\s*=\s*await\s+\1\s*;/g,
+    (all, b, chain, mid, rows) => 'var ' + b + ' = ' + chain + ';' + mid + 'var ' + rows + ' = await ' + chain + ';');
   const re = /(?:(?:var|let|const)\s+([A-Za-z_]\w*)\s*=\s*await\s+[^;]*?\.select\('([^']*)'\)|([A-Za-z_]\w*)\.push\([^;]*?\.select\('([^']*)'\))/g; let m;
   while ((m = re.exec(src))) {
     const chunked = !!m[3]; const v = chunked ? m[3] : m[1], cols = colsOf(chunked ? m[4] : m[2]); if (!cols) continue;
@@ -99,8 +112,8 @@ function analyse(src, ctx) {
 function score() {
   const src = stripComments(fs.readFileSync(path.join(__dirname, 'planted', 'selected-vs-read.js'), 'utf8'));
   const hits = analyse(src, { file: path.join(__dirname, 'planted', 'selected-vs-read.js') }); const fields = hits.map((h) => h.field);
-  const pos = ['p_one', 'p_two', 'p_three', 'p_four', 'p_five', 'p_six', 'p_seven', 'p_eight'], neg = ['n_one', 'n_two', 'n_three', 'n_four', 'n_five', 'name', 'n_seven', 'n_eight'];
-  return { caught: pos.filter((f) => fields.includes(f)).length + '/8', falsePositives: neg.filter((f) => fields.includes(f)).length + '/8', flagged: fields };
+  const pos = ['p_one', 'p_two', 'p_three', 'p_four', 'p_five', 'p_six', 'p_seven', 'p_eight', 'p_nine', 'p_ten'], neg = ['n_one', 'n_two', 'n_three', 'n_four', 'n_five', 'name', 'n_seven', 'n_eight', 'n_nine', 'n_ten'];
+  return { caught: pos.filter((f) => fields.includes(f)).length + '/10', falsePositives: neg.filter((f) => fields.includes(f)).length + '/10', flagged: fields };
 }
 if (require.main === module) {
   if (process.argv[2] === '--score') { console.log(JSON.stringify(score())); process.exit(0); }
