@@ -1,0 +1,23 @@
+# Class ① plants (sweep block 2, 2026-09-02)
+
+Each row: the guard file, the product file, the search anchor (route), the exact text replaced, and what it became. A: call site removed. B: call site kept, effect removed. Result per row is in `~/Desktop/scout-findings.md` (block 2) and BUILD-LIST; every B plant ran the full suite green (2132/2132). All plants were reverted and the revert asserted.
+
+| plant | test | file | anchor | replaced | with |
+|---|---|---|---|---|---|
+| cross-user-grading A: gate call REMOVED from /update-analyses/:user_id | `cross-user-grading` | `routes/fathom.js` | `router.post('/update-analyses/:user_id'` | `  if (ownerOnlyGrading(req, res)) return;` | `  /* planted: gate call removed */` |
+| cross-user-grading B: gate CALLED, result IGNORED (route continues after the 403) | `cross-user-grading` | `routes/fathom.js` | `router.post('/update-analyses/:user_id'` | `  if (ownerOnlyGrading(req, res)) return;` | `  ownerOnlyGrading(req, res);` |
+| call-review-scope A: scope check REMOVED (\`if (false)\`) | `call-review-scope` | `routes/admin.js` | `router.get('/fathom-calls/:user_id/:call_id'` | `if (!scopeCheck.data \|\| scopeCheck.data.managed_by !== req.user.id) {` | `if (false) {` |
+| call-review-scope B: comparison KEPT, made dead (\`&& false\`) | `call-review-scope` | `routes/admin.js` | `router.get('/fathom-calls/:user_id/:call_id'` | `if (!scopeCheck.data \|\| scopeCheck.data.managed_by !== req.user.id) {` | `if ((!scopeCheck.data \|\| scopeCheck.data.managed_by !== req.user.id) && false) {` |
+| rep-page-scope A: scope check REMOVED | `rep-page-scope` | `routes/admin.js` | `router.get('/needs-work-sections/:user_id'` | `if (!t \|\| t.managed_by !== req.user.id) {` | `if (false) {` |
+| rep-page-scope B: comparison KEPT, made dead | `rep-page-scope` | `routes/admin.js` | `router.get('/needs-work-sections/:user_id'` | `if (!t \|\| t.managed_by !== req.user.id) {` | `if ((!t \|\| t.managed_by !== req.user.id) && false) {` |
+| failed-calls-surface A: classify call REMOVED (permanent failures re-dispatched) | `failed-calls-surface` | `routes/fathom.js` | — | `if (classifyFailure(reasonBy[row.id], row.call_date) !== 'permanent') failedIds.push(row.id);` | `failedIds.push(row.id);` |
+| failed-calls-surface B: classify CALLED, result IGNORED | `failed-calls-surface` | `routes/fathom.js` | — | `if (classifyFailure(reasonBy[row.id], row.call_date) !== 'permanent') failedIds.push(row.id);` | `classifyFailure(reasonBy[row.id], row.call_date); if (undefined !== 'permanent') failedIds.push(row.id);` |
+| board-lifecycle A: rename UPDATE loses its user scope | `board-lifecycle` | `routes/team.js` | `router.patch('/dashboard/:id/name'` | `.eq('id', req.params.id).eq('user_id', req.user.id)` | `.eq('id', req.params.id)` |
+| board-lifecycle B: scope text KEPT on a dead lookup, the UPDATE unscoped | `board-lifecycle` | `routes/team.js` | `router.patch('/dashboard/:id/name'` | `.eq('id', req.params.id).eq('user_id', req.user.id)` | `.eq('id', req.params.id); var _dead = admin.from('team_dashboards').select('id').eq('user_id', req.user.id); void _dead` |
+| board-lifecycle C: delete confirm AWAITED, answer IGNORED | `board-lifecycle` | `web/dashboard.html` | `async function dashDeleteBoard() {` | `if (!ok) return;` | `/* planted: answer ignored */` |
+| team-epoch A: stale-response drop REMOVED | `team-epoch` | `web/dashboard.html` | — | `if (which !== 'context' && epoch !== teamEpoch) {` | `if (false) {` |
+| team-epoch B: comparison KEPT, made dead | `team-epoch` | `web/dashboard.html` | — | `if (which !== 'context' && epoch !== teamEpoch) {` | `if (which !== 'context' && epoch !== teamEpoch && false) {` |
+| company-picker-placement A: owner gate REMOVED from the picker | `company-picker-placement` | `web/dashboard.html` | — | `if (!(ctx2 && ctx2.is_owner && Array.isArray(ctx2.teams) && ctx2.teams.length)) return '';` | `if (!(ctx2 && Array.isArray(ctx2.teams) && ctx2.teams.length)) return '';` |
+| company-picker-placement B: \`is_owner\` READ, not gating | `company-picker-placement` | `web/dashboard.html` | — | `if (!(ctx2 && ctx2.is_owner && Array.isArray(ctx2.teams) && ctx2.teams.length)) return '';` | `var _isOwner = ctx2 && ctx2.is_owner; if (!(ctx2 && Array.isArray(ctx2.teams) && ctx2.teams.length)) return '';` |
+| admin-companies-render B: tab restore KEPT in place, never runs | `admin-companies-render` | `web/admin.html` | `async function init() {` | `adminTab = readAdminTabFromHash()` | `if (false) adminTab = readAdminTabFromHash()` |
+| customer-language A: the cost-ownership sentence comes back | `customer-language` | `web/dashboard.html` | `var whose = isSelf()` | `var whose = isSelf()` | `var whose = isSelf(); var _c = 'billed to the company';` |
