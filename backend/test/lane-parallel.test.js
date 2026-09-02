@@ -82,3 +82,22 @@ test('⚠⚠ computeCallAnalytics (the Coaching lead number) runs its round trip
   const seq = await sa.computeCallAnalytics(slowAdmin(TABLES, 0, { total: 0, inflight: 0, max: 0 }), 'A', FROM, TO);
   assert.deepStrictEqual(out, seq, 'ordering must not change the answer');
 });
+
+/* ⚠ THE OBJECTIONS GRID HAD THE SAME FLOOR: /team/objections measured 3.9–4.5s
+   warm with the two fixes above live — its own `inChunks` awaited each 100-id
+   chunk in turn. Strict classification is off here (no model call); the
+   highlights fetch still runs AFTER the analyses fetch because the DQ filter
+   between them decides which ids are fetched — so the peak is per family. */
+test('⚠⚠ computeTeamObjections fetches each family\'s chunks at once', async () => {
+  const to = require('../lib/team-objections');
+  const stats = { total: 0, inflight: 0, max: 0 };
+  const t0 = Date.now();
+  const out = await to.computeTeamObjections(slowAdmin(TABLES, DELAY, stats), ['A'], FROM, TO, { strict: false, keyId: 'A' });
+  const ms = Date.now() - t0;
+  assert.ok(stats.total >= 5, 'the fixture must exercise several queries, saw ' + stats.total);
+  assert.ok(stats.max >= 2, 'peak in-flight must show the chunks running together, saw ' + stats.max + ' of ' + stats.total);
+  assert.ok(ms < (stats.total * DELAY) * 0.8, 'wall time ' + ms + 'ms is not below sequential ' + (stats.total * DELAY) + 'ms');
+  assert.strictEqual(out.totals.total, N, 'every objection counted once across the chunks');
+  const seq = await to.computeTeamObjections(slowAdmin(TABLES, 0, { total: 0, inflight: 0, max: 0 }), ['A'], FROM, TO, { strict: false, keyId: 'A' });
+  assert.deepStrictEqual(out, seq, 'ordering must not change the answer');
+});

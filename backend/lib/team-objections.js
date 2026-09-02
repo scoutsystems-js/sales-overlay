@@ -139,14 +139,22 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   calls.forEach(function (c) { meta[c.id] = c; callIds.push(c.id); });
 
   async function inChunks(table, cols, refine) {
-    var out = [];
+    /* ⚠ EVERY CHUNK AT ONCE (2026-09-02): awaited one by one this was the
+       Objections page's warm floor — ~4s of ordinary round trips on a cache
+       hit. Concatenated in chunk order, so the answer is unchanged
+       (test/lane-parallel.test.js deep-equals the sequential result). */
+    var qs = [];
     for (var j = 0; j < callIds.length; j += 100) {
       var qb = admin.from(table).select(cols).in('fathom_call_id', callIds.slice(j, j + 100));
       if (refine) qb = refine(qb);
-      var r = await qb;
+      qs.push(qb);
+    }
+    var rs = await Promise.all(qs);
+    var out = [];
+    rs.forEach(function (r) {
       if (r.error) throw new Error(table + ': ' + r.error.message);
       out = out.concat(r.data || []);
-    }
+    });
     return out;
   }
 
