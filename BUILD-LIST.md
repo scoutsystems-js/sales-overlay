@@ -1604,3 +1604,11 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 **WITHDRAWN** — the volume-suppression proposal. *"I don't care if he takes 1 call, grade it."* `MIN_BUCKET` guards a comparison; a closing rate is a count.
 
 **Remaining:** `section` · `performance` · `objections-intel` · `team-needs-work` · `kb` · `account` · `prospects` · `needs-work` · `team-members`. EOD out of scope.
+
+## 2026-09-01 — CLAUDE.md SPLIT: rules file (54k chars) + SCOUT-HISTORY.md (everything else, verbatim)
+- **The problem:** `CLAUDE.md` had reached 1,269,255 chars / 6,587 lines against Claude Code's 150,000-char limit. Verified, not assumed: a fresh `claude -p` session with the old file **cannot start at all** ("Prompt is too long · ~379,980 tokens, limit 200,000"). Every block since it crossed the limit ran without the rules.
+- **The cut:** `CLAUDE.md` is now standing rules only — 239 lines, 54,793 bytes, 185 rule bullets, each ending in `H###` pointers into `SCOUT-HISTORY.md`. The history file holds the original 6,587 lines **verbatim** (round-trip byte-identical after stripping the id tags) plus a header and a 662-entry table of contents; every heading is tagged `[H###]` so a pointer is one grep away. It is never `@import`ed.
+- **Load check:** a fresh `claude -p … --model haiku` session echoes the token `SCOUT-RULES-LOADED-2026-09-01` from the new file; the same query against the old file fails outright. The token stays in the file so the check is repeatable.
+- **Backup:** `~/Desktop/CLAUDE.md.backup-pre-split-2026-09-01` and `git show 2416f07:CLAUDE.md`.
+- **⚠ QUEUED — this file needs the same cut within the week.** It is 355,980 chars; ~66% is history by its own headings (lines 718–1606: CLOSED/RULED/SUPERSEDED, LIVE, and the per-block ship logs, ~234k chars). Not auto-loaded, so no hard limit, but every read of the queue is ~90k tokens. Move those three sections into `SCOUT-HISTORY.md` under their own ids and leave the ~122k-char queue. Not done this block by instruction.
+- **The design brief (`~/Desktop/scout-prompt.md`) was NOT actioned this block** — Justin will re-send it.
