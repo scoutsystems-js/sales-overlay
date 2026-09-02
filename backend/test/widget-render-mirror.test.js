@@ -60,7 +60,10 @@ function actualCoverage() {
   /* ⚠ bar_rep reads the SAME ranking as by_rep, so its coverage is that set BY
      CONSTRUCTION — the test below asserts the two stay identical rather than
      letting a metric gain one view and not the other. */
-  return { number: num, gauge: gau, trend: tre, by_rep: rep, bar_rep: rep, breakdown: brk, bar_cat: bcat };
+  /* The rep-card widget (2026-09-02) refuses any metric but its own, so the
+     same extraction works: the one it branches on is the one it can draw. */
+  const card = [...slice('dashRepCardHtml', 300, 2500).matchAll(/card\.metric === '([a-z_]+)'/g)].map((m) => m[1]);
+  return { number: num, gauge: gau, trend: tre, by_rep: rep, bar_rep: rep, breakdown: brk, bar_cat: bcat, rep_card: card };
 }
 
 test('⚠⚠ RENDERABLE mirrors what the real card builders branch on', () => {
@@ -243,7 +246,9 @@ test('⚠⚠ step one NAMES the views rather than counting them', () => {
      ceiling is the mirror of a floor — raising one is the single edit that can
      turn a real check vacuous, so it is only ever moved with its cause named.
      The lower bound is what still makes this non-vacuous. */
-  assert.ok(body.length > 800 && body.length < 7000, 'slice: ' + body.length);
+  /* Ceiling 7000 → 9000 on 2026-09-02: step two grew a "Which closer" branch
+     for the person entry (real added markup). The floor keeps this non-vacuous. */
+  assert.ok(body.length > 800 && body.length < 9000, 'slice: ' + body.length);
   /* This read "4 views" — a number that says nothing about WHICH, so the only
      way to find the three metrics with a trend was to open all ten in turn.
      Justin reported "no graphs appear as options" while the picker was offering

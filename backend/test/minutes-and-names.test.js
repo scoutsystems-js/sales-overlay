@@ -37,6 +37,7 @@ test('⚠⚠ EVERY metric carries a description, and it carries its UNIT', () =>
   assert.ok(C._CATALOG.length >= 10, 'non-vacuity: the catalog must not be empty');
   C._CATALOG.forEach((m) => {
     assert.ok(m.description && m.description.length > 20, m.key + ' has no description');
+    if (m.person) return;   // a PERSON entry (the rep card, 2026-09-02) is not a quantity and has no unit
     assert.ok(UNIT.test(m.description), m.key + ' description states no unit: ' + m.description);
   });
   // and it reaches the browser, or none of the above is visible to anyone
@@ -92,7 +93,7 @@ test('⚠⚠ ONE unit table, every card builder — no builder inlines its own',
   // every offerable metric has an entry, bare or not — an ABSENT entry and a
   // deliberately bare one are indistinguishable unless the decision is written down
   const tbl = CODE.slice(CODE.indexOf('var DASH_UNIT = {'), CODE.indexOf('};', CODE.indexOf('var DASH_UNIT = {')));
-  C._CATALOG.filter((m) => C._viewsFor(m).length).forEach((m) => {
+  C._CATALOG.filter((m) => C._viewsFor(m).length && !m.person).forEach((m) => {   // a person entry draws no number, so it has no unit
     assert.ok(new RegExp(m.key + ':').test(tbl), m.key + ' has no DASH_UNIT entry');
   });
 

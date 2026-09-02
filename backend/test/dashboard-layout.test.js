@@ -88,3 +88,17 @@ test('⚠ the default carries only metrics the catalog still offers', () => {
       c.metric + ' defaults to a ' + c.view + ' it cannot support');
   });
 });
+
+test('⚠⚠ a rep card keeps its closer and is never narrower than two columns (2026-09-02)', () => {
+  const r = L.resolveLayout([{ metric: 'rep_card', view: 'rep_card', rep: 'u-1', w: 1, h: 2 }, { metric: 'closing_rate', view: 'gauge', rep: 'u-1', w: 1, h: 1 }]);
+  assert.strictEqual(r.cards.length, 2);
+  assert.strictEqual(r.cards[0].rep, 'u-1', 'the closer rides with the card');
+  assert.strictEqual(r.cards[0].w, 2, 'treatment C does not fit one column — clamped up, same markup');
+  assert.strictEqual(r.cards[0].person, true);
+  assert.strictEqual(r.cards[1].rep, undefined, 'a metric card carries no closer');
+  const s = L.sanitizeLayout([{ metric: 'rep_card', view: 'rep_card', rep: 'u-1', w: 1, h: 2 }, { metric: 'rep_card', view: 'rep_card', w: 2, h: 2 }, { metric: 'rep_card', view: 'rep_card', rep: { x: 1 }, w: 2, h: 2 }]);
+  assert.deepStrictEqual(s, [{ metric: 'rep_card', view: 'rep_card', w: 2, h: 2, rep: 'u-1' }], 'a rep card with no valid closer is dropped, not saved');
+  const d = L.resolveLayout([{ metric: 'rep_card', view: 'rep_card', w: 2, h: 2 }]);
+  assert.strictEqual(d.cards.length, 0);
+  assert.strictEqual(d.dropped[0].reason, 'no closer named');
+});

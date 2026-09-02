@@ -161,7 +161,7 @@ test('renderTeamView ACTUALLY EMITS the graph section — the regression that sh
     'the closing-rate canvas is absent from the rendered markup');
 });
 
-test('the graphs are the FIRST thing on the team view, above the needs-work card', () => {
+test('the rep cards come FIRST under the gauges, and the graphs follow them (converted 2026-09-02)', () => {
   // The glance stat card was removed 2026-08-16 (Justin, twice), so the graphs
   // now sit directly under the header — which is what "the first thing he wants
   // to see" asked for in the first place.
@@ -171,7 +171,7 @@ test('the graphs are the FIRST thing on the team view, above the needs-work card
   // Anchor renamed 2026-08-17: the team objection card is now titled
   // "Objection Handling Focus". The ordering property is unchanged — this is
   // the anchor moving, not the claim.
-  const overview = out.html.indexOf('Team Overview');
+  const overview = out.html.indexOf('<h2>Reps</h2>');   // the cards' section replaced the Team Overview list
 
   /* ⚠ THE needs-work ANCHOR IS GONE FROM THIS PAGE (the split, 2026-08-31) —
      that card moved to Coaching, so "graphs above needs-work" is no longer an
@@ -179,13 +179,14 @@ test('the graphs are the FIRST thing on the team view, above the needs-work card
      asserted: the graphs are the first thing under the header, above every
      score list Performance still owns. */
   assert.notStrictEqual(graphs, -1, 'graph canvas missing');
-  assert.notStrictEqual(overview, -1, 'Team Overview heading missing — anchor is stale');
+  assert.notStrictEqual(overview, -1, 'Reps section missing — anchor is stale');
+  assert.strictEqual(out.html.indexOf('Team Overview'), -1, 'the retired score list must not render');
   assert.notStrictEqual(header, -1, 'page header missing — anchor is stale');
   assert.strictEqual(out.html.indexOf('Objection Handling Focus'), -1,
     'needs-work belongs to Coaching now and must not render here');
 
   assert.ok(header < graphs, 'graphs come after the header');
-  assert.ok(graphs < overview, 'graphs must come BEFORE Team Overview');
+  assert.ok(overview < graphs, 'the cards must come BEFORE the graphs — Justin: "at the bottom they are being hidden"');
   assert.strictEqual(out.html.indexOf('team-glance'), -1, 'the glance card must be gone');
 });
 
@@ -225,8 +226,8 @@ test('NO dead mount: the graph section is never emitted from inside a callback',
   // The exact defect. teamScoreListHtml's callback must be a bare accessor.
   const fn = HTML.slice(HTML.indexOf('function renderTeamPerformance'), HTML.indexOf('function drawRepSeriesCharts'));
   assert.ok(fn.length > 800 && fn.length < 9000, 'slice must cover the render path: ' + fn.length);
-  assert.ok(/teamScoreListHtml\(function \(r\) \{ return r\.avg_score; \}\)/.test(fn),
-    'the avg_score callback must contain nothing but its return');
+  /* The score-list callback that carried the dead mount is gone with its list
+     (2026-09-02); the property that survives is the assertion below. */
   assert.ok(fn.indexOf('insertAdjacentHTML') === -1,
     'the section is part of the main assembly, not appended afterwards');
 });
@@ -361,7 +362,7 @@ test('10c-2: a card renders per rep, SORTED WORST FIRST', () => {
 test('rates render WITH their raw counts, per the house rule', () => {
   const out = renderCards(REPS);
   assert.ok(out.html.indexOf('39 of 142 prospects') !== -1, 'closing counts');
-  assert.ok(out.html.indexOf('17 of 132 handled') !== -1, 'objection counts');
+  assert.ok(out.html.indexOf('Objections handled \u00b7 17 of 132') !== -1, 'objection counts');   // the trading card's wording, 2026-09-02
   assert.ok(out.html.indexOf('3 of 42 handled') !== -1, 'weakest-objection counts');
 });
 
@@ -374,7 +375,7 @@ test('UNMEASURED IS SAID IN WORDS, never a bare dash that reads as zero', () => 
   const avaCard = out.html.slice(out.html.indexOf('>demo-ava<'), out.html.indexOf('>demo-ava<') + 1400);
   assert.strictEqual(avaCard.indexOf('rep-stat-val">\u2014'), -1, 'no dash as a stat value');
   assert.ok(out.html.indexOf('not enough objections yet to judge a category') !== -1);
-  assert.ok(out.html.indexOf('no scored sections yet') !== -1);
+  assert.ok(/no scored sections yet/i.test(out.html), 'a rep with no scored sections is told so, in the bars\' slot');
 });
 
 test('THE TEAM COMPARISON APPEARS ONLY WHEN IT QUALIFIES', () => {
@@ -388,10 +389,12 @@ test('THE TEAM COMPARISON APPEARS ONLY WHEN IT QUALIFIES', () => {
   assert.ok(joshCard.indexOf('lowest on the team') === -1);
 });
 
-test('the weakest SECTION renders with its score and a human label', () => {
+test('the weakest SECTION is the LIT bar, with its human label and its score (converted 2026-09-02)', () => {
   const out = renderCards(REPS);
-  assert.ok(out.html.indexOf('Discovery 47') !== -1);
-  assert.ok(out.html.indexOf('discovery 47') === -1, 'label should be the human form');
+  const lit = out.html.indexOf('class="rep-bar weak"><span>Discovery</span>');
+  assert.notStrictEqual(lit, -1, 'the lit bar is Discovery, labelled in the human form');
+  assert.ok(/>47</.test(out.html.slice(lit, lit + 300)), 'and it carries its score');
+  assert.strictEqual(out.html.indexOf('>discovery<'), -1, 'never the raw key');
 });
 
 test('cards click through via the EXISTING pivot, not a parallel path', () => {
@@ -399,13 +402,16 @@ test('cards click through via the EXISTING pivot, not a parallel path', () => {
   assert.ok(/onclick="setUser\('u-josh'\)"/.test(out.html));
 });
 
-test('10d: the verified sentence renders on the card when it has loaded', () => {
+test('the trading card carries NO why-sentence, even when the lane has one (converted 2026-09-02)', () => {
+  /* Treatment C has no sentence slot, and Performance no longer fetches the
+     why lane (a page that renders nothing from a lane must not fetch it). A
+     sentence that happens to be in state must still not appear. */
   const out = renderTeam(Object.assign({}, BASE, {
     teamOverview: { reps: [], per_rep: REPS, totals: {} }, teamOverviewLoading: false,
     teamWhy: { by_rep: { 'u-josh': { sentence: 'Josh closed 39 of 142 prospects (27%).', tier: 2 } } },
   }));
-  assert.ok(out.html.indexOf('rep-why') !== -1);
-  assert.ok(out.html.indexOf('Josh closed 39 of 142 prospects (27%).') !== -1);
+  assert.strictEqual(out.html.indexOf('rep-why'), -1);
+  assert.strictEqual(out.html.indexOf('Josh closed 39 of 142 prospects (27%).'), -1);
 });
 
 test('10d: a card WITHOUT a sentence renders complete, with no placeholder', () => {
@@ -415,9 +421,10 @@ test('10d: a card WITHOUT a sentence renders complete, with no placeholder', () 
     teamOverview: { reps: [], per_rep: REPS, totals: {} }, teamOverviewLoading: false,
     teamWhy: { by_rep: { 'u-josh': { sentence: 'x', tier: 1 } } },
   }));
-  const avaCard = out.html.slice(out.html.indexOf('>demo-ava<'), out.html.indexOf('>demo-ava<') + 1600);
+  const avaCard = out.html.slice(out.html.indexOf('>demo-ava<'), out.html.indexOf('>demo-ava<') + 2400);
   assert.strictEqual(avaCard.indexOf('rep-why'), -1, 'no empty slot for a rep with no sentence');
-  assert.ok(avaCard.indexOf('Discovery 45') !== -1, 'the rest of the card is intact');
+  const lit = avaCard.indexOf('class="rep-bar weak"><span>Discovery</span>');
+  assert.ok(lit !== -1 && />45</.test(avaCard.slice(lit, lit + 300)), 'the rest of the card is intact');
 });
 
 test('10d loads LAZILY and is cleared when the team or range changes', () => {
@@ -433,18 +440,19 @@ test('10d loads LAZILY and is cleared when the team or range changes', () => {
    cards sit between the graphs and needs-work" is an ordering that no longer
    exists on one page. The SUBJECT — rep cards come after the graphs and before
    the score lists — survives on Performance and is what is asserted now. */
-test('the rep cards sit between the graphs and the score lists', () => {
+test('the rep cards sit between the gauges and the graphs; the score lists are gone (converted 2026-09-02)', () => {
   const out = renderTeam(Object.assign({}, BASE, {
     teamOverview: { reps: [], per_rep: REPS, totals: {} }, teamOverviewLoading: false,
   }));
+  const gauges = Math.max(out.html.indexOf('Team Averages'), out.html.indexOf('Measuring the last 7 days'));
   const graphs = out.html.indexOf('repHandleChart');
-  const cards  = out.html.indexOf('rep-card');
-  const lists  = out.html.indexOf('Team Overview');
+  const cards  = out.html.indexOf('rep-card-list');
+  assert.notStrictEqual(gauges, -1, 'gauges panel missing — anchor is stale');
   assert.notStrictEqual(graphs, -1, 'graph canvas missing');
   assert.notStrictEqual(cards, -1, 'rep cards missing — anchor is stale');
-  assert.notStrictEqual(lists, -1, 'Team Overview missing — anchor is stale');
-  assert.ok(graphs < cards, 'cards come after the graphs');
-  assert.ok(cards < lists, 'and before the score lists');
+  assert.strictEqual(out.html.indexOf('Team Overview'), -1, 'the score lists retired with the cards');
+  assert.ok(gauges < cards, 'cards come after the gauges');
+  assert.ok(cards < graphs, 'and before the graphs — the whole point of the move');
 });
 
 test('an empty or still-loading team degrades without throwing', () => {

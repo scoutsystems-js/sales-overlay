@@ -28,8 +28,10 @@ test('every panel is assigned to exactly one page', () => {
      card linked straight to it). A panel offered in the chooser that nothing
      gates in the render is a control that does nothing, and this guard's sibling
      below caught exactly that the moment the section came off. */
-  assert.strictEqual(ps.length, 8, 'every panel must carry a page, got ' + ps.length);
-  assert.strictEqual(new Set(ps.map(p => p.key)).size, 8, 'no duplicate keys');
+  /* 8 → 5 on 2026-09-02: 'overview', 'closing' and 'objection' retired with the
+     three score lists the rep cards replaced. */
+  assert.strictEqual(ps.length, 5, 'every panel must carry a page, got ' + ps.length);
+  assert.strictEqual(new Set(ps.map(p => p.key)).size, 5, 'no duplicate keys');
   ps.forEach(p => assert.ok(/^team(-\w+)?$/.test(p.page), p.key + ' has no valid page'));
 });
 
@@ -44,8 +46,8 @@ test('⚠ the panel KEYS are unchanged — that is the Customize View migration'
      discarded on read — which is why the HIDDEN set is stored rather than the
      visible one. The eight that remain keep their names, which is the property. */
   assert.deepStrictEqual(keys,
-    ['closing', 'digest', 'gauges', 'graphs', 'objection', 'overview', 'recs', 'reps'],
-    'renaming a surviving key would orphan what a manager hid');
+    ['digest', 'gauges', 'graphs', 'recs', 'reps'],
+    'renaming a surviving key would orphan what a manager hid (three keys RETIRED 2026-09-02 with their lists — a retired key is discarded on read, not renamed)');
   assert.ok(!keys.includes('needswork'),
     'the retired panel must not linger in the chooser — it would toggle nothing');
   assert.ok(/scout_team_panels_v1/.test(LIVE), 'the storage key must not be namespaced per page');
@@ -134,13 +136,17 @@ test('⚠ the Team tab stays underlined on every team page', () => {
 
 /* ⚠ THE LANE EVERY REP CARD READS. The split dropped this kick entirely — no
    renderer asked for it — so each card's one-line summary was blank forever. */
-test('⚠ the page whose cards read teamWhy actually kicks that lane', () => {
+test('⚠ the page whose cards NO LONGER read teamWhy does not kick that model lane (converted 2026-09-02)', () => {
   const at = LIVE.indexOf('function renderTeamPerformance');
   const body = LIVE.slice(at, LIVE.indexOf('content.innerHTML', at));
   assert.ok(body.length > 200 && body.length < 2500, 'slice must cover it: ' + body.length);
-  assert.ok(/loadTeam\('why'\)/.test(body), 'rep cards read state.teamWhy — the lane must be kicked');
+  /* The trading-card rep card carries no sentence, so nothing on Performance
+     renders teamWhy — and a page that renders nothing from a lane must not fetch
+     it, least of all a model lane. The inverse of the original guard. */
+  assert.ok(!/loadTeam\('why'\)/.test(body), 'nothing on Performance renders teamWhy — the lane must not be kicked');
+  assert.strictEqual((LIVE.match(/state\.teamWhy\.by_rep/g) || []).length, 0, 'no reader of the why lane is left on the card');
   // every lane a page's panels read must be kicked BY that page
-  ['overview', 'repSeries', 'teamAverages', 'why'].forEach(l =>
+  ['overview', 'repSeries', 'teamAverages'].forEach(l =>
     assert.ok(body.indexOf("loadTeam('" + l + "')") !== -1, 'Performance must kick ' + l));
 });
 

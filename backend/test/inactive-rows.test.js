@@ -51,7 +51,10 @@ test('⚠⚠ the board skips drawing inactive rows, in BOTH lists', () => {
   const uses = (src.match(/visibleReps\(/g) || []).length;
   assert.ok(uses >= 3, 'expected the definition plus both call sites, found ' + uses);
   assert.ok(/visibleReps\(reps\)\.map\(repCardHtml\)/.test(src), 'the rep cards must use it');
-  assert.ok(/var reps = visibleReps\(o\.per_rep\)\.slice\(\)/.test(src), 'the detail list must use it');
+  /* Converted 2026-09-02: the three score lists retired with the trading-card
+     rep cards; the second list that draws people is now the widget picker's
+     closer list. Same property — every list of people skips inactive rows. */
+  assert.ok(/visibleReps\(ov\.per_rep\)\.slice\(\)/.test(src), 'the widget picker\'s closer list must use it');
 });
 
 test('⚠ unknown/absent `active` renders — the default must not hide real people', () => {

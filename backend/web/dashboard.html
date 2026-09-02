@@ -2453,30 +2453,54 @@
     /* (k2) The all-hidden note. Full-strength text, not a muted hint — it is a
        statement about the user's own action, and the no-grey rule applies. */
     .rep-graph-note { display: none; font-size: 13px; font-weight: 600; color: var(--text); margin-top: 10px; }
-    /* 10c-2 rep cards. All text full strength — the no-grey rule. */
-    .rep-card-list { display: grid; gap: 12px; margin-top: 12px; }
-    .rep-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated);
-                padding: 16px; cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease); }
+    /* ⚠⚠ THE TRADING-CARD REP CARD — TREATMENT C (Justin, 2026-09-02). The five
+       section grades are the picture. ONE surface for two placements: the
+       Performance grid and the dashboard widget — the SAME markup at whatever
+       width the slot has (Justin: "we don't need to make it skinnier").
+       All text full strength (opacity is a depth cue, never --muted). Grades are
+       UNCOLOURED — every grade on the team is one band, and a colour that cannot
+       vary is not a colour; the only colours are the movement chip (a direction,
+       which varies) and the lit weakest bar (the accent). */
+    .rep-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; margin-top: 12px; }
+    .rep-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); overflow: hidden;
+                cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease); }
     .rep-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-    .rep-card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+    .rep-card-band { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg-deep); border-bottom: 1px solid var(--border); }
+    .rep-mono { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-deep); border: 1px solid var(--border-strong); color: var(--text);
+                display: flex; align-items: center; justify-content: center; font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); letter-spacing: .03em; flex: none; }
     .rep-card-name { font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); }
-    .rep-card-calls { font-size: 12px; color: var(--text); }
-    .rep-card-stats { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 10px; }
-    .rep-stat { min-width: 150px; }
-    .rep-stat-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .04em; color: var(--text); }
-    .rep-stat-val { font-size: var(--fs-number); font-weight: var(--fw-normal); color: var(--text); line-height: 1.2; margin-top: 3px; }
-    .rep-stat-sub { font-size: 12px; color: var(--text); margin-top: 1px; }
-    .rep-weak { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; padding-top: 8px;
-                border-top: 1px solid var(--border); font-size: 13px; color: var(--text); }
-    .rep-weak-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .04em; min-width: 132px; }
-    .rep-weak-val { font-weight: var(--fw-normal); }
-    .rep-weak-sub, .rep-weak-cmp, .rep-weak-none { color: var(--text); }
-    .rep-weak-cmp { margin-left: auto; }
-    /* Unmeasured: the sentence IS the value, so there is no dash to misread. */
-    /* Same vertical slot the big number occupies, so mixed rows stay aligned. */
-    .rep-why { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
-               font-size: 13px; line-height: 1.5; color: var(--text); }
-    .rep-stat-none-val { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.2; margin-top: 3px; padding: 4px 0; }
+    .rep-move { font-size: var(--fs-label); white-space: nowrap; color: var(--text); }
+    .rep-move.up { color: var(--good); } .rep-move.down { color: var(--bad); }
+    .rep-card-calls { margin-left: auto; font-size: var(--fs-label); color: var(--text); opacity: .75; white-space: nowrap; }
+    .rep-card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; padding: 16px 18px; }
+    /* ⚠ THE GAUGES' STEP, NOT --fs-display (Justin, 2026-09-02, reversing "go big" once told eight
+       cards at 48 is eight loud numbers): --fs-display stays the ONE loud number on a page. */
+    .rep-card-lead-val { font-size: var(--fs-gauge-value); font-weight: var(--fw-display); line-height: 1; letter-spacing: -.01em; color: var(--text); font-variant-numeric: tabular-nums; }
+    .rep-card-lead-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .05em; color: var(--text); opacity: .75; margin-top: 6px; }
+    .rep-card-lead-sub { font-size: var(--fs-label); color: var(--text); opacity: .75; margin-top: 3px; }
+    /* Unmeasured: the sentence IS the value, in the slot the number would take. */
+    .rep-card-lead-none { font-size: var(--fs-number); font-weight: var(--fw-normal); line-height: 1.15; color: var(--text); }
+    .rep-stat-none-val { font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); line-height: 1.2; color: var(--text); }
+    .rep-bars-none { font-size: var(--fs-secondary); color: var(--text); opacity: .85; }
+    .rep-stat { margin-top: 14px; }
+    .rep-stat-val { font-size: var(--fs-number); font-weight: var(--fw-normal); line-height: 1.15; color: var(--text); font-variant-numeric: tabular-nums; }
+    .rep-stat-val small { font-size: var(--fs-label); opacity: .75; }
+    .rep-side { font-style: normal; font-size: var(--fs-eyebrow); letter-spacing: .05em; text-transform: uppercase; margin-left: 6px; opacity: .85; }
+    .rep-stat-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .05em; color: var(--text); opacity: .7; margin-top: 2px; }
+    .rep-card-bars { display: flex; flex-direction: column; gap: 6px; }
+    .rep-bar { display: grid; grid-template-columns: 64px 1fr 28px; align-items: center; gap: 8px; font-size: var(--fs-label); color: var(--text); }
+    .rep-bar-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .rep-bar-fill { height: 100%; background: var(--text); opacity: .45; border-radius: 3px; }
+    .rep-bar.weak .rep-bar-fill { opacity: 1; background: var(--accent); }
+    .rep-bar.weak { font-weight: var(--fw-emphasis); }
+    .rep-bar-val { text-align: right; font-variant-numeric: tabular-nums; }
+    .rep-bars-cap { font-size: var(--fs-label); color: var(--text); opacity: .7; margin-top: 4px; }
+    .rep-card-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
+                     border-top: 1px solid var(--border); padding-top: 10px; font-size: var(--fs-secondary); color: var(--text); }
+    .rep-weak { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; font-size: var(--fs-secondary); color: var(--text); }
+    .rep-weak-label { opacity: .7; }
+    .rep-weak-val, .rep-weak-sub, .rep-weak-cmp, .rep-weak-none { color: var(--text); }
+    .rep-card-none { padding: 16px 18px; font-size: var(--fs-secondary); line-height: 1.5; color: var(--text); opacity: .85; }
     .rep-graph-skeleton { height: 100%; width: 100%; border-radius: var(--radius); }
     /* Date-range picker (stage 1). All text full strength — the no-grey rule. */
     .dp { position: relative; display: inline-block; }
@@ -10424,7 +10448,6 @@
     // ⚠ repCardHtml() reads state.teamWhy for each rep's one-line summary. The
     //   split dropped this kick entirely — no renderer asked for it, so the
     //   line was blank on every card no matter how long you waited.
-    if (state.teamWhy === null && !state.teamWhyLoading) loadTeam('why');
     if (state.teamAverages === null && !state.teamAveragesLoading) loadTeam('teamAverages');
 
     // The glance drill replaces the body, exactly as it did on the single page.
@@ -10438,17 +10461,16 @@
       // they sat above it on the single page.
       + (teamPanelVisible('gauges') ? avgPanelHtml() : '')
       + teamControlsHtml()
-      + (teamPanelVisible('graphs') ? repSeriesSectionHtml() : '')
+      /* ⚠⚠ CARDS BEFORE GRAPHS (Justin, 2026-09-02). Measured: the Reps section
+         started at 1800px — 2.1 screens down — under three gauges and three
+         graphs, with three score lists BELOW it repeating figures the cards
+         carry. The cards now land inside the first screen; the three lists
+         (Team Overview / Closing Score / Objection Handling Score) are retired —
+         every figure on them is on the card, and ranking one metric across reps
+         is what the by_rep dashboard widget is for. Nothing else linked into
+         them: teamScoreListHtml had these three callers and no other. */
       + (teamPanelVisible('reps') ? repCardsHtml() : '')
-      + (teamPanelVisible('overview') ? '<div class="section fade-in"><div class="section-header"><h2>Team Overview</h2>'
-        + '<div class="meta">avg total score · click a rep to open their coaching dashboard</div></div>'
-        + teamScoreListHtml(function (r) { return r.avg_score; }) + '</div>' : '')
-      + (teamPanelVisible('closing') ? '<div class="section fade-in"><div class="section-header"><h2>Closing Score</h2>'
-        + '<div class="meta">avg Close-section score</div></div>'
-        + teamScoreListHtml(function (r) { return r.sections ? r.sections.close : null; }) + '</div>' : '')
-      + (teamPanelVisible('objection') ? '<div class="section fade-in"><div class="section-header"><h2>Objection Handling Score</h2>'
-        + '<div class="meta">avg Objection-section score</div></div>'
-        + teamScoreListHtml(function (r) { return r.sections ? r.sections.objection : null; }) + '</div>' : '')
+      + (teamPanelVisible('graphs') ? repSeriesSectionHtml() : '')
       + allPanelsHiddenNoteHtml();
 
     /* ⚠⚠ THE CHART MOUNT BELONGS TO THE PAGE THAT HAS THE CANVASES. When the
@@ -10640,27 +10662,8 @@
   // Ranked-bar list of every rep by one 0–100 score (name · bar · value), sorted
   // high→low, each row click-through to the rep's coaching dashboard. Bar width =
   // the score itself (absolute out of 100), colored by scoreColor. null → "—", last.
-  function teamScoreListHtml(scoreFn) {
-    var o = state.teamOverview;
-    if (!o) return laneWaitHtml('overview', 'Adding up the team\'s calls\u2026', null, 80);
-    if (o._forbidden) return '<div class="error">Not authorized for this team.</div>';
-    if (o._error) return '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
-    var reps = visibleReps(o.per_rep).slice();
-    if (!reps.length) return '<div class="empty"><p>No reps in this team yet.</p></div>';
-    reps.sort(function (a, b) {
-      var va = scoreFn(a), vb = scoreFn(b);
-      return (vb == null ? -1 : vb) - (va == null ? -1 : va);
-    });
-    return '<div class="team-detail-list">' + reps.map(function (r) {
-      var v = scoreFn(r);
-      var pct = v == null ? 0 : Math.max(0, Math.min(100, v));
-      return '<div class="team-detail-row" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')" title="Open ' + escapeHtml(personLabel(r) || 'this rep') + '\'s dashboard">'
-        + '<div class="team-detail-name">' + escapeHtml(repName(r)) + '</div>'
-        + '<div class="team-detail-track"><div class="team-detail-fill" style="width:' + Math.max(2, pct) + '%;background:' + scoreColor(v) + ';"></div></div>'
-        + '<div class="team-detail-val">' + (v == null ? '—' : v) + '</div>'
-        + '</div>';
-    }).join('') + '</div>';
-  }
+  /* teamScoreListHtml RETIRED 2026-09-02 with the three score lists it drew —
+     the rep cards carry every figure it ranked; the by_rep widget ranks one. */
 
   // ── "What needs work" (B-2) — compact card + hidden detail page ────────────
   // Compact card directly under the glance boxes: the money paragraph (or the
@@ -12564,6 +12567,22 @@
       + '</div>';
   }
 
+  /* ⚠⚠ THE REP-CARD WIDGET — the SAME repCardHtml the Performance page draws,
+     UNCHANGED — the same markup at whatever width the slot has (Justin: "we
+     don't need to make it skinnier"); the layout clamps the slot to two columns,
+     the card's minimum. Refuses any other
+     metric, exactly as the by-rep ranking refuses an unknown one. */
+  function dashRepCardHtml(card) {
+    var isRepCard = card.metric === 'rep_card';
+    if (!isRepCard) return dashNoValueHtml('this card can only show a closer');
+    var o = state.teamOverview;
+    if (o === null) return laneWaitHtml('overview', 'Adding up this closer\u2019s calls\u2026', null, 220);
+    var problem = laneProblem(o);
+    if (problem) return laneProblemHtml('this closer', problem);
+    var r = (o.per_rep || []).filter(function (x) { return x.user_id === card.rep; })[0];
+    if (!r) return dashNoValueHtml('this closer is not on this board');
+    return repCardHtml(r);
+  }
   function dashCardHtml(card, index) {
     var body =
         card.view === 'gauge'     ? dashGaugeHtml(card)
@@ -12572,6 +12591,7 @@
       : card.view === 'bar_rep'   ? dashBarRepHtml(card)
       : card.view === 'breakdown' ? dashBreakdownHtml(card)
       : card.view === 'bar_cat'   ? dashBarCatHtml(card)
+      : card.view === 'rep_card'  ? dashRepCardHtml(card)
       :                             dashNumberHtml(card);
     /* ⚠ A CARD WHOSE VIEW FELL BACK SAYS SO. The manager chose a gauge and is
        looking at a number; silently differing from what they picked is the
@@ -12598,7 +12618,7 @@
           ? '<button type="button" class="dash-card-remove" data-idx="' + index + '" '
             + 'onclick="dashRemoveCard(' + index + ')" aria-label="Remove this card" title="Remove this card">✕</button>'
           : '')
-      + (card.view === 'number' ? '' : '<div class="dash-card-title">' + escapeHtml(card.label) + '</div>')
+      + ((card.view === 'number' || card.view === 'rep_card') ? '' : '<div class="dash-card-title">' + escapeHtml(card.label) + '</div>')
       + body + fell
       + (editing ? '<div class="dash-card-handle" data-idx="' + index + '" '
                  + 'title="Drag to resize" aria-hidden="true"></div>' : '')
@@ -12712,7 +12732,7 @@
            so forking a pinned board leaves the pin where it was. There is exactly
            one pin and the partial unique index enforces it. */
         body: JSON.stringify({ id: asNew ? null : e.id, name: e.name, layout: e.cards.map(function (c) {
-          return { metric: c.metric, view: c.view, w: c.w, h: c.h };
+          return { metric: c.metric, view: c.view, w: c.w, h: c.h, rep: c.rep };
         }) }),
       });
       var j = await res.json();
@@ -12877,6 +12897,17 @@
     dashPick.step = 2;
     dashRenderPicker();
   }
+  /* ⚠ A person entry's second step picks WHO, not which view — the card is the
+     only view a person has. Two columns, by the layout's own clamp. */
+  function dashPickRep(userId) {
+    var e = state.dashEdit, m = dashPick.metric;
+    if (!e || !m || !m.person || !userId) return;
+    e.cards.push({ metric: m.key, label: m.label, view: 'rep_card', requestedView: null, rep: userId, person: true,
+                   w: 2, h: 2, target: null, targetDirection: 'higher_is_better', band: null, categories: null });
+    e.dirty = true;
+    dashClosePicker();
+    renderTeamDashboard();
+  }
   function dashPickView(view) {
     var e = state.dashEdit, m = dashPick.metric;
     if (!e || !m) return;
@@ -12908,12 +12939,14 @@
     number: 'Number', gauge: 'Gauge', trend: 'Line graph over time',
     by_rep: 'By rep', breakdown: 'Breakdown',
     bar_rep: 'Bar chart by rep', bar_cat: 'Bar chart by category',
+    rep_card: 'Rep card',
   };
   /* ⚠ SHORT FORMS FOR THE SCANNING LIST. "Trend over time" four times across ten
      rows is noise; "Trend" is the word a manager is looking for. */
   var DASH_VIEW_SHORT = {
     number: 'Number', gauge: 'Gauge', trend: 'Line', by_rep: 'By rep', breakdown: 'Breakdown',
     bar_rep: 'Bar by rep', bar_cat: 'Bar by category',
+    rep_card: 'Card',
   };
   var DASH_VIEW_WHY = {
     number: 'One figure with its counts.',
@@ -12923,6 +12956,7 @@
     breakdown: 'Split by category, as a list.',
     bar_rep: 'Every rep, ranked, as horizontal bars.',
     bar_cat: 'Split by category, as vertical bars.',
+    rep_card: 'One closer, every number.',
   };
 
   function dashRenderPicker() {
@@ -12990,6 +13024,23 @@
     }
 
     var m = dashPick.metric;
+    if (m.person) {
+      var ov = state.teamOverview;
+      var reps = (ov && !laneProblem(ov) && ov.per_rep)
+        ? visibleReps(ov.per_rep).slice().sort(function (a, b) { return String(repName(a)).localeCompare(String(repName(b))); }) : [];
+      host.innerHTML = '<button type="button" class="dash-pick-back" onclick="dashPick.step=1;dashRenderPicker();">← All Metrics</button>'
+        + '<div class="dash-pick-group">' + escapeHtml(m.label) + '</div>'
+        + '<div class="dash-pick-sub">Which closer</div>'
+        + (ov === null ? laneWaitHtml('overview', 'Listing the closers\u2026', null, 80)
+          : reps.length
+            ? '<div class="dash-pick-list">' + reps.map(function (r) {
+                return '<button type="button" class="dash-pick-item" onclick="dashPickRep(\'' + escapeHtml(r.user_id) + '\')">'
+                  + '<span>' + escapeHtml(repName(r)) + '</span>'
+                  + '<i>' + (r.calls_analyzed > 0 ? r.calls_analyzed + ' calls graded' : 'no graded calls in this range') + '</i></button>';
+              }).join('') + '</div>'
+            : '<div class="dash-pick-absent"><div>No closers on this board yet.</div></div>');
+      return;
+    }
     /* ⚠⚠ TWO GROUPS, AND THIS IS THE DISTINCTION JUSTIN COULD NOT SEE. He asked
        for bar charts and a scatter, then ruled that "any graph should be metric
        against time" — the two only reconcile if "graph" means A LINE OVER TIME,
@@ -13928,15 +13979,13 @@
     { key: 'digest',    label: 'Daily Digest',            page: 'team' },
     { key: 'graphs',    label: 'Performance graphs',      page: 'team-performance' },
     { key: 'recs',      label: 'Team Recommendations',    page: 'team-coaching' },
-    { key: 'reps',      label: 'Rep cards',               page: 'team-performance' },
-    /* ⚠ 'needswork' REMOVED 2026-09-01 with the section it toggled. A panel
-       offered in the chooser that nothing gates in the render is a control that
-       does nothing — the guard caught it the moment the section came off.
+    { key: 'reps',      label: 'Rep cards',               page: 'team-performance' }
+    /* ⚠ 'needswork' REMOVED 2026-09-01 with the section it toggled; 'overview',
+       'closing' and 'objection' REMOVED 2026-09-02 with the three score lists
+       the rep cards replaced. A panel offered in the chooser that nothing gates
+       in the render is a control that does nothing — the guard catches it.
        ⚠ Stored hidden-sets are unaffected: unknown keys are discarded on read,
        which is exactly why the HIDDEN set is stored rather than the visible one. */
-    { key: 'overview',  label: 'Team Overview',           page: 'team-performance' },
-    { key: 'closing',   label: 'Closing Score',           page: 'team-performance' },
-    { key: 'objection', label: 'Objection Handling Score', page: 'team-performance' }
   ];
   /* Panels belonging to the page being rendered. ⚠ Falls back to ALL panels for
      a page that owns none, so a caller can never get an empty list and conclude
@@ -14592,17 +14641,65 @@
   // version put the label first only when unmeasured, which left mixed cards
   // visibly ragged — the big number and the small label sat on different
   // baselines in the same row.
-  function repCardStat(label, value, sub, unmeasured) {
-    return '<div class="rep-stat' + (unmeasured ? ' rep-stat-none' : '') + '">'
-      + '<div class="rep-stat-label">' + escapeHtml(label) + '</div>'
-      + (unmeasured
-          ? '<div class="rep-stat-none-val">' + escapeHtml(sub) + '</div>'
-          : '<div class="rep-stat-val">' + escapeHtml(value) + '</div>'
-            + '<div class="rep-stat-sub">' + escapeHtml(sub) + '</div>')
-      + '</div>';
+  /* ⚠⚠ THE TRADING-CARD REP CARD — TREATMENT C, JUSTIN'S PICK (2026-09-02).
+     "How can we make them more like trading cards with stats and info?" A row is
+     a comparison; a card is a portrait — one person is the subject. The five
+     section grades are the picture (no other surface shows a rep's section
+     profile at a glance); the headline is the closing rate at the DISPLAY step;
+     the movement chip sits in the name band beside the GRADE it describes,
+     never beside the closes (never diminish the closer's work); banded stats
+     state their side; unmeasured is named, never drawn as zero.
+     ⚠ ONE RENDERER, TWO PLACEMENTS: repCardsHtml (Performance grid) and
+     dashRepCardHtml (the catalog widget) both call THIS, unchanged — the widget
+     slot is clamped to two columns, the card's minimum, by the layout.
+     ⚠ The Close bar draws `close_earned` (the standing note: USE close_score_earned,
+     NEVER close_score) — the same number that picked the weakest section.
+     ⚠ The why-sentence the old row carried is not on the card; the `why` model
+     lane is therefore no longer fetched by Performance (a page that renders
+     nothing from a lane must not fetch it). */
+  function repMonogram(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    var s = parts.map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+    return '<div class="rep-mono">' + escapeHtml(s || '?') + '</div>';
+  }
+  /* Mirrors lib/metric-band.js sideOf — the edges come from the payload (one
+     source); only the comparison is repeated here, and a test runs both. */
+  function bandSideOf(value, band) {
+    if (typeof value !== 'number' || !isFinite(value) || !band || !band.good) return null;
+    if (value < band.good[0]) return 'under';
+    if (value > band.good[1]) return 'over';
+    return 'in';
+  }
+  function repMovementHtml(r) {
+    if (typeof r.avg_score !== 'number' || typeof r.prior_avg_score !== 'number') return '';
+    var d = r.avg_score - r.prior_avg_score;
+    if (d === 0) return '<span class="rep-move flat">\u2014 same as prior period</span>';
+    return '<span class="rep-move ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '\u25B2' : '\u25BC') + ' ' + Math.abs(d) + ' vs prior period</span>';
+  }
+  function repBandStatHtml(value, bandKey, label) {
+    var bands = (state.teamOverview && state.teamOverview.bands) || {};
+    var band = bands[bandKey] || null;
+    if (typeof value !== 'number' || !isFinite(value)) {
+      return '<div class="rep-stat"><div class="rep-stat-none-val">Not measured</div><div class="rep-stat-label">' + escapeHtml(label) + '</div></div>';
+    }
+    var side = bandSideOf(value, band);
+    return '<div class="rep-stat"><div class="rep-stat-val">' + value + ' <small>min</small>'
+      + ((side && side !== 'in') ? '<em class="rep-side">' + side + '</em>' : '') + '</div>'
+      + '<div class="rep-stat-label">' + escapeHtml(label) + (side === 'in' ? ' \u00b7 in the band' : '') + '</div></div>';
+  }
+  function repSectionBarsHtml(sections, weakest) {
+    var keys = ['intro', 'discovery', 'pitch', 'objection', 'close'];
+    var wk = weakest && weakest.section;
+    var any = keys.some(function (k) { return sections && typeof sections[k] === 'number'; });
+    if (!any) return '<div class="rep-card-bars"><div class="rep-bars-none">No scored sections yet</div></div>';
+    return '<div class="rep-card-bars">' + keys.map(function (k) {
+      var v = (sections && typeof sections[k] === 'number') ? sections[k] : null;
+      return '<div class="rep-bar' + (k === wk ? ' weak' : '') + '"><span>' + SECTION_LABEL[k] + '</span>'
+        + '<div class="rep-bar-track"><div class="rep-bar-fill" style="width:' + (v === null ? 0 : Math.max(0, Math.min(100, v))) + '%"></div></div>'
+        + '<span class="rep-bar-val">' + (v === null ? '\u2014' : v) + '</span></div>';
+    }).join('') + '<div class="rep-bars-cap">Section grades \u00b7 weakest lit</div></div>';
   }
 
-  // The weakest-objection line, including the ruling that a ranking needs a team.
   function repWeakestObjectionHtml(wo) {
     if (!wo) {
       return '<div class="rep-weak"><span class="rep-weak-label">Weakest objection</span>'
@@ -14622,53 +14719,45 @@
       + '</div>';
   }
 
-  function repWeakestSectionHtml(ws) {
-    if (!ws) {
-      return '<div class="rep-weak"><span class="rep-weak-label">Weakest section</span>'
-        + '<span class="rep-weak-none">no scored sections yet</span></div>';
-    }
-    return '<div class="rep-weak"><span class="rep-weak-label">Weakest section</span>'
-      + '<span class="rep-weak-val">' + escapeHtml(SECTION_LABEL[ws.section] || ws.section) + ' ' + ws.score + '</span></div>';
-  }
-
   function repCardHtml(r) {
+    var open = '<div class="rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')"'
+      + ' title="Open ' + escapeHtml(repName(r)) + '\'s report">';
+    var band = '<div class="rep-card-band">' + repMonogram(repName(r))
+      + '<div class="rep-card-name">' + escapeHtml(repName(r)) + '</div>' + repMovementHtml(r)
+      + '<div class="rep-card-calls">' + (r.calls_analyzed > 0 ? r.calls_analyzed + ' call' + (r.calls_analyzed === 1 ? '' : 's') : 'no graded calls') + '</div></div>';
+    /* ⚠ UNMEASURED IS NOT ZERO: a rep with no graded call in the range gets a
+       sentence, never a row of zeros and empty bars. */
+    if (!(r.calls_analyzed > 0)) {
+      return open + band + '<div class="rep-card-none">No graded calls in this range \u2014 not a zero. The card fills in as calls are graded.</div></div>';
+    }
     var close = closeRateDisplay(r);
-    var closeUnmeasured = !(r.prospect_close_total > 0);
-    var objUnmeasured = !(r.obj_total > 0);
-    var stats = repCardStat('Closing Rate',
-          closeUnmeasured ? '' : close.value,
-          closeUnmeasured ? 'No prospects yet' : close.sub,
-          closeUnmeasured)
-      + repCardStat('Objection Handling',
-          objUnmeasured ? '' : r.obj_handle_rate + '%',
-          objUnmeasured ? 'No objections yet' : (r.obj_handled + ' of ' + r.obj_total + ' handled'),
-          objUnmeasured);
-
-    // 10d: the verified sentence, if it has loaded. Absent while loading and
-    // absent on failure — the card is complete without it, and a half-sentence
-    // or a spinner in a summary slot is worse than nothing.
-    var w = state.teamWhy && state.teamWhy.by_rep && state.teamWhy.by_rep[r.user_id];
-    var why = (w && w.sentence)
-      ? '<div class="rep-why">' + escapeHtml(w.sentence) + '</div>'
-      : '';
-
-    return '<div class="rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')"'
-      + ' title="Open ' + escapeHtml(repName(r)) + '\'s report">'
-      + '<div class="rep-card-head">'
-        + '<div class="rep-card-name">' + escapeHtml(repName(r)) + '</div>'
-        + '<div class="rep-card-calls">' + r.calls_analyzed + ' call' + (r.calls_analyzed === 1 ? '' : 's') + '</div>'
-      + '</div>'
-      + '<div class="rep-card-stats">' + stats + '</div>'
-      + repWeakestSectionHtml(r.weakest_section)
-      + repWeakestObjectionHtml(r.weakest_objection)
-      + why
-      + '</div>';
+    var measuredClose = r.prospect_close_total > 0;
+    var sections = Object.assign({}, r.sections || {});
+    if (typeof r.close_earned === 'number') sections.close = r.close_earned;
+    return open + band
+      + '<div class="rep-card-body">'
+        + '<div class="rep-card-left">'
+          /* ⚠ UNMEASURED IS SAID IN WORDS — never a dash where the value goes: a big
+             "\u2014" where a percentage sits reads as zero however the line beneath
+             it is worded. */
+          + '<div class="rep-card-lead">'
+            + (measuredClose
+                ? '<div class="rep-card-lead-val">' + escapeHtml(close.value) + '</div><div class="rep-card-lead-label">Closing rate</div>'
+                  + '<div class="rep-card-lead-sub">' + escapeHtml(close.sub) + '</div>'
+                : '<div class="rep-card-lead-none">No prospects yet</div><div class="rep-card-lead-label">Closing rate</div>')
+            + '</div>'
+          + '<div class="rep-stat">'
+            + (r.obj_total > 0
+                ? '<div class="rep-stat-val">' + r.obj_handle_rate + '%</div><div class="rep-stat-label">Objections handled \u00b7 ' + r.obj_handled + ' of ' + r.obj_total + '</div>'
+                : '<div class="rep-stat-none-val">No objections yet</div><div class="rep-stat-label">Objections handled</div>')
+            + '</div>'
+          + repBandStatHtml(r.avg_call_time, 'avg_call_time', 'Avg call time')
+        + '</div>'
+        + repSectionBarsHtml(sections, r.weakest_section)
+        + '<div class="rep-card-foot">' + repWeakestObjectionHtml(r.weakest_objection)
+          + '<span class="rep-card-grade">' + (typeof r.avg_score === 'number' ? 'Avg grade ' + r.avg_score : 'No grade yet') + '</span></div>'
+      + '</div></div>';
   }
-
-  // Mirrors lib/rep-card-metrics.sortRepsWorstFirst. Kept inline because the
-  // page has no module loader; the mirror test forbids the two from drifting.
-  // Closing rate ascending, reps with NO prospects LAST — a genuine 0% is worst,
-  // zero prospects is unmeasured.
   function sortRepsWorstFirst(reps) {
     if (!Array.isArray(reps)) return [];
     return reps.slice().sort(function (a, b) {

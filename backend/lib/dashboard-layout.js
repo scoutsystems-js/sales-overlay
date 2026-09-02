@@ -51,6 +51,15 @@ function clampSpan(n, max) {
  * read path that prunes storage makes that unrecoverable. Drop it from the
  * RENDER, never from the ROW.
  */
+/* ⚠ A rep card names its closer. A stored id is a string of the shape auth
+   ids have; anything else is not a closer and the card cannot render. */
+function repOf(c) {
+  return (c && typeof c.rep === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(c.rep)) ? c.rep : null;
+}
+/* ⚠ Treatment C does not fit one column (measured: a column is ~276px at 1200,
+   the card needs 360). The span is clamped UP, same markup — a narrower second
+   arrangement would be the two designs the ruling forbids. */
+function spanFor(c, m) { var w = clampSpan(c.w, 4); return m.person ? Math.max(2, w) : w; }
 function resolveLayout(stored) {
   var raw = Array.isArray(stored) && stored.length ? stored : DEFAULT_LAYOUT;
   var cards = [];
@@ -83,11 +92,14 @@ function resolveLayout(stored) {
        what it holds, and the risk was in its other readers. */
     var want = c.view;
     var view = (m.views.indexOf(want) !== -1) ? want : m.views[0];
+    var rep = repOf(c);
 
+    if (m.person && !rep) { dropped.push({ metric: m.key, reason: 'no closer named' }); return; }
     cards.push({
       metric: m.key, label: m.label, view: view,
       requestedView: (view === want) ? null : (want || null),
-      w: clampSpan(c.w, 4), h: clampSpan(c.h, 3),
+      w: spanFor(c, m), h: clampSpan(c.h, 3),
+      rep: m.person ? rep : undefined, person: m.person ? true : undefined,
       target: (typeof m.target === 'number') ? m.target : null,
       targetDirection: m.targetDirection || 'higher_is_better',
       // ⚠ A stored card keeps its band, or a reload drops the ranked list back
@@ -119,7 +131,11 @@ function sanitizeLayout(input) {
     if (!m || !m.available) return;
     /* ⚠ SAME REASON AS THE READ PATH: `number` is no longer universal. */
     var view = (c.view && m.views.indexOf(c.view) !== -1) ? c.view : m.views[0];
-    out.push({ metric: m.key, view: view, w: clampSpan(c.w, 4), h: clampSpan(c.h, 3) });
+    var rep = repOf(c);
+    if (m.person && !rep) return;                       // a rep card with no closer cannot render — not saved
+    var row = { metric: m.key, view: view, w: spanFor(c, m), h: clampSpan(c.h, 3) };
+    if (m.person) row.rep = rep;
+    out.push(row);
   });
   return out;
 }

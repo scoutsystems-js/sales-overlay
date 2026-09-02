@@ -60,6 +60,11 @@ const VIEWS = {
      avoid the whole mount/destroy/rebuild lifecycle a canvas drags in. */
   BAR_REP: 'bar_rep',      // needs per-rep values — horizontal
   BAR_CAT: 'bar_cat',      // needs categories — vertical
+  /* ⚠⚠ A PERSON, NOT A METRIC (2026-09-02). The catalog derives views from what
+     a METRIC has; a rep card is ONE closer with every metric, so it is its own
+     kind, offered only by a `person` entry and drawn by the SAME repCardHtml the
+     Performance page uses. One design, two placements. */
+  REP_CARD: 'rep_card',
 };
 
 /**
@@ -108,6 +113,18 @@ const CATALOG = [
     measured: 'duration_seconds on 2,046 of 2,052 real calls, 2,005 of them > 0',
     note: '⚠ THE ONLY INVERTED TARGET — 60 is a CEILING. A gauge must say so; '
         + '"at or below 60 min", never "at or above target".',
+  },
+  {
+    /* ⚠⚠ THE REP CARD — a PERSON entry (Justin, 2026-09-02: trading-card rep cards,
+       treatment C). Not a metric: it has no value, no target, no history of its
+       own. It carries a `rep` on the placed card and renders every figure that
+       closer has, through the one repCardHtml the Performance page draws. */
+    key: 'rep_card', description: 'One closer, every number \u2014 the card from the Performance page. You pick who.', group: 'people', label: 'Rep card',
+    source: 'derived', cost: 'aggregate', lane: 'team-overview',
+    available: true, person: true, perRep: false, target: null, targetDirection: null,
+    history: false, categories: null,
+    measured: 'per_rep on /team/overview \u2014 10 closers on the live board 2026-09-02, 8 with graded calls',
+    note: '\u26a0 A card slot narrower than 2 columns cannot hold treatment C; the layout clamps it up rather than drawing a second, narrower design.',
   },
   {
     key: 'calls_analyzed', description: 'How many calls Scout has finished grading, as a count.', group: 'people', label: 'Calls graded',
@@ -281,6 +298,7 @@ const RENDERABLE = {
   bar_rep:   ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
               'avg_call_time', 'time_to_price'],
   bar_cat:   ['objection_handle_rate'],
+  rep_card:  ['rep_card'],
 };
 
 function canRender(view, key) {
@@ -292,6 +310,9 @@ function viewsFor(metric) {
   /* ⚠ THE DATA GATE IS UNCHANGED AND STILL FIRST — a gauge is unofferable for a
      metric with no target whether or not a renderer exists. The render gate
      only ever REMOVES; it can never add a view the data cannot support. */
+  /* A person offers the card and nothing else — derived from the property,
+     never listed by hand. */
+  if (metric.person) return canRender(VIEWS.REP_CARD, metric.key) ? [VIEWS.REP_CARD] : [];
   const wanted = [VIEWS.NUMBER];
   if (typeof metric.target === 'number') wanted.push(VIEWS.GAUGE);
   if (metric.history) wanted.push(VIEWS.TREND);
@@ -333,7 +354,7 @@ function byKey(k) { return catalog().filter(function (m) { return m.key === k; }
 /* ⚠ `band` REACHES THE BROWSER because the ranked list and the card both need
    its edges to say which side a rep is on. A band with no edges on the wire
    would leave the client guessing, which is the direction model again. */
-var PUBLIC_FIELDS = ['key', 'label', 'description', 'views', 'target', 'targetDirection', 'band', 'history', 'categories'];
+var PUBLIC_FIELDS = ['key', 'label', 'description', 'views', 'target', 'targetDirection', 'band', 'history', 'categories', 'person'];
 
 function publicMetric(m) {
   var out = {};

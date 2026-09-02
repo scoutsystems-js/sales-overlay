@@ -255,6 +255,10 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       connected: connectedSet[id] === true,
       calls_analyzed: c.calls_analyzed,
       avg_score: curAvg,
+      /* ⚠ The Close bar on the rep card draws THIS, not sections.close — the
+         weakest-section pick already uses the earned close, and a lit bar that
+         showed a different number from the one that chose it would read wrong. */
+      close_earned: avg(c.close_earned_sum, c.close_earned_n),
       /* ⚠ MINUTES, ROUNDED TO ONE PLACE. NULL when the rep has nothing to
          measure — unmeasured and fast are opposite meanings, and a 0 here
          would say a rep quotes instantly. */

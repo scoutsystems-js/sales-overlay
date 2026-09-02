@@ -256,8 +256,10 @@ test('HEADINGS are title case on this view', () => {
   // ⚠ ANCHORS RE-POINTED 2026-08-18 for item (k): "Over Time" was dropped from
   // both graph titles. The old anchors would have gone on passing as absent-case
   // checks while the present-case checks failed — which is what caught it here.
+  /* 'Team Overview' left this list 2026-09-02: the three score lists retired
+     with the trading-card rep cards. */
   ['Objection Handling %', 'Closing %', 'What Needs Work',
-   'Team Overview', 'Team Recommendations', 'Daily Digest'].forEach((h) => {
+   'Team Recommendations', 'Daily Digest'].forEach((h) => {
     assert.ok(HTML.indexOf('>' + h + '<') !== -1, 'missing title-cased heading: ' + h);
   });
   ['>Objection handling %<', '>Closing %<'.toLowerCase(), '>What needs work<',

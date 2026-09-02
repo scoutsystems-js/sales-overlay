@@ -95,3 +95,13 @@ test('⚠ the inverted target says so — a ceiling is not a floor', () => {
     }
   });
 });
+
+test('⚠⚠ THE REP CARD IS A PERSON, NOT A METRIC — it offers exactly the card view (2026-09-02)', () => {
+  const m = C.byKey('rep_card');
+  assert.ok(m && m.person === true, 'rep_card is a person entry');
+  assert.deepStrictEqual(m.views, ['rep_card'], 'a person offers the card and nothing else — derived from `person`, not listed');
+  assert.strictEqual(m.group, 'people');
+  const people = C.grouped().filter((g) => g.key === 'people')[0];
+  assert.ok(people && people.metrics.some((x) => x.key === 'rep_card' && x.person === true), 'the picker is told it is a person');
+  assert.deepStrictEqual(C._RENDERABLE.rep_card, ['rep_card']);
+});

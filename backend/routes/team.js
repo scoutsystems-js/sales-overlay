@@ -14,6 +14,7 @@ const express = require('express');
 const { resolveDisplayName } = require('../lib/display-name');
 const { nameMapFor } = require('../lib/team-name-map');
 const { emailMapFor } = require('../lib/email-map');
+const METRIC_BAND = require('../lib/metric-band');
 var { withBoardOwner } = require('../lib/team-membership');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
@@ -224,7 +225,9 @@ router.get('/overview', teamGate, async function (req, res) {
     var team = await resolveTeam(admin, req);
     var em = await emailMap(admin);
     var data = await computeTeamAnalytics(admin, team.memberIds, range.from, range.to, em);
-    res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode } }, data));
+    /* ⚠ The bands ride with the payload so the rep card states each side
+       (`47.3 min OVER`) from the ONE source, never a client copy of the edges. */
+    res.json(Object.assign({ team: { label: team.label, key: team.keyId, mode: team.mode }, bands: METRIC_BAND.BANDS }, data));
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('overview', err); res.status(500).json({ error: 'Failed to load team overview' }); }
 });
 

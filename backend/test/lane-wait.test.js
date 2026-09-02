@@ -16,7 +16,7 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html')
 const LIVE = stripComments(HTML);
 
 const LANE_RENDERERS = [
-  'teamObjGridHtml', 'teamObjFeedHtml', 'teamScoreListHtml', 'teamNeedsWorkCardHtml', 'teamAggregateHtml',
+  'teamObjGridHtml', 'teamObjFeedHtml', 'teamNeedsWorkCardHtml', 'teamAggregateHtml',   // teamScoreListHtml retired 2026-09-02
   'teamTrendsHtml', 'repCardsHtml', 'teamDigestHtml', 'dashGaugeHtml', 'avgPanelHtml', 'renderTeamDashboard',
   'sectionRankCardHtml', 'needsWorkCardHtml', 'needsWorkDetailBodyHtml', 'renderOverview', 'renderEodView',
   'renderAccountView', 'renderObjectionsIntel', 'dashRenderPicker', 'teamMembersBodyHtml', 'teamRecsHtml',
