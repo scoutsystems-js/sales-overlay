@@ -31,6 +31,19 @@
 
 ## 🎯 CURRENT SESSION
 
+### 🔎 SWEEP BLOCK 7 (2026-09-02) — CLASS ⑥: A VALUE WHERE A LABEL BELONGS. NO FIXES.
+
+Detector built maps-first (28 label maps → 10 carrier fields → raw text renders), scored 5/5 · 0/6, cross-checked by a hand enumeration of the mapped fields across every page and outbound text. Detail: `~/Desktop/scout-findings.md` (block 7), H672. **Pulse: ⑦ one block; one or two candidates need a DB read to prove.**
+
+| tag | finding | evidence |
+|---|---|---|
+| `🐛 BUG` **⑥-1 the My Team table shows the role as `user` / `manager`** | `dashboard.html:14349` `teamMembersBodyHtml`: `escapeHtml(m.role \|\| 'user')` in the Role column. The only role map is `admin.html:871 roleLabel`, which maps `owner` alone. | A manager reads the machine word `user` beside the header "Rep" every day. Not pinned. Not outbound. **NOT VERIFIED that a ruling names role labels** — one is needed before a fix (Rep? Closer? Manager? Admin?). |
+| `🐛 BUG` **⑥-2 the header pill on a pivot shows `owner` / `manager` raw** | `dashboard.html:7908` `renderHeaderHtml`: `escapeHtml(state.me.role)` in `.scope-pill` (no text-transform). | Same map gap; visible on every pivot. Same ruling needed. |
+| `▪ MINOR` **⑥-3 `/coaching` says `owner view`** | `coaching.html:353` `currentUser.role + ' view'`; served at `index.js:142`, linked from nowhere. | A legacy page — decide whether it exists before labelling it. |
+| `🗄 WITH THE MERGE RETIREMENT` **⑥-4 the merge page shows `follow_up` / `no_show` raw** | `dashboard.html:16237`, while `eodOutcomeLabel` sits in the same file. | Retired page (H664); goes with its removal. |
+| `📋 §4 — NO MAP EXISTS` | KB badge `scope` (`GLOBAL/TEAM/PERSONAL`, `:16855`), review speaker badge (`PROSPECT/CLOSER`, `:18994`) — CSS-uppercased machine words that are also product words. | "add a map" is a product decision; nothing reads wrong today. |
+| `🗄 NOT COVERED` | prompt strings hand the model `follow_up`, `uncategorized` (digest), `partner` (Why prose), `risk_signal` (corrections); whether it echoes them into customer prose is not enumerable statically. Bare-variable hops. | NOT VERIFIED. The digest is the outbound one. |
+
 ### 🔎 SWEEP BLOCK 6 (2026-09-02) — CLASS ③: ONE QUESTION, MANY ANSWERS. NO FIXES.
 
 Detector 5/5 · 0/5 (lists as SETS with order reported, named thresholds, directions; copies imported from their module and pairs pinned by a mirror guard are excluded). The 124 strippers are counted in block 5. Detail: `~/Desktop/scout-findings.md` (block 6), H671. **Pulse: ⑥ one block, ⑦ one to two — two blocks, three at most.**

@@ -1,0 +1,15 @@
+<script>
+  var OUTCOME_LABELS = { closed: 'Closed', follow_up: 'Follow-up', lost: 'Lost', no_show: 'No-show' };
+  function sourceLabel(s) { return s === 'fathom' ? 'Fathom' : s === 'zoom' ? 'Zoom' : 'Recording'; }
+  function rowA(a) { return '<span class="chip">' + OUTCOME_LABELS[a.outcome] + '</span>'; }                       // N1 rendered through its map
+  function rowB(a) { return '<span class="chip">' + a.outcome + '</span>'; }                                       // P1 raw where a map exists
+  function rowC(a) { return '<span class="chip">' + a.sync_state + '</span>'; }                                    // N2 raw, but no map exists anywhere (§4)
+  function rowD(a) { return '<span class="chip chip-' + a.outcome + '">x</span>'; }                                // N3 class fragment only
+  function rowE(a) { return '<span class="chip chip-' + a.outcome + '">' + a.outcome + '</span>'; }                 // P2 class AND rendered text
+  function rowF(a) { return '<b>' + sourceLabel(a.source) + '</b>'; }                                              // N4 surface one: through the function
+  function rowG(a) { return '<b>' + escapeHtml(a.source) + '</b>'; }                                               // P3 surface two: raw
+  function copyText(f) { var lines = []; lines.push('Outcome: ' + f.outcome); return lines.join('\n'); }           // P4 leaves the product, raw
+  function rowH(a) { if (a.outcome === 'closed') return 'won'; return '<i>' + OUTCOME_LABELS[a.outcome] + '</i>'; } // N5 a comparison, then the map
+  function rowI(a) { return '<a href="/x?outcome=' + a.outcome + '">go</a>'; }                                     // N6 a query parameter
+  function rowJ(a) { var el = document.getElementById('o'); el.textContent = a.outcome; }                          // P5 textContent raw
+</script>
