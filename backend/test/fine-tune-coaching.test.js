@@ -222,6 +222,7 @@ test('⚠ the health-snapshot line no longer promises a control to everyone', ()
 test('⚠⚠ SURFACE ②: an insight carries its moment (highlight id + call id), and the lane version moved with the shape', () => {
   const ts = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8'));
   assert.ok(/highlight_id: r\.id/.test(ts), 'the candidate keeps the highlight row id');
+  assert.ok(/inChunks\('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker/.test(ts), 'and the id is SELECTED — a field read at the consumer and selected nowhere is undefined everywhere, silently');
   assert.ok(/highlight_id: ev \? ev\.highlight_id : null/.test(ts), 'the rendered item carries it');
   assert.ok(/call_id: ev \? ev\.call_id : null/.test(ts), 'and the call id');
   const v = /RECS_LANE_VERSION = '([^']+)'/.exec(ts);

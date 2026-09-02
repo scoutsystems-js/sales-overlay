@@ -74,7 +74,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v5-2026-09-02-never-diminish-highlight-id';   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v6-2026-09-02-never-diminish-highlight-id';   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -306,7 +306,10 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   // contradict the rate rendered next to it.
   objRows.forEach(function (r) { var bk = obj[r.objection_category]; if (bk) { bk.total++; if (isHandled(r, outcomeByCall[r.fathom_call_id])) bk.handled++; } });
 
-  var hlRows = await w.inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type');
+  /* ⚠ `id` IS SELECTED because the candidate carries it as highlight_id — a field
+     read at the consumer and selected nowhere is undefined everywhere with no
+     error, which is exactly what shipped for twenty minutes on 2026-09-02. */
+  var hlRows = await w.inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type');
   function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
   var candidates = hlRows.map(function (r) {
     var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
