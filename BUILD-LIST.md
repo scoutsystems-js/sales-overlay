@@ -1652,3 +1652,13 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - **(c)** summary starts after the grid lands (`gridLanded`); `getBucketMapping` shares one in-flight call per phrase set. Guard `test/bucket-inflight.test.js`. Chosen over one endpoint so the grid paints first.
 - **(d)** `computeTeamAnalytics`, `computeCallAnalytics`, `computeTeamObjections` issue their round trips together; `lib/email-map.js` reads listUsers once per 60s. Guards `test/lane-parallel.test.js`, `test/email-map-cache.test.js`.
 - **Filed:** recommendations and needs-work lanes still have their own sequential reads (~4–5s warm, `loadTeamWindow`); the summary recomputes the grid's rows on a cache hit (2.1s); a deep link fetches team lanes twice when the saved team differs from the default; the needs-work cache key moved under a loaded page (65.9s "warm" miss, cause not established).
+
+
+## 2026-09-02 — TRADING-CARD REP CARDS: DESIGN REPORTED, NOT BUILT (awaiting Justin's pick)
+- Three treatments mocked with live numbers — A Portrait (recommended; fits the Performance grid AND the catalog widget unchanged), B Ledger (keeps Scout's sentence; too wide for a widget), C Stat sheet (section bars as the picture). Captures and the mock on the Desktop. Report: `~/Desktop/scout-findings.md`.
+- **Placement measured:** Reps start 2.1 screens down (1800px of 6559). Proposed gauges → cards → graphs; retire the three score lists (their figures are on the cards; ranking one metric is the `by_rep` widget).
+- **🔴 NEEDS JUSTIN:** treatment · headline size (24 = the gauges' step, recommended; 48 breaks "one loud number per page") · placement · photos (no avatar column exists — monogram now; upload is its own item).
+- **Build notes:** the form line's trailing bucket is a partial week — label or drop it; the widget is a new `people` KIND rendered by the same `repCardHtml`; form from the rep-series lane already loaded, movement from the overview's prior window — no new fetch.
+- **FILED, AFTER THE SESSION — re-analysing another user's calls becomes ADMIN-ONLY.** Narrows the 2026-08-28 managers-and-above ruling: WHO changes, not WHAT (30 days stays). Reason: spend on someone else's account once onboarding exists. Self-serve grading of one's own calls is unaffected (it is how Godwin's backlog was cleared).
+- **Filed:** rep photos (storage + privacy line).
+- **Design session status:** built — rail/mesh, content-sized rail, sticky bar + wordmark, lane waits, deep-link paint, speed ×4; awaiting a pick — rep cards; with Justin — ground cast; ruled — column width unchanged.
