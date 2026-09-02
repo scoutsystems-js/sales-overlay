@@ -13601,10 +13601,12 @@
     var stale = document.getElementById('navTeamMenu'); if (stale) stale.remove();   // a re-open during the closing animation
     wrap.insertAdjacentHTML('beforeend', navTeamMenuHtml());
     /* Open from 0fr: insert collapsed, FORCE a reflow so the 0fr start state is
-       computed, then release. ⚠ NOT requestAnimationFrame — verified live: the
-       double-rAF release never fired inside a frame, so the menu sat at 0fr
-       with the class still on and the card grew 4px. A forced reflow is
-       synchronous and cannot be throttled. */
+       computed, then release. A forced reflow is synchronous; a double
+       requestAnimationFrame release does the same job but is FROZEN in a hidden
+       document (a background tab), which is where it was first observed "not
+       firing" — that observation was the harness, not the code (`document.hidden`
+       was true and the transition clock sat at 0). Kept synchronous anyway:
+       it cannot be throttled by anything. */
     var fresh = document.getElementById('navTeamMenu');
     if (fresh) { fresh.classList.add('is-collapsed'); void fresh.offsetHeight; fresh.classList.remove('is-collapsed'); }
     var a = document.getElementById('navTeam');
