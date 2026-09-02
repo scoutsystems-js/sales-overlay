@@ -1716,3 +1716,10 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - The objections lane carried no KB context before: the notes are ADDED (+~150 tokens header when any note exists, +~40 per note, nothing when none).
 - **Regeneration:** every team's recommendations (3 teams, 140 cached windows), every rep's Performance Summary (8 reps, 79 windows) and every board's Objections "Why" regenerate on first visit — ~14s / ~34s / ~11–20s respectively; the cron warm-up rebuilds recommendations for the default window.
 - Dialog: multi-line (`multiline: true`), 190px minimum, Enter = newline, Cmd/Ctrl+Enter = confirm. Button: green text/border at rest, solid green + black on hover — the login pair (11.76:1, computed in the guard). Suite 2129/0.
+
+
+## 2026-09-02 — FINE TUNE COACHING FINISHED — LIVE `fd6ee07` (16:33Z)
+- **"Noted ✓" survives a reload:** `POST /kb/noted-moments` — one team-scoped query per page with the highlight ids on it (≤200), replacing the per-call route (not kept beside it). All three surfaces ask once per render and repaint only when something new comes back; ids already asked about are not asked again.
+- **Surface ③:** the Objections "Why" evidence moments (each carries `highlight_id` + `fathom_call_id` now — PROMPT_VERSION v13, every board's Why regenerates once, ~11–20s) → the same helper, `surface: 'team_objections_why'`, validated server-side (400 otherwise). The loop is sound: notes are written only by the one route behind the manager's confirmation; the lanes only read.
+- **Built:** ①②③ + 7c + three coaching syntheses reading the notes. **Deliberately OFF:** needs-work (its classifier sets a rate), the digest, the Coach Summary tile, the section-rank card, the Performance Summary control. **Filed:** nothing further on this feature.
+- **NEXT (Justin's order): the full site sweep, then Scout AI.**
