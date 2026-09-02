@@ -46,21 +46,37 @@ test('the band is derived from the column, not a picked pixel value', () => {
      190px sidebar has just narrowed. Left on (100vw - 1200px)/4 the band would
      be sized against a gutter that no longer exists and slide artwork under the
      content. ONE token feeds both the page margin and this. */
-  assert.ok(/calc\(\(100vw - var\(--sidebar-w\) - 1200px\) \/ 4\)/.test(r),
-    'the band must subtract the sidebar — half of the gutter that is actually left');
-  assert.ok(/max\(0px,/.test(r),
-    'below 1200px the gutter is negative — the band must clamp to 0, not invert');
+  /* 2026-09-02 — BOTH GUTTERS. The mask's stops are the column's OWN layout
+     tokens (--page-left / --page-w), so the artwork is cut exactly where the
+     .page column begins and ends and cannot slide under text however the
+     viewport moves. Asserting the TOKENS, not a formula: the formula lives in
+     ONE place (:root) and this guard checks the three consumers read it. */
+  assert.ok(/rgba\(0,0,0,1\) var\(--page-left\)/.test(r) && /rgba\(0,0,0,0\) var\(--page-left\)/.test(r),
+    'the LEFT edge of the black centre must sit at var(--page-left)');
+  assert.ok(/calc\(var\(--page-left\) \+ var\(--page-w\)\)/.test(r),
+    'the RIGHT edge must sit at page-left + page-w — the column\'s own width');
+  const tokAt = H.indexOf('--rail-total:'); assert.ok(tokAt > -1, 'stale anchor — the rail tokens');
+  const root = H.slice(tokAt - 200, tokAt + 600);
+  assert.ok(/--page-left:\s*max\(var\(--rail-total\), calc\(\(100vw - 1200px\) \/ 2\)\)/.test(root),
+    '--page-left must be derived: packed against the rail, or centred when there is room');
+  assert.ok(/--page-w:\s*min\(1200px, calc\(100vw - var\(--rail-total\) - 24px\)\)/.test(root),
+    '--page-w must leave the 24px right band by construction');
+  const page = H.slice(H.indexOf('.page {\n      /* ⚠ --page-left'), H.indexOf('.page {\n      /* ⚠ --page-left') + 900);
+  assert.ok(/margin-left:\s*var\(--page-left\)/.test(page) && /max-width:\s*var\(--page-w\)/.test(page),
+    'the .page column must read the SAME tokens the mask reads');
 });
 
 test('⚠ it is a HARD EDGE, not a fade — the mesh is not being dimmed', () => {
   const r = meshRule().code;
-  const at = r.indexOf('linear-gradient(to left');
+  const at = r.indexOf('linear-gradient(to right');
   assert.ok(at !== -1, 'the horizontal mask is missing');
   const horiz = r.slice(at, r.indexOf(');', at));
   /* the same offset appears twice — opaque up to it, transparent from it — which
      is what makes the boundary a cut rather than a ramp. */
-  const stops = (horiz.match(/max\(0px, calc\(\(100vw - var\(--sidebar-w\) - 1200px\) \/ 4\)\)/g) || []).length;
-  assert.strictEqual(stops, 2, 'both stops must sit at the same offset, or the edge fades');
+  const left = (horiz.match(/\) var\(--page-left\)/g) || []).length;
+  const right = (horiz.match(/calc\(var\(--page-left\) \+ var\(--page-w\)\)/g) || []).length;
+  assert.strictEqual(left, 2, 'the left edge needs two stops at the same offset, or it fades');
+  assert.strictEqual(right, 2, 'the right edge needs two stops at the same offset, or it fades');
 });
 
 test('⚠⚠ it INTERSECTS the vertical fade, never replaces it', () => {

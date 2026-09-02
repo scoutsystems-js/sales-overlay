@@ -465,31 +465,26 @@ test('⚠⚠ the generator REFUSES to write when any variant fails AA', () => {
    threshold inherited from a retired design is the defect; one computed from the
    current geometry is not. If the sidebar or the column changes, this fails —
    which is correct, because the threshold would genuinely need to move. */
-test('⚠⚠ the hide threshold is DERIVED from the band, not inherited from a retired treatment', () => {
+test('⚠⚠ the width floor is RETIRED and the band is >= 24px BY CONSTRUCTION (2026-09-02)', () => {
+  /* The 1495px floor existed because the right band was (100vw - rail - 1200)/4
+     and fell to a 2.5px line at 1410. With the floating rail the column width
+     is min(1200, 100vw - rail-total - 24px), so whenever the column is packed
+     the right band is EXACTLY 24px, and the left gutter carries the rail inset
+     and gap on top. A threshold would now be a hand-picked number — the stale
+     kind — so the guard flips again: there must be NO width cut above the
+     900px mobile rule, and the 24px term must be at least MIN_BAND. */
   const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
-  const m = live.match(/@media \(max-width: (\d+)px\) \{ body\[data-view\]::before \{ display: none/);
-  assert.ok(m, 'stale anchor — the width media query moved');
-  const px = Number(m[1]);
-
-  // the geometry the threshold must follow, read from the page itself
-  const sb = live.match(/--sidebar-w:\s*(\d+)px/);
-  assert.ok(sb, 'stale anchor — the sidebar width token');
-  const sidebar = Number(sb[1]);
-  const COLUMN = 1200;          // .page max-width, the band's own denominator
+  const cuts = [...live.matchAll(/@media \(max-width: (\d+)px\) \{ body\[data-view\]::before \{ display: none/g)].map(m => Number(m[1]));
+  assert.deepStrictEqual(cuts, [900], 'only the mobile cut may hide the layer — got ' + JSON.stringify(cuts));
   const MIN_BAND = 24;          // below this the band renders as a line, measured at 1410 = 2.5px
-
-  assert.strictEqual(px, MIN_BAND * 4 + sidebar + COLUMN - 1,
-    'the threshold must be the width at which the band reaches ' + MIN_BAND + 'px — '
-    + 'got ' + px + ', expected ' + (MIN_BAND * 4 + sidebar + COLUMN - 1)
-    + '. A hand-picked number here is how the last one went stale.');
-
-  /* ⚠ AND IT MUST NOT SILENTLY BECOME A FULL-BLEED THRESHOLD AGAIN. If the mesh
-     ever returns to covering the viewport, the band maths stops applying and
-     this whole guard needs re-deriving rather than the number nudging. */
-  assert.ok(/linear-gradient\(to left/.test(live),
-    'the horizontal band mask must still exist — without it this threshold means nothing');
+  const pw = live.match(/--page-w:\s*min\(1200px, calc\(100vw - var\(--rail-total\) - (\d+)px\)\)/);
+  assert.ok(pw, 'stale anchor — --page-w must leave a fixed right band');
+  assert.ok(Number(pw[1]) >= MIN_BAND, 'the right band must be >= ' + MIN_BAND + 'px, got ' + pw[1]);
+  const inset = live.match(/--rail-inset:\s*(\d+)px/), gap = live.match(/--rail-gap:\s*(\d+)px/);
+  assert.ok(inset && gap, 'stale anchors — the rail tokens');
+  assert.ok(Number(inset[1]) + Number(gap[1]) >= MIN_BAND, 'the left gutter (inset + gap) must be >= ' + MIN_BAND + 'px');
+  assert.ok(/linear-gradient\(to right/.test(live), 'the two-gutter mask must still exist — without it this guard means nothing');
 });
-
 test('⚠ edges stay DOMINANT over nodes at any weight — that ratio fixed "green stars"', () => {
   const gen = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'gen-mesh.js'), 'utf8');
   const edgeOp = gen.match(/const o = \(([\d.]+) \+ near \* ([\d.]+)\)/);

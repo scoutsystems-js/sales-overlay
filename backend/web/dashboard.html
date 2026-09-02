@@ -123,6 +123,23 @@
          artwork compete for the same horizontal space: at 1440 the band is
          (1440 - 200 - 1200)/4 = 10px. Every pixel here comes off the band. */
       --sidebar-w: 200px;
+      /* ⚠⚠ THE FLOATING RAIL — Josh's "floating sidebar" (approved 2026-09-02).
+         The rail is a CARD: --rail-inset off the window edge on three sides,
+         --rail-gap of mesh between it and the content. ONE geometry feeds THREE
+         consumers — the .page margin, the .page width and the mesh mask — via
+         --page-left / --page-w below. They MUST stay one definition: the mask
+         keeps the artwork off the column by using the SAME expression the column
+         is laid out with, so a change to one cannot slide artwork under text.
+         ⚠ --page-left is where the column starts: packed against the rail when
+         there is no room to centre (1440: 240px), centred when there is (1920:
+         360px). --page-w is 1200 wherever it fits and otherwise leaves a 24px
+         right band — which is why the band is >= 24px BY CONSTRUCTION above the
+         900px mobile cut, and the old 1495px floor is retired (see the mesh rule). */
+      --rail-inset: 16px;
+      --rail-gap: 24px;
+      --rail-total: calc(var(--rail-inset) + var(--sidebar-w) + var(--rail-gap));
+      --page-left: max(var(--rail-total), calc((100vw - 1200px) / 2));
+      --page-w: min(1200px, calc(100vw - var(--rail-total) - 24px));
     
       /* ⚠⚠ THREE WEIGHTS, NOT SEVEN. The 115 semibolds were the single
          cheapest-looking thing in the app — heavy text at 11-12px is close to the
@@ -557,9 +574,19 @@
            ground would have fixed five pages and left the other seven two-sided.
            ⚠ max(0px, ...) because below 1200px the gutter is negative; the band
            collapses to nothing, which is what was already visible there. */
-      linear-gradient(to left, rgba(0,0,0,1) 0px,
-        rgba(0,0,0,1) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)),
-        rgba(0,0,0,0) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)));
+      /* ⚠⚠ BOTH GUTTERS (2026-09-02, Josh's 24" monitor: 260px of dead black
+         on the left, 130 dead + 130 mesh on the right). The artwork shows LEFT
+         of the column (under and around the floating rail) and RIGHT of it; the
+         column itself stays black so the seven-plus views whose text has no
+         ground of its own are never on the artwork. Hard edges, not fades: the
+         mesh is not being dimmed. The stops are the column's OWN layout tokens,
+         so the mask and the .page rule cannot disagree about where text is. */
+      linear-gradient(to right, rgba(0,0,0,1) 0px,
+        rgba(0,0,0,1) var(--page-left),
+        rgba(0,0,0,0) var(--page-left),
+        rgba(0,0,0,0) calc(var(--page-left) + var(--page-w)),
+        rgba(0,0,0,1) calc(var(--page-left) + var(--page-w)),
+        rgba(0,0,0,1) 100%);
       /* ⚠ INTERSECT, NEVER REPLACE. The vertical gradient above is the derived
          smoothstep top-fade — its slope is zero at both ends so the ramp has no
          corner to catch (Mach banding). Overwriting mask-image would delete it. */
@@ -583,9 +610,19 @@
            ground would have fixed five pages and left the other seven two-sided.
            ⚠ max(0px, ...) because below 1200px the gutter is negative; the band
            collapses to nothing, which is what was already visible there. */
-      linear-gradient(to left, rgba(0,0,0,1) 0px,
-        rgba(0,0,0,1) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)),
-        rgba(0,0,0,0) max(0px, calc((100vw - var(--sidebar-w) - 1200px) / 4)));
+      /* ⚠⚠ BOTH GUTTERS (2026-09-02, Josh's 24" monitor: 260px of dead black
+         on the left, 130 dead + 130 mesh on the right). The artwork shows LEFT
+         of the column (under and around the floating rail) and RIGHT of it; the
+         column itself stays black so the seven-plus views whose text has no
+         ground of its own are never on the artwork. Hard edges, not fades: the
+         mesh is not being dimmed. The stops are the column's OWN layout tokens,
+         so the mask and the .page rule cannot disagree about where text is. */
+      linear-gradient(to right, rgba(0,0,0,1) 0px,
+        rgba(0,0,0,1) var(--page-left),
+        rgba(0,0,0,0) var(--page-left),
+        rgba(0,0,0,0) calc(var(--page-left) + var(--page-w)),
+        rgba(0,0,0,1) calc(var(--page-left) + var(--page-w)),
+        rgba(0,0,0,1) 100%);
       /* ⚠ INTERSECT, NEVER REPLACE. The vertical gradient above is the derived
          smoothstep top-fade — its slope is zero at both ends so the ramp has no
          corner to catch (Mach banding). Overwriting mask-image would delete it. */
@@ -709,7 +746,13 @@
        before that check. Say so rather than present it as derived.
        ⚠ THE GROUND IS UNAFFECTED. This hides a flourish, never the floor text
        sits on — 0 exposed across ten views, unchanged. */
-    @media (max-width: 1495px) { body[data-view]::before { display: none; } }
+    /* ⚠ RETIRED 2026-09-02 — the 1495px floor. With the floating rail the right
+       band is 24px BY CONSTRUCTION above the 900px cut (--page-w leaves exactly
+       24px when packed) and the left gutter carries --rail-inset + --rail-gap
+       plus everything beneath the rail, so "band >= 24px" holds at every width
+       this layer renders at. A hand-picked threshold here would be the stale
+       kind. The 900px rule below is the only width cut. The retired line:
+       (max-width: 1495px) → body[data-view]::before display none. */
     /* ⚠ Kept though the rule above already covers it: it records that the layer
        was ALWAYS meant to be absent on small screens, independently of the band
        maths, so a future change to the floor does not accidentally revive it. */
@@ -944,11 +987,23 @@
        the page because it is the same floor the content sits on. */
     .sidebar {
       position: fixed;
-      top: 61px;                      /* the nav's own height */
-      left: 0;
-      bottom: 0;
+      /* ⚠ THE CARD FLOATS: inset from the nav (51px tall, measured) and from
+         the left and bottom edges by --rail-inset, so the mesh shows left of it,
+         beneath it and in the gap before the content. OPAQUE, DELIBERATELY —
+         Josh asked for "a slight transparency"; a translucent panel is nav text
+         on the mesh, and the mesh is not uniform, so contrast would vary label
+         by label. The float and the gaps are what make it read as floating.
+         If it still reads flat, transparency is a one-token experiment to
+         MEASURE against the brightest node behind each label, never to ship on
+         a look. --bg-elevated (not --bg) so the card keeps its edge where the
+         mesh above the fade is black. */
+      top: calc(51px + var(--rail-inset));
+      left: var(--rail-inset);
+      bottom: var(--rail-inset);
       width: var(--sidebar-w);
-      background: var(--bg);
+      background: var(--bg-elevated);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
       padding: 28px 20px;
       display: flex;
       flex-direction: column;
@@ -1060,15 +1115,16 @@
        packs it against the sidebar only when there is not (at 1440 it starts at
        190 instead of 120). */
     .page {
-      margin-left: max(var(--sidebar-w), calc((100vw - 1200px) / 2));
+      /* ⚠ --page-left / --page-w are the SAME tokens the mesh mask reads. */
+      margin-left: var(--page-left);
       margin-right: auto;
       /* ⚠⚠ THE COLUMN MUST FIT WHAT IS LEFT, OR THE PAGE SCROLLS SIDEWAYS.
          max-width:1200 does not shrink for a 190px margin, so between 900 and
          1366 the page overflowed — by 24px at 1366 and 290px at 1100. Measured
          across widths before shipping, not noticed afterwards. */
-      max-width: min(1200px, calc(100vw - var(--sidebar-w) - 64px));
+      max-width: var(--page-w);
     }
-    @media (max-width: 900px) { .page { margin-left: auto; } }
+    @media (max-width: 900px) { :root { --rail-total: 0px; } .page { margin-left: auto; } }
 
     /* ⚠ STACKING CONTEXT, NOT z-index ON THE PANEL. `.fade-in` animates a
        transform with `both` fill, so EVERY .page-header and .section keeps a
@@ -4396,6 +4452,7 @@
        WAS BUILT BY PAGE NAME, NOT BY REACHABILITY — so it kept its boxes while
        the page linking to it lost them, and clicking through read as a
        regression. Ground first, as always. */
+    body[data-view="eod"] .page,
     body[data-view="call-review"] .page,
     body[data-view="call-library"] .page,
     body[data-view="team-expanded"] .page,
