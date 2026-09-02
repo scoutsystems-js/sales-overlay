@@ -1671,3 +1671,4 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - 17 older guards converted (row card, lists, panel keys, catalog units, picker ceiling), none deleted. Suite 2103/0.
 - ⚠ Cron: TWO slots missed now (02:00Z, 04:00Z); nothing since 23:57Z. GitHub Actions scheduling.
 - **🔴 NEXT — Justin picks, from the three filed for the end of the session:** the Fine Tune Coaching control · the Coaching Dashboard dropdown (Performance/Coaching/Objections, for closers) · the Closer/Manager tag. Also filed: re-analyse-others admin-only; rep photos.
+- **04:22Z — the cron fired at 04:17:53Z and the warm-after-drain path worked end to end on its first cycle:** `deferred — 5 dispatched` → `deferred — 3/2/1 claim(s) still live` → `{"managers":2,"warmed":2}`; two `team` cache rows written at 04:21:04Z, after the analyses landed.
