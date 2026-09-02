@@ -1093,21 +1093,26 @@ router.post('/update-analyses/:user_id', requireAuth, async function(req, res) {
   var target = req.params.user_id;
   var role = req.userProfileRole;
 
-  /* ⚠ FAIL CLOSED. requireAuth fails OPEN on a DB error, leaving the role
-     undefined — which is neither 'manager' nor 'owner', so a blip refuses
-     rather than grants. The safe direction when the thing being gated is spend. */
-  if (role !== 'manager' && role !== 'owner') {
-    console.warn('[fathom] update-analyses scope violation: actor=%s (role=%s) target=%s', req.user.id, role, target);
-    return res.status(403).json({ error: 'Only managers and owners can grade another user\'s calls.' });
-  }
-
+  /* ⚠⚠ ADMIN-ONLY (Justin's ruling, 2026-09-02). This NARROWS the 2026-08-28
+     ruling above — managers and above could grade a rep on their own team —
+     to OWNERS ONLY. WHO changes; WHAT does not (30 days, the same runner, the
+     same claim). The self-serve route is untouched: a rep grading their own
+     calls is a different act, and it is how Godwin's backlog was actually
+     cleared.
+     THE REASON, so it is not softened later: re-analysing spends money on
+     someone else's account, and once onboarding exists a manager with a
+     re-analyse button and a growing team is an unbounded spend path. Today
+     there are nine users and one person pressing it.
+     ⚠ The team-boundary lookup that gated managers is GONE, not left dead: an
+     owner grades anyone, so a check that could never run would be a promise
+     the code does not keep. Enforced here, not only in the UI — a hidden
+     button is a suggestion, and this one spends money. The refusal names who
+     can, so the client can say the same thing.
+     ⚠ FAIL CLOSED. requireAuth fails OPEN on a DB error, leaving the role
+     undefined — which is not 'owner', so a blip refuses rather than grants. */
   if (role !== 'owner') {
-    var admin = getAdminClient();
-    var t = await admin.from('user_profiles').select('managed_by').eq('user_id', target).maybeSingle();
-    if (t.error || !t.data || t.data.managed_by !== req.user.id) {
-      console.warn('[fathom] update-analyses scope violation: actor=%s target=%s not on their team', req.user.id, target);
-      return res.status(403).json({ error: 'That user is not on your team.' });
-    }
+    console.warn('[fathom] update-analyses scope violation: actor=%s (role=%s) target=%s', req.user.id, role, target);
+    return res.status(403).json({ error: 'Grading another user\'s calls is limited to admins. Ask an admin, or they can grade their own calls from their Calls page.' });
   }
 
   return runUpdateAnalyses(req, res, target, role);

@@ -55,19 +55,23 @@ test('⚠⚠ THE CROSS-USER ROUTE GRADES THE TARGET, NOT THE CALLER', () => {
   assert.ok(/req\.params\.user_id/.test(src));
 });
 
-test('⚠ MANAGERS AND ABOVE ONLY — a rep must not grade a peer', () => {
+test('⚠ ADMIN-ONLY — a rep must not grade a peer, and since 2026-09-02 neither may a manager', () => {
+  /* Converted 2026-09-02: Justin narrowed the 2026-08-28 ruling to owners only
+     (spend on someone else's account). test/reanalyse-admin-only.test.js drives
+     the real handler; this keeps the source-level pin. */
   const src = route("router.post('/update-analyses/:user_id'");
-  assert.ok(/role !== 'manager' && role !== 'owner'/.test(src), 'plain users refused');
+  assert.ok(/role !== 'owner'/.test(src), 'everyone but an owner refused');
+  assert.ok(!/role !== 'manager'/.test(src), 'no manager grant');
   assert.ok(/403/.test(src));
 });
 
-test('⚠⚠ THE BOUNDARY: a manager may only grade their OWN team', () => {
-  // Decided and enforced, not left to the UI. Verified live: manager -> a rep on
-  // another board is 403; owner -> the same rep is 200.
+test('⚠⚠ THE BOUNDARY IS NOW THE ROLE ITSELF — no dead team check left behind (converted 2026-09-02)', () => {
+  /* The manager-on-own-team predicate gated a grant that no longer exists. A
+     check that can never run is a promise the code does not keep, so it went
+     with the grant. An owner is unrestricted, as before. */
   const src = route("router.post('/update-analyses/:user_id'");
-  assert.ok(/managed_by !== req\.user\.id/.test(src),
-    'the same predicate every other cross-user route uses');
-  assert.ok(/role !== 'owner'/.test(src), 'and an owner is unrestricted');
+  assert.ok(!/managed_by !== req\.user\.id/.test(src), 'the team lookup is gone with the manager grant');
+  assert.ok(/role !== 'owner'/.test(src), 'an owner is unrestricted');
 });
 
 test('⚠⚠ ALL-TIME STAYS OWNER-ONLY, AND ON THE ACTOR\'S ROLE — no second cap', () => {
@@ -81,7 +85,8 @@ test('⚠⚠ ALL-TIME STAYS OWNER-ONLY, AND ON THE ACTOR\'S ROLE — no second c
 
 test('⚠ FAIL CLOSED — requireAuth fails OPEN, so an undefined role must refuse', () => {
   const src = route("router.post('/update-analyses/:user_id'");
-  assert.ok(/role !== 'manager' && role !== 'owner'/.test(src),
+  /* Converted 2026-09-02 with the admin-only ruling: the positive check is now `!== 'owner'`. */
+  assert.ok(/role !== 'owner'/.test(src),
     'a positive check refuses on undefined; a negative one would grant');
 });
 
@@ -101,11 +106,11 @@ test('⚠⚠ THE CLIENT SENDS THE TARGET — a server that accepts it changes no
   assert.ok((LIVE.match(/gradeBacklogUrl\(\)/g) || []).length >= 2, 'both dry-run and go use it');
 });
 
-test('⚠ THE CONTROL RENDERS ON A PIVOT ONLY FOR MANAGERS AND ABOVE', () => {
+test('⚠ THE CONTROL RENDERS ON A PIVOT ONLY FOR OWNERS (converted 2026-09-02); a manager gets the note', () => {
   const at = LIVE.indexOf('function canGradeViewedUser');
   assert.ok(at !== -1, 'stale anchor');
   const src = LIVE.slice(at, LIVE.indexOf('\n  }', at));
-  assert.ok(/isSelf\(\)/.test(src) && /manager/.test(src) && /owner/.test(src));
+  assert.ok(/isSelf\(\)/.test(src) && /owner/.test(src) && !/manager/.test(src));
   assert.ok(/canGradeViewedUser\(\) && gradeBacklogWorkCount\(\) > 0/.test(LIVE),
     'and the render gate must use it');
 });

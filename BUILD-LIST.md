@@ -1672,3 +1672,10 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - ⚠ Cron: TWO slots missed now (02:00Z, 04:00Z); nothing since 23:57Z. GitHub Actions scheduling.
 - **🔴 NEXT — Justin picks, from the three filed for the end of the session:** the Fine Tune Coaching control · the Coaching Dashboard dropdown (Performance/Coaching/Objections, for closers) · the Closer/Manager tag. Also filed: re-analyse-others admin-only; rep photos.
 - **04:22Z — the cron fired at 04:17:53Z and the warm-after-drain path worked end to end on its first cycle:** `deferred — 5 dispatched` → `deferred — 3/2/1 claim(s) still live` → `{"managers":2,"warmed":2}`; two `team` cache rows written at 04:21:04Z, after the analyses landed.
+
+
+## 2026-09-02 — RE-ANALYSING ANOTHER USER'S CALLS IS ADMIN-ONLY (Justin's ruling; narrows 2026-08-28)
+- `POST /fathom/update-analyses/:user_id` refuses everyone but an owner (403, names who can); the manager team-boundary lookup went with the grant. Self-serve `POST /fathom/update-analyses` untouched (any user, own calls). All-time owner-only, unchanged, inside the shared runner. Matrix in the findings.
+- UI: on a pivot the control renders for owners only; a manager sees "Grading another closer's calls is limited to admins — ask an admin, or {rep} can grade them from their own Calls page." where the control was. A manager keeps two routes to a rep's backlog: the rep's own control, or an admin.
+- Nothing re-graded, nothing deleted, no analysis changed — a permissions change. Guard `test/reanalyse-admin-only.test.js` (drives the real handler with a forged actor: manager 403, user 403, undefined 403, owner passes). Suite green.
+- **⚠ FOR JUSTIN, REPORT ONLY:** the repo's git remote URL carries a GitHub token in plain text in `.git/config` (local file, not committed, not public). Rotate when convenient; untouched here.
