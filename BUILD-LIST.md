@@ -1643,3 +1643,12 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - Served markers (comment-stripped): backdrop 0 · overscroll 1 · wordmark 1 · text span 0. Suite 2076/0.
 - ⚠ Cron still not fired since 23:57Z as of 02:50Z. No `[team-warm]` line yet.
 - ⚠ Honest limit: the harness cannot reproduce a scroll bounce (hidden document, no animated scroll). Justin's scroll is the closing check.
+
+
+## 2026-09-02 — PAGE LOAD SPEED — LIVE `8e0a94f` + `bca1caa` + `2b275bb` (03:34Z)
+- **Measured before/after on production, cold and warm separately** (full tables in the findings). Warm: /team/overview 5.5–7.4s → 1.9–3.6s; objections grid 4.2–4.5s → 1.6–2.7s; objections summary 4.3s → 2.1s; /me/analytics2 2.3–2.9s → 0.9–1.0s. Cold model lanes unchanged in time (model-bound), but the Objections page pays ONE bucketing call, not two.
+- **(a)** `laneWaitHtml` — the Recommendations shape on all 21 lane renderers; `laneWaitLong` (renamed from `teamWaitLong`) serves team and personal lanes; Reps no longer vanishes on an error; **the boot spinner was hiding a real delay** — deep-linked team/EOD/Account views now paint before the personal analytics lane returns (team lanes start ~1.4s earlier, measured). Guard `test/lane-wait.test.js`.
+- **(b)** `lib/warm-after-drain.js` — the warm-up runs at the end of each analyze loop when no claim is live; sync-all warms only when it dispatched nothing. Guard `test/warm-after-drain.test.js`. ⚠ Not yet exercised live: nothing has synced since the deploy and **the cron has not fired since 23:57Z (02:00Z never ran; 04:00Z pending at 03:35Z)**.
+- **(c)** summary starts after the grid lands (`gridLanded`); `getBucketMapping` shares one in-flight call per phrase set. Guard `test/bucket-inflight.test.js`. Chosen over one endpoint so the grid paints first.
+- **(d)** `computeTeamAnalytics`, `computeCallAnalytics`, `computeTeamObjections` issue their round trips together; `lib/email-map.js` reads listUsers once per 60s. Guards `test/lane-parallel.test.js`, `test/email-map-cache.test.js`.
+- **Filed:** recommendations and needs-work lanes still have their own sequential reads (~4–5s warm, `loadTeamWindow`); the summary recomputes the grid's rows on a cache hit (2.1s); a deep link fetches team lanes twice when the saved team differs from the default; the needs-work cache key moved under a loaded page (65.9s "warm" miss, cause not established).
