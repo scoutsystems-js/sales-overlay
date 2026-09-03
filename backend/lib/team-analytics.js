@@ -354,7 +354,8 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     time_to_price: t.price_n > 0 ? Math.round((t.price_sum / t.price_n / 60) * 10) / 10 : null,
     time_to_price_n: t.price_n,
   };
-  return { from: from, to: to, totals: totals, per_rep: per_rep, objection_categories: teamByCat };
+  /* the prospect reads' row counts and truncation flag, so a cut set can never render as a complete rate (H683) */
+  return { from: from, to: to, totals: totals, per_rep: per_rep, objection_categories: teamByCat, prospect_reads: prospectRates._reads || null };
 }
 
 // Trend buckets across the team by call_date. bucket ∈ week|month|quarter.

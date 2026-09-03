@@ -178,16 +178,41 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
 
        ⚠ `.not(col,'is',true)`, never `.eq(col,false)` — nullable column; see
        test/not-a-sales-call.test.js. */
-    var cq = admin.from('fathom_calls')
-      .select('id, user_id, fathom_call_id, prospect_id, call_date')
-      .in('user_id', ids)
-      .not('not_a_sales_call', 'is', true)
-      .is('duplicate_of', null)
-      .not('prospect_id', 'is', null);
-    if (fromIso) cq = cq.gte('call_date', fromIso);
-    if (toIso) cq = cq.lte('call_date', toIso);
-    var calls = await cq;
-    if (calls.error || !calls.data || !calls.data.length) return {};
+    /* ⚠⚠ PAGED (2026-09-02, H683). This read carried a whole team's prospect-attached
+       calls in ONE select — PostgREST returns 1,000 and stops SILENTLY. The Sober
+       Living team stood at 947 in its 90-day window, growing 20.7 a day: from about
+       5 September the closing rate on every team page would have been computed on a
+       truncated set with no error, a wrong number rendered as a right one on the
+       metric Justin rules from. Every page is fetched HERE before anything is
+       computed, so no surface ever shows a partial rate; the read's row count and a
+       `truncated` flag travel on the result (non-enumerable, so callers that iterate
+       users never see a phantom rep) and team-analytics forwards them on its payload.
+       Fix #6's shape (routes/kb.js), not a second approach. Pinned by
+       test/close-rate-paged.test.js, which failed on the unpaged code. */
+    var PE_PAGE = 1000, PE_MAX_PAGES = 25;
+    var reads = { calls: 0, prospects: 0, truncated: false };
+    var buildCalls = function () {
+      var q = admin.from('fathom_calls')
+        .select('id, user_id, fathom_call_id, prospect_id, call_date')
+        .in('user_id', ids)
+        .not('not_a_sales_call', 'is', true)
+        .is('duplicate_of', null)
+        .not('prospect_id', 'is', null);
+      if (fromIso) q = q.gte('call_date', fromIso);
+      if (toIso) q = q.lte('call_date', toIso);
+      return q;
+    };
+    var calls = { data: [], error: null };
+    for (var pg = 0; pg < PE_MAX_PAGES; pg++) {
+      var page = await buildCalls().range(pg * PE_PAGE, pg * PE_PAGE + PE_PAGE - 1);
+      if (page.error) { calls = page; break; }
+      calls.data = calls.data.concat(page.data || []);
+      if (!page.data || page.data.length < PE_PAGE) break;
+      if (pg === PE_MAX_PAGES - 1) reads.truncated = true;
+    }
+    reads.calls = (calls.data || []).length;
+    var withReads = function (out) { Object.defineProperty(out, '_reads', { value: reads, enumerable: false }); return out; };
+    if (calls.error || !calls.data || !calls.data.length) return withReads({});
 
     /* ⚠⚠ SYNTHETIC EXCLUSION — AND IT NEEDS NO SECOND RULE FOR PROSPECTS.
        The close rate is computed from CALLS grouped by prospect_id, so
@@ -237,12 +262,21 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
       if (an.error) {
         console.error('[prospect-entity] outcome lookup failed (' + allIds.length
           + ' calls, chunk at ' + oi + '): ' + an.error.message);
-        return {};
+        return withReads({});
       }
       (an.data || []).forEach(function (a) { outcomeBy[a.fathom_call_id] = a.outcome; });
     }
 
-    var pr = await admin.from('prospects').select('id, merged_into').in('user_id', ids);
+    /* the merge map — paged for the same reason (886 rows for the same team, +36 a day) */
+    var pr = { data: [], error: null };
+    for (var pp = 0; pp < PE_MAX_PAGES; pp++) {
+      var ppage = await admin.from('prospects').select('id, merged_into').in('user_id', ids).range(pp * PE_PAGE, pp * PE_PAGE + PE_PAGE - 1);
+      if (ppage.error) { pr = ppage; break; }
+      pr.data = pr.data.concat(ppage.data || []);
+      if (!ppage.data || ppage.data.length < PE_PAGE) break;
+      if (pp === PE_MAX_PAGES - 1) reads.truncated = true;
+    }
+    reads.prospects = (pr.data || []).length;
     var mergedInto = {};
     if (!pr.error) {
       (pr.data || []).forEach(function (p) { if (p.merged_into) mergedInto[p.id] = p.merged_into; });
@@ -264,7 +298,7 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
        coaching and moments — filtering it anywhere else would HIDE it, which is
        precisely the not_a_sales_call behaviour this deliberately is not. */
     var rated = ratedCallsOnly(joined);
-    return rollupProspects(rated, mergedInto);
+    return withReads(rollupProspects(rated, mergedInto));
   } catch (err) {
     console.error('[prospect-entity] close-rate fetch failed: ' + ((err && err.message) || 'unknown'));
     return {};
