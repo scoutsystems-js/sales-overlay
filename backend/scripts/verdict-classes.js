@@ -18,6 +18,14 @@ const days = Number(process.argv[2] || 7);
   const by = {}; rows.forEach((x) => { const k = x.sales_call_verdict + ' / ' + (x.sales_call_reason_class || '(none)'); (by[k] = by[k] || []).push(x); });
   console.log('live verdicts, last ' + days + ' days: ' + rows.length);
   Object.keys(by).sort((a, b) => by[b].length - by[a].length).forEach((k) => { console.log('  ' + k + ': ' + by[k].length); if (/not_sales|unsure/.test(k)) by[k].slice(0, 5).forEach((x) => console.log('     - "' + (x.fathom_calls.title || '').slice(0, 50) + '" [' + (x.sales_call_review || 'pending') + '] ' + (x.sales_call_reason || '').slice(0, 120))); });
+  /* THE TELL that found both class gaps: a verdict whose reason disagrees with itself. A "sales"
+     verdict whose reason says nobody was being sold to — outside the logistics-only class Justin
+     ruled as sales (a real prospect present, no pitch) — or a "not_sales" verdict whose reason
+     names a prospect being sold to. Report them; a third gap will look like this. */
+  const tell = rows.filter((x) => (x.sales_call_verdict === 'sales' && x.sales_call_reason_class !== 'prospect_logistics_only' && /no prospect|not (there )?to (buy|purchase)|internal|no sales conversation|not a prospect|regulator|vendor|due diligence|scheduling error/i.test(x.sales_call_reason || ''))
+    || (x.sales_call_verdict === 'not_sales' && /a real prospect is on the call being (sold|pitched|qualified)/i.test(x.sales_call_reason || '')));
+  console.log('self-disagreeing verdicts (the tell): ' + tell.length);
+  tell.forEach((x) => console.log('  ! [' + x.sales_call_verdict + ' / ' + x.sales_call_reason_class + '] "' + (x.fathom_calls.title || '').slice(0, 50) + '": ' + (x.sales_call_reason || '').slice(0, 140)));
   const ns = rows.filter((x) => x.sales_call_verdict === 'not_sales');
   console.log('queue: pending ' + ns.filter((x) => !x.sales_call_review && x.fathom_calls.not_a_sales_call !== true).length + ' · confirmed ' + ns.filter((x) => x.sales_call_review === 'confirmed').length + ' · corrected ' + ns.filter((x) => x.sales_call_review === 'corrected').length + ' · per week at this rate ≈ ' + Math.round((ns.length / days) * 7));
 })().catch((e) => { console.error('FAILED: ' + e.message); process.exit(1); });

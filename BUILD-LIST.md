@@ -31,6 +31,35 @@
 
 ## 🎯 CURRENT SESSION
 
+### 🔒 SESSION CLOSED (2026-09-03, H713) — THE STATE, NOT AN INFERENCE
+
+**WHAT SHIPPED THIS SESSION (all deployed and verified by hash; every build has an executed guard):**
+- **Identity:** the invitee list, per-speaker emails and the title segment captured at arrival (062, H700); the splitting pass applied under a named ruling — 48 calls, 21 one-word prospects → 47 people, reversible rows (063, H702–H703); linking under the recorded policy — human name → invitee email → title/display name → today's key, the Anthony plant executed (064, H705); prospect rename that carries everywhere, a merge confirmed naming both, the EOD's name field the same path (066, H707).
+- **The follow-up flag and attribution (065, H706):** booked · follow-up · not a sales call; a linked later call is a follow-up, path 3 never manufactures one, the human mark always wins; the rate's window is the prospect's booked-call anchor on the analytics, cards, gauge and graph; the EOD's "follow up close" label and day line; the digest reads it (v7). The ten closer marks reversed by ruling; Dre's 3-minute call a follow-up by ruling.
+- **The naming split (H709):** outcome Closed · Open · Lost · No-show · DQ; type Booked · Follow-up · Not a sales call; one map, executed mirror; the type a tag; the prompts handed the label.
+- **The classifier (067, H708–H712):** the blind harness first (self-tested on plants), sets drawn (231), the three-state field riding the grader with the reason first (v38 → v40), the blind test held-out ONCE — 0/129 real calls deleted, 1/28 trainings through (3.6%), unsure never fired, 11/11 hard cases; the review queue for managers and above with the ONE mark (068), nothing auto-marked; the 100-confirmation checkpoint.
+- **Design:** card C (weakest red, sub-lines stripped), the three arrows (server-floored, no words), the dial captions off, the vector wordmark and glyph, the toggle, the top bar at 51.
+- **The Calls library:** the outage fixed (the header executed, rows clicked in Electron — the guard the page never had) and the two list controls (inline rename on the name, the type tag).
+- **The sweep's twelve fixes and H352 recorded as standing on a false reason (H706).**
+
+**IN OBSERVATION — NEEDS NO BLOCK:** the queue's confirmations and corrections (checkpoint at 100, ~6 weeks; Justin rules again) · the weekly reason classes (`scripts/verdict-classes.js`; the first live `not_sales` under v40 is the regulator fix's test) · linking's first real week per path (first hours: invitee email 4 · display name 2 · today's key 7 · unattached 3 of 16) · the identity coverage on new rows.
+
+**WHAT REMAINS FILED, AND WHAT EACH WAITS ON:**
+| row | waits on |
+|---|---|
+| **The landing page rewrite — PUBLIC AND OUT OF DATE.** It describes the product before the correction loop, the dashboards, the discovery items and the coaching rework (Connect · Grade · Coach · Objection Intelligence · EOD · pricing). It does NOT mention the overlay or teleprompter (checked: 0). **The only filed row a customer can see today.** | Justin's copy decisions |
+| Scout AI | the next session (Justin's order) |
+| CRM integration — GHL first, read-only; then Close; maybe HubSpot (▰ MAJOR) | after Scout AI; the linking policy's first path once it exists; nicknames revisited then |
+| The classifier's correction path (the mark is the label; Fine Tune Coaching is the lesson, new surface) | the queue's first corrections |
+| Auto-marking | 100 confirmations at ≥ 99% and Justin's ruling |
+| A fresh held-out set | only if a measured prompt change is wanted (the current set is spent) |
+| The attach rule re-forming one-word collisions on path-3 calls | the CRM (or a ruling to re-run the splitting pass periodically — it is idempotent) |
+| The social cards (`og:image`) · Safari touch icon · the phone layout (every view scrolls sideways at 390) | design blocks |
+| The 112 stripper files (ratchet) · the two dated reads (~November) · the dead code (35 KB) · the orphaned desktop removal | maintenance blocks |
+| The starter-set sweep · the grade-card design direction · the six rules with no guard (`SCOUT-DESIGN.md` §6) | Justin rules |
+| The josh@scoutsystems.io / joshua@soberlivingriches.com double sync (one workspace, two accounts) | a ruling on which account owns the history |
+
+
 ### ✅ THE SWEEP IS FINISHED (2026-09-02) — THE FIX LIST, RANKED BY WHAT IT COSTS TO LEAVE ALONE. Justin rules; nothing below is built.
 
 Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed with evidence in the block sections beneath. Detail and the full table: `~/Desktop/scout-findings.md` (block 8), H673.
