@@ -1041,16 +1041,21 @@
     }
     .top-bar-right { display: flex; align-items: center; gap: 20px; font-size: 13px; color: var(--text); }
     .top-bar-right a:hover { color: var(--text); }
-    /* ⚠ THE BACKGROUND SWITCH — see the markup note. The edge is ALWAYS there (ruled): a
-       fill change must not move a pixel, and a black square on a black bar needs a frame
-       to exist. Focus is the accent ring every control here uses. */
-    .bg-switch { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0;
-                 font-size: var(--fs-secondary); color: var(--text); cursor: pointer; line-height: 1; }
-    .bg-switch-box { width: 14px; height: 14px; border: 1px solid var(--edge-white); border-radius: 0;
-                     background: var(--accent); box-sizing: border-box; display: inline-block; }
-    .bg-switch[aria-checked="false"] .bg-switch-box { background: #000000; }
-    .bg-switch:hover .bg-switch-label { color: var(--accent); }
-    .bg-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--radius-sm); }
+    /* ⚠ THE BACKGROUND TOGGLE — see the markup note (H696). The track is black in both states and
+       keeps its white edge always; the KNOB moves (20px of travel) and the glyph rides it. The
+       glyph is the repo's vector as a mask, so its fill is a CSS colour: --accent on, --text at
+       .45 off. Guard: test/background-switch.test.js (rendered — edge, box, knob travel, colours). */
+    .bg-switch { display: inline-flex; align-items: center; background: none; border: 0; padding: 0; cursor: pointer; line-height: 0; }
+    .bg-switch-track { position: relative; display: block; width: 44px; height: 24px; box-sizing: border-box;
+                       background: #000000; border: 1px solid var(--edge-white); border-radius: 999px; }
+    .bg-switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg-field);
+                      display: flex; align-items: center; justify-content: center; transform: translateX(20px); transition: transform .15s var(--ease); }
+    .bg-switch[aria-checked="false"] .bg-switch-knob { transform: translateX(0); }
+    .bg-switch-glyph { display: block; width: 12px; height: 16px; background: var(--accent);
+                       -webkit-mask: url(/scout-glyph.svg) center / contain no-repeat; mask: url(/scout-glyph.svg) center / contain no-repeat; }
+    .bg-switch[aria-checked="false"] .bg-switch-glyph { background: var(--text); opacity: .45; }
+    .bg-switch:hover .bg-switch-track { border-color: var(--accent); }
+    .bg-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 999px; }
     .signout { cursor: pointer; }
     .signout:hover { color: var(--text); }
 
@@ -5298,19 +5303,6 @@
     <!-- ⚠ Admin's visibility rule is UNTOUCHED: init() reveals it for role
          'owner' and nothing here changes who sees it. -->
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
-    <!-- ⚠⚠ THE BACKGROUND SWITCH (Justin, 2026-09-03). "Background" is the visible label;
-         the square is the state: Scout green fill when the artwork is ON, black fill when
-         it is OFF, and a 1px WHITE edge ALWAYS (--edge-white) — the two states differ by
-         fill alone; the shape never moves and the outline never appears or disappears.
-         Top bar, between Admin and My Account: this row is who you are and how your
-         Scout is set up; the sidebar is where you go. It is a real <button role="switch">
-         with an accessible name and aria-checked, so a screen reader hears what it
-         toggles and which state it is in. The Account page's Display checkbox is the SAME
-         setting's second door — both call setBackgroundOff, which syncs both. -->
-    <button type="button" id="bgSwitch" class="bg-switch" role="switch" aria-checked="true"
-            aria-label="Background artwork" title="Turn the background artwork off" onclick="toggleBackground()">
-      <span class="bg-switch-label">Background</span><span class="bg-switch-box" aria-hidden="true"></span>
-    </button>
     <!-- ⚠⚠ A LABEL WHERE A VALUE USED TO BE. This printed the raw signed-in
          email — the same defect as an admin dropdown printing a manager's
          address where a company name belongs. It NAVIGATES to the account page,
@@ -5319,6 +5311,21 @@
          email was the only place on screen naming the signed-in account. It is
          still there, under Profile — one click deeper. -->
     <a id="signedInEmail" onclick="goAccount(); return false;" title="Account settings" style="cursor:pointer">My Account</a>
+    <!-- ⚠⚠ THE BACKGROUND TOGGLE (Justin, 2026-09-03, second ruling — H696). A REAL sliding toggle
+         at the far edge of the bar, to the right of My Account ("puts it more out of the way"):
+         a black pill track that never changes colour, with a 1px WHITE edge in BOTH states
+         (--edge-white, the product's one white); a knob that SLIDES; and the mesh glyph
+         (/scout-glyph.svg, the vector, as a CSS mask so its colour is CSS) riding the knob —
+         Scout green when the artwork is ON, dimmed text-white when OFF. No text label: the
+         glyph is what tells a user what it controls. One object, never two. The control's own
+         box never changes between states — only the knob moves inside it. Still a real
+         switch button with role, aria-checked, an accessible name and the accent focus ring;
+         the Account page's Display checkbox is the same setting's second door, both synced by
+         setBackgroundOff. -->
+    <button type="button" id="bgSwitch" class="bg-switch" role="switch" aria-checked="true"
+            aria-label="Background artwork" title="Turn the background artwork off" onclick="toggleBackground()">
+      <span class="bg-switch-track" aria-hidden="true"><span class="bg-switch-knob"><span class="bg-switch-glyph"></span></span></span>
+    </button>
   </div>
 </nav>
 
