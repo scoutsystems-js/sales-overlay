@@ -206,6 +206,14 @@
 </main>
 
 <script>
+  /* ⚠ MIRROR of lib/role-labels.js — RULED labels (H673): user → Rep · manager → Manager ·
+     owner → Admin. The stored value never changes. Pinned by test/role-labels-mirror.test.js,
+     which EXECUTES this copy against the lib's. Edit the lib first, then this. */
+  var ROLE_LABELS = { user: 'Rep', manager: 'Manager', owner: 'Admin' };
+  function roleLabel(role) {
+    var k = (typeof role === 'string') ? role.toLowerCase() : '';
+    return Object.prototype.hasOwnProperty.call(ROLE_LABELS, k) ? ROLE_LABELS[k] : 'Rep';
+  }
   // ─── Session / auth (shared pattern from dashboard.html + admin.html) ──
   var STORAGE_KEY = 'scout_session_v1';
   function getSession() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return null; } }
@@ -348,9 +356,9 @@
       var viewedUser = allUsers.find(function(u) { return u.user_id === viewingUserId; });
       var label = viewedUser ? viewedUser.email : viewingUserId;
       heading.textContent = 'Coaching review · ' + label;
-      sub.textContent = 'Viewing as ' + currentUser.role + ' — pick another user from the dropdown above.';
+      sub.textContent = 'Viewing as ' + roleLabel(currentUser.role) + ' — pick another user from the dropdown above.';
       badge.style.display = '';
-      badge.textContent = currentUser.role + ' view';
+      badge.textContent = roleLabel(currentUser.role) + ' view';
     }
   }
 

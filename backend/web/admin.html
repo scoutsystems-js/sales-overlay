@@ -868,7 +868,14 @@
   }
 
   // Naming decision: role 'owner' is surfaced as "admin (owner)".
-  function roleLabel(r) { return r === 'owner' ? 'admin (owner)' : r; }
+  /* ⚠ MIRROR of lib/role-labels.js — RULED labels (H673): user → Rep · manager → Manager ·
+     owner → Admin. The stored value never changes. Pinned by test/role-labels-mirror.test.js,
+     which EXECUTES this copy against the lib's. Edit the lib first, then this. */
+  var ROLE_LABELS = { user: 'Rep', manager: 'Manager', owner: 'Admin' };
+  function roleLabel(role) {
+    var k = (typeof role === 'string') ? role.toLowerCase() : '';
+    return Object.prototype.hasOwnProperty.call(ROLE_LABELS, k) ? ROLE_LABELS[k] : 'Rep';
+  }
   function roleBadgeClass(r) { return r === 'owner' ? 'owner' : (r === 'manager' ? 'admin' : 'user'); }
   function managersList() { return usersArray.filter(function(u) { return u.role === 'manager' || u.role === 'owner'; }); }
   function shortDate(iso) { var d = new Date(iso); return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); }
