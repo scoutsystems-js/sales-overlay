@@ -30,4 +30,13 @@ function renderComputed(html, probeJs, opts) {
   return JSON.parse(line.slice('@@RESULT@@'.length));
 }
 
-module.exports = { renderComputed, ELECTRON };
+/** Render an existing file in place (relative assets — fonts, css/ — resolve) and evaluate `probeJs`. */
+function renderFileComputed(file, probeJs, opts) {
+  if (!fs.existsSync(ELECTRON)) throw new Error('electron binary not found at ' + ELECTRON + ' — the rendered guard cannot run');
+  const r = spawnSync(ELECTRON, [RUNNER, file, probeJs, String((opts && opts.width) || 1400)], { encoding: 'utf8', timeout: 30000 });
+  const line = String(r.stdout || '').split('\n').filter((l) => l.startsWith('@@RESULT@@')).pop();
+  if (!line) throw new Error('electron produced no result (status ' + r.status + '): ' + String(r.stderr || '').slice(0, 400));
+  return JSON.parse(line.slice('@@RESULT@@'.length));
+}
+
+module.exports = { renderComputed, renderFileComputed, ELECTRON };
