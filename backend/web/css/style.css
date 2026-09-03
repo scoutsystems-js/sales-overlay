@@ -122,10 +122,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   background: var(--green);
   color: #000;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   font-size: 14px;
   padding: 10px 22px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
   transition: background 0.15s, transform 0.1s;
@@ -137,10 +137,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   background: transparent;
   color: var(--text);
-  font-weight: 500;
+  font-weight: var(--fw-emphasis);
   font-size: 14px;
   padding: 9px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   cursor: pointer;
   transition: border-color 0.15s;
@@ -152,7 +152,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   background: transparent;
   color: var(--muted);
-  font-weight: 500;
+  font-weight: var(--fw-emphasis);
   font-size: 15px;
   padding: 10px 4px;
   border: none;
@@ -161,8 +161,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .btn-ghost:hover { color: var(--text); }
 
-.btn-lg { font-size: 16px; padding: 13px 28px; border-radius: 10px; }
-.btn-full { width: 100%; justify-content: center; font-size: 16px; padding: 14px; border-radius: 10px; }
+.btn-lg { font-size: 16px; padding: 13px 28px; border-radius: var(--radius); }
+.btn-full { width: 100%; justify-content: center; font-size: 16px; padding: 14px; border-radius: var(--radius); }
 
 /* ── NAV ──────────────────────────────────────────────────────────────────── */
 .nav {
@@ -183,7 +183,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   gap: 9px;
   font-size: 17px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   letter-spacing: -0.3px;
 }
 
@@ -209,7 +209,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: var(--green-dim);
   color: var(--green);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--fw-emphasis);
   letter-spacing: 0.5px;
   text-transform: uppercase;
   padding: 5px 14px;
@@ -220,7 +220,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .hero h1 {
   font-size: clamp(40px, 7vw, 72px);
-  font-weight: 800;
+  font-weight: var(--fw-emphasis);
   line-height: 1.08;
   letter-spacing: -2px;
   margin-bottom: 24px;
@@ -253,7 +253,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   max-width: 580px;
   background: rgba(15,20,23,0.9);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: 0 0 60px rgba(var(--green-rgb), 0.08), 0 24px 60px rgba(0,0,0,0.5);
 }
@@ -267,9 +267,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: rgba(255,255,255,0.02);
 }
 
-.mockup-logo { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; }
-.mockup-brand { font-size: 13px; font-weight: 700; }
-.mockup-status { font-size: 11px; color: var(--green); font-weight: 600; }
+.mockup-logo { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: var(--fw-emphasis); }
+.mockup-brand { font-size: 13px; font-weight: var(--fw-emphasis); }
+.mockup-status { font-size: 11px; color: var(--green); font-weight: var(--fw-emphasis); }
 
 .mockup-prompt {
   padding: 14px 16px;
@@ -281,11 +281,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mockup-badge {
   display: inline-block;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin-bottom: 6px;
 }
 .mockup-badge.discovery { background: rgba(59,130,246,0.15); color: #60a5fa; }
@@ -293,7 +293,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mockup-badge.objection { background: rgba(239,68,68,0.15); color: #f87171; }
 .mockup-badge.close { background: rgba(var(--green-rgb), 0.15); color: var(--green); }
 
-.mockup-headline { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+.mockup-headline { font-size: 11px; font-weight: var(--fw-emphasis); color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
 .mockup-text { font-size: 14px; color: var(--text); line-height: 1.5; }
 
 /* ── SECTIONS ─────────────────────────────────────────────────────────────── */
@@ -303,7 +303,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .section-label {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--green);
@@ -312,7 +312,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .section h2 {
   font-size: clamp(28px, 4vw, 44px);
-  font-weight: 800;
+  font-weight: var(--fw-emphasis);
   letter-spacing: -1px;
   margin-bottom: 16px;
 }
@@ -333,13 +333,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .step-num {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: var(--fw-emphasis);
   color: var(--green);
   letter-spacing: 1px;
   margin-bottom: 14px;
 }
 
-.step h3 { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+.step h3 { font-size: 17px; font-weight: var(--fw-emphasis); margin-bottom: 10px; }
 .step p { font-size: 14px; color: var(--muted); line-height: 1.7; }
 
 /* ── FEATURES ─────────────────────────────────────────────────────────────── */
@@ -352,14 +352,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .feature {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 28px;
   transition: border-color 0.2s;
 }
 .feature:hover { border-color: rgba(var(--green-rgb), 0.3); }
 
 .feature-icon { font-size: 28px; margin-bottom: 14px; }
-.feature h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.feature h3 { font-size: 16px; font-weight: var(--fw-emphasis); margin-bottom: 8px; }
 .feature p { font-size: 14px; color: var(--muted); line-height: 1.7; }
 
 /* ── PRICING ──────────────────────────────────────────────────────────────── */
@@ -368,15 +368,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   margin: 0 auto;
   background: var(--bg2);
   border: 1px solid rgba(var(--green-rgb), 0.3);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 40px;
   box-shadow: 0 0 40px rgba(var(--green-rgb), 0.06);
 }
 
 .pricing-top { margin-bottom: 32px; }
-.pricing-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--green); margin-bottom: 12px; }
+.pricing-name { font-size: 13px; font-weight: var(--fw-emphasis); text-transform: uppercase; letter-spacing: 1px; color: var(--green); margin-bottom: 12px; }
 .pricing-price { display: flex; align-items: baseline; gap: 4px; margin-bottom: 10px; }
-.price-amount { font-size: 56px; font-weight: 800; letter-spacing: -2px; }
+.price-amount { font-size: 56px; font-weight: var(--fw-emphasis); letter-spacing: -2px; }
 .price-period { font-size: 18px; color: var(--muted); }
 .pricing-desc { font-size: 14px; color: var(--muted); }
 
@@ -395,7 +395,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   gap: 16px;
 }
 
-.footer-logo { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.footer-logo { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: var(--fw-emphasis); }
 .footer-copy { font-size: 13px; color: var(--muted); }
 
 /* ── AUTH PAGES ───────────────────────────────────────────────────────────── */
@@ -412,7 +412,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   max-width: 420px;
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 40px;
 }
 
@@ -421,20 +421,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   gap: 10px;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   margin-bottom: 32px;
 }
 
-.auth-card h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+.auth-card h1 { font-size: 24px; font-weight: var(--fw-emphasis); margin-bottom: 8px; }
 .auth-card .subtitle { font-size: 14px; color: var(--muted); margin-bottom: 32px; }
 
 .form-group { margin-bottom: 20px; }
-.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.form-group label { display: block; font-size: 13px; font-weight: var(--fw-emphasis); color: var(--muted); margin-bottom: 8px; }
 .form-group input {
   width: 100%;
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 11px 14px;
   font-size: 15px;
   color: var(--text);
@@ -450,7 +450,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .auth-divider { text-align: center; font-size: 13px; color: var(--muted); margin: 20px 0; }
 .auth-switch { text-align: center; font-size: 14px; color: var(--muted); margin-top: 24px; }
-.auth-switch a { color: var(--green); font-weight: 600; }
+.auth-switch a { color: var(--green); font-weight: var(--fw-emphasis); }
 .auth-switch a:hover { text-decoration: underline; }
 
 /* ── DASHBOARD ────────────────────────────────────────────────────────────── */
@@ -474,7 +474,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   gap: 10px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   padding: 0 24px 28px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
@@ -509,7 +509,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   margin-bottom: 36px;
 }
 
-.dash-header h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+.dash-header h1 { font-size: 24px; font-weight: var(--fw-emphasis); letter-spacing: -0.5px; }
 
 .stat-grid {
   display: grid;
@@ -521,31 +521,31 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .stat-card {
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 24px;
 }
-.stat-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 8px; }
-.stat-value { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+.stat-label { font-size: 12px; font-weight: var(--fw-emphasis); text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 8px; }
+.stat-value { font-size: 32px; font-weight: var(--fw-emphasis); letter-spacing: -1px; }
 .stat-value.green { color: var(--green); }
 
 .table-card {
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .table-card-header {
   padding: 20px 24px;
   border-bottom: 1px solid var(--border);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
 }
 .sessions-table { width: 100%; border-collapse: collapse; }
 .sessions-table th {
   text-align: left;
   padding: 12px 24px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--muted);
@@ -562,9 +562,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .badge {
   display: inline-block;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: var(--fw-emphasis);
   padding: 3px 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .badge-win { background: rgba(var(--green-rgb), 0.15); color: var(--green); }
 .badge-loss { background: rgba(239,68,68,0.12); color: #f87171; }

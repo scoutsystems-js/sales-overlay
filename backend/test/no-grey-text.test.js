@@ -71,7 +71,8 @@ test('HIERARCHY IS CARRIED BY TYPOGRAPHY, since it is no longer carried by colou
   assert.ok(/font-size:\s*11px/.test(label[0]), 'smaller than its value');
   assert.ok(/text-transform:\s*uppercase/.test(label[0]), 'cased differently');
   assert.ok(/letter-spacing/.test(label[0]), 'tracked');
-  assert.ok(/font-weight:\s*600/.test(label[0]), 'and weighted, so the distinction is explicit');
+  /* re-pinned 2026-09-03 (D-2, H689): the scale's heaviest weight is --fw-emphasis; 600 was the literal this guard enshrined */
+  assert.ok(/font-weight:\s*var\(--fw-emphasis\)/.test(label[0]), 'and weighted (the emphasis token), so the distinction is explicit');
 });
 
 test('GUARD IS NON-VACUOUS: it would catch a reintroduced grey', () => {

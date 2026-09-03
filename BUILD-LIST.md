@@ -114,7 +114,7 @@ Detector 5/5 · 0/5 (lists as SETS with order reported, named thresholds, direct
 | `✅ FIXED 2026-09-02 (row 9, H685)` **③-5 highlight-type sets typed twice** | `PROSPECT_POSITION_TYPES` (worker :939) vs `HANDLING_TYPES` (dashboard :18783); `COACHABLE_TYPES` (coaching.js:26) vs `NEGATIVE_TYPES` (evidence-rule.js:29) | sets agree, order differs, nothing pins. A new type coached on but refused as evidence, or anchored but not rendered. |
 | `✅ FIXED 2026-09-02 (row 9, H685 — 23 loops, one was at 50)` **③-6 the chunk size is the literal 100 at 22 sites** | 13 files, no constant | one edit to 500 fails at the measured ~395 ceiling. One `CHUNK` in `lib/`. |
 | `✅ FIXED 2026-09-02 (row 9, H685)` **③-7 `by_rep` and `bar_rep` lists typed twice under a comment claiming "identical by construction"** | `widget-catalog.js:292` and `:298` | a comment asserting a parity the code does not enforce (H551). Derive one from the other. |
-| `📋 LOW` route paging constants (`admin.js`/`me.js`), token tolerance (`auth.js`/`fathom.js`), averages order (`team-averages:82`/dashboard `:13472`), desktop outcomes (`log.js`, `me.js:271`) | agree today, unpinned | cosmetic or dormant. |
+| `📋 LOW` route paging constants (`admin.js`/`me.js`), token tolerance (`auth.js`/`fathom.js`), averages order (`team-averages:82`/dashboard `:13472`) | agree today, unpinned | cosmetic. The desktop outcomes (`log.js`, `me.js:271`) moved to the ORPHANED list below (H689). |
 | `🗄 NOT FINDINGS` | the four duplicated headings (both read one function or are different content by design); zero closing-rate divisions outside `prospect-entity`; same-name per-lane budgets; `VALID_OUTCOMES` (deliberately different questions); the three pinned good-type lists. | reviewed, evidence in the report. |
 
 ### 🔎 SWEEP BLOCK 5 (2026-09-02) — CLASS ②: CHECKS THAT PASS WHILE MEASURING NOTHING. NO FIXES.
@@ -579,7 +579,7 @@ WARM, another board            3,425 / 1,730 / 1,505 ms
 | `🐛 BUG` **Blank graphs — THE SILENCE IS FIXED, THE CAUSE IS NOT. STILL OPEN.** ⚠⚠ **`04bfc13` fixed the render path SWALLOWING the failure, so a failed lane now SAYS so. The underlying reason `/team/rep-series` fails on a refresh HAS NEVER BEEN REPRODUCED.** Do not read this row as closed: what shipped makes the symptom visible and diagnosable next time it occurs, which is the only reason it can now be investigated at all. | Two silences in the render path, proven by driving the SHIPPED functions through every state a refresh can leave the lane in: `_error` dropped the skeleton (a truthy object reads as ARRIVED) and rendered an empty 300px box with **no message**; `_forbidden` **was not checked at all** and drew three empty charts. | ⚠⚠ **THIS DOES NOT IDENTIFY WHY THE REQUEST FAILS UPSTREAM** — it makes the next occurrence SAY so instead of blanking, which is exactly what this row was missing. ⚠ Same placeholder-is-a-valid-value shape as the sentinel leak, one level up: a truthy error object passes every check that asks whether something is PRESENT. |
 | `🐛 BUG` Date-picker focus trap | Tab leaves the open panel; panel stays open until an outside click | held deliberately — a naive blur handler fights the re-render |
 | `🐛 BUG` Bare-domain HTTPS | `https://scoutsystems.io` times out (Namecheap redirect has no 443) | needs Cloudflare DNS migration |
-| `🐛 BUG` DMG notarization gap | Every release needs manual DMG sign+notarize+staple | electron-builder config |
+| `🗄 DEAD 2026-09-03 (the desktop app is not being built — Justin)` ~~DMG notarization gap~~ | there will be no next release | orphaned with the app (H689) |
 
 ---
 
@@ -616,7 +616,7 @@ Cash tile → EOD (**verified: EOD is still self-only**) · 8c/8d barrier link (
 | modals for user-management confirms | **16 dialogs, not 2.** Native dialogs block the harness, so those flows are human-only to verify until this lands — an argument FOR it |
 | settings toggle — background off | per-user, already ruled; **0 refs** |
 | first-run onboarding sequence | the get-started card exists; a fuller sequence needs scoping |
-| desktop persistent-login parity | designed and approved; ships with the next DMG |
+| ~~desktop persistent-login parity~~ | DEAD 2026-09-03 — there is no next DMG (H689) |
 | exposure sweep guard | **not cheap** — needs a headless-browser devDependency this repo does not have |
 
 
@@ -810,6 +810,22 @@ So **"at least 10 characters" is already the rule and is already enforced** — 
 
 ---
 
+## 🗄 THE DESKTOP OVERLAY AND TELEPROMPTER ARE DEAD (Justin, 2026-09-03: "we've completely removed the thought of adding another overlay and teleprompter") — H689
+
+The two MAJOR rows are deleted, not parked. **What the ruling orphans — reported, NOT deleted this block.** Each line says whether the web app still uses it.
+
+| orphan | what it is | serves the web app? |
+|---|---|---|
+| `routes/proxy.js` (`/proxy/*`) + the `getAnthropic()` exemption in CLAUDE.md | key proxy for the desktop app; the only `claude-haiku-4-5` caller | **no** — no web page calls it |
+| `routes/log.js` (`/log`) + the `['win','loss','follow_up']` outcome set | session/log ingest from the desktop app (`src/lib/session-logger.js` is its only caller) | **no** |
+| `routes/me.js:219–297` — outcome inference from `call_sessions.post_call_summary` and the `session_logs` objection mining | reads desktop-era tables | **no** (the rest of `me.js` is the web app) |
+| `routes/admin.js:103, :197` — `call_sessions` counts and list | admin's session panels | **partly** — admin still renders them; they will read zero forever |
+| `call_sessions`, `session_logs` tables | desktop analytics (§7c already "kept but unwritten") | **no** |
+| `routes/download.js` (`/download`) + `web/download.html` | the DMG download page and GitHub-release redirects | **no** — nothing links to it |
+| repo-root `package.json` (`electron .`, `electron-builder`), `src/`, `build/`, `dist.nosync`, `~/sales-overlay` BUILD dir, `build-release.sh`, the GitHub releases (v1.1.2), `sales-overlay-backup-2026-04-08.zip` | the Electron app and its release chain | **no** — EXCEPT the `electron` devDependency, which the web app's rendered guards now run on (`test/helpers/electron-render.js`); keep the dependency, retire the build chain |
+| `DEEPGRAM_API_KEY` / `DEEPGRAM_PROJECT_ID` on Railway; `lib/team-analytics` desktop-era naming (`outcomeClass` win/loss in `performance-synthesis.js` is internal naming and stays) | Deepgram was the live-transcription vendor | **no** for the keys |
+| CLAUDE.md §7a's "preserve for a future revival" (H007–H016, H116, H117) and §3's release sequence | rules about a product that will not exist | retired (H689) |
+
 ## ▰ FEATURES — MAJOR
 
 **⚠ Justin's queue order puts ROLE HIERARCHY fourth, after the admin rebuild, the password page and Zoom.** It leads this section for that reason.
@@ -826,8 +842,6 @@ So **"at least 10 characters" is already the rule and is already enforced** — 
 | `▰ MAJOR` Account/org entity | Real billing needs it (seats, one invoice) | ⚠ per-user customisation does NOT wait on this — ruled 2026-08-20 |
 | `▰ MAJOR` Stripe billing | `SKIP_BILLING=true`; keys pending | needs the account/org entity first |
 | `▰ MAJOR` Zoom clip extraction (sub-stage 3) | download → ffmpeg-cut → discard source → store clips | the only part needing hosted storage |
-| `▰ MAJOR` Adaptive Learning Engine (desktop) | Post-call pattern extraction into the KB | desktop app dormant |
-| `▰ MAJOR` Teleprompter section-mode | Prompt only during objection/close | architecture preserved, unscheduled |
 
 ---
 
