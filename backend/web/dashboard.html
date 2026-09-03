@@ -113,6 +113,16 @@
          to re-open the scale rather than declare a fourth. */
       --fs-company: 24px;
 
+      /* ⚠⚠ THE REP CARD'S EDGE — A DELIBERATE EXCEPTION, NOT AN OVERSIGHT (Justin,
+         2026-09-02: "so it looks like a playing card"). The design pass removed
+         borders everywhere and replaced them with space; the rep card is the ONE
+         surface where the border IS the metaphor — the same standing as the
+         call-review verdict border (H267). It is the first white border in the
+         product. A later sweep must not remove it; a `border: 0` shorthand once
+         destroyed the verdict exemption with nothing failing, so this one is
+         guarded on the RENDERED result (test/rep-card-border-rendered.test.js). */
+      --rep-card-edge: #ffffff;
+
       /* ⚠ THE SIDEBAR'S WIDTH IS A LAYOUT CONSTANT READ IN TWO PLACES — the
          page's left margin AND the mesh band's gutter maths. One token, or the
          artwork is sized against a gutter the sidebar has already taken.
@@ -2469,7 +2479,9 @@
        vary is not a colour; the only colours are the movement chip (a direction,
        which varies) and the lit weakest bar (the accent). */
     .rep-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; margin-top: 12px; }
-    .rep-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); overflow: hidden;
+    /* ⚠ PLAYING CARD (Justin, 2026-09-02): a WHITE edge and the large radius — the ruled
+       exception recorded at --rep-card-edge. Hover keeps the accent edge (the click affordance). */
+    .rep-card { border: 1px solid var(--rep-card-edge); border-radius: var(--radius-lg); background: var(--bg-elevated); overflow: hidden;
                 cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease); }
     .rep-card:hover { border-color: var(--accent); transform: translateY(-1px); }
     .rep-card-band { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg-deep); border-bottom: 1px solid var(--border); }
