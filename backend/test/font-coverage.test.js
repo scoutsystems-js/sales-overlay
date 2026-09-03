@@ -103,7 +103,7 @@ test('⚠ the wordmark is an IMAGE on both surfaces — so no face has to cover 
   // pages carry an <img> whose alt text is the wordmark.
   for (const [name, src] of pages()) {
     const l = live(src);
-    assert.ok(/src="\/scout-wordmark\.png"/.test(l), name + ' does not load the wordmark image');
+    assert.ok(/src="\/scout-wordmark\.svg"/.test(l), name + ' does not load the wordmark image');
     assert.ok(/alt="Scout Systems"/.test(l), name + ' wordmark image has no/!wrong alt text');
   }
   // and the text lockup must not creep back alongside it — one logo per screen

@@ -15,7 +15,7 @@
 | **Three weights: 300 display · 400 everything · 500 emphasis. Nothing above 500** — the 600 nav and the 700 family came down on 2026-09-03 | CLAUDE.md §4e "Weights" (H689) | `scale-literals-ratchet.test.js` (literal weights at zero in the dashboard, the modal's CSS string and the shared file); `type-scale.test.js` |
 | **Face: Saira, self-hosted, variable** (`/fonts/saira-variable-latin.woff2`, weight 100–900, width 50–125%); body 450; `tabular-nums` on numeric surfaces only | CLAUDE.md §4e "Typeface" (H345, H349); `dashboard.html:3749` @font-face | `font-coverage.test.js` (Saira covers every string it sets); `style-tokens-mirror.test.js` (every outside page's `--font` leads with Saira) |
 | **Controls inherit by capability, never by enumeration** — every control inherits the face and size; a per-type list is how an email box became white Arial | CLAUDE.md §4d (H688) | `controls-inherit-rendered.test.js` (rendered, with the inverse check) |
-| **The wordmark is NOT Saira.** It is a 1038×138 raster whose face is not in the repo; no vector exists anywhere (the brand-asset folder is thirteen PNGs). **This is why the logo work is blocked** — it needs the font file or the wordmark as outlines. Never draw the PNG above half its native width on a retina surface | CLAUDE.md §4e (H691, H692, H540) | none for the face (an asset fact); the PNG cap is a rule with **no guard** |
+| **The wordmark is a VECTOR, `/scout-wordmark.svg`** (an auto-trace of the old raster — not Saira, no font involved — fill = the token), on all four surfaces; the nav sized by its rendered CAP (12.1px), not a height value; the glow is the `--wordmark-glow` filter on login, set-password and the welcome overlay, never the nav; `/scout-glyph.svg` is the favicon | CLAUDE.md §4e (H695; the measurement H691–H694) | `wordmark-vector.test.js` (rendered cap, four surfaces, no manifest, every page's icon); `style-tokens-mirror.test.js` (the glow token) |
 
 ## 2 · Shape and surface
 
@@ -62,4 +62,4 @@
 
 ## 6 · Findings — rules with no guard
 
-The green button treatment · a new view's ground · at-most-one-48 per view · the badge words · the picker's whiteness · the PNG cap. Each is a rule a sweep could break with the suite green. Filed in `BUILD-LIST.md`.
+The green button treatment · a new view's ground · at-most-one-48 per view · the badge words · the picker's whiteness. Each is a rule a sweep could break with the suite green. Filed in `BUILD-LIST.md`.

@@ -5,7 +5,7 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: width, height: 900, webPreferences: { offscreen: true, sandbox: false } });
   try {
     await win.loadFile(file);
-    const out = await win.webContents.executeJavaScript('JSON.stringify((() => { return (' + probe + '); })())');
+    const out = await win.webContents.executeJavaScript('(async () => JSON.stringify(await (' + probe + ')))()');   /* a probe may be async (an image to decode) */
     process.stdout.write('@@RESULT@@' + out + '\n');
     app.exit(0);
   } catch (e) { process.stderr.write(String(e && e.stack || e)); app.exit(2); }

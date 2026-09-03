@@ -41,7 +41,7 @@ test('the wordmark is the full name — now carried by the IMAGE and its alt tex
   const lockup = LOGIN_LIVE.slice(LOGIN_LIVE.indexOf('class="brand-lockup"'),
                                   LOGIN_LIVE.indexOf('class="card-header"'));
   assert.ok(lockup.length > 80 && lockup.length < 1200, 'slice suspicious: ' + lockup.length);
-  assert.ok(/src="\/scout-wordmark\.png"/.test(lockup), 'the lockup must load the logo image');
+  assert.ok(/src="\/scout-wordmark\.svg"/.test(lockup), 'the lockup must load the logo image');
   assert.ok(/alt="Scout Systems"/.test(lockup),
     'the wordmark must still READ "Scout Systems" — for a screen reader that alt '
     + 'text is now the only wordmark on the page');
@@ -136,7 +136,7 @@ test('⚠⚠ the BACKGROUND mark is still drawn, and the only fetched image is t
   assert.ok(!/icon\.png/.test(LOGIN_LIVE), 'icon.png must never be used as the logo here');
   const imgs = LOGIN_LIVE.match(/<img[^>]*>/g) || [];
   assert.strictEqual(imgs.length, 1, 'exactly one image on this page, got ' + imgs.length);
-  assert.ok(/scout-wordmark\.png/.test(imgs[0]), 'and it is the wordmark: ' + imgs[0]);
+  assert.ok(/scout-wordmark\.svg/.test(imgs[0]), 'and it is the wordmark: ' + imgs[0]);
 });
 
 /**
@@ -367,18 +367,16 @@ test('⚠⚠ the image cap is the ASSET\'S NATIVE WIDTH — the new failure mode
   assert.ok(boxVw && boxPx, 'the lockup box must be min(<vw>, <px>)');
   assert.ok(boxVw <= 100, 'the vw cap must keep the image inside the viewport: ' + boxVw);
 
-  // ⚠ READ THE ASSET'S REAL WIDTH — do not hard-code it. A number copied from a
-  // comment goes stale the moment the artwork is re-exported.
-  const png = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-wordmark.png'));
-  assert.strictEqual(png.toString('latin1', 12, 16), 'IHDR', 'not a PNG');
-  const nativeW = png.readUInt32BE(16);
-  const nativeH = png.readUInt32BE(20);
-  assert.ok(boxPx <= nativeW,
-    'the px cap (' + boxPx + ') must not exceed the asset\'s native width ('
-    + nativeW + '), or the logo is upscaled on every desktop');
-  // and the markup's intrinsic size must match the file, or the page reflows on load
-  assert.ok(new RegExp('width="' + nativeW + '" height="' + nativeH + '"').test(LOGIN),
-    'the <img> width/height must match the asset (' + nativeW + 'x' + nativeH + ')');
+  /* ⚠ THE ASSET IS A VECTOR NOW (2026-09-03, H695) — read its declared size from the SVG root, never a
+     hard-coded number; a vector has no native width, so the old "px cap must not exceed native width"
+     (the upscale guard) is retired — there is nothing to upscale. The markup's intrinsic size must still
+     match the file, or the page reflows on load. */
+  const svg = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-wordmark.svg'), 'utf8');
+  const root = svg.match(/<svg[^>]*\swidth="(\d+)"[^>]*\sheight="(\d+)"/);
+  assert.ok(root, 'the SVG declares width and height');
+  const nativeW = Number(root[1]), nativeH = Number(root[2]);
+  assert.ok(/<path\b/.test(svg) && !/<metadata\b/.test(svg), 'outlines, and no metadata manifest');
+  assert.ok(new RegExp('width="' + nativeW + '" height="' + nativeH + '"').test(LOGIN), 'the markup declares the file\'s intrinsic size');
 });
 
 test('⚠ the wordmark face is SELF-HOSTED — no third-party request on the first page', () => {

@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Coaching Dashboard — Scout Systems</title>
+  <link rel="icon" type="image/svg+xml" href="/scout-glyph.svg">
   <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
   <script>
     /**
@@ -126,6 +127,10 @@
          destroyed the verdict exemption with nothing failing, so this one is
          guarded on the RENDERED result (test/rep-card-border-rendered.test.js). */
       --edge-white: #ffffff;
+      /* ⚠ THE WORDMARK'S GLOW — a CSS filter on the vector, matching the retired PNG's baked glow
+         (measured: 17px at 23%). Applied on the login/set-password lockups and the welcome overlay,
+         never the nav. ONE LINE TO DROP if Justin wants it gone (H695). Mirrored in style.css. */
+      --wordmark-glow: drop-shadow(0 0 6px rgba(9, 224, 70, 0.35)) drop-shadow(0 0 14px rgba(9, 224, 70, 0.22));
 
       /* ⚠ THE SIDEBAR'S WIDTH IS A LAYOUT CONSTANT READ IN TWO PLACES — the
          page's left margin AND the mesh band's gutter maths. One token, or the
@@ -896,7 +901,14 @@
     }
     .top-bar-left { display: flex; align-items: center; gap: 12px; font-weight: var(--fw-emphasis); font-size: 14px; }
     .top-bar-left .brand-link { display: block; line-height: 0; }
-    .top-bar-left .brand-wordmark { height: 22px; width: auto; display: block; }
+    /* ⚠⚠ THE WORDMARK IS A VECTOR (2026-09-03, H695) — sharp at every size on every screen. Its
+       canvas (1090×170) carries more padding than the retired PNG's (1038×138), so the SAME cap
+       height needs a taller box: 25.71px = 12.1px cap ÷ (80/170). Measured, not assumed: at 22px
+       it rendered 141 wide with a 10.5px cap (13% smaller than the wordmark Justin called gorgeous);
+       at 25.71px it renders 165 wide with a 12.1px cap — today's exact width and cap. THE GUARD IS
+       ON THE RENDERED CAP, NOT THIS NUMBER (test/wordmark-vector.test.js), so trimming the viewBox
+       later does not kill it. No glow here — the nav never had one. */
+    .top-bar-left .brand-wordmark { height: 25.71px; width: auto; display: block; }
     .top-bar-left .sep { color: var(--text); font-weight: var(--fw-normal); }
     .top-bar-left .sub { color: var(--text); font-weight: var(--fw-emphasis); font-size: 13px; }
     /* Primary-nav items in the top-left. Hover lights up the text; the active
@@ -3825,7 +3837,8 @@
        does not track, so its width is a constant 42vmin against a 92vmin stage:
        it cannot overflow at any viewport, by construction rather than by
        measurement. (Measured anyway — see the findings.) */
-    .wel-title  { margin-top: 8px; width: min(42vmin, 637px); height: auto;
+    /* ⚠ the glow the retired PNG carried baked-in is now the shared filter — one line to drop (H695) */
+    .wel-title  { margin-top: 8px; width: min(42vmin, 637px); height: auto; filter: var(--wordmark-glow);
                   display: block; }
     /* ⚠⚠ THE SAME DERIVED CHAIN AS THE LOGIN LOCKUP, COPIED VERBATIM — not
        re-derived by eye. The old values here (0.844 / 0.700 / 0.0873) were
@@ -5279,7 +5292,7 @@
          22px CSS = 44 device px on retina, a 3.1× DOWNSCALE of the 138px
          source, which is why it is sharp here while the login lockup is soft
          at 2× — never upscale this asset. -->
-    <a href="/dashboard" class="brand-link" aria-label="Scout Systems — dashboard"><img class="brand-wordmark" src="/scout-wordmark.png" alt="Scout Systems" width="1038" height="138"></a>
+    <a href="/dashboard" class="brand-link" aria-label="Scout Systems — dashboard"><img class="brand-wordmark" src="/scout-wordmark.svg" alt="Scout Systems" width="1090" height="170"></a>
   </div>
   <div class="top-bar-right">
     <!-- ⚠ Admin's visibility rule is UNTOUCHED: init() reveals it for role
@@ -5951,7 +5964,7 @@
       + '<div class="wel-stage">' + svg
         + '<div class="wel-text">'
           + '<div class="wel-kicker" style="--wel-track:0.42em;animation-delay:' + T.textAt + 'ms">Welcome to</div>'
-          + '<img class="wel-title" src="/scout-wordmark.png" alt="Scout Systems" width="1038" height="138" style="animation-delay:' + T.titleAt + 'ms">'
+          + '<img class="wel-title" src="/scout-wordmark.svg" alt="Scout Systems" width="1090" height="170" style="animation-delay:' + T.titleAt + 'ms">'
         + '</div>'
       + '</div></div>';
   }

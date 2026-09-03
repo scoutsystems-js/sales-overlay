@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In — Scout Systems</title>
+  <link rel="icon" type="image/svg+xml" href="/scout-glyph.svg">
   <!-- ⚠ MONTSERRAT IS A FEEL TEST ON THIS PAGE ONLY (Justin, 2026-08-18) — the
        site-wide sweep is a separate item. TWO WEIGHTS ONLY: 300 Light for the
        page, 500 Medium for the wordmark. display=swap so a slow font can never
@@ -362,8 +363,10 @@
       display: block;
       width: 100%;
       height: auto;
-      /* ⚠ NO text-shadow / filter GLOW HERE. The glow is IN the artwork — it was
-         drawn with it — and adding a CSS one would double it. */
+      /* ⚠ THE GLOW IS A FILTER NOW (2026-09-03, H695). The retired PNG carried it baked in; the
+         vector carries none, so the shared token reproduces the measured 17px/23% glow. ONE LINE
+         TO DROP if Justin wants the lockup plain. */
+      filter: var(--wordmark-glow);
     }
 
     /* ⚠⚠ THE TEXT LOCKUP AND ITS ENTIRE DERIVATION ARE RETIRED (2026-08-21).
@@ -1154,8 +1157,8 @@
          Do not re-add it above the wordmark — the background mark and a small
          mark stacked over it is the same logo twice on one screen. -->
     <div class="brand-lockup">
-      <img class="brand-img" src="/scout-wordmark.png"
-           alt="Scout Systems" width="1038" height="138" fetchpriority="high">
+      <img class="brand-img" src="/scout-wordmark.svg"
+           alt="Scout Systems" width="1090" height="170" fetchpriority="high">
     </div>
 
     <div class="card-header">

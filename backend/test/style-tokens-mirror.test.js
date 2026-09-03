@@ -28,7 +28,7 @@ const SHARED = tokens(stripComments(read('css/style.css')));
 test('⚠⚠ every token the shared stylesheet declares with a dashboard name carries the dashboard value', () => {
   const names = ['--fs-display', '--fs-number', '--fs-title', '--fs-body', '--fs-secondary', '--fs-label', '--fs-eyebrow', '--fs-gauge-value', '--fs-company',
     '--fw-display', '--fw-normal', '--fw-emphasis', '--bg', '--bg-elevated', '--bg-field', '--border', '--border-strong', '--text',
-    '--good', '--mid', '--bad', '--radius-sm', '--radius', '--radius-lg', '--edge-white', '--green', '--green-dark'];
+    '--good', '--mid', '--bad', '--wordmark-glow', '--radius-sm', '--radius', '--radius-lg', '--edge-white', '--green', '--green-dark'];
   const drift = names.filter((n) => SHARED[n] === undefined || DASH[n] === undefined || SHARED[n] !== DASH[n]).map((n) => n + ': shared=' + SHARED[n] + ' dashboard=' + DASH[n]);
   assert.ok(names.length >= 23, 'floor');
   assert.strictEqual(SHARED['--green'], DASH['--accent'], 'the shared file\'s --green IS the dashboard\'s --accent (the shared file declares no --accent, by ruling)');

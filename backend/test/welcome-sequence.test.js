@@ -241,7 +241,7 @@ test('the sequence is about three seconds, with no external dependency', () => {
   // than shipped as artwork — survives and is asserted below.
   const imgs = mk.match(/<img[^>]*>/g) || [];
   assert.strictEqual(imgs.length, 1, 'exactly one image in the overlay, got ' + imgs.length);
-  assert.ok(/scout-wordmark\.png/.test(imgs[0]), 'and it is the wordmark: ' + imgs[0]);
+  assert.ok(/scout-wordmark\.svg/.test(imgs[0]), 'and it is the wordmark: ' + imgs[0]);
   assert.ok(/<circle|<path/.test(mk), 'the dial itself must still be DRAWN, not an asset');
 });
 
@@ -254,7 +254,7 @@ test('⚠ the overlay title IS the logo image, and the dial is not doubled', () 
   const mk = LIVE.slice(mAt, LIVE.indexOf('function welcomeDismiss'));
   assert.ok(mk.length > 500, 'slice suspicious: ' + mk.length);
   assert.ok(/class="wel-title"/.test(mk), 'the title element must keep its class');
-  assert.ok(/src="\/scout-wordmark\.png"/.test(mk), 'the title must be the wordmark image');
+  assert.ok(/src="\/scout-wordmark\.svg"/.test(mk), 'the title must be the wordmark image');
   assert.ok(/alt="Scout Systems"/.test(mk),
     'alt text is now the only wordmark a screen reader gets');
   assert.ok(!/wel-o/.test(mk), 'the retired O slot must not come back');
@@ -471,11 +471,11 @@ test('⚠ both surfaces load the SAME wordmark asset — one logo, one file', ()
   // byte for byte, because they had drifted. With both now using an image the
   // equivalent guarantee is simply that it is the SAME image — which is also
   // what keeps it a single cached request across the login -> dashboard hop.
-  assert.ok(/src="\/scout-wordmark\.png"/.test(HTML), 'the overlay must use the shared asset');
-  assert.ok(/src="\/scout-wordmark\.png"/.test(LOGIN_PAGE), 'login must use the shared asset');
+  assert.ok(/src="\/scout-wordmark\.svg"/.test(HTML), 'the overlay must use the shared asset');
+  assert.ok(/src="\/scout-wordmark\.svg"/.test(LOGIN_PAGE), 'login must use the shared asset');
   const dims = /width="(\d+)" height="(\d+)"/;
-  const a = HTML.slice(HTML.indexOf('scout-wordmark.png') - 200, HTML.indexOf('scout-wordmark.png') + 200).match(dims);
-  const b = LOGIN_PAGE.slice(LOGIN_PAGE.indexOf('scout-wordmark.png') - 200, LOGIN_PAGE.indexOf('scout-wordmark.png') + 200).match(dims);
+  const a = HTML.slice(HTML.indexOf('scout-wordmark.svg') - 200, HTML.indexOf('scout-wordmark.svg') + 200).match(dims);
+  const b = LOGIN_PAGE.slice(LOGIN_PAGE.indexOf('scout-wordmark.svg') - 200, LOGIN_PAGE.indexOf('scout-wordmark.svg') + 200).match(dims);
   assert.ok(a && b, 'both <img> tags must declare intrinsic width/height');
   assert.deepStrictEqual([a[1], a[2]], [b[1], b[2]], 'the declared intrinsic size must match');
 });

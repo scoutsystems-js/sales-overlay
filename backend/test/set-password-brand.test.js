@@ -25,11 +25,11 @@ function code(s) {
 const CODE = code(SP);
 
 test('the wordmark is the SAME asset and treatment as login, not a lookalike', () => {
-  assert.ok(/<img[^>]*class="brand-img"[^>]*src="\/scout-wordmark\.png"/.test(CODE),
+  /* ⚠ THE WORDMARK IS A VECTOR (2026-09-03, H695) — the same asset on both pages, no native width to cap at. */
+  assert.ok(/<img[^>]*class="brand-img"[^>]*src="\/scout-wordmark\.svg"/.test(CODE),
     'set-password must use the login wordmark image');
-  assert.ok(LOGIN.indexOf('/scout-wordmark.png') !== -1, 'login lost its wordmark — anchor stale');
-  // the native-width cap is what stops the browser upscaling the artwork
-  assert.ok(/min\(96vw,\s*1038px\)/.test(CODE), 'lockup must cap at the asset native width');
+  assert.ok(LOGIN.indexOf('/scout-wordmark.svg') !== -1, 'login lost its wordmark — anchor stale');
+  assert.ok(/min\(96vw,\s*1038px\)/.test(CODE), 'the lockup keeps the ruled 1038px width (the cap height is identical to the PNG at that width)');
 });
 
 test('the wordmark sits OUTSIDE both card states, so a dead link still shows it', () => {

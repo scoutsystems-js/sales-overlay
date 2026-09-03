@@ -86,6 +86,7 @@
   --radius:      12px;
   --radius-lg:   16px;
   --edge-white:  #ffffff;
+  --wordmark-glow: drop-shadow(0 0 6px rgba(9, 224, 70, 0.35)) drop-shadow(0 0 14px rgba(9, 224, 70, 0.22));   /* the vector wordmark's glow — see dashboard.html's token (H695) */
   /* ⚠⚠ SAIRA, THE PRODUCT'S TYPEFACE — self-hosted, the same file the dashboard and login
      load (one download, cached across every page). The system stack was why admin,
      set-password, connect and the connected screen rendered in -apple-system while the

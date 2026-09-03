@@ -97,8 +97,8 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 
 ### 🔒 SESSION CLOSED (2026-09-03, H693) — `SCOUT-DESIGN.md` written; nothing else built. WHAT REMAINS FILED:
 
-1. **The wordmark — OUTLINES ARRIVED AND ARE VERIFIED (H694): `scout-wordmark.svg` is the same artwork, an auto-trace of the raster, clean at every size, fill = the token.** What remains is Justin's: the swap itself (four surfaces at once), the nav at `height: 25.71px` (measured: 165 wide, the current's width) or a trimmed viewBox, and the glow (plain, or a CSS drop-shadow — shown both ways). Ship the METADATA-STRIPPED copies (9,813 / 2,963 bytes). The old "font file or outlines" ask is closed.
-2. **The favicon** — no page links one; **`scout-glyph.svg` is sharp at 16 and 32 (H694) and is the source** — the brand's own outline; the app icon PNG for the large sizes.
+1. ✅ **CLOSED 2026-09-03 (H695) — the vector wordmark shipped on all four surfaces; nav cap-matched at 25.71px and guarded on the rendered cap; glow as a filter (one line to drop; Justin has not ruled); PNG retired.** Was: **The wordmark — OUTLINES ARRIVED AND ARE VERIFIED (H694): `scout-wordmark.svg` is the same artwork, an auto-trace of the raster, clean at every size, fill = the token.** What remains is Justin's: the swap itself (four surfaces at once), the nav at `height: 25.71px` (measured: 165 wide, the current's width) or a trimmed viewBox, and the glow (plain, or a CSS drop-shadow — shown both ways). Ship the METADATA-STRIPPED copies (9,813 / 2,963 bytes). The old "font file or outlines" ask is closed.
+2. ✅ **CLOSED 2026-09-03 (H695) — every page links `/scout-glyph.svg`; follow-up filed: a `rel="apple-touch-icon"` PNG for Safari, which does not render SVG icons.** Was: **The favicon** — no page links one; **`scout-glyph.svg` is sharp at 16 and 32 (H694) and is the source** — the brand's own outline; the app icon PNG for the large sizes.
 3. **The social cards** — `og:image` (the link-preview asset exists), nothing set today.
 4. **The landing page rewrite.**
 5. **The toggle redesign.**
@@ -109,6 +109,8 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 10. **The starter-set sweep** (row 13).
 11. **The orphaned desktop removal** (the table under the desktop ruling; the `electron` devDependency stays).
 12. **The grade-card design direction** (a call, not a rep; a different visual language — Justin rules).
+14. **Safari favicon** — a `rel="apple-touch-icon"` PNG (the app icon), since Safari does not render SVG icons (H695).
+15. ⚠⚠ **THE TWO HEAVY LIFTS JUSTIN HAS NAMED FOR AFTER THIS SESSION:** **auto-marking non-sales calls** — three-valued (sales · not-a-sales-call · UNSURE), measured against the hand-marked control set, a human mark always wins; and **extracting the prospect's name from the transcript** — a wrong name is worse than a meeting-room title; silence beats a guess.
 13. **Rules with no guard** (from `SCOUT-DESIGN.md` §6): the green button treatment · a new view's ground · at-most-one-48 per view · the badge words · the picker's whiteness · the PNG cap.
 
 ### 🎨 THE BRAND ASSETS (2026-09-03, H692) — `~/Library/Mobile Documents/com~apple~CloudDocs/Scout Brand Assets/` · thirteen PNGs · NO VECTOR · nothing copied into the repo
