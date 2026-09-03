@@ -91,7 +91,27 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 | favicon | **none linked on any page** | — | a gap, not a wordmark problem |
 | welcome email | plain text | — | — |
 
+**REBUILD AS A VECTOR (Justin, 2026-09-03: "SCOUT SYSTEMS in our font and colours with the radar rings replacing the O"; layout A; "A but wrong font") — MEASURED, NOT DRAWN (H691).** The spec is read from the asset (cap 76; T stem 15; letter-spacing 7–12; word space 38; mark 1.30× cap centred 2.5px above cap-mid, three top-half rings + two trailing dots = the existing nav vector at ~5.6×; letters flat #5DC64D, glow ~17px at ~23%). **The face is NOT Saira** (C=U=T widths, no overshoot, straight-spined squared S, short-vertex M — nothing Saira does at any weight or width) **and is not in the repo or on this machine: an asset question for Justin — name the face or supply the outlines.** The mark, the colour, the glow and the layout can be drawn today; the letters cannot without the face. Pictures and `measure-wordmark.py` in `~/Desktop/scan-reports/wordmark/`.
+
 **Sources:** `web/scout-wordmark.png` and `~/Desktop/scout-logo.png` are the same 1038×138 screenshot; `build/icon.png` (1024²) is the mark alone. **A genuinely sharper wordmark needs the original artwork — an asset task for Justin.** The one code-side fix that is not an upscale: cap the lockups at half native (519 CSS px → 1038 device px on retina = native), which halves the login lockup an earlier ruling sized to break out of the 400px card. Crops at device resolution (as-is vs capped) in `~/Desktop/scan-reports/wordmark/`. **Shown, not shipped — Justin rules.**
+
+### 🎨 THE BRAND ASSETS (2026-09-03, H692) — `~/Library/Mobile Documents/com~apple~CloudDocs/Scout Brand Assets/` · thirteen PNGs · NO VECTOR · nothing copied into the repo
+
+| asset | size | what it is | serves which row |
+|---|---|---|---|
+| `scout-wordmark-transparent.png` | 1090×170 | the shipped wordmark re-exported 5% larger, glow removed, green nearer the token; the same soft raster | **NEEDS JUSTIN — the swap.** Raises the login/set-password ceiling (still 1.9× on retina), drops the login glow, and shrinks the nav wordmark 13% at `height: 22px` unless re-sized to 25.4px. Pictures `wordmark/11–15`. |
+| `scout-glyph-transparent.png` | 132×170 | the mark alone, soft-edged; a blob at 16px, readable at 32 | the favicon gap's LARGE sizes; at 16/32 the inline nav SVG mark is sharper |
+| `scout-app-icon.png` | 1024×1024 | glyph on the radar ground, opaque | the favicon gap (PWA/store icon) |
+| `scout-avatar.png` | 1024×1024 | glyph on black | social profile — no row |
+| `scout-link-preview-og.png` | 1200×630 | wordmark + hero line | the landing page's `og:image` (none set today) — the social-cards row |
+| `scout-email-signature.png` | 1200×200 | wordmark + tagline + domain | the welcome email — RULED plain text; unused |
+| `scout-social-square.png` · `scout-quote-post.png` | 1080×1080 | posts | social — no row |
+| `scout-linkedin-banner.png` | 1584×396 | banner | social — no row |
+| `scout-three-modules.png` | 1920×1080 | Connect / Grade / Coach | the landing page's three steps as a slide — no row |
+| `scout-desktop-wallpaper.png` · `scout-phone-wallpaper.png` | 2560×1440 · 1170×2532 | wallpapers | none |
+| **`scout-grade-card.png`** | 1080×1350 | **a DESIGN DIRECTION, not a task.** A single call's grade card: radar rings on the ground, a huge glowing display number, the five section scores beside it, monospace caps labels, "ONE THING TO FIX". **Stated with it: it is a different visual language from the one just enforced (glow, display weight, monospace — all outside the scale, the three weights and the no-glow treatment), and it is a CALL, not a rep (the shipped rep card is a person over a period).** | Justin rules; nothing adopted piecemeal |
+
+The face of the wordmark is still unnamed and there is still no vector (H691): "draw it properly" stays blocked on outlines. The PNG-cap rule stands.
 
 ### 🔎 SWEEP BLOCK 8 (2026-09-02) — CLASS ⑦: AN ABSENT FIELD PASSING A CHECK WRITTEN FOR A WRONG ONE. CLEAN TODAY.
 
