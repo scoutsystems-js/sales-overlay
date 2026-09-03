@@ -66,10 +66,16 @@ function titleNameSegment(title) {
   /* Calendar placeholders that pass every structural check: "Crystal NoLastname"
      was planned as a person by the splitting pass on live data (H702). A token
      that SAYS it is not a name produces no segment. */
-  for (var i = 0; i < tokens.length; i++) {
-    if (PLACEHOLDER_TOKENS[tokens[i].toLowerCase().replace(/[^a-z/]/g, '')]) return null;
-  }
+  if (hasPlaceholderToken(tokens)) return null;
   return seg;
+}
+
+/* Shared with the linking chooser (H705): a token that SAYS it is not a name. */
+function hasPlaceholderToken(tokens) {
+  for (var i = 0; i < tokens.length; i++) {
+    if (PLACEHOLDER_TOKENS[String(tokens[i]).toLowerCase().replace(/[^a-z/]/g, '')]) return true;
+  }
+  return false;
 }
 
 /* One entry per speaker, encounter order, from the normalizer's pre-turns
@@ -106,6 +112,7 @@ async function storeCallIdentities(admin, callId, userId, patch) {
 }
 
 module.exports = {
+  hasPlaceholderToken:   hasPlaceholderToken,
   inviteesFromMeeting:   inviteesFromMeeting,
   titleNameSegment:      titleNameSegment,
   speakerIdentitiesFrom: speakerIdentitiesFrom,

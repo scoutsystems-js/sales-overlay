@@ -359,11 +359,18 @@ test('10c-2: a card renders per rep, SORTED WORST FIRST', () => {
   assert.ok(order[1] < order[2], 'the rep with NO prospects sorts last');
 });
 
-test('rates render WITH their raw counts, per the house rule', () => {
+test('the CARD carries no counts under its three stats (amended 2026-09-03, H705); the weakest-objection line still carries its counts', () => {
+  /* ⚠ AMENDED, NOT DROPPED. Was: "rates render WITH their raw counts, per the house rule" —
+     "39 of 142 prospects" and "Objections handled · 17 of 132" on the card. Justin ruled
+     knowingly (the fifth over-labelling instance in a day): the three stats are value +
+     arrow + label and nothing else. The house rule STANDS on the ranked views and the
+     drill-down — this pin now guards that the card does NOT carry them, and that the one
+     count line the ruling did not name (the weakest objection) still does. */
   const out = renderCards(REPS);
-  assert.ok(out.html.indexOf('39 of 142 prospects') !== -1, 'closing counts');
-  assert.ok(out.html.indexOf('Objections handled \u00b7 17 of 132') !== -1, 'objection counts');   // the trading card's wording, 2026-09-02
-  assert.ok(out.html.indexOf('3 of 42 handled') !== -1, 'weakest-objection counts');
+  assert.strictEqual(out.html.indexOf('39 of 142 prospects'), -1, 'no closing counts on the card');
+  assert.strictEqual(out.html.indexOf('17 of 132'), -1, 'no objection counts on the card');
+  assert.ok(out.html.indexOf('Objection handle %') !== -1, 'the label Justin specified');
+  assert.ok(out.html.indexOf('3 of 42 handled') !== -1, 'weakest-objection counts stay');
 });
 
 test('UNMEASURED IS SAID IN WORDS, never a bare dash that reads as zero', () => {

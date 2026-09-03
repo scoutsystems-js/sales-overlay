@@ -30,7 +30,7 @@ test('⚠⚠ three arrows, one style: closing %, objections handled, avg call ti
   const html = liveCard()(STATE)(Object.assign({}, JOSH, { close_delta: 2, obj_delta: -4, time_delta: 3.2 }));
   const lead = html.slice(html.indexOf('rep-card-lead-val'), html.indexOf('rep-card-lead-label'));
   assert.ok(/24%[\s\S]{0,60}<span class="rep-delta up">▲ 2%<\/span>/.test(lead), 'closing: arrow + change to the right of the %: ' + lead);
-  const obj = html.slice(html.indexOf('Objections handled') - 400, html.indexOf('Objections handled'));
+  const obj = html.slice(html.indexOf('Objection handle %') - 400, html.indexOf('Objection handle %'));
   assert.ok(/13%[\s\S]{0,60}<span class="rep-delta down">▼ 4%<\/span>/.test(obj), 'objections: same style: ' + obj.slice(-200));
   const time = html.slice(html.indexOf('47.3'), html.indexOf('Avg call time'));
   assert.ok(/<span class="rep-delta up">▲ 3\.2 min<\/span>/.test(time), 'call time: same style, its own unit: ' + time);

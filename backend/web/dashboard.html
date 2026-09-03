@@ -2541,11 +2541,24 @@
     .rep-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; margin-top: 12px; }
     /* ⚠ PLAYING CARD (Justin, 2026-09-02): a WHITE edge and the large radius — the ruled
        exception recorded at --edge-white. Hover keeps the accent edge (the click affordance). */
-    .rep-card { border: 1px solid var(--edge-white); border-radius: var(--radius-lg); background: var(--bg-elevated); overflow: hidden;
-                cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease); }
+    .rep-card { border: 1px solid var(--edge-white); border-radius: var(--radius-lg); background: var(--bg-elevated); overflow: hidden; position: relative;
+                cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease);
+                /* ⚠ CARD C (Justin's pick, 2026-09-03, H705): the accent GLOW sits outside the white
+                   edge — the edge stays white (the playing-card ruling), the glow is a soft outer
+                   halo that does not touch the corners. */
+                box-shadow: 0 0 0 1px rgba(var(--accent-rgb), .10), 0 0 28px rgba(var(--accent-rgb), .10); }
     .rep-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    /* ⚠ CARD C — the faint radar-ring wash in the card's GROUND (9–10% alpha: texture, never a
+       chart). It sits behind everything and carries no text; the band and body are stacked above. */
+    .rep-card::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+      background: radial-gradient(circle at 78% 18%, rgba(var(--accent-rgb), .14) 0, rgba(var(--accent-rgb), 0) 36%),
+                  repeating-radial-gradient(circle at 78% 18%, rgba(var(--accent-rgb), .10) 0 1px, transparent 1px 40px); }
+    .rep-card-band, .rep-card-body, .rep-card-none { position: relative; z-index: 1; }
+    /* the lit top edge: a short green light line on the band, and the lit monogram */
+    .rep-card-band::after { content: ""; position: absolute; left: 18px; top: 0; width: 96px; height: 2px; background: var(--accent);
+                            box-shadow: 0 0 8px rgba(var(--accent-rgb), .8); }
     .rep-card-band { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg-deep); border-bottom: 1px solid var(--border); }
-    .rep-mono { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-deep); border: 1px solid var(--border-strong); color: var(--text);
+    .rep-mono { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-deep); border: 1px solid rgba(var(--accent-rgb), .6); color: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), .35);
                 display: flex; align-items: center; justify-content: center; font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); letter-spacing: .03em; flex: none; }
     .rep-card-name { font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); }
     /* ⚠ H704: the arrow — one rule per DIRECTION, never per metric; no words, no judgement. */
@@ -2555,9 +2568,12 @@
     .rep-card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; padding: 16px 18px; }
     /* ⚠ THE GAUGES' STEP, NOT --fs-display (Justin, 2026-09-02, reversing "go big" once told eight
        cards at 48 is eight loud numbers): --fs-display stays the ONE loud number on a page. */
-    .rep-card-lead-val { font-size: var(--fs-gauge-value); font-weight: var(--fw-display); line-height: 1; letter-spacing: -.01em; color: var(--text); font-variant-numeric: tabular-nums; }
+    /* CARD C: the green carries light on the headline — the ONE green number on the card. */
+    .rep-card-lead-val { font-size: var(--fs-gauge-value); font-weight: var(--fw-display); line-height: 1; letter-spacing: -.01em; color: var(--accent); font-variant-numeric: tabular-nums;
+                         text-shadow: 0 0 12px rgba(var(--accent-rgb), .7), 0 0 32px rgba(var(--accent-rgb), .35); }
     .rep-card-lead-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .05em; color: var(--text); opacity: .75; margin-top: 6px; }
-    .rep-card-lead-sub { font-size: var(--fs-label); color: var(--text); opacity: .75; margin-top: 3px; }
+    /* ⚠ .rep-card-lead-sub REMOVED 2026-09-03 (H705): "7 of 61 prospects" leaves the CARD by Justin's
+       ruling — the counts stay on the ranked views and the drill-down. */
     /* Unmeasured: the sentence IS the value, in the slot the number would take. */
     .rep-card-lead-none { font-size: var(--fs-number); font-weight: var(--fw-normal); line-height: 1.15; color: var(--text); }
     .rep-stat-none-val { font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); line-height: 1.2; color: var(--text); }
@@ -2565,15 +2581,19 @@
     .rep-stat { margin-top: 14px; }
     .rep-stat-val { font-size: var(--fs-number); font-weight: var(--fw-normal); line-height: 1.15; color: var(--text); font-variant-numeric: tabular-nums; }
     .rep-stat-val small { font-size: var(--fs-label); opacity: .75; }
-    .rep-side { font-style: normal; font-size: var(--fs-eyebrow); letter-spacing: .05em; text-transform: uppercase; margin-left: 6px; opacity: .85; }
+    /* ⚠ .rep-side REMOVED 2026-09-03 (H705): the OVER/UNDER tag leaves the CARD by Justin's ruling; the reading's colour still follows the band elsewhere. */
     .rep-stat-label { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .05em; color: var(--text); opacity: .7; margin-top: 2px; }
     .rep-card-bars { display: flex; flex-direction: column; gap: 6px; }
     .rep-bar { display: grid; grid-template-columns: 64px 1fr 28px; align-items: center; gap: 8px; font-size: var(--fs-label); color: var(--text); }
-    .rep-bar-track { height: 6px; background: var(--border); border-radius: var(--radius-sm); overflow: hidden; }
-    .rep-bar-fill { height: 100%; background: var(--text); opacity: .45; border-radius: var(--radius-sm); }
-    .rep-bar.weak .rep-bar-fill { opacity: 1; background: var(--accent); }
+    /* CARD C: glowing bars. ⚠ THE WEAKEST IS RED (Justin, 2026-09-03): --bad for the thing that
+       needs attention — the one place on the card where a colour carries a judgement (the
+       score-colour rule). Everything else on the card stays green. */
+    .rep-bar-track { height: 6px; background: rgba(255, 255, 255, .07); border-radius: var(--radius-sm); overflow: visible; }
+    .rep-bar-fill { height: 100%; background: rgba(var(--accent-rgb), .55); opacity: 1; border-radius: var(--radius-sm); box-shadow: 0 0 8px rgba(var(--accent-rgb), .35); }
+    .rep-bar.weak .rep-bar-fill { background: var(--bad); box-shadow: 0 0 10px rgba(248, 113, 113, .75), 0 0 22px rgba(248, 113, 113, .35); }
     .rep-bar.weak { font-weight: var(--fw-emphasis); }
-    .rep-bar-val { text-align: right; font-variant-numeric: tabular-nums; }
+    .rep-bar.weak .rep-bar-val { color: var(--bad); }
+    .rep-bar-val { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent); }
     .rep-bars-cap { font-size: var(--fs-label); color: var(--text); opacity: .7; margin-top: 4px; }
     .rep-card-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
                      border-top: 1px solid var(--border); padding-top: 10px; font-size: var(--fs-secondary); color: var(--text); }
@@ -14848,10 +14868,11 @@
     if (typeof value !== 'number' || !isFinite(value)) {
       return '<div class="rep-stat"><div class="rep-stat-none-val">Not measured</div><div class="rep-stat-label">' + escapeHtml(label) + '</div></div>';
     }
-    var side = bandSideOf(value, band);
-    return '<div class="rep-stat"><div class="rep-stat-val">' + value + ' <small>min</small>'
-      + ((side && side !== 'in') ? '<em class="rep-side">' + side + '</em>' : '') + repDeltaHtml(delta, 'min') + '</div>'
-      + '<div class="rep-stat-label">' + escapeHtml(label) + (side === 'in' ? ' \u00b7 in the band' : '') + '</div></div>';
+    /* ⚠ H705: the OVER/UNDER tag and "· in the band" are GONE from the card (Justin, knowingly,
+       amending "a banded metric states its side" for THIS surface). `band` is still read so an
+       unmeasured band key stays a sentence, never a number. */
+    return '<div class="rep-stat"><div class="rep-stat-val">' + value + ' <small>min</small>' + repDeltaHtml(delta, 'min') + '</div>'
+      + '<div class="rep-stat-label">' + escapeHtml(label) + '</div></div>';
   }
   function repSectionBarsHtml(sections, weakest) {
     var keys = ['intro', 'discovery', 'pitch', 'objection', 'close'];
@@ -14908,14 +14929,14 @@
              it is worded. */
           + '<div class="rep-card-lead">'
             + (measuredClose
+                /* ⚠ H705: the counts sub-line is GONE from the card (Justin, knowingly, amending "a rate carries its counts" for THIS surface). */
                 ? '<div class="rep-card-lead-val">' + escapeHtml(close.value) + repDeltaHtml(r.close_delta, '%') + '</div><div class="rep-card-lead-label">Closing rate</div>'
-                  + '<div class="rep-card-lead-sub">' + escapeHtml(close.sub) + '</div>'
                 : '<div class="rep-card-lead-none">No prospects yet</div><div class="rep-card-lead-label">Closing rate</div>')
             + '</div>'
           + '<div class="rep-stat">'
             + (r.obj_total > 0
-                ? '<div class="rep-stat-val">' + r.obj_handle_rate + '%' + repDeltaHtml(r.obj_delta, '%') + '</div><div class="rep-stat-label">Objections handled \u00b7 ' + r.obj_handled + ' of ' + r.obj_total + '</div>'
-                : '<div class="rep-stat-none-val">No objections yet</div><div class="rep-stat-label">Objections handled</div>')
+                ? '<div class="rep-stat-val">' + r.obj_handle_rate + '%' + repDeltaHtml(r.obj_delta, '%') + '</div><div class="rep-stat-label">Objection handle %</div>'
+                : '<div class="rep-stat-none-val">No objections yet</div><div class="rep-stat-label">Objection handle %</div>')
             + '</div>'
           + repBandStatHtml(r.avg_call_time, 'avg_call_time', 'Avg call time', r.time_delta)
         + '</div>'

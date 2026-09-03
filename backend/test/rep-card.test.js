@@ -27,7 +27,10 @@ test('⚠⚠ the card leads with the closing rate AND its counts; the band is th
      with the rate. The arrows themselves are pinned in test/rep-card-arrows.test.js. */
   const html = liveCard()(STATE)(JOSH);
   assert.ok(/rep-card-lead-val[^>]*>24%/.test(html), 'headline is the closing rate');
-  assert.ok(html.indexOf('29 of 121 prospects') !== -1, 'the counts ride with the rate');
+  /* ⚠ AMENDED 2026-09-03 (H705): the counts LEAVE THE CARD by Justin's ruling ("a rate carries its
+     counts" stands on the ranked views and the drill-down, not here). Never-diminish survives. */
+  assert.ok(html.indexOf('29 of 121 prospects') === -1, 'the counts are not on the card');
+  assert.ok(/rep-card-lead-label">Closing rate</.test(html), 'the label is the only line under the value');
   const band = html.slice(html.indexOf('rep-card-band'), html.indexOf('rep-card-body'));
   assert.ok(!/rep-move|prior period|rep-card-calls/.test(band), 'the band is the name: ' + band.slice(0, 300));
   assert.ok(!/\b(but|however)\b/i.test(html.replace(/<[^>]+>/g, ' ')), 'never diminish: no subtracting clause');
@@ -46,9 +49,10 @@ test('⚠⚠ the five section bars are the picture; exactly ONE is lit and it is
 
 test('⚠ banded metrics state their side; unmeasured is named, never drawn as zero', () => {
   const josh = liveCard()(STATE)(JOSH);
-  assert.ok(/47\.3[\s\S]{0,140}rep-side">over</.test(josh), '47.3 min OVER: ' + josh.slice(josh.indexOf('47.3') - 40, josh.indexOf('47.3') + 160));
+  /* ⚠ AMENDED 2026-09-03 (H705): the OVER/UNDER tag LEAVES THE CARD by Justin's ruling; the value stays. */
+  assert.ok(/47\.3 <small>min<\/small>/.test(josh) && !/rep-side/.test(josh), '47.3 min, no side tag on the card');
   const dre = liveCard()(STATE)(DRE);
-  assert.ok(/44\.1[\s\S]{0,120}in the band/i.test(dre), '44.1 min · in the band');
+  assert.ok(/44\.1 <small>min<\/small>/.test(dre) && !/in the band/i.test(dre), '44.1 min, no band clause on the card');
   assert.ok(!/rep-move|rep-delta/.test(dre), 'no prior period → no chip, no arrow');
   assert.ok(/not enough objections yet/i.test(dre), 'weakest objection unmeasured is said, not zeroed');
   const dan = liveCard()(STATE)(DANIEL);

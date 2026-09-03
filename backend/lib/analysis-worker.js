@@ -46,6 +46,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
 const { storeCallIdentities } = require('./prospect-identity');   // H700
+const { chooseLink, attachProspect } = require('./prospect-link');   // H705: the linking policy
 const compromisedFile = require('./compromised-file');
 const { fetchSellingContext } = require('./selling-context');
 const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
@@ -1278,7 +1279,7 @@ async function analyzeCall(fathomCallId, userId) {
          component is correct and the thing that reaches it is broken. That exact
          missing-column bug has shipped here three times (the review page's
          `section`/`resolution`, and `id` on the highlights select). */
-      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url, source, not_a_sales_call, not_sales_marked_by, exclusion_reason')
+      .select('id, fathom_call_id, call_date, duration_seconds, user_id, title, recording_url, source, not_a_sales_call, not_sales_marked_by, exclusion_reason, calendar_invitees, title_name_segment')
       .eq('id', fathomCallId)
       .maybeSingle();
     if (callQ.error) throw new Error('fathom_calls fetch: ' + callQ.error.message);
@@ -2215,42 +2216,34 @@ async function analyzeCall(fathomCallId, userId) {
       });
     }
 
-    // ─── Phase 7c: attach the call to its PROSPECT (3d-1) ───────────────
-    // EXACT-match attach only. Fuzzy joins are PROPOSALS for human review
-    // (3d-2), never automatic — a wrong merge silently fabricates close-rate
-    // numbers and is invisible in the aggregate.
-    //
-    // A call with no resolved name gets NO prospect. It must not join an
-    // "Unknown" bucket: that would merge every unidentified prospect into one
-    // row and wreck both the numerator and the denominator.
-    //
-    // Non-fatal throughout — grades are already saved and a grouping failure
-    // must never fail an analysis.
+    // ─── Phase 7c: attach the call to its PROSPECT — LINKING (H705) ──────
+    /* ⚠⚠ Justin's approved policy (CLAUDE.md §4b), built 2026-09-03:
+         path 1 · exactly ONE external invitee email whose name agrees with the
+                  speaker → keyed by the email (the only exact path);
+         path 2 · a Fathom title segment / a two-word Zoom display name whose
+                  first word is the resolved first name → keyed by the full name;
+         path 3 · today's one-word key, unchanged.
+       Silence at every step; a call with no resolved name gets NO prospect (never
+       an "Unknown" bucket). New calls only — nothing here re-attaches history.
+       `prospect_link_path` records which path fired so the first week's yield can
+       be measured. Non-fatal throughout — a grouping failure never fails an
+       analysis. Was: `nameKey(resolvedProspect.name)` alone, which refilled the
+       one-word "Anthony" row with every new "Anthony Davis" call. */
     try {
-      var pKey = nameKey(resolvedProspect.name);
-      if (pKey) {
-        var found = await admin.from('prospects').select('id')
-          .eq('user_id', userId).eq('name_key', pKey).maybeSingle();
-        var prospectId = found.data ? found.data.id : null;
-        if (!prospectId) {
-          var ins = await admin.from('prospects')
-            .insert({ user_id: userId, display_name: resolvedProspect.name, name_key: pKey })
-            .select('id').maybeSingle();
-          if (ins.error && ins.error.code === '23505') {
-            // Lost a race with a concurrent analysis of the same prospect —
-            // the unique index arbitrated; just read the winner.
-            var again = await admin.from('prospects').select('id')
-              .eq('user_id', userId).eq('name_key', pKey).maybeSingle();
-            prospectId = again.data ? again.data.id : null;
-          } else if (!ins.error) {
-            prospectId = ins.data ? ins.data.id : null;
-          }
-        }
-        if (prospectId) {
-          await admin.from('fathom_calls').update({ prospect_id: prospectId })
-            .eq('id', fathomCallId).eq('user_id', userId);
-        }
-      }
+      var prospectDisplayNames = (normalized.speaker_confidence === 'matched')
+        ? normalized.turns.filter(function (t) { return t.speaker === 'PROSPECT'; }).map(function (t) { return t.display_name; })
+            .filter(function (v, i, arr) { return arr.indexOf(v) === i; })
+        : [];
+      var link = chooseLink({
+        resolvedName:         resolvedProspect.name,
+        invitees:             callRow.calendar_invitees,
+        titleSegment:         callRow.title_name_segment,
+        title:                callRow.title,
+        source:               transcriptSourceFor(callRow),
+        prospectDisplayNames: prospectDisplayNames,
+      });
+      var attached = await attachProspect(admin, { userId: userId, callId: fathomCallId, link: link });
+      if (link && link.path) console.log('[prospect-link] call=' + fathomCallId + ' path=' + link.path + ' prospect=' + (attached.prospect_id || 'none') + (attached.created ? ' (new)' : ''));
     } catch (pErr) {
       console.warn('[analysis] prospect attach failed for ' + fathomCallId + ': ' + ((pErr && pErr.message) || 'unknown'));
     }
