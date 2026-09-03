@@ -155,6 +155,38 @@ function rollupProspects(calls, mergedInto) {
 
 // DB wrapper around rollupProspects. Never throws — a close-rate failure must
 // degrade to "—" rather than break an analytics response.
+/* ⚠⚠ ATTRIBUTION (Justin's ruling 2026-09-03, H706): A PROSPECT'S WINDOW IS THE DATE OF
+   ITS FIRST BOOKED CALL. A close on a later call attributes to the booked call's date,
+   flagged "follow-up close". So the window is applied to the prospect's ANCHOR — the
+   earliest call that is not a follow-up (else the earliest call) — never to each call.
+   A prospect booked in August and closed in September is closed IN AUGUST, and
+   nowhere in September. Every surface that shows a closing rate reads THIS grouping.
+   The read is therefore the rep's whole prospect history (paged, capped, `truncated`
+   on the result), not the window: ~1,800 rows today, +36 a day. */
+function anchorOf(calls_) {
+  var booked = calls_.filter(function (c) { return c.call_kind !== 'follow_up'; });
+  var pool = booked.length ? booked : calls_;
+  var min = null;
+  pool.forEach(function (c) { if (c.call_date && (min === null || c.call_date < min)) min = c.call_date; });
+  return min;
+}
+function windowByAnchor(calls, fromIso, toIso) {
+  var groups = {};
+  (Array.isArray(calls) ? calls : []).forEach(function (c) {
+    if (!c || !c.user_id || !c.prospect_id) return;
+    var k = c.user_id + '|' + c.prospect_id;
+    (groups[k] = groups[k] || []).push(c);
+  });
+  var keep = {};
+  Object.keys(groups).forEach(function (k) {
+    var a = anchorOf(groups[k]);
+    if (a === null) return;
+    if (fromIso && a < fromIso) return;
+    if (toIso && a > toIso) return;
+    keep[k] = true;
+  });
+  return (Array.isArray(calls) ? calls : []).filter(function (c) { return c && keep[c.user_id + '|' + c.prospect_id]; });
+}
 async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
   try {
     var ids = Array.isArray(userIds) ? userIds : [userIds];
@@ -193,14 +225,13 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
     var PE_PAGE = 1000, PE_MAX_PAGES = 25;
     var reads = { calls: 0, prospects: 0, truncated: false };
     var buildCalls = function () {
+      /* H706: no date filter here — the window is applied to the prospect's ANCHOR below. */
       var q = admin.from('fathom_calls')
-        .select('id, user_id, fathom_call_id, prospect_id, call_date')
+        .select('id, user_id, fathom_call_id, prospect_id, call_date, call_kind')
         .in('user_id', ids)
         .not('not_a_sales_call', 'is', true)
         .is('duplicate_of', null)
         .not('prospect_id', 'is', null);
-      if (fromIso) q = q.gte('call_date', fromIso);
-      if (toIso) q = q.lte('call_date', toIso);
       return q;
     };
     var calls = { data: [], error: null };
@@ -227,8 +258,8 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
        ⚠ Unfiltered until 2026-08-24, which is why a demo account with ZERO
        calls still showed "13% closing rate, 3 of 24 prospects" directly under
        an honest "0 calls". */
-    var realCalls = realCallsOnly(calls.data);
-    if (!realCalls.length) return {};
+    var realCalls = windowByAnchor(realCallsOnly(calls.data), fromIso, toIso);   // H706
+    if (!realCalls.length) return withReads({});
 
     var byId = {};
     realCalls.forEach(function (c) { byId[c.id] = c; });
@@ -330,6 +361,8 @@ function closeRateForCalls(calls, mergedInto) {
 
 module.exports = {
   closeRateForCalls: closeRateForCalls,
+  windowByAnchor: windowByAnchor,   // H706 — the one attribution rule
+  anchorOf: anchorOf,
   hadAConversation: hadAConversation,
   nameKey: nameKey,
   prospectOutcome: prospectOutcome,

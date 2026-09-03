@@ -87,7 +87,7 @@ const METRICS = {
     target: CLOSING_TARGET_PCT, scale: CLOSING_SCALE_MAX,
     unit: '%', unitName: 'prospect', numeratorName: 'closed',
     direction: HIGHER_IS_BETTER,
-    targetCaption: 'Target ' + CLOSING_TARGET_PCT + '%',
+    targetCaption: null,   // ⚠ OFF (Justin, 2026-09-03, H706): the dials are clean. Was 'Target ' + CLOSING_TARGET_PCT + '%'.
     thresholdPhrase: 'at or above target',
   },
   objections: {
@@ -95,7 +95,7 @@ const METRICS = {
     target: OBJECTION_TARGET_PCT, scale: OBJECTION_SCALE_MAX,
     unit: '%', unitName: 'objection', numeratorName: 'handled',
     direction: HIGHER_IS_BETTER,
-    targetCaption: 'Target ' + OBJECTION_TARGET_PCT + '%',
+    targetCaption: null,   // ⚠ OFF (Justin, 2026-09-03, H706): the dials are clean. Was 'Target ' + OBJECTION_TARGET_PCT + '%'.
     thresholdPhrase: 'at or above target',
   },
   /* ⚠⚠ THE BANDED ONE. Neither direction was true: a ceiling awards first place

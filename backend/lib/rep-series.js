@@ -41,7 +41,7 @@
 const { DQ_OUTCOME } = require('./dq-exclusion');
 const { countsAsObjection } = require('./objection-strict');
 const { bucketStart, bucketRangeLabel } = require('./team-analytics');
-const { prospectOutcome, hadAConversation } = require('./prospect-entity');
+const { prospectOutcome, hadAConversation, anchorOf } = require('./prospect-entity');
 const { isHandled } = require('./objection-handled');
 
 // The selector vocabulary. Scout's own labels — see the ruling above.
@@ -113,6 +113,10 @@ function buildRepSeries(input) {
   calls.forEach(function (c) { if (c && c.id) callById[c.id] = c; });
   var outcomeOf = {};
   analyses.forEach(function (a) { if (a && a.fathom_call_id) outcomeOf[a.fathom_call_id] = a.outcome || null; });
+  /* H706 — the prospect's whole history (the route fetches it without the window) so a
+     prospect is anchored at its first BOOKED call, and its outcomes come from every call. */
+  var prospectCalls = Array.isArray(d.prospect_calls) ? d.prospect_calls : null;
+  (Array.isArray(d.prospect_analyses) ? d.prospect_analyses : []).forEach(function (a) { if (a && a.fathom_call_id && !(a.fathom_call_id in outcomeOf)) outcomeOf[a.fathom_call_id] = a.outcome || null; });
 
   // ── handle rate: objections attributed to their call's week ──────────────
   var hAcc = {};   // user -> bucketIndex -> {handled, total}
@@ -144,17 +148,20 @@ function buildRepSeries(input) {
   });
 
   // ── closing rate: prospects, bucketed by their FIRST call ────────────────
-  var prospects = {};  // user -> prospect_id -> {firstMs, outcomes:[]}
-  calls.forEach(function (c) {
+  /* ⚠⚠ H706 — ATTRIBUTION: a prospect is bucketed at its FIRST BOOKED call (anchorOf —
+     the earliest call that is not a follow-up), read across the prospect's history so a
+     prospect booked before the picker's start does not re-anchor at its first in-window
+     call. Outcomes come from every call of the prospect (any close wins). */
+  var prospects = {};  // user -> prospect_id -> {calls:[], outcomes:[]}
+  (prospectCalls || calls).forEach(function (c) {
     if (!c || !c.prospect_id || !c.call_date) return;   // no prospect => not a prospect
     /* ⚠ AND THE SAME EXCLUSION ON THE CLOSING GRAPH. A prospect whose only call
        is a DQ contributes no calls and leaves both halves by construction —
        the same property lib/prospect-entity relies on. */
     if (outcomeOf[c.id] === DQ_OUTCOME) return;
     var byUser = prospects[c.user_id] || (prospects[c.user_id] = {});
-    var p = byUser[c.prospect_id] || (byUser[c.prospect_id] = { firstMs: Infinity, outcomes: [] });
-    var ms = new Date(c.call_date).getTime();
-    if (ms < p.firstMs) p.firstMs = ms;
+    var p = byUser[c.prospect_id] || (byUser[c.prospect_id] = { calls: [], outcomes: [] });
+    p.calls.push(c);
     p.outcomes.push(outcomeOf[c.id] || null);
   });
 
@@ -162,7 +169,9 @@ function buildRepSeries(input) {
   Object.keys(prospects).forEach(function (user) {
     Object.keys(prospects[user]).forEach(function (pid) {
       var p = prospects[user][pid];
-      var i = index[bucketStart(new Date(p.firstMs).toISOString(), bucket).getTime()];
+      var anchor = anchorOf(p.calls);
+      if (!anchor) return;
+      var i = index[bucketStart(new Date(anchor).toISOString(), bucket).getTime()];
       if (i === undefined) return;
       var byUser = cAcc[user] || (cAcc[user] = {});
       var cell = byUser[i] || (byUser[i] = { closed: 0, total: 0 });

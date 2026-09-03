@@ -181,7 +181,7 @@ async function loadTeamWindow(admin, repIds, from, to) {
        in this select before, which is why the filter could not be applied here
        until now. Same failure family as the Part-1b missing-`section` bug: the
        predicate was fine, the column never arrived. */
-    var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, recording_url, call_date, title, source')
+    var cq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, recording_url, call_date, title, source, call_kind')
       .in('user_id', repIds).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
       .is('duplicate_of', null)

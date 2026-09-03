@@ -28,6 +28,7 @@ const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-ne
 const { retractExcludedCall } = require('../lib/excluded-call-retraction');
 const { VALID_OUTCOMES, TAGGABLE_OUTCOMES, effectiveCloseScore, canTagOutcome,
         canMarkNotSalesCall, markRoleFor } = require('../lib/outcome-tag');
+const { setCallKindHuman, earlierCallsFor } = require('../lib/call-kind');   // H706
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 
@@ -1006,6 +1007,50 @@ router.get('/prospects/merge-candidates', requireAuth, async function (req, res)
  * NULL ("never assessed"). Collapsing them would lose the record that a human
  * looked at this call and said it counts.
  */
+/* ⚠⚠ THE FOLLOW-UP FLAG BY HAND (Justin's ruling 2026-09-03, H706). booked · follow-up ·
+   not-a-sales-call: the impromptu reconnect with only the rep on the invite cannot be
+   linked, and the closer knows what it was. Same permission as not-a-sales-call (H352
+   stands: a closer may mark their own call). THE HUMAN MARK ALWAYS WINS — written
+   through setCallKindHuman with the actor stamped; the worker's automatic setter never
+   touches a row with call_kind_marked_by set. A follow-up attributes to the earliest
+   earlier call of the same prospect when one is known; otherwise it is a follow-up
+   with nowhere to attribute — still a sales call, still counted as work. */
+router.post('/calls/:id/call-kind', requireAuth, async function (req, res) {
+  var callId = req.params.id;
+  var kind = req.body && req.body.call_kind;
+  if (kind !== 'booked' && kind !== 'follow_up') {
+    return res.status(400).json({ error: 'call_kind must be booked or follow_up' });
+  }
+  try {
+    var admin = getAdminClient();
+    var cq = await admin.from('fathom_calls').select('id, user_id, prospect_id, call_date').eq('id', callId).maybeSingle();
+    if (cq.error) throw new Error('call lookup: ' + cq.error.message);
+    if (!cq.data) return res.status(404).json({ error: 'Call not found' });
+    var ownerId = cq.data.user_id;
+    var profs = await admin.from('user_profiles').select('user_id, role, managed_by').in('user_id', [ownerId, req.user.id]);
+    var rows = (profs.data || []);
+    var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0] || { user_id: ownerId, managed_by: null };
+    var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
+    var actor = { id: req.user.id, role: (actorRow && actorRow.role) || req.userProfileRole || 'user' };
+    if (!canMarkNotSalesCall(actor, ownerProfile)) {
+      console.warn('[me] call-kind denied: actor=%s call=%s owner=%s', req.user.id, callId, ownerId);
+      return res.status(403).json({ error: 'You are not allowed to mark this call' });
+    }
+    var follows = null;
+    if (kind === 'follow_up' && cq.data.prospect_id) {
+      var earlier = await earlierCallsFor(admin, ownerId, cq.data.prospect_id, cq.data.call_date, callId);
+      var booked = earlier.filter(function (c) { return c.call_kind !== 'follow_up'; });
+      follows = (booked[0] || earlier[0] || {}).id || null;
+    }
+    var up = await setCallKindHuman(admin, callId, kind, req.user.id, follows);
+    if (up.error) throw new Error('update: ' + up.error.message);
+    res.json({ ok: true, call: up.data });
+  } catch (err) {
+    console.error('[me] call-kind:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/calls/:id/not-a-sales-call', requireAuth, async function (req, res) {
   var callId = req.params.id;
   var marked = req.body && req.body.not_a_sales_call;

@@ -108,7 +108,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v5-2026-09-01-never-diminish';
+var DIGEST_PROMPT_VERSION = 'v6-2026-09-03-follow-up-close';   // H706: a follow-up close reads as one in the call line
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -199,7 +199,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     var a = analysisByCall[cid];
     if (a && a.outcome && byOutcome.hasOwnProperty(a.outcome)) byOutcome[a.outcome]++;
     callLines.push('- [' + cid + '] ' + repName(c.user_id) + ' — "' + (c.title || 'untitled') + '"'
-      + (a ? (' | outcome: ' + (a.outcome || 'unknown') + ' | score: ' + (a.overall_score == null ? 'n/a' : a.overall_score)
+      + (a ? (' | outcome: ' + (a.outcome || 'unknown') + ((c && c.call_kind === 'follow_up' && a.outcome === 'closed') ? ' (follow-up close — counts on the booked call it follows)' : '') + ' | score: ' + (a.overall_score == null ? 'n/a' : a.overall_score)
         + (a.why_outcome ? ' | why: ' + str(a.why_outcome, 200) : '')
         + (a.one_thing ? ' | one_thing: ' + str(a.one_thing, 200) : ''))
         : ' | not yet analyzed'));

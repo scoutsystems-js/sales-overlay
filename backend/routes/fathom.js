@@ -1493,7 +1493,7 @@ async function loadCallsList(admin, userId, opts) {
        using one you forgot to select, are the same bug from opposite ends; this
        codebase has shipped the second four times. The flag is emitted in the
        mapped payload below and asserted in test/not-a-sales-call.test.js. */
-    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, duplicate_of, exclusion_reason')
+    .select('id, fathom_call_id, title, call_date, duration_seconds, recording_url, sync_status, not_a_sales_call, duplicate_of, exclusion_reason, call_kind, call_kind_source')
     .eq('user_id', userId)
     .order('call_date', { ascending: false, nullsFirst: false });
   if (opts.from) q = q.gte('call_date', opts.from);

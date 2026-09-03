@@ -10,7 +10,7 @@
 const { isDisqualified } = require('./../lib/dq-exclusion');
 const { CHUNK } = require('../lib/chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const { strictObjections } = require('./../lib/objection-strict');
-const { closeRateForCalls } = require('./../lib/prospect-entity');
+const { closeRateForCalls, fetchProspectCloseRates } = require('./../lib/prospect-entity');
 const express = require('express');
 const { resolveDisplayName } = require('../lib/display-name');
 const { nameMapFor } = require('../lib/team-name-map');
@@ -633,8 +633,12 @@ router.get('/averages', teamGate, async function (req, res) {
         call_date: c.call_date, outcome: outcomeByCall[c.id],
       });
     });
-    Object.keys(byRep).forEach(function (uid) {
-      var r = closeRateForCalls(byRep[uid], {});
+    /* ⚠⚠ H706 — ATTRIBUTION: the gauge's 7-day window is applied to the PROSPECT'S
+       BOOKED-CALL DATE, through the one computation (fetchProspectCloseRates), not to
+       each call. `byRep` above still feeds the objection and call-time slots. */
+    var anchoredRates = await fetchProspectCloseRates(admin, candidates, win.from, win.to);
+    Object.keys(byRep).concat(Object.keys(anchoredRates)).filter(function (u, i, arr) { return arr.indexOf(u) === i; }).forEach(function (uid) {
+      var r = anchoredRates[uid] || { closed: 0, total: 0, pct: null };
       var sl = slot(uid);
       sl.closing.total += r.total;
       sl.closing.numerator += r.closed;
@@ -755,6 +759,29 @@ router.get('/rep-series', teamGate, async function (req, res) {
 
     // A rep with NO calls in the window is absent from the chart entirely —
     // not drawn as a flat zero, and not an empty legend entry implying a line.
+    /* ⚠⚠ H706 — ATTRIBUTION: the closing lane buckets a prospect at its FIRST BOOKED
+       call, so the builder needs the prospect's whole history, not the window. Paged
+       like prospect-entity (1,000 rows, capped); outcomes for the out-of-window calls
+       are read in CHUNKs and merged by the builder. ~1,800 rows today, +36 a day. */
+    var prospectCalls = [], pStart = 0;
+    for (var pg = 0; pg < 25; pg++) {
+      var pq = await admin.from('fathom_calls').select('id, user_id, fathom_call_id, prospect_id, call_date, call_kind')
+        .in('user_id', candidates).not('not_a_sales_call', 'is', true).is('duplicate_of', null).not('prospect_id', 'is', null)
+        .range(pStart, pStart + 999);
+      if (pq.error) throw new Error('fathom_calls (prospect history): ' + pq.error.message);
+      prospectCalls = prospectCalls.concat(pq.data || []);
+      if (!pq.data || pq.data.length < 1000) break;
+      pStart += 1000;
+    }
+    prospectCalls = realCallsOnly(prospectCalls);
+    var known = {}; ids.forEach(function (id) { known[id] = true; });
+    var extraIds = prospectCalls.map(function (c) { return c.id; }).filter(function (id) { return !known[id]; });
+    var prospectAnalyses = [];
+    for (var xi = 0; xi < extraIds.length; xi += CHUNK) {
+      var xq = await admin.from('call_analyses').select('fathom_call_id, outcome').in('fathom_call_id', extraIds.slice(xi, xi + CHUNK)).eq('status', 'done');
+      if (xq.error) throw new Error('call_analyses (prospect history): ' + xq.error.message);
+      prospectAnalyses = prospectAnalyses.concat(xq.data || []);
+    }
     var withCalls = {}; calls.forEach(function (c) { withCalls[c.user_id] = true; });
     var em = await emailMap(admin);
     /* ⚠⚠ price_pif IS NO LONGER SELECTED HERE, AND THAT IS THE POINT (2026-08-31).
@@ -783,6 +810,7 @@ router.get('/rep-series', teamGate, async function (req, res) {
 
     res.json(buildRepSeries({
       reps: reps, calls: calls, analyses: analyses, objections: objections,
+      prospect_calls: prospectCalls, prospect_analyses: prospectAnalyses,   // H706
       from: range.from, to: range.to, bucket: bucket, objectionCategory: cat,
     }));
   } catch (err) {

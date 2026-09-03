@@ -135,7 +135,7 @@ router.get('/', requireAuth, async function (req, res) {
     });
 
     var callsQ = await admin.from('fathom_calls')
-      .select('id, title, call_date, recording_url')
+      .select('id, title, call_date, recording_url, call_kind, follows_call_id')
       .eq('user_id', userId)
       .gte('call_date', bounds.fromIso).lt('call_date', bounds.toIso)
       .not('not_a_sales_call', 'is', true)
@@ -172,16 +172,23 @@ router.get('/', requireAuth, async function (req, res) {
         payment_structure: a.payment_structure || 'none_stated',
       };
       var merged = applyEdits(analysis, edByCall[c.id] || {});
+      /* ⚠ H706 — Justin's caveat, verbatim: a follow-up close appears on the day it
+         HAPPENED, labelled "follow up close", and the day's numbers say what was
+         attributed elsewhere. The label is a fact about the call, not a judgement. */
+      var followUpClose = (c.call_kind === 'follow_up') && (a.outcome === 'closed');
       return {
         call_id: c.id,
         call_date: c.call_date,
         recording_url: c.recording_url || null,
         analysis_status: a.status || null,
+        call_kind: c.call_kind || null,
+        follow_up_close: followUpClose,
         fields: merged.fields,
         edited: merged.edited,
       };
     });
-    res.json({ date: date, calls: out, sync: freshness });
+    var attributedElsewhere = out.filter(function (r) { return r.follow_up_close; }).length;
+    res.json({ date: date, calls: out, sync: freshness, follow_up_closes: attributedElsewhere });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[eod] list:', err.message);

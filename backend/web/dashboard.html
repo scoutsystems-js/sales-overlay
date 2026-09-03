@@ -3138,6 +3138,8 @@
     /* The picker sits inline in the toolbar rather than right-aligned as it is
        on the range pages — its panel still anchors to its own button. */
     .eod-toolbar .dp { position: relative; }
+    .eod-chip-follow { color: var(--text); border: 1px solid var(--border-strong); background: var(--bg-field); }
+    .eod-attributed { font-size: var(--fs-secondary); color: var(--text); opacity: .85; margin: 0 0 10px; }
     .eod-call { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 14px 16px; margin-bottom: 12px; }
     .eod-row { display: flex; align-items: baseline; gap: 8px; margin: 6px 0; }
     .eod-label { flex: 0 0 110px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); }
@@ -14930,7 +14932,7 @@
           + '<div class="rep-card-lead">'
             + (measuredClose
                 /* ⚠ H705: the counts sub-line is GONE from the card (Justin, knowingly, amending "a rate carries its counts" for THIS surface). */
-                ? '<div class="rep-card-lead-val">' + escapeHtml(close.value) + repDeltaHtml(r.close_delta, '%') + '</div><div class="rep-card-lead-label">Closing rate</div>'
+                ? '<div class="rep-card-lead-val">' + escapeHtml(close.value) + repDeltaHtml(r.close_delta, '%') + '</div><div class="rep-card-lead-label" title="By the booked call\u2019s date \u2014 a follow-up close counts on the call it follows">Closing rate</div>'
                 : '<div class="rep-card-lead-none">No prospects yet</div><div class="rep-card-lead-label">Closing rate</div>')
             + '</div>'
           + '<div class="rep-stat">'
@@ -16291,7 +16293,11 @@
         body = '<div class="empty"><h3>No calls on ' + escapeHtml(d.date || '') + '</h3><p>Days without calls have nothing to report — pick another day above.</p></div>';
       }
     } else {
-      body = d.calls.map(function (c) {
+      /* H706: the day's numbers say what was attributed elsewhere */
+      var attributedNote = (d.follow_up_closes > 0)
+        ? '<div class="eod-attributed">' + d.follow_up_closes + ' follow up close' + (d.follow_up_closes === 1 ? '' : 's') + ' today — counted on the booked call' + (d.follow_up_closes === 1 ? '' : 's') + ' they follow</div>'
+        : '';
+      body = attributedNote + d.calls.map(function (c) {
         var f = c.fields, e = c.edited || {};
         function row(label, field, value, isArea) {
           var cls = (isArea ? 'eod-textarea' : 'eod-input') + (e[field] ? ' edited' : '');
@@ -16328,7 +16334,9 @@
            */
           + '<div class="eod-row"><div class="eod-label">Outcome</div>'
             + '<div class="eod-static"><span class="eod-chip eod-chip-' + eodOutcomeTone(f.outcome) + '">'
-            + escapeHtml(f.outcome == null ? '—' : String(f.outcome)) + '</span></div></div>'
+            + escapeHtml(f.outcome == null ? '—' : String(f.outcome)) + '</span>'
+            /* H706 — Justin's caveat, verbatim: shown and labelled "follow up close" on the EOD */
+            + (c.follow_up_close ? ' <span class="eod-chip eod-chip-follow">follow up close</span>' : '') + '</div></div>'
           + row('Cash ($)', 'cash_collected', f.cash_collected)
           + row('Summary', 'summary', f.summary, true)
           + '</div>';
@@ -18859,6 +18867,7 @@
         + '<div class="review-title-side">'
           + (status === 'done' ? outcomeTagHtml((src.id || (review && review.id) || ''), (review && review.analysis ? review.analysis.outcome : src.outcome), (review && review.analysis ? review.analysis.outcome_source : src.outcome_source), false) : '')
           + notSalesBtnHtml((src.id || (review && review.id) || ''), src.not_a_sales_call === true)
+          + callKindBtnHtml((src.id || (review && review.id) || ''), src.call_kind, src.not_a_sales_call === true)
           + badge
           + fathomLink
         + '</div>'
@@ -18877,6 +18886,43 @@
    * closed on the first pick — both with a green suite. So the button disables,
    * says "Marking…", and only then re-renders from the server's answer.
    */
+  /* ⚠⚠ THE FOLLOW-UP FLAG BY HAND (H706): the third state beside the outcome and
+     not-a-sales-call. The label is the ACTION; the state shows on the row badge. A
+     follow-up IS a sales call — the control is hidden only when the call is marked
+     not-a-sales-call, because then there is nothing to be a follow-up of. */
+  function callKindBtnHtml(callId, kind, notSales) {
+    if (!callId || notSales) return '';
+    var isFollow = kind === 'follow_up';
+    return '<button class="btn-fathom-secondary call-kind-btn' + (isFollow ? ' is-marked' : '') + '"'
+      + ' type="button" id="callKindBtn"'
+      + ' onclick="setCallKind(\'' + escapeHtml(callId) + '\', \'' + (isFollow ? 'booked' : 'follow_up') + '\')">'
+      + (isFollow ? '\u21a9 Booked call' : 'Mark as follow-up')
+      + '</button>';
+  }
+  async function setCallKind(callId, next) {
+    var btn = document.getElementById('callKindBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+    try {
+      var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/call-kind', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ call_kind: next }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (res.status === 403) {
+        if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as follow-up' : '\u21a9 Booked call'; }
+        await scoutConfirm({ title: 'Not allowed', body: 'You are not allowed to mark this call.', confirmText: 'OK' });
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      state.callReviewCache = {};
+      state.callLibraryCache = null;
+      await openCallReview(callId);
+    } catch (err) {
+      if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as follow-up' : '\u21a9 Booked call'; }
+      await scoutConfirm({ title: 'Could not save', body: String((err && err.message) || err), confirmText: 'OK' });
+    }
+  }
   function notSalesBtnHtml(callId, isMarked) {
     if (!callId) return '';
     return '<button class="btn-fathom-secondary not-sales-btn' + (isMarked ? ' is-marked' : '') + '"'

@@ -30,7 +30,7 @@ test('⚠⚠ the card leads with the closing rate AND its counts; the band is th
   /* ⚠ AMENDED 2026-09-03 (H705): the counts LEAVE THE CARD by Justin's ruling ("a rate carries its
      counts" stands on the ranked views and the drill-down, not here). Never-diminish survives. */
   assert.ok(html.indexOf('29 of 121 prospects') === -1, 'the counts are not on the card');
-  assert.ok(/rep-card-lead-label">Closing rate</.test(html), 'the label is the only line under the value');
+  assert.ok(/rep-card-lead-label[^>]*>Closing rate</.test(html), 'the label is the only line under the value (it carries the attribution hover, H706)');
   const band = html.slice(html.indexOf('rep-card-band'), html.indexOf('rep-card-body'));
   assert.ok(!/rep-move|prior period|rep-card-calls/.test(band), 'the band is the name: ' + band.slice(0, 300));
   assert.ok(!/\b(but|however)\b/i.test(html.replace(/<[^>]+>/g, ' ')), 'never diminish: no subtracting clause');

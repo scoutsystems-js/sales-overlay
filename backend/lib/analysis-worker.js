@@ -47,6 +47,7 @@ const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
 const { storeCallIdentities } = require('./prospect-identity');   // H700
 const { chooseLink, attachProspect } = require('./prospect-link');   // H705: the linking policy
+const { deriveCallKind, setCallKindAuto, earlierCallsFor } = require('./call-kind');   // H706: the follow-up flag
 const compromisedFile = require('./compromised-file');
 const { fetchSellingContext } = require('./selling-context');
 const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
@@ -2244,6 +2245,14 @@ async function analyzeCall(fathomCallId, userId) {
       });
       var attached = await attachProspect(admin, { userId: userId, callId: fathomCallId, link: link });
       if (link && link.path) console.log('[prospect-link] call=' + fathomCallId + ' path=' + link.path + ' prospect=' + (attached.prospect_id || 'none') + (attached.created ? ' (new)' : ''));
+      /* ⚠⚠ THE FOLLOW-UP FLAG (H706): a LINKED later call for the prospect is a follow-up
+         of its earliest booked call; otherwise booked. Path 3 never manufactures one.
+         The setter writes only where no human has marked the call — the human mark
+         always wins and a re-analysis never reverses it. */
+      var earlier = attached.prospect_id ? await earlierCallsFor(admin, userId, attached.prospect_id, callRow.call_date, fathomCallId) : [];
+      var kind = deriveCallKind({ linkPath: link.path, prospectId: attached.prospect_id, callDate: callRow.call_date, earlierCalls: earlier });
+      await setCallKindAuto(admin, fathomCallId, userId, kind);
+      console.log('[call-kind] call=' + fathomCallId + ' kind=' + kind.call_kind + ' source=' + kind.call_kind_source + (kind.follows_call_id ? ' follows=' + kind.follows_call_id : ''));
     } catch (pErr) {
       console.warn('[analysis] prospect attach failed for ' + fathomCallId + ': ' + ((pErr && pErr.message) || 'unknown'));
     }
