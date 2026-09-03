@@ -14,7 +14,7 @@ function mapper(rawSrc, strippedSrc) {
     for (let s = 1; s <= strippedLine; s++) {
       if (memo[s] !== undefined) { cursor = memo[s]; continue; }
       const text = stripped[s - 1]; let found = null;
-      if (text) { for (let r = cursor; r < raw.length; r++) { if (raw[r] === text || (raw[r].startsWith(text) && /^\s*(\/\/|\/\*)/.test(raw[r].slice(text.length)))) { found = r + 1; cursor = r + 1; break; } } }
+      if (text) { for (let r = cursor; r < raw.length; r++) { if (raw[r] === text || (raw[r] != null && raw[r].startsWith(text) && /^\s*(\/\/|\/\*)/.test(raw[r].slice(text.length)))) { found = r + 1; cursor = r + 1; break; } } }
       memo[s] = found;
     }
     return memo[strippedLine];

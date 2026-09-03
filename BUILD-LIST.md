@@ -31,17 +31,47 @@
 
 ## 🎯 CURRENT SESSION
 
+### ✅ THE SWEEP IS FINISHED (2026-09-02) — THE FIX LIST, RANKED BY WHAT IT COSTS TO LEAVE ALONE. Justin rules; nothing below is built.
+
+Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed with evidence in the block sections beneath. Detail and the full table: `~/Desktop/scout-findings.md` (block 8), H673.
+
+| # | leave-alone cost | what | rows |
+|---|---|---|---|
+| **1** | two objection-handling rates for one team and window, on the metric being ruled on | three definitions of "what counts as an objection" + the team pages never select `objection_class` | ③-1, ④a-1 |
+| **2** | spend and cross-user access with no working guard | nine guards pass with the gate's effect removed; `cross-user-grading` also passes with the gate commented out | ①-1…①-8, ②-2 |
+| **3** | a page reps use dies within days | Coaching section drill-down at 390 of ~395 ids | ⑧-3 |
+| **4** | a ranked widget rewards the behaviour ruled against, one click from live | average call time `lower_is_better` in the catalog, pinned by its test | ③-2 |
+| 5 | tests asserting against mangled source; a role check invisible to eleven of them | 112 private strippers, `/admin/*` at `dashboard.html:6136` | ②-1…②-4 |
+| 6 | Justin's KB list is silently 1,000 of 2,272 | owner list unpaged | ⑧-2 |
+| 7 | a ruled category never reaching two prompts, silently | five unpinned copies of the objection set | ③-3 |
+| 8 | machine words on My Team and the pivot pill | role labels (RULED Rep · Manager · Admin; one map) | ⑥-1…⑥-3 |
+| 9 | silent drift | classes and type sets typed twice; chunk literal 100 ×22; `by_rep`/`bar_rep` | ③-4…③-7 |
+| 10 | reads crossing 1,000 rows around Nov 2026 | team close-rate calls 935; per-user reads 634 +188/mo | ⑧ thresholds |
+| 11 | a note rendering a design nobody wrote | `.sec-note` two designs; dead earlier declarations | ④b-1, ④b cleanup |
+| 12 | 3.2% of a file that is 46% comment | dead functions and classes in five families | ⑤-1, ⑤-2, ⑤-4, ⑤-5 |
+| — | **watch, NOT VERIFIED** | digest echoing a machine word; 277 sentinel rows behind per-lib guards; two lane-failure conventions | ⑦ notes |
+| — | **closed by ruling** | merge route retired; three review panels retained; KB scope/speaker badges unchanged | H664, H669, H673 |
+
+### 🔎 SWEEP BLOCK 8 (2026-09-02) — CLASS ⑦: AN ABSENT FIELD PASSING A CHECK WRITTEN FOR A WRONG ONE. CLEAN TODAY.
+
+Detector: four tells (strict-null on an absent field; a sentinel winning a truthiness test; a lane payload read without the problem predicate; `X.error` after a catch returning undefined), scored 5/5 · 0/5 against planted cases modelled on the founding incidents. 28 strict-null sites reviewed against their producers (all explicit nulls or two-way checks; the one flagged is the already-fixed prompt-branch incident, `team-objection-summary.js:240/456`); 8 sentinel sites all guarded upstream, with **277 live sentinel rows** making those guards load-bearing; 7 renderers all check their lane's failure shape; 0 dangling-promise sites. Live rows queried for every absent state. No fix row.
+
+| tag | note | evidence |
+|---|---|---|
+| `👁 WATCH` **the dashboard has no sentinel knowledge** | every feeding lib proves or strips `closer_response` first (`team-objection-summary`, `team-synthesis`, `objection-synthesis`, `team-needs-work`, `kb.js:994`). | 277 of 9,333 highlights carry a sentinel today; a new server path that forgets the guard renders `__no_reply__` to a customer. A per-lane test when the strippers are unified. |
+| `📋 NOTE` **two lane-failure conventions** | `{ _error / _forbidden }` through `laneProblem`; `{ available: false, reason }` in nine synthesis lanes. | each renderer checks the one its lane emits; `laneProblem` would read `available:false` as arrived if a lane switched. |
+
 ### 🔎 SWEEP BLOCK 7 (2026-09-02) — CLASS ⑥: A VALUE WHERE A LABEL BELONGS. NO FIXES.
 
 Detector built maps-first (28 label maps → 10 carrier fields → raw text renders), scored 5/5 · 0/6, cross-checked by a hand enumeration of the mapped fields across every page and outbound text. Detail: `~/Desktop/scout-findings.md` (block 7), H672. **Pulse: ⑦ one block; one or two candidates need a DB read to prove.**
 
 | tag | finding | evidence |
 |---|---|---|
-| `🐛 BUG` **⑥-1 the My Team table shows the role as `user` / `manager`** | `dashboard.html:14349` `teamMembersBodyHtml`: `escapeHtml(m.role \|\| 'user')` in the Role column. The only role map is `admin.html:871 roleLabel`, which maps `owner` alone. | A manager reads the machine word `user` beside the header "Rep" every day. Not pinned. Not outbound. **NOT VERIFIED that a ruling names role labels** — one is needed before a fix (Rep? Closer? Manager? Admin?). |
-| `🐛 BUG` **⑥-2 the header pill on a pivot shows `owner` / `manager` raw** | `dashboard.html:7908` `renderHeaderHtml`: `escapeHtml(state.me.role)` in `.scope-pill` (no text-transform). | Same map gap; visible on every pivot. Same ruling needed. |
-| `▪ MINOR` **⑥-3 `/coaching` says `owner view`** | `coaching.html:353` `currentUser.role + ' view'`; served at `index.js:142`, linked from nowhere. | A legacy page — decide whether it exists before labelling it. |
+| `🐛 BUG` ✅ **RULED 2026-09-02 (H673): `user` → Rep · `manager` → Manager · `owner` → Admin.** **⑥-1 the My Team table shows the role as `user` / `manager`** | `dashboard.html:14349` `teamMembersBodyHtml`: `escapeHtml(m.role \|\| 'user')` in the Role column. The only role map is `admin.html:871 roleLabel`, which maps `owner` alone. | **The fix is ONE shared map every surface calls (this table, the pivot pill, `/coaching`, and admin's partial map) — never three string edits. The stored values do not change; nothing is renamed in the database.** Not built in the sweep. |
+| `🐛 BUG` **⑥-2 the header pill on a pivot shows `owner` / `manager` raw** | `dashboard.html:7908` `renderHeaderHtml`: `escapeHtml(state.me.role)` in `.scope-pill` (no text-transform). | Same map; same fix. |
+| `▪ MINOR` **⑥-3 `/coaching` says `owner view`** | `coaching.html:353` `currentUser.role + ' view'`; served at `index.js:142`, linked from nowhere. | Same map — or decide the page does not exist. |
 | `🗄 WITH THE MERGE RETIREMENT` **⑥-4 the merge page shows `follow_up` / `no_show` raw** | `dashboard.html:16237`, while `eodOutcomeLabel` sits in the same file. | Retired page (H664); goes with its removal. |
-| `📋 §4 — NO MAP EXISTS` | KB badge `scope` (`GLOBAL/TEAM/PERSONAL`, `:16855`), review speaker badge (`PROSPECT/CLOSER`, `:18994`) — CSS-uppercased machine words that are also product words. | "add a map" is a product decision; nothing reads wrong today. |
+| `✅ REVIEWED, DELIBERATELY UNCHANGED (Justin 2026-09-02, H673)` | KB badge `scope` (`GLOBAL/TEAM/PERSONAL`, `:16855`), review speaker badge (`PROSPECT/CLOSER`, `:18994`). | **Machine words that ARE the product's words; the attribution wording is already ruled (H623). A later sweep must not "finish" them.** |
 | `🗄 NOT COVERED` | prompt strings hand the model `follow_up`, `uncategorized` (digest), `partner` (Why prose), `risk_signal` (corrections); whether it echoes them into customer prose is not enumerable statically. Bare-variable hops. | NOT VERIFIED. The digest is the outbound one. |
 
 ### 🔎 SWEEP BLOCK 6 (2026-09-02) — CLASS ③: ONE QUESTION, MANY ANSWERS. NO FIXES.
