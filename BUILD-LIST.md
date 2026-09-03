@@ -95,6 +95,22 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 
 **Sources:** `web/scout-wordmark.png` and `~/Desktop/scout-logo.png` are the same 1038×138 screenshot; `build/icon.png` (1024²) is the mark alone. **A genuinely sharper wordmark needs the original artwork — an asset task for Justin.** The one code-side fix that is not an upscale: cap the lockups at half native (519 CSS px → 1038 device px on retina = native), which halves the login lockup an earlier ruling sized to break out of the 400px card. Crops at device resolution (as-is vs capped) in `~/Desktop/scan-reports/wordmark/`. **Shown, not shipped — Justin rules.**
 
+### 🔒 SESSION CLOSED (2026-09-03, H693) — `SCOUT-DESIGN.md` written; nothing else built. WHAT REMAINS FILED:
+
+1. **The wordmark asset task** — the font file, or the wordmark exported as outlines (H691, H692). Justin ruled: do not swap the transparent PNG.
+2. **The favicon** — no page links one; the inline nav SVG mark is the sharpest source at 16/32, the app icon and glyph PNGs the large sizes.
+3. **The social cards** — `og:image` (the link-preview asset exists), nothing set today.
+4. **The landing page rewrite.**
+5. **The toggle redesign.**
+6. **The phone layout** (every view scrolls sideways at 390).
+7. **The 112 stripper files** (hand work; the ratchet).
+8. **The two dated reads** (manager KB list ~mid-November; per-user all-time ~November).
+9. **The dead code** (35 KB, 3.2%; ⑤-3 retained by ruling).
+10. **The starter-set sweep** (row 13).
+11. **The orphaned desktop removal** (the table under the desktop ruling; the `electron` devDependency stays).
+12. **The grade-card design direction** (a call, not a rep; a different visual language — Justin rules).
+13. **Rules with no guard** (from `SCOUT-DESIGN.md` §6): the green button treatment · a new view's ground · at-most-one-48 per view · the badge words · the picker's whiteness · the PNG cap.
+
 ### 🎨 THE BRAND ASSETS (2026-09-03, H692) — `~/Library/Mobile Documents/com~apple~CloudDocs/Scout Brand Assets/` · thirteen PNGs · NO VECTOR · nothing copied into the repo
 
 | asset | size | what it is | serves which row |

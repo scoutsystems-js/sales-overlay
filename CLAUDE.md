@@ -6,7 +6,7 @@
 
 **Load check token** (so a session can prove this file loaded — see §3): `SCOUT-RULES-LOADED-2026-09-01`.
 
-**The queue is `BUILD-LIST.md`** (repo root): open work, rulings needed, filed items. Update it after every push, alongside this file (H533).
+**The design system is listed once in `SCOUT-DESIGN.md`** (rules as pointers to this file, the token blocks and the guards — never restated there; H693). **The queue is `BUILD-LIST.md`** (repo root): open work, rulings needed, filed items. Update it after every push, alongside this file (H533).
 
 ---
 
