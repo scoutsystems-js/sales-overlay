@@ -1184,13 +1184,28 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
 
   var cols = 'fathom_call_id, prospect_name, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned, '
     + 'intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes';
-  var an = await admin.from('call_analyses').select(cols).in('fathom_call_id', callIds).eq('status', 'done');
-  if (an.error) throw new Error('call_analyses: ' + an.error.message);
-
-  var hl = await admin.from('call_highlights')
-    .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified, coaching')
-    .in('fathom_call_id', callIds).eq('section', section);
-  if (hl.error) throw new Error('call_highlights: ' + hl.error.message);
+  /* ⚠⚠ CHUNKED AT 100 (fix #3, H677). An unchunked `.in()` carries every id in the URL
+     and the request DIES above ~395 ids — measured 2026-09-02: 390 succeed, 400
+     `fetch failed` after ~8 s, no PostgREST error (H663). The owner was at 390 calls
+     at 90 days, ~5 a day: this page was days from returning 500. The limit fixed
+     against is the URL ceiling, NOT the 1,000-row cap. 100 is the shared size the
+     21 other sites use; the two chunk loops issue their reads together.
+     Pinned by test/section-drilldown-chunked.test.js, which executes the route
+     against a fake wire that refuses more than 395 ids. */
+  var anRows = [], hlRows = [];
+  var anChunks = [], hlChunks = [];
+  for (var ci = 0; ci < callIds.length; ci += 100) {
+    var slice = callIds.slice(ci, ci + 100);
+    anChunks.push(admin.from('call_analyses').select(cols).in('fathom_call_id', slice).eq('status', 'done'));
+    hlChunks.push(admin.from('call_highlights')
+      .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified, coaching')
+      .in('fathom_call_id', slice).eq('section', section));
+  }
+  var anRes = await Promise.all(anChunks);
+  var hlRes = await Promise.all(hlChunks);
+  for (var ai = 0; ai < anRes.length; ai++) { if (anRes[ai].error) throw new Error('call_analyses: ' + anRes[ai].error.message); anRows = anRows.concat(anRes[ai].data || []); }
+  for (var hi = 0; hi < hlRes.length; hi++) { if (hlRes[hi].error) throw new Error('call_highlights: ' + hlRes[hi].error.message); hlRows = hlRows.concat(hlRes[hi].data || []); }
+  var an = { data: anRows }, hl = { data: hlRows };
 
   // Prospect name comes from the analysis row (3a); fall back to nothing rather
   // than the meeting title, which is the booked name and often the wrong person.
@@ -1228,8 +1243,12 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
       .is('duplicate_of', null);
     var prevIds = (prev.data || []).map(function (c) { return c.id; });
     if (prevIds.length) {
-      var pa = await admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds).eq('status', 'done');
-      var pv = (pa.data || []).map(function (a) { return sectionScoreOf(a, section); }).filter(function (v) { return typeof v === 'number'; });
+      /* chunked for the same reason as above — the previous window can be as long as this one */
+      var paChunks = [];
+      for (var pi = 0; pi < prevIds.length; pi += 100) paChunks.push(admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds.slice(pi, pi + 100)).eq('status', 'done'));
+      var paRes = await Promise.all(paChunks);
+      var paRows = []; paRes.forEach(function (x) { paRows = paRows.concat(x.data || []); });
+      var pv = paRows.map(function (a) { return sectionScoreOf(a, section); }).filter(function (v) { return typeof v === 'number'; });
       out.prior_average = pv.length ? Math.round(pv.reduce(function (x, y) { return x + y; }, 0) / pv.length) : null;
     } else out.prior_average = null;
   } catch (e) { out.prior_average = null; }
