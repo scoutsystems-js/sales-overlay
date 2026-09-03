@@ -97,8 +97,8 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 
 ### 🔒 SESSION CLOSED (2026-09-03, H693) — `SCOUT-DESIGN.md` written; nothing else built. WHAT REMAINS FILED:
 
-1. **The wordmark asset task** — the font file, or the wordmark exported as outlines (H691, H692). Justin ruled: do not swap the transparent PNG.
-2. **The favicon** — no page links one; the inline nav SVG mark is the sharpest source at 16/32, the app icon and glyph PNGs the large sizes.
+1. **The wordmark — OUTLINES ARRIVED AND ARE VERIFIED (H694): `scout-wordmark.svg` is the same artwork, an auto-trace of the raster, clean at every size, fill = the token.** What remains is Justin's: the swap itself (four surfaces at once), the nav at `height: 25.71px` (measured: 165 wide, the current's width) or a trimmed viewBox, and the glow (plain, or a CSS drop-shadow — shown both ways). Ship the METADATA-STRIPPED copies (9,813 / 2,963 bytes). The old "font file or outlines" ask is closed.
+2. **The favicon** — no page links one; **`scout-glyph.svg` is sharp at 16 and 32 (H694) and is the source** — the brand's own outline; the app icon PNG for the large sizes.
 3. **The social cards** — `og:image` (the link-preview asset exists), nothing set today.
 4. **The landing page rewrite.**
 5. **The toggle redesign.**
