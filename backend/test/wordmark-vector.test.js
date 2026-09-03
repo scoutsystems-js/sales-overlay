@@ -63,7 +63,7 @@ const PROBE = `(async () => { const img = document.querySelector('.brand-wordmar
   let x0 = 0; while (x0 < W && ![...Array(H).keys()].some((y) => A(x0, y) >= 200)) x0++;
   let x1 = x0; while (x1 < W && [...Array(H).keys()].some((y) => A(x1, y) >= 200)) x1++;
   let top = H, bot = 0; for (let x = x0; x < x1; x++) for (let y = 0; y < H; y++) if (A(x, y) >= 200) { if (y < top) top = y; if (y > bot) bot = y; }
-  return { boxW: r.width, boxH: r.height, capCss: (bot - top + 1) / K, filter: getComputedStyle(img).filter }; })()`;
+  return { boxW: r.width, boxH: r.height, capCss: (bot - top + 1) / K, filter: getComputedStyle(img).filter, barH: document.querySelector('.top-bar').getBoundingClientRect().height }; })()`;
 
 test('⚠⚠ RENDERED: the nav wordmark keeps today\'s cap (12.1px) and width (165px) — measured on the cap, not the height value', () => {
   const page = '<!doctype html><html><head>' + STYLE + '</head><body data-view="overview">' + NAV + '</body></html>';
@@ -71,4 +71,5 @@ test('⚠⚠ RENDERED: the nav wordmark keeps today\'s cap (12.1px) and width (1
   assert.ok(Math.abs(r.capCss - 12.1) <= 0.35, 'rendered cap ' + r.capCss + 'px must be 12.1 ± 0.35 (the PNG wordmark\'s)');
   assert.ok(Math.abs(r.boxW - 165) <= 1.5, 'rendered width ' + r.boxW + ' must be 165 ± 1.5');
   assert.strictEqual(r.filter, 'none', 'the nav has no glow');
+  assert.strictEqual(r.barH, 51, 'the bar stays 51px with the 25.71px wordmark in it (it had grown to 55 — H697)');
 });

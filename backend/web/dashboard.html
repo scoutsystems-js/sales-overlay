@@ -869,7 +869,14 @@
     .top-bar {
       background: linear-gradient(180deg, #161616 0%, #0d0d0d 100%);
       border-bottom: 1px solid var(--border);
-      padding: 14px 32px;
+      /* ⚠⚠ THE BAR IS 51px BY DECLARATION, NOT BY ACCIDENT (2026-09-03, H697). It used to be
+         14px padding + a 22px line + 14px + the 1px border = 51, and the rail's top, the
+         ground's min-height and the sidebar's max-height are all derived from that 51 (H700).
+         The vector wordmark at 25.71px silently grew the line to 55 — measured live one block
+         after it shipped, because the IMAGE was measured and the BAR was not. An explicit
+         height makes the number a fact the contents cannot move; align-items centres them.
+         Guarded on the rendered bar in test/background-switch.test.js and wordmark-vector.test.js. */
+      height: 51px; box-sizing: border-box; padding: 0 32px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1053,7 +1060,7 @@
     .bg-switch[aria-checked="false"] .bg-switch-knob { transform: translateX(0); }
     .bg-switch-glyph { display: block; width: 12px; height: 16px; background: var(--accent);
                        -webkit-mask: url(/scout-glyph.svg) center / contain no-repeat; mask: url(/scout-glyph.svg) center / contain no-repeat; }
-    .bg-switch[aria-checked="false"] .bg-switch-glyph { background: var(--text); opacity: .45; }
+    .bg-switch[aria-checked="false"] .bg-switch-glyph { background: var(--text); opacity: .55; }   /* .45 read as a ghost on the knob at device pixels — looked at live (H697) */
     .bg-switch:hover .bg-switch-track { border-color: var(--accent); }
     .bg-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 999px; }
     .signout { cursor: pointer; }

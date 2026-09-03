@@ -63,9 +63,11 @@ test('⚠⚠ RENDERED: white edge in BOTH states on a black track that never cha
     assert.ok(st.masked, name + ': the glyph is the vector, masked'); assert.ok(st.glyphH >= 15, name + ': the glyph is knob-sized (' + st.glyphH + 'px)'); assert.strictEqual(st.text, '', name + ': no text');
   }
   assert.strictEqual(on.glyphFill, 'rgb(9, 224, 70)', 'on: the glyph is Scout green'); assert.strictEqual(on.glyphOpacity, '1');
-  assert.strictEqual(off.glyphFill, 'rgb(237, 237, 237)', 'off: the glyph is the text white, dimmed'); assert.ok(+off.glyphOpacity < 0.6, 'off: dimmed (' + off.glyphOpacity + ')');
+  assert.strictEqual(off.glyphFill, 'rgb(237, 237, 237)', 'off: the glyph is the text white, dimmed'); assert.ok(+off.glyphOpacity >= 0.5 && +off.glyphOpacity <= 0.7, 'off: dimmed but readable (' + off.glyphOpacity + ')');
   assert.ok(on.knobX - off.knobX >= 16, 'the knob travels: on at ' + on.knobX + ', off at ' + off.knobX);
   assert.deepStrictEqual(on.box, off.box, 'the control\'s own box is identical in both states');
   assert.deepStrictEqual([on.barH, on.markRight, on.acctLeft, on.acctRight], [off.barH, off.markRight, off.acctLeft, off.acctRight], 'the bar, the wordmark and My Account do not move between states');
   assert.ok(on.box[0] > on.acctRight, 'the toggle sits to the right of My Account');
+  assert.strictEqual(on.barH, 51, 'the bar is 51px with the toggle in it (the vector wordmark had grown it to 55 — H697)');
+  assert.ok(on.box[1] >= 2 && on.box[1] + on.box[3] <= 51 - 2, 'the track FITS inside the 51px bar with room on both sides (top ' + on.box[1] + ', height ' + on.box[3] + ') — an explicit bar height would otherwise hide a track that overflows it');
 });
