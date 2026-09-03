@@ -8,6 +8,7 @@
  * stops the detection overruling a person.
  */
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -67,8 +68,7 @@ test('total on junk — an analysis must not fail because this could not decide'
 
 test('nothing in the rule knows about Zoom, phones or dial-ins', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'compromised-file.js'), 'utf8');
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-                  .filter(l => l.trim().indexOf('//') !== 0).join('\n');
+  const code = stripComments(src);
   assert.ok(code.length > 400, 'stripped source is too small — the check is not measuring');
   [/zoom/i, /fathom/i, /phone/i, /dial/i, /provider/i].forEach(re => {
     assert.ok(!re.test(code), 'detection must be data-driven, not provider-specific: ' + re);

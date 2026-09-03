@@ -13,6 +13,7 @@
    so clipping the artwork off the left vacates that gutter to the ground colour
    on EVERY view, for free. */
 const test = require('node:test');
+const { stripComments, blankComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684): blankComments keeps offsets, stripComments measures
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
@@ -22,7 +23,7 @@ const H = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), '
 function meshRule() {
   // ⚠ the FIRST body[data-view]::before is archived in a comment block; take the
   //   live one by stripping comments before locating it
-  const live = H.replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length));
+  const live = blankComments(H);   // positions kept — the slice below is taken from the RAW page by offset
   const at = live.indexOf('body[data-view]::before {');
   assert.ok(at !== -1, 'stale anchor — the mesh layer is gone');
   const end = H.indexOf('\n    }', at);
@@ -31,7 +32,7 @@ function meshRule() {
      raw against 1,077 of actual CSS), so a raw bound is meaningless here — a
      first version capped at 6000 and failed on correct code. The stripped size
      is what "did the slice cover one rule" actually means. */
-  const code = rule.replace(/\/\*[\s\S]*?\*\//g, '');
+  const code = stripComments(rule);
   assert.ok(code.length > 400 && code.length < 2500, 'slice must cover one rule: ' + code.length);
   assert.strictEqual((code.match(/\{/g) || []).length, 1, 'the slice must hold exactly one rule');
   return { rule: rule, code: code };
@@ -96,4 +97,10 @@ test('⚠ the layer is NOT dimmed to achieve this', () => {
   assert.ok(m, 'stale anchor — the layer opacity');
   assert.strictEqual(m[1], '1',
     'the mesh renders at full strength; narrowing is layout, dimming is the thing the ruling forbids');
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

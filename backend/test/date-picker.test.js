@@ -13,6 +13,7 @@
  * future "consistency" pass fails loudly instead of quietly breaking one.
  */
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -186,7 +187,7 @@ test('THE CONTROL READS ITS RANGE THROUGH THE GETTER AND WRITES THROUGH THE SETT
 test('GUARD: the control source never references app state', () => {
   // The whole point of the getter/setter shape. A single `state.dateRange` in
   // here would silently re-couple every view to one shared range.
-  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const code = stripComments(SRC);
   assert.ok(!/\bstate\./.test(code), 'the picker must not read or write app state');
   assert.ok(!/loadTeam|reloadAll|renderTeamView|setDateRange|setTeamRange/.test(code),
     'the picker must not call a view directly — the setter is the only outlet');
@@ -344,7 +345,7 @@ test('team and coaching each mount their own instance', () => {
 
 test('STAGE 3: the preset buttons are gone from BOTH headers', () => {
   const rendered = HTML.replace(SRC, '');
-  const live = rendered.replace(/\/\*[\s\S]*?\*\//g, '');   // ignore commented-out archives
+  const live = stripComments(rendered);   // ignore commented-out archives
   assert.ok(!/onclick="setDateRange\(/.test(live), 'coaching presets must be gone from the render path');
   assert.ok(!/onclick="setTeamRange\(/.test(live), 'team presets must be gone from the render path');
   // And the archived originals are kept, per the standing convention.
@@ -383,7 +384,7 @@ test('the needs-work window label NAMES THE WINDOW, never "last N days"', () => 
     'Jul 1 - Jul 31');
   assert.strictEqual(fn({}, api.rangeLabelInclusive), 'your recent calls', 'degrades without inventing a window');
 
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   assert.ok(!/your last ' \+ win \+ ' days/.test(live), 'the trailing-window phrasing must be gone');
   assert.ok(!/try 30 or 90 days/.test(live), 'and must not point at presets that no longer exist');
 });
@@ -437,7 +438,7 @@ test('⚠ the single-day label uses the MONDAY-FIRST weekday index', () => {
 test('SEEDING HAS EXACTLY ONE CALLER — drillCalls, and nowhere else', () => {
   // "Seeded once" versus "kept in sync" is the coupling that drifts back
   // together. A second caller is how it happens, so the count is pinned.
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   const calls = (live.match(/seedCallsRangeFromCoaching\(\)/g) || []).length;
   assert.strictEqual(calls, 2, 'one definition + exactly one call site; found ' + calls);
   const drillAt = HTML.indexOf('function drillCalls');
@@ -469,7 +470,7 @@ test('the three ranges are three distinct state fields', () => {
 });
 
 test('the Calls presets are gone from the render path', () => {
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   assert.ok(!/onclick="setCallLibraryRange\(/.test(live));
 });
 
@@ -565,7 +566,7 @@ test('the router PARSES the range back for the whole team family', () => {
 
 test('the superseded exact-match branches are commented, not left live', () => {
   assert.ok(/REMOVED 2026-08-17/.test(HTML));
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   assert.strictEqual(/else if \(h === 'team-recs'\)/.test(live), false,
     'the unreachable duplicate must not stay in the render path');
 });
@@ -577,4 +578,10 @@ test('the COACHING family already carried the range — no regression there', ()
     const line = fn.split('\n').find((l) => l.indexOf("return '" + h + "'") !== -1);
     assert.ok(line && /coachingRangeHashSuffix\(\)/.test(line), h + ': ' + (line || 'missing'));
   });
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

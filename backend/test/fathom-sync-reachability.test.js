@@ -24,6 +24,7 @@
 'use strict';
 
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
@@ -33,7 +34,7 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html')
 /* ⚠ Comments are stripped before any ABSENCE check: this codebase archives
    removed code in place, and the comments here deliberately QUOTE the defective
    line to explain it. Checking the raw text would report the fix as un-shipped. */
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const LIVE = stripComments(HTML);
 
 /* ── slice one function out, with the standing guards ─────────────────────── */
 function slice(startMarker, endMarker, min) {
@@ -202,7 +203,7 @@ test('⚠⚠ renderCallLibrary ACTUALLY CALLS IT — the function is not the cal
     'renderCallLibrary must DELEGATE its empty state — a correct helper nothing calls '
     + 'is exactly the shape of the bug that shipped');
 
-  const live = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const live = stripComments(src);
   assert.strictEqual(live.indexOf('connectSourceCtaHtml()'), -1,
     'renderCallLibrary still emits the Connect CTA directly. That unconditional call — '
     + 'shown whenever the list was empty, with no connectivity check — IS the reported bug.');
@@ -230,7 +231,7 @@ test('⚠⚠ NO CONNECTION-PATH HANDLER RENDERS ONLY THE OVERVIEW', () => {
     ['connectZoom', 'async function connectZoom() {', '\n  async function disconnectProvider'],
   ];
   FNS.forEach(([name, a, b]) => {
-    const src = slice(a, b).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const src = stripComments(slice(a, b));
     assert.strictEqual(src.indexOf("state.view === 'overview'"), -1,
       name + ' still renders only when the view is overview. Its prompt/notice is shown '
       + 'in #account -> Connections, so from there the call is a no-op and the user sees '
@@ -298,4 +299,10 @@ test('⚠ THE GUARDS ABOVE ARE NOT VACUOUS — the defect is reintroduced and th
   const overviewOnly = "  if (state.view === 'overview') renderOverview(false);\n";
   assert.ok(overviewOnly.indexOf("state.view === 'overview'") !== -1,
     'the overview-only guard must match the exact string the defect used');
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

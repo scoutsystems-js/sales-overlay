@@ -24,6 +24,7 @@
 'use strict';
 
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const { syncFreshness } = require('../lib/eod-freshness');
 
@@ -91,7 +92,7 @@ test('⚠⚠ BOTH EOD EXITS RETURN sync — the EMPTY day is the one that mislea
 test('⚠ THE PAGE RENDERS THE NOTE, and above the list rather than under it', () => {
   const fs2 = require('fs'), path2 = require('path');
   const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-  const live = html.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  const live = stripComments(html);
   assert.ok(/function eodSyncNoteHtml/.test(live), 'the helper must exist');
   assert.ok(/\+ eodSyncNoteHtml\(d\.sync\)/.test(live),
     'and be CALLED — a builder nothing calls is the defect shape this codebase keeps hitting');
@@ -142,7 +143,13 @@ test('⚠ THE INVALIDATION IS ON ENTRY, NOT IN THE RENDERER', () => {
   const fs2 = require('fs'), path2 = require('path');
   const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
   const i = html.indexOf('function renderCallLibrary()');
-  const fn = html.slice(i, html.indexOf('\n  }', i)).replace(/\/\*[\s\S]*?\*\//g, '');
+  const fn = stripComments(html.slice(i, html.indexOf('\n  }', i)));
   assert.ok(!/state\.callLibrary = null/.test(fn),
     'renderCallLibrary must never null the list — it would break pagination');
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

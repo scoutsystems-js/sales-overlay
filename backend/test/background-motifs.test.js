@@ -78,6 +78,7 @@
  * motifs silently, which is exactly what these tests refuse to allow.
  */
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -92,7 +93,7 @@ const ACCENT = (function () {
   if (!m) throw new Error('--accent token not found — the motif guard cannot derive the brand green');
   return m[1];
 })();
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/[^\n]*$/gm, '');
+const LIVE = stripComments(HTML);
 
 // ⚠ fromIndex + a length assertion. Without both, the slice can run backwards
 // and every check below passes against an empty string.
@@ -225,7 +226,7 @@ test('⚠ NON-VACUITY — the body-background guard fires when the background re
 
 // live CSS only: the superseded 0.035 rule is archived in a comment block and
 // a raw scan would read it as if it still governed (presence vs precedence).
-const LIVE_CSS = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+const LIVE_CSS = stripComments(HTML);
 
 /* ⚠⚠ RETIRED 2026-08-20 — the --motif-mesh VARIABLE ITSELF IS GONE, so this
    asserts a property of a declaration that no longer exists. Kept, not deleted:
@@ -314,7 +315,7 @@ test('⚠⚠ exactly ONE live body[data-view]::before rule that PAINTS', () => {
      counts rules CONTAINING background-image, and separately requires every
      other copy to be display:none only — which is stricter, because a second
      painting rule inside a media query would now also be caught. */
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   const rules = [];
   const re = /(^|[};\s])([^{}]*body\[data-view\]::before)\s*\{([^}]*)\}/g;
   let m;
@@ -346,7 +347,7 @@ test('⚠⚠ exactly ONE live body[data-view]::before rule that PAINTS', () => {
    Kept as a record of what was protected, not deleted:
 
 test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   const bright = live.match(/html\[data-mesh="bright"\]\s*\{[^}]*\}/);
   assert.ok(bright, 'the trial variant must be attribute-scoped');
   assert.ok(/--motif-alpha:\s*1/.test(bright[0]), 'bright means full strength');
@@ -385,7 +386,7 @@ test('⚠⚠ the bright mesh is OPT-IN ONLY — never the default', () => {
    Kept as a record of what was protected, not deleted:
 
 test('⚠⚠ every motif view has its OWN window — none shares another\'s', () => {
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   /* ⚠ PERCENTAGES, NOT PIXELS (2026-08-20). A px offset that covers at one
      viewport width leaves a bare band at another, because the rendered size
      follows the viewport — that is what left the account view 95% empty. * /
@@ -414,7 +415,7 @@ test('⚠⚠ every motif view has its OWN window — none shares another\'s', ()
    asserts a property of a declaration that no longer exists. Kept, not deleted:
 
 test('⚠ ONE field powers them all — fifteen artworks was 1.8x the page', () => {
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   const decls = (live.match(/--motif-mesh:\s*url\(/g) || []).length;
   assert.strictEqual(decls, 1,
     'exactly one field: ' + decls + ' artworks would multiply the payload and, '
@@ -473,7 +474,7 @@ test('⚠⚠ the width floor is RETIRED and the band is >= 24px BY CONSTRUCTION 
      and gap on top. A threshold would now be a hand-picked number — the stale
      kind — so the guard flips again: there must be NO width cut above the
      900px mobile rule, and the 24px term must be at least MIN_BAND. */
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   const cuts = [...live.matchAll(/@media \(max-width: (\d+)px\) \{ body\[data-view\]::before \{ display: none/g)].map(m => Number(m[1]));
   assert.deepStrictEqual(cuts, [900], 'only the mobile cut may hide the layer — got ' + JSON.stringify(cuts));
   const MIN_BAND = 24;          // below this the band renders as a line, measured at 1410 = 2.5px
@@ -513,7 +514,7 @@ test('⚠ edges stay DOMINANT over nodes at any weight — that ratio fixed "gre
    Kept as a record of what was protected, not deleted:
 
 test('⚠⚠ the field renders LARGER than the viewport, so any window still covers', () => {
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   const at = live.indexOf('body[data-view]::before {');
   const rule = live.slice(at, live.indexOf('\n    }', at));
   const size = rule.match(/background-size:\s*([^;]+);/);
@@ -533,7 +534,7 @@ test('⚠⚠ the field renders LARGER than the viewport, so any window still cov
    Kept as a record of what was protected, not deleted:
 
 test('⚠ window offsets stay within 0-100% — beyond that is off the image', () => {
-  const live = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(HTML);
   const rules = [...live.matchAll(/body\[data-view="[a-z-]+"\]::before \{ background-position: (\d+)% (\d+)%; \}/g)];
   /* ⚠ 14, NOT 15, SINCE 2026-08-20 — and this is a CORRECTION, not a
        weakening. The `team` view no longer uses the mesh at all: it carries a
@@ -550,3 +551,8 @@ test('⚠ window offsets stay within 0-100% — beyond that is off the image', (
 });
 */
 
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
+});

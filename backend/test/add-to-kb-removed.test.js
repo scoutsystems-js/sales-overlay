@@ -23,6 +23,7 @@
  * endpoint. Justin, 2026-08-18.
  */
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -34,8 +35,7 @@ const HTML = fs.readFileSync(WEB, 'utf8');
 // every removed control still exists verbatim inside a /* */ block. Matching the
 // raw file would report the removal as un-shipped. Same discipline the Title Case
 // guard uses, and the same one the deploy-verification rule requires.
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '')
-  .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+const LIVE = stripComments(HTML);
 
 /* ⚠⚠ CONVERTED 2026-08-29 — ONE OF THE TWO CONTROLS IS BACK, AND THE
    DISTINCTION IS THE WHOLE POINT.
@@ -170,4 +170,10 @@ test('the manager→team gap is STILL real for AUTO-HARVESTED rows — B does no
     'a manager seeing this row would mean the gap has been closed — update the note');
   assert.strictEqual(kbScope.kbReadRowVisible(repRow, { p_user_id: 'rep-1', p_admin_id: 'mgr-1' }), true,
     'the rep must still see their own harvested moments');
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

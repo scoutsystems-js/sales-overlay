@@ -29,6 +29,14 @@ KILLERS.forEach(([name, src, keep]) => {
     keep.forEach((line) => assert.ok(out.indexOf(line) !== -1, 'lost: ' + line));
   });
 });
+test('⚠ EXECUTED: the trailing option drops a comment after code but keeps a // inside a string, and blankComments keeps every offset', () => {
+  assert.strictEqual(stripComments("var u = 'http://x'; // t\nvar k = 1;", { trailing: true }), "var u = 'http://x'; \nvar k = 1;");
+  const { blankComments } = require('./helpers/strip-comments');
+  const src = "var a = 1; /* gone */\n// gone too\nvar b = 'http://y';";
+  const b = blankComments(src);
+  assert.strictEqual(b.length, src.length, 'same length'); assert.strictEqual(b.indexOf("var b = 'http://y';"), src.indexOf("var b = 'http://y';"), 'same offset');
+  assert.ok(!/gone/.test(b));
+});
 test('⚠⚠ EXECUTED on the live dashboard: the 42 lines behind `/admin/*` are visible, and the script still parses', () => {
   const raw = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
   const out = stripComments(raw);
@@ -40,7 +48,7 @@ test('⚠⚠ EXECUTED on the live dashboard: the 42 lines behind `/admin/*` are 
 const PRIVATE = [/replace\(\/\\\/\\\*\[\\s\\S\]\*\?\\\*\\\/\/g/, /\^\\s\*\\\/\\\/.*filter\(/, /indexOf\('\/\/'\) !== 0/, /replace\(\/\\\/\\\/\.\*\/g/, /replace\(\/\\\/\\\/\[\^\\n\]\*\/g/, /replace\(\/\\\/\\\/\.\*\$\/gm/];
 function hasPrivateForm(src) { const code = src.replace(/^\s*\/\/.*$/gm, ''); return PRIVATE.some((re) => re.test(code)); }
 const FILES = fs.readdirSync(__dirname).filter((f) => f.endsWith('.test.js') && f !== 'one-stripper.test.js');
-const RATCHET = 123;  // files still carrying a private form on 2026-09-02 — the mechanical conversion was STOPPED (H682); lower it as they are hand-converted
+const RATCHET = 112;  // 123 on 2026-09-02 after the stopped mechanical run (H682); the eleven blind files were hand-converted the same day (H684); lower it as more land
 test('⚠ the count of test files carrying a private stripper may FALL, never rise (ratchet ' + RATCHET + ')', () => {
   const left = FILES.filter((f) => hasPrivateForm(fs.readFileSync(path.join(__dirname, f), 'utf8')));
   assert.ok(left.length <= RATCHET, 'a new private stripper appeared: ' + left.length + ' > ' + RATCHET + ' — ' + left.join(', '));

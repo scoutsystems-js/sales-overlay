@@ -17,9 +17,16 @@
    Scored against the five killers in sweep/detect-stripper-copies.js and verified on
    dashboard.html (the inline script still parses, 549 functions, zero code lines
    lost against the reference tokenizer). */
-function stripComments(src) {
+function stripComments(src, opts) {
   const noLine = src.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
-  return noLine.replace(/("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\\n]|\\.)*`)|\/\*[\s\S]*?\*\//g, function (m, str) { return str ? str : ''; });
+  const out = noLine.replace(/("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\\n]|\\.)*`)|\/\*[\s\S]*?\*\//g, function (m, str) { return str ? str : ''; });
+  if (!(opts && opts.trailing)) return out;
+  /* ⚠ opts.trailing (H684): ALSO drop a `// …` that follows code on a line, string-aware
+     (`'http://x'` survives). For slices where a `//` cannot open a REGEX LITERAL — CSS,
+     arrays of string literals, prose — because a regex such as /\/\// would be cut.
+     Off by default; the ramp-colour test needs it because its trailing comments
+     name the hexes they replaced. */
+  return out.split('\n').map((l) => l.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|\/\/.*$/g, function (m, str) { return str ? str : ''; })).join('\n');
 }
 /* The body of `function NAME(` by brace matching from its first `{`. Throws when
    the function is not found, so a renamed function fails loudly instead of
@@ -36,4 +43,14 @@ function fnBody(src, name) {
   }
   throw new Error('function ' + name + ' never closes');
 }
-module.exports = { stripComments, fnBody };
+/* ⚠ THE SAME TOKENISATION, POSITIONS KEPT (H684). A test that slices the RAW page by
+   character offset or line number cannot use stripComments — removed lines shift
+   everything after them. blankComments strips exactly what stripComments strips but
+   replaces each comment with whitespace of the same length (newlines preserved), so
+   every surviving character keeps its offset and line. One tokeniser, two shapes;
+   never a private copy of either. */
+function blankComments(src) {
+  const lines = src.split('\n').map((l) => (/^\s*\/\//.test(l) ? ' '.repeat(l.length) : l)).join('\n');
+  return lines.replace(/("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\\n]|\\.)*`)|\/\*[\s\S]*?\*\//g, function (m, str) { return str ? str : m.replace(/[^\n]/g, ' '); });
+}
+module.exports = { stripComments, blankComments, fnBody };

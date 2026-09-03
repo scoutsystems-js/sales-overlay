@@ -15,6 +15,7 @@
 'use strict';
 
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 
 const { resolveFathomIdentity, normEmail } = require('../lib/fathom-identity');
@@ -120,8 +121,7 @@ test('⚠⚠ A HISTORY PULL USES THE FIRST-SYNC GRADING CAP, NOT STEADY STATE', 
      backfill: 560 pulled calls would fire 560 analyses. Caught before clicking
      it on production. */
   const fs2 = require('fs'), path2 = require('path');
-  const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const src = stripComments(fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8'));
   const m = src.match(/callIdsToAnalyze\(newRows,\s*([^,]+),/);
   assert.ok(m, 'the analyse-selection call moved');
   assert.ok(/historyMode/.test(m[1]),
@@ -138,7 +138,7 @@ test('⚠⚠ A HEALTHY ACCOUNT HAS A REACHABLE WAY TO GRADE ITS BACKLOG', () => 
      The capability was deleted silently along with the card that hosted it. */
   const fs2 = require('fs'), path2 = require('path');
   const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-  const live = html.replace(/\/\*[\s\S]*?\*\//g, '');
+  const live = stripComments(html);
 
   assert.ok(/function fathomBacklogRowHtml/.test(live), 'the control must exist');
   // and be CALLED — a builder nothing calls is exactly the bug being fixed
@@ -188,7 +188,7 @@ test('⚠⚠ THE WINDOW PICKER SHOWS FOR A PURE BACKLOG, not only for outdated w
 test('⚠ THE TILE EXPLAINS ITSELF — "19 of 149" alone reads as broken', () => {
   const fs2 = require('fs'), path2 = require('path');
   const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-  assert.ok(/not graded yet/.test(html.replace(/\/\*[\s\S]*?\*\//g, '')),
+  assert.ok(/not graded yet/.test(stripComments(html)),
     'an ungraded remainder must be named on the tile, not left as a bare ratio');
 });
 
@@ -196,8 +196,7 @@ test('⚠ THE TILE EXPLAINS ITSELF — "19 of 149" alone reads as broken', () =>
 
 test('⚠⚠ A NEW FATHOM CONNECTION DEFAULTS TO 30 DAYS — but never overwrites a choice', () => {
   const fs2 = require('fs'), path2 = require('path');
-  const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'auth.js'), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const src = stripComments(fs2.readFileSync(path2.join(__dirname, '..', 'routes', 'auth.js'), 'utf8'));
   assert.ok(/sync_window:\s*keepWindow \|\| '30d'/.test(src),
     'the connect upsert must default to 30d');
   assert.ok(/select\('sync_window'\)/.test(src),
@@ -222,10 +221,15 @@ test('⚠⚠ ZOOM SENDS THE 30-DAY DATE rather than inheriting Zoom\'s default',
 test('⚠ THE GRADING CAP IS UNCHANGED BY THIS — 30 days can still exceed 20 calls', () => {
   const fs2 = require('fs'), path2 = require('path');
   ['fathom', 'zoom'].forEach((r) => {
-    const src = fs2.readFileSync(path2.join(__dirname, '..', 'routes', r + '.js'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    const src = stripComments(fs2.readFileSync(path2.join(__dirname, '..', 'routes', r + '.js'), 'utf8'));
     assert.ok(/callIdsToAnalyze\(/.test(src) && /FIRST_SYNC_ANALYZE_CAP/.test(src),
       r + ' must still cap grading on a first sync — pulling fewer calls does '
       + 'not mean grading all of them');
   });
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

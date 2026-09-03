@@ -16,12 +16,13 @@
  * in place, so an archived block would otherwise answer for the live one.
  */
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
-const LIVE = HTML.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/[^\n]*$/gm, '');
+const LIVE = stripComments(HTML);
 
 // ⚠ Slice with an explicit fromIndex and assert the length. Without fromIndex
 // the end marker resolves to its FIRST occurrence in the file, the slice runs
@@ -48,7 +49,7 @@ function sliceRamp(src) {
  * ramp gained explanatory comments.
  */
 function hexes(s) {
-  const code = s.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+  const code = stripComments(s, { trailing: true });   // the ramp's trailing comments name the hexes they REPLACED — those must not count
   return (code.match(/#[0-9a-f]{6}/gi) || []).map((h) => h.toLowerCase());
 }
 
@@ -131,4 +132,10 @@ test('⚠ NON-VACUITY — the guard fires when a reserved hue is put back in the
   assert.ok(bad.indexOf(tokenValue('accent')) !== -1,
     'the accent must be detectable in the ramp once reintroduced, or this suite proves nothing');
   assert.notStrictEqual(bad[0], first[1], 'and the leads-with-cyan check must move too');
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

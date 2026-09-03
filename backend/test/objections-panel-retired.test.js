@@ -11,6 +11,7 @@
  * So nothing was lost, and the shared pieces had to survive the removal.
  */
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -18,7 +19,7 @@ const path = require('node:path');
 const RAW = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
 /* ⚠ Comments stripped: this codebase archives removed code IN PLACE, so a raw
    grep reports a shipped removal as un-shipped. */
-const LIVE = RAW.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+const LIVE = stripComments(RAW.replace(/<!--[\s\S]*?-->/g, ''));
 
 test('the retired view has no live render path', () => {
   assert.strictEqual((LIVE.match(/renderTeamNeedsWorkView/g) || []).length, 0,
@@ -77,4 +78,10 @@ test('the drilldown genuinely carries what the retired view had', () => {
     'the strict denominator and exclusion counts must live in the drilldown lane');
   assert.ok(/Handle rate by objection type/.test(LIVE),
     'the sales-language taxonomy must render somewhere live');
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });

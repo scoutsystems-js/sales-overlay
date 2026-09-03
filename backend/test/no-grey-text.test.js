@@ -20,13 +20,14 @@
  * named a banned identifier broke the check.
  */
 const test = require('node:test');
+const { stripComments } = require('./helpers/strip-comments');   // ⚠ ONE stripper (H684) — this file's private copy is gone
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const RAW = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
 // /* … */ and <!-- … --> removed: archived code may legitimately mention greys.
-const LIVE = RAW.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '');
+const LIVE = stripComments(RAW).replace(/<!--[\s\S]*?-->/g, '');   // JS/CSS comments through the shared stripper; HTML comments are markup, stripped here
 
 const DEAD_TOKENS = ['--text-muted', '--text-dim', '--muted', '--text-soft'];
 
@@ -84,4 +85,10 @@ test('GUARD IS NON-VACUOUS: it would catch a reintroduced grey', () => {
   const rgb = (sample.match(/color:\s*rgb\([^)]*\)/gi) || [])
     .filter((s) => { const n = s.match(/\d+/g).map(Number); return n[0] === n[1] && n[1] === n[2] && n[0] > 80 && n[0] < 210; });
   assert.strictEqual(rgb.length, 1, 'the rgb matcher must fire on rgb(139,139,139)');
+});
+
+test('⚠ CONVERTED (H684): this file now reads the dashboard through the shared stripper — the 42 lines behind `/admin/*` are visible to it', () => {
+  const page = stripComments(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  assert.ok(page.indexOf("var target = params.get('user');") !== -1, 'the ?user= pivot restore must be visible');
+  assert.ok(/state\.me\.role === 'manager' \|\| state\.me\.role === 'admin' \|\| state\.me\.role === 'owner'/.test(page), 'the role check must be visible');
 });
