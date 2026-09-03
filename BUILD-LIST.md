@@ -48,7 +48,7 @@
 | row | waits on |
 |---|---|
 | **The landing page rewrite — PUBLIC AND OUT OF DATE.** It describes the product before the correction loop, the dashboards, the discovery items and the coaching rework (Connect · Grade · Coach · Objection Intelligence · EOD · pricing). It does NOT mention the overlay or teleprompter (checked: 0). **The only filed row a customer can see today.** | Justin's copy decisions |
-| Scout AI | the next session (Justin's order) |
+| **Scout AI — RECON DONE 2026-09-03 (H714); admin-only from the first line by ruling (server-side gate, the owner-only pattern, planted both ways; Justin lifts it by a named ruling). THE FILE DOES NOT SAY WHAT IT IS: one roadmap line ("Scout as assistant" acting on a CRM, confirmed writes) and a Major-class name. NEEDS JUSTIN before any design: what a person does with it · who it is for · team-only or not · acts or answers. Stands on: 2,455 embedded KB rows, 1,643 graded calls, 1,502 objection moments (1,391 verifiable), the six discovery items on 172 calls (v33+). Missing: a conversation store, a free-question lane, per-rep/period retrieval, a retrieval cap and a daily ceiling. ≈ 3–5¢ a question at list. | Justin's answers to the four questions; then design, gated |
 | CRM integration — GHL first, read-only; then Close; maybe HubSpot (▰ MAJOR) | after Scout AI; the linking policy's first path once it exists; nicknames revisited then |
 | The classifier's correction path (the mark is the label; Fine Tune Coaching is the lesson, new surface) | the queue's first corrections |
 | Auto-marking | 100 confirmations at ≥ 99% and Justin's ruling |
