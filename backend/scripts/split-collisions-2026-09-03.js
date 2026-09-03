@@ -17,6 +17,12 @@ const keys = fs.readFileSync(path.join(__dirname, '..', '..', 'API Keys.md'), 'u
 const pick = (n) => { const m = keys.match(new RegExp(n + '\\s*[=:]\\s*([^\\s`]+)')); return m ? m[1] : null; };
 const admin = createClient(pick('SUPABASE_URL'), pick('SUPABASE_SERVICE_ROLE_KEY'));
 const APPLY = process.argv.includes('--apply');
+/* ⚠ THE STOP RULE IS NOT LOOSENED — it is overridden only by a NAMED RULING passed
+   on the command line, echoed in the output and stored on every split row as
+   reason.stop_override, so the decision is on the record, not in the code. */
+const ovIdx = process.argv.indexOf('--override-stop');
+const OVERRIDE = (ovIdx !== -1 && process.argv[ovIdx + 1] && !process.argv[ovIdx + 1].startsWith('--')) ? process.argv[ovIdx + 1] : null;
+const MEASURE = process.argv.includes('--measure');   // print live rates for every rep with a split row; plan nothing
 const { planSplits, applySplits } = require('../lib/prospect-split');
 const { closeRateForCalls } = require('../lib/prospect-entity');
 const { realCallsOnly } = require('../lib/real-calls');
@@ -53,6 +59,19 @@ async function pageAll(build) {
   const users = await admin.auth.admin.listUsers({ perPage: 1000 });
   const email = {}; (users.data && users.data.users || []).forEach(u => { email[u.id] = u.email; });
 
+  if (MEASURE) {
+    const sp = await pageAll(() => admin.from('prospect_splits').select('user_id, call_id, undone_at'));
+    const reps = {}; sp.forEach(r => { if (!r.undone_at) reps[r.user_id] = (reps[r.user_id] || 0) + 1; });
+    const since = new Date(Date.now() - 30 * 86400e3).toISOString();
+    [['all-time', null], ['30-day', since]].forEach(([w, from]) => {
+      const joined = calls.filter(c => Object.prototype.hasOwnProperty.call(outcomeBy, c.id) && (!from || c.call_date >= from))
+        .map(c => ({ id: c.id, user_id: c.user_id, call_date: c.call_date, outcome: outcomeBy[c.id], prospect_id: c.prospect_id }));
+      const rated = ratedCallsOnly(joined); const byRep = {}; rated.forEach(c => (byRep[c.user_id] = byRep[c.user_id] || []).push(c));
+      console.log(w + ' LIVE close rate, reps with split rows:');
+      Object.keys(reps).forEach(uid => { const r = closeRateForCalls(byRep[uid] || [], mergedInto); console.log('  ' + (email[uid] || uid) + ': ' + r.closed + '/' + r.total + ' (' + r.pct + '%)  [' + reps[uid] + ' live split rows]'); });
+    });
+    return;
+  }
   const plan = planSplits({ prospects, calls });
   const moveBy = {}; plan.moves.forEach(m => { moveBy[m.call_id] = m; });
   const existingKey = {}; prospects.forEach(p => { existingKey[p.user_id + '|' + (p.display_name || '').toLowerCase()] = p.id; });
@@ -88,7 +107,8 @@ async function pageAll(build) {
   const outDir = path.join(os.homedir(), 'Desktop', 'scan-reports'); fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, 'splits-2026-09-03.csv'), csv + '\n');
   console.log('\nplan written: ~/Desktop/scan-reports/splits-2026-09-03.csv');
-  if (stop) { console.log('\n⚠ STOP RULE: a rate would move DOWN. Not applying' + (APPLY ? ' (even with --apply)' : '') + '.'); process.exit(2); }
+  if (stop && !OVERRIDE) { console.log('\n⚠ STOP RULE: a rate would move DOWN. Not applying' + (APPLY ? ' (even with --apply; a ruling must be named: --override-stop "<who, when, why>")' : '') + '.'); process.exit(2); }
+  if (stop && OVERRIDE) { console.log('\n⚠ STOP RULE OVERRIDDEN BY RULING: ' + OVERRIDE); plan.moves.forEach(m => { m.reason.stop_override = OVERRIDE; }); }
   if (!APPLY) { console.log('\nDRY RUN — nothing written. Re-run with --apply.'); return; }
   const res = await applySplits(admin, plan.moves);
   console.log('\nAPPLIED: ' + JSON.stringify(res));
