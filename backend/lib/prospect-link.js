@@ -25,7 +25,7 @@ var { nameKey } = require('./prospect-entity');
 var { titleNameSegment, hasPlaceholderToken } = require('./prospect-identity');
 var { isRejectedName } = require('./prospect-name');
 
-var PATHS = { INVITEE_EMAIL: 'invitee_email', TITLE_NAME: 'title_name', DISPLAY_NAME: 'display_name', RESOLVED_NAME: 'resolved_name' };
+var PATHS = { HUMAN: 'human', INVITEE_EMAIL: 'invitee_email', TITLE_NAME: 'title_name', DISPLAY_NAME: 'display_name', RESOLVED_NAME: 'resolved_name' };
 
 function firstWord(s) { return (typeof s === 'string' && s.trim()) ? s.trim().split(/\s+/)[0].toLowerCase().replace(/[.,'"]/g, '') : null; }
 function fullNameOk(s) {
@@ -48,6 +48,10 @@ function chooseLink(input) {
   var resolved = (typeof o.resolvedName === 'string' && o.resolvedName.trim()) ? o.resolvedName.trim() : null;
   var rFirst = firstWord(resolved);
   var rKey = nameKey(resolved);
+  /* ── path 0 · THE HUMAN PATH (H707): a person's rename on the call, above the exact path —
+       a person on the call knows more than an invite list. */
+  var human = (typeof o.humanName === 'string' && o.humanName.trim()) ? o.humanName.replace(/\s+/g, ' ').trim() : null;
+  if (human && nameKey(human)) return { path: PATHS.HUMAN, email: null, display_name: human, name_key: nameKey(human) };
   if (!rKey) return { path: null, email: null, display_name: null, name_key: null, reason: 'no_resolved_name' };
   // ── path 1 · exactly one external invitee whose name agrees with the speaker ──
   var ext = (Array.isArray(o.invitees) ? o.invitees : []).filter(function (i) { return i && i.is_external === true && typeof i.email === 'string' && i.email; });

@@ -1966,8 +1966,12 @@ async function analyzeCall(fathomCallId, userId) {
     // earned close score. The EFFECTIVE outcome (manual if locked, else inferred)
     // drives close_score (Thread 2) and payment_structure.
     var existingRow = await admin.from('call_analyses')
-      .select('outcome, outcome_source, outcome_set_at, outcome_set_by')
+      .select('outcome, outcome_source, outcome_set_at, outcome_set_by, prospect_name, prospect_name_source, prospect_name_confidence')
       .eq('fathom_call_id', fathomCallId).maybeSingle();
+    /* ⚠⚠ H707: A HUMAN NAME WINS OVER THE GRADER — a re-analysis never overwrites a person's
+       rename. Same read-before-write rule as manualLocked on the outcome. */
+    var humanNamed = !!(existingRow.data && existingRow.data.prospect_name_source === 'manual' && existingRow.data.prospect_name);
+    if (humanNamed) resolvedProspect = { name: existingRow.data.prospect_name, source: 'manual', confidence: existingRow.data.prospect_name_confidence || 'high' };
     var manualLocked = !!(existingRow.data && existingRow.data.outcome_source === 'manual');
     var effectiveOutcome = manualLocked ? existingRow.data.outcome : inferredOutcome;
     var earnedClose = (typeof close.score === 'number') ? close.score : null;
@@ -2236,6 +2240,7 @@ async function analyzeCall(fathomCallId, userId) {
             .filter(function (v, i, arr) { return arr.indexOf(v) === i; })
         : [];
       var link = chooseLink({
+        humanName:            humanNamed ? resolvedProspect.name : null,   // H707: the human path, above the exact path
         resolvedName:         resolvedProspect.name,
         invitees:             callRow.calendar_invitees,
         titleSegment:         callRow.title_name_segment,

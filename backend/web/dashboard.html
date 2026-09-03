@@ -16100,14 +16100,22 @@
   // (still an override); we never send null from the UI (no un-override
   // affordance yet — analysis values remain visible by clearing the row's edit
   // via support if ever needed).
-  async function eodSaveField(callId, field, el) {
+  async function eodSaveField(callId, field, el, confirmMerge) {
     var value = el.value;
     try {
       var res = await fetch('/eod/edit', {
         method: 'PUT',
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ call_id: callId, field: field, value: value }),
+        body: JSON.stringify({ call_id: callId, field: field, value: value, confirm_merge: confirmMerge === true }),
       });
+      /* ⚠ H707: the prospect name field IS the prospect rename — a merge comes back 409 naming both. */
+      if (res.status === 409 && field === 'prospect_name') {
+        var data = null; try { data = await res.json(); } catch (e) {}
+        var m = data && data.merge_required;
+        var ok = m && await scoutConfirm({ title: 'This is a merge', body: '\u201c' + (m.from || 'this prospect') + '\u201d would become \u201c' + m.into + '\u201d \u2014 ' + m.calls_moving + ' call' + (m.calls_moving === 1 ? '' : 's') + ' would move onto that prospect. Merge them?', confirmText: 'Merge' });
+        if (ok) return eodSaveField(callId, field, el, true);
+        return;
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       el.classList.add('edited');
       // update local state so a re-render (or Slack copy) uses the new value
@@ -18868,6 +18876,7 @@
           + (status === 'done' ? outcomeTagHtml((src.id || (review && review.id) || ''), (review && review.analysis ? review.analysis.outcome : src.outcome), (review && review.analysis ? review.analysis.outcome_source : src.outcome_source), false) : '')
           + notSalesBtnHtml((src.id || (review && review.id) || ''), src.not_a_sales_call === true)
           + callKindBtnHtml((src.id || (review && review.id) || ''), src.call_kind, src.not_a_sales_call === true)
+          + renameProspectBtnHtml((src.id || (review && review.id) || ''), (review && review.analysis ? review.analysis.prospect_name : src.prospect_name))
           + badge
           + fathomLink
         + '</div>'
@@ -18890,13 +18899,51 @@
      not-a-sales-call. The label is the ACTION; the state shows on the row badge. A
      follow-up IS a sales call — the control is hidden only when the call is marked
      not-a-sales-call, because then there is nothing to be a follow-up of. */
+  /* ⚠⚠ PROSPECT RENAME THAT CARRIES EVERYWHERE (H707). The label is the action. A rename
+     that lands on another prospect's name is a MERGE: the server answers 409 naming
+     both, and the person confirms with both names in front of them — never silent. */
+  function renameProspectBtnHtml(callId, currentName) {
+    if (!callId) return '';
+    /* the current name rides on a data attribute — a quoted literal inside onclick would need escaping a scanner cannot follow */
+    return '<button class="btn-fathom-secondary rename-prospect-btn" type="button" id="renameProspectBtn" data-name="' + escapeHtml(currentName || '') + '"'
+      + ' onclick="renameProspect(\'' + escapeHtml(callId) + '\', this.dataset.name)">Rename Prospect</button>';
+  }
+  async function renameProspect(callId, currentName) {
+    var name = await scoutPrompt({ title: 'Rename this prospect', body: 'The new name applies to every call on this prospect. If it is already another prospect\u2019s name, you will be asked to confirm a merge.', value: currentName || '', confirmText: 'Rename' });
+    if (name === null || name === undefined || !String(name).trim()) return;
+    await sendRename(callId, String(name).trim(), false);
+  }
+  async function sendRename(callId, name, confirmMerge) {
+    try {
+      var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/prospect-name', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ name: name, confirm_merge: confirmMerge === true }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      var data = null; try { data = await res.json(); } catch (e) {}
+      if (res.status === 409 && data && data.merge_required) {
+        var m = data.merge_required;
+        var ok = await scoutConfirm({ title: 'This is a merge', body: '\u201c' + (m.from || 'this prospect') + '\u201d would become \u201c' + m.into + '\u201d \u2014 ' + m.calls_moving + ' call' + (m.calls_moving === 1 ? '' : 's') + ' would move onto that prospect' + (m.calls_skipped ? ' (' + m.calls_skipped + ' already renamed differently stay)' : '') + '. Merge them?', confirmText: 'Merge' });
+        if (ok) await sendRename(callId, name, true);
+        return;
+      }
+      if (res.status === 403) { await scoutConfirm({ title: 'Not allowed', body: 'You are not allowed to rename on this call.', confirmText: 'OK' }); return; }
+      if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+      state.callReviewCache = {};
+      state.callLibraryCache = null;
+      await openCallReview(callId);
+    } catch (err) {
+      await scoutConfirm({ title: 'Could not rename', body: String((err && err.message) || err), confirmText: 'OK' });
+    }
+  }
   function callKindBtnHtml(callId, kind, notSales) {
     if (!callId || notSales) return '';
     var isFollow = kind === 'follow_up';
     return '<button class="btn-fathom-secondary call-kind-btn' + (isFollow ? ' is-marked' : '') + '"'
       + ' type="button" id="callKindBtn"'
       + ' onclick="setCallKind(\'' + escapeHtml(callId) + '\', \'' + (isFollow ? 'booked' : 'follow_up') + '\')">'
-      + (isFollow ? '\u21a9 Booked call' : 'Mark as follow-up')
+      + (isFollow ? '\u21a9 Booked Call' : 'Mark as Follow-up')
       + '</button>';
   }
   async function setCallKind(callId, next) {
@@ -18910,7 +18957,7 @@
       });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
       if (res.status === 403) {
-        if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as follow-up' : '\u21a9 Booked call'; }
+        if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as Follow-up' : '\u21a9 Booked Call'; }
         await scoutConfirm({ title: 'Not allowed', body: 'You are not allowed to mark this call.', confirmText: 'OK' });
         return;
       }
@@ -18919,7 +18966,7 @@
       state.callLibraryCache = null;
       await openCallReview(callId);
     } catch (err) {
-      if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as follow-up' : '\u21a9 Booked call'; }
+      if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as Follow-up' : '\u21a9 Booked Call'; }
       await scoutConfirm({ title: 'Could not save', body: String((err && err.message) || err), confirmText: 'OK' });
     }
   }

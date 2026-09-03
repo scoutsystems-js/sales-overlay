@@ -14,7 +14,7 @@
 // THE HUMAN MARK ALWAYS WINS and is never reversed by a re-analysis: the automatic
 // setter writes only where call_kind_marked_by is NULL.
 'use strict';
-var LINKED_PATHS = { invitee_email: 1, title_name: 1, display_name: 1 };
+var LINKED_PATHS = { human: 1, invitee_email: 1, title_name: 1, display_name: 1 };   // H707: a human-named link is a link
 
 /* input: { linkPath, prospectId, callDate, earlierCalls: [{ id, call_date, call_kind }] }
    → { call_kind, call_kind_source, follows_call_id } — pure and total. */

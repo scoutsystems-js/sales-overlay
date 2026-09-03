@@ -25,6 +25,7 @@ const router = express.Router();
 // structure into the EOD label. The EOD view shows it read-only; this route no
 // longer accepts outcome edits. (No eod_edits.outcome rows existed to migrate.)
 const { nameFromTitle } = require('../lib/prospect-name');
+const { renameOnCall } = require('../lib/prospect-rename');   // H707: the EOD name field is the rename
 
 const EDITABLE_FIELDS = ['prospect_name', 'cash_collected', 'summary', 'payment_structure'];
 const VALUE_CAPS = { prospect_name: 200, cash_collected: 20, summary: 3000, payment_structure: 20 };
@@ -164,6 +165,8 @@ router.get('/', requireAuth, async function (req, res) {
 
     var out = calls.map(function (c) {
       var a = anByCall[c.id] || {};
+      /* H707: the prospect name lives on the analysis row now (a rename writes it there); a stale eod_edits row must not overlay it. */
+      if (edByCall[c.id] && edByCall[c.id].prospect_name) delete edByCall[c.id].prospect_name;
       var analysis = {
         prospect_name: prospectNameFor(a, c.title),
         outcome: outcomePrefill(a),
@@ -215,6 +218,14 @@ router.put('/edit', requireAuth, async function (req, res) {
     var own = await admin.from('fathom_calls').select('id').eq('id', callId).eq('user_id', userId).maybeSingle();
     if (own.error) throw new Error('ownership check: ' + own.error.message);
     if (!own.data) return res.status(404).json({ error: 'call not found' });
+    /* ⚠⚠ H707: the EOD's prospect name IS the prospect rename — one path, never a second
+       store that can disagree. A merge comes back 409 naming both until confirmed. */
+    if (field === 'prospect_name') {
+      if (body.value === null || body.value === undefined || !String(body.value).trim()) return res.status(400).json({ error: 'a prospect name cannot be cleared here' });
+      var renamed = await renameOnCall(admin, { userId: userId, actorId: userId, callId: callId, name: String(body.value), confirmMerge: body.confirm_merge === true });
+      if (!renamed.ok) return res.status(renamed.status || 400).json(renamed);
+      return res.json({ ok: true, renamed: renamed });
+    }
 
     if (body.value === null || body.value === undefined) {
       var del = await admin.from('eod_edits').delete()

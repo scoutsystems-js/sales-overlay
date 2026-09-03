@@ -29,6 +29,7 @@ const { retractExcludedCall } = require('../lib/excluded-call-retraction');
 const { VALID_OUTCOMES, TAGGABLE_OUTCOMES, effectiveCloseScore, canTagOutcome,
         canMarkNotSalesCall, markRoleFor } = require('../lib/outcome-tag');
 const { setCallKindHuman, earlierCallsFor } = require('../lib/call-kind');   // H706
+const { renameOnCall } = require('../lib/prospect-rename');   // H707
 const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 
@@ -1015,6 +1016,39 @@ router.get('/prospects/merge-candidates', requireAuth, async function (req, res)
    touches a row with call_kind_marked_by set. A follow-up attributes to the earliest
    earlier call of the same prospect when one is known; otherwise it is a follow-up
    with nowhere to attribute — still a sales call, still counted as work. */
+/* ⚠⚠ PROSPECT RENAME THAT CARRIES EVERYWHERE (Justin's ruling 2026-09-03, H707). The
+   risk is stated in lib/prospect-rename.js. Permission: closers on their own calls,
+   managers and above on their team's — the same gate as the outcome and the
+   not-a-sales-call mark. A rename that lands on an existing prospect's name is a
+   MERGE and comes back 409 naming both until confirm_merge is sent. */
+router.post('/calls/:id/prospect-name', requireAuth, async function (req, res) {
+  var callId = req.params.id;
+  var name = req.body && req.body.name;
+  if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'name required' });
+  try {
+    var admin = getAdminClient();
+    var cq = await admin.from('fathom_calls').select('id, user_id').eq('id', callId).maybeSingle();
+    if (cq.error) throw new Error('call lookup: ' + cq.error.message);
+    if (!cq.data) return res.status(404).json({ error: 'Call not found' });
+    var ownerId = cq.data.user_id;
+    var profs = await admin.from('user_profiles').select('user_id, role, managed_by').in('user_id', [ownerId, req.user.id]);
+    var rows = (profs.data || []);
+    var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0] || { user_id: ownerId, managed_by: null };
+    var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
+    var actor = { id: req.user.id, role: (actorRow && actorRow.role) || req.userProfileRole || 'user' };
+    if (!canMarkNotSalesCall(actor, ownerProfile)) {
+      console.warn('[me] prospect-name denied: actor=%s call=%s owner=%s', req.user.id, callId, ownerId);
+      return res.status(403).json({ error: 'You are not allowed to rename on this call' });
+    }
+    var out = await renameOnCall(admin, { userId: ownerId, actorId: req.user.id, callId: callId, name: name, confirmMerge: req.body.confirm_merge === true });
+    if (!out.ok) return res.status(out.status || 400).json(out);
+    res.json(out);
+  } catch (err) {
+    console.error('[me] prospect-name:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/calls/:id/call-kind', requireAuth, async function (req, res) {
   var callId = req.params.id;
   var kind = req.body && req.body.call_kind;
