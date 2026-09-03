@@ -46,7 +46,7 @@ const { displayCloserResponse, provenCloserResponse } = require('./closer-side')
    than a null the cache layer has to special-case. */
 const EMPTY_FINGERPRINT = crypto.createHash('md5').update('empty').digest('hex');
 
-const OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+const OBJECTION_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 const UNCATEGORIZED = 'uncategorized';
 const ALL_CATEGORIES = OBJECTION_CATEGORIES.concat([UNCATEGORIZED]);
 const FEED_CAP = 200;

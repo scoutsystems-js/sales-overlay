@@ -111,7 +111,7 @@ const VALID_HIGHLIGHT_TYPES = [
 ];
 const VALID_HIGHLIGHT_SPEAKERS = ['CLOSER', 'PROSPECT'];
 // Objection sub-categories (migration 012). Only set on type='objection' rows.
-const VALID_OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+const VALID_OBJECTION_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 // Objection resolution (migration 013). Grounds the coaching synthesis.
 const VALID_RESOLUTIONS = ['handled', 'partial', 'unhandled'];
 // 8a — did the closer engage with a risk_signal/barrier, or move past it?

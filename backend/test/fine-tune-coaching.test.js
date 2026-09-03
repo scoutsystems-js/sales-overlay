@@ -281,11 +281,11 @@ test('⚠⚠ ONE WORDING, THREE COACHING LANES + 7c; the classifier, the grader 
 
 test('⚠⚠ EACH LANE\'S CACHE KEY MOVES WITH THE NOTES, and its version moved with the prompt', () => {
   const ts = laneSrc('team-synthesis.js');
-  assert.ok(/\|\|notes:' \+ corr\.hash/.test(ts) && /RECS_LANE_VERSION = 'v7-/.test(ts), 'recommendations');
+  assert.ok(/\|\|notes:' \+ corr\.hash/.test(ts) && /RECS_LANE_VERSION = 'v([7-9]|\d{2,})-/.test(ts), 'recommendations (v7 added the notes lane; a later bump keeps it — fix #7 moved it to v8, H680)');
   const os = laneSrc('team-objection-summary.js');
   assert.ok(/\|notes:' \+ corr\.hash/.test(os) && /PROMPT_VERSION = 'v1[3-9]-/.test(os), 'objections Why (v13: the payload gained the moment ids)');
   const ps = laneSrc('performance-synthesis.js');
-  assert.ok(/\|\|notes:' \+ corr\.hash/.test(ps) && /SYNTH_RULE_VERSION = 'v4-/.test(ps), 'performance summary');
+  assert.ok(/\|\|notes:' \+ corr\.hash/.test(ps) && /SYNTH_RULE_VERSION = 'v([4-9]|\d{2,})-/.test(ps), 'performance summary (v4 added the notes lane; a later bump keeps it — fix #7 moved it to v5, H680)');
   const nw = laneSrc('team-needs-work.js');
   assert.ok(!/notes:/.test(nw), 'needs-work: no bump, nothing regenerates, nothing changed');
 });

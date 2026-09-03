@@ -245,7 +245,7 @@ function sectionsShape() {
 // existing highlights; the objection_category / resolution / closer_response
 // fields stay empty until a re-analysis populates them (Anthropic-credit gated).
 // Cap-safe: fathom_calls paginated, highlights read in chunks of 100 call ids.
-var OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+var OBJECTION_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 
 async function computeObjectionIntel(admin, userId, from, to) {
   // 1) calls in window → metadata map (recording_url powers the clip link).

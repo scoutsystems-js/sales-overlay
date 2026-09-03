@@ -81,8 +81,13 @@ test('the objection SELECTOR filters on objection_category', () => {
   assert.strictEqual(build({ calls, objections, objectionCategory: 'timing' }).reps[0].handle[0].rate, null, 'none that week');
 });
 
-test('the four categories are the selector vocabulary — no invented labels', () => {
-  assert.deepStrictEqual(S.OBJECTION_CATEGORIES, ['fear', 'timing', 'logistical', 'partner']);
+test('CONVERTED 2026-09-02 (H680): the selector vocabulary IS the ruled set, in its stored order — the module, not a copy', () => {
+  /* This used to pin the file's own literal, in the order it happened to be typed —
+     one of five hand copies sweep block 6 found (③-3). The set now comes from
+     lib/objection-categories.js; pin the identity, not a second literal. */
+  const cats = require('../lib/objection-categories');
+  assert.strictEqual(S.OBJECTION_CATEGORIES, cats.STORED_OBJECTION_CATEGORIES, 'the same array object');
+  assert.deepStrictEqual(S.OBJECTION_CATEGORIES, ['fear', 'timing', 'partner', 'logistical']);
 });
 
 // ─── closing rate ──────────────────────────────────────────────────────────

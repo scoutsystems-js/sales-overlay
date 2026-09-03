@@ -29,7 +29,7 @@ const { provenCloserResponse } = require('./closer-side');
    lane and not another. */
 const TONE = require('./coaching-tone.js');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
-const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+const OBJ_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 const MAX_CANDIDATES = 20;
 const MAX_ONE_THINGS = 20;
 
@@ -74,7 +74,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v7-2026-09-02-never-diminish-manager-notes';   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS

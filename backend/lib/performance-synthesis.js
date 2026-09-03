@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 /* Bumped ONLY for a correctness defect in what the cache already holds —
    never for a speculative improvement. See the key comment below. */
-const SYNTH_RULE_VERSION = 'v4-2026-09-02-never-diminish-manager-notes';   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
+const SYNTH_RULE_VERSION = 'v5-2026-09-02-category-order-canonical';   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 
@@ -26,7 +26,7 @@ const { displayCloserResponse } = require('./closer-side');
    lane and not another. */
 const TONE = require('./coaching-tone.js');
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
-const OBJ_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+const OBJ_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 const SYNTH_MAX_TOKENS = 2600;
 const MAX_CANDIDATES = 16;   // evidence moments handed to the model
 const MAX_ONE_THINGS = 15;   // one_thing notes summarized as a theme

@@ -16,7 +16,7 @@ const { CLAUDE_MODEL } = require('../config');
 
 const { clipHref } = require('./clip-link');
 const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
-const OBJECTION_CATEGORIES = ['fear', 'logistical', 'timing', 'partner'];
+const OBJECTION_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 const SYNTH_MAX_TOKENS = 2500;
 
 var _anthropic = null;

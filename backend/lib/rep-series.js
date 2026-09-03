@@ -45,7 +45,7 @@ const { prospectOutcome, hadAConversation } = require('./prospect-entity');
 const { isHandled } = require('./objection-handled');
 
 // The selector vocabulary. Scout's own labels — see the ruling above.
-const OBJECTION_CATEGORIES = ['fear', 'timing', 'logistical', 'partner'];
+const OBJECTION_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 
 function pct(n, d) { return d > 0 ? Math.round((n / d) * 100) : null; }
 

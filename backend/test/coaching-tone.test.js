@@ -44,8 +44,14 @@ test('⚠⚠ each bumped version is IN ITS CACHE KEY — a prompt edit alone shi
     const code = src.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
     assert.ok(new RegExp(keyMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(code),
       file + ': ' + ver + ' is not folded into the cache key');
-    assert.ok(/never-diminish/.test(code),
-      file + ': the version was not bumped, so cached text keeps the old wording');
+    /* CONVERTED 2026-09-02 (H680): this pinned the tone bump's own version string
+       (`never-diminish`), so the next legitimate bump — fix #7 moved two lanes to
+       v5/v8 for a category-order change — broke it. The property is that the lane's
+       version is dated ON OR AFTER the day the tone rule landed; a later bump keeps
+       the rule and moves the date forward. Never pin a version literal (H511). */
+    const vm = new RegExp(ver + "\\s*=\\s*'v(\\d+)-(\\d{4}-\\d{2}-\\d{2})").exec(code);
+    assert.ok(vm, file + ': ' + ver + ' must be a dated literal vN-YYYY-MM-DD-…');
+    assert.ok(vm[2] >= '2026-09-01', file + ': ' + ver + ' is dated ' + vm[2] + ' — before the tone rule landed (2026-09-01), so cached text keeps the old wording');
   });
 });
 
