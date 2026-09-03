@@ -2360,6 +2360,8 @@ module.exports = {
   _sanitizeHighlights:         sanitizeHighlights,
   _violatesProspectAnchor:     violatesProspectAnchor,
   _VALID_HIGHLIGHT_TYPES:      VALID_HIGHLIGHT_TYPES,
+  // ⚠ mirrored on the review page as HANDLING_TYPES (③-5) — test/duplicated-constants.test.js
+  _PROSPECT_POSITION_TYPES:    PROSPECT_POSITION_TYPES,
   _persistHighlights:          persistHighlights,
   _coachCallMoments:           coachCallMoments,
   _findMeeting:                findMeeting,

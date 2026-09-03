@@ -1,4 +1,5 @@
 const express = require('express');
+const { CHUNK } = require('../lib/chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const { normalizeName } = require('../lib/display-name');
 const Anthropic = require('@anthropic-ai/sdk');
 const createWithUsage = require('../lib/model-usage').usageFor('me-extract');
@@ -1194,8 +1195,8 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
      against a fake wire that refuses more than 395 ids. */
   var anRows = [], hlRows = [];
   var anChunks = [], hlChunks = [];
-  for (var ci = 0; ci < callIds.length; ci += 100) {
-    var slice = callIds.slice(ci, ci + 100);
+  for (var ci = 0; ci < callIds.length; ci += CHUNK) {
+    var slice = callIds.slice(ci, ci + CHUNK);
     anChunks.push(admin.from('call_analyses').select(cols).in('fathom_call_id', slice).eq('status', 'done'));
     hlChunks.push(admin.from('call_highlights')
       .select('id, fathom_call_id, section, type, resolution, speaker, quote, observation, timestamp_seconds, speaker_verified, closer_response, closer_response_verified, coaching')
@@ -1245,7 +1246,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
     if (prevIds.length) {
       /* chunked for the same reason as above — the previous window can be as long as this one */
       var paChunks = [];
-      for (var pi = 0; pi < prevIds.length; pi += 100) paChunks.push(admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds.slice(pi, pi + 100)).eq('status', 'done'));
+      for (var pi = 0; pi < prevIds.length; pi += CHUNK) paChunks.push(admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds.slice(pi, pi + CHUNK)).eq('status', 'done'));
       var paRes = await Promise.all(paChunks);
       var paRows = []; paRes.forEach(function (x) { paRows = paRows.concat(x.data || []); });
       var pv = paRows.map(function (a) { return sectionScoreOf(a, section); }).filter(function (v) { return typeof v === 'number'; });
@@ -1378,8 +1379,8 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
   var cols = 'fathom_call_id, prospect_name, what_mattered, intro_score, discovery_score, pitch_score, '
     + 'objection_score, close_score_earned, intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes';
   var analyses = [], highlights = [];
-  for (var i = 0; i < callIds.length; i += 100) {
-    var slice = callIds.slice(i, i + 100);
+  for (var i = 0; i < callIds.length; i += CHUNK) {
+    var slice = callIds.slice(i, i + CHUNK);
     var an = await admin.from('call_analyses').select(cols).in('fathom_call_id', slice).eq('status', 'done');
     if (an.error) throw new Error('call_analyses: ' + an.error.message);
     analyses = analyses.concat(an.data || []);

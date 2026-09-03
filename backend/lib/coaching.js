@@ -23,7 +23,11 @@ var COACHING_MAX_TOKENS   = 2000;
 /* Coach only the moments a surface actually renders. The What Needs Work panel
    shows the `bad` group, which is where all four approved samples came from.
    Coaching moments nobody renders is spend with no consumer. */
-var COACHABLE_TYPES = ['objection', 'risk_signal', 'barrier', 'missed_opportunity', 'disqualify_signal'];
+/* ⚠ ONE SOURCE (③-5, 2026-09-02): the coachable set IS the evidence rule's negative set —
+   "moments where something went wrong". Typed twice they agreed, in different orders, and
+   nothing pinned them; a type coached on but refused as evidence would drift by omission.
+   Order is prompt text over there and irrelevant here (indexOf). Pinned by identity. */
+var COACHABLE_TYPES = require('./evidence-rule').NEGATIVE_TYPES;
 
 /* ⚠ `coachingOpening` REMOVED 2026-08-30. It assembled "At HH:MM:SS the prospect
    said …" and prepended it, which made the card show the quote twice; the panel

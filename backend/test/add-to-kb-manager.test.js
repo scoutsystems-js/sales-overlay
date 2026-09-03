@@ -112,7 +112,13 @@ test('⚠⚠ the note reaches the rep and is NOT attributed', () => {
   assert.strictEqual(out.length, 1);
   assert.strictEqual(out[0].note, 'isolate first');
 
-  assert.ok(/class="sec-note"/.test(LIVE), 'the note must render');
+  /* ⚠ ITS OWN CLASS (④b-1, 2026-09-02). `.sec-note` is the section page's italic caveat;
+     the manager's note once shared the name and the browser merged the two designs. The
+     assertion is scoped to the note's render, not the whole page, so the caveat's class
+     cannot satisfy it. */
+  const noteAt = LIVE.indexOf('var noteHtml');
+  assert.ok(noteAt !== -1, 'the note render must exist');
+  assert.ok(/class="sec-moment-note"/.test(LIVE.slice(noteAt, noteAt + 400)), 'the note must render with its OWN class');
   assert.ok(!/your manager|added by|marked by/i.test(
     LIVE.slice(LIVE.indexOf('var noteHtml'), LIVE.indexOf('var noteHtml') + 400)),
     'it must not name who marked it');

@@ -1,4 +1,5 @@
 const express = require('express');
+const { CHUNK } = require('../lib/chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth } = require('../middleware/auth');
 const { outdatedCallIds } = require('../lib/grading-backlog');
@@ -909,8 +910,8 @@ async function runUpdateAnalyses(req, res, userId) {
         .eq('user_id', userId).eq('sync_status', 'error')
         .not('not_a_sales_call', 'is', true).is('duplicate_of', null);
       var failedRows = fq.error ? [] : (fq.data || []);
-      for (var fi = 0; fi < failedRows.length; fi += 100) {
-        var slice = failedRows.slice(fi, fi + 100);
+      for (var fi = 0; fi < failedRows.length; fi += CHUNK) {
+        var slice = failedRows.slice(fi, fi + CHUNK);
         var fa = await admin.from('call_analyses').select('fathom_call_id, overall_summary')
           .in('fathom_call_id', slice.map(function (x) { return x.id; })).eq('status', 'error');
         var reasonBy = {};
@@ -927,8 +928,8 @@ async function runUpdateAnalyses(req, res, userId) {
     // call dates for the union and let orderBatchIds do the rest.
     var dateById = {};
     var allIds = pendingIds2.concat(failedIds).concat(outdatedIds);
-    for (var ci = 0; ci < allIds.length; ci += 100) {
-      var dq = await admin.from('fathom_calls').select('id, call_date').in('id', allIds.slice(ci, ci + 100));
+    for (var ci = 0; ci < allIds.length; ci += CHUNK) {
+      var dq = await admin.from('fathom_calls').select('id, call_date').in('id', allIds.slice(ci, ci + CHUNK));
       if (dq.error) { console.error('[fathom] update-analyses date lookup failed (order degrades to analyzed_at): ' + dq.error.message); break; }
       (dq.data || []).forEach(function (r) { dateById[r.id] = r.call_date || ''; });
     }
@@ -982,10 +983,10 @@ async function runUpdateAnalyses(req, res, userId) {
     var heldIds = [];
     if (ids.length > 0) {
       var claimCutoff = new Date(Date.now() - worker._CLAIM_STALE_MS).toISOString();
-      for (var hi = 0; hi < ids.length; hi += 100) {
+      for (var hi = 0; hi < ids.length; hi += CHUNK) {
         var held = await admin.from('call_analyses')
           .select('fathom_call_id')
-          .in('fathom_call_id', ids.slice(hi, hi + 100))
+          .in('fathom_call_id', ids.slice(hi, hi + CHUNK))
           .eq('status', 'processing')
           .gt('analyzed_at', claimCutoff);
         if (held.error) {
@@ -1498,11 +1499,11 @@ async function loadCallsList(admin, userId, opts) {
   // Enrich with analyses (chunked .in — cap-safe).
   var ids = calls.map(function(c) { return c.id; });
   var analysisByCallId = {};
-  for (var c = 0; c < ids.length; c += 100) {
+  for (var c = 0; c < ids.length; c += CHUNK) {
     var ar = await admin
       .from('call_analyses')
       .select('fathom_call_id, status, overall_score, overall_summary, outcome, outcome_source, prospect_name')
-      .in('fathom_call_id', ids.slice(c, c + 100));
+      .in('fathom_call_id', ids.slice(c, c + CHUNK));
     if (!ar.error) (ar.data || []).forEach(function(a) { analysisByCallId[a.fathom_call_id] = a; });
   }
   var enriched = calls.map(function(cc) {
@@ -1573,8 +1574,8 @@ async function windowOutcomeCounts(admin, userId, opts) {
                           a number that never reaches zero, and a number that
                           never reaches zero stops being read. */
   var failedRetryable = 0, failedPermanent = 0;
-  for (var i = 0; i < ids.length; i += 100) {
-    var chunk = ids.slice(i, i + 100);
+  for (var i = 0; i < ids.length; i += CHUNK) {
+    var chunk = ids.slice(i, i + CHUNK);
     var ar = await admin.from('call_analyses').select('fathom_call_id, outcome')
       .in('fathom_call_id', chunk).eq('status', 'done');
     if (ar.error) return { closed: null, not_closed: null, ungraded: null, total: ids.length };

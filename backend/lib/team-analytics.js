@@ -4,6 +4,7 @@
 // supabase-js 1000-row cap, same as session-analytics.js.
 
 var { resolveDisplayName, disambiguateNames } = require('./display-name');
+const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 
 var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
@@ -69,12 +70,12 @@ async function aggregateWindow(admin, repIds, from, to) {
      first, then highlights. Same rows, same order, same answer
      (test/lane-parallel.test.js deep-equals the sequential result). */
   var aChunks = [], hChunks = [];
-  for (var c0 = 0; c0 < callIds.length; c0 += 100) {
+  for (var c0 = 0; c0 < callIds.length; c0 += CHUNK) {
     aChunks.push(admin.from('call_analyses')
       .select('fathom_call_id, analyzed_at, overall_score, outcome, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned, price_stated_at_seconds')
-      .in('fathom_call_id', callIds.slice(c0, c0 + 100)).eq('status', 'done'));
+      .in('fathom_call_id', callIds.slice(c0, c0 + CHUNK)).eq('status', 'done'));
     hChunks.push(admin.from('call_highlights').select('fathom_call_id, resolution, objection_category, objection_class')   /* ⚠ objection_class MUST be selected: countsAsObjection reads it, and an unselected column is undefined on the wire — every row counted (④a-1, H671). Pinned by test/objection-counting-carrier.test.js. */
-      .in('fathom_call_id', callIds.slice(c0, c0 + 100)).eq('type', 'objection'));
+      .in('fathom_call_id', callIds.slice(c0, c0 + CHUNK)).eq('type', 'objection'));
   }
   var both = await Promise.all([Promise.all(aChunks), Promise.all(hChunks)]);
   both[0].forEach(function (aq) {
@@ -426,9 +427,9 @@ async function computeTeamTrends(admin, repIds, bucket, from, to) {
   if (callIds.length === 0) return { bucket: bucket, buckets: [] };
 
   var buckets = {}; // key(ms) -> {calls, score_sum, score_n, wins, decided}
-  for (var i = 0; i < callIds.length; i += 100) {
+  for (var i = 0; i < callIds.length; i += CHUNK) {
     var aq = await admin.from('call_analyses').select('fathom_call_id, overall_score, outcome')
-      .in('fathom_call_id', callIds.slice(i, i + 100)).eq('status', 'done');
+      .in('fathom_call_id', callIds.slice(i, i + CHUNK)).eq('status', 'done');
     if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
     (aq.data || []).forEach(function (a) {
       var d = dateOf[a.fathom_call_id]; if (!d) return;

@@ -26,6 +26,7 @@
  * within a minute. It can be a few seconds EARLY; it can never claim work is
  * finished while `waiting` is non-zero, which is the property the card depends on.
  */
+const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 
 // Calls graded under an older prompt version — the "outdated" half of `work`.
 // ⚠ MOVED HERE FROM routes/fathom.js: it answers a backlog question, not a
@@ -75,9 +76,9 @@ async function outdatedCallIds(admin, userId, currentVersion) {
        by the mark/un-mark itself. Different path, different purpose. */
     var markedOut = {};
     var ids0 = rows.map(function (r) { return r.fathom_call_id; }).filter(Boolean);
-    for (var mi = 0; mi < ids0.length; mi += 100) {
+    for (var mi = 0; mi < ids0.length; mi += CHUNK) {
       var mq = await admin.from('fathom_calls').select('id')
-        .in('id', ids0.slice(mi, mi + 100))
+        .in('id', ids0.slice(mi, mi + CHUNK))
         .eq('not_a_sales_call', true);
       (mq.data || []).forEach(function (c) { markedOut[c.id] = true; });
     }

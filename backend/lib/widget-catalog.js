@@ -257,6 +257,12 @@ const CATALOG = [
    exactly how a shared-carrier failure hides. One definition, both consumers. */
 var METRIC_BAND = require('./metric-band.js');
 
+/* ⚠ ONE ARRAY, TWO KEYS (③-7, 2026-09-02). `by_rep` and `bar_rep` were typed twice under a
+   comment claiming they were identical by construction; they were identical by coincidence.
+   The bars draw the same ranking the list reads, so the offer is the same object. */
+const RANKED_REP_VIEWS = ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
+                          'avg_call_time', 'time_to_price'];
+
 const RENDERABLE = {
   /* ⚠⚠ BOTH MINUTE METRICS REACH THE NUMBER CARD, AND ONLY ONE REACHES THE
      RANKED VIEWS. A number states a value and implies NO ORDERING, so it is
@@ -289,14 +295,12 @@ const RENDERABLE = {
      ranking by distance from the band is now well defined — and each row states
      WHICH SIDE, because a rep pricing at 15 minutes and one pricing at 60 are
      both outside and need opposite coaching. */
-  by_rep:    ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
-              'avg_call_time', 'time_to_price'],
+  by_rep:    RANKED_REP_VIEWS,
   breakdown: ['objection_handle_rate'],
   /* ⚠ THE BARS DRAW THE SAME DATA THE LIST VIEWS ALREADY READ, so their
-     renderable sets are identical by construction rather than by coincidence —
-     a test asserts that, so a metric cannot gain one and not the other. */
-  bar_rep:   ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
-              'avg_call_time', 'time_to_price'],
+     renderable set is the SAME ARRAY — identical by construction now, not by a
+     comment (③-7); a test asserts the identity. */
+  bar_rep:   RANKED_REP_VIEWS,
   bar_cat:   ['objection_handle_rate'],
   rep_card:  ['rep_card'],
 };

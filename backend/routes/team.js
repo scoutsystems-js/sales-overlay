@@ -8,6 +8,7 @@
 // owner with reps defaults to their own team.
 
 const { isDisqualified } = require('./../lib/dq-exclusion');
+const { CHUNK } = require('../lib/chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const { strictObjections } = require('./../lib/objection-strict');
 const { closeRateForCalls } = require('./../lib/prospect-entity');
 const express = require('express');
@@ -547,8 +548,8 @@ router.get('/averages', teamGate, async function (req, res) {
 
     var ids = calls.map(function (c) { return c.id; });
     var analyses = [], objections = [];
-    for (var i = 0; i < ids.length; i += 100) {
-      var slice = ids.slice(i, i + 100);
+    for (var i = 0; i < ids.length; i += CHUNK) {
+      var slice = ids.slice(i, i + CHUNK);
       var aq = await admin.from('call_analyses').select('fathom_call_id, outcome')
         .in('fathom_call_id', slice).eq('status', 'done');
       if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
@@ -736,8 +737,8 @@ router.get('/rep-series', teamGate, async function (req, res) {
 
     var ids = calls.map(function (c) { return c.id; });
     var analyses = [], objections = [];
-    for (var i = 0; i < ids.length; i += 100) {
-      var slice = ids.slice(i, i + 100);
+    for (var i = 0; i < ids.length; i += CHUNK) {
+      var slice = ids.slice(i, i + CHUNK);
       // price_stated_at_seconds drives the third graph (item j). Selecting it
       // here is the same class of omission that made the Part-1b section tags
       // invisible — the component was fine, the SELECT did not fetch the column.

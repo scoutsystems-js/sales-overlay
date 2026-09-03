@@ -212,6 +212,7 @@ module.exports = {
 // Sub-stage 0's day-snapping already coarsens the timestamps, so two views on
 // the same day share a key.
 const crypto = require('crypto');
+const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const { cacheGet, cachePut } = require('./team-synthesis');
 const { realCallsOnly } = require('./real-calls');
 
@@ -241,9 +242,9 @@ async function computeWhyProse(admin, rep, from, to, ask) {
   calls = realCallsOnly(calls);
   var ids = calls.map(function (c) { return c.id; });
   var rows = [];
-  for (var i = 0; i < ids.length; i += 100) {
+  for (var i = 0; i < ids.length; i += CHUNK) {
     var aq = await admin.from('call_analyses').select('fathom_call_id, analyzed_at, what_mattered')
-      .in('fathom_call_id', ids.slice(i, i + 100)).eq('status', 'done');
+      .in('fathom_call_id', ids.slice(i, i + CHUNK)).eq('status', 'done');
     if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
     rows = rows.concat(aq.data || []);
   }

@@ -27,6 +27,7 @@
 // happily accepts and that only throws when the line runs. Exactly the defect
 // that killed add-user.
 const { ratedCallsOnly } = require('./dq-exclusion');
+const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 var { realCallsOnly } = require('./real-calls');
 
 // Normalized grouping key. Two calls resolving to the same key attach to the
@@ -251,10 +252,10 @@ async function fetchProspectCloseRates(admin, userIds, fromIso, toIso) {
        at 100; this one did not. */
     var outcomeBy = {};
     var allIds = Object.keys(byId);
-    for (var oi = 0; oi < allIds.length; oi += 100) {
+    for (var oi = 0; oi < allIds.length; oi += CHUNK) {
       var an = await admin.from('call_analyses')
         .select('fathom_call_id, outcome')
-        .in('fathom_call_id', allIds.slice(oi, oi + 100))
+        .in('fathom_call_id', allIds.slice(oi, oi + CHUNK))
         .eq('status', 'done');
       /* ⚠ LOUD, NOT SILENT. Returning {} on error is still the safe answer — a
          wrong close rate is worse than none — but it must say so, or the next

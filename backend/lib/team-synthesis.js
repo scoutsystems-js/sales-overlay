@@ -11,6 +11,7 @@
 //     quote + clip + why.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const createWithUsage = require('./model-usage').usageFor('team-synthesis');
 const { displayNameFromEmail } = require('./display-name');
 const { isHandled } = require('./objection-handled');
@@ -216,8 +217,8 @@ async function loadTeamWindow(admin, repIds, from, to) {
   calls.forEach(function (c) { meta[c.id] = c; callIds.push(c.id); });
   async function inChunks(table, cols, refine) {
     var out = [];
-    for (var i = 0; i < callIds.length; i += 100) {
-      var qb = admin.from(table).select(cols).in('fathom_call_id', callIds.slice(i, i + 100));
+    for (var i = 0; i < callIds.length; i += CHUNK) {
+      var qb = admin.from(table).select(cols).in('fathom_call_id', callIds.slice(i, i + CHUNK));
       if (refine) qb = refine(qb);
       var r = await qb; if (r.error) throw new Error(table + ': ' + r.error.message);
       out = out.concat(r.data || []);

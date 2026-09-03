@@ -531,7 +531,10 @@ async function computeTeamNeedsWork(admin, keyId, repIds, from, to, emailMap, na
   return Object.assign({ available: true, cached: false }, result);
 }
 
-var BUCKET_CLASSES = ['true_objection', 'logistical_barrier', 'disqualification'];
+/* ⚠ ONE SOURCE (③-4, 2026-09-02): the v37 classes are typed once, in objection-strict.js.
+   needs-work sets a RATE from these and is deliberately note-free — a class added there
+   and not here would move that rate silently. Pinned by identity in test/duplicated-constants.test.js. */
+var BUCKET_CLASSES = require('./objection-strict').OBJECTION_CLASSES;
 // Claude bucketing of the DISTINCT surfaces only (no numbers). It (a) groups
 // COARSELY — collapses synonyms into one bucket — and (b) CLASSIFIES each bucket.
 // Returns {ok:true, mapping, bucketClass} | {ok:false, empty:true} | {ok:false, reason}.

@@ -19,6 +19,7 @@
 'use strict';
 
 const { isDisqualified } = require('./dq-exclusion');
+const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const { clipHref } = require('./clip-link');
 const { realCallsOnly } = require('./real-calls');
 // ⚠ isCredited is IMPORTED, never re-expressed. objection-handled.js exists
@@ -108,8 +109,8 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
   // ⚠ `is not true`, never `= false`: a `= false` predicate drops every
   // never-assessed row, which is almost the entire corpus.
   var calls = [], PAGE = 1000;
-  for (var i = 0; i < memberIds.length; i += 50) {
-    var slice = memberIds.slice(i, i + 50);
+  for (var i = 0; i < memberIds.length; i += CHUNK) {
+    var slice = memberIds.slice(i, i + CHUNK);
     var start = 0;
     for (;;) {
       var cq = await admin.from('fathom_calls')
@@ -145,8 +146,8 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
        hit. Concatenated in chunk order, so the answer is unchanged
        (test/lane-parallel.test.js deep-equals the sequential result). */
     var qs = [];
-    for (var j = 0; j < callIds.length; j += 100) {
-      var qb = admin.from(table).select(cols).in('fathom_call_id', callIds.slice(j, j + 100));
+    for (var j = 0; j < callIds.length; j += CHUNK) {
+      var qb = admin.from(table).select(cols).in('fathom_call_id', callIds.slice(j, j + CHUNK));
       if (refine) qb = refine(qb);
       qs.push(qb);
     }

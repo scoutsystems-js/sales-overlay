@@ -9,6 +9,7 @@ var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'clos
 // Reuse the TEAM view's prior-window machinery for the Avg-score tile trend, so
 // "prior period" means the exact same thing everywhere (no second implementation).
 const { isDisqualified } = require('./dq-exclusion');
+const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 var teamAnalytics = require('./team-analytics');
 const { isCredited } = require('./objection-handled');
 const { countsAsObjection } = require('./objection-strict');   // the ONE definition — see test/objection-counting-carrier.test.js
@@ -91,8 +92,8 @@ async function computeCallAnalytics(admin, userId, from, to) {
   // IN list or fetching the user's entire all-time history.
   async function fetchByCallIds(table, columns, refine) {
     var qs = [];
-    for (var c = 0; c < callIds.length; c += 100) {
-      var qb = admin.from(table).select(columns).in('fathom_call_id', callIds.slice(c, c + 100));
+    for (var c = 0; c < callIds.length; c += CHUNK) {
+      var qb = admin.from(table).select(columns).in('fathom_call_id', callIds.slice(c, c + CHUNK));
       if (refine) qb = refine(qb);
       qs.push(qb);
     }
@@ -288,11 +289,11 @@ async function computeObjectionIntel(admin, userId, from, to) {
 
   // 2) objection highlights for those calls (chunked, cap-safe).
   var rows = [];
-  for (var c = 0; c < callIds.length; c += 100) {
+  for (var c = 0; c < callIds.length; c += CHUNK) {
     var hr = await admin
       .from('call_highlights')
       .select('fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, objection_class, resolution, closer_response, closer_response_verified')
-      .in('fathom_call_id', callIds.slice(c, c + 100))
+      .in('fathom_call_id', callIds.slice(c, c + CHUNK))
       .eq('type', 'objection');
     if (hr.error) throw new Error('call_highlights: ' + hr.error.message);
     rows = rows.concat(hr.data || []);
@@ -303,9 +304,9 @@ async function computeObjectionIntel(admin, userId, from, to) {
   // win/loss split lives in computeCallAnalytics, a different function — so this
   // is one chunked select, matching the pattern directly above.
   var outcomeByCall = {};
-  for (var oc = 0; oc < callIds.length; oc += 100) {
+  for (var oc = 0; oc < callIds.length; oc += CHUNK) {
     var orq = await admin.from('call_analyses').select('fathom_call_id, outcome')
-      .in('fathom_call_id', callIds.slice(oc, oc + 100)).eq('status', 'done');
+      .in('fathom_call_id', callIds.slice(oc, oc + CHUNK)).eq('status', 'done');
     if (orq.error) throw new Error('call_analyses: ' + orq.error.message);
     (orq.data || []).forEach(function (a) { outcomeByCall[a.fathom_call_id] = a.outcome || null; });
   }

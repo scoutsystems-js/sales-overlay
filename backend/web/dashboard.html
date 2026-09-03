@@ -1055,8 +1055,10 @@
       border-radius: var(--radius-sm);
       border-bottom: 0;               /* the underline was a horizontal-nav idiom */
       color: var(--text);
-      line-height: 1.3;
     }
+    /* ⚠ line-height is NOT in the group above (④b cleanup): `.nav-soon` restates
+       its own 1.25 further down, so the group's value was dead for it. */
+    .sidebar .nav-link { line-height: 1.3; }
     .sidebar .nav-link:hover { background: rgba(var(--accent-rgb), 0.10); }
     .sidebar .nav-link.nav-active {
       background: rgba(var(--accent-rgb), 0.14);
@@ -1144,7 +1146,7 @@
     .acct-signout:focus-visible { outline: 2px solid var(--bad); outline-offset: 3px; }
 
     /* ── Page layout ────────────────────────────────────────────────── */
-    .page { max-width: 1200px; margin: 0 auto; padding: 36px 32px 100px; }
+    .page { margin: 0 auto; padding: 36px 32px 100px; }   /* max-width lives ONLY in the rule below (var(--page-w)); the 1200px here was dead (④b cleanup) */
     /* ⚠⚠ AFTER THE RULE IT OVERRIDES, NOT BEFORE. A first version sat above and
        did nothing: `.page`'s `margin: 0 auto` SHORTHAND resets margin-left, and
        CSS is last-wins — so the content rendered UNDER the fixed sidebar while
@@ -1313,7 +1315,12 @@
     .srk-reply-label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 2px; }
     .srk-obs { font-size: 12.5px; color: var(--text); opacity: 0.85; margin-top: 4px; }
     .srk-coach { margin-top:10px; padding:10px 12px; border-left:2px solid var(--accent); background:rgba(var(--accent-rgb),0.06); border-radius:0 6px 6px 0; line-height:1.55; }
-    .sec-note { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin-bottom: 7px; }
+    /* ⚠⚠ RENAMED FROM `.sec-note` (2026-09-02, ④b-1). This is the MANAGER'S NOTE on a
+       proven closer moment (sectionLibraryHtml), built like `.srk-reply` above. A
+       `.sec-note` — the section page's own italic caveat — already existed 3,400
+       lines down, and the browser merged the two into a design neither author
+       wrote: 12px italic WITH a border. One class per design; do not reuse the name. */
+    .sec-moment-note { font-size: 13px; color: var(--text); border-left: 2px solid var(--accent); padding-left: 9px; margin-bottom: 7px; }
     .acct-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
     .members-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); padding: 8px 10px; border-bottom: 1px solid var(--border); }
     .members-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -2933,7 +2940,7 @@
     .synth-block h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text); }
     .synth-block .body { font-size: 13px; color: var(--text); }
     .obj-group-header { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); margin: 24px 0 10px; font-weight: 700; }
-    .obj-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .obj-card-head { display: flex; align-items: center; flex-wrap: wrap; }   /* gap is set ONCE, at the 14px rule below; the 8px here was dead (④b cleanup) */
     .obj-surface { font-weight: var(--fw-emphasis); font-size: var(--fs-body); }
     .obj-callmeta { margin-left: auto; font-size: 12px; color: var(--text); }
     .obj-quote { font-size: 14px; margin: 8px 0 4px; }
@@ -4072,8 +4079,11 @@
     .dash-board-select { min-width: 150px; }
     .dash-pin-badge, .dash-default-badge {
       font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--text); opacity: 0.65; font-weight: var(--fw-normal);
+      font-weight: var(--fw-normal);
     }
+    /* ⚠ colour and opacity are PER BADGE, not in the group (④b cleanup): the group's
+       values were dead for the pin badge, which always restated both. */
+    .dash-default-badge { color: var(--text); opacity: 0.65; }
     .dash-pin-badge { color: var(--accent); opacity: 0.9; }
     /* ⚠ A GAP, NOT A LINE. The row already carries four buttons; a rule between
        them would read as another element. This just holds delete apart. */
@@ -4749,6 +4759,9 @@
     .sec-more { display: block; width: 100%; margin-top: 4px; padding: 9px; font-size: 13px; font-family: inherit;
                 background: none; border: 1px dashed var(--border-strong); color: var(--text); border-radius: 8px; cursor: pointer; }
     .sec-more:hover { color: var(--accent); border-color: var(--accent); }
+    /* ⚠ The section page's CAVEAT note — the histogram's Close caveat and the
+       "Not shown:" line. The manager's note on a closer moment is `.sec-moment-note`
+       (④b-1, 2026-09-02): the two once shared this name and rendered as a merge. */
     .sec-note { font-size: 12px; color: var(--text); margin-bottom: 18px; font-style: italic; }
     /* ⚠ TWO TREATMENTS WERE BUILT AND COMPARED ON SCREEN before this shipped.
        Filling EVERY container shielded correctly but stacked three boxes before
@@ -5068,13 +5081,16 @@
       background: var(--bg3);
       border: 1px solid var(--border);
       color: var(--text);
-      font-family: inherit;
       font-size: 13px;
-      padding: 10px 12px;
       border-radius: 8px;
       outline: none;
       box-sizing: border-box;
     }
+    /* ⚠ font-family and padding are stated where they WIN (④b cleanup): the textarea
+       is monospace and the file input is shorter, both below, so the group's values
+       were dead for those two. */
+    .kb-tab-panel input[type="text"], .kb-tab-panel input[type="url"], .kb-tab-panel input[type="file"] { font-family: inherit; }
+    .kb-tab-panel input[type="text"], .kb-tab-panel input[type="url"], .kb-tab-panel textarea { padding: 10px 12px; }
     .kb-tab-panel input:focus,
     .kb-tab-panel textarea:focus { border-color: var(--green); }
     .kb-tab-panel textarea { resize: vertical; min-height: 140px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -16755,7 +16771,7 @@
          turns coaching into a directive, and a rep argues with a directive
          instead of trying it. So the reasoning appears; the author does not. */
       var noteHtml = m.note
-        ? '<div class="sec-note">' + escapeHtml(m.note) + '</div>' : '';
+        ? '<div class="sec-moment-note">' + escapeHtml(m.note) + '</div>' : '';
       return '<div class="sec-moment sec-moment-closer">'
         + '<div class="sec-moment-top">' + clip + '<span class="sec-when">' + escapeHtml(when) + '</span></div>'
         + noteHtml
@@ -18801,7 +18817,7 @@
   // else, so it went with the button — both call sites now pass two arguments.
   // The three types a closer response bears on. One definition, so the row and
   // any future consumer cannot disagree about which moments earn a badge.
-  var HANDLING_TYPES = ['risk_signal', 'barrier', 'objection'];
+  var HANDLING_TYPES = ['risk_signal', 'barrier', 'objection'];   // ⚠ MIRROR of the worker's PROSPECT_POSITION_TYPES — pinned as a set by test/duplicated-constants.test.js (③-5)
 
   /**
    * ADD TO KNOWLEDGE BASE — MANAGERS AND ABOVE (2026-08-29).

@@ -1,4 +1,5 @@
 const express = require('express');
+const { CHUNK } = require('../lib/chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const kbCounter = require('../lib/kb-counter');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
@@ -681,10 +682,10 @@ router.get('/counter', protect, async function(req, res) {
     if (rows.length) {
       var dayIds = rows.map(function (r) { return r.fathom_call_id; }).filter(Boolean);
       var keep = {};
-      for (var ki = 0; ki < dayIds.length; ki += 100) {
+      for (var ki = 0; ki < dayIds.length; ki += CHUNK) {
         var kq = await admin.from('fathom_calls')
           .select('id')
-          .in('id', dayIds.slice(ki, ki + 100))
+          .in('id', dayIds.slice(ki, ki + CHUNK))
           .not('not_a_sales_call', 'is', true)
           .is('duplicate_of', null);
         if (kq.error) throw new Error('fathom_calls: ' + kq.error.message);
