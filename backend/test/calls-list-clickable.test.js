@@ -82,6 +82,17 @@ test('⚠⚠ RENDERED + CLICKED: the row opens the call; the NAME renames withou
   assert.strictEqual(r.nameText, 'Anthony Davis');
 });
 
+test('⚠ never the same name twice on a row: when the title IS the prospect name, the title is the rename control; with no name, the meta says Unknown prospect', () => {
+  const { callLibraryCardHtml } = build();
+  const named = callLibraryCardHtml(SEED);
+  assert.strictEqual((named.match(/>Anthony Davis</g) || []).length, 1, 'the name appears once as visible text (the data attribute is not text)');
+  assert.ok(/library-card-title[^>]*><button type="button" class="library-card-name is-title"/.test(named), 'the title line is the rename control');
+  assert.ok(!/<span class="sep">\u00b7<\/span><button type="button" class="library-card-name"/.test(named), 'no duplicate in the meta');
+  const unnamed = callLibraryCardHtml(Object.assign({}, SEED, { prospect_name: null }));
+  assert.ok(/library-card-name anon"[^>]*>Unknown prospect</.test(unnamed), 'no name → the meta offers the rename as Unknown prospect');
+  assert.ok(/library-card-title"[^>]*><span>PS Sober Living Riches \| Anthony Davis<\/span>/.test(unnamed) || /library-card-title[^>]*>PS Sober/.test(unnamed) || /Anthony Davis<\/span>/.test(unnamed), 'the meeting title stays the title');
+});
+
 test('⚠ the list payload carries prospect_name and call_kind for the two controls', () => {
   const src = stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8'));
   assert.ok(/prospect_name: a \? \(a\.prospect_name \|\| null\) : null,\s*call_kind: cc\.call_kind \|\| null,/.test(src), 'the row payload carries both');

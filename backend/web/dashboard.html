@@ -2209,6 +2209,8 @@
     .library-card-name { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: text; border-bottom: 1px dotted var(--border-strong); }
     .library-card-name:hover { color: var(--accent); border-bottom-color: var(--accent); }
     .library-card-name.anon { font-style: italic; opacity: .75; }
+    .library-card-name.is-title { border-bottom: 0; text-align: left; }
+    .library-card-title .library-card-name.is-title:hover { color: var(--accent); }
     .library-card-side {
       display: flex;
       align-items: center;
@@ -18340,10 +18342,17 @@
            the human mark always wins. Both are proven as RENDERED clicks in
            test/calls-list-clickable.test.js — the guard this page never had. */
     var pname = (c.prospect_name && String(c.prospect_name).trim()) ? String(c.prospect_name).trim() : '';
-    var nameEl = isNS ? '' : '<span class="sep">\u00b7</span><button type="button" class="library-card-name' + (pname ? '' : ' anon') + '"'
-      + ' title="Rename this prospect" data-name="' + escapeHtml(pname) + '"'
-      + ' onclick="event.stopPropagation(); renameProspectFromRow(\'' + cardId + '\', this.dataset.name)">'
-      + (pname ? escapeHtml(pname) : 'Unknown prospect') + '</button>';
+    var nameBtn = function (text, extraClass) {
+      return '<button type="button" class="library-card-name' + (extraClass || '') + '"'
+        + ' title="Rename this prospect" data-name="' + escapeHtml(pname) + '"'
+        + ' onclick="event.stopPropagation(); renameProspectFromRow(\'' + cardId + '\', this.dataset.name)">' + text + '</button>';
+    };
+    /* callLabel already puts the prospect's NAME on the title line when one is known — so the
+       title itself becomes the inline rename, and the meta carries the control only when the
+       title is the meeting title (no name known yet). Never the same name twice on a row. */
+    var titleIsName = !!pname && String(callLabel(c) || '') === pname;
+    var nameEl = (isNS || titleIsName) ? '' : '<span class="sep">\u00b7</span>' + nameBtn(pname ? escapeHtml(pname) : 'Unknown prospect', pname ? '' : ' anon');
+    if (titleIsName && !isNS) title = nameBtn(escapeHtml(pname), ' is-title');
     return '<div class="library-card' + (isNS ? ' is-not-sales not-clickable' : '') + '" id="libcard-' + cardId + '"'
       + (isNS ? '' : ' onclick="openCallReview(\'' + cardId + '\')"') + '>'
       + '<div class="library-card-main">'
