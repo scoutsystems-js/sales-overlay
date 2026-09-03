@@ -4356,24 +4356,15 @@
       font-size: var(--fs-number); font-weight: var(--fw-normal);
     }
 
-    /* ⚠⚠ NO NESTED CONTAINERS. The rep cards were boxes INSIDE a box; they are
-       now rows separated by a hairline — a boundary you read rather than a
-       frame you see. The last row draws none: a trailing rule is a line with
-       nothing on the other side of it. */
-    body[data-view="team-members"] .rep-card ,
-    body[data-view="team-objections"] .rep-card ,
-    body[data-view="team-coaching"] .rep-card ,
-    body[data-view="team"] .rep-card ,
-    body[data-view="team-performance"] .rep-card {
-      background: transparent; border: 0; border-radius: 0;
-      border-bottom: 1px solid var(--border);
-      padding: 20px 0;
-    }
-    body[data-view="team-members"] .rep-card:last-child ,
-    body[data-view="team-objections"] .rep-card:last-child ,
-    body[data-view="team-coaching"] .rep-card:last-child ,
-    body[data-view="team"] .rep-card:last-child ,
-    body[data-view="team-performance"] .rep-card:last-child { border-bottom: 0; padding-bottom: 0; }
+    /* ⚠⚠ THE REP CARD IS EXEMPT FROM THIS SWEEP (Justin, 2026-09-02 — see
+       --rep-card-edge). The 2026-09-01 version of this block took the rep cards
+       to hairline rows ("NO NESTED CONTAINERS … a boundary you read rather than
+       a frame you see") — and it was still winning on 2026-09-02 after the
+       white edge shipped, because it is scoped to the view and the rendered
+       guard's first version was not. The old ruling is recorded here, shown to
+       the new one: the rep card is a PLAYING CARD, the frame IS the point, and
+       the bare `.rep-card` rule above is the one that renders. The `.rep-weak` /
+       `.rep-why` treatment below is unchanged. */
     body[data-view="team-members"] .rep-weak,
     body[data-view="team-objections"] .rep-weak,
     body[data-view="team-coaching"] .rep-weak,

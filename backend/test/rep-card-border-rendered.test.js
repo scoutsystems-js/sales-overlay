@@ -20,13 +20,22 @@ const { liveCard, JOSH, DRE, DANIEL, STATE, HTML } = require('./helpers/rep-card
 const STYLE = HTML.slice(HTML.indexOf('<style>'), HTML.indexOf('</style>') + '</style>'.length);
 assert.ok(STYLE.length > 100000, 'floor: the stylesheet was found (' + STYLE.length + ')');
 
-function page() {
+/* ⚠⚠ RENDERED UNDER THE REAL HOST, OR IT GUARDS NOTHING. The first version of
+   this guard rendered the cards under a bare <body> and passed while the live
+   Team Performance page showed NO border at all: a `body[data-view="team-performance"]
+   .rep-card { border: 0 }` rule (the 2026-09-01 "rows, not boxes" pass) only
+   fires under the page's data-view attribute and ancestor chain. So each
+   placement is rendered under the view that hosts it, inside the ancestors the
+   page actually builds (read from the live DOM 2026-09-02). */
+const HOSTS = [
+  { view: 'team-performance', open: '<main class="page"><div><div class="section fade-in"><div class="rep-card-list" id="grid">', close: '</div></div></div></main>', count: 8 },
+  { view: 'team-dashboard',   open: '<main class="page"><div><div class="section fade-in"><div class="dash-grid"><div class="dash-card" id="slot" style="grid-column:span 2;">', close: '</div></div></div></div></main>', count: 1 },
+];
+function page(host) {
   const card = liveCard()(STATE);
-  const eight = [JOSH, DRE, DANIEL, JOSH, DRE, JOSH, DRE, JOSH].map((r, i) => card(Object.assign({}, r, { user_id: r.user_id + i }))).join('');
-  return '<!doctype html><html><head>' + STYLE + '</head><body>'
-    + '<div class="page"><div class="rep-card-list" id="grid">' + eight + '</div>'
-    + '<div class="dash-grid"><div class="dash-card" id="slot" style="grid-column:span 2;">' + card(JOSH) + '</div></div></div>'
-    + '</body></html>';
+  const reps = [JOSH, DRE, DANIEL, JOSH, DRE, JOSH, DRE, JOSH].slice(0, host.count);
+  const cards = reps.map((r, i) => card(Object.assign({}, r, { user_id: r.user_id + i }))).join('');
+  return '<!doctype html><html><head>' + STYLE + '</head><body data-view="' + host.view + '">' + host.open + cards + host.close + '</body></html>';
 }
 
 const PROBE = `[...document.querySelectorAll('.rep-card')].map((el) => { const cs = getComputedStyle(el); return {
@@ -36,16 +45,20 @@ const PROBE = `[...document.querySelectorAll('.rep-card')].map((el) => { const c
   radius: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '),
   clip: cs.overflow } })`;
 
-test('⚠⚠ RENDERED: every rep card, in the grid and in the widget slot, has a 1px WHITE edge and 16px corners', () => {
-  const cards = renderComputed(page(), PROBE);
-  assert.strictEqual(cards.length, 9, 'floor: eight grid cards and one slot card rendered');
-  assert.ok(cards.some((c) => c.where === 'slot') && cards.filter((c) => c.where === 'grid').length === 8, 'both placements present');
-  for (const c of cards) {
-    assert.strictEqual(c.edge, '1px solid rgb(255, 255, 255)', c.where + ': the edge must be 1px solid white as rendered, got ' + c.edge);
-    assert.strictEqual(c.edges, 'rgb(255, 255, 255)|rgb(255, 255, 255)|rgb(255, 255, 255)', c.where + ': all four sides white');
-    assert.strictEqual(c.radius, '16px 16px 16px 16px', c.where + ': playing-card corners (--radius-lg), got ' + c.radius);
-    assert.strictEqual(c.clip, 'hidden', c.where + ': the band must clip to the rounded corner');
+test('⚠⚠ RENDERED under each host view: every rep card has a 1px WHITE edge and 16px corners', () => {
+  let seen = 0;
+  for (const host of HOSTS) {
+    const cards = renderComputed(page(host), PROBE);
+    assert.strictEqual(cards.length, host.count, host.view + ': floor — ' + host.count + ' card(s) rendered');
+    for (const c of cards) {
+      seen++;
+      assert.strictEqual(c.edge, '1px solid rgb(255, 255, 255)', host.view + '/' + c.where + ': the edge must be 1px solid white as rendered, got ' + c.edge);
+      assert.strictEqual(c.edges, 'rgb(255, 255, 255)|rgb(255, 255, 255)|rgb(255, 255, 255)', host.view + ': all four sides white');
+      assert.strictEqual(c.radius, '16px 16px 16px 16px', host.view + ': playing-card corners (--radius-lg), got ' + c.radius);
+      assert.strictEqual(c.clip, 'hidden', host.view + ': the band must clip to the rounded corner');
+    }
   }
+  assert.strictEqual(seen, 9, 'nine cards measured across both hosts');
 });
 
 test('⚠ the exception is recorded beside the token, so the next sweep reads it before removing it', () => {
