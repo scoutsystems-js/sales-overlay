@@ -21,6 +21,8 @@
 'use strict';
 var { isRejectedName } = require('./prospect-name');
 
+var PLACEHOLDER_TOKENS = { nolastname: 1, lastname: 1, firstname: 1, noname: 1, unknown: 1, tbd: 1, 'n/a': 1, na: 1, test: 1, guest: 1, prospect: 1, client: 1, lead: 1 };
+
 function str(v) { return (typeof v === 'string' && v.trim()) ? v.trim() : null; }
 function email(v) { var s = str(v); return s ? s.toLowerCase() : null; }
 
@@ -61,6 +63,12 @@ function titleNameSegment(title) {
   var tokens = seg.split(' ');
   if (tokens.length < 2 || tokens.length > 4) return null;
   if (isRejectedName(seg)) return null;
+  /* Calendar placeholders that pass every structural check: "Crystal NoLastname"
+     was planned as a person by the splitting pass on live data (H702). A token
+     that SAYS it is not a name produces no segment. */
+  for (var i = 0; i < tokens.length; i++) {
+    if (PLACEHOLDER_TOKENS[tokens[i].toLowerCase().replace(/[^a-z/]/g, '')]) return null;
+  }
   return seg;
 }
 

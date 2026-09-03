@@ -84,6 +84,8 @@ test('titleNameSegment: last "|" segment, 2–4 tokens, no digits/emails, reject
   assert.strictEqual(pi.titleNameSegment('Sober Living Riches | mt@example.com'), null, 'an email is not a name segment');
   assert.strictEqual(pi.titleNameSegment("Sober Living Riches | Margaret's iPhone"), null, 'device vocabulary rejected');
   assert.strictEqual(pi.titleNameSegment(null), null);
+  assert.strictEqual(pi.titleNameSegment('PS Sober Living Riches | Crystal NoLastname'), null, 'a calendar placeholder is not a name (planned as a person on live data, H702)');
+  assert.strictEqual(pi.titleNameSegment('PS Sober Living Riches | Test Prospect'), null);
 });
 
 /* ── 3 · per-speaker identities from the transcript, once per call ─────────── */
