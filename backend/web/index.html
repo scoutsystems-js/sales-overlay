@@ -64,6 +64,13 @@
          (D-7, 2026-09-03); this page is self-contained by ruling, so they are inlined here and
          mirrored against the dashboard by test/style-tokens-mirror.test.js. */
       --fs-display: 48px; --fs-number: 20px; --fs-title: 18px; --fs-body: 14px; --fs-secondary: 13px; --fs-label: 12px; --fs-eyebrow: 11px;
+      /* ⚠⚠ TWO NAMED EXCEPTIONS FOR THIS PAGE ONLY (Justin, 2026-09-03) — NOT NEW STEPS ON THE SCALE.
+         A landing page is not a dashboard: under the scale the hero fell to 48 and the section
+         headings to 20, which sat BELOW the hero's own body lede. The same standing as the
+         verdict border and the rep card's edge — a deliberate exemption with its reason, so the
+         next sweep does not "finish" it. Everything else on this page is on the scale. */
+      --fs-hero: 58px;      /* the hero headline, at --fw-display */
+      --fs-section: 32px;   /* the section headings, at --fw-emphasis */
       --fw-display: 300; --fw-normal: 400; --fw-emphasis: 500;
       --radius-sm: 8px;
       --border:        #1f1f1f;
@@ -118,7 +125,7 @@
     /* ── Hero ── */
     .hero { text-align: center; padding: 70px 0 60px; }
     .hero h1 {
-      font-size: var(--fs-display); font-weight: var(--fw-emphasis); line-height: 1.08;
+      font-size: var(--fs-hero); font-weight: var(--fw-display); line-height: 1.08;   /* the page-scoped exemption, see :root */
       letter-spacing: -0.02em; margin-bottom: 22px;
     }
     .hero h1 .accent { color: var(--accent); }
@@ -134,7 +141,7 @@
       font-size: var(--fs-label); text-transform: uppercase; letter-spacing: 0.08em;
       color: var(--accent); font-weight: var(--fw-emphasis); margin-bottom: 12px;
     }
-    h2 { font-size: var(--fs-number); font-weight: var(--fw-emphasis); letter-spacing: -0.02em; margin-bottom: 14px; }
+    h2 { font-size: var(--fs-section); font-weight: var(--fw-emphasis); letter-spacing: -0.02em; margin-bottom: 14px; }   /* the page-scoped exemption, see :root */
     .section-sub { color: var(--text-muted); max-width: 640px; margin-bottom: 36px; font-size: var(--fs-body); }
 
     /* ── How it works ── */

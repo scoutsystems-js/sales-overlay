@@ -5112,7 +5112,8 @@
     }
 
     .kb-counter-card { text-align: center; padding: 22px; }
-    .kb-counter-card .kbc-num { font-size: 42px; font-weight: var(--fw-emphasis); color: var(--accent); line-height: 1.1; }
+    /* ⚠ THE PAGE'S ONE LOUD NUMBER, at the scale's display step (Justin, 2026-09-03: "42 is 48 with a hand on it"). */
+    .kb-counter-card .kbc-num { font-size: var(--fs-display); font-weight: var(--fw-display); color: var(--accent); line-height: 1.1; }
     .kb-counter-card .kbc-head { font-size: 14px; font-weight: var(--fw-emphasis); color: var(--text); margin-top: 4px; }
     .kb-counter-card .kbc-sub { font-size: 13px; color: var(--text); margin-top: 6px; }
     .kb-counter-card .kbc-note { font-size: 12px; color: var(--text); opacity: .85; margin-top: 10px; }
@@ -17638,14 +17639,18 @@
     if (state.view === 'objections-intel') renderObjectionsIntel();
   }
 
-  function objStatCard(label, big, small) {
+  /* ⚠⚠ ONE LOUD NUMBER ON THIS PAGE, AND IT IS THE HANDLE RATE (Justin, 2026-09-03). The three tiles
+     rendered at 30/700 — three equal loud things, none loudest, and no 48 anywhere on the page. The
+     rate the page exists for takes the display step; its numerator and denominator are supporting
+     stats at --fs-number. `loud` is passed by the caller, never inferred from the label. */
+  function objStatCard(label, big, small, loud) {
     // ⚠ background ADDED 2026-08-20 — these tiles are built as unclassed,
     // inline-styled divs, so no class rule can card them; the fill has to go
     // here. They were 9 of the 75 exposed leaves on objections-intel
     // (Objections / 132 / 83 calls / Handle Rate / 19% / Handled / 25 / ...).
     return '<div style="flex:1;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center;">'
       + '<div style="font-size:12px;color:var(--text);text-transform:uppercase;letter-spacing:0.04em;">' + escapeHtml(label) + '</div>'
-      + '<div style="font-size:30px;font-weight:var(--fw-emphasis);margin:6px 0 2px;">' + escapeHtml(String(big)) + '</div>'
+      + '<div style="font-size:var(' + (loud ? '--fs-display' : '--fs-number') + ');font-weight:var(' + (loud ? '--fw-display' : '--fw-normal') + ');line-height:1.1;margin:6px 0 2px;">' + escapeHtml(String(big)) + '</div>'
       + '<div style="font-size:12px;color:var(--text);">' + escapeHtml(small) + '</div>'
       + '</div>';
   }
@@ -17787,8 +17792,8 @@
       // objections on calls that CLOSED — handled by the ruling of 2026-08-17
       // even where the moment itself was not. Without showing it, a manager
       // adds up handled/partial/unhandled and gets a different rate.
-      + objStatCard('Handle Rate', m.handled_rate === null ? '—' : (m.handled_rate + '%'),
-          (m.handled + (m.credited || 0) + m.partial + m.unhandled) + ' resolution-tagged')
+      + objStatCard('Handle Rate', m.handled_rate === null ? '—' : (m.handled_rate + '%'),   /* the ONE loud number on this page — see objStatCard */
+          (m.handled + (m.credited || 0) + m.partial + m.unhandled) + ' resolution-tagged', true)
       + objStatCard('Handled', m.handled + (m.credited || 0),
           (m.credited ? m.credited + ' credited (call closed) · ' : '') + m.partial + ' partial · ' + m.unhandled + ' unhandled')
       + '</div>';
