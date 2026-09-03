@@ -123,9 +123,11 @@ function buildRepSeries(input) {
     if (!c || !c.call_date) return;
     var i = index[bucketStart(c.call_date, bucket).getTime()];
     if (i === undefined) return;
-    var byUser = hAcc[c.user_id] || (hAcc[c.user_id] = {});
-    var cell = byUser[i] || (byUser[i] = { handled: 0, total: 0 });
-    cell.total++;
+    /* ⚠⚠ THE EXCLUSIONS COME BEFORE THE COUNT (H674, 2026-09-02). Until today
+       `cell.total++` ran first, so a DQ call's objections and every
+       logistical_barrier / disqualification row sat in the DENOMINATOR while
+       only the numerator skipped them — the graph's rate read LOWER than the
+       cards' for the same rows. One definition means one order, everywhere. */
     // Ruling 2026-08-17: an objection on a CLOSED call is credited whatever its
     // resolution — they side-stepped the barrier and still closed. One shared
     // predicate; see lib/objection-handled.js for why it is not inlined.
@@ -135,6 +137,9 @@ function buildRepSeries(input) {
     if (outcomeOf[o.fathom_call_id] === DQ_OUTCOME) return;
     // ⚠ one definition — see lib/objection-strict.js
     if (!countsAsObjection(o)) return;
+    var byUser = hAcc[c.user_id] || (hAcc[c.user_id] = {});
+    var cell = byUser[i] || (byUser[i] = { handled: 0, total: 0 });
+    cell.total++;
     if (isHandled(o, outcomeOf[o.fathom_call_id])) cell.handled++;
   });
 

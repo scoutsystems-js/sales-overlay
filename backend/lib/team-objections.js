@@ -26,6 +26,7 @@ const { realCallsOnly } = require('./real-calls');
 // which surfaces as two different handle rates on one screen. This module
 // would have been the eleventh copy.
 const { outcomeMap, isCredited } = require('./objection-handled');
+const { countsAsObjection } = require('./objection-strict');   // the ONE definition — see test/objection-counting-carrier.test.js
 /* ⚠⚠ THE STRICT STANDARD (Justin's ruling, 2026-08-22): "the strict guidelines
    for objection handling is the standard." Disqualifications and payment /
    logistical barriers are NOT coachable objections and must not count toward
@@ -278,6 +279,14 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
        nothing re-analyses, so older moments carry no class and this page keeps
        classifying them exactly as it does today. New calls agree everywhere from
        the moment they are graded; the population converges as calls turn over. */
+    /* ⚠⚠ ONE DEFINITION (H674, 2026-09-02): countsAsObjection, and nothing else. The
+       classifier fallback that used to decide NULL-class rows here was the second
+       answer sweep block 6 found — on Josh's board it excluded 104 pre-v37 rows the
+       Performance cards were counting, and put 12% on this page beside 16% there.
+       The bucket mapping still LABELS buckets below; it no longer counts. */
+    return countsAsObjection(r);
+  }
+  function isCoachableLegacyClassifier(r) {   // kept only as the record of what this page used to do; called nowhere
     var stored = r.objection_class;
     if (stored) return stored === 'true_objection';
     if (!strict) return true;
@@ -335,9 +344,9 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
        underneath says how many there were. Silently dropping them would make
        the rate move for a reason nobody could see. */
     if (!isCoachable(r)) {
-      var b0 = bucketOf[normSurface(r.objection_surface)];
-      if (b0 && b0.cls === 'disqualification') excluded.disqualifications += 1;
-      else if (b0 && b0.cls === 'logistical_barrier') excluded.logistical += 1;
+      /* the exclusion line reports the STORED class — the only thing that excludes now */
+      if (r.objection_class === 'disqualification') excluded.disqualifications += 1;
+      else if (r.objection_class === 'logistical_barrier') excluded.logistical += 1;
       return;
     }
 

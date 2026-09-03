@@ -746,7 +746,7 @@ router.get('/rep-series', teamGate, async function (req, res) {
       var aq = await admin.from('call_analyses').select('fathom_call_id, outcome, price_stated_at_seconds, overall_score').in('fathom_call_id', slice).eq('status', 'done');
       if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
       analyses = analyses.concat(aq.data || []);
-      var oq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')
+      var oq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category, objection_class')   /* ⚠ buildRepSeries calls countsAsObjection on these rows — the column must travel (H674) */
         .in('fathom_call_id', slice).eq('type', 'objection');
       if (oq.error) throw new Error('call_highlights: ' + oq.error.message);
       objections = objections.concat(oq.data || []);

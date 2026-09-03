@@ -37,7 +37,10 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 
 | # | leave-alone cost | what | rows |
 |---|---|---|---|
-| **1** | two objection-handling rates for one team and window, on the metric being ruled on | three definitions of "what counts as an objection" + the team pages never select `objection_class` | ③-1, ④a-1 |
+| **1** ✅ **SHIPPED 2026-09-02 (fix #1, H674)** | two objection-handling rates for one team and window, on the metric being ruled on | **ONE function at five sites** (`team-analytics`, `routes/team.js`→`rep-series`, `team-objections`, `session-analytics`); every site selects `objection_class`; `rep-series` also stopped incrementing the denominator before the exclusions (a fifth defect the pin found). Pinned per site by execution, proven under both plants. **The team Objections page now reads 16% not 12% on Josh's board; Josh moves 6th → 4th there; the cards do not move.** | ③-1, ④a-1 — closed |
+| `🔴 NEEDS JUSTIN` **the price gate ("after pitch and price drop")** | Justin's definition's second half. Testable going forward — closed calls analysed after the framing detector shipped are detected 12 of 13 (92%) — **not on the corpus: 34% of older closed calls, 27% overall, because nothing re-analyses.** Built today it would silently drop most historical objections. **Not built.** | `~/Desktop/scout-findings.md` (fix #1) §2–3 |
+| `🔴 NEEDS JUSTIN — a write, no model` **zero-model price-moment backfill** | today's framing detector run over the stored transcripts of the 1,192 price-less analyses finds a moment on **328 (28%)** — 60 of 181 closed — with no model call; corpus coverage 27% → ~47%. A write to `call_analyses`. | measured, not run |
+| `🐛 BUG` **one closed call the framing detector declines** | `4bd4343a` — "the full 9800" / "9800 dollars", framed, by the closer, $750 collected; no obvious reason (not Rule A, not per-period, in bounds). One call for the detector's author. | H674 |
 | **2** | spend and cross-user access with no working guard | nine guards pass with the gate's effect removed; `cross-user-grading` also passes with the gate commented out | ①-1…①-8, ②-2 |
 | **3** | a page reps use dies within days | Coaching section drill-down at 390 of ~395 ids | ⑧-3 |
 | **4** | a ranked widget rewards the behaviour ruled against, one click from live | average call time `lower_is_better` in the catalog, pinned by its test | ③-2 |
@@ -51,6 +54,7 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 | 12 | 3.2% of a file that is 46% comment | dead functions and classes in five families | ⑤-1, ⑤-2, ⑤-4, ⑤-5 |
 | — | **watch, NOT VERIFIED** | digest echoing a machine word; 277 sentinel rows behind per-lib guards; two lane-failure conventions | ⑦ notes |
 | — | **closed by ruling** | merge route retired; three review panels retained; KB scope/speaker badges unchanged | H664, H669, H673 |
+| **13 · last** | coaching drifting from the method it was captured from | **a sweep to confirm the starter set is in use and standardised** — Justin's method, the objection scripts, the six discovery items, the three trust targets, pain-versus-goals — captured in one session; nothing has verified that every coaching surface reads them | filed 2026-09-02, not built |
 
 ### 🔎 SWEEP BLOCK 8 (2026-09-02) — CLASS ⑦: AN ABSENT FIELD PASSING A CHECK WRITTEN FOR A WRONG ONE. CLEAN TODAY.
 

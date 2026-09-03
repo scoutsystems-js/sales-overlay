@@ -11,6 +11,7 @@ var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'clos
 const { isDisqualified } = require('./dq-exclusion');
 var teamAnalytics = require('./team-analytics');
 const { isCredited } = require('./objection-handled');
+const { countsAsObjection } = require('./objection-strict');   // the ONE definition — see test/objection-counting-carrier.test.js
 var { fetchProspectCloseRates } = require('./prospect-entity');
 
 const { clipHref } = require('./clip-link');
@@ -290,7 +291,7 @@ async function computeObjectionIntel(admin, userId, from, to) {
   for (var c = 0; c < callIds.length; c += 100) {
     var hr = await admin
       .from('call_highlights')
-      .select('fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, resolution, closer_response, closer_response_verified')
+      .select('fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, objection_class, resolution, closer_response, closer_response_verified')
       .in('fathom_call_id', callIds.slice(c, c + 100))
       .eq('type', 'objection');
     if (hr.error) throw new Error('call_highlights: ' + hr.error.message);
@@ -311,6 +312,11 @@ async function computeObjectionIntel(admin, userId, from, to) {
   var callsWith = {};
   var feed = [];
   rows.forEach(function(r) {
+    /* ⚠ ONE DEFINITION OF WHAT COUNTS (H674): the strict predicate — a row with no
+       class (pre-v37) counts; a stored logistical_barrier or disqualification does
+       not. This page counted every row until 2026-09-02, the third answer sweep
+       block 6 found. The feed below still lists the moment; only the rate excludes it. */
+    if (!countsAsObjection(r)) return;
     callsWith[r.fathom_call_id] = true;
     base.metrics.total += 1;
     var res = (r.resolution === 'handled' || r.resolution === 'partial' || r.resolution === 'unhandled') ? r.resolution : null;

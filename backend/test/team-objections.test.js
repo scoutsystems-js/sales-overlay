@@ -336,41 +336,40 @@ const MAPPING_OK = {
   },
 };
 
-test('⚠⚠ A NON-COACHABLE MOMENT LEAVES THE GRID, THE TOTALS AND THE FEED — AND IS COUNTED', async () => {
+test('⚠⚠ CONVERTED 2026-09-02 (H674): a STORED disqualification leaves the grid, the totals and the feed — and is counted; the CLASSIFIER no longer decides', async () => {
+  /* Until 2026-09-02 this test proved the classifier fallback excluded "cant afford it"
+     (h2) as a disqualification. That fallback was the SECOND definition of what
+     counts as an objection (sweep block 6, H671) — on Josh's board it put 12% on
+     this page beside 16% on the Performance cards. The ONE definition is
+     countsAsObjection: a stored class decides; a row with no class counts. So the
+     same classifier verdict that used to exclude h2 must now leave it in, and only
+     a STORED disqualification is excluded and reported. */
+  const dq = { id: 'h8', fathom_call_id: 'c1', type: 'objection', objection_category: 'fear', resolution: 'unhandled', quote: 'no money at all', observation: 'obs', closer_response: null, closer_response_verified: null, timestamp_seconds: 500, objection_surface: 'no money', objection_class: 'disqualification' };
+  HIGHLIGHTS.push(dq);
   const h = withClassifier(MAPPING_OK);
   try {
     const out = await h.run();
     assert.strictEqual(out.strict, true, 'the strict standard must be in force');
-
-    // the fixture's logistical moments are classified as a payment failure
-    // stored as `fear`, classified as a disqualification -> out of the grid
-    assert.strictEqual(out.grid[0].by_category.fear.total, 0,
-      'a disqualification must not sit in the grid, whatever its stored category');
-    assert.strictEqual(out.excluded.disqualifications, 1, 'and it must be counted so the panel can say so');
+    assert.strictEqual(out.excluded.disqualifications, 1, 'the STORED disqualification is excluded and counted so the panel can say so');
     assert.strictEqual(out.excluded.logistical, 0);
-
-    // ⚠ and out of the FEED too — the feed is the evidence for the rate, so a
-    // moment that does not count must not appear as though it does
-    const inFeed = out.instances.filter((i) => i.category === 'fear').length;
-    assert.strictEqual(inFeed, 0, 'the excluded moment must not appear in the moment list');
-
-    // ⚠ FLOOR: the true objections must still be there, or this passes by
-    // excluding everything.
-    assert.ok(out.totals.total >= 2, 'true objections must survive; got ' + out.totals.total);
-  } finally { h.restore(); }
+    assert.ok(out.instances.every((i) => i.quote !== 'no money at all'), 'the excluded moment must not appear in the moment list');
+    assert.ok(out.instances.some((i) => i.quote === 'scared'), 'h2 — the row the classifier calls a DQ — STAYS: no stored class means it counts');
+    assert.ok(out.grid[0].by_category.fear.total >= 1, 'and it sits in the grid');
+    assert.ok(out.totals.total >= 3, 'true objections plus the no-class row survive; got ' + out.totals.total);
+  } finally { h.restore(); HIGHLIGHTS.pop(); }
 });
 
-test('⚠⚠ THE RATE ACTUALLY MOVES — strict vs loose on identical rows', async () => {
+test('⚠⚠ CONVERTED 2026-09-02 (H674): THE STRICT FLAG NO LONGER MOVES THE RATE — one definition on identical rows', async () => {
+  /* The loose/strict split was the old page's own standard. The count is now the
+     one predicate whatever the flag says; the flag still travels so the view can
+     label whether bucket LABELS were classified. */
   const strictRun = withClassifier(MAPPING_OK);
   let strictOut, looseOut;
   try { strictOut = await strictRun.run(); } finally { strictRun.restore(); }
   const looseRun = withClassifier(MAPPING_OK);
   try { looseOut = await looseRun.run(null, null, { strict: false }); } finally { looseRun.restore(); }
-
-  assert.ok(looseOut.totals.total > strictOut.totals.total,
-    'the loose denominator must be larger — otherwise nothing was excluded and this '
-    + 'test proves nothing. loose ' + looseOut.totals.total + ' vs strict ' + strictOut.totals.total);
-  assert.strictEqual(looseOut.strict, false, 'and the loose run must SAY it is not the standard');
+  assert.strictEqual(looseOut.totals.total, strictOut.totals.total, 'the denominator is the same under both flags — the flag is not a definition');
+  assert.strictEqual(looseOut.strict, false, 'and the loose run still SAYS the labels were not classified');
 });
 
 test('⚠⚠ AN UNCLASSIFIED PHRASE COUNTS — never a silent shrink of the denominator', async () => {

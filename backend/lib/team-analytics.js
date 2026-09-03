@@ -73,7 +73,7 @@ async function aggregateWindow(admin, repIds, from, to) {
     aChunks.push(admin.from('call_analyses')
       .select('fathom_call_id, analyzed_at, overall_score, outcome, cash_collected, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned, price_stated_at_seconds')
       .in('fathom_call_id', callIds.slice(c0, c0 + 100)).eq('status', 'done'));
-    hChunks.push(admin.from('call_highlights').select('fathom_call_id, resolution, objection_category')
+    hChunks.push(admin.from('call_highlights').select('fathom_call_id, resolution, objection_category, objection_class')   /* ⚠ objection_class MUST be selected: countsAsObjection reads it, and an unselected column is undefined on the wire — every row counted (④a-1, H671). Pinned by test/objection-counting-carrier.test.js. */
       .in('fathom_call_id', callIds.slice(c0, c0 + 100)).eq('type', 'objection'));
   }
   var both = await Promise.all([Promise.all(aChunks), Promise.all(hChunks)]);
