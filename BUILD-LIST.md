@@ -909,6 +909,7 @@ The two MAJOR rows are deleted, not parked. **What the ruling orphans — report
 | `🛣` **Zoom webhook — sub-stage 4** | `recording.completed` ingestion, polling, connect UI | **0 refs today.** The connect-time check Justin filed as high priority lives here: it would have answered Godwin's ticket without a human reading server logs |
 | `🛣` **Slack connect** | EOD one-click send + manager digests | |
 | `🛣` **CRM integration (GHL, Close.io)** | Read then write, diff-then-confirm on writes | after call analysis is proven |
+| `🛣` **Zoom prospect email — ONLY via registration or a host calendar integration** (H701) | Zoom returns an empty `user_email` for external/guest participants (since 2022-03) and removed their ids (2023-03); Scout's Zoom scopes cannot call the participant endpoints anyway. A registered join link (first name, last name, email) is a BOOKING-FLOW change and would also mark which calls were booked. Justin's decision, not ours; never propose Zoom email parity as code. | with the CRM row |
 
 ## 🥱 RULED CLOSED — DO NOT RAISE AGAIN UNLESS THE TRIGGER FIRES
 
