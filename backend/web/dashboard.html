@@ -2205,6 +2205,10 @@
       align-items: center;
     }
     .library-card-meta .sep { color: var(--text); }
+    /* H710: the prospect name on the row is a control that reads as text — click to rename; the row's click is stopped inside it */
+    .library-card-name { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: text; border-bottom: 1px dotted var(--border-strong); }
+    .library-card-name:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    .library-card-name.anon { font-style: italic; opacity: .75; }
     .library-card-side {
       display: flex;
       align-items: center;
@@ -18327,11 +18331,24 @@
        call and the data-loss argument is gone.
        ⚠ The row still RENDERS, with its badge and its un-mark button. Excluded
        must stay visible; only the way in is closed. */
+    /* ⚠⚠ H710 — TWO SECOND DOORS ON THE LIST (Justin: reachable without clicking in).
+       (1) the PROSPECT NAME, inline in the meta: clicking the NAME edits (event.stopPropagation —
+           the row's own click must not fire), clicking anywhere else on the row OPENS the call.
+           It calls the same rename entry as the review header (sendRename → renameOnCall):
+           same merge question naming both, carries everywhere. Never a second path.
+       (2) the CALL TYPE TAG in the side: the same setter as the review header (setCallKind),
+           the human mark always wins. Both are proven as RENDERED clicks in
+           test/calls-list-clickable.test.js — the guard this page never had. */
+    var pname = (c.prospect_name && String(c.prospect_name).trim()) ? String(c.prospect_name).trim() : '';
+    var nameEl = isNS ? '' : '<span class="sep">\u00b7</span><button type="button" class="library-card-name' + (pname ? '' : ' anon') + '"'
+      + ' title="Rename this prospect" data-name="' + escapeHtml(pname) + '"'
+      + ' onclick="event.stopPropagation(); renameProspectFromRow(\'' + cardId + '\', this.dataset.name)">'
+      + (pname ? escapeHtml(pname) : 'Unknown prospect') + '</button>';
     return '<div class="library-card' + (isNS ? ' is-not-sales not-clickable' : '') + '" id="libcard-' + cardId + '"'
       + (isNS ? '' : ' onclick="openCallReview(\'' + cardId + '\')"') + '>'
       + '<div class="library-card-main">'
         + '<div class="library-card-title' + (c.title ? '' : ' anon') + '">' + title + '</div>'
-        + '<div class="library-card-meta">' + meta + '</div>'
+        + '<div class="library-card-meta">' + meta + nameEl + '</div>'
       + '</div>'
       + '<div class="library-card-side">'
         + (isNS ? '<span class="not-sales-badge" title="' + escapeHtml(exclusionTitle(c)) + '">' + escapeHtml(exclusionLabel(c)) + '</span>' : '')
@@ -18342,6 +18359,7 @@
            recorded a meeting would find one copy simply gone. */
         + (c.is_duplicate ? '<span class="dupe-badge" title="The same meeting was also recorded by your other provider. This copy is not counted.">Duplicate</span>' : '')
         + (c.analysis_status === 'done' ? outcomeTagHtml(c.id, c.outcome, c.outcome_source, true) : '')
+        + (isNS ? '' : callTypeTagHtml(cardId, c.call_kind, false, true))   /* H710: the type tag, from the list */
         + badge
         + recordingLink
         + libRowNotSalesHtml(cardId, isNS)
@@ -18909,22 +18927,67 @@
    * closed on the first pick — both with a green suite. So the button disables,
    * says "Marking…", and only then re-renders from the server's answer.
    */
+  /* ⚠⚠ PROSPECT RENAME THAT CARRIES EVERYWHERE (H707). The label is the action. A rename
+     that lands on another prospect's name is a MERGE: the server answers 409 naming
+     both, and the person confirms with both names in front of them — never silent. */
+  function renameProspectBtnHtml(callId, currentName) {
+    if (!callId) return '';
+    /* the current name rides on a data attribute — a quoted literal inside onclick would need escaping a scanner cannot follow */
+    return '<button class="btn-fathom-secondary rename-prospect-btn" type="button" id="renameProspectBtn" data-name="' + escapeHtml(currentName || '') + '"'
+      + ' onclick="renameProspect(\'' + escapeHtml(callId) + '\', this.dataset.name)">Rename Prospect</button>';
+  }
+  async function renameProspect(callId, currentName) {
+    var name = await scoutPrompt({ title: 'Rename this prospect', body: 'The new name applies to every call on this prospect. If it is already another prospect\u2019s name, you will be asked to confirm a merge.', value: currentName || '', confirmText: 'Rename' });
+    if (name === null || name === undefined || !String(name).trim()) return;
+    await sendRename(callId, String(name).trim(), false);
+  }
+  /* H710 — the list's second door to the rename: the same entry, the list refreshed after. */
+  async function renameProspectFromRow(callId, currentName) {
+    var name = await scoutPrompt({ title: 'Rename this prospect', body: 'The new name applies to every call on this prospect. If it is already another prospect\u2019s name, you will be asked to confirm a merge.', value: currentName || '', confirmText: 'Rename' });
+    if (name === null || name === undefined || !String(name).trim()) return;
+    await sendRename(callId, String(name).trim(), false, 'list');
+  }
+  async function sendRename(callId, name, confirmMerge, from) {
+    try {
+      var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/prospect-name', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ name: name, confirm_merge: confirmMerge === true }),
+      });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      var data = null; try { data = await res.json(); } catch (e) {}
+      if (res.status === 409 && data && data.merge_required) {
+        var m = data.merge_required;
+        var ok = await scoutConfirm({ title: 'This is a merge', body: '\u201c' + (m.from || 'this prospect') + '\u201d would become \u201c' + m.into + '\u201d \u2014 ' + m.calls_moving + ' call' + (m.calls_moving === 1 ? '' : 's') + ' would move onto that prospect' + (m.calls_skipped ? ' (' + m.calls_skipped + ' already renamed differently stay)' : '') + '. Merge them?', confirmText: 'Merge' });
+        if (ok) await sendRename(callId, name, true, from);
+        return;
+      }
+      if (res.status === 403) { await scoutConfirm({ title: 'Not allowed', body: 'You are not allowed to rename on this call.', confirmText: 'OK' }); return; }
+      if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+      state.callReviewCache = {};
+      state.callLibraryCache = null;
+      if (from === 'list') await loadCallLibrary(0); else await openCallReview(callId);
+    } catch (err) {
+      await scoutConfirm({ title: 'Could not rename', body: String((err && err.message) || err), confirmText: 'OK' });
+    }
+  }
   /* ⚠⚠ THE CALL TYPE IS A TAG, NOT A BUTTON (Justin, 2026-09-03, H709): a tag reads as a
      FACT about the call; a button reads as an action — that is what stops the type being
      confused with the outcome beside it. The tag's words come from CALL_TYPE_LABELS
      (Booked · Follow-up · Not a sales call). A call marked not-a-sales-call shows the
      third word as a static badge — the "↩ Count this call" button is its inverse. */
-  function callTypeTagHtml(callId, kind, notSales) {
+  function callTypeTagHtml(callId, kind, notSales, fromList) {
     if (!callId) return '';
     if (notSales) return '<span class="outcome-tag-badge call-type-badge">' + escapeHtml(CALL_TYPE_LABELS.not_sales) + '</span>';
     var cur = (kind === 'follow_up') ? 'follow_up' : 'booked';
-    return '<span class="outcome-tag call-type-tag" title="Call type">'
-      + '<select class="outcome-tag-select call-type-select" id="callTypeSelect" onchange="setCallKind(\'' + escapeHtml(callId) + '\', this.value)">'
+    var sp = fromList ? 'event.stopPropagation();' : '';
+    return '<span class="outcome-tag call-type-tag" title="Call type"' + (fromList ? ' onclick="event.stopPropagation()"' : '') + '>'
+      + '<select class="outcome-tag-select call-type-select"' + (fromList ? ' id="calltype-' + escapeHtml(callId) + '"' : ' id="callTypeSelect"') + ' onchange="' + sp + 'setCallKind(\'' + escapeHtml(callId) + '\', this.value' + (fromList ? ", 'list'" : '') + ')">'
       + ['booked', 'follow_up'].map(function (k) { return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + escapeHtml(CALL_TYPE_LABELS[k]) + '</option>'; }).join('')
       + '</select></span>';
   }
-  async function setCallKind(callId, next) {
-    var sel = document.getElementById('callTypeSelect');
+  async function setCallKind(callId, next, from) {
+    var sel = document.getElementById(from === 'list' ? 'calltype-' + callId : 'callTypeSelect');
     if (sel) sel.disabled = true;
     try {
       var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/call-kind', {
@@ -18941,7 +19004,7 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       state.callReviewCache = {};
       state.callLibraryCache = null;
-      await openCallReview(callId);
+      if (from === 'list') { if (sel) sel.disabled = false; await loadCallLibrary(0); } else { await openCallReview(callId); }
     } catch (err) {
       if (sel) sel.disabled = false;
       await scoutConfirm({ title: 'Could not save', body: String((err && err.message) || err), confirmText: 'OK' });

@@ -1531,6 +1531,9 @@ async function loadCallsList(admin, userId, opts) {
       is_duplicate: !!cc.duplicate_of,
       analysis_status: a ? a.status : null, overall_score: a ? a.overall_score : null, overall_summary: a ? a.overall_summary : null,
       outcome: a ? a.outcome : null, outcome_source: a ? a.outcome_source : null,
+      /* H710: the two list controls — inline rename on the NAME and the call-type TAG — need these on the row */
+      prospect_name: a ? (a.prospect_name || null) : null,
+      call_kind: cc.call_kind || null,
     };
   });
 
