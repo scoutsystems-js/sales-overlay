@@ -2168,6 +2168,19 @@
        review page (Phase 2 Step 4; current implementation surfaces a
        "coming soon" notice via the existing fathomNotice system). */
     .library-list { display: flex; flex-direction: column; gap: 10px; }
+    /* H712 — the review queue on the Calls page (managers and above). Tokens only; words, not badges. */
+    .vq { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elevated); padding: 14px 16px; margin: 12px 0 16px; }
+    .vq-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+    .vq-title { font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); }
+    .vq-counts { font-size: var(--fs-label); color: var(--text); opacity: .75; }
+    .vq-empty { font-size: var(--fs-secondary); color: var(--text); opacity: .85; }
+    .vq-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 10px 0; border-top: 1px solid var(--border); }
+    .vq-main { flex: 1; min-width: 0; }
+    .vq-call { font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); color: var(--text); }
+    .vq-meta { font-weight: var(--fw-normal); opacity: .75; }
+    .vq-reason { font-size: var(--fs-secondary); color: var(--text); margin-top: 3px; line-height: 1.45; }
+    .vq-actions { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
+    .vq-correct { border-color: var(--accent); color: var(--accent); }
     .library-card {
       background: var(--bg-elevated);
       border: 1px solid var(--border);
@@ -18072,6 +18085,10 @@
 
     var header = renderCallLibraryHeaderHtml();
     var notice = renderFathomNoticeHtml(); // reuse the global flash mechanism
+    /* H712 — the review queue (managers and above) sits under the header; fetched once per view. */
+    if (canSeeVerdictQueue() && state.verdictQueue === undefined) { state.verdictQueue = null; loadVerdictQueue(); }
+    var queueHost = canSeeVerdictQueue() ? '<div id="verdictQueueHost">' + (state.verdictQueue ? verdictQueueHtml(state.verdictQueue) : '') + '</div>' : '';
+    notice = notice + queueHost;
 
     if (state.callLibraryError) {
       content.innerHTML = header + notice
@@ -18103,6 +18120,55 @@
       + loadMore;
   }
 
+  /* ⚠⚠ THE REVIEW QUEUE (Justin's ruling 2026-09-03, H712) — managers and above. Every "not a
+     sales call" verdict the grader wrote lands here with its reason; one click confirms (through
+     the ONE mark) or corrects (it IS a sales call — data for the next fix). Nothing is
+     auto-marked. Words for a customer: what the call was and what to do. */
+  function verdictQueueHtml(q) {
+    if (!q || q._error) return q && q._error ? '<div class="vq"><div class="vq-head">Review queue could not load.</div></div>' : '';
+    var pending = Array.isArray(q.pending) ? q.pending : [];
+    var c = q.counts || { pending: 0, confirmed: 0, corrected: 0 };
+    var head = '<div class="vq-head"><span class="vq-title">Calls that look like they are not sales calls</span>'
+      + '<span class="vq-counts">' + pending.length + ' to review \u00b7 ' + (c.confirmed || 0) + ' confirmed \u00b7 ' + (c.corrected || 0) + ' corrected</span></div>';
+    if (!pending.length) return '<div class="vq">' + head + '<div class="vq-empty">Nothing waiting. New calls are checked as they are graded.</div></div>';
+    var rows = pending.map(function (p) {
+      return '<div class="vq-row" id="vq-' + escapeHtml(p.call_id) + '">'
+        + '<div class="vq-main"><div class="vq-call">' + escapeHtml(p.title || 'Untitled call') + ' <span class="vq-meta">' + escapeHtml(formatNaturalDate(p.call_date)) + (p.rep ? ' \u00b7 ' + escapeHtml(p.rep) : '') + '</span></div>'
+        + '<div class="vq-reason">' + escapeHtml(p.reason || 'No reason was given.') + '</div></div>'
+        + '<div class="vq-actions">'
+        + '<button type="button" class="obj-btn" onclick="reviewVerdict(\'' + escapeHtml(p.call_id) + '\', \'confirm\')">Confirm: Not a Sales Call</button>'
+        + '<button type="button" class="obj-btn vq-correct" onclick="reviewVerdict(\'' + escapeHtml(p.call_id) + '\', \'correct\')">It Is a Sales Call</button>'
+        + '<button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(p.call_id) + '\')">Open</button>'
+        + '</div></div>';
+    }).join('');
+    return '<div class="vq">' + head + rows + '</div>';
+  }
+  function canSeeVerdictQueue() { return !!(state.me && (state.me.role === 'manager' || state.me.role === 'owner')); }
+  async function loadVerdictQueue() {
+    if (!canSeeVerdictQueue()) { state.verdictQueue = null; return; }
+    try {
+      var res = await fetch('/team/verdict-queue', { headers: authHeader() });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      state.verdictQueue = res.ok ? await res.json() : { _error: 'HTTP ' + res.status };
+    } catch (e) { state.verdictQueue = { _error: String((e && e.message) || e) }; }
+    var host = document.getElementById('verdictQueueHost');
+    if (host) host.innerHTML = verdictQueueHtml(state.verdictQueue);
+  }
+  async function reviewVerdict(callId, decision) {
+    var row = document.getElementById('vq-' + callId);
+    if (row) row.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    try {
+      var res = await fetch('/team/verdict-review', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ call_id: callId, decision: decision }) });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) { var d = null; try { d = await res.json(); } catch (e) {} throw new Error((d && d.error) || ('HTTP ' + res.status)); }
+      state.callLibraryCache = null;
+      await loadVerdictQueue();
+      if (decision === 'confirm') await loadCallLibrary(0);
+    } catch (err) {
+      if (row) row.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+      await scoutConfirm({ title: 'Could not save', body: String((err && err.message) || err), confirmText: 'OK' });
+    }
+  }
   function renderCallLibraryHeaderHtml() {
     var count = (state.callLibrary && state.callLibrary.length) || 0;
     var sub = state.callLibrary === null

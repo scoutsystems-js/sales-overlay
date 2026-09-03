@@ -25,8 +25,9 @@ test('⚠⚠ per-moment COACHING is gated on not_a_sales_call, like the harvest 
 });
 
 test('⚠⚠ marking a call RETRACTS what it already produced — a forward gate cannot un-say', () => {
-  const me = code('routes/me.js');
-  assert.ok(/retractExcludedCall\(admin, callId\)/.test(me),
+  /* ⚠ MOVED 2026-09-03 (H712): the retraction call site lives in lib/not-sales-mark.js (the ONE mark). */
+  const me = code('lib/not-sales-mark.js');
+  assert.ok(/retractExcludedCall\(admin, a\.callId\)/.test(me),
     'a call is almost always marked AFTER it was analysed, so by then its moments are in '
     + 'the knowledge base and its coaching is written. Measured before this shipped: 4 KB '
     + 'moments from 2 marked calls, one an internal check-up.');
@@ -41,10 +42,11 @@ test('⚠⚠ marking a call RETRACTS what it already produced — a forward gate
 });
 
 test('⚠ a failed retraction must NEVER roll back the mark', () => {
-  const me = code('routes/me.js');
+  /* ⚠ MOVED 2026-09-03 (H712): the retraction call site lives in lib/not-sales-mark.js (the ONE mark). */
+  const me = code('lib/not-sales-mark.js');
   // ⚠ anchor on the CALL SITE, not the import — indexOf finds the first
   // occurrence, which is the require at the top of the file.
-  const i = me.indexOf('retractExcludedCall(admin, callId)');
+  const i = me.indexOf('retractExcludedCall(admin, a.callId)');
   assert.ok(i !== -1, 'call site not found');
   const slice = me.slice(i, i + 900);
   assert.ok(slice.length > 500, 'slice must cover the block: ' + slice.length);

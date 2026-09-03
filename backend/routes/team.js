@@ -19,6 +19,7 @@ const METRIC_BAND = require('../lib/metric-band');
 var { withBoardOwner } = require('../lib/team-membership');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { markNotSalesCall } = require('../lib/not-sales-mark');   // H712: the ONE mark, shared with /me
 const { computeTeamAnalytics, computeTeamTrends } = require('../lib/team-analytics');
 const { buildRepSeries, OBJECTION_CATEGORIES } = require('../lib/rep-series');
 const TA = require('../lib/team-averages');
@@ -49,7 +50,9 @@ const { computeTeamObjectionSummary } = require('../lib/team-objection-summary')
 const router = express.Router();
 const teamGate = [requireAuth, requireRole(['manager', 'owner'])];
 
+var _adminOverride = null;   // H712: tests inject a fake through router._setAdminClientForTests
 function getAdmin() {
+  if (_adminOverride) return _adminOverride;
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('Supabase admin not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
   }
@@ -1045,4 +1048,80 @@ router.get('/objections/summary', teamGate, async function (req, res) {
 router._resolveTeam = resolveTeam;
 router._repIdsFor = repIdsFor;
 
+
+/* ⚠⚠ THE REVIEW QUEUE (Justin's ruling 2026-09-03, H712). Every "not a sales call" verdict the
+   grader writes (call_analyses.sales_call_verdict, v38+) lands here with its reason. A manager
+   (or above — teamGate; a closer confirming their own call is the H352 shape Justin has not
+   ruled) CONFIRMS or CORRECTS. NOTHING IS AUTO-MARKED: a confirmation goes through the ONE
+   not-a-sales-call mark (lib/not-sales-mark.js), the only thing that removes a call from a
+   rate. Confirmations and corrections are counted separately — a correction is data. */
+router.get('/verdict-queue', teamGate, async function (req, res) {
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var ids = team.memberIds || [];
+    if (!ids.length) return res.json({ pending: [], counts: { pending: 0, confirmed: 0, corrected: 0 } });
+    var calls = [];
+    for (var i = 0; i < ids.length; i += CHUNK) {
+      var cq = await admin.from('fathom_calls').select('id, user_id, title, call_date, not_a_sales_call')
+        .in('user_id', ids.slice(i, i + CHUNK)).is('duplicate_of', null).order('call_date', { ascending: false }).limit(1000);
+      if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+      calls = calls.concat(cq.data || []);
+    }
+    calls = realCallsOnly(calls);   // ⚠ every cross-user fathom_calls read filters synthetic rows (H369)
+    var byId = {}; calls.forEach(function (c) { byId[c.id] = c; });
+    var callIds = Object.keys(byId);
+    var verdicts = [];
+    for (var j = 0; j < callIds.length; j += CHUNK) {
+      var vq = await admin.from('call_analyses').select('fathom_call_id, sales_call_verdict, sales_call_reason, sales_call_reason_class, sales_call_review, sales_call_reviewed_at')
+        .in('fathom_call_id', callIds.slice(j, j + CHUNK)).eq('sales_call_verdict', 'not_sales');
+      if (vq.error) throw new Error('call_analyses: ' + vq.error.message);
+      verdicts = verdicts.concat(vq.data || []);
+    }
+    var nameOf = await nameMapFor(admin, ids);
+    var counts = { pending: 0, confirmed: 0, corrected: 0 };
+    var pending = [];
+    verdicts.forEach(function (v) {
+      var c = byId[v.fathom_call_id]; if (!c) return;
+      if (v.sales_call_review === 'confirmed') { counts.confirmed++; return; }
+      if (v.sales_call_review === 'corrected') { counts.corrected++; return; }
+      if (c.not_a_sales_call === true) { counts.confirmed++; return; }   // a person already marked it by the button
+      counts.pending++;
+      pending.push({ call_id: c.id, title: c.title || null, call_date: c.call_date, rep: nameOf[c.user_id] || null, user_id: c.user_id,
+                     reason: v.sales_call_reason || null, reason_class: v.sales_call_reason_class || null });
+    });
+    pending.sort(function (a, b) { return String(b.call_date || '').localeCompare(String(a.call_date || '')); });
+    res.json({ pending: pending, counts: counts });
+  } catch (err) { if (handleConfigError(err, res)) return; logTeamError('verdict-queue', err); res.status(500).json({ error: 'Failed to load the review queue' }); }
+});
+router.post('/verdict-review', teamGate, async function (req, res) {
+  var callId = req.body && req.body.call_id;
+  var decision = req.body && req.body.decision;
+  if (!callId || (decision !== 'confirm' && decision !== 'correct')) return res.status(400).json({ error: 'call_id and decision (confirm|correct) required' });
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var cq = await admin.from('fathom_calls').select('id, user_id, not_a_sales_call').eq('id', callId).maybeSingle();
+    if (cq.error) throw new Error('call lookup: ' + cq.error.message);
+    if (!cq.data || !realCallsOnly([cq.data]).length) return res.status(404).json({ error: 'Call not found' });   // a synthetic row is never reviewable (H369)
+    if ((team.memberIds || []).indexOf(cq.data.user_id) === -1) {
+      console.warn('[team] verdict-review denied: actor=%s call=%s owner=%s', req.user.id, callId, cq.data.user_id);
+      return res.status(403).json({ error: 'That call is not on your team' });
+    }
+    var actor = { id: req.user.id, role: req.userProfileRole || 'manager' };
+    var ownerProfile = { user_id: cq.data.user_id, managed_by: req.user.id };
+    var marked = null;
+    if (decision === 'confirm') {
+      /* ⚠ THE ONE MARK — never an update of not_a_sales_call here */
+      var row = await markNotSalesCall(admin, { callId: callId, ownerId: cq.data.user_id, actor: actor, ownerProfile: ownerProfile, marked: true, reanalyze: false });
+      marked = row.not_a_sales_call === true;
+    }
+    var st = await admin.from('call_analyses').update({ sales_call_review: decision === 'confirm' ? 'confirmed' : 'corrected', sales_call_reviewed_by: req.user.id, sales_call_reviewed_at: new Date().toISOString() })
+      .eq('fathom_call_id', callId);
+    if (st.error) throw new Error('review stamp: ' + st.error.message);
+    res.json({ ok: true, decision: decision, marked: marked });
+  } catch (err) { if (handleConfigError(err, res)) return; logTeamError('verdict-review', err); res.status(500).json({ error: 'Failed to save the review' }); }
+});
+
+router._setAdminClientForTests = function (factory) { _adminOverride = factory ? factory() : null; };   // H712
 module.exports = router;

@@ -217,6 +217,9 @@ test('⚠⚠ THE ENDPOINT ENFORCES SERVER-SIDE — not by hiding a button', () =
   const body = s.slice(at, at + 3200);
   assert.ok(/canMarkNotSalesCall\(/.test(body), 'it calls the predicate');
   assert.ok(/status\(403\)/.test(body), 'and REFUSES with 403 — the API is the boundary');
-  assert.ok(/not_sales_marked_role: markRoleFor\(/.test(body), 'records which role acted');
+  /* ⚠ MOVED 2026-09-03 (H712): the role stamp is written by the ONE mark in lib/not-sales-mark.js, which the route calls. */
+  assert.ok(/markNotSalesCall\(admin, \{ callId: callId, ownerId: ownerId, actor: actor, ownerProfile: ownerProfile, marked: marked \}\)/.test(body), 'the route writes through the one mark');
+  const lib = live(fs.readFileSync(path.join(ROOT, 'lib', 'not-sales-mark.js'), 'utf8'));
+  assert.ok(/not_sales_marked_role: markRoleFor\(/.test(lib), 'records which role acted');
   assert.ok(!/canTagOutcome\(/.test(body), 'must NOT use the outcome rule — it blocks managed reps');
 });

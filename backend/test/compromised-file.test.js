@@ -105,8 +105,10 @@ test('the detection NEVER overrules a person', () => {
 });
 
 test('a human mark clears the reason in BOTH directions', () => {
-  const upd = ME.slice(ME.indexOf("router.post('/calls/:id/not-a-sales-call'"));
-  assert.ok(upd.length > 500, 'route slice is too small');
+  /* ⚠ MOVED 2026-09-03 (H712): the mark's update lives in lib/not-sales-mark.js — the ONE mark shared by the
+     Calls-page button and the review queue's confirm. The subject (un-marking clears the reason) is unchanged. */
+  const upd = fs.readFileSync(path.join(__dirname, '..', 'lib', 'not-sales-mark.js'), 'utf8');
+  assert.ok(upd.length > 500, 'lib slice is too small');
   assert.ok(/exclusion_reason:\s*null/.test(upd),
     'un-marking must clear the reason or the call returns still wearing the badge');
 });

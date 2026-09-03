@@ -26,6 +26,7 @@ const { computeWhyFacts } = require('../lib/why-prose');
 const { nameKey } = require('../lib/prospect-entity');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { retractExcludedCall } = require('../lib/excluded-call-retraction');
+const { markNotSalesCall } = require('../lib/not-sales-mark');   // H712: the ONE mark
 const { VALID_OUTCOMES, TAGGABLE_OUTCOMES, effectiveCloseScore, canTagOutcome,
         canMarkNotSalesCall, markRoleFor } = require('../lib/outcome-tag');
 const { setCallKindHuman, earlierCallsFor } = require('../lib/call-kind');   // H706
@@ -1123,52 +1124,10 @@ router.post('/calls/:id/not-a-sales-call', requireAuth, async function (req, res
        Writing the human's id into not_sales_marked_by is what makes the
        override durable: the worker reads exactly that to know a person has
        spoken, and skips re-detecting the call on the re-analysis below. */
-    var up = await admin.from('fathom_calls').update({
-      not_a_sales_call:      marked,
-      exclusion_reason:      null,
-      not_sales_marked_by:   req.user.id,
-      not_sales_marked_at:   new Date().toISOString(),
-      not_sales_marked_role: markRoleFor(actor, ownerProfile),
-    }).eq('id', callId).select('id, not_a_sales_call, not_sales_marked_role').single();
-    if (up.error) throw new Error('update: ' + up.error.message);
-
-    /* ⚠⚠ RETRACT WHAT THE CALL ALREADY PRODUCED. The gates look FORWARD — a
-       marked call is never harvested or coached again — but a call is almost
-       always marked AFTER it was analysed, and by then its moments are in the
-       knowledge base and its coaching is written. A forward-only gate cannot
-       un-say something. Measured before this shipped: 4 KB moments from 2 marked
-       calls, one of them an internal check-up.
-       ⚠ AWAITED, unlike the re-analysis below, because it is a data correction
-       rather than an enrichment: the caller must not be told the call is excluded
-       while its moments are still teaching the knowledge base.
-       ⚠ Un-marking does not restore them — the re-analysis below regenerates
-       both from scratch, which is better than restoring stale text. */
-    if (marked) {
-      try {
-        var retraction = await retractExcludedCall(admin, callId);
-        console.log('[me] not-a-sales-call retraction: call=%s kb_deleted=%d coaching_cleared=%d%s',
-          callId, retraction.kb_deleted, retraction.coaching_cleared,
-          retraction.errors.length ? ' errors=' + retraction.errors.join('; ') : '');
-      } catch (e) {
-        // ⚠ NEVER roll back the mark over this. The mark is the user's decision;
-        // a failed retraction is a data-cleanup problem, logged and visible.
-        console.error('[me] not-a-sales-call retraction failed for %s: %s', callId, (e && e.message) || 'unknown');
-      }
-    }
-
-    /* ⚠ RE-ANALYSIS ON TOGGLE is fire-and-forget and MUST NOT gate the response.
-       The mark itself is already durable; making the user wait on a Claude run
-       would make a working button look dead, and a failed re-analysis must never
-       roll back a successful mark. */
-    try {
-      var worker = require('../lib/analysis-worker');
-      if (worker && typeof worker.analyzeCall === 'function') {
-        Promise.resolve(worker.analyzeCall(callId, ownerId)).catch(function (e) {
-          console.warn('[me] not-a-sales-call re-analysis failed (non-fatal):', e && e.message);
-        });
-      }
-    } catch (e) { /* never block the mark */ }
-
+    /* ⚠⚠ H712 — THE ONE MARK. The update, the retraction and the re-analysis live in
+       lib/not-sales-mark.js, shared with the review queue's confirm: one place removes a
+       call from a rate, so the queue can never become a second remover. */
+    var up = { data: await markNotSalesCall(admin, { callId: callId, ownerId: ownerId, actor: actor, ownerProfile: ownerProfile, marked: marked }) };
     return res.json({ ok: true, not_a_sales_call: up.data.not_a_sales_call,
                       marked_role: up.data.not_sales_marked_role });
   } catch (err) {
