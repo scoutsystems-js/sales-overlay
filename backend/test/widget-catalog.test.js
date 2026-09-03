@@ -83,11 +83,21 @@ test('every row carries its MEASUREMENT, not a claim', () => {
   });
 });
 
-test('⚠ the inverted target says so — a ceiling is not a floor', () => {
+test('⚠ RE-PINNED 2026-09-02 (H678): the inverted target is the NUMBER CARD\'s ceiling caption (H125) — the RANKED view reads the ruled BAND attached on the wire (H518), never this direction', () => {
+  /* Sweep block 6 read this assertion as "a guard pinning the ruling in reverse":
+     the entry says lower_is_better and carries no band, so the by-rep widget would
+     rank the shortest call first. The band travels on the wire — publicMetric
+     attaches lib/metric-band.js's band for every keyed metric — and the dashboard
+     ranks by it whenever a card has one. Executed end to end in
+     test/call-time-ranking-band.test.js. Both are asserted here so neither ruling
+     can be read as the other's reverse again. */
   const t = C.byKey('avg_call_time');
   assert.strictEqual(t.targetDirection, 'lower_is_better',
-    '60 minutes is a MAX. A gauge that reads it as a floor told a manager the '
+    '60 minutes is a MAX for the number card and the gauge. A gauge that reads it as a floor told a manager the '
     + 'team was failing at a 46-minute average.');
+  const served = C._publicMetric(t);
+  assert.deepStrictEqual(served.band && served.band.good, [35, 45], 'the served entry carries the ruled sweet spot — that is what the ranked view uses');
+  assert.deepStrictEqual(served.band && served.band.ok, [20, 60]);
   C.catalog().forEach((m) => {
     if (typeof m.target === 'number' && m.key !== 'avg_call_time') {
       assert.ok(m.targetDirection === undefined || m.targetDirection === 'higher_is_better',
