@@ -265,7 +265,10 @@ test('⚠⚠ the BANDED metric names BOTH edges — a caption must say which way
     A.countSentence({ meeting: 4, measured: 4, unmeasured: 1, total: 5 }, 'calltime'),
     '4 of 4 reps in the 35\u201345 min sweet spot · 1 not enough calls');
   assert.strictEqual(A.METRICS.calltime.thresholdPhrase, 'in the 35\u201345 min sweet spot');
-  assert.strictEqual(A.METRICS.calltime.targetCaption, 'Sweet spot 35\u201345 min');
+  /* ⚠ CONVERTED 2026-09-03 (H704): the caption under the call-time dial is GONE by ruling
+     ("an observed data point — no recommendations needed"); the band it named STAYS and
+     still says both edges through thresholdPhrase and the ranked views. */
+  assert.strictEqual(A.METRICS.calltime.targetCaption, null, 'no sentence under the dial; the band stays');
   assert.ok(!/max|below|above/i.test(A.METRICS.calltime.thresholdPhrase),
     'a one-directional word on a banded metric is the caption lying again');
   assert.strictEqual(A.METRICS.closing.thresholdPhrase, 'at or above target');

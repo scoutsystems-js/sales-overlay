@@ -74,5 +74,18 @@ test('⚠⚠ 1,050 prospect-attached calls → the rep\'s closing rate counts al
   assert.ok(r.body.prospect_reads && r.body.prospect_reads.truncated === false, 'the payload must say the prospect reads were complete: ' + JSON.stringify(r.body.prospect_reads));
   const calls = RANGES.fathom_calls.filter((rg) => rg[1] - rg[0] + 1 === PAGE || rg[0] > 0);
   assert.ok(calls.length >= 2, 'the prospect calls read must page: ranges ' + JSON.stringify(RANGES.fathom_calls));
-  assert.ok(RANGES.prospects.length >= 2 && RANGES.prospects.every((rg, i) => rg[0] === i * PAGE), 'the prospects read must page consecutively: ' + JSON.stringify(RANGES.prospects));
+  /* ⚠ RE-PINNED 2026-09-03 (H704): the overview now reads the prospect rates for TWO
+     windows at once (current + prior, for the rep-card arrows), so two readers' pages
+     interleave. The PROPERTY is that every reader pages consecutively to the end —
+     each page start appears once per reader and the starts run 0, 1000, … past N.
+     The old form pinned "exactly one reader", an implementation. */
+  const starts = RANGES.prospects.map((rg) => rg[0]);
+  const readers = starts.filter((x) => x === 0).length;
+  const distinct = [...new Set(starts)].sort((a, b) => a - b);
+  assert.ok(readers >= 1 && distinct.length >= 2, 'the prospects read must page: ' + JSON.stringify(RANGES.prospects));
+  distinct.forEach((st, i) => {
+    assert.strictEqual(st, i * PAGE, 'pages must be consecutive: ' + JSON.stringify(distinct));
+    assert.strictEqual(starts.filter((x) => x === st).length, readers, 'every reader must reach page ' + i + ': ' + JSON.stringify(RANGES.prospects));
+  });
+  assert.ok(distinct[distinct.length - 1] + PAGE >= N, 'the last page must reach past N');
 });

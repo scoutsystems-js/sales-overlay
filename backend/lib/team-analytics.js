@@ -13,11 +13,22 @@ var { DQ_OUTCOME } = require('./dq-exclusion');
 var { countsAsObjection } = require('./objection-strict');
 var { weakestSection, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
 var { isHandled } = require('./objection-handled');
+var { MIN_BUCKET } = require('./team-needs-work');   // H704: the one comparison floor for the card arrows
 // ⚠ ONE definition of "synthetic" — shared with lib/team-synthesis.js (the team
 // loader) and lib/team-objections.js (the drilldown). Never re-expressed here.
 var { realCallsOnly } = require('./real-calls');
 
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
+/* H704 — movement since the prior window. cur/prior: the two values (null =
+   unmeasured); curN/priorN: each window's sample; floor: the comparison floor
+   BOTH must clear; decimals: 0 for rates (points), 1 for minutes. Returns null
+   when it cannot be said, 0 when flat. A floor guards a COMPARISON, never a count. */
+function repDelta(cur, prior, curN, priorN, floor, decimals) {
+  if (typeof cur !== 'number' || !isFinite(cur) || typeof prior !== 'number' || !isFinite(prior)) return null;
+  if (!(curN >= floor) || !(priorN >= floor)) return null;
+  var k = Math.pow(10, decimals || 0);
+  return Math.round((cur - prior) * k) / k;
+}
 
 // One window's raw per-rep accumulation. Returns { rep: {id: {...}}, done_call_ids }.
 async function aggregateWindow(admin, repIds, from, to) {
@@ -162,6 +173,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
     fetchProspectCloseRates(admin, repIds, from, to),
     aggregateWindow(admin, repIds, from, to),
     aggregateWindow(admin, repIds, priorFrom, from),
+    fetchProspectCloseRates(admin, repIds, priorFrom, from),   // H704: the prior window's closing rate, for the arrow
     repIds.length > 0 ? Promise.all([
       admin.from('fathom_connections').select('user_id').in('user_id', repIds),
       admin.from('call_connections').select('user_id').in('user_id', repIds),
@@ -171,6 +183,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
   var prospectRates = all[0], cur = all[1];
   // prior window = same length immediately before `from`
   var prior = all[2];
+  var priorProspectRates = all[3] || {};   // H704
 
   // Names for the rep cards — resolved through the shared helper (real name when
   // set, email prefix fallback otherwise), so the fallback lives in one place.
@@ -185,7 +198,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
      and this drives a badge that accuses someone by name. */
   var connectedSet = {};
   if (repIds.length > 0) {
-    var conns = all[3];
+    var conns = all[4];
     var connErr = conns.some(function (c) { return !!c.error; });
     if (connErr) {
       console.error('[team-analytics] connection lookup failed — nobody will be reported unconnected');
@@ -199,7 +212,7 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
 
   var profileMap = {};
   if (repIds.length > 0) {
-    var profs = all[4];
+    var profs = all[5];
     if (!profs.error) (profs.data || []).forEach(function (p) { profileMap[p.user_id] = p; });
   }
 
@@ -267,6 +280,17 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       time_to_price: c.price_n > 0 ? Math.round((c.price_sum / c.price_n / 60) * 10) / 10 : null,
       prior_avg_score: priAvg,
       trend: trend,
+      /* ⚠⚠ H704 — THE THREE ARROWS' DELTAS, computed HERE so the page has no rule:
+         movement since the prior window, floored on BOTH windows (MIN_BUCKET), null
+         when either side is unmeasured or too small (the partial-period trap: a
+         Tuesday's three calls never produce a red arrow). No judgement — a sign. */
+      close_delta: repDelta((prospectRates[id] || {}).pct, (priorProspectRates[id] || {}).pct,
+                            (prospectRates[id] || {}).total, (priorProspectRates[id] || {}).total, MIN_BUCKET),
+      obj_delta:   repDelta(c.obj_total > 0 ? Math.round((c.obj_handled / c.obj_total) * 100) : null,
+                            p.obj_total > 0 ? Math.round((p.obj_handled / p.obj_total) * 100) : null,
+                            c.obj_total, p.obj_total, MIN_BUCKET),
+      time_delta:  repDelta(c.dur_n > 0 ? c.dur_sum / c.dur_n / 60 : null, p.dur_n > 0 ? p.dur_sum / p.dur_n / 60 : null,
+                            c.dur_n, p.dur_n, MIN_BUCKET, 1),
       win_mean: avg(c.win_sum, c.win_n),
       win_n: c.win_n,
     /* ⚠ CASH REMOVED FROM THIS PAYLOAD 2026-08-25 (Justin): "we don't track
@@ -456,6 +480,7 @@ async function computeTeamTrends(admin, repIds, bucket, from, to) {
 
 module.exports = {
   computeTeamAnalytics: computeTeamAnalytics,
+  repDelta: repDelta,   // H704
   computeTeamTrends: computeTeamTrends,
   _aggregateWindow: aggregateWindow,
   // Exported for lib/rep-series.js (10a) so the manager board's weekly buckets

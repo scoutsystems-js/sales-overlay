@@ -19,14 +19,17 @@ const LIVE = stripComments(HTML);
 
 const { liveCard, JOSH, DRE, DANIEL, STATE } = require('./helpers/rep-card-live');   /* ⚠ the harness moved to a helper (2026-09-02) so the rendered-border guard drives the SAME card */
 
-test('⚠⚠ the card leads with the closing rate AND its counts; movement sits by the GRADE, never by the closes', () => {
+test('⚠⚠ the card leads with the closing rate AND its counts; the band is the NAME (the grade chip and call count are gone — H704)', () => {
+  /* ⚠ CONVERTED 2026-09-03 (H704). Was: "movement sits by the GRADE, never by the
+     closes" — the chip read "▼ 3 vs prior period" in the name band. Justin: over-
+     labelling. The movement is now an ARROW beside each of the three values with
+     no words; the subject that survives is NEVER DIMINISH and the counts riding
+     with the rate. The arrows themselves are pinned in test/rep-card-arrows.test.js. */
   const html = liveCard()(STATE)(JOSH);
-  assert.ok(/rep-card-lead-val[^>]*>24%</.test(html), 'headline is the closing rate');
+  assert.ok(/rep-card-lead-val[^>]*>24%/.test(html), 'headline is the closing rate');
   assert.ok(html.indexOf('29 of 121 prospects') !== -1, 'the counts ride with the rate');
   const band = html.slice(html.indexOf('rep-card-band'), html.indexOf('rep-card-body'));
-  const lead = html.slice(html.indexOf('rep-card-lead'), html.indexOf('rep-card-bars'));
-  assert.ok(/rep-move[^>]*>[^<]*▼ 3 vs prior period/.test(band), 'the movement chip is in the name band: ' + band.slice(0, 300));
-  assert.ok(!/rep-move/.test(lead), 'no movement clause anywhere near the closes');
+  assert.ok(!/rep-move|prior period|rep-card-calls/.test(band), 'the band is the name: ' + band.slice(0, 300));
   assert.ok(!/\b(but|however)\b/i.test(html.replace(/<[^>]+>/g, ' ')), 'never diminish: no subtracting clause');
 });
 
@@ -46,7 +49,7 @@ test('⚠ banded metrics state their side; unmeasured is named, never drawn as z
   assert.ok(/47\.3[\s\S]{0,140}rep-side">over</.test(josh), '47.3 min OVER: ' + josh.slice(josh.indexOf('47.3') - 40, josh.indexOf('47.3') + 160));
   const dre = liveCard()(STATE)(DRE);
   assert.ok(/44\.1[\s\S]{0,120}in the band/i.test(dre), '44.1 min · in the band');
-  assert.ok(!/rep-move/.test(dre), 'no prior period → no movement chip');
+  assert.ok(!/rep-move|rep-delta/.test(dre), 'no prior period → no chip, no arrow');
   assert.ok(/not enough objections yet/i.test(dre), 'weakest objection unmeasured is said, not zeroed');
   const dan = liveCard()(STATE)(DANIEL);
   assert.ok(/No graded calls in this range/.test(dan) && /not a zero/.test(dan), 'the unmeasured card says so');

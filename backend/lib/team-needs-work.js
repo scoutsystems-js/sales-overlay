@@ -802,6 +802,7 @@ async function computePersonalNeedsWork(admin, userId, from, to) {
 }
 
 module.exports = {
+  MIN_BUCKET: MIN_BUCKET,   // ⚠ the ONE comparison floor (H660, H704) — the rep-card arrows floor BOTH windows on it
   computeTeamNeedsWork: computeTeamNeedsWork,
   computePersonalNeedsWork: computePersonalNeedsWork,
   loadBucketEvidence: loadBucketEvidence,

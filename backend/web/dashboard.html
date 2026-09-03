@@ -2548,9 +2548,10 @@
     .rep-mono { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-deep); border: 1px solid var(--border-strong); color: var(--text);
                 display: flex; align-items: center; justify-content: center; font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); letter-spacing: .03em; flex: none; }
     .rep-card-name { font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); }
-    .rep-move { font-size: var(--fs-label); white-space: nowrap; color: var(--text); }
-    .rep-move.up { color: var(--good); } .rep-move.down { color: var(--bad); }
-    .rep-card-calls { margin-left: auto; font-size: var(--fs-label); color: var(--text); opacity: .75; white-space: nowrap; }
+    /* ⚠ H704: the arrow — one rule per DIRECTION, never per metric; no words, no judgement. */
+    .rep-delta { font-size: var(--fs-label); font-weight: var(--fw-emphasis); margin-left: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; vertical-align: baseline; }
+    .rep-delta.up { color: var(--good); }
+    .rep-delta.down { color: var(--bad); }
     .rep-card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; padding: 16px 18px; }
     /* ⚠ THE GAUGES' STEP, NOT --fs-display (Justin, 2026-09-02, reversing "go big" once told eight
        cards at 48 is eight loud numbers): --fs-display stays the ONE loud number on a page. */
@@ -12312,7 +12313,11 @@
     // rates. Rebuilding it here from m.target alone is what produced "Target 60
     // min" on a metric where 60 is the limit — a caption that survives a
     // screenshot and reads as the opposite of the rule.
-    var targetCap = m.target_caption || ('Target ' + m.target + (m.unit === 'min' ? ' min' : '%'));
+    /* ⚠ H704: a NULL caption means "no sentence under this dial" (the call-time
+       band, by ruling) — never fall back to inventing "Target 40 min". Only an
+       ABSENT caption (undefined) takes the legacy fallback. */
+    var targetCap = (m.target_caption === null) ? '' : (m.target_caption || ('Target ' + m.target + (m.unit === 'min' ? ' min' : '%')));
+    var targetCapHtml = targetCap ? '<div class="avg-target-cap">' + targetCap + '</div>' : '';
 
     if (m.value === null || m.value === undefined) {
       // ⚠ WITHHELD, NOT ZEROED. A dial reading 0 claims the team achieved
@@ -12320,7 +12325,7 @@
       return '<div class="avg-card avg-card-empty">'
         + '<div class="avg-name">' + escapeHtml(m.label) + '</div>'
         + '<div class="avg-empty">Not enough to measure<span>' + escapeHtml(m.reason || '') + '</span></div>'
-        + '<div class="avg-target-cap">' + targetCap + '</div></div>';
+        + targetCapHtml + '</div>';
     }
 
     var valueText = (m.unit === 'min')
@@ -12345,7 +12350,7 @@
       + '<div class="avg-name">' + escapeHtml(m.label) + '</div>'
       + '<div class="avg-dial">' + avgGaugeSvg(m.value, m.target, m.scale, band, m.sweet_spot)
       + '<div class="avg-readout"><div class="avg-value avg-value-' + band + '">' + valueText + '</div>'
-      + '<div class="avg-target-cap">' + targetCap + '</div></div></div>'
+      + targetCapHtml + '</div></div>'
       + '<div class="avg-counts">' + escapeHtml(counts) + '</div>'
       /* ⚠⚠ THE REPS SUB-LINE IS REMOVED (Justin, live 2026-09-01). It read
          "3 of 7 reps at or above target · 2 not enough calls" — Scout
@@ -14823,13 +14828,21 @@
     if (value > band.good[1]) return 'over';
     return 'in';
   }
-  function repMovementHtml(r) {
-    if (typeof r.avg_score !== 'number' || typeof r.prior_avg_score !== 'number') return '';
-    var d = r.avg_score - r.prior_avg_score;
-    if (d === 0) return '<span class="rep-move flat">\u2014 same as prior period</span>';
-    return '<span class="rep-move ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '\u25B2' : '\u25BC') + ' ' + Math.abs(d) + ' vs prior period</span>';
+  /* ⚠⚠ THE ARROW (Justin, 2026-09-03, H704). Replaces the grade chip "▼ 4 vs prior
+     period · 143 calls": a small coloured arrow to the right of the value and the
+     change — NOTHING ELSE. It tracks movement since the prior window and carries
+     NO judgement: up = went up, down = went down, colour follows direction,
+     identical for closing %, objections handled and avg call time (a longer call
+     is "up" and green). Whether a move is good is the band's, the gauge's and the
+     rankings' job — two signals, two jobs. The delta arrives from the server
+     already floored on BOTH windows (team-analytics repDelta): null or 0 → no
+     arrow, no placeholder, no words. */
+  function repDeltaHtml(d, unit) {
+    if (typeof d !== 'number' || !isFinite(d) || d === 0) return '';
+    var up = d > 0;
+    return '<span class="rep-delta ' + (up ? 'up' : 'down') + '">' + (up ? '\u25B2' : '\u25BC') + ' ' + Math.abs(d) + (unit === 'min' ? ' min' : '%') + '</span>';
   }
-  function repBandStatHtml(value, bandKey, label) {
+  function repBandStatHtml(value, bandKey, label, delta) {
     var bands = (state.teamOverview && state.teamOverview.bands) || {};
     var band = bands[bandKey] || null;
     if (typeof value !== 'number' || !isFinite(value)) {
@@ -14837,7 +14850,7 @@
     }
     var side = bandSideOf(value, band);
     return '<div class="rep-stat"><div class="rep-stat-val">' + value + ' <small>min</small>'
-      + ((side && side !== 'in') ? '<em class="rep-side">' + side + '</em>' : '') + '</div>'
+      + ((side && side !== 'in') ? '<em class="rep-side">' + side + '</em>' : '') + repDeltaHtml(delta, 'min') + '</div>'
       + '<div class="rep-stat-label">' + escapeHtml(label) + (side === 'in' ? ' \u00b7 in the band' : '') + '</div></div>';
   }
   function repSectionBarsHtml(sections, weakest) {
@@ -14876,8 +14889,8 @@
     var open = '<div class="rep-card" onclick="setUser(\'' + escapeHtml(r.user_id) + '\')"'
       + ' title="Open ' + escapeHtml(repName(r)) + '\'s report">';
     var band = '<div class="rep-card-band">' + repMonogram(repName(r))
-      + '<div class="rep-card-name">' + escapeHtml(repName(r)) + '</div>' + repMovementHtml(r)
-      + '<div class="rep-card-calls">' + (r.calls_analyzed > 0 ? r.calls_analyzed + ' call' + (r.calls_analyzed === 1 ? '' : 's') : 'no graded calls') + '</div></div>';
+      /* ⚠ H704: the band is the name — the grade chip and the call count are gone (over-labelling). */
+      + '<div class="rep-card-name">' + escapeHtml(repName(r)) + '</div></div>';
     /* ⚠ UNMEASURED IS NOT ZERO: a rep with no graded call in the range gets a
        sentence, never a row of zeros and empty bars. */
     if (!(r.calls_analyzed > 0)) {
@@ -14895,16 +14908,16 @@
              it is worded. */
           + '<div class="rep-card-lead">'
             + (measuredClose
-                ? '<div class="rep-card-lead-val">' + escapeHtml(close.value) + '</div><div class="rep-card-lead-label">Closing rate</div>'
+                ? '<div class="rep-card-lead-val">' + escapeHtml(close.value) + repDeltaHtml(r.close_delta, '%') + '</div><div class="rep-card-lead-label">Closing rate</div>'
                   + '<div class="rep-card-lead-sub">' + escapeHtml(close.sub) + '</div>'
                 : '<div class="rep-card-lead-none">No prospects yet</div><div class="rep-card-lead-label">Closing rate</div>')
             + '</div>'
           + '<div class="rep-stat">'
             + (r.obj_total > 0
-                ? '<div class="rep-stat-val">' + r.obj_handle_rate + '%</div><div class="rep-stat-label">Objections handled \u00b7 ' + r.obj_handled + ' of ' + r.obj_total + '</div>'
+                ? '<div class="rep-stat-val">' + r.obj_handle_rate + '%' + repDeltaHtml(r.obj_delta, '%') + '</div><div class="rep-stat-label">Objections handled \u00b7 ' + r.obj_handled + ' of ' + r.obj_total + '</div>'
                 : '<div class="rep-stat-none-val">No objections yet</div><div class="rep-stat-label">Objections handled</div>')
             + '</div>'
-          + repBandStatHtml(r.avg_call_time, 'avg_call_time', 'Avg call time')
+          + repBandStatHtml(r.avg_call_time, 'avg_call_time', 'Avg call time', r.time_delta)
         + '</div>'
         + repSectionBarsHtml(sections, r.weakest_section)
         + '<div class="rep-card-foot">' + repWeakestObjectionHtml(r.weakest_objection)

@@ -107,9 +107,14 @@ const METRICS = {
     target: CALLTIME_TARGET_MIN, scale: CALLTIME_SCALE_MAX,
     unit: 'min', unitName: 'call', numeratorName: null,
     band: METRIC_BAND.bandFor('avg_call_time'),
-    // "Sweet spot", not "Max" — the caption has to say which way it points, and
-    // a band points BOTH ways. A screenshot has to carry that too.
-    targetCaption: 'Sweet spot 35\u201345 min',
+    /* ⚠ NO CAPTION UNDER THIS DIAL (Justin, 2026-09-03, H704): "average call time
+       is just an observed data point — no recommendations needed", and the
+       sentence overlapped the gauge. THE BAND STAYS: it colours the reading and
+       drives the ranked views; it just stops being narrated under a dial (the
+       same class as the dial sub-lines already removed). The other two dials'
+       "Target N%" captions were REPORTED, not removed — Justin rules on those.
+       Was: targetCaption: 'Sweet spot 35–45 min'. */
+    targetCaption: null,
     thresholdPhrase: 'in the 35\u201345 min sweet spot',
   },
 };
