@@ -62,7 +62,7 @@ test('⚠⚠ RENDERED under each host view: every rep card has a 1px WHITE edge 
 });
 
 test('⚠ the exception is recorded beside the token, so the next sweep reads it before removing it', () => {
-  const at = HTML.indexOf('--rep-card-edge: #ffffff;');
+  const at = HTML.indexOf('--edge-white: #ffffff;');   /* promoted from --rep-card-edge on 2026-09-03 — the background switch shares it */
   assert.ok(at !== -1, 'the token exists');
   const above = HTML.slice(Math.max(0, at - 900), at);
   assert.ok(/DELIBERATE EXCEPTION/.test(above) && /playing card/.test(above), 'the ruling is stated where the value lives');

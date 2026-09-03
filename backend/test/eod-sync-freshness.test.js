@@ -94,9 +94,11 @@ test('⚠ THE PAGE RENDERS THE NOTE, and above the list rather than under it', (
   const html = fs2.readFileSync(path2.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
   const live = stripComments(html);
   assert.ok(/function eodSyncNoteHtml/.test(live), 'the helper must exist');
-  assert.ok(/\+ eodSyncNoteHtml\(d\.sync\)/.test(live),
-    'and be CALLED — a builder nothing calls is the defect shape this codebase keeps hitting');
-  const i = live.indexOf('+ eodSyncNoteHtml(d.sync)');
+  /* ⚠ RE-PINNED 2026-09-03 (D-9, H688): the call is guarded on the lane — `d.sync` on a
+     still-loading lane threw on a direct entry to the view. The builder is still called. */
+  assert.ok(/\+ \(d \? eodSyncNoteHtml\(d\.sync\) : ''\)/.test(live),
+    'and be CALLED, guarded on the lane — a builder nothing calls is the defect shape this codebase keeps hitting');
+  const i = live.indexOf("+ (d ? eodSyncNoteHtml(d.sync) : '')");
   const j = live.indexOf('+ toolbar + body', i);
   assert.ok(j > i, 'the note must render ABOVE the toolbar and list');
 });

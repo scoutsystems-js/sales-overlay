@@ -113,7 +113,11 @@
          to re-open the scale rather than declare a fourth. */
       --fs-company: 24px;
 
-      /* ⚠⚠ THE REP CARD'S EDGE — A DELIBERATE EXCEPTION, NOT AN OVERSIGHT (Justin,
+      /* ⚠⚠ THE WHITE EDGE — THE PRODUCT'S ONE WHITE, PROMOTED TO A SHARED NAME (2026-09-03).
+         Born as the rep card's edge; the background switch reuses it (Justin: "like we do
+         with everything else"). Never declare a second white — two tokens for one colour is
+         the duplication this codebase keeps paying for.
+         THE REP CARD'S EDGE — A DELIBERATE EXCEPTION, NOT AN OVERSIGHT (Justin,
          2026-09-02: "so it looks like a playing card"). The design pass removed
          borders everywhere and replaced them with space; the rep card is the ONE
          surface where the border IS the metaphor — the same standing as the
@@ -121,7 +125,7 @@
          product. A later sweep must not remove it; a `border: 0` shorthand once
          destroyed the verdict exemption with nothing failing, so this one is
          guarded on the RENDERED result (test/rep-card-border-rendered.test.js). */
-      --rep-card-edge: #ffffff;
+      --edge-white: #ffffff;
 
       /* ⚠ THE SIDEBAR'S WIDTH IS A LAYOUT CONSTANT READ IN TWO PLACES — the
          page's left margin AND the mesh band's gutter maths. One token, or the
@@ -775,7 +779,28 @@
     @media (prefers-contrast: more) { body[data-view]::before { display: none; } }
 
     a { color: inherit; text-decoration: none; }
-    button { font-family: inherit; cursor: pointer; }
+    /* ⚠⚠ CONTROLS INHERIT BY CAPABILITY, NOT BY ENUMERATION (D-1, 2026-09-03). Before this
+       the only base rule was `button { font-family: inherit }`; inputs were dressed one
+       TYPE at a time (`input[type="text"]`, `.eod-input`…), so every unlisted type and
+       every <select> fell to the browser — an email box 22px of white Arial beside two
+       styled name fields, a white select inside the Need-help dialog, Arial on all
+       twenty outcome dropdowns. Justin named two; the product had dozens. Every control
+       now inherits the face, the size and the colour, every field-like control gets the
+       field surface and the small radius, and the specific rules override from there.
+       Guard: test/controls-inherit-rendered.test.js (rendered, with the inverse check). */
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]),
+    select, textarea {
+      background: var(--bg-field); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+      color: var(--text); padding: 8px 10px; box-sizing: border-box;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    input[type="file"]::file-selector-button {
+      font: inherit; color: var(--text); background: var(--bg-field); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm); padding: 4px 10px; margin-right: 8px; cursor: pointer;
+    }
+    input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
     /* ── Top bar ───────────────────────────────────────────────────── */
     /* TABULAR NUMERALS ON EVERY NUMERIC SURFACE. Proportional digits change
@@ -1003,6 +1028,16 @@
     }
     .top-bar-right { display: flex; align-items: center; gap: 20px; font-size: 13px; color: var(--text); }
     .top-bar-right a:hover { color: var(--text); }
+    /* ⚠ THE BACKGROUND SWITCH — see the markup note. The edge is ALWAYS there (ruled): a
+       fill change must not move a pixel, and a black square on a black bar needs a frame
+       to exist. Focus is the accent ring every control here uses. */
+    .bg-switch { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0;
+                 font-size: var(--fs-secondary); color: var(--text); cursor: pointer; line-height: 1; }
+    .bg-switch-box { width: 14px; height: 14px; border: 1px solid var(--edge-white); border-radius: 0;
+                     background: var(--accent); box-sizing: border-box; display: inline-block; }
+    .bg-switch[aria-checked="false"] .bg-switch-box { background: #000000; }
+    .bg-switch:hover .bg-switch-label { color: var(--accent); }
+    .bg-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
     .signout { cursor: pointer; }
     .signout:hover { color: var(--text); }
 
@@ -2480,8 +2515,8 @@
        which varies) and the lit weakest bar (the accent). */
     .rep-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; margin-top: 12px; }
     /* ⚠ PLAYING CARD (Justin, 2026-09-02): a WHITE edge and the large radius — the ruled
-       exception recorded at --rep-card-edge. Hover keeps the accent edge (the click affordance). */
-    .rep-card { border: 1px solid var(--rep-card-edge); border-radius: var(--radius-lg); background: var(--bg-elevated); overflow: hidden;
+       exception recorded at --edge-white. Hover keeps the accent edge (the click affordance). */
+    .rep-card { border: 1px solid var(--edge-white); border-radius: var(--radius-lg); background: var(--bg-elevated); overflow: hidden;
                 cursor: pointer; transition: border-color .15s var(--ease), transform .1s var(--ease); }
     .rep-card:hover { border-color: var(--accent); transform: translateY(-1px); }
     .rep-card-band { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg-deep); border-bottom: 1px solid var(--border); }
@@ -4357,7 +4392,7 @@
     }
 
     /* ⚠⚠ THE REP CARD IS EXEMPT FROM THIS SWEEP (Justin, 2026-09-02 — see
-       --rep-card-edge). The 2026-09-01 version of this block took the rep cards
+       --edge-white). The 2026-09-01 version of this block took the rep cards
        to hairline rows ("NO NESTED CONTAINERS … a boundary you read rather than
        a frame you see") — and it was still winning on 2026-09-02 after the
        white edge shipped, because it is scoped to the view and the rendered
@@ -5024,7 +5059,9 @@
 
     .kb-form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
     .kb-form-label { font-size: 11px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.4px; }
-    .kb-form-row input[type="text"],
+    /* ⚠ EVERY input in a form row, not `[type="text"]` (D-1): the Add-rep EMAIL box was the
+       one unlisted type and rendered 22px of white Arial beside two styled name fields. */
+    .kb-form-row input,
     .kb-form-row select {
       width: 100%;
       background: var(--bg3);
@@ -5239,6 +5276,19 @@
     <!-- ⚠ Admin's visibility rule is UNTOUCHED: init() reveals it for role
          'owner' and nothing here changes who sees it. -->
     <a href="/admin" id="adminLink" style="display:none">Admin</a>
+    <!-- ⚠⚠ THE BACKGROUND SWITCH (Justin, 2026-09-03). "Background" is the visible label;
+         the square is the state: Scout green fill when the artwork is ON, black fill when
+         it is OFF, and a 1px WHITE edge ALWAYS (--edge-white) — the two states differ by
+         fill alone; the shape never moves and the outline never appears or disappears.
+         Top bar, between Admin and My Account: this row is who you are and how your
+         Scout is set up; the sidebar is where you go. It is a real <button role="switch">
+         with an accessible name and aria-checked, so a screen reader hears what it
+         toggles and which state it is in. The Account page's Display checkbox is the SAME
+         setting's second door — both call setBackgroundOff, which syncs both. -->
+    <button type="button" id="bgSwitch" class="bg-switch" role="switch" aria-checked="true"
+            aria-label="Background artwork" title="Turn the background artwork off" onclick="toggleBackground()">
+      <span class="bg-switch-label">Background</span><span class="bg-switch-box" aria-hidden="true"></span>
+    </button>
     <!-- ⚠⚠ A LABEL WHERE A VALUE USED TO BE. This printed the raw signed-in
          email — the same defect as an admin dropdown printing a manager's
          address where a company name belongs. It NAVIGATES to the account page,
@@ -6020,6 +6070,7 @@
   }
 
   async function init() {
+    syncBackgroundControls();   // the top-bar switch reflects the stored setting before anything else paints
     // ─── Fathom OAuth popup handoff (must run BEFORE any auth/render so the
     // popup closes quickly without flashing the dashboard inside it). ───
     // When the Fathom OAuth callback redirects the popup to
@@ -15765,7 +15816,24 @@
       if (off) document.documentElement.setAttribute('data-bg', 'off');
       else document.documentElement.removeAttribute('data-bg');
     } catch (e) {}
+    syncBackgroundControls();
   }
+  /* ⚠⚠ ONE SETTING, TWO DOORS, NEVER OUT OF STEP (2026-09-03). The top-bar switch and the
+     Account page's Display checkbox both call setBackgroundOff, and the setter re-reads the
+     stored value into BOTH controls — so neither can show a state the other does not. */
+  function syncBackgroundControls() {
+    var off = backgroundIsOff();
+    try {
+      var sw = document.getElementById('bgSwitch');
+      if (sw) {
+        sw.setAttribute('aria-checked', off ? 'false' : 'true');
+        sw.setAttribute('title', off ? 'Turn the background artwork on' : 'Turn the background artwork off');
+      }
+      var cb = document.getElementById('acctBgOff');
+      if (cb) cb.checked = off;
+    } catch (e) {}
+  }
+  function toggleBackground() { setBackgroundOff(!backgroundIsOff()); }
 
   function renderAccountView() {
     var content = document.getElementById('content');
@@ -16204,7 +16272,7 @@
       + (daySummary ? '<div class="eod-summary">' + escapeHtml(daySummary) + '</div>' : '')
       // ⚠ ABOVE the toolbar and the list: a caveat under the calls is a caveat
       // nobody reads, and this one changes how the count should be read.
-      + eodSyncNoteHtml(d.sync)
+      + (d ? eodSyncNoteHtml(d.sync) : '')   /* ⚠ D-9 (2026-09-03): the toolbar is built BEFORE the null-lane branch below; `d.sync` on a still-loading lane threw on a direct entry to the view */
       + toolbar + body + '</div>';
   }
 

@@ -13,9 +13,9 @@
        ⚠ WHAT WAS WRONG: this class also dressed the CATEGORY chip, which is an
        ordinary word ("Grading", "Sync"). Monospace made a label look like an
        identifier. The category now has its own class. */
-    .support-cat-admin, .support-ref-admin { font-size: 13px;
+    .support-cat-admin, .support-ref-admin { font-size: var(--fs-secondary);
       background: var(--bg-field); border: 1px solid var(--border-strong);
-      border-radius: 4px; padding: 1px 6px; }
+      border-radius: var(--radius-sm); padding: 1px 6px; }
     .support-ref-admin { font-family: ui-monospace, Menlo, monospace; }
     /* Three-section admin layout:
          A — user management (top, full width)
@@ -37,10 +37,10 @@
       justify-content: space-between;
       padding: 14px 24px;
       border-bottom: 1px solid var(--border);
-      background: rgba(8,11,13,0.95);
+      background: var(--bg);
     }
-    .admin-top-left { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
-    .admin-top-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+    .admin-top-left { display: flex; align-items: center; gap: 10px; font-size: var(--fs-body); font-weight: var(--fw-emphasis); }
+    .admin-top-right { display: flex; align-items: center; gap: 16px; font-size: var(--fs-secondary); color: var(--muted); }
     .admin-top-right .signout { cursor: pointer; }
     .admin-top-right .signout:hover { color: var(--text); }
 
@@ -65,17 +65,17 @@
       flex-wrap: wrap;
     }
     .users-header h2 {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: var(--fs-body);
+      font-weight: var(--fw-emphasis);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--muted);
     }
     .btn-add-user {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: var(--fs-secondary);
+      font-weight: var(--fw-emphasis);
       padding: 7px 14px;
-      border-radius: 7px;
+      border-radius: var(--radius-sm);
       border: 1px solid var(--border);
       background: transparent;
       color: var(--text);
@@ -86,29 +86,29 @@
 
     /* Create-user modal + editable-field status (Stage 4 console) */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-    .modal-box { background: #16181d; border: 1px solid var(--border); border-radius: 10px; padding: 24px; width: 420px; max-width: 92vw; }
-    .modal-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
-    .modal-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
-    .modal-input, .modal-select { display: block; width: 100%; margin-top: 5px; font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-family: inherit; }
+    .modal-box { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; width: 420px; max-width: 92vw; }
+    .modal-title { font-size: var(--fs-body); font-weight: var(--fw-emphasis); color: var(--text); margin-bottom: 16px; }
+    .modal-label { display: block; font-size: var(--fs-label); color: var(--muted); margin-bottom: 14px; }
+    .modal-input, .modal-select { display: block; width: 100%; margin-top: 5px; font-size: var(--fs-secondary); padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-family: inherit; }
     .modal-input:focus, .modal-select:focus { outline: none; border-color: var(--green); }
-    .modal-err { font-size: 12px; color: #f87171; margin-bottom: 10px; }
+    .modal-err { font-size: var(--fs-label); color: var(--bad); margin-bottom: 10px; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
-    .btn-modal-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 7px; border: none; background: var(--green); color: #0b1f12; cursor: pointer; font-family: inherit; }
+    .btn-modal-primary { font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); padding: 8px 16px; border-radius: var(--radius-sm); border: none; background: var(--green); color: #0b1f12; cursor: pointer; font-family: inherit; }
     .btn-modal-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-modal-secondary { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; }
-    .cu-created-msg { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 14px; }
-    .cu-email-status { font-size: 13px; margin: 6px 0 10px; }
-    .temp-pw-box { display: flex; align-items: center; gap: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-bottom: 16px; }
-    .temp-pw-box code { font-size: 14px; color: var(--green); font-family: ui-monospace, Menlo, monospace; flex: 1; word-break: break-all; }
-    .btn-copy { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-family: inherit; }
-    .field-status { font-size: 12px; margin-left: 6px; }
+    .btn-modal-secondary { font-size: var(--fs-secondary); font-weight: var(--fw-emphasis); padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; }
+    .cu-created-msg { font-size: var(--fs-secondary); color: var(--text); line-height: 1.5; margin-bottom: 14px; }
+    .cu-email-status { font-size: var(--fs-secondary); margin: 6px 0 10px; }
+    .temp-pw-box { display: flex; align-items: center; gap: 10px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 16px; }
+    .temp-pw-box code { font-size: var(--fs-body); color: var(--green); font-family: ui-monospace, Menlo, monospace; flex: 1; word-break: break-all; }
+    .btn-copy { font-size: var(--fs-label); font-weight: var(--fw-emphasis); padding: 5px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; font-family: inherit; }
+    .field-status { font-size: var(--fs-label); margin-left: 6px; }
     .field-status.ok { color: var(--green); }
-    .field-status.err { color: #f87171; }
+    .field-status.err { color: var(--bad); }
 
     .users-table-wrap {
       background: var(--bg2);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--radius);
       /* ⚠⚠ `max-height: 320px` WAS HERE AND IT HID PEOPLE. It clipped at ~6
          rows behind an INNER scrollbar, so the 8-user All Users list was
          already truncated before company blocks existed — and a stacked block
@@ -132,8 +132,8 @@
     .users-table th {
       text-align: left;
       padding: 10px 16px;
-      font-size: 11px;
-      font-weight: 700;
+      font-size: var(--fs-eyebrow);
+      font-weight: var(--fw-emphasis);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--muted);
@@ -144,26 +144,26 @@
     }
     .users-table td {
       padding: 11px 16px;
-      font-size: 13px;
+      font-size: var(--fs-secondary);
       border-bottom: 1px solid var(--border);
       color: var(--text);
       vertical-align: middle;
     }
     .users-table tr:last-child td { border-bottom: none; }
 
-    .btn-resend { font-size: 11px; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg2); color: var(--muted); cursor: pointer; white-space: nowrap; }
+    .btn-resend { font-size: var(--fs-eyebrow); padding: 4px 9px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg2); color: var(--muted); cursor: pointer; white-space: nowrap; }
 
     .btn-resend:hover:not(:disabled) { color: var(--text); border-color: var(--green); }
     .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .admin-danger { color: #f87171; border-color: rgba(248,113,113,0.35); }
+    .admin-danger { color: var(--bad); border-color: rgba(248,113,113,0.35); }
     .admin-danger:hover:not(:disabled) { color: #fca5a5; border-color: rgba(248,113,113,0.6); }
 
     .role-badge {
       display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
+      font-size: var(--fs-eyebrow);
+      font-weight: var(--fw-emphasis);
       padding: 3px 9px;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       text-transform: lowercase;
       letter-spacing: 0.3px;
     }
@@ -171,18 +171,18 @@
     .role-badge.admin { background: rgba(59,130,246,0.15); color: #60a5fa; }
     .role-badge.user  { background: rgba(255,255,255,0.06); color: var(--muted); }
     .role-badge .self-tag {
-      font-size: 10px;
+      font-size: var(--fs-eyebrow);
       color: var(--muted);
       margin-left: 6px;
-      font-weight: 500;
+      font-weight: var(--fw-emphasis);
       text-transform: none;
       letter-spacing: 0;
     }
 
     .role-select {
-      font-size: 12px;
+      font-size: var(--fs-label);
       padding: 4px 8px;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       background: var(--bg3);
       border: 1px solid var(--border);
       color: var(--text);
@@ -193,10 +193,10 @@
 
     .role-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .role-save {
-      font-size: 11px;
-      font-weight: 700;
+      font-size: var(--fs-eyebrow);
+      font-weight: var(--fw-emphasis);
       padding: 5px 10px;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       background: var(--green);
       color: #000;
       border: none;
@@ -206,23 +206,23 @@
     .role-save:hover:not(:disabled) { background: var(--green-dark); }
     .role-save:disabled { opacity: 0.35; cursor: not-allowed; background: var(--bg3); color: var(--muted); }
     .role-warning {
-      font-size: 11px;
-      color: #fbbf24;
+      font-size: var(--fs-eyebrow);
+      color: var(--mid);
       width: 100%;
       margin-top: 2px;
       display: block;
     }
     .role-warning.hidden { display: none; }
     .role-saved {
-      font-size: 11px;
+      font-size: var(--fs-eyebrow);
       color: var(--green);
-      font-weight: 600;
+      font-weight: var(--fw-emphasis);
       opacity: 0;
       transition: opacity 0.15s;
     }
     .role-saved.show { opacity: 1; }
 
-    .empty-msg { padding: 24px 20px; font-size: 13px; color: var(--muted); text-align: center; }
+    .empty-msg { padding: 24px 20px; font-size: var(--fs-secondary); color: var(--muted); text-align: center; }
 
     .spinner {
       width: 18px; height: 18px;
@@ -247,57 +247,57 @@
        visually in future. Extract to /css/analytics.css if it grows. */
     .analytics-section { margin: 24px 0; }
     .analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
-    .analytics-header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+    .analytics-header h2 { margin: 0; font-size: var(--fs-title); font-weight: var(--fw-emphasis); }
     .analytics-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
     .analytics-controls select {
       background: var(--bg2); border: 1px solid #2a2a2a; color: inherit;
-      padding: 6px 28px 6px 10px; border-radius: 6px; font-size: 13px;
+      padding: 6px 28px 6px 10px; border-radius: var(--radius-sm); font-size: var(--fs-secondary);
       font-family: inherit; min-width: 220px;
     }
     .analytics-empty {
-      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: 8px;
-      padding: 32px; text-align: center; color: var(--muted); font-size: 13px;
+      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: var(--radius-sm);
+      padding: 32px; text-align: center; color: var(--muted); font-size: var(--fs-secondary);
     }
     .date-presets { display: flex; gap: 6px; flex-wrap: wrap; }
     .date-preset {
       background: var(--bg2); border: 1px solid #2a2a2a; color: var(--muted);
-      padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      padding: 6px 12px; border-radius: var(--radius-sm); font-size: var(--fs-label); cursor: pointer;
       font-family: inherit;
     }
-    .date-preset:hover { background: #2a2a2a; color: inherit; }
-    .date-preset.active { background: #2a2a2a; color: inherit; border-color: #4a9eff; }
+    .date-preset:hover { background: var(--bg-field); color: inherit; }
+    .date-preset.active { background: var(--bg-field); color: inherit; border-color: #4a9eff; }
 
     .stats-row {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: 12px; margin-bottom: 24px;
     }
     .stat-card {
-      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: 8px;
+      background: var(--bg2); border: 1px solid #2a2a2a; border-radius: var(--radius-sm);
       padding: 14px 16px;
     }
-    .stat-card .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-card .stat-value { font-size: 24px; font-weight: 600; margin-top: 4px; }
-    .stat-card .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .stat-card .stat-label { font-size: var(--fs-eyebrow); color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .stat-value { font-size: var(--fs-company); font-weight: var(--fw-emphasis); margin-top: 4px; }
+    .stat-card .stat-sub { font-size: var(--fs-eyebrow); color: var(--muted); margin-top: 4px; }
 
     .objection-section { margin-bottom: 24px; }
-    .objection-totals { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .objection-totals { font-size: var(--fs-label); color: var(--muted); margin-bottom: 10px; }
     .objection-table {
       width: 100%; border-collapse: collapse;
-      background: var(--bg2); border-radius: 8px; overflow: hidden;
+      background: var(--bg2); border-radius: var(--radius-sm); overflow: hidden;
     }
     .objection-table th, .objection-table td {
-      padding: 10px 14px; text-align: left; font-size: 13px;
+      padding: 10px 14px; text-align: left; font-size: var(--fs-secondary);
       border-bottom: 1px solid #2a2a2a;
     }
     .objection-table th {
-      background: #1a1a1a; color: var(--muted); font-weight: 500;
-      font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+      background: var(--bg-elevated); color: var(--muted); font-weight: var(--fw-emphasis);
+      font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: 0.5px;
     }
     .objection-table tr:last-child td { border-bottom: none; }
-    .objection-table .pct-cell { font-weight: 600; }
-    .pct-good { color: #09e046; }
-    .pct-mid  { color: #facc15; }
-    .pct-bad  { color: #f87171; }
+    .objection-table .pct-cell { font-weight: var(--fw-emphasis); }
+    .pct-good { color: var(--green); }
+    .pct-mid  { color: var(--mid); }
+    .pct-bad  { color: var(--bad); }
     .pct-none { color: var(--muted); }
 
     /* ─── Company blocks + admin tabs (2026-08-24) ─────────────────────────
@@ -305,51 +305,51 @@
     .admin-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
     .admin-tab {
       background: var(--bg-elevated, #131313); color: var(--text, #ededed);
-      border: 1px solid var(--border-strong, #2a2a2a); border-radius: 6px;
-      padding: 7px 13px; font: inherit; font-size: 13px; font-weight: 600;
+      border: 1px solid var(--border-strong, #2a2a2a); border-radius: var(--radius-sm);
+      padding: 7px 13px; font: inherit; font-size: var(--fs-secondary); font-weight: var(--fw-emphasis);
       cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
     }
     .admin-tab:hover { border-color: var(--green, #09e046); }
     .admin-tab.active { border-color: var(--green, #09e046); color: var(--green, #09e046); }
     .admin-tab-count {
-      font-size: 11px; font-weight: 600; opacity: 0.75;
-      border: 1px solid currentColor; border-radius: 10px; padding: 0 6px; line-height: 16px;
+      font-size: var(--fs-eyebrow); font-weight: var(--fw-emphasis); opacity: 0.75;
+      border: 1px solid currentColor; border-radius: var(--radius); padding: 0 6px; line-height: 16px;
     }
 
     .company-block {
-      border: 1px solid var(--border-strong, #2a2a2a); border-radius: 10px;
+      border: 1px solid var(--border-strong, #2a2a2a); border-radius: var(--radius);
       padding: 16px; margin-bottom: 18px; background: var(--bg-elevated, #131313);
     }
     /* ⚠ TOP CENTRE — Justin's ruling. Scoped to the block; nothing else in the
        admin page is centred, and this must not leak into the shared table. */
     .company-head { text-align: center; margin-bottom: 14px; }
     .company-name-input, .company-name-static {
-      font-size: 19px; font-weight: 700; text-align: center; color: var(--text, #ededed);
-      background: transparent; border: 1px solid transparent; border-radius: 6px;
+      font-size: var(--fs-number); font-weight: var(--fw-emphasis); text-align: center; color: var(--text, #ededed);
+      background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
       padding: 5px 10px; max-width: 100%; width: 360px; font-family: inherit;
     }
     .company-name-input:hover { border-color: var(--border-strong, #2a2a2a); }
     .company-name-input:focus { border-color: var(--green, #09e046); outline: none; }
     /* An unnamed company reads as a gap to fill, not as a name. */
     .company-name-input.unnamed::placeholder, .company-name-static.unnamed { opacity: 0.6; font-style: italic; }
-    .company-sub { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+    .company-sub { font-size: var(--fs-label); opacity: 0.7; margin-top: 2px; }
 
     .add-company-bar {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       margin-bottom: 16px; padding: 12px 14px;
-      border: 1px dashed var(--border); border-radius: 10px; background: var(--bg2);
+      border: 1px dashed var(--border); border-radius: var(--radius); background: var(--bg2);
     }
     .add-company-name { width: 220px; }
 
     .company-block.deactivated { opacity: 0.72; border-style: dashed; }
     .company-actions { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 12px; flex-wrap: wrap; }
     .company-off-badge {
-      font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-      border: 1px solid var(--border-strong, #2a2a2a); border-radius: 10px; padding: 2px 9px;
+      font-size: var(--fs-eyebrow); font-weight: var(--fw-emphasis); letter-spacing: 0.04em; text-transform: uppercase;
+      border: 1px solid var(--border-strong, #2a2a2a); border-radius: var(--radius); padding: 2px 9px;
     }
       /* ⚠ the head's cell is a FACT, not a disabled control — no dropdown chrome,
        because there is no choice to make. Same weight as the select beside it. */
-    .company-head-label { font-size: 12px; color: var(--text); }
+    .company-head-label { font-size: var(--fs-label); color: var(--text); }
 </style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>

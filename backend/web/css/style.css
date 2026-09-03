@@ -65,12 +65,40 @@
      ⚠ The first version of this note claimed a 5.142 -> 4.639 drop. That was
      measured against #000, which login never used. */
   --bg:          #0a0a0a;
-  --bg2:         #0f1417;
-  --bg3:         #161d22;
-  --border:      rgba(255,255,255,0.08);
-  --text:        #f0f4f7;
-  --muted:       #8a9aaa;
-  --font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* ⚠⚠ THE PRODUCT'S OWN SURFACES, NOT A BLUE-GREY SIBLING (D-7, Justin 2026-09-03: bring the
+     outside pages onto the same styling). --bg2/--bg3 were #0f1417/#161d22 — a blue-grey that
+     made admin read as a different product — and --text/--border were their own spellings of
+     white and hairline. Every value below is the dashboard's token, mirrored by
+     test/style-tokens-mirror.test.js; --muted is the same grey with the blue taken out. */
+  --bg2:         #131313;   /* = dashboard --bg-elevated */
+  --bg3:         #1c1c1c;   /* = dashboard --bg-field */
+  --bg-elevated: #131313;
+  --bg-field:    #1c1c1c;
+  --border:      #1f1f1f;
+  --border-strong: #2e2e2e;
+  --text:        #ededed;
+  --muted:       #8a9aaa;   /* ⚠ UNCHANGED BY D-7: the login and landing marks' opacity ceiling was MEASURED against this grey and put to Justin (declined) — see the mark notes in login.html / index.html */
+  /* ⚠ no --accent here, by an existing ruling: this stylesheet's green is --green (test/login-*.test.js pins it) */
+  --good:        #09e046;
+  --mid:         #fbbf24;
+  --bad:         #f87171;
+  --radius-sm:   8px;
+  --radius:      12px;
+  --radius-lg:   16px;
+  --edge-white:  #ffffff;
+  /* ⚠⚠ SAIRA, THE PRODUCT'S TYPEFACE — self-hosted, the same file the dashboard and login
+     load (one download, cached across every page). The system stack was why admin,
+     set-password, connect and the connected screen rendered in -apple-system while the
+     product is Saira. */
+  --font:        'Saira', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+@font-face {
+  font-family: 'Saira';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 50% 125%;
+  font-display: swap;
+  src: url('/fonts/saira-variable-latin.woff2') format('woff2-variations');
 }
 
 html { scroll-behavior: smooth; }
@@ -85,6 +113,8 @@ body {
 
 a { color: inherit; text-decoration: none; }
 ul { list-style: none; }
+/* ⚠ CONTROLS INHERIT BY CAPABILITY (D-1) — the same base rule the dashboard carries. */
+button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ── BUTTONS ──────────────────────────────────────────────────────────────── */
 .btn-primary {

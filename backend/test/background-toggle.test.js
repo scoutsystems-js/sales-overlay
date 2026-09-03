@@ -42,7 +42,7 @@ function api(stored) {
     },
   };
   const fn = new Function('localStorage', 'document',
-    grab('backgroundIsOff') + '\n' + grab('setBackgroundOff') +
+    grab('backgroundIsOff') + '\n' + grab('setBackgroundOff') + '\n' + grab('syncBackgroundControls') +   /* the setter now syncs both doors (2026-09-03) */
     '\nreturn { isOff: backgroundIsOff, set: setBackgroundOff, attrs: document.documentElement.attrs, store: store0 };'
       .replace('store0', 'null'));
   const out = fn({
@@ -82,7 +82,7 @@ test('unreadable storage means the DEFAULT, never a crash', () => {
   const boom = { getItem() { throw new Error('private mode'); }, setItem() { throw new Error('nope'); }, removeItem() { throw new Error('nope'); } };
   const doc = { documentElement: { attrs: {}, setAttribute() {}, removeAttribute() {} } };
   const fn = new Function('localStorage', 'document',
-    grab('backgroundIsOff') + '\n' + grab('setBackgroundOff') + '\nreturn { isOff: backgroundIsOff, set: setBackgroundOff };');
+    grab('backgroundIsOff') + '\n' + grab('setBackgroundOff') + '\n' + grab('syncBackgroundControls') +   /* the setter now syncs both doors (2026-09-03) */ '\nreturn { isOff: backgroundIsOff, set: setBackgroundOff };');
   const a = fn(boom, doc);
   assert.strictEqual(a.isOff(), false, 'a throwing read must fall back to the default');
   assert.doesNotThrow(() => a.set(true), 'a throwing write must not break the toggle');
