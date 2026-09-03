@@ -101,7 +101,7 @@ Eight classes, eleven scored detectors in `backend/sweep/`, every finding filed 
 2. ✅ **CLOSED 2026-09-03 (H695) — every page links `/scout-glyph.svg`; follow-up filed: a `rel="apple-touch-icon"` PNG for Safari, which does not render SVG icons.** Was: **The favicon** — no page links one; **`scout-glyph.svg` is sharp at 16 and 32 (H694) and is the source** — the brand's own outline; the app icon PNG for the large sizes.
 3. **The social cards** — `og:image` (the link-preview asset exists), nothing set today.
 4. **The landing page rewrite.**
-5. **The toggle redesign.**
+5. ✅ **CLOSED 2026-09-03 (H696) — the toggle redesign shipped: a sliding toggle right of My Account, the glyph riding the knob, no label; the bar pinned at 51px after it was found at 55 (H697).**
 6. **The phone layout** (every view scrolls sideways at 390).
 7. **The 112 stripper files** (hand work; the ratchet).
 8. **The two dated reads** (manager KB list ~mid-November; per-user all-time ~November).

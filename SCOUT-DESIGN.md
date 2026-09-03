@@ -33,7 +33,8 @@
 | rule | stated in | pinned by |
 |---|---|---|
 | **One black:** `--bg` #0a0a0a across the product; the shared file's `--bg2`/`--bg3` are the dashboard's elevated and field surfaces | CLAUDE.md §4e (H688); `style.css:4` | `style-tokens-mirror.test.js` |
-| **One white edge:** `--edge-white` #ffffff — the rep card and the background switch share it; never declare a second white | `dashboard.html:128` (H686, H688) | `rep-card-border-rendered.test.js`, `background-switch.test.js` |
+| **One white edge:** `--edge-white` #ffffff — the rep card and the background toggle's track share it; never declare a second white | `dashboard.html:128` (H686, H696) | `rep-card-border-rendered.test.js`, `background-switch.test.js` |
+| **The top bar is 51px by declaration** — the rail top, the ground and the sidebar derive from it; its contents cannot move it | CLAUDE.md §4e (H697, H700) | `background-switch.test.js`, `wordmark-vector.test.js` (rendered bar) |
 | **Scout green #09e046 carries three meanings at once — good, brand, and the association between them — BY DESIGN.** Never raise it as a collision again; the only green question is legibility, answered by form, never hue. `--accent-rgb` exists because `rgba()` cannot read a hex token; every tint derives from it. The shared file spells it `--green` and declares no `--accent` | CLAUDE.md §4e (H364, H321, H326) | `accent-palette.test.js` (one spelling, tints derived); `login-brand.test.js` (the shared file declares no `--accent`); the three-meanings ruling itself needs no guard |
 | **`--good` / `--mid` / `--bad`** are semantic; the categorical rep-line ramp borrows no hue from them | CLAUDE.md §4e (H327, H052) | `team-averages-palette.test.js` |
 | **No grey body text on the dashboard** — `--muted` is not referenced for text; dim with opacity on `--text` | CLAUDE.md §4e (H280, H119) | `no-grey-text.test.js` |
