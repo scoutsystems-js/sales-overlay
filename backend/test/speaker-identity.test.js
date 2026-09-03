@@ -46,15 +46,23 @@ test('exact email equality labels CLOSER and PROSPECT', () => {
   assert.deepStrictEqual(out.turns.map(t => t.speaker), ['CLOSER', 'PROSPECT', 'CLOSER']);
 });
 
-test('RULING 1 — the email is discarded, never persisted onto a turn', () => {
+test('RULING 1, amended 2026-09-03 (H700) — the email is never on a TURN; it appears once per speaker in speaker_identities', () => {
   const out = normalizeTranscript(meetingWith([
     turn('Joshua Pinner', CLOSER_EMAIL, 'Hello.'),
     turn('Leonard', null, 'Hi.'),
   ], CLOSER_EMAIL));
 
+  /* `turns` is what transcript_stored persists — the PII reasoning of RULING 1
+     stands there. The per-call, per-speaker store is Justin's ruling, so the
+     email must appear EXACTLY ONCE in the whole output: on its speaker's entry. */
   const serialized = JSON.stringify(out);
-  assert.ok(serialized.indexOf(CLOSER_EMAIL) === -1,
-    'closer email must not appear anywhere in the normalized output (it is stored as transcript_stored)');
+  assert.strictEqual(serialized.split(CLOSER_EMAIL).length - 1, 1,
+    'closer email appears exactly once — on speaker_identities, never on a turn');
+  assert.ok(JSON.stringify(out.turns).indexOf(CLOSER_EMAIL) === -1, 'never on a turn (transcript_stored)');
+  assert.deepStrictEqual(out.speaker_identities, [
+    { display_name: 'Joshua Pinner', email: CLOSER_EMAIL, turns: 1 },
+    { display_name: 'Leonard', email: null, turns: 1 },
+  ]);
   out.turns.forEach(t => {
     assert.strictEqual(t.matched_calendar_invitee_email, undefined);
     assert.strictEqual(t.email, undefined);

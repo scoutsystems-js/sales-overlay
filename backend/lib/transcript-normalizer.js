@@ -40,6 +40,12 @@
  *     email onto every row of every transcript would spread PII for no
  *     downstream gain, since the label is the only thing anything reads.
  *
+ *     AMENDED 2026-09-03 (Justin, the prospect-name lift, H700): the email is
+ *     still never copied onto a TURN — that reasoning stands — but it is now
+ *     kept ONCE per call, per speaker, as `speaker_identities`
+ *     ([{display_name, email, turns}]) for the worker to store on
+ *     fathom_calls.speaker_identities. Exact identity, captured, not resolved.
+ *
  *     When no email signal is available (no connection email, a Zoom VTT, or
  *     a call recorded by a different workspace member) we pass display names
  *     through verbatim and the pipeline asks Claude to infer roles. That path
@@ -62,6 +68,7 @@
 // collision detector. Kept in its own module because the reasoning for why it
 // is NOT the refused fuzzy name match belongs beside the rule, not here.
 var zoomIdentity = require('./zoom-identity');
+var prospectIdentity = require('./prospect-identity');   // H700: per-speaker identities, once per call
 
 /**
  * Convert a duration-style timestamp string to integer seconds.
@@ -190,7 +197,7 @@ function findCloserDisplayName(recordedByName, displayNames) {
  * @returns {{turns: Array, highlights: Array, closer_name: string|null, speaker_confidence: string}}
  */
 function normalizeTranscript(meeting) {
-  var EMPTY = { turns: [], highlights: [], closer_name: null, speaker_confidence: 'unknown' };
+  var EMPTY = { turns: [], highlights: [], closer_name: null, speaker_confidence: 'unknown', speaker_identities: [] };
   if (!meeting || typeof meeting !== 'object') return EMPTY;
 
   // ─── Highlights pass-through ─────────────────────────────────────────
@@ -353,6 +360,8 @@ function normalizeTranscript(meeting) {
     highlights:         highlights,
     closer_name:        closerName,
     speaker_confidence: speakerConfidence,
+    // H700: once per call, per speaker — never on a turn (RULING 1, amended).
+    speaker_identities: prospectIdentity.speakerIdentitiesFrom(preTurns),
   };
 }
 

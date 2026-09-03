@@ -30,6 +30,7 @@ const FATHOM_API_BASE   = 'https://api.fathom.ai/external/v1';
 const syncWindow = require('../lib/sync-window');
 var { classifyFailure } = require('../lib/failure-class');
 const { applyDuplicateSuppression } = require('../lib/duplicate-calls');
+const prospectIdentity = require('../lib/prospect-identity');   // H700: capture invitees + title segment at sync
 const FATHOM_TOKEN_URL  = 'https://fathom.video/external/v1/oauth2/token';
 const TOKEN_EXPIRY_TOLERANCE_SECONDS = 300; // 5 min — matches OAuth route + SDK
 const MAX_PAGES         = 20;   // legacy default; lib/sync-window scales it per choice   // safety cap; 20 pages * Fathom page size ≈ enough for any realistic user
@@ -353,6 +354,14 @@ function meetingToRow(userId, m) {
        ⚠ It is Fathom's OWN value for the row, not our filter argument — if the
        two ever disagree that is itself the thing worth seeing. */
     recorded_by:      (m.recorded_by && typeof m.recorded_by.email === 'string' && m.recorded_by.email) || null,
+    /* ⚠ H700 — THE PROSPECT-NAME LIFT, STEP 1: store the exact identity that already
+       arrives. The invitee list is Fathom's own (name, email, is_external…); the
+       title segment is the last "|" part verbatim. Captured, never resolved: no
+       grouping, merge or rate reads either yet. NULL = not received. The upsert
+       below is ignoreDuplicates, so existing rows are untouched — new calls only
+       by construction, no refresh, no backfill. */
+    calendar_invitees:  prospectIdentity.inviteesFromMeeting(m),
+    title_name_segment: prospectIdentity.titleNameSegment((m.meeting_title && String(m.meeting_title)) || (m.title && String(m.title)) || null),
     sync_status:      'pending',
   };
 }
@@ -1732,6 +1741,7 @@ router._markConnectionError = markConnectionError;
 router._loadCallsList       = loadCallsList;      // shared with /admin/fathom-calls/:user_id
 router._parseCallListOpts   = parseCallListOpts;
 router._loadCallReview      = loadCallReview;   // shared with /admin/fathom-calls/:user_id/:call_id
+router._meetingToRow        = meetingToRow;     // H700: the arrival mapper, EXECUTED by test/prospect-identity-capture.test.js
 
 // ── DELETE /fathom/disconnect ────────────────────────────────────────────────
 // Deletes the caller's OWN Fathom connection (stops syncing new calls). NEVER

@@ -45,6 +45,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { createClient } = require('@supabase/supabase-js');
 const { CLAUDE_MODEL } = require('../config');
 const { normalizeTranscript } = require('./transcript-normalizer');
+const { storeCallIdentities } = require('./prospect-identity');   // H700
 const compromisedFile = require('./compromised-file');
 const { fetchSellingContext } = require('./selling-context');
 const { shouldHarvest, harvestClosedCall } = require('./kb-harvest');
@@ -1494,6 +1495,13 @@ async function analyzeCall(fathomCallId, userId) {
 
     // ─── Phase 5: normalize ──────────────────────────────────────────────
     var normalized = normalizeTranscript(meeting);
+    /* ⚠ H700 — store the per-speaker identities (matched_calendar_invitee_email,
+       once per call, never per turn) BEFORE any model call, so identity is kept
+       even when grading fails. Fathom only: a Zoom VTT carries no emails, and the
+       column must read NULL (not captured) there, never []. Captured, not resolved. */
+    if (transcriptSourceFor(callRow) !== 'zoom') {
+      await storeCallIdentities(admin, fathomCallId, userId, { speaker_identities: normalized.speaker_identities });
+    }
     if (!normalized.turns || normalized.turns.length === 0) {
       // Include the raw first turn so a field-name mismatch between
       // /recordings/{id}/transcript and what normalizeTranscript expects
