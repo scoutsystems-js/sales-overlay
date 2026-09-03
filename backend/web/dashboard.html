@@ -15270,7 +15270,7 @@
        a row of outcomes a reader adds up, and the mock does not have it. */
     var statLine = ['closed',
       (s.calls || 0) + ' call' + ((s.calls || 0) === 1 ? '' : 's'),
-      (s.follow_up || 0) + ' follow-up' + ((s.follow_up || 0) === 1 ? '' : 's'),
+      (s.follow_up || 0) + ' ' + OUTCOME_LABELS.follow_up.toLowerCase(),   /* H709: the outcome reads Open */
       (s.lost || 0) + ' lost'].join(' \u00B7 ');
     var stats = leadNumberHtml(s.closed || 0, statLine);
 
@@ -16165,26 +16165,24 @@
     var closed = list.filter(function (c) {
       return eodOutcomeTone(c && c.fields && c.fields.outcome) === 'good';
     }).length;
+    /* H709 — the day reads "N calls · N closed · N open · N lost" through the ONE map; the
+       counts come from the outcome TONE so a composed "Closed - PIF" still counts as closed. */
+    var open = list.filter(function (c) { return eodOutcomeTone(c && c.fields && c.fields.outcome) === 'mid'; }).length;
+    var lost = list.filter(function (c) { return eodOutcomeTone(c && c.fields && c.fields.outcome) === 'bad'; }).length;
     if (!n) return null;
-    return n + ' call' + (n === 1 ? '' : 's') + ' · ' + closed + ' closed';
+    return n + ' call' + (n === 1 ? '' : 's') + ' · ' + closed + ' closed · ' + open + ' ' + OUTCOME_LABELS.follow_up.toLowerCase() + ' · ' + lost + ' lost';
   }
 
   function eodOutcomeTone(outcome) {
     var t = String(outcome == null ? '' : outcome).trim().toLowerCase();
     if (!t) return 'none';
     if (t.indexOf('closed') === 0 || t.indexOf('won') === 0) return 'good';
-    if (t.indexOf('follow') === 0 || t.indexOf('pending') === 0) return 'mid';
+    if (t.indexOf('follow') === 0 || t.indexOf('open') === 0 || t.indexOf('pending') === 0) return 'mid';
     if (t.indexOf('lost') === 0 || t.indexOf('no-show') === 0 || t.indexOf('no show') === 0) return 'bad';
     return 'none';
   }
 
-  function eodOutcomeLabel(oc) {
-    if (oc === 'closed') return 'Closed';
-    if (oc === 'follow_up') return 'Follow-up';
-    if (oc === 'lost') return 'Lost';
-    if (oc === 'no_show') return 'No-show';
-    return oc || 'Unknown';
-  }
+  function eodOutcomeLabel(oc) { return outcomeLabel(oc); }   // H709: through the ONE map
 
   // Plain text for Slack — EXACT field order per spec: prospect name, outcome,
   // Fathom link, cash collected, brief summary. All calls, one paste.
@@ -16342,7 +16340,7 @@
            */
           + '<div class="eod-row"><div class="eod-label">Outcome</div>'
             + '<div class="eod-static"><span class="eod-chip eod-chip-' + eodOutcomeTone(f.outcome) + '">'
-            + escapeHtml(f.outcome == null ? '—' : String(f.outcome)) + '</span>'
+            + escapeHtml(f.outcome == null ? '—' : (OUTCOME_LABELS[String(f.outcome)] || String(f.outcome))) + '</span>'
             /* H706 — Justin's caveat, verbatim: shown and labelled "follow up close" on the EOD */
             + (c.follow_up_close ? ' <span class="eod-chip eod-chip-follow">follow up close</span>' : '') + '</div></div>'
           + row('Cash ($)', 'cash_collected', f.cash_collected)
@@ -18245,7 +18243,23 @@
      in calls analyzed and is excluded from the closing and objection-handling
      rates — a DQ'd prospect was never closeable, so leaving them in either
      denominator marks the rep down for a call that could not be won. */
-  var OUTCOME_OPTS = [['closed', 'Closed'], ['follow_up', 'Follow up'], ['lost', 'Lost'], ['no_show', 'No show'], ['disqualified', 'Disqualified']];
+  /* ⚠⚠ THE NAMING SPLIT (Justin, 2026-09-03, H709) — MIRROR of lib/outcome-labels.js, verbatim;
+     test/outcome-labels-mirror.test.js EXECUTES this copy against the lib. The stored value
+     stays `follow_up`; only the word a customer reads changes: the OUTCOME reads Open, the
+     CALL TYPE takes the word Follow-up. Never edit a string here without the lib. */
+  var OUTCOME_LABELS = { closed: 'Closed', follow_up: 'Open', lost: 'Lost', no_show: 'No-show', disqualified: 'DQ' };
+  var OUTCOME_ORDER = ['closed', 'follow_up', 'lost', 'no_show', 'disqualified'];
+  var CALL_TYPE_LABELS = { booked: 'Booked', follow_up: 'Follow-up', not_sales: 'Not a sales call' };
+  function outcomeLabel(outcome) {
+    var k = (typeof outcome === 'string') ? outcome.trim().toLowerCase() : '';
+    return Object.prototype.hasOwnProperty.call(OUTCOME_LABELS, k) ? OUTCOME_LABELS[k] : (k ? outcome : 'Unknown');
+  }
+  function callTypeLabel(kind, notSales) {
+    if (notSales === true) return CALL_TYPE_LABELS.not_sales;
+    var k = (typeof kind === 'string') ? kind.trim().toLowerCase() : '';
+    return Object.prototype.hasOwnProperty.call(CALL_TYPE_LABELS, k) ? CALL_TYPE_LABELS[k] : CALL_TYPE_LABELS.booked;
+  }
+  var OUTCOME_OPTS = OUTCOME_ORDER.map(function (k) { return [k, OUTCOME_LABELS[k]]; });
   function outcomeTagHtml(callId, outcome, source, stopProp) {
     var sp = stopProp ? 'event.stopPropagation();' : '';
     if (!canTagOutcomeClient()) {
@@ -18875,7 +18889,7 @@
         + '<div class="review-title-side">'
           + (status === 'done' ? outcomeTagHtml((src.id || (review && review.id) || ''), (review && review.analysis ? review.analysis.outcome : src.outcome), (review && review.analysis ? review.analysis.outcome_source : src.outcome_source), false) : '')
           + notSalesBtnHtml((src.id || (review && review.id) || ''), src.not_a_sales_call === true)
-          + callKindBtnHtml((src.id || (review && review.id) || ''), src.call_kind, src.not_a_sales_call === true)
+          + callTypeTagHtml((src.id || (review && review.id) || ''), src.call_kind, src.not_a_sales_call === true)
           + renameProspectBtnHtml((src.id || (review && review.id) || ''), (review && review.analysis ? review.analysis.prospect_name : src.prospect_name))
           + badge
           + fathomLink
@@ -18895,60 +18909,23 @@
    * closed on the first pick — both with a green suite. So the button disables,
    * says "Marking…", and only then re-renders from the server's answer.
    */
-  /* ⚠⚠ THE FOLLOW-UP FLAG BY HAND (H706): the third state beside the outcome and
-     not-a-sales-call. The label is the ACTION; the state shows on the row badge. A
-     follow-up IS a sales call — the control is hidden only when the call is marked
-     not-a-sales-call, because then there is nothing to be a follow-up of. */
-  /* ⚠⚠ PROSPECT RENAME THAT CARRIES EVERYWHERE (H707). The label is the action. A rename
-     that lands on another prospect's name is a MERGE: the server answers 409 naming
-     both, and the person confirms with both names in front of them — never silent. */
-  function renameProspectBtnHtml(callId, currentName) {
+  /* ⚠⚠ THE CALL TYPE IS A TAG, NOT A BUTTON (Justin, 2026-09-03, H709): a tag reads as a
+     FACT about the call; a button reads as an action — that is what stops the type being
+     confused with the outcome beside it. The tag's words come from CALL_TYPE_LABELS
+     (Booked · Follow-up · Not a sales call). A call marked not-a-sales-call shows the
+     third word as a static badge — the "↩ Count this call" button is its inverse. */
+  function callTypeTagHtml(callId, kind, notSales) {
     if (!callId) return '';
-    /* the current name rides on a data attribute — a quoted literal inside onclick would need escaping a scanner cannot follow */
-    return '<button class="btn-fathom-secondary rename-prospect-btn" type="button" id="renameProspectBtn" data-name="' + escapeHtml(currentName || '') + '"'
-      + ' onclick="renameProspect(\'' + escapeHtml(callId) + '\', this.dataset.name)">Rename Prospect</button>';
-  }
-  async function renameProspect(callId, currentName) {
-    var name = await scoutPrompt({ title: 'Rename this prospect', body: 'The new name applies to every call on this prospect. If it is already another prospect\u2019s name, you will be asked to confirm a merge.', value: currentName || '', confirmText: 'Rename' });
-    if (name === null || name === undefined || !String(name).trim()) return;
-    await sendRename(callId, String(name).trim(), false);
-  }
-  async function sendRename(callId, name, confirmMerge) {
-    try {
-      var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/prospect-name', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
-        body: JSON.stringify({ name: name, confirm_merge: confirmMerge === true }),
-      });
-      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      var data = null; try { data = await res.json(); } catch (e) {}
-      if (res.status === 409 && data && data.merge_required) {
-        var m = data.merge_required;
-        var ok = await scoutConfirm({ title: 'This is a merge', body: '\u201c' + (m.from || 'this prospect') + '\u201d would become \u201c' + m.into + '\u201d \u2014 ' + m.calls_moving + ' call' + (m.calls_moving === 1 ? '' : 's') + ' would move onto that prospect' + (m.calls_skipped ? ' (' + m.calls_skipped + ' already renamed differently stay)' : '') + '. Merge them?', confirmText: 'Merge' });
-        if (ok) await sendRename(callId, name, true);
-        return;
-      }
-      if (res.status === 403) { await scoutConfirm({ title: 'Not allowed', body: 'You are not allowed to rename on this call.', confirmText: 'OK' }); return; }
-      if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
-      state.callReviewCache = {};
-      state.callLibraryCache = null;
-      await openCallReview(callId);
-    } catch (err) {
-      await scoutConfirm({ title: 'Could not rename', body: String((err && err.message) || err), confirmText: 'OK' });
-    }
-  }
-  function callKindBtnHtml(callId, kind, notSales) {
-    if (!callId || notSales) return '';
-    var isFollow = kind === 'follow_up';
-    return '<button class="btn-fathom-secondary call-kind-btn' + (isFollow ? ' is-marked' : '') + '"'
-      + ' type="button" id="callKindBtn"'
-      + ' onclick="setCallKind(\'' + escapeHtml(callId) + '\', \'' + (isFollow ? 'booked' : 'follow_up') + '\')">'
-      + (isFollow ? '\u21a9 Booked Call' : 'Mark as Follow-up')
-      + '</button>';
+    if (notSales) return '<span class="outcome-tag-badge call-type-badge">' + escapeHtml(CALL_TYPE_LABELS.not_sales) + '</span>';
+    var cur = (kind === 'follow_up') ? 'follow_up' : 'booked';
+    return '<span class="outcome-tag call-type-tag" title="Call type">'
+      + '<select class="outcome-tag-select call-type-select" id="callTypeSelect" onchange="setCallKind(\'' + escapeHtml(callId) + '\', this.value)">'
+      + ['booked', 'follow_up'].map(function (k) { return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + escapeHtml(CALL_TYPE_LABELS[k]) + '</option>'; }).join('')
+      + '</select></span>';
   }
   async function setCallKind(callId, next) {
-    var btn = document.getElementById('callKindBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+    var sel = document.getElementById('callTypeSelect');
+    if (sel) sel.disabled = true;
     try {
       var res = await fetch('/me/calls/' + encodeURIComponent(callId) + '/call-kind', {
         method: 'POST',
@@ -18957,7 +18934,7 @@
       });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
       if (res.status === 403) {
-        if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as Follow-up' : '\u21a9 Booked Call'; }
+        if (sel) sel.disabled = false;
         await scoutConfirm({ title: 'Not allowed', body: 'You are not allowed to mark this call.', confirmText: 'OK' });
         return;
       }
@@ -18966,7 +18943,7 @@
       state.callLibraryCache = null;
       await openCallReview(callId);
     } catch (err) {
-      if (btn) { btn.disabled = false; btn.textContent = next === 'follow_up' ? 'Mark as Follow-up' : '\u21a9 Booked Call'; }
+      if (sel) sel.disabled = false;
       await scoutConfirm({ title: 'Could not save', body: String((err && err.message) || err), confirmText: 'OK' });
     }
   }

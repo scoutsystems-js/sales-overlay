@@ -94,7 +94,8 @@ test('⚠⚠ THE RATE SITES EXCLUDE IT AND THE COUNT SITES DO NOT', () => {
 test('⚠ the dropdown offers it, and the route accepts only what a human may set', () => {
   const page = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '');
-  assert.ok(/\['disqualified', 'Disqualified'\]/.test(page), 'the option must be in the dropdown');
+  /* ⚠ AMENDED 2026-09-03 (H709): the dropdown is DERIVED from the one outcome map, where DQ is a member. */
+  assert.ok(/disqualified: 'DQ'/.test(page) && /OUTCOME_ORDER = \['closed', 'follow_up', 'lost', 'no_show', 'disqualified'\]/.test(page) && /OUTCOME_OPTS = OUTCOME_ORDER\.map/.test(page), 'the option must be in the dropdown, through the map');
   const me = fs.readFileSync(path.join(__dirname, '..', 'routes', 'me.js'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(/TAGGABLE_OUTCOMES\.indexOf\(outcome\) === -1/.test(me),

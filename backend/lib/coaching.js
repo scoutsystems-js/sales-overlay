@@ -1,3 +1,4 @@
+var { outcomeLabel } = require('./outcome-labels');   // H709
 /**
  * PER-MOMENT COACHING (v30).
  *
@@ -79,7 +80,7 @@ function buildCoachingPrompt(moments, opts) {
     'You are coaching a high-ticket closer on moments from their own sales call.',
     'You are their sales manager. You have watched the call.',
     '',
-    'Call outcome: ' + outcome + '.',
+    'Call outcome: ' + outcomeLabel(outcome) + '.',   /* H709: the label (Open), never the machine word */
     (o.later ? 'What happened on the call overall: ' + o.later : ''),
     /* ⚠ How objection handling went ACROSS the call — Justin: "the context behind
        what was said is vital". It is the grader's own objection_notes, so it is

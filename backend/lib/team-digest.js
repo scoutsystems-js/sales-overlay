@@ -22,6 +22,7 @@
 // uses the real ET day bounds in UTC (04:00Z summer / 05:00Z winter).
 
 const { isDisqualified } = require('./dq-exclusion');
+var { outcomeLabel } = require('./outcome-labels');   // H709: the ONE map
 const crypto = require('crypto');
 const { displayNameFromEmail } = require('./display-name');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -108,7 +109,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v6-2026-09-03-follow-up-close';   // H706: a follow-up close reads as one in the call line
+var DIGEST_PROMPT_VERSION = 'v7-2026-09-03-open-outcome';   // H709: the outcome word is Open; the prompt is handed the LABEL, never the machine word   // H706: a follow-up close reads as one in the call line
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -199,7 +200,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     var a = analysisByCall[cid];
     if (a && a.outcome && byOutcome.hasOwnProperty(a.outcome)) byOutcome[a.outcome]++;
     callLines.push('- [' + cid + '] ' + repName(c.user_id) + ' — "' + (c.title || 'untitled') + '"'
-      + (a ? (' | outcome: ' + (a.outcome || 'unknown') + ((c && c.call_kind === 'follow_up' && a.outcome === 'closed') ? ' (follow-up close — counts on the booked call it follows)' : '') + ' | score: ' + (a.overall_score == null ? 'n/a' : a.overall_score)
+      + (a ? (' | outcome: ' + (a.outcome ? outcomeLabel(a.outcome) : 'unknown') + ((c && c.call_kind === 'follow_up' && a.outcome === 'closed') ? ' (follow-up close — counts on the booked call it follows)' : '') + ' | score: ' + (a.overall_score == null ? 'n/a' : a.overall_score)
         + (a.why_outcome ? ' | why: ' + str(a.why_outcome, 200) : '')
         + (a.one_thing ? ' | one_thing: ' + str(a.one_thing, 200) : ''))
         : ' | not yet analyzed'));
@@ -280,7 +281,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
        not close — Scout records no scheduled callbacks at all, so any sentence
        treating a follow-up as an appointment asserts something that is not in
        the data. */
-    '- "Follow-up" is an OUTCOME meaning the call did not close. It is NOT a scheduled callback and Scout does not record scheduled calls. Never write "6 of yesterday\'s follow-ups" to mean six upcoming appointments — say "yesterday\'s calls".',
+    '- "Open" is an OUTCOME meaning the call did not close and the deal is still alive (it used to be called "Follow-up"; never use that word for an outcome — "follow-up" now means a CALL TYPE, a call that follows a booked call). It is NOT a scheduled callback and Scout does not record scheduled calls. Never write "6 of yesterday\'s follow-ups" to mean six upcoming appointments — say "yesterday\'s calls".',
     '- Name prospects consistently, or give a count instead. Do not mix forms in one sentence ("Nick\'s Michelle Raquino, Dre\'s lost call") — "Dre\'s lost call" is not a name.',
     '  "notable": [ { "call_id": "<id from CALLS>", "timestamp_seconds": <int or null>, "text": "one specific notable moment, pattern, or risk — cite the rep by the name used above" } ],  // 0-3 items, only genuinely notable ones',
     '  "focus": "ONE clear coaching focus for the team today — the single highest-leverage thing, specific enough to act on this morning. If one rep needs it most, say who."',
