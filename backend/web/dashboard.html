@@ -6836,6 +6836,14 @@
      through their own expression. The email is still shown where it IS the
      subject (the signed-in address, the Account field, the line UNDER a name in
      the members table) — those are not titles and were deliberately left. */
+  /* ⚠ MIRROR of lib/role-labels.js — RULED labels (H673): user → Rep · manager → Manager ·
+     owner → Admin. The stored value never changes. Pinned by test/role-labels-mirror.test.js,
+     which EXECUTES this copy against the lib's. Edit the lib first, then this. */
+  var ROLE_LABELS = { user: 'Rep', manager: 'Manager', owner: 'Admin' };
+  function roleLabel(role) {
+    var k = (typeof role === 'string') ? role.toLowerCase() : '';
+    return Object.prototype.hasOwnProperty.call(ROLE_LABELS, k) ? ROLE_LABELS[k] : 'Rep';
+  }
   function personLabel(u) {
     if (!u) return null;
     var n = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
@@ -7905,7 +7913,7 @@
     });
     */
 
-    var scopePill = state.viewingUserId !== state.me.user_id ? '<span class="scope-pill">' + escapeHtml(state.me.role || '') + ' view</span>' : '';
+    var scopePill = state.viewingUserId !== state.me.user_id ? '<span class="scope-pill">' + escapeHtml(roleLabel(state.me.role || '')) + ' view</span>' : '';
 
     // ⚠ ABOVE the name, not beside it — the point is to be seen before the
     // manager reads whose board this is and wonders how to get out.
@@ -14346,7 +14354,7 @@
         + (isOwner ? '<button class="members-act danger" onclick="deleteMember(\'' + m.user_id + '\', \'' + escapeHtml(m.email || '') + '\')">Delete</button>' : '');
       return '<tr class="' + (active ? '' : 'inactive') + '">'
         + '<td><div class="members-name">' + escapeHtml(name) + '</div><div class="members-email">' + escapeHtml(m.email || '') + '</div></td>'
-        + '<td>' + escapeHtml(m.role || 'user') + '</td>'
+        + '<td>' + escapeHtml(roleLabel(m.role || 'user')) + '</td>'   /* the ruled label, never the stored word (fix #8) */
         + '<td>' + (active ? '<span class="member-badge on">● active</span>' : '<span class="member-badge off">○ inactive</span>') + '</td>'
         + '<td>' + moveSel + '</td>'
         + '<td class="members-actions">' + acts + '</td>'
@@ -16408,6 +16416,11 @@
     }
     var data = await res.json();
     renderKbList((data && data.uploads) || []);
+    /* ⚠ A cut list must say so (H062). The server pages the whole list before answering,
+       so this only fires at its hard cap — but the count on this page must never read as
+       complete when it is not. */
+    if (data && data.truncated) container.insertAdjacentHTML('afterbegin',
+      '<div class="msg-error">Showing ' + escapeHtml(String(data.total_rows)) + ' rows \u2014 the list was cut at the server\'s limit; the rest are not shown.</div>');
   }
 
   // PROSPECT NAMES 3a — what to LABEL a call with. Prefers the resolved prospect

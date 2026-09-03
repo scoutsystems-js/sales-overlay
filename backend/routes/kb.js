@@ -719,30 +719,40 @@ router.get('/list', protect, async function(req, res) {
     var scope = await resolveUserScope(admin, req.user.id);
     var managedReader = scope.role === 'user' && !!scope.managed_by;
 
-    var result;
-    if (managedReader) {
-      // Fetch only team-relevant candidates, then apply the visibility predicate
-      // for exactness. 2a: the candidate set must now ALSO include rows keyed to
-      // the team via team_owner_id — a PROMOTED row has uploaded_by = the rep who
-      // created it, not the manager, so the old three-branch .or() would have
-      // filtered promoted material out before the predicate ever saw it.
-      result = await admin
-        .from('knowledge_base')
-        .select('source_label, scope, metadata, created_at, uploaded_by, team_owner_id')
-        .not('uploaded_by', 'is', null)
-        .or('scope.eq.global,uploaded_by.eq.' + scope.p_admin_id + ',uploaded_by.eq.' + scope.p_user_id + ',team_owner_id.eq.' + scope.p_admin_id)
-        .order('created_at', { ascending: false });
-      if (!result.error) result.data = (result.data || []).filter(function (row) { return kbReadRowVisible(row, scope); });
-    } else {
-      var visibleIds = await getVisibleUploaderIds(admin, req.user.id, scope.role);
-      var query = admin
-        .from('knowledge_base')
+    /* ⚠⚠ PAGED (fix #6, H679). PostgREST caps an unpaged select at 1,000 rows and
+       stops SILENTLY; the owner's list held 2,277 rows on 2026-09-02 and the page
+       rendered 1,000 of them as if they were all of them — a data problem rendering
+       as good news, on Justin's own page (H062). Every page is fetched HERE, before
+       the response, so the client never shows a count that grows; if the hard cap
+       below is ever hit the payload says so (`truncated`) and the client prints it.
+       Both branches page: the manager list (835 rows, ~15/week) crosses the cap in
+       about eleven weeks. Pinned by test/kb-list-paged.test.js (2,272 seeded rows). */
+    var KB_PAGE = 1000, KB_MAX_PAGES = 25;
+    var visibleIds = managedReader ? null : await getVisibleUploaderIds(admin, req.user.id, scope.role);
+    var buildQuery = function () {
+      if (managedReader) {
+        return admin.from('knowledge_base')
+          .select('source_label, scope, metadata, created_at, uploaded_by, team_owner_id')
+          .not('uploaded_by', 'is', null)
+          .or('scope.eq.global,uploaded_by.eq.' + scope.p_admin_id + ',uploaded_by.eq.' + scope.p_user_id + ',team_owner_id.eq.' + scope.p_admin_id)
+          .order('created_at', { ascending: false });
+      }
+      var q = admin.from('knowledge_base')
         .select('source_label, scope, metadata, created_at, uploaded_by')
         .not('uploaded_by', 'is', null)
         .order('created_at', { ascending: false });
-      if (visibleIds !== null) query = query.in('uploaded_by', visibleIds);
-      result = await query;
+      if (visibleIds !== null) q = q.in('uploaded_by', visibleIds);
+      return q;
+    };
+    var result = { data: [], error: null }, truncated = false;
+    for (var page = 0; page < KB_MAX_PAGES; page++) {
+      var pg = await buildQuery().range(page * KB_PAGE, page * KB_PAGE + KB_PAGE - 1);
+      if (pg.error) { result = pg; break; }
+      result.data = result.data.concat(pg.data || []);
+      if (!pg.data || pg.data.length < KB_PAGE) break;
+      if (page === KB_MAX_PAGES - 1) truncated = true;
     }
+    if (!result.error && managedReader) result.data = result.data.filter(function (row) { return kbReadRowVisible(row, scope); });
     if (result.error) {
       console.error('[kb] list query failed:', result.error.message);
       return res.status(500).json({ error: 'Could not list uploads' });
@@ -775,7 +785,7 @@ router.get('/list', protect, async function(req, res) {
     }
 
     var uploads = Object.keys(groups).map(function(k) { return groups[k]; });
-    return res.json({ uploads: uploads });
+    return res.json({ uploads: uploads, total_rows: rowsArr.length, truncated: truncated });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[kb] list error:', err.message);
