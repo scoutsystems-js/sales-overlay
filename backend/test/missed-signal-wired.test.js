@@ -134,3 +134,24 @@ test('⚠ H723 — the block carries NO coloured left border (the swept accent) 
   assert.ok(/\.missed-pair-end \{[^}]*font-size: var\(--fs-body\)/.test(LIVE), 'the quotes sit on the body step');
   assert.ok(/\.missed-pair-reply \{[^}]*font-size: var\(--fs-body\)/.test(LIVE), 'the reply sits on the body step');
 });
+
+test('⚠⚠ H723 — Open on the panel names the call\'s OWNER and openCallReview walks the pivot door when the owner differs (executed with stubs)', () => {
+  const LIVE = stripComments(fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  const esc = (s) => String(s == null ? '' : s);
+  const render = new Function('escapeHtml', 'formatTimestampDisplay', fnBody(LIVE, 'missedPairHtml') + '\n return missedPairHtml;')(esc, (s) => String(s));
+  const html = render({ signal: { timestamp_seconds: 1, quote: 'q' }, dq: { timestamp_seconds: 400, quote: 'd' }, gap_seconds: 399 }, { callId: 'c1', ownerUserId: 'rep-1', title: 't' });
+  assert.ok(/openCallReview\('c1', 'rep-1'\)/.test(html), 'the panel passes the owner: ' + html.slice(0, 200));
+  const pivots = []; const loads = [];
+  const state = { me: { user_id: 'mgr' }, viewingUserId: 'mgr', view: 'team-coaching' };
+  const open = new Function('state', 'setUser', 'render', 'syncHashFromState', 'loadCallReview', 'window', fnBody(LIVE, 'openCallReview') + '\n return openCallReview;')(state, (u) => { pivots.push(u); state.viewingUserId = u; }, () => {}, () => {}, (id) => loads.push(id), { scrollTo: () => {} });
+  open('c1', 'rep-1');
+  assert.deepStrictEqual(pivots, ['rep-1'], 'a rep\'s call from a team page pivots first');
+  assert.strictEqual(state.view, 'call-review'); assert.deepStrictEqual(loads, ['c1']);
+  open('c2', 'mgr');
+  assert.deepStrictEqual(pivots, ['rep-1', 'mgr'], 'own call while pivoted to a rep: pivots BACK to self (the review must follow the owner)');
+  open('c4', 'mgr');
+  assert.deepStrictEqual(pivots, ['rep-1', 'mgr'], 'own call while viewing self: no pivot');
+  open('c3');
+  assert.deepStrictEqual(pivots, ['rep-1', 'mgr'], 'no owner named: behaves as before (no pivot)');
+  assert.ok(/openCallReview\(\\'' \+ escapeHtml\(p\.call_id\) \+ '\\', \\'' \+ escapeHtml\(p\.user_id \|\| ''\)/.test(LIVE), 'the verdict queue passes the owner too');
+});

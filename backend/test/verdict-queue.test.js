@@ -116,9 +116,9 @@ test('⚠⚠ ONE REMOVER: no route writes not_a_sales_call itself — only lib/n
 test('⚠ the panel renders from a fixture: the reason in plain language, three actions per row, and an honest empty state', () => {
   const LIVE = stripComments(fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
   const fn = new Function('escapeHtml', 'formatNaturalDate', fnBody(LIVE, 'verdictQueueHtml') + '\n return verdictQueueHtml;')((s) => String(s), () => 'Sep 2');
-  const html = fn({ pending: [{ call_id: 'c1', title: 'SLR Team Meeting', call_date: '2026-09-02', rep: 'Ava', reason: 'two internal staff, no prospect present' }], counts: { pending: 1, confirmed: 4, corrected: 1 } });
+  const html = fn({ pending: [{ call_id: 'c1', user_id: 'A', title: 'SLR Team Meeting', call_date: '2026-09-02', rep: 'Ava', reason: 'two internal staff, no prospect present' }], counts: { pending: 1, confirmed: 4, corrected: 1 } });
   assert.ok(/two internal staff, no prospect present/.test(html) && /1 to review · 4 confirmed · 1 corrected/.test(html));
-  assert.ok(/reviewVerdict\('c1', 'confirm'\)/.test(html) && /reviewVerdict\('c1', 'correct'\)/.test(html) && /openCallReview\('c1'\)/.test(html), 'confirm, correct, open');
+  assert.ok(/reviewVerdict\('c1', 'confirm'\)/.test(html) && /reviewVerdict\('c1', 'correct'\)/.test(html) && /openCallReview\('c1', 'A'\)/.test(html), 'confirm, correct, open — Open names the call\'s OWNER (H723: a manager opening a rep\'s call must pivot first)');
   assert.ok(!/verdict|classifier|grader|not_sales/.test(html.replace(/reviewVerdict/g, '')), 'no internal words for a customer');
   assert.ok(/Nothing waiting/.test(fn({ pending: [], counts: { pending: 0, confirmed: 0, corrected: 0 } })));
 });

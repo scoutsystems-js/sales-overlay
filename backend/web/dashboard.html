@@ -15201,7 +15201,7 @@
       ? '<div class="missed-pair-reply"><span class="missed-pair-label">Closer replied</span>' + escapeHtml(sg.closer_response) + '</div>' : '';
     var head = o.inline ? '' : '<div class="missed-pair-head">' + escapeHtml(o.title || 'Untitled call')
       + (o.call_date ? ' · ' + escapeHtml(String(o.call_date).slice(0, 10)) : '')
-      + (o.callId ? ' <button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(o.callId) + '\')">Open</button>' : '') + '</div>';
+      + (o.callId ? ' <button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(o.callId) + '\'' + (o.ownerUserId ? ', \'' + escapeHtml(o.ownerUserId) + '\'' : '') + ')">Open</button>' : '') + '</div>';
     return '<div class="missed-pair' + (o.inline ? ' is-inline' : '') + '">' + head
       + '<div class="missed-pair-end">' + stamp(sg.timestamp_seconds) + '<span class="missed-pair-label">Signal</span><span class="missed-pair-quote">' + escapeHtml(sg.quote) + '</span></div>'
       + reply
@@ -15227,7 +15227,7 @@
     var html = '<div class="missed-pair-intro">' + r.total_pairs + ' on ' + r.total_calls + ' call' + (r.total_calls === 1 ? '' : 's') + ' — a red flag raised, not explored, and a disqualification later.</div>';
     reps.forEach(function (rep) {
       html += '<div class="missed-pair-rep"><div class="missed-pair-rep-name">' + escapeHtml(rep.name || 'Unnamed') + ' <span class="missed-pair-rep-count">' + rep.pairs.length + '</span></div>'
-        + rep.pairs.map(function (p) { return missedPairHtml(p, { title: p.title, call_date: p.call_date, callId: p.call_id, recordingUrl: p.recording_url }); }).join('')
+        + rep.pairs.map(function (p) { return missedPairHtml(p, { title: p.title, call_date: p.call_date, callId: p.call_id, ownerUserId: rep.user_id, recordingUrl: p.recording_url }); }).join('')
         + '</div>';
     });
     return html;
@@ -18224,7 +18224,7 @@
         + '<div class="vq-actions">'
         + '<button type="button" class="obj-btn" onclick="reviewVerdict(\'' + escapeHtml(p.call_id) + '\', \'confirm\')">Confirm: Not a Sales Call</button>'
         + '<button type="button" class="obj-btn vq-correct" onclick="reviewVerdict(\'' + escapeHtml(p.call_id) + '\', \'correct\')">It Is a Sales Call</button>'
-        + '<button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(p.call_id) + '\')">Open</button>'
+        + '<button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(p.call_id) + '\', \'' + escapeHtml(p.user_id || '') + '\')">Open</button>'
         + '</div></div>';
     }).join('');
     return '<div class="vq">' + head + rows + '</div>';
@@ -19952,7 +19952,14 @@
     }
   }
 
-  function openCallReview(callId) {
+  /* ⚠⚠ H723 — WHOSE CALL IS THIS. The review loader takes its scope from `state.viewingUserId`
+     (self → /fathom/calls/:id, a pivot → /admin/fathom-calls/:user/:id), so a manager opening a
+     REP's call from a TEAM page while viewing themselves got "Call not found" — found live on
+     the Missed Signals panel's Open button, and the verdict queue's Open shared the shape. When
+     the caller knows the owner, it says so, and the pivot door (setUser — the ONE door, with
+     its scope reset) is walked first. A call site that cannot name the owner behaves as before. */
+  function openCallReview(callId, ownerUserId) {
+    if (ownerUserId && state.me && ownerUserId !== state.viewingUserId) setUser(ownerUserId);
     state.selectedCallId = callId;
     state.callReview = null;
     state.callReviewError = null;
