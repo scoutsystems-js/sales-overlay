@@ -114,7 +114,23 @@ test('⚠ the renderer, executed from the live source: both quotes, both timesta
   const html = fn(pair, { recordingUrl: 'https://r/x', title: 'AF | Someone <b>', call_date: '2026-09-02T10:00:00Z' });
   assert.ok(/I invested money in things that did not work out/.test(html) && /even 20 grand, I do not have it/.test(html));
   assert.ok(/00:03:03/.test(html) && /00:39:48/.test(html) && /36 min/.test(html));
-  assert.ok(/not explored/.test(html));
+  /* H723: the prose sentence renders in NEITHER placement — the ends are laid out, and the
+     sentence repeated them. It stays on the payload as the text form. The guard words stay
+     absent in BOTH forms. */
+  assert.ok(!/not explored|missed-pair-sentence/.test(html), 'no prose sentence where the ends are laid out');
+  assert.ok(!/foreshadow|caused|led to|because/.test(html) && !/foreshadow|caused|led to|because/.test(pair.sentence));
   assert.ok(/&lt;b&gt;/.test(html), 'escaped');
   assert.ok(!/disqualify_signal|risk_signal|handling|gap_seconds/.test(html), 'no field names for a customer');
+});
+
+test('⚠ H723 — the block carries NO coloured left border (the swept accent) and its type sits on the scale, not on literals', () => {
+  const LIVE = stripComments(fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  const rules = LIVE.match(/^\s*\.missed-pair[a-z-]*(?:\.[a-z-]+)?\s*\{[^}]*\}/gm) || [];
+  assert.ok(rules.length >= 10, 'the block rules are present: ' + rules.length);
+  rules.forEach((r) => {
+    assert.ok(!/border-left/.test(r), 'no left border: ' + r.trim().slice(0, 60));
+    assert.ok(!/font-size:\s*\d/.test(r), 'no literal font-size: ' + r.trim().slice(0, 60));
+  });
+  assert.ok(/\.missed-pair-end \{[^}]*font-size: var\(--fs-body\)/.test(LIVE), 'the quotes sit on the body step');
+  assert.ok(/\.missed-pair-reply \{[^}]*font-size: var\(--fs-body\)/.test(LIVE), 'the reply sits on the body step');
 });

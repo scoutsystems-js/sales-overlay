@@ -2685,22 +2685,27 @@
     .review-handling-badge.deflected { background: rgba(220,80,80,.12);  color: var(--bad); }
     .review-handling-badge.ignored   { background: rgba(220,80,80,.12);  color: var(--bad); }
     .review-reply { margin-top: 6px; font-size: 13px; color: var(--text); }
-    /* H722 — the missed-signal pair, one renderer, two placements. Tokens only. */
-    .missed-pair { margin-top: 10px; padding: 10px 12px; border-left: 2px solid var(--bad); background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 6px; }
+    /* H722/H723 — the missed-signal pair, one renderer, two placements. ON THE SCALE: the two
+       quotes and the reply on --fs-body (Justin, live 2026-09-04: "make the font size bigger" —
+       moved from the secondary step, one step up, the page's default text); labels on the
+       eyebrow step; the gap on the label step. ⚠ NO LEFT BORDER: the coloured side bar is the
+       accent Justin named "a very common Claude design" and had swept from every surface
+       (H649/H650); it came back here on new markup — new markup inherits nothing. The block
+       is held by its ground tint and radius alone. */
+    .missed-pair { margin-top: 10px; padding: 12px 14px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px; }
     .missed-pair.is-inline { margin-top: 8px; }
-    .missed-pair-head { display: flex; align-items: center; gap: 8px; font-size: 13px; opacity: 0.85; }
-    .missed-pair-end { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+    .missed-pair-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-secondary); opacity: 0.85; }
+    .missed-pair-end { display: flex; gap: 10px; align-items: baseline; font-size: var(--fs-body); line-height: 1.5; }
     .missed-pair-time { font-variant-numeric: tabular-nums; color: var(--accent); text-decoration: none; flex: none; }
     .missed-pair-time:hover { text-decoration: underline; }
-    .missed-pair-label { flex: none; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
+    .missed-pair-label { flex: none; font-size: var(--fs-eyebrow); letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
     .missed-pair-quote { color: var(--text); }
-    .missed-pair-reply { font-size: 13px; opacity: 0.85; display: flex; gap: 8px; align-items: baseline; }
-    .missed-pair-gap { font-size: 12px; opacity: 0.7; font-variant-numeric: tabular-nums; }
-    .missed-pair-sentence { font-size: 13px; opacity: 0.9; padding-top: 4px; }
-    .missed-pair-intro { font-size: 13px; opacity: 0.85; margin-bottom: 10px; }
+    .missed-pair-reply { font-size: var(--fs-body); line-height: 1.5; opacity: 0.85; display: flex; gap: 10px; align-items: baseline; }
+    .missed-pair-gap { font-size: var(--fs-label); opacity: 0.7; font-variant-numeric: tabular-nums; }
+    .missed-pair-intro { font-size: var(--fs-secondary); opacity: 0.85; margin-bottom: 10px; }
     .missed-pair-rep { margin-top: 14px; }
     .missed-pair-rep-name { font-weight: var(--fw-emphasis); margin-bottom: 4px; display: flex; gap: 8px; align-items: baseline; }
-    .missed-pair-rep-count { font-size: 12px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+    .missed-pair-rep-count { font-size: var(--fs-label); opacity: 0.7; font-variant-numeric: tabular-nums; }
     .review-reply-label { display: inline-block; font-size: 11px; font-weight: var(--fw-emphasis); letter-spacing: .04em;
                           text-transform: uppercase; color: var(--accent); margin-right: 6px; }
     .review-type-badge.buying_signal      { background: rgba(9, 224, 70, 0.12);  color: var(--good); }
@@ -15174,9 +15179,8 @@
      "that rule has been paid for four times in this codebase"). Beside the moment on the
      review page (inline, under the signal's own row) and on Team → Coaching for managers
      and above (with the call named). Both quotes, both timestamps (clip links when the
-     recording allows), the closer's reply when PROVEN, the gap, and the sentence the
-     server assembled in code from the two ends and the gap — no principle, no model
-     call, no coaching voice. Field names never reach the screen. */
+     recording allows), the closer's reply when PROVEN, and the gap — the two quotes and
+     the gap say it themselves. Field names never reach the screen. */
   function missedPairHtml(pair, opts) {
     if (!pair || !pair.signal || !pair.dq) return '';
     var o = opts || {};
@@ -15203,7 +15207,10 @@
       + reply
       + '<div class="missed-pair-gap">' + escapeHtml(gapWords(pair.gap_seconds)) + ' later</div>'
       + '<div class="missed-pair-end">' + stamp(dq.timestamp_seconds) + '<span class="missed-pair-label">Disqualification</span><span class="missed-pair-quote">' + escapeHtml(dq.quote) + '</span></div>'
-      + (pair.sentence ? '<div class="missed-pair-sentence">' + escapeHtml(pair.sentence) + '</div>' : '')
+      /* ⚠ NO PROSE SENTENCE HERE (Justin, 2026-09-04, H723): both placements lay the ends out, and
+         the sentence repeated all of them — "the two quotes and the gap say it themselves".
+         `pair.sentence` stays on the payload as the TEXT FORM for anywhere the ends cannot be
+         laid out; today nothing renders it. */
       + '</div>';
   }
 
