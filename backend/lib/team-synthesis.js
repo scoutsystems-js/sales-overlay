@@ -75,7 +75,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v9-2026-09-04-evidence-subject';   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -123,6 +123,34 @@ function proseNamesRep(text, rep) {
   if (!t || t.length < 3) return false;   // never match on an initial
   return new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(String(text || ''));
 }
+/* ⚠⚠ NO UNEARNED QUOTES (Justin, 2026-09-04, H724). The rep binding below checks WHOSE quote it
+   is; NOTHING checked what the quote was ABOUT — the live defect was a partner-objection claim
+   ("handled 5 of 177, surfaced too late, Nathan and Nick") carrying a prospect saying they felt
+   comfortable buying. Nick was named, so it passed. The moment's own type, objection category
+   and section are STORED, so the check is exact and needs no model call: the lane declares each
+   claim's subject and the cited moment must agree. A claim built on COUNTS ("5 of 177") stands
+   alone and carries no quote. Where it cannot be checked — no subject, an unknown kind — the
+   quote is dropped and the claim kept: absent beats wrong. */
+var SUBJECT_KINDS = ['buying_signal', 'objection', 'risk_signal', 'barrier', 'missed_opportunity', 'strong_moment', 'rapport_moment', 'disqualify_signal', 'section', 'count'];
+/** null when the evidence proves the claim's subject; a reason string when the quote must go. */
+function evidenceSubjectMismatch(subject, ev) {
+  if (!ev) return null;
+  var kind = subject && typeof subject.kind === 'string' ? subject.kind.trim().toLowerCase() : null;
+  if (!kind || SUBJECT_KINDS.indexOf(kind) === -1) return 'no checkable subject declared (' + String(kind) + ') — the quote cannot be proven to earn its place';
+  if (kind === 'count') return 'a claim built on counts carries no quote';
+  if (kind === 'section') {
+    var sec = subject.section ? String(subject.section).toLowerCase() : null;
+    if (!sec) return 'a section claim named no section';
+    return (ev.section === sec) ? null : 'a claim about ' + sec + ' cites a moment from ' + (ev.section || 'no section');
+  }
+  if (ev.type !== kind) return 'a claim about ' + kind.replace(/_/g, ' ') + ' cites a ' + String(ev.type || 'untyped') + ' moment';
+  if (kind === 'objection' && subject.category) {
+    var cat = String(subject.category).toLowerCase();
+    if (ev.objection_category !== cat) return 'a claim about the ' + cat + ' objection cites a ' + (ev.objection_category || 'uncategorised') + ' one';
+  }
+  return null;
+}
+
 /** null when the evidence may stand; a reason string when it must be dropped. */
 function evidenceMismatch(claimText, evRep, allReps) {
   if (!evRep) return null;
@@ -248,6 +276,20 @@ async function cachePut(admin, keyId, type, from, to, hash, synthesis) {
 }
 
 // ── Team recommendations ─────────────────────────────────────────────────────
+/* H724: the resolve step, module-level so a test can EXECUTE it with a planted payload. */
+function resolveInsights(arr, byId, allRepNames) {
+    return arr.slice(0, 3).map(function (it) {
+      var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
+      /* ⚠ BIND THE EVIDENCE TO THE CLAIM, or drop it. See evidenceMismatch. */
+      var mism = ev ? evidenceMismatch(String((it && it.claim) || '') + ' ' + String((it && it.data) || ''), ev.rep, allRepNames) : null;
+      if (mism) { console.warn('[team-synthesis] evidence dropped: ' + mism); ev = null; }
+      /* H724: WHOSE quote passed; now WHAT it is about. The claim stands either way. */
+      var subj = ev ? evidenceSubjectMismatch(it && it.subject, ev) : null;
+      if (subj) { console.warn('[team-synthesis] evidence dropped (subject): ' + subj); ev = null; }
+      return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null, highlight_id: ev ? ev.highlight_id : null };
+    }).filter(function (it) { return it.claim; });
+  }
+
 async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailMap, nameMap) {
   if (!repIds || repIds.length === 0) return { available: true, working: [], improve: [], generated_at: new Date().toISOString() };
   var w = await loadTeamWindow(admin, repIds, from, to);
@@ -313,12 +355,12 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   /* ⚠ `id` IS SELECTED because the candidate carries it as highlight_id — a field
      read at the consumer and selected nowhere is undefined everywhere with no
      error, which is exactly what shipped for twenty minutes on 2026-09-02. */
-  var hlRows = await w.inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type');
+  var hlRows = await w.inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type, objection_category, section');   // H724: category and section are what the subject check reads
   function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
   var candidates = hlRows.map(function (r) {
     var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
     var reply = capAtSentence(provenCloserResponse(r), 200);   // null unless PROVEN to be the closer
-    return { cls: c, type: r.type, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
+    return { cls: c, type: r.type, objection_category: r.objection_category || null, section: r.section || null, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
       /* ⚠⚠ WHO SPOKE IS RECORDED HERE, BECAUSE THIS `||` IS WHERE IT IS DECIDED
          and nothing downstream can recover it. Without it `rep` means "whose
          CALL", not "who SPOKE" — and labelling a prospect's line with the rep's
@@ -353,15 +395,17 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
        what was missing is what the types MEAN for a claim. */
     EVIDENCE_RULE,
     '',
-    'EVIDENCE MOMENTS (cite one by id in evidence_id; do not invent quotes). Each is tagged with the rep and its TYPE:',
-  ]).concat(candidates.map(function (c) { return '  [' + c.id + '] (' + c.cls.toUpperCase() + ', rep ' + c.rep + ') ' + c.type + ': "' + c.quote + '"'; })).concat([
+    'EVIDENCE MOMENTS (cite one by id in evidence_id; do not invent quotes). Each is tagged with the rep, its TYPE (and objection category), and the SECTION of the call it came from:',
+  ]).concat(candidates.map(function (c) { return '  [' + c.id + '] (' + c.cls.toUpperCase() + ', rep ' + c.rep + ') ' + c.type + (c.objection_category ? '/' + c.objection_category : '') + (c.section ? ' in ' + c.section : '') + ': "' + c.quote + '"'; })).concat([
+    '',
+    'A QUOTE MUST PROVE THE CLAIM IT SITS UNDER. For each item declare its subject: {"kind": one of buying_signal | objection | risk_signal | barrier | missed_opportunity | strong_moment | rapport_moment | disqualify_signal | section | count, "category": the objection category when kind is objection (fear | timing | partner | logistical | other) or null, "section": the section when kind is section, else null}. Cite ONLY a moment of that kind (and category); a claim built on counts is kind "count" with evidence_id null — it needs no quote. A quote that does not prove its claim is discarded downstream.',
     '',
     'Produce: WHATS WORKING (2-3 team strengths, each grounded in an evidence_id + a number), WHAT TO IMPROVE (2-3 team gaps: the team-wide weakest section, the most-lost objection category, and the synthesized one-thing theme; cite the rep(s) it most applies to and a representative evidence_id).',
     /* ⚠ THE LENGTH RULE THE CAPS SIT ABOVE. Without one there was nothing to
        derive a cap from, so the cap was a number nobody could defend — and it
        cut five of six data fields off mid-phrase. */
     'LENGTH: keep each "claim" to ONE sentence of at most 45 words, and each "data" to at most two sentences totalling 45 words. Finish your sentences — never trail off mid-clause.',
-    'Respond with ONLY this JSON — no markdown: {"working":[{"claim":"...","data":"...","evidence_id":"m1"}],"improve":[{"claim":"...","data":"...","evidence_id":"m2"}]}',
+    'Respond with ONLY this JSON — no markdown: {"working":[{"claim":"...","data":"...","evidence_id":"m1","subject":{"kind":"strong_moment","category":null,"section":null}}],"improve":[{"claim":"...","data":"...","evidence_id":"m2","subject":{"kind":"objection","category":"partner","section":null}}]}',
   ]);
   if (selling.contextText && selling.contextText.trim()) {
     promptLines.splice(1, 0,
@@ -378,15 +422,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   if (!parsed || !Array.isArray(parsed.working) || !Array.isArray(parsed.improve)) return { available: false, reason: 'synthesis returned unparseable output' };
   var allRepNames = [];
   candidates.forEach(function (c) { if (c.rep && allRepNames.indexOf(c.rep) === -1) allRepNames.push(c.rep); });
-  function resolve(arr) {
-    return arr.slice(0, 3).map(function (it) {
-      var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
-      /* ⚠ BIND THE EVIDENCE TO THE CLAIM, or drop it. See evidenceMismatch. */
-      var mism = ev ? evidenceMismatch(String((it && it.claim) || '') + ' ' + String((it && it.data) || ''), ev.rep, allRepNames) : null;
-      if (mism) { console.warn('[team-synthesis] evidence dropped: ' + mism); ev = null; }
-      return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null, highlight_id: ev ? ev.highlight_id : null };
-    }).filter(function (it) { return it.claim; });
-  }
+  function resolve(arr) { return resolveInsights(arr, byId, allRepNames); }
   var synthesis = { working: resolve(parsed.working), improve: resolve(parsed.improve), generated_at: new Date().toISOString() };
   await cachePut(admin, keyId, 'team', from, to, hash, synthesis);
   return Object.assign({ available: true, cached: false }, synthesis);
@@ -489,6 +525,8 @@ async function computeWeeklyHighlights(admin, keyId, repIds, from, to, emailMap,
 module.exports = {
   _spokeOf: spokeOf,
   _evidenceMismatch: evidenceMismatch,
+  _evidenceSubjectMismatch: evidenceSubjectMismatch,
+  _resolveInsights: resolveInsights,
   _proseNamesRep: proseNamesRep,
   computeTeamRecommendations: computeTeamRecommendations,
   /* computeWeeklyHighlights — RETIRED 2026-09-01, archived above. */

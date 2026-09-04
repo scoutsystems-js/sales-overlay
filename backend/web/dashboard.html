@@ -15202,9 +15202,12 @@
     var head = o.inline ? '' : '<div class="missed-pair-head">' + escapeHtml(o.title || 'Untitled call')
       + (o.call_date ? ' · ' + escapeHtml(String(o.call_date).slice(0, 10)) : '')
       + (o.callId ? ' <button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(o.callId) + '\'' + (o.ownerUserId ? ', \'' + escapeHtml(o.ownerUserId) + '\'' : '') + ')">Open</button>' : '') + '</div>';
+    /* ⚠ BESIDE A MOMENT (inline) THE SIGNAL END IS THE MOMENT ITSELF — quote and reply are the
+       row it sits under. So inline shows only the gap and the disqualification end (Justin,
+       2026-09-04, H724: the review-page duplication goes with the fold). The two-ended form
+       belongs to the panel, where the moment is not on screen. */
     return '<div class="missed-pair' + (o.inline ? ' is-inline' : '') + '">' + head
-      + '<div class="missed-pair-end">' + stamp(sg.timestamp_seconds) + '<span class="missed-pair-label">Signal</span><span class="missed-pair-quote">' + escapeHtml(sg.quote) + '</span></div>'
-      + reply
+      + (o.inline ? '' : '<div class="missed-pair-end">' + stamp(sg.timestamp_seconds) + '<span class="missed-pair-label">Signal</span><span class="missed-pair-quote">' + escapeHtml(sg.quote) + '</span></div>' + reply)
       + '<div class="missed-pair-gap">' + escapeHtml(gapWords(pair.gap_seconds)) + ' later</div>'
       + '<div class="missed-pair-end">' + stamp(dq.timestamp_seconds) + '<span class="missed-pair-label">Disqualification</span><span class="missed-pair-quote">' + escapeHtml(dq.quote) + '</span></div>'
       /* ⚠ NO PROSE SENTENCE HERE (Justin, 2026-09-04, H723): both placements lay the ends out, and

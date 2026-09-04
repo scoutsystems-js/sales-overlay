@@ -155,3 +155,15 @@ test('⚠⚠ H723 — Open on the panel names the call\'s OWNER and openCallRevi
   assert.deepStrictEqual(pivots, ['rep-1', 'mgr'], 'no owner named: behaves as before (no pivot)');
   assert.ok(/openCallReview\(\\'' \+ escapeHtml\(p\.call_id\) \+ '\\', \\'' \+ escapeHtml\(p\.user_id \|\| ''\)/.test(LIVE), 'the verdict queue passes the owner too');
 });
+
+test('⚠ H724 — beside a moment (inline) the block shows only the gap and the disqualification end; the panel form keeps both ends', () => {
+  const LIVE = stripComments(fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  const esc = (s) => String(s == null ? '' : s);
+  const fn = new Function('escapeHtml', 'formatTimestampDisplay', fnBody(LIVE, 'missedPairHtml') + '\n return missedPairHtml;')(esc, (s) => new Date(s * 1000).toISOString().substr(11, 8));
+  const pair = P.findMissedSignalPairs(HL.c1)[0];
+  const inline = fn(pair, { inline: true });
+  assert.ok(!/I invested money/.test(inline) && !/I am not just a salesperson/.test(inline), 'inline: no signal quote, no reply — that is the row above');
+  assert.ok(/even 20 grand/.test(inline) && /36 min/.test(inline) && /00:39:48/.test(inline), 'inline: the gap and the DQ end');
+  const panel = fn(pair, { title: 't' });
+  assert.ok(/I invested money/.test(panel) && /I am not just a salesperson/.test(panel) && /even 20 grand/.test(panel), 'panel: both ends');
+});
