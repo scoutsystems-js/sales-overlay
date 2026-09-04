@@ -75,7 +75,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v9-2026-09-04-evidence-subject';   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v10-2026-09-04-candidates-pass-the-bar';   /* v10 (H725): a moment becomes EVIDENCE only if it passes the selectivity bar — a payment confirmation with no earned move is not a candidate. Was v9: */ // 'v9-2026-09-04-evidence-subject'   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -160,6 +160,7 @@ function evidenceMismatch(claimText, evRep, allReps) {
   return ok ? null : 'evidence rep "' + evRep + '" is not named in the claim';
 }
 
+const { momentReason } = require('./moment-bar');   // H725: evidence must pass the bar
 const CLAIM_CAP = 520;   // the prompt asks for <= 45 words (~290 chars)
 const DATA_CAP  = 520;
 function capAtSentence(x, cap) {
@@ -276,6 +277,19 @@ async function cachePut(admin, keyId, type, from, to, hash, synthesis) {
 }
 
 // ── Team recommendations ─────────────────────────────────────────────────────
+/* ⚠⚠ H725 — A MOMENT BECOMES EVIDENCE ONLY IF IT PASSES THE SELECTIVITY BAR. Justin, live on the
+   coaching page: a claim that reps "convert live resistance into live decisions" carried the quote
+   "It says payment complete." — the moment the money landed, not the move that earned it. The
+   subject check passed it (a buying signal is the right KIND). Under Justin's own filter — did this
+   move the call forward, or cost it — a payment confirmation moved nothing; it recorded that
+   everything already had. So the bar that governs capture (lib/moment-bar.js) also governs what may
+   be cited: a buying signal with no earned move, a rapport moment, a lone disqualification, a
+   leaving — none is evidence. The claim keeps its numbers and loses the quote. */
+function candidateEligible(r) {
+  if (!r || r.type === 'prospect_left') return false;
+  return momentReason(r) !== null;
+}
+
 /* H724: the resolve step, module-level so a test can EXECUTE it with a planted payload. */
 function resolveInsights(arr, byId, allRepNames) {
     return arr.slice(0, 3).map(function (it) {
@@ -355,9 +369,9 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   /* ⚠ `id` IS SELECTED because the candidate carries it as highlight_id — a field
      read at the consumer and selected nowhere is undefined everywhere with no
      error, which is exactly what shipped for twenty minutes on 2026-09-02. */
-  var hlRows = await w.inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type, objection_category, section');   // H724: category and section are what the subject check reads
+  var hlRows = await w.inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type, objection_category, section, resolution, handling, cause');   // H725: the bar reads resolution, handling and the cause   // H724: category and section are what the subject check reads
   function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
-  var candidates = hlRows.map(function (r) {
+  var candidates = hlRows.filter(candidateEligible).map(function (r) {
     var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
     var reply = capAtSentence(provenCloserResponse(r), 200);   // null unless PROVEN to be the closer
     return { cls: c, type: r.type, objection_category: r.objection_category || null, section: r.section || null, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
@@ -526,6 +540,7 @@ module.exports = {
   _spokeOf: spokeOf,
   _evidenceMismatch: evidenceMismatch,
   _evidenceSubjectMismatch: evidenceSubjectMismatch,
+  _candidateEligible: candidateEligible,
   _resolveInsights: resolveInsights,
   _proseNamesRep: proseNamesRep,
   computeTeamRecommendations: computeTeamRecommendations,

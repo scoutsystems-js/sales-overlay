@@ -132,7 +132,10 @@ test('⚠⚠ the SANITIZER keeps closer_response for EVERY type — not just the
     observation: 'the prospect asked for the price',
     type: t, closer_response: 'Well it depends which package you go with',
   }));
-  const out = worker._sanitizeHighlights(rows, 3600);
+  /* The sanitizer caps a call at MAX_HIGHLIGHTS (8) and the type list is nine since H725, so the
+     property is checked in slices of eight — every type, no moment dropped. */
+  let out = [];
+  for (let i = 0; i < rows.length; i += 8) out = out.concat(worker._sanitizeHighlights(rows.slice(i, i + 8), 3600));
   assert.strictEqual(out.length, types.length, 'no moment may be dropped');
   const lost = out.filter((o) => !o.closer_response).map((o) => o.type);
   assert.deepStrictEqual(lost, [], 'sanitizer discarded closer_response for: ' + lost.join(', '));

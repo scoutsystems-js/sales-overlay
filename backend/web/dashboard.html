@@ -3240,8 +3240,11 @@
     .team-rep-metric .k { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text); margin-top: 2px; }
     .team-insight { border-left: 3px solid var(--border); padding: 10px 0 10px 14px; margin-bottom: 12px; }
     .team-insight.working { border-left-color: var(--good); } .team-insight.improve { border-left-color: var(--mid); }
-    .team-insight-claim { font-size: 14px; color: var(--text); line-height: 1.55; }
-    .team-insight-data { font-size: 12.5px; color: var(--text); margin-top: 4px; }
+    /* H725 — Justin, live: "the part that says Josh P and Godwin is too small of text and hard to read". The
+       data line is the most specific sentence in the block. It sat BETWEEN steps at 12.5px; it moves to the
+       body step, the same step as the claim above it (whose literal 14px is now the token). No new size. */
+    .team-insight-claim { font-size: var(--fs-body); color: var(--text); line-height: 1.55; }
+    .team-insight-data { font-size: var(--fs-body); color: var(--text); margin-top: 4px; line-height: 1.5; }
     .team-insight-foot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 
     /* ⚠⚠ THE PERSONAL COACHING DASHBOARD — part 2 (Justin, 2026-09-01).
@@ -19571,6 +19574,7 @@
       risk_signal:        'Risk signal',
       barrier:            'Barrier',
       disqualify_signal:  'Disqualify signal',
+      prospect_left:      'Prospect left',   // H725
     };
     return (type && labels[type]) || (type || 'Moment');
   }

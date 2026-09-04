@@ -26,7 +26,7 @@
  */
 
 // Moments where something went wrong. These can evidence a gap directly.
-var NEGATIVE_TYPES = ['objection', 'missed_opportunity', 'risk_signal', 'barrier', 'disqualify_signal'];
+var NEGATIVE_TYPES = ['objection', 'missed_opportunity', 'risk_signal', 'barrier', 'disqualify_signal', 'prospect_left'];   // H725: a leaving is something that went wrong
 // Moments where something went right. These can evidence a STRENGTH — or a gap
 // ONLY when the gap is that the moment was missed or not acted on.
 var POSITIVE_TYPES = ['buying_signal', 'strong_moment', 'rapport_moment'];
@@ -49,5 +49,5 @@ module.exports = {
   // ⚠ Folded into BOTH synthesis cache keys. Without it the cached wrong quotes
   // serve indefinitely and the fix looks shipped while changing nothing on
   // screen — the exact trap NEEDS_WORK_LANE_VERSION was added for.
-  EVIDENCE_RULE_VERSION: 'v1-evidence-rule-2026-08-28',
+  EVIDENCE_RULE_VERSION: 'v2-evidence-rule-2026-09-04-prospect-left',   // v2 (H725): the negative set gained prospect_left; was v1-evidence-rule-2026-08-28
 };

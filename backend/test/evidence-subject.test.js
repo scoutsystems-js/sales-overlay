@@ -52,6 +52,26 @@ test('⚠ the lane asks for the subject, tags each candidate with its category a
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
   assert.ok(/"subject":\s*\{"kind"/.test(src), 'the JSON shape declares a subject');
   assert.ok(/objection_category, section/.test(src) || /objection_category,\s*section/.test(src), 'category and section are SELECTED');
-  assert.ok(/RECS_LANE_VERSION = 'v9-/.test(src), 'v9 — a payload change bumps the lane inside its cache key');
+  assert.ok(/RECS_LANE_VERSION = 'v(9|10)-/.test(src), 'v9+ — a payload change bumps the lane inside its cache key');
   assert.ok(/evidenceSubjectMismatch\(/.test(src.replace(/function evidenceSubjectMismatch\(/, '')), 'the check is CALLED');
+});
+
+test('⚠⚠ H725 — a moment becomes EVIDENCE only if it passes the bar: "It says payment complete." never becomes a candidate; a verified strong moment does; the builder filters on it', () => {
+  assert.strictEqual(lane._candidateEligible({ type: 'buying_signal', speaker: 'PROSPECT', speaker_verified: true, cause: null, quote: 'It says payment complete.' }), false);
+  assert.strictEqual(lane._candidateEligible({ type: 'buying_signal', speaker: 'PROSPECT', speaker_verified: true, cause: { move: 'none', none_reason: 'arrived_pre_sold' } }), false);
+  assert.strictEqual(lane._candidateEligible({ type: 'buying_signal', speaker: 'PROSPECT', speaker_verified: true, cause: { move: 'digging for pain', evidence: [{ located: true }, { located: true }] } }), true);
+  assert.strictEqual(lane._candidateEligible({ type: 'strong_moment', speaker: 'CLOSER', speaker_verified: true }), true);
+  assert.strictEqual(lane._candidateEligible({ type: 'objection', resolution: 'handled' }), true);
+  assert.strictEqual(lane._candidateEligible({ type: 'rapport_moment' }), false);
+  assert.strictEqual(lane._candidateEligible({ type: 'prospect_left', speaker: 'PROSPECT' }), false);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
+  assert.ok(/hlRows\.filter\(candidateEligible\)\.map\(/.test(src), 'the candidate builder filters on it');
+  assert.ok(/RECS_LANE_VERSION = 'v10-/.test(src), 'v10 — the payload changed');
+  assert.ok(/resolution, handling, cause/.test(src), 'the fields the bar reads are SELECTED');
+});
+
+test('⚠ H725 — the card\'s data line (the reps) and the claim sit on the body step, no literal size', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
+  assert.ok(/\.team-insight-data \{ font-size: var\(--fs-body\)/.test(page));
+  assert.ok(/\.team-insight-claim \{ font-size: var\(--fs-body\)/.test(page));
 });
