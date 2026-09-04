@@ -114,7 +114,15 @@ function selectHarvestMoments(highlights, cap) {
 
        ⚠ === true / === 'CLOSER', never truthiness: an ABSENT verdict is not a
        positive one. */
-    if (h.speaker !== 'CLOSER') continue;
+    /* H719: a PROSPECT buying signal whose CAUSE is evidenced carries the closer's
+       material in its located evidence lines — the closer's move IS the coachable
+       unit (Justin: the sequence closer did → prospect said). It passes the bar on
+       the strength of those lines, and only those: `none` files nothing new. */
+    var evidencedCause = h.type === 'buying_signal' && h.cause && typeof h.cause === 'object'
+      && h.cause.move && h.cause.move !== 'none'
+      && Array.isArray(h.cause.evidence) && h.cause.evidence.length >= 2
+      && h.cause.evidence.every(function (e) { return e && e.located === true; });
+    if (h.speaker !== 'CLOSER' && !evidencedCause) continue;
     if (h.speaker_verified !== true) continue;
 
     var n = perSection[h.section] || 0;

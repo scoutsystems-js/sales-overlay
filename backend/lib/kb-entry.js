@@ -36,6 +36,7 @@
 const crypto = require('crypto');
 
 const { displayCloserResponse } = require('./closer-side');
+const { causeContentText } = require('./arc-cause');   // H719
 // The metadata content-type for a harvested call moment. MUST stay out of
 // GRADER_CATEGORIES and SYNTHESIS_CATEGORIES — see ruling 1 above.
 var KB_ENTRY_METADATA_CATEGORY = 'call_moment';
@@ -94,6 +95,9 @@ function buildEntryContent(h) {
   if (observation) parts.push('What happened: ' + observation + '.');
   if (response) parts.push('The closer responded: "' + response + '".');
   if (hl.resolution) parts.push('Outcome: ' + hl.resolution + '.');
+  // H719: the closer's move, as ONE sentence — a field on the moment, never a longer chunk.
+  var causeText = causeContentText(hl.cause);
+  if (causeText) parts.push(causeText);
   return parts.join(' ');
 }
 
@@ -163,6 +167,9 @@ function buildMomentRow(opts) {
       timestamp_seconds: (typeof h.timestamp_seconds === 'number') ? h.timestamp_seconds : null,
       source_fathom_call_id: opts.fathomCallId,
       source_highlight_id: h.id || null,      // provenance only — NEVER the dedupe key
+      // H719: the cause (move + located closer lines + summary) and the disclosure tier ride the moment.
+      cause: (h.cause && typeof h.cause === 'object') ? h.cause : null,
+      disclosure_handling: (h.disclosure_handling && typeof h.disclosure_handling === 'object') ? h.disclosure_handling : null,
       source_user_id: opts.sourceUserId || null,
       added_by: opts.addedBy || null,
       /* The marking manager's reasoning, when supplied. Stored separately from
