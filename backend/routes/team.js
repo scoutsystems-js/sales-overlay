@@ -44,6 +44,7 @@ const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
 // ⚠ ONE definition of "synthetic", shared with every other team surface.
 const { realCallsOnly } = require('../lib/real-calls');
+const { findMissedSignalPairs, pairSentence } = require('../lib/missed-signal-pair');   // H722
 const { companyDisplayName } = require('../lib/company');
 const { computeTeamObjectionSummary } = require('../lib/team-objection-summary');
 
@@ -833,6 +834,62 @@ router.get('/recommendations', teamGate, async function (req, res) {
     var data = await computeTeamRecommendations(admin, team.keyId, team.memberIds, range.from, range.to, em, await nameMapFor(admin, team.memberIds, em));
     res.json(data);
   } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('recommendations', err); res.status(500).json({ error: 'Failed to load team recommendations' }); }
+});
+
+/* H722 — GET /team/missed-signal-pairs?from&to — MANAGERS AND ABOVE (teamGate). Every pair on the
+   team's counted real calls in the window: an early risk signal or barrier the closer ignored or
+   deflected, and a later prospect-spoken disqualification, five minutes or more apart. A
+   computation on stored rows, no model call; the sentence is assembled in code by the lib. A rep
+   never reaches this route — what a rep sees is their own review page, where the pair sits beside
+   the moment (the same renderer). */
+router.get('/missed-signal-pairs', teamGate, async function (req, res) {
+  var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var ids = team.memberIds || [];
+    if (!ids.length) return res.json({ reps: [], total_pairs: 0, total_calls: 0 });
+    var calls = [];
+    for (var i = 0; i < ids.length; i += CHUNK) {
+      /* ⚠ PAGED inside the request (H683): a team's window can exceed the 1,000-row cap, and a
+         truncated read would silently drop the oldest calls' pairs. Hard cap 10 pages. */
+      for (var page = 0; page < 10; page++) {
+        var cq = await admin.from('fathom_calls').select('id, fathom_call_id, user_id, title, call_date, recording_url, not_a_sales_call, duplicate_of')
+          .in('user_id', ids.slice(i, i + CHUNK)).gte('call_date', range.from).lte('call_date', range.to)
+          .not('not_a_sales_call', 'is', true).is('duplicate_of', null).order('call_date', { ascending: false }).range(page * 1000, page * 1000 + 999);
+        if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+        calls = calls.concat(cq.data || []);
+        if ((cq.data || []).length < 1000) break;
+      }
+    }
+    calls = realCallsOnly(calls);   // ⚠ every cross-user fathom_calls read filters synthetic rows (H369)
+    calls = calls.filter(function (c) { return c.not_a_sales_call !== true && !c.duplicate_of; });   // the paired exclusions, also in JS (a fake wire may not filter)
+    var byId = {}; calls.forEach(function (c) { byId[c.id] = c; });
+    var callIds = Object.keys(byId);
+    var hlByCall = {};
+    for (var j = 0; j < callIds.length; j += CHUNK) {
+      var hq = await admin.from('call_highlights')
+        .select('id, fathom_call_id, type, handling, section, speaker, timestamp_seconds, quote, observation, closer_response, closer_response_verified')
+        .in('fathom_call_id', callIds.slice(j, j + CHUNK)).in('type', ['risk_signal', 'barrier', 'disqualify_signal']);
+      if (hq.error) throw new Error('call_highlights: ' + hq.error.message);
+      (hq.data || []).forEach(function (h) { (hlByCall[h.fathom_call_id] = hlByCall[h.fathom_call_id] || []).push(h); });
+    }
+    var nameOf = await nameMapFor(admin, ids);
+    var byRep = {}; var totalPairs = 0; var callsWithPairs = {};
+    callIds.forEach(function (cid) {
+      var c = byId[cid];
+      findMissedSignalPairs(hlByCall[cid] || []).forEach(function (p) {
+        p.sentence = pairSentence(p);
+        var rep = byRep[c.user_id] = byRep[c.user_id] || { user_id: c.user_id, name: nameOf[c.user_id] || null, pairs: [] };
+        rep.pairs.push(Object.assign({ call_id: c.id, title: c.title || null, call_date: c.call_date, recording_url: c.recording_url || null }, p));
+        totalPairs++; callsWithPairs[cid] = true;
+      });
+    });
+    var reps = Object.keys(byRep).map(function (k) { return byRep[k]; });
+    reps.forEach(function (r) { r.pairs.sort(function (a, b) { return String(b.call_date || '').localeCompare(String(a.call_date || '')); }); });
+    reps.sort(function (a, b) { return b.pairs.length - a.pairs.length; });
+    res.json({ reps: reps, total_pairs: totalPairs, total_calls: Object.keys(callsWithPairs).length, from: range.from, to: range.to });
+  } catch (err) { if (handleConfigError(err, res)) return; logTeamError('missed-signal-pairs', err); res.status(500).json({ error: 'Failed to load missed signals' }); }
 });
 
 // C-1: "Generate summary" — page-agnostic executive summary. The client hands

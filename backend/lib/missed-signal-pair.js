@@ -9,7 +9,13 @@
  *
  * The pair is TWO POINTS ON A CALL AND THE GAP BETWEEN THEM: an early
  * `risk_signal` or `barrier` the closer IGNORED or DEFLECTED, and a LATER
- * `disqualify_signal` on the same call. It is the same move as tying back in,
+ * `disqualify_signal` on the same call. THE TWO NEED NOT BE THE SAME KIND OF
+ * THING (Justin, 2026-09-04): "even though the prospect trying and failing
+ * doesn't exactly line up with a financial DQ, it IS a fear signal that
+ * should've been resolved and uncovered." A fear signal left unexplored is
+ * exactly how a call reaches the close before anyone knows whether the prospect
+ * is hesitant (fear) or genuinely cannot afford it (a financial DQ) — the
+ * three-way boundary already on file. It is the same move as tying back in,
  * inverted — there a disclosure used well at the close, here a disclosure
  * missed and paid for. One vocabulary, two outcomes.
  *
@@ -90,7 +96,14 @@ function hms(sec) { var s = Math.max(0, Math.floor(sec || 0)); var h = Math.floo
 
 /* The sentence a manager reads — MECHANICAL, assembled in code from the two ends and
    the gap (H721): what was said, when, what the closer did, what came later. It states
-   no principle; the principle is Justin's and belongs to a coaching lane, which is held. */
+   no principle; the principle is Justin's and belongs to a coaching lane, which is held.
+   ⚠ JUSTIN'S CORRECTION (2026-09-04, H722): the flag and the disqualification need not
+   be the same kind of thing — a prior bad investment is FEAR, the DQ was financial, and
+   the pair is still valid because the flag was a signal that went unexplored, not
+   because it predicted that outcome. So the sentence must NOT say the flag
+   "foreshadowed" the DQ: that asserts a causal link the data does not carry. The honest
+   claim is: a signal was raised, it was not explored, and the call later ended in a
+   disqualification. */
 function pairSentence(p) {
   if (!p || !p.signal || !p.dq) return '';
   var s = p.signal, d = p.dq;
@@ -98,8 +111,8 @@ function pairSentence(p) {
     ? 'The closer replied "' + s.closer_response + '" and moved on.'
     : (s.closer_response === '__no_reply__' ? 'The closer did not reply.' : 'The closer moved on.');
   return 'At ' + hms(s.timestamp_seconds) + ' the prospect said "' + s.quote + '". ' + replied
-    + ' At ' + hms(d.timestamp_seconds) + ' the prospect said "' + d.quote + '". '
-    + gapLabel(p.gap_seconds) + ' between the flag and the disqualification it foreshadowed.';
+    + ' The signal was not explored. ' + gapLabel(p.gap_seconds) + ' later, at ' + hms(d.timestamp_seconds)
+    + ', the prospect said "' + d.quote + '" — a disqualification.';
 }
 
 module.exports = { findMissedSignalPairs: findMissedSignalPairs, gapLabel: gapLabel, pairSentence: pairSentence, MIN_GAP_SECONDS: MIN_GAP_SECONDS, MISS_HANDLING: MISS_HANDLING, SIGNAL_TYPES: SIGNAL_TYPES };

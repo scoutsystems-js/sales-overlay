@@ -1,3 +1,4 @@
+const { findMissedSignalPairs, pairSentence } = require('../lib/missed-signal-pair');   // H722
 const express = require('express');
 const { CHUNK } = require('../lib/chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const { createClient } = require('@supabase/supabase-js');
@@ -1712,6 +1713,9 @@ async function loadCallReview(admin, callId, ownerUserId) {
     exclusion_reason: call.exclusion_reason || null,
     analysis:         analysis,
     highlights:       highlightsResult.data || [],
+    /* H722: the missed-signal pairs, computed HERE so the self and the manager review routes
+       (both call this builder) cannot disagree. Floor and closer-DQ exclusion live in the lib. */
+    missed_signal_pairs: findMissedSignalPairs(highlightsResult.data || []).map(function (p) { p.sentence = pairSentence(p); return p; }),
   } };
 }
 
