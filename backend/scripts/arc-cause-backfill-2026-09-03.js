@@ -36,7 +36,7 @@ const arc = require('../lib/arc-cause');
 const { labelForQuote } = require('../lib/quote-locate');
 const W = require('../lib/analysis-worker');
 const { usageFor, setUsageRecorder } = require('../lib/model-usage');
-const { getVoyageEmbeddings } = require('../lib/voyage');
+const { getVoyageEmbeddings, embeddingCapability } = require('../lib/voyage');
 const { quoteHash } = require('../lib/kb-entry');
 const { CHUNK } = require('../lib/chunk');
 const { realCallsOnly } = require('../lib/real-calls');
@@ -140,7 +140,31 @@ async function loadTargets() {
   return { targets, extra, skipped, kbRows: kb.length, calls: callIds.length };
 }
 
+/* `--reembed-only <run_id>`: the touched KB rows' vectors, again. The first run wrote 706 rows
+   with their new sentence and then found no Voyage key in the local environment (the key lives
+   on Railway only) — the content changed and the vector did not, which is worse than unembedded
+   because nothing marks it stale. Batched, never per row. */
+async function reembedOnly(runId) {
+  const rows = []; for (let from = 0; ; from += 1000) {
+    const r = await admin.from('knowledge_base').select('id, content, metadata').eq('category', 'learned_pattern').range(from, from + 999);
+    if (r.error) throw new Error(r.error.message);
+    rows.push(...r.data.filter((k) => k.metadata && k.metadata.cause_run_id === runId));
+    if (r.data.length < 1000) break;
+  }
+  let embedded = 0, unembedded = 0;
+  for (let b = 0; b < rows.length; b += 100) {
+    const batch = rows.slice(b, b + 100);
+    const embs = await getVoyageEmbeddings(batch.map((r) => r.content), 'arc-cause-reembed');
+    for (let k = 0; k < batch.length; k++) {
+      if (embs && embs[k]) { const u = await admin.from('knowledge_base').update({ embedding: embs[k] }).eq('id', batch[k].id); if (!u.error) { embedded++; continue; } }
+      unembedded++;
+    }
+  }
+  console.log('re-embed ' + runId + ': ' + rows.length + ' rows, embedded ' + embedded + ', unembedded ' + unembedded);
+}
+
 (async () => {
+  if (flag('--reembed-only')) { await reembedOnly(flag('--reembed-only')); return; }
   const { targets, extra, skipped, kbRows, calls } = await loadTargets();
   // seeded-random CALL order, the extra open-call moments first (they are the test's requirement and cost cents)
   let seed = 20260904; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
@@ -167,6 +191,12 @@ async function loadTargets() {
     return;
   }
   if (!APPROVED) { console.log('DRY RUN — nothing sent, nothing written. Pass --approved "<who, when>" to run.'); return; }
+  /* ⚠ THE KEY LIVES ON RAILWAY ONLY (learned the hard way on the first run: 706 rows rewritten,
+     then Voyage 401 — content changed, vector did not, and nothing marks a vector stale). A run
+     that rewrites KB text REFUSES to start without the embedding capability; export it for the
+     process only: VOYAGE_API_KEY=$(railway variables --service sales-overlay --json | …). */
+  const cap = embeddingCapability();
+  if (!cap.ok) { console.error('REFUSED: ' + cap.reason + ' — this run rewrites KB text and must re-embed it in the same run.'); process.exit(3); }
   setUsageRecorder(admin);
   let i = 0, done = 0, failed = 0, saturated = 0, aborted = false; const results = [];
   async function worker() {
