@@ -30,7 +30,7 @@ test('every panel is assigned to exactly one page', () => {
      below caught exactly that the moment the section came off. */
   /* 8 → 5 on 2026-09-02: 'overview', 'closing' and 'objection' retired with the
      three score lists the rep cards replaced. */
-  /* 5 → 6 on 2026-09-04: 'missed' — the missed-signal pairs on Team → Coaching (H722). ADDING a
+  /* 5 → 6 on 2026-09-04: 'missed' (H722), renamed 'coachable' the same day (H726). ADDING a
      panel is the allowed change; this guard exists to catch a RENAME, which would orphan a stored
      hidden-set. */
   assert.strictEqual(ps.length, 6, 'every panel must carry a page, got ' + ps.length);
@@ -49,7 +49,7 @@ test('⚠ the panel KEYS are unchanged — that is the Customize View migration'
      discarded on read — which is why the HIDDEN set is stored rather than the
      visible one. The eight that remain keep their names, which is the property. */
   assert.deepStrictEqual(keys,
-    ['digest', 'gauges', 'graphs', 'missed', 'recs', 'reps'],   // 'missed' ADDED 2026-09-04 (H722) — an addition, never a rename
+    ['coachable', 'digest', 'gauges', 'graphs', 'recs', 'reps'],   // 'missed' (H722, one day old) became 'coachable' (H726) when missed signals ceased to be its own section — a stored hidden 'missed' is discarded on read
     'renaming a surviving key would orphan what a manager hid (three keys RETIRED 2026-09-02 with their lists — a retired key is discarded on read, not renamed)');
   assert.ok(!keys.includes('needswork'),
     'the retired panel must not linger in the chooser — it would toggle nothing');

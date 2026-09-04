@@ -2706,6 +2706,12 @@
     .missed-pair-rep { margin-top: 14px; }
     .missed-pair-rep-name { font-weight: var(--fw-emphasis); margin-bottom: 4px; display: flex; gap: 8px; align-items: baseline; }
     .missed-pair-rep-count { font-size: var(--fs-label); opacity: 0.7; font-variant-numeric: tabular-nums; }
+    /* H726 — coachable moments: the kind above each block on the eyebrow step; the move line; the empty sentence. */
+    .coach-item { margin-top: 10px; }
+    .coach-item-kind { font-size: var(--fs-eyebrow); letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.75; margin: 0 0 2px 2px; }
+    .coach-item.forward .coach-item-kind { color: var(--accent); opacity: 0.9; }
+    .coach-item-move { font-size: var(--fs-body); line-height: 1.5; display: flex; gap: 10px; align-items: baseline; }
+    .coach-item-empty { font-size: var(--fs-secondary); opacity: 0.8; padding: 6px 2px; }
     .review-reply-label { display: inline-block; font-size: 11px; font-weight: var(--fw-emphasis); letter-spacing: .04em;
                           text-transform: uppercase; color: var(--accent); margin-right: 6px; }
     .review-type-badge.buying_signal      { background: rgba(9, 224, 70, 0.12);  color: var(--good); }
@@ -5652,7 +5658,7 @@
        matches and the lane never speaks. */
     laneWaitLong:   {},
     teamRecs:       null,   teamRecsLoading: false,
-    teamMissed:     null,   teamMissedLoading: false,   // H722: the missed-signal pairs lane (Team → Coaching)
+    teamCoachable:  null,   teamCoachableLoading: false,   // H726: coachable moments (Team → Coaching) — the pairs are one kind within it
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
     teamDashboard: null,    teamDashboardLoading: false,
     teamCatalog: null,      teamCatalogLoading: false,
@@ -5810,7 +5816,7 @@
     repLineHidden: 1, repFilterLoadedKey: 1, teamObjDrillCategory: 1,
     // team-scoped lanes — a rep pivot does not change the selected team
     teamContext: 1, teamSelected: 1, teamOverview: 1, teamOverviewLoading: 1,
-    teamTrends: 1, teamTrendsLoading: 1, teamRecs: 1, teamRecsLoading: 1, teamMissed: 1, teamMissedLoading: 1,
+    teamTrends: 1, teamTrendsLoading: 1, teamRecs: 1, teamRecsLoading: 1, teamCoachable: 1, teamCoachableLoading: 1,
     teamDigest: 1,   // teamHighlights retired 2026-09-01
     teamDigestLoading: 1, teamDigestDate: 1, teamDetailMetric: 1,
     teamWhy: 1, teamWhyLoading: 1, teamNeedsWork: 1, teamNeedsWorkLoading: 1,
@@ -9034,7 +9040,7 @@
      SO THE SCOPE IS A PROPERTY OF THE LANE, NOT OF THE CALL SITE. Adding a lane
      means declaring what invalidates it, once, here. */
   var TEAM_LANE_SCOPE = {
-    teamOverview: 'both', teamTrends: 'both', teamRecs: 'both', teamMissed: 'both',
+    teamOverview: 'both', teamTrends: 'both', teamRecs: 'both', teamCoachable: 'both',
     /* ⚠⚠ 'both', NOT 'team' — I set this to 'team' first and the guard caught it
        on the first run, correctly. The layout is keyed on the VIEWER, so a range
        change genuinely cannot alter it and a 'team' scope looked harmless. But
@@ -9249,7 +9255,7 @@
       overview: { flag: 'teamOverviewLoading',   set: 'teamOverview',   url: '/team/overview?' + teamQP() },
       trends:   { flag: 'teamTrendsLoading',     set: 'teamTrends',     url: '/team/trends?' + teamQP('bucket=' + state.teamTrendBucket) },
       recs:     { flag: 'teamRecsLoading',       set: 'teamRecs',       url: '/team/recommendations?' + teamQP() },
-      missed:   { flag: 'teamMissedLoading',     set: 'teamMissed',     url: '/team/missed-signal-pairs?' + teamQP() },   // H722
+      coachable:{ flag: 'teamCoachableLoading',  set: 'teamCoachable',  url: '/team/coachable-moments?' + teamQP() },   // H726
       needsWork:{ flag: 'teamNeedsWorkLoading',  set: 'teamNeedsWork',  url: '/team/needs-work?' + teamQP() },
       /* highlights — RETIRED 2026-09-01, see the archived renderer. */
       /* ⚠ The dashboard lane returns the LAYOUT ONLY — every card reads a lane
@@ -10734,7 +10740,7 @@
        markup. The lane itself stays — 13 other references across the objections
        drilldown and the coaching tile still use it. */
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
-    if (state.teamMissed === null && !state.teamMissedLoading) loadTeam('missed');   // H722
+    if (state.teamCoachable === null && !state.teamCoachableLoading) loadTeam('coachable');   // H726
     if (state.teamRecs && !state.teamRecs._error) loadNotedMoments(((state.teamRecs.working || []).concat(state.teamRecs.improve || [])).map(function (i) { return i && i.highlight_id; }));
     /* ⚠ COACHING LEADS WITH THE TEAM'S AVERAGE SCORE (ruled). Performance shows
        the RANKING; this shows the ONE number — different granularity, not a
@@ -10754,9 +10760,9 @@
          state.teamRecs this page already fetched. */
       + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>'
         + teamRecsHtml() + '</div>' : '')
-      // H722: the missed-signal pairs — managers and above, this page only.
-      + (teamPanelVisible('missed') ? '<div class="section fade-in"><div class="section-header"><h2>Missed Signals</h2></div>'
-        + teamMissedHtml() + '</div>' : '')
+      // H726: coachable moments — one panel, mixed kinds; managers and above, this page only.
+      + (teamPanelVisible('coachable') ? '<div class="section fade-in"><div class="section-header"><h2>Coachable Moments</h2></div>'
+        + teamCoachableHtml() + '</div>' : '')
       /* ⚠⚠ THE "Call Highlights of the Week →" LINK WENT WITH THE FEATURE
          (2026-09-01). It was added days earlier precisely so Highlights would not
          become unreachable — and the right move when the destination is retired
@@ -14209,7 +14215,7 @@
     { key: 'graphs',    label: 'Performance graphs',      page: 'team-performance' },
     { key: 'recs',      label: 'Team Recommendations',    page: 'team-coaching' },
     { key: 'reps',      label: 'Rep cards',               page: 'team-performance' },
-    { key: 'missed',    label: 'Missed signals',          page: 'team-coaching' }   // H722
+    { key: 'coachable', label: 'Coachable moments',       page: 'team-coaching' }   // H726 (replaced 'missed', H722 — a stored hidden 'missed' is discarded on read)
     /* ⚠ 'needswork' REMOVED 2026-09-01 with the section it toggled; 'overview',
        'closing' and 'objection' REMOVED 2026-09-02 with the three score lists
        the rep cards replaced. A panel offered in the chooser that nothing gates
@@ -15220,20 +15226,53 @@
       + '</div>';
   }
 
-  /* H722 — the Team → Coaching panel: every pair on the team's counted calls in the window,
-     grouped by rep, newest first. Managers and above only (it is a team lane); a rep sees
-     their own pairs beside the moment on their review page, never an aggregate. */
-  function teamMissedHtml() {
-    var r = state.teamMissed;
-    if (!r) return laneWaitHtml('missed', 'Reading the team’s calls…', 'Still reading — every counted call in the window is checked.', 120);
+  /* ⚠⚠ H726 — COACHABLE MOMENTS, one panel, mixed kinds (Justin: "I'd prefer a coachable moments
+     section that includes moments like this WHEN NEEDED" — missed signals is not its own section).
+     Five per rep, one per call, three cost + two forward, tier before recency — the selection is
+     the server's (lib/coachable-moments.js); this only draws it. A pair is drawn by missedPairHtml
+     (the ONE renderer, H722); every other kind by coachableItemHtml. A rep with nothing qualifying
+     is drawn with a sentence, never dropped — zero is a measurement. Managers and above. */
+  function coachableItemHtml(it) {
+    if (!it || !it.moment) return '';
+    if (it.kind === 'missed_signal_pair' && it.pair) {
+      return '<div class="coach-item"><div class="coach-item-kind">' + escapeHtml(it.label || 'Missed signal') + '</div>'
+        + missedPairHtml(Object.assign({}, it.pair, { recording_url: it.recording_url }), { title: it.title, call_date: it.call_date, callId: it.call_id, ownerUserId: it.user_id, recordingUrl: it.recording_url })
+        + '</div>';
+    }
+    var m = it.moment; var rec = it.recording_url || null;
+    var stampHtml = (typeof m.timestamp_seconds === 'number')
+      ? (rec ? '<a class="missed-pair-time" href="' + escapeHtml(rec + (rec.indexOf('?') !== -1 ? '&' : '?') + 't=' + m.timestamp_seconds) + '" target="_blank" rel="noopener">' + escapeHtml(formatTimestampDisplay(m.timestamp_seconds)) + '</a>'
+             : '<span class="missed-pair-time">' + escapeHtml(formatTimestampDisplay(m.timestamp_seconds)) + '</span>')
+      : '';
+    var who = (m.speaker === 'CLOSER') ? 'Closer' : 'Prospect';
+    var reply = (m.speaker !== 'CLOSER' && m.closer_response && m.closer_response_verified === true && !/^__/.test(m.closer_response))
+      ? '<div class="missed-pair-reply"><span class="missed-pair-label">Closer replied</span>' + escapeHtml(m.closer_response) + '</div>' : '';
+    var moveHtml = (it.kind === 'earned_signal' && it.move)
+      ? '<div class="coach-item-move"><span class="missed-pair-label">The move</span>' + escapeHtml(it.move) + (it.move_summary ? ' — ' + escapeHtml(it.move_summary) : '') + '</div>' : '';
+    return '<div class="coach-item ' + escapeHtml(it.direction || '') + '">'
+      + '<div class="coach-item-kind">' + escapeHtml(it.label || '') + '</div>'
+      + '<div class="missed-pair">'
+        + '<div class="missed-pair-head">' + escapeHtml(it.title || 'Untitled call') + (it.call_date ? ' · ' + escapeHtml(String(it.call_date).slice(0, 10)) : '')
+          + (it.call_id ? ' <button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\'' + (it.user_id ? ', \'' + escapeHtml(it.user_id) + '\'' : '') + ')">Open</button>' : '') + '</div>'
+        + '<div class="missed-pair-end">' + stampHtml + '<span class="missed-pair-label">' + who + '</span><span class="missed-pair-quote">' + escapeHtml(m.quote || '') + '</span></div>'
+        + reply + moveHtml
+        + (it.consequence ? '<div class="missed-pair-gap">' + escapeHtml(it.consequence) + '</div>' : '')
+      + '</div>'
+    + '</div>';
+  }
+  function teamCoachableHtml() {
+    var r = state.teamCoachable;
+    if (!r) return laneWaitHtml('coachable', 'Reading the team’s calls…', 'Still reading — every counted call in the window is checked.', 120);
     var problem = laneProblem(r);
-    if (problem) return laneProblemHtml('missed signals', problem);
+    if (problem) return laneProblemHtml('coachable moments', problem);
     var reps = Array.isArray(r.reps) ? r.reps : [];
-    if (!reps.length) return '<div class="team-empty">No missed signals in this window.</div>';
-    var html = '<div class="missed-pair-intro">' + r.total_pairs + ' on ' + r.total_calls + ' call' + (r.total_calls === 1 ? '' : 's') + ' — a red flag raised, not explored, and a disqualification later.</div>';
+    if (!reps.length) return '<div class="team-empty">No coachable moments in this window.</div>';
+    var html = '';
     reps.forEach(function (rep) {
-      html += '<div class="missed-pair-rep"><div class="missed-pair-rep-name">' + escapeHtml(rep.name || 'Unnamed') + ' <span class="missed-pair-rep-count">' + rep.pairs.length + '</span></div>'
-        + rep.pairs.map(function (p) { return missedPairHtml(p, { title: p.title, call_date: p.call_date, callId: p.call_id, ownerUserId: rep.user_id, recordingUrl: p.recording_url }); }).join('')
+      var items = Array.isArray(rep.items) ? rep.items : [];
+      html += '<div class="missed-pair-rep"><div class="missed-pair-rep-name">' + escapeHtml(rep.name || 'Unnamed') + ' <span class="missed-pair-rep-count">' + items.length + '</span></div>'
+        + (items.length ? items.map(coachableItemHtml).join('')
+                        : '<div class="coach-item-empty">No qualifying moments in this window' + (rep.calls ? ' across ' + rep.calls + ' call' + (rep.calls === 1 ? '' : 's') : '') + '.</div>')
         + '</div>';
     });
     return html;

@@ -79,16 +79,20 @@ function appFor(actorId, role) {
 function get(app, p) { return new Promise((resolve, reject) => { const server = http.createServer(app).listen(0, () => {
   http.get({ port: server.address().port, path: p }, (res) => { let d = ''; res.on('data', (c) => { d += c; }); res.on('end', () => { server.close(); let j = null; try { j = JSON.parse(d); } catch (e) {} resolve({ status: res.statusCode, body: j }); }); }).on('error', (e) => { server.close(); reject(e); }); }); }); }
 
-test('⚠⚠ /team/missed-signal-pairs: a rep is refused (managers and above); a manager sees their own team\'s pairs, synthetic rows and other teams excluded, sentence attached', async () => {
-  assert.strictEqual((await get(appFor('A', 'user'), '/team/missed-signal-pairs?from=2026-08-01T00:00:00Z&to=2026-09-30T00:00:00Z')).status, 403);
-  const r = await get(appFor('mgr', 'manager'), '/team/missed-signal-pairs?from=2026-08-01T00:00:00Z&to=2026-09-30T00:00:00Z');
+test('⚠⚠ /team/coachable-moments (H726, replaced /team/missed-signal-pairs): a rep is refused; a manager sees every member — the pair as one kind, synthetic rows and other teams excluded, a member with nothing drawn with zero', async () => {
+  assert.strictEqual((await get(appFor('A', 'user'), '/team/coachable-moments?from=2026-08-01T00:00:00Z&to=2026-09-30T00:00:00Z')).status, 403);
+  assert.strictEqual((await get(appFor('mgr', 'manager'), '/team/missed-signal-pairs?from=2026-08-01T00:00:00Z&to=2026-09-30T00:00:00Z')).status, 404, 'the old section\'s route is gone — one panel');
+  const r = await get(appFor('mgr', 'manager'), '/team/coachable-moments?from=2026-08-01T00:00:00Z&to=2026-09-30T00:00:00Z');
   assert.strictEqual(r.status, 200, JSON.stringify(r.body));
-  assert.strictEqual(r.body.total_pairs, 1, 'the seed call and the other team never count');
-  assert.strictEqual(r.body.reps.length, 1);
-  assert.strictEqual(r.body.reps[0].user_id, 'A'); assert.strictEqual(r.body.reps[0].name, 'Ava Reyes');
-  const p = r.body.reps[0].pairs[0];
-  assert.strictEqual(p.call_id, 'c1'); assert.strictEqual(p.signal.id, 'h1'); assert.strictEqual(p.dq.id, 'h3'); assert.strictEqual(p.gap_seconds, 2205);
-  assert.ok(/not explored/.test(p.sentence));
+  assert.strictEqual(r.body.total_items, 1, 'the seed call and the other team never count');
+  const names = r.body.reps.map((x) => x.user_id).sort();
+  assert.deepStrictEqual(names, ['A', 'mgr'], 'every member returned, the manager included (a team member on every team surface)');
+  const a = r.body.reps.find((x) => x.user_id === 'A'); const m = r.body.reps.find((x) => x.user_id === 'mgr');
+  assert.strictEqual(a.name, 'Ava Reyes'); assert.strictEqual(a.items.length, 1); assert.deepStrictEqual(m.items, []);
+  const it = a.items[0];
+  assert.strictEqual(it.kind, 'missed_signal_pair'); assert.strictEqual(it.call_id, 'c1'); assert.strictEqual(it.pair.signal.id, 'h1'); assert.strictEqual(it.pair.dq.id, 'h3'); assert.strictEqual(it.pair.gap_seconds, 2205);
+  assert.strictEqual(it.consequence, '36 min later, a disqualification.');
+  assert.ok(!/foreshadow|caused|led to|because/.test(JSON.stringify(r.body)));
 });
 
 test('⚠⚠ ONE renderer, TWO placements: missedPairHtml is called by the review row and by the Team → Coaching panel, never a second implementation', () => {
@@ -96,14 +100,15 @@ test('⚠⚠ ONE renderer, TWO placements: missedPairHtml is called by the revie
   const LIVE = stripComments(src);
   const defs = LIVE.match(/function missedPairHtml\(/g) || [];
   assert.strictEqual(defs.length, 1, 'exactly one renderer');
-  const entry = fnBody(LIVE, 'highlightEntryHtml'); const panel = fnBody(LIVE, 'teamMissedHtml');
+  const entry = fnBody(LIVE, 'highlightEntryHtml'); const panel = fnBody(LIVE, 'coachableItemHtml');
   assert.ok(/missedPairHtml\(/.test(entry), 'the review row calls it');
-  assert.ok(/missedPairHtml\(/.test(panel), 'the coaching panel calls it');
-  assert.ok(/key: 'missed',\s*label: 'Missed signals',\s*page: 'team-coaching'/.test(LIVE), 'the panel is registered on team-coaching only');
-  assert.ok(/missed:\s*\{\s*flag: 'teamMissedLoading',\s*set: 'teamMissed',\s*url: '\/team\/missed-signal-pairs\?' \+ teamQP\(\)/.test(LIVE), 'the lane');
-  assert.ok(/teamMissed:\s*'both'/.test(LIVE), 'lane scope declared');
+  assert.ok(/missedPairHtml\(/.test(panel), 'the coachable-moments item calls it for a pair');
+  assert.ok(!/function teamMissedHtml\(/.test(LIVE) && !/Missed Signals<\/h2>/.test(LIVE), 'missed signals is NOT its own section any more (H726)');
+  assert.ok(/key: 'coachable',\s*label: 'Coachable moments',\s*page: 'team-coaching'/.test(LIVE), 'the panel is registered on team-coaching only');
+  assert.ok(/coachable:\s*\{\s*flag: 'teamCoachableLoading',\s*set: 'teamCoachable',\s*url: '\/team\/coachable-moments\?' \+ teamQP\(\)/.test(LIVE), 'the lane');
+  assert.ok(/teamCoachable:\s*'both'/.test(LIVE), 'lane scope declared');
   const coaching = fnBody(LIVE, 'renderTeamCoaching');
-  assert.ok(/loadTeam\('missed'\)/.test(coaching) && /teamMissedHtml\(\)/.test(coaching), 'Team → Coaching kicks the lane and draws the panel');
+  assert.ok(/loadTeam\('coachable'\)/.test(coaching) && /teamCoachableHtml\(\)/.test(coaching), 'Team → Coaching kicks the lane and draws the panel');
 });
 
 test('⚠ the renderer, executed from the live source: both quotes, both timestamps, the gap, the sentence; escaped; no internal words', () => {
@@ -166,4 +171,29 @@ test('⚠ H724 — beside a moment (inline) the block shows only the gap and the
   assert.ok(/even 20 grand/.test(inline) && /36 min/.test(inline) && /00:39:48/.test(inline), 'inline: the gap and the DQ end');
   const panel = fn(pair, { title: 't' });
   assert.ok(/I invested money/.test(panel) && /I am not just a salesperson/.test(panel) && /even 20 grand/.test(panel), 'panel: both ends');
+});
+
+test('⚠ H726 — the panel renderer, executed: every kind labelled in plain words, the consequence shown, a rep with nothing drawn with a sentence, no wording-guard words, no field names', () => {
+  const LIVE = stripComments(fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const hms = (s) => new Date(s * 1000).toISOString().substr(11, 8);
+  const pairFn = new Function('escapeHtml', 'formatTimestampDisplay', fnBody(LIVE, 'missedPairHtml') + '\n return missedPairHtml;')(esc, hms);
+  const itemFn = new Function('escapeHtml', 'formatTimestampDisplay', 'missedPairHtml', fnBody(LIVE, 'coachableItemHtml') + '\n return coachableItemHtml;')(esc, hms, pairFn);
+  const state = { teamCoachable: { reps: [
+    { user_id: 'A', name: 'Ava Reyes', calls: 12, items: [
+      { kind: 'missed_signal_pair', direction: 'cost', label: 'Missed signal', call_id: 'c1', user_id: 'A', title: 'AF | Someone', call_date: '2026-09-02', pair: P.findMissedSignalPairs(HL.c1)[0], moment: HL.c1[0], consequence: '36 min later, a disqualification.' },
+      { kind: 'earned_signal', direction: 'forward', label: 'Buying signal the closer earned', call_id: 'c2', user_id: 'A', title: 'AF | Other', call_date: '2026-09-01', moment: { timestamp_seconds: 300, speaker: 'PROSPECT', quote: 'You are right, I need to do something' }, move: 'digging for pain', move_summary: 'Built up the pain until he admitted it.', consequence: 'The call closed.' },
+    ] },
+    { user_id: 'mgr', name: 'Mia', calls: 3, items: [] },
+  ] } };
+  const panelFn = new Function('state', 'escapeHtml', 'coachableItemHtml', 'laneWaitHtml', 'laneProblem', 'laneProblemHtml', fnBody(LIVE, 'teamCoachableHtml') + '\n return teamCoachableHtml;')(state, esc, itemFn, () => 'wait', () => null, () => 'problem');
+  const html = panelFn();
+  assert.ok(/Ava Reyes/.test(html) && /Missed signal/.test(html) && /Buying signal the closer earned/.test(html) && /digging for pain/.test(html));
+  /* a pair's block IS its consequence (the gap line and the disqualification end) — the item adds no second line, which would say it twice */
+  assert.ok(/36 min later/.test(html) && /even 20 grand/.test(html) && /The call closed\./.test(html), 'the consequence, in code');
+  assert.strictEqual((html.match(/36 min later/g) || []).length, 1, 'said once');
+  assert.ok(/Mia/.test(html) && /No qualifying moments in this window across 3 calls\./.test(html), 'zero is a measurement');
+  assert.ok(/openCallReview\('c2', 'A'\)/.test(html), 'Open names the owner');
+  assert.ok(!/foreshadow|caused|led to|because/.test(html));
+  assert.ok(!/earned_signal|missed_signal_pair|objection_unhandled|closer_response|gap_seconds/.test(html.replace(/coach-item|missed-pair/g, '')), 'no field names for a customer');
 });
