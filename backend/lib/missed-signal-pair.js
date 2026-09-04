@@ -86,4 +86,20 @@ function gapLabel(sec) {
   return m + ' min ' + r + ' s';
 }
 
-module.exports = { findMissedSignalPairs: findMissedSignalPairs, gapLabel: gapLabel, MIN_GAP_SECONDS: MIN_GAP_SECONDS, MISS_HANDLING: MISS_HANDLING, SIGNAL_TYPES: SIGNAL_TYPES };
+function hms(sec) { var s = Math.max(0, Math.floor(sec || 0)); var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60; var two = function (n) { return (n < 10 ? '0' : '') + n; }; return two(h) + ':' + two(m) + ':' + two(r); }
+
+/* The sentence a manager reads — MECHANICAL, assembled in code from the two ends and
+   the gap (H721): what was said, when, what the closer did, what came later. It states
+   no principle; the principle is Justin's and belongs to a coaching lane, which is held. */
+function pairSentence(p) {
+  if (!p || !p.signal || !p.dq) return '';
+  var s = p.signal, d = p.dq;
+  var replied = (s.closer_response && !/^__/.test(s.closer_response) && s.closer_response_verified === true)
+    ? 'The closer replied "' + s.closer_response + '" and moved on.'
+    : (s.closer_response === '__no_reply__' ? 'The closer did not reply.' : 'The closer moved on.');
+  return 'At ' + hms(s.timestamp_seconds) + ' the prospect said "' + s.quote + '". ' + replied
+    + ' At ' + hms(d.timestamp_seconds) + ' the prospect said "' + d.quote + '". '
+    + gapLabel(p.gap_seconds) + ' between the flag and the disqualification it foreshadowed.';
+}
+
+module.exports = { findMissedSignalPairs: findMissedSignalPairs, gapLabel: gapLabel, pairSentence: pairSentence, MIN_GAP_SECONDS: MIN_GAP_SECONDS, MISS_HANDLING: MISS_HANDLING, SIGNAL_TYPES: SIGNAL_TYPES };

@@ -68,3 +68,11 @@ test('a DQ the CLOSER speaks is the closer acting on the flag, not missing it â€
   const rows = [H({ type: 'risk_signal', handling: 'ignored', timestamp_seconds: 300 }), H({ id: 'dq', type: 'disqualify_signal', timestamp_seconds: 2400, speaker: 'CLOSER', quote: 'our conversation is a little premature right now' })];
   assert.strictEqual(P.findMissedSignalPairs(rows).length, 0);
 });
+
+test('pairSentence is assembled from the two ends and the gap and states no principle', () => {
+  const p = { signal: { timestamp_seconds: 183, quote: 'I invested money in things that did not work out', closer_response: 'I am not just a salesperson', closer_response_verified: true }, dq: { timestamp_seconds: 2388, quote: 'even 20 grand, I do not have it' }, gap_seconds: 2205 };
+  const s = P.pairSentence(p);
+  assert.strictEqual(s, 'At 00:03:03 the prospect said "I invested money in things that did not work out". The closer replied "I am not just a salesperson" and moved on. At 00:39:48 the prospect said "even 20 grand, I do not have it". 36 min between the flag and the disqualification it foreshadowed.');
+  assert.ok(!/gotta|should|must/.test(s));
+  assert.strictEqual(P.pairSentence({ signal: { timestamp_seconds: 1, quote: 'q', closer_response: '__no_reply__' }, dq: { timestamp_seconds: 400, quote: 'd' }, gap_seconds: 399 }).indexOf('The closer did not reply.') > 0, true);
+});
