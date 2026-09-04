@@ -185,6 +185,7 @@ test('⚠ H726 — the panel renderer, executed: every kind labelled in plain wo
       { kind: 'earned_signal', direction: 'forward', label: 'Buying signal the closer earned', call_id: 'c2', user_id: 'A', title: 'AF | Other', call_date: '2026-09-01', moment: { timestamp_seconds: 300, speaker: 'PROSPECT', quote: 'You are right, I need to do something' }, move: 'digging for pain', move_summary: 'Built up the pain until he admitted it.', consequence: 'The call closed.' },
     ] },
     { user_id: 'mgr', name: 'Mia', calls: 3, items: [] },
+    { user_id: 'new', name: 'Noor', calls: 0, items: [] },
   ] } };
   const panelFn = new Function('state', 'escapeHtml', 'coachableItemHtml', 'laneWaitHtml', 'laneProblem', 'laneProblemHtml', fnBody(LIVE, 'teamCoachableHtml') + '\n return teamCoachableHtml;')(state, esc, itemFn, () => 'wait', () => null, () => 'problem');
   const html = panelFn();
@@ -193,6 +194,7 @@ test('⚠ H726 — the panel renderer, executed: every kind labelled in plain wo
   assert.ok(/36 min later/.test(html) && /even 20 grand/.test(html) && /The call closed\./.test(html), 'the consequence, in code');
   assert.strictEqual((html.match(/36 min later/g) || []).length, 1, 'said once');
   assert.ok(/Mia/.test(html) && /No qualifying moments in this window across 3 calls\./.test(html), 'zero is a measurement');
+  assert.ok(/Noor/.test(html) && /No counted calls in this window\./.test(html), 'no calls is a different fact from calls with nothing qualifying');
   assert.ok(/openCallReview\('c2', 'A'\)/.test(html), 'Open names the owner');
   assert.ok(!/foreshadow|caused|led to|because/.test(html));
   assert.ok(!/earned_signal|missed_signal_pair|objection_unhandled|closer_response|gap_seconds/.test(html.replace(/coach-item|missed-pair/g, '')), 'no field names for a customer');

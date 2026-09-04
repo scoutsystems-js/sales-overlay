@@ -15271,8 +15271,11 @@
     reps.forEach(function (rep) {
       var items = Array.isArray(rep.items) ? rep.items : [];
       html += '<div class="missed-pair-rep"><div class="missed-pair-rep-name">' + escapeHtml(rep.name || 'Unnamed') + ' <span class="missed-pair-rep-count">' + items.length + '</span></div>'
+        /* zero is a measurement, absence is not: a rep with NO counted calls in the window is a different fact
+           from a rep whose calls held nothing qualifying, and the sentence says which. */
         + (items.length ? items.map(coachableItemHtml).join('')
-                        : '<div class="coach-item-empty">No qualifying moments in this window' + (rep.calls ? ' across ' + rep.calls + ' call' + (rep.calls === 1 ? '' : 's') : '') + '.</div>')
+                        : (rep.calls ? '<div class="coach-item-empty">No qualifying moments in this window across ' + rep.calls + ' call' + (rep.calls === 1 ? '' : 's') + '.</div>'
+                                     : '<div class="coach-item-empty">No counted calls in this window.</div>'))
         + '</div>';
     });
     return html;
