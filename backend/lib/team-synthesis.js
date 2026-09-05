@@ -134,6 +134,10 @@ function evidenceMismatch(claimText, evRep, allReps) {
 
 const { evidenceSubjectMismatch, candidateEligible } = require('./evidence-subject');   // H724/H725/H728: ONE module for every citing lane
 const doctrineLib = require('./doctrine');   // H733: a disqualified prospect is never a lost deal — what the lane is told, and what it may say
+/* H737 — THE IMPORT THAT WAS MISSING FOR SEVEN HOURS. H731 added the call to loadKbMaterial and no require; `node -c` cannot
+   see an unresolved identifier; no test executed this function; every Team Recommendations load answered 500 from the
+   deploy at 04:56Z until Justin saw it. The route is now executed end to end by test/lanes-execute.test.js. */
+const { loadKbMaterial } = require('./kb-material');
 const PF = require('./page-facts');
 const { MIN_BUCKET } = require('./team-needs-work');   // the ONE comparison floor   // H728 step 2: the same facts to every lane on the page
 const CLAIM_CAP = 520;   // the prompt asks for <= 45 words (~290 chars)

@@ -8691,7 +8691,7 @@
     var head = '<div class="section-header"><h2>What Needs Work</h2>'
       + '<div class="meta">Across the Whole Sales Process</div></div>';
     if (d === null) return head + laneWaitHtml('sectionRank', 'Ranking the sections of your calls\u2026', null, 120);
-    if (d._error) return head + '<div class="error">Could not load the section ranking: ' + escapeHtml(d._error) + '</div>';
+    if (d._error) return head + '<div class="error">' + laneFailureCopy('the section ranking') + '</div>';
     var list = d.sections || [];
     if (!list.length) return head + '<div class="empty"><p>No graded calls in this range yet.</p></div>';
 
@@ -8760,7 +8760,7 @@
     var head = '<div class="section-header"><h2>Objection Handling Focus</h2><div class="meta">'
       + escapeHtml(needsWorkWindowLabel()) + '</div></div>';
     if (!d) return head + laneWaitHtml('needsWork', 'Finding your toughest objection\u2026', 'Still working \u2014 the first look at this range groups every objection from scratch and takes a moment.', 70);
-    if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d._error) return head + '<div class="error">' + laneFailureCopy('what needs work') + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     /* SHARED-CARRIER UPDATE 2026-08-20: `insufficient` was SPLIT into
        no_volume / thin_types / even_performance because one state meant three
@@ -10921,7 +10921,7 @@
     var d = state.teamNeedsWork;
     if (!d) return laneWaitHtml('needsWork', 'Working out where the team gets stuck\u2026', 'Still working \u2014 the first look at this range groups every objection from scratch and takes a moment.', 70);
     var head = '<div class="section-header"><h2>Objection Handling Focus</h2></div>';
-    if (d._error) return head + '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d._error) return head + '<div class="error">' + laneFailureCopy('what needs work') + '</div>';
     if (d.available === false) return head + '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     // insufficient → deterministic message, not clickable (no detail worth opening).
     /* SHARED-CARRIER UPDATE 2026-08-20: `insufficient` was SPLIT into
@@ -11285,7 +11285,7 @@
   function teamObjGridHtml() {
     var d = state.teamObjections;
     if (!d) return laneWaitHtml('objections', 'Counting objections across the team\'s calls\u2026', 'Still working \u2014 the first look at this range sorts every objection from scratch and takes a moment.', 150);
-    if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d._error) return '<div class="error">' + laneFailureCopy('the objections grid') + '</div>';
     var all = d.grid || [];
     if (!all.length) {
       return '<div class="empty"><h3>No objections in this range</h3>'
@@ -11466,7 +11466,7 @@
   function teamObjFeedHtml() {
     var d = state.teamObjections;
     if (!d) return laneWaitHtml('objections', 'Gathering the moments\u2026', 'Still working \u2014 the first look at this range sorts every objection from scratch and takes a moment.', 200);
-    if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d._error) return '<div class="error">' + laneFailureCopy('the objections feed') + '</div>';
     /* ⚠ THE REP FILTER APPLIES HERE TOO. Filtering the grid but not the moments
        would leave a manager reading a hidden rep's calls under a table that
        does not contain them — two halves of one screen disagreeing about who is
@@ -11524,7 +11524,7 @@
 
   function needsWorkDetailBodyHtml(d) {
     if (!d) return laneWaitHtml('needsWork', 'Pulling the moments together\u2026', null, 200);
-    if (d._error) return '<div class="error">Could not load: ' + escapeHtml(d._error) + '</div>';
+    if (d._error) return '<div class="error">' + laneFailureCopy('this detail') + '</div>';
     if (d.available === false) return '<div class="empty"><p>' + escapeHtml(d.reason || 'Not available right now.') + '</p></div>';
     var det = d.detail || {};
     var personal = det.subject === 'personal';
@@ -12200,7 +12200,7 @@
       + '</div>';
     var body;
     if (d === null) body = '<div class="skeleton" style="height:150px;"></div>';
-    else if (d && d._error) body = '<div class="error">Could not load the dials: ' + escapeHtml(d._error) + '</div>';
+    else if (d && d._error) body = '<div class="error">' + laneFailureCopy('the dials') + '</div>';
     else {
       var reps = repGaugeTotals(d);
       body = reps.length
@@ -12914,11 +12914,16 @@
     if (d._error) return 'error';
     return null;
   }
+  /* H737 — A FAILURE IS WRITTEN FOR THE PERSON READING IT: what happened and what to do. Never a status code, never a
+     mechanism. "HTTP 500" on the recommendations panel taught a manager nothing and gave them nothing to do. */
+  function laneFailureCopy(what) {
+    return 'Scout could not load ' + what + ' just now. Nothing is wrong with your calls or your data \u2014 try again in a minute, and if it keeps happening tell your admin.';
+  }
   function laneProblemHtml(what, kind) {
     return kind === 'forbidden'
       ? '<div class="dash-card-empty">You do not have access to ' + what
         + '<span>This is a manager view. Ask whoever manages your team if you need it.</span></div>'
-      : '<div class="error">Could not load ' + what + '.</div>';
+      : '<div class="error">' + laneFailureCopy(what) + '</div>';
   }
 
   function dashEditing() { return !!state.dashEdit; }
@@ -13692,7 +13697,7 @@
     var d = state.teamAverages;
     var body;
     if (d === null) body = laneWaitHtml('teamAverages', 'Measuring the last 7 days\u2026', null, 180);
-    else if (d && d._error) body = '<div class="error">Could not load team averages: ' + escapeHtml(d._error) + '</div>';
+    else if (d && d._error) body = '<div class="error">' + laneFailureCopy('the team averages') + '</div>';
     else {
       var m = (d && d.metrics) || {};
       var order = ['closing', 'objections', 'calltime'];
@@ -14786,7 +14791,7 @@
   function teamAggregateHtml() {
     var o = state.teamOverview;
     if (o && o._forbidden) return '<div class="error">Not authorized for this team.</div>';
-    if (o && o._error) return '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
+    if (o && o._error) return '<div class="error">' + laneFailureCopy('the team overview') + '</div>';
     if (!o) return laneWaitHtml('overview', 'Adding up the team\'s calls\u2026', null, 80);
     var t = o.totals;
     function stat(label, val, extra) {
@@ -15153,7 +15158,7 @@
     if (!cfg) { state.teamDetailMetric = null; return ''; }
     var head = '<div class="section-header"><div><h2>' + escapeHtml(cfg.title) + '</h2><div class="meta">' + escapeHtml(cfg.meta) + '</div></div>' + back + '</div>';
     if (!o || o._forbidden) return head + '<div class="error">Not authorized for this team.</div>';
-    if (o._error) return head + '<div class="error">Could not load team overview: ' + escapeHtml(o._error) + '</div>';
+    if (o._error) return head + '<div class="error">' + laneFailureCopy('the team overview') + '</div>';
     var reps = (o.per_rep || []).slice();
     if (!reps.length) return head + '<div class="empty"><p>No reps in this team yet.</p></div>';
     reps.sort(function (a, b) { return cfg.value(b) - cfg.value(a); });
@@ -15390,7 +15395,7 @@
        reader never sees the longer sentence, which would be a lie in the other
        direction. */
     if (!r) return laneWaitHtml('recs', 'Reading the team\'s calls\u2026', 'Still working \u2014 the first load of the day writes these from scratch and takes a moment.', 120);
-    if (r._error) return '<div class="error">Could not load recommendations: ' + escapeHtml(r._error) + '</div>';
+    if (r._error) return laneProblemHtml('the recommendations', 'error');   // H737: what happened and what to do, never a status code
     if (!r.available) return '<div class="empty"><h3>Recommendations unavailable</h3><p>' + escapeHtml(r.reason || 'Could not generate right now.') + '</p></div>';
     if (r.no_material) return noMaterialHtml(r.copy);   // H731
     var w = r.working || [], i = r.improve || [];
@@ -15427,7 +15432,7 @@
   function teamHighlightsHtml() {
     var h = state.teamHighlights;
     if (!h) return '<div class="skeleton" style="height:80px;"></div>';
-    if (h._error) return '<div class="error">Could not load highlights: ' + escapeHtml(h._error) + '</div>';
+    if (h._error) return '<div class="error">' + laneFailureCopy('the highlights') + '</div>';
     if (!h.available) return '<div class="empty"><h3>Highlights unavailable</h3><p>' + escapeHtml(h.reason || '') + '</p></div>';
     var lanes = h.lanes || {};
     var LANE = { objection_handling: 'Best objection handling', challenging: 'Best challenger moment', pain_excavation: 'Best pain excavation' };
@@ -15497,7 +15502,7 @@
 
     var d = state.teamDigest;
     if (!d) return laneWaitHtml('digest', 'Reading yesterday\'s calls\u2026', null, 80);
-    if (d._error) return '<div class="error">Could not load digest: ' + escapeHtml(d._error) + '</div>';
+    if (d._error) return '<div class="error">' + laneFailureCopy('the digest') + '</div>';
 
     /* Day navigation. Replaced the chip row 2026-08-26 — Justin: "the dates
        going backwards but moving to the right just looks off." */
@@ -16568,7 +16573,7 @@
 
     var body;
     if (!d) body = laneWaitHtml('eod', 'Building today\'s report\u2026', null, 120);
-    else if (d._error) body = '<div class="error">Could not load EOD report: ' + escapeHtml(d._error) + '</div>';
+    else if (d._error) body = '<div class="error">' + laneFailureCopy('the EOD report') + '</div>';
     else if (!d.calls || d.calls.length === 0) {
       // FD-3 (Option A): a never-synced user (no recording source connected → no
       // calls at all) gets a "no calls yet" state + connect CTA. The "pick another
