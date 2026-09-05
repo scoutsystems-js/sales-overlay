@@ -143,14 +143,14 @@ test('⚠⚠ the candidate builder CALLS spokeOf — it does not re-derive inlin
 });
 
 test('⚠⚠ resolveInsights CALLS evidenceMismatch and DROPS on a mismatch (module-level since H724, so a test can execute it; resolve() delegates to it)', () => {
-  const at = stripped.indexOf('function resolveInsights(arr, byId, allRepNames)');
+  const at = stripped.indexOf('function resolveInsights(arr, byId, allRepNames, opts)');   // opts = the page facts (H728)
   assert.ok(at !== -1, 'anchor missing');
   const fn = stripped.slice(at, stripped.indexOf('async function computeTeamRecommendations(', at));
   assert.ok(fn.length > 200 && fn.length < 3000, 'slice sane: ' + fn.length);
   assert.ok(fn.indexOf('evidenceMismatch(') !== -1, 'the check must be called inside resolveInsights');
   assert.ok(/if \(mism\)[^\n]*ev = null/.test(fn),
     'and a mismatch must actually DROP the evidence — computing it and ignoring it is worse than not checking');
-  assert.ok(/function resolve\(arr\) \{ return resolveInsights\(arr, byId, allRepNames\); \}/.test(stripped), 'the lane resolves through the module-level function');
+  assert.ok(/function resolve\(arr, direction\) \{ return resolveInsights\(arr, byId, allRepNames, \{ facts: facts, direction: direction \}\); \}/.test(stripped), 'the lane resolves through the module-level function, with the page facts');
   /* executed: the rep mismatch drops the quote through the real function */
   const out = lane._resolveInsights([{ claim: 'Godwin and Nick rush the close.', data: 'x', evidence_id: 'm1', subject: { kind: 'objection', category: null } }],
     { m1: { id: 'm1', rep: 'Gabriel Ocasio', type: 'objection', quote: 'q', spoke: 'prospect' } }, ['Godwin Ona', "Nick O'Neal", 'Gabriel Ocasio']);

@@ -52,7 +52,7 @@ test('⚠ the lane asks for the subject, tags each candidate with its category a
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
   assert.ok(/"subject":\s*\{"kind"/.test(src), 'the JSON shape declares a subject');
   assert.ok(/objection_category, section/.test(src) || /objection_category,\s*section/.test(src), 'category and section are SELECTED');
-  assert.ok(/RECS_LANE_VERSION = 'v(9|10)-/.test(src), 'v9+ — a payload change bumps the lane inside its cache key');
+  assert.ok(/RECS_LANE_VERSION = 'v(9|1\d)-/.test(src), 'v9+ — a payload change bumps the lane inside its cache key');
   assert.ok(/evidenceSubjectMismatch\(/.test(src.replace(/function evidenceSubjectMismatch\(/, '')), 'the check is CALLED');
 });
 
@@ -66,7 +66,7 @@ test('⚠⚠ H725 — a moment becomes EVIDENCE only if it passes the bar: "It s
   assert.strictEqual(lane._candidateEligible({ type: 'prospect_left', speaker: 'PROSPECT' }), false);
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
   assert.ok(/hlRows\.filter\(candidateEligible\)\.map\(/.test(src), 'the candidate builder filters on it');
-  assert.ok(/RECS_LANE_VERSION = 'v10-/.test(src), 'v10 — the payload changed');
+  assert.ok(/RECS_LANE_VERSION = 'v1\d-/.test(src), 'v10+ — the payload changed');
   assert.ok(/resolution, handling, cause/.test(src), 'the fields the bar reads are SELECTED');
 });
 
@@ -74,4 +74,22 @@ test('⚠ H725 — the card\'s data line (the reps) and the claim sit on the bod
   const page = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
   assert.ok(/\.team-insight-data \{ font-size: var\(--fs-body\)/.test(page));
   assert.ok(/\.team-insight-claim \{ font-size: var\(--fs-body\)/.test(page));
+});
+
+test('⚠⚠ H728 step 1 — the PERFORMANCE lane carries the same subject check and bar as the recommendations lane, from ONE module', () => {
+  const ES = require('../lib/evidence-subject');
+  assert.strictEqual(typeof ES.evidenceSubjectMismatch, 'function'); assert.strictEqual(typeof ES.candidateEligible, 'function');
+  assert.strictEqual(lane._evidenceSubjectMismatch, ES.evidenceSubjectMismatch, 'the recs lane re-exports the one function (identity)');
+  const perf = require('../lib/performance-synthesis');
+  assert.strictEqual(perf._evidenceSubjectMismatch, ES.evidenceSubjectMismatch, 'the performance lane uses the SAME function (identity)');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'performance-synthesis.js'), 'utf8');
+  assert.ok(/hlRows\.filter\(candidateEligible\)\.map\(/.test(src), 'candidates pass the bar');
+  assert.ok(/"subject":\s*\{"kind"/.test(src), 'the prompt asks for the subject');
+  assert.ok(/objection_category, section, speaker, speaker_verified, resolution, handling, cause/.test(src), 'the fields the checks read are SELECTED');
+  const out = perf._resolveInsights([
+    { claim: 'Closes confirmed payment on calls where prospects arrived with real doubt.', data: 'd', evidence_id: 'm1', subject: { kind: 'buying_signal' } },
+    { claim: 'Handles the partner objection cleanly.', data: 'd', evidence_id: 'm2', subject: { kind: 'objection', category: 'partner' } },
+  ], { m1: { id: 'm1', type: 'buying_signal', quote: 'It says payment complete.', cause: null }, m2: { id: 'm2', type: 'objection', objection_category: 'partner', quote: 'I need to ask my wife', resolution: 'handled' } }, {});
+  assert.strictEqual(out[0].quote, 'It says payment complete.', 'the subject matches (the bar is applied at CANDIDATE time, so a payment confirmation never reaches byId in production)');
+  assert.strictEqual(out[1].quote, 'I need to ask my wife');
 });

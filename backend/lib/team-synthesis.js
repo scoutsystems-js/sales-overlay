@@ -75,7 +75,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v10-2026-09-04-candidates-pass-the-bar';   /* v10 (H725): a moment becomes EVIDENCE only if it passes the selectivity bar — a payment confirmation with no earned move is not a candidate. Was v9: */ // 'v9-2026-09-04-evidence-subject'   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v11-2026-09-05-page-facts';   /* v11 (H728): the page facts block in the prompt; a claim whose direction contradicts them is dropped. Was v10-2026-09-04-candidates-pass-the-bar */ //   /* v10 (H725): a moment becomes EVIDENCE only if it passes the selectivity bar — a payment confirmation with no earned move is not a candidate. Was v9: */ // 'v9-2026-09-04-evidence-subject'   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -123,34 +123,6 @@ function proseNamesRep(text, rep) {
   if (!t || t.length < 3) return false;   // never match on an initial
   return new RegExp('\\b' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(String(text || ''));
 }
-/* ⚠⚠ NO UNEARNED QUOTES (Justin, 2026-09-04, H724). The rep binding below checks WHOSE quote it
-   is; NOTHING checked what the quote was ABOUT — the live defect was a partner-objection claim
-   ("handled 5 of 177, surfaced too late, Nathan and Nick") carrying a prospect saying they felt
-   comfortable buying. Nick was named, so it passed. The moment's own type, objection category
-   and section are STORED, so the check is exact and needs no model call: the lane declares each
-   claim's subject and the cited moment must agree. A claim built on COUNTS ("5 of 177") stands
-   alone and carries no quote. Where it cannot be checked — no subject, an unknown kind — the
-   quote is dropped and the claim kept: absent beats wrong. */
-var SUBJECT_KINDS = ['buying_signal', 'objection', 'risk_signal', 'barrier', 'missed_opportunity', 'strong_moment', 'rapport_moment', 'disqualify_signal', 'section', 'count'];
-/** null when the evidence proves the claim's subject; a reason string when the quote must go. */
-function evidenceSubjectMismatch(subject, ev) {
-  if (!ev) return null;
-  var kind = subject && typeof subject.kind === 'string' ? subject.kind.trim().toLowerCase() : null;
-  if (!kind || SUBJECT_KINDS.indexOf(kind) === -1) return 'no checkable subject declared (' + String(kind) + ') — the quote cannot be proven to earn its place';
-  if (kind === 'count') return 'a claim built on counts carries no quote';
-  if (kind === 'section') {
-    var sec = subject.section ? String(subject.section).toLowerCase() : null;
-    if (!sec) return 'a section claim named no section';
-    return (ev.section === sec) ? null : 'a claim about ' + sec + ' cites a moment from ' + (ev.section || 'no section');
-  }
-  if (ev.type !== kind) return 'a claim about ' + kind.replace(/_/g, ' ') + ' cites a ' + String(ev.type || 'untyped') + ' moment';
-  if (kind === 'objection' && subject.category) {
-    var cat = String(subject.category).toLowerCase();
-    if (ev.objection_category !== cat) return 'a claim about the ' + cat + ' objection cites a ' + (ev.objection_category || 'uncategorised') + ' one';
-  }
-  return null;
-}
-
 /** null when the evidence may stand; a reason string when it must be dropped. */
 function evidenceMismatch(claimText, evRep, allReps) {
   if (!evRep) return null;
@@ -160,7 +132,9 @@ function evidenceMismatch(claimText, evRep, allReps) {
   return ok ? null : 'evidence rep "' + evRep + '" is not named in the claim';
 }
 
-const { momentReason } = require('./moment-bar');   // H725: evidence must pass the bar
+const { evidenceSubjectMismatch, candidateEligible } = require('./evidence-subject');   // H724/H725/H728: ONE module for every citing lane
+const PF = require('./page-facts');
+const { MIN_BUCKET } = require('./team-needs-work');   // the ONE comparison floor   // H728 step 2: the same facts to every lane on the page
 const CLAIM_CAP = 520;   // the prompt asks for <= 45 words (~290 chars)
 const DATA_CAP  = 520;
 function capAtSentence(x, cap) {
@@ -277,21 +251,9 @@ async function cachePut(admin, keyId, type, from, to, hash, synthesis) {
 }
 
 // ── Team recommendations ─────────────────────────────────────────────────────
-/* ⚠⚠ H725 — A MOMENT BECOMES EVIDENCE ONLY IF IT PASSES THE SELECTIVITY BAR. Justin, live on the
-   coaching page: a claim that reps "convert live resistance into live decisions" carried the quote
-   "It says payment complete." — the moment the money landed, not the move that earned it. The
-   subject check passed it (a buying signal is the right KIND). Under Justin's own filter — did this
-   move the call forward, or cost it — a payment confirmation moved nothing; it recorded that
-   everything already had. So the bar that governs capture (lib/moment-bar.js) also governs what may
-   be cited: a buying signal with no earned move, a rapport moment, a lone disqualification, a
-   leaving — none is evidence. The claim keeps its numbers and loses the quote. */
-function candidateEligible(r) {
-  if (!r || r.type === 'prospect_left') return false;
-  return momentReason(r) !== null;
-}
-
 /* H724: the resolve step, module-level so a test can EXECUTE it with a planted payload. */
-function resolveInsights(arr, byId, allRepNames) {
+function resolveInsights(arr, byId, allRepNames, opts) {
+  var facts = opts && opts.facts; var direction = opts && opts.direction;
     return arr.slice(0, 3).map(function (it) {
       var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
       /* ⚠ BIND THE EVIDENCE TO THE CLAIM, or drop it. See evidenceMismatch. */
@@ -300,8 +262,12 @@ function resolveInsights(arr, byId, allRepNames) {
       /* H724: WHOSE quote passed; now WHAT it is about. The claim stands either way. */
       var subj = ev ? evidenceSubjectMismatch(it && it.subject, ev) : null;
       if (subj) { console.warn('[team-synthesis] evidence dropped (subject): ' + subj); ev = null; }
+      /* H728 step 2: a claim whose DIRECTION contradicts the page facts is dropped — two lanes on one
+         page may generalise, never assert opposites. */
+      var contra = facts ? PF.claimContradictsFacts(it, direction, facts) : null;
+      if (contra) { console.warn('[team-synthesis] claim dropped (contradicts the page facts): ' + contra); return null; }
       return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null, highlight_id: ev ? ev.highlight_id : null };
-    }).filter(function (it) { return it.claim; });
+    }).filter(function (it) { return it && it.claim; });
   }
 
 async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailMap, nameMap) {
@@ -409,6 +375,8 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
        what was missing is what the types MEAN for a claim. */
     EVIDENCE_RULE,
     '',
+    PF.factsBlock(PF.pageFacts(sections, obj, { minBucket: MIN_BUCKET })),
+    '',
     'EVIDENCE MOMENTS (cite one by id in evidence_id; do not invent quotes). Each is tagged with the rep, its TYPE (and objection category), and the SECTION of the call it came from:',
   ]).concat(candidates.map(function (c) { return '  [' + c.id + '] (' + c.cls.toUpperCase() + ', rep ' + c.rep + ') ' + c.type + (c.objection_category ? '/' + c.objection_category : '') + (c.section ? ' in ' + c.section : '') + ': "' + c.quote + '"'; })).concat([
     '',
@@ -436,8 +404,9 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   if (!parsed || !Array.isArray(parsed.working) || !Array.isArray(parsed.improve)) return { available: false, reason: 'synthesis returned unparseable output' };
   var allRepNames = [];
   candidates.forEach(function (c) { if (c.rep && allRepNames.indexOf(c.rep) === -1) allRepNames.push(c.rep); });
-  function resolve(arr) { return resolveInsights(arr, byId, allRepNames); }
-  var synthesis = { working: resolve(parsed.working), improve: resolve(parsed.improve), generated_at: new Date().toISOString() };
+  var facts = PF.pageFacts(sections, obj, { minBucket: MIN_BUCKET });
+  function resolve(arr, direction) { return resolveInsights(arr, byId, allRepNames, { facts: facts, direction: direction }); }
+  var synthesis = { working: resolve(parsed.working, 'working'), improve: resolve(parsed.improve, 'improve'), generated_at: new Date().toISOString() };
   await cachePut(admin, keyId, 'team', from, to, hash, synthesis);
   return Object.assign({ available: true, cached: false }, synthesis);
 }

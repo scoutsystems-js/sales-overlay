@@ -16,9 +16,12 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 /* Bumped ONLY for a correctness defect in what the cache already holds —
    never for a speculative improvement. See the key comment below. */
-const SYNTH_RULE_VERSION = 'v5-2026-09-02-category-order-canonical';   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
+const SYNTH_RULE_VERSION = 'v6-2026-09-05-subject-bar-page-facts';   /* v6 (H728): the subject check, the candidate bar and the page facts — the same three the recommendations lane carries. Was v5-2026-09-02-category-order-canonical */ //   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
+const { evidenceSubjectMismatch, candidateEligible, subjectPromptRule } = require('./evidence-subject');   // H728 step 1
+const PF = require('./page-facts');   // H728 step 2
+const { MIN_BUCKET } = require('./team-needs-work');
 
 const { clipHref } = require('./clip-link');
 const { displayCloserResponse } = require('./closer-side');
@@ -106,10 +109,14 @@ function buildPrompt(agg, oneThings, candidates, sellingContext, managerNotes) {
   //   team synthesis, so the two cannot drift on where it appears.
   lines.push(EVIDENCE_RULE);
   lines.push('');
-  lines.push('EVIDENCE MOMENTS (cite exactly one by its id in evidence_id; do not invent quotes). Each carries its TYPE:');
+  lines.push(PF.factsBlock(PF.pageFacts(agg.sections, agg.obj, { minBucket: MIN_BUCKET })));   // H728 step 2: the same facts as the page
+  lines.push('');
+  lines.push('EVIDENCE MOMENTS (cite exactly one by its id in evidence_id; do not invent quotes). Each carries its TYPE, category and SECTION:');
   candidates.forEach(function (c) {
-    lines.push('  [' + c.id + '] (' + c.cls.toUpperCase() + ' call) ' + c.type + ': "' + (c.quote || '').slice(0, 160) + '"');
+    lines.push('  [' + c.id + '] (' + c.cls.toUpperCase() + ' call) ' + c.type + (c.objection_category ? '/' + c.objection_category : '') + (c.section ? ' in ' + c.section : '') + ': "' + (c.quote || '').slice(0, 160) + '"');
   });
+  lines.push('');
+  lines.push(subjectPromptRule());
   lines.push('');
   lines.push('Produce:');
   lines.push('- WHAT\'S WORKING: 2-3 strengths, each grounded in a specific WIN-call moment (evidence_id from a win call) and tied to a number (e.g. the strongest section).');
@@ -117,8 +124,31 @@ function buildPrompt(agg, oneThings, candidates, sellingContext, managerNotes) {
   lines.push('State explicitly what DIFFERS between win and loss calls.');
   lines.push('');
   lines.push('Respond with ONLY this JSON — no markdown, no fences:');
-  lines.push('{"working":[{"claim":"...","data":"...","evidence_id":"m1"}],"improve":[{"claim":"...","data":"...","evidence_id":"m2"}]}');
+  lines.push('{"working":[{"claim":"...","data":"...","evidence_id":"m1","subject":{"kind":"strong_moment","category":null,"section":null}}],"improve":[{"claim":"...","data":"...","evidence_id":"m2","subject":{"kind":"objection","category":"partner","section":null}}]}');
   return lines.join('\n');
+}
+
+/* H728 — module-level so a test can EXECUTE it: WHAT the quote is about (evidenceSubjectMismatch — the
+   same function the recommendations lane uses) and whether the claim's DIRECTION agrees with the page
+   facts (claimContradictsFacts). The claim keeps its numbers and loses an unearned quote; a claim that
+   contradicts the page is dropped. */
+function resolveInsights(arr, byId, opts) {
+  var facts = opts && opts.facts; var direction = opts && opts.direction;
+  return (Array.isArray(arr) ? arr : []).slice(0, 3).map(function (it) {
+    var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
+    var subj = ev ? evidenceSubjectMismatch(it && it.subject, ev) : null;
+    if (subj) { console.warn('[performance-synthesis] evidence dropped (subject): ' + subj); ev = null; }
+    var contra = facts ? PF.claimContradictsFacts(it, direction, facts) : null;
+    if (contra) { console.warn('[performance-synthesis] claim dropped (contradicts the page facts): ' + contra); return null; }
+    return {
+      claim: str(it && it.claim, 400),
+      data: str(it && it.data, 200),
+      quote: ev ? ev.quote : null,
+      clip_url: ev ? ev.clip_url : null,
+      source: ev ? ev.source : null,
+      call_id: ev ? ev.call_id : null,
+    };
+  }).filter(function (it) { return it && it.claim; });
 }
 
 async function computePerformanceSynthesis(admin, userId, from, to) {
@@ -241,11 +271,11 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   objRows.forEach(function (r) { var b = obj[r.objection_category]; if (b) { b.total++; if (isHandled(r, outcomeByCall[r.fathom_call_id])) b.handled++; } });
 
   // 5) candidate evidence moments (with real clip links + outcome class).
-  var hlRows = await inChunks('call_highlights', 'fathom_call_id, timestamp_seconds, quote, closer_response, type');
-  var candidates = hlRows.map(function (r) {
+  var hlRows = await inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, closer_response, type, objection_category, section, speaker, speaker_verified, resolution, handling, cause');
+  var candidates = hlRows.filter(candidateEligible).map(function (r) {
     var cls = outcomeClass(outcomeByCall[r.fathom_call_id]);
     return {
-      cls: cls, type: r.type,
+      cls: cls, type: r.type, objection_category: r.objection_category || null, section: r.section || null,
       /* ⚠ SENTINEL-GATED: a sentinel is a non-empty string and would WIN this
          fallback, rendering `__moment_is_closer__` as the evidence quote. */
       quote: str(displayCloserResponse(r.closer_response), 220) || str(r.quote, 220) || '',
@@ -279,21 +309,9 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   var parsed = extractJson(resp.content && resp.content[0] ? resp.content[0].text : '');
   if (!parsed || !Array.isArray(parsed.working) || !Array.isArray(parsed.improve)) return { available: false, reason: 'synthesis returned unparseable output' };
 
-  // 7) resolve evidence_id → real {quote, clip_url, call_id} (never LLM-invented).
-  function resolve(arr) {
-    return arr.slice(0, 3).map(function (it) {
-      var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
-      return {
-        claim: str(it && it.claim, 400),
-        data: str(it && it.data, 200),
-        quote: ev ? ev.quote : null,
-        clip_url: ev ? ev.clip_url : null,
-        source: ev ? ev.source : null,
-        call_id: ev ? ev.call_id : null,
-      };
-    }).filter(function (it) { return it.claim; });
-  }
-  var synthesis = { working: resolve(parsed.working), improve: resolve(parsed.improve), generated_at: new Date().toISOString() };
+  // 7) resolve evidence_id → real {quote, clip_url, call_id} (never LLM-invented) — the subject check and the page facts inside.
+  var facts = PF.pageFacts(agg.sections, agg.obj, { minBucket: MIN_BUCKET });
+  var synthesis = { working: resolveInsights(parsed.working, byId, { facts: facts, direction: 'working' }), improve: resolveInsights(parsed.improve, byId, { facts: facts, direction: 'improve' }), generated_at: new Date().toISOString() };
 
   // 8) cache (best-effort).
   var up = await admin.from('objection_synthesis_cache').upsert(
@@ -304,4 +322,4 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-module.exports = { computePerformanceSynthesis: computePerformanceSynthesis, _buildPrompt: buildPrompt };
+module.exports = { computePerformanceSynthesis: computePerformanceSynthesis, _buildPrompt: buildPrompt, _resolveInsights: resolveInsights, _evidenceSubjectMismatch: evidenceSubjectMismatch, _candidateEligible: candidateEligible };
