@@ -70,6 +70,7 @@ var LANE_KEYS = {
   'team-synthesis':       ['discovery_is_the_upstream_cause_of_every_objection', 'tying_back_in', 'follow_ups', 'closing_percentage_counts_prospects_not_calls', 'how_coaching_is_written', 'what_good_looks_like', 'what_scout_must_never_do'],
   'performance-synthesis': ['discovery_is_the_upstream_cause_of_every_objection', 'tying_back_in', 'follow_ups', 'closing_percentage_counts_prospects_not_calls', 'how_coaching_is_written', 'what_good_looks_like', 'what_scout_must_never_do'],
   'team-digest':          ['follow_ups', 'closing_percentage_counts_prospects_not_calls', 'how_coaching_is_written', 'what_good_looks_like', 'what_scout_must_never_do'],
+  'rep-line':             ['what_an_objection_is', 'the_five_objection_types', 'the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection', 'isolation_is_the_correct_first_move', 'tying_back_in', 'how_coaching_is_written', 'what_good_looks_like', 'what_scout_must_never_do'],   // H734
 };
 function unitsFor(doctrine, lane) {
   var keys = LANE_KEYS[lane]; var units = (doctrine && doctrine.units) || [];

@@ -44,7 +44,8 @@ const { computePageSummary } = require('../lib/page-summary');
 const { computeTeamObjections, ALL_CATEGORIES: OBJ_DRILL_CATEGORIES } = require('../lib/team-objections');
 // ⚠ ONE definition of "synthetic", shared with every other team surface.
 const { realCallsOnly } = require('../lib/real-calls');
-const { selectCoachableMoments } = require('../lib/coachable-moments');   // H726 (the pair rides inside it)
+const { loadCoachableTeam } = require('../lib/coachable-team');   // H734: ONE gather for the panel and the rep line
+const { computeRepLines } = require('../lib/rep-line');           // H734: the rep line IS the judgement
 const { companyDisplayName } = require('../lib/company');
 const { computeTeamObjectionSummary } = require('../lib/team-objection-summary');
 
@@ -849,42 +850,23 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     var team = await resolveTeam(admin, req);
     var ids = team.memberIds || [];
     if (!ids.length) return res.json({ reps: [], total_items: 0, by_kind: {}, from: range.from, to: range.to });
-    var calls = [];
-    for (var i = 0; i < ids.length; i += CHUNK) {
-      for (var page = 0; page < 10; page++) {   // PAGED inside the request (H683)
-        var cq = await admin.from('fathom_calls').select('id, fathom_call_id, user_id, title, call_date, recording_url, not_a_sales_call, duplicate_of')
-          .in('user_id', ids.slice(i, i + CHUNK)).gte('call_date', range.from).lte('call_date', range.to)
-          .not('not_a_sales_call', 'is', true).is('duplicate_of', null).order('call_date', { ascending: false }).range(page * 1000, page * 1000 + 999);
-        if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
-        calls = calls.concat(cq.data || []);
-        if ((cq.data || []).length < 1000) break;
-      }
-    }
-    calls = realCallsOnly(calls).filter(function (c) { return c.not_a_sales_call !== true && !c.duplicate_of; });   // H369 + the paired exclusions
-    var byId = {}; calls.forEach(function (c) { byId[c.id] = c; c.highlights = []; });
-    var callIds = Object.keys(byId);
-    for (var j = 0; j < callIds.length; j += CHUNK) {
-      var slice = callIds.slice(j, j + CHUNK);
-      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name').in('fathom_call_id', slice);
-      if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
-      (aq.data || []).forEach(function (a) { if (byId[a.fathom_call_id]) { byId[a.fathom_call_id].outcome = a.outcome || null; byId[a.fathom_call_id].prospect_name = a.prospect_name || null; } });   // H730: a name where a name belongs, never the raw title
-      var hq = await admin.from('call_highlights')
-        .select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, closer_response, closer_response_verified, cause')
-        .in('fathom_call_id', slice);
-      if (hq.error) throw new Error('call_highlights: ' + hq.error.message);
-      (hq.data || []).forEach(function (h) { if (byId[h.fathom_call_id]) byId[h.fathom_call_id].highlights.push(h); });
-    }
+    /* H734: ONE gather (lib/coachable-team) shared with the measurement script, so what is priced is what is sent. */
+    var gathered = await loadCoachableTeam(admin, ids, range.from, range.to);
     var nameOf = await nameMapFor(admin, ids);
-    var byRep = {}; ids.forEach(function (u) { byRep[u] = []; });
-    calls.forEach(function (c) { if (byRep[c.user_id]) byRep[c.user_id].push(c); });
     var byKind = {}; var total = 0;
-    var reps = ids.map(function (u) {
-      var items = selectCoachableMoments(byRep[u]);
-      items.forEach(function (it) { byKind[it.kind] = (byKind[it.kind] || 0) + 1; total++; });
-      return { user_id: u, name: nameOf[u] || null, calls: byRep[u].length, items: items };
+    var reps = gathered.reps.map(function (r) {
+      r.items.forEach(function (it) { byKind[it.kind] = (byKind[it.kind] || 0) + 1; total++; });
+      return { user_id: r.user_id, name: nameOf[r.user_id] || null, calls: r.calls, items: r.items, loss_scope: r.loss_scope };
     });
+    /* H734 — THE REP LINE IS THE JUDGEMENT: one model call per rep per period, cached; the knowledge base
+       read ONCE for the team before any line (H731) — nothing on file → no model call, the one shape. */
+    var material = await require('../lib/kb-material').loadKbMaterial(admin, { userId: team.keyId, lane: 'rep-line', maxChars: 2500 });
+    var lines = await computeRepLines(admin, reps, material, range.from, range.to);
+    reps.forEach(function (r, i) { r.line = lines[i] || null; delete r.loss_scope; });
     reps.sort(function (a, b) { return b.items.length - a.items.length || String(a.name || '').localeCompare(String(b.name || '')); });
-    res.json({ reps: reps, total_items: total, by_kind: byKind, from: range.from, to: range.to });
+    var payload = { reps: reps, total_items: total, by_kind: byKind, from: range.from, to: range.to };
+    if (!material.hasMaterial) Object.assign(payload, require('../lib/kb-material').nothingToSay({}));
+    res.json(payload);
   } catch (err) { if (handleConfigError(err, res)) return; logTeamError('coachable-moments', err); res.status(500).json({ error: 'Failed to load coachable moments' }); }
 });
 

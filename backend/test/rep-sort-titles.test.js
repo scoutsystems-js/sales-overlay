@@ -63,8 +63,9 @@ test('⚠ names where names belong: the coaching heads show the prospect name, n
   const itemFn = new Function('escapeHtml', 'formatTimestampDisplay', 'missedPairHtml', fnBody(LIVE, 'coachableItemHtml') + '\n return coachableItemHtml;')(esc, (s) => String(s), pairFn);
   const item = itemFn({ kind: 'objection_unhandled', label: 'Objection left unhandled', call_id: 'c2', user_id: 'A', title: "Godwin Ona's Personal Meeting Room", prospect_name: null, call_date: '2026-09-01', moment: { timestamp_seconds: 10, speaker: 'PROSPECT', quote: 'q' }, consequence: 'The call did not close.' });
   assert.ok(/Unknown prospect/.test(item) && !/Personal Meeting Room/.test(item));
-  const route = stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8'));
-  assert.ok(/select\('fathom_call_id, outcome, prospect_name'\)/.test(route), 'the coachable route SELECTS the name');
+  const gather = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'coachable-team.js'), 'utf8'));   // H734: the route reads the one gather
+  assert.ok(/select\('fathom_call_id, outcome, prospect_name'\)/.test(gather), 'the coachable gather SELECTS the name');
+  assert.ok(/loadCoachableTeam\(admin, ids, range\.from, range\.to\)/.test(stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8'))), 'and the route calls it');
   const lib = fs.readFileSync(path.join(__dirname, '..', 'lib', 'coachable-moments.js'), 'utf8');
   assert.ok(/prospect_name: call\.prospect_name \|\| null/.test(lib), 'and the item carries it');
 });

@@ -71,10 +71,18 @@ function teamKeyOf(row) {
   return null;
 }
 
+// H734 — DOCTRINE IS INVISIBLE INFRASTRUCTURE (Justin, 2026-09-05): a doctrine row (category 'doctrine',
+// global, no uploader — H732) is how Scout thinks, never a search result. Both visibility arms below would
+// admit it, so it is refused FIRST here and by the same conjunct in the match_knowledge RPC (migration 072,
+// text mirrored as KB_HIDDEN_FROM_SEARCH_SQL). The advice lanes read it by category (lib/doctrine) — untouched.
+var KB_HIDDEN_FROM_SEARCH_SQL = "kb.category IS DISTINCT FROM 'doctrine'";
+function hiddenFromSearch(row) { return !!row && row.category === 'doctrine'; }
+
 // The read-scope predicate. Fail-closed: any missing input denies access.
 function kbReadRowVisible(row, scope) {
   if (!row) return false;
-  if (row.uploaded_by === null || row.uploaded_by === undefined) return true; // seeded framework
+  if (hiddenFromSearch(row)) return false;                                     // H734: the doctrine, never
+  if (row.uploaded_by === null || row.uploaded_by === undefined) return true; // seeded framework — none remain (H732); the arm now admits the doctrine to the LANES only, never here
   if (row.scope === 'global') return true;                                     // owner global uploads
   if (!scope) return false;
   if (row.scope === 'personal' && row.uploaded_by === scope.p_user_id) return true;
@@ -90,5 +98,6 @@ module.exports = {
   kbReadRowVisible: kbReadRowVisible,
   teamKeyOf: teamKeyOf,
   KB_VISIBILITY_SQL: KB_VISIBILITY_SQL,
+  KB_HIDDEN_FROM_SEARCH_SQL: KB_HIDDEN_FROM_SEARCH_SQL, hiddenFromSearch: hiddenFromSearch,
   TEAM_KEY_COLUMN: TEAM_KEY_COLUMN,
 };

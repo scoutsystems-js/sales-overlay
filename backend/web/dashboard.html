@@ -2704,6 +2704,18 @@
     .missed-pair-gap { font-size: var(--fs-label); opacity: 0.7; font-variant-numeric: tabular-nums; }
     .missed-pair-intro { font-size: var(--fs-secondary); opacity: 0.85; margin-bottom: 10px; }
     .missed-pair-rep { margin-top: 14px; }
+    /* H734: the rep line — one row per rep, the judgement; opens to the moments. Inherits font and colour from the
+       control rule; no coloured edge; the caret is the only state cue and the count chip the only number. */
+    .rep-line-row { margin-top: 2px; }
+    .rep-line-head { width: 100%; display: flex; gap: 12px; align-items: baseline; text-align: left; background: none; border: 0; padding: 10px 2px; cursor: pointer; }
+    .rep-line-head:hover .rep-line-text { opacity: 1; }
+    .rep-line-text { font-size: var(--fs-body); line-height: 1.45; flex: 1 1 auto; }
+    .rep-line-text.quiet { opacity: 0.7; }
+    .rep-line-text.strength { color: var(--accent); }
+    .rep-line-caret { opacity: 0.7; transition: transform 0.15s ease; flex: 0 0 auto; }
+    .rep-line-row.open .rep-line-caret { transform: rotate(180deg); }
+    .rep-line-body { padding: 0 2px 10px 2px; }
+    .rep-line-evidence { font-size: var(--fs-eyebrow); letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); opacity: 0.9; margin: 10px 0 -6px 2px; }
     .missed-pair-rep-name { font-weight: var(--fw-emphasis); margin-bottom: 4px; display: flex; gap: 8px; align-items: baseline; }
     .missed-pair-rep-count { font-size: var(--fs-label); opacity: 0.7; font-variant-numeric: tabular-nums; }
     /* H726 — coachable moments: the kind above each block on the eyebrow step; the move line; the empty sentence. */
@@ -5667,6 +5679,7 @@
     laneWaitLong:   {},
     teamRecs:       null,   teamRecsLoading: false,
     teamCoachable:  null,   teamCoachableLoading: false,   // H726: coachable moments (Team → Coaching) — the pairs are one kind within it
+    repLineOpen: {},   // H734: which rep rows are open on the Coachable Moments panel (by user id); resets on pivot
     repSortKey: 'close', repSortDir: 'worst',   // H730: the rep-card sort — one of the card's four numbers, either direction
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
     teamDashboard: null,    teamDashboardLoading: false,
@@ -15315,25 +15328,55 @@
       + '</div>'
     + '</div>';
   }
+  /* H734 — THE REP LINE IS THE JUDGEMENT. One row per rep: the sentence a manager would say after watching
+     that rep's calls, assembled by Scout (lib/rep-line), which opens to the moments it is about — the cited
+     ones first, marked. A rep with no pattern says so in code; a refused line says so; unmeasured is never
+     zero. The whole panel is collapsed by default: the line is what gets read. */
+  function repLineRowHtml(rep) {
+    var items = Array.isArray(rep.items) ? rep.items : [];
+    var L = rep.line || {};
+    var open = !!state.repLineOpen[rep.user_id];
+    var name = escapeHtml(rep.name || 'Unnamed');
+    var quiet = !(L.kind === 'pattern' || L.kind === 'strength');
+    var text;
+    if (L.kind === 'pattern' || L.kind === 'strength') text = escapeHtml(L.line || '');
+    else if (L.kind === 'none') text = name + ' \u2014 no pattern this period across ' + items.length + ' moment' + (items.length === 1 ? '' : 's') + '.';
+    else if (L.kind === 'refused') text = name + ' \u2014 Scout could not anchor a pattern to these moments this period.';
+    else if (L.kind === 'no_material') text = name + ' \u2014 nothing on file to judge against yet.';
+    else if (L.kind === 'unavailable') text = name + ' \u2014 the line could not be written just now.';
+    else if (!items.length) text = name + ' \u2014 ' + (rep.calls ? 'no qualifying moments across ' + rep.calls + ' call' + (rep.calls === 1 ? '' : 's') + '.' : 'no counted calls in this window.');
+    else text = name + ' \u2014 reading these moments\u2026';
+    var cited = {}; (L.evidence_ids || []).forEach(function (id) { cited[id] = true; });
+    var ordered = items.map(function (it, i) { return { it: it, cited: !!cited['m' + (i + 1)] }; })
+      .sort(function (x, y) { return (y.cited ? 1 : 0) - (x.cited ? 1 : 0); });
+    var body = ordered.map(function (o) { return (o.cited ? '<div class="rep-line-evidence">Evidence for the line</div>' : '') + coachableItemHtml(o.it); }).join('');
+    return '<div class="rep-line-row' + (open ? ' open' : '') + '" data-rep="' + escapeHtml(rep.user_id || '') + '">'
+      + '<button type="button" class="rep-line-head" aria-expanded="' + (open ? 'true' : 'false') + '" onclick="toggleRepLine(this.parentNode.getAttribute(\'data-rep\'))">'
+        + '<span class="rep-line-text' + (quiet ? ' quiet' : '') + (L.kind === 'strength' ? ' strength' : '') + '">' + text + '</span>'
+        + '<span class="missed-pair-rep-count">' + items.length + '</span>'
+        + '<span class="rep-line-caret" aria-hidden="true">\u25be</span>'
+      + '</button>'
+      + '<div class="rep-line-body"' + (open ? '' : ' hidden') + '>' + (items.length ? body : '') + '</div>'
+    + '</div>';
+  }
+  function toggleRepLine(userId) {
+    if (!userId) return;
+    state.repLineOpen[userId] = !state.repLineOpen[userId];
+    var row = document.querySelector('.rep-line-row[data-rep="' + userId.replace(/"/g, '') + '"]');
+    if (!row) return;
+    var open = !!state.repLineOpen[userId];
+    row.classList.toggle('open', open);
+    var head = row.querySelector('.rep-line-head'); if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var body = row.querySelector('.rep-line-body'); if (body) body.hidden = !open;
+  }
   function teamCoachableHtml() {
     var r = state.teamCoachable;
-    if (!r) return laneWaitHtml('coachable', 'Reading the team’s calls…', 'Still reading — every counted call in the window is checked.', 120);
+    if (!r) return laneWaitHtml('coachable', 'Reading the team\u2019s calls\u2026', 'Still reading \u2014 every counted call in the window is checked, and the first load of the day writes each rep\u2019s line from scratch.', 120);
     var problem = laneProblem(r);
     if (problem) return laneProblemHtml('coachable moments', problem);
     var reps = Array.isArray(r.reps) ? r.reps : [];
     if (!reps.length) return '<div class="team-empty">No coachable moments in this window.</div>';
-    var html = '';
-    reps.forEach(function (rep) {
-      var items = Array.isArray(rep.items) ? rep.items : [];
-      html += '<div class="missed-pair-rep"><div class="missed-pair-rep-name">' + escapeHtml(rep.name || 'Unnamed') + ' <span class="missed-pair-rep-count">' + items.length + '</span></div>'
-        /* zero is a measurement, absence is not: a rep with NO counted calls in the window is a different fact
-           from a rep whose calls held nothing qualifying, and the sentence says which. */
-        + (items.length ? items.map(coachableItemHtml).join('')
-                        : (rep.calls ? '<div class="coach-item-empty">No qualifying moments in this window across ' + rep.calls + ' call' + (rep.calls === 1 ? '' : 's') + '.</div>'
-                                     : '<div class="coach-item-empty">No counted calls in this window.</div>'))
-        + '</div>';
-    });
-    return html;
+    return (r.no_material ? noMaterialHtml(r.copy) : '') + reps.map(repLineRowHtml).join('');
   }
 
   /* H731 — WHAT A USER SEES WHEN NOTHING RELEVANT IS FOUND. Every advice lane returns the one shape
