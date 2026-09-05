@@ -2712,9 +2712,9 @@
     .rep-line-row:first-child { border-top: 0; }
     .rep-line-head { display: block; width: 100%; max-width: 72ch; text-align: left; background: none; border: 0; padding: 12px 2px 12px 2px; cursor: pointer; }
     .rep-line-head:hover .rep-line-text { opacity: 1; }
-    .rep-line-kind { display: block; font-size: var(--fs-eyebrow); letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; margin-bottom: 3px; }
+    .rep-line-kind { display: inline-block; font-size: var(--fs-eyebrow); letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; margin-right: 10px; vertical-align: 1px; }   /* inline before the name: a row stays one line where the sentence allows */
     .rep-line-row.strength .rep-line-kind { color: var(--accent); opacity: 0.95; }
-    .rep-line-text { display: block; font-size: var(--fs-body); line-height: 1.5; }
+    .rep-line-text { display: inline; font-size: var(--fs-body); line-height: 1.5; }
     .rep-line-text.quiet { opacity: 0.7; }
     .rep-line-name { font-weight: var(--fw-emphasis); }
     .rep-line-row.strength .rep-line-name { color: var(--accent); }
