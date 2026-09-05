@@ -15635,10 +15635,17 @@
     var item = items[index];
     var list = active.map(function (r) {
       var evidence = r.improvements || [];
-      return '<button type="button" class="coaching-rep-choice' + (r === selected ? ' is-selected' : '') + '" data-user="' + escapeHtml(r.user_id) + '" aria-pressed="' + (r === selected) + '" onclick="selectCoachingRep(this.dataset.user)"><strong>' + escapeHtml(coachingRepName(r)) + '</strong><span>' + escapeHtml(evidence.length ? evidence[0].topic : 'No evidenced improvement yet') + '</span>' + (evidence.length ? '<small>' + evidence.length + ' call' + (evidence.length === 1 ? '' : 's') + '</small>' : '') + '</button>';
+      return '<button type="button" class="coaching-rep-choice' + (r === selected ? ' is-selected' : '') + '" data-user="' + escapeHtml(r.user_id) + '" aria-pressed="' + (r === selected) + '" onclick="selectCoachingRep(this.dataset.user)"><strong>' + escapeHtml(coachingRepName(r)) + '</strong><span>' + escapeHtml(evidence.length ? evidence[0].topic : 'Calls available') + '</span>' + (evidence.length ? '<small>' + evidence.length + ' call' + (evidence.length === 1 ? '' : 's') + '</small>' : '') + '</button>';
     }).join('');
     var detail = '<h3 id="coachingDetailTitle" tabindex="-1">' + escapeHtml(selected ? coachingRepName(selected) : 'Coachable Moments') + '</h3>';
-    if (!item) detail += '<p class="coaching-empty-detail">' + (selected ? 'No supported improvement with coaching and a call excerpt is available for this closer in this period.' : 'No counted calls in this period.') + '</p>';
+    if (!item) {
+      detail += '<p class="coaching-empty-detail">' + (selected ? selected.calls + ' call' + (selected.calls === 1 ? '' : 's') + ' in this period. No supported coaching focus is available yet.' : 'No counted calls in this period.') + '</p>';
+      var recentCalls = selected ? selected.recent_calls || [] : [];
+      if (recentCalls.length) detail += '<h4>Recent calls</h4>' + recentCalls.map(function (call) {
+        var status = call.analysis_status === 'done' ? (call.outcome ? outcomeLabel(call.outcome) : 'Outcome not recorded') : call.analysis_status === 'processing' ? 'Analysis in progress' : call.analysis_status === 'error' ? 'Analysis needs attention' : 'Analysis not ready';
+        return '<div class="coaching-outcome-row"><span>' + escapeHtml(String(call.call_date || '').slice(0,10)) + ' · ' + escapeHtml(status) + '</span><button type="button" class="obj-btn" data-coaching-call="' + escapeHtml(call.call_id) + '" data-owner="' + escapeHtml(selected.user_id) + '" onclick="openCallReview(this.dataset.coachingCall, this.dataset.owner)">Review Call</button></div>';
+      }).join('');
+    }
     else {
       detail += '<span class="coaching-topic">' + escapeHtml(item.topic) + '</span><h4>One thing to do differently</h4><p class="coaching-action-copy">' + escapeHtml(item.coaching) + '</p>';
       if (items.length > 1) detail += '<div class="coaching-call-tabs" aria-label="Calls supporting this focus">' + items.map(function (it, k) { return '<button type="button" aria-pressed="' + (index === k) + '" onclick="selectCoachingMoment(' + k + ')">Call ' + (k + 1) + ' · ' + escapeHtml(String(it.call_date || '').slice(0,10)) + '</button>'; }).join('') + '</div>';
@@ -15656,10 +15663,9 @@
     if (!r) return laneWaitHtml('coachable', 'Reading the team’s calls…', null, 120);
     var problem = laneProblem(r);
     if (problem) return laneProblemHtml('coachable moments', problem);
-    if (r.no_material) return noMaterialHtml(r.copy);
     var reps = Array.isArray(r.reps) ? r.reps : [];
-    if (!reps.length) return '<div class="team-empty">No coachable moments in this window.</div>';
-    return coachingRepWorkspaceHtml(reps);
+    if (!reps.length) return r.no_material ? noMaterialHtml(r.copy) : '<div class="team-empty">No team members in this window.</div>';
+    return (r.no_material ? noMaterialHtml(r.copy) : '') + coachingRepWorkspaceHtml(reps);
   }
 
   /* H731 — WHAT A USER SEES WHEN NOTHING RELEVANT IS FOUND. Every advice lane returns the one shape

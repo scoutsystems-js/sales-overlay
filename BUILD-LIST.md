@@ -2002,3 +2002,6 @@ Approved compact priorities, closer selector/detail panel, expandable strengths,
 
 ## Validator v2 — 2026-09-05
 Implemented source IDs, date-bounded record-backed memory, and separate contradiction/missing-evidence/reference outcomes. 2,485 tests and saved-response regression replay pass; no paid review or historical upgrade performed. These fix the observed protocol and memory-waiver gaps; semantic accuracy is not established by the test count. Deployment verification in gpt.md.
+
+## Team Coaching call availability — 2026-09-05
+Built locally: closers without an approved coaching focus retain their measured call count and up to five recent calls with recorded outcome/analysis status and a Review Call action. Missing team material no longer suppresses call access. No coaching was restored, regenerated or inferred. Full suite 2,487/2,487; current-data carrier check passed. Deployment pending.

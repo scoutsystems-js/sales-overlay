@@ -34,12 +34,12 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
   for (var j = 0; j < callIds.length; j += CHUNK) {
     var slice = callIds.slice(j, j + CHUNK);
     var pair = await Promise.all([
-      admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name').in('fathom_call_id', slice),
+      admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name, status').in('fathom_call_id', slice),
       admin.from('call_highlights').select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, coaching, coaching_review, closer_response, closer_response_verified, cause, objection_class, objection_category').in('fathom_call_id', slice),
     ]);
     if (pair[0].error) throw new Error('call_analyses: ' + pair[0].error.message);
     if (pair[1].error) throw new Error('call_highlights: ' + pair[1].error.message);
-    (pair[0].data || []).forEach(function (a) { if (byId[a.fathom_call_id]) { byId[a.fathom_call_id].outcome = a.outcome || null; byId[a.fathom_call_id].prospect_name = a.prospect_name || null; } });
+    (pair[0].data || []).forEach(function (a) { if (byId[a.fathom_call_id]) { byId[a.fathom_call_id].analysis_status = a.status || null; byId[a.fathom_call_id].outcome = a.outcome || null; byId[a.fathom_call_id].prospect_name = a.prospect_name || null; } });
     (pair[1].data || []).forEach(function (h) { if (byId[h.fathom_call_id]) byId[h.fathom_call_id].highlights.push(h); });
   }
   var byRep = {}; ids.forEach(function (u) { byRep[u] = []; });
@@ -48,7 +48,8 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
     var items = selectCoachableMoments(byRep[u]).map(function (it) { return Object.assign({ label: KIND_LABELS[it.kind] || it.kind }, it); });
     var hl = []; byRep[u].forEach(function (c) { hl = hl.concat(c.highlights || []); });
     var scope = doctrineLib.lossScope(byRep[u].map(function (c) { return { fathom_call_id: c.id, outcome: c.outcome }; }), hl);
-    return { user_id: u, calls: byRep[u].length, items: items, improvements: selectImprovementFocus(byRep[u], {all:true,kbHash:kbHash}), loss_scope: scope };
+    var recentCalls = byRep[u].slice(0, 5).map(function (c) { return { call_id:c.id, user_id:c.user_id, call_date:c.call_date, outcome:c.analysis_status === 'done' ? c.outcome : null, analysis_status:c.analysis_status || null }; });
+    return { user_id: u, calls: byRep[u].length, recent_calls:recentCalls, items: items, improvements: selectImprovementFocus(byRep[u], {all:true,kbHash:kbHash}), loss_scope: scope };
   });
   // Locate every reviewed candidate before ranking; rejected evidence cannot hide a valid area.
   var evidenceIds = [...new Set(reps.flatMap(function (r) { return r.improvements.map(function (it) { return it.call_id; }); }))];

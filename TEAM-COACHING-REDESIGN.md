@@ -7,3 +7,9 @@ The page now follows the mockup's hierarchy: compact header and score, a green o
 This supersedes the earlier all-evidence-expanded presentation on Team Coaching only. Other views keep their existing insight treatment. The Scout wordmark and browser-local background toggle are unchanged.
 
 Local visual check used representative content rendered through the actual recommendation functions and stylesheet. No overflow at 1400, 979 and 390px. Every one of six evidence disclosures exists and starts collapsed. Live Sober Living Riches page verified: three focus findings, three strengths, six disclosures; evidence opens correctly.
+
+## Call availability recovery — 2026-09-05
+
+The coaching workspace no longer equates withheld advice with missing rep data. A closer with calls but no supported focus sees the measured call count and up to five recent calls, including recorded outcome or an honest analysis state, with each call opening under the correct closer. If team material is missing, that guidance remains visible above the same call workspace. This changes no coaching judgement, metric or stored call data.
+
+Current-data verification across the eight reviewed closers found 805 eligible calls, one displayed focus, and five reviewable recent calls per closer. Full backend suite: 2,487 passed, zero failed. Deployment pending at the time of this entry.

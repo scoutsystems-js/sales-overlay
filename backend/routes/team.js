@@ -857,7 +857,7 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     var byKind = {}; var total = 0;
     var reps = gathered.reps.map(function (r) {
       r.items.forEach(function (it) { byKind[it.kind] = (byKind[it.kind] || 0) + 1; total++; });
-      return { user_id: r.user_id, name: nameOf[r.user_id] || null, calls: r.calls, items: r.items, improvements: r.improvements, loss_scope: r.loss_scope };
+      return { user_id: r.user_id, name: nameOf[r.user_id] || null, calls: r.calls, recent_calls: r.recent_calls, items: r.items, improvements: r.improvements, loss_scope: r.loss_scope };
     });
     /* H734 — THE REP LINE IS THE JUDGEMENT: one model call per rep per period, cached; the knowledge base
        read ONCE for the team before any line (H731) — nothing on file → no model call, the one shape. */

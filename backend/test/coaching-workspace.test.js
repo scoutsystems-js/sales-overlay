@@ -37,7 +37,7 @@ test('real team gather attaches only located exchanges and preserves owner/outco
 function page() {
  const item={...selectImprovementFocus([c])[0],moment:h};
  const state={view:'team-coaching',notedHighlightIds:{},teamCoachable:{reps:[{user_id:'u1',name:'Ava',calls:2,improvements:[item],items:[{kind:'strong_moment',moment:{quote:'Do not render positive evidence'}}]},{user_id:'u2',name:'Ben',calls:2,improvements:[{...item,user_id:'u2',call_id:'c2',coaching:'Check the decision process.'}]},{user_id:'u3',name:'Noor',calls:0,improvements:[]}]}};
- const funcs=['teamCoachableHtml','coachingRepWorkspaceHtml','coachingRepName','selectCoachingRep','selectCoachingMoment','fineTuneFromCoachingFocus','coachableItemHtml','missedPairHtml'].map(n=>fnBody(live,n)).join('\n');
+ const funcs=['noMaterialHtml','teamCoachableHtml','coachingRepWorkspaceHtml','coachingRepName','selectCoachingRep','selectCoachingMoment','fineTuneFromCoachingFocus','coachableItemHtml','missedPairHtml'].map(n=>fnBody(live,n)).join('\n');
  return '<html><head>'+source.slice(source.indexOf('<style>'),source.indexOf('</style>')+8)+'</head><body data-view="team-coaching"><main id="content" class="page"><div class="team-coaching-workspace" id="testHost"></div></main><script>var state='+JSON.stringify(state)+';var fineTarget;function escapeHtml(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\"/g,"&quot;");} function displayNameFromEmail(s){return s;}function canMarkStandard(){return true;}function laneProblem(){return null;}function formatTimestampDisplay(){return "00:00:10";}function outcomeLabel(){return "Follow-up";}function fineTuneCoaching(t){fineTarget=t;}'+funcs+';document.getElementById("testHost").innerHTML=teamCoachableHtml();</script></body></html>';
 }
 test('workspace switches closer, preserves correction target, and fits desktop and mobile',()=>{
@@ -51,4 +51,17 @@ test('workspace switches closer, preserves correction target, and fits desktop a
  assert.equal(result.target.callId,'c2');assert.equal(result.target.highlightId,'h1');
  assert.match(result.initial,/closers without calls/);
  }
+});
+
+test('team gather keeps recent calls when no improvement passes review',async()=>{
+ const tables={fathom_calls:[{id:'kept',fathom_call_id:'real-1',user_id:'u1',call_date:'2026-09-04',not_a_sales_call:false,duplicate_of:null},{id:'excluded',fathom_call_id:'real-2',user_id:'u1',not_a_sales_call:true}],call_analyses:[{fathom_call_id:'kept',status:'done',outcome:'closed'}],call_highlights:[]};
+ const admin={from(t){const q={select(){return q},in(){return q},gte(){return q},lte(){return q},not(){return q},is(){return q},order(){return q},range(){return q},then(resolve){return Promise.resolve({data:tables[t],error:null}).then(resolve)}};return q}};
+ const result=await loadCoachableTeam(admin,['u1','u2'],'2026-08-07','2026-09-05');
+ assert.equal(result.reps[0].improvements.length,0);assert.equal(result.reps[0].calls,1);
+ assert.deepEqual(result.reps[0].recent_calls,[{call_id:'kept',user_id:'u1',call_date:'2026-09-04',outcome:'closed',analysis_status:'done'}]);assert.deepEqual(result.reps[1].recent_calls,[]);
+});
+test('no-coaching and no-material states retain call review with the correct owner',()=>{
+ const html=page().replace('document.getElementById("testHost").innerHTML=teamCoachableHtml();',`state.teamCoachable.no_material=true;state.teamCoachable.copy='Add team materials for coaching.';state.teamCoachable.reps[0].improvements=[];state.teamCoachable.reps[1].improvements=[];state.teamCoachable.reps[0].recent_calls=[{call_id:'kept',user_id:'u1',call_date:'2026-09-04',outcome:'closed',analysis_status:'done'}];function openCallReview(id,user){window.opened=[id,user];}document.getElementById("testHost").innerHTML=teamCoachableHtml();`);
+ const result=renderComputed(html,`(()=>{const b=document.querySelector('[data-coaching-call]');if(b)b.click();return {text:document.body.innerText,opened:window.opened};})()`,{width:979});
+ assert.match(result.text,/2 calls in this period/);assert.match(result.text,/Add team materials/);assert.deepEqual(result.opened,['kept','u1']);
 });
