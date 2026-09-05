@@ -23,8 +23,8 @@ test('coaching layout retains every recommendation and its original action index
   const original = recommendations('team', payload), coaching = recommendations('team-coaching', payload);
   assert.deepEqual(coaching.calls, original.calls);
   assert.equal(coaching.calls.length, 6);
-  assert.match(coaching.output, /coaching-recommendations-grid/);
-  assert.doesNotMatch(original.output, /coaching-recommendations-grid/);
+  assert.match(coaching.output, /coaching-strength-grid/g);
+  assert.doesNotMatch(original.output, /coaching-strength-grid/);
 });
 
 test('coaching layout preserves loading, errors, absent knowledge, and empty states', () => {
@@ -42,4 +42,14 @@ test('coaching render preserves lane dispatch and panel visibility', () => {
   assert.deepEqual(dispatch, []);
   assert.match(content.innerHTML, /TEAMDATE<\/div>SCORE/);
   assert.match(content.innerHTML, /HIDDEN<\/div>$/);
+});
+
+
+test('workspace evidence retains attribution, clip and original Fine Tune target inside disclosure', () => {
+  const render = new Function('state', 'escapeHtml', 'canMarkStandard', 'displayNameFromEmail', 'tsFromClipUrl', 'clipLabelFor',
+    fnBody(live, 'teamInsightHtml') + ';return teamInsightHtml({claim:"claim",data:"supporting evidence",quote:"exact quote",rep:"Rep",spoke:"closer",clip_url:"https://example.com/clip",highlight_id:"h1",call_id:"c1"},"improve",2);');
+  const output = render({view:'team-coaching'}, s=>String(s), ()=>true, s=>s, ()=>'01:20', ()=>'Clip');
+  assert.match(output, /<details class="coaching-evidence"><summary>/);
+  for (const retained of ['supporting evidence', 'exact quote', 'Rep', 'https://example.com/clip', 'data-kind="improve"', 'data-idx="2"']) assert.ok(output.includes(retained), retained);
+  assert.ok(output.indexOf('Rep') < output.indexOf('exact quote'), 'attribution precedes quote');
 });

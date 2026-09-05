@@ -1989,3 +1989,6 @@ Implemented and approved for deployment: compact Team Coaching layout; all recom
 
 ### Team Coaching correction — 2026-09-05
 The first deployment underdelivered the approved mockup. Compact header, narrower rail, framed score/rep rows and two-column layout at 979px are verified locally (2,452 checks). Deployed as 0dbdeb1 after the active drain finished; signed-in visual check passed, including rep expansion and artwork preference persistence. Original wordmark/background toggle and all coaching evidence/actions retained.
+
+### Team Coaching structural rebuild — 2026-09-05
+The previous styling-only passes were rejected. Implemented the approved focus → strengths → rep rows hierarchy, with full evidence behind disclosures and original Fine Tune targets retained. Local visual checks pass; release verification pending.

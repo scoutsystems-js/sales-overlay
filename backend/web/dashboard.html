@@ -5355,14 +5355,6 @@
     body[data-view="team-coaching"] .team-coaching-workspace .lead-number-val { font-size: var(--fs-number); }
     body[data-view="team-coaching"] .team-coaching-workspace .section { margin-bottom: 28px; }
     body[data-view="team-coaching"] .team-coaching-workspace .section-header { margin-bottom: 14px; }
-    body[data-view="team-coaching"] .coaching-recommendations-grid {
-      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;
-    }
-    body[data-view="team-coaching"] .coaching-recommendations-group { min-width: 0; }
-    body[data-view="team-coaching"] .coaching-recommendations-group > .obj-group-header:first-child {
-      margin-top: 0 !important; padding: 10px 12px; border-bottom: 1px solid var(--border);
-      background: rgba(var(--accent-rgb), .04);
-    }
     body[data-view="team-coaching"] .team-coaching-workspace .team-insight {
       background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
       padding: 16px; margin: 0 0 12px; overflow-wrap: anywhere;
@@ -5376,7 +5368,7 @@
     body[data-view="team-coaching"] .team-coaching-workspace .rep-line-row.open > .rep-line-head { background: rgba(var(--accent-rgb), 0.08); }
     body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body { max-width: none; padding: 12px 16px; background: var(--bg); }
     @media (max-width: 740px) {
-      body[data-view="team-coaching"] .coaching-recommendations-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+      body[data-view="team-coaching"] .coaching-strength-grid { grid-template-columns: minmax(0, 1fr); }
       body[data-view="team-coaching"] .coaching-workspace-header { grid-template-columns: minmax(0, 1fr); }
       body[data-view="team-coaching"] .coaching-workspace-header .team-controls-row { grid-column: 1; grid-row: 3; }
       body[data-view="team-coaching"] .coaching-workspace-header .page-header--company { flex-wrap: wrap; }
@@ -5384,6 +5376,28 @@
       body[data-view="team-coaching"] .team-coaching-workspace .lead-number { flex-wrap: wrap; }
       body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body { padding: 10px; }
     }
+
+    /* Focus → strengths → reps, matching the approved software mockup. */
+    body[data-view="team-coaching"] .coaching-breadcrumb { font-size: var(--fs-eyebrow); text-transform: uppercase; letter-spacing: .12em; opacity: .65; margin-bottom: 12px; }
+    body[data-view="team-coaching"] .coaching-workspace-header { gap: 6px 16px; margin-bottom: 16px; }
+    body[data-view="team-coaching"] .coaching-focus { border: 1px solid rgba(var(--accent-rgb), .3); border-radius: var(--radius); background: linear-gradient(110deg, rgba(var(--accent-rgb), .06), transparent 75%); padding: 18px 20px 8px; margin-bottom: 24px; }
+    body[data-view="team-coaching"] .coaching-focus-heading { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    body[data-view="team-coaching"] .coaching-focus-heading h2 { font-size:var(--fs-title); margin:0; }
+    body[data-view="team-coaching"] .coaching-section-note { font-size:var(--fs-label); opacity:.65; margin-left:auto; }
+    body[data-view="team-coaching"] .coaching-signal { width:18px; height:18px; border:1px solid var(--accent); border-radius:50%; box-shadow:inset 0 0 0 4px var(--bg); background:rgba(var(--accent-rgb), .3); flex-shrink:0; }
+    body[data-view="team-coaching"] .coaching-strength-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    body[data-view="team-coaching"] .coaching-insight-number { font-size:var(--fs-eyebrow); opacity:.55; letter-spacing:.12em; }
+    body[data-view="team-coaching"] .coaching-focus .team-insight { display:grid; grid-template-columns:24px minmax(0,1fr); column-gap:12px; padding:12px 0; border:0; border-top:1px solid var(--border); border-radius:0; background:transparent; margin:0; }
+    body[data-view="team-coaching"] .coaching-focus .team-insight-claim { grid-column:2; }
+    body[data-view="team-coaching"] .coaching-focus .coaching-evidence,
+    body[data-view="team-coaching"] .coaching-focus .team-insight > .team-insight-foot { grid-column:2; }
+    body[data-view="team-coaching"] .coaching-strengths .team-insight { margin:0; padding:16px; }
+    body[data-view="team-coaching"] .coaching-strengths .team-insight-claim { margin-top:8px; font-size:var(--fs-secondary); }
+    body[data-view="team-coaching"] .coaching-evidence summary { cursor:pointer; color:var(--accent); font-size:var(--fs-label); width:fit-content; padding:8px 0; }
+    body[data-view="team-coaching"] .coaching-evidence[open] { border-bottom:1px solid var(--border); padding-bottom:12px; }
+    body[data-view="team-coaching"] .coaching-evidence summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+    @media(max-width:1100px) { body[data-view="team-coaching"] .coaching-strength-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:740px) { body[data-view="team-coaching"] .coaching-strength-grid { grid-template-columns:1fr; } body[data-view="team-coaching"] .coaching-section-note { display:none; } }
   </style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>
@@ -10841,19 +10855,13 @@
     var avg = (state.teamOverview && state.teamOverview.totals) ? state.teamOverview.totals.avg_score : null;
     content.innerHTML =
       '<div class="team-coaching-workspace">'
-      + '<div class="coaching-workspace-header"><div class="coaching-page-title"><h2>Team Coaching</h2><p>Team patterns. Your coaching standards.</p></div>'
+      + '<div class="coaching-breadcrumb">Team / Coaching</div><div class="coaching-workspace-header"><div class="coaching-page-title"><h2>Team Coaching</h2></div>'
       + teamHeaderHtml()
       + teamControlsHtml() + '</div>'
       + leadNumberHtml(avg, 'Team average score')
-      /* ⚠⚠ THE FULL RECOMMENDATIONS, INLINE — NOT A ONE-LINE TEASER. Measured
-         before changing anything: the lane this page ALREADY LOADS holds THREE
-         "working" and THREE "improve" insights, each with a ~220-character
-         claim, a verbatim quote and a clip link. The compact card rendered ONE
-         claim and threw the other five away along with every quote and clip.
-         ⚠ NOTHING IS INVENTED AND NO EXTRA MODEL CALL IS MADE: teamRecsHtml is
-         the builder the expanded page already uses, reading the same
-         state.teamRecs this page already fetched. */
-      + (teamPanelVisible('recs') ? '<div class="section fade-in"><div class="section-header"><h2>Team Recommendations</h2></div>'
+      /* Approved workspace revision: every recommendation remains, with evidence
+         behind a disclosure instead of six fully expanded blocks. No new synthesis. */
+      + (teamPanelVisible('recs') ? '<div class="section fade-in">'
         + teamRecsHtml() + '</div>' : '')
       // H726: coachable moments — one panel, mixed kinds; managers and above, this page only.
       + (teamPanelVisible('coachable') ? '<div class="section fade-in"><div class="section-header"><h2>Coachable Moments</h2></div>'
@@ -15312,11 +15320,13 @@
     } else if (it.quote) {
       quoteHtml = '<div class="team-insight-data team-insight-inline-q">\u201C' + escapeHtml(it.quote) + '\u201D</div>';
     }
+    var evidence = (it.data ? '<div class="team-insight-data">' + escapeHtml(it.data) + '</div>' : '')
+      + quoteHtml + (attributed ? '' : '<div class="team-insight-foot">' + repTag + clipBtn + '</div>');
+    var workspace = state.view === 'team-coaching';
     return '<div class="team-insight ' + kind + '">'
+      + (workspace ? '<span class="coaching-insight-number" aria-hidden="true">' + String(idx + 1).padStart(2, '0') + '</span>' : '')
       + '<div class="team-insight-claim">' + escapeHtml(it.claim || '') + '</div>'
-      + (it.data ? '<div class="team-insight-data">' + escapeHtml(it.data) + '</div>' : '')
-      + quoteHtml
-      + (attributed ? '' : '<div class="team-insight-foot">' + repTag + clipBtn + '</div>')
+      + (workspace ? '<details class="coaching-evidence"><summary>View evidence <span aria-hidden="true">↗</span></summary>' + evidence + '</details>' : evidence)
       + (ftBtn ? '<div class="team-insight-foot">' + ftBtn + '</div>' : '')
     + '</div>';
   }
@@ -15481,15 +15491,18 @@
     if (r.no_material) return noMaterialHtml(r.copy);   // H731
     var w = r.working || [], i = r.improve || [];
     if (!w.length && !i.length) return '<div class="empty"><p>Not enough analyzed team calls yet.</p></div>';
-    // Layout wrappers only: preserve all insights, source indexes and actions.
-    var workspace = state.view === 'team-coaching';
-    return (workspace ? '<div class="coaching-recommendations-grid"><div class="coaching-recommendations-group">' : '')
-      + '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
+    // The workspace shows every claim; evidence stays accessible in native disclosures.
+    // Keep source indexes unchanged: Fine Tune resolves these against the original arrays.
+    if (state.view === 'team-coaching') {
+      var strengths = w.map(function (x, k) { return teamInsightHtml(x, 'working', k); }).join('');
+      var focus = i.map(function (x, k) { return teamInsightHtml(x, 'improve', k); }).join('');
+      return (i.length ? '<section class="coaching-focus"><div class="coaching-focus-heading"><span class="coaching-signal" aria-hidden="true"></span><h2>Coaching Focus</h2><span class="coaching-section-note">What to improve</span></div>' + focus + '</section>' : '')
+        + (w.length ? '<section class="coaching-strengths"><div class="section-header"><h2>Team Strengths</h2></div><div class="coaching-strength-grid">' + strengths + '</div></section>' : '');
+    }
+    return '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
       + (w.length ? w.map(function (x, k) { return teamInsightHtml(x, 'working', k); }).join('') : '<div class="empty"><p>—</p></div>')
-      + (workspace ? '</div><div class="coaching-recommendations-group">' : '')
       + '<div class="obj-group-header" style="color:var(--mid);margin-top:18px;">What to improve</div>'
-      + (i.length ? i.map(function (x, k) { return teamInsightHtml(x, 'improve', k); }).join('') : '<div class="empty"><p>—</p></div>')
-      + (workspace ? '</div></div>' : '');
+      + (i.length ? i.map(function (x, k) { return teamInsightHtml(x, 'improve', k); }).join('') : '<div class="empty"><p>—</p></div>');
   }
 
 /* ⚠⚠⚠ CALL HIGHLIGHTS OF THE WEEK — RETIRED 2026-09-01 (Justin's ruling).

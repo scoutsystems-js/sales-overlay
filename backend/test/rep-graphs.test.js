@@ -259,7 +259,7 @@ test('HEADINGS are title case on this view', () => {
   /* 'Team Overview' left this list 2026-09-02: the three score lists retired
      with the trading-card rep cards. */
   ['Objection Handling %', 'Closing %', 'What Needs Work',
-   'Team Recommendations', 'Daily Digest'].forEach((h) => {
+   'Coaching Focus', 'Team Strengths', 'Daily Digest'].forEach((h) => {
     assert.ok(HTML.indexOf('>' + h + '<') !== -1, 'missing title-cased heading: ' + h);
   });
   ['>Objection handling %<', '>Closing %<'.toLowerCase(), '>What needs work<',

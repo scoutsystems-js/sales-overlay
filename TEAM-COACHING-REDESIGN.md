@@ -1,7 +1,9 @@
-# Team Coaching redesign
+# Team Coaching workspace rebuild
 
-The correction deployed successfully as 0dbdeb15b9000ef48111cc82557f8be2dc4d785c; Railway reports SUCCESS. The first deployment (455bef1) retained too much of the old page and collapsed the columns at the user's 979px viewport.
+Not yet pushed. The two prior CSS deployments did not deliver the approved page structure.
 
-The approved compact workspace now has a unified title/date/team header, a 170px rail, a bordered score strip, two coaching columns down to 741px, and framed expandable rep rows. This approval supersedes the centered company heading on Team Coaching only. Original wordmark and browser-local artwork toggle remain intact. Every recommendation, evidence quote, clip and Fine Tune action remains rendered by the same functions; no data or analysis changes.
+The page now follows the mockup's hierarchy: compact header and score, a green outlined Coaching Focus panel, Team Strengths cards, then the existing expandable rep rows. All three improvement claims and all three strength claims remain visible. Each finding retains its full supporting data, attribution, quote and clip under View evidence; eligible Fine Tune actions keep their original kind/index. The approved mockup's fictional priority, extra counters and freshness were not substituted for live facts.
 
-Validation: all 2,452 backend checks pass; inline JavaScript parses. Actual stylesheet rendered at 1400, 979, 900 and 390px without horizontal overflow; two columns verified at 979px, stacked at 390px. Signed-in visual verification completed at 1435px and 979px: six recommendations retained, two columns visible, rep rows expand, artwork switches off/on and the off preference survives reload. Original on setting and default viewport restored.
+This supersedes the earlier all-evidence-expanded presentation on Team Coaching only. Other views keep their existing insight treatment. The Scout wordmark and browser-local background toggle are unchanged.
+
+Local visual check used representative content rendered through the actual recommendation functions and stylesheet. No overflow at 1400, 979 and 390px. Every one of six evidence disclosures exists and starts collapsed. Live visual verification follows deployment.
