@@ -51,7 +51,15 @@ function pickMoment(h) {
     handling: h.handling || null, resolution: h.resolution || null };
 }
 function notClosed(call) { return call.outcome !== 'closed'; }
-function consequenceFor(call) { return call.outcome === 'closed' ? 'The call closed.' : 'The call did not close.'; }
+/* The consequence, in code. A FORWARD item on a call that is still open says so (Justin, 2026-09-04): an
+   earned signal beside "The call did not close." read as a contradiction — both true, direction not
+   outcome — and "still open" removes it without flattering anything. A cost item only exists on a call
+   that did not close, and says that. */
+function consequenceFor(call, direction) {
+  if (call.outcome === 'closed') return 'The call closed.';
+  if (direction === 'forward' && call.outcome === 'follow_up') return 'The call is still open.';
+  return 'The call did not close.';
+}
 function first(arr, f) { for (var i = 0; i < arr.length; i++) if (f(arr[i])) return arr[i]; return null; }
 
 /* The best COST item on one call, by tier, or null. */
@@ -77,13 +85,13 @@ function forwardItem(call) {
   var hs = Array.isArray(call.highlights) ? call.highlights : [];
   var earned = first(hs, function (h) { return h.type === 'buying_signal' && evidencedMove(h); });
   if (earned) return { kind: 'earned_signal', direction: 'forward', tier: 0, moment: pickMoment(earned), move: earned.cause.move, move_summary: earned.cause.summary || null,
-    evidence: earned.cause.evidence, consequence: consequenceFor(call) };
+    evidence: earned.cause.evidence, consequence: consequenceFor(call, 'forward') };
   var handled = first(hs, function (h) { return h.type === 'objection' && h.resolution === 'handled'; });
-  if (handled) return { kind: 'objection_handled', direction: 'forward', tier: 1, moment: pickMoment(handled), consequence: consequenceFor(call) };
+  if (handled) return { kind: 'objection_handled', direction: 'forward', tier: 1, moment: pickMoment(handled), consequence: consequenceFor(call, 'forward') };
   var addressed = first(hs, function (h) { return (h.type === 'risk_signal' || h.type === 'barrier') && h.handling === 'addressed'; });
-  if (addressed) return { kind: 'signal_addressed', direction: 'forward', tier: 2, moment: pickMoment(addressed), consequence: consequenceFor(call) };
+  if (addressed) return { kind: 'signal_addressed', direction: 'forward', tier: 2, moment: pickMoment(addressed), consequence: consequenceFor(call, 'forward') };
   var strong = first(hs, function (h) { return h.type === 'strong_moment' && h.speaker === 'CLOSER' && h.speaker_verified === true; });
-  if (strong) return { kind: 'strong_moment', direction: 'forward', tier: 3, moment: pickMoment(strong), consequence: consequenceFor(call) };
+  if (strong) return { kind: 'strong_moment', direction: 'forward', tier: 3, moment: pickMoment(strong), consequence: consequenceFor(call, 'forward') };
   return null;
 }
 

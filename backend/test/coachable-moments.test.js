@@ -76,6 +76,9 @@ test('the consequence is stated in code, never a principle; the wording guard ho
   assert.strictEqual(byKind.objection_unhandled.consequence, 'The call did not close.');
   assert.match(byKind.missed_signal_pair.consequence, /^31 min later, a disqualification\.$/);
   assert.strictEqual(byKind.earned_signal.consequence, 'The call closed.');
+  const open = C.selectCoachableMoments([call('c4', '2026-09-05', 'follow_up', [H({ type: 'buying_signal', cause: CAUSE })]), call('c5', '2026-09-05', 'lost', [H({ type: 'objection', resolution: 'handled' })])]);
+  assert.strictEqual(open.find((i) => i.kind === 'earned_signal').consequence, 'The call is still open.', 'a forward item on an open call says so — direction, not outcome');
+  assert.strictEqual(open.find((i) => i.kind === 'objection_handled').consequence, 'The call did not close.', 'a forward item on a lost call still says the truth');
   out.forEach((i) => assert.ok(!/foreshadow|caused|led to|because/.test(JSON.stringify(i)), 'wording guard: ' + i.kind));
 });
 
