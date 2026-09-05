@@ -2272,16 +2272,24 @@ async function analyzeCall(fathomCallId, userId) {
        did not, so a marked call still had per-moment coaching written for it.
        Justin found Discovery coaching on a closer's internal meeting with his
        own sales manager. */
+    /* H736 — THE PASS LEAVES A MARK. 'pending' before it is dispatched, its result after; a row still 'pending' once the
+       analysis is done is a pass that never finished (killed with the process), which nothing could count or retry
+       before — four calls graded since v30 sat with coachable moments and no coaching, two of them coached on a first
+       grade and lost on a re-grade. The mark is best-effort: a failed write of the mark never fails the analysis. */
+    var markCoaching = function (status) { return admin.from('call_analyses').update({ coaching_status: String(status).slice(0, 200) }).eq('fathom_call_id', fathomCallId).then(function (u) { if (u && u.error) console.warn('[coaching] call=%s mark not written: %s', fathomCallId, u.error.message); }, function () {}); };
     if (callRow && callRow.not_a_sales_call === true) {
       console.log('[coaching] call=%s skipped — not a sales call', fathomCallId);
+      markCoaching('skipped:not_a_sales_call');
     } else
-    coachCallMoments(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection.notes, userId)
+    markCoaching('pending').then(function () { return coachCallMoments(admin, fathomCallId, effectiveOutcome, whyReason, objection && objection.notes, userId); })
       .then(function (r) {
         console.log('[coaching] call=%s moments=%d written=%d%s',
           fathomCallId, r.selected, r.written, r.skipped ? ' skipped=' + r.skipped : '');
+        return markCoaching(r.skipped ? 'skipped:' + r.skipped : 'written:' + r.written);
       })
       .catch(function (e) {
         console.warn('[coaching] call=%s failed: %s', fathomCallId, e && e.message);
+        return markCoaching('failed:' + ((e && e.message) || 'unknown'));
       });
 
     // ─── Phase 7b: auto-populate the rep's KB from a CLOSED call ─────────

@@ -351,11 +351,11 @@ function renderCards(reps) {
   }));
 }
 
-test('10c-2: a card renders per rep, SORTED WORST FIRST', () => {
+test('10c-2: a card renders per rep, SORTED BEST FIRST by closing rate (H736, Justin 2026-09-05 — was worst first)', () => {
   const out = renderCards(REPS);
-  const order = ['zed', 'josh', 'demo-ava'].map((n) => out.html.indexOf('>' + n + '<'));
-  order.forEach((i, k) => assert.notStrictEqual(i, -1, 'missing card: ' + ['zed','josh','demo-ava'][k]));
-  assert.ok(order[0] < order[1], 'zed (5%) before josh (27%)');
+  const order = ['josh', 'zed', 'demo-ava'].map((n) => out.html.indexOf('>' + n + '<'));
+  order.forEach((i, k) => assert.notStrictEqual(i, -1, 'missing card: ' + ['josh','zed','demo-ava'][k]));
+  assert.ok(order[0] < order[1], 'josh (27%) before zed (5%)');
   assert.ok(order[1] < order[2], 'the rep with NO prospects sorts last');
 });
 
@@ -390,7 +390,7 @@ test('THE TEAM COMPARISON APPEARS ONLY WHEN IT QUALIFIES', () => {
   // zed qualifies (comparable true) — josh does not.
   assert.ok(out.html.indexOf('team 24%') !== -1, 'a qualifying comparison is shown');
   assert.ok(out.html.indexOf('lowest on the team') !== -1);
-  const joshCard = out.html.slice(out.html.indexOf('>josh<'), out.html.indexOf('>demo-ava<'));
+  const joshCard = out.html.slice(out.html.indexOf('>josh<'), out.html.indexOf('>zed<'));   // H736: josh now sorts first; his card ends where zed's begins
   assert.ok(joshCard.indexOf('Timing 7%') !== -1, 'josh still gets his own rate');
   assert.ok(joshCard.indexOf('team ') === -1, 'but NO ranking off n=1');
   assert.ok(joshCard.indexOf('lowest on the team') === -1);

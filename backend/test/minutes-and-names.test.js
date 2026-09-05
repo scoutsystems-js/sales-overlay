@@ -59,13 +59,15 @@ test('⚠⚠⚠ both minute metrics get a NUMBER; only the RULED one gets a rank
      the early edge came from the coverage table. THE SUBJECT SURVIVES: a ranked
      view is offered only where the ORDER IS WELL DEFINED — by a direction or by
      a band — and never by default. */
+  /* H736 (Justin, 2026-09-05): call time is never a rank — the ranked views are withdrawn; number, gauge and trend stay. */
   assert.deepStrictEqual(C._viewsFor(C.byKey('avg_call_time')),
-    ['number', 'gauge', 'trend', 'by_rep', 'bar_rep']);
+    ['number', 'gauge', 'trend']);
   assert.deepStrictEqual(C._viewsFor(C.byKey('time_to_price')),
     ['number', 'trend', 'by_rep', 'bar_rep']);
 
   const BAND = require('../lib/metric-band.js');
-  ['avg_call_time', 'time_to_price'].forEach((k) => {
+  assert.ok(BAND.bandFor('avg_call_time'), 'call time keeps its band (it colours the number and the gauge) without being ranked');
+  ['time_to_price'].forEach((k) => {
     const m = C.byKey(k);
     assert.ok(BAND.bandFor(k), k + ' is ranked, so its order must be defined by a band');
     assert.ok(!m.targetDirection || !BAND.bandFor(k) === false,
@@ -75,8 +77,8 @@ test('⚠⚠⚠ both minute metrics get a NUMBER; only the RULED one gets a rank
   // and the page half: both rankable, and every row states its side
   const rank = CODE.slice(CODE.indexOf('function dashRepRanking'), CODE.indexOf('function dashRepNote'));
   assert.ok(rank.length > 300 && rank.length < 5000, 'slice: ' + rank.length);
-  assert.ok(/avg_call_time: function \(r\)/.test(rank) && /time_to_price: function \(r\)/.test(rank),
-    'both minute metrics must be rankable now that both have a band');
+  assert.ok(!/avg_call_time: function \(r\)/.test(rank) && /time_to_price: function \(r\)/.test(rank),
+    'H736: time to price is rankable by its band; call time is never rankable');
   assert.ok(/x\.side = /.test(rank) && /b\.dist - a\.dist/.test(rank),
     'a banded metric ranks by DISTANCE and every row carries its SIDE — distance '
     + 'alone puts a rep who rushes next to one who rambles with nothing saying which');

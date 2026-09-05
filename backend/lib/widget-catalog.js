@@ -260,8 +260,11 @@ var METRIC_BAND = require('./metric-band.js');
 /* ⚠ ONE ARRAY, TWO KEYS (③-7, 2026-09-02). `by_rep` and `bar_rep` were typed twice under a
    comment claiming they were identical by construction; they were identical by coincidence.
    The bars draw the same ranking the list reads, so the offer is the same object. */
+/* H736 (Justin, 2026-09-05): `avg_call_time` LEAVES THE RANKED VIEWS. It is never a sort key, never a rank, never a
+   judgement — a rep is never worse for a call being long or short (the doctrine's never-do). The number card, the
+   gauge and the trend keep it; a list or a bar chart asserts better-and-worse, and that claim is withdrawn. */
 const RANKED_REP_VIEWS = ['avg_score', 'closing_rate', 'objection_handle_rate', 'calls_analyzed', 'prospects',
-                          'avg_call_time', 'time_to_price'];
+                          'time_to_price'];
 
 const RENDERABLE = {
   /* ⚠⚠ BOTH MINUTE METRICS REACH THE NUMBER CARD, AND ONLY ONE REACHES THE

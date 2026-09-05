@@ -31,22 +31,22 @@ test('closing, worst first (the default): measured reps ascending, the unmeasure
   assert.deepStrictEqual(sortReps(REPS, null, 'worst').map((r) => r.display_name), ['A', 'C', 'B', 'Z'], 'an explicit argument still wins');
 });
 
-test('⚠ call time sorts by distance from the band from the WIRE: 60 (15 out) is worse than 25 (10 out); 40 is inside and best', () => {
-  const state = { teamOverview: { bands: { avg_call_time: { good: [35, 45] } } }, repSortKey: 'time', repSortDir: 'worst' };
-  const sortReps = sorter(state);
-  assert.deepStrictEqual(sortReps(REPS).map((r) => r.display_name), ['A', 'C', 'B', 'Z'], 'furthest from the band first');
-  state.repSortDir = 'best';
-  assert.deepStrictEqual(sortReps(REPS).map((r) => r.display_name), ['B', 'C', 'A', 'Z']);
-  const noBand = sorter({ teamOverview: { bands: {} }, repSortKey: 'time', repSortDir: 'worst' });
-  assert.deepStrictEqual(noBand(REPS).map((r) => r.display_name), ['A', 'B', 'C', 'Z'], 'no band on the wire: nothing is measured, names only');
+test('⚠⚠ H736 (Justin, 2026-09-05): CALL TIME IS NEVER A SORT KEY — a stale "time" key falls back to closing, and the control never offers it; the default is closing BEST first', () => {
+  /* CONVERTED: this asserted the band-distance sort for call time (H730). The ruling withdrew call time from the
+     sort entirely — it stays on the card, never a rank, never a judgement. */
+  const state = { teamOverview: { bands: { avg_call_time: { good: [35, 45] } } }, repSortKey: 'time', repSortDir: 'best' };
+  assert.deepStrictEqual(sorter(state)(REPS).map((r) => r.display_name), ['B', 'C', 'A', 'Z'], 'a stale time key sorts by the first metric, closing');
+  assert.ok(!/key: 'time'/.test(LIVE), 'no time entry in the sort metrics');
+  assert.ok(/repSortKey: 'close', repSortDir: 'best'/.test(LIVE), 'closing, best first, is the default');
 });
 
-test('objections and grade sort by their number; the control offers exactly the four and a direction; the section uses it', () => {
+test('objections and grade sort by their number; the control offers exactly the three and a direction; the section uses it', () => {
   const state = { teamOverview: { bands: {} }, repSortKey: 'grade', repSortDir: 'worst' };
   assert.deepStrictEqual(sorter(state)(REPS).map((r) => r.display_name), ['B', 'C', 'A', 'Z']);
   state.repSortKey = 'obj';
   assert.deepStrictEqual(sorter(state)(REPS).map((r) => r.display_name), ['B', 'C', 'A', 'Z']);
-  assert.ok(/var REP_SORT_METRICS = \[[\s\S]*'close'[\s\S]*'obj'[\s\S]*'time'[\s\S]*'grade'[\s\S]*\];/.test(LIVE));
+  const metrics = LIVE.slice(LIVE.indexOf('var REP_SORT_METRICS = ['), LIVE.indexOf('];', LIVE.indexOf('var REP_SORT_METRICS = [')));
+  assert.deepStrictEqual([...metrics.matchAll(/key: '([a-z]+)'/g)].map((m) => m[1]), ['close', 'obj', 'grade'], 'exactly the three, in this order — call time is out (H736)');
   assert.ok(/repSortControlHtml\(\)/.test(fnBody(LIVE, 'repCardsHtml')), 'the Reps section carries the control');
   assert.ok(/var reps = sortReps\(o\.per_rep \|\| \[\]\);/.test(fnBody(LIVE, 'repCardsHtml')), 'and sorts through it');
   assert.ok(!/35|45/.test(fnBody(LIVE, 'sortReps')), 'no band literal — the band comes from the wire');

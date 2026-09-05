@@ -5681,7 +5681,7 @@
     teamRecs:       null,   teamRecsLoading: false,
     teamCoachable:  null,   teamCoachableLoading: false,   // H726: coachable moments (Team → Coaching) — the pairs are one kind within it
     repLineOpen: {},   // H734: which rep rows are open on the Coachable Moments panel (by user id); resets on pivot
-    repSortKey: 'close', repSortDir: 'worst',   // H730: the rep-card sort — one of the card's four numbers, either direction
+    repSortKey: 'close', repSortDir: 'best',   // H736 (Justin, 2026-09-05): closing rate, BEST first, by default; switchable; Objections and Grade stay; call time is never a sort key
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
     teamDashboard: null,    teamDashboardLoading: false,
     teamCatalog: null,      teamCatalogLoading: false,
@@ -12638,12 +12638,9 @@
       objection_handle_rate: function (r) { return r.obj_handle_rate; },
       calls_analyzed: function (r) { return r.calls_analyzed; },
       prospects: function (r) { return r.prospect_close_total; },
-      /* ⚠ BOTH MINUTE METRICS ARE RANKABLE NOW, and only because they have a
-         BAND. While `time_to_price` had neither a band nor a direction it was
-         refused: it would have sorted slowest-first with the longest bar reading
-         as the best rep. Justin ruled the late edge; the early one came from the
-         coverage table. */
-      avg_call_time: function (r) { return r.avg_call_time; },
+      /* H736 (Justin, 2026-09-05): `avg_call_time` is NOT rankable — never a sort key, never a rank, never a
+         judgement; the entry is REMOVED here as it is from the catalog's RANKED_REP_VIEWS (the mirror test pins
+         the two together). `time_to_price` stays rankable by its band (the late edge ruled, the early one measured). */
       time_to_price: function (r) { return r.time_to_price; },
     }[card.metric];
     if (!pickVal) return { error: 'no per-rep card can show this metric yet' };
@@ -15051,13 +15048,9 @@
   var REP_SORT_METRICS = [
     { key: 'close', label: 'Closing', value: function (r) { return (r.prospect_close_total > 0 && typeof r.prospect_close_rate === 'number') ? r.prospect_close_rate : null; } },
     { key: 'obj',   label: 'Objections', value: function (r) { return (typeof r.obj_handle_rate === 'number') ? r.obj_handle_rate : null; } },
-    { key: 'time',  label: 'Call time', value: function (r) {
-        if (typeof r.avg_call_time !== 'number' || !isFinite(r.avg_call_time)) return null;
-        var bands = (state.teamOverview && state.teamOverview.bands) || {}; var band = bands.avg_call_time && bands.avg_call_time.good;
-        if (!band) return null;
-        var d = r.avg_call_time < band[0] ? band[0] - r.avg_call_time : (r.avg_call_time > band[1] ? r.avg_call_time - band[1] : 0);
-        return -d;   // higher is better: inside the band is 0, further out is more negative
-      } },
+    /* H736 (Justin, 2026-09-05): CALL TIME IS OUT OF THE SORT CONTROL — it stays on the card, it is never a sort key,
+       never a rank, never a judgement ("a rep is never worse for a call being long or short"; the doctrine's never-do).
+       The 'time' entry that ranked by distance from the band (H730) is REMOVED, not hidden. */
     { key: 'grade', label: 'Grade', value: function (r) { return (typeof r.avg_score === 'number') ? r.avg_score : null; } },
   ];
   function repSortMetric() { return REP_SORT_METRICS.filter(function (m) { return m.key === state.repSortKey; })[0] || REP_SORT_METRICS[0]; }
