@@ -65,7 +65,7 @@ test('⚠ names where names belong: the coaching heads show the prospect name, n
   assert.ok(/Unknown prospect/.test(item) && !/Personal Meeting Room/.test(item));
   const gather = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'coachable-team.js'), 'utf8'));   // H734: the route reads the one gather
   assert.ok(/select\('fathom_call_id, outcome, prospect_name'\)/.test(gather), 'the coachable gather SELECTS the name');
-  assert.ok(/loadCoachableTeam\(admin, ids, range\.from, range\.to\)/.test(stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8'))), 'and the route calls it');
+  assert.ok(/loadCoachableTeam\(admin, ids, range\.from, range\.to,/.test(stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'team.js'), 'utf8'))), 'and the route calls it');
   const lib = fs.readFileSync(path.join(__dirname, '..', 'lib', 'coachable-moments.js'), 'utf8');
   assert.ok(/prospect_name: call\.prospect_name \|\| null/.test(lib), 'and the item carries it');
 });

@@ -1,3 +1,4 @@
+const {withEvidence,withReviewModel}=require('./helpers/coaching-evidence-fixture');
 /**
  * THE COACHING PASS CHECKS THE KNOWLEDGE BASE BEFORE IT SPEAKS (H731) — EXECUTED. The model seam is stubbed
  * BEFORE the worker loads, so the real coachCallMoments runs against a fake wire and the prompt it would send
@@ -16,6 +17,7 @@ require.cache[muPath].exports = Object.assign({}, realMu, {
   usageFor: function () { return async function (params) { captured.push(params.messages[0].content); return { content: [{ text: '{}' }] }; }; },
   setUsageRecorder: function () {},
 });
+require.cache[require.resolve('../lib/model-usage')].exports.createWithUsage = withReviewModel(require.cache[require.resolve('../lib/model-usage')].exports.createWithUsage);
 const W = require('../lib/analysis-worker');
 
 const P = {
@@ -27,7 +29,7 @@ const P = {
 const D = require('../lib/doctrine');
 const DOCTRINE_ROWS = D.doctrineRows(D.readDoctrineFile()).map((r, i) => Object.assign({ id: 'doc' + i, created_at: '2026-09-05' }, r));
 const MOMENT = { id: 'h1', fathom_call_id: 'c1', type: 'objection', resolution: 'unhandled', section: 'close', timestamp_seconds: 1200, quote: 'I need to think about it', observation: 'o', closer_response: 'Sure, take your time', closer_response_verified: true };
-function fakeAdmin(writes) {
+function fakeAdminBase(writes) {
   return { from(table) {
     const ch = { f: {}, _in: null, _op: 'select', _p: null, select() { return ch; }, update(p) { ch._op = 'update'; ch._p = p; return ch; }, eq(k, v) { ch.f[k] = v; return ch; }, in(k, v) { ch._in = [k, v]; return ch; }, is() { return ch; }, not() { return ch; }, order() { return ch; }, limit() { return ch; },
       maybeSingle() { return Promise.resolve({ data: table === 'user_profiles' ? (P[ch.f.user_id] ? Object.assign({}, P[ch.f.user_id]) : null) : null, error: null }); },
@@ -75,3 +77,5 @@ test('⚠⚠ H732 — THE SEPARATION: doctrine present, team material absent →
   const out = await W._coachCallMoments(fakeAdmin(writes), 'c1', 'lost', null, null, 'solo');
   assert.strictEqual(out.skipped, 'no_material'); assert.strictEqual(captured.length, 0); assert.strictEqual(writes.length, 0);
 });
+
+function fakeAdmin(...args) { return withEvidence(fakeAdminBase(...args)); }

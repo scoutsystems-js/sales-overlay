@@ -1,3 +1,4 @@
+const {withEvidence,withReviewModel}=require('./helpers/coaching-evidence-fixture');
 /**
  * H737 — THE RETRY SWEEP, executed: a row left 'pending' after its analysis is done gets the coaching pass again
  * (awaited, marked with the result); NULL rows — the four uncoached calls, Josh N's sixteen — are never selected; the
@@ -15,12 +16,13 @@ require.cache[muPath].exports = Object.assign({}, realMu, {
   usageFor: function () { return async function (params) { captured.push(params.messages[0].content); return { content: [{ text: '{}' }] }; }; },
   setUsageRecorder: function () {},
 });
+require.cache[muPath].exports.createWithUsage=withReviewModel(require.cache[muPath].exports.createWithUsage);
 const W = require('../lib/analysis-worker');
 const { warmWhenDrained } = require('../lib/warm-after-drain');
 const D = require('../lib/doctrine');
 const DOCTRINE_ROWS = D.doctrineRows(D.readDoctrineFile()).map((r, i) => Object.assign({ id: 'doc' + i }, r));
 const PROFILE = { user_id: 'mgr', role: 'manager', managed_by: null, offer: 'Team offer: the blueprint, long enough to count as material', qualifications: 'TEAM QUALIFICATIONS: 10k saved', niche: 'x', script_raw: null };
-function fake(analyses, writes) {
+function fakeBase(analyses, writes) {
   return { from(table) {
     const ch = { f: {}, _op: 'select', _p: null, select() { return ch; }, update(p) { ch._op = 'update'; ch._p = p; return ch; }, eq(k, v) { ch.f[k] = v; return ch; }, lt() { return ch; }, gte() { return ch; }, in() { return ch; }, is() { return ch; }, not() { return ch; }, order() { return ch; }, limit() { return ch; },
       maybeSingle() { return Promise.resolve({ data: table === 'user_profiles' ? (ch.f.user_id === 'rep' ? { user_id: 'rep', managed_by: 'mgr' } : Object.assign({}, PROFILE)) : (table === 'fathom_calls' ? { call_date: '2026-09-05T10:00:00Z' } : null), error: null }); },
@@ -28,7 +30,7 @@ function fake(analyses, writes) {
         if (ch._op === 'update') { writes.push({ table, patch: ch._p, f: ch.f }); return Promise.resolve({ data: null, error: null }).then(res, rej); }
         let rows = [];
         if (table === 'call_analyses') rows = analyses.filter((a) => Object.keys(ch.f).every((k) => a[k] === ch.f[k]));
-        else if (table === 'call_highlights') rows = [{ id: 'h1', fathom_call_id: 'c1', type: 'objection', objection_category: 'fear', objection_class: 'true_objection', resolution: 'unhandled', section: 'close', speaker: 'PROSPECT', timestamp_seconds: 900, quote: 'I need to think', observation: 'o', closer_response: 'ok', closer_response_verified: true }];
+        else if (table === 'call_highlights') rows = [{ id: 'h1', fathom_call_id: 'c1', type: 'objection', objection_category: 'fear', objection_class: 'true_objection', resolution: 'unhandled', section: 'close', speaker: 'PROSPECT', timestamp_seconds: 900, quote: 'I need to think about this decision', observation: 'o', closer_response: 'ok', closer_response_verified: true }];
         else if (table === 'user_profiles') rows = [PROFILE, { user_id: 'rep', managed_by: 'mgr' }];
         else if (table === 'knowledge_base' && ch.f.category === 'doctrine') rows = DOCTRINE_ROWS;
         return Promise.resolve({ data: rows, error: null }).then(res, rej);
@@ -56,3 +58,5 @@ test('⚠ the sweep rides the post-drain warm-up and steps aside while a claim i
   const out2 = await warmWhenDrained(busy, { retryCoaching: retry, warm: async () => ({ ok: true }), now: Date.now(), staleMs: 1000 });
   assert.strictEqual(out2.skipped, 'draining'); assert.strictEqual(ran, 1, 'not while a claim is live');
 });
+
+function fake(...args){return withEvidence(fakeBase(...args));}

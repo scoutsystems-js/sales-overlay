@@ -1,45 +1,25 @@
 # GPT updates — Scout
 
-## Current approved work — 2026-09-05
-Status: implementation in progress; this workspace update is not deployed yet.
+## Current state — 2026-09-05
+Code verified locally; deployment held while new calls are processing. Migration 075 is applied. Two confirmed incorrect notes on the one approved test call have been removed in production, with rejection provenance; their quote timestamps are corrected to transcript positions. No historical backfill.
 
-Justin approved the page review and sidebar mockup. Keep the original wordmark and per-browser background artwork toggle.
+## Approved page and sidebar
+Compact team/date/score header; expandable Coaching Focus; closer selector with one improvement area; expandable Team Strengths with full exchanges and outcomes; compact sidebar icons and persistent Team subpages. Original Scout wordmark and browser-local artwork toggle preserved. These changes are built, not yet deployed.
 
-- Compact header with team, date range and average score.
-- Expandable Coaching Focus priorities; full supporting text remains available.
-- Coachable Moments moves above strengths, with a closer selector and one selected coaching panel.
-- Improvement content uses stored per-moment coaching, excludes positive moments, requires call excerpts, and keeps KB processing invisible. No new advice-generation prompt or backfill.
-- Select the best-supported coaching area by distinct calls, then newest evidence; this is not a measured prediction of which change will increase closes most.
-- Show the actual exchange, continuation, recorded outcome and call review link. Never derive the call outcome from moment resolution.
-- Compact Team Strength summaries open the detailed exchange and outcome format Justin approved.
-- Sidebar shows Team subpages from the existing route list; forthcoming features leave primary navigation. Existing access controls still govern visibility.
-- Add functional and rendered checks, then verify the production commit before reporting live.
+## Coaching contradiction fix
+The old pass read a truncated saved closer reply and treated an earlier observation as authoritative. The transcript shows the closer did ask the feared-result question, isolate, offer a refundable deposit, and ask for conditional commitment. That contradicts both stored criticisms on call 99e6f117-562f-4b64-9473-04b02f58d682.
 
-## Earlier changes verified live
-- `58abde4`: Team Coaching structure with focus, strengths and rep evidence.
-- `27d70cb`: transcript-matched strength exchanges and recorded outcomes.
-- `8909310`: full-call review retains the cited closer's scope.
+The generator now sees complete turns in a bounded window plus the ending, can explicitly return no change, and cannot supply timestamps in its advice. Code locates quote timestamps in the stored transcript. One separate review per call compares proposed advice with the exchange and applicable knowledge/manager material. Missing, rejected, uncertain, malformed or ungrounded approval writes no advice. Approval provenance records reviewer version, knowledge hash and transcript context hash. A retry clears this call's prior advice before generating replacements.
 
-## Accuracy limits
-The existing coaching generator reads team knowledge and manager corrections. This change reuses its stored output; it does not add an independent semantic KB validator or re-judge historical coaching against newly edited material. Transcript matching and explicit contradiction guards are mechanical checks, not proof of a causal claim. Missing or ambiguous evidence must not be invented.
+Team Coaching requires current approved provenance, matching transcript context and current knowledge. It verifies all candidate areas before ranking, so a rejected example cannot hide a valid alternative. The chosen area is the one with most distinct evidenced calls, then recency; this is not a prediction of which change will yield the most closes. Existing historical advice is not retroactively certified. Initially the new panel may have no supported improvement available.
 
-## Verification and deployment
-Pending. This section will be updated with actual results.
+## Actual-output test and limits
+Justin approved the one-call test and ongoing reviews, expressly excluding a historical backfill. The reviewer rejected both existing incorrect notes. A fresh draft still made a similar mistake and was rejected. After allowing no-change explicitly, one moment returned no advice and the other proposed a new unsupported criticism, also rejected. Correct result for these moments: withhold coaching. This demonstrates the safeguard on this specific regression, not general model accuracy or infallibility. No further prompt tuning or paid test is authorized implicitly.
 
-## Build result — 2026-09-05
-Built locally in `.codex/team-coaching` on `codex/team-coaching-ready`. NOT DEPLOYED.
+Targeted production correction removed only highlights 75e12224-15f9-43ad-9e24-f96eb77df193 and 7fabcd4c-ae08-4505-bca7-09e093fe02c3, retaining quotes, outcomes and rejection provenance. Located timestamps: 1635 and 1765 seconds. The original rows are backed up locally in the evidence report directory.
 
-Implemented the approved page and sidebar structure. Original wordmark and background toggle retained. Desktop and mobile rendered checks cover 1400, 979 and 390 CSS pixels. The selected closer changes correctly, only one detail panel renders, and Fine Tune retains the selected call and highlight. The actual gather is executed against a fake database wire and rejects a quote absent from the transcript. Full backend suite: 2,477 passed, 0 failed. Inline dashboard scripts parse.
+## Verification
+2,480 backend tests passed; zero failures. Changed modules and extracted dashboard inline scripts parse. Desktop/mobile checks cover 1400, 979 and 390 CSS pixels, closer switching and Fine Tune targets. Independent-review regression tests fail both when the gate is removed and when it is called but its effect ignored. Current-knowledge mismatch and selecting a valid alternative after rejecting another area are exercised through the real gather. Model stubs test plumbing only; the actual one-call review above tests the reported contradiction.
 
-### Concrete blocker discovered while reading actual output
-Call `99e6f117-562f-4b64-9473-04b02f58d682`, current `v47-2026-09-05` coaching, contains a note saying the closer merely acknowledged the concern without exploring it. The stored full closer turn continues into a question about the feared licensing result and what the prospect would do. The coaching also opens with 00:30:23, while its quoted prospect turn locates at 00:29:25. These are current records, not merely outdated historical coaching.
-
-The previous progress note suggesting this might only be historical was corrected after reading the version. Do not publish this draft's new advice panel as verified. The current selection verifies quote location and excludes positive/unsupported moments, but that does not verify the advice's interpretation. `loadKbMaterial` reads the KB for generation; it is not an independent after-generation factual judge. This requires a semantic validation path that sees the fuller exchange and applicable material, plus real-output review. No extra model calls, backfill, production-data edits or deployment were performed for this build.
-
-### Remaining before deployment
-- Resolve the coaching interpretation gap; do not hide it by shortening text or relabeling advice.
-- Verify new sidebar navigation and the full new panel against an authenticated local/staging session (rendered function checks are not that).
-- Verify live data coverage: selecting an area before quote verification can leave no eligible example despite other candidate areas. Re-rank after verification when implementing the validator.
-- Check the analysis drain separately, push only verified work, then verify Railway's deployed commit and live visible differences.
-
-The local layout preview uses anonymized real call excerpts, illustrative priority headlines, and a visible content-review notice. It is a layout check, not validated production coaching.
+## Deployment
+Pending: active analysis drain, then push, exact Railway commit verification, and authenticated live sidebar/page checks. Do not call this redesign live before those checks. Prior live commit: 8909310. Local preview now withholds unreviewed advice; its priority headlines remain illustrative.

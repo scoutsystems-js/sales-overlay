@@ -1,3 +1,4 @@
+const {withEvidence,withReviewModel}=require('./helpers/coaching-evidence-fixture');
 /**
  * H733 — THE MANAGER'S VOICE ON TOP OF THE DOCTRINE, EXECUTED. The model seam is stubbed BEFORE the worker loads, the
  * real coaching pass runs on a fake wire, and the prompt it would send is captured. Asserted on the OUTPUT:
@@ -20,6 +21,7 @@ require.cache[muPath].exports = Object.assign({}, realMu, {
   usageFor: function () { return async function (params) { captured.push(params.messages[0].content); return { content: [{ text: reply(params.messages[0].content) }] }; }; },
   setUsageRecorder: function () {},
 });
+require.cache[require.resolve('../lib/model-usage')].exports.createWithUsage = withReviewModel(require.cache[require.resolve('../lib/model-usage')].exports.createWithUsage);
 const W = require('../lib/analysis-worker');
 const D = require('../lib/doctrine');
 const coaching = require('../lib/coaching');
@@ -47,7 +49,7 @@ const OBJ = { id: 'h1', fathom_call_id: 'c1', type: 'objection', objection_class
 const DQ  = { id: 'h2', fathom_call_id: 'c2', type: 'disqualify_signal', resolution: null, section: 'discovery', timestamp_seconds: 700, quote: 'I have nothing saved at all', observation: 'o', closer_response: 'Okay', closer_response_verified: true, speaker: 'PROSPECT' };
 const OBJ2 = Object.assign({}, OBJ, { id: 'h1b', timestamp_seconds: 1500, quote: 'That is more than I expected' });
 const HL = { c1: [OBJ, OBJ2], c2: [Object.assign({}, OBJ, { id: 'h3', fathom_call_id: 'c2' }), Object.assign({}, OBJ2, { id: 'h3b', fathom_call_id: 'c2' }), DQ] };
-function fakeAdmin(writes) {
+function fakeAdminBase(writes) {
   return { from(table) {
     const ch = { f: {}, _op: 'select', _p: null, select() { return ch; }, update(p) { ch._op = 'update'; ch._p = p; return ch; }, eq(k, v) { ch.f[k] = v; return ch; }, in() { return ch; }, is() { return ch; }, order() { return ch; }, not() { return ch; }, limit() { return ch; },
       maybeSingle() { return Promise.resolve({ data: table === 'user_profiles' ? (P[ch.f.user_id] ? Object.assign({}, P[ch.f.user_id]) : null) : null, error: null }); },
@@ -155,3 +157,5 @@ test('⚠⚠ ITEM 3 — the personal objections synthesis and the team objection
   assert.strictEqual(D.enforceLossRule('Isolate, then reframe — you lost the deal by skipping it.', s, null), null);
   assert.strictEqual(D.enforceLossRule('Isolate, then reframe.', s, null), 'Isolate, then reframe.');
 });
+
+function fakeAdmin(...args) { return withEvidence(fakeAdminBase(...args)); }

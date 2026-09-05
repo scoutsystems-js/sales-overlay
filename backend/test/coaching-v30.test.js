@@ -80,7 +80,7 @@ test('ONE prompt covers EVERY moment — never one call per moment', () => {
   const p = C.buildCoachingPrompt(moments, { outcome: 'follow_up' });
   moments.forEach(m => assert.ok(p.indexOf(m.quote) !== -1, 'missing ' + m.quote));
   assert.ok(/MOMENT 1/.test(p) && /MOMENT 2/.test(p) && /MOMENT 3/.test(p));
-  assert.ok(p.indexOf('There are 3 moments below') !== -1);
+  assert.ok(p.indexOf('There are 3 candidate moments below') !== -1);
   // the model returns an array so each piece maps back to its row
   assert.ok(/JSON array/.test(p) && /"moment":1/.test(p));
 });
@@ -93,7 +93,7 @@ test('the prompt carries the rules Justin ruled on, and they are not optional', 
   assert.ok(/NEVER NAME THE PROSPECT/.test(p), 'why_outcome named the wrong person once');
   assert.ok(/ISOLATION IS CORRECT TECHNIQUE/.test(p), 'Scout coached a rep out of isolating');
   assert.ok(/COACH THE PRINCIPLE, NOT A SCRIPT/.test(p), 'principles, not word tracks');
-  assert.ok(/OUTRANKS THE QUOTE/.test(p), 'the observation beats a garbled ASR quote');
+  assert.ok(/earlier interpretation, not proof/.test(p), 'the prior interpretation is checked against the full exchange');
   assert.ok(/is this something you would want to do/.test(p), 'commitment, not a date');
   assert.ok(!/when would you want to get started/.test(p), 'the retired phrasing must not return');
 });
@@ -133,13 +133,13 @@ test('⚠ ONE model call per CALL — the worker must not loop the coaching call
   const site = w.slice(w.indexOf('async function coachCallMoments'));
   const body = site.slice(0, site.indexOf('\nmodule.exports'));
   /* H735: the function now reads the coaching record before the prompt and writes it after each entry — the ceiling moved with it; the property under test (one model call per call) is unchanged. */
-  assert.ok(body.length > 400 && body.length < 6500, 'slice must cover the function: ' + body.length);
+  assert.ok(body.length > 400 && body.length < 11000, 'slice must cover the function: ' + body.length);
   /* ⚠⚠ COUNT BOTH FORMS. This counted `messages.create(` only, and the call now
      goes through the spend-logging seam — so after that change it counted ZERO
      and would have SILENTLY STOPPED GUARDING the rule it exists for. A guard
      that quietly measures nothing is worse than one that fails. */
   const calls = (body.match(/messages\.create\(|createWithUsage\(/g) || []).length;
-  assert.strictEqual(calls, 1, 'exactly one model call for the whole set, got ' + calls);
+  assert.strictEqual(calls, 2, 'one generation and one independent review for the whole call, never per moment');
 });
 
 test('⚠ FOUR HOPS — coaching is selected, shaped, mapped and rendered', () => {
@@ -169,6 +169,6 @@ test('hop 2 in ACTION — the shaper really carries it onto the moment', () => {
 
 test('the version bump landed and marks the coaching release', () => {
   const w = read('lib/analysis-worker.js');
-  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v47-2026-09-05'/.test(w));
+  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v48-2026-09-05'/.test(w));
   assert.ok(/ONE CALL PER CALL, COVERING ALL ITS MOMENTS/.test(w), 'the ruling must travel with the bump');
 });

@@ -851,7 +851,8 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     var ids = team.memberIds || [];
     if (!ids.length) return res.json({ reps: [], total_items: 0, by_kind: {}, from: range.from, to: range.to });
     /* H734: ONE gather (lib/coachable-team) shared with the measurement script, so what is priced is what is sent. */
-    var gathered = await loadCoachableTeam(admin, ids, range.from, range.to);
+    var material = await require('../lib/kb-material').loadKbMaterial(admin, { userId: team.keyId, lane: 'rep-line', maxChars: 2500 });
+    var gathered = await loadCoachableTeam(admin, ids, range.from, range.to, material.hasMaterial ? material.kbHash : null);
     var nameOf = await nameMapFor(admin, ids);
     var byKind = {}; var total = 0;
     var reps = gathered.reps.map(function (r) {
@@ -860,7 +861,6 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     });
     /* H734 — THE REP LINE IS THE JUDGEMENT: one model call per rep per period, cached; the knowledge base
        read ONCE for the team before any line (H731) — nothing on file → no model call, the one shape. */
-    var material = await require('../lib/kb-material').loadKbMaterial(admin, { userId: team.keyId, lane: 'rep-line', maxChars: 2500 });
     var lines = await computeRepLines(admin, reps, material, range.from, range.to);
     /* H735 — THE REP'S HISTORY REACHES THE LINE, in code: for a PATTERN line, the record's count of calls Scout has
        coached this rep on that pattern inside the window; the not-moved claim only where its bar is cleared
@@ -885,7 +885,7 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
         L.history_clause = coachHistory.historyClause(entry, assessment);
       }
     } catch (hErr) { logTeamError('coachable-moments/history', hErr); }
-    reps.forEach(function (r, i) { r.line = lines[i] || null; if (!material.hasMaterial) r.improvements = []; delete r.loss_scope; });
+    reps.forEach(function (r, i) { r.line = lines[i] || null; r.improvements = material.hasMaterial ? (r.improvements || []).filter(function(it){return it.moment.coaching_review && it.moment.coaching_review.kb_hash===material.kbHash;}) : []; delete r.loss_scope; });
     reps.sort(function (a, b) { return b.items.length - a.items.length || String(a.name || '').localeCompare(String(b.name || '')); });
     var payload = { reps: reps, total_items: total, by_kind: byKind, from: range.from, to: range.to };
     if (!material.hasMaterial) Object.assign(payload, require('../lib/kb-material').nothingToSay({}));

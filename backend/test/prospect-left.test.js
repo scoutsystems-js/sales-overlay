@@ -21,7 +21,7 @@ test('the ninth type is valid, prospect-positioned (never a closer line), and st
   ], 3000);
   assert.strictEqual(s.length, 1, 'a closer line can never be a leaving');
   assert.strictEqual(s[0].type, 'prospect_left');
-  assert.match(fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8'), /ANALYSIS_PROMPT_VERSION = 'v47-2026-09-05'/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8'), /ANALYSIS_PROMPT_VERSION = 'v48-2026-09-05'/);
 });
 
 test('the prompt states the discriminator: a stated reason the offer does not apply is a disqualification; leaving without one is leaving', () => {

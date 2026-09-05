@@ -9,7 +9,7 @@ const {selectImprovementFocus} = require('../lib/improvement-focus');
 const {loadCoachableTeam} = require('../lib/coachable-team');
 const source = fs.readFileSync(path.join(__dirname,'../web/dashboard.html'),'utf8');
 const live = stripComments(source);
-const h = {id:'h1', type:'objection', resolution:'unhandled', section:'objection', objection_category:'fear', speaker:'PROSPECT', speaker_verified:true, timestamp_seconds:10, quote:'I am not certain this is the right decision.', coaching:'Explore the concern before moving to the next step.'};
+const h = {coaching_review:{version:require('../lib/coaching-evidence-review').VERSION,verdict:'approved'},id:'h1', type:'objection', resolution:'unhandled', section:'objection', objection_category:'fear', speaker:'PROSPECT', speaker_verified:true, timestamp_seconds:10, quote:'I am not certain this is the right decision.', coaching:'Explore the concern before moving to the next step.'};
 const c = {id:'c1', user_id:'u1', call_date:'2026-09-04', outcome:'follow_up', highlights:[h]};
 test('improvement selection uses stored coaching and refuses positive, unverified and unsupported moments',()=>{
  assert.equal(selectImprovementFocus([c]).length,1);
@@ -20,12 +20,19 @@ test('improvement selection uses stored coaching and refuses positive, unverifie
 test('real team gather attaches only located exchanges and preserves owner/outcome',async()=>{
  const tables = {fathom_calls:[{...c,fathom_call_id:'real-recording',not_a_sales_call:false,duplicate_of:null}],call_highlights:[{...h,fathom_call_id:'c1'}],call_analyses:[{fathom_call_id:'c1',status:'done',outcome:'follow_up',transcript_stored:{turns:[{speaker:'PROSPECT',start_seconds:10,text:h.quote},{speaker:'CLOSER',start_seconds:15,text:'What is the concern?'}]}}]};
  const admin={from(table){let filters=[];const q={select(){return q;},in(k,ids){filters.push(r=>ids.includes(r[k]));return q;},eq(k,v){filters.push(r=>r[k]===v);return q;},not(){return q;},is(){return q;},gte(){return q;},lte(){return q;},order(){return q;},range(){return q;},then(resolve,reject){return Promise.resolve({data:tables[table].filter(r=>filters.every(f=>f(r))),error:null}).then(resolve,reject);}};return q;}};
+ tables.call_highlights[0].coaching_review.context_hash=require('../lib/coaching-evidence-review').contextFor(tables.call_highlights[0],tables.call_analyses[0]).hash;
  const good=await loadCoachableTeam(admin,['u1'],'2026-08-07','2026-09-05');
  assert.equal(good.reps[0].improvements.length,1);
  assert.equal(good.reps[0].improvements[0].call_evidence.owner_user_id,'u1');
  assert.equal(good.reps[0].improvements[0].call_evidence.outcome,'follow_up');
+ tables.call_highlights[0].coaching_review.kb_hash='current';
+ assert.equal((await loadCoachableTeam(admin,['u1'],'2026-08-07','2026-09-05','changed')).reps[0].improvements.length,0);
+ tables.fathom_calls.push({...tables.fathom_calls[0],id:'c2'});
+ tables.call_highlights.push({...h,id:'h2',fathom_call_id:'c2',objection_category:null,section:'discovery',coaching_review:{...tables.call_highlights[0].coaching_review}});
+ tables.call_analyses.push({...tables.call_analyses[0],fathom_call_id:'c2',transcript_stored:JSON.parse(JSON.stringify(tables.call_analyses[0].transcript_stored))});
  tables.call_analyses[0].transcript_stored.turns[0].text='Unrelated words';
- assert.equal((await loadCoachableTeam(admin,['u1'],'2026-08-07','2026-09-05')).reps[0].improvements.length,0);
+ const fallback=await loadCoachableTeam(admin,['u1'],'2026-08-07','2026-09-05','current');
+ assert.equal(fallback.reps[0].improvements[0].call_id,'c2');
 });
 function page() {
  const item={...selectImprovementFocus([c])[0],moment:h};

@@ -1,3 +1,4 @@
+const {withEvidence,withReviewModel}=require('./helpers/coaching-evidence-fixture');
 /**
  * H735 — THE REP'S HISTORY REACHES THE COACHING, executed. The pattern key is code over stored fields; the not-moved
  * bar is pure and driven through its cases; the clause is code; the route is executed on a fake wire with the model
@@ -17,6 +18,7 @@ require.cache[muPath].exports = Object.assign({}, realMu, {
   setUsageRecorder: function () {},
 });
 const H = require('../lib/coaching-history');
+require.cache[require.resolve('../lib/model-usage')].exports.createWithUsage = withReviewModel(require.cache[require.resolve('../lib/model-usage')].exports.createWithUsage);
 const W = require('../lib/analysis-worker');
 const D = require('../lib/doctrine');
 
@@ -64,7 +66,7 @@ const HISTORY = [
   { user_id: 'z', team_key: 'otherteam', pattern_key: 'objection:partner', fathom_call_id: 'z1', call_date: IN + '1T10:00:00Z' },
 ];
 function calls(uid) { return ['1', '2', '3'].map((n) => ({ id: uid + n, fathom_call_id: uid + n, user_id: uid, title: 'T', call_date: IN + n + 'T10:00:00Z', recording_url: null, not_a_sales_call: false, duplicate_of: null })); }
-function fakeAdmin(writes) {
+function fakeAdminBase(writes) {
   return { from(table) {
     const ch = { f: {}, _in: null, _op: 'select', _p: null, _gte: null, _lte: null, select() { return ch; }, upsert(p) { ch._op = 'upsert'; ch._p = p; return ch; }, update(p) { ch._op = 'update'; ch._p = p; return ch; }, eq(k, v) { ch.f[k] = v; return ch; }, in(k, v) { ch._in = [k, v]; return ch; }, is() { return ch; }, not() { return ch; }, gte(k, v) { ch._gte = v; return ch; }, lte(k, v) { ch._lte = v; return ch; }, order() { return ch; }, range() { return ch; }, limit() { return ch; },
       maybeSingle() { if (table === 'user_profiles') return Promise.resolve({ data: P[ch.f.user_id] ? Object.assign({}, P[ch.f.user_id]) : null, error: null }); if (table === 'fathom_calls') return Promise.resolve({ data: { call_date: IN + '3T10:00:00Z' }, error: null }); return Promise.resolve({ data: null, error: null }); },
@@ -116,7 +118,7 @@ test('⚠⚠ THE COACHING PASS, EXECUTED: the prompt carries the record for this
   captured.length = 0; writes.length = 0;
   reply = () => JSON.stringify([{ moment: 1, coaching: 'Yet again you let the partner objection sit. Same mistake.', applied_manager_notes: [] }]);
   const out2 = await W._coachCallMoments(fakeAdmin(writes), 'a3', 'lost', null, null, 'a');
-  assert.strictEqual(out2.written, 0, 'a scolding entry is dropped'); assert.ok(!writes.some((w) => w.table === 'call_highlights'));
+  assert.strictEqual(out2.written, 0, 'a scolding entry is dropped'); assert.ok(!writes.some((w) => w.table === 'call_highlights' && w.row && w.row.coaching));
 });
 test('the page appends the clause after the line, never builds one itself', () => {
   const fs = require('fs'); const path = require('path'); const { stripComments } = require('./helpers/strip-comments');
@@ -124,3 +126,5 @@ test('the page appends the clause after the line, never builds one itself', () =
   assert.ok(/clauseHtml = '<span class="rep-line-history">' \+ escapeHtml\(L\.history_clause\) \+ '<\/span>'/.test(LIVE), 'H737: the clause is its own line below the sentence');
   assert.ok(!/coached this on/.test(LIVE), 'the clause text lives in one place: the lib');
 });
+
+function fakeAdmin(...args) { return withEvidence(fakeAdminBase(...args)); }

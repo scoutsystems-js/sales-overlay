@@ -15,7 +15,7 @@ var { selectCoachableMoments, KIND_LABELS } = require('./coachable-moments');
 var doctrineLib = require('./doctrine');
 var { selectImprovementFocus } = require('./improvement-focus');
 
-async function loadCoachableTeam(admin, memberIds, from, to) {
+async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
   var ids = memberIds || [];
   var calls = [];
   for (var i = 0; i < ids.length; i += CHUNK) {
@@ -35,7 +35,7 @@ async function loadCoachableTeam(admin, memberIds, from, to) {
     var slice = callIds.slice(j, j + CHUNK);
     var pair = await Promise.all([
       admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name').in('fathom_call_id', slice),
-      admin.from('call_highlights').select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, coaching, closer_response, closer_response_verified, cause, objection_class, objection_category').in('fathom_call_id', slice),
+      admin.from('call_highlights').select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, coaching, coaching_review, closer_response, closer_response_verified, cause, objection_class, objection_category').in('fathom_call_id', slice),
     ]);
     if (pair[0].error) throw new Error('call_analyses: ' + pair[0].error.message);
     if (pair[1].error) throw new Error('call_highlights: ' + pair[1].error.message);
@@ -48,9 +48,9 @@ async function loadCoachableTeam(admin, memberIds, from, to) {
     var items = selectCoachableMoments(byRep[u]).map(function (it) { return Object.assign({ label: KIND_LABELS[it.kind] || it.kind }, it); });
     var hl = []; byRep[u].forEach(function (c) { hl = hl.concat(c.highlights || []); });
     var scope = doctrineLib.lossScope(byRep[u].map(function (c) { return { fathom_call_id: c.id, outcome: c.outcome }; }), hl);
-    return { user_id: u, calls: byRep[u].length, items: items, improvements: selectImprovementFocus(byRep[u]), loss_scope: scope };
+    return { user_id: u, calls: byRep[u].length, items: items, improvements: selectImprovementFocus(byRep[u], {all:true,kbHash:kbHash}), loss_scope: scope };
   });
-  // Fetch transcripts only for selected evidence, not the whole team's history.
+  // Locate every reviewed candidate before ranking; rejected evidence cannot hide a valid area.
   var evidenceIds = [...new Set(reps.flatMap(function (r) { return r.improvements.map(function (it) { return it.call_id; }); }))];
   var evidenceAnalyses = new Map();
   for (var ei = 0; ei < evidenceIds.length; ei += CHUNK) {
@@ -60,10 +60,15 @@ async function loadCoachableTeam(admin, memberIds, from, to) {
   }
   var buildEvidence = require('./strength-call-evidence').buildEvidence;
   reps.forEach(function (r) {
-    r.improvements = r.improvements.map(function (it) {
-      var evidence = buildEvidence({ quote:it.moment.quote, spoke:String(it.moment.speaker).toLowerCase() }, evidenceAnalyses.get(it.call_id), it.recording_url);
-      return evidence ? Object.assign({}, it, {call_evidence:Object.assign({}, evidence, {owner_user_id:it.user_id})}) : null;
-    }).filter(Boolean);
+    var evidenceByMoment = new Map();
+    r.improvements.forEach(function (it) {
+      var analysis = evidenceAnalyses.get(it.call_id);
+      var evidence = buildEvidence({ quote:it.moment.quote, spoke:String(it.moment.speaker).toLowerCase() }, analysis, it.recording_url);
+      var context = require('./coaching-evidence-review').contextFor(it.moment, analysis);
+      if (evidence && context && it.moment.coaching_review.context_hash === context.hash) evidenceByMoment.set(it.moment.id, Object.assign({},evidence,{owner_user_id:it.user_id}));
+    });
+    r.improvements = selectImprovementFocus(byRep[r.user_id], {kbHash:kbHash,eligible:function(call,moment){return evidenceByMoment.has(moment.id);}})
+      .map(function(it){return Object.assign({},it,{call_evidence:evidenceByMoment.get(it.moment.id)});});
   });
   return { calls: calls, byRep: byRep, reps: reps };
 }

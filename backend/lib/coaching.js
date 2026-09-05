@@ -99,15 +99,14 @@ function buildCoachingPrompt(moments, opts) {
     (o.objectionNotes ? 'How objection handling went across the whole call: ' + o.objectionNotes : ''),
     (o.historyBlock && String(o.historyBlock).trim()) ? '\n' + String(o.historyBlock).trim() : '',   // H735: what Scout has coached this closer on before
     '',
-    'There are ' + moments.length + ' moments below. Coach each one separately.',
+    'There are ' + moments.length + ' candidate moments below. They are candidates, not established mistakes. Evaluate each independently against the full supplied exchange and team material. If the closer did the appropriate work, or you cannot support a concrete improvement, return coaching:null and no_change:true. Do not invent an improvement to fill a slot. It is valid for EVERY candidate to need no change.',
     '',
     moments.map(momentBlock).join('\n\n'),
+    o.evidenceContext || '',
     '',
     '⚠⚠ WHAT YOU KNOW ABOUT THE PROSPECT — AND IT IS ONLY THIS',
-    'The lines given for each moment, plus the call outcome, are EVERYTHING you know',
-    'about this prospect. You have not seen the transcript. You do not know what they',
-    'said before or after, how they sounded, whether they paused, what they were',
-    'thinking, or what they intended to do next.',
+    'The supplied transcript windows and ending, plus the stored outcome, are everything you know. Read the complete closer replies and subsequent questions before criticizing an omission. These are excerpts, not the whole call: never assert a move never happened elsewhere. Do not infer emotion, intent, or a causal explanation from the outcome.',
+    'Do not write timestamps in coaching prose. Code supplies the located timestamp beside the actual quote.',
     '',
     'ABSOLUTE RULE — NEVER INVENT THE PROSPECT.',
     'Every statement about what the prospect said, did, meant or wanted must come from',
@@ -134,10 +133,9 @@ function buildCoachingPrompt(moments, opts) {
     '⚠ NEVER write a placeholder. No $X, no <name>. If you were not given a number,',
     '  describe it in words or leave it out.',
     '',
-    '⚠ THE OBSERVATION IS THE VERIFIED READING OF A MOMENT AND IT OUTRANKS THE QUOTE.',
+    'The observation is an earlier interpretation, not proof. Check it against the complete supplied exchange. If the interpretation and the dialogue conflict, do not repeat the interpretation as fact.',
     'The quote is raw speech-to-text and is sometimes garbled or missing a word, so read',
-    'literally it can say the OPPOSITE of what the prospect meant. Where the two',
-    'disagree, the observation is what happened. ⚠⚠ Just state what happened — do not',
+    'literally it can be ambiguous. When the evidence is ambiguous, withhold the claim. Just state what is supported — do not',
     'narrate the disagreement, do not explain how you know, and never name this system',
     'or any internal part of it.',
     '',
@@ -318,7 +316,7 @@ function buildCoachingPrompt(moments, opts) {
     notes
       ? '[{"moment":1,"coaching":"...","applied_manager_notes":[1]}, {"moment":2,"coaching":"...","applied_manager_notes":[]}]'
       : '[{"moment":1,"coaching":"..."}, {"moment":2,"coaching":"..."}]',
-    'No prose outside the JSON.',
+    'A correctly handled or insufficiently supported candidate must be {"moment":1,"coaching":null,"no_change":true}. Re-read the later questions before alleging an omission. No prose outside the JSON.',
   ].filter(Boolean).join('\n');
 }
 

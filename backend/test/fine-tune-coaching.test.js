@@ -1,3 +1,4 @@
+const {withEvidence,withReviewModel}=require('./helpers/coaching-evidence-fixture');
 'use strict';
 /* ⚠⚠ FINE TUNE COACHING (Justin, 2026-09-02) — Add-to-Knowledge-Base from the
    other end: a manager corrects a piece of coaching, Scout extracts the concept,
@@ -23,7 +24,7 @@ function pathGet(row, col) {
   for (const p of parts) { if (v == null) return undefined; v = v[p]; }
   return v;
 }
-function fakeAdmin(tables) {
+function fakeAdminBase(tables) {
   const writes = [];
   const admin = {
     writes,
@@ -86,7 +87,8 @@ function coachingReply(args) {
 
 test('⚠⚠ THE ISOLATION REPLAY — a stored correction CHANGES the coaching written for the moment, on a checkable field', async () => {
   const run = (withCorrection) => withModel(coachingReply, async () => {
-    const worker = require('../lib/analysis-worker');
+    require('../lib/model-usage').createWithUsage = withReviewModel(require('../lib/model-usage').createWithUsage);
+const worker = require('../lib/analysis-worker');
     const admin = fakeAdmin({
       call_highlights: [Object.assign({}, ISOLATING)],
       user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }, { user_id: 'mgr', managed_by: null, role: 'manager', qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }]   /* H731: the coaching pass says nothing without team material, so the head carries some */,
@@ -96,12 +98,14 @@ test('⚠⚠ THE ISOLATION REPLAY — a stored correction CHANGES the coaching w
     return { out, row: admin.from === undefined ? null : (function () { return admin; })(), highlight: (function () { return admin; })() };
   });
   const without = await withModel(coachingReply, async () => {
+    require('../lib/model-usage').createWithUsage = withReviewModel(require('../lib/model-usage').createWithUsage);
     const worker = require('../lib/analysis-worker');
     const tables = { call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }, { user_id: 'mgr', managed_by: null, role: 'manager', qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }]   /* H731: the coaching pass says nothing without team material, so the head carries some */, knowledge_base: [] };
     const out = await worker._coachCallMoments(fakeAdmin(tables), 'call-1', 'lost', null, null, 'rep');
     return { out, h: tables.call_highlights[0] };
   });
   const withIt = await withModel(coachingReply, async (calls) => {
+    require('../lib/model-usage').createWithUsage = withReviewModel(require('../lib/model-usage').createWithUsage);
     const worker = require('../lib/analysis-worker');
     const tables = { call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }, { user_id: 'mgr', managed_by: null, role: 'manager', qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }]   /* H731: the coaching pass says nothing without team material, so the head carries some */, knowledge_base: [Object.assign({}, CORRECTION_ROW)] };
     const out = await worker._coachCallMoments(fakeAdmin(tables), 'call-1', 'lost', null, null, 'rep');
@@ -459,3 +463,5 @@ test('⚠ H733 — the dashboard shows the refusal and names the entry a note sh
   assert.ok(/this will shape how Scout coaches/.test(ft), 'the entry the note speaks to is shown before saving');
   assert.ok(/meta\.doctrine_titles/.test(LIVE) && /Shapes:/.test(LIVE), 'the KB card shows what the note shapes');
 });
+
+function fakeAdmin(...args) { return withEvidence(fakeAdminBase(...args)); }
