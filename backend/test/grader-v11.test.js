@@ -37,7 +37,7 @@ test('ANALYSIS_PROMPT_VERSION is the current shipped version (v29)', () => {
   // v30 = PER-MOMENT COACHING — a third model call writes call_highlights.coaching.
   //       ONE call per CALL covering all its moments, never one per moment.
   //       Additive: no existing prompt touched, no score moves, so no delta gate.
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v46-2026-09-05'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v47-2026-09-05'/);
 });
 
 /* ⚠⚠ v25's three fixes, asserted on the BUILT PROMPT STRING rather than on the

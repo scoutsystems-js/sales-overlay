@@ -97,6 +97,7 @@ function buildCoachingPrompt(moments, opts) {
        what was said is vital". It is the grader's own objection_notes, so it is
        real rather than inferred; absent when the grader wrote none. */
     (o.objectionNotes ? 'How objection handling went across the whole call: ' + o.objectionNotes : ''),
+    (o.historyBlock && String(o.historyBlock).trim()) ? '\n' + String(o.historyBlock).trim() : '',   // H735: what Scout has coached this closer on before
     '',
     'There are ' + moments.length + ' moments below. Coach each one separately.',
     '',

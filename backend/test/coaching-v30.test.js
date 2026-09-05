@@ -127,7 +127,8 @@ test('⚠ ONE model call per CALL — the worker must not loop the coaching call
   const w = code(read('lib/analysis-worker.js'));
   const site = w.slice(w.indexOf('async function coachCallMoments'));
   const body = site.slice(0, site.indexOf('\nmodule.exports'));
-  assert.ok(body.length > 400 && body.length < 4000, 'slice must cover the function: ' + body.length);
+  /* H735: the function now reads the coaching record before the prompt and writes it after each entry — the ceiling moved with it; the property under test (one model call per call) is unchanged. */
+  assert.ok(body.length > 400 && body.length < 6500, 'slice must cover the function: ' + body.length);
   /* ⚠⚠ COUNT BOTH FORMS. This counted `messages.create(` only, and the call now
      goes through the spend-logging seam — so after that change it counted ZERO
      and would have SILENTLY STOPPED GUARDING the rule it exists for. A guard
@@ -163,6 +164,6 @@ test('hop 2 in ACTION — the shaper really carries it onto the moment', () => {
 
 test('the version bump landed and marks the coaching release', () => {
   const w = read('lib/analysis-worker.js');
-  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v46-2026-09-05'/.test(w));
+  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v47-2026-09-05'/.test(w));
   assert.ok(/ONE CALL PER CALL, COVERING ALL ITS MOMENTS/.test(w), 'the ruling must travel with the bump');
 });

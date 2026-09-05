@@ -48,7 +48,7 @@ function pickMoment(h) {
     quote: h.quote, observation: h.observation || null,
     closer_response: (typeof h.closer_response === 'string') ? h.closer_response : null,
     closer_response_verified: (typeof h.closer_response_verified === 'boolean') ? h.closer_response_verified : null,
-    handling: h.handling || null, resolution: h.resolution || null };
+    handling: h.handling || null, resolution: h.resolution || null, objection_category: h.objection_category || null };   // H735: the pattern key reads it
 }
 function notClosed(call) { return call.outcome !== 'closed'; }
 /* The consequence, in code. A FORWARD item on a call that is still open says so (Justin, 2026-09-04): an

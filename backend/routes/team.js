@@ -862,6 +862,29 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
        read ONCE for the team before any line (H731) — nothing on file → no model call, the one shape. */
     var material = await require('../lib/kb-material').loadKbMaterial(admin, { userId: team.keyId, lane: 'rep-line', maxChars: 2500 });
     var lines = await computeRepLines(admin, reps, material, range.from, range.to);
+    /* H735 — THE REP'S HISTORY REACHES THE LINE, in code: for a PATTERN line, the record's count of calls Scout has
+       coached this rep on that pattern inside the window; the not-moved claim only where its bar is cleared
+       (lib/coaching-history). Never on a strength. A record read failure leaves the lines without a clause. */
+    try {
+      var coachHistory = require('../lib/coaching-history');
+      var hist = await coachHistory.loadHistory(admin, ids, range.from, range.to);
+      var histAll = null;
+      for (var li = 0; li < reps.length; li++) {
+        var L = lines[li]; var rr = reps[li];
+        if (!L || L.kind !== 'pattern') continue;
+        var hkey = coachHistory.repLinePatternKey(rr.items, L.evidence_ids);
+        var entry = hkey && hist[rr.user_id] && hist[rr.user_id][hkey];
+        if (!entry) continue;
+        var assessment = null;
+        if (/^objection:/.test(hkey) && entry.calls >= coachHistory.REPEAT_FLOOR) {
+          histAll = histAll || await coachHistory.loadHistory(admin, ids);
+          var firstEver = histAll[rr.user_id] && histAll[rr.user_id][hkey] && histAll[rr.user_id][hkey].first;
+          assessment = await coachHistory.assessObjectionMovement(admin, rr.user_id, hkey.slice('objection:'.length), firstEver);
+        }
+        L.history = { key: hkey, label: coachHistory.labelFor(hkey), calls: entry.calls, window: { from: range.from, to: range.to }, assessment: assessment };
+        L.history_clause = coachHistory.historyClause(entry, assessment);
+      }
+    } catch (hErr) { logTeamError('coachable-moments/history', hErr); }
     reps.forEach(function (r, i) { r.line = lines[i] || null; delete r.loss_scope; });
     reps.sort(function (a, b) { return b.items.length - a.items.length || String(a.name || '').localeCompare(String(b.name || '')); });
     var payload = { reps: reps, total_items: total, by_kind: byKind, from: range.from, to: range.to };

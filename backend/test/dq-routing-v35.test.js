@@ -51,6 +51,6 @@ test('v35: disqualify_signal is defined to include NO NEED', () => {
 });
 
 test('v35: the version is stamped (new calls only — nothing re-grades)', () => {
-  assert.ok(/^v46-/.test(worker.ANALYSIS_PROMPT_VERSION),
+  assert.ok(/^v47-/.test(worker.ANALYSIS_PROMPT_VERSION),
     'a prompt change and its version bump are ONE atomic change');
 });
