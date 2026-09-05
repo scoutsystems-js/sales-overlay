@@ -2409,6 +2409,35 @@ async function analyzeCall(fathomCallId, userId) {
  * Generate coaching for every coachable moment on a call, in ONE model call.
  * Returns a summary; never throws — the caller treats failure as "no coaching".
  */
+/* H737 — THE RETRY SWEEP. A coaching pass is fire-and-forget and dies with the process; since H736 it leaves a mark, so
+   a row still 'pending' once its analysis is done is a pass that never finished. This re-runs the pass for those rows,
+   AWAITED, one at a time, capped — called from the post-drain warm-up (lib/warm-after-drain), i.e. only when no claim
+   is live, so it never lengthens a grading window. It spends one coaching call per row it finds. IT SHIPS IDLE: no row
+   on file carries 'pending' today (the mark is newer than every graded call); the four uncoached calls and Josh N's
+   sixteen carry NULL, are Justin's to spend on, and are never selected here. */
+async function retryPendingCoaching(admin, opts) {
+  var o = opts || {}; var limit = typeof o.limit === 'number' ? o.limit : 10;
+  var olderThan = new Date((typeof o.now === 'number' ? o.now : Date.now()) - (typeof o.staleMs === 'number' ? o.staleMs : CLAIM_STALE_MS)).toISOString();
+  var q = await admin.from('call_analyses').select('fathom_call_id, user_id, outcome, why_outcome, objection_notes')
+    .eq('status', 'done').eq('coaching_status', 'pending').lt('analyzed_at', olderThan).order('analyzed_at', { ascending: true }).limit(limit);
+  if (q.error) { console.warn('[coaching-retry] read failed: ' + q.error.message); return { found: 0, retried: 0, error: q.error.message }; }
+  var rows = q.data || []; var retried = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    try {
+      var out = await coachCallMoments(admin, r.fathom_call_id, r.outcome, r.why_outcome || null, r.objection_notes || null, r.user_id);
+      await admin.from('call_analyses').update({ coaching_status: out.skipped ? 'skipped:' + out.skipped : 'written:' + out.written }).eq('fathom_call_id', r.fathom_call_id);
+      retried++;
+      console.log('[coaching-retry] call=%s moments=%d written=%d%s', r.fathom_call_id, out.selected, out.written, out.skipped ? ' skipped=' + out.skipped : '');
+    } catch (e) {
+      await admin.from('call_analyses').update({ coaching_status: 'failed:' + String((e && e.message) || 'unknown').slice(0, 180) }).eq('fathom_call_id', r.fathom_call_id);
+      console.warn('[coaching-retry] call=%s failed: %s', r.fathom_call_id, e && e.message);
+    }
+  }
+  if (rows.length) console.log('[coaching-retry] found=%d retried=%d', rows.length, retried);
+  return { found: rows.length, retried: retried };
+}
+
 async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNotes, userId) {
   var res = await admin.from('call_highlights')
     .select('id, type, resolution, section, timestamp_seconds, quote, observation, closer_response, closer_response_verified, objection_category, objection_class, handling')   // H735: the pattern key and the DQ class read these
@@ -2513,6 +2542,7 @@ module.exports = {
   _attachArcFields:            attachArcFields,
   _applyMomentBarToCall:       applyMomentBarToCall,
   _coachCallMoments:           coachCallMoments,
+  retryPendingCoaching:        retryPendingCoaching,   // H737: the sweep — rows left 'pending' get the pass again
   _findMeeting:                findMeeting,
   _formatTurnsForPrompt:       formatTurnsForPrompt,
   _formatSeconds:              formatSeconds,

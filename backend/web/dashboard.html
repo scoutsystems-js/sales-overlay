@@ -2706,16 +2706,23 @@
     .missed-pair-rep { margin-top: 14px; }
     /* H734: the rep line — one row per rep, the judgement; opens to the moments. Inherits font and colour from the
        control rule; no coloured edge; the caret is the only state cue and the count chip the only number. */
-    .rep-line-row { margin-top: 2px; }
-    .rep-line-head { width: 100%; display: flex; gap: 12px; align-items: baseline; text-align: left; background: none; border: 0; padding: 10px 2px; cursor: pointer; }
+    /* H737 — the row's shape: a reading measure (72ch), a hairline between reps, the kind as a tag, the name set apart,
+       the count and caret at the sentence's end, the history clause its own line. Tokens only; no coloured edge. */
+    .rep-line-row { border-top: 1px solid var(--border); }
+    .rep-line-row:first-child { border-top: 0; }
+    .rep-line-head { display: block; width: 100%; max-width: 72ch; text-align: left; background: none; border: 0; padding: 12px 2px 12px 2px; cursor: pointer; }
     .rep-line-head:hover .rep-line-text { opacity: 1; }
-    .rep-line-text { font-size: var(--fs-body); line-height: 1.45; flex: 1 1 auto; }
+    .rep-line-kind { display: block; font-size: var(--fs-eyebrow); letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; margin-bottom: 3px; }
+    .rep-line-row.strength .rep-line-kind { color: var(--accent); opacity: 0.95; }
+    .rep-line-text { display: block; font-size: var(--fs-body); line-height: 1.5; }
     .rep-line-text.quiet { opacity: 0.7; }
-    .rep-line-text.strength { color: var(--accent); }
-    .rep-line-history { opacity: 0.75; }   /* H735: the history clause — the same size, a step back */
-    .rep-line-caret { opacity: 0.7; transition: transform 0.15s ease; flex: 0 0 auto; }
+    .rep-line-name { font-weight: var(--fw-emphasis); }
+    .rep-line-row.strength .rep-line-name { color: var(--accent); }
+    .rep-line-meta { display: inline-flex; gap: 6px; align-items: baseline; margin-left: 10px; white-space: nowrap; }
+    .rep-line-history { display: block; margin-top: 5px; font-size: var(--fs-secondary); line-height: 1.45; opacity: 0.8; }   /* H735/H737: the record's clause — its own line, a step down */
+    .rep-line-caret { opacity: 0.7; transition: transform 0.15s ease; display: inline-block; }
     .rep-line-row.open .rep-line-caret { transform: rotate(180deg); }
-    .rep-line-body { padding: 0 2px 10px 2px; }
+    .rep-line-body { padding: 0 2px 12px 2px; max-width: 72ch; }
     .rep-line-evidence { font-size: var(--fs-eyebrow); letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); opacity: 0.9; margin: 10px 0 -6px 2px; }
     .missed-pair-rep-name { font-weight: var(--fw-emphasis); margin-bottom: 4px; display: flex; gap: 8px; align-items: baseline; }
     .missed-pair-rep-count { font-size: var(--fs-label); opacity: 0.7; font-variant-numeric: tabular-nums; }
@@ -11234,7 +11241,7 @@
             : 'Working out why…')
         + '</div>';
     }
-    if (s._error) return '<div class="error">Could not load: ' + escapeHtml(s._error) + '</div>';
+    if (s._error) return '<div class="error">' + laneFailureCopy('the summary') + '</div>';
     if (s.no_material) return noMaterialHtml(s.copy);   // H731
     if (!s.available) {
       return '<div class="empty"><h3>Coaching summary unavailable</h3><p>Could not generate it right now'
@@ -15338,7 +15345,7 @@
     var name = escapeHtml(rep.name || 'Unnamed');
     var quiet = !(L.kind === 'pattern' || L.kind === 'strength');
     var text;
-    if (L.kind === 'pattern' || L.kind === 'strength') text = escapeHtml(L.line || '') + (L.history_clause ? ' <span class="rep-line-history">' + escapeHtml(L.history_clause) + '</span>' : '');   // H735: the record's clause, never on a strength (the route never sets it there)
+    if (L.kind === 'pattern' || L.kind === 'strength') text = escapeHtml(L.line || '');   // H735/H737: the record's clause is drawn on its own line below, never on a strength (the route never sets it there)
     else if (L.kind === 'none') text = name + ' \u2014 no pattern this period across ' + items.length + ' moment' + (items.length === 1 ? '' : 's') + '.';
     else if (L.kind === 'refused') text = name + ' \u2014 Scout could not anchor a pattern to these moments this period.';
     else if (L.kind === 'no_material') text = name + ' \u2014 nothing on file to judge against yet.';
@@ -15349,11 +15356,21 @@
     var ordered = items.map(function (it, i) { return { it: it, cited: !!cited['m' + (i + 1)] }; })
       .sort(function (x, y) { return (y.cited ? 1 : 0) - (x.cited ? 1 : 0); });
     var body = ordered.map(function (o) { return (o.cited ? '<div class="rep-line-evidence">Evidence for the line</div>' : '') + coachableItemHtml(o.it); }).join('');
-    return '<div class="rep-line-row' + (open ? ' open' : '') + '" data-rep="' + escapeHtml(rep.user_id || '') + '">'
+    /* H737 — THE ROW HAS A SHAPE (Justin: "it looks terrible"): a reading measure, the name set apart, the count and
+       caret tied to the sentence's end, the kind named in a tag rather than carried by colour alone, the history clause
+       on its own line as a separate thing, and a hairline between reps. */
+    var kindTag = (L.kind === 'strength') ? 'Strength' : (L.kind === 'pattern') ? 'Pattern' : '';
+    var dash = String(text).indexOf(' \u2014 ');
+    var nameHtml = dash > 0 ? '<span class="rep-line-name">' + text.slice(0, dash) + '</span>' + text.slice(dash) : text;
+    var clauseHtml = '';
+    if (L.history_clause && (L.kind === 'pattern' || L.kind === 'strength')) { nameHtml = nameHtml.replace(/ <span class="rep-line-history">[\s\S]*<\/span>$/, ''); clauseHtml = '<span class="rep-line-history">' + escapeHtml(L.history_clause) + '</span>'; }
+    return '<div class="rep-line-row' + (open ? ' open' : '') + (L.kind === 'strength' ? ' strength' : '') + '" data-rep="' + escapeHtml(rep.user_id || '') + '">'
       + '<button type="button" class="rep-line-head" aria-expanded="' + (open ? 'true' : 'false') + '" onclick="toggleRepLine(this.parentNode.getAttribute(\'data-rep\'))">'
-        + '<span class="rep-line-text' + (quiet ? ' quiet' : '') + (L.kind === 'strength' ? ' strength' : '') + '">' + text + '</span>'
-        + '<span class="missed-pair-rep-count">' + items.length + '</span>'
-        + '<span class="rep-line-caret" aria-hidden="true">\u25be</span>'
+        + (kindTag ? '<span class="rep-line-kind">' + kindTag + '</span>' : '')
+        + '<span class="rep-line-text' + (quiet ? ' quiet' : '') + '">' + nameHtml
+          + '<span class="rep-line-meta"><span class="missed-pair-rep-count">' + items.length + '</span><span class="rep-line-caret" aria-hidden="true">\u25be</span></span>'
+        + '</span>'
+        + clauseHtml
       + '</button>'
       + '<div class="rep-line-body"' + (open ? '' : ' hidden') + '>' + (items.length ? body : '') + '</div>'
     + '</div>';
@@ -16184,7 +16201,7 @@
     if (state.account === null && !state.accountLoading) loadAccount();
     var a = state.account;
     if (!a) { content.innerHTML = '<div class="section fade-in">' + laneWaitHtml('account', 'Loading your account\u2026', null, 160) + '</div>'; return; }
-    if (a._error) { content.innerHTML = '<div class="section fade-in"><div class="error">Could not load account: ' + escapeHtml(a._error) + '</div></div>'; return; }
+    if (a._error) { content.innerHTML = '<div class="section fade-in"><div class="error">' + laneFailureCopy('your account') + '</div></div>'; return; }
 
     var managedNotice = '<div class="acct-notice">Your account is managed by your admin — ask them to make changes.</div>';
 

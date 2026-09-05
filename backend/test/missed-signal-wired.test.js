@@ -193,8 +193,8 @@ test('⚠ H726 — the panel renderer, executed: every kind labelled in plain wo
   /* a pair's block IS its consequence (the gap line and the disqualification end) — the item adds no second line, which would say it twice */
   assert.ok(/36 min later/.test(html) && /even 20 grand/.test(html) && /The call closed\./.test(html), 'the consequence, in code');
   assert.strictEqual((html.match(/36 min later/g) || []).length, 1, 'said once');
-  assert.ok(/Mia — no qualifying moments across 3 calls\./.test(html), 'zero is a measurement (H734: the sentence is the rep\'s row)');
-  assert.ok(/Noor — no counted calls in this window\./.test(html), 'no calls is a different fact from calls with nothing qualifying');
+  assert.ok(/Mia<\/span> — no qualifying moments across 3 calls\./.test(html), 'zero is a measurement (H734: the sentence is the rep\'s row)');
+  assert.ok(/Noor<\/span> — no counted calls in this window\./.test(html), 'no calls is a different fact from calls with nothing qualifying');
   assert.ok(/openCallReview\('c2', 'A'\)/.test(html), 'Open names the owner');
   assert.ok(!/foreshadow|caused|led to|because/.test(html));
   assert.ok(!/earned_signal|missed_signal_pair|objection_unhandled|closer_response|gap_seconds/.test(html.replace(/coach-item|missed-pair/g, '')), 'no field names for a customer');

@@ -121,6 +121,6 @@ test('⚠⚠ THE COACHING PASS, EXECUTED: the prompt carries the record for this
 test('the page appends the clause after the line, never builds one itself', () => {
   const fs = require('fs'); const path = require('path'); const { stripComments } = require('./helpers/strip-comments');
   const LIVE = stripComments(fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));
-  assert.ok(/L\.history_clause \? ' <span class="rep-line-history">' \+ escapeHtml\(L\.history_clause\)/.test(LIVE));
+  assert.ok(/clauseHtml = '<span class="rep-line-history">' \+ escapeHtml\(L\.history_clause\) \+ '<\/span>'/.test(LIVE), 'H737: the clause is its own line below the sentence');
   assert.ok(!/coached this on/.test(LIVE), 'the clause text lives in one place: the lib');
 });

@@ -27,18 +27,23 @@ async function warmWhenDrained(admin, deps) {
       console.log('[team-warm] deferred — ' + n + ' analysis claim(s) still live; the last loop to finish will warm');
       return { skipped: 'draining', live: n };
     }
+    /* H737 — the coaching retry sweep rides here: the one place that already runs only when no claim is live. */
+    var retry = deps.retryCoaching || require('./analysis-worker').retryPendingCoaching;
+    var retried = null;
+    try { retried = await retry(admin, { now: now, staleMs: staleMs }); }
+    catch (rErr) { console.warn('[coaching-retry] sweep failed: ' + ((rErr && rErr.message) || 'unknown')); }
     var profs = await admin.from('user_profiles').select('user_id, managed_by');
     if (profs.error) throw new Error('user_profiles: ' + profs.error.message);
     var managers = membersByManager(profs.data || []);
     if (Object.keys(managers).length === 0) {
       console.log('[team-warm] nothing to warm — no manager has reps');
-      return { skipped: 'no_managers' };
+      return { skipped: 'no_managers', coaching_retry: retried };
     }
     var emailMap = {};
     try { emailMap = await emailMapFor(admin); }
     catch (e) { console.warn('[team-warm] emailMap failed (names degrade): ' + (e.message || 'unknown')); }
     var summary = await warm(admin, { managers: managers, emailMap: emailMap });
-    return { summary: summary };
+    return { summary: summary, coaching_retry: retried };
   } catch (err) {
     var bug = (err instanceof ReferenceError) || (err instanceof TypeError);
     console.error('[team-warm] after-drain ' + (bug ? 'BUG' : 'failed') + ': ' + (err.message || 'unknown'));
