@@ -2435,7 +2435,7 @@ async function coachCallMoments(admin, fathomCallId, outcome, later, objectionNo
   var raw = reply.content.map(function (c) { return c.text || ''; }).join('');
   var parsed = extractFirstJsonArray(stripCodeFences(raw));
   if (!Array.isArray(parsed)) return { selected: moments.length, written: 0, skipped: 'unparseable' };
-  parsed = coachingLib.enforceHardRules(parsed);   // H732: the two hard rules, in code, on the written text
+  parsed = coachingLib.enforceHardRules(parsed, { hasDq: coachingLib.hasDqMoment(res.data || []) });   // H732: the two hard rules, in code, on the written text
 
   var written = 0;
   for (var k = 0; k < parsed.length; k++) {

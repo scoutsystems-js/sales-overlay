@@ -324,17 +324,23 @@ function toMoment(h) {
 
 /* H732 — the two hard rules on the WRITTEN text: an entry that coaches a rep out of isolating, or frames a moment as a lost
    deal or failed close, is dropped and logged. A pattern check: it catches the shapes seen so far, not every phrasing. */
-function enforceHardRules(entries) {
+// H732 — the two hard rules, in code, on the written text. The isolation rule applies to every call. The loss rule
+// applies only to a call that carries a disqualification (`opts.hasDq`): on a call with none, "you lost the deal" is an
+// honest sentence and dropping it would make the lane say less than it knows.
+function enforceHardRules(entries, opts) {
+  var hasDq = !!(opts && opts.hasDq);
   return (Array.isArray(entries) ? entries : []).filter(function (e) {
     var t = e && e.coaching;
     if (doctrineLib.violatesIsolation(t)) { console.warn('[coaching] dropped (coaches out of isolating): ' + String(t).slice(0, 120)); return false; }
-    if (doctrineLib.framesDqAsLoss(t)) { console.warn('[coaching] dropped (frames a disqualification as a loss): ' + String(t).slice(0, 120)); return false; }
+    if (hasDq && doctrineLib.framesDqAsLoss(t)) { console.warn('[coaching] dropped (frames a disqualification as a loss): ' + String(t).slice(0, 120)); return false; }
     return true;
   });
 }
+function hasDqMoment(rows) { return (Array.isArray(rows) ? rows : []).some(doctrineLib.isDqMoment); }
 
 module.exports = {
   enforceHardRules:      enforceHardRules,
+  hasDqMoment:           hasDqMoment,
   CLAUDE_COACHING_MODEL: CLAUDE_COACHING_MODEL,
   COACHING_MAX_TOKENS:   COACHING_MAX_TOKENS,
   COACHABLE_TYPES:       COACHABLE_TYPES,

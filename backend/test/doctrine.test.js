@@ -53,7 +53,12 @@ test('⚠⚠ HARD RULE 2 in code: a disqualification is never coached as a lost 
   assert.deepStrictEqual(coaching.selectCoachableMoments(rows).map((h) => h.id), ['c', 'd'], 'the DQ and the DQ-classed objection are never coached');
   assert.ok(D.framesDqAsLoss('You lost the deal when you let the price sit.') && D.framesDqAsLoss('A failed close: the money was never there.'));
   assert.ok(!D.framesDqAsLoss('This was a financial disqualification — the miss was in discovery, on qualification.'));
-  assert.deepStrictEqual(coaching.enforceHardRules([{ moment: 1, coaching: 'You lost the deal here.' }, { moment: 2, coaching: 'Ask about savings before the pitch.' }]).map((e) => e.moment), [2]);
+  const lossEntries = [{ moment: 1, coaching: 'You lost the deal here.' }, { moment: 2, coaching: 'Ask about savings before the pitch.' }];
+  assert.deepStrictEqual(coaching.enforceHardRules(lossEntries, { hasDq: true }).map((e) => e.moment), [2], 'on a call with a disqualification the loss framing is dropped');
+  assert.deepStrictEqual(coaching.enforceHardRules(lossEntries, { hasDq: false }).map((e) => e.moment), [1, 2], 'on a call with none, "lost the deal" is an honest sentence and stays');
+  assert.ok(coaching.hasDqMoment(rows) && !coaching.hasDqMoment(rows.filter((h) => h.id === 'c' || h.id === 'd')), 'hasDqMoment reads the call\'s highlights by the one DQ predicate');
+  const wsrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
+  assert.ok(/enforceHardRules\(parsed, \{ hasDq: coachingLib\.hasDqMoment\(res\.data \|\| \[\]\) \}\)/.test(wsrc), 'the worker passes the call\'s DQ state to the loss rule');
 });
 
 test('doctrine is method, not material: the retrieval carries it but never counts it; every lane prompt carries the block; no user-facing string names it', () => {
