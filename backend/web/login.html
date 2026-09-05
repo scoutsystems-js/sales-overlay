@@ -1374,11 +1374,18 @@
     var btn = document.getElementById('forgotBtn');
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
     try {
-      var res = await fetch('/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email }),
-      });
+      var res;
+      try {
+        res = await fetch('/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email }),
+        });
+      } catch (netErr) {
+        /* H739: a request that never arrived says so — before this it fell through to the outer catch's generic line */
+        err.textContent = 'Scout could not reach the server, so the reset link was not sent. Nothing was changed — check your connection and try again, and if it keeps happening tell your admin.';
+        err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Send reset link'; return;
+      }
       var body = null; try { body = await res.json(); } catch (e) {}
       if (res.status === 429) {
         err.textContent = (body && body.error) || 'Too many requests. Please wait a bit and try again.';
@@ -1395,7 +1402,7 @@
       sent.textContent = (body && body.message) || "If an account exists for that email, we've emailed a password reset link. Check your inbox (and spam).";
       sent.style.display = 'block';
     } catch (e2) {
-      err.textContent = 'Could not reach the server — please try again.';
+      err.textContent = 'Scout could not reach the server, so the reset link was not sent. Nothing was changed — check your connection and try again, and if it keeps happening tell your admin.';
       err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Send reset link';
     }
   }
@@ -1509,7 +1516,7 @@
       if (!redirected) showSignedInView(getSession());
 
     } catch (err) {
-      showError('Could not reach server. Check your connection.');
+      showError('Scout could not reach the server, so you were not signed in. Nothing was changed — check your connection and try again, and if it keeps happening tell your admin.');
       btn.disabled = false;
       btn.textContent = currentTab === 'login' ? 'Log In' : 'Create Account';
     }

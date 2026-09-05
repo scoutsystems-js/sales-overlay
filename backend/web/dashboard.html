@@ -6645,7 +6645,7 @@
       else { state.fathomStatus = { connected: false }; state.fathomNotice = null; }
       rerenderConnectionViews();
     } catch (err) {
-      window.alert('Could not reach the server.');
+      window.alert(networkFailureCopy('the disconnect'));
     }
   }
 
@@ -6777,7 +6777,7 @@
         noticeKind = 'error';
       }
     } catch (err) {
-      noticeText = 'Sync error: ' + (err && err.message || 'unknown');
+      noticeText = networkFailureCopy('the sync');
       noticeKind = 'error';
     }
     state.fathomNotice = { kind: noticeKind, text: noticeText };
@@ -6829,7 +6829,7 @@
         noticeKind = 'error';
       }
     } catch (err) {
-      noticeText = 'Sync error: ' + (err && err.message || 'unknown');
+      noticeText = networkFailureCopy('the sync');
       noticeKind = 'error';
     }
     state.zoomNotice = { kind: noticeKind, text: noticeText };
@@ -7262,7 +7262,7 @@
       supportAttach = { path: body.path, name: f.name };
       stateEl.textContent = 'Attached: ' + f.name;
     } catch (e) {
-      stateEl.textContent = 'Could not upload that image. You can still send the report.';
+      stateEl.textContent = networkFailureCopy('the image') + ' You can still send the report without it.';
       supportAttach = { error: 'network error during upload', name: f.name };
     }
   }
@@ -7313,7 +7313,7 @@
         + 'You can check this report and its status any time under <em>Your reports</em> on your Account page.</p>'
         + '<div class="support-actions"><button class="btn-fathom-primary" type="button" onclick="closeSupport()">Close</button></div>';
     } catch (e) {
-      err.innerHTML = 'Could not reach the server. You can email <a href="mailto:justin@scoutsystems.io">justin@scoutsystems.io</a>.';
+      err.innerHTML = escapeHtml(networkFailureCopy('your message')) + ' You can also email <a href="mailto:justin@scoutsystems.io">justin@scoutsystems.io</a>.';
       err.style.display = '';
       btn.disabled = false; btn.textContent = 'Send';
     }
@@ -7551,7 +7551,7 @@
         return;
       }
     } catch (err) {
-      state.fathomNotice = { kind: 'error', text: 'Could not save email: ' + (err && err.message || 'unknown') };
+      state.fathomNotice = { kind: 'error', text: networkFailureCopy('the email') };
       state.fathomIdentitySaving = false;
       rerenderConnectionViews();
       return;
@@ -12995,6 +12995,21 @@
   }
   /* H737 — A FAILURE IS WRITTEN FOR THE PERSON READING IT: what happened and what to do. Never a status code, never a
      mechanism. "HTTP 500" on the recommendations panel taught a manager nothing and gave them nothing to do. */
+  /* H739 — A BUTTON THAT FAILS QUIET IS A CLOSER BELIEVING IT SAVED. The request that never arrived gets ONE sentence, the
+     same voice as the lanes': what happened (nothing was changed) and what to do. The server's own refusal keeps its own
+     sentence — it already says why. */
+  function networkFailureCopy(what) {
+    return 'Scout could not reach the server, so ' + what + ' was not saved. Nothing was changed \u2014 check your connection and try again, and if it keeps happening tell your admin.';
+  }
+  /* the server refused: its own sentence when it gave one, otherwise the same voice */
+  function serverRefusedCopy(serverError, what) {
+    return serverError || ('Scout could not save ' + what + ' just now. Nothing was changed \u2014 try again in a minute, and if it keeps happening tell your admin.');
+  }
+  /* a thrown error at an action site is either the server's sentence (thrown above) or a request that never arrived */
+  function serverOrNetwork(err, what) {
+    var m = (err && err.message) ? String(err.message) : '';
+    return (m && !/^(TypeError|Failed to fetch|NetworkError|Load failed|fetch)/i.test(m) && !/^HTTP \d/.test(m)) ? m : networkFailureCopy(what);
+  }
   function laneFailureCopy(what) {
     return 'Scout could not load ' + what + ' just now. Nothing is wrong with your calls or your data \u2014 try again in a minute, and if it keeps happening tell your admin.';
   }
@@ -14704,7 +14719,8 @@
 
   // Re-fetch users (+ team roster when membership changed) and re-render.
   async function refreshMembers(rosterChanged) {
-    try { await loadUsers(); } catch (e) {}
+    /* H739: the action itself already reported; a refresh that fails left the list STALE with no word — the one empty catch judged "should be loud". */
+    try { await loadUsers(); } catch (e) { window.alert('Saved. The list could not refresh just now \u2014 reload the page to see the change.'); }
     if (rosterChanged) { state.teamOverview = null; if (state.view === 'team-members') loadTeam('overview'); }
     if (state.view === 'team-members') renderTeamMembersView();
   }
@@ -15925,7 +15941,7 @@
       note.textContent = '✓ Saved'; note.style.color = 'var(--good)';
       if (state.account) { state.account.first_name = body.first_name; state.account.last_name = body.last_name; }
       setTimeout(function () { if (note) note.textContent = ''; }, 3000);
-    } catch (e) { note.textContent = 'Could not reach server'; note.style.color = 'var(--bad)'; }
+    } catch (e) { note.textContent = networkFailureCopy('the new password'); note.style.color = 'var(--bad)'; }
   }
 
   async function changePassword() {
@@ -15950,7 +15966,7 @@
       document.getElementById('pwNew').value = '';
       document.getElementById('pwNew2').value = '';
       setTimeout(function () { if (note) note.textContent = ''; }, 4000);
-    } catch (e) { note.textContent = 'Could not reach server'; }
+    } catch (e) { note.textContent = networkFailureCopy('the new password'); }
   }
 
   function acctRow(label, inner) {
@@ -16092,7 +16108,7 @@
         noticeKind = 'error';
       }
     } catch (err) {
-      noticeText = 'History sync error: ' + ((err && err.message) || 'unknown');
+      noticeText = networkFailureCopy('the history sync');
       noticeKind = 'error';
     }
     state.fathomNotice = { kind: noticeKind, text: noticeText };
@@ -16205,7 +16221,7 @@
       if (!res.ok) { var e; try { e = await res.json(); } catch (x) { e = {}; } if (msg) msg.textContent = e.error || 'Could not save.'; return; }
       if (msg) msg.textContent = 'Saved.';
       state.account = null;
-    } catch (err) { if (msg) msg.textContent = 'Could not reach the server.'; }
+    } catch (err) { if (msg) msg.textContent = networkFailureCopy('the change'); }
   }
 
   async function saveAccountPrice() {
@@ -16233,7 +16249,7 @@
       }
       if (msg) msg.textContent = 'Saved.';
       state.account = null;
-    } catch (err) { if (msg) msg.textContent = 'Could not reach the server.'; }
+    } catch (err) { if (msg) msg.textContent = networkFailureCopy('the change'); }
   }
 
   /**
@@ -16885,7 +16901,7 @@
         headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
         body: JSON.stringify({ from_id: fromId, into_id: intoId }),
       });
-    } catch (err) { window.alert('Could not reach server: ' + err.message); return; }
+    } catch (err) { window.alert(networkFailureCopy('this change')); return; }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
     if (!res.ok) {
       var e; try { e = await res.json(); } catch (x) { e = { error: 'HTTP ' + res.status }; }
@@ -16969,7 +16985,7 @@
     try {
       res = await fetch('/kb/list', { headers: authHeader() });
     } catch (err) {
-      container.innerHTML = '<div class="msg-error">Could not reach server.</div>';
+      container.innerHTML = '<div class="msg-error">' + laneFailureCopy('this') + '</div>';
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
@@ -17376,7 +17392,7 @@
    *       headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
    *       body: JSON.stringify({ fathom_call_id: cid, highlight_id: hid }),
    *     });
-   *   } catch (err) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not reach server: ' + err.message); return; }
+   *   } catch (err) { btn.disabled = false; btn.textContent = '+ Save'; window.alert(networkFailureCopy('this change')); return; }
    *   if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
    *   if (!res.ok) { btn.disabled = false; btn.textContent = '+ Save'; window.alert('Could not save that moment'); return; }
    *   btn.outerHTML = '<span class="sec-saved">saved</span>';
@@ -17496,7 +17512,7 @@
         body: JSON.stringify({ scope: targetScope }),
       });
     } catch (err) {
-      window.alert('Could not reach server: ' + err.message);
+      window.alert(networkFailureCopy('this change'));
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
@@ -17521,7 +17537,7 @@
         headers: authHeader(),
       });
     } catch (err) {
-      window.alert('Could not reach server: ' + err.message);
+      window.alert(networkFailureCopy('this change'));
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
@@ -17633,7 +17649,7 @@
         body: fd,
       });
     } catch (err) {
-      setKbStatus('Could not reach server: ' + err.message, 'error');
+      setKbStatus(networkFailureCopy('the upload'), 'error');
       if (submit) { submit.disabled = false; submit.textContent = 'Add to Knowledge Base'; }
       return;
     }
@@ -17683,7 +17699,7 @@
     try {
       res = await fetch('/kb/entries/' + encodeURIComponent(sourceLabel), { headers: authHeader() });
     } catch (err) {
-      panel.innerHTML = '<div class="kb-pattern-empty">Could not reach server.</div>';
+      panel.innerHTML = '<div class="kb-pattern-empty">' + laneFailureCopy('these entries') + '</div>';
       return;
     }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
@@ -18544,7 +18560,7 @@
       if (decision === 'confirm') await loadCallLibrary(0);
     } catch (err) {
       if (row) row.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
-      await scoutConfirm({ title: 'Could not save', body: String((err && err.message) || err), confirmText: 'OK' });
+      await scoutConfirm({ title: 'Could not save', body: serverOrNetwork(err, 'the change'), confirmText: 'OK' });
     }
   }
   function renderCallLibraryHeaderHtml() {
@@ -18735,7 +18751,7 @@
       else if (state.view === 'call-review') { state.callReview = null; loadCallReview(state.selectedCallId); }
       state.analytics2 = null; state.needsWork = null; // stale after an outcome change
       if (state.view === 'overview') reloadAll();
-    } catch (err) { alert('Could not update outcome: ' + (err.message || 'unknown')); }
+    } catch (err) { alert(networkFailureCopy('the outcome')); }
   }
 
   function callLibraryCardHtml(c) {
@@ -18962,7 +18978,7 @@
    *     });
    *   } catch (err) {
    *     if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
-   *     window.alert('Could not reach server: ' + err.message);
+   *     window.alert(networkFailureCopy('this change'));
    *     return;
    *   }
    *   if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
@@ -19421,7 +19437,7 @@
       state.callLibraryCache = null;
       if (from === 'list') await loadCallLibrary(0); else await openCallReview(callId);
     } catch (err) {
-      await scoutConfirm({ title: 'Could not rename', body: String((err && err.message) || err), confirmText: 'OK' });
+      await scoutConfirm({ title: 'Could not rename', body: serverOrNetwork(err, 'the name'), confirmText: 'OK' });
     }
   }
   /* ⚠⚠ THE CALL TYPE IS A TAG, NOT A BUTTON (Justin, 2026-09-03, H709): a tag reads as a
@@ -19454,13 +19470,13 @@
         await scoutConfirm({ title: 'Not allowed', body: 'You are not allowed to mark this call.', confirmText: 'OK' });
         return;
       }
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) { var eb = null; try { eb = await res.json(); } catch (e) {} throw new Error(serverRefusedCopy((eb && eb.error) || null, 'the call type')); }
       state.callReviewCache = {};
       state.callLibraryCache = null;
       if (from === 'list') { if (sel) sel.disabled = false; await loadCallLibrary(0); } else { await openCallReview(callId); }
     } catch (err) {
       if (sel) sel.disabled = false;
-      await scoutConfirm({ title: 'Could not save', body: String((err && err.message) || err), confirmText: 'OK' });
+      await scoutConfirm({ title: 'Could not save', body: serverOrNetwork(err, 'the change'), confirmText: 'OK' });
     }
   }
   function notSalesBtnHtml(callId, isMarked) {
@@ -19490,7 +19506,7 @@
         alert('You are not allowed to mark this call.');
         return;
       }
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) { var eb = null; try { eb = await res.json(); } catch (e) {} throw new Error(serverRefusedCopy((eb && eb.error) || null, 'the mark')); }
       /* Re-analysis is fire-and-forget server-side; the mark itself is already
          durable, so reload the review from the server rather than guessing. */
       state.callReview = null;
@@ -19498,7 +19514,7 @@
       state.calls = null;
     } catch (e) {
       if (btn) { btn.disabled = false; btn.textContent = next ? 'Not a sales call' : '↩ Count this call'; }
-      alert('Could not update this call: ' + (e && e.message ? e.message : 'unknown'));
+      alert(serverOrNetwork(e, 'the mark'));
     }
   }
 
@@ -19661,7 +19677,7 @@
          manager at the moment they submit it — never stored, never silently dropped. */
       if (!r1.ok && first && first.refused) { await scoutConfirm({ title: 'Scout can\u2019t keep this note', body: first.error, confirmText: 'OK', cancelText: 'Close' }); reset(); return; }
       if (!r1.ok) { alert((first && first.error) || 'Could not read that.'); reset(); return; }
-    } catch (err) { alert('Could not reach the server.'); reset(); return; }
+    } catch (err) { alert(networkFailureCopy('your note')); reset(); return; }
     var failed = !first || first.extraction_failed || !first.concept;
     /* H733: the entry of Scout's method the note speaks to — shown, so the attachment is never implicit. */
     var speaksTo = (first && Array.isArray(first.doctrine) && first.doctrine.length) ? first.doctrine.map(function (d) { return d.title; }).join(' · ') : '';
@@ -19686,7 +19702,7 @@
       if (!r2.ok) { alert((d && d.error) || 'Could not save that note.'); reset(); return; }
       state.notedHighlightIds[highlightId] = true;
       if (btn) { btn.className = 'review-kb-btn is-saved'; btn.textContent = d && d.duplicate ? 'Already noted \u2713' : 'Noted \u2713'; btn.title = 'Your team has a coaching note from this moment'; }
-    } catch (err) { alert('Could not reach the server.'); reset(); }
+    } catch (err) { alert(networkFailureCopy('your note')); reset(); }
   }
   async function loadSavedMoments(callId) {
     try {
@@ -19747,7 +19763,7 @@
       state.savedMomentIds[highlightId] = true;
       if (btn) { btn.className = 'review-kb-btn is-saved'; btn.textContent = 'In KB ✓'; btn.title = 'Already in the knowledge base'; }
     } catch (err) {
-      alert('Could not reach the server.');
+      alert(networkFailureCopy('the moment'));
       if (btn) { btn.disabled = false; btn.textContent = '+ Add to KB'; }
     }
   }
@@ -20224,7 +20240,7 @@
         body: JSON.stringify({ not_a_sales_call: next }),
       });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      if (!res.ok) throw new Error(res.status === 403 ? 'You are not allowed to mark this call.' : ('HTTP ' + res.status));
+      if (!res.ok) { var eb2 = null; try { eb2 = await res.json(); } catch (e) {} throw new Error(res.status === 403 ? 'You are not allowed to mark this call.' : serverRefusedCopy((eb2 && eb2.error) || null, 'the mark')); }
       var body = await res.json();
       var marked = body.not_a_sales_call === true;   // ⚠ the SERVER's answer, not the requested value
       if (card) card.classList.toggle('is-not-sales', marked);
@@ -20249,7 +20265,7 @@
       state.calls = null;   // the next library load comes from the server
     } catch (e) {
       if (btn) { btn.disabled = false; btn.textContent = next ? 'NON SALES CALL' : 'COUNT THIS CALL'; }
-      alert('Could not update this call: ' + (e && e.message ? e.message : 'unknown'));
+      alert(serverOrNetwork(e, 'the mark'));
     }
   }
 
