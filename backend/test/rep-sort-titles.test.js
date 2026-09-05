@@ -27,14 +27,16 @@ test('closing, worst first (the default): measured reps ascending, the unmeasure
   const sortReps = sorter(state);
   assert.deepStrictEqual(sortReps(REPS).map((r) => r.display_name), ['A', 'C', 'B', 'Z']);
   state.repSortDir = 'best';
-  assert.deepStrictEqual(sortReps(REPS, null, 'best').map((r) => r.display_name), ['B', 'C', 'A', 'Z']);
+  assert.deepStrictEqual(sortReps(REPS).map((r) => r.display_name), ['B', 'C', 'A', 'Z'], 'the direction comes from STATE when the section passes none — the live flip defect');
+  assert.deepStrictEqual(sortReps(REPS, null, 'worst').map((r) => r.display_name), ['A', 'C', 'B', 'Z'], 'an explicit argument still wins');
 });
 
 test('⚠ call time sorts by distance from the band from the WIRE: 60 (15 out) is worse than 25 (10 out); 40 is inside and best', () => {
   const state = { teamOverview: { bands: { avg_call_time: { good: [35, 45] } } }, repSortKey: 'time', repSortDir: 'worst' };
   const sortReps = sorter(state);
   assert.deepStrictEqual(sortReps(REPS).map((r) => r.display_name), ['A', 'C', 'B', 'Z'], 'furthest from the band first');
-  assert.deepStrictEqual(sortReps(REPS, null, 'best').map((r) => r.display_name), ['B', 'C', 'A', 'Z']);
+  state.repSortDir = 'best';
+  assert.deepStrictEqual(sortReps(REPS).map((r) => r.display_name), ['B', 'C', 'A', 'Z']);
   const noBand = sorter({ teamOverview: { bands: {} }, repSortKey: 'time', repSortDir: 'worst' });
   assert.deepStrictEqual(noBand(REPS).map((r) => r.display_name), ['A', 'B', 'C', 'Z'], 'no band on the wire: nothing is measured, names only');
 });

@@ -15046,7 +15046,9 @@
   function repSortMetric() { return REP_SORT_METRICS.filter(function (m) { return m.key === state.repSortKey; })[0] || REP_SORT_METRICS[0]; }
   function sortReps(reps, metric, dir) {
     if (!Array.isArray(reps)) return [];
-    var m = metric || repSortMetric(); var worstFirst = dir !== 'best';
+    /* ⚠ the direction comes from STATE when the caller passes none — found live: the flip changed nothing
+       because the section calls sortReps(reps) and this read only the argument. */
+    var m = metric || repSortMetric(); var worstFirst = (dir || state.repSortDir) !== 'best';
     return reps.slice().sort(function (a, b) {
       var av = m.value(a), bv = m.value(b);
       var am = av !== null, bm = bv !== null;
