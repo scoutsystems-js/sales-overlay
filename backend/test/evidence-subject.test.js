@@ -51,7 +51,7 @@ test('⚠⚠ resolveInsights, EXECUTED: the quote is dropped and the claim and i
 test('⚠ the lane asks for the subject, tags each candidate with its category and section, and moved its version', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
   assert.ok(/"subject":\s*\{"kind"/.test(src), 'the JSON shape declares a subject');
-  assert.ok(/objection_category, section/.test(src) || /objection_category,\s*section/.test(src), 'category and section are SELECTED');
+  assert.ok(/objection_category, objection_class, section/.test(src), 'category, class and section are SELECTED (H733: class marks a DQ-classed objection)');
   assert.ok(/RECS_LANE_VERSION = 'v(9|1\d)-/.test(src), 'v9+ — a payload change bumps the lane inside its cache key');
   assert.ok(/evidenceSubjectMismatch\(/.test(src.replace(/function evidenceSubjectMismatch\(/, '')), 'the check is CALLED');
 });
@@ -85,7 +85,7 @@ test('⚠⚠ H728 step 1 — the PERFORMANCE lane carries the same subject check
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'performance-synthesis.js'), 'utf8');
   assert.ok(/hlRows\.filter\(candidateEligible\)\.map\(/.test(src), 'candidates pass the bar');
   assert.ok(/"subject":\s*\{"kind"/.test(src), 'the prompt asks for the subject');
-  assert.ok(/objection_category, section, speaker, speaker_verified, resolution, handling, cause/.test(src), 'the fields the checks read are SELECTED');
+  assert.ok(/objection_category, objection_class, section, speaker, speaker_verified, resolution, handling, cause/.test(src), 'the fields the checks read are SELECTED');
   const out = perf._resolveInsights([
     { claim: 'Closes confirmed payment on calls where prospects arrived with real doubt.', data: 'd', evidence_id: 'm1', subject: { kind: 'buying_signal' } },
     { claim: 'Handles the partner objection cleanly.', data: 'd', evidence_id: 'm2', subject: { kind: 'objection', category: 'partner' } },

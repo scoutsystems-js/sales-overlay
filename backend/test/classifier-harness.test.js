@@ -72,7 +72,7 @@ test('⚠⚠ NOTHING AUTO-MARKS: the worker stores the verdict beside the call a
   const lines = src.split('\n').filter((l) => /sales_call_verdict|salesCallVerdict/.test(l));
   assert.ok(lines.length >= 3);
   lines.forEach((l) => assert.ok(!/not_a_sales_call|fathom_calls/.test(l), 'the verdict never reaches fathom_calls: ' + l.trim()));
-  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v45-2026-09-05'/.test(src), 'the field shipped with its version bump');
+  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v46-2026-09-05'/.test(src), 'the field shipped with its version bump');
   const W = require('../lib/analysis-worker');
   assert.deepStrictEqual(W._salesCallVerdict({ sales_call_verdict: 'Not_Sales', sales_call_reason_class: 'training_or_roleplay', sales_call_reason: ' a role-play ' }), { verdict: 'not_sales', reason_class: 'training_or_roleplay', reason: 'a role-play' });
   assert.strictEqual(W._salesCallVerdict({ sales_call_verdict: 'maybe' }).verdict, null, 'an unknown verdict is NULL, never a guess');

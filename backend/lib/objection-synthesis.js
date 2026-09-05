@@ -58,7 +58,7 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v3-2026-09-05-doctrine';   /* v3 (H732): Scout's doctrine in the prompt as a constraint. Was v2-2026-09-05-kb-material */ //   // H731: the knowledge base before the advice; no generic fallback. v1 was the unversioned original.
+var SYNTH_PROMPT_VERSION = 'v4-2026-09-05-layered';   /* v4 (H733): notes under their entries; the loss rule in code. Was v3-2026-09-05-doctrine */ //   /* v3 (H732): Scout's doctrine in the prompt as a constraint. Was v2-2026-09-05-kb-material */ //   // H731: the knowledge base before the advice; no generic fallback. v1 was the unversioned original.
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
@@ -152,8 +152,10 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
 
   // 4) categorized objection highlights → per-category counts + handled examples.
   var rows = await inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, quote, objection_surface, objection_category, resolution, closer_response, closer_response_verified',
-    function(q) { return q.eq('type', 'objection'); });
+    'fathom_call_id, timestamp_seconds, quote, objection_surface, objection_category, resolution, closer_response, closer_response_verified, type, objection_class',
+    function(q) { return q.in('type', ['objection', 'disqualify_signal']); });
+  var lossScope = require('./doctrine').lossScope(done, rows);   // H733: which of this closer's calls carry a disqualification
+  rows = rows.filter(function (r) { return r.type === 'objection'; });
   var byCat = {};
   OBJECTION_CATEGORIES.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [] }; });
   rows.forEach(function(r) {
@@ -201,7 +203,11 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     var b = byCat[c], g = guide[c] || {};
     return {
       category: c, count: b.count, handled: b.handled, grounded: b.examples.length > 0,
-      isolate: str(g.isolate, 500), reframe: str(g.reframe, 500), overcome: str(g.overcome, 500),
+      /* H733: the loss rule in code — the guidance is unattributed prose, so it is dropped only when every loss
+         in this closer's window is a disqualification (then loss framing can only be about a DQ). */
+      isolate: require('./doctrine').enforceLossRule(str(g.isolate, 500), lossScope, null, 'objection-synthesis'),
+      reframe: require('./doctrine').enforceLossRule(str(g.reframe, 500), lossScope, null, 'objection-synthesis'),
+      overcome: require('./doctrine').enforceLossRule(str(g.overcome, 500), lossScope, null, 'objection-synthesis'),
       evidence: b.examples.slice(0, 2),
     };
   });

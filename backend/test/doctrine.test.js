@@ -58,7 +58,7 @@ test('⚠⚠ HARD RULE 2 in code: a disqualification is never coached as a lost 
   assert.deepStrictEqual(coaching.enforceHardRules(lossEntries, { hasDq: false }).map((e) => e.moment), [1, 2], 'on a call with none, "lost the deal" is an honest sentence and stays');
   assert.ok(coaching.hasDqMoment(rows) && !coaching.hasDqMoment(rows.filter((h) => h.id === 'c' || h.id === 'd')), 'hasDqMoment reads the call\'s highlights by the one DQ predicate');
   const wsrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
-  assert.ok(/enforceHardRules\(parsed, \{ hasDq: coachingLib\.hasDqMoment\(res\.data \|\| \[\]\) \}\)/.test(wsrc), 'the worker passes the call\'s DQ state to the loss rule');
+  assert.ok(/var callHasDq = coachingLib\.hasDqMoment\(res\.data \|\| \[\]\) \|\| outcome === 'disqualified';/.test(wsrc) && /enforceHardRules\(parsed, \{ hasDq: callHasDq \}\)/.test(wsrc) && /dq: callHasDq/.test(wsrc), 'the worker computes the call\'s DQ state once and hands it to the prompt and to the loss rule');
 });
 
 test('doctrine is method, not material: the retrieval carries it but never counts it; every lane prompt carries the block; no user-facing string names it', () => {

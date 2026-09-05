@@ -23,6 +23,7 @@
 
 const { isDisqualified } = require('./dq-exclusion');
 var { outcomeLabel } = require('./outcome-labels');   // H709: the ONE map
+var doctrineLib = require('./doctrine');   // H733
 const crypto = require('crypto');
 const { displayNameFromEmail } = require('./display-name');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -109,7 +110,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v9-2026-09-05-doctrine';   /* v9 (H732): Scout's doctrine in the prompt as a constraint. Was v8-2026-09-05-kb-material */ //   /* v8 (H731): the notes join the selling context through the one retrieval; nothing relevant → the prose says nothing. Was v7-2026-09-03-open-outcome */ //   // H709: the outcome word is Open; the prompt is handed the LABEL, never the machine word   // H706: a follow-up close reads as one in the call line
+var DIGEST_PROMPT_VERSION = 'v10-2026-09-05-layered';   /* v10 (H733): notes under their entries; a call carrying a DQ is presented as disqualified, never lost; the loss rule in code. Was v9-2026-09-05-doctrine */ //   /* v9 (H732): Scout's doctrine in the prompt as a constraint. Was v8-2026-09-05-kb-material */ //   /* v8 (H731): the notes join the selling context through the one retrieval; nothing relevant → the prose says nothing. Was v7-2026-09-03-open-outcome */ //   // H709: the outcome word is Open; the prompt is handed the LABEL, never the machine word   // H706: a follow-up close reads as one in the call line
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -194,6 +195,13 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     return (nameMap && nameMap[uid]) || (emailMap && emailMap[uid] ? displayNameFromEmail(emailMap[uid], 'rep') : 'rep');
   };
   var byOutcome = { closed: 0, follow_up: 0, lost: 0, no_show: 0 };
+  /* H733: the DQ moments are read BEFORE the call lines are written, so a call that carries a disqualification
+     is presented as disqualified, never as lost. The objection rows below come from the same read. */
+  var objectionsAll = await w.inChunks('call_highlights',
+    'fathom_call_id, timestamp_seconds, speaker, quote, observation, type, objection_category, objection_class, resolution',
+    function (q) { return q.in('type', ['objection', 'disqualify_signal']); });
+  var lossScope = doctrineLib.lossScope(analyses, objectionsAll);
+  objectionsAll = objectionsAll.filter(function (r) { return r.type === 'objection'; });
   var callLines = [];
   var analysisByCall = {};
   analyses.forEach(function (a) { analysisByCall[a.fathom_call_id] = a; });
@@ -202,15 +210,12 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     var a = analysisByCall[cid];
     if (a && a.outcome && byOutcome.hasOwnProperty(a.outcome)) byOutcome[a.outcome]++;
     callLines.push('- [' + cid + '] ' + repName(c.user_id) + ' — "' + (c.title || 'untitled') + '"'
-      + (a ? (' | outcome: ' + (a.outcome ? outcomeLabel(a.outcome) : 'unknown') + ((c && c.call_kind === 'follow_up' && a.outcome === 'closed') ? ' (follow-up close — counts on the booked call it follows)' : '') + ' | score: ' + (a.overall_score == null ? 'n/a' : a.overall_score)
+      + (a ? (' | outcome: ' + (a.outcome ? (lossScope.dqCalls[cid] ? 'Disqualified (the prospect could not buy — not a lost deal, not a failed close)' : outcomeLabel(a.outcome)) : 'unknown') + ((c && c.call_kind === 'follow_up' && a.outcome === 'closed') ? ' (follow-up close — counts on the booked call it follows)' : '') + ' | score: ' + (a.overall_score == null ? 'n/a' : a.overall_score)
         + (a.why_outcome ? ' | why: ' + str(a.why_outcome, 200) : '')
         + (a.one_thing ? ' | one_thing: ' + str(a.one_thing, 200) : ''))
         : ' | not yet analyzed'));
   });
 
-  var objectionsAll = await w.inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, speaker, quote, observation, type, objection_category, resolution',
-    function (q) { return q.eq('type', 'objection'); });
   /* ⚠ A DQ CALL'S OBJECTIONS DO NOT REACH THE DIGEST'S FIGURES. Its prospect was
      never closeable, so counting them would put a rate in front of a manager
      that marks a rep down for a call that could not be won. The call itself is
@@ -226,6 +231,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
      exactly this shape. */
   var dqDigest = {};
   (analyses || []).forEach(function (a2) { if (isDisqualified(a2)) dqDigest[a2.fathom_call_id] = 1; });
+  Object.keys(lossScope.dqCalls).forEach(function (id) { dqDigest[id] = 1; });   // H733: a call carrying a DQ moment leaves the figures too
   var objections = objectionsAll.filter(function (r) { return !dqDigest[r.fathom_call_id]; });
   var objLines = objections.slice(0, 20).map(function (h) {
     return '- [' + h.fathom_call_id + ' @' + h.timestamp_seconds + 's] ' + (h.objection_category || 'uncategorized')
@@ -332,6 +338,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
       var text = str(n && n.text, 400);
       if (!text) return;
       var c = n && w.meta[n.call_id] ? w.meta[n.call_id] : null;
+      if (doctrineLib.enforceLossRule(text, lossScope, c ? n.call_id : null, 'team-digest') === null) return;   // H733: the loss rule, in code
       var ts = (n && typeof n.timestamp_seconds === 'number' && n.timestamp_seconds >= 0) ? Math.floor(n.timestamp_seconds) : null;
       notable.push({
         text: text,
@@ -355,9 +362,11 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
       date: dateStr,
       quiet: false,
       stats: stats,
-      summary: str(parsed.summary, 1000),
+      /* H733: the day's prose is unattributed, so the loss rule fires only when every loss of the day is a
+         disqualification — then loss framing can only be about a DQ, and the sentence is dropped (null). */
+      summary: doctrineLib.enforceLossRule(str(parsed.summary, 1000), lossScope, null, 'team-digest'),
       notable: notable,
-      focus: str(parsed.focus, 600) || 'Review yesterday’s calls with the team.',
+      focus: doctrineLib.enforceLossRule(str(parsed.focus, 600) || 'Review yesterday’s calls with the team.', lossScope, null, 'team-digest'),
       generated_at: new Date().toISOString(),
     };
   } catch (e) {

@@ -97,6 +97,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     totals: emptyCounts(), instance_count: 0, truncated: false,
     strict: true, strict_reason: null, excluded: { disqualifications: 0, logistical: 0 },
     bucket_rates: [],
+    loss_scope_by_user: {},   // H733
     real_call_owners: [],
     board_size: boardSize, analysis_fingerprint: EMPTY_FINGERPRINT,
     category_totals: (function () {
@@ -177,6 +178,18 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
      marking a call DQ drops it out and the hash changes — the same property the
      not_a_sales_call note below relies on. A lane computing its own hash would
      go on serving a paragraph built on a call the manager had just excluded. */
+  /* H733 — THE LOSS SCOPE PER CLOSER, for the summary lane's code-level loss rule: which of each closer's calls
+     carry a disqualification (a DQ moment, or the manual outcome) and which were lost. Read over the FULL call
+     list, before the manual-DQ removal below; it feeds NO rate — the objection figures are untouched. */
+  var dqMomentRows = await inChunks('call_highlights', 'fathom_call_id, type, objection_class', function (q) { return q.eq('type', 'disqualify_signal'); });
+  var lossScopeByUser = (function () {
+    var byUser = {};
+    function bucket(uid) { if (!byUser[uid]) byUser[uid] = { analyses: [], highlights: [] }; return byUser[uid]; }
+    doneAll.forEach(function (d) { var m = meta[d.fathom_call_id]; if (m && m.user_id) bucket(m.user_id).analyses.push(d); });
+    dqMomentRows.forEach(function (h) { var m = meta[h.fathom_call_id]; if (m && m.user_id) bucket(m.user_id).highlights.push(h); });
+    var out = {}; Object.keys(byUser).forEach(function (uid) { out[uid] = require('./doctrine').lossScope(byUser[uid].analyses, byUser[uid].highlights); });
+    return out;
+  })();
   var dqIds = {};
   doneAll.forEach(function (d) { if (isDisqualified(d)) dqIds[d.fathom_call_id] = 1; });
   var done = doneAll.filter(function (d) { return !dqIds[d.fathom_call_id]; });
@@ -203,6 +216,8 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
     'closer_response, timestamp_seconds, speaker_verified, closer_response_verified',
     function (q) { return q.eq('type', 'objection'); }
   );
+  /* H733: an objection the extractor classed as a disqualification marks its call disqualified in the loss scope too. */
+  rows.forEach(function (r) { if (r.objection_class === 'disqualification') { var m = meta[r.fathom_call_id]; if (m && m.user_id && lossScopeByUser[m.user_id]) { lossScopeByUser[m.user_id].dqCalls[r.fathom_call_id] = 1; lossScopeByUser[m.user_id].hasDq = true; var sc = lossScopeByUser[m.user_id]; sc.allLossesAreDq = Object.keys(sc.lostCalls).every(function (id) { return sc.dqCalls[id]; }); } } });
 
   /* ── 3b) THE STRICT STANDARD ────────────────────────────────────────────
      Classify the distinct surface phrases into true_objection /
@@ -488,6 +503,7 @@ async function computeTeamObjections(admin, memberIds, from, to, opts) {
        ⚠ It is derived from `calls`, which has ALREADY had the synthetic and
        not_a_sales_call filters applied — so a demo account has no real calls and
        is excluded BY CONSTRUCTION rather than by a second rule that could drift. */
+    loss_scope_by_user: lossScopeByUser,   // H733
     real_call_owners: (function () {
       var seen = {}, out = [];
       calls.forEach(function (c) { if (c && c.user_id && !seen[c.user_id]) { seen[c.user_id] = 1; out.push(c.user_id); } });

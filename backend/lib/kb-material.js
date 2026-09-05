@@ -52,7 +52,7 @@ async function loadKbMaterial(admin, opts) {
     notes: notes || { rows: [], text: '', hash: 'none' },
     hasMaterial: hasContext || hasNotes,
     doctrine: doctrine,
-    doctrineBlock: function (lane) { return doctrineLib.doctrineBlock(doctrine, lane); },
+    doctrineBlock: function (lane) { return doctrineLib.doctrineBlock(doctrine, lane, (notes && notes.rows) || []); },   // H733: attached notes ride under their entries
     kbHash: (selling.kbHash || 'none') + '|notes:' + ((notes && notes.hash) || 'none') + '|doctrine:' + doctrine.hash,
     sources: selling.sources || [],
     teamKey: teamKey,

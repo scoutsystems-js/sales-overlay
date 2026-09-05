@@ -79,12 +79,19 @@ function buildCoachingPrompt(moments, opts) {
   var kb = (o.teamReasoning || '').trim();
   var notes = (o.managerNotes || '').trim();
   var outcome = o.outcome || 'unknown';
+  /* H733 — A DISQUALIFIED PROSPECT IS NEVER A LOST DEAL. On a call that carries a disqualification (`o.dq`), the
+     lane is TOLD the prospect was disqualified, never that the call was lost — the stored outcome is untouched;
+     this is what the coaching reads. The opening line, the cost clause and the drop after the parse all follow. */
+  var dq = !!o.dq;
+  var advised = doctrineLib.outcomeForAdvice(outcome, dq);
 
   return [
     'You are coaching a high-ticket closer on moments from their own sales call.',
     'You are their sales manager. You have watched the call.',
     '',
-    'Call outcome: ' + outcomeLabel(outcome) + '.',   /* H709: the label (Open), never the machine word */
+    dq
+      ? 'Call outcome: the prospect was DISQUALIFIED — they stated a reason the offer does not apply, or the money genuinely was not there. This is NOT a lost deal and NOT a failed close: there was no deal to lose. Never open with, or frame this call as, a loss; if there was a miss it is upstream, in qualification, and that is what you coach.'
+      : 'Call outcome: ' + outcomeLabel(advised) + '.',   /* H709: the label (Open), never the machine word */
     (o.later ? 'What happened on the call overall: ' + o.later : ''),
     /* ⚠ How objection handling went ACROSS the call — Justin: "the context behind
        what was said is vital". It is the grader's own objection_notes, so it is
@@ -258,7 +265,11 @@ function buildCoachingPrompt(moments, opts) {
     '   the objection" with no substance is WORSE than a script. Name the SPECIFIC',
     '   information to get, every time.',
     '5. STATE THE COST plainly — AND IT MUST MATCH THE CALL OUTCOME ABOVE.',
-    (outcome === 'closed'
+    (dq
+      ? '   THIS PROSPECT WAS DISQUALIFIED. There was no deal to lose, so nothing here "cost the deal" and'
+        + ' nothing was a failed close. Do not say or imply either. The cost, if any, is time spent past the'
+        + ' point where qualification should have ended the pitch — say that, or say what to do next time and stop.'
+      : outcome === 'closed'
       ? '   THIS CALL CLOSED. It did NOT cost the deal and you must not say or imply that it'
         + ' did. The cost is what it made harder, slower or left unresolved — or there may be'
         + ' no cost at all, in which case say what to do next time and stop. Do not invent a'

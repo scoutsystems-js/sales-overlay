@@ -75,7 +75,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v13-2026-09-05-doctrine';   /* v13 (H732): Scout's doctrine in the prompt as a constraint. Was v12-2026-09-05-kb-material */ //   /* v12 (H731): the ONE knowledge-base retrieval before the prompt; nothing relevant → the lane says nothing. Was v11-2026-09-05-page-facts */ //   /* v11 (H728): the page facts block in the prompt; a claim whose direction contradicts them is dropped. Was v10-2026-09-04-candidates-pass-the-bar */ //   /* v10 (H725): a moment becomes EVIDENCE only if it passes the selectivity bar — a payment confirmation with no earned move is not a candidate. Was v9: */ // 'v9-2026-09-04-evidence-subject'   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v14-2026-09-05-layered';   /* v14 (H733): the manager's notes ride under the doctrine entries they speak to; a disqualified prospect is never a lost deal (tag + code drop). Was v13-2026-09-05-doctrine */ //   /* v13 (H732): Scout's doctrine in the prompt as a constraint. Was v12-2026-09-05-kb-material */ //   /* v12 (H731): the ONE knowledge-base retrieval before the prompt; nothing relevant → the lane says nothing. Was v11-2026-09-05-page-facts */ //   /* v11 (H728): the page facts block in the prompt; a claim whose direction contradicts them is dropped. Was v10-2026-09-04-candidates-pass-the-bar */ //   /* v10 (H725): a moment becomes EVIDENCE only if it passes the selectivity bar — a payment confirmation with no earned move is not a candidate. Was v9: */ // 'v9-2026-09-04-evidence-subject'   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -133,6 +133,7 @@ function evidenceMismatch(claimText, evRep, allReps) {
 }
 
 const { evidenceSubjectMismatch, candidateEligible } = require('./evidence-subject');   // H724/H725/H728: ONE module for every citing lane
+const doctrineLib = require('./doctrine');   // H733: a disqualified prospect is never a lost deal — what the lane is told, and what it may say
 const PF = require('./page-facts');
 const { MIN_BUCKET } = require('./team-needs-work');   // the ONE comparison floor   // H728 step 2: the same facts to every lane on the page
 const CLAIM_CAP = 520;   // the prompt asks for <= 45 words (~290 chars)
@@ -253,7 +254,7 @@ async function cachePut(admin, keyId, type, from, to, hash, synthesis) {
 // ── Team recommendations ─────────────────────────────────────────────────────
 /* H724: the resolve step, module-level so a test can EXECUTE it with a planted payload. */
 function resolveInsights(arr, byId, allRepNames, opts) {
-  var facts = opts && opts.facts; var direction = opts && opts.direction;
+  var facts = opts && opts.facts; var direction = opts && opts.direction; var loss = opts && opts.lossScope;
     return arr.slice(0, 3).map(function (it) {
       var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
       /* ⚠ BIND THE EVIDENCE TO THE CLAIM, or drop it. See evidenceMismatch. */
@@ -266,6 +267,9 @@ function resolveInsights(arr, byId, allRepNames, opts) {
          page may generalise, never assert opposites. */
       var contra = facts ? PF.claimContradictsFacts(it, direction, facts) : null;
       if (contra) { console.warn('[team-synthesis] claim dropped (contradicts the page facts): ' + contra); return null; }
+      /* H733: the loss rule, in code — a claim that frames a loss is dropped when its loss is a disqualified
+         prospect: the cited moment's call carries a DQ, or (no citation) every loss in the window is a DQ. */
+      if (loss && doctrineLib.enforceLossRule(String((it && it.claim) || '') + ' ' + String((it && it.data) || ''), loss, ev ? ev.call_id : null, 'team-synthesis') === null) return null;
       return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null, highlight_id: ev ? ev.highlight_id : null };
     }).filter(function (it) { return it && it.claim; });
   }
@@ -339,10 +343,12 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   /* ⚠ `id` IS SELECTED because the candidate carries it as highlight_id — a field
      read at the consumer and selected nowhere is undefined everywhere with no
      error, which is exactly what shipped for twenty minutes on 2026-09-02. */
-  var hlRows = await w.inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type, objection_category, section, resolution, handling, cause');   // H725: the bar reads resolution, handling and the cause   // H724: category and section are what the subject check reads
-  function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
+  var hlRows = await w.inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, speaker, speaker_verified, closer_response, closer_response_verified, type, objection_category, objection_class, section, resolution, handling, cause');   // H733: objection_class — a DQ-classed objection marks the call disqualified
+  var lossScope = doctrineLib.lossScope(analyses, hlRows);   // H733: which calls carry a disqualification   // H725: the bar reads resolution, handling and the cause   // H724: category and section are what the subject check reads
+  function cls(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : (o === 'disqualified' ? 'disqualified' : 'other')); }
   var candidates = hlRows.filter(candidateEligible).map(function (r) {
-    var c = cls(outcomeByCall[r.fathom_call_id]); var rid = repOf(r.fathom_call_id);
+    /* H733: a moment on a disqualified call is tagged DISQUALIFIED, never LOSS — the model is not told a DQ was a loss. */
+    var c = cls(doctrineLib.outcomeForAdvice(outcomeByCall[r.fathom_call_id], !!lossScope.dqCalls[r.fathom_call_id])); var rid = repOf(r.fathom_call_id);
     var reply = capAtSentence(provenCloserResponse(r), 200);   // null unless PROVEN to be the closer
     return { cls: c, type: r.type, objection_category: r.objection_category || null, section: r.section || null, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
       /* ⚠⚠ WHO SPOKE IS RECORDED HERE, BECAUSE THIS `||` IS WHERE IT IS DECIDED
@@ -411,7 +417,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   var allRepNames = [];
   candidates.forEach(function (c) { if (c.rep && allRepNames.indexOf(c.rep) === -1) allRepNames.push(c.rep); });
   var facts = PF.pageFacts(sections, obj, { minBucket: MIN_BUCKET });
-  function resolve(arr, direction) { return resolveInsights(arr, byId, allRepNames, { facts: facts, direction: direction }); }
+  function resolve(arr, direction) { return resolveInsights(arr, byId, allRepNames, { facts: facts, direction: direction, lossScope: lossScope }); }
   var synthesis = { working: resolve(parsed.working, 'working'), improve: resolve(parsed.improve, 'improve'), generated_at: new Date().toISOString() };
   await cachePut(admin, keyId, 'team', from, to, hash, synthesis);
   return Object.assign({ available: true, cached: false }, synthesis);

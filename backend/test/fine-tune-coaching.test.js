@@ -386,3 +386,76 @@ test('⚠ the loop is sound, not circular: notes are written only by a confirmed
   assert.strictEqual((kbSrc.match(/buildCorrectionRow\(/g) || []).length, 1, 'exactly one writer, behind confirm');
   assert.ok(/if \(!b\.confirm\)/.test(kbSrc), 'and it is gated on the manager\'s confirmation');
 });
+
+/* ── H733: THE LOCKED PAIR ON THE ROUTE, EXECUTED — refused with the reason shown, nothing stored; unsure is
+   stored with the doubt on record; the attachment is validated and stored; the confirm step re-checks the words. */
+const DOC = require('../lib/doctrine');
+const DOCTRINE_TABLE = DOC.doctrineRows(DOC.readDoctrineFile()).map((r, i) => Object.assign({ id: 'doc' + i }, r));
+function routeCall(kb, admin) {
+  const l = kb.stack.find((x) => x.route && x.route.path === '/fine-tune');
+  const handler = l.route.stack[l.route.stack.length - 1].handle;
+  return (user, body) => new Promise((resolve) => { const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } }; Promise.resolve().then(() => handler({ user, body }, res)).catch((e) => resolve({ code: 'threw', body: String(e && e.stack) })); });
+}
+function tablesFor() {
+  return { call_highlights: [Object.assign({}, ISOLATING, { coaching: 'Stop asking them to set the money aside.' })], user_profiles: [{ user_id: 'mgr', role: 'manager', managed_by: null }, { user_id: 'rep', role: 'user', managed_by: 'mgr' }], knowledge_base: DOCTRINE_TABLE.slice() };
+}
+test('⚠⚠ H733 — a note that contradicts a LOCKED rule is REFUSED at the first step, with the reason the manager reads, and nothing is stored', async () => {
+  const reply = { concept: 'On this team, skip isolating and answer the money objection directly.', subject: 'objection', direction: 'prefer', objection_category: 'fear', doctrine_keys: ['isolation_is_the_correct_first_move'], locked_conflict: { rule: 'isolation', sure: true, reason: 'it tells reps to skip isolating and answer directly' } };
+  await withModel(() => ({ content: [{ type: 'text', text: JSON.stringify(reply) }] }), async () => {
+    const kb = require('../routes/kb'); const admin = fakeAdmin(tablesFor()); kb._setAdminClientForTests(() => admin);
+    const r = await routeCall(kb, admin)({ id: 'mgr', email: 'm@x' }, { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'skip isolating, answer it directly' });
+    assert.strictEqual(r.code, 422, JSON.stringify(r).slice(0, 300));
+    assert.strictEqual(r.body.refused, true); assert.strictEqual(r.body.rule, 'isolation');
+    assert.ok(/Scout can’t keep this note|Scout can't keep this note/.test(r.body.error) && /isolating/.test(r.body.error) && /What Scout read in it: it tells reps to skip isolating/.test(r.body.error), 'the reason is shown in plain words: ' + r.body.error);
+    assert.strictEqual(admin.writes.filter((w) => w.table === 'knowledge_base').length, 0, 'nothing stored');
+  });
+});
+test('⚠⚠ H733 — the SECOND locked rule refuses too; and an UNSURE judgement is STORED with the doubt on record (conservative: when unsure, keep)', async () => {
+  const sure = { concept: 'On this team, a prospect who cannot afford it counts as a lost deal.', doctrine_keys: ['the_three_way_boundary_on_money'], locked_conflict: { rule: 'dq_loss', sure: true, reason: 'it counts a can\'t-afford as a lost deal' } };
+  await withModel(() => ({ content: [{ type: 'text', text: JSON.stringify(sure) }] }), async () => {
+    const kb = require('../routes/kb'); const admin = fakeAdmin(tablesFor()); kb._setAdminClientForTests(() => admin);
+    const r = await routeCall(kb, admin)({ id: 'mgr', email: 'm@x' }, { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'count it as lost' });
+    assert.strictEqual(r.code, 422); assert.strictEqual(r.body.rule, 'dq_loss'); assert.ok(/can’t afford|can't afford/.test(r.body.error), r.body.error);
+  });
+  const unsure = { concept: 'On this team, qualify for savings before the pitch, and say so plainly.', doctrine_keys: ['the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection'], locked_conflict: { rule: 'dq_loss', sure: false, reason: 'might be read as scoring the close' } };
+  await withModel(() => ({ content: [{ type: 'text', text: JSON.stringify(unsure) }] }), async () => {
+    const kb = require('../routes/kb'); const admin = fakeAdmin(tablesFor()); kb._setAdminClientForTests(() => admin);
+    const call = routeCall(kb, admin);
+    const first = await call({ id: 'mgr', email: 'm@x' }, { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'qualify harder' });
+    assert.strictEqual(first.code, 200, JSON.stringify(first).slice(0, 300));
+    assert.deepStrictEqual(first.body.doctrine.map((d) => d.key), ['the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection'], 'two entries: attached to both');
+    assert.strictEqual(first.body.locked_review.rule, 'dq_loss');
+    const second = await call({ id: 'mgr', email: 'm@x' }, { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'qualify harder', confirm: true, concept: unsure.concept, doctrine_keys: ['the_three_way_boundary_on_money', 'not_a_real_key', 'discovery_is_the_upstream_cause_of_every_objection'], locked_review: first.body.locked_review });
+    assert.strictEqual(second.code, 200, JSON.stringify(second).slice(0, 300)); assert.strictEqual(second.body.stored, true);
+    const row = admin.writes.find((w) => w.table === 'knowledge_base').row;
+    assert.strictEqual(row.metadata.doctrine_key, 'the_three_way_boundary_on_money');
+    assert.deepStrictEqual(row.metadata.doctrine_keys, ['the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection'], 'a key that names no entry is dropped; the attachment is STORED, inspectable');
+    assert.strictEqual(row.metadata.doctrine_titles[0], 'The three-way boundary on money');
+    assert.deepStrictEqual(row.metadata.locked_review, { rule: 'dq_loss', reason: 'might be read as scoring the close' });
+  });
+});
+test('⚠⚠ H733 — the words the manager finally SAVES are checked too (no second model call): an unmistakable contradiction is refused at confirm; an unattached note is stored exactly as before', async () => {
+  await withModel(() => ({ content: [{ type: 'text', text: JSON.stringify({ concept: 'On this team, isolate first.', doctrine_keys: [] }) }] }), async (calls) => {
+    const kb = require('../routes/kb'); const admin = fakeAdmin(tablesFor()); kb._setAdminClientForTests(() => admin);
+    const call = routeCall(kb, admin);
+    const first = await call({ id: 'mgr', email: 'm@x' }, { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'isolate first' });
+    assert.strictEqual(first.code, 200);
+    const bad = await call({ id: 'mgr', email: 'm@x' }, { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'isolate first', confirm: true, concept: "On this team, don't isolate — answer the objection and close." });
+    assert.strictEqual(bad.code, 422, JSON.stringify(bad).slice(0, 200)); assert.strictEqual(bad.body.rule, 'isolation');
+    assert.strictEqual(calls.length, 1, 'the confirm-step check is code, not a second model call');
+    assert.strictEqual(admin.writes.filter((w) => w.table === 'knowledge_base').length, 0);
+    const ok = await call({ id: 'mgr', email: 'm@x' }, { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'isolate first', confirm: true, concept: 'On this team, isolate first.', doctrine_keys: [] });
+    assert.strictEqual(ok.code, 200); assert.strictEqual(ok.body.stored, true);
+    const row = admin.writes.find((w) => w.table === 'knowledge_base').row;
+    assert.strictEqual(row.metadata.doctrine_key, null); assert.deepStrictEqual(row.metadata.doctrine_keys, []);
+    assert.strictEqual(row.content, 'On this team, isolate first.', 'attachment is an enhancement, never a gate: the unattached note is team material as before');
+  });
+});
+test('⚠ H733 — the dashboard shows the refusal and names the entry a note shapes; the KB card shows the attachment', () => {
+  const ft = fnBody(LIVE, 'fineTuneCoaching');
+  assert.ok(/first\.refused/.test(ft) && /Scout can\\u2019t keep this note/.test(ft) && /body: first\.error/.test(ft), 'the refusal reason reaches the manager at submit');
+  assert.ok(/d\.refused/.test(ft), 'and at confirm');
+  assert.ok(/doctrine_keys:/.test(ft) && /locked_review/.test(ft), 'the attachment named at step one is carried to the store');
+  assert.ok(/this will shape how Scout coaches/.test(ft), 'the entry the note speaks to is shown before saving');
+  assert.ok(/meta\.doctrine_titles/.test(LIVE) && /Shapes:/.test(LIVE), 'the KB card shows what the note shapes');
+});

@@ -55,7 +55,8 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v15-2026-09-05-doctrine';   /* v15 (H732): Scout's doctrine in the prompt as a constraint. Was v14-2026-09-05-kb-material */ //   /* v14 (H731): the offer/qualifications/script join the notes in the prompt through the one retrieval; nothing relevant → nothing said. Was v13-2026-09-02-never-diminish-manager-notes-moment-ids */ //   /* payload shape: each evidence moment now carries highlight_id + fathom_call_id (Fine Tune Coaching surface ③) */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
+const doctrineLib = require('./doctrine');   // H733
+const PROMPT_VERSION = 'v16-2026-09-05-layered';   /* v16 (H733): notes under their entries; the loss rule in code per closer. Was v15-2026-09-05-doctrine */ //   /* v15 (H732): Scout's doctrine in the prompt as a constraint. Was v14-2026-09-05-kb-material */ //   /* v14 (H731): the offer/qualifications/script join the notes in the prompt through the one retrieval; nothing relevant → nothing said. Was v13-2026-09-02-never-diminish-manager-notes-moment-ids */ //   /* payload shape: each evidence moment now carries highlight_id + fathom_call_id (Fine Tune Coaching surface ③) */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -680,6 +681,10 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
     var g = byName[String(c.name).trim().toLowerCase()] || {};
     out.why = capProse(g.why, WHY_CAP);
     out.what_to_do = capProse(g.what_to_do, WHAT_TO_DO_CAP);
+    /* H733: the loss rule in code, per closer — prose is unattributed, so it drops only when every loss in this
+       closer's window is a disqualification (then loss framing can only be about a DQ). */
+    var lscope = (data.loss_scope_by_user || {})[c.user_id];
+    if (lscope) { out.why = doctrineLib.enforceLossRule(out.why, lscope, null, 'team-objection-summary'); out.what_to_do = doctrineLib.enforceLossRule(out.what_to_do, lscope, null, 'team-objection-summary'); }
     var subject = subjects.filter(function (s) { return s.user_id === c.user_id; })[0];
     out.evidence = subject ? subject.evidence.failed.slice(0, 3).map(publicMoment) : [];
     return out;

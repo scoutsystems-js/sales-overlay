@@ -6,6 +6,7 @@ const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireSubscription } = require('../middleware/auth');
 const { kbReadRowVisible } = require('../lib/kb-scope');
+const doctrineLib = require('../lib/doctrine');   // H733: attachment + the locked pair on the fine-tune route
 const { sanitizeSectionValue } = require('../lib/highlight-section');
 const {
   quoteHash, resolveEntryTarget, buildMomentRow, insertMoment,
@@ -1003,10 +1004,29 @@ router.post('/fine-tune', protect, async function(req, res) {
       return res.status(403).json({ error: 'You do not have access to that call' });
     }
     var moment = Object.assign({}, hl.data, { closer_response: (hl.data.closer_response_verified === true) ? hl.data.closer_response : null });
+    /* H733: the method's entries, so the ONE extraction call can name the entry the note speaks to and judge the
+       locked pair. A doctrine read failure attaches nothing and judges nothing — the note is still stored. */
+    var doctrine = { units: [], hash: 'none' };
+    try { doctrine = await doctrineLib.loadDoctrine(admin); } catch (dErr) { console.warn('[kb] fine-tune: doctrine unavailable (' + ((dErr && dErr.message) || 'unknown') + ') — attaching nothing'); }
     if (!b.confirm) {
-      var x = await corrections.extractConcept({ feedback: feedback, moment: moment, coaching: hl.data.coaching || null, userId: req.user.id });
+      var x = await corrections.extractConcept({ feedback: feedback, moment: moment, coaching: hl.data.coaching || null, userId: req.user.id, doctrine: doctrine });
+      /* ⚠⚠ THE LOCKED PAIR — REFUSED HERE, WITH THE REASON THE MANAGER READS, AND NOTHING STORED. Only when the
+         judgement is SURE; unsure is kept (and recorded on the row as locked_review). */
+      if (x.locked_conflict && x.locked_conflict.sure) {
+        console.log('[kb] fine-tune REFUSED (locked rule %s): actor=%s call=%s', x.locked_conflict.rule, req.user.email, fathomCallId);
+        return res.status(422).json({ ok: false, refused: true, rule: x.locked_conflict.rule, error: doctrineLib.lockedRefusalText(x.locked_conflict.rule, x.locked_conflict.reason) });
+      }
       return res.json({ ok: true, stored: false, concept: x.concept, subject: x.subject, direction: x.direction,
-                        objection_category: x.objection_category, extraction_failed: !x.ok, extraction: x.usage || null });
+                        objection_category: x.objection_category, extraction_failed: !x.ok, extraction: x.usage || null,
+                        doctrine: x.doctrine || [], locked_review: (x.locked_conflict && !x.locked_conflict.sure) ? x.locked_conflict : null });
+    }
+    /* H733: the words the manager finally saves get the code-level check (no second model call) — the same
+       conservative bar: only an unmistakable contradiction is refused, and the reason is shown. */
+    var finalText = (typeof b.concept === 'string' && b.concept.trim()) ? b.concept.trim() : feedback;
+    var contra = doctrineLib.noteContradictsLocked(finalText);
+    if (contra) {
+      console.log('[kb] fine-tune REFUSED at confirm (locked rule %s): actor=%s call=%s', contra.rule, req.user.email, fathomCallId);
+      return res.status(422).json({ ok: false, refused: true, rule: contra.rule, error: doctrineLib.lockedRefusalText(contra.rule, contra.reason) });
     }
     var target = { scope: 'team', team_owner_id: scope.p_admin_id, uploaded_by: req.user.id };
     var row = corrections.buildCorrectionRow({
@@ -1020,6 +1040,10 @@ router.post('/fine-tune', protect, async function(req, res) {
                  momentType: hl.data.type || null, section: sanitizeSectionValue(hl.data.section), coachingSnapshot: hl.data.coaching || null, quote: hl.data.quote || null },
       addedBy: req.user.id,
       extraction: (b.extraction && typeof b.extraction === 'object') ? b.extraction : null,
+      /* H733: the attachment the first step named, re-validated against the loaded entries — a key is never trusted raw. */
+      doctrine: doctrineLib.validKeys(doctrine, Array.isArray(b.doctrine_keys) ? b.doctrine_keys : []),
+      lockedReview: (b.locked_review && typeof b.locked_review === 'object' && (b.locked_review.rule === 'isolation' || b.locked_review.rule === 'dq_loss'))
+        ? { rule: b.locked_review.rule, reason: (typeof b.locked_review.reason === 'string') ? b.locked_review.reason.slice(0, 300) : null } : null,
     });
     var existing = await admin.from('knowledge_base').select('id, metadata').eq('category', corrections.CATEGORY).eq('team_owner_id', target.team_owner_id);
     if (!existing.error && (existing.data || []).some(function (r) { return r.metadata && r.metadata.concept_hash === row.metadata.concept_hash; })) {
@@ -1029,7 +1053,7 @@ router.post('/fine-tune', protect, async function(req, res) {
     var ins = await admin.from('knowledge_base').insert(row);
     if (ins.error) { console.error('[kb] fine-tune insert failed:', ins.error.message); return res.status(500).json({ error: 'Could not save that note' }); }
     console.log('[kb] Coaching note added: actor=%s call=%s highlight=%s team=%s concept=%s', req.user.email, fathomCallId, hl.data.id, target.team_owner_id, row.metadata.concept ? 'yes' : 'verbatim');
-    return res.json({ ok: true, stored: true, duplicate: false, concept: row.metadata.concept, verbatim: !row.metadata.concept });
+    return res.json({ ok: true, stored: true, duplicate: false, concept: row.metadata.concept, verbatim: !row.metadata.concept, doctrine_titles: row.metadata.doctrine_titles || [] });
   } catch (err) {
     if (handleConfigError(err, res)) return;
     console.error('[kb] fine-tune error:', err.message);

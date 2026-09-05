@@ -17577,6 +17577,8 @@
           + '<div class="kb-pattern-row"><span class="kb-pattern-text">' + escapeHtml(e.content || '') + '</span></div>'
           + (meta.feedback && meta.feedback !== e.content ? '<div class="kb-pattern-row"><b>' + who + ':</b> <span class="kb-pattern-text">' + escapeHtml(meta.feedback) + '</span></div>' : '')
           + (meta.concept ? '' : '<div class="kb-pattern-row"><span class="kb-pattern-text">Saved as written \u2014 Scout could not summarise it.</span></div>')
+          /* H733: the attachment is inspectable — which part of Scout's method this note shapes for the team. */
+          + (Array.isArray(meta.doctrine_titles) && meta.doctrine_titles.length ? '<div class="kb-pattern-row"><b>Shapes:</b> <span class="kb-pattern-text">' + escapeHtml(meta.doctrine_titles.join(' \u00b7 ')) + '</span></div>' : '')
           + '<div class="kb-pattern-row"><span class="kb-pattern-text">' + escapeHtml(relativeTime(e.created_at)) + '</span></div>'
           + '</div>');
         continue;
@@ -19514,14 +19516,20 @@
       var r1 = await fetch('/kb/fine-tune', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
         body: JSON.stringify({ fathom_call_id: callId, highlight_id: highlightId, feedback: feedback, surface: t.surface }) });
       try { first = await r1.json(); } catch (e) {}
+      /* H733: a note that contradicts one of the two locked rules is REFUSED here, with the reason shown to the
+         manager at the moment they submit it — never stored, never silently dropped. */
+      if (!r1.ok && first && first.refused) { await scoutConfirm({ title: 'Scout can\u2019t keep this note', body: first.error, confirmText: 'OK', cancelText: 'Close' }); reset(); return; }
       if (!r1.ok) { alert((first && first.error) || 'Could not read that.'); reset(); return; }
     } catch (err) { alert('Could not reach the server.'); reset(); return; }
     var failed = !first || first.extraction_failed || !first.concept;
+    /* H733: the entry of Scout's method the note speaks to — shown, so the attachment is never implicit. */
+    var speaksTo = (first && Array.isArray(first.doctrine) && first.doctrine.length) ? first.doctrine.map(function (d) { return d.title; }).join(' · ') : '';
     var concept = await scoutPrompt({
       title: failed ? 'Scout couldn\u2019t summarise that' : 'Scout understood it as',
-      body: failed
+      body: (failed
         ? 'Your words will be saved exactly as written and used as this team\u2019s note. Edit them here if you like.'
-        : 'This is what Scout will learn for your team. Edit it if it isn\u2019t quite right \u2014 your wording wins.',
+        : 'This is what Scout will learn for your team. Edit it if it isn\u2019t quite right \u2014 your wording wins.')
+        + (speaksTo ? '\n\nOn your team this will shape how Scout coaches: ' + speaksTo + '.' : ''),
       value: failed ? feedback : first.concept,
       inputLabel: 'The note Scout will keep', confirmText: 'Save for my team', cancelText: 'Cancel', multiline: true,
     });
@@ -19530,8 +19538,10 @@
       var r2 = await fetch('/kb/fine-tune', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
         body: JSON.stringify({ fathom_call_id: callId, highlight_id: highlightId, feedback: feedback, confirm: true, surface: t.surface,
           concept: failed ? '' : String(concept).trim(), subject: first && first.subject, direction: first && first.direction,
-          objection_category: first && first.objection_category, extraction: first && first.extraction }) });
+          objection_category: first && first.objection_category, extraction: first && first.extraction,
+          doctrine_keys: (first && Array.isArray(first.doctrine)) ? first.doctrine.map(function (d) { return d.key; }) : [], locked_review: first && first.locked_review }) });
       var d = null; try { d = await r2.json(); } catch (e) {}
+      if (!r2.ok && d && d.refused) { await scoutConfirm({ title: 'Scout can\u2019t keep this note', body: d.error, confirmText: 'OK', cancelText: 'Close' }); reset(); return; }
       if (!r2.ok) { alert((d && d.error) || 'Could not save that note.'); reset(); return; }
       state.notedHighlightIds[highlightId] = true;
       if (btn) { btn.className = 'review-kb-btn is-saved'; btn.textContent = d && d.duplicate ? 'Already noted \u2713' : 'Noted \u2713'; btn.title = 'Your team has a coaching note from this moment'; }

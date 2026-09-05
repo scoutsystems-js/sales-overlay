@@ -16,10 +16,11 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 /* Bumped ONLY for a correctness defect in what the cache already holds —
    never for a speculative improvement. See the key comment below. */
-const SYNTH_RULE_VERSION = 'v8-2026-09-05-doctrine';   /* v8 (H732): Scout's doctrine in the prompt as a constraint. Was v7-2026-09-05-kb-material */ //   /* v7 (H731): the one knowledge-base retrieval before the prompt; nothing relevant → nothing said. Was v6-2026-09-05-subject-bar-page-facts */ //   /* v6 (H728): the subject check, the candidate bar and the page facts — the same three the recommendations lane carries. Was v5-2026-09-02-category-order-canonical */ //   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
+const SYNTH_RULE_VERSION = 'v9-2026-09-05-layered';   /* v9 (H733): notes under their entries; a disqualified prospect is never a lost deal. Was v8-2026-09-05-doctrine */ //   /* v8 (H732): Scout's doctrine in the prompt as a constraint. Was v7-2026-09-05-kb-material */ //   /* v7 (H731): the one knowledge-base retrieval before the prompt; nothing relevant → nothing said. Was v6-2026-09-05-subject-bar-page-facts */ //   /* v6 (H728): the subject check, the candidate bar and the page facts — the same three the recommendations lane carries. Was v5-2026-09-02-category-order-canonical */ //   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 const { evidenceSubjectMismatch, candidateEligible, subjectPromptRule } = require('./evidence-subject');   // H728 step 1
+const doctrineLib = require('./doctrine');   // H733
 const PF = require('./page-facts');   // H728 step 2
 const { loadKbMaterial, nothingToSay } = require('./kb-material');   // H731
 const { MIN_BUCKET } = require('./team-needs-work');
@@ -71,7 +72,7 @@ function clipUrl(meta, ts) {
   if (!meta) return null;
   return clipHref(meta.recording_url, ts);
 }
-function outcomeClass(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : 'other'); }
+function outcomeClass(o) { return o === 'closed' ? 'win' : (o === 'lost' ? 'loss' : (o === 'disqualified' ? 'disqualified' : 'other')); }
 function avg(sum, n) { return n > 0 ? Math.round(sum / n) : null; }
 
 // Priority for which highlight moments become candidate evidence (win wins/
@@ -135,13 +136,14 @@ function buildPrompt(agg, oneThings, candidates, sellingContext, managerNotes) {
    facts (claimContradictsFacts). The claim keeps its numbers and loses an unearned quote; a claim that
    contradicts the page is dropped. */
 function resolveInsights(arr, byId, opts) {
-  var facts = opts && opts.facts; var direction = opts && opts.direction;
+  var facts = opts && opts.facts; var direction = opts && opts.direction; var loss = opts && opts.lossScope;
   return (Array.isArray(arr) ? arr : []).slice(0, 3).map(function (it) {
     var ev = (it && it.evidence_id && byId[it.evidence_id]) || null;
     var subj = ev ? evidenceSubjectMismatch(it && it.subject, ev) : null;
     if (subj) { console.warn('[performance-synthesis] evidence dropped (subject): ' + subj); ev = null; }
     var contra = facts ? PF.claimContradictsFacts(it, direction, facts) : null;
     if (contra) { console.warn('[performance-synthesis] claim dropped (contradicts the page facts): ' + contra); return null; }
+    if (loss && doctrineLib.enforceLossRule(String((it && it.claim) || '') + ' ' + String((it && it.data) || ''), loss, ev ? ev.call_id : null, 'performance-synthesis') === null) return null;   // H733
     return {
       claim: str(it && it.claim, 400),
       data: str(it && it.data, 200),
@@ -275,9 +277,10 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   objRows.forEach(function (r) { var b = obj[r.objection_category]; if (b) { b.total++; if (isHandled(r, outcomeByCall[r.fathom_call_id])) b.handled++; } });
 
   // 5) candidate evidence moments (with real clip links + outcome class).
-  var hlRows = await inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, closer_response, type, objection_category, section, speaker, speaker_verified, resolution, handling, cause');
+  var hlRows = await inChunks('call_highlights', 'id, fathom_call_id, timestamp_seconds, quote, closer_response, type, objection_category, objection_class, section, speaker, speaker_verified, resolution, handling, cause');   // H733: objection_class
+  var lossScope = doctrineLib.lossScope(analyses, hlRows);   // H733
   var candidates = hlRows.filter(candidateEligible).map(function (r) {
-    var cls = outcomeClass(outcomeByCall[r.fathom_call_id]);
+    var cls = outcomeClass(doctrineLib.outcomeForAdvice(outcomeByCall[r.fathom_call_id], !!lossScope.dqCalls[r.fathom_call_id]));   // H733: DISQUALIFIED, never LOSS
     return {
       cls: cls, type: r.type, objection_category: r.objection_category || null, section: r.section || null,
       /* ⚠ SENTINEL-GATED: a sentinel is a non-empty string and would WIN this
@@ -316,7 +319,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
 
   // 7) resolve evidence_id → real {quote, clip_url, call_id} (never LLM-invented) — the subject check and the page facts inside.
   var facts = PF.pageFacts(agg.sections, agg.obj, { minBucket: MIN_BUCKET });
-  var synthesis = { working: resolveInsights(parsed.working, byId, { facts: facts, direction: 'working' }), improve: resolveInsights(parsed.improve, byId, { facts: facts, direction: 'improve' }), generated_at: new Date().toISOString() };
+  var synthesis = { working: resolveInsights(parsed.working, byId, { facts: facts, direction: 'working', lossScope: lossScope }), improve: resolveInsights(parsed.improve, byId, { facts: facts, direction: 'improve', lossScope: lossScope }), generated_at: new Date().toISOString() };
 
   // 8) cache (best-effort).
   var up = await admin.from('objection_synthesis_cache').upsert(

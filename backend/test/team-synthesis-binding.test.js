@@ -150,7 +150,7 @@ test('⚠⚠ resolveInsights CALLS evidenceMismatch and DROPS on a mismatch (mod
   assert.ok(fn.indexOf('evidenceMismatch(') !== -1, 'the check must be called inside resolveInsights');
   assert.ok(/if \(mism\)[^\n]*ev = null/.test(fn),
     'and a mismatch must actually DROP the evidence — computing it and ignoring it is worse than not checking');
-  assert.ok(/function resolve\(arr, direction\) \{ return resolveInsights\(arr, byId, allRepNames, \{ facts: facts, direction: direction \}\); \}/.test(stripped), 'the lane resolves through the module-level function, with the page facts');
+  assert.ok(/function resolve\(arr, direction\) \{ return resolveInsights\(arr, byId, allRepNames, \{ facts: facts, direction: direction, lossScope: lossScope \}\); \}/.test(stripped), 'the lane resolves through the module-level function, with the page facts and the loss scope (H733)');
   /* executed: the rep mismatch drops the quote through the real function */
   const out = lane._resolveInsights([{ claim: 'Godwin and Nick rush the close.', data: 'x', evidence_id: 'm1', subject: { kind: 'objection', category: null } }],
     { m1: { id: 'm1', rep: 'Gabriel Ocasio', type: 'objection', quote: 'q', spoke: 'prospect' } }, ['Godwin Ona', "Nick O'Neal", 'Gabriel Ocasio']);

@@ -99,13 +99,15 @@ test('⚠⚠ the DQ filter is OUTSIDE the inChunks callback, not spliced into it
   const at = src.indexOf("var objectionsAll = await w.inChunks(");
   assert.ok(at !== -1, 'stale anchor — the objections fetch is gone');
   const span = src.slice(at, src.indexOf('var objLines', at));
-  assert.ok(span.length > 200 && span.length < 2200, 'slice must cover it: ' + span.length);
+  /* H733 moved the read ABOVE the call lines (a call carrying a DQ is presented as disqualified), so the span now
+     holds the call-line loop too — the ceiling moved with it; the property under test is unchanged. */
+  assert.ok(span.length > 200 && span.length < 4500, 'slice must cover it: ' + span.length);
 
-  // the callback must CLOSE on the line that opens it
-  assert.ok(/function \(q\) \{ return q\.eq\('type', 'objection'\); \}\);/.test(span),
+  // the callback must CLOSE on the line that opens it (H733: it reads objections AND disqualify signals)
+  assert.ok(/function \(q\) \{ return q\.in\('type', \['objection', 'disqualify_signal'\]\); \}\);/.test(span),
     'the inChunks callback must close on its own line — anything after `return` inside it is dead code');
   // and the declaration must come after that close, not before it
-  const close = span.indexOf("'objection'); });");
+  const close = span.indexOf("'disqualify_signal']); });");
   const decl = span.indexOf('var objections =');
   assert.ok(close !== -1 && decl > close,
     'var objections must be declared OUTSIDE the callback, or it is undefined where it is read');
