@@ -111,7 +111,9 @@ test('⚠⚠ THE COACHING PASS, EXECUTED: the prompt carries the record for this
   reply = () => JSON.stringify([{ moment: 1, coaching: 'A partner objection landed and you let it sit. Ask what the partner would need to hear, then ask for the commitment on that.', applied_manager_notes: [] }]);
   const out = await W._coachCallMoments(fakeAdmin(writes), 'a3', 'lost', null, null, 'a');
   assert.strictEqual(captured.length, 1, JSON.stringify(out));
-  assert.ok(/HISTORY — what Scout has already coached this closer on, on earlier calls/.test(captured[0]) && /partner objections: coached on 4 earlier calls/.test(captured[0]), 'the record (all four of A\'s rows, no window on the call) reaches the prompt:\n' + captured[0].slice(0, 300));
+  assert.match(captured[0], /VERIFIED CLOSER MEMORY/);
+  assert.match(captured[0], /Scout has coached this closer on 3 earlier calls about partner objections/);
+  assert.doesNotMatch(captured[0], /coached on 4 earlier calls/, 'the current call and later records cannot inflate earlier coaching');
   assert.ok(!/coached on 5 earlier/.test(captured[0]), 'B\'s five never reach A\'s prompt');
   const rec = writes.find((w) => w.table === 'coaching_history');
   assert.ok(rec && rec.row.user_id === 'a' && rec.row.pattern_key === 'objection:partner' && rec.row.fathom_call_id === 'a3' && rec.row.team_key === 'mgr', 'the record is written with the entry: ' + JSON.stringify(rec));

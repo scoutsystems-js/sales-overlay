@@ -76,18 +76,22 @@ async function recordCoaching(admin, row) {
 async function loadHistory(admin, userIds, from, to) {
   var out = {}; (userIds || []).forEach(function (u) { out[u] = {}; });
   for (var i = 0; i < (userIds || []).length; i += CHUNK) {
-    var q = admin.from('coaching_history').select('user_id, pattern_key, fathom_call_id, call_date').in('user_id', userIds.slice(i, i + CHUNK));
-    if (from) q = q.gte('call_date', from); if (to) q = q.lte('call_date', to);
-    var r = await q;
-    if (r.error) throw new Error('coaching_history: ' + r.error.message);
-    (r.data || []).forEach(function (row) {
-      var byKey = out[row.user_id]; if (!byKey) return;
-      var k = byKey[row.pattern_key] || (byKey[row.pattern_key] = { calls: 0, first: null, last: null, call_ids: [] });
-      if (k.call_ids.indexOf(row.fathom_call_id) !== -1) return;
-      k.call_ids.push(row.fathom_call_id); k.calls++;
-      if (row.call_date && (!k.first || row.call_date < k.first)) k.first = row.call_date;
-      if (row.call_date && (!k.last || row.call_date > k.last)) k.last = row.call_date;
-    });
+    for (var page = 0; page < 10; page++) {
+      var q = admin.from('coaching_history').select('user_id, pattern_key, fathom_call_id, call_date').in('user_id', userIds.slice(i, i + CHUNK));
+      if (from) q = q.gte('call_date', from); if (to) q = q.lte('call_date', to);
+      var r = await q.order('user_id').order('pattern_key').order('fathom_call_id').range(page * 1000, page * 1000 + 999);
+      if (r.error) throw new Error('coaching_history: ' + r.error.message);
+      (r.data || []).forEach(function (row) {
+        var byKey = out[row.user_id]; if (!byKey) return;
+        var k = byKey[row.pattern_key] || (byKey[row.pattern_key] = { calls: 0, first: null, last: null, call_ids: [] });
+        if (k.call_ids.indexOf(row.fathom_call_id) !== -1) return;
+        k.call_ids.push(row.fathom_call_id); k.calls++;
+        if (row.call_date && (!k.first || row.call_date < k.first)) k.first = row.call_date;
+        if (row.call_date && (!k.last || row.call_date > k.last)) k.last = row.call_date;
+      });
+      if ((r.data || []).length < 1000) break;
+      if (page === 9) throw new Error('Coaching history exceeds verified read limit');
+    }
   }
   return out;
 }

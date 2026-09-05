@@ -1999,3 +1999,6 @@ Implemented verified transcript pairing and call-level results for the approved 
 
 ## GPT Team Coaching workspace — 2026-09-05 (local, not deployed)
 Approved compact priorities, closer selector/detail panel, expandable strengths, persistent Team subnavigation and icons are implemented in the Codex worktree; original wordmark/background toggle retained. Full suite 2,477/2,477. The contradiction now has full exchange context and an independent review gate. Migration 075 applied; two proven inaccurate live notes removed; final suite 2,480/2,480. Deployed as 4b17f8b after new analyses completed; exact Railway commit and page markers verified. Authenticated live navigation, closer selection and artwork persistence verified. Historic coaching is not certified or backfilled; the new panel fills as future analyses pass review. See `gpt.md`.
+
+## Validator v2 — 2026-09-05
+Implemented source IDs, date-bounded record-backed memory, and separate contradiction/missing-evidence/reference outcomes. 2,485 tests and saved-response regression replay pass; no paid review or historical upgrade performed. These fix the observed protocol and memory-waiver gaps; semantic accuracy is not established by the test count. Deployment verification in gpt.md.

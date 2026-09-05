@@ -26,9 +26,9 @@ function withReviewModel(original) {
   return async function(params,ctx){
     if(ctx&&ctx.lane==='coaching-review') {
       const p=params.messages[0].content;
-      const support=(p.split('TEAM MATERIAL:\n')[1]||'').split('\n\n')[0].trim();
+      const support=(p.match(/\[(K-[a-f0-9]+)\]/)||[])[1];
       const ids=[...p.matchAll(/MOMENT (\d+) full_call=/g)].map(m=>Number(m[1]));
-      return {content:[{text:JSON.stringify({reviews:ids.map(moment=>({moment,verdict:'approve',evidence_turns:[1],kb_support:support}))})}]};
+      return {content:[{text:JSON.stringify({reviews:ids.map(moment=>({moment,verdict:'approve',evidence_turns:[1],knowledge_refs:[support],history_refs:[]}))})}]};
     }
     return original(params,ctx);
   };

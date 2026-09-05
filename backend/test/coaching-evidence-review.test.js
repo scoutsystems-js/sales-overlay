@@ -12,12 +12,12 @@ test('regression: context includes the question after the saved reply and anchor
  assert.equal(E.safeAdvice('At 00:30:23 you only acknowledged it.'),false);
 });
 test('review requires evidence and knowledge support; missing, unsure and forged approvals fail closed',()=>{
- const entries=[{moment:1,coaching:'Explore the remaining concern.'}];const approved={moment:1,verdict:'approve',evidence_turns:[2,3],kb_support:material.contextText};
+ const entries=[{moment:1,coaching:'Explore the remaining concern.'}];const approved={moment:1,verdict:'approve',evidence_turns:[2,3],knowledge_refs:[E.knowledgeSources(material)[0].id],history_refs:[]};
  assert.equal(E.approvedEntries(entries,{reviews:[approved]},[context],material).length,1);
- for(const reviews of [[],[{...approved,verdict:'reject'}],[{...approved,verdict:'unsure'}],[{...approved,kb_support:'Invented team rule'}],[{...approved,evidence_turns:[999]}],[approved,approved]]) assert.equal(E.approvedEntries(entries,{reviews},[context],material).length,0);
+ for(const reviews of [[],[{...approved,verdict:'reject'}],[{...approved,verdict:'unsure'}],[{...approved,knowledge_refs:['K-invented']}],[{...approved,evidence_turns:[999]}],[approved,approved]]) assert.equal(E.approvedEntries(entries,{reviews},[context],material).length,0);
 });
-const usage=require('../lib/model-usage');let verdict='reject', prompts=[];
-usage.createWithUsage=async(params,ctx)=>{prompts.push({prompt:params.messages[0].content,lane:ctx.lane});return {content:[{text:ctx.lane==='coaching-review'?JSON.stringify({reviews:[{moment:1,verdict,evidence_turns:[2,3],kb_support:material.contextText}]}):JSON.stringify([{moment:1,coaching:'You only acknowledged the concern and did not explore it.'}])}]};};
+const usage=require('../lib/model-usage');let verdict='reject', prompts=[], draft='Explore the concern before proceeding.', invalidRef=false;
+usage.createWithUsage=async(params,ctx)=>{prompts.push({prompt:params.messages[0].content,lane:ctx.lane});return {content:[{text:ctx.lane==='coaching-review'?JSON.stringify({reviews:[{moment:1,verdict,evidence_turns:[2,3],knowledge_refs:[invalidRef?'K-forged':E.knowledgeSources(material)[0].id],history_refs:[]}]}):JSON.stringify([{moment:1,coaching:draft}])}]};};
 require('../lib/kb-material').loadKbMaterial=async()=>material;
 const worker=require('../lib/analysis-worker');
 function admin(writes){return {from(table){const q={select(){return q;},eq(){return q;},in(){return q;},order(){return q;},gte(){return q;},lte(){return q;},update(p){writes.push({table,p});return q;},upsert(){return q;},maybeSingle:async()=>({data:table==='call_analyses'?analysis:null,error:null}),then(resolve,reject){return Promise.resolve({data:table==='call_highlights'?[highlight]:[],error:null}).then(resolve,reject);}};return q;}};}
@@ -28,4 +28,40 @@ test('real worker sends full exchange and team knowledge to a separate reviewer;
  assert.equal(result.written,0);assert.ok(!writes.some(w=>w.p.coaching));
  verdict='approve';writes.length=0;const approved=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
  assert.equal(approved.written,1);const saved=writes.find(w=>w.p.coaching);assert.equal(saved.p.coaching_review.anchor,1765);assert.equal(saved.p.coaching_review.kb_hash,'team-a');
+});
+
+test('real worker withholds historical claims even when reviewer approves, and stores distinct reasons',async()=>{
+ verdict='approve';draft='Twenty-one earlier calls have surfaced this same gap in qualification.';
+ let writes=[];const result=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
+ assert.equal(result.written,0);assert.ok(writes.some(w=>w.p.coaching_review?.category==='missing_evidence'));
+ draft='Explore the concern before proceeding.';invalidRef=true;writes=[];
+ assert.equal((await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1')).written,0);
+ assert.ok(writes.some(w=>w.p.coaching_review?.category==='invalid_reference'));invalidRef=false;
+});
+test('knowledge IDs survive formatting changes; unknown or foreign references are refused',()=>{
+ const sources=E.knowledgeSources(material);assert.equal(sources[0].id,E.knowledgeSources({...material,contextText:'Explore  the concern and establish the next step.'})[0].id);
+ const advice=[{moment:1,coaching:'Explore the concern.'}];const r={moment:1,verdict:'approve',knowledge_refs:[sources[0].id],evidence_turns:[2]};
+ assert.equal(E.evaluateEntries(advice,{reviews:[r]},[context],material)[0].category,'approved');
+ assert.equal(E.evaluateEntries(advice,{reviews:[r]},[context],{...material,contextText:'Another team uses different material.'})[0].category,'invalid_reference');
+ assert.equal(E.evaluateEntries(advice,{reviews:[{...r,verdict:'reject',reason_code:'transcript_contradiction'}]},[context],material)[0].category,'transcript_contradiction');
+});
+test('memory statements require actual distinct earlier call IDs and a matching moment reference',()=>{
+ const moment={type:'missed_opportunity'};const facts=E.historyFacts({missed_opportunity:{calls:999,call_ids:['c1','c2','c2','current']}},[moment],'current');
+ assert.match(facts[0].text,/2 earlier calls/);assert.doesNotMatch(facts[0].text,/999/);
+ const e=[{moment:1,coaching:'Explore the concern. '+facts[0].text}];const r={moment:1,verdict:'approve',knowledge_refs:[E.knowledgeSources(material)[0].id],evidence_turns:[1],history_refs:[facts[0].id]};
+ assert.equal(E.approvedEntries(e,{reviews:[r]},[context],material,facts).length,1);
+ assert.equal(E.approvedEntries(e,{reviews:[r]},[context],material,[]).length,0);
+ assert.equal(E.approvedEntries(e,{reviews:[{...r,history_refs:['H-other']}]},[context],material,facts).length,0);
+ assert.equal(E.approvedEntries([{moment:1,coaching:'Twenty-one earlier calls have surfaced this same gap.'}],{reviews:[r]},[context],material,facts).length,0);
+});
+test('accepted legacy reviews remain readable without upgrading their provenance',()=>{
+ assert.equal(E.isApprovedReview({version:'coaching-evidence-v1',verdict:'approved'}),true);
+ assert.equal(E.isApprovedReview({version:'coaching-evidence-v1',verdict:'rejected'}),false);
+ assert.equal(E.isApprovedReview({version:'unknown',verdict:'approved'}),false);
+});
+test('history reads beyond one database page and refuses a failed page',async()=>{
+ const H=require('../lib/coaching-history');const all=Array.from({length:1001},(_,i)=>({user_id:'u',pattern_key:'missed_opportunity',fathom_call_id:'c'+i,call_date:'2026-08-01'}));let calls=0,fail=false;
+ const db={from(){let start=0,end=999;const q={select(){return q;},in(){return q;},gte(){return q;},lte(){return q;},order(){return q;},range(a,b){start=a;end=b;return q;},then(resolve,reject){calls++;return Promise.resolve({data:all.slice(start,end+1),error:fail&&start>0?{message:'read failed'}:null}).then(resolve,reject);}};return q;}};
+ assert.equal((await H.loadHistory(db,['u'])).u.missed_opportunity.calls,1001);assert.equal(calls,2);
+ fail=true;await assert.rejects(H.loadHistory(db,['u']),/read failed/);
 });
