@@ -57,7 +57,7 @@ async function attachStrengthEvidence(admin, synthesis, window) {
   const working = items.map(item => {
     const meta = window.meta[item.call_id];
     const evidence = meta && buildEvidence(item, analyses.get(item.call_id), meta.recording_url);
-    return evidence ? Object.assign({}, item, { call_evidence: evidence }) : null;
+    return evidence ? Object.assign({}, item, { call_evidence: Object.assign({}, evidence, { owner_user_id: meta.user_id }) }) : null;
   }).filter(Boolean);
   return Object.assign({}, synthesis, { working });
 }

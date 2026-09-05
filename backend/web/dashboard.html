@@ -15321,7 +15321,7 @@
       + (e.following || []).map(excerpt).join('') + '</details>'
       + (e.result_explanation ? '<div class="strength-call-result"><h3>How the Call Ended</h3><p>' + escapeHtml(e.result_explanation) + '</p></div>' : '')
       + '<div class="strength-result"><span>Call result</span><strong>' + escapeHtml(resultLabel) + '</strong></div>'
-      + '<div class="strength-actions"><button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')">Review Full Call</button>' + ftBtn + '</div></article>';
+      + '<div class="strength-actions"><button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\', \'' + escapeHtml(e.owner_user_id || '') + '\')">Review Full Call</button>' + ftBtn + '</div></article>';
   }
 
   function teamInsightHtml(it, kind, idx) {
