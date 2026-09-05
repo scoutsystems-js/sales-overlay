@@ -43,7 +43,7 @@ test('the entry point names what is actually through the door', ...)
    nobody re-checks after a removal. */
 test('⚠⚠ COACHING STILL CARRIES THE RECOMMENDATIONS — removing the wrong half is how a feature becomes unreachable', () => {
   const co = slice('function renderTeamCoaching', 'function drawRepSeriesCharts', 300);
-  assert.ok(co.indexOf('teamRecsHtml()') !== -1,
+  assert.ok(co.indexOf("teamRecsHtml('focus')") !== -1 && co.indexOf("teamRecsHtml('strengths')") !== -1,
     'the SAME full renderer — this is what made both removals safe');
   assert.ok(co.indexOf("loadTeam('recs')") !== -1,
     'and Coaching must still kick the lane it renders');

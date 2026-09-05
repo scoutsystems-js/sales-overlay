@@ -856,7 +856,7 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     var byKind = {}; var total = 0;
     var reps = gathered.reps.map(function (r) {
       r.items.forEach(function (it) { byKind[it.kind] = (byKind[it.kind] || 0) + 1; total++; });
-      return { user_id: r.user_id, name: nameOf[r.user_id] || null, calls: r.calls, items: r.items, loss_scope: r.loss_scope };
+      return { user_id: r.user_id, name: nameOf[r.user_id] || null, calls: r.calls, items: r.items, improvements: r.improvements, loss_scope: r.loss_scope };
     });
     /* H734 — THE REP LINE IS THE JUDGEMENT: one model call per rep per period, cached; the knowledge base
        read ONCE for the team before any line (H731) — nothing on file → no model call, the one shape. */
@@ -885,7 +885,7 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
         L.history_clause = coachHistory.historyClause(entry, assessment);
       }
     } catch (hErr) { logTeamError('coachable-moments/history', hErr); }
-    reps.forEach(function (r, i) { r.line = lines[i] || null; delete r.loss_scope; });
+    reps.forEach(function (r, i) { r.line = lines[i] || null; if (!material.hasMaterial) r.improvements = []; delete r.loss_scope; });
     reps.sort(function (a, b) { return b.items.length - a.items.length || String(a.name || '').localeCompare(String(b.name || '')); });
     var payload = { reps: reps, total_items: total, by_kind: byKind, from: range.from, to: range.to };
     if (!material.hasMaterial) Object.assign(payload, require('../lib/kb-material').nothingToSay({}));

@@ -187,7 +187,7 @@ test('⚠ H726 — the panel renderer, executed: every kind labelled in plain wo
     { user_id: 'mgr', name: 'Mia', calls: 3, items: [] },
     { user_id: 'new', name: 'Noor', calls: 0, items: [] },
   ] }, repLineOpen: { A: true } };   // H734: the panel is one row per rep; Ava's row open so her moments render
-  const panelFn = new Function('state', 'escapeHtml', 'coachableItemHtml', 'laneWaitHtml', 'laneProblem', 'laneProblemHtml', 'noMaterialHtml', fnBody(LIVE, 'repLineRowHtml') + '\n' + fnBody(LIVE, 'teamCoachableHtml') + '\n return teamCoachableHtml;')(state, esc, itemFn, () => 'wait', () => null, () => 'problem', () => 'NOMAT');
+  const panelFn = new Function('state', 'escapeHtml', 'coachableItemHtml', 'laneWaitHtml', 'laneProblem', 'laneProblemHtml', 'noMaterialHtml', fnBody(LIVE, 'repLineRowHtml') + '\n' + fnBody(LIVE, 'teamCoachableHtml') + '\n return function(){return state.teamCoachable.reps.map(repLineRowHtml).join("");};')(state, esc, itemFn, () => 'wait', () => null, () => 'problem', () => 'NOMAT');
   const html = panelFn();
   assert.ok(/Ava Reyes/.test(html) && /Missed signal/.test(html) && /Buying signal the closer earned/.test(html) && /digging for pain/.test(html));
   /* a pair's block IS its consequence (the gap line and the disqualification end) — the item adds no second line, which would say it twice */

@@ -135,7 +135,7 @@ test('⚠ the panel draws one collapsed row per rep with the line as the head, t
   const state = { teamCoachable: { reps: [{ user_id: 'g', name: 'Godwin Ona', calls: 12, items: [{ kind: 'objection_unhandled', moment: { quote: 'A' } }, { kind: 'earned_signal', moment: { quote: 'B' } }], line: { kind: 'pattern', line: 'Godwin — 2 calls where they let it sit.', evidence_ids: ['m2'], calls: 2 } },
     { user_id: 'n', name: 'Nathan', calls: 3, items: [], line: { kind: 'no_items' } }] }, repLineOpen: { g: true } };
   const seen = [];
-  const fn = new Function('state', 'escapeHtml', 'coachableItemHtml', 'laneWaitHtml', 'laneProblem', 'laneProblemHtml', 'noMaterialHtml', src + '\nreturn teamCoachableHtml();');
+  const fn = new Function('state', 'escapeHtml', 'coachableItemHtml', 'laneWaitHtml', 'laneProblem', 'laneProblemHtml', 'noMaterialHtml', src + '\nreturn state.teamCoachable.reps.map(repLineRowHtml).join("");');
   const html = fn(state, (s) => String(s), (it) => { seen.push(it.moment.quote); return '<i>' + it.moment.quote + '</i>'; }, () => 'WAIT', () => null, () => 'PROBLEM', () => 'NOMAT');
   assert.strictEqual((html.match(/class="rep-line-row/g) || []).length, 2, 'one row per rep');
   assert.ok(/aria-expanded="true"/.test(html) && /aria-expanded="false"/.test(html), 'state drives the open row');

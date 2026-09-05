@@ -514,7 +514,7 @@ test('⚠⚠ the unit is PASSED, not inferred — and only a percentage is cappe
 test('⚠ every adjacent nav link pair still HAS its separator element', () => {
   const navAt = HTML.indexOf('<aside class="sidebar"');
   const bar = HTML.slice(navAt, HTML.indexOf('</aside>', navAt));   // ⚠ fromIndex
-  assert.ok(bar.length > 200 && bar.length < 4000, 'nav slice suspicious: ' + bar.length);
+  assert.ok(bar.length > 200 && bar.length < 6500, 'nav slice suspicious: ' + bar.length);
 
   // Strip comments so an archived link cannot answer for a live one.
   const live = bar.replace(/<!--[\s\S]*?-->/g, '');

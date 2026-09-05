@@ -5410,7 +5410,90 @@
     body[data-view="team-coaching"] .strength-progression summary { cursor:pointer; color:var(--accent); margin-bottom:12px; }
     body[data-view="team-coaching"] .strength-result,body[data-view="team-coaching"] .strength-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding-top:16px; border-top:1px solid var(--border); margin-top:12px; }
     @media(max-width:650px) { body[data-view="team-coaching"] .strength-exchange { grid-template-columns:1fr; } }
-  </style>
+      /* Approved Team Coaching workspace and compact navigation, 2026-09-05. */
+    .sidebar-workspace-label { font-size:var(--fs-eyebrow); text-transform:uppercase; letter-spacing:.08em; padding:0 10px 14px; opacity:.65; }
+    .sidebar { padding:20px 10px 16px; box-shadow:none; border:1px solid var(--border); }
+    .sidebar .nav-link { font-size:var(--fs-secondary); padding:10px; }
+    .sidebar .nav-soon { display:none !important; }
+    .workspace-team-pages { display:grid; gap:2px; padding:4px 0 8px 22px; }
+    .workspace-team-link { color:var(--text); text-decoration:none; font-size:var(--fs-secondary); padding:7px 10px; border-left:1px solid var(--border); }
+    .workspace-team-link.is-current { color:var(--accent); border-left-color:var(--accent); background:rgba(var(--accent-rgb),.06); }
+    .workspace-team-link:hover { background:rgba(var(--accent-rgb),.08); }
+    .sidebar .nav-team-menu { display:none; }
+    .sidebar .nav-caret { display:none; }
+    .coaching-rep-workspace { display:grid; grid-template-columns:240px minmax(0,1fr); border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); overflow:hidden; }
+    .coaching-rep-list { border-right:1px solid var(--border); padding:8px; }
+    .coaching-rep-choice { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 8px; width:100%; text-align:left; padding:14px 12px; color:var(--text); border:0; border-bottom:1px solid var(--border); background:transparent; border-radius:var(--radius-sm); cursor:pointer; }
+    .coaching-rep-choice strong { font-weight:var(--fw-emphasis); font-size:var(--fs-body); }
+    .coaching-rep-choice span { grid-column:1; font-size:var(--fs-secondary); opacity:.75; }
+    .coaching-rep-choice small { grid-column:2; grid-row:1; font-size:var(--fs-label); opacity:.65; }
+    .coaching-rep-choice.is-selected { background:rgba(var(--accent-rgb),.09); box-shadow:inset 2px 0 var(--accent); }
+    .coaching-rep-choice.is-selected strong { color:var(--accent); }
+    .coaching-rep-detail { padding:24px; min-width:0; }
+    #content .coaching-rep-detail h3 { font-size:var(--fs-title); margin:0 0 6px; }
+    #content .coaching-rep-detail h4 { font-size:var(--fs-label); text-transform:uppercase; letter-spacing:.06em; opacity:.7; margin:24px 0 8px; font-weight:var(--fw-emphasis); }
+    .coaching-topic { display:block; font-size:var(--fs-secondary); color:var(--accent); margin-bottom:6px; }
+    .coaching-action-copy { font-size:var(--fs-body); line-height:1.7; max-width:70ch; margin:0 0 18px; }
+    .coaching-call-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-top:24px; }
+    .coaching-call-tabs button { padding:7px 10px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-elevated); color:var(--text); cursor:pointer; font-size:var(--fs-label); }
+    .coaching-call-tabs button[aria-pressed="true"] { border-color:var(--accent); }
+    .coaching-outcome-row { display:flex; align-items:center; gap:12px; padding:16px 0; margin-top:8px; border-top:1px solid var(--border); font-size:var(--fs-secondary); }
+    .coaching-outcome-row strong { font-weight:var(--fw-emphasis); }
+    .coaching-quiet-reps { padding:14px 10px; font-size:var(--fs-secondary); opacity:.7; }
+    .coaching-quiet-reps summary { cursor:pointer; }
+    .coaching-empty-detail { opacity:.7; max-width:55ch; line-height:1.7; }
+    body[data-view="team-coaching"] .coaching-rep-detail .coach-item { border:0; margin:0; padding:0; }
+    body[data-view="team-coaching"] .coaching-rep-detail .coach-item-kind:empty { display:none; }
+    body[data-view="team-coaching"] .coaching-rep-detail .missed-pair { margin:0; }
+    body[data-view="team-coaching"] .coaching-workspace-header { grid-template-columns:minmax(0,1fr) auto; align-items:center; }
+    body[data-view="team-coaching"] .coaching-header-score { grid-column:1; grid-row:3; }
+    body[data-view="team-coaching"] .coaching-header-score .lead-number { display:inline-flex; border:0; padding:0; margin:0; gap:10px; }
+    body[data-view="team-coaching"] .coaching-header-score .lead-number-label { font-size:var(--fs-label); }
+    body[data-view="team-coaching"] .coaching-focus { padding:16px 20px; margin:0; }
+    .coaching-priority { border-top:1px solid var(--border); }
+    .coaching-priority summary { display:grid; grid-template-columns:24px minmax(0,1fr) 16px; gap:12px; align-items:center; cursor:pointer; list-style:none; padding:14px 0; font-size:var(--fs-body); }
+    .coaching-priority summary::-webkit-details-marker { display:none; }
+    .coaching-priority-number { color:var(--accent); font-size:var(--fs-label); }
+    .coaching-priority-body { max-width:75ch; padding:0 0 16px 36px; font-size:var(--fs-body); line-height:1.65; }
+    .strength-preview { border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); }
+    .strength-preview > summary { padding:18px 20px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:20px; align-items:center; cursor:pointer; list-style:none; }
+    .strength-preview > summary::-webkit-details-marker { display:none; }
+    .strength-preview > summary strong { font-size:var(--fs-body); font-weight:var(--fw-emphasis); }
+    .coaching-result-chip { font-size:var(--fs-label); padding:4px 8px; border:1px solid var(--border); border-radius:var(--radius-sm); }
+    .coaching-open-label { color:var(--accent); font-size:var(--fs-secondary); }
+    body[data-view="team-coaching"] .strength-preview .strength-outcome-card { border:0; border-top:1px solid var(--border); margin:0; }
+    .coaching-rep-workspace button:focus-visible, .workspace-team-link:focus-visible, .coaching-priority summary:focus-visible, .strength-preview summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    @media(max-width:900px) {
+      .sidebar-workspace-label { display:none; }
+      .workspace-team-pages { display:flex; flex-wrap:wrap; padding:0; }
+      .sidebar .nav-team-wrap { flex-wrap:wrap; }
+      .workspace-team-link { border-left:0; padding:7px; }
+      .coaching-rep-workspace { grid-template-columns:200px minmax(0,1fr); }
+    }
+    @media(max-width:620px) {
+      .coaching-rep-workspace { grid-template-columns:minmax(0,1fr); }
+      .coaching-rep-list { display:flex; gap:6px; overflow-x:auto; border-right:0; border-bottom:1px solid var(--border); }
+      .coaching-rep-choice { flex:0 0 180px; }
+      .coaching-quiet-reps { flex:0 0 170px; }
+      .coaching-rep-detail { padding:18px; }
+      .strength-preview > summary { grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:16px; }
+      .coaching-open-label { grid-column:1 / -1; }
+      .coaching-priority-body { padding-left:0; }
+    }
+
+.sidebar .nav-link:not(.nav-soon) { display:flex; align-items:center; gap:9px; }
+.workspace-nav-icon { width:16px; height:16px; flex:0 0 16px; }
+
+    body[data-view="team-coaching"] .coaching-workspace-header .page-header--company { flex-direction:row; flex-wrap:wrap; }
+    body[data-view="team-coaching"] .coaching-workspace-header .page-header--company .page-header-side { margin:0; width:auto; }
+    body[data-view="team-coaching"] .coaching-workspace-header .page-header--company .page-header-main { flex:1; }
+    @media(min-width:1000px) {
+      body[data-view="team-coaching"] .coaching-workspace-header { grid-template-columns:minmax(0,1fr) auto auto; }
+      body[data-view="team-coaching"] .coaching-workspace-header .page-header--company { grid-column:1 / 3; grid-row:2; }
+      body[data-view="team-coaching"] .coaching-workspace-header .team-controls-row { grid-column:3; grid-row:2; }
+      body[data-view="team-coaching"] .coaching-header-score { grid-column:3; grid-row:1; justify-self:end; }
+    }
+</style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>
 </head>
@@ -5531,11 +5614,11 @@
      getElementById('navTeamSep').style.display = '' with NO null guard, so
      removing them would throw at boot. Hiding them in CSS means that write still
      lands and still resolves to hidden. -->
-<aside class="sidebar" id="sidebar" aria-label="Pages">
+<aside class="sidebar" id="sidebar" aria-label="Pages"><div class="sidebar-workspace-label">Your workspace</div>
     <span class="sep">·</span>
-    <a class="nav-link" id="navOverview" onclick="goOwnCoaching(); return false;">Coaching Dashboard</a>
+    <a class="nav-link" id="navOverview" onclick="goOwnCoaching(); return false;"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Coaching Dashboard</a>
     <span class="sep">·</span>
-    <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;">Calls</a>
+    <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 9v6M8 5v14M12 3v18M16 7v10M20 9v6"/></svg>Calls</a>
     <!-- ⚠ (ff) THIS SEPARATOR WAS SIMPLY NEVER TYPED. The nav is hand-written
          markup, NOT generated from a list — every "·" is a literal span placed by
          hand, so nothing adds one automatically and the next link added will have
@@ -5543,7 +5626,7 @@
          the missing dot is the symptom. Guarded by rep-graphs' nav test so the
          omission fails loudly next time instead of shipping. -->
     <span class="sep">·</span>
-    <a class="nav-link" id="navEod" onclick="goEod(); return false;">EOD Report</a>
+    <a class="nav-link" id="navEod" onclick="goEod(); return false;"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 4H5v17h14V4h-3M9 3h6v4H9zM8 12h8M8 16h6"/></svg>EOD Report</a>
     <span class="sep" id="navTeamSep" style="display:none">·</span>
     <!-- ⚠⚠ THE TEAM TAB IS THE FIVE-PAGE DROPDOWN. The wrapper is an anchor for
          the menu and nothing else; the <a> keeps its class, its onclick shape
@@ -5556,16 +5639,17 @@
            tolerable for a MENU: without this, Escape has nothing to return
            focus to and a keyboard user cannot open the thing at all. -->
       <a class="nav-link" id="navTeam" tabindex="0"
-         onclick="navTeamClick(event); return false;"
-         onkeydown="navTeamButtonKeydown(event);"
-         aria-haspopup="true" aria-expanded="false">Team<span class="nav-caret">▾</span></a>
+         onclick="goTeam(); return false;"
+         onkeydown="if(event.key === 'Enter' || event.key === ' '){event.preventDefault();goTeam();}"
+         ><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 5"/></svg>Team<span class="nav-caret">▾</span></a>
+      <nav class="workspace-team-pages" id="workspaceTeamPages" aria-label="Team pages"></nav>
     </span>
     <!-- Prospects nav link REMOVED 2026-08-04 (Justin: distracting). The page,
          its routes and merge review all remain — reachable at #prospects. Merge
          quality still moves the close rate, so SQL must not become the only way
          in. Hash entry is wired in applyHashToState + onRouteChange below. -->
     <span class="sep" id="navKbSep" style="display:none">·</span>
-    <a class="nav-link" id="navKb" onclick="goKb(); return false;" style="display:none">Knowledge Base</a>
+    <a class="nav-link" id="navKb" onclick="goKb(); return false;" style="display:none"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1v15"/></svg>Knowledge Base</a>
     <!-- ⚠⚠ COMING-SOON TABS ARE <span>, NOT <a> — AND THAT IS THE WHOLE
          IMPLEMENTATION OF "INERT". A <span> has no href, so it cannot navigate,
          is not in the tab order, gets no link semantics from a screen reader,
@@ -5775,6 +5859,7 @@
     laneWaitLong:   {},
     teamRecs:       null,   teamRecsLoading: false,
     teamCoachable:  null,   teamCoachableLoading: false,   // H726: coachable moments (Team → Coaching) — the pairs are one kind within it
+    coachingSelectedRep: null, coachingSelectedMoment: 0,
     repLineOpen: {},   // H734: which rep rows are open on the Coachable Moments panel (by user id); resets on pivot
     repSortKey: 'close', repSortDir: 'best',   // H736 (Justin, 2026-09-05): closing rate, BEST first, by default; switchable; Objections and Grade stay; call time is never a sort key
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
@@ -8169,6 +8254,8 @@
     // ⚠ SAME LIST AS THE COALESCER. Hand-written, this one had gone stale too:
     //   the tab lost its underline on Performance and Coaching.
     if (navTeam) navTeam.classList.toggle('nav-active', isTeamView(state.view));
+    var teamLinks = document.getElementById('workspaceTeamPages');
+    if (teamLinks) teamLinks.innerHTML = teamPagesWithBoard().map(function (p) { return '<a href="#' + p.view + '" class="workspace-team-link' + (p.view === teamPageForView(state.view) ? ' is-current' : '') + '"' + (p.view === teamPageForView(state.view) ? ' aria-current="page"' : '') + ' onclick="event.preventDefault(); goTeamPage(\'' + p.view + '\');">' + escapeHtml(p.label) + '</a>'; }).join('');
     var navKb = document.getElementById('navKb');
     if (navKb) navKb.classList.toggle('nav-active', state.view === 'kb');
     if (navCallLibrary) {
@@ -9186,6 +9273,7 @@
      under another company's name — silently. A forgotten argument must fail
      toward the merely annoying, never toward the wrong. */
   function resetTeamData(reason) {
+    state.coachingSelectedRep = null; state.coachingSelectedMoment = 0;
     // ⚠ the hidden set is PER TEAM — reload it here, or one team's filter
     // silently applies to another team's reps.
     loadRepFilter();
@@ -10860,6 +10948,7 @@
        drilldown and the coaching tile still use it. */
     if (state.teamRecs === null && !state.teamRecsLoading) loadTeam('recs');
     if (state.teamCoachable === null && !state.teamCoachableLoading) loadTeam('coachable');   // H726
+    if (state.teamCoachable && state.teamCoachable.reps) loadNotedMoments(state.teamCoachable.reps.flatMap(function (r) { return (r.improvements || []).map(function (it) { return it.moment.id; }); }));
     if (state.teamRecs && !state.teamRecs._error) loadNotedMoments(((state.teamRecs.working || []).concat(state.teamRecs.improve || [])).map(function (i) { return i && i.highlight_id; }));
     /* ⚠ COACHING LEADS WITH THE TEAM'S AVERAGE SCORE (ruled). Performance shows
        the RANKING; this shows the ONE number — different granularity, not a
@@ -10869,15 +10958,15 @@
       '<div class="team-coaching-workspace">'
       + '<div class="coaching-breadcrumb">Team / Coaching</div><div class="coaching-workspace-header"><div class="coaching-page-title"><h2>Team Coaching</h2></div>'
       + teamHeaderHtml()
-      + teamControlsHtml() + '</div>'
-      + leadNumberHtml(avg, 'Team average score')
+      + teamControlsHtml() + '<div class="coaching-header-score">' + leadNumberHtml(avg, 'Team average score') + '</div></div>'
       /* Approved workspace revision: every recommendation remains, with evidence
          behind a disclosure instead of six fully expanded blocks. No new synthesis. */
       + (teamPanelVisible('recs') ? '<div class="section fade-in">'
-        + teamRecsHtml() + '</div>' : '')
+        + teamRecsHtml('focus') + '</div>' : '')
       // H726: coachable moments — one panel, mixed kinds; managers and above, this page only.
       + (teamPanelVisible('coachable') ? '<div class="section fade-in"><div class="section-header"><h2>Coachable Moments</h2></div>'
         + teamCoachableHtml() + '</div>' : '')
+      + (teamPanelVisible('recs') && state.teamRecs ? '<div class="section fade-in">' + teamRecsHtml('strengths') + '</div>' : '')
       /* ⚠⚠ THE "Call Highlights of the Week →" LINK WENT WITH THE FEATURE
          (2026-09-01). It was added days earlier precisely so Highlights would not
          become unreachable — and the right move when the destination is retired
@@ -15315,12 +15404,12 @@
     }
     return '<article class="strength-outcome-card">'
       + '<div class="strength-outcome-label">' + escapeHtml(it.rep || 'Closer') + ' · Call outcome: ' + escapeHtml(resultLabel) + '</div>'
-      + '<h3>' + escapeHtml(it.claim || '') + '</h3>'
+      + (it.claim ? '<h3>' + escapeHtml(it.claim) + '</h3>' : '')
       + '<div class="strength-exchange">' + excerpt(e.moment) + excerpt(e.response) + '</div>'
       + '<details class="strength-progression"><summary>How the conversation continued</summary>'
       + (e.following || []).map(excerpt).join('') + '</details>'
       + (e.result_explanation ? '<div class="strength-call-result"><h3>How the Call Ended</h3><p>' + escapeHtml(e.result_explanation) + '</p></div>' : '')
-      + '<div class="strength-result"><span>Call result</span><strong>' + escapeHtml(resultLabel) + '</strong></div>'
+
       + '<div class="strength-actions"><button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\', \'' + escapeHtml(e.owner_user_id || '') + '\')">Review Full Call</button>' + ftBtn + '</div></article>';
   }
 
@@ -15339,7 +15428,7 @@
           + ' onclick="fineTuneFromInsight(this.getAttribute(\'data-kind\'), this.getAttribute(\'data-idx\'), this)"'
           + ' title="Tell Scout how your team would handle this \u2014 it learns the idea behind it">Fine Tune Coaching</button>';
     }
-    if (state.view === 'team-coaching' && kind === 'working' && it.call_evidence) return strengthOutcomeHtml(it, ftBtn);
+    if (state.view === 'team-coaching' && kind === 'working' && it.call_evidence) return '<details class="strength-preview"><summary><span><span class="coaching-topic">' + escapeHtml(it.rep || 'Closer') + '</span><strong>' + escapeHtml(coachingShortText(it.claim)) + '</strong></span><span class="coaching-result-chip">' + escapeHtml(outcomeLabel(it.call_evidence.outcome)) + '</span><span class="coaching-open-label">View exchange</span></summary>' + strengthOutcomeHtml(it, ftBtn) + '</details>';
     var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(it.source)) + '</a>' : '';
     var repName = it.rep ? displayNameFromEmail(String(it.rep), String(it.rep)) : '';
     var repTag = repName ? '<span class="team-rep-tag">' + escapeHtml(repName) + '</span>' : '';
@@ -15375,6 +15464,7 @@
     var evidence = (it.data ? '<div class="team-insight-data">' + escapeHtml(it.data) + '</div>' : '')
       + quoteHtml + (attributed ? '' : '<div class="team-insight-foot">' + repTag + clipBtn + '</div>');
     var workspace = state.view === 'team-coaching';
+    if (workspace && kind === 'improve') return '<details class="coaching-priority"><summary><span class="coaching-priority-number">' + String(idx + 1).padStart(2, '0') + '</span><span>' + escapeHtml(coachingShortText(it.claim)) + '</span><span aria-hidden="true">+</span></summary><div class="coaching-priority-body"><p>' + escapeHtml(String(it.claim || '').replace(/most catastrophic gap/gi, 'largest gap')) + '</p>' + evidence + ftBtn + '</div></details>';
     return '<div class="team-insight ' + kind + '">'
       + (workspace ? '<span class="coaching-insight-number" aria-hidden="true">' + String(idx + 1).padStart(2, '0') + '</span>' : '')
       + '<div class="team-insight-claim">' + escapeHtml(it.claim || '') + '</div>'
@@ -15511,14 +15601,65 @@
     var head = row.querySelector('.rep-line-head'); if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
     var body = row.querySelector('.rep-line-body'); if (body) body.hidden = !open;
   }
+  function coachingShortText(text) {
+    var clean = String(text || '').replace(/most catastrophic gap/gi, 'largest gap');
+    return clean.length > 100 ? clean.slice(0, 97).replace(/\s+\S*$/, '') + '…' : clean;
+  }
+  function coachingRepName(rep) { return displayNameFromEmail(String(rep.name || ''), String(rep.name || 'Closer')); }
+  function selectCoachingRep(id) {
+    state.coachingSelectedRep = id; state.coachingSelectedMoment = 0;
+    var host = document.getElementById('coachingRepWorkspace');
+    if (host) host.outerHTML = coachingRepWorkspaceHtml(state.teamCoachable.reps || []);
+    var panel = document.getElementById('coachingDetailTitle'); if (panel) panel.focus();
+  }
+  function selectCoachingMoment(index) {
+    state.coachingSelectedMoment = Number(index) || 0;
+    var host = document.getElementById('coachingRepWorkspace');
+    if (host) host.outerHTML = coachingRepWorkspaceHtml(state.teamCoachable.reps || []);
+    var panel = document.getElementById('coachingDetailTitle'); if (panel) panel.focus();
+  }
+  function fineTuneFromCoachingFocus(btn) {
+    var rep = ((state.teamCoachable || {}).reps || []).find(function (r) { return r.user_id === state.coachingSelectedRep; });
+    var item = rep && (rep.improvements || [])[state.coachingSelectedMoment || 0];
+    if (!item || !item.moment) return;
+    return fineTuneCoaching({callId:item.call_id, highlightId:item.moment.id, surface:'team_coaching_insight', quote:item.moment.quote, coaching:item.coaching}, btn);
+  }
+  function coachingRepWorkspaceHtml(reps) {
+    var active = reps.filter(function (r) { return r.calls > 0; });
+    var quiet = reps.filter(function (r) { return !r.calls; });
+    var selected = active.find(function (r) { return r.user_id === state.coachingSelectedRep; }) || active.find(function (r) { return (r.improvements || []).length; }) || active[0];
+    if (selected) state.coachingSelectedRep = selected.user_id;
+    var items = selected ? selected.improvements || [] : [];
+    var index = Math.min(state.coachingSelectedMoment || 0, Math.max(0, items.length - 1));
+    state.coachingSelectedMoment = index;
+    var item = items[index];
+    var list = active.map(function (r) {
+      var evidence = r.improvements || [];
+      return '<button type="button" class="coaching-rep-choice' + (r === selected ? ' is-selected' : '') + '" data-user="' + escapeHtml(r.user_id) + '" aria-pressed="' + (r === selected) + '" onclick="selectCoachingRep(this.dataset.user)"><strong>' + escapeHtml(coachingRepName(r)) + '</strong><span>' + escapeHtml(evidence.length ? evidence[0].topic : 'No evidenced improvement yet') + '</span>' + (evidence.length ? '<small>' + evidence.length + ' call' + (evidence.length === 1 ? '' : 's') + '</small>' : '') + '</button>';
+    }).join('');
+    var detail = '<h3 id="coachingDetailTitle" tabindex="-1">' + escapeHtml(selected ? coachingRepName(selected) : 'Coachable Moments') + '</h3>';
+    if (!item) detail += '<p class="coaching-empty-detail">' + (selected ? 'No supported improvement with coaching and a call excerpt is available for this closer in this period.' : 'No counted calls in this period.') + '</p>';
+    else {
+      detail += '<span class="coaching-topic">' + escapeHtml(item.topic) + '</span><h4>One thing to do differently</h4><p class="coaching-action-copy">' + escapeHtml(item.coaching) + '</p>';
+      if (items.length > 1) detail += '<div class="coaching-call-tabs" aria-label="Calls supporting this focus">' + items.map(function (it, k) { return '<button type="button" aria-pressed="' + (index === k) + '" onclick="selectCoachingMoment(' + k + ')">Call ' + (k + 1) + ' · ' + escapeHtml(String(it.call_date || '').slice(0,10)) + '</button>'; }).join('') + '</div>';
+      detail += '<h4>What happened</h4>' + (item.call_evidence ? strengthOutcomeHtml({rep:coachingRepName(selected), call_id:item.call_id, call_evidence:item.call_evidence}, '') : coachableItemHtml(Object.assign({}, item, {label:'', prospect_name:'Call excerpt'})));
+      if (!item.call_evidence) detail += '<div class="coaching-outcome-row"><span>Call result</span><strong>' + escapeHtml(item.outcome ? outcomeLabel(item.outcome) : 'Not recorded') + '</strong></div>';
+      if (canMarkStandard()) {
+        var noted = state.notedHighlightIds && state.notedHighlightIds[item.moment.id];
+        detail += '<button class="review-kb-btn review-ft-btn"' + (noted ? ' disabled' : ' onclick="fineTuneFromCoachingFocus(this)"') + '>' + (noted ? 'Noted ✓' : 'Fine Tune Coaching') + '</button>';
+      }
+    }
+    return '<div class="coaching-rep-workspace" id="coachingRepWorkspace"><div class="coaching-rep-list" aria-label="Choose a closer">' + list + (quiet.length ? '<details class="coaching-quiet-reps"><summary>' + quiet.length + ' closers without calls</summary>' + quiet.map(function (r) { return '<p>' + escapeHtml(coachingRepName(r)) + '</p>'; }).join('') + '</details>' : '') + '</div><section class="coaching-rep-detail" aria-label="Selected closer coaching">' + detail + '</section></div>';
+  }
   function teamCoachableHtml() {
     var r = state.teamCoachable;
-    if (!r) return laneWaitHtml('coachable', 'Reading the team\u2019s calls\u2026', 'Still reading \u2014 every counted call in the window is checked, and the first load of the day writes each rep\u2019s line from scratch.', 120);
+    if (!r) return laneWaitHtml('coachable', 'Reading the team’s calls…', null, 120);
     var problem = laneProblem(r);
     if (problem) return laneProblemHtml('coachable moments', problem);
+    if (r.no_material) return noMaterialHtml(r.copy);
     var reps = Array.isArray(r.reps) ? r.reps : [];
     if (!reps.length) return '<div class="team-empty">No coachable moments in this window.</div>';
-    return (r.no_material ? noMaterialHtml(r.copy) : '') + reps.map(repLineRowHtml).join('');
+    return coachingRepWorkspaceHtml(reps);
   }
 
   /* H731 — WHAT A USER SEES WHEN NOTHING RELEVANT IS FOUND. Every advice lane returns the one shape
@@ -15528,7 +15669,7 @@
     return '<div class="empty no-material"><p>' + escapeHtml(copy || 'Scout has nothing on file for this team yet, so it is not coaching from guesswork. Add the offer, qualifications and script on the account page and coaching will use them from the next call on.') + '</p></div>';
   }
 
-  function teamRecsHtml() {
+  function teamRecsHtml(part) {
     var r = state.teamRecs;
     /* ⚠⚠ WORDS, WHERE THE CONTENT WILL BE — not a spinner in a corner and not a
        silent grey block. The reader is looking at the empty space asking whether
@@ -15548,8 +15689,8 @@
     if (state.view === 'team-coaching') {
       var strengths = w.map(function (x, k) { return teamInsightHtml(x, 'working', k); }).join('');
       var focus = i.map(function (x, k) { return teamInsightHtml(x, 'improve', k); }).join('');
-      return (i.length ? '<section class="coaching-focus"><div class="coaching-focus-heading"><span class="coaching-signal" aria-hidden="true"></span><h2>Coaching Focus</h2><span class="coaching-section-note">What to improve</span></div>' + focus + '</section>' : '')
-        + (w.length ? '<section class="coaching-strengths"><div class="section-header"><h2>Team Strengths</h2></div><div class="coaching-strength-grid">' + strengths + '</div></section>' : '');
+      return (part !== 'strengths' && i.length ? '<section class="coaching-focus"><div class="coaching-focus-heading"><span class="coaching-signal" aria-hidden="true"></span><h2>Coaching Focus</h2><span class="coaching-section-note">What to improve</span></div>' + focus + '</section>' : '')
+        + (part !== 'focus' && w.length ? '<section class="coaching-strengths"><div class="section-header"><h2>Team Strengths</h2></div><div class="coaching-strength-grid">' + strengths + '</div></section>' : '');
     }
     return '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
       + (w.length ? w.map(function (x, k) { return teamInsightHtml(x, 'working', k); }).join('') : '<div class="empty"><p>—</p></div>')

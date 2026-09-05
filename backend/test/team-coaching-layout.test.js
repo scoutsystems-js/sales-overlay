@@ -40,16 +40,16 @@ test('coaching render preserves lane dispatch and panel visibility', () => {
     fnBody(live, 'renderTeamCoaching') + ';return renderTeamCoaching();');
   render({ getElementById: () => content }, state, () => {}, lane => dispatch.push(lane), () => {}, () => 'TEAM', () => 'DATE', () => 'SCORE', () => false, () => { throw Error('hidden recommendations rendered'); }, () => { throw Error('hidden moments rendered'); }, () => 'HIDDEN');
   assert.deepEqual(dispatch, []);
-  assert.match(content.innerHTML, /TEAMDATE<\/div>SCORE/);
+  assert.match(content.innerHTML, /TEAMDATE<div class="coaching-header-score">SCORE<\/div><\/div>/);
   assert.match(content.innerHTML, /HIDDEN<\/div>$/);
 });
 
 
 test('workspace evidence retains attribution, clip and original Fine Tune target inside disclosure', () => {
   const render = new Function('state', 'escapeHtml', 'canMarkStandard', 'displayNameFromEmail', 'tsFromClipUrl', 'clipLabelFor',
-    fnBody(live, 'teamInsightHtml') + ';return teamInsightHtml({claim:"claim",data:"supporting evidence",quote:"exact quote",rep:"Rep",spoke:"closer",clip_url:"https://example.com/clip",highlight_id:"h1",call_id:"c1"},"improve",2);');
+    fnBody(live, 'coachingShortText') + fnBody(live, 'teamInsightHtml') + ';return teamInsightHtml({claim:"claim",data:"supporting evidence",quote:"exact quote",rep:"Rep",spoke:"closer",clip_url:"https://example.com/clip",highlight_id:"h1",call_id:"c1"},"improve",2);');
   const output = render({view:'team-coaching'}, s=>String(s), ()=>true, s=>s, ()=>'01:20', ()=>'Clip');
-  assert.match(output, /<details class="coaching-evidence"><summary>/);
+  assert.match(output, /<details class="coaching-priority"><summary>/);
   for (const retained of ['supporting evidence', 'exact quote', 'Rep', 'https://example.com/clip', 'data-kind="improve"', 'data-idx="2"']) assert.ok(output.includes(retained), retained);
   assert.ok(output.indexOf('Rep') < output.indexOf('exact quote'), 'attribution precedes quote');
 });

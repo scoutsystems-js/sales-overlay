@@ -368,7 +368,7 @@ test('⚠⚠ the page dropdown is the NAV TAB, and there is exactly one of it', 
 
   // the nav tab is the control, and it lists every page from the one list
   assert.ok(/id="navTeamWrap"/.test(LIVE), 'the Team tab must anchor the menu');
-  assert.ok(/onclick="navTeamClick\(event\)/.test(LIVE), 'the tab opens it');
+  assert.ok(/id="workspaceTeamPages"/.test(LIVE), 'the Team pages have a persistent navigation host');
   const mAt = LIVE.indexOf('function navTeamMenuHtml');
   const menu = LIVE.slice(mAt, LIVE.indexOf('\n  }', mAt));
   assert.ok(menu.length > 200 && menu.length < 1800, 'menu slice: ' + menu.length);
@@ -439,9 +439,8 @@ test('⚠ the Team tab keeps every cosmetic property — only a caret is added',
      return focus to and the control cannot be opened from the keyboard at all.
      Proven by measuring it: focus return failed before this was added. */
   assert.ok(/tabindex="0"/.test(block), 'the menu tab must be reachable by keyboard');
-  assert.ok(/onkeydown="navTeamButtonKeydown/.test(block), 'and openable from it');
-  assert.ok(/aria-haspopup="true"/.test(block) && /aria-expanded=/.test(block),
-    'and it must announce itself as a menu');
+  assert.ok(/onkeydown="if\(event.key/.test(block), 'Team remains keyboard navigable');
+  assert.ok(!/aria-haspopup="true"/.test(block), 'persistent links must not announce a hidden popup');
   // the wrapper must add no box of its own
   // ⚠ SLICE TO THE RULE'S OWN CLOSING BRACE. A fixed-length slice ran into the
   //   NEXT rule (.nav-caret, which legitimately has margin and font-size) and

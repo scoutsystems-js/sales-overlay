@@ -1996,3 +1996,6 @@ The previous styling-only passes were rejected. Implemented the approved focus �
 ### Team Strengths outcome card — 2026-09-05
 Implemented verified transcript pairing and call-level results for the approved strength layout. Validation and limits: TEAM-STRENGTH-OUTCOME.md. Deployment verification pending.
 - Investigate inconsistent outcome/explanation on call 3ec3b1fb-529d-4439-91a1-5a1b4098e9a9; strength withheld, data unchanged.
+
+## GPT Team Coaching workspace — 2026-09-05 (local, not deployed)
+Approved compact priorities, closer selector/detail panel, expandable strengths, persistent Team subnavigation and icons are implemented in the Codex worktree; original wordmark/background toggle retained. Full suite 2,477/2,477. See `gpt.md` for the concrete current-v47 coaching/transcript contradiction that blocks deploying the new advice panel, validation limits and remaining steps. Do not mark this shipped or push it as verified advice.
