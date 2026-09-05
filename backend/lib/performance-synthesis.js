@@ -16,7 +16,7 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 /* Bumped ONLY for a correctness defect in what the cache already holds —
    never for a speculative improvement. See the key comment below. */
-const SYNTH_RULE_VERSION = 'v7-2026-09-05-kb-material';   /* v7 (H731): the one knowledge-base retrieval before the prompt; nothing relevant → nothing said. Was v6-2026-09-05-subject-bar-page-facts */ //   /* v6 (H728): the subject check, the candidate bar and the page facts — the same three the recommendations lane carries. Was v5-2026-09-02-category-order-canonical */ //   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
+const SYNTH_RULE_VERSION = 'v8-2026-09-05-doctrine';   /* v8 (H732): Scout's doctrine in the prompt as a constraint. Was v7-2026-09-05-kb-material */ //   /* v7 (H731): the one knowledge-base retrieval before the prompt; nothing relevant → nothing said. Was v6-2026-09-05-subject-bar-page-facts */ //   /* v6 (H728): the subject check, the candidate bar and the page facts — the same three the recommendations lane carries. Was v5-2026-09-02-category-order-canonical */ //   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 const { evidenceSubjectMismatch, candidateEligible, subjectPromptRule } = require('./evidence-subject');   // H728 step 1
@@ -111,6 +111,7 @@ function buildPrompt(agg, oneThings, candidates, sellingContext, managerNotes) {
   lines.push(EVIDENCE_RULE);
   lines.push('');
   lines.push(PF.factsBlock(PF.pageFacts(agg.sections, agg.obj, { minBucket: MIN_BUCKET })));   // H728 step 2: the same facts as the page
+  if (agg.doctrineBlock) { lines.push(''); lines.push(agg.doctrineBlock); }   // H732
   lines.push('');
   lines.push('EVIDENCE MOMENTS (cite exactly one by its id in evidence_id; do not invent quotes). Each carries its TYPE, category and SECTION:');
   candidates.forEach(function (c) {
@@ -297,6 +298,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
     sections: sections, strongest: strongest, weakest: weakest,
     win_avg: avg(winSum, winN), win_n: winN, loss_avg: avg(lossSum, lossN), loss_n: lossN,
     blended: avg(blSum, blN), done_n: blN, obj: obj,
+    doctrineBlock: material.doctrineBlock ? material.doctrineBlock('performance-synthesis') : '',   // H732
   };
 
   // 6) Claude call — credit-tolerant.

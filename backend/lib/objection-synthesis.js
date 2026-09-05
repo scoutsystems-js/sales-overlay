@@ -58,7 +58,7 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v2-2026-09-05-kb-material';   // H731: the knowledge base before the advice; no generic fallback. v1 was the unversioned original.
+var SYNTH_PROMPT_VERSION = 'v3-2026-09-05-doctrine';   /* v3 (H732): Scout's doctrine in the prompt as a constraint. Was v2-2026-09-05-kb-material */ //   // H731: the knowledge base before the advice; no generic fallback. v1 was the unversioned original.
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
@@ -87,6 +87,7 @@ function buildSynthPrompt(present, byCat, material) {
     }
   });
   lines.push('');
+  if (material && material.doctrineBlock) { var dblock = material.doctrineBlock('objection-synthesis'); if (dblock) { lines.push(dblock); lines.push(''); } }   // H732
   if (material && material.contextText) { lines.push('TEAM MATERIAL (this closer\'s offer, qualifications and approach — ground every sentence in it):'); lines.push(material.contextText.trim()); lines.push(''); }
   if (material && material.notes && material.notes.text) { lines.push(require('./coaching-corrections').promptLane(material.notes.text)); lines.push(''); }
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
@@ -215,4 +216,4 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-module.exports = { computeObjectionSynthesis: computeObjectionSynthesis };
+module.exports = { computeObjectionSynthesis: computeObjectionSynthesis, _buildSynthPrompt: buildSynthPrompt, _SYNTH_PROMPT_VERSION: SYNTH_PROMPT_VERSION };

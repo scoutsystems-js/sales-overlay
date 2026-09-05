@@ -23,6 +23,7 @@
 'use strict';
 var { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 var corrections = require('./coaching-corrections');
+var doctrineLib = require('./doctrine');   // H732: the method — global, a constraint, NEVER material
 
 var NO_MATERIAL_COPY = 'Scout has nothing on file for this team yet, so it is not coaching from guesswork. Add the offer, qualifications and script on the account page and coaching will use them from the next call on.';
 
@@ -40,12 +41,19 @@ async function loadKbMaterial(admin, opts) {
   var notes = teamKey ? await corrections.loadCorrectionsSafe(admin, teamKey, o.lane || 'kb-material') : { rows: [], text: '', hash: 'none' };
   var hasContext = !!(selling.contextText && selling.contextText.trim());
   var hasNotes = !!(notes && notes.text && String(notes.text).trim());
+  /* H732: DOCTRINE IS METHOD, NOT MATERIAL. It rides the same retrieval (one call before the prompt) and its hash
+     moves every cache key, but it is NOT counted in hasMaterial — a team with nothing of its own on file still
+     says nothing, doctrine or no doctrine. */
+  var doctrine = { units: [], hash: 'none' };
+  try { doctrine = await doctrineLib.loadDoctrine(admin); } catch (e) { console.warn('[kb-material] doctrine unavailable: ' + (e && e.message)); }
   return {
     contextText: hasContext ? selling.contextText : '',
     qualifications: selling.qualifications || null,
     notes: notes || { rows: [], text: '', hash: 'none' },
     hasMaterial: hasContext || hasNotes,
-    kbHash: (selling.kbHash || 'none') + '|notes:' + ((notes && notes.hash) || 'none'),
+    doctrine: doctrine,
+    doctrineBlock: function (lane) { return doctrineLib.doctrineBlock(doctrine, lane); },
+    kbHash: (selling.kbHash || 'none') + '|notes:' + ((notes && notes.hash) || 'none') + '|doctrine:' + doctrine.hash,
     sources: selling.sources || [],
     teamKey: teamKey,
   };

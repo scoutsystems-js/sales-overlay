@@ -193,7 +193,7 @@ test('persistHighlights writes the two columns (executed against a fake wire)', 
 
 test('v41: the prompt lists the sixteen moves (derived, not typed twice), the version is bumped, the cap is 4500', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v44-2026-09-05'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v45-2026-09-05'/);
   assert.match(src, /HIGHLIGHT_MAX_TOK\s*=\s*4500/);
   const prompt = W._buildHighlightExtractorPrompt({ turns: TURNS, speaker_confidence: 'matched' });
   arc.ALL_MOVES.forEach((m) => assert.ok(prompt.indexOf(m) !== -1, 'prompt lacks ' + m));

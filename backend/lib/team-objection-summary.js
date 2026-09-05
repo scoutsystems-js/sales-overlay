@@ -55,7 +55,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v14-2026-09-05-kb-material';   /* v14 (H731): the offer/qualifications/script join the notes in the prompt through the one retrieval; nothing relevant → nothing said. Was v13-2026-09-02-never-diminish-manager-notes-moment-ids */ //   /* payload shape: each evidence moment now carries highlight_id + fathom_call_id (Fine Tune Coaching surface ③) */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
+const PROMPT_VERSION = 'v15-2026-09-05-doctrine';   /* v15 (H732): Scout's doctrine in the prompt as a constraint. Was v14-2026-09-05-kb-material */ //   /* v14 (H731): the offer/qualifications/script join the notes in the prompt through the one retrieval; nothing relevant → nothing said. Was v13-2026-09-02-never-diminish-manager-notes-moment-ids */ //   /* payload shape: each evidence moment now carries highlight_id + fathom_call_id (Fine Tune Coaching surface ③) */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -337,7 +337,7 @@ function evidenceLine(m) {
   return parts.join('\n');
 }
 
-function buildPrompt(subjects, managerNotes, sellingContext) {
+function buildPrompt(subjects, managerNotes, sellingContext, doctrineBlock) {
   var lines = [
     'You are a high-ticket sales coach writing to ONE closer at a time.',
     '',
@@ -480,6 +480,7 @@ function buildPrompt(subjects, managerNotes, sellingContext) {
      notes are ADDED here, not appended: +~150 tokens of header when any note
      exists, +~40 tokens per note, nothing when the team has none. */
   if (managerNotes && String(managerNotes).trim()) { lines.push(require('./coaching-corrections').promptLane(managerNotes)); lines.push(''); }
+  if (doctrineBlock && String(doctrineBlock).trim()) { lines.push(String(doctrineBlock).trim()); lines.push(''); }   // H732
   if (sellingContext && String(sellingContext).trim()) { lines.push('SELLING CONTEXT (this team\'s offer, qualifications and approach — ground the coaching in it, never in invented doctrine):'); lines.push(String(sellingContext).trim()); lines.push(''); }   // H731
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
   lines.push('{"closers":[{"name":"<exact name as given>",'
@@ -628,7 +629,7 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
     resp = await createWithUsage({
       model: CLAUDE_MODEL,
       max_tokens: outputBudget(subjects.length),
-      messages: [{ role: 'user', content: buildPrompt(subjects, corr.text, material.contextText) }],
+      messages: [{ role: 'user', content: buildPrompt(subjects, corr.text, material.contextText, material.doctrineBlock ? material.doctrineBlock('team-objection-summary') : '') }],
     });
   } catch (apiErr) {
     // ⚠ NEVER CACHE A FAILURE. A cached "unavailable" would persist until the

@@ -29,6 +29,7 @@ var COACHING_MAX_TOKENS   = 2000;
    nothing pinned them; a type coached on but refused as evidence would drift by omission.
    Order is prompt text over there and irrelevant here (indexOf). Pinned by identity. */
 var COACHABLE_TYPES = require('./evidence-rule').NEGATIVE_TYPES;
+var doctrineLib = require('./doctrine');   // H732
 
 /* ⚠ `coachingOpening` REMOVED 2026-08-30. It assembled "At HH:MM:SS the prospect
    said …" and prepended it, which made the card show the quote twice; the panel
@@ -50,6 +51,9 @@ function selectCoachableMoments(highlights) {
     if (COACHABLE_TYPES.indexOf(h.type) === -1) return false;
     // an objection the closer HANDLED is a good moment, not something to fix
     if (h.type === 'objection' && h.resolution === 'handled') return false;
+    /* H732, HARD RULE IN CODE: a financial disqualification is never a lost deal or a failed close — it is not coached
+       here at all (it is coached upstream, on qualification, by the grader's qualification check). */
+    if (doctrineLib.isDqMoment(h)) return false;
     return true;
   });
 }
@@ -291,6 +295,9 @@ function buildCoachingPrompt(moments, opts) {
        grader never sees these (lib/coaching-corrections.js). */
     /* H731: the team's own material — the offer, the qualifications, the script — the coaching is checked against.
        Every sentence must be consistent with it; nothing outside it is asserted as this team's doctrine. */
+    /* H732: Scout's method — a constraint on the reasoning, never evidence; the team's material below wins where it is more specific. */
+    (o.doctrineBlock && String(o.doctrineBlock).trim()) ? String(o.doctrineBlock).trim() : '',
+    '',
     (o.sellingContext && String(o.sellingContext).trim()) ? 'TEAM MATERIAL (this team\'s offer, qualifications and approach — the coaching must agree with it; never invent doctrine beyond it):\n' + String(o.sellingContext).trim() : '',
     '',
     notes ? require('./coaching-corrections').promptLane(notes, { applied: true }) : '',
@@ -315,7 +322,19 @@ function toMoment(h) {
   };
 }
 
+/* H732 — the two hard rules on the WRITTEN text: an entry that coaches a rep out of isolating, or frames a moment as a lost
+   deal or failed close, is dropped and logged. A pattern check: it catches the shapes seen so far, not every phrasing. */
+function enforceHardRules(entries) {
+  return (Array.isArray(entries) ? entries : []).filter(function (e) {
+    var t = e && e.coaching;
+    if (doctrineLib.violatesIsolation(t)) { console.warn('[coaching] dropped (coaches out of isolating): ' + String(t).slice(0, 120)); return false; }
+    if (doctrineLib.framesDqAsLoss(t)) { console.warn('[coaching] dropped (frames a disqualification as a loss): ' + String(t).slice(0, 120)); return false; }
+    return true;
+  });
+}
+
 module.exports = {
+  enforceHardRules:      enforceHardRules,
   CLAUDE_COACHING_MODEL: CLAUDE_COACHING_MODEL,
   COACHING_MAX_TOKENS:   COACHING_MAX_TOKENS,
   COACHABLE_TYPES:       COACHABLE_TYPES,

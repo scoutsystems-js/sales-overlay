@@ -109,7 +109,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v8-2026-09-05-kb-material';   /* v8 (H731): the notes join the selling context through the one retrieval; nothing relevant → the prose says nothing. Was v7-2026-09-03-open-outcome */ //   // H709: the outcome word is Open; the prompt is handed the LABEL, never the machine word   // H706: a follow-up close reads as one in the call line
+var DIGEST_PROMPT_VERSION = 'v9-2026-09-05-doctrine';   /* v9 (H732): Scout's doctrine in the prompt as a constraint. Was v8-2026-09-05-kb-material */ //   /* v8 (H731): the notes join the selling context through the one retrieval; nothing relevant → the prose says nothing. Was v7-2026-09-03-open-outcome */ //   // H709: the outcome word is Open; the prompt is handed the LABEL, never the machine word   // H706: a follow-up close reads as one in the call line
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -269,6 +269,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     ]);
   }
   if (material.notes && material.notes.text) promptLines = promptLines.concat([require('./coaching-corrections').promptLane(material.notes.text), '']);   // H731
+  if (material.doctrineBlock) { var dblock = material.doctrineBlock('team-digest'); if (dblock) promptLines = promptLines.concat([dblock, '']); }   // H732
   promptLines = promptLines.concat([
     'Respond with ONLY a JSON object:',
     '{',

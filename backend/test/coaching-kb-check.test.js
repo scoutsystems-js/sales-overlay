@@ -24,6 +24,8 @@ const P = {
   headB: { user_id: 'headB', managed_by: null, niche: 'Roofing', offer: 'Team B offer: roofing leads programme, long enough to count', qualifications: 'TEAM B QUALIFICATIONS: owns a truck', script_raw: null },
   solo:  { user_id: 'solo',  managed_by: null, niche: null, offer: null, qualifications: null, script_raw: null },
 };
+const D = require('../lib/doctrine');
+const DOCTRINE_ROWS = D.doctrineRows(D.readDoctrineFile()).map((r, i) => Object.assign({ id: 'doc' + i, created_at: '2026-09-05' }, r));
 const MOMENT = { id: 'h1', fathom_call_id: 'c1', type: 'objection', resolution: 'unhandled', section: 'close', timestamp_seconds: 1200, quote: 'I need to think about it', observation: 'o', closer_response: 'Sure, take your time', closer_response_verified: true };
 function fakeAdmin(writes) {
   return { from(table) {
@@ -34,6 +36,7 @@ function fakeAdmin(writes) {
         let rows = [];
         if (table === 'call_highlights') rows = [Object.assign({}, MOMENT, { fathom_call_id: ch.f.fathom_call_id || 'c1' })];
         else if (table === 'user_profiles') rows = Object.values(P).filter((r) => Object.keys(ch.f).every((k) => r[k] === ch.f[k]));
+        else if (table === 'knowledge_base' && ch.f.category === 'doctrine') rows = DOCTRINE_ROWS;
         return Promise.resolve({ data: rows, error: null }).then(res, rej);
       } };
     return ch;
@@ -56,4 +59,19 @@ test('⚠⚠ with NOTHING on file the model is never called and nothing is writt
   const out = await W._coachCallMoments(fakeAdmin(writes), 'c1', 'lost', null, null, 'solo');
   assert.strictEqual(captured.length, 0, 'no model call'); assert.strictEqual(writes.length, 0, 'nothing written');
   assert.strictEqual(out.skipped, 'no_material');
+});
+
+test('⚠⚠ H732 — with material, the prompt carries SCOUT\'S METHOD as a constraint (a plant that drops doctrine from the retrieval, or keeps it and discards it, fails here)', async () => {
+  captured.length = 0; const writes = [];
+  await W._coachCallMoments(fakeAdmin(writes), 'c1', 'lost', null, null, 'repA');
+  assert.strictEqual(captured.length, 1);
+  assert.ok(/SCOUT'S METHOD/.test(captured[0]), 'the doctrine block is in the prompt');
+  assert.ok(/Isolation is the correct first move/.test(captured[0]) && /never coach a rep away from isolating/i.test(captured[0]), 'whole units, not fragments');
+  assert.ok(captured[0].indexOf("SCOUT'S METHOD") < captured[0].indexOf('TEAM MATERIAL'), 'the method precedes the team material, which wins where more specific');
+});
+
+test('⚠⚠ H732 — THE SEPARATION: doctrine present, team material absent → the empty state, no model call, nothing written', async () => {
+  captured.length = 0; const writes = [];
+  const out = await W._coachCallMoments(fakeAdmin(writes), 'c1', 'lost', null, null, 'solo');
+  assert.strictEqual(out.skipped, 'no_material'); assert.strictEqual(captured.length, 0); assert.strictEqual(writes.length, 0);
 });
