@@ -5398,6 +5398,18 @@
     body[data-view="team-coaching"] .coaching-evidence summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
     @media(max-width:1100px) { body[data-view="team-coaching"] .coaching-strength-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media(max-width:740px) { body[data-view="team-coaching"] .coaching-strength-grid { grid-template-columns:1fr; } body[data-view="team-coaching"] .coaching-section-note { display:none; } }
+
+    body[data-view="team-coaching"] .coaching-strength-grid { grid-template-columns:minmax(0,1fr); }
+    body[data-view="team-coaching"] .strength-outcome-card { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:24px; }
+    body[data-view="team-coaching"] .strength-outcome-label { font-size:var(--fs-label); margin-bottom:10px; }
+    body[data-view="team-coaching"] .strength-outcome-card h3 { font-size:var(--fs-title); font-weight:var(--fw-emphasis); max-width:850px; margin:0 0 20px; }
+    body[data-view="team-coaching"] .strength-exchange { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+    body[data-view="team-coaching"] .strength-excerpt-label { font-size:var(--fs-label); opacity:.85; }
+    body[data-view="team-coaching"] .strength-excerpt blockquote { margin:8px 0 18px; padding:14px; background:rgba(var(--accent-rgb),.04); border-left:2px solid var(--border); font-size:var(--fs-body); }
+    body[data-view="team-coaching"] .strength-progression { border-top:1px solid var(--border); padding:12px 0; }
+    body[data-view="team-coaching"] .strength-progression summary { cursor:pointer; color:var(--accent); margin-bottom:12px; }
+    body[data-view="team-coaching"] .strength-result,body[data-view="team-coaching"] .strength-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding-top:16px; border-top:1px solid var(--border); margin-top:12px; }
+    @media(max-width:650px) { body[data-view="team-coaching"] .strength-exchange { grid-template-columns:1fr; } }
   </style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>
@@ -15289,6 +15301,29 @@
     var hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = t % 60;
     return [hh, mm, ss].map(function (n) { return String(n).padStart(2, '0'); }).join(':');
   }
+  function strengthOutcomeHtml(it, ftBtn) {
+    var e = it.call_evidence;
+    if (!e || !e.moment || !e.response) return '';
+    var resultLabel = e.outcome ? outcomeLabel(e.outcome) : 'Not recorded';
+    function excerpt(t) {
+      var who = t.speaker === 'CLOSER' ? escapeHtml(it.rep || 'Closer') : 'Prospect';
+      var time = formatTimestampDisplay(t.timestamp_seconds);
+      var url = e.recording_url ? e.recording_url + (e.recording_url.indexOf('?') === -1 ? '?' : '&') + 't=' + t.timestamp_seconds : null;
+      return '<div class="strength-excerpt"><div class="strength-excerpt-label">' + who + ' · ' + escapeHtml(time)
+        + (url ? ' <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Play clip ↗</a>' : '')
+        + '</div><blockquote>' + escapeHtml(t.quote) + '</blockquote></div>';
+    }
+    return '<article class="strength-outcome-card">'
+      + '<div class="strength-outcome-label">' + escapeHtml(it.rep || 'Closer') + ' · Call outcome: ' + escapeHtml(resultLabel) + '</div>'
+      + '<h3>' + escapeHtml(it.claim || '') + '</h3>'
+      + '<div class="strength-exchange">' + excerpt(e.moment) + excerpt(e.response) + '</div>'
+      + '<details class="strength-progression"><summary>How the conversation continued</summary>'
+      + (e.following || []).map(excerpt).join('') + '</details>'
+      + (e.result_explanation ? '<div class="strength-call-result"><h3>How the Call Ended</h3><p>' + escapeHtml(e.result_explanation) + '</p></div>' : '')
+      + '<div class="strength-result"><span>Call result</span><strong>' + escapeHtml(resultLabel) + '</strong></div>'
+      + '<div class="strength-actions"><button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\')">Review Full Call</button>' + ftBtn + '</div></article>';
+  }
+
   function teamInsightHtml(it, kind, idx) {
     /* FINE TUNE COACHING, surface \u2461 (2026-09-02): an insight names a rep and
        cites a moment \u2014 exactly the condition the control needs. Same helper,
@@ -15304,6 +15339,7 @@
           + ' onclick="fineTuneFromInsight(this.getAttribute(\'data-kind\'), this.getAttribute(\'data-idx\'), this)"'
           + ' title="Tell Scout how your team would handle this \u2014 it learns the idea behind it">Fine Tune Coaching</button>';
     }
+    if (state.view === 'team-coaching' && kind === 'working' && it.call_evidence) return strengthOutcomeHtml(it, ftBtn);
     var clipBtn = it.clip_url ? '<a class="review-why-clip" href="' + escapeHtml(it.clip_url) + '" target="_blank" rel="noopener">▶ ' + escapeHtml(clipLabelFor(it.source)) + '</a>' : '';
     var repName = it.rep ? displayNameFromEmail(String(it.rep), String(it.rep)) : '';
     var repTag = repName ? '<span class="team-rep-tag">' + escapeHtml(repName) + '</span>' : '';

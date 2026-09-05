@@ -1992,3 +1992,7 @@ The first deployment underdelivered the approved mockup. Compact header, narrowe
 
 ### Team Coaching structural rebuild — 2026-09-05
 The previous styling-only passes were rejected. Implemented the approved focus → strengths → rep rows hierarchy, with full evidence behind disclosures and original Fine Tune targets retained. Deployed as 58abde4; signed-in visual and evidence-disclosure checks passed.
+
+### Team Strengths outcome card — 2026-09-05
+Implemented verified transcript pairing and call-level results for the approved strength layout. Validation and limits: TEAM-STRENGTH-OUTCOME.md. Deployment verification pending.
+- Investigate inconsistent outcome/explanation on call 3ec3b1fb-529d-4439-91a1-5a1b4098e9a9; strength withheld, data unchanged.

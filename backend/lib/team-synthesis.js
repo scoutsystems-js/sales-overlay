@@ -319,7 +319,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
        and its lane version bump are ONE atomic change. */
     + '||recs:' + RECS_LANE_VERSION).digest('hex');
   var cached = await cacheGet(admin, keyId, 'team', from, to, hash);
-  if (cached) return Object.assign({ available: true, cached: true }, cached);
+  if (cached) return require('./strength-call-evidence').attachStrengthEvidence(admin, Object.assign({ available: true, cached: true }, cached), w);
   if (!material.hasMaterial) return nothingToSay({ working: [], improve: [], generated_at: new Date().toISOString() });   // H731: silence beats a guess
 
   var repOf = function (cid) { return w.meta[cid] ? w.meta[cid].user_id : null; };
@@ -424,7 +424,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
   function resolve(arr, direction) { return resolveInsights(arr, byId, allRepNames, { facts: facts, direction: direction, lossScope: lossScope }); }
   var synthesis = { working: resolve(parsed.working, 'working'), improve: resolve(parsed.improve, 'improve'), generated_at: new Date().toISOString() };
   await cachePut(admin, keyId, 'team', from, to, hash, synthesis);
-  return Object.assign({ available: true, cached: false }, synthesis);
+  return require('./strength-call-evidence').attachStrengthEvidence(admin, Object.assign({ available: true, cached: false }, synthesis), w);
 }
 
 /* ⚠⚠⚠ CALL HIGHLIGHTS OF THE WEEK — RETIRED 2026-09-01 (Justin's ruling).
