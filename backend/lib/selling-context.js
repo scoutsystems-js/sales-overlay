@@ -41,8 +41,28 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
     var prof = await admin.from('user_profiles')
       .select('managed_by, niche, offer, qualifications, script_raw')
       .eq('user_id', userId).maybeSingle();
-    var pdata = (prof && prof.data) || {};
+    var pdata = Object.assign({}, (prof && prof.data) || {});
     var managedBy = pdata.managed_by || null;
+
+    /* ⚠⚠ THE PASS-THROUGH (Justin, 2026-09-04, H728): A REP INHERITS FROM THE TEAM HEAD — already ruled,
+       and how the knowledge base, corrections and the digest scope. This function read the rep's OWN
+       row and stopped, so the grader context for every rep on Sober Living Riches was ZERO characters
+       while the head's qualifications read "not living paycheck to paycheck" — the exact disclosure a
+       missed signal the same evening had rolled over. FIELD BY FIELD: a rep's own field with content
+       still wins; only the empty ones inherit. The chain climbs managed_by to the head (bounded). */
+    var inheritedFrom = { niche: null, offer: null, qualifications: null, script_raw: null };
+    var up = managedBy, hops = 0, seenIds = {};
+    while (up && hops < 5 && !seenIds[up]) {
+      seenIds[up] = true; hops++;
+      var hp = await admin.from('user_profiles').select('user_id, managed_by, niche, offer, qualifications, script_raw').eq('user_id', up).maybeSingle();
+      var hd = (hp && hp.data) || null;
+      if (!hd) break;
+      ['niche', 'offer', 'qualifications', 'script_raw'].forEach(function (k) {
+        var min = (k === 'script_raw') ? 200 : undefined;
+        if (!usableProfileField(pdata[k], min) && usableProfileField(hd[k], min)) { pdata[k] = hd[k]; inheritedFrom[k] = up; }
+      });
+      up = hd.managed_by || null;
+    }
 
     var cols = 'id, label, scope, uploaded_by, content, metadata, created_at';
     function base() {
@@ -107,6 +127,7 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
       got.forEach(function (c) { out.push(c); });
       sourceSummary.push({
         label: k, group: (k === 'kb') ? 'knowledge_base' : 'profile',
+        inherited_from: (k === 'kb') ? null : (inheritedFrom[k === 'offer' ? 'offer' : (k === 'script' ? 'script_raw' : 'qualifications')] || null),
         chunks_total: lanes.filter(function (l) { return l.key === k; })[0].chunks.length,
         chunks_used: got.length,
         chars: got.reduce(function (n, c) { return n + c.length; }, 0),
