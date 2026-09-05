@@ -352,7 +352,13 @@
       /* ⚠ the head's cell is a FACT, not a disabled control — no dropdown chrome,
        because there is no choice to make. Same weight as the select beside it. */
     .company-head-label { font-size: var(--fs-label); color: var(--text); }
-</style>
+    /* H730 — the inline offer editor */
+    .offer-editor { display: grid; gap: 10px; padding: 10px 6px 14px; }
+    .offer-field { display: grid; gap: 4px; font-size: var(--fs-label); color: var(--text); opacity: 0.8; }
+    .offer-field textarea { width: 100%; max-width: 720px; font: inherit; color: inherit; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; resize: vertical; }
+    .offer-editor-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .offer-editor-note { font-size: var(--fs-label); color: var(--text); opacity: 0.8; }
+  </style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>
 </head>
@@ -939,8 +945,12 @@
       // Full member action set in /admin (owner console) — deactivate/reactivate +
       // delete, alongside the existing role/managed-by(move)/billing controls. Same
       // server-side gates + zero-history delete rule as Team → Manage members.
+      /* H730 — the OFFER on a HEAD's row (managed_by null): niche, offer, qualifications, script — inherited by
+         every rep on the team. A managed rep's row never gets the button; the server refuses it anyway. */
+      var offerBtn = (!u.managed_by && (isOwnerViewer || isSelf))
+        ? '<button class="btn-resend" title="The offer, qualifications and script this team is graded against" onclick="toggleOfferEditor(\'' + u.user_id + '\')">Offer</button>' : '';
       var actions = editable
-        ? '<div class="admin-actions">'
+        ? '<div class="admin-actions">' + offerBtn
             + '<button class="btn-resend" title="Resend the set-password / welcome email" onclick="resendWelcomeEmail(this, \'' + u.user_id + '\')">Resend</button>'
             + '<button class="btn-resend" onclick="' + (active ? 'adminDeactivate' : 'adminReactivate') + '(\'' + u.user_id + '\')">' + (active ? 'Deactivate' : 'Reactivate') + '</button>'
             + '<button class="btn-resend admin-danger" onclick="adminDelete(\'' + u.user_id + '\', \'' + escapeHtml(u.email || '') + '\')">Delete</button>'
@@ -954,9 +964,38 @@
         + '<td>' + billCell + '</td>'
         + '<td>' + statusCell + '</td>'
         + '<td style="color:var(--muted);font-size:12px;">' + escapeHtml(created) + '</td>'
-        + '<td>' + actions + '</td>'
-      + '</tr>';
+        + '<td>' + (actions || (offerBtn ? '<div class="admin-actions">' + offerBtn + '</div>' : '')) + '</td>'
+      + '</tr>'
+      + '<tr class="offer-editor-row" id="offer-row-' + u.user_id + '" hidden><td colspan="8"><div id="offer-editor-' + u.user_id + '"></div></td></tr>';
 
+  }
+
+  /* H730 — the inline offer editor under a head's row. Loads through GET /admin/users/:id/offer, saves
+     through PATCH; the one sentence, nothing about mechanism. */
+  async function toggleOfferEditor(userId) {
+    var row = document.getElementById('offer-row-' + userId); var host = document.getElementById('offer-editor-' + userId);
+    if (!row || !host) return;
+    if (!row.hidden) { row.hidden = true; host.innerHTML = ''; return; }
+    row.hidden = false; host.innerHTML = '<div class="empty-msg">Loading…</div>';
+    var res;
+    try { res = await fetch('/admin/users/' + encodeURIComponent(userId) + '/offer', { headers: authHeader() }); } catch (e) { host.innerHTML = '<div class="empty-msg">Could not reach the server.</div>'; return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) { var err; try { err = await res.json(); } catch (e) { err = {}; } host.innerHTML = '<div class="empty-msg">' + escapeHtml(err.error || 'Could not load the offer.') + '</div>'; return; }
+    var d = await res.json();
+    function field(key, label, rows) { return '<label class="offer-field"><span>' + label + '</span><textarea id="offer-' + key + '-' + userId + '" rows="' + rows + '">' + escapeHtml(d[key] || '') + '</textarea></label>'; }
+    host.innerHTML = '<div class="offer-editor">' + field('niche', 'Niche', 1) + field('offer', 'Offer', 4) + field('qualifications', 'Qualifications', 2) + field('script_raw', 'Script', 6)
+      + '<div class="offer-editor-foot"><button class="btn-resend" onclick="saveOfferEditor(\'' + userId + '\')">Save</button><span class="field-status" id="offer-status-' + userId + '"></span>'
+      + '<span class="offer-editor-note">This changes how this team’s calls are graded from the next call on.</span></div></div>';
+  }
+  async function saveOfferEditor(userId) {
+    var status = document.getElementById('offer-status-' + userId);
+    var body = {}; ['niche', 'offer', 'qualifications', 'script_raw'].forEach(function (k) { var el = document.getElementById('offer-' + k + '-' + userId); if (el) body[k] = el.value; });
+    if (status) { status.textContent = '…'; status.className = 'field-status'; }
+    var res;
+    try { res = await fetch('/admin/users/' + encodeURIComponent(userId) + '/offer', { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify(body) }); } catch (e) { if (status) { status.textContent = '✗ network'; status.className = 'field-status err'; } return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    if (!res.ok) { var err; try { err = await res.json(); } catch (e) { err = { error: 'HTTP ' + res.status }; } if (status) { status.textContent = '✗ ' + (err.error || 'failed'); status.className = 'field-status err'; } return; }
+    if (status) { status.textContent = '✓ saved'; status.className = 'field-status ok'; }
   }
 
   var USERS_TABLE_HEADER = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Company</th><th>Billing</th><th>Status</th><th>Created</th><th></th></tr>';

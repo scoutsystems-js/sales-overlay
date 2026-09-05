@@ -96,7 +96,7 @@ function forwardItem(call) {
 }
 
 function withCall(item, call) {
-  return Object.assign({ call_id: call.id, user_id: call.user_id || null, title: call.title || null, call_date: call.call_date || null, recording_url: call.recording_url || null, outcome: call.outcome || null, label: KIND_LABELS[item.kind] }, item);
+  return Object.assign({ call_id: call.id, user_id: call.user_id || null, title: call.title || null, prospect_name: call.prospect_name || null, call_date: call.call_date || null, recording_url: call.recording_url || null, outcome: call.outcome || null, label: KIND_LABELS[item.kind] }, item);
 }
 
 /**

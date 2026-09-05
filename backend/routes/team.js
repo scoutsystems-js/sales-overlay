@@ -865,9 +865,9 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     var callIds = Object.keys(byId);
     for (var j = 0; j < callIds.length; j += CHUNK) {
       var slice = callIds.slice(j, j + CHUNK);
-      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome').in('fathom_call_id', slice);
+      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name').in('fathom_call_id', slice);
       if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
-      (aq.data || []).forEach(function (a) { if (byId[a.fathom_call_id]) byId[a.fathom_call_id].outcome = a.outcome || null; });
+      (aq.data || []).forEach(function (a) { if (byId[a.fathom_call_id]) { byId[a.fathom_call_id].outcome = a.outcome || null; byId[a.fathom_call_id].prospect_name = a.prospect_name || null; } });   // H730: a name where a name belongs, never the raw title
       var hq = await admin.from('call_highlights')
         .select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, closer_response, closer_response_verified, cause')
         .in('fathom_call_id', slice);

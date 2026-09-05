@@ -116,7 +116,7 @@ test('⚠ the renderer, executed from the live source: both quotes, both timesta
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const fn = new Function('escapeHtml', 'formatTimestampDisplay', 'clipHref', fnBody(LIVE, 'missedPairHtml') + '\n return missedPairHtml;')(esc, (s) => new Date(s * 1000).toISOString().substr(11, 8), (u, s) => u ? u + '?t=' + s : null);
   const pair = P.findMissedSignalPairs(HL.c1)[0]; pair.sentence = P.pairSentence(pair);
-  const html = fn(pair, { recordingUrl: 'https://r/x', title: 'AF | Someone <b>', call_date: '2026-09-02T10:00:00Z' });
+  const html = fn(pair, { recordingUrl: 'https://r/x', prospect_name: 'Someone <b>', title: 'AF | Someone', call_date: '2026-09-02T10:00:00Z' });   // H730: the head shows the prospect's NAME
   assert.ok(/I invested money in things that did not work out/.test(html) && /even 20 grand, I do not have it/.test(html));
   assert.ok(/00:03:03/.test(html) && /00:39:48/.test(html) && /36 min/.test(html));
   /* H723: the prose sentence renders in NEITHER placement — the ends are laid out, and the

@@ -28,6 +28,7 @@ const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const provisionUser = require('../lib/provision-user');
 const { applyPriceFields } = require('../lib/price-fields');
+const { applyOfferFields } = require('../lib/offer-fields');   // H730
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -984,6 +985,40 @@ router.post('/users', requireAuth, requireRole(['manager', 'owner']), async func
 // Owner-only resend: mints a FRESH set-password link (supersedes any prior
 // one) and sends the welcome email again. Same isolation contract as creation
 // — failures report status, never 500 for email reasons.
+/* H730 — the OFFER FIELDS on a HEAD's row, from the Admin page. Managers and owners. The target must be a
+   HEAD (managed_by NULL): a managed rep's offer is never written by anyone — the rep INHERITS the head's
+   (H728), and a rep-level value would let a graded person's own row outrank the team's. A manager may act
+   on their own row only; an owner on any head. GET returns the four fields; PATCH writes them. */
+async function offerTarget(admin, req, res) {
+  var t = await admin.from('user_profiles').select('user_id, managed_by, niche, offer, qualifications, script_raw').eq('user_id', req.params.user_id).maybeSingle();
+  if (t.error) throw new Error('target lookup: ' + t.error.message);
+  if (!t.data) { res.status(404).json({ error: 'No profile found for that user.' }); return null; }
+  if (t.data.managed_by) { res.status(403).json({ error: 'That person is on a team: their offer, qualifications and script are inherited from the team head\'s profile and are edited there.' }); return null; }
+  if (req.user.role !== 'owner' && t.data.user_id !== req.user.id) { res.status(403).json({ error: 'You can only edit your own offer.' }); return null; }
+  return t.data;
+}
+router.get('/users/:user_id/offer', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var t = await offerTarget(admin, req, res); if (!t) return;
+    res.json({ niche: t.niche || null, offer: t.offer || null, qualifications: t.qualifications || null, script_raw: t.script_raw || null });
+  } catch (err) { if (handleConfigError(err, res)) return; console.error('[admin] offer read:', err.message); res.status(500).json({ error: 'Could not load the offer' }); }
+});
+router.patch('/users/:user_id/offer', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var t = await offerTarget(admin, req, res); if (!t) return;
+    var updates;
+    try { updates = applyOfferFields(req.body || {}, {}); } catch (ve) { if (ve.status === 400) return res.status(400).json({ error: ve.message }); throw ve; }
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: niche, offer, qualifications, script_raw)' });
+    updates.updated_at = new Date().toISOString();
+    var up = await admin.from('user_profiles').update(updates).eq('user_id', t.user_id);
+    if (up.error) throw new Error('update: ' + up.error.message);
+    console.log('[admin] offer set: actor=%s target=%s fields=%s', req.user.email, t.user_id, Object.keys(updates).filter(function (k) { return k !== 'updated_at'; }).join(','));
+    res.json({ ok: true });
+  } catch (err) { if (handleConfigError(err, res)) return; console.error('[admin] offer update:', err.message); res.status(500).json({ error: 'Could not save the offer' }); }
+});
+
 router.post('/users/:user_id/welcome-email', requireAuth, requireRole(['manager', 'owner']), async function(req, res) {
   try {
     var admin = getAdminClient();

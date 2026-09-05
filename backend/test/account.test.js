@@ -32,6 +32,9 @@ test('buildAccountPayload: profile + email → UI shape; managed lock state; bil
     price_pif: null,
     is_managed: true,
     billing: { status: 'trial', plan: null, provider: null },
+    // H730: the offer fields the head edits and the team inherits, and the one save sentence
+    niche: null, offer: null, qualifications: null, script_raw: null, price_2pay: null,
+    team_size: 0, offer_save_sentence: 'This changes how your calls are graded from the next call on.',
   });
   // unmanaged + populated billing seam
   const p2 = me._buildAccountPayload({ first_name: null, last_name: null, role: 'manager', managed_by: null, billing_status: 'active', billing_plan: 'single_user', billing_provider: 'stripe' }, 'm@x.co');

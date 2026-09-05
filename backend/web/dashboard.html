@@ -2712,6 +2712,13 @@
     .coach-item.forward .coach-item-kind { color: var(--accent); opacity: 0.9; }
     .coach-item-move { font-size: var(--fs-body); line-height: 1.5; display: flex; gap: 10px; align-items: baseline; }
     .coach-item-empty { font-size: var(--fs-secondary); opacity: 0.8; padding: 6px 2px; }
+    /* H730 — the rep-card sort: four pills and a direction, one line, tokens only. */
+    .rep-sort { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .rep-sort-pill, .rep-sort-dir { font-size: var(--fs-label); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); opacity: 0.75; cursor: pointer; }
+    .rep-sort-pill.on { border-color: var(--accent); color: var(--accent); opacity: 1; }
+    .rep-sort-dir { margin-left: 6px; font-variant-numeric: tabular-nums; }
+    .rep-sort-pill:hover, .rep-sort-dir:hover { opacity: 1; }
+    .acct-offer-field { width: 100%; max-width: 640px; resize: vertical; }
     .review-reply-label { display: inline-block; font-size: 11px; font-weight: var(--fw-emphasis); letter-spacing: .04em;
                           text-transform: uppercase; color: var(--accent); margin-right: 6px; }
     .review-type-badge.buying_signal      { background: rgba(9, 224, 70, 0.12);  color: var(--good); }
@@ -5659,6 +5666,7 @@
     laneWaitLong:   {},
     teamRecs:       null,   teamRecsLoading: false,
     teamCoachable:  null,   teamCoachableLoading: false,   // H726: coachable moments (Team → Coaching) — the pairs are one kind within it
+    repSortKey: 'close', repSortDir: 'worst',   // H730: the rep-card sort — one of the card's four numbers, either direction
     /* teamHighlights — RETIRED 2026-09-01 with Call Highlights of the Week. */
     teamDashboard: null,    teamDashboardLoading: false,
     teamCatalog: null,      teamCatalogLoading: false,
@@ -15015,6 +15023,46 @@
       return String(a.display_name || '').localeCompare(String(b.display_name || ''));
     });
   }
+  /* sortRepsWorstFirst above is the MIRROR of lib/rep-card-metrics (pinned by test/team-view-render) and stays
+     self-contained; the control below extends it: closing/worst is the same order. */
+  /* ⚠⚠ H730 — THE REP-CARD SORT (Justin: worst-to-best and back, "something creative that doesn't take up
+     a bunch of space but looks good"). What ordered them before: closing rate, worst first, fixed
+     (sortRepsWorstFirst). Now: ONE of the card's four numbers, either direction. Measured reps first
+     always — an unmeasured rep is a sentence on the card, not a zero, so it never ranks (H189).
+     ⚠ AVERAGE CALL TIME IS A BAND: "worst" is FURTHEST FROM THE BAND (35–45 from the wire, never a
+     literal here), not highest; inside the band every rep ties and falls back to the name (H518). */
+  var REP_SORT_METRICS = [
+    { key: 'close', label: 'Closing', value: function (r) { return (r.prospect_close_total > 0 && typeof r.prospect_close_rate === 'number') ? r.prospect_close_rate : null; } },
+    { key: 'obj',   label: 'Objections', value: function (r) { return (typeof r.obj_handle_rate === 'number') ? r.obj_handle_rate : null; } },
+    { key: 'time',  label: 'Call time', value: function (r) {
+        if (typeof r.avg_call_time !== 'number' || !isFinite(r.avg_call_time)) return null;
+        var bands = (state.teamOverview && state.teamOverview.bands) || {}; var band = bands.avg_call_time && bands.avg_call_time.good;
+        if (!band) return null;
+        var d = r.avg_call_time < band[0] ? band[0] - r.avg_call_time : (r.avg_call_time > band[1] ? r.avg_call_time - band[1] : 0);
+        return -d;   // higher is better: inside the band is 0, further out is more negative
+      } },
+    { key: 'grade', label: 'Grade', value: function (r) { return (typeof r.avg_score === 'number') ? r.avg_score : null; } },
+  ];
+  function repSortMetric() { return REP_SORT_METRICS.filter(function (m) { return m.key === state.repSortKey; })[0] || REP_SORT_METRICS[0]; }
+  function sortReps(reps, metric, dir) {
+    if (!Array.isArray(reps)) return [];
+    var m = metric || repSortMetric(); var worstFirst = dir !== 'best';
+    return reps.slice().sort(function (a, b) {
+      var av = m.value(a), bv = m.value(b);
+      var am = av !== null, bm = bv !== null;
+      if (am !== bm) return am ? -1 : 1;
+      if (am && av !== bv) return worstFirst ? av - bv : bv - av;
+      return String(a.display_name || '').localeCompare(String(b.display_name || ''));
+    });
+  }
+  function setRepSort(key, dir) { if (key) state.repSortKey = key; if (dir) state.repSortDir = dir; render(); }
+  function repSortControlHtml() {
+    var m = repSortMetric(); var worst = state.repSortDir !== 'best';
+    return '<div class="rep-sort">'
+      + REP_SORT_METRICS.map(function (x) { return '<button type="button" class="rep-sort-pill' + (x.key === m.key ? ' on' : '') + '" onclick="setRepSort(\'' + x.key + '\')">' + x.label + '</button>'; }).join('')
+      + '<button type="button" class="rep-sort-dir" onclick="setRepSort(null, \'' + (worst ? 'best' : 'worst') + '\')" title="Flip the order">' + (worst ? 'worst \u2192 best' : 'best \u2192 worst') + '</button>'
+      + '</div>';
+  }
 
   /* ⚠⚠ ROWS ONLY — NEVER NUMBERS. Justin's ruling: DEACTIVATE LEAVES THE
      NUMBERS. A switched-off person's calls, cash and objections still count in
@@ -15036,14 +15084,14 @@
        vanished on an error, indistinguishable from a team with no reps. */
     if (o._forbidden || o._error) return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
       + laneProblemHtml('the reps', laneProblem(o)) + '</div>';
-    var reps = sortRepsWorstFirst(o.per_rep || []);
+    var reps = sortReps(o.per_rep || []);
     if (!reps.length) {
       return '<div class="section fade-in"><div class="section-header"><h2>Reps</h2></div>'
         + '<div class="empty"><p>No reps in this team yet.</p></div></div>';
     }
     return '<div class="section fade-in">'
       + '<div class="section-header"><h2>Reps</h2>'
-        + '<div class="meta">weakest first · click a rep to open their report</div></div>'
+        + repSortControlHtml() + '</div>'
       + '<div class="rep-card-list">' + visibleReps(reps).map(repCardHtml).join('') + '</div>'
       + '</div>';
   }
@@ -15208,7 +15256,9 @@
     var sg = pair.signal, dq = pair.dq;
     var reply = (sg.closer_response && sg.closer_response_verified === true && !/^__/.test(sg.closer_response))
       ? '<div class="missed-pair-reply"><span class="missed-pair-label">Closer replied</span>' + escapeHtml(sg.closer_response) + '</div>' : '';
-    var head = o.inline ? '' : '<div class="missed-pair-head">' + escapeHtml(o.title || 'Untitled call')
+    /* H730: a NAME where a name belongs — never the raw meeting title ("Godwin Ona's Personal Meeting Room").
+       No name is "Unknown prospect": silence beats a wrong name (H020). */
+    var head = o.inline ? '' : '<div class="missed-pair-head">' + escapeHtml(o.prospect_name || 'Unknown prospect')
       + (o.call_date ? ' · ' + escapeHtml(String(o.call_date).slice(0, 10)) : '')
       + (o.callId ? ' <button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(o.callId) + '\'' + (o.ownerUserId ? ', \'' + escapeHtml(o.ownerUserId) + '\'' : '') + ')">Open</button>' : '') + '</div>';
     /* ⚠ BESIDE A MOMENT (inline) THE SIGNAL END IS THE MOMENT ITSELF — quote and reply are the
@@ -15236,7 +15286,7 @@
     if (!it || !it.moment) return '';
     if (it.kind === 'missed_signal_pair' && it.pair) {
       return '<div class="coach-item"><div class="coach-item-kind">' + escapeHtml(it.label || 'Missed signal') + '</div>'
-        + missedPairHtml(Object.assign({}, it.pair, { recording_url: it.recording_url }), { title: it.title, call_date: it.call_date, callId: it.call_id, ownerUserId: it.user_id, recordingUrl: it.recording_url })
+        + missedPairHtml(Object.assign({}, it.pair, { recording_url: it.recording_url }), { prospect_name: it.prospect_name, call_date: it.call_date, callId: it.call_id, ownerUserId: it.user_id, recordingUrl: it.recording_url })
         + '</div>';
     }
     var m = it.moment; var rec = it.recording_url || null;
@@ -15252,7 +15302,7 @@
     return '<div class="coach-item ' + escapeHtml(it.direction || '') + '">'
       + '<div class="coach-item-kind">' + escapeHtml(it.label || '') + '</div>'
       + '<div class="missed-pair">'
-        + '<div class="missed-pair-head">' + escapeHtml(it.title || 'Untitled call') + (it.call_date ? ' · ' + escapeHtml(String(it.call_date).slice(0, 10)) : '')
+        + '<div class="missed-pair-head">' + escapeHtml(it.prospect_name || 'Unknown prospect') + (it.call_date ? ' · ' + escapeHtml(String(it.call_date).slice(0, 10)) : '')
           + (it.call_id ? ' <button type="button" class="obj-btn" onclick="openCallReview(\'' + escapeHtml(it.call_id) + '\'' + (it.user_id ? ', \'' + escapeHtml(it.user_id) + '\'' : '') + ')">Open</button>' : '') + '</div>'
         + '<div class="missed-pair-end">' + stampHtml + '<span class="missed-pair-label">' + who + '</span><span class="missed-pair-quote">' + escapeHtml(m.quote || '') + '</span></div>'
         + reply + moveHtml
@@ -15990,6 +16040,21 @@
       + '<div class="acct-hint">Your full price, paid in full. Not shown to anyone else.</div></div>';
   }
 
+  /* H730 — save the four offer fields through the one account route; the managed lock is the server's. */
+  async function saveAccountOffer() {
+    var msg = document.getElementById('acctOfferMsg');
+    var read = function (id) { var el = document.getElementById(id); return el ? el.value : undefined; };
+    var body = { niche: read('acctNiche'), offer: read('acctOffer'), qualifications: read('acctQualifications'), script_raw: read('acctScript') };
+    if (msg) msg.textContent = 'Saving…';
+    try {
+      var res = await fetch('/me/account', { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify(body) });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) { var e; try { e = await res.json(); } catch (x) { e = {}; } if (msg) msg.textContent = e.error || 'Could not save.'; return; }
+      if (msg) msg.textContent = 'Saved.';
+      state.account = null;
+    } catch (err) { if (msg) msg.textContent = 'Could not reach the server.'; }
+  }
+
   async function saveAccountPrice() {
     var el = document.getElementById('acctPricePif');
     var msg = document.getElementById('acctPriceMsg');
@@ -16094,13 +16159,28 @@
 
     // Offer — link to the KB, never a second editor. FD-4: managed reps can now
     // VIEW their team's KB read-only (their manager manages the contents).
-    var offerBody = a.is_managed
+    /* H730 — THE OFFER FORM. Managers and above, and single users: the four fields the grader reads
+       (inherited by every rep on the team, H728). A managed rep sees the notice and never a field — and
+       the SERVER refuses them anyway (the managed lock on PATCH /me/account); hiding is not the gate.
+       The save says the one sentence the server supplies and nothing more. */
+    function offerField(id, label, value, rows) {
+      return acctRow(label, '<textarea class="eod-input acct-offer-field" id="' + id + '" rows="' + rows + '">' + escapeHtml(value || '') + '</textarea>');
+    }
+    var offerForm = a.is_managed ? '' :
+        offerField('acctNiche', 'Niche', a.niche, 1)
+      + offerField('acctOffer', 'Offer', a.offer, 5)
+      + offerField('acctQualifications', 'Qualifications', a.qualifications, 2)
+      + offerField('acctScript', 'Script', a.script_raw, 8)
+      + '<div class="eod-row"><div class="eod-label"></div><div><button class="btn-fathom-secondary" type="button" onclick="saveAccountOffer()">Save</button>'
+        + '<span class="acct-save-note" id="acctOfferMsg"></span>'
+        + '<div class="meta" style="margin-top:6px;">' + escapeHtml(a.offer_save_sentence || '') + '</div></div></div>';
+    var offerBody = offerForm + (a.is_managed
       ? '<div class="acct-notice" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;">'
         + '<span>Your team’s offer docs, scripts, and winning calls live in your Knowledge Base — they’re what Scout grades your calls against. Your manager manages the contents; you can view them here.</span>'
         + '<button class="btn-fathom-secondary" type="button" onclick="goKb()">Open Knowledge Base →</button></div>'
       : '<div class="acct-notice" style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;">'
         + '<span>Your offer docs, scripts, and winning calls live in your Knowledge Base — they ground your call grading.</span>'
-        + '<button class="btn-fathom-secondary" type="button" onclick="goKb()">Open Knowledge Base →</button></div>';
+        + '<button class="btn-fathom-secondary" type="button" onclick="goKb()">Open Knowledge Base →</button></div>');
 
     // Billing — badge + provider-keyed action slot
     var b = a.billing || {};

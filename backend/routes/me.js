@@ -19,6 +19,7 @@ const SR = require('../lib/section-ranking');
 const { selectLibraryMoments } = require('../lib/section-library');
 const { kbReadRowVisible } = require('../lib/kb-scope');
 const { applyPriceFields } = require('../lib/price-fields');
+const { applyOfferFields, saveSentence } = require('../lib/offer-fields');   // H730
 const { clipHref } = require('../lib/clip-link');
 const { computeWhyFacts } = require('../lib/why-prose');
 /* const { quoteHash } = require('../lib/kb-entry'); */ // only reader was the
@@ -832,9 +833,14 @@ function validateNameField(v) {
   return (t.length >= 1 && t.length <= 60) ? t : null;
 }
 
-function buildAccountPayload(prof, email) {
+function buildAccountPayload(prof, email, teamSize) {
   prof = prof || {};
   return {
+    // H730: the offer fields — editable by the head (the managed lock refuses a rep); inherited by the team.
+    niche: prof.niche || null, offer: prof.offer || null, qualifications: prof.qualifications || null, script_raw: prof.script_raw || null,
+    price_2pay: (prof.price_2pay != null) ? Number(prof.price_2pay) : null,
+    team_size: teamSize || 0,
+    offer_save_sentence: saveSentence(teamSize || 0),
     // (j) the seller's own price — the price-drop lookup reads this.
     price_pif: (prof.price_pif != null) ? Number(prof.price_pif) : null,
     email: email,
@@ -855,10 +861,12 @@ router.get('/account', requireAuth, async function(req, res) {
   try {
     var admin = getAdminClient();
     var q = await admin.from('user_profiles')
-      .select('first_name, last_name, role, managed_by, billing_status, billing_plan, billing_provider, price_pif')
+      .select('first_name, last_name, role, managed_by, billing_status, billing_plan, billing_provider, price_pif, price_2pay, niche, offer, qualifications, script_raw')
       .eq('user_id', req.user.id).maybeSingle();
     if (q.error) throw new Error('user_profiles: ' + q.error.message);
-    res.json(buildAccountPayload(q.data, req.user.email));
+    // H730: how many reps inherit this row — the save sentence says "your team" only when there is one.
+    var team = await admin.from('user_profiles').select('user_id', { count: 'exact', head: true }).eq('managed_by', req.user.id);
+    res.json(buildAccountPayload(q.data, req.user.email, (team && typeof team.count === 'number') ? team.count : 0));
   } catch (err) {
     console.error('[me] account:', err.message);
     res.status(500).json({ error: 'Failed to load account' });
@@ -904,7 +912,10 @@ router.patch('/account', requireAuth, async function(req, res) {
      * never reads it.
      */
     applyPriceFields(body, updates);
-    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: first_name, last_name, price_pif, price_2pay)' });
+    /* H730: the offer fields ride the same route and the same managed lock above — a managed rep never
+       reaches this line, and that lock is the whole gate (lib/offer-fields.js says why). */
+    try { applyOfferFields(body, updates); } catch (ve) { if (ve.status === 400) return res.status(400).json({ error: ve.message }); throw ve; }
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update (editable: first_name, last_name, price_pif, price_2pay, niche, offer, qualifications, script_raw)' });
     updates.updated_at = new Date().toISOString();
     var up = await admin.from('user_profiles').update(updates).eq('user_id', req.user.id);
     if (up.error) throw new Error('update: ' + up.error.message);
