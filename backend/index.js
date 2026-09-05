@@ -191,6 +191,16 @@ function reportEnv() {
 
 welcomeEmail.init(); // one-time SMTP verify at boot; feature-off log when unconfigured
 
+/* H734 — THE USAGE LOG IS ARMED AT BOOT, not on the first grading run. Until now the recorder was handed its
+   client inside analyzeCall only, so a freshly deployed process logged NOTHING from the synthesis lanes
+   (recommendations, digest, rep line…) until a call was graded in that process — found when ten live rep-line
+   calls left no model_usage rows. One client, once; a lane still records nothing if the env is absent. */
+try {
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    require('./lib/model-usage').setUsageRecorder(require('@supabase/supabase-js').createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }));
+  }
+} catch (e) { console.warn('[server] usage log not armed: ' + (e && e.message)); }
+
 app.listen(PORT, '0.0.0.0', function() {
   console.log('[server] Scout backend running on port ' + PORT);
   reportEnv();

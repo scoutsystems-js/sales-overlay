@@ -55,3 +55,11 @@ test('⚠⚠ every model call goes through the seam — none may call messages.c
      Wiring it would add spend rows for a surface that produces none. */
   assert.deepStrictEqual(offenders, [], 'these call Anthropic without recording spend');
 });
+
+test('⚠⚠ H734 — the usage log is armed at BOOT in index.js, before app.listen — a fresh process must not go unlogged until its first grading run', () => {
+  const fs = require('fs'); const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const arm = src.indexOf("require('./lib/model-usage').setUsageRecorder(");
+  assert.ok(arm !== -1, 'index.js arms the recorder');
+  assert.ok(arm < src.indexOf('app.listen('), 'before the server listens');
+});
