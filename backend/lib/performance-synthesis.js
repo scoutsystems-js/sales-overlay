@@ -207,8 +207,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   /* H731: THE KNOWLEDGE BASE, BEFORE THE ADVICE — one retrieval, scoped by the relationship rules. */
   var material = await loadKbMaterial(admin, { userId: userId, lane: 'performance-synthesis', maxChars: 3000 });
   var selling = { contextText: material.contextText, kbHash: material.kbHash };
-  var corr = material.notes;
-  var corr = await cc.loadCorrectionsSafe(admin, await cc.teamKeyFor(admin, userId).catch(function () { return null; }), 'performance-synthesis');
+  var corr = material.notes;   // the notes ride the one retrieval (H731)
   var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash + '||notes:' + corr.hash
     /* ⚠⚠ A VERSION IS IN THIS KEY AGAIN, AND THE DISTINCTION IS THE POINT.
 
