@@ -40,6 +40,6 @@ test('coaching render preserves lane dispatch and panel visibility', () => {
     fnBody(live, 'renderTeamCoaching') + ';return renderTeamCoaching();');
   render({ getElementById: () => content }, state, () => {}, lane => dispatch.push(lane), () => {}, () => 'TEAM', () => 'DATE', () => 'SCORE', () => false, () => { throw Error('hidden recommendations rendered'); }, () => { throw Error('hidden moments rendered'); }, () => 'HIDDEN');
   assert.deepEqual(dispatch, []);
-  assert.match(content.innerHTML, /TEAMDATESCORE/);
+  assert.match(content.innerHTML, /TEAMDATE<\/div>SCORE/);
   assert.match(content.innerHTML, /HIDDEN<\/div>$/);
 });

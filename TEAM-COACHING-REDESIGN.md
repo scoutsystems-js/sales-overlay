@@ -1,11 +1,7 @@
 # Team Coaching redesign
 
-Approved for deployment. Implementation is on codex/team-coaching-ready, based on 25279f5. Live verification will be recorded after the push.
+The correction is verified locally and not yet pushed. The first deployment (455bef1) retained too much of the old page and collapsed the columns at the user's 979px viewport.
 
-The Team Coaching page has a compact title and score row, two recommendation columns on wide screens, stacked recommendations on narrower screens, and full-width expandable rep rows. All recommendations, evidence, clip links, action indexes, existing permission checks and loading/error states remain in their original renderers. The original wordmark and background preference controls are unchanged. Artwork preferences remain browser-local, not account-synced.
+The approved compact workspace now has a unified title/date/team header, a 170px rail, a bordered score strip, two coaching columns down to 741px, and framed expandable rep rows. This approval supersedes the centered company heading on Team Coaching only. Original wordmark and browser-local artwork toggle remain intact. Every recommendation, evidence quote, clip and Fine Tune action remains rendered by the same functions; no data or analysis changes.
 
-Validation: 2,433 tests passed with local HTTP and Electron execution enabled; 47 focused checks passed. The actual stylesheet rendered without horizontal overflow at 1400, 900 and 390px with artwork enabled and disabled; recommendation cards retained an opaque background. Inline JavaScript parses. Render checks used synthetic content, not signed-in production sessions. No model prompts, data queries, migrations, or backend behavior changed.
-
-The customize-view guard now uses the existing string-aware function extractor instead of an end marker tied to exact punctuation. New tests preserve recommendation completeness/indexes and loading, empty, unavailable and hidden-panel behavior.
-
-Review before release: compare this implementation using representative signed-in data, then merge this branch after checking the current main state and the analysis drain. No deployment was performed by this block.
+Validation: all 2,452 backend checks pass; inline JavaScript parses. Actual stylesheet rendered at 1400, 979, 900 and 390px without horizontal overflow; two columns verified at 979px, stacked at 390px. Signed-in visual verification will follow deployment.

@@ -1986,3 +1986,6 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 ## Team Coaching presentation — 2026-09-05
 
 Implemented and approved for deployment: compact Team Coaching layout; all recommendations and existing actions retained; original wordmark and browser-local background toggle unchanged. Validation: 2,433 tests passed. Deploy authorization includes the eight stale processing rows from September 1–2. Live deployment verification is recorded in TEAM-COACHING-REDESIGN.md.
+
+### Team Coaching correction — 2026-09-05
+The first deployment underdelivered the approved mockup. Compact header, narrower rail, framed score/rep rows and two-column layout at 979px are verified locally (2,452 checks). Awaiting the active analysis drain before push; signed-in visual check follows. Original wordmark/background toggle and all coaching evidence/actions retained.

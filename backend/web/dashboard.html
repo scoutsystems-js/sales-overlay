@@ -5325,47 +5325,64 @@
     /* Team Coaching presentation, September 2026. The workspace uses the
        existing opaque page ground; artwork and its saved toggle remain global.
        Scope every selector so other dashboard pages keep their own treatment. */
-    body[data-view="team-coaching"] .team-coaching-workspace .coaching-page-title h2 {
-      font-size: var(--fs-title); font-weight: var(--fw-emphasis); margin: 0 0 12px;
+    body[data-view="team-coaching"] { --sidebar-w: 170px; }
+    body[data-view="team-coaching"] .page { padding: 24px 24px 80px; }
+    body[data-view="team-coaching"] .coaching-workspace-header {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px;
+      align-items: start; margin-bottom: 20px;
     }
-    body[data-view="team-coaching"] .team-coaching-workspace .page-header--company {
-      margin-bottom: 16px; min-height: 0;
+    body[data-view="team-coaching"] .coaching-page-title { grid-column: 1; grid-row: 1; }
+    body[data-view="team-coaching"] .coaching-page-title h2 {
+      font-size: var(--fs-title); font-weight: var(--fw-emphasis); margin: 0;
     }
-    body[data-view="team-coaching"] .team-coaching-workspace .team-controls-row { margin-bottom: 16px; }
+    body[data-view="team-coaching"] .coaching-page-title p { margin: 4px 0 0; font-size: var(--fs-secondary); opacity: .8; }
+    body[data-view="team-coaching"] .coaching-workspace-header .page-header--company {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      grid-column: 1 / -1; grid-row: 2; margin: 0 !important; min-height: 0; padding: 0;
+    }
+    body[data-view="team-coaching"] .coaching-workspace-header .page-header-main { padding: 0; width: auto; text-align: left; }
+    body[data-view="team-coaching"] .coaching-workspace-header .page-header-main h1 {
+      font-size: var(--fs-body); font-weight: var(--fw-normal); margin: 0; opacity: .8;
+    }
+    body[data-view="team-coaching"] .coaching-workspace-header .page-header--company .page-header-side { position: static; transform: none; }
+    body[data-view="team-coaching"] .coaching-workspace-header .team-controls-row {
+      grid-column: 2; grid-row: 1; margin: 0; padding: 0; min-height: 0;
+    }
     body[data-view="team-coaching"] .team-coaching-workspace .lead-number {
-      display: flex; align-items: baseline; gap: 12px; margin: 0 0 20px;
-      padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px; margin: 0 0 24px;
+      padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg);
     }
     body[data-view="team-coaching"] .team-coaching-workspace .lead-number-val { font-size: var(--fs-number); }
-    body[data-view="team-coaching"] .team-coaching-workspace .section { margin-bottom: 24px; }
-    body[data-view="team-coaching"] .team-coaching-workspace .section-header { margin-bottom: 12px; }
+    body[data-view="team-coaching"] .team-coaching-workspace .section { margin-bottom: 28px; }
+    body[data-view="team-coaching"] .team-coaching-workspace .section-header { margin-bottom: 14px; }
     body[data-view="team-coaching"] .coaching-recommendations-grid {
-      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;
     }
     body[data-view="team-coaching"] .coaching-recommendations-group { min-width: 0; }
-    body[data-view="team-coaching"] .coaching-recommendations-group > .obj-group-header:first-child { margin-top: 0 !important; }
+    body[data-view="team-coaching"] .coaching-recommendations-group > .obj-group-header:first-child {
+      margin-top: 0 !important; padding: 10px 12px; border-bottom: 1px solid var(--border);
+      background: rgba(var(--accent-rgb), .04);
+    }
     body[data-view="team-coaching"] .team-coaching-workspace .team-insight {
       background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
-      padding: 14px; margin: 0 0 12px; overflow-wrap: anywhere;
+      padding: 16px; margin: 0 0 12px; overflow-wrap: anywhere;
     }
-    body[data-view="team-coaching"] .team-coaching-workspace .team-insight-claim { font-weight: var(--fw-emphasis); }
-    body[data-view="team-coaching"] .team-coaching-workspace .team-insight-data { font-size: var(--fs-secondary); }
+    body[data-view="team-coaching"] .team-coaching-workspace .team-insight-claim { font-weight: var(--fw-emphasis); line-height: 1.45; }
+    body[data-view="team-coaching"] .team-coaching-workspace .team-insight-data { font-size: var(--fs-secondary); margin-top: 8px; }
     body[data-view="team-coaching"] .team-coaching-workspace .team-insight-foot { flex-wrap: wrap; }
-    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-head {
-      max-width: none; padding: 12px 8px; border-radius: var(--radius-sm);
-    }
-    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-row.open > .rep-line-head {
-      background: rgba(var(--accent-rgb), 0.08);
-    }
-    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body {
-      max-width: none; padding: 12px 16px; background: var(--bg);
-    }
-    @media (max-width: 1000px) {
+    body[data-view="team-coaching"] .team-coaching-workspace .review-why-quote { font-size: var(--fs-secondary); padding: 10px; margin-top: 8px; }
+    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-row { border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; background: var(--bg); }
+    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-head { max-width: none; padding: 16px; border-radius: var(--radius-sm); }
+    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-row.open > .rep-line-head { background: rgba(var(--accent-rgb), 0.08); }
+    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body { max-width: none; padding: 12px 16px; background: var(--bg); }
+    @media (max-width: 740px) {
       body[data-view="team-coaching"] .coaching-recommendations-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-    }
-    @media (max-width: 600px) {
+      body[data-view="team-coaching"] .coaching-workspace-header { grid-template-columns: minmax(0, 1fr); }
+      body[data-view="team-coaching"] .coaching-workspace-header .team-controls-row { grid-column: 1; grid-row: 3; }
+      body[data-view="team-coaching"] .coaching-workspace-header .page-header--company { flex-wrap: wrap; }
+      body[data-view="team-coaching"] .page { padding: 20px 16px 64px; }
       body[data-view="team-coaching"] .team-coaching-workspace .lead-number { flex-wrap: wrap; }
-      body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body { padding: 10px 4px; }
+      body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body { padding: 10px; }
     }
   </style>
   <script src="/js/scout-auth.js"></script>
@@ -10824,9 +10841,9 @@
     var avg = (state.teamOverview && state.teamOverview.totals) ? state.teamOverview.totals.avg_score : null;
     content.innerHTML =
       '<div class="team-coaching-workspace">'
-      + '<div class="coaching-page-title"><h2>Team Coaching</h2></div>'
+      + '<div class="coaching-workspace-header"><div class="coaching-page-title"><h2>Team Coaching</h2><p>Team patterns. Your coaching standards.</p></div>'
       + teamHeaderHtml()
-      + teamControlsHtml()
+      + teamControlsHtml() + '</div>'
       + leadNumberHtml(avg, 'Team average score')
       /* ⚠⚠ THE FULL RECOMMENDATIONS, INLINE — NOT A ONE-LINE TEASER. Measured
          before changing anything: the lane this page ALREADY LOADS holds THREE
