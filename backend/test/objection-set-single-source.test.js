@@ -32,6 +32,6 @@ test('⚠⚠ EXECUTED: the two modules that export their set export the canonica
 test('⚠ the two prompt lanes whose category line changed order carry a NEW lane version (a prompt change is a cache bump, H442)', () => {
   const perf = fs.readFileSync(path.join(__dirname, '..', 'lib', 'performance-synthesis.js'), 'utf8');
   const recs = fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-synthesis.js'), 'utf8');
-  assert.ok(/SYNTH_RULE_VERSION = 'v(5|6|\d\d)-/.test(perf), 'v5 carried the category-order change; later bumps (v6 H728) stand on it');
+  assert.ok(/SYNTH_RULE_VERSION = 'v([5-9]|\d\d)-/.test(perf), 'v5 carried the category-order change; later bumps (v6 H728) stand on it');
   assert.ok(/RECS_LANE_VERSION = 'v(8|9|1\d)-/.test(recs), 'v8 carried the category-order change; later bumps (v9–v11) stand on it');
 });

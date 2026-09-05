@@ -289,6 +289,10 @@ function buildCoachingPrompt(moments, opts) {
        hard rule: a moment that was genuinely different may be said to be so,
        in a sentence, never silently. Substitution, not suppression — the
        grader never sees these (lib/coaching-corrections.js). */
+    /* H731: the team's own material — the offer, the qualifications, the script — the coaching is checked against.
+       Every sentence must be consistent with it; nothing outside it is asserted as this team's doctrine. */
+    (o.sellingContext && String(o.sellingContext).trim()) ? 'TEAM MATERIAL (this team\'s offer, qualifications and approach — the coaching must agree with it; never invent doctrine beyond it):\n' + String(o.sellingContext).trim() : '',
+    '',
     notes ? require('./coaching-corrections').promptLane(notes, { applied: true }) : '',
     '',
     'Return ONLY a JSON array, one entry per moment, in the same order:',

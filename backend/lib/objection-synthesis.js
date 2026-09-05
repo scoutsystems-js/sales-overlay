@@ -58,7 +58,8 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-function buildSynthPrompt(present, byCat) {
+var SYNTH_PROMPT_VERSION = 'v2-2026-09-05-kb-material';   // H731: the knowledge base before the advice; no generic fallback. v1 was the unversioned original.
+function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
     '  - Isolate: confirm it is the real/only objection before addressing it.',
@@ -80,10 +81,14 @@ function buildSynthPrompt(present, byCat) {
         lines.push('    - prospect said "' + (e.surface || e.quote || '').slice(0, 80) + '" → closer responded: "' + (e.closer_response || '').slice(0, 320) + '"');
       });
     } else {
-      lines.push('  (no handled examples in this window — use general best practice, and it will be labeled as such)');
+        /* H731: NO GENERIC FALLBACK. A category with no handled example and nothing in the knowledge base that
+         speaks to it gets NO advice — the fields come back null and the surface says so. */
+      lines.push('  (no handled examples in this window — if the TEAM MATERIAL below speaks to this category, coach from it and say so; if it does not, return null for isolate, reframe and overcome — never general best practice)');
     }
   });
   lines.push('');
+  if (material && material.contextText) { lines.push('TEAM MATERIAL (this closer\'s offer, qualifications and approach — ground every sentence in it):'); lines.push(material.contextText.trim()); lines.push(''); }
+  if (material && material.notes && material.notes.text) { lines.push(require('./coaching-corrections').promptLane(material.notes.text)); lines.push(''); }
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
   lines.push('{"categories":[{"category":"fear","isolate":"...","reframe":"...","overcome":"..."}]}');
   return lines.join('\n');
@@ -128,7 +133,9 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   var done = await inChunks('call_analyses', 'fathom_call_id, analyzed_at, outcome', function(q) { return q.eq('status', 'done'); });
   var outcomeByCall = outcomeMap(done);
   var hashInput = done.map(function(d) { return d.fathom_call_id + ':' + d.analyzed_at; }).sort().join('|');
-  var hash = crypto.createHash('md5').update(hashInput || 'empty').digest('hex');
+  /* H731: the material rides the hash — a profile edit or a new note regenerates; the version too. */
+  var material = await require('./kb-material').loadKbMaterial(admin, { userId: userId, lane: 'objection-synthesis', maxChars: 2500 });
+  var hash = crypto.createHash('md5').update((hashInput || 'empty') + '|' + SYNTH_PROMPT_VERSION + '|kb:' + material.kbHash).digest('hex');
 
   // 3) cache check.
   // Key snapped to UTC day boundaries — see lib/cache-window.js. The hash above
@@ -138,6 +145,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     .select('synthesis').eq('user_id', userId).eq('synthesis_type', 'objections').eq('from_ts', ck.from).eq('to_ts', ck.to).eq('analysis_set_hash', hash)
     .maybeSingle();
   if (!cacheQ.error && cacheQ.data && cacheQ.data.synthesis) {
+  if (!material.hasMaterial) return require('./kb-material').nothingToSay({ categories: [], generated_at: new Date().toISOString() });   // H731: nothing relevant → nothing said
     return Object.assign({ available: true, cached: true }, cacheQ.data.synthesis);
   }
 
@@ -176,7 +184,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   try {
     resp = await createWithUsage({
       model: CLAUDE_MODEL, max_tokens: SYNTH_MAX_TOKENS,
-      messages: [{ role: 'user', content: buildSynthPrompt(present, byCat) }],
+      messages: [{ role: 'user', content: buildSynthPrompt(present, byCat, material) }],
     });
   } catch (apiErr) {
     return { available: false, reason: 'Anthropic API failure' + ((apiErr && apiErr.status) ? ' (HTTP ' + apiErr.status + ')' : '') + ': ' + ((apiErr && apiErr.message) || 'unknown') };

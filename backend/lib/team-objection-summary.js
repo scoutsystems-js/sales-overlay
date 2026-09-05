@@ -55,7 +55,7 @@ const SYNTHESIS_TYPE = 'team_objections';
    ⚠ THIS IS THE SAME LESSON AS NEEDS_WORK_LANE_VERSION. Bump it on EVERY change
    to buildPrompt, in the SAME commit — a prompt edit and its version bump are
    one atomic change, exactly as they are for the grader. */
-const PROMPT_VERSION = 'v13-2026-09-02-never-diminish-manager-notes-moment-ids';   /* payload shape: each evidence moment now carries highlight_id + fathom_call_id (Fine Tune Coaching surface ③) */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
+const PROMPT_VERSION = 'v14-2026-09-05-kb-material';   /* v14 (H731): the offer/qualifications/script join the notes in the prompt through the one retrieval; nothing relevant → nothing said. Was v13-2026-09-02-never-diminish-manager-notes-moment-ids */ //   /* payload shape: each evidence moment now carries highlight_id + fathom_call_id (Fine Tune Coaching surface ③) */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */   /* ⚠ THE PAYLOAD SHAPE CHANGED, NOT THE PROMPT: publicMoment now carries `ts`, and it runs BEFORE the cache write — so without this bump every cached window keeps rendering "57% through the call" indefinitely. A shape change earns a bump exactly as a prompt change does. */
 /** Evidence per closer. Enough to show a pattern, few enough to stay cheap. */
 const MAX_FAILED_EVIDENCE = 5;
 const MAX_WORKED_EVIDENCE = 2;
@@ -337,7 +337,7 @@ function evidenceLine(m) {
   return parts.join('\n');
 }
 
-function buildPrompt(subjects, managerNotes) {
+function buildPrompt(subjects, managerNotes, sellingContext) {
   var lines = [
     'You are a high-ticket sales coach writing to ONE closer at a time.',
     '',
@@ -480,6 +480,7 @@ function buildPrompt(subjects, managerNotes) {
      notes are ADDED here, not appended: +~150 tokens of header when any note
      exists, +~40 tokens per note, nothing when the team has none. */
   if (managerNotes && String(managerNotes).trim()) { lines.push(require('./coaching-corrections').promptLane(managerNotes)); lines.push(''); }
+  if (sellingContext && String(sellingContext).trim()) { lines.push('SELLING CONTEXT (this team\'s offer, qualifications and approach — ground the coaching in it, never in invented doctrine):'); lines.push(String(sellingContext).trim()); lines.push(''); }   // H731
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
   lines.push('{"closers":[{"name":"<exact name as given>",'
     + '"why":"paragraph 1 (what happened — lead with the timestamp and their words) then a blank line then paragraph 2 (the principle)",'
@@ -596,11 +597,13 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
   // comes from computeTeamObjections, computed over the already-filtered call
   // list — see the note there for why the placement is the mechanism.
   var ck = snapCacheWindow(from, to);
-  var corr = await require('./coaching-corrections').loadCorrectionsSafe(admin, keyId, 'team-objection-summary');
+  var material = await require('./kb-material').loadKbMaterial(admin, { userId: keyId, teamKey: keyId, lane: 'team-objection-summary', maxChars: 2500 });   // H731
+  var corr = material.notes;
   var hash = crypto.createHash('md5')
-    .update(PROMPT_VERSION + '|' + data.analysis_fingerprint + '|' + memberIds.slice().sort().join(',') + '|notes:' + corr.hash)
+    .update(PROMPT_VERSION + '|' + data.analysis_fingerprint + '|' + memberIds.slice().sort().join(',') + '|kb:' + material.kbHash)
     .digest('hex');
 
+  if (!material.hasMaterial) return Object.assign({ available: true, cached: false, state: 'no_material', closers: [], card_text: null, generated_at: new Date().toISOString(), no_material: true, copy: require('./kb-material').NO_MATERIAL_COPY }, base);   // H731
   if (!opts.force) {
     var cq = await admin.from('objection_synthesis_cache')
       .select('synthesis').eq('user_id', keyId).eq('synthesis_type', SYNTHESIS_TYPE)
@@ -625,7 +628,7 @@ async function computeTeamObjectionSummary(admin, memberIds, from, to, opts) {
     resp = await createWithUsage({
       model: CLAUDE_MODEL,
       max_tokens: outputBudget(subjects.length),
-      messages: [{ role: 'user', content: buildPrompt(subjects, corr.text) }],
+      messages: [{ role: 'user', content: buildPrompt(subjects, corr.text, material.contextText) }],
     });
   } catch (apiErr) {
     // ⚠ NEVER CACHE A FAILURE. A cached "unavailable" would persist until the

@@ -89,7 +89,7 @@ test('⚠⚠ THE ISOLATION REPLAY — a stored correction CHANGES the coaching w
     const worker = require('../lib/analysis-worker');
     const admin = fakeAdmin({
       call_highlights: [Object.assign({}, ISOLATING)],
-      user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }],
+      user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }, { user_id: 'mgr', managed_by: null, role: 'manager', qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }]   /* H731: the coaching pass says nothing without team material, so the head carries some */,
       knowledge_base: withCorrection ? [Object.assign({}, CORRECTION_ROW)] : [],
     });
     const out = await worker._coachCallMoments(admin, 'call-1', 'lost', null, null, 'rep');
@@ -97,13 +97,13 @@ test('⚠⚠ THE ISOLATION REPLAY — a stored correction CHANGES the coaching w
   });
   const without = await withModel(coachingReply, async () => {
     const worker = require('../lib/analysis-worker');
-    const tables = { call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }], knowledge_base: [] };
+    const tables = { call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }, { user_id: 'mgr', managed_by: null, role: 'manager', qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }]   /* H731: the coaching pass says nothing without team material, so the head carries some */, knowledge_base: [] };
     const out = await worker._coachCallMoments(fakeAdmin(tables), 'call-1', 'lost', null, null, 'rep');
     return { out, h: tables.call_highlights[0] };
   });
   const withIt = await withModel(coachingReply, async (calls) => {
     const worker = require('../lib/analysis-worker');
-    const tables = { call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }], knowledge_base: [Object.assign({}, CORRECTION_ROW)] };
+    const tables = { call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'rep', managed_by: 'mgr', role: 'user' }, { user_id: 'mgr', managed_by: null, role: 'manager', qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }]   /* H731: the coaching pass says nothing without team material, so the head carries some */, knowledge_base: [Object.assign({}, CORRECTION_ROW)] };
     const out = await worker._coachCallMoments(fakeAdmin(tables), 'call-1', 'lost', null, null, 'rep');
     return { out, h: tables.call_highlights[0], prompt: calls[0].messages[0].content };
   });
@@ -127,7 +127,7 @@ test('⚠⚠ SUBSTITUTION, NOT SUPPRESSION — the grader and the extractor neve
   const w = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8'));
   const coach = w.slice(w.indexOf('async function coachCallMoments'), w.indexOf('\nmodule.exports'));
   const rest = w.slice(0, w.indexOf('async function coachCallMoments'));
-  assert.ok(/loadCorrections\(/.test(coach), 'the coaching pass reads the corrections');
+  assert.ok(/loadKbMaterial\(/.test(coach), 'the coaching pass reads the corrections — through the ONE knowledge-base retrieval since H731');
   assert.ok(!/loadCorrections\(|managerNotes/.test(rest), 'nothing before the coaching pass — grader, extractor, harvest — touches them');
 });
 
@@ -271,7 +271,7 @@ test('⚠⚠ ONE WORDING, THREE COACHING LANES + 7c; the classifier, the grader 
   assert.strictEqual(cc.promptLane(''), '', 'no notes, no lane');
   assert.ok(/applied_manager_notes/.test(cc.promptLane('1. x', { applied: true })) && !/applied_manager_notes/.test(lane), 'only 7c asks which notes were applied');
   ['team-synthesis.js', 'team-objection-summary.js', 'performance-synthesis.js', 'coaching.js'].forEach((f) => assert.ok(/promptLane\(/.test(laneSrc(f)), f + ' renders the shared lane'));
-  ['team-synthesis.js', 'team-objection-summary.js', 'performance-synthesis.js'].forEach((f) => assert.ok(/loadCorrections(Safe)?\(/.test(laneSrc(f)), f + ' loads the team notes'));
+  ['team-synthesis.js', 'team-objection-summary.js', 'performance-synthesis.js'].forEach((f) => assert.ok(/loadCorrections(Safe)?\(|loadKbMaterial\(/.test(laneSrc(f)), f + ' loads the team notes (through the one retrieval since H731)'));
   assert.ok(!/MANAGER NOTES/.test(laneSrc('coaching.js')), 'coaching.js no longer carries its own copy of the wording');
   assert.ok(!/loadCorrections(Safe)?\(|promptLane\(|managerNotes/.test(laneSrc('team-needs-work.js')), 'needs-work: the bucket classifier sets a RATE — a note must not reach it');
   assert.ok(!/loadCorrections(Safe)?\(|promptLane\(/.test(laneSrc('selling-context.js')), 'the grader/extractor context never carries a note');
@@ -283,7 +283,7 @@ test('⚠⚠ EACH LANE\'S CACHE KEY MOVES WITH THE NOTES, and its version moved 
   const ts = laneSrc('team-synthesis.js');
   assert.ok(/\|\|notes:' \+ corr\.hash/.test(ts) && /RECS_LANE_VERSION = 'v([7-9]|\d{2,})-/.test(ts), 'recommendations (v7 added the notes lane; a later bump keeps it — fix #7 moved it to v8, H680)');
   const os = laneSrc('team-objection-summary.js');
-  assert.ok(/\|notes:' \+ corr\.hash/.test(os) && /PROMPT_VERSION = 'v1[3-9]-/.test(os), 'objections Why (v13: the payload gained the moment ids)');
+  assert.ok(/\|kb:' \+ material\.kbHash/.test(os) && /PROMPT_VERSION = 'v1[3-9]-/.test(os), 'objections Why (v13: the payload gained the moment ids; v14: the notes hash rides the material hash)');
   const ps = laneSrc('performance-synthesis.js');
   assert.ok(/\|\|notes:' \+ corr\.hash/.test(ps) && /SYNTH_RULE_VERSION = 'v([4-9]|\d{2,})-/.test(ps), 'performance summary (v4 added the notes lane; a later bump keeps it — fix #7 moved it to v5, H680)');
   const nw = laneSrc('team-needs-work.js');
@@ -360,7 +360,7 @@ test('⚠⚠ SURFACE ③: the Why evidence carries its moment; the SAME helper; 
   const os = require('../lib/team-objection-summary');
   const pm = os._publicMoment({ id: 'h9', fathom_call_id: 'c9', quote: 'q', timestamp_seconds: 10 });
   assert.strictEqual(pm.highlight_id, 'h9'); assert.strictEqual(pm.fathom_call_id, 'c9');
-  assert.ok(/PROMPT_VERSION = 'v13-/.test(laneSrc('team-objection-summary.js')), 'a payload-shape change bumps the version in the key');
+  assert.ok(/PROMPT_VERSION = 'v1[3-9]-/.test(laneSrc('team-objection-summary.js')), 'a payload-shape change bumps the version in the key (v13 carried the moment ids; v14 the knowledge base)');
   const card = fnBody(LIVE, 'objSummaryCloserHtml');
   assert.ok(/fineTuneFromWhy\(/.test(card) && /canMarkStandard\(\)/.test(card) && /m\.highlight_id/.test(card), 'the control on each evidence moment, behind the gate, only when the moment is named');
   const bridge = fnBody(LIVE, 'fineTuneFromWhy');
@@ -369,7 +369,7 @@ test('⚠⚠ SURFACE ③: the Why evidence carries its moment; the SAME helper; 
   const kbSrc = stripComments(fs.readFileSync(path.join(__dirname, '..', 'routes', 'kb.js'), 'utf8'));
   assert.ok(/SURFACES = \['call_review_moment', 'team_coaching_insight', 'team_objections_why'\]/.test(kbSrc));
   const kb = require('../routes/kb');
-  kb._setAdminClientForTests(() => fakeAdmin({ call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'mgr', role: 'manager', managed_by: null }, { user_id: 'rep', role: 'user', managed_by: 'mgr' }], knowledge_base: [] }));
+  kb._setAdminClientForTests(() => fakeAdmin({ call_highlights: [Object.assign({}, ISOLATING)], user_profiles: [{ user_id: 'mgr', role: 'manager', managed_by: null, qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }, { user_id: 'rep', role: 'user', managed_by: 'mgr' }], knowledge_base: [] }));
   const l = kb.stack.find((x) => x.route && x.route.path === '/fine-tune'); const handler = l.route.stack[l.route.stack.length - 1].handle;
   const bad = await new Promise((resolve) => { const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } }; Promise.resolve().then(() => handler({ user: { id: 'mgr' }, body: { fathom_call_id: 'call-1', highlight_id: 'h-iso', feedback: 'x', surface: 'somewhere_else' }, headers: {} }, res)).catch((e) => resolve({ code: 'threw' })); });
   assert.strictEqual(bad.code, 400, 'an unknown surface is refused before any work');

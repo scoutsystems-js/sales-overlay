@@ -75,7 +75,7 @@ function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().sli
 /* ⚠ Bump this whenever the recommendations PROMPT or the shape of a stored
    insight changes — the generated text lives inside the cached payload, so a
    key that does not move means the change is invisible indefinitely. */
-const RECS_LANE_VERSION = 'v11-2026-09-05-page-facts';   /* v11 (H728): the page facts block in the prompt; a claim whose direction contradicts them is dropped. Was v10-2026-09-04-candidates-pass-the-bar */ //   /* v10 (H725): a moment becomes EVIDENCE only if it passes the selectivity bar — a payment confirmation with no earned move is not a candidate. Was v9: */ // 'v9-2026-09-04-evidence-subject'   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
+const RECS_LANE_VERSION = 'v12-2026-09-05-kb-material';   /* v12 (H731): the ONE knowledge-base retrieval before the prompt; nothing relevant → the lane says nothing. Was v11-2026-09-05-page-facts */ //   /* v11 (H728): the page facts block in the prompt; a claim whose direction contradicts them is dropped. Was v10-2026-09-04-candidates-pass-the-bar */ //   /* v10 (H725): a moment becomes EVIDENCE only if it passes the selectivity bar — a payment confirmation with no earned move is not a candidate. Was v9: */ // 'v9-2026-09-04-evidence-subject'   /* v9 (H724): every insight declares its SUBJECT and a cited moment whose stored type/category/section disagrees loses its quote — the claim stands; a count claim carries no quote. Was v8: */ // const RECS_LANE_VERSION = 'v8-2026-09-02-category-order-canonical';   /* v8: the "OBJECTIONS by category" line now iterates the ruled stored order — prompt text changed, cache key changes (fix #7, H680). v7 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane — a prompt edit and its bump are one atomic change */   /* v5 rows were written without the id (column not selected) — bumped again so they regenerate */   /* ⚠ PAYLOAD SHAPE: each insight now carries the highlight id it cites (Fine Tune Coaching surface ② needs a moment to record what it was given on). A shape change earns a bump exactly as a prompt change does. */
 /* ⚠⚠ WHO SPOKE THE QUOTE — READ, NEVER INFERRED (2026-09-01).
    THE BUG THIS REPLACES: `spoke` was derived from WHICH FIELD the caller fell
    back to — `closer_response ? 'closer' : 'prospect'`. `closer_response` IS
@@ -282,10 +282,13 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
 
   // KB-grounded: the manager/owner's team selling context (cap 3000), folded into
   // the set-hash so a KB upload invalidates the cached team recommendations.
-  var selling = await fetchSellingContext(admin, keyId, 3000, SYNTHESIS_CATEGORIES);
+  /* H731: THE KNOWLEDGE BASE, BEFORE THE ADVICE. One retrieval (lib/kb-material): the team's offer, qualifications,
+     script, uploads and coaching notes, scoped by the relationship rules. Nothing relevant → nothing said. */
+  var material = await loadKbMaterial(admin, { userId: keyId, teamKey: keyId, lane: 'team-synthesis', maxChars: 3000 });
+  var selling = { contextText: material.contextText, kbHash: material.kbHash, qualifications: material.qualifications };
   /* FINE TUNE COACHING (2026-09-02): this team's corrections join the KEY (a new
      note invalidates the next load) and the PROMPT, through the one shared lane. */
-  var corr = await require('./coaching-corrections').loadCorrectionsSafe(admin, keyId, 'team-synthesis');
+  var corr = material.notes;
   var hash = crypto.createHash('md5').update(analyses.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash + '||notes:' + corr.hash
     /* ⚠⚠ THE RULE VERSION IS DELIBERATELY *NOT* IN THIS KEY — see CLAUDE.md.
        Adding it forces every cached synthesis to regenerate at real cost, and
@@ -309,6 +312,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     + '||recs:' + RECS_LANE_VERSION).digest('hex');
   var cached = await cacheGet(admin, keyId, 'team', from, to, hash);
   if (cached) return Object.assign({ available: true, cached: true }, cached);
+  if (!material.hasMaterial) return nothingToSay({ working: [], improve: [], generated_at: new Date().toISOString() });   // H731: silence beats a guess
 
   var repOf = function (cid) { return w.meta[cid] ? w.meta[cid].user_id : null; };
   var secSum = {}, secN = {}; SECTIONS.forEach(function (s) { secSum[s] = 0; secN[s] = 0; });

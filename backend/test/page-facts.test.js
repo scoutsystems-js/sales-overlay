@@ -52,7 +52,7 @@ test('⚠ both lanes on a page are handed the SAME block and both check directio
   assert.ok(/require\('\.\/page-facts'\)/.test(ts) && /require\('\.\/page-facts'\)/.test(ps), 'both lanes read the one module');
   assert.ok(/factsBlock\(/.test(ts) && /factsBlock\(/.test(ps), 'both prompts carry the block');
   assert.ok(/claimContradictsFacts\(/.test(ts) && /claimContradictsFacts\(/.test(ps), 'both resolve steps check direction');
-  assert.ok(/RECS_LANE_VERSION = 'v11-/.test(ts) && /SYNTH_RULE_VERSION = 'v6-/.test(ps), 'both lanes moved their version');
+  assert.ok(/RECS_LANE_VERSION = 'v1[1-9]-/.test(ts) && /SYNTH_RULE_VERSION = 'v[6-9]-/.test(ps), 'both lanes moved their version (v11/v6 carried the facts; later bumps stand on them)');
   const lane = require('../lib/team-synthesis');
   const f = PF.pageFacts(SECTIONS, OBJ, { minBucket: 5 });
   const out = lane._resolveInsights([

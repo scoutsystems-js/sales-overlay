@@ -16,11 +16,12 @@ const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
 /* Bumped ONLY for a correctness defect in what the cache already holds —
    never for a speculative improvement. See the key comment below. */
-const SYNTH_RULE_VERSION = 'v6-2026-09-05-subject-bar-page-facts';   /* v6 (H728): the subject check, the candidate bar and the page facts — the same three the recommendations lane carries. Was v5-2026-09-02-category-order-canonical */ //   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
+const SYNTH_RULE_VERSION = 'v7-2026-09-05-kb-material';   /* v7 (H731): the one knowledge-base retrieval before the prompt; nothing relevant → nothing said. Was v6-2026-09-05-subject-bar-page-facts */ //   /* v6 (H728): the subject check, the candidate bar and the page facts — the same three the recommendations lane carries. Was v5-2026-09-02-category-order-canonical */ //   /* v5: the "OBJECTIONS by category" line now iterates the ruled stored order (fear, timing, partner, logistical) — prompt text changed, so the cache key changes (fix #7, H680). v4 was the manager-notes lane. */   /* the prompt gained the MANAGER NOTES lane (Fine Tune Coaching) */
 const { fetchSellingContext, SYNTHESIS_CATEGORIES } = require('./selling-context');
 const { EVIDENCE_RULE, EVIDENCE_RULE_VERSION } = require('./evidence-rule');
 const { evidenceSubjectMismatch, candidateEligible, subjectPromptRule } = require('./evidence-subject');   // H728 step 1
 const PF = require('./page-facts');   // H728 step 2
+const { loadKbMaterial, nothingToSay } = require('./kb-material');   // H731
 const { MIN_BUCKET } = require('./team-needs-work');
 
 const { clipHref } = require('./clip-link');
@@ -203,8 +204,10 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
 
   // KB-grounded: fetch the closer's selling context (offer/scripts, cap 3000) and
   // fold its hash into the set-hash so a KB upload invalidates the cached synthesis.
-  var selling = await fetchSellingContext(admin, userId, 3000, SYNTHESIS_CATEGORIES);
-  var cc = require('./coaching-corrections');
+  /* H731: THE KNOWLEDGE BASE, BEFORE THE ADVICE — one retrieval, scoped by the relationship rules. */
+  var material = await loadKbMaterial(admin, { userId: userId, lane: 'performance-synthesis', maxChars: 3000 });
+  var selling = { contextText: material.contextText, kbHash: material.kbHash };
+  var corr = material.notes;
   var corr = await cc.loadCorrectionsSafe(admin, await cc.teamKeyFor(admin, userId).catch(function () { return null; }), 'performance-synthesis');
   var hashInput = keyRows.map(function (a) { return a.fathom_call_id + ':' + a.analyzed_at; }).sort().join('|') + '||kb:' + selling.kbHash + '||notes:' + corr.hash
     /* ⚠⚠ A VERSION IS IN THIS KEY AGAIN, AND THE DISTINCTION IS THE POINT.
@@ -234,6 +237,7 @@ async function computePerformanceSynthesis(admin, userId, from, to) {
   var cacheQ = await admin.from('objection_synthesis_cache').select('synthesis')
     .eq('user_id', userId).eq('synthesis_type', 'performance').eq('from_ts', ck.from).eq('to_ts', ck.to).eq('analysis_set_hash', hash).maybeSingle();
   if (!cacheQ.error && cacheQ.data && cacheQ.data.synthesis) return Object.assign({ available: true, cached: true }, cacheQ.data.synthesis);
+  if (!material.hasMaterial) return nothingToSay({ working: [], improve: [], generated_at: new Date().toISOString() });   // H731
 
   // MISS from here on — now pay for the columns the synthesis actually needs.
   var analyses = await inChunks('call_analyses',

@@ -104,7 +104,9 @@ function fakeAdmin(over) {
       const rows = table === 'fathom_calls' ? calls
                  : table === 'call_highlights' ? HIGHLIGHTS
                  : table === 'call_analyses' ? ANALYSES
-                 : table === 'objection_synthesis_cache' ? cache : [];
+                 : table === 'objection_synthesis_cache' ? cache
+                 /* H731: the lane reads the knowledge base before it speaks and says nothing without material — the head carries some here */
+                 : table === 'user_profiles' ? [{ user_id: JOSH, managed_by: null, role: 'manager', qualifications: '10k saved, not living paycheck to paycheck, 640 or above credit score' }] : [];
       return builder(rows, state, table);
     },
   };

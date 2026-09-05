@@ -8883,6 +8883,7 @@
         + '</div>';
     }
     if (!s.available) return '<div class="empty"><h3>Performance summary unavailable</h3><p>Could not generate it right now' + (s.reason ? ' (' + escapeHtml(s.reason) + ')' : '') + '. Your scores above are unaffected.</p></div>';
+    if (s.no_material) return noMaterialHtml(s.copy);   // H731
     var work = (s.working || []), imp = (s.improve || []);
     if (!work.length && !imp.length) return '<div class="empty"><h3>Not enough data yet</h3><p>Analyze more calls (with win/loss outcomes) to surface a performance summary.</p></div>';
     var block = function(title, arr, kind) {
@@ -11219,6 +11220,7 @@
         + '</div>';
     }
     if (s._error) return '<div class="error">Could not load: ' + escapeHtml(s._error) + '</div>';
+    if (s.no_material) return noMaterialHtml(s.copy);   // H731
     if (!s.available) {
       return '<div class="empty"><h3>Coaching summary unavailable</h3><p>Could not generate it right now'
         + (s.reason ? ' (' + escapeHtml(s.reason) + ')' : '')
@@ -15333,6 +15335,13 @@
     return html;
   }
 
+  /* H731 — WHAT A USER SEES WHEN NOTHING RELEVANT IS FOUND. Every advice lane returns the one shape
+     (lib/kb-material nothingToSay) and every surface draws it with this — in words, what happened and
+     what to do, nothing invented. */
+  function noMaterialHtml(copy) {
+    return '<div class="empty no-material"><p>' + escapeHtml(copy || 'Scout has nothing on file for this team yet, so it is not coaching from guesswork. Add the offer, qualifications and script on the account page and coaching will use them from the next call on.') + '</p></div>';
+  }
+
   function teamRecsHtml() {
     var r = state.teamRecs;
     /* ⚠⚠ WORDS, WHERE THE CONTENT WILL BE — not a spinner in a corner and not a
@@ -15345,6 +15354,7 @@
     if (!r) return laneWaitHtml('recs', 'Reading the team\'s calls\u2026', 'Still working \u2014 the first load of the day writes these from scratch and takes a moment.', 120);
     if (r._error) return '<div class="error">Could not load recommendations: ' + escapeHtml(r._error) + '</div>';
     if (!r.available) return '<div class="empty"><h3>Recommendations unavailable</h3><p>' + escapeHtml(r.reason || 'Could not generate right now.') + '</p></div>';
+    if (r.no_material) return noMaterialHtml(r.copy);   // H731
     var w = r.working || [], i = r.improve || [];
     if (!w.length && !i.length) return '<div class="empty"><p>Not enough analyzed team calls yet.</p></div>';
     return '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
@@ -15505,9 +15515,8 @@
          not a label — and now renders on its own only when it applies. */
       + (d.quiet ? '<div class="meta">Quiet day</div>' : '')
       + stats
-      + '<div class="digest-summary">' + escapeHtml(d.summary || '') + '</div>'
-      + notable
-      + digestFocusHtml(d.focus);
+      + (d.no_material ? noMaterialHtml(d.copy)   // H731: the numbers stay; the prose says nothing
+          : '<div class="digest-summary">' + escapeHtml(d.summary || '') + '</div>' + notable + digestFocusHtml(d.focus));
   }
 
   /* ⚠⚠ THE EYEBROW IS THE WHOLE FIX. Justin said three times that this
@@ -18044,6 +18053,8 @@
     } else if (!s.available) {
       body = '<div class="empty"><h3>Synthesis unavailable</h3><p>Could not generate coaching right now'
         + (s.reason ? ' (' + escapeHtml(s.reason) + ')' : '') + '. The objection data below is unaffected.</p></div>';
+    } else if (s.no_material) {
+      body = noMaterialHtml(s.copy);   // H731
     } else if (!s.categories || s.categories.length === 0) {
       body = '<div class="empty"><h3>No categorized objections yet</h3><p>Once objections are categorized in this window, per-category coaching appears here.</p></div>';
     } else {
@@ -18058,6 +18069,12 @@
     var tag = c.grounded
       ? '<span class="badge badge-win">grounded</span>'
       : '<span class="scope-pill">general best practice</span>';
+    /* H731: a category with no handled example and nothing in the knowledge base that speaks to it gets no
+       advice — the lane returned nulls, and the surface says so rather than "—" or general best practice. */
+    if (!c.isolate && !c.reframe && !c.overcome) {
+      return '<div class="synth-section"><div class="synth-head"><h3>' + escapeHtml(labelMap[c.category] || c.category) + '</h3>' + tag + '</div>'
+        + '<div class="empty no-material"><p>No handled example in this window, and nothing on file speaks to it — so no coaching is offered here.</p></div></div>';
+    }
     var blocks = '<div class="synth-grid">'
       + '<div class="synth-block"><h4>Isolate</h4><div class="body">' + escapeHtml(c.isolate || '—') + '</div></div>'
       + '<div class="synth-block"><h4>Reframe</h4><div class="body">' + escapeHtml(c.reframe || '—') + '</div></div>'

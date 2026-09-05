@@ -75,7 +75,7 @@ test('⚠ the prompts are handed the LABEL, never the machine word — digest v7
   const dg = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'team-digest.js'), 'utf8'));
   assert.ok(/outcome: ' \+ \(a\.outcome \? outcomeLabel\(a\.outcome\) : 'unknown'\)/.test(dg), 'the digest call line carries the label');
   assert.ok(/"Open" is an OUTCOME meaning the call did not close/.test(dg), 'the digest rule names the new word');
-  assert.ok(/DIGEST_PROMPT_VERSION = 'v7-/.test(dg), 'the lane version bumped with the prompt');
+  assert.ok(/DIGEST_PROMPT_VERSION = 'v[7-9]-|DIGEST_PROMPT_VERSION = 'v\d\d-/.test(dg), 'the lane version bumped with the prompt (v7 carried the label; v8 the knowledge base)');
   const co = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'coaching.js'), 'utf8'));
   assert.ok(/'Call outcome: ' \+ outcomeLabel\(outcome\) \+ '\.'/.test(co), 'the coaching prompt carries the label');
   assert.ok(/eod-chip-follow">follow up close</.test(LIVE), 'the follow-up close label (the call TYPE) stays exactly as ruled');

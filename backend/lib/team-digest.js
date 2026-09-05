@@ -109,7 +109,7 @@ function digestCacheKey(dateStr) {
 /* ⚠ IN the set hash below — a copy change lives inside the cached payload, so
    without a bump every stored digest keeps rendering the old wording and the
    change looks shipped while changing nothing on screen. */
-var DIGEST_PROMPT_VERSION = 'v7-2026-09-03-open-outcome';   // H709: the outcome word is Open; the prompt is handed the LABEL, never the machine word   // H706: a follow-up close reads as one in the call line
+var DIGEST_PROMPT_VERSION = 'v8-2026-09-05-kb-material';   /* v8 (H731): the notes join the selling context through the one retrieval; nothing relevant → the prose says nothing. Was v7-2026-09-03-open-outcome */ //   // H709: the outcome word is Open; the prompt is handed the LABEL, never the machine word   // H706: a follow-up close reads as one in the call line
 
 function digestSetHash(analyses, kbHash, callIds) {
   return crypto.createHash('md5')
@@ -174,11 +174,13 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
     function (q) { return q.eq('status', 'done'); });
 
   // KB folded into the hash (and the prompt) — same discipline as the other lanes.
-  var selling = await fetchSellingContext(admin, keyId, 2000, SYNTHESIS_CATEGORIES);
+  var material = await require('./kb-material').loadKbMaterial(admin, { userId: keyId, teamKey: keyId, lane: 'team-digest', maxChars: 2000 });   // H731
+  var selling = { contextText: material.contextText, kbHash: material.kbHash };
   var hash = digestSetHash(analyses, selling.kbHash, w.callIds);
 
   var cached = await cacheGet(admin, keyId, 'digest', key.fromTs, key.toTs, hash);
   if (cached) return Object.assign({ available: true, cached: true }, cached);
+  if (!material.hasMaterial) return require('./kb-material').nothingToSay({ summary: null, focus: null, notable: [], generated_at: new Date().toISOString() });   // H731
 
   // Zero calls → deterministic quiet digest, cached, no Claude spend.
   if (w.callIds.length === 0) {
@@ -266,6 +268,7 @@ async function computeDailyDigest(admin, keyId, repIds, dateStr, emailMap, nameM
       '',
     ]);
   }
+  if (material.notes && material.notes.text) promptLines = promptLines.concat([require('./coaching-corrections').promptLane(material.notes.text), '']);   // H731
   promptLines = promptLines.concat([
     'Respond with ONLY a JSON object:',
     '{',
