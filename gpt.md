@@ -1,10 +1,10 @@
 # GPT updates — Scout
 
 ## Current state — 2026-09-05
-Code verified locally; deployment held while new calls are processing. Migration 075 is applied. Two confirmed incorrect notes on the one approved test call have been removed in production, with rejection provenance; their quote timestamps are corrected to transcript positions. No historical backfill.
+Code deployed: Railway SUCCESS at 4b17f8b2f4941030887bc07a5c422aba11aadb7a. Migration 075 is applied. Two confirmed incorrect notes on the one approved test call have been removed in production, with rejection provenance; their quote timestamps are corrected to transcript positions. No historical backfill.
 
 ## Approved page and sidebar
-Compact team/date/score header; expandable Coaching Focus; closer selector with one improvement area; expandable Team Strengths with full exchanges and outcomes; compact sidebar icons and persistent Team subpages. Original Scout wordmark and browser-local artwork toggle preserved. These changes are built, not yet deployed.
+Compact team/date/score header; expandable Coaching Focus; closer selector with one improvement area; expandable Team Strengths with full exchanges and outcomes; compact sidebar icons and persistent Team subpages. Original Scout wordmark and browser-local artwork toggle preserved. These changes are deployed; signed-in checks passed.
 
 ## Coaching contradiction fix
 The old pass read a truncated saved closer reply and treated an earlier observation as authoritative. The transcript shows the closer did ask the feared-result question, isolate, offer a refundable deposit, and ask for conditional commitment. That contradicts both stored criticisms on call 99e6f117-562f-4b64-9473-04b02f58d682.
@@ -22,4 +22,4 @@ Targeted production correction removed only highlights 75e12224-15f9-43ad-9e24-f
 2,480 backend tests passed; zero failures. Changed modules and extracted dashboard inline scripts parse. Desktop/mobile checks cover 1400, 979 and 390 CSS pixels, closer switching and Fine Tune targets. Independent-review regression tests fail both when the gate is removed and when it is called but its effect ignored. Current-knowledge mismatch and selecting a valid alternative after rejecting another area are exercised through the real gather. Model stubs test plumbing only; the actual one-call review above tests the reported contradiction.
 
 ## Deployment
-Pending: active analysis drain, then push, exact Railway commit verification, and authenticated live sidebar/page checks. Do not call this redesign live before those checks. Prior live commit: 8909310. Local preview now withholds unreviewed advice; its priority headlines remain illustrative.
+New analyses finished before the push. Three stable polls returned only the eight previously approved stale rows; the last also showed no active coaching. Railway reports SUCCESS at 4b17f8b. Served-page markers verified RAW/comment-stripped: coaching-rep-workspace 5/5, workspaceTeamPages 2/2, selectCoachingRep 2/2. Authenticated live checks passed: closer selection, My Team navigation and return, original wordmark, one detail panel and no horizontal overflow. Artwork on persisted through reload; restored to the user’s original off preference. Previous live commit: 8909310. Local preview now withholds unreviewed advice; its priority headlines remain illustrative.
