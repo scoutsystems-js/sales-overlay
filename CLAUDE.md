@@ -45,6 +45,8 @@
 ## 3 · Git, deploy and the drain
 
 - **SITE DESIGN IS NO LONGER OURS (Justin, 2026-09-05).** Justin is using ChatGPT for site design from now on, working in a **separate GitHub tree**. Expect design changes on the site that this session did not make and has no record of. **Do not be alarmed by them, do not revert them, do not "fix" them, and never force-push over that tree's work.** If a design change appears to break behaviour, report it to Justin — do not undo it yourself. The landing page in particular is out of scope for this session, standing.
+- Justin’s explicit “send it” means deploy the change currently under discussion (2026-09-05). For the Team Coaching redesign only, he approved proceeding despite eight stale processing records last updated September 1–2; this does not waive checks for new active work.
+
 
 - **A push deploys production** (`main` → Railway, ~60s). Push only verified work with no drain running (next rule) and verify the deployed commit afterwards. Justin has said not to ask for confirmation on routine commits and pushes (memory, later than the 2026-07-22 "no push without approval" rule in H558) — so do not ask, but never push mid-block unverified work, and never force-push `main` (five commits were lost that way once). (H558, H019)
 - **NEVER push during an analysis drain.** A redeploy kills the fire-and-forget analyze loop (`/fathom/sync`, `/reanalyze`, `/update-analyses`, `/zoom/sync`) and strands rows. The drain check is **its own command whose output you read before deciding** — never `&&`-chained to the push. A drain is `processing > 0` OR `pending` falling across polls; a static `pending` across several polls is NOT a drain. Push code first, let it settle, then dispatch. (H558, H358)

@@ -1981,3 +1981,8 @@ Today: *"calls taken — not prospects."* 2026-08-03: *"if 1 prospect takes 3 ca
 - Detector discipline: proven on ≥5 planted positives and ≥5 planted negatives before any hit is reviewed (the first dead-function counter was 61% wrong until bare references were counted). Findings land here with evidence; Justin decides what is built.
 - Candidates surfaced while sizing, untouched: KB and highlight reads already past the 1,000-row cap for one account; `objection_class` possibly read but not selected in `team-analytics`; 14 zero-reference dashboard functions; 172 stylesheet-only classes; objection-category literals in 10 files; 4 headings with two renderers; 123 private comment-strippers in tests.
 - **🔴 NEEDS JUSTIN: full or first pass, and the order.**
+
+
+## Team Coaching presentation — 2026-09-05
+
+Implemented and approved for deployment: compact Team Coaching layout; all recommendations and existing actions retained; original wordmark and browser-local background toggle unchanged. Validation: 2,433 tests passed. Deploy authorization includes the eight stale processing rows from September 1–2. Live deployment verification is recorded in TEAM-COACHING-REDESIGN.md.

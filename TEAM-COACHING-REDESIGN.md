@@ -1,6 +1,6 @@
 # Team Coaching redesign
 
-Not pushed or deployed. Implementation is isolated on codex/team-coaching-ready, based on 25279f5.
+Approved for deployment. Implementation is on codex/team-coaching-ready, based on 25279f5. Live verification will be recorded after the push.
 
 The Team Coaching page has a compact title and score row, two recommendation columns on wide screens, stacked recommendations on narrower screens, and full-width expandable rep rows. All recommendations, evidence, clip links, action indexes, existing permission checks and loading/error states remain in their original renderers. The original wordmark and background preference controls are unchanged. Artwork preferences remain browser-local, not account-synced.
 
