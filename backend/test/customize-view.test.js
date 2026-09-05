@@ -14,6 +14,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { fnBody, stripComments } = require('./helpers/strip-comments');
 
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
 
@@ -53,11 +54,11 @@ function registrySrc() {
 /* Every team render function concatenated — the split turned one page into
    five, so "the render" is the union of the pages that own panels. */
 function renderPath() {
-  return ['renderTeamDigest', 'renderTeamPerformance', 'renderTeamCoaching'].map(function (f) {
-    const at = HTML.indexOf('function ' + f);
-    if (at === -1) throw new Error('missing render function: ' + f);
-    return HTML.slice(at, HTML.indexOf('\n  }', HTML.indexOf('allPanelsHiddenNoteHtml();', at)));
-  }).join('\n');
+  // Shared string-aware extraction survives presentation wrappers after the
+  // final panel. A punctuation-dependent end marker can omit the whole view.
+  const live = stripComments(HTML);
+  return ['renderTeamDigest', 'renderTeamPerformance', 'renderTeamCoaching']
+    .map(f => fnBody(live, f)).join('\n');
 }
 
 function api(stored) {

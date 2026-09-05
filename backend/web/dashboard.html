@@ -5322,6 +5322,51 @@
       border: 1px solid var(--border-strong, #2a2a2a); border-radius: var(--radius-sm);
       padding: 2px 7px; margin-left: 8px; opacity: 0.85; white-space: nowrap;
     }
+    /* Team Coaching presentation, September 2026. The workspace uses the
+       existing opaque page ground; artwork and its saved toggle remain global.
+       Scope every selector so other dashboard pages keep their own treatment. */
+    body[data-view="team-coaching"] .team-coaching-workspace .coaching-page-title h2 {
+      font-size: var(--fs-title); font-weight: var(--fw-emphasis); margin: 0 0 12px;
+    }
+    body[data-view="team-coaching"] .team-coaching-workspace .page-header--company {
+      margin-bottom: 16px; min-height: 0;
+    }
+    body[data-view="team-coaching"] .team-coaching-workspace .team-controls-row { margin-bottom: 16px; }
+    body[data-view="team-coaching"] .team-coaching-workspace .lead-number {
+      display: flex; align-items: baseline; gap: 12px; margin: 0 0 20px;
+      padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    body[data-view="team-coaching"] .team-coaching-workspace .lead-number-val { font-size: var(--fs-number); }
+    body[data-view="team-coaching"] .team-coaching-workspace .section { margin-bottom: 24px; }
+    body[data-view="team-coaching"] .team-coaching-workspace .section-header { margin-bottom: 12px; }
+    body[data-view="team-coaching"] .coaching-recommendations-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;
+    }
+    body[data-view="team-coaching"] .coaching-recommendations-group { min-width: 0; }
+    body[data-view="team-coaching"] .coaching-recommendations-group > .obj-group-header:first-child { margin-top: 0 !important; }
+    body[data-view="team-coaching"] .team-coaching-workspace .team-insight {
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 14px; margin: 0 0 12px; overflow-wrap: anywhere;
+    }
+    body[data-view="team-coaching"] .team-coaching-workspace .team-insight-claim { font-weight: var(--fw-emphasis); }
+    body[data-view="team-coaching"] .team-coaching-workspace .team-insight-data { font-size: var(--fs-secondary); }
+    body[data-view="team-coaching"] .team-coaching-workspace .team-insight-foot { flex-wrap: wrap; }
+    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-head {
+      max-width: none; padding: 12px 8px; border-radius: var(--radius-sm);
+    }
+    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-row.open > .rep-line-head {
+      background: rgba(var(--accent-rgb), 0.08);
+    }
+    body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body {
+      max-width: none; padding: 12px 16px; background: var(--bg);
+    }
+    @media (max-width: 1000px) {
+      body[data-view="team-coaching"] .coaching-recommendations-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    }
+    @media (max-width: 600px) {
+      body[data-view="team-coaching"] .team-coaching-workspace .lead-number { flex-wrap: wrap; }
+      body[data-view="team-coaching"] .team-coaching-workspace .rep-line-body { padding: 10px 4px; }
+    }
   </style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>
@@ -10778,7 +10823,9 @@
        repeat. It is the figure the coaching on this page exists to move. */
     var avg = (state.teamOverview && state.teamOverview.totals) ? state.teamOverview.totals.avg_score : null;
     content.innerHTML =
-      teamHeaderHtml()
+      '<div class="team-coaching-workspace">'
+      + '<div class="coaching-page-title"><h2>Team Coaching</h2></div>'
+      + teamHeaderHtml()
       + teamControlsHtml()
       + leadNumberHtml(avg, 'Team average score')
       /* ⚠⚠ THE FULL RECOMMENDATIONS, INLINE — NOT A ONE-LINE TEASER. Measured
@@ -10800,7 +10847,7 @@
          is to remove the door, NOT to leave it pointing at a dead page. The
          view redirects (ARCHIVED_VIEWS) so an old bookmark still lands
          somewhere; nothing in the product now offers the trip. */
-      + allPanelsHiddenNoteHtml();
+      + allPanelsHiddenNoteHtml() + '</div>';
   }
 
   // Both graphs, guarded so a missing/failed series simply leaves the empty
@@ -15417,10 +15464,15 @@
     if (r.no_material) return noMaterialHtml(r.copy);   // H731
     var w = r.working || [], i = r.improve || [];
     if (!w.length && !i.length) return '<div class="empty"><p>Not enough analyzed team calls yet.</p></div>';
-    return '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
+    // Layout wrappers only: preserve all insights, source indexes and actions.
+    var workspace = state.view === 'team-coaching';
+    return (workspace ? '<div class="coaching-recommendations-grid"><div class="coaching-recommendations-group">' : '')
+      + '<div class="obj-group-header" style="color:var(--good)">What\'s working</div>'
       + (w.length ? w.map(function (x, k) { return teamInsightHtml(x, 'working', k); }).join('') : '<div class="empty"><p>—</p></div>')
+      + (workspace ? '</div><div class="coaching-recommendations-group">' : '')
       + '<div class="obj-group-header" style="color:var(--mid);margin-top:18px;">What to improve</div>'
-      + (i.length ? i.map(function (x, k) { return teamInsightHtml(x, 'improve', k); }).join('') : '<div class="empty"><p>—</p></div>');
+      + (i.length ? i.map(function (x, k) { return teamInsightHtml(x, 'improve', k); }).join('') : '<div class="empty"><p>—</p></div>')
+      + (workspace ? '</div></div>' : '');
   }
 
 /* ⚠⚠⚠ CALL HIGHLIGHTS OF THE WEEK — RETIRED 2026-09-01 (Justin's ruling).
