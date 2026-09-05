@@ -199,3 +199,18 @@ test('⚠ H726 — the panel renderer, executed: every kind labelled in plain wo
   assert.ok(!/foreshadow|caused|led to|because/.test(html));
   assert.ok(!/earned_signal|missed_signal_pair|objection_unhandled|closer_response|gap_seconds/.test(html.replace(/coach-item|missed-pair/g, '')), 'no field names for a customer');
 });
+
+test('⚠ H729 — the review lists its moments BY CALL TIME, whatever order the wire returns; the pair still sits beside its own moment', async () => {
+  const fathom = require('../routes/fathom');
+  const scrambled = fakeAdmin();
+  const origFrom = scrambled.from.bind(scrambled);
+  scrambled.from = (table) => { const ch = origFrom(table); if (table === 'call_highlights') { const t = ch.then.bind(ch); ch.then = (res, rej) => t((r) => res({ data: (r.data || []).slice().reverse(), error: null }), rej); } return ch; };
+  const out = await fathom._loadCallReview(scrambled, 'c1', 'A');
+  const ts = out.body.highlights.map((h) => h.timestamp_seconds);
+  assert.deepStrictEqual(ts, ts.slice().sort((a, b) => a - b), 'ascending by call time: ' + ts.join(','));
+  assert.strictEqual(out.body.highlights[0].id, 'h1');
+  assert.strictEqual(out.body.missed_signal_pairs[0].signal.id, 'h1', 'the pair is keyed on the moment, not its position');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'routes', 'fathom.js'), 'utf8');
+  assert.ok(/\.order\('timestamp_seconds', \{ ascending: true \}\)/.test(src), 'the query asks for time order too');
+  assert.ok(/\.order\('timestamp_seconds', \{ ascending: true \}\)\.order\('sequence_order', \{ ascending: true \}\)/.test(src), 'time first, the model\'s order only as the tie-break');
+});

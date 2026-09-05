@@ -1694,10 +1694,19 @@ async function loadCallReview(admin, callId, ownerUserId) {
     .from('call_highlights')
     .select('id, timestamp_seconds, speaker, quote, observation, type, sequence_order, section, resolution, handling, closer_response, closer_response_verified, speaker_verified')
     .eq('fathom_call_id', callId)
-    .order('sequence_order', { ascending: true });
+    .order('timestamp_seconds', { ascending: true }).order('sequence_order', { ascending: true });
   if (highlightsResult.error) {
     console.error('[fathom] call review highlights fetch failed for call ' + callId + ': ' + highlightsResult.error.message);
   }
+  /* ⚠ CHRONOLOGICAL, BY CALL TIME (Justin, live, 2026-09-05, H729): minute 1 before minute 49, so a manager
+     reads the call as it happened. It was `sequence_order` — the model's OUTPUT order, asked to be
+     chronological and not enforced: 552 of 1,577 calls (35%) were out of order. Sorted here in JS as well
+     as in the query, so the ONE builder both review routes call cannot depend on the wire's ordering. */
+  var orderedHighlights = (highlightsResult.data || []).slice().sort(function (a, b) {
+    var ta = (typeof a.timestamp_seconds === 'number') ? a.timestamp_seconds : Infinity;
+    var tb = (typeof b.timestamp_seconds === 'number') ? b.timestamp_seconds : Infinity;
+    return (ta - tb) || ((a.sequence_order || 0) - (b.sequence_order || 0));
+  });
 
   return { status: 200, body: {
     id:               call.id,
@@ -1712,10 +1721,10 @@ async function loadCallReview(admin, callId, ownerUserId) {
     not_a_sales_call: call.not_a_sales_call === true,
     exclusion_reason: call.exclusion_reason || null,
     analysis:         analysis,
-    highlights:       highlightsResult.data || [],
+    highlights:       orderedHighlights,
     /* H722: the missed-signal pairs, computed HERE so the self and the manager review routes
        (both call this builder) cannot disagree. Floor and closer-DQ exclusion live in the lib. */
-    missed_signal_pairs: findMissedSignalPairs(highlightsResult.data || []).map(function (p) { p.sentence = pairSentence(p); return p; }),
+    missed_signal_pairs: findMissedSignalPairs(orderedHighlights).map(function (p) { p.sentence = pairSentence(p); return p; }),
   } };
 }
 
