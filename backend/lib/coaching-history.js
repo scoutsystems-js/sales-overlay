@@ -25,7 +25,7 @@
 var { CHUNK } = require('./chunk');
 var { isHandled } = require('./objection-handled');
 var { countsAsObjection } = require('./objection-strict');
-var { MIN_BUCKET } = require('./team-needs-work');
+var { MIN_BUCKET } = require('./comparison-floor');   // H738
 
 var REPEAT_FLOOR = 3;      // the third time this period earns a clause
 var PRIOR_FLOOR = 2;       // the coaching prompt is told when this is at least the third call (two earlier)

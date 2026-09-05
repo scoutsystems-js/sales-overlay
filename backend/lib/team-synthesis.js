@@ -137,9 +137,9 @@ const doctrineLib = require('./doctrine');   // H733: a disqualified prospect is
 /* H737 — THE IMPORT THAT WAS MISSING FOR SEVEN HOURS. H731 added the call to loadKbMaterial and no require; `node -c` cannot
    see an unresolved identifier; no test executed this function; every Team Recommendations load answered 500 from the
    deploy at 04:56Z until Justin saw it. The route is now executed end to end by test/lanes-execute.test.js. */
-const { loadKbMaterial } = require('./kb-material');
+const { loadKbMaterial, nothingToSay } = require('./kb-material');   // H738: nothingToSay was the SECOND bare call in this file — the empty-state path would have 500'd for a team with nothing on file
 const PF = require('./page-facts');
-const { MIN_BUCKET } = require('./team-needs-work');   // the ONE comparison floor   // H728 step 2: the same facts to every lane on the page
+const { MIN_BUCKET } = require('./comparison-floor');   // H738: the ONE comparison floor — from the dependency-free module, never from team-needs-work (a require cycle left this undefined in production from H728 to H738)   // H728 step 2: the same facts to every lane on the page
 const CLAIM_CAP = 520;   // the prompt asks for <= 45 words (~290 chars)
 const DATA_CAP  = 520;
 function capAtSentence(x, cap) {
@@ -527,6 +527,7 @@ module.exports = {
   _evidenceSubjectMismatch: evidenceSubjectMismatch,
   _candidateEligible: candidateEligible,
   _resolveInsights: resolveInsights,
+  _MIN_BUCKET: MIN_BUCKET,   // H738: what the lane HOLDS — a cycle guard reads it after a production-order load
   _proseNamesRep: proseNamesRep,
   computeTeamRecommendations: computeTeamRecommendations,
   /* computeWeeklyHighlights — RETIRED 2026-09-01, archived above. */

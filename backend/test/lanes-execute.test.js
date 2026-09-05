@@ -27,11 +27,14 @@ const ROWS = {
   knowledge_base: DOCTRINE_ROWS,
 };
 function proxyAdmin() {
-  const build = (table) => { const target = {
+  /* category-aware on knowledge_base: the doctrine rows answer ONLY a category='doctrine' read — an upload read gets nothing,
+     so a team with an empty profile is genuinely empty (the first version handed the doctrine to every read and it counted as material) */
+  const build = (table, f) => { f = f || {}; const target = {
     maybeSingle: () => Promise.resolve({ data: table === 'user_profiles' ? Object.assign({}, PROFILE) : null, error: null }),
     single: () => Promise.resolve({ data: null, error: null }),
-    then: (res, rej) => Promise.resolve({ data: (table === 'knowledge_base') ? DOCTRINE_ROWS : (ROWS[table] || []), error: null, count: (ROWS[table] || []).length }).then(res, rej) };
-    return new Proxy(target, { get(t, prop) { if (prop in t) return t[prop]; if (typeof prop === 'symbol') return undefined; return () => build(table); } }); };
+    eq: (k, v) => build(table, Object.assign({}, f, { [k]: v })),
+    then: (res, rej) => Promise.resolve({ data: (table === 'knowledge_base') ? (f.category === 'doctrine' ? DOCTRINE_ROWS : []) : (ROWS[table] || []), error: null, count: (ROWS[table] || []).length }).then(res, rej) };
+    return new Proxy(target, { get(t, prop) { if (prop in t) return t[prop]; if (typeof prop === 'symbol') return undefined; return () => build(table, f); } }); };
   return { from: build, rpc: async () => ({ data: [], error: null }), auth: { admin: { listUsers: async () => ({ data: { users: [{ id: 'rep', email: 'ava@x' }, { id: 'mgr', email: 'm@x' }] } }) } } };
 }
 function notABug(e, lane) { assert.ok(!(e instanceof ReferenceError) && !(e instanceof TypeError) && !/is not defined|is not a function/.test(String(e && e.message)), lane + ' threw a programmer error: ' + (e && e.stack || e)); }
@@ -76,4 +79,15 @@ test('⚠ RATCHET: no lane renders a raw error string to a customer — every fa
   const raw = (LIVE.match(/Could not load[^']*: ' \+ escapeHtml\([a-z]\._error\)/g) || []);
   assert.deepStrictEqual(raw, [], 'raw error renders: ' + raw.join(' | '));
   assert.ok((LIVE.match(/laneFailureCopy\(/g) || []).length >= 13, 'the shared sentence is what every lane draws');
+});
+test('⚠⚠ H738 — the recommendations ROUTE on a team with NOTHING on file answers 200 with the empty shape (the second bare call: nothingToSay)', async () => {
+  const saved = Object.assign({}, PROFILE); PROFILE.offer = null; PROFILE.qualifications = null; PROFILE.niche = null; PROFILE.script_raw = null;
+  try {
+    const team = require('../routes/team'); team._setAdminClientForTests(() => proxyAdmin());
+    const l = team.stack.find((x) => x.route && x.route.path === '/recommendations');
+    const handler = l.route.stack[l.route.stack.length - 1].handle;
+    const r = await new Promise((resolve) => { const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } }; Promise.resolve().then(() => handler({ user: { id: 'mgr', email: 'm@x' }, query: { from: '2026-08-07T00:00:00Z', to: '2026-09-05T23:59:59Z' } }, res)).catch((e) => resolve({ code: 'threw', body: String(e && e.stack) })); });
+    assert.strictEqual(r.code, 200, JSON.stringify(r.body).slice(0, 300));
+    assert.strictEqual(r.body.no_material, true, 'the one empty shape: ' + JSON.stringify(r.body).slice(0, 200));
+  } finally { Object.assign(PROFILE, saved); }
 });

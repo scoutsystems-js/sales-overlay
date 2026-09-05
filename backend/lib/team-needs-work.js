@@ -32,7 +32,7 @@ const { isHandled, outcomeMap } = require('./objection-handled');
 const { clipHref } = require('./clip-link');
 const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
 // ── Guardrails (Phase 1, approved) ──────────────────────────────────────────
-const MIN_BUCKET = 6;        // no "needs work" claim off a tiny bucket
+const { MIN_BUCKET, PERSONAL_MIN_BUCKET: _PERSONAL_FLOOR } = require('./comparison-floor');   // H738: the one floor, from a module with no dependencies — this file re-exports it
 const MIN_GAP_PP = 5;        // rate must be at least this far below baseline
 const MAX_FOCUS  = 3;        // a FOCUS panel stops being one if unbounded
 const MIN_ANALYZED = 10;     // analyzed calls needed to model at all
@@ -53,7 +53,7 @@ const MIN_ANALYZED = 10;     // analyzed calls needed to model at all
 // drops so a modest closer can still surface a rate-gap focus. The MONEY clause
 // keeps the full linkage/cash gates — its stability comes from TEAM-BORROWED
 // coefficients, not from lowering the money bar.
-const PERSONAL_MIN_BUCKET = 4;
+const PERSONAL_MIN_BUCKET = _PERSONAL_FLOOR;
 const PERSONAL_MIN_ANALYZED = 3;
 
 /* ⚠⚠ THE OUTPUT CAP MUST SCALE WITH THE NUMBER OF PHRASES — A FIXED ONE IS
