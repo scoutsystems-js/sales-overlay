@@ -142,6 +142,6 @@ test('⚠ the panel draws one collapsed row per rep with the line as the head, t
   assert.ok(html.indexOf('<span class="rep-line-name">Godwin</span> — 2 calls where they let it sit.') !== -1, 'the line is the head (H737: the name set apart)');
   assert.ok(/<span class="rep-line-kind">Pattern<\/span>/.test(html), 'the kind is named in a tag, not carried by colour alone');
   assert.deepStrictEqual(seen, ['B', 'A'], 'the cited moment is drawn first'); assert.ok(html.indexOf('Evidence for the line') < html.indexOf('<i>B</i>'));
-  assert.ok(/Nathan — no qualifying moments across 3 calls\./.test(html), 'unmeasured is a sentence, never zero');
+  assert.ok(/Nathan<\/span> — no qualifying moments across 3 calls\./.test(html), 'unmeasured is a sentence, never zero');
   assert.ok(/rep-line-body" hidden/.test(html), 'the other row is collapsed');
 });

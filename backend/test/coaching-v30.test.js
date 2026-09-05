@@ -120,7 +120,12 @@ test('⚠ THE PIPELINE ACTUALLY CALLS IT — a function nothing invokes is the r
   assert.ok(w.indexOf('persistHighlights(admin, fathomCallId') < w.indexOf('coachCallMoments(admin'),
     'coaching must run after the highlights are persisted');
   // and it must not be awaited — the drain dies on a redeploy
-  assert.ok(!/await coachCallMoments/.test(w), 'must not be awaited');
+  /* H737: the post-drain RETRY SWEEP awaits the pass on purpose — it runs only when no claim is live, so it lengthens no
+     grading window. The dispatch inside analyzeCall stays un-awaited: the only awaited call sits inside retryPendingCoaching. */
+  const sweep = w.slice(w.indexOf('async function retryPendingCoaching'), w.indexOf('async function coachCallMoments'));
+  const outsideSweep = w.slice(0, w.indexOf('async function retryPendingCoaching')) + w.slice(w.indexOf('async function coachCallMoments'));
+  assert.ok(!/await coachCallMoments/.test(outsideSweep), 'must not be awaited where the analysis dispatches it');
+  assert.ok(/await coachCallMoments\(/.test(sweep), 'and IS awaited in the sweep, which runs after the drain');
 });
 
 test('⚠ ONE model call per CALL — the worker must not loop the coaching call per moment', () => {
