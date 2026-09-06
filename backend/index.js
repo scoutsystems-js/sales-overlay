@@ -204,5 +204,6 @@ try {
 app.listen(PORT, '0.0.0.0', function() {
   console.log('[server] Scout backend running on port ' + PORT);
   console.log('[coaching-build] ' + require('./lib/analysis-worker').ANALYSIS_PROMPT_VERSION + ' action-answer-records');
+  console.log('[manager-followup-build] ' + require('./lib/followup-facts').VERSION);
   reportEnv();
 });

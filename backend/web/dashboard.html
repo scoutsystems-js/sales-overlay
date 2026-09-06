@@ -5429,6 +5429,23 @@
     .coaching-rep-choice small { grid-column:2; grid-row:1; font-size:var(--fs-label); opacity:.65; }
     .coaching-rep-choice.is-selected { background:rgba(var(--accent-rgb),.09); box-shadow:inset 2px 0 var(--accent); }
     .coaching-rep-choice.is-selected strong { color:var(--accent); }
+    body[data-view="team-coaching"] .manager-priority { padding:20px; margin-bottom:18px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-elevated); overflow-wrap:anywhere; }
+    .manager-priority-heading, .manager-priority-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+    .manager-priority-heading { justify-content:space-between; font-size:var(--fs-label); opacity:.75; }
+    .manager-priority-label { text-transform:uppercase; letter-spacing:.08em; }
+    .manager-priority h3 { font-size:var(--fs-title); margin:12px 0 6px; }
+    .manager-priority-frequency { font-weight:var(--fw-emphasis); }
+    .manager-priority-coverage { font-size:var(--fs-secondary); opacity:.7; }
+    .manager-priority-example { border-top:1px solid var(--border); margin-top:16px; padding-top:16px; }
+    .manager-priority-example summary { cursor:pointer; display:flex; flex-wrap:wrap; gap:8px 20px; align-items:center; }
+    .manager-priority-example summary span { font-size:var(--fs-secondary); opacity:.8; }
+    .manager-priority-example summary::after { content:'+'; margin-left:auto; font-size:var(--fs-title); }
+    .manager-priority-example[open] > summary::after { content:'−'; }
+    .manager-priority-exchange { max-width:76ch; padding:4px 0; }
+    .manager-priority-exchange p { line-height:1.65; }
+    .manager-priority-exchange strong { font-size:var(--fs-label); margin-right:8px; }
+    .manager-priority-actions a { color:var(--accent); }
+    .manager-call-examples > summary { cursor:pointer; padding:12px 0; font-weight:var(--fw-emphasis); }
     .coaching-rep-detail { padding:24px; min-width:0; }
     #content .coaching-rep-detail h3 { font-size:var(--fs-title); margin:0 0 6px; }
     #content .coaching-rep-detail h4 { font-size:var(--fs-label); text-transform:uppercase; letter-spacing:.06em; opacity:.7; margin:24px 0 8px; font-weight:var(--fw-emphasis); }
@@ -15658,6 +15675,20 @@
     }
     return '<div class="coaching-rep-workspace" id="coachingRepWorkspace"><div class="coaching-rep-list" aria-label="Choose a closer">' + list + (quiet.length ? '<details class="coaching-quiet-reps"><summary>' + quiet.length + ' closers without calls</summary>' + quiet.map(function (r) { return '<p>' + escapeHtml(coachingRepName(r)) + '</p>'; }).join('') + '</details>' : '') + '</div><section class="coaching-rep-detail" aria-label="Selected closer coaching">' + detail + '</section></div>';
   }
+  function managerFollowupHtml(p) {
+    if (!p) return '';
+    var period = new Date(p.from).toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}) + ' – ' + new Date(p.to).toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'});
+    var header = '<div class="manager-priority-heading"><span class="manager-priority-label">Close</span><span>' + escapeHtml(period) + '</span></div>';
+    if (!p.matching_calls) return '<section class="manager-priority">' + header + '<h3>Scheduling Review</h3><p>' + p.assessed_calls + ' of ' + p.total_calls + ' calls assessed.' + (p.unassessed_calls ? ' More calls still need review.' : ' No missed bookings found under your team’s standard.') + '</p></section>';
+    var examples = (p.examples || []).map(function (x, i) {
+      var evidence = x.evidence || [], firstCloser = evidence.findIndex(function (e) { return e.speaker === 'CLOSER'; });
+      var preview = evidence.slice(Math.max(0, firstCloser - 1), Math.max(0, firstCloser - 1) + 2);
+      var quotes = preview.map(function (e) { return '<p><strong>' + (e.speaker === 'CLOSER' ? 'Closer' : 'Prospect') + '</strong> “' + escapeHtml(e.quote) + '”</p>'; }).join('');
+      var clip = /^https?:\/\//i.test(x.clip_url || '') ? '<a href="' + escapeHtml(x.clip_url) + '" target="_blank" rel="noopener noreferrer">' + (x.source === 'zoom' ? 'Open recording' : 'Watch clip') + '</a>' : '';
+      return '<details class="manager-priority-example"' + (i === 0 ? ' open' : '') + '><summary><strong>' + escapeHtml(x.prospect_name) + '</strong><span>Closer: ' + escapeHtml(x.closer_name) + '</span><span>Recorded outcome: ' + escapeHtml(outcomeLabel(x.outcome)) + '</span></summary><div class="manager-priority-exchange">' + quotes + '<div class="manager-priority-actions">' + clip + (x.source === 'zoom' && evidence.length ? '<span>' + escapeHtml(formatTimestampDisplay(evidence[0].timestamp_seconds)) + '</span>' : '') + '<button type="button" class="review-kb-btn" data-priority-call="' + escapeHtml(x.call_id) + '" data-owner="' + escapeHtml(x.owner_user_id) + '" onclick="openCallReview(this.dataset.priorityCall,this.dataset.owner)">Review Call</button></div></div></details>';
+    }).join('');
+    return '<section class="manager-priority">' + header + '<h3>' + escapeHtml(p.topic.title) + '</h3><p class="manager-priority-frequency">' + escapeHtml(p.frequency) + '</p><p>These calls ended open with further contact discussed, but no confirmed follow-up appointment.</p>' + (p.unassessed_calls ? '<p class="manager-priority-coverage">' + p.unassessed_calls + ' calls still need review. This is not a complete team rate.</p>' : '') + examples + '</section>';
+  }
   function teamCoachableHtml() {
     var r = state.teamCoachable;
     if (!r) return laneWaitHtml('coachable', 'Reading the team’s calls…', null, 120);
@@ -15665,7 +15696,7 @@
     if (problem) return laneProblemHtml('coachable moments', problem);
     var reps = Array.isArray(r.reps) ? r.reps : [];
     if (!reps.length) return r.no_material ? noMaterialHtml(r.copy) : '<div class="team-empty">No team members in this window.</div>';
-    return (r.no_material ? noMaterialHtml(r.copy) : '') + coachingRepWorkspaceHtml(reps);
+    return (r.no_material ? noMaterialHtml(r.copy) : '') + (r.followup_priority ? managerFollowupHtml(r.followup_priority) + '<details class="manager-call-examples"><summary>Call examples by closer</summary>' + coachingRepWorkspaceHtml(reps) + '</details>' : '') + (r.followup_priority ? '' : coachingRepWorkspaceHtml(reps));
   }
 
   /* H731 — WHAT A USER SEES WHEN NOTHING RELEVANT IS FOUND. Every advice lane returns the one shape

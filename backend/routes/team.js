@@ -888,6 +888,10 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     reps.forEach(function (r, i) { r.line = lines[i] || null; r.improvements = material.hasMaterial ? (r.improvements || []).filter(function(it){return it.moment.coaching_review && it.moment.coaching_review.kb_hash===material.kbHash;}) : []; delete r.loss_scope; });
     reps.sort(function (a, b) { return b.items.length - a.items.length || String(a.name || '').localeCompare(String(b.name || '')); });
     var payload = { reps: reps, total_items: total, by_kind: byKind, from: range.from, to: range.to };
+    try {
+      payload.followup_priority = await require('../lib/manager-followup-loader').loadFollowupPriority(admin, {calls:gathered.calls, memberIds:ids, teamOwner:team.keyId, names:nameOf, from:range.from, to:range.to});
+    } catch (priorityError) { logTeamError('coachable-moments/followup', priorityError); payload.followup_unavailable = true; }
+
     if (!material.hasMaterial) Object.assign(payload, require('../lib/kb-material').nothingToSay({}));
     res.json(payload);
   } catch (err) { if (handleConfigError(err, res)) return; logTeamError('coachable-moments', err); res.status(500).json({ error: 'Failed to load coachable moments' }); }

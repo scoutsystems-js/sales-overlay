@@ -2169,6 +2169,12 @@ async function analyzeCall(fathomCallId, userId) {
       transcript_attempts: 0,
       model_attempts:      0,
     };
+    // Scheduling assessment remains inside the live analysis claim, before status
+    // becomes done. A failed optional assessment never discards the call's grade.
+    analysisPayload.manager_followup_facts = null;
+    try {
+      analysisPayload.manager_followup_facts = await require('./followup-worker').assessNewCallFollowup(admin, callRow, analysisPayload, userId);
+    } catch (followupError) { console.warn('[manager-followup] call=%s held: %s', fathomCallId, followupError && followupError.message); }
     var upsert = await admin
       .from('call_analyses')
       .upsert(analysisPayload, { onConflict: 'fathom_call_id' });

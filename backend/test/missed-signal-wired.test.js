@@ -85,6 +85,9 @@ test('⚠⚠ /team/coachable-moments (H726, replaced /team/missed-signal-pairs):
   const r = await get(appFor('mgr', 'manager'), '/team/coachable-moments?from=2026-08-01T00:00:00Z&to=2026-09-30T00:00:00Z');
   assert.strictEqual(r.status, 200, JSON.stringify(r.body));
   assert.strictEqual(r.body.total_items, 1, 'the seed call and the other team never count');
+  assert.strictEqual(r.body.followup_priority.total_calls, 1, 'the scheduling loader receives only the resolved real team calls');
+  assert.strictEqual(r.body.followup_priority.matching_calls, 0, 'no saved scheduling facts cannot invent a priority');
+  assert.strictEqual(r.body.followup_priority.unassessed_calls, 1, 'unchecked calls stay unchecked through the real route');
   const names = r.body.reps.map((x) => x.user_id).sort();
   assert.deepStrictEqual(names, ['A', 'mgr'], 'every member returned, the manager included (a team member on every team surface)');
   const a = r.body.reps.find((x) => x.user_id === 'A'); const m = r.body.reps.find((x) => x.user_id === 'mgr');

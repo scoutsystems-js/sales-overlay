@@ -17,11 +17,11 @@ function summarizePriority({topic,calls,assessedCallIds,examples,from,to,memberI
     if (!call || !assessed.has(call.id)) continue;
     let validClip=false;
     try {validClip=['https:','http:'].includes(new URL(example.clip_url).protocol);} catch (_) { /* missing/invalid link cannot support an example */ }
-    if (!example.highlight_id || typeof example.quote!=='string' || !example.quote.trim() || !validClip) {unsupported.add(call.id);continue;}
+    if (!(example.highlight_id || example.evidence_id) || typeof example.quote!=='string' || !example.quote.trim() || !validClip) {unsupported.add(call.id);continue;}
     if (!matches.has(call.id)) matches.set(call.id,{
       call_id:call.id,owner_user_id:call.user_id,call_date:call.call_date,
       prospect_name:call.prospect_name||'Unknown prospect',closer_name:call.closer_name||'Unknown closer',
-      outcome:call.outcome||null,highlight_id:example.highlight_id,quote:example.quote,clip_url:example.clip_url
+      outcome:call.outcome||null,highlight_id:example.highlight_id||null,evidence_id:example.evidence_id||null,quote:example.quote,clip_url:example.clip_url,source:call.source||null,evidence:example.evidence||[]
     });
   }
   // A claimed match lacking usable evidence is unknown, never silently negative.

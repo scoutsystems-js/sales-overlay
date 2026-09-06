@@ -20,7 +20,7 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
   var calls = [];
   for (var i = 0; i < ids.length; i += CHUNK) {
     for (var page = 0; page < 10; page++) {
-      var cq = await admin.from('fathom_calls').select('id, fathom_call_id, user_id, title, call_date, recording_url, not_a_sales_call, duplicate_of')
+      var cq = await admin.from('fathom_calls').select('id, fathom_call_id, user_id, title, call_date, recording_url, source, not_a_sales_call, duplicate_of')
         .in('user_id', ids.slice(i, i + CHUNK)).gte('call_date', from).lte('call_date', to)
         .not('not_a_sales_call', 'is', true).is('duplicate_of', null).order('call_date', { ascending: false }).range(page * 1000, page * 1000 + 999);
       if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
