@@ -1,3 +1,12 @@
+## CURRENT SESSION — finish Team → Coaching (H750)
+**Objective:** finish the approved manager coaching page, not an open-ended coaching-engine audit. Clear team priorities; verified frequencies and date windows; real named prospect/closer examples with factual continuation, recorded outcomes and clip links; compact strengths and less text. Preserve rep/call access, Scout wordmark, approved sidebar and background toggle. Knowledge validation stays behind the scenes.
+
+**Execution rule:** finish one active build item at a time. Handle a discovery immediately only if it is necessary to complete or safely release that item. File everything else here with evidence and continue in order. Do not abandon half-built work or present supporting modules as a finished page.
+
+**Active sequence:** finish the bounded follow-up fix → connect verified findings to the approved manager presentation → verify the actual page and release. Broad KB retrieval redesign, unrelated audits and other feature work are filed, not active.
+
+**Current handoff, not a completion claim:** Justin confirmed the exact follow-up standard (H749), and it is saved in the team's KB. Separate fact/policy modules and ten tests exist locally, but are not yet connected to the page or worker. The latest four-call diagnostic completed: Gabriel and Josh candidate issues; Nick outside the open-call topic; Godwin unknown. These are unapproved candidate results, not published manager counts. Inspect Godwin's unresolved result within this bounded fix; do not launch another broad prompt experiment. Page connection and release remain unfinished. Existing wording-only release is live.
+
 ## Wording release LIVE — manager checker remains disabled (H748)
 Justin authorized release with “send it.” Deployed and verified `1ee7788305388136c29b79739b24796c6ac9d61d`: Railway SUCCESS and deployment-specific `[coaching-build] v55-2026-09-05 action-answer-records` marker. Before push: processing zero, pending twelve unchanged across two polls. Existing 2,524 tests and syntax checks passed on this unchanged source.
 
