@@ -1,4 +1,11 @@
-## CURRENT — scope corrected; pause after this correction (H752)
+## ACTIVE — restore missing Team Coaching (resumed by Justin)
+Justin resumed work specifically on missing coaching. The broader manager recommendations mean evidence-derived priorities across discovery, pitch, objections and Close, not hardcoded topics. H752's pause is lifted only for this work; the dedicated follow-up feature remains disconnected.
+
+Read-only diagnosis: Aug 7–Sep 5 selected window contains 822 real calls. 218 highlights have evidence reviews: 216 rejected and 2 approved, all from evidence-v1. Neither approval matches current team guidance. The page therefore has zero eligible improvements. Calls and stored highlights are present; this is not a missing-rep query or a CSS issue. Do not bypass approval/freshness checks to fill the page.
+
+Next bounded item: trace the historical review results and current coaching writer to determine what can be regenerated and verified from existing transcripts under current guidance. Preserve grades and outcomes; no full-call regrading or unrelated feature work. No model requests or data writes occurred in this diagnosis. General manager aggregation remains subsequent work.
+
+## HISTORICAL — scope corrected; pause subsequently lifted for missing coaching (H752)
 Justin clarified that missed follow-up booking was an EXAMPLE of a coachable Close-section moment, not a request for a dedicated scheduling feature. This supersedes H751's feature scope and historical-review queue. H749's approved sales principle remains valid; it does not authorize making it the page's universal focus.
 
 Built: disconnect the dedicated manager scheduling payload and automatic new-call scheduling assessment; restore direct access to the existing closer workspace. Preserve the evidence renderer, named examples/outcome/clip layout, saved facts, normal call analysis, strengths, wordmark, sidebar and background toggle. No historical batch is queued or authorized by this correction. LIVE at ac5d5628a772837cdbd8875a11a72c590784a52a: exact deployed commit/startup marker and fresh signed-in page verified; dedicated card absent, closer workspace/strengths/background toggle present. All 2,543 tests pass.
