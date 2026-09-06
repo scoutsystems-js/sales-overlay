@@ -169,6 +169,6 @@ test('hop 2 in ACTION — the shaper really carries it onto the moment', () => {
 
 test('the version bump landed and marks the coaching release', () => {
   const w = read('lib/analysis-worker.js');
-  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v49-2026-09-05'/.test(w));
+  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v50-2026-09-05'/.test(w));
   assert.ok(/ONE CALL PER CALL, COVERING ALL ITS MOMENTS/.test(w), 'the ruling must travel with the bump');
 });

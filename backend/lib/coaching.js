@@ -10,9 +10,8 @@ var { outcomeLabel } = require('./outcome-labels');   // H709
  *
  * ⚠⚠ ONE MODEL CALL PER CALL, COVERING ALL ITS MOMENTS. Never one per moment.
  * Calls average 5.7 coachable moments, so per-moment would be a 5.7x error.
- * This call does NOT carry the transcript — it works from moments already
- * stored — so it is ~2.5k input tokens against the ~23.7k the grader and the
- * extractor each send.
+ * Each candidate carries a located transcript exchange and the call ending.
+ * Those excerpts do not establish what happened in the omitted parts of a call.
  *
  * ⚠ IT DRIVES NO SCORE. Coaching text is written to call_highlights.coaching and
  * read by the What Needs Work panel. Nothing aggregates it.
@@ -65,7 +64,7 @@ function momentBlock(m, i) {
     'The prospect said: "' + m.quote + '"',
     (m.closerResponse
       ? 'The closer replied: "' + m.closerResponse + '"'
-      : 'The closer did not reply to this.'),
+      : 'No verified reply is stored for this moment. This does not establish silence; read the supplied transcript turns.'),
     'What was observed: ' + (m.observation || '(nothing recorded)'),
   ].join('\n');
 }
@@ -87,16 +86,16 @@ function buildCoachingPrompt(moments, opts) {
 
   return [
     'You are coaching a high-ticket closer on moments from their own sales call.',
-    'You are their sales manager. You have watched the call.',
+    'Write from the perspective of their sales manager, using only the supplied evidence. You have excerpts, not a recording of the whole call.',
     '',
     dq
       ? 'Call outcome: the prospect was DISQUALIFIED — they stated a reason the offer does not apply, or the money genuinely was not there. This is NOT a lost deal and NOT a failed close: there was no deal to lose. Never open with, or frame this call as, a loss; if there was a miss it is upstream, in qualification, and that is what you coach.'
       : 'Call outcome: ' + outcomeLabel(advised) + '.',   /* H709: the label (Open), never the machine word */
-    (o.later ? 'What happened on the call overall: ' + o.later : ''),
+    (o.later ? 'Earlier call summary (an interpretation to verify against the supplied dialogue, not independent proof of causation): ' + o.later : ''),
     /* ⚠ How objection handling went ACROSS the call — Justin: "the context behind
        what was said is vital". It is the grader's own objection_notes, so it is
        real rather than inferred; absent when the grader wrote none. */
-    (o.objectionNotes ? 'How objection handling went across the whole call: ' + o.objectionNotes : ''),
+    (o.objectionNotes ? 'Earlier objection-handling summary (verify its claims against the supplied dialogue): ' + o.objectionNotes : ''),
     (o.historyBlock && String(o.historyBlock).trim()) ? '\n' + String(o.historyBlock).trim() : '',   // H735: what Scout has coached this closer on before
     '',
     'There are ' + moments.length + ' candidate moments below. They are candidates, not established mistakes. Evaluate each independently against the full supplied exchange and team material. If the closer did the appropriate work, or you cannot support a concrete improvement, return coaching:null and no_change:true. Do not invent an improvement to fill a slot. It is valid for EVERY candidate to need no change.',
@@ -201,23 +200,23 @@ function buildCoachingPrompt(moments, opts) {
     'real constraint wants a plan, not reassurance.',
     '',
     '⚠⚠ START WITH THE CONTEXT. A coaching note that cannot be read without already',
-    'knowing the call is not coaching. Before any detail, the reader must know WHERE',
-    'THEY ARE: how the call ended and what drove it. Then the moment.',
+    'knowing the call is not coaching. Before any detail, orient the reader with the',
+    'recorded outcome and the observed continuation after this moment. Keep those facts separate from an explanation of why the outcome happened.',
     '',
     'THE SHAPE — and it is a FRAMEWORK, not a sentence to reproduce:',
-    '  1. the outcome AND its cause, in one sentence',
-    '  2. when it happened and what the prospect raised',
+    '  1. the recorded outcome and what visibly happened next, without inventing a causal link',
+    '  2. the stage of the conversation and what the prospect raised; code supplies the timestamp',
     '  3. what the closer did, plainly',
     '  4. the specific behaviour to change',
-    '⚠ An example of that shape, NOT a template to copy: "This call didn\'t close',
-    'because of a spousal objection. At 00:47 she brings it up and you never attempt',
-    'to handle it — you asked if he would be supportive and let her off the hook."',
+    '⚠ An example of that shape, ONLY if these facts are present: "The call remains open. After the partner concern,',
+    'the conversation moved to an email recap without a confirmed follow-up time in the supplied ending.',
+    'Agree a specific next conversation and what needs to be resolved before it."',
     '⚠⚠ DO NOT REPRODUCE THAT WORDING. Write the opening the CALL needs. If two',
     'different calls would produce the same first sentence from you, you are filling',
     'in a formula rather than describing what happened.',
     '⚠ AND DO NOT OPEN EVERY NOTE THE SAME WAY. "The call ended…" is one way in, not',
-    '  THE way in. Lead with whatever actually explains THIS call — the outcome, the',
-    '  moment, what the closer did, or what it cost. Vary it because the calls vary.',
+    '  THE way in. Lead with a supported fact about THIS call — the outcome, the',
+    '  moment, what the closer did, or the observed continuation. Vary it because the calls vary.',
     '⚠ Use the call outcome and the overall context you were given. If you were not',
     'told how something went, DO NOT INVENT IT — say less. The rule against inventing',
     'the prospect outranks every instruction here.',
@@ -263,20 +262,19 @@ function buildCoachingPrompt(moments, opts) {
     '   ⚠ AND DO NOT DRIFT INTO VAGUENESS — the opposite failure. "Dig deeper, isolate',
     '   the objection" with no substance is WORSE than a script. Name the SPECIFIC',
     '   information to get, every time.',
-    '5. STATE THE COST plainly — AND IT MUST MATCH THE CALL OUTCOME ABOVE.',
+    '5. DISTINGUISH OBSERVED CONTINUATION FROM CAUSAL IMPACT. Describe what the prospect said or did next when it is visible. Sequence alone does not prove that the closer caused it.',
+    '   If the impact is unknown, leave it unknown. A useful improvement does not require a claim that it cost the deal, time, momentum or trust. Never invent a consequence to make the advice sound important.',
     (dq
       ? '   THIS PROSPECT WAS DISQUALIFIED. There was no deal to lose, so nothing here "cost the deal" and'
-        + ' nothing was a failed close. Do not say or imply either. The cost, if any, is time spent past the'
-        + ' point where qualification should have ended the pitch — say that, or say what to do next time and stop.'
+        + ' nothing was a failed close. Do not say or imply either. An evidenced upstream qualification miss can still be coached; do not turn genuine inability to buy into an objection to overcome.'
       : outcome === 'closed'
       ? '   THIS CALL CLOSED. It did NOT cost the deal and you must not say or imply that it'
-        + ' did. The cost is what it made harder, slower or left unresolved — or there may be'
-        + ' no cost at all, in which case say what to do next time and stop. Do not invent a'
-        + ' consequence to have one.'
+        + ' did. Coach a supported improvement only; a close proves neither that every move was correct nor that a particular move caused the close.'
       : outcome === 'lost'
-        ? '   THIS CALL WAS LOST. You may say it likely cost the deal. You may NOT say WHY they'
-          + ' left or what they did after the call unless you were told above.'
-        : '   THIS CALL IS STILL OPEN. Do not say it cost the deal — it has not been lost.'),
+        ? '   THIS CALL WAS LOST. That is the recorded outcome, not proof that this moment caused it. A stated reason from the prospect may be attributed to them, but do not infer a reason or a lost-deal cause.'
+        : outcome === 'follow_up'
+          ? '   THIS CALL IS STILL OPEN. Do not say it cost the deal — it has not been lost.'
+          : '   THE CALL OUTCOME IS UNKNOWN. Do not substitute open, lost or closed.'),
     '',
     'HOW IT MUST SOUND',
     '- Second person. Talk to them, not about them.',
@@ -295,7 +293,7 @@ function buildCoachingPrompt(moments, opts) {
          'this prospect — the rule above still holds.'].join('\n')
       : ['⚠ DO NOT EXPLAIN WHY THE TECHNIQUE WORKS. You have no source for it here, and',
          'invented sales theory reads as authoritative and is not this team\'s doctrine.',
-         'Say what to do and what it cost. Do not say why it works.'].join('\n'),
+         'Say what to do and describe only the observed continuation. Do not say why it works.'].join('\n'),
     '',
     /* ⚠⚠ MANAGER NOTES — FINE TUNE COACHING (2026-09-02). This team's manager
        corrected earlier coaching; the concepts behind those corrections come
