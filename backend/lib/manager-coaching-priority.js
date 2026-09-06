@@ -31,7 +31,7 @@ function summarizePriority({topic,calls,assessedCallIds,examples,from,to,memberI
   return {
     topic,from,to,total_calls:eligible.size,assessed_calls:assessed.size,unassessed_calls:eligible.size-assessed.size,
     matching_calls:count,coverage_complete:complete,
-    frequency:complete ? count+' of '+eligible.size+' calls' : count+' evidenced calls · '+assessed.size+' of '+eligible.size+' assessed',
+    frequency:complete ? count+' of '+eligible.size+' calls' : count+' evidenced call'+(count===1?'':'s')+' · '+assessed.size+' of '+eligible.size+' assessed',
     examples:[...matches.values()].sort((a,b)=>String(b.call_date).localeCompare(String(a.call_date))||String(a.call_id).localeCompare(String(b.call_id)))
   };
 }

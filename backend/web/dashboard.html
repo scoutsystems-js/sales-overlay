@@ -15677,7 +15677,7 @@
   }
   function managerFollowupHtml(p) {
     if (!p) return '';
-    var period = new Date(p.from).toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'}) + ' – ' + new Date(p.to).toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'});
+    var period = rangeLabelInclusive(p.from, p.to);
     var header = '<div class="manager-priority-heading"><span class="manager-priority-label">Close</span><span>' + escapeHtml(period) + '</span></div>';
     if (!p.matching_calls) return '<section class="manager-priority">' + header + '<h3>Scheduling Review</h3><p>' + p.assessed_calls + ' of ' + p.total_calls + ' calls assessed.' + (p.unassessed_calls ? ' More calls still need review.' : ' No missed bookings found under your team’s standard.') + '</p></section>';
     var examples = (p.examples || []).map(function (x, i) {
