@@ -92,6 +92,7 @@ test('⚠⚠ /team/coachable-moments (H726, replaced /team/missed-signal-pairs):
   assert.strictEqual(a.name, 'Ava Reyes'); assert.strictEqual(a.items.length, 0); assert.deepStrictEqual(m.items, []);
   assert.strictEqual(a.period_summary.calls, 1, 'seed and other-team calls stay excluded');
   assert.strictEqual(m.period_summary.status, 'no_calls');
+  assert.deepStrictEqual(r.body.reps.map(r=>r.user_id), ['A','mgr'], 'reps with calls stay above no-call members');
   const legacy = await require('../lib/coachable-team').loadCoachableTeam(fakeAdmin(), ['A','mgr'], '2026-08-01T00:00:00Z', '2026-09-30T00:00:00Z', null);
   const it = legacy.reps.find(r=>r.user_id==='A').items[0];
   assert.strictEqual(it.kind, 'missed_signal_pair'); assert.strictEqual(it.call_id, 'c1'); assert.strictEqual(it.pair.signal.id, 'h1'); assert.strictEqual(it.pair.dq.id, 'h3'); assert.strictEqual(it.pair.gap_seconds, 2205);

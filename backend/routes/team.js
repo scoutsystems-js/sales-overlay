@@ -864,7 +864,7 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     });
     // H754: the window overview is derived from stored reviewed calls; date changes spend nothing.
     reps.forEach(function(r){r.line=null;delete r.loss_scope;});
-    reps.sort(function (a, b) { return b.items.length - a.items.length || String(a.name || '').localeCompare(String(b.name || '')); });
+    reps.sort(function (a, b) { return Number(b.calls > 0) - Number(a.calls > 0) || String(a.name || '').localeCompare(String(b.name || '')); });
     var payload = { reps: reps, total_items: total, by_kind: byKind, from: range.from, to: range.to };
     // H752: follow-up was an example, not a dedicated manager priority.
 
