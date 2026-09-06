@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const P=require('../lib/call-period-review'),E=require('../lib/coaching-evidence-review');
+const analysis={outcome:'follow_up',transcript_stored:[{speaker:'PROSPECT',text:'I want to have evenings with my children.',start_seconds:1},{speaker:'CLOSER',text:'What would that change for you?',start_seconds:2},{speaker:'PROSPECT',text:'I could stop missing their games.',start_seconds:3},{speaker:'CLOSER',text:'Think about the offer and call me.',start_seconds:2000}]};
+const material={kbHash:'kb',contextText:'Bring the prospect’s stated goals back into the decision at the close.'};
+test('period coaching can name tying back in without changing the closed buying-signal vocabulary',()=>{const f={section:'close',move:'tying back in',observation:'The prospect described missing family time. The closer ended with an invitation to think about the offer.',recommendation:'Connect the stated goal to the decision before ending.',turn_ids:[1,2,3,4],knowledge_refs:[E.knowledgeSources(material)[0].id]};assert.equal(P.candidates({findings:[f]},P.prepare(analysis),material).length,1);assert.equal(require('../lib/arc-cause').ALL_MOVES.includes('tying back in'),false);});
+test('broader coaching prompt explicitly checks depth, pitch fit and later use without making every objection proof of a discovery miss',()=>{const p=P.writerPrompt(P.prepare(analysis),material,analysis.outcome);assert.match(p,/discovery depth/i);assert.match(p,/pitch fit/i);assert.match(p,/objection alone does not prove/i);assert.match(p,/later use/i);});
+
+test("review explicitly refuses a pitch transition treated as the close",()=>{assert.match(P.reviewPrompt([],P.prepare(analysis),material,analysis.outcome),/does not establish the close/);});

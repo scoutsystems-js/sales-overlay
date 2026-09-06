@@ -35,7 +35,7 @@ var NO_MATERIAL_COPY = 'Scout has nothing on file for this team yet, so it is no
  */
 async function loadKbMaterial(admin, opts) {
   var o = opts || {};
-  var selling = await fetchSellingContext(admin, o.userId, o.maxChars, o.categories || SYNTHESIS_CATEGORIES);
+  var selling = await fetchSellingContext(admin, o.userId, o.maxChars, o.categories || SYNTHESIS_CATEGORIES, o.sellingOptions);
   var teamKey = o.teamKey || null;
   if (!teamKey) { try { teamKey = await corrections.teamKeyFor(admin, o.userId); } catch (e) { teamKey = null; } }
   var notes = teamKey ? await corrections.loadCorrectionsSafe(admin, teamKey, o.lane || 'kb-material') : { rows: [], text: '', hash: 'none' };

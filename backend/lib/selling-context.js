@@ -27,7 +27,7 @@ var GRADER_CATEGORIES = ['script', 'offer_document', 'objection_framework', 'cas
 var SYNTHESIS_CATEGORIES = GRADER_CATEGORIES.concat(['winning_call', 'training_material']);
 var DEFAULT_MAX_CHARS = 5000;
 
-async function fetchSellingContext(admin, userId, maxChars, categories) {
+async function fetchSellingContext(admin, userId, maxChars, categories, options) {
   var cap = maxChars || DEFAULT_MAX_CHARS;
   var cats = (Array.isArray(categories) && categories.length) ? categories : GRADER_CATEGORIES;
   try {
@@ -115,7 +115,7 @@ async function fetchSellingContext(admin, userId, maxChars, categories) {
     var lanes = [
       { key: 'qualifications', priority: 1, reserve: 600,  chunks: qualChunks },
       { key: 'offer',          priority: 2, reserve: 900,  chunks: offerChunks },
-      { key: 'script',         priority: 3, reserve: 1500, chunks: scriptChunks },
+      { key: 'script',         priority: 3, reserve: options && options.completeScript ? scriptChunks.reduce(function(n,c){return n+c.length;},0) : 1500, chunks: scriptChunks },
       { key: 'kb',             priority: 4, reserve: 1500, chunks: kbChunks },
     ];
     var picked = allocate(lanes, cap);

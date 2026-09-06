@@ -53,3 +53,14 @@ test('the chain climbs to the head through an empty manager; the head itself inh
   const bad = await fetchSellingContext({ from() { throw new Error('boom'); } }, 'rep');
   assert.strictEqual(bad.contextText, ''); assert.strictEqual(bad.qualifications, null);
 });
+
+ test('complete-script coaching option includes later script guidance without changing default callers', async()=>{
+ const original=HEAD.script_raw;
+ try{HEAD.script_raw=('Explore goals and current problems before presenting. ').repeat(260)+' END OF SCRIPT: connect the stated goals to the final decision.';
+ const limited=await fetchSellingContext(fakeAdmin(),'rep',2500);
+ const complete=await fetchSellingContext(fakeAdmin(),'rep',25000,undefined,{completeScript:true});
+ assert.ok(!limited.contextText.includes('END OF SCRIPT'));
+ assert.ok(complete.contextText.includes('END OF SCRIPT'));
+ const script=complete.sources.find(s=>s.label==='script');assert.strictEqual(script.chunks_used,script.chunks_total);
+ }finally{HEAD.script_raw=original;}
+ });
