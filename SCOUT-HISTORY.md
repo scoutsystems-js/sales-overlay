@@ -7907,3 +7907,9 @@ Built: disconnect the dedicated manager scheduling payload and automatic new-cal
 Main objective: team recommendations derived from actual coaching opportunities across discovery, pitch, objections and Close, checked against team standards; recommendation → supported frequency/window → named real example → what happened → clip. Do not hardcode Justin's examples as product requirements. The general manager-priority implementation remains unfinished.
 
 **What's next:** PAUSE and report back after this correction. Do not start general-priority implementation, historical processing or another investigation until Justin resumes work.
+
+## [H753] Missing coaching: exact interior excerpts
+## ACTIVE RELEASE — restore missing coaching, exact excerpt fix (H753)
+Root cause confirmed: the transcript locator required the quote to start a turn. Six of 32 sampled candidates were unique exact interior excerpts and were incorrectly unlocatable. Accept unique verbatim containment for the correct speaker across the whole call, return the complete turn and original timestamp, and still reject repeated/absent/wrong-speaker evidence. No fuzzy matching or approval bypass. Real-example regression failed before correction and passes afterward.
+
+Recovery uses the actual existing coaching worker against stored transcripts, staging every clinical-data write for inspection; grades, outcomes and prior advice are untouched until reviewed patches are explicitly applied. This is a bounded recovery across reps, not a full historical regrade or a new follow-up feature. Initial reviewed output includes financial qualification for Godwin and Dre. Release and persistence verification pending. Other reps remain unresolved; do not call this a complete historical recovery.

@@ -1,3 +1,8 @@
+## ACTIVE RELEASE — restore missing coaching, exact excerpt fix (H753)
+Root cause confirmed: the transcript locator required the quote to start a turn. Six of 32 sampled candidates were unique exact interior excerpts and were incorrectly unlocatable. Accept unique verbatim containment for the correct speaker across the whole call, return the complete turn and original timestamp, and still reject repeated/absent/wrong-speaker evidence. No fuzzy matching or approval bypass. Real-example regression failed before correction and passes afterward.
+
+Recovery uses the actual existing coaching worker against stored transcripts, staging every clinical-data write for inspection; grades, outcomes and prior advice are untouched until reviewed patches are explicitly applied. This is a bounded recovery across reps, not a full historical regrade or a new follow-up feature. Initial reviewed output includes financial qualification for Godwin and Dre. Release and persistence verification pending. Other reps remain unresolved; do not call this a complete historical recovery.
+
 ## ACTIVE — restore missing Team Coaching (resumed by Justin)
 Justin resumed work specifically on missing coaching. The broader manager recommendations mean evidence-derived priorities across discovery, pitch, objections and Close, not hardcoded topics. H752's pause is lifted only for this work; the dedicated follow-up feature remains disconnected.
 

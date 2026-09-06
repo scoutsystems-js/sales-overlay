@@ -17,8 +17,9 @@ function buildEvidence(item, analysis, recordingUrl) {
   if (quote.length < 20) return null;
   const role = item.spoke === 'closer' ? 'CLOSER' : item.spoke === 'prospect' ? 'PROSPECT' : null;
   if (!role) return null;
-  const matches = turns.map((t, index) => ({ t, index })).filter(x => x.t.speaker === role && normalized(x.t.text).startsWith(quote));
-  // A repeated sentence cannot be assigned to a convenient occurrence.
+  const matches = turns.map((t, index) => ({ t, index })).filter(x => x.t.speaker === role && normalized(x.t.text).includes(quote));
+  // A verbatim excerpt may start inside a turn. Match the stated speaker and
+  // require one turn across the whole call; never choose a convenient occurrence.
   if (matches.length !== 1) return null;
   const match = matches[0];
   const excerpt = t => ({ speaker: t.speaker, quote: t.text, timestamp_seconds: t.start_seconds });
