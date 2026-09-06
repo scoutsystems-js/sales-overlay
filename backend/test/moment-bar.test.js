@@ -62,7 +62,7 @@ test('the worker exposes the bar and applies it AFTER the arc fields (the buying
   const barAt = s.indexOf('sanitizedHighlights = applyMomentBarToCall(sanitizedHighlights, fathomCallId)', fn);
   const persist = s.indexOf('persistHighlights(admin, fathomCallId, userId, sanitizedHighlights)', fn);
   assert.ok(attach > fn && barAt > attach && persist > barAt, 'attach → bar → persist, in that order');
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v54-2026-09-05'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v55-2026-09-05'/);
   const prompt = W._buildHighlightExtractorPrompt({ turns: [{ speaker: 'CLOSER', text: 'hi', start_seconds: 1 }], speaker_confidence: 'matched' });
   assert.ok(prompt.indexOf(bar.barPromptRule()) !== -1, 'the prompt carries the ONE bar rule from the lib');
   // executed: a rapport moment and an unevidenced buying signal never reach the rows a persist would write

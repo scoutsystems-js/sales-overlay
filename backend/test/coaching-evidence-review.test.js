@@ -100,3 +100,13 @@ test('the real worker reviews and writes original moment 2 when moment 1 is no-c
   assert.ok(!writes.some(w=>w.p.coaching));
  } finally {highlightRows=null;draftRows=null;reviewRows=null;}
 });
+test('the actual worker reviews and writes ended wording, leaving source quotes unchanged',async()=>{
+ const writes=[];prompts=[];draft='The call closed open with a weekend callback. Agree a specific time.';verdict='approve';
+ try {
+  const result=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
+  assert.equal(result.written,1);
+  assert.ok(prompts.find(p=>p.lane==='coaching-review').prompt.includes('The call ended open with a weekend callback.'));
+  assert.equal(writes.find(w=>w.p.coaching).p.coaching,'The call ended open with a weekend callback. Agree a specific time.');
+  assert.equal(highlight.quote,quote);
+ }finally{draft='Explore the concern before proceeding.';}
+});

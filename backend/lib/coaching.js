@@ -93,6 +93,7 @@ function buildCoachingPrompt(moments, opts) {
     'Write concise post-call coaching to the closer. Use the transcript evidence and this team\'s guidance, not generic sales commentary.',
     'There are ' + moments.length + ' candidate moments below. A candidate is not an established mistake. If the closer handled it appropriately or a useful change is not supported, return coaching:null and no_change:true.',
     'ONE SHORT NOTE PER CANDIDATE: Aim for 45–65 words, usually three sentences. The hard maximum is ' + COACHING_MAX_WORDS + ' words including any memory statement. Do not pad, repeat the quote, add a headline, or list several improvements.',
+    'Say \"the call ended\" when describing termination; reserve \"closed\" for a won deal. Never say \"the call closed open\".',
     'First orient the reader with the recorded outcome and observed continuation after the moment. Then give ONE concrete change the closer can make and, when useful, the specific information it would establish. Stop there. The evidence display already supplies the quote and timestamp.',
     'An example of that shape, ONLY when its facts are supported: "The call remains open. In this exchange, the family discussion led to a text follow-up without a confirmed time. Clarify what that discussion needs to resolve and agree a time to reconnect." DO NOT REPRODUCE THAT WORDING on other calls.',
     'EVIDENCE: Read the entire supplied closer reply and following turns. The observation is an earlier interpretation, not proof; prior summaries also need verification against the dialogue. A general method is not evidence of what happened on this particular call.',
@@ -142,7 +143,10 @@ function toMoment(h) {
 // honest sentence and dropping it would make the lane say less than it knows.
 function enforceHardRules(entries, opts) {
   var hasDq = !!(opts && opts.hasDq);
-  return (Array.isArray(entries) ? entries : []).filter(function (e) {
+  return (Array.isArray(entries) ? entries : []).map(function(e) {
+    if (!e || typeof e.coaching !== 'string') return e;
+    return Object.assign({},e,{coaching:e.coaching.replace(/\b((?:the|this) call) closed\b/gi, '$1 ended')});
+  }).filter(function (e) {
     var t = e && e.coaching;
     if (doctrineLib.violatesIsolation(t)) { console.warn('[coaching] dropped (coaches out of isolating): ' + String(t).slice(0, 120)); return false; }
     if (hasDq && doctrineLib.framesDqAsLoss(t)) { console.warn('[coaching] dropped (frames a disqualification as a loss): ' + String(t).slice(0, 120)); return false; }

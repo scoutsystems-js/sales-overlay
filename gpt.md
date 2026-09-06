@@ -1,5 +1,25 @@
 # GPT updates — Scout
 
+## ACTIVE — manager coaching priorities (Justin, approved 2026-09-05)
+
+### First implementation block — built locally, not live
+Validation: all 2,517 backend tests passed; syntax and whitespace checks passed.
+- Wording normalization runs before independent review and persistence: “the call closed” becomes “the call ended” in generated advice. Deal-outcome wording and stored transcript quotes are unchanged. The prompt carries the same rule (v55).
+- `manager-coaching-priority.js` implements the counting/presentation contract: unique calls, explicit period, scope/exclusion filters, assessed versus unassessed coverage, and named prospect/closer examples with clip links. Invalid evidence cannot become a negative finding. This helper is NOT an issue detector and is not yet wired into the manager page.
+- Justin clarified that booking a follow-up belongs under **Close**. Agreed: **section = Close; specific issue = booking the follow-up**. The current broad section labels organize the work but do not themselves establish whether a follow-up was booked. The next assessment reads closing exchanges and call endings for that specific issue before counting it.
+- Next implementation: verified issue assessment and its source freshness, then manager cards. No model requests, historical processing or production deployment in this block. Existing call access remains live.
+
+This is the next build, ahead of broad historical coaching recovery. The live individual-call writer stays useful; the manager presentation changes. Supersedes the manager-only presentation of “One thing to do differently” as the primary content. Personal Call Review coaching remains second-person advice.
+
+1. **Built locally — wording:** use “the call ended” for termination. Reserve “closed” for won deals; never “the call closed open.” Enforce in generated coaching without modifying verbatim transcript quotes or changing outcome definitions.
+2. **Built locally — trustworthy grouping contract:** group validated examples by a specific coaching issue, deduplicate calls, apply the selected team/closer/date scope, and separate assessed calls from unassessed calls. A positive example or a generic Discovery section cannot prove a missing-follow-up pattern. Never infer “3 of 8” from one excerpt or treat unassessed calls as negatives.
+3. **Next — issue assessment:** identify the specific issue from complete relevant exchanges plus endings and team guidance; preserve evidence and distinguish unresolved objections from legitimate barriers. Verify the issue and every stated qualifier before counting it. Existing broad section labels and free-text advice are insufficient. Measure a bounded real-call trial before any historical processing.
+4. **Next — manager presentation:** Coaching priority → verified frequency and explicit period → example with prospect name, closer name, factual continuation/recorded outcome and Watch clip. No separate Manager action block. Individual-call advice may illustrate the priority, never substitute for the pattern summary. Reuse existing owner-aware Call Review/clip links and Fine Tune controls. Preserve original wordmark and background toggle.
+5. **Next — verify and release:** test duplicate examples, stale/foreign evidence, incomplete coverage, exclusions, unknown names, clip destinations and mobile layout; show real-data examples before release. Keep existing call access until replacement data is ready. Historical recovery and the eight interrupted analyses remain separate, not completed by this build.
+
+Mock structure (illustrative numbers, never fixture data presented as real): **Coaching priority: Drill booking the follow-up.** “Yesterday, 3 of 8 calls ended open without a booked follow-up after [verified circumstance].” **Example: [prospect] · Closer: [closer]** → what happened → **Watch clip**. Prospect names are metadata on the example, not injected into second-person coaching prose. H746.
+
+
 ## Evidence-first writer LIVE — 2026-09-05
 LIVE as `48c3b1ee3b7544018889e06aeed4f90a1f0c735c`. Railway reported SUCCESS at this exact commit; its logs contain `[coaching-build] v54-2026-09-05 action-answer-records`. v54 assembles exact consecutive closer/prospect turns in code, preserving every supplied turn and excerpt scope. The writer no longer receives earlier observation, truncated saved reply or prior summary interpretations. No additional model stage ships. All 2,507 backend tests passed; syntax and whitespace checks passed. The independent reviewer and all existing refusal gates remain; sentence review improves checkability but is not a guarantee of semantic correctness.
 
