@@ -61,12 +61,13 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
   }
   var buildEvidence = require('./strength-call-evidence').buildEvidence;
   reps.forEach(function (r) {
+    // A coaching review approves its advice and exchange, not an older grader explanation.
     var evidenceByMoment = new Map();
     r.improvements.forEach(function (it) {
       var analysis = evidenceAnalyses.get(it.call_id);
       var evidence = buildEvidence({ quote:it.moment.quote, spoke:String(it.moment.speaker).toLowerCase() }, analysis, it.recording_url);
       var context = require('./coaching-evidence-review').contextFor(it.moment, analysis);
-      if (evidence && context && it.moment.coaching_review.context_hash === context.hash) evidenceByMoment.set(it.moment.id, Object.assign({},evidence,{owner_user_id:it.user_id}));
+      if (evidence && context && it.moment.coaching_review.context_hash === context.hash) evidenceByMoment.set(it.moment.id, Object.assign({},evidence,{owner_user_id:it.user_id,result_explanation:null}));
     });
     r.improvements = selectImprovementFocus(byRep[r.user_id], {kbHash:kbHash,eligible:function(call,moment){return evidenceByMoment.has(moment.id);}})
       .map(function(it){return Object.assign({},it,{call_evidence:evidenceByMoment.get(it.moment.id)});});

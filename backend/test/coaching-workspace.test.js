@@ -18,13 +18,14 @@ test('improvement selection uses stored coaching and refuses positive, unverifie
  assert.equal(selectImprovementFocus([{...c,highlights:[h,{...h,id:'h2'}]}]).length,1);
 });
 test('real team gather attaches only located exchanges and preserves owner/outcome',async()=>{
- const tables = {fathom_calls:[{...c,fathom_call_id:'real-recording',not_a_sales_call:false,duplicate_of:null}],call_highlights:[{...h,fathom_call_id:'c1'}],call_analyses:[{fathom_call_id:'c1',status:'done',outcome:'follow_up',transcript_stored:{turns:[{speaker:'PROSPECT',start_seconds:10,text:h.quote},{speaker:'CLOSER',start_seconds:15,text:'What is the concern?'}]}}]};
+ const tables = {fathom_calls:[{...c,fathom_call_id:'real-recording',not_a_sales_call:false,duplicate_of:null}],call_highlights:[{...h,fathom_call_id:'c1'}],call_analyses:[{fathom_call_id:'c1',status:'done',outcome:'follow_up',why_outcome:'Unreviewed explanation about why the call ended.',transcript_stored:{turns:[{speaker:'PROSPECT',start_seconds:10,text:h.quote},{speaker:'CLOSER',start_seconds:15,text:'What is the concern?'}]}}]};
  const admin={from(table){let filters=[];const q={select(){return q;},in(k,ids){filters.push(r=>ids.includes(r[k]));return q;},eq(k,v){filters.push(r=>r[k]===v);return q;},not(){return q;},is(){return q;},gte(){return q;},lte(){return q;},order(){return q;},range(){return q;},then(resolve,reject){return Promise.resolve({data:tables[table].filter(r=>filters.every(f=>f(r))),error:null}).then(resolve,reject);}};return q;}};
  tables.call_highlights[0].coaching_review.context_hash=require('../lib/coaching-evidence-review').contextFor(tables.call_highlights[0],tables.call_analyses[0]).hash;
  const good=await loadCoachableTeam(admin,['u1'],'2026-08-07','2026-09-05');
  assert.equal(good.reps[0].improvements.length,1);
  assert.equal(good.reps[0].improvements[0].call_evidence.owner_user_id,'u1');
  assert.equal(good.reps[0].improvements[0].call_evidence.outcome,'follow_up');
+ assert.equal(good.reps[0].improvements[0].call_evidence.result_explanation,null,'approval of coaching does not approve an older outcome explanation');
  tables.call_highlights[0].coaching_review.kb_hash='current';
  assert.equal((await loadCoachableTeam(admin,['u1'],'2026-08-07','2026-09-05','changed')).reps[0].improvements.length,0);
  tables.fathom_calls.push({...tables.fathom_calls[0],id:'c2'});
