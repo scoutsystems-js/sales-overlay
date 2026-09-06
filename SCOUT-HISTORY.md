@@ -7860,3 +7860,12 @@ Validation: all 2,517 backend tests passed; syntax and whitespace checks passed.
 - `manager-coaching-priority.js` implements the counting/presentation contract: unique calls, explicit period, scope/exclusion filters, assessed versus unassessed coverage, and named prospect/closer examples with clip links. Invalid evidence cannot become a negative finding. This helper is NOT an issue detector and is not yet wired into the manager page.
 - Justin clarified that booking a follow-up belongs under **Close**. Agreed: **section = Close; specific issue = booking the follow-up**. The current broad section labels organize the work but do not themselves establish whether a follow-up was booked. The next assessment reads closing exchanges and call endings for that specific issue before counting it.
 - Next implementation: verified issue assessment and its source freshness, then manager cards. No model requests, historical processing or production deployment in this block. Existing call access remains live.
+
+## [H747] Manager follow-up diagnostic held after knowledge-scope failure
+
+## Manager follow-up diagnostic — held, not live (H747)
+Built `backend/lib/manager-followup-assessment.js` and seven behavior tests. The full-transcript diagnostic retains exact turns, source/outcome/material hashes, and unknown states. No production caller, database migration, historical coaching write or manager UI change. All 2,524 backend tests passed; this proves mechanics, not semantic accuracy.
+
+Bounded four-call real-data test: Godwin/Shauna’s accepted Tuesday 12:30 appointment was correctly recognized; Nick’s closed call was outside this open-call topic. The first version incorrectly stretched knowledge guidance for Gabriel/Judah and Josh/Lourdes. A stricter scope instruction withheld Josh but still accepted Gabriel with unsupported reasoning. Both model reads agreeing is not proof. All results remain non-publishable; no third prompt retry and no deployment.
+
+Next: separate observed booking facts from coaching-policy applicability and retrieve relevant team guidance, then validate before persisting/wiring manager priorities. The normal 2,500-character selection lacked direct support for these recommendations; a broader read remained capped, so do not claim the full KB lacks the rule. Keep coverage honest and existing call access available. No user action needed for the completed diagnostic. Report: `~/Desktop/scan-reports/manager-followup-trial/RESULTS.md`. Earlier counting/wording commit remains local.
