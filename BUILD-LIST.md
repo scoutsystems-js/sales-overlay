@@ -1,5 +1,9 @@
 # SCOUT — BUILD LIST
 
+## Scope and format correction — built locally, 2026-09-05
+Analysis v51 / review v4 enforces 90 words before paid review and before persistence, refuses known unscoped absence claims from excerpt-only evidence, and builds the response example from requested original moment IDs. No truncation or positional remapping. Full suite 2,499/2,499; saved three-draft replay withholds all three. Shorter scope cases and real-worker ID/write tests pass. No model calls or historical writes. NOT DEPLOYED; semantic efficacy remains unverified. This closes the prior proposed scope/ID/length build block. The same four-call/five-candidate test is remeasured and prepared but needs fresh approval before running, then Justin reading its real output before deployment. Report: `~/Desktop/scan-reports/coaching-correction-test/SCOPE-FIX.md`; manifest: `~/Desktop/scan-reports/coaching-scope-test/plan.json`. H741.
+
+
 ## Four-call correction check — completed, not published — 2026-09-05
 Justin authorized the prepared test with `send it`. Four calls / five candidates produced two no-change results and three drafts. Automated review approved Gabriel and Josh P; Godwin was withheld because moment 2 received a moment-1 review. Manual inspection held Gabriel's unsupported whole-call absence claims and found Josh's wording assumes more about the husband's role than the excerpt establishes. All three drafts exceeded 90 words. No output is certified for publication, no historical coaching rows changed, and no request errors remain. No further paid test is authorized. Next proposed block: scope discipline, explicit requested moment IDs and the length limit; no broad recovery or deployment yet. Actual output and evidence: `~/Desktop/scan-reports/coaching-correction-test/RESULTS.md`.
 

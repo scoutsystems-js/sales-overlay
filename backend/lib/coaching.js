@@ -19,6 +19,7 @@ var { outcomeLabel } = require('./outcome-labels');   // H709
 
 var CLAUDE_COACHING_MODEL = 'claude-sonnet-4-6';
 var COACHING_MAX_TOKENS   = 2000;
+var COACHING_MAX_WORDS    = 90;
 
 /* Coach only the moments a surface actually renders. The What Needs Work panel
    shows the `bad` group, which is where all four approved samples came from.
@@ -105,6 +106,7 @@ function buildCoachingPrompt(moments, opts) {
     '',
     '⚠⚠ WHAT YOU KNOW ABOUT THE PROSPECT — AND IT IS ONLY THIS',
     'The supplied transcript windows and ending, plus the stored outcome, are everything you know. Read the complete closer replies and subsequent questions before criticizing an omission. These are excerpts, not the whole call: never assert a move never happened elsewhere. Do not infer emotion, intent, or a causal explanation from the outcome.',
+    'Scope an observation of something missing to the evidence you can see, in the same sentence: for example, "In this exchange, no callback time was confirmed." This is not permission to add a local label to a whole-call claim. Do not assert that price never dropped, no objection was ever raised, or a move never happened earlier in the call.',
     'Do not write timestamps in coaching prose. Code supplies the located timestamp beside the actual quote.',
     '',
     'ABSOLUTE RULE — NEVER INVENT THE PROSPECT.',
@@ -284,7 +286,7 @@ function buildCoachingPrompt(moments, opts) {
     '  sentences and line breaks only. Quotation marks around quoted speech are fine.',
     '- Do not summarise at the end. Stop when you have said it.',
     '- Never use the words: leverage, impactful, key takeaway, opportunity to improve.',
-    '- 90 words or fewer per moment. Fewer is fine. Do not pad to reach a length.',
+    '- ' + COACHING_MAX_WORDS + ' words or fewer per moment, including any memory sentence and example wording. This maximum is enforced; longer advice is withheld, never cut mid-sentence. Fewer is fine. Do not pad to reach a length.',
     '',
     kb
       ? ['WHY IT WORKS — use this, it is your team\'s own material:', kb,
@@ -351,6 +353,7 @@ module.exports = {
   hasDqMoment:           hasDqMoment,
   CLAUDE_COACHING_MODEL: CLAUDE_COACHING_MODEL,
   COACHING_MAX_TOKENS:   COACHING_MAX_TOKENS,
+  COACHING_MAX_WORDS:    COACHING_MAX_WORDS,
   COACHABLE_TYPES:       COACHABLE_TYPES,
   selectCoachableMoments: selectCoachableMoments,
   buildCoachingPrompt:   buildCoachingPrompt,

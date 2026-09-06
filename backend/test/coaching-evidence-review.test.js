@@ -16,11 +16,11 @@ test('review requires evidence and knowledge support; missing, unsure and forged
  assert.equal(E.approvedEntries(entries,{reviews:[approved]},[context],material).length,1);
  for(const reviews of [[],[{...approved,verdict:'reject'}],[{...approved,verdict:'unsure'}],[{...approved,knowledge_refs:['K-invented']}],[{...approved,evidence_turns:[999]}],[approved,approved]]) assert.equal(E.approvedEntries(entries,{reviews},[context],material).length,0);
 });
-const usage=require('../lib/model-usage');let verdict='reject', prompts=[], draft='Explore the concern before proceeding.', invalidRef=false;
-usage.createWithUsage=async(params,ctx)=>{prompts.push({prompt:params.messages[0].content,lane:ctx.lane});return {content:[{text:ctx.lane==='coaching-review'?JSON.stringify({reviews:[{moment:1,verdict,evidence_turns:[2,3],knowledge_refs:[invalidRef?'K-forged':E.knowledgeSources(material)[0].id],history_refs:[]}]}):JSON.stringify([{moment:1,coaching:draft}])}]};};
+const usage=require('../lib/model-usage');let verdict='reject', prompts=[], draft='Explore the concern before proceeding.', invalidRef=false, draftRows=null, reviewRows=null, highlightRows=null;
+usage.createWithUsage=async(params,ctx)=>{prompts.push({prompt:params.messages[0].content,lane:ctx.lane});return {content:[{text:ctx.lane==='coaching-review'?JSON.stringify({reviews:reviewRows||[{moment:1,verdict,evidence_turns:[2,3],knowledge_refs:[invalidRef?'K-forged':E.knowledgeSources(material)[0].id],history_refs:[]}]}):JSON.stringify(draftRows||[{moment:1,coaching:draft}])}]};};
 require('../lib/kb-material').loadKbMaterial=async()=>material;
 const worker=require('../lib/analysis-worker');
-function admin(writes){return {from(table){const q={select(){return q;},eq(){return q;},in(){return q;},order(){return q;},gte(){return q;},lte(){return q;},update(p){writes.push({table,p});return q;},upsert(){return q;},maybeSingle:async()=>({data:table==='call_analyses'?analysis:null,error:null}),then(resolve,reject){return Promise.resolve({data:table==='call_highlights'?[highlight]:[],error:null}).then(resolve,reject);}};return q;}};}
+function admin(writes){return {from(table){let write;const q={select(){return q;},eq(key,value){if(write)(write.filters||(write.filters={}))[key]=value;return q;},in(){return q;},order(){return q;},gte(){return q;},lte(){return q;},update(p){write={table,p};writes.push(write);return q;},upsert(){return q;},maybeSingle:async()=>({data:table==='call_analyses'?analysis:null,error:null}),then(resolve,reject){return Promise.resolve({data:table==='call_highlights'?(highlightRows||[highlight]):[],error:null}).then(resolve,reject);}};return q;}};}
 test('real worker sends full exchange and team knowledge to a separate reviewer; rejected advice is not persisted',async()=>{
  const writes=[];prompts=[];verdict='reject';const result=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
  assert.equal(prompts.length,2);assert.equal(prompts[1].lane,'coaching-review');
@@ -64,4 +64,31 @@ test('history reads beyond one database page and refuses a failed page',async()=
  const db={from(){let start=0,end=999;const q={select(){return q;},in(){return q;},gte(){return q;},lte(){return q;},order(){return q;},range(a,b){start=a;end=b;return q;},then(resolve,reject){calls++;return Promise.resolve({data:all.slice(start,end+1),error:fail&&start>0?{message:'read failed'}:null}).then(resolve,reject);}};return q;}};
  assert.equal((await H.loadHistory(db,['u'])).u.missed_opportunity.calls,1001);assert.equal(calls,2);
  fail=true;await assert.rejects(H.loadHistory(db,['u']),/read failed/);
+});
+
+test('the worker withholds overlong drafts before paying for a reviewer, without truncation',async()=>{
+ const writes=[];prompts=[];draft=Array.from({length:91},()=> 'word').join(' ');verdict='approve';
+ try {
+  const result=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
+  assert.equal(prompts.length,1);
+  assert.equal(result.written,0);
+  assert.ok(writes.some(w=>w.p.coaching_review?.category==='invalid_format'));
+  assert.ok(!writes.some(w=>w.p.coaching));
+ } finally {draft='Explore the concern before proceeding.';}
+});
+
+test('the real worker reviews and writes original moment 2 when moment 1 is no-change',async()=>{
+ const writes=[];prompts=[];
+ highlightRows=[highlight,{...highlight,id:'h2',observation:'A second candidate on the same located exchange.'}];
+ draftRows=[{moment:1,coaching:null,no_change:true},{moment:2,coaching:'Explore the remaining concern.'}];
+ reviewRows=[{moment:2,verdict:'approve',evidence_turns:[1,2],knowledge_refs:[E.knowledgeSources(material)[0].id]}];
+ try {
+  const result=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
+  assert.equal(result.written,1);
+  assert.match(prompts.find(p=>p.lane==='coaching-review').prompt,/Requested moment IDs: \[2\]/);
+  assert.deepEqual(writes.filter(w=>w.p.coaching).map(w=>w.filters.id),['h2']);
+  reviewRows[0].moment=1;writes.length=0;
+  assert.equal((await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1')).written,0);
+  assert.ok(!writes.some(w=>w.p.coaching));
+ } finally {highlightRows=null;draftRows=null;reviewRows=null;}
 });

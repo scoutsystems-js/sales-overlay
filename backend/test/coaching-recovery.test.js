@@ -59,3 +59,51 @@ test('v2 approved history retains its original provenance', () => {
   assert.equal(E.isApprovedReview(previous),true);
   assert.equal(previous.version,'coaching-evidence-v2');
 });
+
+const scopedMaterial = {contextText:'Agree a specific next conversation.'};
+const excerpt = {fullCall:false,turns:[{speaker:'CLOSER',text:'Call me over the weekend.'}]};
+function decide(coaching, context = excerpt, moment = 1) {
+  return E.evaluateEntries([{moment,coaching}], {reviews:[{moment,verdict:'approve',evidence_turns:[1],knowledge_refs:[E.knowledgeSources(scopedMaterial)[0].id]}]}, Array.from({length:moment},()=>context), scopedMaterial)[0];
+}
+
+test('the saved Gabriel absence claims fail even with an approving reviewer and under the length limit', () => {
+  for (const text of [
+    'No price was presented and no confirmed next step was secured before the call ended.',
+    'No objection was ever raised because price never dropped.',
+    'The call ended before any close attempt.',
+    'You did not ask about the decision maker.',
+    'The prospect never said what needed to be resolved.',
+    'At no point in the call was a price discussed.',
+    'No price was presented. In this exchange, secure a callback.',
+  ]) assert.equal(decide(text).verdict,'withheld',text);
+});
+
+test('scope checks preserve bounded observations, directional advice and full-call review eligibility', () => {
+  for (const text of [
+    'In this exchange, no confirmed time was set. Agree a specific callback.',
+    'No confirmed time was set in the call ending. Agree a specific callback.',
+    'During this exchange, you did not ask what the family discussion needed to resolve.',
+    'Find out whether the family discussion is the only remaining concern.',
+    'The call remains open. Agree a specific next conversation.',
+    'Never stop isolating a concern merely because the deal remains open.',
+  ]) assert.equal(decide(text).verdict,'approved',text);
+  assert.equal(decide('No price was presented.',{...excerpt,fullCall:true}).verdict,'approved');
+  assert.equal(decide('In this exchange, no price was presented anywhere in the call.').verdict,'withheld');
+});
+
+test('ninety words is an enforced maximum, never a truncation', () => {
+  const ninety = Array.from({length:90},()=> 'word').join(' ');
+  assert.equal(decide(ninety).verdict,'approved');
+  assert.equal(decide(ninety+' extra').category,'invalid_format');
+  assert.equal(decide('  '+ninety.replaceAll(' ','\n\t')+'  ').verdict,'approved');
+});
+
+test('a filtered moment keeps its identifier in the actual response example', () => {
+  const prompt = E.buildReviewPrompt([{moment:2,coaching:'Agree a specific next conversation.'}], [{},{}], [excerpt,excerpt],scopedMaterial,'follow_up');
+  const schema = JSON.parse(prompt.split('Return ONLY JSON: ')[1].split('. Cite only IDs')[0]);
+  assert.deepEqual(schema.reviews.map(r=>r.moment),[2]);
+  assert.match(prompt,/Requested moment IDs: \[2\]/);
+  const wrong = E.evaluateEntries([{moment:2,coaching:'Agree a specific callback.'}],{reviews:[{moment:1,verdict:'approve',evidence_turns:[1],knowledge_refs:[E.knowledgeSources(scopedMaterial)[0].id]}]},[excerpt,excerpt],scopedMaterial);
+  assert.equal(wrong[0].verdict,'withheld');
+  assert.equal(decide('Agree a specific callback.',excerpt,2).verdict,'approved');
+});
