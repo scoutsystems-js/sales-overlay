@@ -1,5 +1,11 @@
 # GPT updates — Scout
 
+## Four-call correction check — completed, not published — 2026-09-05
+Justin authorized the prepared test with `send it`. Four calls / five candidates produced two no-change results and three drafts. Automated review approved Gabriel and Josh P; Godwin was withheld because moment 2 received a moment-1 review. Manual inspection held Gabriel's unsupported whole-call absence claims and found Josh's wording assumes more about the husband's role than the excerpt establishes. All three drafts exceeded 90 words. No output is certified for publication, no historical coaching rows changed, and no request errors remain. No further paid test is authorized. Next proposed block: scope discipline, explicit requested moment IDs and the length limit; no broad recovery or deployment yet. Actual output and evidence: `~/Desktop/scan-reports/coaching-correction-test/RESULTS.md`.
+
+This completion supersedes earlier pending-approval and pending-run notes for the four-call test only; deployment is still held.
+
+
 ## Current state — 2026-09-05
 Code deployed: Railway SUCCESS at 4b17f8b2f4941030887bc07a5c422aba11aadb7a. Migration 075 is applied. Two confirmed incorrect notes on the one approved test call have been removed in production, with rejection provenance; their quote timestamps are corrected to transcript positions. No historical backfill.
 

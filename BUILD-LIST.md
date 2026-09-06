@@ -1,5 +1,11 @@
 # SCOUT — BUILD LIST
 
+## Four-call correction check — completed, not published — 2026-09-05
+Justin authorized the prepared test with `send it`. Four calls / five candidates produced two no-change results and three drafts. Automated review approved Gabriel and Josh P; Godwin was withheld because moment 2 received a moment-1 review. Manual inspection held Gabriel's unsupported whole-call absence claims and found Josh's wording assumes more about the husband's role than the excerpt establishes. All three drafts exceeded 90 words. No output is certified for publication, no historical coaching rows changed, and no request errors remain. No further paid test is authorized. Next proposed block: scope discipline, explicit requested moment IDs and the length limit; no broad recovery or deployment yet. Actual output and evidence: `~/Desktop/scan-reports/coaching-correction-test/RESULTS.md`.
+
+This completion supersedes earlier pending-approval and pending-run notes for the four-call test only; deployment is still held.
+
+
 **Created 2026-08-20.** Seeded from the live-site audit and the current repo, **not** from `BUILD-PLAN.md` (19 April, four months stale — treat it as history).
 
 **⚠ STANDING PROCEDURE: update this file after every push, alongside `CLAUDE.md`.**
