@@ -103,31 +103,12 @@ async function runRoute() {
   const handler = l.route.stack[l.route.stack.length - 1].handle;
   return new Promise((resolve) => { const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } }; Promise.resolve().then(() => handler({ user: { id: 'mgr', email: 'm@x' }, query: {} }, res)).catch((e) => resolve({ code: 'threw', body: String(e && e.stack) })); });
 }
-test('⚠⚠ THE ROUTE, EXECUTED: each rep carries a line whose evidence is beneath it and whose count matches; the cache is written; nothing on file → no model call', async () => {
-  const team = require('../routes/team'); const writes = []; team._setAdminClientForTests(() => fakeAdmin(writes));
-  captured.length = 0;
-  reply = () => JSON.stringify({ kind: 'pattern', judgement: '2 calls where they let a money hesitation sit and the call did not close', evidence_ids: ['m1', 'm2'], calls_claimed: 2 });
-  const r = await runRoute();
-  assert.strictEqual(r.code, 200, JSON.stringify(r.body).slice(0, 300));
-  const g = r.body.reps.find((x) => x.user_id === 'godwin');
-  assert.ok(g && g.items.length === 3, 'three moments beneath: ' + JSON.stringify(g && g.items.length));
-  assert.strictEqual(captured.length, 1, 'one model call for the one rep with moments (the manager has none)');
-  assert.strictEqual(g.line.kind, 'pattern'); assert.strictEqual(g.line.line, 'Godwin — 2 calls where they let a money hesitation sit and the call did not close.');
-  assert.deepStrictEqual(g.line.evidence_ids, ['m1', 'm2']); assert.strictEqual(g.line.calls, 2);
-  assert.ok(writes.some((w) => w.table === 'objection_synthesis_cache' && w.row.synthesis_type === 'rep_line' && w.row.user_id === 'godwin'), 'cached on the synthesis cache');
-  assert.ok(g.loss_scope === undefined, 'internals stay off the wire');
-  // the claim against the set beneath it — the model cites a moment that is not there
-  captured.length = 0; reply = () => JSON.stringify({ kind: 'pattern', judgement: '2 calls where they let a money hesitation sit', evidence_ids: ['m1', 'm2', 'm7'], calls_claimed: 2 });
-  team._setAdminClientForTests(() => fakeAdmin([]));
-  const r2 = await runRoute(); const g2 = r2.body.reps.find((x) => x.user_id === 'godwin');
-  assert.strictEqual(g2.line.kind, 'refused', 'a line whose evidence is not beneath it is refused: ' + JSON.stringify(g2.line));
-  assert.match(String(g2.line.reason), /not beneath it: m7/, 'for that reason — the count alone would have passed');
-  assert.strictEqual(g2.line.line, RL.REFUSED_COPY);
-  // nothing on file: no model call, the one shape
-  const saved = P.mgr; P.mgr = Object.assign({}, saved, { offer: null, qualifications: null, niche: null });
-  try { captured.length = 0; team._setAdminClientForTests(() => fakeAdmin([])); const r3 = await runRoute(); assert.strictEqual(captured.length, 0); assert.strictEqual(r3.body.no_material, true); assert.strictEqual(r3.body.reps.find((x) => x.user_id === 'godwin').line.kind, 'no_material'); }
-  finally { P.mgr = saved; }
+test('manager period route returns scoped data without paying for the retired per-window line', async()=>{
+ const team=require('../routes/team');const writes=[];captured.length=0;team._setAdminClientForTests(()=>fakeAdmin(writes));
+ const result=await runRoute();assert.equal(result.code,200);const rep=result.body.reps.find(r=>r.user_id==='godwin');
+ assert.equal(rep.calls,3);assert.ok(rep.period_summary);assert.equal(rep.line,null);assert.equal(captured.length,0);assert.equal(writes.length,0);assert.equal(rep.loss_scope,undefined);
 });
+
 test('⚠ the panel draws one collapsed row per rep with the line as the head, the cited moments first, and toggles by state (executed from the page source)', () => {
   const fs = require('fs'); const path = require('path'); const { stripComments, fnBody } = require('./helpers/strip-comments');
   const LIVE = stripComments(fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8'));

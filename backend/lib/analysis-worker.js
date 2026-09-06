@@ -2170,6 +2170,11 @@ async function analyzeCall(fathomCallId, userId) {
       model_attempts:      0,
     };
     // H752: dedicated scheduling assessment disconnected; preserve existing saved evidence.
+    // H754: general section coaching completes inside the analysis claim. Failure
+    // leaves the grade intact and is retrievable as unreviewed coverage.
+    analysisPayload.rep_period_coaching = null;
+    try { analysisPayload.rep_period_coaching = await require('./period-coaching-worker').assessPeriodCoaching(admin, callRow, analysisPayload, userId); }
+    catch (periodError) { console.warn('[rep-period] call=%s held: %s', fathomCallId, periodError && periodError.message); }
     var upsert = await admin
       .from('call_analyses')
       .upsert(analysisPayload, { onConflict: 'fathom_call_id' });

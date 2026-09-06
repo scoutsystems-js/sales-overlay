@@ -34,12 +34,12 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
   for (var j = 0; j < callIds.length; j += CHUNK) {
     var slice = callIds.slice(j, j + CHUNK);
     var pair = await Promise.all([
-      admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name, status').in('fathom_call_id', slice),
+      admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name, status, intro_score, discovery_score, pitch_score, objection_score, close_score_earned, rep_period_coaching').in('fathom_call_id', slice),
       admin.from('call_highlights').select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, coaching, coaching_review, closer_response, closer_response_verified, cause, objection_class, objection_category').in('fathom_call_id', slice),
     ]);
     if (pair[0].error) throw new Error('call_analyses: ' + pair[0].error.message);
     if (pair[1].error) throw new Error('call_highlights: ' + pair[1].error.message);
-    (pair[0].data || []).forEach(function (a) { if (byId[a.fathom_call_id]) { byId[a.fathom_call_id].analysis_status = a.status || null; byId[a.fathom_call_id].outcome = a.outcome || null; byId[a.fathom_call_id].prospect_name = a.prospect_name || null; } });
+    (pair[0].data || []).forEach(function (a) { if (byId[a.fathom_call_id]) { byId[a.fathom_call_id].analysis = a; byId[a.fathom_call_id].analysis_status = a.status || null; byId[a.fathom_call_id].outcome = a.outcome || null; byId[a.fathom_call_id].prospect_name = a.prospect_name || null; } });
     (pair[1].data || []).forEach(function (h) { if (byId[h.fathom_call_id]) byId[h.fathom_call_id].highlights.push(h); });
   }
   var byRep = {}; ids.forEach(function (u) { byRep[u] = []; });
@@ -52,7 +52,7 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
     return { user_id: u, calls: byRep[u].length, recent_calls:recentCalls, items: items, improvements: selectImprovementFocus(byRep[u], {all:true,kbHash:kbHash}), loss_scope: scope };
   });
   // Locate every reviewed candidate before ranking; rejected evidence cannot hide a valid area.
-  var evidenceIds = [...new Set(reps.flatMap(function (r) { return r.improvements.map(function (it) { return it.call_id; }); }))];
+  var evidenceIds = [...new Set(calls.filter(c=>c.analysis && c.analysis.rep_period_coaching).map(c=>c.id).concat(reps.flatMap(function (r) { return r.improvements.map(function (it) { return it.call_id; }); })))];
   var evidenceAnalyses = new Map();
   for (var ei = 0; ei < evidenceIds.length; ei += CHUNK) {
     var eq = await admin.from('call_analyses').select('fathom_call_id,outcome,why_outcome,transcript_stored').in('fathom_call_id', evidenceIds.slice(ei, ei + CHUNK)).eq('status', 'done');
@@ -71,6 +71,15 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
     });
     r.improvements = selectImprovementFocus(byRep[r.user_id], {kbHash:kbHash,eligible:function(call,moment){return evidenceByMoment.has(moment.id);}})
       .map(function(it){return Object.assign({},it,{call_evidence:evidenceByMoment.get(it.moment.id)});});
+    var periodExamples = [];
+    byRep[r.user_id].forEach(function (call) {
+      var analysis = evidenceAnalyses.get(call.id);
+      var record = call.analysis && call.analysis.rep_period_coaching;
+      var examples = require('./call-period-review').storedExamples(record, analysis, kbHash, {call_id:call.id,call_date:call.call_date,user_id:r.user_id,prospect_name:call.prospect_name,recording_url:call.recording_url,source:call.source});
+      if (examples !== null && record) { examples.forEach(function(e){e.clip_url=e.source==='zoom'?e.recording_url:require('./clip-link').clipHref(e.recording_url,e.evidence[0].timestamp_seconds);}); call.period_review_current = true; periodExamples = periodExamples.concat(examples); }
+    });
+    r.period_summary = require('./rep-period-coaching').summarize(byRep[r.user_id], periodExamples, {from:from,to:to});
+
   });
   return { calls: calls, byRep: byRep, reps: reps };
 }

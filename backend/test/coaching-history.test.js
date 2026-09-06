@@ -91,21 +91,13 @@ async function runRoute(query) {
   const handler = l.route.stack[l.route.stack.length - 1].handle;
   return new Promise((resolve) => { const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } }; Promise.resolve().then(() => handler({ user: { id: 'mgr', email: 'm@x' }, query: query || {} }, res)).catch((e) => resolve({ code: 'threw', body: String(e && e.stack) })); });
 }
-test('⚠⚠ THE ROUTE, EXECUTED: a pattern line carries the record\'s count for THAT rep inside the window — never another rep\'s rows, never another team\'s, never outside the window; a strength carries nothing', async () => {
-  const team = require('../routes/team'); const writes = []; team._setAdminClientForTests(() => fakeAdmin(writes));
-  captured.length = 0;
-  reply = (p) => JSON.stringify(/CLOSER: Ben/.test(p) ? { kind: 'strength', judgement: '2 calls where they isolated the partner objection and closed', evidence_ids: ['m1', 'm2'], calls_claimed: 2 }
-                                             : { kind: 'pattern', judgement: '3 calls where a partner objection landed and they let it sit', evidence_ids: ['m1', 'm2', 'm3'], calls_claimed: 3 });
-  const r = await runRoute({ from: '2026-08-01T00:00:00Z', to: '2026-08-31T00:00:00Z' });
-  assert.strictEqual(r.code, 200, JSON.stringify(r.body).slice(0, 300));
-  const a = r.body.reps.find((x) => x.user_id === 'a'), b = r.body.reps.find((x) => x.user_id === 'b');
-  assert.strictEqual(a.line.kind, 'pattern'); assert.ok(a.line.history, 'the record reached the line: ' + JSON.stringify(a.line));
-  assert.strictEqual(a.line.history.key, 'objection:partner');
-  assert.strictEqual(a.line.history.calls, 3, 'A: three rows in the window — the fourth is outside it, B\'s five are B\'s, team Z\'s is not on this board');
-  assert.strictEqual(a.line.history_clause, 'Scout has coached this on 3 calls this period.', 'the bar is not cleared on this wire (too few attempts), so the count and nothing else');
-  assert.strictEqual(a.line.history.assessment.state, 'not_cleared');
-  assert.strictEqual(b.line.kind, 'strength'); assert.strictEqual(b.line.history, undefined); assert.strictEqual(b.line.history_clause, undefined, 'a strength never carries a history clause');
+test('period route keeps history outside the window overview and spends nothing on a date selection', async()=>{
+ const team=require('../routes/team'),writes=[];team._setAdminClientForTests(()=>fakeAdmin(writes));captured.length=0;
+ const r=await runRoute({from:'2026-08-01T00:00:00Z',to:'2026-08-31T00:00:00Z'});assert.equal(r.code,200);
+ for(const id of ['a','b']){const rep=r.body.reps.find(x=>x.user_id===id);assert.ok(rep.period_summary);assert.equal(rep.period_summary.from,'2026-08-01T00:00:00Z');assert.equal(rep.line,null);}
+ assert.equal(captured.length,0);assert.equal(writes.length,0);
 });
+
 test('⚠⚠ THE COACHING PASS, EXECUTED: the prompt carries the record for this rep only; the record is written with the entry; a scolding entry is dropped', async () => {
   captured.length = 0; const writes = [];
   reply = () => JSON.stringify([{ moment: 1, coaching: 'A partner objection landed and you let it sit. Ask what the partner would need to hear, then ask for the commitment on that.', applied_manager_notes: [] }]);
