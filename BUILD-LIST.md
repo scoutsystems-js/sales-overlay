@@ -1,5 +1,9 @@
 # SCOUT — BUILD LIST
 
+## Spending threshold updated; scope check complete — 2026-09-05
+Justin now permits logical spending operations of $20 or less within the authorized task without another request; over $20 requires approval. H742 records the ruling. The four-call scope check has run: two no-change responses and three overlong drafts, all three withheld before review. No reviewer request or historical coaching write occurred. NOT DEPLOYED; compliant generation remains unresolved. This closes prior pending-run/approval notes for this four-call check. Next technical issue: simplify the writer's overloaded output requirements while preserving evidence, outcome and directional coaching; do not keep adding prompt warnings or start broad reprocessing. Report: `~/Desktop/scan-reports/coaching-scope-test/RESULTS.md`.
+
+
 ## Scope and format correction — built locally, 2026-09-05
 Analysis v51 / review v4 enforces 90 words before paid review and before persistence, refuses known unscoped absence claims from excerpt-only evidence, and builds the response example from requested original moment IDs. No truncation or positional remapping. Full suite 2,499/2,499; saved three-draft replay withholds all three. Shorter scope cases and real-worker ID/write tests pass. No model calls or historical writes. NOT DEPLOYED; semantic efficacy remains unverified. This closes the prior proposed scope/ID/length build block. The same four-call/five-candidate test is remeasured and prepared but needs fresh approval before running, then Justin reading its real output before deployment. Report: `~/Desktop/scan-reports/coaching-correction-test/SCOPE-FIX.md`; manifest: `~/Desktop/scan-reports/coaching-scope-test/plan.json`. H741.
 
