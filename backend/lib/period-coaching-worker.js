@@ -1,14 +1,16 @@
 'use strict';
 const P=require('./call-period-review'),U=require('./model-usage');
 const {realCallsOnly}=require('./real-calls');
-const MODEL='claude-sonnet-4-6',INDEPENDENT_MODEL='claude-opus-4-6',MAX_CALL_COST=2;
+// Measured 65,475-token call: nine reads plus one transport retry each reserve < $6.
+// This is a worst-case envelope, not a target; unsupported findings stop before later reads.
+const MODEL='claude-sonnet-4-6',INDEPENDENT_MODEL='claude-opus-4-6',MAX_CALL_COST=6;
 async function assessPeriodCoaching(admin,call,analysis,userId,deps={}) {
  if(!call||call.not_a_sales_call||call.duplicate_of||!realCallsOnly([call]).length)return null;
  const context=P.prepare(analysis);if(!context)return null;
  const material=await (deps.loadMaterial||require('./period-coaching-material').loadPeriodMaterial)(admin,{userId,lane:'rep-period',maxChars:2500});if(!material.hasMaterial)return null;
  async function current(){const q=await admin.from('fathom_calls').select('id,fathom_call_id,user_id,not_a_sales_call,duplicate_of').eq('id',call.id).eq('user_id',userId).maybeSingle();if(q.error||!q.data||q.data.user_id!==userId||q.data.not_a_sales_call||q.data.duplicate_of||!realCallsOnly([q.data]).length)throw Error('Call eligibility changed');}
  let reserved=0;
- async function request(prompt,stage,maxTokens=P.MAX_TOKENS){const model=stage==='independent-review'?INDEPENDENT_MODEL:MODEL;await current();const messages=[{role:'user',content:prompt}];
+ async function request(prompt,stage,maxTokens=P.MAX_TOKENS){const model=['independent-review','observation-facts'].includes(stage)?INDEPENDENT_MODEL:MODEL;await current();const messages=[{role:'user',content:prompt}];
   const count=deps.countTokens?await deps.countTokens(prompt):await (async()=>{const r=await fetch('https://api.anthropic.com/v1/messages/count_tokens',{method:'POST',signal:AbortSignal.timeout(15000),headers:{'x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01','content-type':'application/json'},body:JSON.stringify({model,messages})});if(!r.ok)throw Error('Token count unavailable');return (await r.json()).input_tokens;})();
   const retries=deps.maxRetries===undefined?1:deps.maxRetries;
   if(!Number.isFinite(count)||count<1||!Number.isInteger(retries)||retries<0)throw Error('Budget measurement unavailable');
@@ -31,6 +33,12 @@ async function assessPeriodCoaching(admin,call,analysis,userId,deps={}) {
   // Reuse the factual reader only to validate this claim, never to choose the rep's priority.
   const facts=await require('./followup-facts').readFollowupFacts(analysis,(prompt,stage)=>request(P.schedulingPrompt(prompt),'scheduling-'+stage,1200));
   record=P.applySchedulingFacts(record,analysis,facts);
+ }
+ if(record.findings.length){
+  const O=require('./period-observation-facts'),first=await request(O.prompt(record.findings,context),'observation-facts',O.MAX_TOKENS);
+  const decisions=O.evaluate(record.findings,first,context),eligible=record.findings.filter(f=>decisions.some(d=>d.moment===f.moment&&d.semantic_supported));
+  const second=eligible.length?await request(O.prompt(eligible,context),'observation-facts',O.MAX_TOKENS):{observations:[]};
+  record=O.applyPair(record,[first,second],context);
  }
  return record;
 }

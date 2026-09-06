@@ -33,8 +33,15 @@ test('historical and broader records each require their own current guidance ide
 test('new records cannot render without matching independent review and located stage evidence',()=>{
  const c=P.prepare(a),S=require('../lib/period-stage-facts');const record={version:P.VERSION,source_hash:c.hash,kb_hash:'k',findings:[{...f,moment:1}],decisions:[{moment:1,verdict:'approved'}],stage_facts:S.finish(c,{decisions:[]},{decisions:[]})};
  assert.equal(P.storedExamples(record,a,'k',{}),null);
- const complete={...record,independent_review:{version:'period-independent-v2',source_hash:c.hash,kb_hash:'k',decisions:[{moment:1,verdict:'approved',checked_skill:{move:f.move,section:f.section}}]}};
+ let complete={...record,independent_review:{version:'period-independent-v2',source_hash:c.hash,kb_hash:'k',decisions:[{moment:1,verdict:'approved',checked_skill:{move:f.move,section:f.section}}]}};
+ const evidence=[{turn:1,speaker:'PROSPECT',quote:a.transcript_stored[0].text},{turn:2,speaker:'CLOSER',quote:a.transcript_stored[1].text}];
+ const factual={observations:[{moment:1,sentences:[{sentence:1,status:'supported',claims:[{text:f.observation,actor:'CALL',kind:'absence',evidence}],evidence,counterevidence:[],reason:'The recorded exchange supports the observation.'}]}]};
+ complete=require('../lib/period-observation-facts').applyPair(complete,[factual,factual],c);
  assert.equal(P.storedExamples(complete,a,'k',{}).length,1);
  assert.equal(P.storedExamples({...complete,stage_facts:null},a,'k',{}),null);
  assert.equal(P.storedExamples({...complete,independent_review:{...complete.independent_review,source_hash:'stale'}},a,'k',{}),null);
+});
+test('current coaching cannot render without its separate factual approval',()=>{
+ const c=P.prepare(a),S=require('../lib/period-stage-facts'),record={version:P.VERSION,source_hash:c.hash,kb_hash:'k',findings:[{...f,moment:1}],decisions:[{moment:1,verdict:'approved'}],stage_facts:S.finish(c,{decisions:[]},{decisions:[]}),independent_review:{version:'period-independent-v2',source_hash:c.hash,kb_hash:'k',decisions:[{moment:1,verdict:'approved',checked_skill:{move:f.move,section:f.section}}]}};
+ assert.equal(P.storedExamples(record,a,'k',{}),null);
 });

@@ -31,7 +31,9 @@ function knowledgeSources(material) {
     ['method', material.doctrineBlock ? material.doctrineBlock('coaching-review') : '']];
   const sources = new Map();
   for (const [kind, text] of groups) {
-    for (const part of text.split(/\n\s*\n/).map(t => t.trim()).filter(Boolean)) {
+    // Complete-script callers retain whole source groups: storage chunks may split a sentence.
+    const parts = material.sourceMode === 'complete_documents' ? [text] : text.split(/\n\s*\n/);
+    for (const part of parts.map(t => t.trim()).filter(Boolean)) {
       const id = 'K-' + crypto.createHash('sha256').update(kind + ':' + part.replace(/\s+/g, ' ')).digest('hex').slice(0, 16);
       sources.set(id, { id, kind, text: part });
     }
@@ -53,7 +55,10 @@ function memoryBlock(facts) {
   return 'VERIFIED CLOSER MEMORY: Only the exact sentence for this moment may appear in advice. Do not paraphrase it or infer a narrower behavior, a weekly count, deal impact, or improvement trend. If there is no fact, make no claim about other calls.\n' +
     facts.map((f, i) => 'Moment ' + (i + 1) + ': ' + (f ? '[' + f.id + '] ' + f.text : 'No verified memory statement.')).join('\n');
 }
-function mentionsHistory(text) {
+function mentionsHistory(text, context) {
+  // In a full-call audit, repetition may be local. The evidence reviewers still
+  // have to locate it; explicit history and habits remain forbidden.
+  if (context?.fullCall && context.historyScope === 'single_call') text = text.replace(/\b(?:repeatedly|repeated|again)\b/gi, '');
   return /\b(?:earlier|prior|previous|other|past|last|recent|multiple|several|consecutive)\s+(?:\w+\s+){0,2}calls?\b|\b(?:this|last|each|every)\s+(?:week|month)\b|\b(?:repeatedly|recurring|repeated|again|tendency|tends to|habitually)\b|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twenty[ -]one)\s+(?:\w+\s+){0,2}(?:calls|times|deals)\b|\b(?:hasn't|has not|haven't|have not) (?:improved|changed|moved)\b/i.test(text);
 }
 function hasUnscopedAbsence(text) {
@@ -71,7 +76,7 @@ function draftProblem(entry, context, fact) {
   const words = entry.coaching.trim().split(/\s+/u).length;
   if (words > COACHING_MAX_WORDS) return {category:'invalid_format',reason:'Advice exceeds ' + COACHING_MAX_WORDS + ' words (' + words + ').'};
   const remainder = fact && entry.coaching.includes(fact.text) ? entry.coaching.replace(fact.text, '') : entry.coaching;
-  if (mentionsHistory(remainder)) return {category:'missing_evidence',reason:'Historical claim is not an exact supplied record.'};
+  if (mentionsHistory(remainder, context)) return {category:'missing_evidence',reason:'Historical claim is not an exact supplied record.'};
   if (!context || (!context.fullCall && hasUnscopedAbsence(remainder))) return {category:'missing_evidence',reason:'The supplied exchange cannot establish this claim.'};
   return null;
 }

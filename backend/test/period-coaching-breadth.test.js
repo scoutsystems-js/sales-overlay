@@ -57,3 +57,41 @@ test('the independent review supplies the checked skill, and a missing or unsupp
  const checked=structuredClone(review);checked.reviews[0].skill_check={section:'close',move:'booking the follow-up',status:'supported',evidence_turns:[1,3,4],reason:'The proposed action is scheduling.'};
  const result=P.applyIndependentReview(record,findings,checked,context,material);assert.equal(result.findings[0].move,'booking the follow-up');assert.equal(P.applySchedulingFacts(result,analysis,null).findings.length,0);
 });
+test('complete-document references keep script sentences together without mixing manager and team sources',()=>{
+ const m={contextText:'Tie the pitch to\n\nthe stated goal.',notes:{text:'Accept a suitable payment plan.'},doctrineBlock:()=> 'Check the actual call.',sourceMode:'complete_documents'};
+ const complete=E.knowledgeSources(m);assert.equal(complete.length,3);assert.match(complete.find(s=>s.kind==='team').text,/Tie the pitch to\s+the stated goal/);assert.doesNotMatch(complete.find(s=>s.kind==='team').text,/payment plan/);
+ assert.equal(E.knowledgeSources({...m,sourceMode:undefined}).length,4,'other coaching lanes keep their existing source identities');
+});
+test('internal turn citations are removed before the advice is reviewed, without changing its factual wording',()=>{
+ const {context,findings}=reviewFixture();const original={...findings[0],observation:'The closer described the offer at turns 3–4 without checking fit.'};
+ const result=P.candidates({findings:[original]},context,material);assert.equal(result[0].observation,'The closer described the offer without checking fit.');assert.doesNotMatch(result[0].coaching,/turns 3/);
+});
+test('duplicate skills are reduced only after independent approval so an earlier rejection cannot hide a valid later example',()=>{
+ const {context,findings,review}=reviewFixture();const both=[findings[0],{...findings[0],moment:2}];const response={reviews:[review.reviews[0],{...review.reviews[0],moment:2}]};const record=finish(both,response,context,material);
+ assert.equal(P.applyIndependentReview(record,both,response,context,material).findings.length,1);
+ const firstRejected=structuredClone(response);firstRejected.reviews[0].verdict='reject';firstRejected.reviews[0].reason_code='missing_evidence';
+ const result=P.applyIndependentReview(record,both,firstRejected,context,material);assert.equal(result.findings.length,1);assert.equal(result.findings[0].moment,2);
+});
+test('a supported recommendation can use the reviewer’s already-evidenced opportunity without duplicating its turn list',()=>{
+ const {context,findings,review}=reviewFixture();review.reviews[0].sentence_checks[1].support_turns=[];
+ assert.equal(finish(findings,review,context,material).findings.length,1);
+ review.reviews[0].sentence_checks[1].status='unknown';assert.equal(finish(findings,review,context,material).findings.length,0);
+ review.reviews[0].sentence_checks[1].status='supported';review.reviews[0].opportunity.status='uncertain';assert.equal(finish(findings,review,context,material).findings.length,0);
+ const observation=reviewFixture();observation.review.reviews[0].sentence_checks[0].support_turns=[];assert.equal(finish(observation.findings,observation.review,observation.context,material).findings.length,0);
+});
+test('repeated behavior within a full call reaches review without licensing cross-call history',()=>{
+ const {context,findings,review}=reviewFixture();const f={...findings[0],observation:'The prospect repeatedly described the goal, and the closer left it unused at the decision.'};
+ const rows=P.candidates({findings:[f]},context,material);assert.equal(rows.length,1);
+ assert.equal(finish(rows,review,context,material).findings.length,1);
+ for(const observation of ['The closer repeatedly missed this on previous calls.','The closer has a tendency to skip this.','The closer did this three times last week.'])assert.equal(P.candidates({findings:[{...f,observation}]},context,material).length,0);
+ assert.equal(E.mentionsHistory('The closer repeatedly missed this.'),true,'existing moment lanes retain their history boundary');
+ const rejected=structuredClone(review);rejected.reviews[0].verdict='reject';assert.equal(finish(rows,rejected,context,material).findings.length,0,'within-call behavior still requires evidence review');
+});
+
+test('ending a call is not described as closing a deal',()=>{
+ const {context,findings}=reviewFixture();
+ const f={...findings[0],observation:'The closer closed without securing a day and time.'};
+ assert.equal(P.candidates({findings:[f]},context,material)[0].observation,'The closer ended the call without securing a day and time.');
+ const closed={...f,observation:'The deal closed after the payment was accepted.'};
+ assert.equal(P.candidates({findings:[closed]},context,material)[0].observation,closed.observation);
+});
