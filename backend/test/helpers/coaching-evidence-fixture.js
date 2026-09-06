@@ -28,7 +28,7 @@ function withReviewModel(original) {
       const p=params.messages[0].content;
       const support=(p.match(/\[(K-[a-f0-9]+)\]/)||[])[1];
       const ids=[...p.matchAll(/MOMENT (\d+) full_call=/g)].map(m=>Number(m[1]));
-      return {content:[{text:JSON.stringify({reviews:ids.map(moment=>({moment,verdict:'approve',evidence_turns:[1],knowledge_refs:[support],history_refs:[]}))})}]};
+      return {content:[{text:JSON.stringify({reviews:ids.map(moment=>({moment,verdict:'approve',sentence_checks:[...p.split('MOMENT '+moment+' full_call=')[1].split('TRANSCRIPT:')[0].matchAll(/\[S(\d+)\]/g)].map(m=>({sentence:Number(m[1]),status:'supported',counterevidence_turns:[],reason:'Accepting fixture, not semantic verification.'})),evidence_turns:[1],knowledge_refs:[support],history_refs:[]}))})}]};
     }
     return original(params,ctx);
   };

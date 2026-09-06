@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../lib/coaching');
 const E = require('../lib/coaching-evidence-review');
+const checks=text=>E.adviceSentences(text).map((_,i)=>({sentence:i+1,status:'supported',counterevidence_turns:[],reason:'Fixture support.'}));
 
 test('the writer has one compact brief with room below the enforced maximum', () => {
   const prompt = C.buildCoachingPrompt([], {});
@@ -51,7 +52,7 @@ test('supported principles can pass the existing evidence gate without accepting
   // They do not simulate an independent model reaching the right judgment.
   const material = {contextText:'Establish whether this is the only concern. Qualify financial fit before the pitch.'};
   const context = {fullCall:false, turns:[{speaker:'PROSPECT',text:'I need to discuss this with my partner.'},{speaker:'CLOSER',text:'All right, I will email you.'}]};
-  const review = {reviews:[{moment:1,verdict:'approve',knowledge_refs:[E.knowledgeSources(material)[0].id],evidence_turns:[1,2]}]};
+  const review = {reviews:[{moment:1,verdict:'approve',sentence_checks:checks('One sentence.'),knowledge_refs:[E.knowledgeSources(material)[0].id],evidence_turns:[1,2]}]};
   for (const coaching of ['In this exchange, establish whether consulting their partner is the only remaining concern.', 'Clarify financial fit before continuing into the pitch.']) {
     assert.equal(E.approvedEntries([{moment:1,coaching}],review,[context],material).length,1);
   }
@@ -70,7 +71,7 @@ test('v2 approved history retains its original provenance', () => {
 const scopedMaterial = {contextText:'Agree a specific next conversation.'};
 const excerpt = {fullCall:false,turns:[{speaker:'CLOSER',text:'Call me over the weekend.'}]};
 function decide(coaching, context = excerpt, moment = 1) {
-  return E.evaluateEntries([{moment,coaching}], {reviews:[{moment,verdict:'approve',evidence_turns:[1],knowledge_refs:[E.knowledgeSources(scopedMaterial)[0].id]}]}, Array.from({length:moment},()=>context), scopedMaterial)[0];
+  return E.evaluateEntries([{moment,coaching}], {reviews:[{moment,verdict:'approve',sentence_checks:checks(coaching),evidence_turns:[1],knowledge_refs:[E.knowledgeSources(scopedMaterial)[0].id]}]}, Array.from({length:moment},()=>context), scopedMaterial)[0];
 }
 
 test('the saved Gabriel absence claims fail even with an approving reviewer and under the length limit', () => {
