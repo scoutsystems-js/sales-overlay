@@ -99,13 +99,13 @@ test('⚠⚠ ITEM 2 — on a call that carries a disqualification the coaching l
   reply = () => JSON.stringify([{ moment: 1, coaching: 'This call was lost, and the first warning came in discovery.', applied_manager_notes: [] }, { moment: 2, coaching: 'The prospect had nothing saved; the miss was upstream, on qualification.', applied_manager_notes: [] }]);
   const out = await W._coachCallMoments(fakeAdmin(writes), 'c2', 'lost', null, null, 'repA');
   const p = captured[0];
-  assert.ok(/the prospect was DISQUALIFIED/.test(p) && !/Call outcome: Lost\./.test(p), 'told disqualified, not lost:\n' + p.slice(0, 400));
+  assert.ok(/THIS PROSPECT WAS DISQUALIFIED/.test(p) && !/RECORDED OUTCOME: Lost\./.test(p), 'told disqualified, not lost:\n' + p.slice(0, 400));
   assert.ok(/THIS PROSPECT WAS DISQUALIFIED\. There was no deal to lose/.test(p), 'the cost clause follows');
   assert.strictEqual(out.written, 1, 'the loss-framed entry was dropped, the other written: ' + JSON.stringify(out));
   assert.ok(writes.some((w) => /miss was upstream/.test(String(w.patch.coaching))) && !writes.some((w) => /This call was lost/.test(String(w.patch.coaching))));
   captured.length = 0; writes = [];
   const out2 = await W._coachCallMoments(fakeAdmin(writes), 'c1', 'lost', null, null, 'repA');
-  assert.ok(/Call outcome: Lost\./.test(captured[0]), 'a genuinely lost call is still told so');
+  assert.ok(/RECORDED OUTCOME: Lost\./.test(captured[0]), 'a genuinely lost call is still told so');
   assert.strictEqual(out2.written, 2, 'and "This call was lost" stands on it');
   reply = () => JSON.stringify([{ moment: 1, coaching: 'Isolate the money objection before answering it.', applied_manager_notes: [] }]);
 });

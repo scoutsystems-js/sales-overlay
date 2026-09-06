@@ -4,6 +4,13 @@ const assert = require('node:assert/strict');
 const C = require('../lib/coaching');
 const E = require('../lib/coaching-evidence-review');
 
+test('the writer has one compact brief with room below the enforced maximum', () => {
+  const prompt = C.buildCoachingPrompt([], {});
+  assert.ok(prompt.length < 6500, 'the fixed brief must not crowd out the actual evidence: '+prompt.length);
+  assert.match(prompt,/Aim for 45–65 words/);
+  assert.doesNotMatch(prompt,/SAY WHAT THE CLOSER ACTUALLY DID, in their own words, quoted|NAME THE TYPE, using ONLY|strongest coaching often has one/);
+});
+
 // Prompt-contract regressions, not a model efficacy score. These exercise the
 // assembled requests so stale instructions cannot survive in another branch.
 test('every outcome branch permits unknown impact instead of requiring a cause or cost', () => {

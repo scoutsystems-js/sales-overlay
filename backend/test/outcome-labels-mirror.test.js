@@ -76,7 +76,11 @@ test('⚠ the prompts are handed the LABEL, never the machine word — digest v7
   assert.ok(/outcome: ' \+ \(a\.outcome \? \(lossScope\.dqCalls\[cid\] \? 'Disqualified \(the prospect could not buy — not a lost deal, not a failed close\)' : outcomeLabel\(a\.outcome\)\) : 'unknown'\)/.test(dg), 'the digest call line carries the label (H733: disqualified where the call carries a DQ, the map otherwise)');
   assert.ok(/"Open" is an OUTCOME meaning the call did not close/.test(dg), 'the digest rule names the new word');
   assert.ok(/DIGEST_PROMPT_VERSION = 'v[7-9]-|DIGEST_PROMPT_VERSION = 'v\d\d-/.test(dg), 'the lane version bumped with the prompt (v7 carried the label; v8 the knowledge base)');
-  const co = stripComments(fs.readFileSync(path.join(__dirname, '..', 'lib', 'coaching.js'), 'utf8'));
-  assert.ok(/'Call outcome: ' \+ outcomeLabel\(advised\) \+ '\.'/.test(co) && /var advised = doctrineLib\.outcomeForAdvice\(outcome, dq\);/.test(co), 'the coaching prompt carries the label (H733: through outcomeForAdvice, so a disqualified prospect is never told as Lost)');
+  const coaching = require('../lib/coaching');
+  assert.match(coaching.buildCoachingPrompt([], {outcome:'follow_up'}), /RECORDED OUTCOME: Open\./);
+  assert.match(coaching.buildCoachingPrompt([], {outcome:'lost'}), /RECORDED OUTCOME: Lost\./);
+  const disqualified = coaching.buildCoachingPrompt([], {outcome:'lost',dq:true});
+  assert.match(disqualified, /THIS PROSPECT WAS DISQUALIFIED/);
+  assert.doesNotMatch(disqualified, /RECORDED OUTCOME: Lost\./);
   assert.ok(/eod-chip-follow">follow up close</.test(LIVE), 'the follow-up close label (the call TYPE) stays exactly as ruled');
 });

@@ -20,6 +20,10 @@ const usage=require('../lib/model-usage');let verdict='reject', prompts=[], draf
 usage.createWithUsage=async(params,ctx)=>{prompts.push({prompt:params.messages[0].content,lane:ctx.lane});return {content:[{text:ctx.lane==='coaching-review'?JSON.stringify({reviews:reviewRows||[{moment:1,verdict,evidence_turns:[2,3],knowledge_refs:[invalidRef?'K-forged':E.knowledgeSources(material)[0].id],history_refs:[]}]}):JSON.stringify(draftRows||[{moment:1,coaching:draft}])}]};};
 require('../lib/kb-material').loadKbMaterial=async()=>material;
 const worker=require('../lib/analysis-worker');
+test('production parser reads a fenced coaching array after prose containing transcript references',()=>{
+ const text='The closer isolated correctly at [42–43].\n\n```json\n[{"moment":1,"coaching":null,"no_change":true}]\n```';
+ assert.deepEqual(worker._extractFirstJsonArray(text),[{moment:1,coaching:null,no_change:true}]);
+});
 function admin(writes){return {from(table){let write;const q={select(){return q;},eq(key,value){if(write)(write.filters||(write.filters={}))[key]=value;return q;},in(){return q;},order(){return q;},gte(){return q;},lte(){return q;},update(p){write={table,p};writes.push(write);return q;},upsert(){return q;},maybeSingle:async()=>({data:table==='call_analyses'?analysis:null,error:null}),then(resolve,reject){return Promise.resolve({data:table==='call_highlights'?(highlightRows||[highlight]):[],error:null}).then(resolve,reject);}};return q;}};}
 test('real worker sends full exchange and team knowledge to a separate reviewer; rejected advice is not persisted',async()=>{
  const writes=[];prompts=[];verdict='reject';const result=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');

@@ -67,7 +67,7 @@ test('⚠⚠ nothing relevant → hasMaterial false and the one shape every surf
 test('⚠ every advice lane calls the ONE retrieval before its prompt and returns the one shape when empty (pins on the wiring; the coaching lane is EXECUTED in test/coaching-kb-check.test.js)', () => {
   const fs = require('node:fs'); const path = require('node:path'); const { stripComments } = require('./helpers/strip-comments');
   const read = (f) => stripComments(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
-  const lanes = { 'lib/team-synthesis.js': 'RECS_LANE_VERSION = \'v14-', 'lib/performance-synthesis.js': 'SYNTH_RULE_VERSION = \'v9-', 'lib/team-objection-summary.js': 'PROMPT_VERSION = \'v16-', 'lib/team-digest.js': 'DIGEST_PROMPT_VERSION = \'v10-', 'lib/objection-synthesis.js': 'SYNTH_PROMPT_VERSION = \'v4-', 'lib/analysis-worker.js': 'ANALYSIS_PROMPT_VERSION = \'v51-' };
+  const lanes = { 'lib/team-synthesis.js': 'RECS_LANE_VERSION = \'v14-', 'lib/performance-synthesis.js': 'SYNTH_RULE_VERSION = \'v9-', 'lib/team-objection-summary.js': 'PROMPT_VERSION = \'v16-', 'lib/team-digest.js': 'DIGEST_PROMPT_VERSION = \'v10-', 'lib/objection-synthesis.js': 'SYNTH_PROMPT_VERSION = \'v4-', 'lib/analysis-worker.js': 'ANALYSIS_PROMPT_VERSION = \'v52-' };
   Object.keys(lanes).forEach((f) => {
     const src = read(f);
     assert.ok(/loadKbMaterial\(admin, \{/.test(src), f + ' calls the one retrieval');

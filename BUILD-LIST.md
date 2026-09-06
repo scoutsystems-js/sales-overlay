@@ -1,5 +1,9 @@
 # SCOUT — BUILD LIST
 
+## Compact coaching writer completed locally — 2026-09-05
+NOT DEPLOYED. The writer simplification proposed in H742 is built (v52): one compact brief, 45–65 word target, existing 90-word ceiling and evidence gates retained. Four calls yielded four drafts of 51, 78, 76 and 70 words plus one no-change response. All drafts received model approval, but manual review found a false approval: Godwin was told no question explored the hesitation even though the excerpt contains that question. Josh’s “only at this point” also overreaches the excerpt. No historical coaching rows changed. The shared response parser now correctly reads fenced JSON after leading transcript references; cached responses were recovered without regeneration. Full backend suite: 2,501 passed. Next: correct the reviewer’s distinction between a question not asked and an answer not resolved, and verify claim scope against real evidence before deployment or broader recovery. H743; report: `~/Desktop/scan-reports/coaching-compact-writer-test/RESULTS.md`.
+
+
 ## Spending threshold updated; scope check complete — 2026-09-05
 Justin now permits logical spending operations of $20 or less within the authorized task without another request; over $20 requires approval. H742 records the ruling. The four-call scope check has run: two no-change responses and three overlong drafts, all three withheld before review. No reviewer request or historical coaching write occurred. NOT DEPLOYED; compliant generation remains unresolved. This closes prior pending-run/approval notes for this four-call check. Next technical issue: simplify the writer's overloaded output requirements while preserving evidence, outcome and directional coaching; do not keep adding prompt warnings or start broad reprocessing. Report: `~/Desktop/scan-reports/coaching-scope-test/RESULTS.md`.
 
