@@ -7940,3 +7940,6 @@ Next after this session: (1) recent source/analysis recovery and speaker/recordi
 Evidence/report: ~/Desktop/scan-reports/team-coaching-completion/release-report.md, route-verification.json, persistence-receipt.json and deployment.json. The existing unread ~/Desktop/scout-findings.md was preserved.
 
 H754 final navigation correction: live testing exposed hash/back-navigation updating the date label without clearing old period payloads. onRouteChange now compares the previous view/range and invokes the existing range reset before rendering, also advancing its response epoch. Two regressions failed before the fix; all 2,558 tests pass. This correction is built and pending push at this checkpoint; the data backfill remains saved.
+
+## [H755] Session wrap-up — Justin, September 6, 2026
+Justin requested a summary after every completed session in plain language at a fifth-grade reading level, with no technical language. End with the recommended next build and two alternatives only if those real tasks exist; fewer options or no next-work section is correct when the queue has fewer items. This expands the earlier build handoff rule and supersedes the two-line chat restriction for the final session summary. No product change requested.

@@ -1,3 +1,22 @@
+# Current session — September 6: coaching speed, then coaching breadth
+
+## 1. Coaching page speed — investigation complete; awaiting plan approval
+Read-only execution of the actual coachable-moments handler against current stored data: month Aug8–Sep6 9,785ms, day Sep4 1,692ms. Local-to-database timing, not production browser SLA; one sample per window. Month fetched 144 full transcripts (~14MB), 3,582 legacy highlights (~3.1MB), 583 knowledge rows (~1.8MB); serial batches add waits. Existing period renderer bypasses legacy improvements/items, though items still influence rep sort and legacy Fine Tune noted lookup; preserve deliberate ordering and other consumers when slimming the path.
+
+Proposed approved block: (1) capture repeated comparable baseline for month/week/day and signed-in page; (2) slim the current period route to necessary scores/review data, stop unused legacy gathering for this route only, preserve name/scope/no-call behavior; (3) overlap independent reads with bounded concurrency and share same-request team/material work; (4) measure again; only if still needed, separate quick rep/score overview from on-demand selected-rep evidence, preserving full transcript/current-KB freshness checks before showing advice; no stale coaching cache or weakened evidence gate; (5) simple stable loading placeholders, no layout jump or old-date content; (6) verify parity of counts/scores/examples, day/month navigation, rapid switches, role access, notes/source changes, errors, mobile and background toggle; tests and verified deployment after approval. Target at least 50% lower comparable month wait; stretch first useful overview <=3s. Targets must be measured, not promised. No paid call reanalysis or new plugin needed for speed work.
+Research consulted: https://supabase.com/docs/guides/database/query-optimization (measure actual plans before index changes; no speculative index work planned).
+Evidence: ~/Desktop/scan-reports/coaching-speed/read-timings.json. Implementation has not started.
+
+## 2. Broader coaching skills — NOT STARTED
+Only after task1 finished. Read actual Scout doctrine markdown and current team guidance first, then propose plan and specific missing business input. Do not invent a matching file if absent. Same session total spending cap $100. No paid coaching experiments until this task's plan is approved.
+
+## Filed after current tasks
+- Remove requested “Examples cover…” paragraph (prior user explicitly asked to file, not start).
+- Previously filed unreadable calls, reviewer consistency and source/name discrepancies remain queued unless a measured blocker to the active task.
+
+Session rules: work in order; new unrelated issues append here, never interrupt active work unless blocking. Plain-language session summary with real next-work options only.
+
+---
 ## LIVE — period-specific Team Coaching; one scope approval remains (H754)
 Live and verified at 130cb98774191c0512b6f05f534ccf4f3dc53f9e. All 12 members are visible; nine with month-wide calls have weakest-area labels and section scores. 141 paid-window calls have saved review results, with 30 supported findings across all eight reps with calls in that window. All 2,556 tests pass. Grades/outcomes remained unchanged on every write. Live month/day filtering, exact exchanges, rep-owned call review and persistent background toggle verified. No model runs on the Coachable Moments date-range aggregation.
 
@@ -2152,3 +2171,8 @@ Josh N scope decision CLOSED: Justin explicitly approved his three newest August
 Josh N approved exception completed: three August 28 calls reviewed and saved, zero failed writes, grade/outcome fields unchanged. One supported Shia follow-up-time example passed independent coaching review and two scheduling reads; one call returned no finding; Bernard candidate withheld because reviewer populated contradictory evidence despite approving (file reviewer consistency for later, do not bypass guard). Totals now 144 saved reviews / 31 supported findings / all nine reps with month calls covered. Live panel final verification pending at this checkpoint.
 
 H754 COMPLETE — final authenticated verification: Josh N selected on live month page, Close 52/100, 17 calls, three reviewed, Shia example with recorded Open outcome and Fathom clip 801619931?t=2901; exact exchange expanded and matched stored lines. All nine reps with month calls have labels and supported examples. Three members genuinely have no calls. 144 review writes, zero failed writes, 31 supported findings. No further user action required. Date-switch bug and presentation tweaks live. Next queue in order: month-load latency; unreadable/failed analyses and source metadata; reviewer consistency/broader skills evaluation; direct Fine Tune on new examples; title/name mismatches. Final report: ~/Desktop/scan-reports/team-coaching-completion/release-report.md.
+
+## Filed only — coaching coverage copy, Justin September 6
+Remove the Coachable Moments paragraph beginning “Examples cover … reviewed calls; … have not completed this review. The section averages use all available grades in your selected period.” Justin does not want every data point explained with period call counts. Explicit instruction: file for later; do not implement now. Page and underlying coverage calculations unchanged.
+
+Speed task BUILT, pending final tests/deployment: period-only route skips legacy highlights; three bounded read batches; knowledge/name reads overlap calls while current KB and full-transcript verification remain mandatory. Same-data old/new comparison: month7558→2677ms and6035→3226ms; day2020→1322ms. All period counts, grades, examples and recent-call payloads identical in both versions. No UI redesign or paid call review needed. Broader coaching task remains blocked by sequence until deployment verification is complete.

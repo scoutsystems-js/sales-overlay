@@ -15,7 +15,14 @@ var { selectCoachableMoments, KIND_LABELS } = require('./coachable-moments');
 var doctrineLib = require('./doctrine');
 var { selectImprovementFocus } = require('./improvement-focus');
 
-async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
+// Three independent read batches at a time; keep URL-safe CHUNK sizing.
+async function readBatches(ids, read) {
+  var next = 0;
+  async function worker() { while (next < ids.length) { var start = next; next += CHUNK; await read(ids.slice(start, start + CHUNK)); } }
+  await Promise.all([worker(), worker(), worker()]);
+}
+async function loadCoachableTeam(admin, memberIds, from, to, kbHash, options) {
+  var periodOnly = !!(options && options.periodOnly);
   var ids = memberIds || [];
   var calls = [];
   for (var i = 0; i < ids.length; i += CHUNK) {
@@ -31,34 +38,34 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash) {
   calls = realCallsOnly(calls).filter(function (c) { return c.not_a_sales_call !== true && !c.duplicate_of; });
   var byId = {}; calls.forEach(function (c) { byId[c.id] = c; c.highlights = []; c.outcome = null; c.prospect_name = null; });
   var callIds = Object.keys(byId);
-  for (var j = 0; j < callIds.length; j += CHUNK) {
-    var slice = callIds.slice(j, j + CHUNK);
+  var loaded = await Promise.all([readBatches(callIds, async function (slice) {
     var pair = await Promise.all([
       admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name, status, intro_score, discovery_score, pitch_score, objection_score, close_score_earned, rep_period_coaching').in('fathom_call_id', slice),
-      admin.from('call_highlights').select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, coaching, coaching_review, closer_response, closer_response_verified, cause, objection_class, objection_category').in('fathom_call_id', slice),
+      periodOnly ? Promise.resolve({data:[]}) : admin.from('call_highlights').select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, coaching, coaching_review, closer_response, closer_response_verified, cause, objection_class, objection_category').in('fathom_call_id', slice),
     ]);
     if (pair[0].error) throw new Error('call_analyses: ' + pair[0].error.message);
     if (pair[1].error) throw new Error('call_highlights: ' + pair[1].error.message);
     (pair[0].data || []).forEach(function (a) { if (byId[a.fathom_call_id]) { byId[a.fathom_call_id].analysis = a; byId[a.fathom_call_id].analysis_status = a.status || null; byId[a.fathom_call_id].outcome = a.outcome || null; byId[a.fathom_call_id].prospect_name = a.prospect_name || null; } });
     (pair[1].data || []).forEach(function (h) { if (byId[h.fathom_call_id]) byId[h.fathom_call_id].highlights.push(h); });
-  }
+  }), kbHash]);
+  kbHash = loaded[1]; // Guidance loads alongside call reads; evidence still checks its current hash.
   var byRep = {}; ids.forEach(function (u) { byRep[u] = []; });
   calls.forEach(function (c) { if (byRep[c.user_id]) byRep[c.user_id].push(c); });
   var reps = ids.map(function (u) {
-    var items = selectCoachableMoments(byRep[u]).map(function (it) { return Object.assign({ label: KIND_LABELS[it.kind] || it.kind }, it); });
+    var items = (periodOnly ? [] : selectCoachableMoments(byRep[u])).map(function (it) { return Object.assign({ label: KIND_LABELS[it.kind] || it.kind }, it); });
     var hl = []; byRep[u].forEach(function (c) { hl = hl.concat(c.highlights || []); });
-    var scope = doctrineLib.lossScope(byRep[u].map(function (c) { return { fathom_call_id: c.id, outcome: c.outcome }; }), hl);
+    var scope = periodOnly ? null : doctrineLib.lossScope(byRep[u].map(function (c) { return { fathom_call_id: c.id, outcome: c.outcome }; }), hl);
     var recentCalls = byRep[u].slice(0, 5).map(function (c) { return { call_id:c.id, user_id:c.user_id, call_date:c.call_date, outcome:c.analysis_status === 'done' ? c.outcome : null, analysis_status:c.analysis_status || null }; });
-    return { user_id: u, calls: byRep[u].length, recent_calls:recentCalls, items: items, improvements: selectImprovementFocus(byRep[u], {all:true,kbHash:kbHash}), loss_scope: scope };
+    return { user_id: u, calls: byRep[u].length, recent_calls:recentCalls, items: items, improvements: periodOnly ? [] : selectImprovementFocus(byRep[u], {all:true,kbHash:kbHash}), loss_scope: scope };
   });
   // Locate every reviewed candidate before ranking; rejected evidence cannot hide a valid area.
   var evidenceIds = [...new Set(calls.filter(c=>c.analysis && c.analysis.rep_period_coaching).map(c=>c.id).concat(reps.flatMap(function (r) { return r.improvements.map(function (it) { return it.call_id; }); })))];
   var evidenceAnalyses = new Map();
-  for (var ei = 0; ei < evidenceIds.length; ei += CHUNK) {
-    var eq = await admin.from('call_analyses').select('fathom_call_id,outcome,why_outcome,transcript_stored').in('fathom_call_id', evidenceIds.slice(ei, ei + CHUNK)).eq('status', 'done');
+  await readBatches(evidenceIds, async function (slice) {
+    var eq = await admin.from('call_analyses').select('fathom_call_id,outcome,why_outcome,transcript_stored').in('fathom_call_id', slice).eq('status', 'done');
     if (eq.error) throw new Error('Coaching evidence unavailable');
     (eq.data || []).forEach(function (a) { evidenceAnalyses.set(a.fathom_call_id, a); });
-  }
+  });
   var buildEvidence = require('./strength-call-evidence').buildEvidence;
   reps.forEach(function (r) {
     // A coaching review approves its advice and exchange, not an older grader explanation.
