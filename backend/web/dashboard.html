@@ -16158,7 +16158,15 @@
   // that doesn't self-load, so kick its fetch explicitly.
   function onRouteChange() {
     if (!state.me) return; // not booted yet — init() handles the initial hash
+    var previousView = state.view;
+    var previousRange = isTeamView(previousView) ? teamRange() : null;
     applyHashToState();
+    if (isTeamView(state.view)) {
+      var currentRange = teamRange();
+      // H754: URL navigation changes the period just as the picker does.
+      // Clear old payloads and invalidate in-flight answers before relabelling the page.
+      if (previousView !== state.view || !previousRange || previousRange.from !== currentRange.from || previousRange.to !== currentRange.to) resetTeamData('range');
+    }
     render();
     if (state.view === 'call-review' && state.selectedCallId) loadCallReview(state.selectedCallId);
     window.scrollTo({ top: 0, behavior: 'auto' });

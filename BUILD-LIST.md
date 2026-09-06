@@ -2137,3 +2137,5 @@ Pilot complete: eight calls, eleven candidates, five no-change responses, six wi
 
 ## Team Coaching call availability — 2026-09-05
 LIVE as `d059599`: closers without an approved coaching focus retain their measured call count and up to five recent calls with recorded outcome/analysis status and a Review Call action. Missing team material no longer suppresses call access. No coaching was restored, regenerated or inferred. Full suite 2,487/2,487; current-data carrier check passed. Signed-in verification selected Josh P, showed 143 calls and five recent calls, and opened the selected call under Josh's user ID.
+
+H754 final navigation correction: live testing exposed hash/back-navigation updating the date label without clearing old period payloads. onRouteChange now compares the previous view/range and invokes the existing range reset before rendering, also advancing its response epoch. Two regressions failed before the fix; all 2,558 tests pass. This correction is built and pending push at this checkpoint; the data backfill remains saved.

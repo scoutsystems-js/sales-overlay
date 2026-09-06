@@ -7938,3 +7938,5 @@ Remaining required input: approve Josh N’s three newest August 28 calls as an 
 Next after this session: (1) recent source/analysis recovery and speaker/recording inconsistencies; (2) direct Fine Tune for the new call-level examples through the existing notes store; (3) measured reviewer quality and broader knowledge-supported skill coverage; (4) existing back-navigation date-picker display and call title/prospect-name discrepancies. Do not start those unrelated blocks before closing current coverage.
 
 Evidence/report: ~/Desktop/scan-reports/team-coaching-completion/release-report.md, route-verification.json, persistence-receipt.json and deployment.json. The existing unread ~/Desktop/scout-findings.md was preserved.
+
+H754 final navigation correction: live testing exposed hash/back-navigation updating the date label without clearing old period payloads. onRouteChange now compares the previous view/range and invokes the existing range reset before rendering, also advancing its response epoch. Two regressions failed before the fix; all 2,558 tests pass. This correction is built and pending push at this checkpoint; the data backfill remains saved.
