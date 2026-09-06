@@ -1,5 +1,17 @@
 # SCOUT — BUILD LIST
 
+## Evidence-first writer release prepared — 2026-09-05
+NOT DEPLOYED YET. v54 assembles exact consecutive closer/prospect turns in code, preserving every supplied turn and excerpt scope. The writer no longer receives earlier observation, truncated saved reply or prior summary interpretations. No additional model stage ships. All 2,507 backend tests passed; syntax and whitespace checks passed. The independent reviewer and all existing refusal gates remain; sentence review improves checkability but is not a guarantee of semantic correctness.
+
+Same four-call diagnostic, five candidates: Gabriel callback coaching and Godwin financial-qualification coaching approved and manually checked; Nick and Godwin's already-correct objection exchange returned no change; Josh's new draft was withheld by the scope gate. The original Godwin missing-question accusation was not regenerated. Josh's old first-occurrence assertion was not regenerated, but his new note still overreached the excerpt and was withheld. These are measured improvements on fixed diagnostic cases, not a representative accuracy score or a claim that the reviewer now rejects every bad note. Earlier drafts remain withheld. No historical coaching was written and no recovery run was dispatched.
+
+The proposed extra model-written action record FAILED: two records failed source/order/length checks, and Josh's old inaccurate note still received approval. That stage is not wired or shipped. The code-only record replaces it. Live-data records: `~/Desktop/scan-reports/coaching-action-writer-test/` and `coaching-evidence-first-test/`.
+
+Deployment preparation also repaired eight abandoned processing claims from September 1–2. Their claim timestamps predated subsequent production deployments, and the worker's stale threshold is ten minutes. Guarded compare-and-set changed only status to error; every other analysis field was verified unchanged against saved originals. No calls were reprocessed. Processing is now zero; pending remains twelve. The eight interrupted analyses still need recovery; changing their status did not complete them. Backup/verification: `stale-claim-repair.json`. H745.
+
+Next after deployment: verify the exact deployed build and startup marker, then measure the eligible historical recovery set before proposing or dispatching it. Do not treat this release as completed history recovery.
+
+
 ## Sentence review experiment — NOT DEPLOYED, 2026-09-05
 Justin authorized fixing and shipping the reviewer failure. Built a sentence-level review protocol locally (v53 / coaching-evidence-v5): every original sentence must have exactly one supported check; a contradiction, counterevidence, missing check or unknown result withholds the note despite an overall approval. Preserves earlier accepted review versions. All 2,504 backend tests passed; syntax and whitespace checks passed. Also fixed the actual worker passing prematurely stripped fences to the JSON parser; the executed worker regression now includes leading bracketed prose.
 

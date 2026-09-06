@@ -5,7 +5,7 @@ const E=require('../lib/coaching-evidence-review');
 const checks=text=>E.adviceSentences(text).map((_,i)=>({sentence:i+1,status:'supported',counterevidence_turns:[],reason:'Fixture support.'}));
 const quote='And I just hope that it is not something that will deter me from going forward.';
 const turns=[{speaker:'PROSPECT',start_seconds:1765,text:quote},{speaker:'CLOSER',start_seconds:1778,text:'I know you said you have no idea what she will say.'},{speaker:'CLOSER',start_seconds:1780,text:'If she says the property is not compliant, what do you feel you will do then?'},{speaker:'PROSPECT',start_seconds:1800,text:'I would need to consider another property.'}];
-const highlight={id:'h1',fathom_call_id:'c1',type:'objection',resolution:'unhandled',speaker:'PROSPECT',section:'close',timestamp_seconds:1823,quote,closer_response:turns[1].text,closer_response_verified:true};
+const highlight={id:'h1',fathom_call_id:'c1',type:'objection',resolution:'unhandled',speaker:'PROSPECT',section:'close',observation:'UNVERIFIED_INTERPRETATION_NOT_FOR_WRITER',timestamp_seconds:1823,quote,closer_response:turns[1].text,closer_response_verified:true};
 const analysis={transcript_stored:{turns},outcome:'follow_up',why_outcome:''};
 const material={hasMaterial:true,kbHash:'team-a',contextText:'Explore the concern and establish the next step.',notes:{rows:[],text:''},doctrineBlock:()=>''};
 const context=E.contextFor(highlight,analysis);
@@ -30,6 +30,8 @@ function admin(writes){return {from(table){let write;const q={select(){return q;
 test('real worker sends full exchange and team knowledge to a separate reviewer; rejected advice is not persisted',async()=>{
  const writes=[];prompts=[];verdict='reject';const result=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
  assert.equal(prompts.length,2);assert.equal(prompts[1].lane,'coaching-review');
+ assert.ok(prompts[0].prompt.includes('ACTION / ANSWER RECORD'));
+ assert.ok(!prompts[0].prompt.includes('UNVERIFIED_INTERPRETATION_NOT_FOR_WRITER'));
  for(const p of prompts){assert.ok(p.prompt.includes(turns[2].text));assert.ok(p.prompt.includes(material.contextText));}
  assert.equal(result.written,0);assert.ok(!writes.some(w=>w.p.coaching));
  verdict='approve';writes.length=0;const approved=await worker._coachCallMoments(admin(writes),'c1','follow_up',null,null,'u1');
