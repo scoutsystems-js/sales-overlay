@@ -2003,5 +2003,8 @@ Approved compact priorities, closer selector/detail panel, expandable strengths,
 ## Validator v2 — 2026-09-05
 Implemented source IDs, date-bounded record-backed memory, and separate contradiction/missing-evidence/reference outcomes. 2,485 tests and saved-response regression replay pass; no paid review or historical upgrade performed. These fix the observed protocol and memory-waiver gaps; semantic accuracy is not established by the test count. Deployment verification in gpt.md.
 
+## Coaching recovery follow-up — 2026-09-05
+Pilot complete: eight calls, eleven candidates, five no-change responses, six withheld drafts, zero publishable notes. Production coaching data unchanged. Resolve conflicting generation instructions requiring a cause/cost while prohibiting unsupported causation; align the example with timestamp/pronoun rules. Check the reviewer's isolation and financial-qualification reasoning using saved counterexamples, preserving evidence requirements. This is the next proposed bounded block, not implemented. No additional paid batch authorized. Evidence: `~/Desktop/scan-reports/coaching-recovery/RESULTS.md`.
+
 ## Team Coaching call availability — 2026-09-05
 LIVE as `d059599`: closers without an approved coaching focus retain their measured call count and up to five recent calls with recorded outcome/analysis status and a Review Call action. Missing team material no longer suppresses call access. No coaching was restored, regenerated or inferred. Full suite 2,487/2,487; current-data carrier check passed. Signed-in verification selected Josh P, showed 143 calls and five recent calls, and opened the selected call under Josh's user ID.

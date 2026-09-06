@@ -30,6 +30,9 @@ Read-only dry run for Sober Living Riches, August 7–September 5 (America/New_Y
 ## Historical review authorized and running — 2026-09-05
 Justin: “send it. approved” — hard $6 cap for the prepared last-30-days review only. Runner re-reads each call, checks priced prompt equality and scoped membership, reserves the full per-call maximum before dispatch, disables automatic retries, and writes a durable ledger before each request. Three requests maximum in parallel; uncertain failures retain their reservation and are not replayed. No full analyses are rerun. Progress/backup ledger: ~/Desktop/scan-reports/coaching-30day-review/run-ledger.json. Final results pending.
 
+## Recovery pilot completed — 2026-09-05
+Justin's `c` continued the prepared eight-call pilot under the proposed cap. Full-roster measurement corrected the earlier seven-rep scope: Josh N was missing from the original historical-review membership. Eleven candidates across eight calls produced five no-change responses and six drafts; all six were withheld. No historical coaching rows were changed, and no calls remain unfinished. Evidence and detailed limitations: `~/Desktop/scan-reports/coaching-recovery/RESULTS.md` and `pilot-ledger.json`. Recovery is not achieved. Generator instructions conflict on causal/cost claims; reviewer reasons also contain reasoning errors. Next bounded corrective block is filed, not implemented; no further paid recovery is authorized.
+
 ## Historical review complete — 2026-09-05
 Completed the approved August 7–September 5 Sober Living Riches review: 119 calls, 216 existing coaching moments. Two notes passed and 214 were withheld. One additional excerpt was excluded because speaker_verified was false; that call's other two moments were reviewed. All 216 database writes were verified against the ledger, including verdict, coaching presence/absence and transcript timestamp. No call grades, outcomes or complete analyses were recomputed.
 
