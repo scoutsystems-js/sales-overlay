@@ -72,5 +72,10 @@ test('doctrine is method, not material: the retrieval carries it but never count
 });
 test('equivalent meaning earns tie-back credit and the revised unit has a new stored version',()=>{
  const unit=D.readDoctrineFile().find(u=>u.key==='tying_back_in');assert.match(unit.text,/accurate paraphrase counts/i);assert.match(unit.text,/Coach only when something useful is missing/);assert.doesNotMatch(unit.text,/not paraphrased/);
- const rows=D.doctrineRows(D.readDoctrineFile());assert.strictEqual(rows.find(r=>r.metadata.key==='tying_back_in').metadata.version,'v2-2026-09-06');assert.ok(rows.filter(r=>r.metadata.key!=='tying_back_in').every(r=>r.metadata.version===D.DOCTRINE_VERSION));
+ const rows=D.doctrineRows(D.readDoctrineFile());assert.strictEqual(rows.find(r=>r.metadata.key==='tying_back_in').metadata.version,'v2-2026-09-06');assert.ok(rows.filter(r=>!['tying_back_in','follow_ups'].includes(r.metadata.key)).every(r=>r.metadata.version===D.DOCTRINE_VERSION));
+});
+
+test('an interrupted booked continuation permits completing qualification later and preserves independent mistakes',()=>{
+ const unit=D.readDoctrineFile().find(u=>u.key==='follow_ups');assert.match(unit.text,/qualification can continue on the resumed call/);assert.match(unit.text,/separately evidenced mistake/);assert.match(unit.text,/Do not invent the reason/);
+ assert.equal(D.doctrineRows([unit])[0].metadata.version,'v2-2026-09-06');
 });

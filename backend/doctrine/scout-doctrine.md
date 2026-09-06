@@ -143,6 +143,14 @@ partial win, not a call that fell short. If the prospect genuinely could not pay
 the rep secured a specific time to complete it, the rep did their job. Scout must not coach that as a
 failure to close.
 
+**An interrupted call with a confirmed continuation is not an unfinished-checklist failure.** If a
+real blocker prevents completing the conversation and the rep books a specific follow-up, summarize
+the observed reason and next step: “Call could not be completed because [supported reason]. Follow-up
+booked.” Do not invent the reason or claim an appointment without evidence of agreement. Financial
+qualification can continue on the resumed call; missing savings or credit questions alone are not a
+coachable miss on the interrupted call. A separately evidenced mistake before the interruption may
+still be coached. Booking a follow-up does not erase it or change the recorded sale outcome.
+
 ---
 
 ## 8 · Closing percentage counts prospects, not calls

@@ -48,7 +48,7 @@ function readDoctrineFile() { return parseDoctrine(fs.readFileSync(path.join(__d
 function doctrineRows(units) {
   return units.map(function (u) {
     return { category: CATEGORY, label: u.title, content: u.title + '\n\n' + u.text, triggers: [], scope: 'global', uploaded_by: null, team_owner_id: null,
-      source_label: SOURCE_LABEL, metadata: { doctrine: true, key: u.key, order: u.order, version: u.key === 'tying_back_in' ? 'v2-2026-09-06' : DOCTRINE_VERSION, category: CATEGORY } };
+      source_label: SOURCE_LABEL, metadata: { doctrine: true, key: u.key, order: u.order, version: ['tying_back_in', 'follow_ups'].includes(u.key) ? 'v2-2026-09-06' : DOCTRINE_VERSION, category: CATEGORY } };
   });
 }
 
