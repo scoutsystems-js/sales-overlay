@@ -1,7 +1,7 @@
 ## CURRENT — scope corrected; pause after this correction (H752)
 Justin clarified that missed follow-up booking was an EXAMPLE of a coachable Close-section moment, not a request for a dedicated scheduling feature. This supersedes H751's feature scope and historical-review queue. H749's approved sales principle remains valid; it does not authorize making it the page's universal focus.
 
-Built: disconnect the dedicated manager scheduling payload and automatic new-call scheduling assessment; restore direct access to the existing closer workspace. Preserve the evidence renderer, named examples/outcome/clip layout, saved facts, normal call analysis, strengths, wordmark, sidebar and background toggle. No historical batch is queued or authorized by this correction. Deployment verification pending.
+Built: disconnect the dedicated manager scheduling payload and automatic new-call scheduling assessment; restore direct access to the existing closer workspace. Preserve the evidence renderer, named examples/outcome/clip layout, saved facts, normal call analysis, strengths, wordmark, sidebar and background toggle. No historical batch is queued or authorized by this correction. LIVE at ac5d5628a772837cdbd8875a11a72c590784a52a: exact deployed commit/startup marker and fresh signed-in page verified; dedicated card absent, closer workspace/strengths/background toggle present. All 2,543 tests pass.
 
 Main objective: team recommendations derived from actual coaching opportunities across discovery, pitch, objections and Close, checked against team standards; recommendation → supported frequency/window → named real example → what happened → clip. Do not hardcode Justin's examples as product requirements. The general manager-priority implementation remains unfinished.
 
