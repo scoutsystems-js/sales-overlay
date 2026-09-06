@@ -15696,7 +15696,8 @@
     if (problem) return laneProblemHtml('coachable moments', problem);
     var reps = Array.isArray(r.reps) ? r.reps : [];
     if (!reps.length) return r.no_material ? noMaterialHtml(r.copy) : '<div class="team-empty">No team members in this window.</div>';
-    return (r.no_material ? noMaterialHtml(r.copy) : '') + (r.followup_priority ? managerFollowupHtml(r.followup_priority) + '<details class="manager-call-examples"><summary>Call examples by closer</summary>' + coachingRepWorkspaceHtml(reps) + '</details>' : '') + (r.followup_priority ? '' : coachingRepWorkspaceHtml(reps));
+    // H752: retain the evidence renderer above for the approved general priority layout.
+    return (r.no_material ? noMaterialHtml(r.copy) : '') + coachingRepWorkspaceHtml(reps);
   }
 
   /* H731 — WHAT A USER SEES WHEN NOTHING RELEVANT IS FOUND. Every advice lane returns the one shape

@@ -7897,3 +7897,13 @@ Real-data route verification: 12 reps, 822 calls in the selected window; 204 ass
 Validation: 2,543 backend tests pass; inline scripts and changed server files parse; desktop/mobile render checks pass, real-data card visually inspected. Budget and policy guards failed both removal and ignored-result plants. Final disclosure styling passed its rendered check. Release marker: `[manager-followup-build] followup-facts-v3`.
 
 **Next in order:** measure the remaining historical scheduling coverage before any batch spending; keep broader retrieval redesign, old diagnostic cleanup and unrelated improvements filed. Main Team Coaching revamp remains the objective; do not describe this first connected priority as completion of every page or coaching topic.
+
+## [H752] Example mistaken for feature scope — corrected
+## CURRENT — scope corrected; pause after this correction (H752)
+Justin clarified that missed follow-up booking was an EXAMPLE of a coachable Close-section moment, not a request for a dedicated scheduling feature. This supersedes H751's feature scope and historical-review queue. H749's approved sales principle remains valid; it does not authorize making it the page's universal focus.
+
+Built: disconnect the dedicated manager scheduling payload and automatic new-call scheduling assessment; restore direct access to the existing closer workspace. Preserve the evidence renderer, named examples/outcome/clip layout, saved facts, normal call analysis, strengths, wordmark, sidebar and background toggle. No historical batch is queued or authorized by this correction. Deployment verification pending.
+
+Main objective: team recommendations derived from actual coaching opportunities across discovery, pitch, objections and Close, checked against team standards; recommendation → supported frequency/window → named real example → what happened → clip. Do not hardcode Justin's examples as product requirements. The general manager-priority implementation remains unfinished.
+
+**What's next:** PAUSE and report back after this correction. Do not start general-priority implementation, historical processing or another investigation until Justin resumes work.

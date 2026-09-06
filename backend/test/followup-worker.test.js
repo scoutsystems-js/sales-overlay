@@ -17,14 +17,7 @@ test('new-call entry reads facts only for eligible calls on a team with the conf
 test('the real assessment entry refuses the entire operation above its spend ceiling',async()=>{
  let calls=0;await assert.rejects(()=>W.assessNewCallFollowup(admin(),{id:'c'},analysis,'rep',{...deps,countTokens:async()=>10000000,create:async()=>{calls++;}}),/budget/);assert.equal(calls,0);
 });
-test('analysis persistence path awaits the scheduling result and preserves grades on failure',async()=>{
+test('production analysis does not dispatch the dedicated scheduling review',()=>{
  const source=fs.readFileSync(require('node:path').join(__dirname,'../lib/analysis-worker.js'),'utf8');
- const start=source.indexOf('    analysisPayload.manager_followup_facts = null;');
- const end=source.indexOf('    var upsert = await admin',start);
- assert.ok(start>0&&end>start);
- const execute=new Function('require','admin','callRow','analysisPayload','userId','fathomCallId','console','return (async()=>{'+source.slice(start,end)+'return analysisPayload;})()');
- const saved=await execute(()=>({assessNewCallFollowup:async()=>({version:'test',facts:{state:'booked'}})}),{}, {id:'c'},{overall_score:70},'rep','c',console);
- assert.equal(saved.manager_followup_facts.facts.state,'booked');assert.equal(saved.overall_score,70);
- const held=await execute(()=>({assessNewCallFollowup:async()=>{throw Error('unavailable');}}),{}, {id:'c'},{overall_score:70},'rep','c',{warn(){}});
- assert.equal(held.manager_followup_facts,null);assert.equal(held.overall_score,70);
+ assert.doesNotMatch(source,/assessNewCallFollowup|require\(['"]\.\/followup-worker/);
 });
