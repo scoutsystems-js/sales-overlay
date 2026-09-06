@@ -2140,7 +2140,9 @@ LIVE as `d059599`: closers without an approved coaching focus retain their measu
 
 H754 final navigation correction: live testing exposed hash/back-navigation updating the date label without clearing old period payloads. onRouteChange now compares the previous view/range and invokes the existing range reset before rendering, also advancing its response epoch. Two regressions failed before the fix; all 2,558 tests pass. This correction is built and pending push at this checkpoint; the data backfill remains saved.
 
-## Queued for end of current section — Justin’s presentation tweaks
-After date-navigation verification, remove the graded-call explanation beneath the weakest-area label (including “This label uses the section averages below.”). Restyle the plain “What to coach” topic/count sentence as compact visual topic tags. Remove “Counts reflect reviewed calls in this period.” Keep the task moving; no design approval requested.
+## Completed presentation tweaks — Justin, September 6
+Completed after date-navigation verification: removed the graded-call explanation and count footnote; topic/count summaries now use compact tags. Live in bbea29d.
 
 H754 presentation checkpoint: date-navigation fix 8bf22f3 is LIVE and signed-in day-to-month navigation verified (Sep 4 to Aug 8–Sep 6). Requested graded-call explanation and count footnote removed; coaching topics use compact tags with distinct call counts. Local real-data rendering and inline syntax passed; full suite 2,558 passed. Presentation polish built, pending deployment. Josh N older-call scope remains unresolved; no older paid review dispatched.
+
+H754 deployment receipt: presentation polish bbea29d88c3b3f8fb7801025b5ad0ff7df3bfc99 is LIVE, Railway SUCCESS with startup marker verified. Served executable page has coaching-topic markup once (raw/comment-stripped 1/1), removed sentences zero (0/0). No new drain (processing 0; pending 14 static). Full goal remains open only for the older-call review scope decision for Josh N.
