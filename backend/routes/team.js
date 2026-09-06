@@ -850,10 +850,10 @@ router.get('/coachable-moments', teamGate, async function (req, res) {
     var ids = team.memberIds || [];
     if (!ids.length) return res.json({ reps: [], total_items: 0, by_kind: {}, from: range.from, to: range.to });
     /* H734: ONE gather (lib/coachable-team) shared with the measurement script, so what is priced is what is sent. */
-    var materialPromise = require('../lib/kb-material').loadKbMaterial(admin, { userId: team.keyId, teamKey: team.keyId, lane: 'rep-line', maxChars: 2500 });
+    var materialPromise = require('../lib/period-coaching-material').loadPeriodMaterial(admin, { userId: team.keyId, teamKey: team.keyId });
     var loaded = await Promise.all([
       materialPromise,
-      loadCoachableTeam(admin, ids, range.from, range.to, materialPromise.then(function(m){return m.hasMaterial ? m.kbHash : null;}), {periodOnly:true}),
+      loadCoachableTeam(admin, ids, range.from, range.to, materialPromise.then(function(m){return m.hasMaterial ? {current:m.kbHash,legacy:m.legacyKbHash} : null;}), {periodOnly:true}),
       nameMapFor(admin, ids)
     ]);
     var material = loaded[0], gathered = loaded[1], nameOf = loaded[2];

@@ -99,12 +99,13 @@ they isolated, or isolated and then moved on without addressing it.
 
 ## 6 · Tying back in
 
-Taking something the prospect disclosed in discovery and bringing it forward at the close, **in the
-prospect's own words.**
+Taking something the prospect disclosed in discovery and bringing its meaning forward at the close.
+**An accurate paraphrase counts. Exact wording is not required.**
 
 This is the highest-leverage move in the call and the one that separates a closer from someone
 reading a script. The prospect told you at nine minutes why this matters to them. At the close, that
-sentence is the reason they should act — said back to them, not paraphrased into your language.
+meaning can support the decision. Count equivalent wording when it preserves the prospect’s actual
+goal or concern. Coach only when something useful is missing, not because the rep used different words.
 
 **It is not recall. It is leverage.** The point of bringing the disclosure forward is to press it
 against the decision in front of them: they have wanted this for a long time, nothing has changed it
@@ -119,8 +120,8 @@ Three tiers, in order:
 
 1. **Let it slide** — the disclosure was made and never used again.
 2. **Dug deeper** — the rep followed up on it in the moment, but it did not return at the close.
-3. **Tied it back in** — the disclosure came back at the close in the prospect's own words, and was
-   used as leverage on the decision rather than mentioned in passing.
+3. **Tied it back in** — the disclosure’s meaning came back at the close, in exact or equivalent
+   wording, and was used in the decision rather than mentioned in passing.
 
 Scout should name which tier a rep hit, and on a loss, point at the specific disclosure that was
 available and unused — and at what it could have been leveraged against.

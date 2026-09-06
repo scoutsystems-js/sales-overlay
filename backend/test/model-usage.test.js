@@ -63,3 +63,8 @@ test('⚠⚠ H734 — the usage log is armed at BOOT in index.js, before app.lis
   assert.ok(arm !== -1, 'index.js arms the recorder');
   assert.ok(arm < src.indexOf('app.listen('), 'before the server listens');
 });
+test('a lane can bound its own retries without changing the shared client defaults',async()=>{
+ const fs=require('fs'),vm=require('vm');let received;const sandbox={module:{exports:{}},process:{env:{ANTHROPIC_API_KEY:'test-only'}},console,require(n){assert.equal(n,'@anthropic-ai/sdk');return class{constructor(){this.messages={create:async(p,o)=>{received=o;return {content:[]};}};}};}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../lib/model-usage'),'utf8'),sandbox);
+ await sandbox.module.exports.createWithUsage({model:'test'},{lane:'test'},{maxRetries:1});assert.equal(received?.maxRetries,1);
+});

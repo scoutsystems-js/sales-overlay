@@ -64,3 +64,13 @@ test('the chain climbs to the head through an empty manager; the head itself inh
  const script=complete.sources.find(s=>s.label==='script');assert.strictEqual(script.chunks_used,script.chunks_total);
  }finally{HEAD.script_raw=original;}
  });
+test('full-script reader derives the legacy material hash from the same reads without accepting changed guidance',async()=>{
+ const original=HEAD.script_raw;
+ try{HEAD.script_raw=('Explore the decision and why it matters. ').repeat(300);let reads=0;const base=fakeAdmin(),db={from(t){reads++;return base.from(t);}};
+ const current=await fetchSellingContext(db,'rep',25000,undefined,{completeScript:true,legacyBudget:2500});const used=reads;
+ const legacy=await fetchSellingContext(fakeAdmin(),'rep',2500);
+ assert.strictEqual(current.legacyKbHash,legacy.kbHash);assert.notStrictEqual(current.kbHash,current.legacyKbHash);
+ await fetchSellingContext(db,'rep',25000,undefined,{completeScript:true});assert.strictEqual(reads-used,used,'compatibility does not add database reads');
+ HEAD.script_raw+=' New approved guidance.';const changed=await fetchSellingContext(fakeAdmin(),'rep',25000,undefined,{completeScript:true,legacyBudget:2500});assert.notStrictEqual(current.kbHash,changed.kbHash);
+ }finally{HEAD.script_raw=original;}
+});

@@ -80,11 +80,11 @@ function record(ctx, model, resp, ok) {
  * costs latency and a retry, and a log that only contains successes cannot show
  * a lane failing.
  */
-async function createWithUsage(params, ctx) {
+async function createWithUsage(params, ctx, requestOptions) {
   const client = getAnthropic();
   let resp;
   try {
-    resp = await client.messages.create(params);
+    resp = await client.messages.create(params, requestOptions);
   } catch (err) {
     record(ctx, params && params.model, null, false);
     throw err;

@@ -54,6 +54,7 @@ async function loadKbMaterial(admin, opts) {
     doctrine: doctrine,
     doctrineBlock: function (lane) { return doctrineLib.doctrineBlock(doctrine, lane, (notes && notes.rows) || []); },   // H733: attached notes ride under their entries
     kbHash: (selling.kbHash || 'none') + '|notes:' + ((notes && notes.hash) || 'none') + '|doctrine:' + doctrine.hash,
+    legacyKbHash: selling.legacyKbHash ? selling.legacyKbHash + '|notes:' + ((notes && notes.hash) || 'none') + '|doctrine:' + doctrine.hash : null,
     sources: selling.sources || [],
     teamKey: teamKey,
   };

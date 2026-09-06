@@ -139,14 +139,20 @@ async function fetchSellingContext(admin, userId, maxChars, categories, options)
     // Hash covers BOTH sources so a profile edit invalidates cached syntheses
     // exactly as a KB upload does. KB rows hash by id+created_at as before;
     // profile material hashes by content, since it has no row identity here.
-    var hashParts = kbUsed.map(function (r) { return r.id + ':' + (r.created_at || ''); }).sort();
-    ['qualifications', 'offer', 'script'].forEach(function (k) {
-      (picked[k] || []).forEach(function (c) { hashParts.push(k + ':' + crypto.createHash('sha1').update(c).digest('hex')); });
-    });
-    var kbHash = hashParts.length
-      ? crypto.createHash('sha1').update(hashParts.join('|')).digest('hex')
-      : 'none';
-    return { contextText: contextText, kbHash: kbHash, sources: sourceSummary, qualifications: qualificationsRaw };
+    function hashFor(selection) {
+      var parts = kbUsed.map(function (r) { return r.id + ':' + (r.created_at || ''); }).sort();
+      ['qualifications', 'offer', 'script'].forEach(function (k) {
+        (selection[k] || []).forEach(function (c) { parts.push(k + ':' + crypto.createHash('sha1').update(c).digest('hex')); });
+      });
+      return parts.length ? crypto.createHash('sha1').update(parts.join('|')).digest('hex') : 'none';
+    }
+    var legacyKbHash = null;
+    if (options && options.legacyBudget) {
+      // Recompute the old allocation over these same current sources, never over cached guidance.
+      var legacyLanes = lanes.map(function(l){return Object.assign({},l,l.key==='script'?{reserve:1500}:{});});
+      legacyKbHash = hashFor(allocate(legacyLanes, options.legacyBudget));
+    }
+    return { contextText: contextText, kbHash: hashFor(picked), sources: sourceSummary, qualifications: qualificationsRaw, ...(legacyKbHash ? {legacyKbHash:legacyKbHash} : {}) };
   } catch (err) {
     console.error('[selling-context] fetch failed for user ' + userId + ' — returning empty: ' + (err && err.message));
     // ⚠ NULL, not undefined — the caller branches on it, and a failed fetch must
