@@ -7869,3 +7869,11 @@ Built `backend/lib/manager-followup-assessment.js` and seven behavior tests. The
 Bounded four-call real-data test: Godwin/Shauna’s accepted Tuesday 12:30 appointment was correctly recognized; Nick’s closed call was outside this open-call topic. The first version incorrectly stretched knowledge guidance for Gabriel/Judah and Josh/Lourdes. A stricter scope instruction withheld Josh but still accepted Gabriel with unsupported reasoning. Both model reads agreeing is not proof. All results remain non-publishable; no third prompt retry and no deployment.
 
 Next: separate observed booking facts from coaching-policy applicability and retrieve relevant team guidance, then validate before persisting/wiring manager priorities. The normal 2,500-character selection lacked direct support for these recommendations; a broader read remained capped, so do not claim the full KB lacks the rule. Keep coverage honest and existing call access available. No user action needed for the completed diagnostic. Report: `~/Desktop/scan-reports/manager-followup-trial/RESULTS.md`. Earlier counting/wording commit remains local.
+
+## [H748] Verified wording release; manager diagnostic stays disabled
+## Wording release LIVE — manager checker remains disabled (H748)
+Justin authorized release with “send it.” Deployed and verified `1ee7788305388136c29b79739b24796c6ac9d61d`: Railway SUCCESS and deployment-specific `[coaching-build] v55-2026-09-05 action-answer-records` marker. Before push: processing zero, pending twelve unchanged across two polls. Existing 2,524 tests and syntax checks passed on this unchanged source.
+
+Live behavior: newly generated coaching uses “the call ended” for termination; original transcript quotes and deal outcomes stay intact. No historical notes were rewritten. No manager-page layout change or new recommendation is enabled. The counting helper and failed diagnostic files are present but have no production caller; diagnostic outputs remain explicitly non-publishable.
+
+Next: resolve the knowledge-applicability failure documented in H747, then finish persistence and manager cards. No user action is required for the deployed wording fix. Release receipt: `~/Desktop/scan-reports/manager-followup-trial/release-verification.json`.

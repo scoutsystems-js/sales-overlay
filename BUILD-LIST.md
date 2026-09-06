@@ -1,3 +1,10 @@
+## Wording release LIVE — manager checker remains disabled (H748)
+Justin authorized release with “send it.” Deployed and verified `1ee7788305388136c29b79739b24796c6ac9d61d`: Railway SUCCESS and deployment-specific `[coaching-build] v55-2026-09-05 action-answer-records` marker. Before push: processing zero, pending twelve unchanged across two polls. Existing 2,524 tests and syntax checks passed on this unchanged source.
+
+Live behavior: newly generated coaching uses “the call ended” for termination; original transcript quotes and deal outcomes stay intact. No historical notes were rewritten. No manager-page layout change or new recommendation is enabled. The counting helper and failed diagnostic files are present but have no production caller; diagnostic outputs remain explicitly non-publishable.
+
+Next: resolve the knowledge-applicability failure documented in H747, then finish persistence and manager cards. No user action is required for the deployed wording fix. Release receipt: `~/Desktop/scan-reports/manager-followup-trial/release-verification.json`.
+
 
 ## Manager follow-up diagnostic — held, not live (H747)
 Built `backend/lib/manager-followup-assessment.js` and seven behavior tests. The full-transcript diagnostic retains exact turns, source/outcome/material hashes, and unknown states. No production caller, database migration, historical coaching write or manager UI change. All 2,524 backend tests passed; this proves mechanics, not semantic accuracy.
