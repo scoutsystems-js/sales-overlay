@@ -11,7 +11,7 @@ const path = require('node:path');
 const D = require('../lib/doctrine');
 const coaching = require('../lib/coaching');
 
-const TITLES = ['What an objection is', 'The five objection types', 'The three-way boundary on money', 'Discovery is the upstream cause of every objection', 'Isolation is the correct first move', 'Tying back in', 'Follow-ups', 'Closing percentage counts prospects, not calls', 'How coaching is written', 'What good looks like', 'What Scout must never do'];
+const TITLES = ['What an objection is', 'The five objection types', 'The three-way boundary on money', 'Discovery and upstream causes', 'Isolation is the correct first move', 'Tying back in', 'Follow-ups', 'Closing percentage counts prospects, not calls', 'How coaching is written', 'What good looks like', 'What Scout must never do'];
 
 test('the approved text parses into exactly eleven complete units, one per entry, never split below an entry and never merged', () => {
   const units = D.readDoctrineFile();
@@ -72,10 +72,16 @@ test('doctrine is method, not material: the retrieval carries it but never count
 });
 test('equivalent meaning earns tie-back credit and the revised unit has a new stored version',()=>{
  const unit=D.readDoctrineFile().find(u=>u.key==='tying_back_in');assert.match(unit.text,/accurate paraphrase counts/i);assert.match(unit.text,/Coach only when something useful is missing/);assert.doesNotMatch(unit.text,/not paraphrased/);
- const rows=D.doctrineRows(D.readDoctrineFile());assert.strictEqual(rows.find(r=>r.metadata.key==='tying_back_in').metadata.version,'v2-2026-09-06');assert.ok(rows.filter(r=>!['tying_back_in','follow_ups'].includes(r.metadata.key)).every(r=>r.metadata.version===D.DOCTRINE_VERSION));
+ const rows=D.doctrineRows(D.readDoctrineFile());assert.strictEqual(rows.find(r=>r.metadata.key==='tying_back_in').metadata.version,'v3-2026-09-06');assert.ok(rows.filter(r=>[1,2,8,10].includes(r.metadata.order)).every(r=>r.metadata.version===D.DOCTRINE_VERSION));
 });
 
 test('an interrupted booked continuation permits completing qualification later and preserves independent mistakes',()=>{
  const unit=D.readDoctrineFile().find(u=>u.key==='follow_ups');assert.match(unit.text,/qualification can continue on the resumed call/);assert.match(unit.text,/separately evidenced mistake/);assert.match(unit.text,/Do not invent the reason/);
  assert.equal(D.doctrineRows([unit])[0].metadata.version,'v2-2026-09-06');
+});
+
+test('revised guidance preserves discovery note identity and versions every changed unit',()=>{
+ const units=D.readDoctrineFile(),rows=D.doctrineRows(units);assert.equal(units.find(u=>u.order===4).key,'discovery_is_the_upstream_cause_of_every_objection');
+ assert.ok(rows.filter(r=>[3,4,5,6,9,11].includes(r.metadata.order)).every(r=>r.metadata.version==='v3-2026-09-06'));
+ assert.match(units.find(u=>u.order===3).text,/BNPL/);assert.match(units.find(u=>u.order===4).text,/does not prove one/);assert.match(units.find(u=>u.order===9).text,/Grounding in the actual call is a requirement/);
 });

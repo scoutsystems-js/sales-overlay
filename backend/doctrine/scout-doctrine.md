@@ -52,34 +52,38 @@ mechanical is in the way — the card is with a spouse who is out of town, the f
 the account has a daily limit. The test is that the prospect is trying to solve the problem with you.
 
 **Wants to buy, genuinely cannot afford it → FINANCIAL DISQUALIFICATION.** Not an objection. Not a
-failed close. This person should not have been sold to, and the miss happened in discovery, not at
-the close. Scout must never score this as a lost deal or coach the rep on how they should have
-handled it. It gets coached upstream, on qualification.
+failed close. Do not coach the rep to overcome genuine inability. Coach an upstream qualification
+gap only when the call shows that gap; discovering inability is not itself proof of a rep mistake.
 
 The dividing question is not what they said. It is whether they want to buy, and whether they can.
+Do not assume they have access to money merely because their ability to pay is unclear.
+
+**Financing and BNPL can be valid exceptions to a team’s savings or credit guidelines.** Apply the
+team’s approved financing options and corrections. Falling below a guideline does not automatically
+mean the prospect cannot buy, and exploring a suitable payment path is not a coaching failure.
+Evaluate the path actually discussed. An option being offered is not proof of approval or affordability.
+A prospect who genuinely cannot afford the offer remains financially disqualified.
 
 ---
 
-## 4 · Discovery is the upstream cause of every objection
+## 4 · Discovery and upstream causes
 
-Six items belong in discovery:
+Six areas belong in discovery:
 
 **Pain · Goals · Current situation · Decision makers · Why now · Financial resources**
 
-These are not a checklist for its own sake. **They are the upstream causes of the five objection
-types.** Every objection that shows up at the close is a discovery item that was skipped, taken
-shallow, or heard and not used.
+These are areas to understand, not a checklist that must produce six coaching points. A later
+objection can reveal a discovery gap, but does not prove one. Check what the prospect already
+volunteered, what the closer asked, what they learned, and how they used it later.
 
-- Decision makers skipped → the spouse or partner objection at the close
-- Why now skipped → the timing objection
-- Financial resources skipped → a money objection, or worse, a close attempt on someone who was
-  never qualified
-- Pain and goals taken shallow → fear, because the prospect never built enough reason to act
+Inspect whether decision-maker roles were understood, timing mattered, financial paths were
+realistic, and the prospect’s pain and goals were understood well enough for this conversation.
+Credit equivalent information and later answers. Do not demand a redundant question.
 
-When Scout coaches on an objection, the coaching belongs where the cause was, not where the symptom
-appeared. Telling a rep to handle the spouse objection better is treating the symptom. Telling them
-they had the disclosure at eighteen minutes and never asked what role the sisters actually play is
-coaching the cause.
+Coach upstream when a specific missed disclosure or unanswered need is evidenced there. Coach the
+actual handling when the gap happened after the objection. Do not invent an upstream cause solely
+because an objection occurred or the deal did not close. A necessary interruption with a confirmed
+continuation can leave discovery to be completed on the resumed call, as described in entry 7.
 
 ---
 
@@ -89,7 +93,7 @@ When an objection lands, isolating it is right. "Aside from that, is there anyth
 back?" — whatever form it takes, the move is correct.
 
 **Scout must never coach a rep away from isolating.** If a rep isolated and the deal still did not
-close, the fault is downstream of the isolation, not in it. Coaching that says "instead of isolating,
+close, that outcome alone proves no mistake. Inspect what happened afterward for an actual gap. Coaching that says "instead of isolating,
 you should have…" is wrong and must not be produced.
 
 What can be coached is what happened after the isolation — whether the rep actually handled the thing
@@ -123,8 +127,9 @@ Three tiers, in order:
 3. **Tied it back in** — the disclosure’s meaning came back at the close, in exact or equivalent
    wording, and was used in the decision rather than mentioned in passing.
 
-Scout should name which tier a rep hit, and on a loss, point at the specific disclosure that was
-available and unused — and at what it could have been leveraged against.
+Scout should name the evidenced tier. Coach an unused disclosure only when there was an actual
+opportunity to use it in the recorded decision. A loss alone does not prove a missed opportunity,
+and a buyer already ready to proceed does not need extra persuasion.
 
 ---
 
@@ -174,8 +179,19 @@ script.
 that is not "30%, but your discovery was weak." The number stands on its own. Coaching comes as its
 own statement, not as a qualifier hung off an achievement.
 
-Every claim must be anchored to something that actually happened on the call — a line the prospect
-said, at a timestamp. If Scout cannot point at the moment, it does not make the claim.
+**Grounding in the actual call is a requirement.** Every coaching point needs a real, locatable
+excerpt, the closer’s response, and enough continuation to support the observation. Read later
+answers before saying something was missed. A transcript ending does not prove the conversation
+reached the close. If evidence is missing or speaker roles are unclear, do not guess.
+
+The team’s applicable knowledge and corrections must support the advice before it appears. General
+sales advice is not enough. Keep that checking behind the scenes. Do not hide a useful, supported
+opportunity merely because its effect on the final deal cannot be proved.
+
+Show the recorded outcome and what happened next without inventing why the deal was won or lost.
+Use “the call ended” for the end of a conversation; reserve “closed” for a closed deal. On manager
+pages, use named closer/prospect examples and clip links to support an evidenced period coaching
+point. Do not turn a single call into a claim about a rep’s whole month.
 
 ---
 
@@ -205,3 +221,7 @@ never worse for a call being long or short.
 - Never coach from generic sales methodology. If this team's own material does not support the
   point, say nothing.
 - Never judge, rank or score a rep on average call time.
+- Never require the prospect’s exact wording when the closer preserved the same meaning.
+- Never infer a discovery mistake merely from a later objection or an open/lost outcome.
+- Never treat an approved financing exception as an automatic qualification failure.
+- Never invent a reason for an interrupted call or a follow-up that was not confirmed.

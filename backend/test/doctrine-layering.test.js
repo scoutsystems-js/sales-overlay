@@ -92,7 +92,7 @@ test('⚠⚠ an UNATTACHED note is team material exactly as before and sits unde
   assert.ok(method.indexOf(NOTE_A_LOOSE) === -1, 'the loose note is under no entry');
   assert.ok(between(p, /MANAGER NOTES/, /$/).indexOf(NOTE_A_LOOSE) !== -1, 'and is in the manager notes as before');
   assert.ok(between(p, /· The three-way boundary on money/, /\n· Discovery is the upstream/).indexOf(NOTE_A_TWO) !== -1, 'under the first entry it speaks to');
-  assert.ok(between(p, /· Discovery is the upstream cause/, /\n· Isolation is the correct/).indexOf(NOTE_A_TWO) !== -1, 'and under the second');
+  assert.ok(between(p, /· Discovery and upstream causes/, /\n· Isolation is the correct/).indexOf(NOTE_A_TWO) !== -1, 'and under the second');
 });
 test('⚠⚠ ITEM 2 — on a call that carries a disqualification the coaching lane is told DISQUALIFIED, never "Call outcome: Lost"; a written "This call was lost" is dropped after the parse', async () => {
   captured.length = 0; let writes = [];

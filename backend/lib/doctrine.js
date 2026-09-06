@@ -38,8 +38,9 @@ function parseDoctrine(md) {
   });
   if (cur) units.push(cur);
   return units.map(function (u) {
+    // Preserve the stored discovery key so existing team notes keep their attachment.
     var text = u.body.join('\n').trim();
-    return { order: u.order, key: u.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''), title: u.title, text: text };
+    return { order: u.order, key: u.title === 'Discovery and upstream causes' ? 'discovery_is_the_upstream_cause_of_every_objection' : u.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''), title: u.title, text: text };
   }).filter(function (u) { return u.text.length > 0; });
 }
 function readDoctrineFile() { return parseDoctrine(fs.readFileSync(path.join(__dirname, '..', 'doctrine', 'scout-doctrine.md'), 'utf8')); }
@@ -48,7 +49,7 @@ function readDoctrineFile() { return parseDoctrine(fs.readFileSync(path.join(__d
 function doctrineRows(units) {
   return units.map(function (u) {
     return { category: CATEGORY, label: u.title, content: u.title + '\n\n' + u.text, triggers: [], scope: 'global', uploaded_by: null, team_owner_id: null,
-      source_label: SOURCE_LABEL, metadata: { doctrine: true, key: u.key, order: u.order, version: ['tying_back_in', 'follow_ups'].includes(u.key) ? 'v2-2026-09-06' : DOCTRINE_VERSION, category: CATEGORY } };
+      source_label: SOURCE_LABEL, metadata: { doctrine: true, key: u.key, order: u.order, version: [3, 4, 5, 6, 9, 11].includes(u.order) ? 'v3-2026-09-06' : u.key === 'follow_ups' ? 'v2-2026-09-06' : DOCTRINE_VERSION, category: CATEGORY } };
   });
 }
 
