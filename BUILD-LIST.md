@@ -1,3 +1,36 @@
+# Current build order — updated September 6, 2026
+
+The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. These tasks are queued; this update does not start implementation.
+
+## 1. Coaching Page Integrity, Design & Stage Classification — NEXT
+
+Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Classification](docs/build-plans/coaching-page-integrity-design-stage-classification.md). All 23 sections, validation requirements, financial-DQ clarification and ruling boundaries are part of this task.
+
+- Inspect current implementation and actual call populations before changing anything. Read current-state, Scout design/brand, doctrine and referenced rulings first.
+- Trace the green treatment and fix semantic-state violations using existing design primitives.
+- Investigate differing stage counts; establish explicit stage eligibility rather than averaging accidentally available grades. Distinguish evaluated, correctly not applicable, expected but missed, and unmeasured stages. Do not force matching denominators or invent zeroes.
+- Apply the approved distinction: financial DQ found correctly during Discovery is successful qualification; missed qualification discovered at Close belongs to Discovery, not a failed Close. Preserve approved financing/BNPL exceptions and actual-call grounding. Integrate the clarification into canonical doctrine after verified implementation.
+- Trace the apparent 2:33 / Close issue through analysis, classification, coaching cause, scoring and presentation. Separate event location from coaching cause; use conversation progression, not fixed timestamps or isolated keywords.
+- Audit Intro/Pitch/Close definitions. Request a ruling for genuinely undefined product philosophy or proposed changes to existing rules.
+- Remove unnecessary explanatory copy and per-card graded-call labels only after validating the underlying logic; retain useful processing information only with a clear customer benefit. Do not relocate unnecessary copy into tooltips.
+- Validate real-call eligibility, design, coaching structure and existing approved examples. Update canonical documentation and deliver the brief's completion report. Preserve the completed broader-coaching work.
+
+## 2. Full-call navigation check — AFTER task 1
+
+Trace the observed Review Full Call return to Team Coaching. Confirm whether it is reproducible and identify the cause before changing anything. Verify the correct call/rep opens and back navigation behaves correctly; the earlier observation did not prove the cause.
+
+## 3. Older Team Strengths wording — AFTER task 2
+
+Check older Team Strengths and aggregate Coaching Focus claims against actual call evidence, particularly claims explaining why a deal was won or lost. Preserve supported positive recognition. Recheck what remains after task 1 rather than duplicating work it already completed.
+
+## 4. Saved text cleanup and grouped quotes — AFTER task 3
+
+Finish any remaining requested call-count/explanatory-copy cleanup, then consider grouping long quote lists into readable paragraphs with time ranges. Task 1 already includes related copy cleanup: close overlapping items there and carry forward only unfinished work. Quote grouping remains deferred until this position in the queue.
+
+---
+
+# Historical build log — previous ordering is superseded above
+
 # Current session — September 6: coaching speed, then coaching breadth
 
 ## 1. Coaching page speed — investigation complete; awaiting plan approval
