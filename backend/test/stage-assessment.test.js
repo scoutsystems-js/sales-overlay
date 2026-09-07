@@ -4,7 +4,7 @@ const S=require('../lib/stage-eligibility');
 const turns=[{speaker:'CLOSER',text:'Let us pick this up tomorrow with your partner.',start_seconds:10},{speaker:'PROSPECT',text:'Tomorrow at noon works for us both.',start_seconds:15}];
 const context={discovery:{areas:[]},sales_conversation:true,ending:{state:'appropriate_continuation',reason:'A joint continuation was booked.',evidence_turns:[1,2]},pitch:{occurred:false,evidence_turns:[]},price:{occurred:false,evidence_turns:[]},prior_presentation:{established:false,evidence_turns:[]},finance:{state:'not_assessed',reason:'Not assessed.',evidence_turns:[],feasible_financing_ruled_out:null}};
 const candidate={context,...Object.fromEntries(S.SECTIONS.map(k=>[k,{assessment:{state:'not_applicable',reason:'This stage was not due.',evidence_turns:[1,2]},grade:null,score:null,notes:null}]))};
-const review={reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'The recorded continuation supports the eligibility.',counterevidence_turns:[],unsupported_claims:[]}))};
+const review={reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'The recorded continuation supports the eligibility.',counterevidence_turns:[],unsupported_claims:[],note_claims:[{clause:1,verdict:'supported',evidence_turns:[1]}]}))};
 test('stage assessment uses two bounded structured requests and returns source-bound reviewed results',async()=>{
  const A=require('../lib/stage-assessment');const requests=[];
  const result=await A.run({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{requests.push(request);return requests.length===1?candidate:review;});
@@ -51,6 +51,7 @@ test('the provider-facing stage transport uses the known compact unconstrained a
  assert.equal(Object.hasOwn(sections,'maxItems'),false);
  assert.equal(sections.items.type,'object');
  assert.deepEqual(Object.keys(sections.items.properties).sort(),['assessment','grade','notes','score','section']);
+ assert.equal(sections.items.properties.assessment.properties.evidence_turns.maxItems,8);
 });
 
 test('both stage generation and evidence review read the canonical coaching method',()=>{

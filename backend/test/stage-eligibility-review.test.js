@@ -44,6 +44,44 @@ test('the evidence reviewer cannot infer a fault from the numeric grade',()=>{
  assert.ok(p.includes('The call direction was established.'));
 });
 
+function atomicReview({note,evidence,review}) {
+ return {
+  version:S.VERSION,
+  source_hash:S.sourceHash(turns),
+  context:{},
+  sections:Object.fromEntries(S.SECTIONS.map(stage=>[stage,stage==='discovery'?{
+   state:'evaluated',score:75,grade:'B',notes:note,reason:'observed_work',evidence,
+  }:{state:'not_applicable',score:null,grade:null,notes:null,reason:'not_reached',evidence:[]}])) ,
+  response:{reviews:S.SECTIONS.map(stage=>stage==='discovery'?review:{stage,verdict:'supported',facts_supported:true,omissions:[],reason:'No score proposed.',counterevidence_turns:[],unsupported_claims:[],note_claims:[]})},
+ };
+}
+
+test('a partner being absent cannot pass review as partner decision necessity',()=>{
+ const source=[{speaker:'CLOSER',text:'Will your partner be on the call?',start_seconds:1},{speaker:'PROSPECT',text:'My partner cannot join this meeting.',start_seconds:2}];
+ const note='Closer asked whether the partner would join; Prospect said the partner needed to be present for the decision.';
+ const review={stage:'discovery',verdict:'supported',facts_supported:true,omissions:[],reason:'The note is supported.',counterevidence_turns:[],unsupported_claims:[],note_claims:[{clause:1,verdict:'supported',evidence_turns:[1]},{clause:2,verdict:'contradicted',evidence_turns:[2]}]};
+ const input=atomicReview({note,evidence:[{speaker:'CLOSER',quote:source[0].text,timestamp_seconds:1,turn:1},{speaker:'PROSPECT',quote:source[1].text,timestamp_seconds:2,turn:2}],review});
+ input.source_hash=S.sourceHash(source);
+ assert.equal(R.apply(input,input.response,source,'material').sections.discovery.state,'unmeasured');
+});
+
+test('family involvement cannot pass review as decision dependency or wrong actor attribution',()=>{
+ const source=[{speaker:'CLOSER',text:'Does your decision depend on your brother?',start_seconds:1},{speaker:'PROSPECT',text:'No, he would move forward separately.',start_seconds:2}];
+ const note='Closer asked whether the decision depended on the brother; Prospect said the decision depended on the brother.';
+ const review={stage:'discovery',verdict:'supported',facts_supported:true,omissions:[],reason:'The note is supported.',counterevidence_turns:[],unsupported_claims:[],note_claims:[{clause:1,verdict:'supported',evidence_turns:[1]},{clause:2,verdict:'contradicted',evidence_turns:[2]}]};
+ const input=atomicReview({note,evidence:[{speaker:'CLOSER',quote:source[0].text,timestamp_seconds:1,turn:1},{speaker:'PROSPECT',quote:source[1].text,timestamp_seconds:2,turn:2}],review});
+ input.source_hash=S.sourceHash(source);
+ assert.equal(R.apply(input,input.response,source,'material').sections.discovery.state,'unmeasured');
+});
+
+test('review prompt requires each scored note clause to be directly grounded in its cited actor evidence',()=>{
+ const candidate={context:{},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},score:75,notes:'Closer asked who would decide.'}};
+ const prompt=R.prompt(candidate,[{speaker:'PROSPECT',text:'I decide alone.',start_seconds:1}],{contextText:''});
+ assert.match(prompt,/each factual clause/i);
+ assert.match(prompt,/cited evidence/i);
+ assert.match(prompt,/actor is wrong/i);
+});
+
 test('a proof from an older stage policy cannot be promoted under the new policy',()=>{
  const old={...assessment,version:'old-stage-policy'};
  const r=R.apply(old,supported,turns,'material');

@@ -230,3 +230,18 @@ test('a scored producer observation with more than eight evidence turns is rejec
  const result=S.assess({context,sections:rows},expanded);
  assert.equal(result.sections.intro.state,'unmeasured');
 });
+
+test('scored notes reject ability, necessity, intent, readiness, and judgment wording',()=>{
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]}}});
+ for(const notes of [
+  'Prospect said the partner could attend.',
+  'Prospect said fifteen thousand was set aside.',
+  'Closer correctly asked who would decide.',
+  'Prospect said they felt ready.',
+  'Prospect said the partner needed to decide.',
+  'Prospect said the decision depended on the partner.',
+ ]){
+  const candidate=rows.map(row=>row.section==='discovery'?{...row,notes}:row);
+  assert.equal(S.assess({context,sections:candidate},turns).sections.discovery.state,'unmeasured');
+ }
+});
