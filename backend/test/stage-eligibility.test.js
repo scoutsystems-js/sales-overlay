@@ -207,6 +207,14 @@ test('a producer candidate with a duplicate stage record is rejected before revi
  assert.equal(S.reviewableCandidate({context,sections:[...rows,{...rows[1]}]},result),null);
 });
 
+test('the provider five-key stage object is normalized as exactly one record per stage',()=>{
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]}}});
+ const sections=Object.fromEntries(rows.map(({section,...record})=>[section,record]));
+ const result=S.assess({context,sections},turns);
+ assert.equal(result.context,context);
+ assert.equal(result.sections.discovery.score,78);
+});
+
 test('scored notes require the exact factual actor grammar and matching actor evidence',()=>{
  const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]},notes:'Closer asked who would decide; Prospect said their partner would join tomorrow.'}});
  assert.equal(S.assess({context,sections:rows},turns).sections.discovery.score,78);
