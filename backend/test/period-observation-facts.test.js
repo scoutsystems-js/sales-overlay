@@ -48,3 +48,9 @@ test('missing or incomplete second judgments are not agreement',()=>{
  assert.equal(F.applyPair(record,[response(),{observations:[]}],context).findings.length,0);
  const incomplete=response();delete incomplete.observations[0].sentences[0].status;assert.equal(F.applyPair(record,[response(),incomplete],context).findings.length,0);
 });
+test('database JSON key ordering does not invalidate unchanged approved findings',()=>{
+ const record=F.applyPair({findings:[{moment:1,observation:'The prospect wants to retire.',recommendation:'Clarify the desired result.',turn_ids:[1,2]}]},[response(),response()],context);
+ const reorder=value=>Array.isArray(value)?value.map(reorder):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().reverse().map(k=>[k,reorder(value[k])])):value;
+ const stored=reorder(record);assert.equal(F.isVerified(stored,context),true);
+ stored.findings[0].recommendation='Invent a different goal.';assert.equal(F.isVerified(stored,context),false);
+});
