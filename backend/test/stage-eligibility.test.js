@@ -11,7 +11,7 @@ const turns = [
  {speaker:'PROSPECT',start_seconds:25,text:'Yes, noon works for both of us.'},
 ];
 const evidence = [{speaker:'CLOSER',timestamp_seconds:10,quote:turns[0].text},{speaker:'PROSPECT',timestamp_seconds:15,quote:turns[1].text}];
-const measured = {grade:'B',score:78,notes:'CLOSER: asked who would decide.',assessment:{state:'evaluated',reason:'Decision-maker qualification occurred.',evidence}};
+const measured = {grade:'B',score:78,notes:'Closer asked who would decide.',assessment:{state:'evaluated',reason:'Decision-maker qualification occurred.',evidence}};
 // Simulated model response for persistence tests; semantic accuracy is tested on real calls.
 function simulatedFacts(method){const V=require('../lib/stage-observation-review'),E=require('../lib/coaching-evidence-review');const evidence=[{turn:1,speaker:'CLOSER',quote:turns[0].text}];const response={observations:V.findings(method).map(f=>({moment:f.moment,sentences:E.adviceSentences(f.observation).map((text,i)=>({sentence:i+1,status:'supported',claims:[{text,actor:'CLOSER',kind:'action',evidence}],evidence,counterevidence:[],reason:'Source supports this synthetic observation.'}))}))};return V.applyPair(method,[response,response],turns,'material');}
 function savedAssessment(r){const R=require('../lib/stage-eligibility-review');const checked=R.apply(r,{reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'Source supports this stage.',counterevidence_turns:[],unsupported_claims:[]}))},turns,'material');return S.toColumns(simulatedFacts(checked),String,turns,'material').stage_eligibility;}
@@ -88,12 +88,12 @@ test('missing structural facts, an objection before presentation, and unproven f
  assert.equal(assess({context:doubtful,discovery:measured},turns).sections.discovery.state,'unmeasured');
 });
 
-test('valid long source evidence is not discarded by an arbitrary turn count',()=>{
+ test('a scored stage with more than eight selected source turns is withheld before review',()=>{
  const long=Array.from({length:30},(_,i)=>({speaker:'CLOSER',start_seconds:i,text:'Source line '+i}));
  const ids=long.map((_,i)=>i+1);
  const c={...context,pitch:{occurred:true,evidence_turns:ids}};
  const r=assess({context:c,discovery:{...measured,assessment:{state:'evaluated',reason:'Relevant work is evidenced.',evidence_turns:ids}}},long);
- assert.equal(r.sections.discovery.score,78);
+ assert.equal(r.sections.discovery.state,'unmeasured');
 });
 test('an absent stage can use actual conversation context, but an unevidenced miss cannot',()=>{
  const empty={...measured,assessment:{state:'not_applicable',reason:'The decision-maker conversation was continued.',evidence_turns:[]}};
@@ -107,8 +107,9 @@ test('unreviewed stage candidates cannot become saved score columns',()=>{
 
 test('structured stage arrays use stage identity and reject duplicate entries',()=>{
  const row={...measured,section:'discovery',assessment:{state:'evaluated',reason:'The decision maker was checked.',evidence_turns:[1,2]}};
- assert.equal(S.assess({context,sections:[row]},turns).sections.discovery.score,78);
- assert.equal(S.assess({context,sections:[row,row]},turns).sections.discovery.state,'unmeasured');
+ const complete=completeSections({discovery:row});
+ assert.equal(S.assess({context,sections:complete},turns).sections.discovery.score,78);
+ assert.equal(S.assess({context,sections:[...complete,row]},turns).sections.discovery.state,'unmeasured');
 });
 
 test('saved stage summaries stay small and cannot treat an unchecked candidate as reviewed',()=>{
@@ -151,16 +152,16 @@ test('an explicitly unobserved discovery area is rejected instead of being silen
 });
 
 test('scored notes require explicit factual actor clauses before review',()=>{
- const factual={...measured,notes:'CLOSER: asked who else would decide; PROSPECT: said their partner would join tomorrow.'};
+ const factual={...measured,notes:'Closer asked who else would decide; Prospect said their partner would join tomorrow.'};
  assert.equal(assess({discovery:factual},turns).sections.discovery.score,78);
  const vague={...factual,notes:'The closer asked who else would decide and correctly learned the partner would join.'};
  assert.equal(assess({discovery:vague},turns).sections.discovery.state,'unmeasured');
 });
 
 test('scored notes are one short factual sentence, not a disguised narrative',()=>{
- const narrative={...measured,notes:'CLOSER: asked who would decide. PROSPECT: said their partner would join tomorrow.'};
+ const narrative={...measured,notes:'Closer asked who would decide. Prospect said their partner would join tomorrow.'};
  assert.equal(assess({discovery:narrative},turns).sections.discovery.state,'unmeasured');
- const long={...measured,notes:'CLOSER: asked who would decide with several extra words that make this otherwise factual actor statement much longer than the allowed thirty five words for one stage note and add a needless description of the call conversation.'};
+ const long={...measured,notes:'Closer asked who would decide with several extra words that make this otherwise factual actor statement much longer than the allowed thirty five words for one stage note and add a needless description of the call conversation.'};
  assert.equal(assess({discovery:long},turns).sections.discovery.state,'unmeasured');
 });
 
@@ -178,6 +179,46 @@ test('scheduling-only evidence cannot create a Discovery area',()=>{
   {speaker:'CLOSER',start_seconds:3,text:'Let us reschedule for Saturday.'},
  ];
  const schedulingContext={...context,discovery:{areas:[{area:'current_situation',evidence_turns:[1,2,3]}]},ending:{state:'appropriate_continuation',evidence_turns:[2,3]}};
- const score={...measured,assessment:{...measured.assessment,evidence_turns:[1,2,3]},notes:'CLOSER: asked whether the prospect was at work; PROSPECT: said weekends were available.'};
+ const score={...measured,assessment:{...measured.assessment,evidence_turns:[1,2,3]},notes:'Closer asked whether the prospect was at work; Prospect said weekends were available.'};
  assert.equal(assess({context:schedulingContext,discovery:score},scheduling).sections.discovery.state,'unmeasured');
+});
+
+function completeSections(overrides={}) {
+ return S.SECTIONS.map(section=>overrides[section]||{
+  section,
+  assessment:{state:'unmeasured',reason:'insufficient_evidence',evidence_turns:[]},
+  grade:null,
+  score:null,
+  notes:null,
+ });
+}
+
+test('a producer candidate missing any required stage record is rejected before review',()=>{
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]}}});
+ const result=S.assess({context,sections:rows.filter(row=>row.section!=='close')},turns);
+ assert.equal(result.context,null);
+ assert.equal(S.reviewableCandidate({context,sections:rows.filter(row=>row.section!=='close')},result),null);
+});
+
+test('a producer candidate with a duplicate stage record is rejected before review',()=>{
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]}}});
+ const result=S.assess({context,sections:[...rows,{...rows[1]}]},turns);
+ assert.equal(result.context,null);
+ assert.equal(S.reviewableCandidate({context,sections:[...rows,{...rows[1]}]},result),null);
+});
+
+test('scored notes require the exact factual actor grammar and matching actor evidence',()=>{
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]},notes:'Closer asked who would decide; Prospect said their partner would join tomorrow.'}});
+ assert.equal(S.assess({context,sections:rows},turns).sections.discovery.score,78);
+ const vague=rows.map(row=>row.section==='discovery'?{...row,notes:'Closer framed the decision-maker question.'}:row);
+ assert.equal(S.assess({context,sections:vague},turns).sections.discovery.state,'unmeasured');
+ const wrongActor=rows.map(row=>row.section==='discovery'?{...row,assessment:{...row.assessment,evidence_turns:[2]},notes:'Closer asked who would decide.'}:row);
+ assert.equal(S.assess({context,sections:wrongActor},turns).sections.discovery.state,'unmeasured');
+});
+
+test('a scored producer observation with more than eight evidence turns is rejected before review',()=>{
+ const expanded=Array.from({length:9},(_,index)=>({speaker:'CLOSER',start_seconds:index,text:'Question '+index}));
+ const rows=completeSections({intro:{...measured,section:'intro',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2,3,4,5,6,7,8,9]},notes:'Closer asked about the meeting.'}});
+ const result=S.assess({context,sections:rows},expanded);
+ assert.equal(result.sections.intro.state,'unmeasured');
 });

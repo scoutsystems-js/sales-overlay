@@ -30,7 +30,7 @@ test('unsafe candidate wording is withheld before it reaches the independent rev
 
 test('a measured stage requires two factual reads before it is returned as verified',async()=>{
  const A=require('../lib/stage-assessment');const requests=[];
- const measured={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'B',score:75,notes:'CLOSER: booked the continuation.'}};
+ const measured={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'B',score:75,notes:'Closer booked the continuation.'}};
  const factual={moment:2,status:'supported',claims:[{text:'Closer booked the continuation.',actor:'CLOSER',kind:'action',evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}]}],evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}],counterevidence:[],reason:'The source supports this observation.'};
  const result=await A.run({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{requests.push(request);return [measured,review,factual,factual][requests.length-1];});
  assert.equal(requests.length,4);
