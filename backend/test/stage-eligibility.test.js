@@ -13,7 +13,7 @@ const turns = [
 const evidence = [{speaker:'CLOSER',timestamp_seconds:10,quote:turns[0].text},{speaker:'PROSPECT',timestamp_seconds:15,quote:turns[1].text}];
 const measured = {grade:'B',score:78,notes:'The decision maker was checked.',assessment:{state:'evaluated',reason:'Decision-maker qualification occurred.',evidence}};
 // Simulated model response for persistence tests; semantic accuracy is tested on real calls.
-function simulatedFacts(method){const V=require('../lib/stage-observation-review'),E=require('../lib/coaching-evidence-review');const evidence=[{turn:1,speaker:'CLOSER',quote:turns[0].text}];const response={observations:V.findings(method).map(f=>({moment:f.moment,sentences:E.adviceSentences(f.observation).map((text,i)=>({sentence:i+1,status:'supported',claims:[{text,actor:'CLOSER',kind:'action',evidence}],evidence,counterevidence:[],reason:'Source supports this synthetic observation.'}))}))};return V.apply(method,response,turns,'material');}
+function simulatedFacts(method){const V=require('../lib/stage-observation-review'),E=require('../lib/coaching-evidence-review');const evidence=[{turn:1,speaker:'CLOSER',quote:turns[0].text}];const response={observations:V.findings(method).map(f=>({moment:f.moment,sentences:E.adviceSentences(f.observation).map((text,i)=>({sentence:i+1,status:'supported',claims:[{text,actor:'CLOSER',kind:'action',evidence}],evidence,counterevidence:[],reason:'Source supports this synthetic observation.'}))}))};return V.applyPair(method,[response,response],turns,'material');}
 function savedAssessment(r){const R=require('../lib/stage-eligibility-review');const checked=R.apply(r,{reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'Source supports this stage.',counterevidence_turns:[],unsupported_claims:[]}))},turns,'material');return S.toColumns(simulatedFacts(checked),String,turns,'material').stage_eligibility;}
 test('a measured qualification is retained; an appropriately omitted stage never contributes a numeric score',()=>{
  const result=assess({discovery:measured,close:{...measured,score:0,assessment:{state:'not_applicable',reason:'The buyer and decision maker booked the full discussion for tomorrow.',evidence}}},turns);
@@ -143,9 +143,9 @@ test('recorded discovery work cannot be labelled not applicable, and non-sales c
  assert.equal(assess({context:{...context,sales_conversation:false},intro:measured},turns).sections.intro.state,'unmeasured');
 });
 
-test('an explicitly unobserved discovery area does not erase other established stages',()=>{
- const c={...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]},{area:'financial_resources',evidence_turns:[]}]}};
- const result=assess({context:c,discovery:measured,intro:measured},turns);
- assert.equal(result.sections.discovery.score,78);
- assert.deepEqual(result.context.discovery.areas,[{area:'decision_makers',evidence_turns:[1,2]}]);
+test('an explicitly unobserved discovery area is rejected instead of being silently normalized',()=>{
+  const c={...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]},{area:'financial_resources',evidence_turns:[]}]}};
+  const result=assess({context:c,discovery:measured,intro:measured},turns);
+ assert.equal(result.sections.discovery.state,'unmeasured');
+ assert.equal(result.sections.intro.state,'unmeasured');
 });

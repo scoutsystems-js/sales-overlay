@@ -23,7 +23,10 @@ async function run({turns, duration, material}, request) {
   const hash=S.guidanceHash(material);
   const method=R.apply(assessment,review,turns,hash);
   const findings=V.findings(method);
-  const factual=findings.length?await request({model:S.MODEL,max_tokens:V.MAX_TOKENS,messages:[{role:'user',content:F.prompt(findings,V.context(turns))}]}):null;
-  return {candidate,review,factual,record:V.apply(method,factual,turns,hash)};
+  const factual=findings.length?[
+    await request({model:S.MODEL,max_tokens:V.MAX_TOKENS,messages:[{role:'user',content:F.prompt(findings,V.context(turns))}]}),
+    await request({model:S.MODEL,max_tokens:V.MAX_TOKENS,messages:[{role:'user',content:F.prompt(findings,V.context(turns))}]}),
+  ]:[];
+  return {candidate,review,factual,record:V.applyPair(method,factual,turns,hash)};
 }
 module.exports = {run};

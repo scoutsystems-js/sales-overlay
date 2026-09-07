@@ -17,6 +17,16 @@ test('a failed evidence check does not return a candidate as an approved score',
  await assert.rejects(A.run({turns,duration:15,material:{kbHash:'material'}},async()=>{if(++calls===1)return candidate;throw Error('Reviewer unavailable');}),/Reviewer unavailable/);
 });
 
+test('a measured stage requires two factual reads before it is returned as verified',async()=>{
+ const A=require('../lib/stage-assessment');const requests=[];
+ const measured={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'B',score:75,notes:'Closer booked the continuation.'}};
+ const factual={observations:[{moment:2,sentences:[{sentence:1,status:'supported',claims:[{text:'Closer booked the continuation.',actor:'CLOSER',kind:'action',evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}]}],evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}],counterevidence:[],reason:'The source supports this observation.'}]}]};
+ const result=await A.run({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{requests.push(request);return [measured,review,factual,factual][requests.length-1];});
+ assert.equal(requests.length,4);
+ assert.equal(result.factual.length,2);
+ assert.ok(require('../lib/stage-observation-review').verified(result.record,turns,S.guidanceHash({contextText:'Team offer',kbHash:'material'})));
+});
+
 test('the output schema stays within the provider limit of sixteen union fields',()=>{
  const schema=require('../lib/stage-output-schema').producer;
  const count=x=>!x||typeof x!=='object'?0:(Array.isArray(x.type)||Array.isArray(x.anyOf)?1:0)+Object.values(x).reduce((n,v)=>n+(Array.isArray(v)?v.reduce((m,c)=>m+count(c),0):count(v)),0);
