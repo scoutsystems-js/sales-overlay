@@ -17,7 +17,11 @@ Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Cl
 
 ### Current checkpoint — local, not live
 
-Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. Two product questions pending: Intro timing boundary and purchase-Close versus continuation booking. No grading/data changes, paid run or deployment yet. See `investigation.md`.
+Local work only; no deployment or score/outcome/coaching data changes. Justin reaffirmed a $100 total session budget and authorized continuing without another spending request within that cap. No product ruling is pending. Both H762 definitions are approved.
+
+The first 17-call stage trial and subsequent controls exposed unsupported premises, incorrect pause penalties, and malformed/truncated model output. These are failures, not validation passes. Structured output now uses a stage array because repeated nullable stage objects exceeded the provider grammar limits. Numeric grades are hidden from the method reviewer to prevent invented deductions based on the number. The latest local candidate uses canonical doctrine, fixed eligibility reason codes, and factual-only stage notes; the method review and separate factual check remain under real-call validation. A four-call trial of this latest contract is active. Existing live coaching remains unchanged.
+
+Local persistence checks reject unchecked method reviews, stale source/guidance/version proofs, and changed scores; compact stage summaries are prepared for page reads. A separate factual-proof wrapper exists but is not yet connected to the save path. That connection, broader real-call validation, seven-day correction, migration, live integration, final doctrine update, and deployment are still pending. Do not promote any experimental records. Quote grouping and unrelated work remain deferred.
 
 ## 2. Full-call navigation check — AFTER task 1
 

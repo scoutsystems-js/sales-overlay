@@ -1,0 +1,31 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const S=require('../lib/stage-eligibility');
+const turns=[{speaker:'CLOSER',text:'Let us pick this up tomorrow with your partner.',start_seconds:10},{speaker:'PROSPECT',text:'Tomorrow at noon works for us both.',start_seconds:15}];
+const context={discovery:{areas:[]},sales_conversation:true,ending:{state:'appropriate_continuation',reason:'A joint continuation was booked.',evidence_turns:[1,2]},pitch:{occurred:false,evidence_turns:[]},price:{occurred:false,evidence_turns:[]},prior_presentation:{established:false,evidence_turns:[]},finance:{state:'not_assessed',reason:'Not assessed.',evidence_turns:[],feasible_financing_ruled_out:null}};
+const candidate={context,...Object.fromEntries(S.SECTIONS.map(k=>[k,{assessment:{state:'not_applicable',reason:'This stage was not due.',evidence_turns:[1,2]},grade:null,score:null,notes:null}]))};
+const review={reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'The recorded continuation supports the eligibility.',counterevidence_turns:[],unsupported_claims:[]}))};
+test('stage assessment uses two bounded structured requests and returns source-bound reviewed results',async()=>{
+ const A=require('../lib/stage-assessment');const requests=[];
+ const result=await A.run({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{requests.push(request);return requests.length===1?candidate:review;});
+ assert.equal(requests.length,2);assert.ok(requests.every(r=>r.output_config.format.type==='json_schema'));
+ assert.ok(require('../lib/stage-eligibility-review').verified(result.record,turns,S.guidanceHash({contextText:'Team offer',kbHash:'material'})));
+ assert.equal(result.record.sections.close.state,'not_applicable');
+});
+test('a failed evidence check does not return a candidate as an approved score',async()=>{
+ const A=require('../lib/stage-assessment');let calls=0;
+ await assert.rejects(A.run({turns,duration:15,material:{kbHash:'material'}},async()=>{if(++calls===1)return candidate;throw Error('Reviewer unavailable');}),/Reviewer unavailable/);
+});
+
+test('the output schema stays within the provider limit of sixteen union fields',()=>{
+ const schema=require('../lib/stage-output-schema').producer;
+ const count=x=>!x||typeof x!=='object'?0:(Array.isArray(x.type)||Array.isArray(x.anyOf)?1:0)+Object.values(x).reduce((n,v)=>n+(Array.isArray(v)?v.reduce((m,c)=>m+count(c),0):count(v)),0);
+ assert.ok(count(schema)<=16);
+});
+
+test('both stage generation and evidence review read the canonical coaching method',()=>{
+ const guide=S.methodGuide();
+ assert.ok(S.buildPrompt({turns},15,'Offer').includes(guide));
+ assert.ok(require('../lib/stage-eligibility-review').prompt(candidate,turns,{contextText:'Offer'}).includes(guide));
+ assert.notEqual(S.guidanceHash({kbHash:'a',contextText:'First offer'}),S.guidanceHash({kbHash:'a',contextText:'Changed offer'}));
+});

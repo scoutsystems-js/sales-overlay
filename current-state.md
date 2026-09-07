@@ -1,10 +1,14 @@
 # Scout current state
 
-Updated September 6, 2026 (Eastern). Broader coaching is LIVE and complete. The new Coaching Page Integrity task is ACTIVE. Verified application release: `d477b31a53e0c1b42ef3649411d0e5b9590b2e2a`, Railway SUCCESS, marker `period-breadth-v16-facts5`. Page-speed work remains complete. Two definition questions are pending for the new task (Intro timing and purchase-Close versus continuation booking).
+Updated September 6, 2026 (Eastern). Broader coaching is LIVE and complete. The new Coaching Page Integrity task is ACTIVE. Verified application release: `d477b31a53e0c1b42ef3649411d0e5b9590b2e2a`, Railway SUCCESS, marker `period-breadth-v16-facts5`. Page-speed work remains complete. Both definition questions are approved (H762); no definition ruling is pending. The $100 session budget and independent evidence-check approach are approved.
 
 ## Active task — Coaching Page Integrity
 
-Investigation and UI correction are local, not live. Dre’s selected week contains11calls:9done,1error,1without analysis. Stage populations9/8/7/6/7 follow numeric availability, not explicit eligibility. Source checks confirm inappropriate absent-stage grades and a staff meeting with Intro0. The 153-second credit example is Discovery; Close labels the lowest period average. Local UI uses existing score bands, a neutral focus border/advice panel, and separate call-coaching heading without internal review coverage prose. Per-stage counts remain until eligibility is verified. No score, outcome, call-kind, doctrine or live-data mutation has occurred. Continue explicit stage-model work after the two product definitions; keep unrelated backlog deferred. Investigation: `~/Desktop/scan-reports/coaching-integrity/investigation.md`.
+Local work only; no deployment or score/outcome/coaching data changes. Justin reaffirmed a $100 total session budget and authorized continuing without another spending request within that cap. No product ruling is pending. Both H762 definitions are approved.
+
+The first 17-call stage trial and subsequent controls exposed unsupported premises, incorrect pause penalties, and malformed/truncated model output. These are failures, not validation passes. Structured output now uses a stage array because repeated nullable stage objects exceeded the provider grammar limits. Numeric grades are hidden from the method reviewer to prevent invented deductions based on the number. The latest local candidate uses canonical doctrine, fixed eligibility reason codes, and factual-only stage notes; the method review and separate factual check remain under real-call validation. A four-call trial of this latest contract is active. Existing live coaching remains unchanged.
+
+Local persistence checks reject unchecked method reviews, stale source/guidance/version proofs, and changed scores; compact stage summaries are prepared for page reads. A separate factual-proof wrapper exists but is not yet connected to the save path. That connection, broader real-call validation, seven-day correction, migration, live integration, final doctrine update, and deployment are still pending. Do not promote any experimental records. Quote grouping and unrelated work remain deferred.
 
 ## Canonical implementation
 

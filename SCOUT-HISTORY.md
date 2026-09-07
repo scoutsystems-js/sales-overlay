@@ -7969,3 +7969,7 @@ Live verification caught and fixed two storage-identity issues before completion
 
 
 SESSION COMPLETE — September6,2026: broader coaching live at d477b31; period-v16/facts-v5,45 saved reviews/20 findings, approved guidance active. Two storage identity defects corrected and verified after real database roundtrip.2,609 checks pass; live month/week/day exactly match staged patterns/counts/scores; signed-in excerpts and clips visible. No user action pending. Prior experiments above are historical; current-state.md is canonical. Next separate blocks: legacy Strengths/Focus grounding, filed coverage-text cleanup, quote grouping. Fresh-load slowness/query failure filed for measurement if repeated.
+
+
+## [H762] Intro opening and purchase-Close boundary — September 6, 2026
+Justin answered yes to both: judge how well the rep opens the conversation without requiring it in the first60seconds, allowing greetings and technical trouble; recognize a correctly booked continuation as good follow-up behavior without giving a purchase-Close score when no purchase decision was due. This replaces the grader’s old first60seconds instruction and resolves the Close/continuation ambiguity. It does not excuse separate supported misses or turn every follow-up into an appropriate pause. The stage-eligibility implementation remains pending validation.

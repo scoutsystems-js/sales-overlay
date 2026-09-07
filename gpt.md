@@ -1,3 +1,13 @@
+## Current checkpoint — September 6, 2026
+
+Local work only; no deployment or score/outcome/coaching data changes. Justin reaffirmed a $100 total session budget and authorized continuing without another spending request within that cap. No product ruling is pending. Both H762 definitions are approved.
+
+The first 17-call stage trial and subsequent controls exposed unsupported premises, incorrect pause penalties, and malformed/truncated model output. These are failures, not validation passes. Structured output now uses a stage array because repeated nullable stage objects exceeded the provider grammar limits. Numeric grades are hidden from the method reviewer to prevent invented deductions based on the number. The latest local candidate uses canonical doctrine, fixed eligibility reason codes, and factual-only stage notes; the method review and separate factual check remain under real-call validation. A four-call trial of this latest contract is active. Existing live coaching remains unchanged.
+
+Local persistence checks reject unchecked method reviews, stale source/guidance/version proofs, and changed scores; compact stage summaries are prepared for page reads. A separate factual-proof wrapper exists but is not yet connected to the save path. That connection, broader real-call validation, seven-day correction, migration, live integration, final doctrine update, and deployment are still pending. Do not promote any experimental records. Quote grouping and unrelated work remain deferred.
+
+Older entries below are historical; current-state.md is canonical.
+
 ## LIVE — period-specific Team Coaching; one scope approval remains (H754)
 Live and verified at 130cb98774191c0512b6f05f534ccf4f3dc53f9e. All 12 members are visible; nine with month-wide calls have weakest-area labels and section scores. 141 paid-window calls have saved review results, with 30 supported findings across all eight reps with calls in that window. All 2,556 tests pass. Grades/outcomes remained unchanged on every write. Live month/day filtering, exact exchanges, rep-owned call review and persistent background toggle verified. No model runs on the Coachable Moments date-range aggregation.
 
@@ -262,4 +272,4 @@ SESSION COMPLETE — September6,2026: broader coaching live at d477b31; period-v
 Filed after final page check: clicking Review Full Call formed the correct call/owner URL, but the next observation had returned to Team Coaching before full-call content was verified. Do not claim successful full-call page loading from this run. Rep switching, visible coaching/excerpts and clip URLs passed. This pre-existing navigation path was untouched; root cause is unverified and belongs in the next focused block, ahead of cosmetic cleanup.
 
 
-Coaching Integrity ACTIVE September6: read-only Dre-week source audit proves numeric availability rather than eligibility; inappropriate grades on postponed/unperformed stages. Local UI score-band correction and separation of period score versus call coaching built; not live. Internal review counts removed, stage counts held. Two definition questions pending (Intro first60seconds and Close purchase/continuation boundary). No model spending or data writes. Read current-state and scan-reports/coaching-integrity/investigation.md; do not start queued navigation/Strengths/quote grouping.
+Coaching Integrity ACTIVE September6: read-only Dre-week source audit proves numeric availability rather than eligibility; inappropriate grades on postponed/unperformed stages. Local UI score-band correction and separation of period score versus call coaching built; not live. Internal review counts removed, stage counts held. Both definitions are approved by H762 (no Intro clock cutoff; booking continuation is separate from purchase-Close). No model spending or data writes. Read current-state and scan-reports/coaching-integrity/investigation.md; do not start queued navigation/Strengths/quote grouping.

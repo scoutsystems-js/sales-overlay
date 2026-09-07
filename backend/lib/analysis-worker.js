@@ -573,6 +573,9 @@ function qualificationCheckInstruction(qualifications) {
 }
 
 function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext, coachingAreas, opts) {
+  // Unwired stage-integrity experiment. Normal analyses retain the live grader
+  // until real-call validation passes; stageOnly is used by the offline runner.
+  if (opts && opts.stageOnly) return require('./stage-eligibility').buildPrompt(normalized, durationSeconds, sellingContext);
   var transcriptText = formatTurnsForPrompt(normalized.turns);
   var durationLabel = (durationSeconds != null) ? Math.round(durationSeconds / 60) + ' minutes' : 'unknown duration';
   /* ⚠⚠ v24 — THE CLOSER'S OWN LANGUAGE. See lib/closer-voice.js: this was a

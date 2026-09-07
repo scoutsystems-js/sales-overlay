@@ -39,6 +39,7 @@
  */
 
 // The order of the sales process, for stable tie-breaking and for display.
+const stageEligibility = require('./stage-eligibility');
 const SECTION_ORDER = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 const LABELS = {
@@ -85,9 +86,12 @@ function sectionStatsFromAnalyses(rows) {
   var out = {};
   SECTION_ORDER.forEach(function (key) {
     var vals = [];
+    var eligibility = {evaluated:0, not_applicable:0, expected_but_missed:0, unmeasured:0, legacy_unreviewed:0};
     list.forEach(function (r) {
       if (!r) return;
-      var v = num(r[COLUMN[key]]);
+      var stage = stageEligibility.read(r, key);
+      eligibility[stage.state]++;
+      var v = num(stage.score);
       if (v !== null) vals.push(v);
     });
     var n = vals.length;
@@ -97,7 +101,7 @@ function sectionStatsFromAnalyses(rows) {
       var ss = vals.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0);
       sd = Math.sqrt(ss / (n - 1));
     }
-    out[key] = { mean: mean, n: n, sd: sd };
+    out[key] = { mean: mean, n: n, sd: sd, eligibility: eligibility };
   });
   return out;
 }
