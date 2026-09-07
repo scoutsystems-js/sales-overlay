@@ -11,7 +11,7 @@ const turns = [
  {speaker:'PROSPECT',start_seconds:25,text:'Yes, noon works for both of us.'},
 ];
 const evidence = [{speaker:'CLOSER',timestamp_seconds:10,quote:turns[0].text},{speaker:'PROSPECT',timestamp_seconds:15,quote:turns[1].text}];
-const measured = {grade:'B',score:78,notes:'The decision maker was checked.',assessment:{state:'evaluated',reason:'Decision-maker qualification occurred.',evidence}};
+const measured = {grade:'B',score:78,notes:'CLOSER: asked who would decide.',assessment:{state:'evaluated',reason:'Decision-maker qualification occurred.',evidence}};
 // Simulated model response for persistence tests; semantic accuracy is tested on real calls.
 function simulatedFacts(method){const V=require('../lib/stage-observation-review'),E=require('../lib/coaching-evidence-review');const evidence=[{turn:1,speaker:'CLOSER',quote:turns[0].text}];const response={observations:V.findings(method).map(f=>({moment:f.moment,sentences:E.adviceSentences(f.observation).map((text,i)=>({sentence:i+1,status:'supported',claims:[{text,actor:'CLOSER',kind:'action',evidence}],evidence,counterevidence:[],reason:'Source supports this synthetic observation.'}))}))};return V.applyPair(method,[response,response],turns,'material');}
 function savedAssessment(r){const R=require('../lib/stage-eligibility-review');const checked=R.apply(r,{reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'Source supports this stage.',counterevidence_turns:[],unsupported_claims:[]}))},turns,'material');return S.toColumns(simulatedFacts(checked),String,turns,'material').stage_eligibility;}
@@ -148,4 +148,36 @@ test('an explicitly unobserved discovery area is rejected instead of being silen
   const result=assess({context:c,discovery:measured,intro:measured},turns);
  assert.equal(result.sections.discovery.state,'unmeasured');
  assert.equal(result.sections.intro.state,'unmeasured');
+});
+
+test('scored notes require explicit factual actor clauses before review',()=>{
+ const factual={...measured,notes:'CLOSER: asked who else would decide; PROSPECT: said their partner would join tomorrow.'};
+ assert.equal(assess({discovery:factual},turns).sections.discovery.score,78);
+ const vague={...factual,notes:'The closer asked who else would decide and correctly learned the partner would join.'};
+ assert.equal(assess({discovery:vague},turns).sections.discovery.state,'unmeasured');
+});
+
+test('scored notes are one short factual sentence, not a disguised narrative',()=>{
+ const narrative={...measured,notes:'CLOSER: asked who would decide. PROSPECT: said their partner would join tomorrow.'};
+ assert.equal(assess({discovery:narrative},turns).sections.discovery.state,'unmeasured');
+ const long={...measured,notes:'CLOSER: asked who would decide with several extra words that make this otherwise factual actor statement much longer than the allowed thirty five words for one stage note and add a needless description of the call conversation.'};
+ assert.equal(assess({discovery:long},turns).sections.discovery.state,'unmeasured');
+});
+
+test('false context flags cannot carry stage evidence',()=>{
+ const contradictoryPrice={...context,price:{occurred:false,evidence_turns:[1]}};
+ assert.equal(assess({context:contradictoryPrice,intro:measured},turns).sections.intro.state,'unmeasured');
+ const contradictoryPrior={...context,prior_presentation:{established:false,evidence_turns:[1]}};
+ assert.equal(assess({context:contradictoryPrior,intro:measured},turns).sections.intro.state,'unmeasured');
+});
+
+test('scheduling-only evidence cannot create a Discovery area',()=>{
+ const scheduling=[
+  {speaker:'CLOSER',start_seconds:1,text:'Are you at work right now?'},
+  {speaker:'PROSPECT',start_seconds:2,text:'Yes, I can only meet on weekends.'},
+  {speaker:'CLOSER',start_seconds:3,text:'Let us reschedule for Saturday.'},
+ ];
+ const schedulingContext={...context,discovery:{areas:[{area:'current_situation',evidence_turns:[1,2,3]}]},ending:{state:'appropriate_continuation',evidence_turns:[2,3]}};
+ const score={...measured,assessment:{...measured.assessment,evidence_turns:[1,2,3]},notes:'CLOSER: asked whether the prospect was at work; PROSPECT: said weekends were available.'};
+ assert.equal(assess({context:schedulingContext,discovery:score},scheduling).sections.discovery.state,'unmeasured');
 });

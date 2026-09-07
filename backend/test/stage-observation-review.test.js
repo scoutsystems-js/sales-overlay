@@ -15,3 +15,12 @@ test('a missing factual result cannot approve a numeric score and source changes
  assert.equal(result.sections.discovery.state,'unmeasured');
  assert.equal(V.verified(result,[{...turns[0],text:'Changed source.'}],'material'),false);
 });
+
+test('each stage proof request is limited to one score and its selected evidence',()=>{
+ const finding={moment:2,stage:'discovery',observation:'CLOSER: asked about a laptop.',evidence:[{turn:1,speaker:'PROSPECT',quote:turns[0].text}]};
+ const prompt=V.proofPrompt(finding,turns);
+ assert.match(prompt,/Moment 2/);
+ assert.match(prompt,/Yes, I have a laptop/);
+ assert.doesNotMatch(prompt,/FULL TRANSCRIPT/);
+ assert.equal(V.proofContext(finding,turns).turns.length,1);
+});
