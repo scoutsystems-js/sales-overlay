@@ -1,6 +1,10 @@
 # Scout current state
 
-Updated September 6, 2026 (Eastern). Broader coaching is LIVE and the current session is complete. Verified application release: `d477b31a53e0c1b42ef3649411d0e5b9590b2e2a`, Railway SUCCESS, marker `period-breadth-v16-facts5`. Page-speed work remains complete. No user action or approval is pending.
+Updated September 6, 2026 (Eastern). Broader coaching is LIVE and complete. The new Coaching Page Integrity task is ACTIVE. Verified application release: `d477b31a53e0c1b42ef3649411d0e5b9590b2e2a`, Railway SUCCESS, marker `period-breadth-v16-facts5`. Page-speed work remains complete. Two definition questions are pending for the new task (Intro timing and purchase-Close versus continuation booking).
+
+## Active task — Coaching Page Integrity
+
+Investigation and UI correction are local, not live. Dre’s selected week contains11calls:9done,1error,1without analysis. Stage populations9/8/7/6/7 follow numeric availability, not explicit eligibility. Source checks confirm inappropriate absent-stage grades and a staff meeting with Intro0. The 153-second credit example is Discovery; Close labels the lowest period average. Local UI uses existing score bands, a neutral focus border/advice panel, and separate call-coaching heading without internal review coverage prose. Per-stage counts remain until eligibility is verified. No score, outcome, call-kind, doctrine or live-data mutation has occurred. Continue explicit stage-model work after the two product definitions; keep unrelated backlog deferred. Investigation: `~/Desktop/scan-reports/coaching-integrity/investigation.md`.
 
 ## Canonical implementation
 

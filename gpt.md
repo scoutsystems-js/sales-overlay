@@ -260,3 +260,6 @@ SESSION COMPLETE — September6,2026: broader coaching live at d477b31; period-v
 
 
 Filed after final page check: clicking Review Full Call formed the correct call/owner URL, but the next observation had returned to Team Coaching before full-call content was verified. Do not claim successful full-call page loading from this run. Rep switching, visible coaching/excerpts and clip URLs passed. This pre-existing navigation path was untouched; root cause is unverified and belongs in the next focused block, ahead of cosmetic cleanup.
+
+
+Coaching Integrity ACTIVE September6: read-only Dre-week source audit proves numeric availability rather than eligibility; inappropriate grades on postponed/unperformed stages. Local UI score-band correction and separation of period score versus call coaching built; not live. Internal review counts removed, stage counts held. Two definition questions pending (Intro first60seconds and Close purchase/continuation boundary). No model spending or data writes. Read current-state and scan-reports/coaching-integrity/investigation.md; do not start queued navigation/Strengths/quote grouping.

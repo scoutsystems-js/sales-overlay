@@ -1,8 +1,8 @@
 # Current build order — updated September 6, 2026
 
-The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. These tasks are queued; this update does not start implementation.
+The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Task 1 is active following Justin’s “you may begin.” Tasks 2–4 remain queued.
 
-## 1. Coaching Page Integrity, Design & Stage Classification — NEXT
+## 1. Coaching Page Integrity, Design & Stage Classification — ACTIVE
 
 Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Classification](docs/build-plans/coaching-page-integrity-design-stage-classification.md). All 23 sections, validation requirements, financial-DQ clarification and ruling boundaries are part of this task.
 
@@ -14,6 +14,10 @@ Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Cl
 - Audit Intro/Pitch/Close definitions. Request a ruling for genuinely undefined product philosophy or proposed changes to existing rules.
 - Remove unnecessary explanatory copy and per-card graded-call labels only after validating the underlying logic; retain useful processing information only with a clear customer benefit. Do not relocate unnecessary copy into tooltips.
 - Validate real-call eligibility, design, coaching structure and existing approved examples. Update canonical documentation and deliver the brief's completion report. Preserve the completed broader-coaching work.
+
+### Current checkpoint — local, not live
+
+Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. Two product questions pending: Intro timing boundary and purchase-Close versus continuation booking. No grading/data changes, paid run or deployment yet. See `investigation.md`.
 
 ## 2. Full-call navigation check — AFTER task 1
 
