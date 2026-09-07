@@ -145,5 +145,7 @@ test('recorded discovery work cannot be labelled not applicable, and non-sales c
 
 test('an explicitly unobserved discovery area does not erase other established stages',()=>{
  const c={...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]},{area:'financial_resources',evidence_turns:[]}]}};
- assert.equal(assess({context:c,discovery:measured,intro:measured},turns).sections.discovery.score,78);
+ const result=assess({context:c,discovery:measured,intro:measured},turns);
+ assert.equal(result.sections.discovery.score,78);
+ assert.deepEqual(result.context.discovery.areas,[{area:'decision_makers',evidence_turns:[1,2]}]);
 });
