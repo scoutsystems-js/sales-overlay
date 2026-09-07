@@ -215,6 +215,13 @@ test('the provider five-key stage object is normalized as exactly one record per
  assert.equal(result.sections.discovery.score,78);
 });
 
+test('the eight fixed producer evidence slots become the selected stage evidence',()=>{
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:{turn_1:1,turn_2:2,turn_3:null,turn_4:null,turn_5:null,turn_6:null,turn_7:null,turn_8:null}}}});
+ const result=S.assess({context,sections:rows},turns);
+ assert.equal(result.sections.discovery.score,78);
+ assert.deepEqual(result.sections.discovery.evidence.map(item=>item.turn),[1,2]);
+});
+
 test('scored notes require the exact factual actor grammar and matching actor evidence',()=>{
  const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]},notes:'Closer asked who would decide; Prospect said their partner would join tomorrow.'}});
  assert.equal(S.assess({context,sections:rows},turns).sections.discovery.score,78);

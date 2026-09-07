@@ -51,7 +51,9 @@ test('the provider-facing stage transport uses the known compact unconstrained a
  assert.equal(Object.hasOwn(sections,'maxItems'),false);
  assert.equal(sections.items.type,'object');
  assert.deepEqual(Object.keys(sections.items.properties).sort(),['assessment','grade','notes','score','section']);
- assert.equal(sections.items.properties.assessment.properties.evidence_turns.maxItems,8);
+ const evidence=sections.items.properties.assessment.properties.evidence_turns;
+ assert.equal(evidence.type,'object');
+ assert.deepEqual(Object.keys(evidence.properties),['turn_1','turn_2','turn_3','turn_4','turn_5','turn_6','turn_7','turn_8']);
 });
 
 test('both stage generation and evidence review read the canonical coaching method',()=>{
