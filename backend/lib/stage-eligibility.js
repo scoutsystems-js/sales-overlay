@@ -8,7 +8,7 @@ const STATES = ['evaluated', 'not_applicable', 'expected_but_missed', 'unmeasure
 const scoreColumn = section => section === 'close' ? 'close_score_earned' : section + '_score';
 const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
 const isScore = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
-const FACTUAL_NOTE_WORDS=/\b(?:correct(?:ly)?|appropriate(?:ly)?|useful|directionally|good|weak|should|could|can(?:not)?|can't|able|ability|adequate|learned|determined|identified|established|framed|provided|walked\s+through|verified|set|ready|felt\s+ready|need(?:s|ed)?|must|necessary|necessity|depend(?:s|ed|ent|ency)?|intend(?:s|ed)?|intent(?:ion)?|prefer(?:s|red)?|missed\s+opportunity|because|therefore|thus|caused|causing|led\s+to|resulted\s+in|shows?|proved|demonstrates?|indicates?|suggests?)\b/i;
+const FACTUAL_NOTE_WORDS=/\b(?:correct(?:ly)?|appropriate(?:ly)?|useful|directionally|good|weak|should|could|can(?:not)?|can't|able|ability|adequate|learned|determined|identified|established|framed|provided|walked\s+through|verified|set|ready|felt\s+ready|need(?:s|ed)?|must|necessary|necessity|require(?:s|d|ment)?|depend(?:s|ed|ent|ency)?|intend(?:s|ed)?|intent(?:ion)?|prefer(?:s|red)?|missed\s+opportunity|because|therefore|thus|caused|causing|led\s+to|resulted\s+in|shows?|proved|demonstrates?|indicates?|suggests?)\b/i;
 const NOTE_ACTIONS={
  Closer:['asked','said','stated','confirmed','described','explained','offered','scheduled','booked','requested','agreed','declined','named','responded','rescheduled'],
  Prospect:['said','answered','stated','confirmed','described','reported','shared','explained','agreed','declined','named','responded'],
@@ -18,10 +18,14 @@ const noteActor = clause => {
  return match&&NOTE_ACTIONS[match[1]]?.includes(match[2])?match[1]:null;
 };
 const noteClauses = value => clean(value).replace(/[.!?]+$/,'').split(';').map(clean).filter(Boolean);
+const singleActorClause = clause => {
+ const actors=clause.match(/\b(?:Closer|Prospect)\s+(?:asked|said|stated|confirmed|described|explained|offered|scheduled|booked|requested|agreed|declined|named|responded|rescheduled|answered|reported|shared)\b/g)||[];
+ return actors.length===1;
+};
 const factualNote = (value,evidence=[]) => {
  const note=clean(value), body=note.replace(/[.!?]+$/,''), clauses=noteClauses(note);
  const actors=clauses.map(noteActor);
- return !!note&&note.split(/\s+/).length<=35&&!/[.!?]/.test(body)&&clauses.length>0&&clauses.length<=2&&!FACTUAL_NOTE_WORDS.test(note)&&actors.every(Boolean)&&actors.every(actor=>evidence.some(item=>item.speaker===actor.toUpperCase()));
+ return !!note&&note.split(/\s+/).length<=35&&!/[.!?]/.test(body)&&clauses.length>0&&clauses.length<=2&&!FACTUAL_NOTE_WORDS.test(note)&&actors.every(Boolean)&&clauses.every(singleActorClause)&&actors.every(actor=>evidence.some(item=>item.speaker===actor.toUpperCase()));
 };
 const unknown = reason => ({state:'unmeasured',reason,grade:null,score:null,notes:null,evidence:[]});
 
@@ -52,6 +56,7 @@ function promptInstructions(sellingContext) {
   methodGuide(),
   'CONTEXT FIRST: Return context before the five stages: {"sales_conversation":true|false|null,"ending":{"state":"completed|appropriate_continuation|cut_off|unknown","evidence_turns":[]},"pitch":{"occurred":true|false|null,"evidence_turns":[]},"price":{"occurred":true|false|null,"evidence_turns":[]},"prior_presentation":{"established":true|false|null,"evidence_turns":[]},"finance":{"state":"qualified|genuine_dq|unresolved|not_assessed","evidence_turns":[],"feasible_financing_ruled_out":true|false|null}}. These are facts, not grades. A false `occurred` or `established` flag MUST have an empty evidence_turns array. If you cite evidence for pitch, price, or prior presentation, set that flag true. Prior presentation requires an explicit source reference establishing the offer and price were already presented; do not assume it just because someone says follow-up.',
   'A prospect using a financing application is unresolved until the recording establishes approval or inability to use a feasible route. A cash or credit guideline alone cannot establish genuine_dq. A current application error is not proof financing is unavailable. Correctly exploring a payment route is not itself a coaching fault.',
+  'PRODUCER NOTE SAFETY: For a scored note, use only one or two short, semicolon-separated facts in the forms “Closer asked…”, “Closer stated…”, “Prospect said…”, “Prospect answered…”, “Prospect confirmed…”, “Prospect declined…”, “Prospect named…”, or “Prospect described…”. Each clause names one actor only. Do not use evaluative or interpretive wording such as set aside, felt ready, correctly ended, required, dependency, intent, readiness, ability, or necessity. A partner being absent or a family member being discussed is not proof that the person is required for the decision. Do not score Intro or Discovery from opening scheduling, time, work availability, laptop availability, or rescheduling alone; return a safe unscored stage unless actual stage work is separately evidenced.',
   'STAGE DEFINITIONS: Intro establishes useful direction for the actual conversation. Discovery establishes relevant pain/goals/current situation/decision makers/why now/resources WHEN DUE; information volunteered or accurately paraphrased counts. Pitch frames the offered solution against discovered needs; market education or a brief answer alone is not automatically a program pitch. Objection handling evaluates resistance AFTER offer presentation and price (or a specifically evidenced prior presentation); pre-price concerns belong to the stage where they occurred and can be coached there if supported. Close evaluates the purchase decision, not merely ending a call or booking another meeting.',
   'ELIGIBILITY BEFORE SCORE: On an appropriate continuation, incomplete future work is not a current miss. Score the useful work already performed. A concrete separate mistake may still be graded, but cite what made that work due NOW; available time or general usefulness is insufficient. With no pitch/price and no evidenced prior presentation, objection MUST be not_applicable. If genuine financial inability is established only late, judge the actual qualification miss in Discovery, not inability to buy in Close.',
   'SCORING SCALE (only for evaluated or evidenced expected_but_missed):85-100 exceptional;70-84 strong;55-69 adequate with real gaps;40-54 weak;below40 significant failure or barely attempted work that was actually due. Do not lower a score for correctly omitted work. Do not assign a score simply because a call ended without a sale. Grade letters A/B/C/D/F accompany numeric scores; not_applicable and unmeasured have null grade and score.',
@@ -116,7 +121,10 @@ function validProducerSections(parsed) {
 function schedulingOnly(area, source) {
  if (area?.area!=='current_situation') return false;
  const evidence=(area.evidence_turns||[]).map(turn=>clean(source[turn-1]?.text));
- return evidence.length>0&&evidence.every(text=>/\b(?:at work right now|available|availability|weekends?|reschedul(?:e|ing)|calendar|laptop|time to meet|tomorrow|today)\b/i.test(text));
+ return logisticsOnly(evidence);
+}
+function logisticsOnly(evidence) {
+ return evidence.length>0&&evidence.every(text=>/\b(?:at work|work(?:s)?\s+(?:monday|tuesday|wednesday|thursday|friday|today)|available|availability|weekends?|reschedul(?:e|ing)|calendar|laptop|time(?:\s+(?:to|and|available))?|schedule(?:d|ing)?|tomorrow|today)\b/i.test(clean(text)));
 }
 function assess(parsed, turns) {
  const sectionsValid=validProducerSections(parsed);
@@ -145,6 +153,7 @@ function assess(parsed, turns) {
   if (!evidence) return [section,unknown('Stage evidence could not be located for the stated speaker and time.')];
   const scored=a.state==='evaluated'||a.state==='expected_but_missed';
   if(scored&&recordedContext.sales_conversation!==true)return [section,unknown('A sales conversation is not established.')];
+  if(scored&&['intro','discovery'].includes(section)&&logisticsOnly(evidence.map(item=>item.quote)))return [section,unknown('Opening logistics alone cannot be scored stage work.')];
   if(section==='discovery'&&((a.state==='not_applicable'&&recordedContext.discovery.areas.length)||(a.state==='evaluated'&&!recordedContext.discovery.areas.length)))return [section,unknown('Discovery eligibility conflicts with the recorded qualification work.')];
   if(scored&&section==='objection'){
    const presented=context.pitch.occurred===true&&context.pitch.evidence_turns.length&&context.price.occurred===true&&context.price.evidence_turns.length;

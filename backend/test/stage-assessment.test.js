@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const S=require('../lib/stage-eligibility');
-const turns=[{speaker:'CLOSER',text:'Let us pick this up tomorrow with your partner.',start_seconds:10},{speaker:'PROSPECT',text:'Tomorrow at noon works for us both.',start_seconds:15}];
+const turns=[{speaker:'CLOSER',text:'Who else needs to be here for the decision?',start_seconds:10},{speaker:'PROSPECT',text:'Tomorrow at noon works for us both.',start_seconds:15}];
 const context={discovery:{areas:[]},sales_conversation:true,ending:{state:'appropriate_continuation',reason:'A joint continuation was booked.',evidence_turns:[1,2]},pitch:{occurred:false,evidence_turns:[]},price:{occurred:false,evidence_turns:[]},prior_presentation:{established:false,evidence_turns:[]},finance:{state:'not_assessed',reason:'Not assessed.',evidence_turns:[],feasible_financing_ruled_out:null}};
 const candidate={context,...Object.fromEntries(S.SECTIONS.map(k=>[k,{assessment:{state:'not_applicable',reason:'This stage was not due.',evidence_turns:[1,2]},grade:null,score:null,notes:null}]))};
 const review={reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'The recorded continuation supports the eligibility.',counterevidence_turns:[],unsupported_claims:[],note_claims:[{clause:1,verdict:'supported',evidence_turns:[1]}]}))};
@@ -30,8 +30,8 @@ test('unsafe candidate wording is withheld before it reaches the independent rev
 
 test('a measured stage requires two factual reads before it is returned as verified',async()=>{
  const A=require('../lib/stage-assessment');const requests=[];
- const measured={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'B',score:75,notes:'Closer booked the continuation.'}};
- const factual={moment:2,status:'supported',claims:[{text:'Closer booked the continuation.',actor:'CLOSER',kind:'action',evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}]}],evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}],counterevidence:[],reason:'The source supports this observation.'};
+ const measured={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'B',score:75,notes:'Closer asked who would decide.'}};
+ const factual={moment:2,status:'supported',claims:[{text:'Closer asked who would decide.',actor:'CLOSER',kind:'action',evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}]}],evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}],counterevidence:[],reason:'The source supports this observation.'};
  const result=await A.run({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{requests.push(request);return [measured,review,factual,factual][requests.length-1];});
  assert.equal(requests.length,4);
  assert.equal(result.factual.length,1);assert.equal(result.factual[0].responses.length,2);

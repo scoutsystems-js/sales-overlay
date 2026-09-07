@@ -252,3 +252,44 @@ test('scored notes reject ability, necessity, intent, readiness, and judgment wo
   assert.equal(S.assess({context,sections:candidate},turns).sections.discovery.state,'unmeasured');
  }
 });
+
+test('producer rejects the exact interpretive notes returned by the failed validation candidates',()=>{
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]}}});
+ for(const notes of [
+  'Closer asked about capital set aside and credit score; Prospect reported approximately fifteen thousand saved and a credit score below six hundred.',
+  'Closer described the program; Prospect said the process was straightforward and felt ready.',
+  'Closer asked whether Prospect would be the main decision maker; Prospect said the partner would need to be present, establishing a decision-maker qualification that correctly ended further discovery.',
+ ]){
+  const candidate=rows.map(row=>row.section==='discovery'?{...row,notes}:row);
+  assert.equal(S.assess({context,sections:candidate},turns).sections.discovery.state,'unmeasured');
+ }
+});
+
+test('producer rejects an unsupported partner or family decision requirement even when a closer asked about it',()=>{
+ const source=[
+  {speaker:'CLOSER',start_seconds:1,text:'Will your partner join the decision call?'},
+  {speaker:'PROSPECT',start_seconds:2,text:'My partner is absent today.'},
+  {speaker:'CLOSER',start_seconds:3,text:'Does your brother need to join for the decision?'},
+  {speaker:'PROSPECT',start_seconds:4,text:'No, he makes his own decisions.'},
+ ];
+ const decisionContext={...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}};
+ const rows=completeSections({discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]},notes:'Closer asked whether the partner would join; Prospect said the partner was required for the decision.'}});
+ assert.equal(S.assess({context:decisionContext,sections:rows},source).sections.discovery.state,'unmeasured');
+ const godwin=rows.map(row=>row.section==='discovery'?{...row,assessment:{...row.assessment,evidence_turns:[3,4]},notes:'Closer asked whether the brother participation was required; Prospect said he would decide separately.'}:row);
+ assert.equal(S.assess({context:decisionContext,sections:godwin},source).sections.discovery.state,'unmeasured');
+});
+
+test('producer withholds scored Intro and Discovery when selected evidence is only opening logistics',()=>{
+ const kimba=[
+  {speaker:'CLOSER',start_seconds:1,text:'Are you at work right now?'},
+  {speaker:'PROSPECT',start_seconds:2,text:'Yes, I work Monday through Friday.'},
+  {speaker:'CLOSER',start_seconds:3,text:'Do you have time and a laptop available?'},
+  {speaker:'PROSPECT',start_seconds:4,text:'I am available on weekends.'},
+  {speaker:'CLOSER',start_seconds:5,text:'Let us reschedule for Saturday.'},
+ ];
+ const logisticsContext={...context,discovery:{areas:[]},ending:{state:'appropriate_continuation',evidence_turns:[5]}};
+ const rows=completeSections({intro:{...measured,section:'intro',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2,3,4,5]},notes:'Closer asked whether Prospect had time and a laptop; Prospect said weekends were available.'},discovery:{...measured,section:'discovery',assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2,3,4,5]},notes:'Closer asked about work availability; Prospect said weekends were available.'}});
+ const result=S.assess({context:logisticsContext,sections:rows},kimba);
+ assert.equal(result.sections.intro.state,'unmeasured');
+ assert.equal(result.sections.discovery.state,'unmeasured');
+});
