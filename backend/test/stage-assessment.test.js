@@ -44,6 +44,15 @@ test('the output schema stays within the provider limit of sixteen union fields'
  assert.ok(count(schema)<=16);
 });
 
+test('the provider-facing stage transport uses the known compact unconstrained array shape',()=>{
+ const sections=require('../lib/stage-output-schema').producer.properties.sections;
+ assert.equal(sections.type,'array');
+ assert.equal(Object.hasOwn(sections,'minItems'),false);
+ assert.equal(Object.hasOwn(sections,'maxItems'),false);
+ assert.equal(sections.items.type,'object');
+ assert.deepEqual(Object.keys(sections.items.properties).sort(),['assessment','grade','notes','score','section']);
+});
+
 test('both stage generation and evidence review read the canonical coaching method',()=>{
  const guide=S.methodGuide();
  assert.ok(S.buildPrompt({turns},15,'Offer').includes(guide));
