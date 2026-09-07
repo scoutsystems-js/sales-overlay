@@ -2216,3 +2216,9 @@ Broader-coaching release candidate — September 6, 2026: previous experimental 
 
 
 Live verification caught and fixed two storage-identity issues before completion: staged note timestamps used Z while PostgREST returned +00:00 (full guidance text and instants proved identical before guarded identity correction), and JSONB reordered finding keys, invalidating an order-dependent fingerprint. The latter now uses recursively sorted object keys, preserves array order, and has a regression test proven failing before the fix. Observation proof v5; all45 records pass simulated storage reordering without changing20 findings. Full2,609 tests pass. Initial deployment1976d40 is live; the storage-order repair and final live confirmation are still pending. A transient evidence-query failure was retried diagnostically, not hidden.
+
+
+SESSION COMPLETE — September6,2026: broader coaching live at d477b31; period-v16/facts-v5,45 saved reviews/20 findings, approved guidance active. Two storage identity defects corrected and verified after real database roundtrip.2,609 checks pass; live month/week/day exactly match staged patterns/counts/scores; signed-in excerpts and clips visible. No user action pending. Prior experiments above are historical; current-state.md is canonical. Next separate blocks: legacy Strengths/Focus grounding, filed coverage-text cleanup, quote grouping. Fresh-load slowness/query failure filed for measurement if repeated.
+
+
+Filed after final page check: clicking Review Full Call formed the correct call/owner URL, but the next observation had returned to Team Coaching before full-call content was verified. Do not claim successful full-call page loading from this run. Rep switching, visible coaching/excerpts and clip URLs passed. This pre-existing navigation path was untouched; root cause is unverified and belongs in the next focused block, ahead of cosmetic cleanup.
