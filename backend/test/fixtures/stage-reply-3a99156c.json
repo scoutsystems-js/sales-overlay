@@ -1,0 +1,110 @@
+{
+ "call_id": "3a99156c-6221-46f4-8aec-0e268556160b",
+ "source_turns": 154,
+ "source_hash": "2a6fe1a26e94a9e3a457703d198224d4657d05e01797a78f85ba2f3ee5316c49",
+ "recorded_at": "2026-09-07T22:38 ET, offline diagnostic at bd744ea",
+ "old_validator": {
+  "status": "withheld",
+  "failure_reason": "Stage assessment context is missing or invalid."
+ },
+ "stage_assessment": {
+  "context": {
+   "sales_conversation": true,
+   "call_kind": "initial",
+   "ending": {
+    "state": "completed",
+    "evidence_turn_ids": [
+     143,
+     148,
+     150
+    ]
+   },
+   "pitch": {
+    "occurred": false,
+    "evidence_turn_ids": []
+   },
+   "price": {
+    "occurred": false,
+    "evidence_turn_ids": []
+   },
+   "prior_presentation": {
+    "established": false,
+    "evidence_turn_ids": []
+   },
+   "objection": {
+    "occurred": false,
+    "evidence_turn_ids": []
+   },
+   "finance": {
+    "state": "genuine_dq",
+    "discovered_stage": "discovery",
+    "feasible_financing_ruled_out": true,
+    "evidence_turn_ids": [
+     87,
+     93,
+     104,
+     106,
+     107,
+     108
+    ]
+   },
+   "close_due": false
+  },
+  "stages": [
+   {
+    "stage": "intro",
+    "state": "evaluated",
+    "score": 72,
+    "grade": "C",
+    "evidence_turn_ids": [
+     4,
+     9,
+     15,
+     22
+    ],
+    "reason": "Closer recovered from a confusing start and asked the location question per script, but skipped the agenda-setting step entirely — no frame was set, no mutual agreement on how the call would run, and credibility was never established before questions began. The transition from pleasantries to discovery was abrupt with no bridge."
+   },
+   {
+    "stage": "discovery",
+    "state": "evaluated",
+    "score": 80,
+    "grade": "B",
+    "evidence_turn_ids": [
+     15,
+     22,
+     46,
+     52,
+     78,
+     86,
+     92,
+     104
+    ],
+    "reason": "Closer established current situation (first-time investor, one primary residence), motivation and emotional driver (personal sober living history, passion, fear of failure), urgency (ASAP), and financial position. Goals in dollar terms were never elicited — no income target or monthly number was established — and decision-maker confirmation was absent. Despite those gaps, enough was uncovered to reach a correct disqualification, which is the purpose discovery must serve."
+   },
+   {
+    "stage": "pitch",
+    "state": "not_applicable",
+    "score": null,
+    "grade": null,
+    "evidence_turn_ids": [],
+    "reason": "Prospect was financially disqualified during discovery; a pitch was never due."
+   },
+   {
+    "stage": "objection_handling",
+    "state": "not_applicable",
+    "score": null,
+    "grade": null,
+    "evidence_turn_ids": [],
+    "reason": "No pitch or price was presented, so no sales objections arose."
+   },
+   {
+    "stage": "close",
+    "state": "not_applicable",
+    "score": null,
+    "grade": null,
+    "evidence_turn_ids": [],
+    "reason": "Prospect was disqualified before any close was due."
+   }
+  ]
+ }
+}

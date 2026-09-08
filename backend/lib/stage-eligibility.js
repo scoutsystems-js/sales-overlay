@@ -8,7 +8,30 @@ const STATES = ['evaluated', 'not_applicable', 'expected_but_missed', 'unmeasure
 const GRADES = ['A+','A','B','C','D','F'];
 const PRODUCTION_VERIFICATION = 'normal_grader';
 const PRODUCTION_GRADER_VERSION = 'normal-stage-grader-v1';
+// THE EVIDENCE BOUNDS (Justin, 2026-09-07). A STAGE record cites 1–4 turns so a
+// manager can check a score at a glance. A CONTEXT fact carries NO upper bound:
+// nobody audits a context list, and binding it by a rule built for score
+// auditability withheld a call whose grading was good (call 3a99156c: finance
+// cited six turns, every stage was thrown away). The prompt sentence below is
+// built from these two constants and the worker embeds it verbatim, so the
+// prompt and the validator cannot state different numbers.
 const MAX_PRODUCTION_EVIDENCE = 4;
+const CONTEXT_EVIDENCE_MAX = null;
+const EVIDENCE_PROMPT_RULE = 'EVIDENCE BOUNDS: each of the five stage records cites 1-'+MAX_PRODUCTION_EVIDENCE+' transcript turn identifiers — a scored stage (evaluated or expected_but_missed) needs at least one and never more than '+MAX_PRODUCTION_EVIDENCE+'; an unscored stage (not_applicable or unmeasured) may cite none. Each context fact (ending, pitch, price, prior_presentation, objection, finance) cites as many turn identifiers as it needs, with '+(CONTEXT_EVIDENCE_MAX===null?'no upper bound':'at most '+CONTEXT_EVIDENCE_MAX)+'; a false occurred/established flag cites none. Every identifier must be a real turn from this transcript and no identifier is repeated.';
+// Which stage decisions READ each context field. A field that fails validation
+// withholds exactly these stages and nothing else (the blast radius). Fields
+// absent from this map are recorded and gate nothing.
+const CONTEXT_DEPENDENCIES = {
+ sales_conversation: ['intro','discovery','pitch','objection','close'],   // every scored stage
+ ending:             ['intro','discovery','pitch','objection','close'],   // the cut-off rule, only on expected_but_missed
+ pitch:              ['objection'],
+ price:              ['objection'],
+ prior_presentation: ['objection'],
+ objection:          ['objection'],
+ finance:            ['pitch','objection','close'],                        // the early-DQ rule
+ close_due:          ['close'],
+ call_kind:          [],                                                   // recorded, gates nothing
+};
 const scoreColumn = section => section === 'close' ? 'close_score_earned' : section + '_score';
 const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
 const isScore = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
@@ -193,26 +216,39 @@ const productionReason = value => {
  // This only protects displayed prose. It must never invalidate the score.
  return text&&text.length<=280&&!/\b(?:correct(?:ly)?|appropriate(?:ly)?|should|must|need(?:s|ed)?|ready|because|therefore|proves?|shows?|demonstrates?)\b/i.test(text) ? text : null;
 };
-function productionEvidence(ids, source, required) {
- if(!Array.isArray(ids)||ids.length>MAX_PRODUCTION_EVIDENCE||new Set(ids).size!==ids.length||(required&&ids.length<1))return null;
+// `max` is the bound for THIS list: MAX_PRODUCTION_EVIDENCE for a stage record,
+// CONTEXT_EVIDENCE_MAX (null = unbounded) for a context fact.
+function productionEvidence(ids, source, required, max=MAX_PRODUCTION_EVIDENCE) {
+ if(!Array.isArray(ids)||(max!==null&&ids.length>max)||new Set(ids).size!==ids.length||(required&&ids.length<1))return null;
  if(!ids.every(id=>Number.isInteger(id)&&id>=1&&id<=source.length&&clean(source[id-1]?.text)&&Number.isFinite(source[id-1]?.start_seconds)))return null;
  return ids.map(turn=>({speaker:source[turn-1].speaker,timestamp_seconds:source[turn-1].start_seconds,quote:source[turn-1].text,turn}));
 }
-function validProductionContext(context, source) {
- const ids=values=>productionEvidence(values,source,false)!==null;
- const fact=(item,key)=>item&&[true,false,null].includes(item[key])&&ids(item.evidence_turn_ids)&&!(item[key]===false&&item.evidence_turn_ids.length);
- const ending=context?.ending;
- const finance=context?.finance;
- return !!context
-  && [true,false,null].includes(context.sales_conversation)
-  && ['initial','follow_up','unknown'].includes(context.call_kind)
-  && [true,false,null].includes(context.close_due)
-  && ending&&['completed','appropriate_continuation','cut_off','unknown'].includes(ending.state)&&ids(ending.evidence_turn_ids)
-  && fact(context.pitch,'occurred')&&fact(context.price,'occurred')&&fact(context.prior_presentation,'established')&&fact(context.objection,'occurred')
-  && finance&&['qualified','genuine_dq','unresolved','not_assessed'].includes(finance.state)
-  && ['discovery','late',null].includes(finance.discovered_stage)
-  && [true,false,null].includes(finance.feasible_financing_ruled_out)&&ids(finance.evidence_turn_ids)
-  && !(finance.state==='genuine_dq'&&(!['discovery','late'].includes(finance.discovered_stage)||finance.feasible_financing_ruled_out!==true||!finance.evidence_turn_ids.length));
+// Each context field is judged ON ITS OWN. The result names the fields that
+// failed; a stage is withheld only when a field it depends on failed. A context
+// that is missing or not an object is STRUCTURAL and handled by the caller.
+function checkProductionContext(context, source) {
+ const ids=values=>productionEvidence(values,source,false,CONTEXT_EVIDENCE_MAX)!==null;
+ const fact=(item,key)=>!!item&&typeof item==='object'&&[true,false,null].includes(item[key])&&ids(item.evidence_turn_ids)&&!(item[key]===false&&item.evidence_turn_ids.length);
+ const ending=context.ending, finance=context.finance;
+ const checks={
+  sales_conversation: [true,false,null].includes(context.sales_conversation),
+  call_kind:          ['initial','follow_up','unknown'].includes(context.call_kind),
+  close_due:          [true,false,null].includes(context.close_due),
+  ending:             !!ending&&typeof ending==='object'&&['completed','appropriate_continuation','cut_off','unknown'].includes(ending.state)&&ids(ending.evidence_turn_ids),
+  pitch:              fact(context.pitch,'occurred'),
+  price:              fact(context.price,'occurred'),
+  prior_presentation: fact(context.prior_presentation,'established'),
+  objection:          fact(context.objection,'occurred'),
+  finance:            !!finance&&typeof finance==='object'
+                      &&['qualified','genuine_dq','unresolved','not_assessed'].includes(finance.state)
+                      &&['discovery','late',null].includes(finance.discovered_stage)
+                      &&[true,false,null].includes(finance.feasible_financing_ruled_out)&&ids(finance.evidence_turn_ids)
+                      &&!(finance.state==='genuine_dq'&&(!['discovery','late'].includes(finance.discovered_stage)||finance.feasible_financing_ruled_out!==true||!finance.evidence_turn_ids.length)),
+ };
+ const invalid=Object.keys(checks).filter(field=>!checks[field]);
+ const recorded={};
+ for(const field of Object.keys(checks)) recorded[field]=checks[field]?context[field]:null;
+ return {invalid,recorded};
 }
 function productionWithheld(source, reason) {
  return {version:VERSION,source_hash:sourceHash(source),context:null,status:'withheld',failure_reason:clean(reason).slice(0,240)||'Stage assessment was withheld.',sections:Object.fromEntries(SECTIONS.map(section=>[section,unknown('Stage assessment was withheld.')] ))};
@@ -228,8 +264,15 @@ function assessProduction(parsed, turns) {
   if(!SECTIONS.includes(stage)||byStage[stage])return productionWithheld(source,'Stage assessment has an invalid or duplicate stage.');
   byStage[stage]=row;
  }
- if(!SECTIONS.every(stage=>byStage[stage])||!validProductionContext(raw.context,source))return productionWithheld(source,'Stage assessment context is missing or invalid.');
- const context=raw.context;
+ // THE LINE between "one field is bad" and "the structure is unusable": the
+ // five-stage array (present, five rows, five distinct known stages) and a
+ // context OBJECT are structure — missing or malformed, the whole record is
+ // withheld. Inside a present context, each field stands or falls alone.
+ if(!SECTIONS.every(stage=>byStage[stage]))return productionWithheld(source,'Stage assessment is missing a required stage.');
+ if(!raw.context||typeof raw.context!=='object'||Array.isArray(raw.context))return productionWithheld(source,'Stage assessment context is missing.');
+ const checked=checkProductionContext(raw.context,source);
+ const context=checked.recorded;
+ const brokenFieldFor=(section,state)=>checked.invalid.find(field=>(CONTEXT_DEPENDENCIES[field]||[]).includes(section)&&(field!=='ending'||state==='expected_but_missed'));
  const sections=Object.fromEntries(SECTIONS.map(section=>{
   const row=byStage[section], state=row?.state;
   const scored=state==='evaluated'||state==='expected_but_missed';
@@ -240,18 +283,24 @@ function assessProduction(parsed, turns) {
    return [section,{state,reason:clean(row.reason).slice(0,1000),score:null,grade:null,notes:null,evidence}];
   }
   if(!Number.isInteger(row.score)||!hasCanonicalGrade(row.score,row.grade))return [section,unknown('Stage score and grade do not match the canonical scale.')];
+  // A scored stage reads only the context fields in CONTEXT_DEPENDENCIES; a bad
+  // one withholds this stage alone. `ending` is read only by the cut-off rule.
+  const broken=brokenFieldFor(section,state);
+  if(broken)return [section,unknown('Stage context for '+broken+' is invalid.')];
   if(context.sales_conversation!==true)return [section,unknown('A sales conversation is not established.')];
-  if(context.ending.state==='cut_off'&&state==='expected_but_missed')return [section,unknown('An incomplete recording cannot manufacture a missed stage.')];
+  if(state==='expected_but_missed'&&context.ending.state==='cut_off')return [section,unknown('An incomplete recording cannot manufacture a missed stage.')];
   if(section==='objection'){
    const presented=(context.pitch.occurred===true&&context.pitch.evidence_turn_ids.length&&context.price.occurred===true&&context.price.evidence_turn_ids.length)
      ||(context.prior_presentation.established===true&&context.prior_presentation.evidence_turn_ids.length);
    if(!presented||context.objection.occurred!==true||!context.objection.evidence_turn_ids.length)return [section,unknown('Objection work was not established after a valid presentation.')];
   }
   if(section==='close'&&context.close_due!==true)return [section,unknown('A purchase Close was not due on this call.')];
-  if(context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery'&&['pitch','objection','close'].includes(section))return [section,unknown('Early financial disqualification makes downstream scoring inapplicable.')];
+  if(['pitch','objection','close'].includes(section)&&context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery')return [section,unknown('Early financial disqualification makes downstream scoring inapplicable.')];
   return [section,{state,reason:clean(row.reason).slice(0,1000),score:row.score,grade:row.grade,notes:productionReason(row.reason),evidence}];
  }));
- return {version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION},sections};
+ const record={version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION},sections};
+ if(checked.invalid.length)record.context_invalid_fields=checked.invalid;
+ return record;
 }
 function productionSummaryFor(assessment) {
  return {version:VERSION,verification:PRODUCTION_VERIFICATION,grader_version:PRODUCTION_GRADER_VERSION,source_hash:assessment.source_hash,sections:Object.fromEntries(SECTIONS.map(section=>[section,{state:assessment.sections[section].state,score:assessment.sections[section].score,grade:assessment.sections[section].grade}]))};
@@ -341,4 +390,4 @@ function stageMetric(row, section) {
  const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&hasCanonicalGrade(stage.score,stage.grade);
  return {state:stage.state,contributes,score:contributes?stage.score:null,grade:contributes?stage.grade:null};
 }
-module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
+module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,CONTEXT_DEPENDENCIES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
