@@ -17,7 +17,18 @@ const PRODUCTION_GRADER_VERSION = 'normal-stage-grader-v1';
 // prompt and the validator cannot state different numbers.
 const MAX_PRODUCTION_EVIDENCE = 4;
 const CONTEXT_EVIDENCE_MAX = null;
-const EVIDENCE_PROMPT_RULE = 'EVIDENCE BOUNDS: each of the five stage records cites 1-'+MAX_PRODUCTION_EVIDENCE+' transcript turn identifiers — a scored stage (evaluated or expected_but_missed) needs at least one and never more than '+MAX_PRODUCTION_EVIDENCE+'; an unscored stage (not_applicable or unmeasured) may cite none. Each context fact (ending, pitch, price, prior_presentation, objection, finance) cites as many turn identifiers as it needs, with '+(CONTEXT_EVIDENCE_MAX===null?'no upper bound':'at most '+CONTEXT_EVIDENCE_MAX)+'; a false occurred/established flag cites none. Every identifier must be a real turn from this transcript and no identifier is repeated.';
+const EVIDENCE_PROMPT_RULE = 'EVIDENCE BOUNDS: each of the five stage records cites 1-'+MAX_PRODUCTION_EVIDENCE+' transcript turn identifiers, strongest first — a scored stage (evaluated or expected_but_missed) needs at least one and never more than '+MAX_PRODUCTION_EVIDENCE+'; an unscored stage (not_applicable or unmeasured) may cite none. Each context fact (ending, pitch, price, prior_presentation, objection, finance) cites as many turn identifiers as it needs, with '+(CONTEXT_EVIDENCE_MAX===null?'no upper bound':'at most '+CONTEXT_EVIDENCE_MAX)+'; a false occurred/established flag cites none. Every identifier must be a real turn from this transcript and no identifier is repeated.';
+// The schema fragments the grader prompt shows, so the count and the order sit where the model copies from.
+const STAGE_EVIDENCE_SCHEMA = '['+Array.from({length:MAX_PRODUCTION_EVIDENCE},(_,i)=>i+1).join(',')+'] (1-'+MAX_PRODUCTION_EVIDENCE+' turn ids, strongest first)';
+const CONTEXT_EVIDENCE_SCHEMA = '[1,2,3] (as many as needed'+(CONTEXT_EVIDENCE_MAX===null?'':', at most '+CONTEXT_EVIDENCE_MAX)+')';
+// THE DOCTRINE IN THE GRADER (Justin, 2026-09-08): the stage-relevant entries, read
+// from backend/doctrine/scout-doctrine.md at build time through the same
+// doctrineBlock the coaching lanes use — never a pasted copy. The offline candidate
+// and reviewer had this through methodGuide(); the production grader lost it when
+// the reviewer was deleted. The hash rides the stored record so a doctrine edit is
+// visible per row even though ANALYSIS_PROMPT_VERSION is a constant.
+function graderDoctrineBlock(){const D=require('./doctrine');return D.doctrineBlock({units:D.readDoctrineFile()},'stage',[]);}
+function graderDoctrineHash(){return crypto.createHash('sha1').update(graderDoctrineBlock()).digest('hex');}
 // Which stage decisions READ each context field. A field that fails validation
 // withholds exactly these stages and nothing else (the blast radius). Fields
 // absent from this map are recorded and gate nothing.
@@ -324,7 +335,7 @@ function assessProduction(parsed, turns) {
   if(['pitch','objection','close'].includes(section)&&context.finance&&context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery')return [section,unknown('Early financial disqualification makes downstream scoring inapplicable.')];
   return [section,{state,reason:clean(row.reason).slice(0,1000),score:row.score,grade:row.grade,notes:productionReason(row.reason),evidence}];
  }));
- const record={version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION},sections};
+ const record={version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION,doctrine_hash:graderDoctrineHash()},sections};
  if(checked.invalid.length)record.context_invalid_fields=checked.invalid;
  if(truncations.length)record.evidence_truncations=truncations;
  return record;
@@ -417,4 +428,4 @@ function stageMetric(row, section) {
  const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&hasCanonicalGrade(stage.score,stage.grade);
  return {state:stage.state,contributes,score:contributes?stage.score:null,grade:contributes?stage.grade:null};
 }
-module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,CONTEXT_DEPENDENCIES,CONTEXT_GATES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
+module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,STAGE_EVIDENCE_SCHEMA,CONTEXT_EVIDENCE_SCHEMA,graderDoctrineBlock,graderDoctrineHash,CONTEXT_DEPENDENCIES,CONTEXT_GATES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};

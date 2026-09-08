@@ -65,6 +65,11 @@ async function loadDoctrine(admin) {
 
 /* Which units each lane reads — a lane surfaces whole units, never fragments. */
 var LANE_KEYS = {
+  /* THE STAGE GRADER (Justin, 2026-09-08): the production grader reads these from the FILE at build time —
+     the entries that decide whether a stage became due and what counts as objection, DQ, pause and
+     follow-up. The coaching-lane entries (isolation, tying back in, how coaching is written, the
+     closing-percentage denominator, the five types) are not stage decisions and stay out. */
+  stage:                  ['what_an_objection_is', 'the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection', 'follow_ups', 'what_good_looks_like', 'what_scout_must_never_do'],
   coaching:               ['what_an_objection_is', 'the_five_objection_types', 'the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection', 'isolation_is_the_correct_first_move', 'tying_back_in', 'follow_ups', 'how_coaching_is_written', 'what_scout_must_never_do'],
   'objection-synthesis':  ['what_an_objection_is', 'the_five_objection_types', 'the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection', 'isolation_is_the_correct_first_move', 'how_coaching_is_written', 'what_scout_must_never_do'],
   'team-objection-summary': ['what_an_objection_is', 'the_five_objection_types', 'the_three_way_boundary_on_money', 'discovery_is_the_upstream_cause_of_every_objection', 'isolation_is_the_correct_first_move', 'how_coaching_is_written', 'what_scout_must_never_do'],

@@ -155,23 +155,75 @@ test('the prompt states both bounds from the same constant the validator enforce
 // and hid it as a low score. The rules are ported as prompt text. The wording is
 // chosen so relabelling cannot satisfy it: a stage that never became due is
 // not_applicable, and a score is a claim the work was done, never that it was absent.
+// THE GRADER READS THE DOCTRINE FROM THE FILE (Justin, 2026-09-08). The offline
+// candidate and reviewer read backend/doctrine/scout-doctrine.md through
+// methodGuide(); when the reviewer was deleted the doctrine left the stage path
+// with it. The grader now embeds the stage-relevant entries at build time, from
+// the file, and the hand copy of last block is deleted wherever the file supplies
+// the rule. What stays in the prompt has no equivalent in the doctrine: the
+// candidate prompt's stage rules, the reviewer's three sentences, and the
+// relabelling sentence.
 test('the production grader prompt carries the stage rules the offline prompts carried',()=>{
  const prompt=W._buildSectionGraderPrompt({turns,closer_name:'Rep',speaker_confidence:'matched'},120,'Team offer',null,{});
+ const block=S.graderDoctrineBlock();
+ assert.ok(prompt.includes(block),'the doctrine block, built from the file, is in the grader prompt verbatim');
+ const rest=prompt.replace(block,'');
  for(const sentence of [
-  'A score is a claim that the work was done',                                  // a low score is not a way to say "absent"
-  'never became due on this recording is not_applicable',                       // the state for work that was not due
-  'before the call could legitimately pause or end',                            // expected_but_missed needs a located duty
-  'spare minutes before it are not that exchange',                              // a rebook, a cut-off, spare time never make a duty
-  'IS decision-maker qualification',                                            // Queen: asking whether the partner will join is Discovery
-  'judged when the conversation actually starts',                               // H762: the opening, not the first 60 seconds
-  'not_applicable on this one',                                                 // follow-up: stages done on the earlier call are not due again
-  'A question is not resistance',                                               // Darran: questions are not objections
-  'solving a mechanical problem with you',                                      // Darran: card limit, payment plan, card not running = logistical
-  'genuinely cannot afford it is disqualified, not objecting',                  // DQ is not an objection
-  'Financing and buy-now-pay-later can be valid exceptions',                    // H757
-  'A failure to get an answer is not a failure to ask',                         // Leroy: the unanswered credit question
- ]) assert.ok(prompt.includes(sentence),'missing: '+sentence);
+  'A score is a claim that the work was done',                                  // mine — no doctrine equivalent
+  'never became due on this recording is not_applicable',                       // mine
+  'before the call could legitimately pause or end',                            // reviewer's duty check
+  'spare minutes before it are not that exchange',                              // candidate prompt
+  'IS decision-maker qualification',                                            // candidate prompt (H762 reading)
+  'judged when the conversation actually starts',                               // candidate prompt (H762)
+  'not_applicable on this one',                                                 // candidate prompt: follow-up stages
+  'A failure to get an answer is not a failure to ask',                         // reviewer only
+  'Never require extra work merely because it might be useful',                 // reviewer only
+  'A factual absence during a legitimate pause is not itself a fault',          // reviewer only
+  'unfinished or errored financing application is unresolved',                  // candidate prompt (not in the doctrine)
+  'asking what it costs makes a purchase decision due',                         // Justin, 2026-09-08: Raquel
+  "closer's own reason for not giving the price is not a blocker",              // the circular close
+  'asked in passing during discovery',                                          // and not the opposite error
+ ]) assert.ok(rest.includes(sentence),'missing outside the doctrine block: '+sentence);
+ // Supplied by the doctrine file now — the hand copies are gone from the prompt text.
+ for(const copy of [
+  'solving a mechanical problem with you',
+  'Financing and buy-now-pay-later can be valid exceptions',
+  'Missing savings or credit questions alone are not a miss',
+  'A question is not resistance',
+  'genuinely cannot afford it is disqualified, not objecting',
+ ]) assert.ok(!rest.includes(copy),'hand copy still in the prompt beside the doctrine: '+copy);
+ for(const fromFile of ['A question is not an objection','physically cannot right now','Financing and BNPL can be valid exceptions','interrupted call with a confirmed continuation','never worse for a call being long or short'])
+  assert.ok(block.includes(fromFile),'the doctrine block carries: '+fromFile);
  assert.doesNotMatch(prompt,/from the first 60 seconds/,'the retired first-60-seconds instruction is gone');
+});
+
+test('the grader doctrine block is the stage-relevant entries, read from the file, and the prompt moves when the file moves',()=>{
+ const D=require('../lib/doctrine');
+ assert.deepEqual(D.LANE_KEYS.stage,['what_an_objection_is','the_three_way_boundary_on_money','discovery_is_the_upstream_cause_of_every_objection','follow_ups','what_good_looks_like','what_scout_must_never_do']);
+ const block=S.graderDoctrineBlock();
+ for(const excluded of ['Isolation is the correct first move','Tying back in','How coaching is written','Closing percentage counts prospects','The five objection types']) assert.ok(!block.includes('· '+excluded),'coaching-lane entry in the grader: '+excluded);
+ // Drift guard: the prompt is built from whatever the file says at build time, never from a pasted literal.
+ const original=D.readDoctrineFile;
+ const marker='DRIFT-GUARD-'+Date.now();
+ D.readDoctrineFile=()=>original().map(u=>u.key==='follow_ups'?{...u,text:u.text+'\n\n'+marker}:u);
+ let hashPatched;
+ try {
+  const prompt=W._buildSectionGraderPrompt({turns,closer_name:'Rep',speaker_confidence:'matched'},120,'Team offer',null,{});
+  assert.ok(prompt.includes(marker),'a changed doctrine sentence reaches the built prompt');
+  hashPatched=S.graderDoctrineHash();
+ } finally { D.readDoctrineFile=original; }
+ const hashA=S.graderDoctrineHash();
+ assert.match(hashA,/^[0-9a-f]{40}$/);
+ assert.notEqual(hashPatched,hashA,'the hash moves with the file');
+ assert.equal(S.assessProduction(payload(),turns).production.doctrine_hash,hashA,'the record carries the hash of the doctrine it was graded under');
+});
+
+test('the evidence sentence asks for strongest first and the schema itself says how many',()=>{
+ assert.match(S.EVIDENCE_PROMPT_RULE,/strongest first/);
+ assert.equal(S.STAGE_EVIDENCE_SCHEMA,'[1,2,3,4] (1-4 turn ids, strongest first)');
+ const prompt=W._buildSectionGraderPrompt({turns,closer_name:'Rep',speaker_confidence:'matched'},120,'Team offer',null,{});
+ assert.ok(prompt.includes('"evidence_turn_ids":'+S.STAGE_EVIDENCE_SCHEMA),'the stage schema carries the count and the order');
+ assert.ok(prompt.includes('"evidence_turn_ids":'+S.CONTEXT_EVIDENCE_SCHEMA),'the context schema says as many as needed');
 });
 
 test('replay: the saved reply for the early financial DQ call now measures what the grader graded',()=>{
