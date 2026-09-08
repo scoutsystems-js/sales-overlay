@@ -40,7 +40,7 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash, options) {
   var callIds = Object.keys(byId);
   var loaded = await Promise.all([readBatches(callIds, async function (slice) {
     var pair = await Promise.all([
-      admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name, status, intro_score, discovery_score, pitch_score, objection_score, close_score_earned, rep_period_coaching').in('fathom_call_id', slice),
+      admin.from('call_analyses').select('fathom_call_id, outcome, prospect_name, status, intro_score, discovery_score, pitch_score, objection_score, close_score_earned, stage_eligibility, rep_period_coaching').in('fathom_call_id', slice),
       periodOnly ? Promise.resolve({data:[]}) : admin.from('call_highlights').select('id, fathom_call_id, type, handling, resolution, section, speaker, speaker_verified, timestamp_seconds, quote, observation, coaching, coaching_review, closer_response, closer_response_verified, cause, objection_class, objection_category').in('fathom_call_id', slice),
     ]);
     if (pair[0].error) throw new Error('call_analyses: ' + pair[0].error.message);

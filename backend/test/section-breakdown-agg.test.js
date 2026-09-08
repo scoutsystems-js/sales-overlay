@@ -121,6 +121,24 @@ test('splits moments into good and bad using the shared highlightGroup rule', ()
   assert.strictEqual(out.good[0].quote, 'good one');
 });
 
+test('stage-metric views exclude highlights from calls outside the verified stage population', () => {
+  const excluded = A('excluded', { discovery_score: null }, '2026-07-02');
+  // A stale raw score and a convincing highlight must not re-enter a stage whose
+  // explicit record says it was not applicable.
+  excluded.discovery_score = 0;
+  const out = buildSectionBreakdown('discovery', {
+    analyses: [A('included', { discovery_score: 55 }, '2026-07-01'), excluded],
+    highlights: [
+      H('included', 'discovery', 'missed_opportunity', 'included evidence'),
+      H('excluded', 'discovery', 'missed_opportunity', 'excluded evidence'),
+    ],
+    callMeta: {},
+    stageMetricOnly: true,
+  });
+  assert.deepStrictEqual(out.bad.map((m) => m.quote), ['included evidence']);
+  assert.strictEqual(out.coverage.calls_total, 1);
+});
+
 test('every moment carries what the screen needs: prospect, date, and a ?t= link', () => {
   const out = buildSectionBreakdown('discovery', {
     analyses: [A('c1', { discovery_score: 55 }, '2026-07-01')],

@@ -9,7 +9,7 @@ const { CLAUDE_MODEL } = require('../config');
 const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
 const { gradingBacklog } = require('../lib/grading-backlog');
 const { generateCandidates } = require('../lib/prospect-merge');
-const { buildSectionBreakdown, sectionScoreOf, SECTIONS } = require('../lib/section-breakdown');
+const { buildSectionBreakdown, SECTIONS } = require('../lib/section-breakdown');
 // ⚠ TWO FUNCTIONS CALLED rankSections EXISTED, MEANING OPPOSITE THINGS:
 // section-breakdown's ranked 1 = STRONGEST; section-ranking's ranks 1 = WEAKEST
 // (worst first, which is the coaching frame). The card and the drilldown it
@@ -1233,7 +1233,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
   if (!callIds.length) return buildSectionBreakdown(section, { analyses: [], highlights: [], callMeta: {} });
 
   var cols = 'fathom_call_id, prospect_name, intro_score, discovery_score, pitch_score, objection_score, close_score, close_score_earned, '
-    + 'intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes';
+    + 'intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes, stage_eligibility';
   /* ⚠⚠ CHUNKED AT 100 (fix #3, H677). An unchunked `.in()` carries every id in the URL
      and the request DIES above ~395 ids — measured 2026-09-02: 390 succeed, 400
      `fetch failed` after ~8 s, no PostgREST error (H663). The owner was at 390 calls
@@ -1266,14 +1266,7 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
     meta[c.id] = { prospect_name: nameBy[c.id] || null, recording_url: c.recording_url || null, call_date: c.call_date || null };
   });
 
-  var out = buildSectionBreakdown(section, { analyses: an.data || [], highlights: hl.data || [], callMeta: meta });
-
-  // Rank among the five, computed on the SAME earned-close basis.
-  var averages = {};
-  SECTIONS.forEach(function (sec) {
-    var vals = (an.data || []).map(function (a) { return sectionScoreOf(a, sec); }).filter(function (v) { return typeof v === 'number'; });
-    averages[sec] = vals.length ? Math.round(vals.reduce(function (x, y) { return x + y; }, 0) / vals.length) : null;
-  });
+  var out = buildSectionBreakdown(section, { analyses: an.data || [], highlights: hl.data || [], callMeta: meta, stageMetricOnly: true });
   // Worst-first, matching the needs-work card that links here. `rank_label` is
   // rendered instead of a bare number because "ranked 3 of 5" never said which
   // end was good.
@@ -1298,8 +1291,8 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
       for (var pi = 0; pi < prevIds.length; pi += CHUNK) paChunks.push(admin.from('call_analyses').select(cols).in('fathom_call_id', prevIds.slice(pi, pi + CHUNK)).eq('status', 'done'));
       var paRes = await Promise.all(paChunks);
       var paRows = []; paRes.forEach(function (x) { paRows = paRows.concat(x.data || []); });
-      var pv = paRows.map(function (a) { return sectionScoreOf(a, section); }).filter(function (v) { return typeof v === 'number'; });
-      out.prior_average = pv.length ? Math.round(pv.reduce(function (x, y) { return x + y; }, 0) / pv.length) : null;
+      var prior = SR.sectionStatsFromAnalyses(paRows)[section];
+      out.prior_average = prior.mean === null ? null : Math.round(prior.mean);
     } else out.prior_average = null;
   } catch (e) { out.prior_average = null; }
 
@@ -1426,7 +1419,7 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
   if (!callIds.length) return { sections: SR.rankSections({}), why: null };
 
   var cols = 'fathom_call_id, prospect_name, what_mattered, intro_score, discovery_score, pitch_score, '
-    + 'objection_score, close_score_earned, intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes';
+    + 'objection_score, close_score_earned, intro_notes, discovery_notes, pitch_notes, objection_notes, close_notes, stage_eligibility';
   var analyses = [], highlights = [];
   for (var i = 0; i < callIds.length; i += CHUNK) {
     var slice = callIds.slice(i, i + CHUNK);
@@ -1456,7 +1449,7 @@ async function computeNeedsWorkSections(admin, userId, from, to) {
     entry.moments = [];
     if (!entry.enough) return;
     var secHl = highlights.filter(function (h) { return h && h.section === entry.section; });
-    var bd = buildSectionBreakdown(entry.section, { analyses: analyses, highlights: secHl, callMeta: meta });
+    var bd = buildSectionBreakdown(entry.section, { analyses: analyses, highlights: secHl, callMeta: meta, stageMetricOnly: true });
     // "What to fix" moments — the card is about what needs work. Newest first,
     // capped at three, and only rows carrying an actual quote.
     entry.moments = (bd.bad || []).filter(function (m) { return m && m.quote; }).slice(0, 3)
@@ -1549,4 +1542,3 @@ module.exports._buildAccountPayload = buildAccountPayload;
    decode, which is requireAuth's job and is covered elsewhere.
    ⚠ Sets the module-local _admin, so production behaviour is untouched. */
 module.exports._setAdminClientForTests = function (factory) { _admin = factory(); };
-

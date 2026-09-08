@@ -117,6 +117,16 @@ function buildSectionBreakdown(section, input) {
   var analyses = Array.isArray(d.analyses) ? d.analyses : [];
   var highlights = Array.isArray(d.highlights) ? d.highlights : [];
   var meta = d.callMeta || {};
+  // A stage score's supporting moments must come from the same verified
+  // population as its aggregate. Other coaching readers deliberately leave
+  // this off: their moments are not evidence for a displayed stage metric.
+  var contributingCalls = {};
+  analyses.forEach(function (a) {
+    if (stageMetric(a, section).contributes) contributingCalls[a.fathom_call_id] = true;
+  });
+  if (d.stageMetricOnly) {
+    highlights = highlights.filter(function (h) { return h && contributingCalls[h.fathom_call_id]; });
+  }
 
   // ── score aggregate ────────────────────────────────────────────────────
   var scores = [];
@@ -321,7 +331,7 @@ function buildSectionBreakdown(section, input) {
     coverage: {
       moments: good.length + bad.length,
       calls_with_moments: Object.keys(callsWithMoments).length,
-      calls_total: analyses.length,
+      calls_total: d.stageMetricOnly ? Object.keys(contributingCalls).length : analyses.length,
     },
     // Live: objection is the only section where bad outnumbers good (20 v 13).
     bad_outnumber_good: bad.length > good.length,
