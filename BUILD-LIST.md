@@ -23,6 +23,8 @@ The approved stage map is A+ 98–100, A 90–97, B 80–89, C 70–79, D 60–6
 
 Next gate: local representative human review of normal full call, appropriate continuation, early/late financial DQ, real/no objection, cutoff, follow-up, and the originally inconsistent Coaching period. Do not migrate, promote a writer, regrade history, or deploy before that review. Quote grouping and unrelated work remain deferred.
 
+Earlier checkpoint, September 6 (kept from the root working copy; superseded by the paragraphs above): Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. H762 approved: Intro has no fixed60-second cutoff; a correctly booked continuation is separate from purchase-Close scoring. The stage contract is under local validation; no data changes or deployment. Justin approved a $28 ceiling for the seven-day correction, including validation and retries. First17-call pilot exposed checklist penalties and quote reconstruction failures; results are held. The revised candidate removes the conflicting checklist and pulls indexed evidence from source. See `investigation.md`.
+
 ## 2. Full-call navigation check — AFTER task 1
 
 Trace the observed Review Full Call return to Team Coaching. Confirm whether it is reproducible and identify the cause before changing anything. Verify the correct call/rep opens and back navigation behaves correctly; the earlier observation did not prove the cause.
@@ -188,6 +190,15 @@ Justin authorized the prepared test with `send it`. Four calls / five candidates
 
 This completion supersedes earlier pending-approval and pending-run notes for the four-call test only; deployment is still held.
 
+
+## Codex coaching correction — local only, 2026-09-05
+Cause/cost prompt conflict and review distinctions corrected in `.codex/team-coaching`; 2,493 tests pass. No new coaching published. Next required step is approval for the prepared four-call real-output check, then Justin reading the result before deployment. No additional paid run is authorized yet. See `~/Desktop/scan-reports/coaching-recovery/CORRECTION.md` and H740. This status supersedes older recovery planning notes below for this block only.
+
+**Created 2026-08-20.** Seeded from the live-site audit and the current repo, **not** from `BUILD-PLAN.md` (19 April, four months stale — treat it as history).
+
+**⚠ STANDING PROCEDURE: update this file after every push, alongside `CLAUDE.md`.**
+
+**⚠ ANYTHING UNVERIFIED IS MARKED `UNKNOWN`.** An invented entry is worse than a gap: a gap gets asked about, an invention gets built.
 
 **Created 2026-08-20.** Seeded from the live-site audit and the current repo, **not** from `BUILD-PLAN.md` (19 April, four months stale — treat it as history).
 
@@ -2189,11 +2200,22 @@ Implemented verified transcript pairing and call-level results for the approved 
 ## GPT Team Coaching workspace — 2026-09-05 (local, not deployed)
 Approved compact priorities, closer selector/detail panel, expandable strengths, persistent Team subnavigation and icons are implemented in the Codex worktree; original wordmark/background toggle retained. Full suite 2,477/2,477. The contradiction now has full exchange context and an independent review gate. Migration 075 applied; two proven inaccurate live notes removed; final suite 2,480/2,480. Deployed as 4b17f8b after new analyses completed; exact Railway commit and page markers verified. Authenticated live navigation, closer selection and artwork persistence verified. Historic coaching is not certified or backfilled; the new panel fills as future analyses pass review. See `gpt.md`.
 
+## Historical coaching review findings — 2026-09-05
+The approved 119-call review is complete; 216 notes checked, two accepted, 214 withheld. See gpt.md. Follow-up: reviewer waived one unverified 21-earlier-calls claim despite instructions (manually withheld); 24 model approvals supplied non-exact KB support and were withheld. These are observed validator limitations, not a measured global accuracy rate. No new historical run authorized.
+
 ## Validator v2 — 2026-09-05
-Implemented source IDs, date-bounded record-backed memory, and separate contradiction/missing-evidence/reference outcomes. 2,485 tests and saved-response regression replay pass; no paid review or historical upgrade performed. These fix the observed protocol and memory-waiver gaps; semantic accuracy is not established by the test count. Deployment verification in gpt.md.
+Implemented source IDs, date-bounded record-backed memory, and separate contradiction/missing-evidence/reference outcomes. 2,485 tests and saved-response regression replay pass; no paid review or historical upgrade performed. These fix the observed protocol and memory-waiver gaps; semantic accuracy is not established by the test count. Deployment verification in gpt.md. Deployed as 3de235e; exact Railway commit and legacy reviewed-data compatibility verified (root working copy, later state).
 
 ## Coaching recovery follow-up — 2026-09-05
 Pilot complete: eight calls, eleven candidates, five no-change responses, six withheld drafts, zero publishable notes. Corrective block BUILT LOCALLY: generation no longer demands causal/cost claims; reviewer instructions distinguish isolation, qualification and principles. Full suite 2,493/2,493 and six saved-response gate replays pass. No historical data changed. NOT DEPLOYED; model efficacy remains unverified and Justin must read fresh output. Next: approve and run the prepared four-call real-output test, then review its results before deployment. No additional paid batch is yet authorized. Evidence: `~/Desktop/scan-reports/coaching-recovery/correction-replay.json`; new test manifest: `~/Desktop/scan-reports/coaching-correction-test/plan.json`.
+
+## Consolidated revamp plan — 2026-09-05 — IMPLEMENTATION PAUSED
+Justin paused further implementation to consolidate the work. Active proposal: `/Users/justinschmidt/Desktop/scan-reports/scout-revamp-plan/BUILD-PLAN.md`. C1–C11 cover Team Coaching recovery and presentation; page-by-page plan covers the remaining workspace and supporting pages. Recommended first block is read-only rep coverage measurement plus useful factual rep panels (C1–C2), not another paid backfill. Existing calls remain available despite withheld advice. No new production change or paid processing in this planning block. Resume only when Justin directs; this consolidated order replaces drifting among revamp subprojects, not unrelated product rulings.
+
+### Revamp research refinement — 2026-09-05
+The consolidated plan now includes official-product research, sources, and KEEP/TUNE/REBUILD decisions. Page inventory is not a mandatory rewrite. Coverage recovery remains first; optional coaching progress/example collections are deferred. Task-based comparison must justify each redesign. Implementation stays paused.
+
+H754 final navigation correction: live testing exposed hash/back-navigation updating the date label without clearing old period payloads. onRouteChange now compares the previous view/range and invokes the existing range reset before rendering, also advancing its response epoch. Two regressions failed before the fix; all 2,558 tests pass. This correction is built and pending push at this checkpoint; the data backfill remains saved.
 
 ## Team Coaching call availability — 2026-09-05
 LIVE as `d059599`: closers without an approved coaching focus retain their measured call count and up to five recent calls with recorded outcome/analysis status and a Review Call action. Missing team material no longer suppresses call access. No coaching was restored, regenerated or inferred. Full suite 2,487/2,487; current-data carrier check passed. Signed-in verification selected Josh P, showed 143 calls and five recent calls, and opened the selected call under Josh's user ID.

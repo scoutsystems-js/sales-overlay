@@ -661,7 +661,7 @@ function buildSectionGraderPrompt(normalized, durationSeconds, sellingContext, c
     // v57: the bounds are stated ONCE, from the constants the validator enforces
     // (lib/stage-eligibility.js) — at v56 the prompt bounded stage records only and
     // the validator bounded the context lists too, so a six-turn finance list
-    // withheld every stage on a correctly graded call (H763 follow-up).
+    // withheld every stage on a correctly graded call (H764 follow-up).
     stageEligibility.EVIDENCE_PROMPT_RULE,
     '  - evaluated: this stage work occurred and the recording has enough content to judge it. Include a score and matching grade.',
     '  - expected_but_missed: the recording proves this work was due and materially missed. Include a score and matching grade; do not infer duty merely because a stage was absent or the call did not close.',

@@ -2,6 +2,10 @@
 
 Updated September 6, 2026 (Eastern). Broader coaching is LIVE and complete. The new Coaching Page Integrity task is ACTIVE. Verified application release: `d477b31a53e0c1b42ef3649411d0e5b9590b2e2a`, Railway SUCCESS, marker `period-breadth-v16-facts5`. Page-speed work remains complete. Both definition questions are approved (H762); no definition ruling is pending. The $100 session budget and independent evidence-check approach are approved.
 
+## Development workflow — September 6, 2026
+
+Permanent development-model cost discipline is recorded in `AGENTS.md` → “Development model cost discipline” (H763), with a pointer from `CLAUDE.md`. Apply it to the active task and future work. This documentation change does not itself switch the selected session model or change the live application.
+
 ## Active task — Coaching Page Integrity
 
 Local work only; no deployment or score/outcome/coaching data changes. Justin reaffirmed a $100 total session budget and authorized continuing without another spending request within that cap. No product ruling is pending. Both H762 definitions are approved.

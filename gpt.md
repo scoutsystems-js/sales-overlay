@@ -273,3 +273,20 @@ Filed after final page check: clicking Review Full Call formed the correct call/
 
 
 Coaching Integrity ACTIVE September6: read-only Dre-week source audit proves numeric availability rather than eligibility; inappropriate grades on postponed/unperformed stages. Local UI score-band correction and separation of period score versus call coaching built; not live. Internal review counts removed, stage counts held. Both definitions are approved by H762 (no Intro clock cutoff; booking continuation is separate from purchase-Close). No model spending or data writes. Read current-state and scan-reports/coaching-integrity/investigation.md; do not start queued navigation/Strengths/quote grouping.
+
+## Sections from the root working copy (merged 2026-09-08; the entries above are the branch's)
+
+## Coaching correction — local, not deployed — 2026-09-05
+Codex worktree `.codex/team-coaching`: analysis v50 / review v3 removes mandatory cause/cost claims, fixes the missing-reply inference and clarifies isolation, qualification and principles for the reviewer. Full suite 2,493/2,493; six saved-response gate replays remain withheld. These checks do not establish new model efficacy. No additional paid generation or historical writes in this block. Fresh real-output review is required before deployment; four fixed calls / five candidates are prepared but not authorized to run. Report: `~/Desktop/scan-reports/coaching-recovery/CORRECTION.md`. Standing clarification: H740.
+
+## Build handoff instruction — 2026-09-05
+
+Justin requests a plain-language summary after each build and a **What's next** section. Explicitly distinguish built from live, and state exactly any action Justin must take before deployment and why. If no action is needed, say so. Saved in AGENTS.md. Current work is a consolidated page redesign plan with visual mockups; implementation is paused at Justin's request.
+
+## Consolidated revamp planning — 2026-09-05
+Implementation paused at Justin's request. Created Desktop/scan-reports/scout-revamp-plan/BUILD-PLAN.md with Team Coaching C1–C11, page-by-page rationale, six bounded phases and release acceptance. Twelve primary-page mockup states use explicitly illustrative data, with original wordmark and artwork toggle. Browser checks confirmed all twelve navigation states render, the calls-available fallback works, and no horizontal document overflow at desktop/mobile widths. No production code, data or paid processing changed. Added build-handoff communication rule to AGENTS.md (128,741 bytes after edit).
+
+## Research-informed plan refinement — 2026-09-05
+Reviewed public official Gong, Avoma, Fathom and Grain documentation plus Nielsen Norman Group progressive-disclosure guidance. Appended sources and KEEP/TUNE/REBUILD decisions to Desktop/scan-reports/scout-revamp-plan/BUILD-PLAN.md. User says changes are optional when existing work is good. Coverage-first order retained; added task-based comparison before redesign, deferred progress tracking/example collections, corrected prototype-only navigation/date/font implications. No live code/data changes or paid processing. Competitor efficacy not independently tested; customization is not unique to Scout.
+
+H754 final navigation correction: live testing exposed hash/back-navigation updating the date label without clearing old period payloads. onRouteChange now compares the previous view/range and invokes the existing range reset before rendering, also advancing its response epoch. Two regressions failed before the fix; all 2,558 tests pass. This correction is built and pending push at this checkpoint; the data backfill remains saved.
