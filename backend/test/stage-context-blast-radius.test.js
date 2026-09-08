@@ -99,9 +99,23 @@ test('a bad context field withholds only the stages that depend on it',()=>{
   assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'unmeasured',close:'evaluated:99'},field);
   assert.deepEqual(r.context_invalid_fields,[field]);
  }
- // finance feeds the early-DQ rule on Pitch, Objection Handling and Close; Intro and Discovery survive.
+ // finance feeds ONE rule — the early-DQ rule on Pitch, Objection Handling and Close — so an
+ // invalid finance fact gates those three only when it claims a disqualification that is not
+ // late (Justin, 2026-09-07: "a late DQ leaves those three standing"). Intro and Discovery never read it.
  r=assess(payload({...fullContext,finance:{state:'genuine_dq',discovered_stage:null,feasible_financing_ruled_out:null,evidence_turn_ids:[]}}));
- assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'unmeasured',objection:'unmeasured',close:'unmeasured'});
+ assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'unmeasured',objection:'unmeasured',close:'unmeasured'},'a DQ claim of unstated timing gates');
+ r=assess(payload({...fullContext,finance:{state:'genuine_dq',discovered_stage:'discovery',feasible_financing_ruled_out:false,evidence_turn_ids:[3]}}));
+ assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'unmeasured',objection:'unmeasured',close:'unmeasured'},'an early DQ claim that is invalid gates');
+ assert.deepEqual(r.context_invalid_fields,['finance']);
+ // Adrienne 6c253ea2: genuine_dq, discovered LATE, financing not ruled out — invalid, but the
+ // early-DQ rule could never have fired, so Pitch, Objection and Close stand and the field is still recorded invalid.
+ r=assess(payload({...fullContext,finance:{state:'genuine_dq',discovered_stage:'late',feasible_financing_ruled_out:false,evidence_turn_ids:[3,4,5,6,7]}}));
+ assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'evaluated:81',close:'evaluated:99'},'a late DQ claim that is invalid gates nothing');
+ assert.deepEqual(r.context_invalid_fields,['finance']);
+ assert.equal(r.context.finance,null);
+ r=assess(payload({...fullContext,finance:{state:'unresolved',discovered_stage:'nope',feasible_financing_ruled_out:null,evidence_turn_ids:[]}}));
+ assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'evaluated:81',close:'evaluated:99'},'an invalid non-DQ finance fact gates nothing');
+ assert.deepEqual(r.context_invalid_fields,['finance']);
  // ending feeds the cut-off rule, which only bites an expected_but_missed stage.
  r=assess(payload({...fullContext,ending:{state:'ended',evidence_turn_ids:[]}},{close:{state:'expected_but_missed',score:40,grade:'F'}}));
  assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'evaluated:81',close:'unmeasured'});
@@ -133,6 +147,31 @@ test('the prompt states both bounds from the same constant the validator enforce
  const prompt=W._buildSectionGraderPrompt({turns,closer_name:'Rep',speaker_confidence:'matched'},120,'Team offer',null,{});
  assert.ok(prompt.includes(S.EVIDENCE_PROMPT_RULE),'the grader prompt carries the shared rule verbatim');
  assert.doesNotMatch(prompt.replace(S.EVIDENCE_PROMPT_RULE,''),/1-4 strong transcript turn identifiers/,'no second statement of the bound survives in the prompt');
+});
+
+// THE GRADER IS TOLD THE RULES (Justin, 2026-09-07). Four wrong results on the v57
+// run were one mistake: the production grader was never given the stage rules the
+// offline candidate and reviewer carried, so it graded work that never became due
+// and hid it as a low score. The rules are ported as prompt text. The wording is
+// chosen so relabelling cannot satisfy it: a stage that never became due is
+// not_applicable, and a score is a claim the work was done, never that it was absent.
+test('the production grader prompt carries the stage rules the offline prompts carried',()=>{
+ const prompt=W._buildSectionGraderPrompt({turns,closer_name:'Rep',speaker_confidence:'matched'},120,'Team offer',null,{});
+ for(const sentence of [
+  'A score is a claim that the work was done',                                  // a low score is not a way to say "absent"
+  'never became due on this recording is not_applicable',                       // the state for work that was not due
+  'before the call could legitimately pause or end',                            // expected_but_missed needs a located duty
+  'spare minutes before it are not that exchange',                              // a rebook, a cut-off, spare time never make a duty
+  'IS decision-maker qualification',                                            // Queen: asking whether the partner will join is Discovery
+  'judged when the conversation actually starts',                               // H762: the opening, not the first 60 seconds
+  'not_applicable on this one',                                                 // follow-up: stages done on the earlier call are not due again
+  'A question is not resistance',                                               // Darran: questions are not objections
+  'solving a mechanical problem with you',                                      // Darran: card limit, payment plan, card not running = logistical
+  'genuinely cannot afford it is disqualified, not objecting',                  // DQ is not an objection
+  'Financing and buy-now-pay-later can be valid exceptions',                    // H757
+  'A failure to get an answer is not a failure to ask',                         // Leroy: the unanswered credit question
+ ]) assert.ok(prompt.includes(sentence),'missing: '+sentence);
+ assert.doesNotMatch(prompt,/from the first 60 seconds/,'the retired first-60-seconds instruction is gone');
 });
 
 test('replay: the saved reply for the early financial DQ call now measures what the grader graded',()=>{

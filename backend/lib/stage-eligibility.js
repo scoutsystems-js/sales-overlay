@@ -28,9 +28,18 @@ const CONTEXT_DEPENDENCIES = {
  price:              ['objection'],
  prior_presentation: ['objection'],
  objection:          ['objection'],
- finance:            ['pitch','objection','close'],                        // the early-DQ rule
+ finance:            ['pitch','objection','close'],                        // the early-DQ rule — see CONTEXT_GATES
  close_due:          ['close'],
  call_kind:          [],                                                   // recorded, gates nothing
+};
+// A field gates its stages only when the rule that reads it could have fired.
+// `finance` is read by one rule, the EARLY-DQ rule, so an invalid finance fact
+// withholds Pitch, Objection and Close only when it claims a disqualification
+// whose timing is not late (Justin, 2026-09-07: "a late DQ leaves those three
+// standing" — Adrienne 6c253ea2 lost three good grades to a fact that had no
+// bearing on them). The field is recorded as invalid either way.
+const CONTEXT_GATES = {
+ finance: raw => !!raw&&typeof raw==='object'&&raw.state==='genuine_dq'&&raw.discovered_stage!=='late',
 };
 const scoreColumn = section => section === 'close' ? 'close_score_earned' : section + '_score';
 const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
@@ -272,7 +281,9 @@ function assessProduction(parsed, turns) {
  if(!raw.context||typeof raw.context!=='object'||Array.isArray(raw.context))return productionWithheld(source,'Stage assessment context is missing.');
  const checked=checkProductionContext(raw.context,source);
  const context=checked.recorded;
- const brokenFieldFor=(section,state)=>checked.invalid.find(field=>(CONTEXT_DEPENDENCIES[field]||[]).includes(section)&&(field!=='ending'||state==='expected_but_missed'));
+ const brokenFieldFor=(section,state)=>checked.invalid.find(field=>(CONTEXT_DEPENDENCIES[field]||[]).includes(section)
+  &&(field!=='ending'||state==='expected_but_missed')
+  &&(!CONTEXT_GATES[field]||CONTEXT_GATES[field](raw.context[field])));
  // THE SAFETY NET (Justin, 2026-09-07): every cited id must be a real turn —
  // one bad id anywhere in the list still withholds the stage — but a stage
  // that cites MORE than MAX_PRODUCTION_EVIDENCE valid turns keeps its first
@@ -309,7 +320,8 @@ function assessProduction(parsed, turns) {
    if(!presented||context.objection.occurred!==true||!context.objection.evidence_turn_ids.length)return [section,unknown('Objection work was not established after a valid presentation.')];
   }
   if(section==='close'&&context.close_due!==true)return [section,unknown('A purchase Close was not due on this call.')];
-  if(['pitch','objection','close'].includes(section)&&context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery')return [section,unknown('Early financial disqualification makes downstream scoring inapplicable.')];
+  // `context.finance` is null when the fact was invalid but did not gate this stage (a late DQ claim).
+  if(['pitch','objection','close'].includes(section)&&context.finance&&context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery')return [section,unknown('Early financial disqualification makes downstream scoring inapplicable.')];
   return [section,{state,reason:clean(row.reason).slice(0,1000),score:row.score,grade:row.grade,notes:productionReason(row.reason),evidence}];
  }));
  const record={version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION},sections};
@@ -405,4 +417,4 @@ function stageMetric(row, section) {
  const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&hasCanonicalGrade(stage.score,stage.grade);
  return {state:stage.state,contributes,score:contributes?stage.score:null,grade:contributes?stage.grade:null};
 }
-module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,CONTEXT_DEPENDENCIES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
+module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,CONTEXT_DEPENDENCIES,CONTEXT_GATES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
