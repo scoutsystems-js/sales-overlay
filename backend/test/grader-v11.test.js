@@ -37,7 +37,7 @@ test('ANALYSIS_PROMPT_VERSION is the current shipped version (v29)', () => {
   // v30 = PER-MOMENT COACHING — a third model call writes call_highlights.coaching.
   //       ONE call per CALL covering all its moments, never one per moment.
   //       Additive: no existing prompt touched, no score moves, so no delta gate.
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v55-2026-09-05'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v56-2026-09-07'/);
 });
 
 /* ⚠⚠ v25's three fixes, asserted on the BUILT PROMPT STRING rather than on the
@@ -152,10 +152,12 @@ test('the grader name is fed into the resolver, not written directly', () => {
     'the persisted value must come from the resolver');
 });
 
-test('v11 is ADDITIVE — the scoring/outcome instructions are untouched', () => {
-  // Why no delta-gate is needed. Same reasoning that let v10 ship without one.
+test('the canonical stage scale keeps the existing domain context and rubric', () => {
+  // The simplified stage contract deliberately replaces the former score
+  // boundaries, but it must retain the domain calibration that prevents a
+  // normal non-close from being treated as failed work.
   assert.ok(/ADDITIVE/.test(src));
-  assert.ok(/85-100: exceptional/.test(src), 'the anchored rubric must still be present');
+  assert.ok(/98-100: A\+ — exceptional/.test(src), 'the canonical stage scale must be present');
   assert.ok(/25-35% close rate is STRONG/.test(src), 'domain context must still be present');
 });
 

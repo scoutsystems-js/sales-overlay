@@ -1,13 +1,27 @@
 'use strict';
 const crypto = require('node:crypto');
-const VERSION = 'stage-eligibility-v16';
+const VERSION = 'stage-eligibility-v17';
 const MODEL='claude-sonnet-4-6', MAX_TOKENS=4500;
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const EVIDENCE_SLOTS = Array.from({length:8},(_,index)=>'turn_'+(index+1));
 const STATES = ['evaluated', 'not_applicable', 'expected_but_missed', 'unmeasured'];
+const GRADES = ['A+','A','B','C','D','F'];
+const PRODUCTION_VERIFICATION = 'normal_grader';
+const PRODUCTION_GRADER_VERSION = 'normal-stage-grader-v1';
+const MAX_PRODUCTION_EVIDENCE = 4;
 const scoreColumn = section => section === 'close' ? 'close_score_earned' : section + '_score';
 const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
 const isScore = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
+function canonicalGrade(score) {
+ if (!Number.isInteger(score) || !isScore(score)) return null;
+ if (score >= 98) return 'A+';
+ if (score >= 90) return 'A';
+ if (score >= 80) return 'B';
+ if (score >= 70) return 'C';
+ if (score >= 60) return 'D';
+ return 'F';
+}
+const hasCanonicalGrade = (score, grade) => canonicalGrade(score) === grade;
 const FACTUAL_NOTE_WORDS=/\b(?:correct(?:ly)?|appropriate(?:ly)?|useful|directionally|good|weak|should|could|can(?:not)?|can't|able|ability|adequate|learned|determined|identified|established|framed|provided|walked\s+through|verified|set|ready|felt\s+ready|need(?:s|ed)?|must|necessary|necessity|require(?:s|d|ment)?|depend(?:s|ed|ent|ency)?|intend(?:s|ed)?|intent(?:ion)?|prefer(?:s|red)?|missed\s+opportunity|because|therefore|thus|caused|causing|led\s+to|resulted\s+in|shows?|proved|demonstrates?|indicates?|suggests?)\b/i;
 const NOTE_ACTIONS={
  Closer:['asked','said','stated','confirmed','described','explained','offered','scheduled','booked','requested','agreed','declined','named','responded','rescheduled'],
@@ -59,8 +73,8 @@ function promptInstructions(sellingContext) {
   'PRODUCER NOTE SAFETY: For a scored note, use only one or two short, semicolon-separated facts in the forms “Closer asked…”, “Closer stated…”, “Prospect said…”, “Prospect answered…”, “Prospect confirmed…”, “Prospect declined…”, “Prospect named…”, or “Prospect described…”. Each clause names one actor only. Do not use evaluative or interpretive wording such as set aside, felt ready, correctly ended, required, dependency, intent, readiness, ability, or necessity. A partner being absent or a family member being discussed is not proof that the person is required for the decision. Do not score Intro or Discovery from opening scheduling, time, work availability, laptop availability, or rescheduling alone; return a safe unscored stage unless actual stage work is separately evidenced.',
   'STAGE DEFINITIONS: Intro establishes useful direction for the actual conversation. Discovery establishes relevant pain/goals/current situation/decision makers/why now/resources WHEN DUE; information volunteered or accurately paraphrased counts. Pitch frames the offered solution against discovered needs; market education or a brief answer alone is not automatically a program pitch. Objection handling evaluates resistance AFTER offer presentation and price (or a specifically evidenced prior presentation); pre-price concerns belong to the stage where they occurred and can be coached there if supported. Close evaluates the purchase decision, not merely ending a call or booking another meeting.',
   'ELIGIBILITY BEFORE SCORE: On an appropriate continuation, incomplete future work is not a current miss. Score the useful work already performed. A concrete separate mistake may still be graded, but cite what made that work due NOW; available time or general usefulness is insufficient. With no pitch/price and no evidenced prior presentation, objection MUST be not_applicable. If genuine financial inability is established only late, judge the actual qualification miss in Discovery, not inability to buy in Close.',
-  'SCORING SCALE (only for evaluated or evidenced expected_but_missed):85-100 exceptional;70-84 strong;55-69 adequate with real gaps;40-54 weak;below40 significant failure or barely attempted work that was actually due. Do not lower a score for correctly omitted work. Do not assign a score simply because a call ended without a sale. Grade letters A/B/C/D/F accompany numeric scores; not_applicable and unmeasured have null grade and score.',
-  'Return one JSON object with context and sections. sections MUST be an array of exactly five entries: exactly one each for intro, discovery, pitch, objection, close. Do not omit or duplicate any stage. If a stage cannot be safely scored, return its unmeasured or not_applicable state with empty grade, null score, and empty note. Each entry has section naming the stage plus:{"assessment":{"state":"evaluated|not_applicable|expected_but_missed|unmeasured","evidence_turns":{"turn_1":1,"turn_2":null,"turn_3":null,"turn_4":null,"turn_5":null,"turn_6":null,"turn_7":null,"turn_8":null}},"grade":"A|B|C|D|F"|"","score":0-100|null,"notes":"one factual observation, max35words"|""}. Evidence slots contain at most eight selected source turns; use null for every unused slot. Never copy source quotations or times; code attaches them from evidence slots. Never cite internal turn numbers in notes. Notes may not contradict context or the stage assessment. Not-applicable notes are empty.',
+  'SCORING SCALE (only for evaluated or evidenced expected_but_missed): A+ 98-100; A 90-97; B 80-89; C 70-79; D 60-69; F 0-59. Do not lower a score for correctly omitted work. Do not assign a score simply because a call ended without a sale. not_applicable and unmeasured have null grade and score.',
+  'Return one JSON object with context and sections. sections MUST be an array of exactly five entries: exactly one each for intro, discovery, pitch, objection, close. Do not omit or duplicate any stage. If a stage cannot be safely scored, return its unmeasured or not_applicable state with empty grade, null score, and empty note. Each entry has section naming the stage plus:{"assessment":{"state":"evaluated|not_applicable|expected_but_missed|unmeasured","evidence_turns":{"turn_1":1,"turn_2":null,"turn_3":null,"turn_4":null,"turn_5":null,"turn_6":null,"turn_7":null,"turn_8":null}},"grade":"A+|A|B|C|D|F"|"","score":0-100|null,"notes":"one factual observation, max35words"|""}. Evidence slots contain at most eight selected source turns; use null for every unused slot. Never copy source quotations or times; code attaches them from evidence slots. Never cite internal turn numbers in notes. Notes may not contradict context or the stage assessment. Not-applicable notes are empty.',
   'TEAM SELLING MATERIAL (data about the offer and approach, subject to the eligibility rules above):',
   sellingContext || 'No team selling material supplied.',
  ].join('\n\n');
@@ -162,10 +176,92 @@ function assess(parsed, turns) {
   }
   if(scored&&['discovery','objection','close'].includes(section)&&context.finance.state==='genuine_dq'&&(context.finance.feasible_financing_ruled_out!==true||!context.finance.evidence_turns.length))return [section,unknown('Financial disqualification is not established against feasible financing.')];
   if (scored && evidence.length>8) return [section,unknown('A scored stage may contain no more than eight selected evidence turns.')];
-  if (scored && (!isScore(s.score)||!['A','B','C','D','F'].includes(s.grade)||!factualNote(s.notes,evidence))) return [section,unknown('Stage measurement missing, invalid, or not factual.')];
+  if (scored && (!isScore(s.score)||!hasCanonicalGrade(Math.round(s.score),s.grade)||!factualNote(s.notes,evidence))) return [section,unknown('Stage measurement missing, invalid, or not factual.')];
   return [section,{state:a.state,reason:clean(a.reason).slice(0,1000),evidence,grade:scored?s.grade:null,score:scored?Math.round(s.score):null,notes:typeof s.notes==='string'?s.notes.slice(0,4000):null}];
  }));
  return {version:VERSION,source_hash:sourceHash(source),context:recordedContext,sections};
+}
+
+// Production uses the normal grader's compact stage record. Unlike the
+// candidate experiment above, explanation prose is not proof of a score: the
+// record stands on its state, canonical score/grade, real source turns, and
+// doctrine constraints. Candidate/reviewer/proof helpers remain below for
+// offline QA only.
+const productionStageName = name => name === 'objection_handling' ? 'objection' : name;
+const productionReason = value => {
+ const text=clean(value);
+ // This only protects displayed prose. It must never invalidate the score.
+ return text&&text.length<=280&&!/\b(?:correct(?:ly)?|appropriate(?:ly)?|should|must|need(?:s|ed)?|ready|because|therefore|proves?|shows?|demonstrates?)\b/i.test(text) ? text : null;
+};
+function productionEvidence(ids, source, required) {
+ if(!Array.isArray(ids)||ids.length>MAX_PRODUCTION_EVIDENCE||new Set(ids).size!==ids.length||(required&&ids.length<1))return null;
+ if(!ids.every(id=>Number.isInteger(id)&&id>=1&&id<=source.length&&clean(source[id-1]?.text)&&Number.isFinite(source[id-1]?.start_seconds)))return null;
+ return ids.map(turn=>({speaker:source[turn-1].speaker,timestamp_seconds:source[turn-1].start_seconds,quote:source[turn-1].text,turn}));
+}
+function validProductionContext(context, source) {
+ const ids=values=>productionEvidence(values,source,false)!==null;
+ const fact=(item,key)=>item&&[true,false,null].includes(item[key])&&ids(item.evidence_turn_ids)&&!(item[key]===false&&item.evidence_turn_ids.length);
+ const ending=context?.ending;
+ const finance=context?.finance;
+ return !!context
+  && [true,false,null].includes(context.sales_conversation)
+  && ['initial','follow_up','unknown'].includes(context.call_kind)
+  && [true,false,null].includes(context.close_due)
+  && ending&&['completed','appropriate_continuation','cut_off','unknown'].includes(ending.state)&&ids(ending.evidence_turn_ids)
+  && fact(context.pitch,'occurred')&&fact(context.price,'occurred')&&fact(context.prior_presentation,'established')&&fact(context.objection,'occurred')
+  && finance&&['qualified','genuine_dq','unresolved','not_assessed'].includes(finance.state)
+  && ['discovery','late',null].includes(finance.discovered_stage)
+  && [true,false,null].includes(finance.feasible_financing_ruled_out)&&ids(finance.evidence_turn_ids)
+  && !(finance.state==='genuine_dq'&&(!['discovery','late'].includes(finance.discovered_stage)||finance.feasible_financing_ruled_out!==true||!finance.evidence_turn_ids.length));
+}
+function productionWithheld(source, reason) {
+ return {version:VERSION,source_hash:sourceHash(source),context:null,status:'withheld',failure_reason:clean(reason).slice(0,240)||'Stage assessment was withheld.',sections:Object.fromEntries(SECTIONS.map(section=>[section,unknown('Stage assessment was withheld.')] ))};
+}
+function assessProduction(parsed, turns) {
+ const source=Array.isArray(turns)?turns:[];
+ const raw=parsed?.stage_assessment;
+ const rows=raw?.stages;
+ if(!Array.isArray(rows)||rows.length!==SECTIONS.length)return productionWithheld(source,'Stage assessment is missing a required stage.');
+ const byStage={};
+ for(const row of rows){
+  const stage=productionStageName(row?.stage);
+  if(!SECTIONS.includes(stage)||byStage[stage])return productionWithheld(source,'Stage assessment has an invalid or duplicate stage.');
+  byStage[stage]=row;
+ }
+ if(!SECTIONS.every(stage=>byStage[stage])||!validProductionContext(raw.context,source))return productionWithheld(source,'Stage assessment context is missing or invalid.');
+ const context=raw.context;
+ const sections=Object.fromEntries(SECTIONS.map(section=>{
+  const row=byStage[section], state=row?.state;
+  const scored=state==='evaluated'||state==='expected_but_missed';
+  const evidence=productionEvidence(row?.evidence_turn_ids,source,scored);
+  if(!STATES.includes(state)||!evidence)return [section,unknown('Stage evidence or state is invalid.')];
+  if(!scored){
+   if(row.score!==null||row.grade!==null)return [section,unknown('An unscored stage carried a score or grade.')];
+   return [section,{state,reason:clean(row.reason).slice(0,1000),score:null,grade:null,notes:null,evidence}];
+  }
+  if(!Number.isInteger(row.score)||!hasCanonicalGrade(row.score,row.grade))return [section,unknown('Stage score and grade do not match the canonical scale.')];
+  if(context.sales_conversation!==true)return [section,unknown('A sales conversation is not established.')];
+  if(context.ending.state==='cut_off'&&state==='expected_but_missed')return [section,unknown('An incomplete recording cannot manufacture a missed stage.')];
+  if(section==='objection'){
+   const presented=(context.pitch.occurred===true&&context.pitch.evidence_turn_ids.length&&context.price.occurred===true&&context.price.evidence_turn_ids.length)
+     ||(context.prior_presentation.established===true&&context.prior_presentation.evidence_turn_ids.length);
+   if(!presented||context.objection.occurred!==true||!context.objection.evidence_turn_ids.length)return [section,unknown('Objection work was not established after a valid presentation.')];
+  }
+  if(section==='close'&&context.close_due!==true)return [section,unknown('A purchase Close was not due on this call.')];
+  if(context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery'&&['pitch','objection','close'].includes(section))return [section,unknown('Early financial disqualification makes downstream scoring inapplicable.')];
+  return [section,{state,reason:clean(row.reason).slice(0,1000),score:row.score,grade:row.grade,notes:productionReason(row.reason),evidence}];
+ }));
+ return {version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION},sections};
+}
+function productionSummaryFor(assessment) {
+ return {version:VERSION,verification:PRODUCTION_VERIFICATION,grader_version:PRODUCTION_GRADER_VERSION,source_hash:assessment.source_hash,sections:Object.fromEntries(SECTIONS.map(section=>[section,{state:assessment.sections[section].state,score:assessment.sections[section].score,grade:assessment.sections[section].grade}]))};
+}
+function toProductionColumns(assessment, formatTimestamp, turns) {
+ if(!Array.isArray(turns)||assessment?.source_hash!==sourceHash(turns))throw Error('Normal-grader stage source changed.');
+ if(assessment.status==='withheld')return withheldColumns(turns,assessment.failure_reason);
+ const complete=SECTIONS.every(section=>assessment?.sections?.[section]&&STATES.includes(assessment.sections[section].state));
+ if(!complete)throw Error('Normal-grader stage assessment is incomplete.');
+ return columnsFor(assessment,formatTimestamp,productionSummaryFor(assessment));
 }
 function reviewableCandidate(parsed, assessment) {
  const candidate=normalizedCandidate(parsed);
@@ -205,8 +301,8 @@ function toColumns(assessment, formatTimestamp, turns, materialHash) {
  if(!Array.isArray(turns)||!require('./stage-observation-review').verified(assessment,turns,materialHash))throw Error('Independent stage review is missing or no longer valid.');
  return columnsFor(assessment,formatTimestamp,summaryFor(assessment,'factual_proof'));
 }
-// Production conversion. One independently reviewed result is enough to save;
-// the more expensive proof pair remains a development/QA gate.
+// Offline-QA conversion. A separately reviewed candidate can be saved for
+// inspection; the paired factual-proof conversion remains the stronger QA route.
 function toReviewedColumns(assessment, formatTimestamp, turns, materialHash) {
  if(!Array.isArray(turns)||!require('./stage-eligibility-review').verified(assessment,turns,materialHash))throw Error('Independent stage review is missing or no longer valid.');
  return columnsFor(assessment,formatTimestamp,summaryFor(assessment,'independent_review'));
@@ -231,17 +327,18 @@ function read(row, section) {
  if (!saved) return {state:'legacy_unreviewed',score:null,grade:null};
  const a=saved.sections?.[section];
  const complete=Object.keys(saved.sections||{}).length===SECTIONS.length&&SECTIONS.every(key=>saved.sections?.[key]&&STATES.includes(saved.sections[key].state));
+ const normalGrader=saved.verification===PRODUCTION_VERIFICATION&&saved.grader_version===PRODUCTION_GRADER_VERSION;
  const reviewed=saved.review_version===require('./stage-eligibility-review').VERSION
    && (saved.verification==='independent_review'
      || ((!saved.verification||saved.verification==='factual_proof')&&saved.factual_version===require('./stage-observation-review').VERSION));
- if (saved.version!==VERSION||!reviewed||!saved.source_hash||!complete||!a) return unknown('Stage assessment unavailable.');
+ if (saved.version!==VERSION||(!normalGrader&&!reviewed)||!saved.source_hash||!complete||!a) return unknown('Stage assessment unavailable.');
  if (a.state==='not_applicable'||a.state==='unmeasured') return {state:a.state,score:null,grade:null};
- if (!isScore(a.score)||!['A','B','C','D','F'].includes(a.grade)) return unknown('Stage measurement changed or is incomplete.');
+ if (!hasCanonicalGrade(a.score,a.grade)) return unknown('Stage measurement changed or is incomplete.');
  return {state:a.state,score:a.score,grade:a.grade};
 }
 function stageMetric(row, section) {
  const stage=read(row,section);
- const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&isScore(stage.score)&&['A','B','C','D','F'].includes(stage.grade);
+ const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&hasCanonicalGrade(stage.score,stage.grade);
  return {state:stage.state,contributes,score:contributes?stage.score:null,grade:contributes?stage.grade:null};
 }
-module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,INSTRUCTIONS,methodGuide,guidanceHash,normalizedCandidate,promptInstructions,buildPrompt,assess,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
+module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};

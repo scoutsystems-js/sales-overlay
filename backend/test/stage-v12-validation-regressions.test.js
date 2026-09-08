@@ -9,7 +9,7 @@ const turns=[
  {speaker:'CLOSER',start_seconds:20,text:'Let us reschedule with both decision makers.'},
 ];
 const context={discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]},sales_conversation:true,ending:{state:'appropriate_continuation',evidence_turns:[2,3]},pitch:{occurred:false,evidence_turns:[]},price:{occurred:false,evidence_turns:[]},prior_presentation:{established:false,evidence_turns:[]},finance:{state:'not_assessed',feasible_financing_ruled_out:null,evidence_turns:[]}};
-const measured=(section,note)=>({section,assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]},grade:'B',score:75,notes:note});
+const measured=(section,note)=>({section,assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1,2]},grade:'C',score:75,notes:note});
 const assess=(input,c=context)=>S.assess({context:c,sections:[input]},turns);
 
 test('saved candidate 1 rejects rule judgments in an otherwise factual stage note',()=>{

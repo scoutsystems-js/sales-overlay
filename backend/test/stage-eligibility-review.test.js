@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const R=require('../lib/stage-eligibility-review');
 const S=require('../lib/stage-eligibility');
 const turns=[{speaker:'PROSPECT',text:'I have fifteen thousand saved.',start_seconds:10}];
-const assessment={version:S.VERSION,source_hash:S.sourceHash(turns),context:{},sections:Object.fromEntries(S.SECTIONS.map(k=>[k,{state:'evaluated',score:75,grade:'B',notes:'The available savings were checked.',reason:'Financial information was established.',evidence:[{speaker:'PROSPECT',quote:turns[0].text,timestamp_seconds:10}]}]))};
+const assessment={version:S.VERSION,source_hash:S.sourceHash(turns),context:{},sections:Object.fromEntries(S.SECTIONS.map(k=>[k,{state:'evaluated',score:75,grade:'C',notes:'The available savings were checked.',reason:'Financial information was established.',evidence:[{speaker:'PROSPECT',quote:turns[0].text,timestamp_seconds:10}]}]))};
 const supported={reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'The actual exchange supports this judgment.',counterevidence_turns:[],unsupported_claims:[]}))};
 test('a rejected or missing independent stage review withholds that grade without erasing supported stages',()=>{
  const response={reviews:supported.reviews.map(r=>r.stage==='discovery'?{...r,verdict:'contradicted',reason:'Savings were already disclosed.',counterevidence_turns:[1],unsupported_claims:['Savings were never checked.']}:r).filter(r=>r.stage!=='pitch')};
@@ -38,7 +38,7 @@ test('a small deduction for work not established as due still withholds the grad
 });
 
 test('the evidence reviewer cannot infer a fault from the numeric grade',()=>{
- const candidate={context:{ending:{state:'completed'}},intro:{score:72,grade:'B',notes:'The call direction was established.',assessment:{state:'evaluated',reason:'The agenda was agreed.',evidence_turns:[1]}}};
+ const candidate={context:{ending:{state:'completed'}},intro:{score:72,grade:'C',notes:'The call direction was established.',assessment:{state:'evaluated',reason:'The agenda was agreed.',evidence_turns:[1]}}};
  const p=R.prompt(candidate,turns,{contextText:''});
  assert.ok(!p.includes('"score":72'));assert.ok(!p.includes('"grade":"B"'));
  assert.ok(p.includes('The call direction was established.'));
@@ -50,7 +50,7 @@ function atomicReview({note,evidence,review}) {
   source_hash:S.sourceHash(turns),
   context:{},
   sections:Object.fromEntries(S.SECTIONS.map(stage=>[stage,stage==='discovery'?{
-   state:'evaluated',score:75,grade:'B',notes:note,reason:'observed_work',evidence,
+   state:'evaluated',score:75,grade:'C',notes:note,reason:'observed_work',evidence,
   }:{state:'not_applicable',score:null,grade:null,notes:null,reason:'not_reached',evidence:[]}])) ,
   response:{reviews:S.SECTIONS.map(stage=>stage==='discovery'?review:{stage,verdict:'supported',facts_supported:true,omissions:[],reason:'No score proposed.',counterevidence_turns:[],unsupported_claims:[],note_claims:[]})},
  };

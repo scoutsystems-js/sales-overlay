@@ -13,7 +13,7 @@ const me = require('../routes/me');
 function eligibility(state, score) {
   const sections = Object.fromEntries(S.SECTIONS.map(function (section) {
     return [section, section === 'discovery'
-      ? { state: state, score: score, grade: score == null ? null : 'C' }
+      ? { state: state, score: score, grade: score == null ? null : S.canonicalGrade(Math.round(score)) }
       : { state: 'not_applicable', score: null, grade: null }];
   }));
   return { summary: {

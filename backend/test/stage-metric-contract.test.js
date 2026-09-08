@@ -33,7 +33,7 @@ test('stageMetric defines contribution for every metric state', function () {
 
   const cases = [
     ['evaluated', stage('evaluated', 82, 'B'), true, 82, 'B'],
-    ['expected_but_missed', stage('expected_but_missed', 35, 'D'), true, 35, 'D'],
+    ['expected_but_missed', stage('expected_but_missed', 35, 'F'), true, 35, 'F'],
     ['not_applicable', stage('not_applicable', null, null), false, null, null],
     ['unmeasured', stage('unmeasured', null, null), false, null, null],
   ];
@@ -64,8 +64,8 @@ test('not applicable and unmeasured states never become zero', function () {
 });
 
 test('Close uses the earned score in the eligibility record, never displayed or legacy columns', function () {
-  const row = rowWithStates({ close: stage('evaluated', 63, 'C') }, { close_score: 100, close_score_earned: 7 });
-  assert.deepEqual(S.stageMetric(row, 'close'), { state: 'evaluated', contributes: true, score: 63, grade: 'C' });
+  const row = rowWithStates({ close: stage('evaluated', 63, 'D') }, { close_score: 100, close_score_earned: 7 });
+  assert.deepEqual(S.stageMetric(row, 'close'), { state: 'evaluated', contributes: true, score: 63, grade: 'D' });
 });
 
 test('shared ranking and drilldown count only contributing stage records', function () {
@@ -85,7 +85,7 @@ test('shared ranking and drilldown count only contributing stage records', funct
 
 test('a correct financial DQ in Discovery does not create downstream penalties', function () {
   const row = rowWithStates({
-    discovery: stage('evaluated', 88, 'A'),
+    discovery: stage('evaluated', 88, 'B'),
     pitch: stage('not_applicable', null, null),
     objection: stage('not_applicable', null, null),
     close: stage('not_applicable', null, null),
@@ -98,10 +98,10 @@ test('a correct financial DQ in Discovery does not create downstream penalties',
 
 test('a late financial DQ can retain a supported Discovery miss without penalizing Close', function () {
   const row = rowWithStates({
-    discovery: stage('expected_but_missed', 35, 'D'),
+    discovery: stage('expected_but_missed', 35, 'F'),
     close: stage('not_applicable', null, null),
   }, { discovery_score: 35, close_score_earned: 0 });
-  assert.deepEqual(S.stageMetric(row, 'discovery'), { state: 'expected_but_missed', contributes: true, score: 35, grade: 'D' });
+  assert.deepEqual(S.stageMetric(row, 'discovery'), { state: 'expected_but_missed', contributes: true, score: 35, grade: 'F' });
   assert.deepEqual(S.stageMetric(row, 'close'), { state: 'not_applicable', contributes: false, score: null, grade: null });
 });
 
@@ -118,7 +118,7 @@ test('no objection, no pitch, continuation, and cutoff states do not fabricate f
 
 test('a follow-up contributes only its stage work that was actually due', function () {
   const followUp = rowWithStates({
-    discovery: stage('evaluated', 76, 'B'),
+    discovery: stage('evaluated', 76, 'C'),
     pitch: stage('not_applicable', null, null),
     objection: stage('not_applicable', null, null),
     close: stage('not_applicable', null, null),

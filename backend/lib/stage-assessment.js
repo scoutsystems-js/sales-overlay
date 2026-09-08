@@ -4,9 +4,10 @@ const R = require('./stage-eligibility-review');
 const V = require('./stage-observation-review');
 const schemas = require('./stage-output-schema');
 
-// Production's bounded stage lane: one candidate, local validation, and one
-// independent review. Factual-proof pairs belong to offline QA, never here.
-async function runProduction({turns, duration, material}, request) {
+// Offline QA's bounded candidate/review lane. Production no longer calls this:
+// the normal grader is the sole stage assessment and this remains available for
+// release sampling or human investigation.
+async function runReviewedQa({turns, duration, material}, request) {
   if (!Array.isArray(turns) || !turns.length || !material) throw Error('Stage source or guidance missing');
   const candidate = await request({
     model: S.MODEL, max_tokens: S.MAX_TOKENS,
@@ -28,7 +29,7 @@ async function runProduction({turns, duration, material}, request) {
 // Offline QA retains the paired factual-proof reads used to pressure-test a
 // reviewed candidate before a prompt or validator change is trusted.
 async function run({turns, duration, material}, request) {
-  const reviewed=await runProduction({turns,duration,material},request);
+  const reviewed=await runReviewedQa({turns,duration,material},request);
   if (!reviewed.review) return {...reviewed,factual:[],record:reviewed.record};
   const method=reviewed.record;
   const hash=S.guidanceHash(material);
@@ -43,4 +44,5 @@ async function run({turns, duration, material}, request) {
   }
   return {...reviewed,factual,record:V.applyPairs(method,factual,turns,hash)};
 }
-module.exports = {run,runProduction};
+// analyzeCall does not import or call either reviewed runner.
+module.exports = {run,runReviewedQa};

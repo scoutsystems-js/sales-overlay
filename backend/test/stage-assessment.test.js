@@ -17,9 +17,9 @@ test('a failed evidence check does not return a candidate as an approved score',
  await assert.rejects(A.run({turns,duration:15,material:{kbHash:'material'}},async()=>{if(++calls===1)return candidate;throw Error('Reviewer unavailable');}),/Reviewer unavailable/);
 });
 
-test('production stage assessment makes one candidate and one independent review, never factual-proof reads',async()=>{
+test('offline reviewed QA makes one candidate and one independent review, never factual-proof reads',async()=>{
  const A=require('../lib/stage-assessment');const requests=[];
- const result=await A.runProduction({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{
+ const result=await A.runReviewedQa({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{
   requests.push(request);
   return requests.length===1?candidate:review;
  });
@@ -30,7 +30,7 @@ test('production stage assessment makes one candidate and one independent review
 
 test('unsafe candidate wording is withheld before it reaches the independent reviewer',async()=>{
  const A=require('../lib/stage-assessment');const requests=[];
- const unsafe={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'B',score:75,notes:'The closer correctly learned the partner would attend.'}};
+ const unsafe={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'C',score:75,notes:'The closer correctly learned the partner would attend.'}};
  const result=await A.run({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{
   requests.push(request);
   if(requests.length===2) assert.doesNotMatch(request.messages[0].content,/correctly learned/i);
@@ -41,7 +41,7 @@ test('unsafe candidate wording is withheld before it reaches the independent rev
 
 test('a measured stage requires two factual reads before it is returned as verified',async()=>{
  const A=require('../lib/stage-assessment');const requests=[];
- const measured={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'B',score:75,notes:'Closer asked who would decide.'}};
+const measured={...candidate,context:{...context,discovery:{areas:[{area:'decision_makers',evidence_turns:[1,2]}]}},discovery:{assessment:{state:'evaluated',reason:'observed_work',evidence_turns:[1]},grade:'C',score:75,notes:'Closer asked who would decide.'}};
  const factual={moment:2,status:'supported',claims:[{text:'Closer asked who would decide.',actor:'CLOSER',kind:'action',evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}]}],evidence:[{turn:1,speaker:'CLOSER',quote:turns[0].text}],counterevidence:[],reason:'The source supports this observation.'};
  const result=await A.run({turns,duration:15,material:{contextText:'Team offer',kbHash:'material'}},async request=>{requests.push(request);return [measured,review,factual,factual][requests.length-1];});
  assert.equal(requests.length,4);

@@ -11,7 +11,7 @@ const turns = [
  {speaker:'PROSPECT',start_seconds:25,text:'Yes, noon works for both of us.'},
 ];
 const evidence = [{speaker:'CLOSER',timestamp_seconds:10,quote:turns[0].text},{speaker:'PROSPECT',timestamp_seconds:15,quote:turns[1].text}];
-const measured = {grade:'B',score:78,notes:'Closer asked who would decide.',assessment:{state:'evaluated',reason:'Decision-maker qualification occurred.',evidence}};
+const measured = {grade:'C',score:78,notes:'Closer asked who would decide.',assessment:{state:'evaluated',reason:'Decision-maker qualification occurred.',evidence}};
 // Simulated model response for persistence tests; semantic accuracy is tested on real calls.
 function simulatedFacts(method){const V=require('../lib/stage-observation-review'),E=require('../lib/coaching-evidence-review');const evidence=[{turn:1,speaker:'CLOSER',quote:turns[0].text}];const response={observations:V.findings(method).map(f=>({moment:f.moment,sentences:E.adviceSentences(f.observation).map((text,i)=>({sentence:i+1,status:'supported',claims:[{text,actor:'CLOSER',kind:'action',evidence}],evidence,counterevidence:[],reason:'Source supports this synthetic observation.'}))}))};return V.applyPair(method,[response,response],turns,'material');}
 function savedAssessment(r){const R=require('../lib/stage-eligibility-review');const checked=R.apply(r,{reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'Source supports this stage.',counterevidence_turns:[],unsupported_claims:[]}))},turns,'material');return S.toColumns(simulatedFacts(checked),String,turns,'material').stage_eligibility;}
@@ -26,7 +26,7 @@ test('missing stage, malformed measurement, invented quote and wrong speaker bec
  }
 });
 test('an evidenced expected miss can be graded; absence alone cannot manufacture a failure',()=>{
- const r=assess({discovery:{...measured,score:45,grade:'D',assessment:{...measured.assessment,state:'expected_but_missed'}}},turns);
+ const r=assess({discovery:{...measured,score:45,grade:'F',assessment:{...measured.assessment,state:'expected_but_missed'}}},turns);
  assert.equal(r.sections.discovery.state,'expected_but_missed');assert.equal(r.sections.discovery.score,45);
  const without=assess({discovery:{...measured,assessment:{...measured.assessment,state:'expected_but_missed',evidence:[]}}},turns);
  assert.equal(without.sections.discovery.state,'unmeasured');
@@ -87,7 +87,7 @@ test('reviewed production eligibility persists without factual proof and contrib
  const saved=S.toReviewedColumns(checked,String,turns,'material');
  assert.equal(saved.stage_eligibility.summary.verification,'independent_review');
  assert.equal(saved.stage_eligibility.summary.factual_version,undefined);
- assert.deepEqual(S.stageMetric(saved,'discovery'),{state:'evaluated',contributes:true,score:78,grade:'B'});
+ assert.deepEqual(S.stageMetric(saved,'discovery'),{state:'evaluated',contributes:true,score:78,grade:'C'});
 });
 
 test('withheld production eligibility is a complete unmeasured record and never falls back to raw stage fields',()=>{

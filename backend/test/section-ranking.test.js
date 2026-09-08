@@ -25,7 +25,7 @@ function assessedRow(scores) {
   const sections = Object.fromEntries(S.SECTIONS.map(function (section) {
     const score = section === 'close' ? scores.close_score_earned : scores[section + '_score'];
     return [section, typeof score === 'number'
-      ? { state: 'evaluated', score: score, grade: 'B' }
+      ? { state: 'evaluated', score: score, grade: S.canonicalGrade(Math.round(score)) }
       : { state: 'not_applicable', score: null, grade: null }];
   }));
   return Object.assign({}, scores, { stage_eligibility: { summary: {

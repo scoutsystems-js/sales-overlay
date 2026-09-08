@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const P=require('../lib/rep-period-coaching');
 const S=require('../lib/stage-eligibility');
-function analysis(scores){const sections=Object.fromEntries(S.SECTIONS.map(section=>{const score=section==='close'?scores.close_score_earned:scores[section+'_score'];return [section,typeof score==='number'?{state:'evaluated',score,grade:'B'}:{state:'not_applicable',score:null,grade:null}];}));return {...scores,stage_eligibility:{summary:{version:S.VERSION,review_version:require('../lib/stage-eligibility-review').VERSION,factual_version:require('../lib/stage-observation-review').VERSION,source_hash:'test-source',sections}}};}
+function analysis(scores){const sections=Object.fromEntries(S.SECTIONS.map(section=>{const score=section==='close'?scores.close_score_earned:scores[section+'_score'];return [section,typeof score==='number'?{state:'evaluated',score,grade:S.canonicalGrade(Math.round(score))}:{state:'not_applicable',score:null,grade:null}];}));return {...scores,stage_eligibility:{summary:{version:S.VERSION,review_version:require('../lib/stage-eligibility-review').VERSION,factual_version:require('../lib/stage-observation-review').VERSION,source_hash:'test-source',sections}}};}
 const calls=[{id:'a',call_date:'2026-09-01T12:00:00Z',analysis_status:'done',analysis:analysis({discovery_score:20,pitch_score:70,close_score_earned:80})},{id:'b',call_date:'2026-09-02T12:00:00Z',analysis_status:'done',analysis:analysis({discovery_score:100,pitch_score:70,close_score_earned:10})}];
 test('period focus changes with the selected calls, without rounding or treating missing sections as zero',()=>{
  assert.equal(P.summarize(calls,[],{from:'2026-09-01',to:'2026-09-01T23:59:59Z'}).section,'discovery');
