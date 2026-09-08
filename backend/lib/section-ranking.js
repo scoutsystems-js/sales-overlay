@@ -69,13 +69,6 @@ const MIN_CALLS_TO_RANK = _MIN_ANALYZED;
 // ever could. A single hard-coded number could not express that.
 const CONFIDENCE_Z = 1.96;
 
-// ⚠ close comes from close_score_earned and nowhere else. This function exists
-// so that decision is made ONCE rather than at every caller.
-const COLUMN = {
-  intro: 'intro_score', discovery: 'discovery_score', pitch: 'pitch_score',
-  objection: 'objection_score', close: 'close_score_earned',
-};
-
 function num(x) { return (typeof x === 'number' && isFinite(x)) ? x : null; }
 
 // rows: call_analyses rows. Returns { section: {mean, n, sd} }.
@@ -89,10 +82,9 @@ function sectionStatsFromAnalyses(rows) {
     var eligibility = {evaluated:0, not_applicable:0, expected_but_missed:0, unmeasured:0, legacy_unreviewed:0};
     list.forEach(function (r) {
       if (!r) return;
-      var stage = stageEligibility.read(r, key);
+      var stage = stageEligibility.stageMetric(r, key);
       eligibility[stage.state]++;
-      var v = num(stage.score);
-      if (v !== null) vals.push(v);
+      if (stage.contributes) vals.push(stage.score);
     });
     var n = vals.length;
     var mean = n ? vals.reduce(function (a, b) { return a + b; }, 0) / n : null;
@@ -195,7 +187,6 @@ module.exports = {
   SECTION_ORDER: SECTION_ORDER,
   rankLabel: rankLabel,
   LABELS: LABELS,
-  COLUMN: COLUMN,
   MIN_CALLS_TO_RANK: MIN_CALLS_TO_RANK,
   CONFIDENCE_Z: CONFIDENCE_Z,
   sectionStatsFromAnalyses: sectionStatsFromAnalyses,

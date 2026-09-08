@@ -5,24 +5,40 @@ const assert = require('node:assert');
 const {
   sectionScoreOf, buildHistogram, buildSectionBreakdown, HISTOGRAM_BUCKETS,
 } = require('../lib/section-breakdown');
+const S = require('../lib/stage-eligibility');
+
+function eligibilityFor(scores) {
+  const sections = Object.fromEntries(S.SECTIONS.map(function (section) {
+    const score = section === 'close' ? scores.close_score_earned : scores[section + '_score'];
+    return [section, typeof score === 'number'
+      ? { state: 'evaluated', score: score, grade: 'B' }
+      : { state: 'not_applicable', score: null, grade: null }];
+  }));
+  return { summary: {
+    version: S.VERSION,
+    review_version: require('../lib/stage-eligibility-review').VERSION,
+    factual_version: require('../lib/stage-observation-review').VERSION,
+    source_hash: 'test-source', sections: sections,
+  } };
+}
 
 // ── The close-score trap (ruling 1) ──────────────────────────────────────
-test('CLOSE uses close_score_earned, never the displayed 100', () => {
+test('CLOSE uses the earned score in its eligibility record, never displayed 100', () => {
   // Migration 027 forces close_score=100 on closed calls (21 of 55 live). A
   // histogram built on the displayed value grows a fake spike covering 38% of
   // calls, and its "trend" is a close-rate trend in disguise.
-  const row = { close_score: 100, close_score_earned: 62 };
+  const row = { close_score: 100, close_score_earned: 62, stage_eligibility: eligibilityFor({ close_score_earned: 62 }) };
   assert.strictEqual(sectionScoreOf(row, 'close'), 62);
 });
 
-test('CLOSE falls back to close_score when earned is absent (pre-027 rows)', () => {
-  assert.strictEqual(sectionScoreOf({ close_score: 71, close_score_earned: null }, 'close'), 71);
+test('CLOSE does not use pre-eligibility legacy score columns', () => {
+  assert.strictEqual(sectionScoreOf({ close_score: 71, close_score_earned: null }, 'close'), null);
 });
 
-test('non-close sections read their own score column untouched', () => {
-  assert.strictEqual(sectionScoreOf({ discovery_score: 55 }, 'discovery'), 55);
-  assert.strictEqual(sectionScoreOf({ intro_score: 0 }, 'intro'), 0);   // 0 is a real score
-  assert.strictEqual(sectionScoreOf({ pitch_score: null }, 'pitch'), null);
+test('non-close sections use their eligibility record', () => {
+  assert.strictEqual(sectionScoreOf({ discovery_score: 55, stage_eligibility: eligibilityFor({ discovery_score: 55 }) }, 'discovery'), 55);
+  assert.strictEqual(sectionScoreOf({ intro_score: 0, stage_eligibility: eligibilityFor({ intro_score: 0 }) }, 'intro'), 0);   // 0 is a real score
+  assert.strictEqual(sectionScoreOf({ pitch_score: 55, stage_eligibility: eligibilityFor({ pitch_score: null }) }, 'pitch'), null);
 });
 
 // ── Histogram ────────────────────────────────────────────────────────────
@@ -86,7 +102,7 @@ test('a section with no score is UNRANKED rather than ranked last', () => {
 });
 
 // ── The assembled breakdown ──────────────────────────────────────────────
-const A = (id, scores, date) => Object.assign({ fathom_call_id: id, call_date: date }, scores);
+const A = (id, scores, date) => Object.assign({ fathom_call_id: id, call_date: date }, scores, { stage_eligibility: eligibilityFor(scores) });
 const H = (call, section, type, quote, extra) =>
   Object.assign({ fathom_call_id: call, section, type, quote, observation: 'obs', timestamp_seconds: 60 }, extra || {});
 

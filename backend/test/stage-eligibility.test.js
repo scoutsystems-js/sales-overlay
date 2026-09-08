@@ -31,10 +31,10 @@ test('an evidenced expected miss can be graded; absence alone cannot manufacture
  const without=assess({discovery:{...measured,assessment:{...measured.assessment,state:'expected_but_missed',evidence:[]}}},turns);
  assert.equal(without.sections.discovery.state,'unmeasured');
 });
-test('new assessments cannot be read as valid after their score columns change',()=>{
+test('a valid eligibility record remains authoritative when a legacy score column changes',()=>{
  const r=savedAssessment(assess({discovery:measured},turns));
  assert.equal(S.read({stage_eligibility:r,discovery_score:78},'discovery').score,78);
- assert.equal(S.read({stage_eligibility:r,discovery_score:22},'discovery').state,'unmeasured');
+ assert.equal(S.read({stage_eligibility:r,discovery_score:22},'discovery').score,78);
  assert.equal(S.read({discovery_score:22},'discovery').state,'legacy_unreviewed');
 });
 test('the unvalidated stage experiment does not change the normal live grader',()=>{

@@ -23,6 +23,7 @@
 // Pure and total. No I/O, never throws.
 
 var { highlightGroup } = require('./highlight-section');
+var { stageMetric } = require('./stage-eligibility');
 
 const { clipHref } = require('./clip-link');
 const { displayCloserResponse } = require('./closer-side');
@@ -36,19 +37,11 @@ var HISTOGRAM_BUCKETS = [
   { label: '85-100', lo: 85, hi: 100 },
 ];
 
-// The score to USE for a section on one analysis row. Close is special — see
-// the header. Everything else reads its own column.
+// The score to USE for a section on one analysis row. Eligibility is the only
+// authority for whether this row belongs in the stage population.
 function sectionScoreOf(row, section) {
-  if (!row || !section) return null;
-  if (section === 'close') {
-    var earned = row.close_score_earned;
-    if (typeof earned === 'number') return earned;
-    // Pre-migration-027 rows have no earned value; the displayed score IS the
-    // earned score for those, so falling back is correct rather than lossy.
-    return (typeof row.close_score === 'number') ? row.close_score : null;
-  }
-  var v = row[section + '_score'];
-  return (typeof v === 'number') ? v : null;
+  var metric = stageMetric(row, section);
+  return metric.contributes ? metric.score : null;
 }
 
 function buildHistogram(scores) {

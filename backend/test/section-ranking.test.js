@@ -19,6 +19,22 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const R = require('../lib/section-ranking');
+const S = require('../lib/stage-eligibility');
+
+function assessedRow(scores) {
+  const sections = Object.fromEntries(S.SECTIONS.map(function (section) {
+    const score = section === 'close' ? scores.close_score_earned : scores[section + '_score'];
+    return [section, typeof score === 'number'
+      ? { state: 'evaluated', score: score, grade: 'B' }
+      : { state: 'not_applicable', score: null, grade: null }];
+  }));
+  return Object.assign({}, scores, { stage_eligibility: { summary: {
+    version: S.VERSION,
+    review_version: require('../lib/stage-eligibility-review').VERSION,
+    factual_version: require('../lib/stage-observation-review').VERSION,
+    source_hash: 'test-source', sections: sections,
+  } } });
+}
 
 // Josh, last 30 days — the real measured numbers.
 const JOSH = {
@@ -105,11 +121,11 @@ test('missing or malformed input never throws', () => {
   });
 });
 
-// ── the column trap ───────────────────────────────────────────────────────
-test('⚠⚠ sectionStatsFromAnalyses READS close_score_earned, NEVER close_score', () => {
+// ── the earned-close contract ──────────────────────────────────────────────
+test('⚠⚠ sectionStatsFromAnalyses reads the stored earned Close eligibility score', () => {
   const rows = [
-    { intro_score: 60, discovery_score: 40, pitch_score: 70, objection_score: 65, close_score: 100, close_score_earned: 50 },
-    { intro_score: 50, discovery_score: 44, pitch_score: 66, objection_score: 63, close_score: 100, close_score_earned: 54 },
+    assessedRow({ intro_score: 60, discovery_score: 40, pitch_score: 70, objection_score: 65, close_score: 100, close_score_earned: 50 }),
+    assessedRow({ intro_score: 50, discovery_score: 44, pitch_score: 66, objection_score: 63, close_score: 100, close_score_earned: 54 }),
   ];
   const s = R.sectionStatsFromAnalyses(rows);
   assert.strictEqual(s.close.mean, 52, 'the EARNED mean — reading close_score would give 100');
@@ -129,8 +145,8 @@ test('the earned column is what makes close rank 2nd WORST rather than 2nd BEST'
 
 test('a null section score is skipped, never counted as zero', () => {
   const s = R.sectionStatsFromAnalyses([
-    { intro_score: 60, discovery_score: null, close_score_earned: 50 },
-    { intro_score: 50, discovery_score: 40, close_score_earned: null },
+    assessedRow({ intro_score: 60, discovery_score: null, close_score_earned: 50 }),
+    assessedRow({ intro_score: 50, discovery_score: 40, close_score_earned: null }),
   ]);
   assert.strictEqual(s.discovery.n, 1);
   assert.strictEqual(s.discovery.mean, 40, 'not 20 — a missing grade is absent, not a zero');
