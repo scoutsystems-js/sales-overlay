@@ -5424,6 +5424,7 @@
 
     .coaching-period-heading,.coaching-period-priority,.coaching-pattern-heading,.coaching-example-meta,.coaching-example-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
     .coaching-pattern-heading { margin-top:24px; padding-top:24px; border-top:1px solid var(--border); }
+    .coaching-period-note, .sec-note-new { margin:6px 0 0; max-width:72ch; font-size:var(--fs-secondary); line-height:1.45; }   /* H765 */
     .coaching-period-eyebrow,.coaching-example-next>span { font-size:var(--fs-label); letter-spacing:.06em; color:var(--text); }
     .coaching-period-window,.coaching-pattern-heading>span,.coaching-coverage-note,.coaching-period-intro { font-size:var(--fs-secondary); color:var(--text); }
     .coaching-period-priority { margin:24px 0; padding:20px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); }
@@ -8947,7 +8948,8 @@
     if (!s.enough) {
       return head + '<div class="srk-card">' + nav
         + '<div class="srk-title">' + escapeHtml(s.label) + '</div>'
-        + '<div class="srk-thin">Not enough to judge<span>' + escapeHtml(s.reason || '') + '</span></div>'
+        /* H765: a zero that comes from new grading is not "too thin" — the label mirrors lib/new-grading-copy.js LABEL (pinned rendered by test/new-grading-copy.test.js). */
+        + '<div class="srk-thin">' + (s.awaiting_new_grading ? 'Scores start with new calls' : 'Not enough to judge') + '<span>' + escapeHtml(s.reason || '') + '</span></div>'
         + '</div>';
     }
 
@@ -15690,8 +15692,8 @@
     var detail='<div class="coaching-period-heading"><div><span class="coaching-period-eyebrow">COACHING OVERVIEW</span><h3 id="coachingDetailTitle" tabindex="-1">'+escapeHtml(selected?coachingRepName(selected):'Your team')+'</h3></div><span class="coaching-period-window">'+escapeHtml(p?rangeLabelInclusive(p.from,p.to):'')+'</span></div>';
     if(!p || p.status==='no_calls') detail+='<div class="coaching-period-empty"><h4>No calls in this period</h4><p>Select a wider date range to see this closer’s recorded performance.</p></div>';
     else {
-      detail+='<div class="coaching-period-priority"><div><span class="coaching-period-eyebrow">'+(p.section?(p.tied_sections&&p.tied_sections.length>1?'JOINT LOWEST-SCORING AREA':'LOWEST-SCORING AREA'):'ANALYSIS STATUS')+'</span><h4>'+escapeHtml(p.label)+'</h4></div>'+(p.score!==null?'<div class="coaching-period-score">'+p.score+'<small>/ 100</small></div>':'')+'</div>';
-      detail+='<div class="coaching-section-grid" aria-label="Section scores for this period">'+p.sections.map(function(s){return '<div class="coaching-section-cell'+(s.section===p.section?' is-focus':'')+'"><span>'+escapeHtml(s.label)+'</span><strong>'+(s.score===null?'—':s.score)+'</strong><div class="coaching-score-track"><i style="color:'+scoreColor(s.score)+';width:'+(s.score===null?0:Math.max(0,Math.min(100,s.score)))+'%"></i></div><small>'+s.calls+' graded call'+(s.calls===1?'':'s')+'</small></div>';}).join('')+'</div>';
+      detail+='<div class="coaching-period-priority"><div><span class="coaching-period-eyebrow">'+(p.section?(p.tied_sections&&p.tied_sections.length>1?'JOINT LOWEST-SCORING AREA':'LOWEST-SCORING AREA'):'ANALYSIS STATUS')+'</span><h4>'+escapeHtml(p.label)+'</h4>'+(p.note?'<p class="coaching-period-note">'+escapeHtml(p.note)+'</p>':'')+'</div>'+(p.score!==null?'<div class="coaching-period-score">'+p.score+'<small>/ 100</small></div>':'')+'</div>';
+      detail+='<div class="coaching-section-grid" aria-label="Section scores for this period">'+p.sections.map(function(s){return '<div class="coaching-section-cell'+(s.section===p.section?' is-focus':'')+'"><span>'+escapeHtml(s.label)+'</span><strong>'+(s.score===null?'—':s.score)+'</strong><div class="coaching-score-track"><i style="color:'+scoreColor(s.score)+';width:'+(s.score===null?0:Math.max(0,Math.min(100,s.score)))+'%"></i></div><small>'+(p.awaiting_new_grading?'none counted yet':s.calls+' graded call'+(s.calls===1?'':'s'))+'</small></div>';}).join('')+'</div>';
       detail+='<div class="coaching-pattern-heading"><h4>Coaching from calls</h4></div>';
       if(p.patterns.length) {
         detail+='<ul class="coaching-topic-tags" aria-label="Coaching topics">'+p.patterns.map(function(g){return '<li><span>'+escapeHtml(g.move)+'</span><b>'+g.calls+' call'+(g.calls===1?'':'s')+'</b></li>';}).join('')+'</ul>';
@@ -17498,6 +17500,26 @@
     renderSectionView();
   }
 
+  /* H765: the headline is its own function so the rendered guard can execute it. When the
+     section's zero comes from new grading, the one sentence sits where "average across 0
+     calls" sat — beside the zero, never in a banner. */
+  function sectionHeadlineHtml(d) {
+    var delta = '';
+    if (typeof d.average === 'number' && typeof d.prior_average === 'number' && d.prior_average > 0) {
+      var diff = d.average - d.prior_average;
+      var cls = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
+      delta = '<span class="sec-delta ' + cls + '">' + (diff > 0 ? '▲ +' : (diff < 0 ? '▼ ' : '')) + diff + ' vs previous period</span>';
+    }
+    var first = d.awaiting_new_grading && d.note
+      ? '<div class="sec-note-new">' + escapeHtml(d.note) + '</div>'
+      : '<div>average across ' + d.scored_calls + ' call' + (d.scored_calls === 1 ? '' : 's') + '</div>';
+    return '<div class="sec-headline">'
+      + '<div class="sec-avg">' + (d.average == null ? '—' : d.average) + '</div>'
+      + '<div class="sec-meta">' + first
+      + '<div>' + (d.rank ? 'ranked ' + d.rank + ' of ' + d.section_count + ' sections' : 'not ranked') + '</div>' + delta + '</div>'
+    + '</div>';
+  }
+
   function renderSectionView() {
     var content = document.getElementById('content');
     if (!content) return;
@@ -17519,17 +17541,7 @@
       return;
     }
 
-    var delta = '';
-    if (typeof d.average === 'number' && typeof d.prior_average === 'number' && d.prior_average > 0) {
-      var diff = d.average - d.prior_average;
-      var cls = diff > 0 ? 'up' : (diff < 0 ? 'down' : '');
-      delta = '<span class="sec-delta ' + cls + '">' + (diff > 0 ? '▲ +' : (diff < 0 ? '▼ ' : '')) + diff + ' vs previous period</span>';
-    }
-    var headline = '<div class="sec-headline">'
-      + '<div class="sec-avg">' + (d.average == null ? '—' : d.average) + '</div>'
-      + '<div class="sec-meta"><div>average across ' + d.scored_calls + ' call' + (d.scored_calls === 1 ? '' : 's') + '</div>'
-      + '<div>' + (d.rank ? 'ranked ' + d.rank + ' of ' + d.section_count + ' sections' : 'not ranked') + '</div>' + delta + '</div>'
-    + '</div>';
+    var headline = sectionHeadlineHtml(d);
 
     // Coverage honesty — objection reads thin, and that is information.
     var cov = d.coverage || {};

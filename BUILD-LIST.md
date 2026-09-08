@@ -15,7 +15,10 @@ Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Cl
 - Remove unnecessary explanatory copy and per-card graded-call labels only after validating the underlying logic; retain useful processing information only with a clear customer benefit. Do not relocate unnecessary copy into tooltips.
 - Validate real-call eligibility, design, coaching structure and existing approved examples. Update canonical documentation and deliver the brief's completion report. Preserve the completed broader-coaching work.
 
-### Current checkpoint — local, not live
+### Current checkpoint — LIVE since September 8, 2026 (37e015d, Stage D)
+
+Stage grading is deployed and runs on NEW CALLS ONLY: every row graded before 21:13 UTC on September 8 reads `legacy_unreviewed`. The day-one empty state was fixed the same day (H765: the zero explains itself — one sentence beside every zero the stage population produces, temporary by construction). Ruled and pending: a grader-only regrade of the last thirty days for the team, counted before it is spent, never through the owner's "Update analyses" button. The earlier local-only paragraphs below are kept as the record of how it got here.
+
 
 Local work only; no deployment or score/outcome/coaching data changes. The reviewed-only writer experiment was deliberately replaced after the human audit showed that its candidate, note, reviewer, and proof contracts withheld obvious Discovery, Pitch, and Close work. The normal grader now returns one source-bound five-stage assessment; deterministic validation is the production safety gate. Candidate, independent-review, and factual-proof tools remain offline QA only. Existing live coaching remains unchanged.
 

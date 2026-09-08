@@ -1275,6 +1275,8 @@ async function computeSectionBreakdown(admin, userId, section, from, to) {
   out.rank = mine.rank || null;
   out.rank_label = mine.rank ? SR.rankLabel(mine.rank, ranked.filter(function (x) { return x.enough; }).length) : null;
   out.section_count = SECTIONS.length;
+  out.awaiting_new_grading = !!mine.awaiting_new_grading;   // H765: the zero explains itself
+  out.note = mine.awaiting_new_grading ? mine.reason : null;
 
   // Prior-window delta, reusing the team view's window machinery so the trend
   // means the same thing here as it does on the glance tiles.

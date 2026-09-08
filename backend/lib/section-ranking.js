@@ -51,6 +51,7 @@ const LABELS = {
 // One question, one answer.
 const { _MIN_ANALYZED } = require('./team-needs-work');
 const MIN_CALLS_TO_RANK = _MIN_ANALYZED;
+const NG = require('./new-grading-copy');   // the one sentence beside a zero that comes from new grading (H765)
 
 // 95%. Two means are "level" when their gap falls inside this many standard
 // errors of the difference.
@@ -130,6 +131,10 @@ function rankSections(sections) {
     var s = src[key] || {};
     var mean = num(s.mean), n = (typeof s.n === 'number' && isFinite(s.n)) ? s.n : 0;
     var enough = mean !== null && n >= MIN_CALLS_TO_RANK;
+    /* THE ZERO EXPLAINS ITSELF (H765): zero counted calls AND rows that predate stage grading
+       in the window → the new-grading sentence. Any counted call switches this off. */
+    var legacy = (s.eligibility && typeof s.eligibility.legacy_unreviewed === 'number') ? s.eligibility.legacy_unreviewed : 0;
+    var awaiting = !enough && n === 0 && legacy > 0;
     return {
       section: key,
       label: LABELS[key],
@@ -141,7 +146,9 @@ function rankSections(sections) {
       rank: null,
       gapToNext: null,
       levelWithNext: false,
+      awaiting_new_grading: awaiting,
       reason: enough ? null
+        : awaiting ? NG.newGradingNote(legacy)
         : (n === 0 ? 'no graded calls in this period'
                    : 'only ' + n + ' call' + (n === 1 ? '' : 's') + ' graded in this period'),
     };

@@ -104,7 +104,9 @@ test('the three states are genuinely distinct in the renderer', () => {
   // slice ran backwards ('var delta' occurs earlier in the file) and tested an
   // empty string — the fourth time that has happened in this codebase.
   const at = HTML.indexOf('function renderSectionView');
-  const fn = HTML.slice(at, HTML.indexOf('var delta', at));
+  // H765: the headline moved into sectionHeadlineHtml (declared BEFORE this function), so the end
+  // marker is the call that replaced it — the first line after the three states.
+  const fn = HTML.slice(at, HTML.indexOf('var headline = sectionHeadlineHtml', at));
   assert.ok(fn.length > 200 && fn.length < 4000, 'slice must cover the function: ' + fn.length);
   assert.ok(/state\.sectionLoading/.test(fn), 'loading is checked first');
   assert.ok(/state\.sectionError/.test(fn), 'and failure is a separate state');
