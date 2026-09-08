@@ -81,6 +81,25 @@ test('persistence carries eligibility and earned scores together, with original 
  assert.equal(p.outcome,undefined);assert.equal(p.close_score,undefined);assert.equal(p.rep_period_coaching,undefined);
 });
 
+test('reviewed production eligibility persists without factual proof and contributes through the shared contract',()=>{
+ const R=require('../lib/stage-eligibility-review');
+ const checked=R.apply(assess({discovery:measured},turns),{reviews:S.SECTIONS.map(stage=>({stage,verdict:'supported',facts_supported:true,omissions:[],reason:'Supported.',counterevidence_turns:[],unsupported_claims:[],note_claims:[]}))},turns,'material');
+ const saved=S.toReviewedColumns(checked,String,turns,'material');
+ assert.equal(saved.stage_eligibility.summary.verification,'independent_review');
+ assert.equal(saved.stage_eligibility.summary.factual_version,undefined);
+ assert.deepEqual(S.stageMetric(saved,'discovery'),{state:'evaluated',contributes:true,score:78,grade:'B'});
+});
+
+test('withheld production eligibility is a complete unmeasured record and never falls back to raw stage fields',()=>{
+ const withheld=S.withheldColumns(turns,'Reviewer unavailable');
+ assert.equal(withheld.stage_eligibility.summary.status,'withheld');
+ for(const section of S.SECTIONS){
+  assert.equal(withheld.stage_eligibility.sections[section].state,'unmeasured');
+  assert.equal(withheld[section==='close'?'close_score_earned':section+'_score'],null);
+  assert.deepEqual(S.stageMetric({...withheld,[section+'_score']:100},section),{state:'unmeasured',contributes:false,score:null,grade:null});
+ }
+});
+
 test('missing structural facts, an objection before presentation, and unproven financial DQ cannot yield trusted grades',()=>{
  assert.equal(S.assess({discovery:measured},turns).sections.discovery.state,'unmeasured');
  assert.equal(assess({objection:measured},turns).sections.objection.state,'unmeasured');

@@ -58,6 +58,8 @@ const { findPriceMomentByFraming } = require('./price-moment');
 const { createWithUsage, setUsageRecorder } = require('./model-usage');
 const { nameKey } = require('./prospect-entity');
 const { effectiveCloseScore } = require('./outcome-tag');
+const stageAssessment = require('./stage-assessment');
+const stageEligibility = require('./stage-eligibility');
 const fathomRoutes = require('../routes/fathom');
 // Zoom source (sub-stage 2). Token via the unified call_connections store (its
 // serialized single-flight refresh is a correctness requirement for Zoom's
@@ -334,6 +336,44 @@ function formatSeconds(s) {
   var m = Math.floor((s % 3600) / 60);
   var sec = s % 60;
   return pad2(h) + ':' + pad2(m) + ':' + pad2(sec);
+}
+
+// This is deliberately a self-contained lane. A stage-model or review failure
+// withholds only stage measurement; the normal grader's non-stage analysis can
+// still finish and save. The injected request makes the bounded production
+// sequence testable without a provider call.
+async function stageColumnsForAnalysis(input, request) {
+  var turns = input && input.turns;
+  try {
+    var material = input && input.material;
+    var result = await stageAssessment.runProduction({
+      turns: turns,
+      duration: input && input.duration,
+      material: material,
+    }, request);
+    return stageEligibility.toReviewedColumns(
+      result.record,
+      formatSeconds,
+      turns,
+      stageEligibility.guidanceHash(material)
+    );
+  } catch (err) {
+    var detail = (err && err.message) ? err.message : 'unknown stage-lane failure';
+    console.warn('[stage-eligibility] withheld: ' + detail.slice(0, 240));
+    return stageEligibility.withheldColumns(turns, detail);
+  }
+}
+
+// Compatibility columns are a projection of stage_eligibility, never a merge
+// with the ordinary grader's section output. The existing outcome rule is the
+// only permitted transformation of a reviewed earned Close score.
+function applyStageEligibilityToPayload(payload, stageColumns, effectiveOutcome) {
+  Object.assign(payload, stageColumns, {
+    close_score: stageColumns.close_score_earned === null
+      ? null
+      : effectiveCloseScore(effectiveOutcome, stageColumns.close_score_earned, stageColumns.close_score_earned),
+  });
+  return payload;
 }
 
 // Render the normalized turn array as plain text Claude can grade against.
@@ -2031,11 +2071,10 @@ async function analyzeCall(fathomCallId, userId) {
     });
 
     // ─── Phase 7: persist ────────────────────────────────────────────────
-    var intro     = sanitizeSection(graderParsed.intro);
-    var discovery = sanitizeSection(graderParsed.discovery);
-    var pitch     = sanitizeSection(graderParsed.pitch);
+    // The ordinary grader still supplies non-stage analysis and its objection
+    // text remains input to broader coaching. It can no longer write a stage
+    // compatibility column: those come only from the reviewed stage lane.
     var objection = sanitizeSection(graderParsed.objection);
-    var close     = sanitizeSection(graderParsed.close);
     var overallScore = (typeof graderParsed.overall_score === 'number'
                          && graderParsed.overall_score >= 0
                          && graderParsed.overall_score <= 100)
@@ -2079,7 +2118,19 @@ async function analyzeCall(fathomCallId, userId) {
     if (humanNamed) resolvedProspect = { name: existingRow.data.prospect_name, source: 'manual', confidence: existingRow.data.prospect_name_confidence || 'high' };
     var manualLocked = !!(existingRow.data && existingRow.data.outcome_source === 'manual');
     var effectiveOutcome = manualLocked ? existingRow.data.outcome : inferredOutcome;
-    var earnedClose = (typeof close.score === 'number') ? close.score : null;
+    var stageColumns = await stageColumnsForAnalysis({
+      turns: normalized.turns,
+      duration: callRow.duration_seconds,
+      material: { contextText: selling.contextText, kbHash: selling.kbHash },
+    }, async function (stageRequest) {
+      var response = await createWithUsage(stageRequest, {
+        userId: userId, callId: fathomCallId, lane: 'stage-eligibility',
+      });
+      var stageText = (response.content || []).map(function (part) { return part && part.text || ''; }).join('\n');
+      var parsed = extractFirstJsonObject(stageText);
+      if (!parsed) throw new Error('Stage assessment returned unparseable JSON.');
+      return parsed;
+    });
 
     var analysisPayload = {
       fathom_call_id:      fathomCallId,
@@ -2091,24 +2142,6 @@ async function analyzeCall(fathomCallId, userId) {
       outcome_set_by:      manualLocked ? existingRow.data.outcome_set_by : null,
       overall_score:       overallScore,
       overall_summary:     (typeof graderParsed.overall_summary === 'string') ? graderParsed.overall_summary.slice(0, 3000) : null,
-      intro_grade:         intro.grade,
-      intro_score:         intro.score,
-      intro_notes:         intro.notes,
-      discovery_grade:     discovery.grade,
-      discovery_score:     discovery.score,
-      discovery_notes:     discovery.notes,
-      pitch_grade:         pitch.grade,
-      pitch_score:         pitch.score,
-      pitch_notes:         pitch.notes,
-      objection_grade:     objection.grade,
-      objection_score:     objection.score,
-      objection_notes:     objection.notes,
-      close_grade:         close.grade,
-      // Thread 2: displayed Close = 100 when the effective outcome is 'closed';
-      // the grader's earned score is preserved in close_score_earned.
-      close_score:         effectiveCloseScore(effectiveOutcome, earnedClose, earnedClose),
-      close_score_earned:  earnedClose,
-      close_notes:         close.notes,
       one_thing:                   (typeof graderParsed.one_thing === 'string') ? graderParsed.one_thing.slice(0, 2000) : null,
       why_outcome:                 whyReason,
       why_quote:                   whyQuote,
@@ -2172,6 +2205,9 @@ async function analyzeCall(fathomCallId, userId) {
       transcript_attempts: 0,
       model_attempts:      0,
     };
+    // Thread 2 still applies: a closed outcome displays 100, but its earned
+    // source is now the independently reviewed eligibility Close record.
+    applyStageEligibilityToPayload(analysisPayload, stageColumns, effectiveOutcome);
     // H752: dedicated scheduling assessment disconnected; preserve existing saved evidence.
     // H754: general section coaching completes inside the analysis claim. Failure
     // leaves the grade intact and is retrievable as unreviewed coverage.
@@ -2596,6 +2632,8 @@ module.exports = {
   _findMeeting:                findMeeting,
   _formatTurnsForPrompt:       formatTurnsForPrompt,
   _formatSeconds:              formatSeconds,
+  _stageColumnsForAnalysis:    stageColumnsForAnalysis,
+  _applyStageEligibilityToPayload: applyStageEligibilityToPayload,
   _buildSectionGraderPrompt:   buildSectionGraderPrompt,
   _sanitizeQualificationCovered: sanitizeQualificationCovered,
   _sanitizeCoverage:            sanitizeCoverage,

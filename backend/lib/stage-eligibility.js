@@ -176,9 +176,17 @@ function reviewableCandidate(parsed, assessment) {
   return raw;
  })};
 }
-function toColumns(assessment, formatTimestamp, turns, materialHash) {
- if(!Array.isArray(turns)||!require('./stage-observation-review').verified(assessment,turns,materialHash))throw Error('Independent stage review is missing or no longer valid.');
- const summary={version:VERSION,review_version:assessment.review.version,factual_version:assessment.factual_review.version,source_hash:assessment.source_hash,sections:Object.fromEntries(SECTIONS.map(k=>[k,{state:assessment.sections[k].state,score:assessment.sections[k].score,grade:assessment.sections[k].grade}]))};
+function summaryFor(assessment, verification) {
+ return {
+  version:VERSION,
+  review_version:assessment.review.version,
+  verification,
+  ...(verification==='factual_proof'?{factual_version:assessment.factual_review.version}:{}),
+  source_hash:assessment.source_hash,
+  sections:Object.fromEntries(SECTIONS.map(k=>[k,{state:assessment.sections[k].state,score:assessment.sections[k].score,grade:assessment.sections[k].grade}])),
+ };
+}
+function columnsFor(assessment, formatTimestamp, summary) {
  const columns={stage_eligibility:{...assessment,summary}};
  for(const section of SECTIONS){
   const a=assessment.sections[section];
@@ -192,6 +200,30 @@ function toColumns(assessment, formatTimestamp, turns, materialHash) {
  }
  return columns;
 }
+// Offline QA conversion. It deliberately requires the paired factual proofs.
+function toColumns(assessment, formatTimestamp, turns, materialHash) {
+ if(!Array.isArray(turns)||!require('./stage-observation-review').verified(assessment,turns,materialHash))throw Error('Independent stage review is missing or no longer valid.');
+ return columnsFor(assessment,formatTimestamp,summaryFor(assessment,'factual_proof'));
+}
+// Production conversion. One independently reviewed result is enough to save;
+// the more expensive proof pair remains a development/QA gate.
+function toReviewedColumns(assessment, formatTimestamp, turns, materialHash) {
+ if(!Array.isArray(turns)||!require('./stage-eligibility-review').verified(assessment,turns,materialHash))throw Error('Independent stage review is missing or no longer valid.');
+ return columnsFor(assessment,formatTimestamp,summaryFor(assessment,'independent_review'));
+}
+function withheldColumns(turns, failureReason) {
+ const reason=clean(failureReason).slice(0,240)||'Stage eligibility assessment was withheld.';
+ const assessment={
+  version:VERSION,source_hash:sourceHash(Array.isArray(turns)?turns:[]),context:null,
+  status:'withheld',failure_reason:reason,
+  sections:Object.fromEntries(SECTIONS.map(section=>[section,unknown(reason)])),
+ };
+ const summary={
+  version:VERSION,verification:'withheld',status:'withheld',source_hash:assessment.source_hash,
+  sections:Object.fromEntries(SECTIONS.map(section=>[section,{state:'unmeasured',score:null,grade:null}])),
+ };
+ return columnsFor(assessment,()=>'',summary);
+}
 
 function read(row, section) {
  const stored=row?.stage_eligibility;
@@ -199,7 +231,10 @@ function read(row, section) {
  if (!saved) return {state:'legacy_unreviewed',score:null,grade:null};
  const a=saved.sections?.[section];
  const complete=Object.keys(saved.sections||{}).length===SECTIONS.length&&SECTIONS.every(key=>saved.sections?.[key]&&STATES.includes(saved.sections[key].state));
- if (saved.version!==VERSION||saved.review_version!==require('./stage-eligibility-review').VERSION||saved.factual_version!==require('./stage-observation-review').VERSION||!saved.source_hash||!complete||!a) return unknown('Stage assessment unavailable.');
+ const reviewed=saved.review_version===require('./stage-eligibility-review').VERSION
+   && (saved.verification==='independent_review'
+     || ((!saved.verification||saved.verification==='factual_proof')&&saved.factual_version===require('./stage-observation-review').VERSION));
+ if (saved.version!==VERSION||!reviewed||!saved.source_hash||!complete||!a) return unknown('Stage assessment unavailable.');
  if (a.state==='not_applicable'||a.state==='unmeasured') return {state:a.state,score:null,grade:null};
  if (!isScore(a.score)||!['A','B','C','D','F'].includes(a.grade)) return unknown('Stage measurement changed or is incomplete.');
  return {state:a.state,score:a.score,grade:a.grade};
@@ -209,4 +244,4 @@ function stageMetric(row, section) {
  const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&isScore(stage.score)&&['A','B','C','D','F'].includes(stage.grade);
  return {state:stage.state,contributes,score:contributes?stage.score:null,grade:contributes?stage.grade:null};
 }
-module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,INSTRUCTIONS,methodGuide,guidanceHash,normalizedCandidate,promptInstructions,buildPrompt,assess,reviewableCandidate,toColumns,read,stageMetric,sourceHash,noteClauses};
+module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,INSTRUCTIONS,methodGuide,guidanceHash,normalizedCandidate,promptInstructions,buildPrompt,assess,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
