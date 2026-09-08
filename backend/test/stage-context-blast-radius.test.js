@@ -183,7 +183,15 @@ test('the production grader prompt carries the stage rules the offline prompts c
   'asking what it costs makes a purchase decision due',                         // Justin, 2026-09-08: Raquel
   "closer's own reason for not giving the price is not a blocker",              // the circular close
   'asked in passing during discovery',                                          // and not the opposite error
+  'no matter how agreeable, polite, willing or friendly',                       // Justin, 2026-09-08: the partner objection is positional, not tonal
+  'whose agreement they say they need',                                         // the content test: a deferral to a person
+  'is what a partner objection sounds like every time',                         // the agreeable form is the canonical form
+  'Before the pitch and the price, the same sentence is a decision-maker disclosure', // and not the opposite error (Queen)
+  'answers well in discovery is discovery work and raises this score',          // Justin, 2026-09-08: pre-price handling credited where it happened
+  'answers well in the pitch is pitch work and raises this score',
+  'does not license grading a stage that never happened',                       // kept narrow
  ]) assert.ok(rest.includes(sentence),'missing outside the doctrine block: '+sentence);
+ assert.ok(rest.includes('"the prospect expressed no resistance" is never a reason to set this stage not_applicable'),'the tonal ground is named and refused');
  // Supplied by the doctrine file now — the hand copies are gone from the prompt text.
  for(const copy of [
   'solving a mechanical problem with you',
