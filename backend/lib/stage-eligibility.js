@@ -273,11 +273,25 @@ function assessProduction(parsed, turns) {
  const checked=checkProductionContext(raw.context,source);
  const context=checked.recorded;
  const brokenFieldFor=(section,state)=>checked.invalid.find(field=>(CONTEXT_DEPENDENCIES[field]||[]).includes(section)&&(field!=='ending'||state==='expected_but_missed'));
+ // THE SAFETY NET (Justin, 2026-09-07): every cited id must be a real turn —
+ // one bad id anywhere in the list still withholds the stage — but a stage
+ // that cites MORE than MAX_PRODUCTION_EVIDENCE valid turns keeps its first
+ // four and scores. Four quotes is enough to check a score; a good grade is
+ // never thrown away because the grader was generous. Each cut is RECORDED
+ // as {stage, sent, kept} in `evidence_truncations` on the stored record
+ // (call_analyses.stage_eligibility), so a model that keeps ignoring the
+ // stated bound shows up in the data rather than being papered over.
+ const truncations=[];
  const sections=Object.fromEntries(SECTIONS.map(section=>{
   const row=byStage[section], state=row?.state;
   const scored=state==='evaluated'||state==='expected_but_missed';
-  const evidence=productionEvidence(row?.evidence_turn_ids,source,scored);
-  if(!STATES.includes(state)||!evidence)return [section,unknown('Stage evidence or state is invalid.')];
+  const located=productionEvidence(row?.evidence_turn_ids,source,scored,null);
+  if(!STATES.includes(state)||!located)return [section,unknown('Stage evidence or state is invalid.')];
+  let evidence=located;
+  if(located.length>MAX_PRODUCTION_EVIDENCE){
+   truncations.push({stage:section,sent:located.length,kept:MAX_PRODUCTION_EVIDENCE});
+   evidence=located.slice(0,MAX_PRODUCTION_EVIDENCE);
+  }
   if(!scored){
    if(row.score!==null||row.grade!==null)return [section,unknown('An unscored stage carried a score or grade.')];
    return [section,{state,reason:clean(row.reason).slice(0,1000),score:null,grade:null,notes:null,evidence}];
@@ -300,6 +314,7 @@ function assessProduction(parsed, turns) {
  }));
  const record={version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION},sections};
  if(checked.invalid.length)record.context_invalid_fields=checked.invalid;
+ if(truncations.length)record.evidence_truncations=truncations;
  return record;
 }
 function productionSummaryFor(assessment) {

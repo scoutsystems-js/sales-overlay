@@ -50,12 +50,40 @@ test('a context fact may cite more than four turns; every stage still scores',()
  assert.equal(r.context.ending.evidence_turn_ids.length,12,'the context list is stored as sent');
 });
 
-test('a stage record keeps the 1–4 bound: an over-long stage list withholds that stage only',()=>{
+// THE SAFETY NET (Justin, 2026-09-07): a stage record that cites more than four
+// turns keeps its FIRST FOUR and scores — four quotes is enough to check a score,
+// and a good grade is never thrown away because the grader was generous with
+// evidence. The truncation is RECORDED (stage, sent, kept), never silent. The
+// prompt still says 1-4: the bound is the instruction, the net sits underneath.
+test('a stage record that cites more than four turns keeps its first four, scores, and records the truncation',()=>{
  const r=assess(payload(fullContext,{discovery:{evidence_turn_ids:[2,3,4,5,6,7,8,9]}}));
- assert.equal(r.sections.discovery.state,'unmeasured');
- assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'unmeasured',pitch:'evaluated:95',objection:'evaluated:81',close:'evaluated:99'});
+ assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'evaluated:81',close:'evaluated:99'});
+ assert.deepEqual(r.sections.discovery.evidence.map(e=>e.turn),[2,3,4,5],'the first four, in the order sent');
+ assert.deepEqual(r.evidence_truncations,[{stage:'discovery',sent:8,kept:4}]);
+ const fields=S.toProductionColumns(r,String,turns);
+ assert.deepEqual(fields.stage_eligibility.evidence_truncations,[{stage:'discovery',sent:8,kept:4}],'the record a reader finds in call_analyses.stage_eligibility');
+ assert.equal((fields.discovery_notes.match(/Turn \d+ of a real conversation/g)||[]).length,4,'four quotes beneath the score');
  const four=assess(payload(fullContext,{discovery:{evidence_turn_ids:[2,3,4,5]}}));
  assert.equal(four.sections.discovery.score,88,'exactly the bound still scores');
+ assert.equal(four.evidence_truncations,undefined,'nothing recorded when nothing was cut');
+});
+
+test('truncation applies to too many ids, never to bad ones: an unlocatable id among the extras still withholds the stage',()=>{
+ // eight cited, three not real turns — withheld, exactly as before the net.
+ let r=assess(payload(fullContext,{discovery:{evidence_turn_ids:[2,3,4,5,999,1000,1001,6]}}));
+ assert.equal(r.sections.discovery.state,'unmeasured');
+ assert.equal(r.evidence_truncations,undefined);
+ // the bad id in the part that would have been CUT still withholds
+ r=assess(payload(fullContext,{discovery:{evidence_turn_ids:[2,3,4,5,6,7,8,999]}}));
+ assert.equal(r.sections.discovery.state,'unmeasured');
+ // a repeated id among the extras still withholds
+ r=assess(payload(fullContext,{discovery:{evidence_turn_ids:[2,3,4,5,6,2]}}));
+ assert.equal(r.sections.discovery.state,'unmeasured');
+ // a scored stage still needs at least one id
+ r=assess(payload(fullContext,{discovery:{evidence_turn_ids:[]}}));
+ assert.equal(r.sections.discovery.state,'unmeasured');
+ // the sibling stages were never touched by any of the above
+ assert.equal(r.sections.close.score,99);
 });
 
 test('a bad context field withholds only the stages that depend on it',()=>{
@@ -114,17 +142,15 @@ test('replay: the saved reply for the early financial DQ call now measures what 
  const source=Array.from({length:fixture.source_turns},(_,i)=>({speaker:i%2?'PROSPECT':'CLOSER',start_seconds:i+1,text:'turn '+(i+1)}));
  const r=S.assessProduction({stage_assessment:fixture.stage_assessment},source);
  assert.equal(fixture.old_validator.status,'withheld','at bd744ea the six-id finance list withheld all five');
- // The finance list of six ids is now accepted, so the record is measured:
- // Intro 72 C and the three not_applicable stages read exactly as the grader wrote them.
- // Discovery cited EIGHT turns. Under the ruling the stage bound stays 1–4, so
- // Discovery is withheld by the bound the grader was never told (v56) — the
- // v57 prompt states it. Justin's expectation for this replay was Discovery 80 B;
- // the code does not produce it and this test records the ruled behaviour, not
- // the expectation. Reported, not tuned.
- assert.deepEqual(states(r),{intro:'evaluated:72',discovery:'unmeasured',pitch:'not_applicable',objection:'not_applicable',close:'not_applicable'});
+ // The finance list of six ids is accepted, so the record is measured: Intro 72 C
+ // and the three not_applicable stages read exactly as the grader wrote them.
+ // Discovery cited EIGHT turns; the safety net keeps the first four and scores
+ // 80 B, and the truncation is on the record.
+ assert.deepEqual(states(r),{intro:'evaluated:72',discovery:'evaluated:80',pitch:'not_applicable',objection:'not_applicable',close:'not_applicable'});
  assert.equal(r.sections.intro.grade,'C');
- assert.equal(fixture.stage_assessment.stages.find(s=>s.stage==='discovery').evidence_turn_ids.length,8);
- assert.match(r.sections.discovery.reason,/evidence or state is invalid/);
+ assert.equal(r.sections.discovery.grade,'B');
+ assert.deepEqual(r.sections.discovery.evidence.map(e=>e.turn),[15,22,46,52]);
+ assert.deepEqual(r.evidence_truncations,[{stage:'discovery',sent:8,kept:4}]);
  assert.equal(r.context.finance.evidence_turn_ids.length,6);
  assert.equal(r.context_invalid_fields,undefined);
 });
