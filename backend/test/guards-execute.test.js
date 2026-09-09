@@ -232,11 +232,14 @@ test('⚠⚠ the company picker renders for an OWNER and returns nothing for a M
 test('⚠⚠ a team answer that lands after the team changed is DROPPED — state is untouched and the lane is not left loading', async () => {
   const scope = { state: { teamOverview: null, teamOverviewLoading: false, view: 'team', teamTrendBucket: 'week', teamDigestDate: null, dashBoardId: null, teamSelected: null, teamObjDrillCategory: null }, teamEpoch: 0,
     teamQP: () => 'x=1', repSeriesBucket: () => 'week', encodeURIComponent, isTeamView: () => true, renderTeamSurface: () => {}, armLaneWait: () => {}, clearLaneWait: () => {}, console,
-    fetchTeamJSON: async function () { scope.teamEpoch++; /* the team changed while this request was in flight */ return { per_rep: [1, 2, 3] }; } };
+    /* H766: in production the epoch moves ONLY through resetTeamData, which clears every lane flag and lets the
+       next render start a NEWER request; that request then owns the flag. The stale answer must be dropped
+       WITHOUT touching it — clearing it here let a third request fire (measured live). */
+    fetchTeamJSON: async function () { scope.teamEpoch++; scope.state.teamOverviewLoading = false; /* resetTeamData */ scope.state.teamOverviewLoading = true; /* the newer request, in flight */ return { per_rep: [1, 2, 3] }; } };
   const src = grab('async function loadTeam(which) {', '\n  }') + '\n var __run = loadTeam;';
   await pageFn(src, scope).run('overview');
   assert.strictEqual(scope.state.teamOverview, null, 'the stale answer must not be stored — a comparison kept but made dead shows the wrong team\'s numbers');
-  assert.strictEqual(scope.state.teamOverviewLoading, false, 'and the lane must not be left marked loading');
+  assert.strictEqual(scope.state.teamOverviewLoading, true, 'and the flag the NEWER request owns is left alone (H766) — a discard that cleared it fired a third request');
 });
 test('⚠ NON-VACUITY: with no team change in flight the answer IS stored', async () => {
   const scope = { state: { teamOverview: null, teamOverviewLoading: false, view: 'team', teamTrendBucket: 'week', teamDigestDate: null, dashBoardId: null, teamSelected: null, teamObjDrillCategory: null }, teamEpoch: 0,

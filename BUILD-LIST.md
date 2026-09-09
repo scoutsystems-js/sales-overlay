@@ -28,6 +28,10 @@ Next gate: local representative human review of normal full call, appropriate co
 
 Earlier checkpoint, September 6 (kept from the root working copy; superseded by the paragraphs above): Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. H762 approved: Intro has no fixed60-second cutoff; a correctly booked continuation is separate from purchase-Close scoring. The stage contract is under local validation; no data changes or deployment. Justin approved a $28 ceiling for the seven-day correction, including validation and retries. First17-call pilot exposed checklist penalties and quote reconstruction failures; results are held. The revised candidate removes the conflicting checklist and pulls indexed evidence from source. See `investigation.md`.
 
+### Filed 2026-09-08 (H766): the personal-page pivot race
+
+An owner or manager who opens the Coaching Dashboard and then pivots to a rep can see the previous viewer's number under the rep's name when the earlier request lands last (seen as "152 calls analysed" under Gabriel; the owner's own count). A rep's own login never sees it; a cold deep link is right. Fix shape: a view epoch bumped in `setUser`/`setCallLibraryUser`, captured by every personal loader, stale answers discarded — the team lanes' rule, applied across the 24 personal loaders, guarded like `test/team-arrival-fetches.test.js`.
+
 ## 2. Full-call navigation check — AFTER task 1
 
 Trace the observed Review Full Call return to Team Coaching. Confirm whether it is reproducible and identify the cause before changing anything. Verify the correct call/rep opens and back navigation behaves correctly; the earlier observation did not prove the cause.

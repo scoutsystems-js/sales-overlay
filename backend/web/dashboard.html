@@ -9518,7 +9518,9 @@
   }
   async function loadTeam(which) {
     var map = {
-      context:  { flag: null,                    set: 'teamContext',    url: '/team/context' },
+      /* H766: context carries a flag like every other lane. Without one, every render pass that found
+         teamContext null fired another request — four per cold arrival, measured live. */
+      context:  { flag: 'teamContextLoading',    set: 'teamContext',    url: '/team/context' },
       overview: { flag: 'teamOverviewLoading',   set: 'teamOverview',   url: '/team/overview?' + teamQP() },
       trends:   { flag: 'teamTrendsLoading',     set: 'teamTrends',     url: '/team/trends?' + teamQP('bucket=' + state.teamTrendBucket) },
       recs:     { flag: 'teamRecsLoading',       set: 'teamRecs',       url: '/team/recommendations?' + teamQP() },
@@ -9574,10 +9576,11 @@
     /* ⚠⚠ DISCARD A STALE ANSWER. `context` is exempt: it is not team-scoped —
        it is the list of teams this person may pick, and it is what TRIGGERS the
        reset, so dropping it would discard the very response that caused the bump. */
-    if (which !== 'context' && epoch !== teamEpoch) {
-      if (c.flag) state[c.flag] = false;
-      return;
-    }
+    /* H766: a stale answer is dropped WITHOUT touching the flag. resetTeamData already cleared it when it
+       bumped the epoch, and by now the flag belongs to the NEWER request in flight; clearing it here let the
+       next render see "null and not loading" and fire a third request for the same lane (measured: three
+       coachable-moments requests, 10–16 s of server work each, on one arrival). */
+    if (which !== 'context' && epoch !== teamEpoch) return;
     state[c.set] = payload;
     if (c.flag) state[c.flag] = false;
     clearLaneWait(which);
