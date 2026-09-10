@@ -35,5 +35,5 @@ test('the current version counts, an unknown older version does not', () => {
   const old = S.stageMetric({ stage_eligibility: record('stage-eligibility-v16') }, 'intro');
   assert.equal(old.state, 'unmeasured');
   assert.equal(old.contributes, false);
-  assert.deepEqual([...S.READABLE_VERSIONS].sort(), ['stage-eligibility-v17', 'stage-eligibility-v18']);
+  assert.deepEqual([...S.READABLE_VERSIONS].sort(), ['stage-eligibility-v17', 'stage-eligibility-v18', 'stage-eligibility-v19']);
 });

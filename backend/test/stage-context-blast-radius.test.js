@@ -99,13 +99,15 @@ test('a bad context field withholds only the stages that depend on it',()=>{
   assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'unmeasured',close:'evaluated:99'},field);
   assert.deepEqual(r.context_invalid_fields,[field]);
  }
- // finance feeds ONE rule — the early-DQ rule on Pitch, Objection Handling and Close — so an
- // invalid finance fact gates those three only when it claims a disqualification that is not
- // late (Justin, 2026-09-07: "a late DQ leaves those three standing"). Intro and Discovery never read it.
+ // H771 (Justin, 2026-09-10) REVERSES the Block 4 gate: an INVALID finance fact is recorded and dropped and gates
+ // nothing — a contradictory note about the prospect's finances is not evidence the pitch did not happen. The only
+ // rule that reads finance (H768's genuine-DQ rule) reads a VALID fact. Was: an invalid non-late DQ claim withheld
+ // pitch, objection and close (2026-09-07), which blanked twelve calls in the thirty-day window.
  r=assess(payload({...fullContext,finance:{state:'genuine_dq',discovered_stage:null,feasible_financing_ruled_out:null,evidence_turn_ids:[]}}));
- assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'unmeasured',objection:'unmeasured',close:'unmeasured'},'a DQ claim of unstated timing gates');
+ assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'evaluated:81',close:'evaluated:99'},'a DQ claim of unstated timing is dropped, the stages stand');
+ assert.deepEqual(r.context_invalid_fields,['finance']);
  r=assess(payload({...fullContext,finance:{state:'genuine_dq',discovered_stage:'discovery',feasible_financing_ruled_out:false,evidence_turn_ids:[3]}}));
- assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'unmeasured',objection:'unmeasured',close:'unmeasured'},'an early DQ claim that is invalid gates');
+ assert.deepEqual(states(r),{intro:'evaluated:92',discovery:'evaluated:88',pitch:'evaluated:95',objection:'evaluated:81',close:'evaluated:99'},'an invalid early DQ claim is dropped, the stages stand');
  assert.deepEqual(r.context_invalid_fields,['finance']);
  // Adrienne 6c253ea2: genuine_dq, discovered LATE, financing not ruled out — invalid, but the
  // early-DQ rule could never have fired, so Pitch, Objection and Close stand and the field is still recorded invalid.

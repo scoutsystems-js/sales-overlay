@@ -96,7 +96,7 @@ test('never due is not applicable; unknown stays unmeasured — no sales convers
 });
 
 test('the record says which rules produced it and the prompt carries the ruling beside the version', () => {
-  assert.equal(S.VERSION, 'stage-eligibility-v18');
+  assert.equal(S.VERSION, 'stage-eligibility-v19');
   const src = fs.readFileSync(path.join(__dirname, '../lib/analysis-worker.js'), 'utf8');
   assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v61-2026-09-10'/);
   const live = stripComments(src);

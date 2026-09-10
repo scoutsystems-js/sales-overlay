@@ -1,12 +1,12 @@
 'use strict';
 const crypto = require('node:crypto');
-const VERSION = 'stage-eligibility-v18';
+const VERSION = 'stage-eligibility-v19'; // v19 (H771/H772): an invalid finance fact gates nothing; a recording that starts mid-conversation makes an expected-but-missed Intro/Discovery unmeasured
 /* H768: THE READER CARRIES THE VERSIONS IT CAN READ. A record written under v17 differs from v18 only in what became
    not_applicable (a genuine DQ's objection and close; never-due coercions) — an evaluated score is the same measurement,
    and the states that differ contribute nothing either way. Refusing v17 outright erased 171 valid records from Team →
    Coaching the day v18 shipped (Preston: fourteen calls, twelve with evaluated stages, "Awaiting grades"). A version
    outside this set is what stays unavailable. Guard test/stage-record-versions.test.js. */
-const READABLE_VERSIONS = new Set(['stage-eligibility-v17', VERSION]); // v18 (H768): a genuine financial DQ makes Objection and Close not applicable whenever discovered; a stage the context says never became due is not applicable, not unmeasured
+const READABLE_VERSIONS = new Set(['stage-eligibility-v17', 'stage-eligibility-v18', VERSION]); // v18 (H768): a genuine financial DQ makes Objection and Close not applicable whenever discovered; a stage the context says never became due is not applicable, not unmeasured
 const MODEL='claude-sonnet-4-6', MAX_TOKENS=4500;
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const EVIDENCE_SLOTS = Array.from({length:8},(_,index)=>'turn_'+(index+1));
@@ -45,7 +45,12 @@ const CONTEXT_DEPENDENCIES = {
  price:              ['objection'],
  prior_presentation: ['objection'],
  objection:          ['objection'],
- finance:            ['pitch','objection','close'],                        // the early-DQ rule — see CONTEXT_GATES
+ /* H771 (Justin, 2026-09-10): a contradictory finance note may not erase a stage that stands on its own evidence.
+    An INVALID finance fact is recorded in context_invalid_fields and dropped (recorded as null); it gates nothing,
+    because the only rule that reads finance — the H768 genuine-DQ rule — reads a VALID fact. Was: pitch/objection/close
+    withheld when the invalid fact claimed a non-late DQ (Block 4's gate), which blanked twelve calls' pitch, objection
+    and close in the thirty-day window while the pitch and the price were plainly on the transcript. */
+ finance:            [],
  close_due:          ['close'],
  call_kind:          [],                                                   // recorded, gates nothing
 };
@@ -55,9 +60,7 @@ const CONTEXT_DEPENDENCIES = {
 // whose timing is not late (Justin, 2026-09-07: "a late DQ leaves those three
 // standing" — Adrienne 6c253ea2 lost three good grades to a fact that had no
 // bearing on them). The field is recorded as invalid either way.
-const CONTEXT_GATES = {
- finance: raw => !!raw&&typeof raw==='object'&&raw.state==='genuine_dq'&&raw.discovered_stage!=='late',
-};
+const CONTEXT_GATES = {};   // H771: no field gates conditionally any more; finance gated the early-DQ path until Justin's ruling
 const scoreColumn = section => section === 'close' ? 'close_score_earned' : section + '_score';
 const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
 const isScore = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
@@ -276,6 +279,22 @@ function checkProductionContext(context, source) {
  for(const field of Object.keys(checks)) recorded[field]=checks[field]?context[field]:null;
  return {invalid,recorded};
 }
+/* H772 (Justin, 2026-09-10): A RECORDING THAT STARTS LATE IS NOT A REP WHO SKIPPED THE START. Detected from the
+   transcript in code, never from the model's opinion: no opening exchange in the first eight turns or two minutes (a
+   greeting, a hearing check, a recording notice, an agenda word) AND a first turn that is already content — twenty-five
+   words or more — inside five seconds. Both together. A model reading for tone never reads the transcript's shape, so it
+   cannot route around this. Measured before building (660 window records): one expected-but-missed Intro, and it has no
+   opening exchange; 204 recordings lack a greeting in the first eight turns (no-shows, reconnects), so the greeting
+   alone is not the signal. */
+const OPENING=/\b(hi|hey|hello|good (morning|afternoon|evening)|how are you|how('s| is) it going|how you doing|how are things|can you (hear|see) me|hear me (ok|okay|alright|now)|nice to meet|thanks for (joining|hopping|jumping|coming)|welcome|what's up|there (he|she) is|you made it|glad (we|you)|appreciate you|being recorded|share my screen|my camera|the camera|my audio|microphone|my mic|log(ged)? in|before we (start|get started|dive)|agenda|let's (get started|dive in|jump in))\b/i;
+function recordingStart(turns) {
+ const rows=(Array.isArray(turns)?turns:[]).filter(t=>t&&typeof t.text==='string'&&Number.isFinite(t.start_seconds));
+ if(!rows.length)return 'observed';
+ const first=rows[0];const words=clean(first.text).split(' ').filter(Boolean).length;
+ const head=rows.filter((t,i)=>i<8||t.start_seconds<=first.start_seconds+120);
+ const opening=head.some(t=>OPENING.test(t.text));
+ return (!opening&&words>=25&&first.start_seconds<=5)?'mid_conversation':'observed';
+}
 function productionWithheld(source, reason) {
  return {version:VERSION,source_hash:sourceHash(source),context:null,status:'withheld',failure_reason:clean(reason).slice(0,240)||'Stage assessment was withheld.',sections:Object.fromEntries(SECTIONS.map(section=>[section,unknown('Stage assessment was withheld.')] ))};
 }
@@ -310,6 +329,7 @@ function assessProduction(parsed, turns) {
  // (call_analyses.stage_eligibility), so a model that keeps ignoring the
  // stated bound shows up in the data rather than being papered over.
  const truncations=[];
+ const start=recordingStart(source);   // H772: code-derived from the transcript
  const sections=Object.fromEntries(SECTIONS.map(section=>{
   const row=byStage[section], state=row?.state;
   const scored=state==='evaluated'||state==='expected_but_missed';
@@ -347,6 +367,7 @@ function assessProduction(parsed, turns) {
   if(section==='close'&&context.close_due===false)return notDue('A purchase Close was not due on this call.');
   if(section==='close'&&context.close_due!==true)return [section,unknown('Whether a purchase Close was due is not established.')];
   if(state==='expected_but_missed'&&context.ending.state==='cut_off')return [section,unknown('An incomplete recording cannot manufacture a missed stage.')];
+  if(state==='expected_but_missed'&&['intro','discovery'].includes(section)&&start==='mid_conversation')return [section,unknown('The recording begins mid-conversation; work before it cannot be judged missing.')];
   if(section==='objection'){
    const presented=(context.pitch.occurred===true&&context.pitch.evidence_turn_ids.length&&context.price.occurred===true&&context.price.evidence_turn_ids.length)
      ||(context.prior_presentation.established===true&&context.prior_presentation.evidence_turn_ids.length);
@@ -355,7 +376,7 @@ function assessProduction(parsed, turns) {
   // `context.finance` is null when the fact was invalid but did not gate this stage (a late DQ claim); the H768 rules above already handled a valid genuine_dq.
   return [section,{state,reason:clean(row.reason).slice(0,1000),score:row.score,grade:row.grade,notes:productionReason(row.reason),evidence}];
  }));
- const record={version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION,doctrine_hash:graderDoctrineHash()},sections};
+ const record={version:VERSION,source_hash:sourceHash(source),context,recording_start:start,production:{version:PRODUCTION_GRADER_VERSION,doctrine_hash:graderDoctrineHash()},sections};
  if(checked.invalid.length)record.context_invalid_fields=checked.invalid;
  if(truncations.length)record.evidence_truncations=truncations;
  return record;
@@ -448,4 +469,4 @@ function stageMetric(row, section) {
  const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&hasCanonicalGrade(stage.score,stage.grade);
  return {state:stage.state,contributes,score:contributes?stage.score:null,grade:contributes?stage.grade:null};
 }
-module.exports={VERSION,READABLE_VERSIONS,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,STAGE_EVIDENCE_SCHEMA,CONTEXT_EVIDENCE_SCHEMA,graderDoctrineBlock,graderDoctrineHash,CONTEXT_DEPENDENCIES,CONTEXT_GATES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
+module.exports={VERSION,READABLE_VERSIONS,recordingStart,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,STAGE_EVIDENCE_SCHEMA,CONTEXT_EVIDENCE_SCHEMA,graderDoctrineBlock,graderDoctrineHash,CONTEXT_DEPENDENCIES,CONTEXT_GATES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};

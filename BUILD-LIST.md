@@ -28,7 +28,11 @@ Next gate: local representative human review of normal full call, appropriate co
 
 Earlier checkpoint, September 6 (kept from the root working copy; superseded by the paragraphs above): Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. H762 approved: Intro has no fixed60-second cutoff; a correctly booked continuation is separate from purchase-Close scoring. The stage contract is under local validation; no data changes or deployment. Justin approved a $28 ceiling for the seven-day correction, including validation and retries. First17-call pilot exposed checklist penalties and quote reconstruction failures; results are held. The revised candidate removes the conflicting checklist and pulls indexed evidence from source. See `investigation.md`.
 
-### Filed 2026-09-10 (H768/H769): the coachable-moments evidence read fails intermittently
+### Fixed 2026-09-10 (H770): the coachable-moments evidence read
+
+Root cause a statement timeout (57014) on a 9 MB statement; the period review now carries its verified slice, the 235 existing records were backfilled for $0, and the route reads transcripts only for improvements. Six timed cold loads in H770. Still open from the same look: the 45 cron-graded v17 rows (one scored objection on a genuine DQ; ~$6 to re-run); the personal-page pivot race (filed H766).
+
+### Was filed 2026-09-10 (H768/H769): the coachable-moments evidence read fails intermittently
 
 `GET /team/coachable-moments` returned 500 once in three cold loads on the thirty-day window (13 s, then `[team] coachable-moments: Coaching evidence unavailable`), and 200 on the reloads. The evidence read in `lib/coachable-team.js` selects `transcript_stored` for every window call carrying `rep_period_coaching` — 219 calls, three chunks of 100, about 9 MB of transcript per chunk (~20 MB per page load) — and the thrown message drops `eq.error.message`, so the cause is not in the log. Two rows: carry the error text, and read only what the evidence builder needs (the located turns, not whole transcripts). Not caused by the regrade; the window's growth makes it worse.
 
