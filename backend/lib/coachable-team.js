@@ -63,7 +63,9 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash, options) {
   var evidenceAnalyses = new Map();
   await readBatches(evidenceIds, async function (slice) {
     var eq = await admin.from('call_analyses').select('fathom_call_id,outcome,why_outcome,transcript_stored').in('fathom_call_id', slice).eq('status', 'done');
-    if (eq.error) throw new Error('Coaching evidence unavailable');
+    /* H770: the wire's own message, code and details travel with the throw. A bare sentence here cost a day twice —
+       the log could not say whether the read timed out or hit a size limit, and the two have different fixes. */
+    if (eq.error) throw new Error('Coaching evidence unavailable: ' + [eq.error.message, eq.error.code && ('code ' + eq.error.code), eq.error.details, eq.error.hint].filter(Boolean).join(' · '));
     (eq.data || []).forEach(function (a) { evidenceAnalyses.set(a.fathom_call_id, a); });
   });
   var buildEvidence = require('./strength-call-evidence').buildEvidence;
