@@ -28,6 +28,10 @@ Next gate: local representative human review of normal full call, appropriate co
 
 Earlier checkpoint, September 6 (kept from the root working copy; superseded by the paragraphs above): Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. H762 approved: Intro has no fixed60-second cutoff; a correctly booked continuation is separate from purchase-Close scoring. The stage contract is under local validation; no data changes or deployment. Justin approved a $28 ceiling for the seven-day correction, including validation and retries. First17-call pilot exposed checklist penalties and quote reconstruction failures; results are held. The revised candidate removes the conflicting checklist and pulls indexed evidence from source. See `investigation.md`.
 
+### Filed 2026-09-10 (H768/H769): the coachable-moments evidence read fails intermittently
+
+`GET /team/coachable-moments` returned 500 once in three cold loads on the thirty-day window (13 s, then `[team] coachable-moments: Coaching evidence unavailable`), and 200 on the reloads. The evidence read in `lib/coachable-team.js` selects `transcript_stored` for every window call carrying `rep_period_coaching` — 219 calls, three chunks of 100, about 9 MB of transcript per chunk (~20 MB per page load) — and the thrown message drops `eq.error.message`, so the cause is not in the log. Two rows: carry the error text, and read only what the evidence builder needs (the located turns, not whole transcripts). Not caused by the regrade; the window's growth makes it worse.
+
 ### Ruled and built 2026-09-10 (H768): a DQ is one miss; the panel floor; never-due is n/a
 
 Validator v18 / prompt v61. Next: the five late-DQ calls re-run as verification, then the rest of the thirty-day window (stage record only), then the look — see H768/H769.

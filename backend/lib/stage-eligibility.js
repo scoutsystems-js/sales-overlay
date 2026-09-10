@@ -1,6 +1,12 @@
 'use strict';
 const crypto = require('node:crypto');
-const VERSION = 'stage-eligibility-v18'; // v18 (H768): a genuine financial DQ makes Objection and Close not applicable whenever discovered; a stage the context says never became due is not applicable, not unmeasured
+const VERSION = 'stage-eligibility-v18';
+/* H768: THE READER CARRIES THE VERSIONS IT CAN READ. A record written under v17 differs from v18 only in what became
+   not_applicable (a genuine DQ's objection and close; never-due coercions) — an evaluated score is the same measurement,
+   and the states that differ contribute nothing either way. Refusing v17 outright erased 171 valid records from Team →
+   Coaching the day v18 shipped (Preston: fourteen calls, twelve with evaluated stages, "Awaiting grades"). A version
+   outside this set is what stays unavailable. Guard test/stage-record-versions.test.js. */
+const READABLE_VERSIONS = new Set(['stage-eligibility-v17', VERSION]); // v18 (H768): a genuine financial DQ makes Objection and Close not applicable whenever discovered; a stage the context says never became due is not applicable, not unmeasured
 const MODEL='claude-sonnet-4-6', MAX_TOKENS=4500;
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const EVIDENCE_SLOTS = Array.from({length:8},(_,index)=>'turn_'+(index+1));
@@ -432,7 +438,7 @@ function read(row, section) {
  const reviewed=saved.review_version===require('./stage-eligibility-review').VERSION
    && (saved.verification==='independent_review'
      || ((!saved.verification||saved.verification==='factual_proof')&&saved.factual_version===require('./stage-observation-review').VERSION));
- if (saved.version!==VERSION||(!normalGrader&&!reviewed)||!saved.source_hash||!complete||!a) return unknown('Stage assessment unavailable.');
+ if (!READABLE_VERSIONS.has(saved.version)||(!normalGrader&&!reviewed)||!saved.source_hash||!complete||!a) return unknown('Stage assessment unavailable.');
  if (a.state==='not_applicable'||a.state==='unmeasured') return {state:a.state,score:null,grade:null};
  if (!hasCanonicalGrade(a.score,a.grade)) return unknown('Stage measurement changed or is incomplete.');
  return {state:a.state,score:a.score,grade:a.grade};
@@ -442,4 +448,4 @@ function stageMetric(row, section) {
  const contributes=(stage.state==='evaluated'||stage.state==='expected_but_missed')&&hasCanonicalGrade(stage.score,stage.grade);
  return {state:stage.state,contributes,score:contributes?stage.score:null,grade:contributes?stage.grade:null};
 }
-module.exports={VERSION,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,STAGE_EVIDENCE_SCHEMA,CONTEXT_EVIDENCE_SCHEMA,graderDoctrineBlock,graderDoctrineHash,CONTEXT_DEPENDENCIES,CONTEXT_GATES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
+module.exports={VERSION,READABLE_VERSIONS,MODEL,MAX_TOKENS,SECTIONS,STATES,GRADES,PRODUCTION_VERIFICATION,PRODUCTION_GRADER_VERSION,MAX_PRODUCTION_EVIDENCE,CONTEXT_EVIDENCE_MAX,EVIDENCE_PROMPT_RULE,STAGE_EVIDENCE_SCHEMA,CONTEXT_EVIDENCE_SCHEMA,graderDoctrineBlock,graderDoctrineHash,CONTEXT_DEPENDENCIES,CONTEXT_GATES,checkProductionContext,INSTRUCTIONS,methodGuide,guidanceHash,canonicalGrade,normalizedCandidate,promptInstructions,buildPrompt,assess,assessProduction,toProductionColumns,reviewableCandidate,toColumns,toReviewedColumns,withheldColumns,read,stageMetric,sourceHash,noteClauses};
