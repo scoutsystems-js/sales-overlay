@@ -94,7 +94,10 @@ test('a late financial DQ can retain an evidence-backed Discovery expected miss'
  const result=assess(payload(context,{discovery:{state:'expected_but_missed',score:55,grade:'F',evidence_turn_ids:[3,6,7]},close:{score:72,grade:'C'}}));
  assert.equal(result.sections.discovery.state,'expected_but_missed');
  assert.equal(result.sections.discovery.score,55);
- assert.equal(result.sections.close.score,72);
+ /* H768 (Justin, 2026-09-10) REVERSES the Block 4 reading that a late DQ leaves the close scored: a genuine financial DQ is
+    one miss, coached once — Objection and Close are not applicable whenever the DQ is discovered. Was: close.score 72. */
+ assert.equal(result.sections.close.state,'not_applicable');
+ assert.equal(result.sections.close.score,null);
 });
 
 test('no pitch or price cannot create objection or purchase-close penalties',()=>{

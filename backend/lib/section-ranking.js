@@ -51,7 +51,8 @@ const LABELS = {
 // One question, one answer.
 const { _MIN_ANALYZED } = require('./team-needs-work');
 const MIN_CALLS_TO_RANK = _MIN_ANALYZED;
-const NG = require('./new-grading-copy');   // the one sentence beside a zero that comes from new grading (H765)
+const NG = require('./new-grading-copy');
+const THIN_LABEL = 'Not enough to judge';   // H768: the one wording for "below the floor", read by the rep page's card and the team panel   // the one sentence beside a zero that comes from new grading (H765)
 
 // 95%. Two means are "level" when their gap falls inside this many standard
 // errors of the difference.
@@ -195,6 +196,7 @@ module.exports = {
   rankLabel: rankLabel,
   LABELS: LABELS,
   MIN_CALLS_TO_RANK: MIN_CALLS_TO_RANK,
+  THIN_LABEL: THIN_LABEL,
   CONFIDENCE_Z: CONFIDENCE_Z,
   sectionStatsFromAnalyses: sectionStatsFromAnalyses,
   rankSections: rankSections,

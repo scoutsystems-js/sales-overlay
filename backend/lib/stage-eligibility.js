@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const VERSION = 'stage-eligibility-v17';
+const VERSION = 'stage-eligibility-v18'; // v18 (H768): a genuine financial DQ makes Objection and Close not applicable whenever discovered; a stage the context says never became due is not applicable, not unmeasured
 const MODEL='claude-sonnet-4-6', MAX_TOKENS=4500;
 const SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 const EVIDENCE_SLOTS = Array.from({length:8},(_,index)=>'turn_'+(index+1));
@@ -323,16 +323,30 @@ function assessProduction(parsed, turns) {
   // one withholds this stage alone. `ending` is read only by the cut-off rule.
   const broken=brokenFieldFor(section,state);
   if(broken)return [section,unknown('Stage context for '+broken+' is invalid.')];
+  /* H768 (Justin, 2026-09-10): A STAGE THE CONTEXT SAYS NEVER BECAME DUE IS NOT APPLICABLE, NOT UNMEASURED.
+     Unmeasured means Scout could not measure it; not applicable means it was never due. When the grader scored a
+     stage while its own context says no conversation (false), close not due (false), or a genuine financial DQ,
+     the code coerces to not_applicable and keeps the located evidence. A context that says null (unknown) is
+     genuinely unmeasurable and stays unmeasured. */
+  const notDue=reason=>[section,{state:'not_applicable',reason,score:null,grade:null,notes:null,evidence}];
+  if(context.sales_conversation===false)return notDue('No sales conversation took place; the stage never became due.');
   if(context.sales_conversation!==true)return [section,unknown('A sales conversation is not established.')];
+  /* H768: A GENUINE FINANCIAL DISQUALIFICATION IS ONE MISS, COACHED ONCE. Objection Handling and Close are not
+     applicable on a genuine DQ WHENEVER it is discovered — a DQ is not an objection and not a failed close; Discovery
+     carries the miss (early: good qualification work; late: the qualification that was missed). Enforced HERE, on the
+     finance context the grader itself wrote, so relabelling the stage cannot satisfy it. Unresolved, not_assessed and
+     qualified change nothing. The seven-day regrade charged one prospect who could not fund it three times. */
+  if(['objection','close'].includes(section)&&context.finance&&context.finance.state==='genuine_dq')return notDue('A genuine financial disqualification is not an objection and not a failed close; the miss is charged once, in Discovery.');
+  if(section==='pitch'&&context.finance&&context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery')return notDue('Early financial disqualification: the pitch never became due.');
+  if(section==='close'&&context.close_due===false)return notDue('A purchase Close was not due on this call.');
+  if(section==='close'&&context.close_due!==true)return [section,unknown('Whether a purchase Close was due is not established.')];
   if(state==='expected_but_missed'&&context.ending.state==='cut_off')return [section,unknown('An incomplete recording cannot manufacture a missed stage.')];
   if(section==='objection'){
    const presented=(context.pitch.occurred===true&&context.pitch.evidence_turn_ids.length&&context.price.occurred===true&&context.price.evidence_turn_ids.length)
      ||(context.prior_presentation.established===true&&context.prior_presentation.evidence_turn_ids.length);
    if(!presented||context.objection.occurred!==true||!context.objection.evidence_turn_ids.length)return [section,unknown('Objection work was not established after a valid presentation.')];
   }
-  if(section==='close'&&context.close_due!==true)return [section,unknown('A purchase Close was not due on this call.')];
-  // `context.finance` is null when the fact was invalid but did not gate this stage (a late DQ claim).
-  if(['pitch','objection','close'].includes(section)&&context.finance&&context.finance.state==='genuine_dq'&&context.finance.discovered_stage==='discovery')return [section,unknown('Early financial disqualification makes downstream scoring inapplicable.')];
+  // `context.finance` is null when the fact was invalid but did not gate this stage (a late DQ claim); the H768 rules above already handled a valid genuine_dq.
   return [section,{state,reason:clean(row.reason).slice(0,1000),score:row.score,grade:row.grade,notes:productionReason(row.reason),evidence}];
  }));
  const record={version:VERSION,source_hash:sourceHash(source),context,production:{version:PRODUCTION_GRADER_VERSION,doctrine_hash:graderDoctrineHash()},sections};

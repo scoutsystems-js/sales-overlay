@@ -28,6 +28,10 @@ Next gate: local representative human review of normal full call, appropriate co
 
 Earlier checkpoint, September 6 (kept from the root working copy; superseded by the paragraphs above): Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. H762 approved: Intro has no fixed60-second cutoff; a correctly booked continuation is separate from purchase-Close scoring. The stage contract is under local validation; no data changes or deployment. Justin approved a $28 ceiling for the seven-day correction, including validation and retries. First17-call pilot exposed checklist penalties and quote reconstruction failures; results are held. The revised candidate removes the conflicting checklist and pulls indexed evidence from source. See `investigation.md`.
 
+### Ruled and built 2026-09-10 (H768): a DQ is one miss; the panel floor; never-due is n/a
+
+Validator v18 / prompt v61. Next: the five late-DQ calls re-run as verification, then the rest of the thirty-day window (stage record only), then the look — see H768/H769.
+
 ### Applied 2026-09-09 (H767): the seven-day stage-record regrade
 
 131 Sober Living Riches calls from the seven days to Sep 8 carry a v60 stage record, written to `stage_eligibility` only ($16.69 actual against $16.63 counted; receipt under `~/Desktop/scan-reports/coaching-integrity/seven-day-regrade/`). Extending to fourteen or thirty days is Justin's call. Rulings needed from the audit (H767): a late FINANCIAL DQ scoring the Objection stage (a DQ is not an objection) and the Close; the Team → Coaching panel naming a lowest-scoring area from one counted call.
