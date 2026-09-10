@@ -32,6 +32,10 @@ Earlier checkpoint, September 6 (kept from the root working copy; superseded by 
 
 `GET /team/coachable-moments` returned 500 once in three cold loads on the thirty-day window (13 s, then `[team] coachable-moments: Coaching evidence unavailable`), and 200 on the reloads. The evidence read in `lib/coachable-team.js` selects `transcript_stored` for every window call carrying `rep_period_coaching` — 219 calls, three chunks of 100, about 9 MB of transcript per chunk (~20 MB per page load) — and the thrown message drops `eq.error.message`, so the cause is not in the log. Two rows: carry the error text, and read only what the evidence builder needs (the located turns, not whole transcripts). Not caused by the regrade; the window's growth makes it worse.
 
+### Applied 2026-09-10 (H769): the rest of the thirty days
+
+493 rows regraded under v18/v61 (the five, then 488), $61.59 against $61.30 counted; 662 window records, unmeasured 1.4%. Rulings to take from the look (H769): an invalid genuine-DQ claim (financing not ruled out) withholds three stages on twelve calls — downgrade to unresolved?; a recording that STARTS mid-call manufactures Intro/Discovery misses; the 171 v17 records (126 re-validatable for $0 from saved replies; 45 cron rows need a ~$6 re-run). Extending beyond thirty days is Justin's call.
+
 ### Ruled and built 2026-09-10 (H768): a DQ is one miss; the panel floor; never-due is n/a
 
 Validator v18 / prompt v61. Next: the five late-DQ calls re-run as verification, then the rest of the thirty-day window (stage record only), then the look — see H768/H769.
