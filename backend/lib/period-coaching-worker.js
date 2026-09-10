@@ -40,6 +40,7 @@ async function assessPeriodCoaching(admin,call,analysis,userId,deps={}) {
   const second=eligible.length?await request(O.prompt(eligible,context),'observation-facts',O.MAX_TOKENS):{observations:[]};
   record=O.applyPair(record,[first,second],context);
  }
+ record.verified=P.verifiedSlice(record,analysis);   // H770: the record carries the turns its read-time checks touch
  return record;
 }
 module.exports={assessPeriodCoaching,MAX_CALL_COST};

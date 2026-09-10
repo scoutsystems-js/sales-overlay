@@ -119,16 +119,38 @@ function schedulingPrompt(prompt){
  // Scheduling facts need indexed dialogue, not timestamps that can be mistaken for turn IDs.
  return prompt.replace(/(\[\d+\] (?:CLOSER|PROSPECT)) @\d+(?:\.\d+)?:/g,'$1:')+'\nUse the bracketed transcript turn indices for evidence_turns. Never return timestamps.';
 }
-function applySchedulingFacts(record,analysis,facts){
+function applySchedulingFacts(record,analysis,facts,sourceHash){
  const F=require('./followup-facts');
- const supported=facts?.version===F.VERSION&&facts.source_hash===F.sourceHash(analysis)&&facts.facts?.state==='not_booked'&&facts.facts.further_contact===true&&facts.facts.declined===false&&facts.facts.ending_complete===true;
+ const supported=facts?.version===F.VERSION&&facts.source_hash===(sourceHash||F.sourceHash(analysis))&&facts.facts?.state==='not_booked'&&facts.facts.further_contact===true&&facts.facts.declined===false&&facts.facts.ending_complete===true;
  return {...record,scheduling_facts:facts||null,findings:record.findings.filter(f=>f.move!=='booking the follow-up'||supported)};
 }
-function storedExamples(record,analysis,materialHash,meta){if(materialHash&&typeof materialHash==='object')materialHash=/^call-period-review-v[1-4]$/.test(record?.version)?materialHash.legacy:materialHash.current;const context=prepare(analysis);if(!context||![VERSION,'call-period-review-v10','call-period-review-v9','call-period-review-v8','call-period-review-v7','call-period-review-v6','call-period-review-v5','call-period-review-v4','call-period-review-v1','call-period-review-v2','call-period-review-v3'].includes(record?.version)||record.source_hash!==context.hash||record.kb_hash!==materialHash||!Array.isArray(record.findings))return null;
+/* H770 — THE VERIFIED SLICE. The record is written in the same upsert as the transcript it verified against and a
+   re-analysis rewrites both, so re-deriving its hashes from the transcript at read time is redundant by construction;
+   doing it for every window call read ~20 MB of transcripts per Team → Coaching load and hit the statement timeout.
+   verifiedSlice() stores, at write time, the hashes and exactly the turns storedExamples and finish() touch (a
+   finding's cited turns; a stage-facts read's evidence turn and its next seven, the same-speaker run located() walks;
+   a finished decision's turn ids). contextFromSlice() rebuilds a sparse context from it. A record without a slice
+   still falls back to the transcript. Guard test/period-review-verified-slice.test.js. */
+const SLICE_VERSION='verified-slice-v1';
+function verifiedSlice(record,analysis){
+ const context=prepare(analysis);if(!context||!record||!Array.isArray(record.findings))return null;
+ const F=require('./followup-facts');const need=new Set();const add=n=>{if(Number.isInteger(n)&&n>=1&&n<=context.turns.length)need.add(n);};
+ for(const f of record.findings)for(const n of (f.turn_ids||[]))add(n);
+ for(const read of (record.stage_facts?.reads||[]))for(const d of (read?.decisions||[]))for(const e of (d?.evidence||[]))if(Number.isInteger(e?.turn))for(let n=e.turn;n<=e.turn+7;n++)add(n);
+ for(const d of (record.stage_facts?.decisions||[]))for(const n of (d?.turn_ids||[]))add(n);
+ const turns={};for(const n of [...need].sort((a,b)=>a-b))turns[n]=context.turns[n-1];
+ return {version:SLICE_VERSION,hash:context.hash,followup_hash:F.sourceHash(analysis),turn_count:context.turns.length,turns};
+}
+function contextFromSlice(record){
+ const s=record?.verified;if(!s||s.version!==SLICE_VERSION||!Number.isInteger(s.turn_count)||!s.turns||typeof s.turns!=='object')return null;
+ const turns=new Array(s.turn_count);for(const [n,t] of Object.entries(s.turns))turns[Number(n)-1]=t;
+ const first=turns.find(Boolean);return {turns,fullCall:true,historyScope:'single_call',hash:s.hash,anchor:first?first.time:0,fromSlice:true};
+}
+function storedExamples(record,analysis,materialHash,meta){if(materialHash&&typeof materialHash==='object')materialHash=/^call-period-review-v[1-4]$/.test(record?.version)?materialHash.legacy:materialHash.current;const context=prepare(analysis)||contextFromSlice(record);if(!context||![VERSION,'call-period-review-v10','call-period-review-v9','call-period-review-v8','call-period-review-v7','call-period-review-v6','call-period-review-v5','call-period-review-v4','call-period-review-v1','call-period-review-v2','call-period-review-v3'].includes(record?.version)||record.source_hash!==context.hash||record.kb_hash!==materialHash||!Array.isArray(record.findings))return null;
  if(record.version===VERSION&&record.findings.length&&(!record.independent_review||record.independent_review.version!=='period-independent-v2'||record.independent_review.source_hash!==context.hash||record.independent_review.kb_hash!==materialHash||record.findings.some(f=>!record.independent_review.decisions?.some(d=>d.moment===f.moment&&d.verdict==='approved'&&d.checked_skill?.move===f.move&&d.checked_skill?.section===f.section))))return null;
  if(record.version===VERSION&&record.findings.length&&!require('./period-observation-facts').isVerified(record,context))return null;
- const result=[];for(const f of applySchedulingFacts(record,analysis,record.scheduling_facts).findings){if(!actionable(f))continue;
+ const result=[];for(const f of applySchedulingFacts(record,analysis,record.scheduling_facts,context.fromSlice?record.verified.followup_hash:null).findings){if(!actionable(f))continue;
  if(record.version===VERSION){const S=require('./period-stage-facts');const reads=record.stage_facts?.reads;if(!Array.isArray(reads)||reads.length!==2||!S.allows(f,S.finish(context,...reads),context))return null;}
  if(!record.decisions?.some(d=>d.moment===f.moment&&d.verdict==='approved')||!SECTION_ORDER.includes(f.section)||!ALL_MOVES.includes(f.move)||!E.safeAdvice(f.observation)||!E.safeAdvice(f.recommendation)||!Array.isArray(f.turn_ids)||f.turn_ids.length<3||f.turn_ids.some(n=>!Number.isInteger(n)||!context.turns[n-1]))return null;
  result.push({...f,...meta,outcome:analysis.outcome,evidence:f.turn_ids.map(n=>({speaker:context.turns[n-1].speaker,quote:context.turns[n-1].text,timestamp_seconds:context.turns[n-1].time}))});}return result;}
-module.exports={ALL_MOVES,VERSION,MAX_TOKENS,prepare,writerPrompt,candidates,reviewPrompt,finish,applyIndependentReview,storedExamples,applySchedulingFacts,schedulingPrompt};
+module.exports={ALL_MOVES,VERSION,MAX_TOKENS,prepare,writerPrompt,candidates,reviewPrompt,finish,applyIndependentReview,storedExamples,applySchedulingFacts,schedulingPrompt,verifiedSlice,contextFromSlice,SLICE_VERSION};

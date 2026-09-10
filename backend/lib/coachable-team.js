@@ -16,9 +16,13 @@ var doctrineLib = require('./doctrine');
 var { selectImprovementFocus } = require('./improvement-focus');
 
 // Three independent read batches at a time; keep URL-safe CHUNK sizing.
-async function readBatches(ids, read) {
-  var next = 0;
-  async function worker() { while (next < ids.length) { var start = next; next += CHUNK; await read(ids.slice(start, start + CHUNK)); } }
+/* H770: a transcript read is weighed by bytes, not by URL length. A 100-id statement carrying whole transcripts
+   (~9 MB) was cancelled by the database's statement timeout (57014) on about half the cold loads; twenty per
+   statement keeps each well inside it. CHUNK stays the .in() ceiling for every other read. */
+var EVIDENCE_BATCH = 20;
+async function readBatches(ids, read, size) {
+  var next = 0; var step = size || CHUNK;
+  async function worker() { while (next < ids.length) { var start = next; next += step; await read(ids.slice(start, start + step)); } }
   await Promise.all([worker(), worker(), worker()]);
 }
 async function loadCoachableTeam(admin, memberIds, from, to, kbHash, options) {
@@ -59,7 +63,10 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash, options) {
     return { user_id: u, calls: byRep[u].length, recent_calls:recentCalls, items: items, improvements: periodOnly ? [] : selectImprovementFocus(byRep[u], {all:true,kbHash:kbHash}), loss_scope: scope };
   });
   // Locate every reviewed candidate before ranking; rejected evidence cannot hide a valid area.
-  var evidenceIds = [...new Set(calls.filter(c=>c.analysis && c.analysis.rep_period_coaching).map(c=>c.id).concat(reps.flatMap(function (r) { return r.improvements.map(function (it) { return it.call_id; }); })))];
+  /* H770: a period-review record that carries its verified slice needs no transcript; only improvements (a window
+     around a moment) and records written before the slice still read one. */
+  var sliced = function (c) { var r = c.analysis && c.analysis.rep_period_coaching; return !!(r && r.verified && r.verified.version === require('./call-period-review').SLICE_VERSION); };
+  var evidenceIds = [...new Set(calls.filter(c=>c.analysis && c.analysis.rep_period_coaching && !sliced(c)).map(c=>c.id).concat(reps.flatMap(function (r) { return r.improvements.map(function (it) { return it.call_id; }); })))];
   var evidenceAnalyses = new Map();
   await readBatches(evidenceIds, async function (slice) {
     var eq = await admin.from('call_analyses').select('fathom_call_id,outcome,why_outcome,transcript_stored').in('fathom_call_id', slice).eq('status', 'done');
@@ -67,7 +74,7 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash, options) {
        the log could not say whether the read timed out or hit a size limit, and the two have different fixes. */
     if (eq.error) throw new Error('Coaching evidence unavailable: ' + [eq.error.message, eq.error.code && ('code ' + eq.error.code), eq.error.details, eq.error.hint].filter(Boolean).join(' · '));
     (eq.data || []).forEach(function (a) { evidenceAnalyses.set(a.fathom_call_id, a); });
-  });
+  }, EVIDENCE_BATCH);
   var buildEvidence = require('./strength-call-evidence').buildEvidence;
   reps.forEach(function (r) {
     // A coaching review approves its advice and exchange, not an older grader explanation.
@@ -82,8 +89,8 @@ async function loadCoachableTeam(admin, memberIds, from, to, kbHash, options) {
       .map(function(it){return Object.assign({},it,{call_evidence:evidenceByMoment.get(it.moment.id)});});
     var periodExamples = [];
     byRep[r.user_id].forEach(function (call) {
-      var analysis = evidenceAnalyses.get(call.id);
       var record = call.analysis && call.analysis.rep_period_coaching;
+      var analysis = evidenceAnalyses.get(call.id) || (record && record.verified ? { outcome: call.outcome, why_outcome: null } : undefined);
       var examples = require('./call-period-review').storedExamples(record, analysis, kbHash, {call_id:call.id,call_date:call.call_date,user_id:r.user_id,prospect_name:call.prospect_name,recording_url:call.recording_url,source:call.source});
       if (examples !== null && record) { examples.forEach(function(e){e.clip_url=e.source==='zoom'?e.recording_url:require('./clip-link').clipHref(e.recording_url,e.evidence[0].timestamp_seconds);}); call.period_review_current = true; periodExamples = periodExamples.concat(examples); }
     });
