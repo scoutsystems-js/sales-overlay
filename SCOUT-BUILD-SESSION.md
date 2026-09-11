@@ -391,3 +391,39 @@ Why the ranking chose it: it was the only pattern with two or more calls in (or,
 
 PAID API COST THIS BLOCK = $0
 
+---
+
+## Block 007 — $0 audit: does the "asking for the sale" taxonomy blur affect current Coaching findings? — 2026-09-11
+
+### Prompt (architect)
+
+**Summary.** Block 006 fixed the grader; the remaining semantic gap is the period-review lane's single "asking for the sale" move, which cannot tell the first ask (Pitch), a loop re-ask (Objection Handling) and the final commitment ask (Close) apart. Do not change it yet: measure first, on stored data only, with no model calls. Trace the taxonomy; classify every current "asking for the sale" finding by hand from its stored exchange (pitch_first_ask · objection_reask · close_commitment · ambiguous), broken down by the stage it is filed under; measure rep-level impact; recommend exactly one of A leave it, B small deterministic fix, C prompt/taxonomy change. Follow-up frequency is not a defect. Report primarily in `scout-shared-context.md`.
+
+### Report (developer) — report back in this block
+
+**What the current taxonomy does.** The period-review lane (`lib/call-period-review.js`, lane `call-period-review-v16`) asks the writer for up to one improvement per stage, each with a `section` from the five stage keys and a `move` from the closed vocabulary (`lib/arc-cause.js ALL_MOVES` — six discovery moves; six objection moves including "booking the follow-up"; four "pitch and close" moves: anchoring price, asking for the sale, handling the partner, confirming understanding — plus "tying back in"). The independent reviewer's `skill_check` then overwrites both section and move; the writer's lens says "Close: assess asking for the sale or an appropriate agreed next step" and nothing tells either model where the first ask, a loop re-ask or the final commitment ask belongs. At review time the lane holds: the finding's cited turns, the full transcript, two agreeing fact reads locating each purchase decision with its state (ready / undecided / declined) and turn ids, the scheduling facts, and the team material. The call's stage record (pitch/price/objection/close evidence with timestamps, `close_due`, `finance`) is stored beside it but not read by the lane.
+
+**Findings audited.** 276 stored period-review records (176 v16, 86 v1, 8 v3, 6 v4), all dates, both teams, read-only. 42 surviving findings in total; 41 of them are in the current 30-day Coaching population. Every moment the independent reviewer classified on v16 records: 112.
+
+**Counts for "asking for the sale".** Surviving findings with that move: **0**. Reviewer skill-checks that chose it: **0 of 112**. Raw-string search of every record: **1** hit, inside a rejected reviewer reason ("S1 claims the closer moved directly from asking for the sale to processing payment…"), not a finding. So: pitch_first_ask 0 · objection_reask 0 · close_commitment 0 · ambiguous 0 (n = 0). The wider ask family has one survivor, "anchoring price" filed under Objection Handling (nick, 30 days) — read by hand: the price is stated (turn 680), the prospect asks about payment plans then says they do not have the sum up front, the closer offers financing and a three-month split without fixing the first instalment, the prospect defers to tomorrow; two undecided decisions located. That is post-price handling inside the objection loop: **objection_reask context, correctly filed.**
+
+**Current stage distribution (surviving, all dates).** close/booking the follow-up 33 · discovery/qualifying financially 4 · discovery/uncovering goals 2 · objection/qualifying financially 1 · objection/anchoring price 1 · close/isolating 1. Reviewer classifications that did not survive: close/booking 69→49, objection/isolating 5→0, close/handling the partner 2→0, objection/handling the partner 3→1, objection/normalising the fear 2→0, close/tying back in 2→1, close/qualifying financially 2→1.
+
+**Rep-level product impact.** Diagnoses materially affected by the ask blur: **0**. Reps whose lowest stage or primary pattern would change under the canonical placement of asks: **0**. No page says "Close needs work because asking for the sale…". No true Close behaviour is lost to the bucket, because no ask finding exists to lose; what the data does show is that no ask ever reaches the page (the reviewer never chose the move), and that partner and isolating findings die at the independent review — a survivorship observation, not a taxonomy one, already on record from Block 005.
+
+**The two misfiles the hand read found (2 of 42), neither an ask.** (1) `aa87bf20` "qualifying financially" filed under Objection Handling: the prospect has $3,500 saved and a credit line already earmarked, says they cannot do it now, declines; the stage record says finance = genuine_dq and marks Objection Handling and Close not applicable. By doctrine and the Block 006 definitions a genuine inability is not an objection; the miss belongs to Discovery. Filed on the wrong stage; the rep's diagnosis (nathan.m, lowest Close) is unaffected. (2) `dbaaba9d` "isolating" filed under Close: after the price the prospect says they want it to "resonate" and do not jump in quickly; the closer accepts the soft exit ("do your research… yes or no, both great answers… you need a few days?") without isolating. A post-price need-to-think is an objection; isolating it is Objection Handling, not Close. The rep (josh, Scout Systems) is below the ranking floor, so no diagnosis exists to affect. Both are harmless labelling differences today.
+
+**Is the stored data sufficient for a deterministic correction?** For asks, yes in most cases if they ever appear: an ask cited before the first located purchase decision and before the stage record's first objection evidence is the first ask (Pitch); an ask cited after an undecided/declined located decision is a loop re-ask (Objection Handling); an ask followed by a located `ready` decision or payment evidence is the commitment (Close); the rest ambiguous. For the two family misfiles, yes now: a discovery-family move on a call whose stage record says `finance = genuine_dq` is a Discovery finding; an objection-family move can be routed to Objection Handling by family. Neither correction is warranted by measured impact today.
+
+**Recommendation: A — LEAVE IT FOR NOW.** The distinction is cleaner, but the move the concern is about has never been produced, and the two stage misfiles found move no diagnosis. If ask findings start appearing under v62 grading, the deterministic routing above (B) is the planned first response; no prompt or vocabulary change (C) is justified by the data.
+
+**Verification.** Counts taken two ways (a loop over findings and reviewer decisions; a raw-string search over every record JSON) and agree. Three findings read by hand against their stored transcript turns and stage records. No model classification.
+
+**Filed in BUILD-LIST.md.** A read-time family guard for the two misfile shapes (discovery-family move on a genuine-DQ call → Discovery; objection-family move filed under Close → Objection Handling), held until it would move a diagnosis.
+
+**Decision for Justin.** None required. Optional: whether the persistent absence of ask findings (0 of 112 reviewed moments) is worth a later $0 look at what the writer proposes versus what survives review.
+
+**Confirmations.** No model calls. No production writes (three read-only pulls). No migration. No backfill or regrade. No deploy. No push. PAID API COST THIS BLOCK = $0.
+
+**Commit.** Documentation only; see `git log -1` on `codex/team-coaching-ready`. No source file changed.
+
