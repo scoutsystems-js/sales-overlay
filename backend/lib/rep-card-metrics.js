@@ -23,6 +23,7 @@
 // enough objections to judge a category?") should not have two answers.
 const MIN_CATEGORY_OBJECTIONS = 6;
 const MIN_REPS_FOR_RANKING = 3;
+const SR = require('./section-ranking');   // H774: the one floor and the one wording for "under it"
 
 // Stable order so a tie resolves the same way on every load rather than
 // following object key order, which would make the card flicker.
@@ -33,15 +34,41 @@ function pct(n, d) { return d > 0 ? Math.round((n / d) * 100) : null; }
 // sections: { intro, discovery, pitch, objection, close } — close MUST be the
 // EARNED score. A null section is skipped, never read as zero: a rep with no
 // scored objection calls must not be told objection is their weakest area at 0.
-function weakestSection(sections) {
-  if (!sections || typeof sections !== 'object') return null;
-  var best = null;
+//
+// ⚠ THE FLOOR (Justin, 2026-09-11; H774). counts: { intro: n, … } — how many
+// LEGACY-analysed calls scored each section, the population this bar ranks.
+// rankSections decides (MIN_CALLS_TO_RANK, the one floor the rep page and the
+// team panel use); a section under it holds no position and one graded call
+// lights no bar. A caller that omits the counts is UNDER the floor, never over
+// it — a floor that a missing argument bypasses is no floor. The bar is never
+// made to wait on stage records and never repointed at the stage population:
+// that is a different change, and not ruled.
+function sectionStats(sections, counts) {
+  var stats = {};
   SECTION_ORDER.forEach(function (key) {
-    var v = sections[key];
-    if (typeof v !== 'number' || !isFinite(v)) return;
-    if (best === null || v < best.score) best = { section: key, score: v };
+    var v = sections[key], n = counts[key];
+    stats[key] = { mean: (typeof v === 'number' && isFinite(v)) ? v : null, n: (typeof n === 'number' && isFinite(n)) ? n : 0 };
   });
-  return best;
+  return stats;
+}
+function weakestSection(sections, counts) {
+  if (!sections || typeof sections !== 'object' || !counts || typeof counts !== 'object') return null;
+  var ranked = SR.rankSections(sectionStats(sections, counts));
+  var top = ranked.filter(function (x) { return x.enough; })[0];
+  return top ? { section: top.section, score: top.score } : null;
+}
+
+// Below the floor, what the card says instead of lighting a bar: THIN_LABEL and
+// the ranking's own reason for the section with the most graded calls — the
+// words the rep page already uses, never a third sentence. Null when a section
+// clears the floor (the pick stands) and when nothing is graded at all (the
+// card's "No scored sections yet" is the right sentence there).
+function sectionFloorNote(sections, counts) {
+  if (!sections || typeof sections !== 'object' || !counts || typeof counts !== 'object') return null;
+  var ranked = SR.rankSections(sectionStats(sections, counts));
+  if (ranked.some(function (x) { return x.enough; })) return null;
+  var most = ranked.filter(function (x) { return x.n > 0; }).sort(function (a, b) { return b.n - a.n; })[0];
+  return most ? { label: SR.THIN_LABEL, reason: most.reason } : null;
 }
 
 // byCategory: { fear: {total, handled}, ... } for ONE rep.
@@ -97,6 +124,7 @@ function sortRepsWorstFirst(reps) {
 
 module.exports = {
   weakestSection: weakestSection,
+  sectionFloorNote: sectionFloorNote,
   weakestObjection: weakestObjection,
   sortRepsWorstFirst: sortRepsWorstFirst,
   MIN_CATEGORY_OBJECTIONS: MIN_CATEGORY_OBJECTIONS,

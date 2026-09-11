@@ -22,28 +22,34 @@ const {
 } = require('../lib/rep-card-metrics');
 
 // ── weakest section ───────────────────────────────────────────────────────
+/* ⚠ RE-PINNED 2026-09-11 (H774): the pick is FLOORED on the legacy per-section
+   counts (MIN_CALLS_TO_RANK, the rep page's floor) and the counts are a
+   required argument — a caller that omits them is under the floor, never
+   above it. The floor's own cases live in test/section-floor-surfaces.test.js. */
+const { MIN_CALLS_TO_RANK: FLOOR } = require('../lib/section-ranking');
+const ENOUGH = { intro: FLOOR, discovery: FLOOR, pitch: FLOOR, objection: FLOOR, close: FLOOR };
 
 test('the weakest section is the lowest score, named with its value', () => {
-  const w = weakestSection({ intro: 57, discovery: 47, pitch: 65, objection: 64, close: 57 });
+  const w = weakestSection({ intro: 57, discovery: 47, pitch: 65, objection: 64, close: 57 }, ENOUGH);
   assert.deepStrictEqual(w, { section: 'discovery', score: 47 });
 });
 
 test('a section with no score is SKIPPED, not treated as zero', () => {
   // A rep with no scored objection calls must not be told objection is their
   // weakest area at 0.
-  const w = weakestSection({ intro: 57, discovery: 61, pitch: 65, objection: null, close: 58 });
+  const w = weakestSection({ intro: 57, discovery: 61, pitch: 65, objection: null, close: 58 }, ENOUGH);
   assert.strictEqual(w.section, 'intro');
 });
 
 test('no scored sections at all returns null rather than inventing one', () => {
-  assert.strictEqual(weakestSection({}), null);
-  assert.strictEqual(weakestSection(null), null);
-  assert.strictEqual(weakestSection({ intro: null, discovery: null }), null);
+  assert.strictEqual(weakestSection({}, ENOUGH), null);
+  assert.strictEqual(weakestSection(null, ENOUGH), null);
+  assert.strictEqual(weakestSection({ intro: null, discovery: null }, ENOUGH), null);
 });
 
 test('ties resolve deterministically, so the card does not flicker between loads', () => {
-  const a = weakestSection({ intro: 58, discovery: 58, pitch: 65, objection: 70, close: 71 });
-  const b = weakestSection({ close: 71, objection: 70, pitch: 65, discovery: 58, intro: 58 });
+  const a = weakestSection({ intro: 58, discovery: 58, pitch: 65, objection: 70, close: 71 }, ENOUGH);
+  const b = weakestSection({ close: 71, objection: 70, pitch: 65, discovery: 58, intro: 58 }, ENOUGH);
   assert.strictEqual(a.section, b.section, 'key order must not change the answer');
 });
 

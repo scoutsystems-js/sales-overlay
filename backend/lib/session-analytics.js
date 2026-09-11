@@ -11,6 +11,7 @@ var CALL_ANALYTICS_SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'clos
 const { isDisqualified } = require('./dq-exclusion');
 const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 var teamAnalytics = require('./team-analytics');
+var SR = require('./section-ranking');   // H774: the one floor under the Coach Summary's weakest/strongest badges
 const { isCredited } = require('./objection-handled');
 const { countsAsObjection } = require('./objection-strict');   // the ONE definition — see test/objection-counting-carrier.test.js
 var { fetchProspectCloseRates } = require('./prospect-entity');
@@ -82,7 +83,7 @@ async function computeCallAnalytics(admin, userId, from, to) {
     objections: { calls_with_objection: 0, total_highlights: 0 },
     close_wins: 0, close_decided: 0,
     sections: sectionsShape(),
-    weakest_section: null, strongest_section: null,
+    weakest_section: null, strongest_section: null, section_ranking_note: null,
     latest_one_things: [],
   };
   if (callIds.length === 0) return empty;
@@ -168,11 +169,21 @@ async function computeCallAnalytics(admin, userId, from, to) {
   CALL_ANALYTICS_SECTIONS.forEach(function(s) {
     var avg = sec[s].n > 0 ? Math.round(sec[s].sum / sec[s].n) : null;
     sections[s] = { avg: avg, n: sec[s].n };
-    if (avg !== null) {
-      if (weakest === null || avg < sections[weakest].avg) weakest = s;
-      if (strongest === null || avg > sections[strongest].avg) strongest = s;
-    }
   });
+  /* ⚠ THE FLOOR (Justin, 2026-09-11; H774). The badges ranked five averages with
+     no floor — one graded call named a weakest and a strongest. rankSections
+     decides on the LEGACY per-section counts (this surface's own population,
+     never the stage records): a section under MIN_CALLS_TO_RANK holds no
+     position; a strongest needs a second ranked section to stand against;
+     under the floor the note says what it is based on in the rep page's words. */
+  var stats = {};
+  CALL_ANALYTICS_SECTIONS.forEach(function (s) { stats[s] = { mean: sections[s].avg, n: sections[s].n }; });
+  var ranked = SR.rankSections(stats);
+  var enough = ranked.filter(function (x) { return x.enough; });
+  if (enough.length) weakest = enough[0].section;
+  if (enough.length >= 2) strongest = enough[enough.length - 1].section;
+  var mostGraded = ranked.filter(function (x) { return x.n > 0; }).sort(function (a, b) { return b.n - a.n; })[0];
+  var sectionRankingNote = (!weakest && mostGraded) ? { label: SR.THIN_LABEL, reason: mostGraded.reason } : null;
 
   oneThings.sort(function(x, y) {
     return new Date(y.call_date || 0).getTime() - new Date(x.call_date || 0).getTime();
@@ -221,6 +232,7 @@ async function computeCallAnalytics(admin, userId, from, to) {
     sections: sections,
     weakest_section: weakest,
     strongest_section: strongest,
+    section_ranking_note: sectionRankingNote,   // H774: under the floor, THIN_LABEL + the ranking's reason
     latest_one_things: latestOneThings,
   };
   // Avg-score tile trend baseline (period-over-period). Attached to avg_score so

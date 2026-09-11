@@ -11,7 +11,7 @@ var SECTIONS = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 var { fetchProspectCloseRates, closeRate } = require('./prospect-entity');
 var { DQ_OUTCOME } = require('./dq-exclusion');
 var { countsAsObjection } = require('./objection-strict');
-var { weakestSection, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
+var { weakestSection, sectionFloorNote, weakestObjection, MIN_CATEGORY_OBJECTIONS } = require('./rep-card-metrics');
 var { isHandled } = require('./objection-handled');
 var { MIN_BUCKET } = require('./team-needs-work');   // H704: the one comparison floor for the card arrows
 // ⚠ ONE definition of "synthetic" — shared with lib/team-synthesis.js (the team
@@ -319,9 +319,14 @@ async function computeTeamAnalytics(admin, repIds, from, to, emailMap) {
       // 10c-1, for the rep cards. Both are pure derivations — see rep-card-metrics.
       // weakest_section reads the EARNED close score, never the displayed one.
       objection_categories: c.obj_by_cat,
+      /* H774: the pick is floored on THIS population — legacy-analysed calls per
+         section (sec_n; the earned close's own count) — never on stage records. */
       weakest_section: weakestSection(Object.assign({}, sections, {
         close: avg(c.close_earned_sum, c.close_earned_n),
-      })),
+      }), Object.assign({}, c.sec_n, { close: c.close_earned_n })),
+      weakest_section_note: sectionFloorNote(Object.assign({}, sections, {
+        close: avg(c.close_earned_sum, c.close_earned_n),
+      }), Object.assign({}, c.sec_n, { close: c.close_earned_n })),
       weakest_objection: weakestObjection(c.obj_by_cat, teamByCat),
     };
   });

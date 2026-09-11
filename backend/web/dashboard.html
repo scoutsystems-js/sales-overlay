@@ -6096,6 +6096,12 @@
      mutates state. Resetting from here rather than assigning `null` keeps a
      lane's real empty value — `[]` stays `[]`, `{}` stays `{}`, `0` stays `0`
      — so a reset lane is indistinguishable from a freshly-booted one. */
+  /* H775 — THE VIEW EPOCH, the team lanes' mechanism (teamEpoch, H766) on the personal side: bumped by
+     both pivot doors (setUser, setCallLibraryUser), captured by every loader that fetches for the VIEWED
+     user before its request, compared on arrival — a stale answer is dropped before any state write and
+     before a loading flag it no longer owns. An owner pivoting on a warm page used to see the previous
+     viewer's count under the new rep's name until the new answer landed. */
+  var viewEpoch = 0;
   var INITIAL_STATE = JSON.parse(JSON.stringify(state));
 
   // Reset every rep-scoped lane to its declared initial value.
@@ -8162,11 +8168,13 @@
        how a rep with zero calls rendered another rep's discovery score and
        another prospect's quotes. See PIVOT_KEEP — survival is opt-in now, so a
        lane added tomorrow cannot inherit this. */
+    viewEpoch++;   // H775: every answer still in flight now belongs to the previous viewer
     resetRepScopedState();
     reloadAll();
   }
 
   async function reloadAll() {
+    var epoch = viewEpoch;   // H775: captured before the requests; compared when they land
     // Range/user changed — drop the cached synthesis + recent calls so they
     // re-fetch for the new (user, range). Expanded state persists (UX), the DATA
     // resets. (Server cache handles repeat synthesis requests.)
@@ -8235,6 +8243,7 @@
         zoomPromise,
         backlogPromise,
       ]);
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       state.fathomStatus   = results[0];
       state.analytics2     = results[1];
       clearLaneWait('analytics2');
@@ -8247,6 +8256,7 @@
       // awaits it, so forgetting to set it can only shorten the ceremony.
       markDashboardReady();
     } catch (err) {
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       if (err.message === 'unauth') return;
       document.getElementById('content').innerHTML = '<div class="error">Could not load dashboard data: ' + escapeHtml(err.message || 'unknown') + '</div>';
     }
@@ -8807,9 +8817,10 @@
   async function loadNeedsWork() {
     if (state.needsWorkLoading) return;
     state.needsWorkLoading = true;
+    var epoch = viewEpoch;   // H775
     armLaneWait('needsWork', function () { return state.needsWorkLoading; }, function () { if (state.view === 'overview') renderOverview(false); });
-    try { state.needsWork = await fetchNeedsWork(); }
-    catch (err) { if (err.message === 'unauth') return; state.needsWork = { _error: err.message || 'unknown' }; }
+    try { var nw = await fetchNeedsWork(); if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.needsWork = nw; }
+    catch (err) { if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ if (err.message === 'unauth') return; state.needsWork = { _error: err.message || 'unknown' }; }
     state.needsWorkLoading = false;
     clearLaneWait('needsWork');
     if (state.view === 'overview') renderOverview(false);
@@ -8832,6 +8843,7 @@
   async function loadSectionRank() {
     if (state.sectionRankLoading) return;
     state.sectionRankLoading = true;
+    var epoch = viewEpoch;   // H775
     armLaneWait('sectionRank', function () { return state.sectionRankLoading; }, function () { if (state.view === 'overview') renderOverview(false); });
     try {
       var qs = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
@@ -8841,8 +8853,10 @@
       var base = isSelf() ? '/me/needs-work-sections'
                           : '/admin/needs-work-sections/' + encodeURIComponent(state.viewingUserId);
       var res = await fetch(base + '?' + qs, { headers: authHeader() });
-      state.sectionRank = res.ok ? await res.json() : { _error: 'HTTP ' + res.status };
-    } catch (e) { state.sectionRank = { _error: (e && e.message) || 'unknown' }; }
+      var body = res.ok ? await res.json() : { _error: 'HTTP ' + res.status };
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
+      state.sectionRank = body;
+    } catch (e) { if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.sectionRank = { _error: (e && e.message) || 'unknown' }; }
     state.sectionRankLoading = false;
     clearLaneWait('sectionRank');
     if (state.view === 'overview') renderOverview(false);
@@ -9094,6 +9108,7 @@
   async function loadPerfSynthesis() {
     if (state.perfSynthesisLoading) return;
     state.perfSynthesisLoading = true;
+    var epoch = viewEpoch;   // H775
     state.perfWaitLong = false;
     if (perfWaitTimer) clearTimeout(perfWaitTimer);
     perfWaitTimer = setTimeout(function () {
@@ -9103,8 +9118,8 @@
       if (state.view === 'performance') renderPerformanceView();
       else if (state.view === 'overview') renderOverview(false);
     }, PERF_LONG_WAIT_MS);
-    try { state.perfSynthesis = await fetchPerfSynthesis(); }
-    catch (err) { if (err.message === 'unauth') return; state.perfSynthesis = { available: false, reason: err.message || 'unknown' }; }
+    try { var ps = await fetchPerfSynthesis(); if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.perfSynthesis = ps; }
+    catch (err) { if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ if (err.message === 'unauth') return; state.perfSynthesis = { available: false, reason: err.message || 'unknown' }; }
     state.perfSynthesisLoading = false;
     state.perfWaitLong = false;
     if (perfWaitTimer) { clearTimeout(perfWaitTimer); perfWaitTimer = null; }
@@ -9198,7 +9213,11 @@
     }).join('');
     // The per-call one_thing feed was replaced by the Performance Summary panel
     // (renderPerfSummary) — one_thing stays on individual call review pages.
-    return '<div>' + rows + '</div>';
+    /* H774: under the floor no badge is drawn; the note (THIN_LABEL + the ranking's reason) sits
+       under the rows in the section-rank card's own markup. */
+    var note = a.section_ranking_note && a.section_ranking_note.label
+      ? '<div class="srk-thin">' + escapeHtml(a.section_ranking_note.label) + '<span>' + escapeHtml(a.section_ranking_note.reason || '') + '</span></div>' : '';
+    return '<div>' + rows + note + '</div>';
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -10786,6 +10805,7 @@
   async function loadRepGraph() {
     if (state.repGraphLoading) return;
     state.repGraphLoading = true;
+    var epoch = viewEpoch;   // H775
     try {
       var r = state.dateRange;
       var qp = 'from=' + encodeURIComponent(r.from) + '&to=' + encodeURIComponent(r.to)
@@ -10798,8 +10818,11 @@
       var res = await fetch('/team/rep-series?' + qp, { headers: authHeader() });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      state.repGraph = await res.json();
+      var body = await res.json();
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
+      state.repGraph = body;
     } catch (err) {
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       if (err.message === 'unauth') return;
       state.repGraph = { _error: err.message || 'unknown' };
     }
@@ -15218,7 +15241,9 @@
     return '<div class="rep-stat"><div class="rep-stat-val">' + value + ' <small>min</small>' + repDeltaHtml(delta, 'min') + '</div>'
       + '<div class="rep-stat-label">' + escapeHtml(label) + '</div></div>';
   }
-  function repSectionBarsHtml(sections, weakest) {
+  /* H774: under the floor nothing is lit and the caption says why in the rep page's own words
+     (note = { label: THIN_LABEL, reason }); a lit bar and the note never appear together. */
+  function repSectionBarsHtml(sections, weakest, note) {
     var keys = ['intro', 'discovery', 'pitch', 'objection', 'close'];
     var wk = weakest && weakest.section;
     var any = keys.some(function (k) { return sections && typeof sections[k] === 'number'; });
@@ -15228,7 +15253,7 @@
       return '<div class="rep-bar' + (k === wk ? ' weak' : '') + '"><span>' + SECTION_LABEL[k] + '</span>'
         + '<div class="rep-bar-track"><div class="rep-bar-fill" style="width:' + (v === null ? 0 : Math.max(0, Math.min(100, v))) + '%"></div></div>'
         + '<span class="rep-bar-val">' + (v === null ? '\u2014' : v) + '</span></div>';
-    }).join('') + '<div class="rep-bars-cap">Section grades \u00b7 weakest lit</div></div>';
+    }).join('') + '<div class="rep-bars-cap">' + (wk ? 'Section grades \u00b7 weakest lit' : note && note.label ? escapeHtml(note.label + ' \u00b7 ' + (note.reason || '')) : 'Section grades') + '</div></div>';
   }
 
   function repWeakestObjectionHtml(wo) {
@@ -15284,7 +15309,7 @@
             + '</div>'
           + repBandStatHtml(r.avg_call_time, 'avg_call_time', 'Avg call time', r.time_delta)
         + '</div>'
-        + repSectionBarsHtml(sections, r.weakest_section)
+        + repSectionBarsHtml(sections, r.weakest_section, r.weakest_section_note)
         + '<div class="rep-card-foot">' + repWeakestObjectionHtml(r.weakest_objection)
           + '<span class="rep-card-grade">' + (typeof r.avg_score === 'number' ? 'Avg grade ' + r.avg_score : 'No grade yet') + '</span></div>'
       + '</div></div>';
@@ -17354,6 +17379,7 @@
 
   async function loadSectionBreakdown(key) {
     state.sectionLoading = true;
+    var epoch = viewEpoch;   // H775
     var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
     // Manager pivot (ruling 3) — same ?user= convention as every other coaching
     // surface, routed through the standard /admin mirror.
@@ -17363,9 +17389,11 @@
     try {
       var res = await fetch(url, { headers: authHeader() });
       if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      state.sectionData = res.ok ? await res.json() : null;
+      var body = res.ok ? await res.json() : null;
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
+      state.sectionData = body;
       state.sectionError = res.ok ? null : ('HTTP ' + res.status);
-    } catch (err) { state.sectionData = null; state.sectionError = (err && err.message) || 'network error'; }
+    } catch (err) { if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.sectionData = null; state.sectionError = (err && err.message) || 'network error'; }
     state.sectionLoading = false;
     if (state.view === 'section') renderSectionView();
   }
@@ -18339,6 +18367,7 @@
        and the rest pointing at the PREVIOUS rep — so switching rep here and
        then opening Coaching showed the old rep's numbers under the new name.
        ⚠ `view` is in PIVOT_KEEP, so this stays on the Calls page. */
+    viewEpoch++;   // H775: the second pivot door bumps the same epoch
     resetRepScopedState();
     renderCallLibrary(); // kicks loadCallLibrary(0)
   }
@@ -18351,8 +18380,10 @@
     state.callLibraryLoading = true;
     var requestedLimit = 20;
     var startedOffset = offset || 0;
+    var epoch = viewEpoch;   // H775
     try {
       var data = await fetchCallLibrary(startedOffset, requestedLimit);
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       var calls = (data && data.calls) || [];
       if (startedOffset === 0) {
         state.callLibrary = calls;
@@ -18366,6 +18397,7 @@
       state.callLibraryOffset = startedOffset + calls.length;
       state.callLibraryError = null;
     } catch (err) {
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       if (err.message === 'unauth') return;
       state.callLibraryError = err.message || 'unknown';
     }
@@ -18392,9 +18424,13 @@
   async function loadObjectionsSynthesis() {
     if (state.objectionsSynthesisLoading) return;
     state.objectionsSynthesisLoading = true;
+    var epoch = viewEpoch;   // H775
     try {
-      state.objectionsSynthesis = await fetchObjectionsSynthesis();
+      var os = await fetchObjectionsSynthesis();
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
+      state.objectionsSynthesis = os;
     } catch (err) {
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       if (err.message === 'unauth') return;
       state.objectionsSynthesis = { available: false, reason: err.message || 'unknown' };
     }
@@ -18414,9 +18450,13 @@
   async function loadObjectionsIntel() {
     if (state.objectionsIntelLoading) return;
     state.objectionsIntelLoading = true;
+    var epoch = viewEpoch;   // H775
     try {
-      state.objectionsIntel = await fetchObjectionsIntel();
+      var oi = await fetchObjectionsIntel();
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
+      state.objectionsIntel = oi;
     } catch (err) {
+      if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       if (err.message === 'unauth') return;
       state.objectionsIntel = { error: err.message || 'unknown' };
     }
