@@ -96,3 +96,63 @@ Commit and deploy state (factual: hash if committed; pushed or not; deployed or 
 - `BUILD-LIST.md` was not updated (it is updated after a push; no push happened).
 
 **Commit and deploy state.** These files and the `CLAUDE.md` edit are committed together in one local commit on `codex/team-coaching-ready` in the `.codex/team-coaching` worktree (the hash is `git log -1` on that branch). **Not pushed. Not deployed. No deployment or push occurred.**
+
+---
+
+## Block 002 — Validate and tighten Team Coaching selection logic — 2026-09-11
+
+### Prompt (architect)
+
+**Summary.** Validate, and correct only if needed, the logic that picks what Team → Coaching says about each rep.
+
+**Goal.** For each rep the page tells the manager: (1) the ONE stage the rep most needs coaching on; (2) the specific coaching issue driving that weakness; (3) ONE representative real-call example showing it; (4) what the manager should coach. Manager-facing; not a broad analytics page.
+
+**How this relates to the overall build session.** Newly approved product decision, recorded in `SCOUT-PRODUCT-DECISIONS.md`: *lowest stage → strongest supported coaching pattern/opportunity within that stage → one representative call → manager guidance.* Prefer a recurring pattern when the period data genuinely supports one; no statistical pattern-detection system to satisfy the word "recurring"; without recurrence, the strongest supported opportunity within the lowest stage; the coaching point must genuinely explain the lowest stage's weakness; never an unrelated weakness merely because it occurred on one of the rep's calls. Cross-stage evidence only when the causal relationship is actually supported (a Discovery finance miss is Close evidence only if it impaired the Close). Keep it simple; no causal-inference engine. This block validates/corrects the selection contract; the Option 4 visual redesign is the NEXT block.
+
+**Read first.** `SCOUT-BUILD-BRIEF.md`, `SCOUT-PRODUCT-DECISIONS.md`, `SCOUT-BUILD-SESSION.md`, `current-state.md`, `CLAUDE.md`, the Team Coaching selection code and tests. Use the clean `.codex/team-coaching` worktree.
+
+**Scope.** Inspect first: trace the production path for the lowest stage, the topic/title, the advice, the example call, the transcript evidence, and how they are tied to the stage. If the rule already holds: no rewrite, minimum tests/docs. If a real mismatch: smallest cause, smallest correction; preserve the simplified stage grading and the verified-only population contract. Do not assume the GPT mockup's mismatched example is a bug — it used illustrative content.
+
+**Preserve / do not change.** No stage-grading architecture change, no score/grade mapping change, no regrade, backfill, migration or production data change; no push, deploy or Railway; no canonical-root Git cleanup; no CLAUDE.md refactor; no AGENTS.md sync; no unrelated analytics; no new paid AI/model operations; no paid API calls without Justin's explicit approval; no Option 4 UI.
+
+**Verification.** At the product boundary: A. a Close-weakest rep gets a Close-supported issue. B. an unrelated Discovery weakness cannot become the Close point because it was on the same call. C. a Discovery weakness CAN support Close when the evidence explicitly establishes it affected the Close. D. a recurring supported pattern can be preferred. E. without recurrence, one strong supported opportunity in the lowest stage, no invented trend. F. the representative example supports the claim.
+
+**Report back in this block.** The ten numbered items in the prompt, then `PAID API COST THIS BLOCK = $0` if true, then STOP.
+
+### Report (developer) — report back in this block
+
+**1. What the current production selection path actually does.** `GET /team/coachable-moments` calls `loadCoachableTeam` with `periodOnly:true` (the legacy `improvements`/`items` lanes are empty on this page), then per rep `rep-period-coaching.summarize`:
+- *Lowest stage:* `sectionStatsFromAnalyses` over each call's `stage_eligibility` record (`stageMetric`, verified-only), then `rankSections` with the H768 floor (ten counted calls in the section). Below the floor no stage is named.
+- *Topic/title (e.g. "qualifying financially"):* the stored `rep_period_coaching` findings on the rep's calls in the window, each carrying a `section` and a `move`. The writer proposes both; the independent reviewer's `skill_check` overwrites them with its own classification of the proposed improvement; `period-stage-facts.allows` withholds a close/objection finding unless two agreeing fact reads located a purchase decision. `storedExamples` re-verifies every finding against the transcript (or its verified slice) at read time.
+- *Advice:* the finding's `observation` and `recommendation`.
+- *Example call and exchange:* the finding's cited `turn_ids`, quoted from the stored transcript; the pattern's examples are ordered newest first.
+- *Association with the stage:* only the finding's `section`. Patterns (grouped by `section|move`) were sorted lowest-stage-first, then by call count, and the page opened `patterns[0]` under the "Lowest-scoring area" header.
+
+**2. Was the suspected mismatch real?** Real, but narrow. When the lowest stage had a supporting finding it led. When it had none, the page still opened the first pattern from another stage directly under "Lowest-scoring area: Close" — the mockup's scenario could happen in production, and nothing in the payload distinguished "the reason for the lowest stage" from "other reviewed coaching". Cross-stage support had no representation at all: a Discovery finding could never count for Close, and nothing said so.
+
+**3. Implementation change made.** The smallest one that states the rule in data: `period_summary.focus` and `period_summary.focus_note`.
+- `focus` = the lowest stage's strongest supported pattern: same stage, or (the one cross-stage signal the stored record can establish) an example whose cited exchange carries the located purchase decision when the lowest stage is a decision stage (close, objection). Most supporting calls first, then most recent; `recurring` is true from two calls; one call is a focus with `recurring:false`. It carries the representative `example` (the most recent supporting finding).
+- `focus_note` = one sentence when a lowest stage exists, patterns exist, and none supports it. Nothing is deleted or hidden: every pattern stays listed and counted.
+- `call-period-review.storedExamples` attaches `decision_turns` (the finding's cited turns that are the located decision) by re-locating the stored fact reads, for every record version. The same computation the v16 gate already ran per finding, now run once per record.
+- The page opens only the focus pattern; with no focus nothing opens and the note renders. No other page change.
+
+**4. Files changed.** `backend/lib/rep-period-coaching.js` (focus, focus_note, focus-first order); `backend/lib/call-period-review.js` (decision_turns; stage facts computed once); `backend/web/dashboard.html` (two lines in `coachingPeriodWorkspaceHtml`); `backend/test/coaching-focus-selection.test.js` (new); `SCOUT-PRODUCT-DECISIONS.md` (row 11, open question answered); `current-state.md` (a dated local-not-live note at the top); this file.
+
+**5. Tests run and results.** New guard, eight tests, written first and watched fail (8/8 failed before the change), then A–F plus the below-floor case and the rendered page pass. Planted three times, each caught and each file restored: the section check kept with its effect discarded (A, B, C and the page fail), `decision_turns` never attached (C fails), the page opening the first pattern regardless of focus (the page test fails). Full backend suite: 2,759 passed, 0 failed (2,751 before this block). `node -c` on both libs.
+
+**6. Recurring-pattern behaviour.** Already existed as a count: patterns group findings by stage and skill across the rep's window calls and sort by call count. The bounded change is that the focus now counts only the examples that support the lowest stage, and says `recurring` explicitly instead of leaving a manager to infer it from "2 calls".
+
+**7. Cross-stage causality after this block.** A finding from another stage supports the lowest stage in exactly one case: the lowest stage is close or objection and the finding's cited exchange contains the turns the two independent fact reads agreed are the purchase decision. That is a structural fact the manager can see in the quoted exchange, not an inference. Everything else stays under its own stage and never becomes the lowest stage's reason. The writer prompt forbids causal claims in observations, so no stored prose "explicitly establishes" impact; the located decision is the only explicit link available without a new model pass.
+
+**8. Remaining product questions for architect/Justin.**
+- Is "the cited exchange carries the located purchase decision" the right bar for cross-stage support, or too loose (proximity, not proof of impairment) or too strict (a Discovery miss whose consequence at the close was not cited)? It is the only stored signal; a stricter one needs a new field the writer does not produce.
+- Should `objection` count as a decision stage for cross-stage support alongside `close`? Built that way because the existing stage-facts gate treats the two alike; a ruling can narrow it to close.
+- Whether live reps show recurring patterns or isolated issues is a question about real output. Justin should read the live page (after a deploy that is not this block's) before Option 4 fixes the presentation.
+- The `focus_note` wording ("No reviewed change in Close for these dates. The coaching below is from other areas.") is customer-facing and Justin's to approve or cut.
+
+**9. Git state.** Working tree: the six files above plus the new test, committed together in one local commit on `codex/team-coaching-ready` in `.codex/team-coaching` (the hash is `git log -1` on that branch). Ahead of `origin/main` by two commits (Block 001 and this one).
+
+**10. Explicit confirmation.** No grading architecture redesign. No migration, no backfill. No production write. No push, no deploy, no Railway. No paid API or model calls; every test ran on fixtures over a fake wire.
+
+PAID API COST THIS BLOCK = $0
+

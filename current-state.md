@@ -1,5 +1,7 @@
 # Scout current state
 
+**Block 002, 2026-09-11 — LOCAL, NOT LIVE (see `SCOUT-BUILD-SESSION.md`).** Team → Coaching's period payload now carries `focus`: the lowest stage's strongest supported coaching pattern (same stage, or — the one cross-stage signal on record — an example whose cited exchange carries the located purchase decision), preferring recurrence, then recency; `focus_note` when nothing supports the lowest stage. The page opens only the focus pattern and never an off-stage one under the lowest-scoring area. No grading, scores, data or prompts changed. Committed on `codex/team-coaching-ready`; not pushed, not deployed. The sections below describe the September 6 release and are unchanged.
+
 Updated September 6, 2026 (Eastern). Broader coaching is LIVE and complete. The new Coaching Page Integrity task is ACTIVE. Verified application release: `d477b31a53e0c1b42ef3649411d0e5b9590b2e2a`, Railway SUCCESS, marker `period-breadth-v16-facts5`. Page-speed work remains complete. Both definition questions are approved (H762); no definition ruling is pending. The $100 session budget and independent evidence-check approach are approved.
 
 ## Development workflow — September 6, 2026
