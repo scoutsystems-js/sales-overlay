@@ -35,7 +35,13 @@ function summarize(allCalls,examples,window={}) {
     stage; a LATER stage's finding never explains an earlier one merely because its exchange holds the decision (three
     live reps had a Close finding as their Objection Handling diagnosis). */
  const earlier=g=>SECTION_ORDER.indexOf(g.section)<SECTION_ORDER.indexOf(weakest.section);
- const supporting=g=>!weakest?[]:g.section===weakest.section?g.examples:DECISION_STAGES.includes(weakest.section)&&earlier(g)?g.examples.filter(e=>Array.isArray(e.decision_turns)&&e.decision_turns.length):[];
+ /* Block 006 (Justin's Close definition): Close is the commitment and the transaction once a purchase decision is due —
+    not the booking of another meeting. A "booking the follow-up" finding is the one move exempt from the located-decision
+    gate at review time (it has its own scheduling reader), so it can sit on a call paused before any decision was due.
+    Such a finding stays real coaching (listed, counted) but is Close-stage EVIDENCE only on a call where the two fact
+    reads located a purchase decision (`decision_located`). Guard G3. */
+ const closeEvidence=e=>e.move!=='booking the follow-up'||e.decision_located===true;
+ const supporting=g=>!weakest?[]:g.section===weakest.section?(weakest.section==='close'?g.examples.filter(closeEvidence):g.examples):DECISION_STAGES.includes(weakest.section)&&earlier(g)?g.examples.filter(e=>Array.isArray(e.decision_turns)&&e.decision_turns.length):[];
  const candidates=patterns.map(g=>({section:g.section,move:g.move,examples:supporting(g)})).filter(c=>c.examples.length)
   .map(c=>({section:c.section,move:c.move,calls:c.examples.length,recurring:c.examples.length>=2,support:c.section===weakest.section?'same_section':'purchase_decision_in_exchange',example:c.examples[0]}))
   .sort((a,b)=>b.calls-a.calls||String(b.example.call_date).localeCompare(String(a.example.call_date))||a.move.localeCompare(b.move));

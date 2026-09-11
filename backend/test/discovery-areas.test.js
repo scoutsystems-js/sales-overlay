@@ -85,7 +85,7 @@ test('the six drive NO score — the coverage block carries that prohibition', (
 
 test('the version bump ships with the change', () => {
   const w = read('lib/analysis-worker.js');
-  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v61-2026-09-10'/.test(w));
+  assert.ok(/ANALYSIS_PROMPT_VERSION = 'v62-2026-09-11'/.test(w));
   assert.ok(/NOT A SEVENTH FIELD/.test(w), 'the reasoning must travel with the bump');
 });
 

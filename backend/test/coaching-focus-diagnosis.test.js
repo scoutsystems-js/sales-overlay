@@ -35,6 +35,8 @@ function record(findings, withFacts) {
   const list = [].concat(findings || []);
   const r = { version: 'call-period-review-v10', source_hash: HASH, kb_hash: 'k', findings: list.map((f, i) => ({ ...f, moment: i + 1 })), decisions: list.map((_, i) => ({ moment: i + 1, verdict: 'approved' })) };
   if (withFacts) r.stage_facts = stageFacts;
+  // a follow-up-booking finding survives storedExamples only with valid scheduling facts (the H751 gate) — the real shape
+  if (list.some(f => f.move === 'booking the follow-up')) { const FF = require('../lib/followup-facts'); r.scheduling_facts = { version: FF.VERSION, source_hash: FF.sourceHash({ outcome: 'follow_up', transcript_stored: transcript }), facts: { state: 'not_booked', further_contact: true, declined: false, ending_complete: true } }; }
   return r;
 }
 function eligibility(scores, areas) {
@@ -133,6 +135,17 @@ test('G2. (Block 005) a LATER-stage finding never becomes the diagnosis of an EA
   assert.equal(s.patterns.length, 1); assert.equal(s.patterns[0].section, 'close', 'the Close pattern is still listed as other coaching');
   const earlier = await focus({ c1: { record: record(F.financeAtDecision, true) } }, LOW_OBJECTION);
   assert.equal(earlier.focus.move_section, 'discovery', 'an EARLIER stage reaching the decision still supports it'); assert.equal(earlier.focus.support, 'purchase_decision_in_exchange');
+});
+test('G3. (Block 006) a follow-up-booking finding is Close evidence only on a call where a purchase decision was located; otherwise it stays listed as other coaching', async () => {
+  const book = { section: 'close', move: 'booking the follow-up', observation: 'The closer agreed to reconnect but ended the call without a specific day and time.', recommendation: 'Agree a specific day and time before ending the call.', turn_ids: [8, 9, 10] };
+  const paused = await focus({ c1: { record: record(book) }, c3: { record: record(book) } });   // no stage facts on record → no located decision
+  assert.equal(paused.section, 'close'); assert.equal(paused.focus.state, 'insufficient', 'a booking miss on a call with no decision on record does not explain a low Close');
+  assert.equal(paused.patterns.length, 1); assert.equal(paused.patterns[0].calls, 2, 'the finding is still listed and counted');
+  const due = await focus({ c1: { record: record(book, true) }, c3: { record: record(book, true) } });   // two agreeing reads located the decision
+  assert.equal(due.focus.state, 'pattern'); assert.equal(due.focus.move, 'booking the follow-up'); assert.equal(due.focus.calls, 2);
+  assert.equal(due.focus.example.decision_located, true);
+  const mixed = await focus({ c1: { record: record(book, true) }, c3: { record: record(book) } });
+  assert.equal(mixed.focus.state, 'isolated'); assert.equal(mixed.focus.calls, 1, 'only the call with a located decision counts for Close');
 });
 test('H. a rep below the ranking floor keeps no stage and no focus; the verified-only population is untouched', async () => {
   const out = await loadCoachableTeam(wire({ c1: { record: record(F.ask) } }), ['r1'], '2026-09-10', '2026-09-10T23:59:59Z', Promise.resolve('k'), { periodOnly: true });

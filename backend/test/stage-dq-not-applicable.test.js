@@ -98,7 +98,7 @@ test('never due is not applicable; unknown stays unmeasured — no sales convers
 test('the record says which rules produced it and the prompt carries the ruling beside the version', () => {
   assert.equal(S.VERSION, 'stage-eligibility-v19');
   const src = fs.readFileSync(path.join(__dirname, '../lib/analysis-worker.js'), 'utf8');
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v61-2026-09-10'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v62-2026-09-11'/);
   const live = stripComments(src);
   assert.match(live, /GENUINE FINANCIAL DISQUALIFICATION[^']*not_applicable WHENEVER it is discovered/, 'the grader is told the rule');
   assert.match(live, /A prospect who can pay and does not want to is an objection/, 'and told what is not a DQ');
