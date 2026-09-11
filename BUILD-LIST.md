@@ -28,9 +28,21 @@ Next gate: local representative human review of normal full call, appropriate co
 
 Earlier checkpoint, September 6 (kept from the root working copy; superseded by the paragraphs above): Exact Dre-week populations captured in `~/Desktop/scan-reports/coaching-integrity/`. Confirmed: finite-grade availability drives stage populations; absent/appropriate stages can receive bad grades; weakest-stage CSS is hardcoded green; Close is a period label, not the Discovery example’s event stage. Local UI fixes score bands and separates call coaching; stage-count removal waits for eligibility validation. H762 approved: Intro has no fixed60-second cutoff; a correctly booked continuation is separate from purchase-Close scoring. The stage contract is under local validation; no data changes or deployment. Justin approved a $28 ceiling for the seven-day correction, including validation and retries. First17-call pilot exposed checklist penalties and quote reconstruction failures; results are held. The revised candidate removes the conflicting checklist and pulls indexed evidence from source. See `investigation.md`.
 
+### Applied 2026-09-11 (H776): the 45 cron rows
+
+45 of 45 re-graded under stage-eligibility-v19 / v61 for $5.72 against $5.71 counted (input tokens equal to the count exactly), 0 errors, every raw reply saved under `~/Desktop/scan-reports/coaching-integrity/thirty-day-regrade/cron/replies/`, whole row read back per write, no other column moved. Executed assertion on the window afterwards: 670 records, 27 genuine DQs, **0** carry a scored Objection or Close. The run stopped itself once at 12 rows on the mean-projection stop rule (the second row in order was a 92k-token call); the rows done were 1.02× their own count, the rule was made row-specific (same 20 percent, against the count Justin named) and the run resumed after fresh drain and ledger checks — all on the receipt.
+
+### Filed 2026-09-11 (H776): a no-show's model-said "unmeasured" survives the never-due rule
+
+H768 coerces a SCORED stage to not applicable when the context says no sales conversation; a stage the model itself calls unmeasured returns before that rule (`assessProduction`, the `!scored` branch), so on two no-shows in the cron run (0963a696, e4e088c3) intro and discovery read unmeasured where the v17 record read not applicable. In the window: 68 no-conversation records, 3 carrying unmeasured stages, 6 slots. Neither state counts in any number a person sees; the shape moves. A one-line extension of H768 plus a $0 re-check from saved replies — Justin's ruling, not made.
+
+### Ruled and built 2026-09-11 (H774): the floor under the legacy weakest bar and the Coach Summary badges
+
+`team-analytics.weakest_section` and `session-analytics.computeCallAnalytics` now rank through `rankSections` on the LEGACY per-section counts (their own population, never stage records); below the floor the rep card's caption and the Coach Summary say `THIN_LABEL` + the ranking's reason. Every namer enumerated with its population and floor in H774; the three model lanes that hand a strongest/weakest to a prompt still have none (a prompt change regenerates cached summaries at cost) — Justin's.
+
 ### Fixed 2026-09-10 (H770): the coachable-moments evidence read
 
-Root cause a statement timeout (57014) on a 9 MB statement; the period review now carries its verified slice, the 235 existing records were backfilled for $0, and the route reads transcripts only for improvements. Six timed cold loads in H770. Still open from the same look: the 45 cron-graded v17 rows (one scored objection on a genuine DQ; ~$6 to re-run); the personal-page pivot race (filed H766).
+Root cause a statement timeout (57014) on a 9 MB statement; the period review now carries its verified slice, the 235 existing records were backfilled for $0, and the route reads transcripts only for improvements. Six timed cold loads in H770. Both closed 2026-09-11: the 45 cron rows re-run under v19/v61 for $5.72 (H776); the pivot race fixed (H775).
 
 ### Was filed 2026-09-10 (H768/H769): the coachable-moments evidence read fails intermittently
 
@@ -48,9 +60,9 @@ Validator v18 / prompt v61. Next: the five late-DQ calls re-run as verification,
 
 131 Sober Living Riches calls from the seven days to Sep 8 carry a v60 stage record, written to `stage_eligibility` only ($16.69 actual against $16.63 counted; receipt under `~/Desktop/scan-reports/coaching-integrity/seven-day-regrade/`). Extending to fourteen or thirty days is Justin's call. Rulings needed from the audit (H767): a late FINANCIAL DQ scoring the Objection stage (a DQ is not an objection) and the Close; the Team → Coaching panel naming a lowest-scoring area from one counted call.
 
-### Filed 2026-09-08 (H766): the personal-page pivot race
+### Fixed 2026-09-11 (H775): the personal-page pivot race
 
-An owner or manager who opens the Coaching Dashboard and then pivots to a rep can see the previous viewer's number under the rep's name when the earlier request lands last (seen as "152 calls analysed" under Gabriel; the owner's own count). A rep's own login never sees it; a cold deep link is right. Fix shape: a view epoch bumped in `setUser`/`setCallLibraryUser`, captured by every personal loader, stale answers discarded — the team lanes' rule, applied across the 24 personal loaders, guarded like `test/team-arrival-fetches.test.js`.
+Was filed 2026-09-08 (H766): an owner or manager pivoting on a warm page saw the previous viewer's count under the new rep's name until the new answer landed. Fixed with the team lanes' mechanism and no other — `viewEpoch`, bumped by both pivot doors, captured by every viewed-user loader, compared on arrival. Guard `test/pivot-epoch.test.js` drives the real doors in Electron with the previous viewer's answer landing after the pivot and asserts the DOM; planted five ways.
 
 ## 2. Full-call navigation check — AFTER task 1
 
