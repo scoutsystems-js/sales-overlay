@@ -66,18 +66,18 @@ test('A. a rep whose lowest stage is Close gets a Close focus, never the Discove
 test('B. an unrelated Discovery finding on one of the calls cannot become the Close coaching point', async () => {
   const s = await summary({ c1: record(FINDINGS.discovery), c3: record(FINDINGS.discovery, true) });
   assert.equal(s.section, 'close');
-  assert.equal(s.focus, null, 'no finding supports the lowest stage');
+  assert.equal(s.focus.state, 'insufficient', 'no finding supports the lowest stage'); assert.equal(s.focus.move, null); assert.equal(s.focus.example, null);
   assert.equal(s.patterns.length, 1); assert.equal(s.patterns[0].calls, 2, 'the Discovery pattern stays, counted honestly');
-  assert.match(s.focus_note, /Close/); assert.match(s.focus_note, /other areas/);
+  assert.match(s.focus.summary, /Close is the lowest-scoring area, but there is not yet enough reviewed evidence/);
 });
 test('C. a Discovery finding whose cited exchange carries the located purchase decision CAN support the Close focus', async () => {
   const s = await summary({ c1: record(FINDINGS.discovery, true), c2: record(FINDINGS.discoveryAtDecision, true) });
   assert.ok(s.focus, 'the finding that reaches the decision supports Close');
-  assert.equal(s.focus.section, 'discovery'); assert.equal(s.focus.support, 'purchase_decision_in_exchange');
+  assert.equal(s.focus.section, 'close'); assert.equal(s.focus.move_section, 'discovery'); assert.equal(s.focus.support, 'purchase_decision_in_exchange');
   assert.equal(s.focus.calls, 1, 'only the example that reaches the decision counts — the other Discovery example does not');
   assert.equal(s.focus.example.call_id, 'c2'); assert.deepEqual(s.focus.example.decision_turns, [6, 7]);
   const without = await summary({ c2: record(FINDINGS.discoveryAtDecision) });
-  assert.equal(without.focus, null, 'the same cited turns with no located decision on record establish nothing');
+  assert.equal(without.focus.move, null, 'the same cited turns with no located decision on record establish nothing');
 });
 test('D. a recurring supported pattern in the lowest stage is preferred over a single, newer finding', async () => {
   const s = await summary({ c1: record(FINDINGS.closeOther), c2: record(FINDINGS.close), c4: record(FINDINGS.close) });
@@ -117,10 +117,10 @@ test('the page opens exactly the focus pattern under the lowest-scoring area, an
   const withFocus = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls, [example(FINDINGS.discovery, 'c1'), example(FINDINGS.close, 'c2')], window) }];
   const r = renderComputed(page(withFocus), probe);
   assert.deepEqual(r.open, ['asking for the sale']);
-  assert.match(r.text, /Lowest-scoring area/i); assert.doesNotMatch(r.text, /other areas/);
+  assert.match(r.text, /Lowest-scoring area/i); assert.match(r.text, /Close is the lowest-scoring area, but the reviewed calls show no repeated issue/);
   const noFocus = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls, [example(FINDINGS.discovery, 'c1')], window) }];
   const n = renderComputed(page(noFocus), probe);
   assert.deepEqual(n.open, [], 'an off-stage pattern is never opened as the lowest stage\'s reason');
-  assert.match(n.text, /No reviewed change in Close for these dates/);
+  assert.match(n.text, /Close is the lowest-scoring area, but there is not yet enough reviewed evidence/);
   assert.match(n.text, /qualifying financially/i, 'the Discovery finding is still on the page, collapsed');
 });

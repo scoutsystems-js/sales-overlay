@@ -156,3 +156,63 @@ Commit and deploy state (factual: hash if committed; pushed or not; deployed or 
 
 PAID API COST THIS BLOCK = $0
 
+---
+
+## Block 003 — Period-wide diagnosis of the lowest stage — 2026-09-11
+
+### Prompt (architect)
+
+**Summary.** Product correction: "lowest stage → strongest bad example in it" is too shallow. The stage score tells Scout WHERE the manager should look; the period-wide evidence for that stage tells Scout WHY it needs coaching. Separate jobs.
+
+**Goal.** For each rep: the lowest eligible stage by the existing verified-only rules; then every eligible instance of that stage in the period; then behaviour patterns from the structured findings, preferring recurring weaknesses, then repeated strengths in the same stage, then occasional secondary issues, then isolated problems only when no pattern exists. The focus describes the period-wide pattern, not the representative call. A low average carried by one outlier is said plainly. Too little evidence is an explicit low-confidence state that keeps the stage. The representative example is evidence for the diagnosis, never the diagnosis. An optional concise "what they do well" from the same stage.
+
+**How this relates to the overall build session.** Builds directly on Block 002's `focus`; the Option 4 visual redesign remains the next block. Manager-and-above page; simple job: rep · lowest stage · why across the period · one representative example · optionally a strength · Fine Tune action.
+
+**Read first.** The shared handoff files, `CLAUDE.md`, the canonical state file, Block 002's implementation and report, the aggregation/selection code, the manager-card renderer, the period/section/focus tests.
+
+**Scope.** Deterministic pattern logic from data Scout already stores (structured labels, finding types, rubric criteria, stable identifiers); no LLM pass; no fuzzy clustering; if no stable identifier exists, stop and report the gap. Recurrence: one distinct call is isolated, two or more may be recurring; stronger frequency outranks weaker; ties by recency/severity. Evolve Block 002's `focus` payload, no parallel object. UI stays Option 4-shaped and minor: no extra cards, tabs, badges, charts, evidence lists or controls.
+
+**Preserve / do not change.** No grading architecture redesign; stage grading touched only to consume verified records; no migration, backfill, regrade, deploy or push; no paid model calls; not a generalised coaching engine; Block 002's cross-stage guard kept as is (diagnose primarily from the stage's own findings; never invent causality). Supabase Pro is infrastructure context only — no new persistence merely because capacity exists.
+
+**Verification.** Tests first: A recurring weakness on several calls; B two issues, the recurrent one primary, the smaller secondary; C one outlier among solid calls, no recurring claim, the outlier explained; D recurring weakness plus recurring strength, both represented, the strength never displacing the focus; E one eligible call, isolated, never a trend; F no supporting finding, stage kept, explicit insufficient state, no substitution; G a cross-stage finding without causal support cannot explain the lowest stage; H Block 002 and the verified-only population intact. Focused tests, then the full suite.
+
+**Report back in this block.** The thirteen numbered items in the prompt, ending with the confirmations and `PAID API COST THIS BLOCK = $0`. Commit locally when tests pass; no push, no deploy.
+
+### Report (developer) — report back in this block
+
+**1. What Block 002 actually did.** Found the lowest stage (verified-only stage records, the H768 floor), grouped the period's reviewed findings by stage and skill, and picked the lowest stage's pattern with the most calls as `focus`, with its most recent finding as the example. The page showed the stage and opened that pattern. It said nothing about WHY the stage was low across the period: no denominator, no secondary issue, no strength, no outlier, and an unsupported stage was a null focus with a one-line note.
+
+**2. What changed.** `focus` is now the period-wide diagnosis of the lowest stage, computed in code from stored data. It carries a `state` (pattern · isolated · outlier · insufficient), a one-sentence `summary`, the primary behaviour (`move`, `move_section`, distinct `calls`, `recurring`, `support`), up to two `secondary` behaviours with their counts, `reviewed_calls` (the denominator), an optional Discovery `strength`, an `outlier` when one call carries the low average, and the representative `example`. The stage is always kept; nothing is substituted. The page renders the summary and the strength beneath the lowest-scoring area (their own class, `coaching-period-diagnosis`, because `.coaching-period-note` means the new-grading sentence and a guard asserts its absence) and opens a pattern only when the focus has one. Nothing else on the page moved.
+
+**3. Exact data source for period-wide patterns.** Two stored, structured sources, no new pass:
+- Weaknesses: `call_analyses.rep_period_coaching.findings[]` on the rep's window calls, re-verified at read time by `storedExamples`. The behaviour identity is the finding's `move` — a closed vocabulary (`lib/arc-cause.js ALL_MOVES` plus "tying back in") assigned by the independent reviewer's `skill_check`, not the writer's suggestion and not text. Grouped by `section|move` (already Block 002's grouping).
+- Strength (Discovery only): `call_analyses.stage_eligibility.context.discovery.areas[]` — the normal grader's evidenced work record of the six Discovery areas per call, stored with the stage assessment since Stage D. No structured per-stage positive exists for intro, pitch, objection or close without re-reading `call_highlights` (a read the speed release removed from this route), so no strength is claimed there.
+- The stage itself and the denominator: `stage-eligibility.stageMetric` (verified-only), unchanged.
+
+**4. Exact recurrence rule.** Distinct calls carrying the same reviewer-classified `move` in the lowest stage. Two or more distinct calls → `recurring: true`, state `pattern`. One call → state `isolated`, `recurring: false`, the sentence says "came up in one call" and never uses "pattern", "recurring" or "consistent". Primary = most distinct calls, then the most recent example, then move name; the next two become `secondary`. Denominator `reviewed_calls` = the window's calls where the stage counted and a current period review exists, plus any call carrying a finding in that stage.
+
+**5. Isolated outliers.** When no recurring pattern exists, the stage has at least three counted calls and a second ranked stage exists: drop the single lowest score; if the mean of the rest is above the second-lowest stage's mean (the stage would no longer be the lowest without that call), `outlier = {call_id, score, mean_without}` and the sentence reads "…the reviewed calls do not show a consistent Close problem. The low average is driven mostly by one call." An isolated finding, if any, is still offered after it, as isolated.
+
+**6. Positive behaviour.** Discovery only: an area with evidenced work on two or more counted Discovery calls AND on more than half of them; the top two by count (ties by name); the sentence states "Goals and current situation were established in 8 of 10 graded Discovery calls." Omitted when nothing qualifies; never displaces or softens the focus.
+
+**7. Representative example.** The primary pattern's most recent finding — in the data model `focus.example`, distinct from `focus.summary`; on the page it is the one open pattern's first article. Severity was not used as a tie-break: recency is Block 002's rule and it stands. Evidence for the diagnosis, never the diagnosis.
+
+**8. Schema / payload changes.** No database change. Payload: `focus` gained `state, summary, label, move_section, secondary, reviewed_calls, strength, outlier`; `focus` now exists whenever a lowest stage exists (state `insufficient` when nothing supports it); `focus_note` is gone (the insufficient sentence is `focus.summary`). Block 002's `move, calls, recurring, support, example, section` keep their meaning, with `section` now the diagnosed stage and `move_section` the pattern's own.
+
+**9. Files changed.** `backend/lib/rep-period-coaching.js` (the diagnosis); `backend/web/dashboard.html` (two render lines, one CSS selector added to an existing rule); `backend/test/coaching-focus-diagnosis.test.js` (new, 10 tests); `backend/test/coaching-focus-selection.test.js` (Block 002's guard re-pinned to the evolved contract: an unsupported stage is an explicit state, not a null); `SCOUT-PRODUCT-DECISIONS.md` (row 12); `current-state.md` (the top note now covers Blocks 002–003); this file.
+
+**10. Tests written first.** Before the change: 12 of 18 failed across the new file and the re-pinned Block 002 guard (the six that passed were the parts of Block 002 this block does not alter, including H). After: 18/18. Planted four ways, each caught, each file restored: recurrence at one call (C, both E tests and the Block 002 page test fail); the outlier computed with its effect discarded (C fails); the strength majority removed (D2 fails); the page never rendering the summary (both page tests fail). One full-suite failure surfaced on the first run — `new-grading-copy.test.js` asserting no `.coaching-period-note` on a ready window — which was the guard doing its job; fixed by giving the diagnosis its own class, not by loosening the guard.
+
+**11. Full verification.** Focused guards 18/18; the neighbouring suites (new-grading copy, period workspace, layout, customer language, literal ratchet) green; full backend suite 2,769 passed, 0 failed (2,759 before this block). `node -c` on the lib. Rendered at 1400 and 390 px with no horizontal overflow.
+
+**12. Product decisions still needed.**
+- The wording of the four sentences and the strength line is customer-facing and Justin's to approve or cut (all in `lib/rep-period-coaching.js`, code, no model).
+- The outlier rule is "would the stage still be lowest without its worst call". A different bar (a fixed gap, or one standard deviation) is a ruling, not a defect.
+- Strengths outside Discovery need a structured source. The nearest one is the buying-signal `cause.move` on `call_highlights` (the same vocabulary as the weaknesses, H719), which this route no longer reads for speed. Reading only the small columns for the window is a bounded change if Justin wants strengths for every stage; not built.
+- Fine Tune on a period example is not on the page today (the period examples carry Watch clip and Review Full Call); it was queued before this session and is untouched — Option 4's block or its own.
+- Whether the live reps show patterns or isolated issues is still a question about real output, to be read on the page after a deploy.
+
+**13. Confirmation.** No migration. No historical regrade or backfill. No production write. No deployment. No push. No new persistence (Supabase Pro noted, unused). Committed locally on `codex/team-coaching-ready` in the commit that carries this report (`git log -1`); three commits ahead of `origin/main`.
+
+PAID API COST THIS BLOCK = $0
+
