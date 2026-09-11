@@ -5454,6 +5454,13 @@
     .coaching-example-meta b { font-size:var(--fs-label); font-weight:normal; padding:4px 8px; border:1px solid var(--border); border-radius:var(--radius-sm); }
     .coaching-period-example p { line-height:1.6; margin:14px 0; }
     .coaching-example-next { border-left:2px solid var(--border-strong); padding:8px 14px; background:var(--bg-elevated); }
+    .coaching-period-priority .coaching-example-next { margin-top:16px; }   /* Block 004: what to coach, inside the coaching box */
+    .coaching-period-priority>div:first-child { flex:1 1 0; min-width:0; }   /* the text column yields; the score keeps its place at the right (a long recommendation wrapped it underneath) */
+    .coaching-more>summary strong, .coaching-other>summary strong { text-transform:none; }   /* sentences, not skill labels */
+    .coaching-other-group { padding:6px 0 12px; }
+    .coaching-other-group+.coaching-other-group { border-top:1px solid var(--border); }
+    #content .coaching-rep-detail .coaching-other-group h5 { font-size:var(--fs-body); font-weight:var(--fw-emphasis); text-transform:capitalize; margin:14px 0 0; }
+    .coaching-other-group h5 small { display:block; font-size:var(--fs-secondary); font-weight:normal; text-transform:none; margin-top:4px; }
     .coaching-example-next p { margin:6px 0; }
     .coaching-exact-exchange { margin:16px 0; font-size:var(--fs-secondary); }
     .coaching-exact-exchange summary,.coaching-recent-calls>summary { cursor:pointer; padding:8px 0; }
@@ -15712,6 +15719,14 @@
     if (!item || !item.moment) return;
     return fineTuneCoaching({callId:item.call_id, highlightId:item.moment.id, surface:'team_coaching_insight', quote:item.moment.quote, coaching:item.coaching}, btn);
   }
+  /* BLOCK 004 (SCOUT-BUILD-SESSION.md) — THE OPTION 4 SHAPE. Two things, visibly separate: COACHING (the lowest-scoring
+     stage, the period diagnosis from Block 003, the optional strength, what to coach) and CALL EXAMPLE (one representative
+     call — evidence for the diagnosis, never the diagnosis). The manager's eye: rep → priority → why → what to coach →
+     example. The other reviewed coaching stays reachable, collapsed; the five stage scores follow the example instead of
+     sitting between the priority and its reason. No tags, no charts, no counts beyond the sentence. Fine Tune is NOT
+     rendered on a period example: the /kb/fine-tune door reads a call_highlights row and a period finding has none —
+     a decision for Justin, recorded in Block 004, never a dead button. Guards: test/period-workspace.test.js,
+     test/coaching-focus-selection.test.js, test/coaching-focus-diagnosis.test.js. */
   function coachingPeriodWorkspaceHtml(reps) {
     var selected = reps.find(function(r){return r.user_id===state.coachingSelectedRep;}) || reps.find(function(r){return r.period_summary && r.period_summary.patterns.length;}) || reps[0];
     if(selected) state.coachingSelectedRep=selected.user_id;
@@ -15720,21 +15735,39 @@
     var detail='<div class="coaching-period-heading"><div><span class="coaching-period-eyebrow">COACHING OVERVIEW</span><h3 id="coachingDetailTitle" tabindex="-1">'+escapeHtml(selected?coachingRepName(selected):'Your team')+'</h3></div><span class="coaching-period-window">'+escapeHtml(p?rangeLabelInclusive(p.from,p.to):'')+'</span></div>';
     if(!p || p.status==='no_calls') detail+='<div class="coaching-period-empty"><h4>No calls in this period</h4><p>Select a wider date range to see this closer’s recorded performance.</p></div>';
     else {
-      detail+='<div class="coaching-period-priority"><div><span class="coaching-period-eyebrow">'+(p.section?(p.tied_sections&&p.tied_sections.length>1?'JOINT LOWEST-SCORING AREA':'LOWEST-SCORING AREA'):'ANALYSIS STATUS')+'</span><h4>'+escapeHtml(p.label)+'</h4>'+(p.note?'<p class="coaching-period-note">'+escapeHtml(p.note)+'</p>':'')+(p.focus&&p.focus.summary?'<p class="coaching-period-diagnosis">'+escapeHtml(p.focus.summary)+'</p>':'')+(p.focus&&p.focus.strength?'<p class="coaching-period-diagnosis">'+escapeHtml(p.focus.strength.sentence)+'</p>':'')+'</div>'+(p.score!==null?'<div class="coaching-period-score">'+p.score+'<small>/ 100</small></div>':'')+'</div>';
+      var f=p.focus||null, example=(f&&f.example)||null;
+      var primary=(f&&f.move)?p.patterns.find(function(g){return g.section===(f.move_section||f.section)&&g.move===f.move;})||null:null;
+      var stageLabel=function(section){return (p.sections.find(function(s){return s.section===section;})||{}).label||section;};
+      /* COACHING */
+      detail+='<div class="coaching-period-priority"><div><span class="coaching-period-eyebrow">'+(p.section?(p.tied_sections&&p.tied_sections.length>1?'JOINT LOWEST-SCORING AREA':'LOWEST-SCORING AREA'):'ANALYSIS STATUS')+'</span><h4>'+escapeHtml(p.label)+'</h4>'
+        +(p.note?'<p class="coaching-period-note">'+escapeHtml(p.note)+'</p>':'')
+        +(f&&f.summary?'<p class="coaching-period-diagnosis">'+escapeHtml(f.summary)+'</p>':'')
+        +(f&&f.strength?'<p class="coaching-period-diagnosis">'+escapeHtml(f.strength.sentence)+'</p>':'')
+        +(example?'<div class="coaching-example-next"><span>WHAT TO COACH</span><p>'+escapeHtml(example.recommendation)+'</p></div>':'')
+        +'</div>'+(p.score!==null?'<div class="coaching-period-score">'+p.score+'<small>/ 100</small></div>':'')+'</div>';
+      /* CALL EXAMPLE */
+      detail+='<div class="coaching-pattern-heading"><h4>Call example</h4></div>';
+      if(example){
+        detail+=coachingPeriodExampleHtml(example,selected,{withNext:false});
+        var more=primary?primary.examples.filter(function(e){return e.call_id!==example.call_id;}).slice(0,4):[];
+        if(more.length)detail+='<details class="coaching-pattern coaching-more"><summary><span><strong>More calls with this</strong></span><b>'+more.length+' call'+(more.length===1?'':'s')+'</b></summary><div class="coaching-pattern-body">'+more.map(function(e){return coachingPeriodExampleHtml(e,selected,{withNext:false});}).join('')+'</div></details>';
+      } else detail+='<p class="coaching-period-empty">'+(p.section?'No reviewed call in '+escapeHtml(p.label)+' to show for these dates.':'No reviewed call to show for these dates.')+'</p>';
+      var others=p.patterns.filter(function(g){return g!==primary;});
+      if(others.length)detail+='<details class="coaching-pattern coaching-other"><summary><span><strong>Other coaching from these calls</strong></span><b>'+others.length+'</b></summary><div class="coaching-pattern-body">'+others.map(function(g){return '<div class="coaching-other-group"><h5>'+escapeHtml(g.move)+'<small>'+escapeHtml(stageLabel(g.section))+' · '+g.calls+' call'+(g.calls===1?'':'s')+'</small></h5>'+g.examples.slice(0,3).map(function(e){return coachingPeriodExampleHtml(e,selected,{withNext:true});}).join('')+'</div>';}).join('')+'</div></details>';
+      /* the five stage scores, after the coaching */
+      detail+='<div class="coaching-pattern-heading"><h4>Stage scores this period</h4></div>';
       detail+='<div class="coaching-section-grid" aria-label="Section scores for this period">'+p.sections.map(function(s){return '<div class="coaching-section-cell'+(s.section===p.section?' is-focus':'')+'"><span>'+escapeHtml(s.label)+'</span><strong>'+(s.score===null?'—':s.score)+'</strong><div class="coaching-score-track"><i style="color:'+scoreColor(s.score)+';width:'+(s.score===null?0:Math.max(0,Math.min(100,s.score)))+'%"></i></div><small>'+(p.awaiting_new_grading?'none counted yet':s.calls+' graded call'+(s.calls===1?'':'s'))+'</small></div>';}).join('')+'</div>';
-      detail+='<div class="coaching-pattern-heading"><h4>Coaching from calls</h4></div>';
-      if(p.patterns.length) {
-        detail+='<ul class="coaching-topic-tags" aria-label="Coaching topics">'+p.patterns.map(function(g){return '<li><span>'+escapeHtml(g.move)+'</span><b>'+g.calls+' call'+(g.calls===1?'':'s')+'</b></li>';}).join('')+'</ul>';
-        detail+=p.patterns.slice(0,5).map(function(g,gi){return '<details class="coaching-pattern"'+(gi===0&&p.focus&&p.focus.move?' open':'')+'><summary><span><strong>'+escapeHtml(g.move)+'</strong><small>'+escapeHtml((p.sections.find(function(s){return s.section===g.section;})||{}).label||g.section)+'</small></span><b>'+g.calls+' call'+(g.calls===1?'':'s')+'</b></summary><div class="coaching-pattern-body">'+g.examples.slice(0,5).map(function(e,ei){return coachingPeriodExampleHtml(e,selected,ei);}).join('')+(g.calls>5?'<p class="coaching-period-intro">Showing the five most recent examples of '+g.calls+' calls.</p>':'')+'</div></details>';}).join('');
-      } else detail+='<p class="coaching-period-empty">'+(p.reviewed_calls?'No specific change passed review in the assessed calls. The section scores above still show where performance was lowest.':'The section scores are available. Verified call examples are not available for these dates yet.')+'</p>';
       var recent=selected.recent_calls||[];
       if(recent.length)detail+='<details class="coaching-recent-calls"><summary>Recent calls in this period</summary>'+recent.map(function(c){return '<div class="coaching-outcome-row"><span>'+escapeHtml(String(c.call_date).slice(0,10))+' · '+escapeHtml(c.analysis_status==='done'?(c.outcome?outcomeLabel(c.outcome):'Outcome not recorded'):'Analysis not ready')+'</span><button type="button" class="obj-btn" data-call="'+escapeHtml(c.call_id)+'" data-owner="'+escapeHtml(selected.user_id)+'" onclick="openCallReview(this.dataset.call,this.dataset.owner)">Review Call</button></div>';}).join('')+'</details>';
     }
     return '<div class="coaching-rep-workspace" id="coachingRepWorkspace"><div class="coaching-rep-list" aria-label="Choose a closer">'+list+'</div><section class="coaching-rep-detail" aria-label="Selected closer coaching">'+detail+'</section></div>';
   }
-  function coachingPeriodExampleHtml(e,rep,index) {
-    var first=e.evidence[0];
-    return '<article class="coaching-period-example"><div class="coaching-example-meta"><strong>'+escapeHtml(e.prospect_name||'Prospect name not recorded')+'</strong><span>'+escapeHtml(coachingRepName(rep))+' · '+escapeHtml(String(e.call_date).slice(0,10))+'</span><b>'+escapeHtml(e.outcome?outcomeLabel(e.outcome):'Outcome not recorded')+'</b></div><p>'+escapeHtml(e.observation)+'</p><div class="coaching-example-next"><span>COACHING FOCUS</span><p>'+escapeHtml(e.recommendation)+'</p></div><details class="coaching-exact-exchange"><summary>Read the call exchange</summary>'+e.evidence.map(function(t){return '<blockquote><span>'+escapeHtml(t.speaker==='CLOSER'?coachingRepName(rep):e.prospect_name||'Prospect')+' · '+escapeHtml(formatTimestampDisplay(t.timestamp_seconds))+'</span>'+escapeHtml(t.quote)+'</blockquote>';}).join('')+'</details><div class="coaching-example-actions">'+(e.clip_url?'<a href="'+escapeHtml(e.clip_url)+'" target="_blank" rel="noopener noreferrer">'+(e.source==='zoom'?'Open recording':'Watch clip')+' ↗</a>':'')+'<button type="button" class="obj-btn" data-call="'+escapeHtml(e.call_id)+'" data-owner="'+escapeHtml(rep.user_id)+'" onclick="openCallReview(this.dataset.call,this.dataset.owner)">Review Full Call</button></div></article>';
+  /* One call, as evidence: who, when, how it ended; what happened; the exchange; the clip and the full call.
+     `withNext` adds the finding's own recommendation — only where the example is NOT the page's coaching (the
+     collapsed "other coaching"), because the representative example's advice already sits under WHAT TO COACH. */
+  function coachingPeriodExampleHtml(e,rep,opts) {
+    var withNext=!!(opts&&opts.withNext);
+    return '<article class="coaching-period-example"><div class="coaching-example-meta"><strong>'+escapeHtml(e.prospect_name||'Prospect name not recorded')+'</strong><span>'+escapeHtml(coachingRepName(rep))+' · '+escapeHtml(String(e.call_date).slice(0,10))+'</span><b>'+escapeHtml(e.outcome?outcomeLabel(e.outcome):'Outcome not recorded')+'</b></div><p>'+escapeHtml(e.observation)+'</p>'+(withNext?'<div class="coaching-example-next"><span>COACHING FOCUS</span><p>'+escapeHtml(e.recommendation)+'</p></div>':'')+'<details class="coaching-exact-exchange"><summary>Read the call exchange</summary>'+e.evidence.map(function(t){return '<blockquote><span>'+escapeHtml(t.speaker==='CLOSER'?coachingRepName(rep):e.prospect_name||'Prospect')+' · '+escapeHtml(formatTimestampDisplay(t.timestamp_seconds))+'</span>'+escapeHtml(t.quote)+'</blockquote>';}).join('')+'</details><div class="coaching-example-actions">'+(e.clip_url?'<a href="'+escapeHtml(e.clip_url)+'" target="_blank" rel="noopener noreferrer">'+(e.source==='zoom'?'Open recording':'Watch clip')+' ↗</a>':'')+'<button type="button" class="obj-btn" data-call="'+escapeHtml(e.call_id)+'" data-owner="'+escapeHtml(rep.user_id)+'" onclick="openCallReview(this.dataset.call,this.dataset.owner)">Review Full Call</button></div></article>';
   }
 
   function coachingRepWorkspaceHtml(reps) {

@@ -29,6 +29,6 @@ test('stage color reflects performance, never weakest-area focus',()=>{
 test('period averages and call coaching have separate headings without internal review counters',()=>{
  const r=renderComputed(page(),`({text:document.body.innerText,headings:[...document.querySelectorAll('.coaching-pattern-heading h4')].map(x=>x.textContent)})`);
  assert.match(r.text,/Lowest-scoring area/i);
- assert.deepEqual(r.headings,['Coaching from calls']);
+ assert.deepEqual(r.headings,['Call example','Stage scores this period']);
  assert.doesNotMatch(r.text,/calls reviewed for examples|Examples cover|have not completed this review/);
 });

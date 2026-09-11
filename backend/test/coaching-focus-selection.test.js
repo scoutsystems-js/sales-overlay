@@ -112,15 +112,15 @@ function page(reps) {
   const funcs = ['scoreColor', 'ymd', 'dayLabel', 'rangeLabelInclusive', 'coachingRepName', 'coachingRepWorkspaceHtml', 'coachingPeriodWorkspaceHtml', 'coachingPeriodExampleHtml', 'selectCoachingRep'].map(n => fnBody(live, n)).join('\n');
   return '<html><head>' + source.slice(source.indexOf('<style>'), source.indexOf('</style>') + 8) + '</head><body data-view="team-coaching"><main class="page" id="content"></main><script>var COLORS={win:"#09e046",follow_up:"#fbbf24",loss:"#f87171"};var state={teamCoachable:{reps:' + JSON.stringify(reps) + '}};var MONTH_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];function escapeHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}function formatTimestampDisplay(s){return String(s);}function outcomeLabel(){return "Open";}function displayNameFromEmail(s){return s;}function openCallReview(c,u){window.opened=[c,u];}' + funcs + ';document.querySelector("#content").innerHTML=coachingRepWorkspaceHtml(state.teamCoachable.reps);</script></body></html>';
 }
-const probe = `(()=>{const open=[...document.querySelectorAll('details.coaching-pattern[open]')].map(d=>d.querySelector('summary strong').textContent);return {open,text:document.body.innerText};})()`;
+const probe = `(()=>{const ex=document.querySelector('.coaching-rep-detail > .coaching-period-example [data-call]');const other=[...document.querySelectorAll('.coaching-other .coaching-period-example [data-call]')].map(b=>b.dataset.call);return {example:ex?ex.dataset.call:null,other,otherOpen:!!document.querySelector('.coaching-other[open]'),text:document.body.innerText};})()`;
 test('the page opens exactly the focus pattern under the lowest-scoring area, and opens nothing when no finding supports it', () => {
   const withFocus = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls, [example(FINDINGS.discovery, 'c1'), example(FINDINGS.close, 'c2')], window) }];
   const r = renderComputed(page(withFocus), probe);
-  assert.deepEqual(r.open, ['asking for the sale']);
+  assert.equal(r.example, 'c2', 'the call example is the focus pattern\'s call'); assert.deepEqual(r.other, ['c1'], 'the Discovery finding is the other coaching, collapsed'); assert.equal(r.otherOpen, false);
   assert.match(r.text, /Lowest-scoring area/i); assert.match(r.text, /Close is the lowest-scoring area, but the reviewed calls show no repeated issue/);
   const noFocus = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls, [example(FINDINGS.discovery, 'c1')], window) }];
   const n = renderComputed(page(noFocus), probe);
-  assert.deepEqual(n.open, [], 'an off-stage pattern is never opened as the lowest stage\'s reason');
+  assert.equal(n.example, null, 'an off-stage pattern is never shown as the lowest stage\'s example'); assert.deepEqual(n.other, ['c1']);
   assert.match(n.text, /Close is the lowest-scoring area, but there is not yet enough reviewed evidence/);
-  assert.match(n.text, /qualifying financially/i, 'the Discovery finding is still on the page, collapsed');
+  assert.match(n.text, /Other coaching from these calls/i, 'the Discovery finding is still on the page, under the collapsed other coaching');
 });

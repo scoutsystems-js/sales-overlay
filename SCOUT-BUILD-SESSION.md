@@ -216,3 +216,59 @@ PAID API COST THIS BLOCK = $0
 
 PAID API COST THIS BLOCK = $0
 
+---
+
+## Block 004 — Implement the approved Option 4 Team Coaching presentation — 2026-09-11
+
+### Prompt (architect)
+
+**Summary.** Implement the approved Option 4 presentation for the existing Team Coaching page, using the period-wide focus from Blocks 002 and 003. Primarily a UI/hierarchy block; no coaching-logic redesign unless a concrete mismatch prevents the approved behaviour from rendering.
+
+**Goal.** At a glance per rep: the one stage needing the most attention; the period-wide reason; one representative real-call example supporting that diagnosis; the coaching advice for the manager. Visually simple, close to the existing design; never a trends dashboard, analytics workspace, scorecard or action plan.
+
+**How this relates to the overall build session.** Block 002 stopped the lowest stage borrowing an unrelated point; Block 003 diagnoses the period (pattern · isolated · outlier · insufficient) with the example separate from the diagnosis. This block makes that understandable in the manager-facing UI.
+
+**Read first.** The shared handoff files, Blocks 002–003, `current-state.md`, `SCOUT-DESIGN.md`, `CLAUDE.md`, the Team Coaching components, styles and data path. Verify the checkout is `.codex/team-coaching` on `codex/team-coaching-ready`.
+
+**Scope.** Option 4: a clear separation between COACHING (priority stage · concise period diagnosis · manager advice · a lightweight Fine tune control) and CALL EXAMPLE (one representative call, the existing excerpt and clip/full-call actions), the example reading as evidence, not a competing card. Translate the four focus states to plain language; never word one call as a trend; insufficient support never substitutes another stage. Keep the Block 003 strength line only if it displays simply; no new reads or aggregation for strengths. Quieter than the mockups: no cards in cards, charts, trend graphs, multiple badges, long labels, tabs, extra counts, "AI analysis" language, internal terminology, or the stage name repeated in several places. Fine tune: preserve its boundary; if the interaction does not exist yet, render only what can be supported cleanly and report the decision.
+
+**Preserve / do not change.** Stage grading architecture, eligibility, `stageMetric`, scores and grade mapping, historical records, outcomes, Block 003 selection logic (unless required to render an approved field), the broader-coaching review architecture, schema, migrations, production data, unrelated Team pages, the site-design tree. No new model calls.
+
+**Verification.** Real/local representative payloads, not only fixtures: recurring pattern, isolated issue, outlier, insufficient support, a rep with an example, a rep without the strength line; desktop and narrow widths; one priority dominates; diagnosis and example visually distinct; the example belongs to the payload's priority; no isolated issue worded as recurring; insufficient never substitutes a stage; Fine tune subordinate; no navigation or evidence action broken. A visible rendered check, not unit tests alone.
+
+**Report back in this block.** The thirteen numbered items in the prompt. Do not push or deploy.
+
+### Report (developer) — report back in this block
+
+**1. Inspected before editing.** Checkout confirmed: `.codex/team-coaching`, branch `codex/team-coaching-ready`, clean at `ae2ee1b`. Read: the two period render functions (`coachingPeriodWorkspaceHtml`, `coachingPeriodExampleHtml`), their CSS block (lines ~5425–5537), the Fine Tune page function and its route (`POST /kb/fine-tune` reads a `call_highlights` row by id), the six tests that render this surface, `SCOUT-DESIGN.md`. Then pulled the REAL payload read-only from the live database (service key from `API Keys.md`; the same `loadCoachableTeam` call the route makes, `periodOnly`, both teams, last 30 and 7 days) and read every rep's focus before designing.
+
+**2. The hierarchy implemented.** In the selected rep's panel, top to bottom: the rep and window (unchanged) → the COACHING box: eyebrow LOWEST-SCORING AREA, the stage, the Block 003 diagnosis sentence, the strength sentence when present, then WHAT TO COACH (the representative finding's recommendation) with the stage score at the right → a hairline and the heading CALL EXAMPLE: one call (prospect · closer · date · outcome), what happened, "Read the call exchange" (collapsed), Watch clip / Review Full Call → "More calls with this" (collapsed; the primary pattern's other calls, up to four) → "Other coaching from these calls" (collapsed; every other pattern, its stage and count, up to three calls each, with its own recommendation) → STAGE SCORES THIS PERIOD (the existing five cells, moved after the coaching) → Recent calls (unchanged). Removed: the topic-tag list and the five open accordions of five examples each. Nothing new was added except the two collapsed sections.
+
+**3. Visible verification.** Rendered by Electron from the real payload with the page's own functions and stylesheet; PNGs in `~/Desktop/scan-reports/block-004-option4/` (eight files): `pattern-nathan-30d` (and `-narrow` at 390 px), `isolated-nick-30d`, `outlier-joshn-30d`, `outlier-noexample-yazan-7d`, `insufficient-gabriel-30d` (and `-narrow`), `strength-synthetic`. Looked at each at 1400 px, two at 390 px. One defect found by looking, not by tests: nick's long recommendation pushed the score under the text (the box wraps its flex children); fixed with one rule, re-rendered, confirmed. No horizontal overflow at either width (asserted in the guards too).
+
+**4. The four states as they render.** *Pattern* (nathan.m, Close): "Close needs the most attention. Booking the follow-up came up in 5 of 10 reviewed Close calls. Qualifying financially in 1." + WHAT TO COACH + Marlene's call + More calls with this (4) + Other coaching (2). *Isolated* (nick, Objection Handling): "…the reviewed calls show no repeated issue. Anchoring price came up in one call." + advice + the one call. *Outlier* (josh.n, Close): "…do not show a consistent Close problem. The low average is driven mostly by one call. Booking the follow-up came up in one call." + that call; (yazan, 7 days, Discovery): the outlier sentence, no advice, "No reviewed call in Discovery to show for these dates." *Insufficient* (gabriel, Objection Handling): "…not yet enough reviewed evidence to identify a reliable coaching pattern.", no advice, no example, the two other-stage findings collapsed under Other coaching. No internal state name appears anywhere.
+
+**5. Diagnosis vs example.** Two blocks under two headings with a hairline between: the diagnosis and the advice live in the bordered COACHING box; the example is an article under CALL EXAMPLE with no recommendation of its own (its recommendation IS the advice above). In data: `focus.summary` vs `focus.example`; the page renders the example from `focus.example` only, and the guards assert the rendered example's call id equals the focus's.
+
+**6. The strength line.** Rendered as a second sentence in the COACHING box when `focus.strength` exists (synthetic render). ON REAL DATA IT NEVER EXISTS: all 200 newest stage records carry a `context` whose keys are `call_kind, close_due, ending, finance, objection, pitch, price, prior_presentation, sales_conversation` — no `discovery` at all (v17, v18, v19, normal grader). The schema defines `context.discovery.areas`, the production grader does not write it. Block 003's strength is therefore dormant in production. Not fixed here (a grader output change is grading work); recorded as item 10.
+
+**7. Fine tune coaching.** NOT rendered on a period example, deliberately. The only door, `POST /kb/fine-tune`, requires a `call_highlights` row id (it reads the moment's quote, observation and coaching from that row, 404s otherwise); a period-review finding is stored inside `call_analyses.rep_period_coaching` and has no highlight row. A dead button would violate "a control that does nothing". The existing Fine Tune on the legacy improvements path and on Call Review is untouched. Size of the real thing, for the decision: a second identity on the route (`call id + moment number`, reading the finding and building the same moment shape), the page passing it, "Noted ✓" persistence keyed on that identity — roughly 40 lines plus a guard; its boundary (advice only, never the stage, scores or metrics) is already the route's.
+
+**8. Files changed.** `backend/web/dashboard.html` — the two render functions rewritten to the Option 4 shape; four CSS lines (advice spacing inside the box, the text column yielding to the score, the collapsed groups, sentence-case summaries). `backend/test/period-workspace.test.js` — headings re-pinned. `backend/test/coaching-focus-selection.test.js`, `backend/test/coaching-focus-diagnosis.test.js` — page probes re-pinned to the new shape (the example belongs to the focus; other coaching collapsed; no example on insufficient). `current-state.md` — the top note. This file.
+
+**9. Tests and checks.** The six render guards plus customer-language and the literal ratchet: green. Full backend suite: 2,769 passed, 0 failed. Rendered checks as in item 3. No logic file changed: `rep-period-coaching.js`, `call-period-review.js`, stage grading, routes — untouched.
+
+**10. Real-data cases where the design exposed a logic/data problem.**
+- **Cross-stage support runs the wrong way.** Three reps (joshua 6 of 15, godwin.o, yazan, 30 days) have Objection Handling lowest, and the focus is "Booking the follow-up, carried into the purchase decision" — a CLOSE-stage finding counting as the Objection Handling diagnosis because its cited exchange contains the located decision (Block 002's rule, built for an EARLIER stage's gap reaching the decision). A missed follow-up booking is not an objection-handling weakness. The one-line correction is to allow cross-stage support only from an earlier stage than the diagnosed one (`SECTION_ORDER` index of `move_section` below the diagnosed stage). Not made: it changes Block 003 semantics, which this block was told to report, not alter.
+- **The strength source is empty in production** (item 6).
+- **One skill dominates.** "Booking the follow-up" is the focus for six of nine reps with a focus over 30 days. That is the data on file (the period review's findings lean to follow-up and finance, as `gpt.md` recorded on 2026-09-06), not a rendering fault; it will read as monotonous on the page.
+- The stage name in the COACHING box renders as a small uppercase label rather than a title: an existing later rule (`#content .coaching-rep-detail h4`) outranks the priority box's own rule by order. Pre-existing; left as is; a one-line reorder if Justin wants the stage larger.
+
+**11. Decisions needed.** (a) Adopt the earlier-stage-only rule for cross-stage support (item 10, first bullet) — recommended. (b) Whether to build the period-finding Fine Tune door (item 7). (c) Whether to keep the five stage cells on this page at all, now below the coaching; and the "N graded calls" line under each (Justin filed removing per-card graded-call labels on 2026-09-06). (d) The strength source: leave dormant, or have the grader write `context.discovery.areas` (grading work, its own block). (e) The copy: LOWEST-SCORING AREA, WHAT TO COACH, CALL EXAMPLE, "More calls with this", "Other coaching from these calls", "No reviewed call in X to show for these dates" — Justin's to approve or cut.
+
+**12. Commit.** One local commit on `codex/team-coaching-ready` in `.codex/team-coaching` carrying these files and this report (`git log -1`); four commits ahead of `origin/main`.
+
+**13. State.** Not pushed. Not deployed. No production write: the live database was READ once for the payload and once for the stage-record shape, with the service key, nothing written. No migration, no regrade, no backfill, no model call.
+
+PAID API COST THIS BLOCK = $0
+

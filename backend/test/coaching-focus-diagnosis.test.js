@@ -139,19 +139,19 @@ function page(reps) {
   const funcs = ['scoreColor', 'ymd', 'dayLabel', 'rangeLabelInclusive', 'coachingRepName', 'coachingRepWorkspaceHtml', 'coachingPeriodWorkspaceHtml', 'coachingPeriodExampleHtml', 'selectCoachingRep'].map(n => fnBody(live, n)).join('\n');
   return '<html><head>' + source.slice(source.indexOf('<style>'), source.indexOf('</style>') + 8) + '</head><body data-view="team-coaching"><main class="page" id="content"></main><script>var COLORS={win:"#09e046",follow_up:"#fbbf24",loss:"#f87171"};var state={teamCoachable:{reps:' + JSON.stringify(reps) + '}};var MONTH_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];function escapeHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}function formatTimestampDisplay(s){return String(s);}function outcomeLabel(){return "Open";}function displayNameFromEmail(s){return s;}function openCallReview(c,u){window.opened=[c,u];}' + funcs + ';document.querySelector("#content").innerHTML=coachingRepWorkspaceHtml(state.teamCoachable.reps);</script></body></html>';
 }
-const probe = `(()=>{const open=[...document.querySelectorAll('details.coaching-pattern[open]')].map(d=>d.querySelector('summary strong').textContent);const notes=[...document.querySelectorAll('.coaching-period-priority .coaching-period-diagnosis')].map(n=>n.textContent);return {open,notes,text:document.body.innerText,overflow:document.documentElement.scrollWidth>innerWidth};})()`;
+const probe = `(()=>{const ex=document.querySelector('.coaching-rep-detail > .coaching-period-example [data-call]');const notes=[...document.querySelectorAll('.coaching-period-priority .coaching-period-diagnosis')].map(n=>n.textContent);const advice=(document.querySelector('.coaching-period-priority .coaching-example-next p')||{}).textContent||null;const other=[...document.querySelectorAll('.coaching-other .coaching-period-example [data-call]')].map(b=>b.dataset.call);return {example:ex?ex.dataset.call:null,advice,other,notes,text:document.body.innerText,overflow:document.documentElement.scrollWidth>innerWidth};})()`;
 test('the page shows the period diagnosis and the strength beneath the lowest-scoring area, opens only the focus pattern, and says when evidence is insufficient', () => {
   const withPattern = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls(LOW_DISCOVERY, ['goals', 'current_situation']), [example(F.whyNow, 'c1'), example(F.whyNow, 'c2'), example(F.finance, 'c3')], window) }];
   for (const width of [1400, 390]) {
     const r = renderComputed(page(withPattern), probe, { width });
-    assert.deepEqual(r.open, ['establishing why now']); assert.equal(r.overflow, false, 'width ' + width);
+    assert.equal(r.example, 'c2', 'the call example is the primary pattern\'s most recent call (c2 is dated after c1 in this fixture)'); assert.equal(r.advice, F.whyNow.recommendation, 'what to coach is the representative finding\'s recommendation'); assert.deepEqual(r.other, ['c3'], 'the secondary finding is the other coaching, collapsed'); assert.equal(r.overflow, false, 'width ' + width);
     assert.equal(r.notes.length, 2, 'the diagnosis and the strength, nothing else');
     assert.match(r.notes[0], /Discovery needs the most attention\. Establishing why now came up in 2 of 4 reviewed Discovery calls\. Qualifying financially in 1\./);
     assert.match(r.notes[1], /Current situation and goals were established in 10 of 10 graded Discovery calls/);
   }
   const insufficient = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls(LOW_CLOSE), [example(F.finance, 'c1')], window) }];
   const n = renderComputed(page(insufficient), probe);
-  assert.deepEqual(n.open, []); assert.equal(n.notes.length, 1);
+  assert.equal(n.example, null); assert.equal(n.advice, null); assert.equal(n.notes.length, 1); assert.match(n.text, /No reviewed call in Close to show for these dates/);
   assert.match(n.notes[0], /Close is the lowest-scoring area, but there is not yet enough reviewed evidence/);
-  assert.match(n.text, /qualifying financially/i, 'the off-stage finding stays on the page, collapsed');
+  assert.deepEqual(n.other, ['c1'], 'the off-stage finding stays on the page, under the collapsed other coaching');
 });
