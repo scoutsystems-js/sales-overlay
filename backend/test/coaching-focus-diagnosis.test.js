@@ -124,6 +124,16 @@ test('G. a Discovery finding without current causal support cannot explain a wea
   assert.equal(withDecision.focus.section, 'close', 'the diagnosed stage'); assert.equal(withDecision.focus.move_section, 'discovery', 'the pattern\'s own stage');
   assert.match(withDecision.focus.summary, /carried into the purchase decision/);
 });
+test('G2. (Block 005) a LATER-stage finding never becomes the diagnosis of an EARLIER stage, even when its exchange carries the purchase decision', async () => {
+  const LOW_OBJECTION = { intro: 70, discovery: 90, pitch: 70, objection: 30, close: 80 };
+  const closeAtDecision = { ...F.ask, turn_ids: [6, 7, 8] };   // a Close finding whose cited exchange IS the decision
+  const s = await focus({ c1: { record: record(closeAtDecision, true) }, c2: { record: record(closeAtDecision, true) } }, LOW_OBJECTION);
+  assert.equal(s.section, 'objection');
+  assert.equal(s.focus.state, 'insufficient', 'a Close finding cannot explain a weak Objection Handling stage'); assert.equal(s.focus.move, null);
+  assert.equal(s.patterns.length, 1); assert.equal(s.patterns[0].section, 'close', 'the Close pattern is still listed as other coaching');
+  const earlier = await focus({ c1: { record: record(F.financeAtDecision, true) } }, LOW_OBJECTION);
+  assert.equal(earlier.focus.move_section, 'discovery', 'an EARLIER stage reaching the decision still supports it'); assert.equal(earlier.focus.support, 'purchase_decision_in_exchange');
+});
 test('H. a rep below the ranking floor keeps no stage and no focus; the verified-only population is untouched', async () => {
   const out = await loadCoachableTeam(wire({ c1: { record: record(F.ask) } }), ['r1'], '2026-09-10', '2026-09-10T23:59:59Z', Promise.resolve('k'), { periodOnly: true });
   assert.equal(out.reps[0].period_summary.section, null); assert.equal(out.reps[0].period_summary.focus, null);

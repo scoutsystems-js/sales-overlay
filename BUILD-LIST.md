@@ -2324,3 +2324,11 @@ SESSION COMPLETE — September6,2026: broader coaching live at d477b31; period-v
 
 
 Filed after final page check: clicking Review Full Call formed the correct call/owner URL, but the next observation had returned to Team Coaching before full-call content was verified. Do not claim successful full-call page loading from this run. Rep switching, visible coaching/excerpts and clip URLs passed. This pre-existing navigation path was untouched; root cause is unverified and belongs in the next focused block, ahead of cosmetic cleanup.
+
+---
+
+## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented
+
+- **Team Coaching stage-context UI (deferred UI refinement, architect 2026-09-11):** consider returning the five stage cells to the top of the page so the manager immediately sees why the selected coaching stage is lowest. If implemented, the lowest stage gets a restrained semantic red border/accent of visual intensity comparable to Scout green; Scout green stays reserved for positive/brand meaning; no red fill, no broad red/error styling. Not part of the current priority; do not let it interrupt Block 005.
+- **The Discovery work record is not in the production grader's contract (Block 005, Part 2 — stopped and reported):** `context.discovery.areas` exists in the offline candidate contract (`stage-output-schema.js`, `INSTRUCTIONS`) but the production stage assessment rides the normal grader, whose `stage_assessment.context` (analysis-worker prompt, `checkProductionContext`) carries nine fields and no `discovery`. Populating it means adding an output field to the production grader prompt, validating each area's evidence turns, and bumping `ANALYSIS_PROMPT_VERSION` — a grader prompt change (H402: one pass grades everything), which needs a measured run on a fresh sample before it ships. Block 003's Discovery strength stays dormant until Justin rules on that spend.
+

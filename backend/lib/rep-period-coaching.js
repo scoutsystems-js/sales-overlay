@@ -31,7 +31,11 @@ function summarize(allCalls,examples,window={}) {
     another stage is never the reason: it stays in `patterns`, listed and counted, and `focus_note` says so. Guard
     test/coaching-focus-selection.test.js. */
  const DECISION_STAGES=['close','objection'];
- const supporting=g=>!weakest?[]:g.section===weakest.section?g.examples:DECISION_STAGES.includes(weakest.section)?g.examples.filter(e=>Array.isArray(e.decision_turns)&&e.decision_turns.length):[];
+ /* Block 005: cross-stage support runs ONE way — an EARLIER stage's gap carried into the decision may explain a later
+    stage; a LATER stage's finding never explains an earlier one merely because its exchange holds the decision (three
+    live reps had a Close finding as their Objection Handling diagnosis). */
+ const earlier=g=>SECTION_ORDER.indexOf(g.section)<SECTION_ORDER.indexOf(weakest.section);
+ const supporting=g=>!weakest?[]:g.section===weakest.section?g.examples:DECISION_STAGES.includes(weakest.section)&&earlier(g)?g.examples.filter(e=>Array.isArray(e.decision_turns)&&e.decision_turns.length):[];
  const candidates=patterns.map(g=>({section:g.section,move:g.move,examples:supporting(g)})).filter(c=>c.examples.length)
   .map(c=>({section:c.section,move:c.move,calls:c.examples.length,recurring:c.examples.length>=2,support:c.section===weakest.section?'same_section':'purchase_decision_in_exchange',example:c.examples[0]}))
   .sort((a,b)=>b.calls-a.calls||String(b.example.call_date).localeCompare(String(a.example.call_date))||a.move.localeCompare(b.move));

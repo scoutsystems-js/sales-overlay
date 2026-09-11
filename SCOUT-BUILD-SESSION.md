@@ -272,3 +272,68 @@ PAID API COST THIS BLOCK = $0
 
 PAID API COST THIS BLOCK = $0
 
+---
+
+## Block 005 — Correct real-data diagnosis defects exposed by Block 004 — 2026-09-11
+
+### Prompt (architect)
+
+**Summary.** Block 004 exposed three data/logic issues on real payloads. Correct the cross-stage direction defect; make the approved Discovery strength path populate if the existing grader/schema supports it cleanly; investigate why "Booking the follow-up" is the focus for six of nine reps before deciding whether that needs correction. No UI or architecture redesign.
+
+**Goal.** The period diagnosis explains the actual lowest stage with evidence that legitimately supports it; a later-stage finding never becomes the explanation for an earlier-stage weakness merely because its exchange contains a decision moment; the grounded Discovery strength surfaces where the architecture already intends to produce it; the repeated follow-up focus is left alone until it is known to be stored evidence or a grouping defect.
+
+**How this relates to the overall build session.** Blocks 002–003: scores say where, period evidence says why, one example shows it. Block 004 rendered that against real payloads and found failures unit tests had not. A targeted correctness follow-up, not an architecture pass.
+
+**Read first.** The shared handoff files, Blocks 002–004, `current-state.md`, the repository rules, the Block 003 diagnosis implementation, the grader/schema path for the Discovery work record. Verify `.codex/team-coaching` on `codex/team-coaching-ready`.
+
+**Scope.** Part 1: the smallest correction so cross-stage evidence supports a LATER stage from an EARLIER stage's demonstrated relationship only, never the reverse; keep the evidence requirement; verify the three affected reps. Part 2: inspect whether the production assessment already has the information, whether writing the field is part of the existing contract rather than new grading behaviour, and whether it needs no new model call, reviewer, proof pass, persistence or inference; if yes, the smallest change plus tests; if not, STOP and report. Part 3: no change; audit the six reps (lowest stage, eligible calls, distinct supporting calls, what the findings say, whether they are the same behaviour, other recurring behaviour, why the ranking chose it) and classify: truthful recurrence · grouping/vocabulary defect · ranking defect · mixed/insufficient. Record the deferred stage-cell UI item at the END of the build list, not implemented.
+
+**Preserve / do not change.** Option 4 hierarchy, stage-cell placement, Fine Tune, score calculations, grade mapping, eligibility architecture, `stageMetric`, broader coaching, schema, historical and production data, unrelated pages, the site-design tree. No migration, backfill, regrade, paid call, push or deploy.
+
+**Verification.** Focused tests first, then the full suite; re-inspect the affected real reps' payload/render after Part 1 (lowest stage unchanged, no later-stage substitution, no unrelated stage substituted, the example still supports the focus, isolated/outlier/insufficient still correct). Part 2 changes, if any, verified on local fixtures only.
+
+**Report back in this block.** The fifteen numbered items in the prompt, ending with `PAID API COST THIS BLOCK = $0`.
+
+### Report (developer) — report back in this block
+
+**1. Exact cause of the cross-stage defect.** Block 002's rule let ANY pattern from another stage support a decision stage (close, objection) when an example's cited turns included the located purchase decision. It was written for an earlier stage's gap reaching the decision, but it never tested direction. A "booking the follow-up" finding is Close-stage and, by its nature, its exchange holds the decision the prospect just deferred — so for a rep whose lowest stage was Objection Handling, every such Close finding qualified as the Objection Handling diagnosis.
+
+**2. Exact correction.** One condition in `lib/rep-period-coaching.js`: cross-stage support requires the pattern's stage to be EARLIER in `SECTION_ORDER` than the diagnosed stage. Same-stage support and the evidence requirement (the located decision in the cited turns) are unchanged; nothing was loosened. No other logic moved.
+
+**3. Before/after on the real payload (read-only pull, same window as Block 004, every rep compared).** Exactly the three reps changed; every other rep in both windows is byte-for-byte the same focus.
+- godwin.o (Objection Handling, 71): before `isolated` on a Close "booking the follow-up" finding carried into the decision → after `insufficient`; the two Close findings stay listed under Other coaching.
+- yazan (Objection Handling, 77): before `isolated` on a Close finding → after `insufficient`; four Close findings remain as other coaching.
+- joshua (Objection Handling, 69): before `pattern` "6 of 15" on Close findings → after `outlier` — no Objection Handling finding exists, and without his single lowest Objection Handling score the stage would no longer be the lowest (the Block 003 rule, now reachable). His nine Close findings remain as other coaching.
+Lowest stage unchanged for all three; nothing substituted; the isolated/outlier/insufficient states behave as designed. Rendered all three at 1400 px (`~/Desktop/scan-reports/block-005-cross-stage/`); joshua's reads "…do not show a consistent Objection Handling problem. The low average is driven mostly by one call." with "No reviewed call in Objection Handling to show for these dates." and Other coaching (1).
+
+**4. Discovery strength-path findings.** The production stage assessment rides the normal grader: `analysis-worker.js` asks for `stage_assessment.context` with nine fields (`sales_conversation, call_kind, ending, pitch, price, prior_presentation, objection, finance, close_due`) and `checkProductionContext` validates exactly those nine. `context.discovery.areas` — the "DISCOVERY WORK RECORD" — exists only in the offline candidate contract (`stage-output-schema.js producer`, the `INSTRUCTIONS`/`promptInstructions` prompt used by `buildPrompt` for offline QA). So (1) the production assessment does NOT already have the information — the grader is never asked for it; (2) writing it is not part of the production contract; (3) populating it needs no new model call, but it does need an output field added to the production grader prompt, validated per area against the transcript, with `ANALYSIS_PROMPT_VERSION` bumped — a grader prompt change (H402: one pass grades everything, any change can move outcomes) that cannot be measured here without a paid run on a fresh sample.
+
+**5. Strength-path change made?** No. Stopped, as instructed, because the field cannot be populated from the existing production assessment without changing the grader's contract. The exact change and its cost are filed at the end of `BUILD-LIST.md` for Justin's ruling. Block 003's strength logic stays in place and dormant.
+
+**6. No historical regrade or backfill occurred.** The live database was read twice (the payload pull, the stage-record shape probe); nothing was written.
+
+**7. The six-rep audit (30-day window, from the stored findings).**
+- nathan.m — lowest Close (66); 21 counted Close calls, 10 reviewed; 5 distinct calls with "booking the follow-up"; other patterns: qualifying financially (Discovery ×2, Objection ×1). The five findings all describe the same act: the call ended with a follow-up expected but no specific day and time agreed (texting to book, a vague third-party callback, "in a week", a personal cell number, "text me").
+- preston — lowest Close (74); 10 counted, 6 reviewed; 2 distinct calls; the only pattern. Same act (text to arrange; "Saturday or Monday" with no time).
+- josh.n — lowest Close (67); 10 counted, 1 reviewed; 1 call; the only pattern; outlier state. Same act (Monday agreed, no time).
+- joshua — lowest Objection Handling (69); 51 counted Objection calls, 15 reviewed; 0 Objection Handling findings; 9 distinct Close calls with the follow-up finding (only 6 had the decision inside the cited turns). Same act across all nine (assistant delegated, conditional five o'clock, "beginning of the year", mid-November, "text whenever ready"…).
+- godwin.o — lowest Objection Handling (71); 54 counted, 6 reviewed; 0 Objection findings; 2 Close follow-up findings. Same act.
+- yazan — lowest Objection Handling (77); 54 counted, 16 reviewed; 0 Objection findings; 4 Close follow-up findings. Same act.
+Why the ranking chose it: it was the only pattern with two or more calls in (or, before this block, "carried into") the lowest stage; for godwin.o, yazan and joshua nothing else existed at all in the lowest stage.
+
+**8. Classification: truthful recurrence — with one caveat that is not a grouping or ranking defect.** The findings under the label are substantively one behaviour (an open sale ended without a specific day and time), so the label is honest and the counts are real. The caveat is survivorship in what passes review: "booking the follow-up" has its own dedicated factual gate (`applySchedulingFacts`, H751) and does not depend on a located purchase decision, while every other Close or Objection Handling finding must survive the stage-facts gate and two agreeing observation reads. Three reps have 51–54 counted Objection Handling calls and zero surviving Objection Handling findings. That is consistent with the follow-up finding being easier to prove than a genuine objection-handling finding, not with a vocabulary collapse. It is a hypothesis about the review pipeline, not a measurement.
+
+**9. Product decision needed before changing that behaviour.** Whether to measure the survivorship hypothesis: count, per stage, how many draft findings the writer proposed versus how many survived each gate on the stored records (a $0 read of `rep_period_coaching.decisions` and `independent_review.decisions`). If Objection Handling drafts exist and die at the decision gate, that is a gate question for Justin, not a grouping fix. Until then, the repetition stands as reported.
+
+**10. Files changed.** `backend/lib/rep-period-coaching.js` — the earlier-stage-only condition. `backend/test/coaching-focus-diagnosis.test.js` — G2, the direction guard. `BUILD-LIST.md` — two filed items at the end (the deferred stage-cell UI; the Discovery work record's production contract). `current-state.md` — the top note. This file.
+
+**11. Tests and visible verification.** G2 written first and failed; passes after; planted (the direction check kept, its effect discarded) → G2 fails; restored. Focus and period guards 25/25; full backend suite 2,770 passed, 0 failed. Real payload re-pulled and diffed rep by rep (item 3); the three affected reps rendered and inspected.
+
+**12. Deferred stage-cell item.** Recorded at the end of `BUILD-LIST.md` verbatim in substance; NOT implemented. The stage cells stay where Block 004 put them.
+
+**13. Commit.** One local commit on `codex/team-coaching-ready` in `.codex/team-coaching` carrying these files and this report (`git log -1`); five commits ahead of `origin/main`.
+
+**14. State.** Not pushed. Not deployed. No production write. No migration, no regrade, no backfill.
+
+**15.** PAID API COST THIS BLOCK = $0
+
