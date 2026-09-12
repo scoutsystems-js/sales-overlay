@@ -5438,6 +5438,7 @@
     .coaching-section-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
     .coaching-section-cell { padding:12px; border:1px solid var(--border); border-radius:var(--radius-sm); min-width:0; }
     .coaching-section-cell.is-focus { border-color:var(--border-strong); }
+    .coaching-section-cell.is-thin>strong,.coaching-section-cell.is-thin .coaching-score-track { opacity:.45; }   /* Block 016: below the ranking floor — dimmed AND said (the cell's sub-line), never only one */
     .coaching-section-cell>span,.coaching-section-cell>small { display:block; font-size:var(--fs-label); color:var(--text); }
     .coaching-section-cell>strong { display:block; margin:8px 0; font-size:var(--fs-body); }
     .coaching-score-track { height:3px; background:var(--border); margin:8px 0; }
@@ -15761,7 +15762,10 @@
       if(others.length)detail+='<details class="coaching-pattern coaching-other"><summary><span><strong>Other coaching from these calls</strong></span><b>'+others.length+'</b></summary><div class="coaching-pattern-body">'+others.map(function(g){return '<div class="coaching-other-group"><h5>'+escapeHtml(g.move)+'<small>'+escapeHtml(stageLabel(g.section))+' · '+g.calls+' call'+(g.calls===1?'':'s')+'</small></h5>'+g.examples.slice(0,3).map(function(e){return coachingPeriodExampleHtml(e,selected,{withNext:true});}).join('')+'</div>';}).join('')+'</div></details>';
       /* the five stage scores, after the coaching */
       detail+='<div class="coaching-pattern-heading"><h4>Stage scores this period</h4></div>';
-      detail+='<div class="coaching-section-grid" aria-label="Section scores for this period">'+p.sections.map(function(s){return '<div class="coaching-section-cell'+(s.section===p.section?' is-focus':'')+'"><span>'+escapeHtml(s.label)+'</span><strong>'+(s.score===null?'—':s.score)+'</strong><div class="coaching-score-track"><i style="color:'+scoreColor(s.score)+';width:'+(s.score===null?0:Math.max(0,Math.min(100,s.score)))+'%"></i></div><small>'+(p.awaiting_new_grading?'none counted yet':s.calls+' graded call'+(s.calls===1?'':'s'))+'</small></div>';}).join('')+'</div>';
+      /* Block 016: a cell BELOW THE RANKING FLOOR (payload `enough` — the same rankSections verdict the overview's lowest stage comes from) keeps its
+         measurement but is drawn in the not-rankable state and says so in the ruled words, so the lowest cell a manager can read as eligible is the
+         overview's stage. When no stage is at the floor the headline already says "Not enough to judge" once; the cells do not repeat it. */
+      detail+='<div class="coaching-section-grid" aria-label="Section scores for this period">'+p.sections.map(function(s){var thin=!!p.section&&s.enough===false&&s.score!==null;return '<div class="coaching-section-cell'+(s.section===p.section?' is-focus':'')+(thin?' is-thin':'')+'"><span>'+escapeHtml(s.label)+'</span><strong>'+(s.score===null?'—':s.score)+'</strong><div class="coaching-score-track"><i style="color:'+scoreColor(s.score)+';width:'+(s.score===null?0:Math.max(0,Math.min(100,s.score)))+'%"></i></div><small>'+(p.awaiting_new_grading?'none counted yet':s.calls+' graded call'+(s.calls===1?'':'s')+(thin?' · not enough to judge':''))+'</small></div>';}).join('')+'</div>';
       var recent=selected.recent_calls||[];
       if(recent.length)detail+='<details class="coaching-recent-calls"><summary>Recent calls in this period</summary>'+recent.map(function(c){return '<div class="coaching-outcome-row"><span>'+escapeHtml(String(c.call_date).slice(0,10))+' · '+escapeHtml(c.analysis_status==='done'?(c.outcome?outcomeLabel(c.outcome):'Outcome not recorded'):'Analysis not ready')+'</span><button type="button" class="obj-btn" data-call="'+escapeHtml(c.call_id)+'" data-owner="'+escapeHtml(selected.user_id)+'" onclick="openCallReview(this.dataset.call,this.dataset.owner)">Review Call</button></div>';}).join('')+'</details>';
     }
