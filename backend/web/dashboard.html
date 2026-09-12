@@ -9359,7 +9359,10 @@
      under another company's name — silently. A forgotten argument must fail
      toward the merely annoying, never toward the wrong. */
   function resetTeamData(reason) {
-    state.coachingSelectedRep = null; state.coachingSelectedMoment = 0;
+    /* Block 010: the selected rep survives a RANGE change and a return to the page (the roster is the same team);
+       only a team switch clears it — the reps are different people. */
+    if (reason !== 'range') state.coachingSelectedRep = null;
+    state.coachingSelectedMoment = 0;
     // ⚠ the hidden set is PER TEAM — reload it here, or one team's filter
     // silently applies to another team's reps.
     loadRepFilter();
@@ -15703,6 +15706,7 @@
   function coachingRepName(rep) { return displayNameFromEmail(String(rep.name || ''), String(rep.name || 'Closer')); }
   function selectCoachingRep(id) {
     state.coachingSelectedRep = id; state.coachingSelectedMoment = 0;
+    syncHashFromState(true);   // Block 010: the entry the manager comes back to names this rep (replace, never push)
     var host = document.getElementById('coachingRepWorkspace');
     if (host) host.outerHTML = coachingRepWorkspaceHtml(state.teamCoachable.reps || []);
     var panel = document.getElementById('coachingDetailTitle'); if (panel) panel.focus();
@@ -16062,6 +16066,8 @@
     return '?from=' + ymd(r.from) + '&to=' + ymd(r.to);
   }
   function teamRangeHashSuffix() { return rangeHashSuffix(teamRange()); }
+  // Block 010: `&rep=` after the range (or `?rep=` alone) — the rep selected on Team → Coaching rides the URL.
+  function coachingRepHashSuffix() { if (!state.coachingSelectedRep) return ''; return (teamRangeHashSuffix() ? '&' : '?') + 'rep=' + encodeURIComponent(state.coachingSelectedRep); }
   // The coaching family (overview, needs-work, performance, objections, section)
   // all read state.dateRange, so they all carry the same suffix.
   function coachingRangeHashSuffix() { return rangeHashSuffix(state.dateRange); }
@@ -16110,7 +16116,10 @@
        name the page and a refresh landed back on the default. Both halves are
        needed and only one of them fails loudly. */
     if (state.view === 'team-performance') return 'team-performance' + teamRangeHashSuffix();
-    if (state.view === 'team-coaching')    return 'team-coaching' + teamRangeHashSuffix();
+    /* Block 010: the selected rep rides the URL, so the entry a manager returns to (browser back from Review Full
+       Call, a refresh, a pasted link) restores the rep they were coaching — the pivot the click makes resets every
+       rep-scoped field, the selection included, and nothing else carried it. */
+    if (state.view === 'team-coaching')    return 'team-coaching' + teamRangeHashSuffix() + coachingRepHashSuffix();
     /* team-expanded — retired 2026-09-01; unreachable, so it writes no hash. */
     if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
     if (state.view === 'team-objections')  return 'team-objections' + teamRangeHashSuffix();
@@ -16172,6 +16181,9 @@
       state.view = TEAM_HASH[base];
       var hashed = parseRangeFromHash(h);
       if (hashed) { state.teamRanges[teamRangePage()] = hashed; state.teamRangeInit[teamRangePage()] = true; }
+      /* Block 010: `rep=` names the rep selected on Team → Coaching (written by selectCoachingRep). Read on every
+         entry — back, refresh, paste — so the manager lands on the rep they were coaching. Absent = leave it. */
+      if (state.view === 'team-coaching') { var repParam = /[?&]rep=([^&]+)/.exec(h); if (repParam) state.coachingSelectedRep = decodeURIComponent(repParam[1]); }
       return;
     }
     // The coaching family shares one range, so parse it once for all of them.
