@@ -133,6 +133,41 @@ function evidenceMismatch(claimText, evRep, allReps) {
 }
 
 const { evidenceSubjectMismatch, candidateEligible } = require('./evidence-subject');   // H724/H725/H728: ONE module for every citing lane
+/* BLOCK 011 (SCOUT-SHARED-CONTEXT.md) — two rules on what reaches a manager from this lane, applied at WRITE time on the
+   candidate and at READ time on cached rows (so a stored row is corrected without a regeneration).
+   POLARITY: a claim may only cite a moment of its own polarity — the moment bar's own classification (momentReason:
+   coachable · applaudable). The live cached Coaching Focus cited a buying signal on a closed call as proof of "accepting a
+   soft exit": the subject check compares type/category/section, never polarity. The quote is dropped, the claim kept
+   (the H724 shape). COPY: internal turn numbers reached customer copy ("at turn 1184") on 22 of 600 cached claims; the
+   period review's own strip regex runs on claim and data. Guard test/team-recs-copy-polarity.test.js. */
+const { momentReason } = require('./moment-bar');
+const TURN_REF = /\s+at turns? \d+(?:\s*[–-]\s*\d+)?/gi;
+function cleanInsightCopy(text) { return typeof text === 'string' ? text.replace(TURN_REF, '') : text; }
+function evidencePolarityMismatch(direction, moment) {
+  var kind = (moment && moment.polarity) || ((momentReason(moment) || {}).kind) || null;
+  if (!kind) return null;
+  if (direction === 'improve' && kind === 'applaudable') return 'a gap claim cited an applaudable moment (' + (moment.type || '?') + ')';
+  if (direction === 'working' && kind === 'coachable') return 'a strength claim cited a coachable moment (' + (moment.type || '?') + ')';
+  return null;
+}
+async function normaliseStoredInsights(admin, synthesis) {
+  var out = { working: (synthesis.working || []).map(function (x) { return Object.assign({}, x); }), improve: (synthesis.improve || []).map(function (x) { return Object.assign({}, x); }) };
+  Object.keys(synthesis).forEach(function (k) { if (!(k in out)) out[k] = synthesis[k]; });
+  ['working', 'improve'].forEach(function (kind) { out[kind].forEach(function (it) { it.claim = cleanInsightCopy(it.claim); it.data = cleanInsightCopy(it.data); }); });
+  var ids = []; ['working', 'improve'].forEach(function (kind) { out[kind].forEach(function (it) { if (it.highlight_id && ids.indexOf(it.highlight_id) === -1) ids.push(it.highlight_id); }); });
+  if (!ids.length) return out;
+  var byId = {};
+  for (var i = 0; i < ids.length; i += CHUNK) {
+    var q = await admin.from('call_highlights').select('id, type, resolution, handling, speaker, speaker_verified, cause').in('id', ids.slice(i, i + CHUNK));
+    if (q.error) { console.warn('[team-synthesis] polarity check skipped on a cached row: ' + q.error.message); return out; }
+    (q.data || []).forEach(function (r) { byId[r.id] = r; });
+  }
+  ['working', 'improve'].forEach(function (kind) { out[kind].forEach(function (it) {
+    var row = it.highlight_id && byId[it.highlight_id]; var pol = row ? evidencePolarityMismatch(kind, row) : null;
+    if (pol) { console.warn('[team-synthesis] evidence dropped on a cached row (polarity): ' + pol); it.rep = null; it.quote = null; it.spoke = null; it.clip_url = null; it.source = null; it.call_id = null; it.highlight_id = null; }
+  }); });
+  return out;
+}
 const doctrineLib = require('./doctrine');   // H733: a disqualified prospect is never a lost deal — what the lane is told, and what it may say
 /* H737 — THE IMPORT THAT WAS MISSING FOR SEVEN HOURS. H731 added the call to loadKbMaterial and no require; `node -c` cannot
    see an unresolved identifier; no test executed this function; every Team Recommendations load answered 500 from the
@@ -267,6 +302,8 @@ function resolveInsights(arr, byId, allRepNames, opts) {
       /* H724: WHOSE quote passed; now WHAT it is about. The claim stands either way. */
       var subj = ev ? evidenceSubjectMismatch(it && it.subject, ev) : null;
       if (subj) { console.warn('[team-synthesis] evidence dropped (subject): ' + subj); ev = null; }
+      var pol = ev ? evidencePolarityMismatch(direction, ev) : null;   // Block 011
+      if (pol) { console.warn('[team-synthesis] evidence dropped (polarity): ' + pol); ev = null; }
       /* H728 step 2: a claim whose DIRECTION contradicts the page facts is dropped — two lanes on one
          page may generalise, never assert opposites. */
       var contra = facts ? PF.claimContradictsFacts(it, direction, facts) : null;
@@ -274,7 +311,7 @@ function resolveInsights(arr, byId, allRepNames, opts) {
       /* H733: the loss rule, in code — a claim that frames a loss is dropped when its loss is a disqualified
          prospect: the cited moment's call carries a DQ, or (no citation) every loss in the window is a DQ. */
       if (loss && doctrineLib.enforceLossRule(String((it && it.claim) || '') + ' ' + String((it && it.data) || ''), loss, ev ? ev.call_id : null, 'team-synthesis') === null) return null;
-      return { claim: capAtSentence(it && it.claim, CLAIM_CAP), data: capAtSentence(it && it.data, DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null, highlight_id: ev ? ev.highlight_id : null };
+      return { claim: capAtSentence(cleanInsightCopy(it && it.claim), CLAIM_CAP), data: capAtSentence(cleanInsightCopy(it && it.data), DATA_CAP), rep: ev ? ev.rep : null, quote: ev ? ev.quote : null, spoke: ev ? (ev.spoke || null) : null, clip_url: ev ? ev.clip_url : null, source: ev ? ev.source : null, call_id: ev ? ev.call_id : null, highlight_id: ev ? ev.highlight_id : null };
     }).filter(function (it) { return it && it.claim; });
   }
 
@@ -319,7 +356,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
        and its lane version bump are ONE atomic change. */
     + '||recs:' + RECS_LANE_VERSION).digest('hex');
   var cached = await cacheGet(admin, keyId, 'team', from, to, hash);
-  if (cached) return require('./strength-call-evidence').attachStrengthEvidence(admin, Object.assign({ available: true, cached: true }, cached), w);
+  if (cached) return require('./strength-call-evidence').attachStrengthEvidence(admin, Object.assign({ available: true, cached: true }, await normaliseStoredInsights(admin, cached)), w);   // Block 011
   if (!material.hasMaterial) return nothingToSay({ working: [], improve: [], generated_at: new Date().toISOString() });   // H731: silence beats a guess
 
   var repOf = function (cid) { return w.meta[cid] ? w.meta[cid].user_id : null; };
@@ -354,7 +391,7 @@ async function computeTeamRecommendations(admin, keyId, repIds, from, to, emailM
     /* H733: a moment on a disqualified call is tagged DISQUALIFIED, never LOSS — the model is not told a DQ was a loss. */
     var c = cls(doctrineLib.outcomeForAdvice(outcomeByCall[r.fathom_call_id], !!lossScope.dqCalls[r.fathom_call_id])); var rid = repOf(r.fathom_call_id);
     var reply = capAtSentence(provenCloserResponse(r), 200);   // null unless PROVEN to be the closer
-    return { cls: c, type: r.type, objection_category: r.objection_category || null, section: r.section || null, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
+    return { cls: c, type: r.type, polarity: (momentReason(r) || {}).kind || null, objection_category: r.objection_category || null, section: r.section || null, rep: (nameMap && nameMap[rid]) || (emailMap && emailMap[rid]) || rid,
       /* ⚠⚠ WHO SPOKE IS RECORDED HERE, BECAUSE THIS `||` IS WHERE IT IS DECIDED
          and nothing downstream can recover it. Without it `rep` means "whose
          CALL", not "who SPOKE" — and labelling a prospect's line with the rep's
@@ -525,6 +562,7 @@ module.exports = {
   _spokeOf: spokeOf,
   _evidenceMismatch: evidenceMismatch,
   _evidenceSubjectMismatch: evidenceSubjectMismatch,
+  _evidencePolarityMismatch: evidencePolarityMismatch, _cleanInsightCopy: cleanInsightCopy,
   _candidateEligible: candidateEligible,
   _resolveInsights: resolveInsights,
   _MIN_BUCKET: MIN_BUCKET,   // H738: what the lane HOLDS — a cycle guard reads it after a production-order load
