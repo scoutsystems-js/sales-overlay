@@ -2,7 +2,9 @@
 
 The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Task 1 is active following Justin’s “you may begin.” Tasks 2–4 remain queued.
 
-## 1. Coaching Page Integrity, Design & Stage Classification — ACTIVE
+## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)
+
+**Completion report:** [docs/build-plans/coaching-page-integrity-completion-report.md](docs/build-plans/coaching-page-integrity-completion-report.md). Two items carried, not closed: §9 the per-cell "N graded calls" labels (folded into the deferred stage-cell decision at the end of this file) and §16/§22 adding the Block 006 stage definitions to the doctrine file (a doctrine edit; Justin's call). The bullets below are the original brief and are kept as the record.
 
 Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Classification](docs/build-plans/coaching-page-integrity-design-stage-classification.md). All 23 sections, validation requirements, financial-DQ clarification and ruling boundaries are part of this task.
 
@@ -64,7 +66,7 @@ Validator v18 / prompt v61. Next: the five late-DQ calls re-run as verification,
 
 Was filed 2026-09-08 (H766): an owner or manager pivoting on a warm page saw the previous viewer's count under the new rep's name until the new answer landed. Fixed with the team lanes' mechanism and no other — `viewEpoch`, bumped by both pivot doors, captured by every viewed-user loader, compared on arrival. Guard `test/pivot-epoch.test.js` drives the real doors in Electron with the previous viewer's answer landing after the pivot and asserts the DOM; planted five ways.
 
-## 2. Full-call navigation check — AFTER task 1
+## 2. Full-call navigation check — NEXT ACTIVE (Task 1 closed 2026-09-11; not started)
 
 Trace the observed Review Full Call return to Team Coaching. Confirm whether it is reproducible and identify the cause before changing anything. Verify the correct call/rep opens and back navigation behaves correctly; the earlier observation did not prove the cause.
 

@@ -427,3 +427,38 @@ PAID API COST THIS BLOCK = $0
 
 **Commit.** Documentation only; see `git log -1` on `codex/team-coaching-ready`. No source file changed.
 
+---
+
+## Block 008 — Resume the main Team Coaching build — 2026-09-11
+
+### Prompt (architect)
+
+**Summary.** Block 007 accepted; the ask taxonomy stays untouched. Establish the exact current state of the Team Coaching page from the code, identify the next unfinished ACTIVE requirement from the shared context and build list (never a deferred item; stop if two non-deferred requirements compete), implement the smallest coherent block toward the Option 4 manager product, and report — with Fine Tune inspected only if the files say it is next, and stopped if it needs a product decision.
+
+### Report (developer) — report back in this block
+
+**1. The next active requirement the files showed.** Closing BUILD-LIST Task 1 — "Coaching Page Integrity, Design & Stage Classification — ACTIVE" — whose last unfinished, non-deferred bullet is "validate real-call eligibility, design, coaching structure and existing approved examples; update canonical documentation and deliver the brief's completion report" (§23 of the brief). Everything else in the brief was done by Blocks 002–007 or folded by the architect into a deferred item.
+
+**2. Why it was next rather than a deferred item.** The shared context lists the Option 4 page's remaining pieces as deferred or parked: the Discovery strength path (Justin's decision), the stage-cell tweak (end of the build list), the ask taxonomy (Block 007: leave it), and Fine tune ("exact interaction remains open"; open decision 2). BUILD-LIST's Task 2 (full-call navigation) is explicitly "after Task 1". So the only active, non-deferred, unfinished requirement was Task 1's close-out. No second candidate competed, so no stop was needed.
+
+**3. Current implementation before the block (from the code, `coachingPeriodWorkspaceHtml` / `coachingPeriodExampleHtml`).** Rep list (name, lowest-area label, call count) · COACHING OVERVIEW heading with the window · no-calls empty state · the COACHING box: eyebrow (LOWEST-SCORING AREA / JOINT… / ANALYSIS STATUS), the stage, the H765 zero note when due, the period diagnosis sentence (pattern · isolated · outlier · insufficient), the strength sentence when the payload carries one (dormant on live data), WHAT TO COACH (the representative finding's recommendation), the score at the right · CALL EXAMPLE: one article (prospect · closer · date · outcome badge; what happened; "Read the call exchange" collapsed; Watch clip / Open recording; Review Full Call), "More calls with this" collapsed (up to four), the "No reviewed call in X to show" sentence when none · "Other coaching from these calls" collapsed (each other pattern with its stage and count, up to three calls, each with its own COACHING FOCUS) · STAGE SCORES THIS PERIOD: five cells (label, score, band-coloured bar, "N graded calls" / "none counted yet") · "Recent calls in this period" collapsed · **no Fine Tune control on the period path** (the legacy improvements path still has one).
+
+**4. Exact change made.** Documentation only. `docs/build-plans/coaching-page-integrity-completion-report.md` (new): the §23 report — stage-score integrity, design, UX, coaching, doctrine, rule conflicts — and a 23-row status table with two items carried. `BUILD-LIST.md`: Task 1 marked CLOSED with the two carried items; Task 2 marked NEXT ACTIVE, not started. Session and shared-context records.
+
+**5. Logic affected.** None. **6. UI affected.** None. **7. Real-data inspection.** None needed; the report cites the Block 004–007 real-payload checks.
+
+**8. Tests and visual verification.** None run; no source changed (the last full suite, Block 006, was 2,780/2,780 on this same tree).
+
+**9. Files changed.** `docs/build-plans/coaching-page-integrity-completion-report.md` (new), `BUILD-LIST.md`, `SCOUT-BUILD-SESSION.md`, `scout-shared-context.md` (canonical root).
+
+**10. Commit.** Docs only; hash in `git log -1` on `codex/team-coaching-ready`.
+
+**11. Added to the END of BUILD-LIST.md.** Nothing new; the two carried items point at entries already there (the stage-cell decision) or are named in the Task 1 close-out (the doctrine-file item).
+
+**12. Decisions for Justin.**
+- **Fine Tune on the period coaching (open decision 2, now precise).** Inspected: the only door, `POST /kb/fine-tune`, reads a `call_highlights` row and runs ONE extraction model call to store a TEAM NOTE that shapes future coaching (including the period review, which reads team notes as material). A period finding has no highlight row; the smallest real path is a second identity on that route (`call id + moment`, reading the finding from `rep_period_coaching` and building the same moment shape), the page passing it, and "Noted ✓" keyed on that identity — roughly 40 lines and a guard, and it reuses the existing extraction call (no new lane). BUT the shared context describes Fine tune as "regenerate/refocus advice for this one coaching item", which the existing mechanism does not do — it changes future coaching, not the current sentence. Justin chooses: (a) the existing note mechanism on period examples (small, spends one existing extraction call per note), (b) an in-place regeneration of this rep's advice (a new model lane, a new spend), or (c) neither yet. Not built.
+- **The doctrine file.** Whether the Block 006 stage definitions also go into `backend/doctrine/scout-doctrine.md` (a doctrine edit: version bump, KB reload) or stay canonical in code only.
+- **The stage cells.** Already deferred; the per-cell labels wait on it.
+
+**13. Confirmations.** Block 007 taxonomy issue left alone. No production writes. No migration. No historical regrade or backfill. No push. No deploy. PAID API COST THIS BLOCK = $0.
+
