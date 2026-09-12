@@ -5466,6 +5466,7 @@
     .coaching-exact-exchange summary,.coaching-recent-calls>summary { cursor:pointer; padding:8px 0; }
     .coaching-exact-exchange blockquote { margin:10px 0; padding:10px 14px; border-left:1px solid var(--border); line-height:1.6; }
     .coaching-exact-exchange blockquote span { display:block; margin-bottom:6px; color:var(--text); }
+    .coaching-exact-exchange .coaching-exchange-gap { margin:14px 0 14px 14px; font-size:var(--fs-secondary); opacity:.7; }   /* Block 014: the marker where adjacent quotes sit more than 60 s apart — a time range never hides a hole in the call */
     .coaching-example-actions a { color:var(--accent); font-size:var(--fs-secondary); }
     .coaching-coverage-note { margin:18px 0; line-height:1.6; }
     @media(max-width:700px) { .coaching-section-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .coaching-period-priority { padding:14px; } }
@@ -15771,7 +15772,46 @@
      collapsed "other coaching"), because the representative example's advice already sits under WHAT TO COACH. */
   function coachingPeriodExampleHtml(e,rep,opts) {
     var withNext=!!(opts&&opts.withNext);
-    return '<article class="coaching-period-example"><div class="coaching-example-meta"><strong>'+escapeHtml(e.prospect_name||'Prospect name not recorded')+'</strong><span>'+escapeHtml(coachingRepName(rep))+' · '+escapeHtml(String(e.call_date).slice(0,10))+'</span><b>'+escapeHtml(e.outcome?outcomeLabel(e.outcome):'Outcome not recorded')+'</b></div><p>'+escapeHtml(e.observation)+'</p>'+(withNext?'<div class="coaching-example-next"><span>COACHING FOCUS</span><p>'+escapeHtml(e.recommendation)+'</p></div>':'')+'<details class="coaching-exact-exchange"><summary>Read the call exchange</summary>'+e.evidence.map(function(t){return '<blockquote><span>'+escapeHtml(t.speaker==='CLOSER'?coachingRepName(rep):e.prospect_name||'Prospect')+' · '+escapeHtml(formatTimestampDisplay(t.timestamp_seconds))+'</span>'+escapeHtml(t.quote)+'</blockquote>';}).join('')+'</details><div class="coaching-example-actions">'+(e.clip_url?'<a href="'+escapeHtml(e.clip_url)+'" target="_blank" rel="noopener noreferrer">'+(e.source==='zoom'?'Open recording':'Watch clip')+' ↗</a>':'')+'<button type="button" class="obj-btn" data-call="'+escapeHtml(e.call_id)+'" data-owner="'+escapeHtml(rep.user_id)+'" onclick="openCallReview(this.dataset.call,this.dataset.owner)">Review Full Call</button></div></article>';
+    return '<article class="coaching-period-example"><div class="coaching-example-meta"><strong>'+escapeHtml(e.prospect_name||'Prospect name not recorded')+'</strong><span>'+escapeHtml(coachingRepName(rep))+' · '+escapeHtml(String(e.call_date).slice(0,10))+'</span><b>'+escapeHtml(e.outcome?outcomeLabel(e.outcome):'Outcome not recorded')+'</b></div><p>'+escapeHtml(e.observation)+'</p>'+(withNext?'<div class="coaching-example-next"><span>COACHING FOCUS</span><p>'+escapeHtml(e.recommendation)+'</p></div>':'')+'<details class="coaching-exact-exchange"><summary>Read the call exchange</summary>'+coachingExchangeHtml(e.evidence,rep,e.prospect_name)+'</details><div class="coaching-example-actions">'+(e.clip_url?'<a href="'+escapeHtml(e.clip_url)+'" target="_blank" rel="noopener noreferrer">'+(e.source==='zoom'?'Open recording':'Watch clip')+' ↗</a>':'')+'<button type="button" class="obj-btn" data-call="'+escapeHtml(e.call_id)+'" data-owner="'+escapeHtml(rep.user_id)+'" onclick="openCallReview(this.dataset.call,this.dataset.owner)">Review Full Call</button></div></article>';
+  }
+  /* Block 014 (SCOUT-SHARED-CONTEXT.md; Justin's option B, H757): THE EXCHANGE, GROUPED WITH HONEST GAPS — RENDER-TIME
+     ONLY. The cited turns (`evidence`, in stored order) are what a manager reads under "Read the call exchange"; on
+     real data a list runs 8–69 quotes and a same-speaker run of five to fifteen fragments reads worst (Block 012).
+     A consecutive same-speaker run of MORE THAN THREE quotes becomes one paragraph headed by the speaker and the
+     range first→last timestamp; adjacent quotes more than 60 s apart end any run and draw a gap marker, so a range
+     never hides a hole in the call (Justin's caveat: preserve speaker changes, exact wording and gaps); a speaker
+     change always starts a new quote or group; runs of three or fewer keep the individual quote. Every word verbatim,
+     in order, with its attribution; nothing stored changes. Guard: test/coaching-exchange-grouping.test.js. */
+  function coachingExchangeSegments(evidence) {
+    var GAP_SECONDS = 60, GROUP_MIN = 4;   // the two numbers of the ruling: "more than 60 seconds apart", "more than three quotes"
+    var out = [], run = [];
+    function flush() {
+      if (!run.length) return;
+      if (run.length >= GROUP_MIN) out.push({ kind: 'group', speaker: run[0].speaker, from: run[0].timestamp_seconds, to: run[run.length - 1].timestamp_seconds, quotes: run.slice() });
+      else run.forEach(function (t) { out.push({ kind: 'quote', speaker: t.speaker, at: t.timestamp_seconds, quote: t.quote }); });
+      run = [];
+    }
+    (evidence || []).forEach(function (t, i) {
+      var prev = i ? evidence[i - 1] : null;
+      var gap = prev ? (Number(t.timestamp_seconds) - Number(prev.timestamp_seconds)) : 0;
+      if (prev && gap > GAP_SECONDS) { flush(); out.push({ kind: 'gap', seconds: gap }); }
+      else if (prev && t.speaker !== prev.speaker) flush();
+      run.push(t);
+    });
+    flush();
+    return out;
+  }
+  function coachingExchangeGapLabel(seconds) {
+    var n = Math.max(0, Math.floor(seconds || 0)), m = Math.floor(n / 60), r = n % 60;
+    return (m >= 10 || r === 0 ? m + ' min' : m + ' min ' + r + ' s') + ' later';
+  }
+  function coachingExchangeHtml(evidence, rep, prospectName) {
+    var who = function (speaker) { return escapeHtml(speaker === 'CLOSER' ? coachingRepName(rep) : (prospectName || 'Prospect')); };
+    return coachingExchangeSegments(evidence).map(function (s) {
+      if (s.kind === 'gap') return '<div class="coaching-exchange-gap" role="separator">' + escapeHtml(coachingExchangeGapLabel(s.seconds)) + '</div>';
+      if (s.kind === 'group') return '<blockquote class="coaching-exchange-group"><span>' + who(s.speaker) + ' · ' + escapeHtml(formatTimestampDisplay(s.from)) + '–' + escapeHtml(formatTimestampDisplay(s.to)) + '</span>' + s.quotes.map(function (t) { return escapeHtml(t.quote); }).join(' ') + '</blockquote>';
+      return '<blockquote><span>' + who(s.speaker) + ' · ' + escapeHtml(formatTimestampDisplay(s.at)) + '</span>' + escapeHtml(s.quote) + '</blockquote>';
+    }).join('');
   }
 
   function coachingRepWorkspaceHtml(reps) {
