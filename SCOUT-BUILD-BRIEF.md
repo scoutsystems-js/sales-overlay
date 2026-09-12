@@ -1,6 +1,6 @@
 # Scout — build brief (shared baseline)
 
-Short context every party reads before a handoff block. It does not replace `CLAUDE.md` (the standing rules) or `BUILD-LIST.md` (the queue); where they say more, they win. Settled decisions are tabulated in `SCOUT-PRODUCT-DECISIONS.md`; the running prompt/report log is `SCOUT-BUILD-SESSION.md`.
+Short context every party reads before a handoff block. It does not replace `CLAUDE.md` (the standing rules) or `BUILD-LIST.md` (the queue); where they say more, they win. Settled decisions are tabulated in `SCOUT-PRODUCT-DECISIONS.md`; the running handoff log is `SCOUT-SHARED-CONTEXT.md` at the canonical root (`SCOUT-BUILD-SESSION.md` is the archive of Blocks 001–008).
 
 ## What Scout is
 

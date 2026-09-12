@@ -1,6 +1,6 @@
 # Scout — settled product decisions and boundaries
 
-One row per decision. A row here is closed; reopening it is Justin's call, made in `SCOUT-BUILD-SESSION.md`, not inferred from a prompt. Fuller rulings and their reasoning stay in `CLAUDE.md` and `SCOUT-HISTORY.md`.
+One row per decision. A row here is closed; reopening it is Justin's call, recorded in `SCOUT-SHARED-CONTEXT.md`, not inferred from a prompt. Fuller rulings and their reasoning stay in `CLAUDE.md` and `SCOUT-HISTORY.md`.
 
 | # | Decision | Settled boundary | Recorded |
 |---|---|---|---|

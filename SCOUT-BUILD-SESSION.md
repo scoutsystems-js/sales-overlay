@@ -1,5 +1,7 @@
 # Scout — build session log (architect ↔ developer)
 
+> **ARCHIVED 2026-09-11.** This file is the historical record of Blocks 001–008. The handoff loop described below moved, unchanged in substance, to `SCOUT-SHARED-CONTEXT.md` at the canonical root, which is now the one file both the architect and the developer read first AND the only place new Block reports are appended. Do not append new blocks here. Nothing below this line has been edited.
+
 The one shared, append-only record of handoff blocks between the architect (ChatGPT) and the developer (Claude Code), with Justin between them. Read `SCOUT-BUILD-BRIEF.md` and `SCOUT-PRODUCT-DECISIONS.md` first. This file is a log, not a queue: the queue stays in `BUILD-LIST.md`; the standing rules stay in `CLAUDE.md`.
 
 ## The loop
