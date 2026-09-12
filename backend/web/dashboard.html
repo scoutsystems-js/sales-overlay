@@ -15732,40 +15732,33 @@
      sitting between the priority and its reason. No tags, no charts, no counts beyond the sentence. Fine Tune is NOT
      rendered on a period example: the /kb/fine-tune door reads a call_highlights row and a period finding has none —
      a decision for Justin, recorded in Block 004, never a dead button. Guards: test/period-workspace.test.js,
-     test/coaching-focus-selection.test.js, test/coaching-focus-diagnosis.test.js. */
+     test/coaching-focus-selection.test.js, test/coaching-focus-diagnosis.test.js.
+     BLOCK 018 RESET (Justin, 2026-09-12): the lowest-scoring-area framing, the period diagnosis sentence, the score, the
+     stage grid and the collapsed "more"/"other" flows are gone from this view — what remains is the verified coaching
+     item (`period_summary.coaching`) and its one call. Guard test/coaching-one-call.test.js. */
   function coachingPeriodWorkspaceHtml(reps) {
     var selected = reps.find(function(r){return r.user_id===state.coachingSelectedRep;}) || reps.find(function(r){return r.period_summary && r.period_summary.patterns.length;}) || reps[0];
     if(selected) state.coachingSelectedRep=selected.user_id;
     var p=selected && selected.period_summary;
-    var list=reps.map(function(r){var s=r.period_summary;return '<button type="button" class="coaching-rep-choice'+(r===selected?' is-selected':'')+'" data-user="'+escapeHtml(r.user_id)+'" aria-pressed="'+(r===selected)+'" onclick="selectCoachingRep(this.dataset.user)"><strong>'+escapeHtml(coachingRepName(r))+'</strong><span>'+escapeHtml(s?s.label:'Awaiting data')+'</span><small>'+r.calls+' call'+(r.calls===1?'':'s')+'</small></button>';}).join('');
+    /* Block 018: the rep selector is names only — a name is all a manager needs to choose a rep; counts and stage labels left with the reset. */
+    var list=reps.map(function(r){return '<button type="button" class="coaching-rep-choice'+(r===selected?' is-selected':'')+'" data-user="'+escapeHtml(r.user_id)+'" aria-pressed="'+(r===selected)+'" onclick="selectCoachingRep(this.dataset.user)"><strong>'+escapeHtml(coachingRepName(r))+'</strong></button>';}).join('');
     var detail='<div class="coaching-period-heading"><div><span class="coaching-period-eyebrow">COACHING OVERVIEW</span><h3 id="coachingDetailTitle" tabindex="-1">'+escapeHtml(selected?coachingRepName(selected):'Your team')+'</h3></div><span class="coaching-period-window">'+escapeHtml(p?rangeLabelInclusive(p.from,p.to):'')+'</span></div>';
     if(!p || p.status==='no_calls') detail+='<div class="coaching-period-empty"><h4>No calls in this period</h4><p>Select a wider date range to see this closer’s recorded performance.</p></div>';
     else {
-      var f=p.focus||null, example=(f&&f.example)||null;
-      var primary=(f&&f.move)?p.patterns.find(function(g){return g.section===(f.move_section||f.section)&&g.move===f.move;})||null:null;
-      var stageLabel=function(section){return (p.sections.find(function(s){return s.section===section;})||{}).label||section;};
-      /* COACHING */
-      detail+='<div class="coaching-period-priority"><div><span class="coaching-period-eyebrow">'+(p.section?(p.tied_sections&&p.tied_sections.length>1?'JOINT LOWEST-SCORING AREA':'LOWEST-SCORING AREA'):'ANALYSIS STATUS')+'</span><h4>'+escapeHtml(p.label)+'</h4>'
-        +(p.note?'<p class="coaching-period-note">'+escapeHtml(p.note)+'</p>':'')
-        +(f&&f.summary?'<p class="coaching-period-diagnosis">'+escapeHtml(f.summary)+'</p>':'')
-        +(f&&f.strength?'<p class="coaching-period-diagnosis">'+escapeHtml(f.strength.sentence)+'</p>':'')
-        +(example?'<div class="coaching-example-next"><span>WHAT TO COACH</span><p>'+escapeHtml(example.recommendation)+'</p></div>':'')
-        +'</div>'+(p.score!==null?'<div class="coaching-period-score">'+p.score+'<small>/ 100</small></div>':'')+'</div>';
-      /* CALL EXAMPLE */
-      detail+='<div class="coaching-pattern-heading"><h4>Call example</h4></div>';
-      if(example){
-        detail+=coachingPeriodExampleHtml(example,selected,{withNext:false});
-        var more=primary?primary.examples.filter(function(e){return e.call_id!==example.call_id;}).slice(0,4):[];
-        if(more.length)detail+='<details class="coaching-pattern coaching-more"><summary><span><strong>More calls with this</strong></span><b>'+more.length+' call'+(more.length===1?'':'s')+'</b></summary><div class="coaching-pattern-body">'+more.map(function(e){return coachingPeriodExampleHtml(e,selected,{withNext:false});}).join('')+'</div></details>';
-      } else detail+='<p class="coaching-period-empty">'+(p.section?'No reviewed call in '+escapeHtml(p.label)+' to show for these dates.':'No reviewed call to show for these dates.')+'</p>';
-      var others=p.patterns.filter(function(g){return g!==primary;});
-      if(others.length)detail+='<details class="coaching-pattern coaching-other"><summary><span><strong>Other coaching from these calls</strong></span><b>'+others.length+'</b></summary><div class="coaching-pattern-body">'+others.map(function(g){return '<div class="coaching-other-group"><h5>'+escapeHtml(g.move)+'<small>'+escapeHtml(stageLabel(g.section))+' · '+g.calls+' call'+(g.calls===1?'':'s')+'</small></h5>'+g.examples.slice(0,3).map(function(e){return coachingPeriodExampleHtml(e,selected,{withNext:true});}).join('')+'</div>';}).join('')+'</div></details>';
-      /* the five stage scores, after the coaching */
-      detail+='<div class="coaching-pattern-heading"><h4>Stage scores this period</h4></div>';
-      /* Block 016: a cell BELOW THE RANKING FLOOR (payload `enough` — the same rankSections verdict the overview's lowest stage comes from) keeps its
-         measurement but is drawn in the not-rankable state and says so in the ruled words, so the lowest cell a manager can read as eligible is the
-         overview's stage. When no stage is at the floor the headline already says "Not enough to judge" once; the cells do not repeat it. */
-      detail+='<div class="coaching-section-grid" aria-label="Section scores for this period">'+p.sections.map(function(s){var thin=!!p.section&&s.enough===false&&s.score!==null;return '<div class="coaching-section-cell'+(s.section===p.section?' is-focus':'')+(thin?' is-thin':'')+'"><span>'+escapeHtml(s.label)+'</span><strong>'+(s.score===null?'—':s.score)+'</strong><div class="coaching-score-track"><i style="color:'+scoreColor(s.score)+';width:'+(s.score===null?0:Math.max(0,Math.min(100,s.score)))+'%"></i></div><small>'+(p.awaiting_new_grading?'none counted yet':s.calls+' graded call'+(s.calls===1?'':'s')+(thin?' · not enough to judge':''))+'</small></div>';}).join('')+'</div>';
+      /* Block 018 (SCOUT-SHARED-CONTEXT.md; Justin's ruling): a manager sees ONLY what this rep needs help with and ONE real call that shows it.
+         The item is the payload's `coaching` (lib/rep-period-coaching.js: a stored, verified example first; the score-selected stage only breaks
+         ties; an item from another stage is shown as its own stage). One call is never a pattern; two or more supporting calls may say so. With
+         no verified example anywhere: one plain sentence. The stage-score grid, "More calls with this" and "Other coaching from these calls"
+         left this view (Block 016's grid agreement lives on in the payload's `sections`, read by nothing here). Guard test/coaching-one-call.test.js. */
+      var c=p.coaching||{state:'none'};
+      if(c.state==='item'&&c.example){
+        var move=String(c.move||''),title=move.charAt(0).toUpperCase()+move.slice(1);
+        detail+='<div class="coaching-period-priority"><div><span class="coaching-period-eyebrow">WHAT TO WORK ON</span><h4>'+escapeHtml(title)+'</h4>'
+          +'<p class="coaching-period-diagnosis">'+escapeHtml(c.label)+(c.recurring?' · seen on '+c.calls+' calls in this period':'')+'</p>'
+          +'<div class="coaching-example-next"><span>WHAT TO COACH</span><p>'+escapeHtml(c.example.recommendation)+'</p></div>'
+          +'</div></div>';
+        detail+='<div class="coaching-pattern-heading"><h4>The call</h4></div>'+coachingPeriodExampleHtml(c.example,selected,{withNext:false});
+      } else detail+='<p class="coaching-period-empty">'+escapeHtml(c.copy||'No coachable call found for these dates.')+'</p>';
       var recent=selected.recent_calls||[];
       if(recent.length)detail+='<details class="coaching-recent-calls"><summary>Recent calls in this period</summary>'+recent.map(function(c){return '<div class="coaching-outcome-row"><span>'+escapeHtml(String(c.call_date).slice(0,10))+' · '+escapeHtml(c.analysis_status==='done'?(c.outcome?outcomeLabel(c.outcome):'Outcome not recorded'):'Analysis not ready')+'</span><button type="button" class="obj-btn" data-call="'+escapeHtml(c.call_id)+'" data-owner="'+escapeHtml(selected.user_id)+'" onclick="openCallReview(this.dataset.call,this.dataset.owner)">Review Call</button></div>';}).join('')+'</details>';
     }

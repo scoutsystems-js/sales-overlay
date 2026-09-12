@@ -113,14 +113,16 @@ function page(reps) {
   return '<html><head>' + source.slice(source.indexOf('<style>'), source.indexOf('</style>') + 8) + '</head><body data-view="team-coaching"><main class="page" id="content"></main><script>var COLORS={win:"#09e046",follow_up:"#fbbf24",loss:"#f87171"};var state={teamCoachable:{reps:' + JSON.stringify(reps) + '}};var MONTH_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];function escapeHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}function formatTimestampDisplay(s){return String(s);}function outcomeLabel(){return "Open";}function displayNameFromEmail(s){return s;}function openCallReview(c,u){window.opened=[c,u];}' + funcs + ';document.querySelector("#content").innerHTML=coachingRepWorkspaceHtml(state.teamCoachable.reps);</script></body></html>';
 }
 const probe = `(()=>{const ex=document.querySelector('.coaching-rep-detail > .coaching-period-example [data-call]');const other=[...document.querySelectorAll('.coaching-other .coaching-period-example [data-call]')].map(b=>b.dataset.call);return {example:ex?ex.dataset.call:null,other,otherOpen:!!document.querySelector('.coaching-other[open]'),text:document.body.innerText};})()`;
-test('the page opens exactly the focus pattern under the lowest-scoring area, and opens nothing when no finding supports it', () => {
+/* Block 018 (the reset) re-pinned this rendered case: the lowest stage's finding is preferred when it exists; when the lowest stage has no
+   example the verified Discovery finding is the coaching item, shown as Discovery — never as the lowest stage's example, never collapsed
+   under "other coaching" (that flow left the view). The payload's `focus` (the tests above) is unchanged. */
+test('the page shows the lowest stage\'s finding when it has one; otherwise the verified finding from another stage, as its own stage', () => {
   const withFocus = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls, [example(FINDINGS.discovery, 'c1'), example(FINDINGS.close, 'c2')], window) }];
   const r = renderComputed(page(withFocus), probe);
-  assert.equal(r.example, 'c2', 'the call example is the focus pattern\'s call'); assert.deepEqual(r.other, ['c1'], 'the Discovery finding is the other coaching, collapsed'); assert.equal(r.otherOpen, false);
-  assert.match(r.text, /Lowest-scoring area/i); assert.match(r.text, /Close is the lowest-scoring area, but the reviewed calls show no repeated issue/);
+  assert.equal(r.example, 'c2', 'the call example is the lowest stage\'s finding'); assert.deepEqual(r.other, [], 'Block 018: no other-coaching flow'); assert.equal(r.otherOpen, false);
+  assert.match(r.text, /WHAT TO WORK ON/); assert.match(r.text, /\bClose\b/); assert.doesNotMatch(r.text, /Lowest-scoring area|reviewed calls show no repeated issue/i);
   const noFocus = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls, [example(FINDINGS.discovery, 'c1')], window) }];
   const n = renderComputed(page(noFocus), probe);
-  assert.equal(n.example, null, 'an off-stage pattern is never shown as the lowest stage\'s example'); assert.deepEqual(n.other, ['c1']);
-  assert.match(n.text, /Close is the lowest-scoring area, but there is not yet enough reviewed evidence/);
-  assert.match(n.text, /Other coaching from these calls/i, 'the Discovery finding is still on the page, under the collapsed other coaching');
+  assert.equal(n.example, 'c1', 'one verified call is enough: the Discovery finding is shown as the coaching item'); assert.deepEqual(n.other, []);
+  assert.match(n.text, /\bDiscovery\b/, 'shown as its own stage'); assert.doesNotMatch(n.text, /Close is the lowest-scoring area|not yet enough reviewed evidence|Other coaching from these calls/i);
 });

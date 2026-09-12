@@ -39,37 +39,36 @@ test('payload: every section says whether it is at the ranking floor, from the s
  assert.equal(lowestEligible.section,p.section,'the overview names the lowest section among the ones the grid marks eligible');
  assert.equal(p.focus.example.section,'discovery','the example supports the named stage, never the below-floor Close');
 });
-test('RENDERED (Gabriel\'s shape, 1400 and 390): the overview title, its score, the grid\'s lowest eligible cell, the diagnosis and the example agree; below-floor cells keep their score but are drawn as not enough to judge',()=>{
+/* Block 018 (the reset) re-pinned the rendered half: the Stage Scores grid and the lowest-scoring-area overview LEFT Team → Coaching, so there
+   is no grid to agree with on this view — the payload half above still carries `enough` and the displayed-precision tie for its other readers.
+   What the page now shows for Gabriel's shape is the verified item on the lowest stage and its call, with no grid, no score and no cells. */
+test('RENDERED (Gabriel\'s shape, 1400 and 390): the lowest stage\'s verified example is the coaching item; no grid, no score, no below-floor cells on this view',()=>{
  const reps=[{user_id:'g',name:'Gabriel',calls:16,period_summary:P.summarize(gabriel(),[example,closeExample],window)}];
  for(const width of [1400,390]){const r=renderComputed(page(reps),PROBE,{width});
   assert.equal(r.overflow,false,'width '+width);
-  assert.equal(String(r.title).toLowerCase(),'discovery');assert.equal(r.score,'73/ 100');assert.equal(r.eyebrow,'LOWEST-SCORING AREA');
-  const low=lowestEligibleCell(r.cells);assert.equal(low.label,'Discovery','the lowest cell a manager can read as eligible is the overview\'s stage: '+JSON.stringify(r.cells));
-  assert.equal(low.score,'73');assert.equal(low.focus,true);
-  const oh=r.cells.find(c=>c.label==='Objection Handling'),cl=r.cells.find(c=>c.label==='Close');
-  assert.equal(oh.score,'69','the measurement is still shown');assert.equal(cl.score,'61');
-  assert.equal(oh.thin,true);assert.equal(cl.thin,true);assert.match(oh.sub,/^7 graded calls · not enough to judge$/);assert.match(cl.sub,/^8 graded calls · not enough to judge$/);
-  assert.ok(Number(oh.valueOpacity)<1&&Number(cl.valueOpacity)<1,'a below-floor value is dimmed AND said, never only one');
-  assert.match(r.cells.find(c=>c.label==='Discovery').sub,/^16 graded calls$/);assert.equal(r.cells.find(c=>c.label==='Discovery').thin,false);
-  assert.match(r.diag,/^Discovery /,'the diagnosis is about the named stage');
-  assert.equal(r.exampleObs,example.observation,'the call example beneath is the Discovery example, not the Close one');
+  assert.equal(r.eyebrow,'WHAT TO WORK ON');assert.equal(String(r.title).toLowerCase(),'qualifying financially');assert.equal(r.score,null,'no score on this view');
+  assert.equal(r.cells.length,0,'Block 018: the stage grid left Team → Coaching: '+JSON.stringify(r.cells));
+  assert.match(r.diag,/^Discovery$/,'the item is shown as its own stage — the lowest stage, which has a verified example');
+  assert.equal(r.exampleObs,example.observation,'the call beneath is the Discovery example, not the Close one');
  }
 });
-test('a tie at the DISPLAYED precision is a joint lowest — the overview never names one 78 above another 78',()=>{
+test('a tie at the DISPLAYED precision is a joint lowest on the payload; the page names no lowest area at all',()=>{
  const calls=Array.from({length:12},(_,i)=>({id:'y'+i,call_date:'2026-09-08T10:00:00Z',analysis_status:'done',analysis:assessed({intro_score:85,discovery_score:i<4?80:77,pitch_score:86,objection_score:i<3?80:77,close_score_earned:79}),period_review_current:true}));
  const p=P.summarize(calls,[],window);
  const by=Object.fromEntries(p.sections.map(s=>[s.section,s]));
  assert.equal(by.discovery.score,by.objection.score,'both render the same number: '+by.discovery.score+' / '+by.objection.score);
  assert.ok(p.tied_sections.includes('discovery')&&p.tied_sections.includes('objection'),'both are named joint lowest: '+JSON.stringify(p.tied_sections));
  const r=renderComputed(page([{user_id:'y',name:'Yazan',calls:12,period_summary:p}]),PROBE);
- assert.equal(r.eyebrow,'JOINT LOWEST-SCORING AREA');
- assert.ok(r.cells.filter(c=>c.score===String(p.score)&&!c.thin).length>=2,'the two tied cells are both eligible and both show the overview score');
+ assert.equal(r.eyebrow,null,'Block 018: no lowest-scoring-area overview on this view');assert.equal(r.cells.length,0);
+ assert.equal(r.empty,'No coachable call found for these dates.','no verified example → the one plain sentence');
 });
 test('the honest states are untouched: below the floor everywhere, no calls, and a legacy window',()=>{
  const thin=P.summarize(gabriel().slice(0,8),[],window);assert.equal(thin.status,'thin');assert.equal(thin.label,'Not enough to judge');assert.equal(thin.section,null);assert.ok(thin.sections.every(s=>s.enough===false));
  const none=P.summarize([],[],window);assert.equal(none.status,'no_calls');assert.ok(none.sections.every(s=>s.score===null&&s.calls===0));
  const legacy=P.summarize(Array.from({length:5},(_,i)=>({id:'l'+i,call_date:'2026-09-08T10:00:00Z',analysis_status:'done',analysis:{intro_score:70},period_review_current:false})),[],window);
  assert.equal(legacy.awaiting_new_grading,true);assert.ok(legacy.sections.every(s=>s.score===null));
+ /* Block 018: on Team → Coaching a below-floor window with no verified example shows the one plain sentence — no "Not enough to judge" headline, no cells;
+    the payload's thin state (asserted above) still serves the rep page's card and the drilldown. */
  const r=renderComputed(page([{user_id:'t',name:'Preston',calls:8,period_summary:thin},{user_id:'l',name:'Old',calls:5,period_summary:legacy}]),PROBE);
- assert.equal(String(r.title).toLowerCase(),'not enough to judge');assert.ok(r.cells.every(c=>/graded call/.test(c.sub)&&!/not enough to judge/.test(c.sub)),'when nothing is judged the headline says so once; the cells do not repeat it: '+JSON.stringify(r.cells.map(c=>c.sub)));
+ assert.equal(r.title,null);assert.equal(r.cells.length,0);assert.equal(r.empty,'No coachable call found for these dates.');
 });

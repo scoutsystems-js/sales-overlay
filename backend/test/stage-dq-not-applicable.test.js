@@ -138,9 +138,10 @@ test('RENDERED: the panel below the floor shows the status words and never a low
     + 'function escapeHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}function formatTimestampDisplay(s){return String(s);}function outcomeLabel(){return "Open";}function displayNameFromEmail(s){return s;}function openCallReview(){}'
     + 'var state=' + JSON.stringify({ teamCoachable: { reps: [rep] }, coachingSelectedRep: 'a' }) + ';' + funcs
     + ';document.querySelector("#content").innerHTML=coachingRepWorkspaceHtml(state.teamCoachable.reps);</script></body></html>';
-  const r = renderComputed(html, '({text:document.body.innerText, note:(document.querySelector(".coaching-period-note")||{}).textContent||null, eyebrow:(document.querySelector(".coaching-period-eyebrow")||{}).textContent||null})');
-  assert.ok(r.text.includes('Not enough to judge'));
-  assert.equal(r.note, 'only 9 calls graded in this period');
-  assert.doesNotMatch(r.text, /LOWEST-SCORING AREA|63\/ ?100/);
-  assert.match(r.text, /9 graded calls/);
+  /* Block 018 (the reset): below the floor with no verified example, Team → Coaching shows the one plain sentence — never a lowest-scoring area,
+     a score, a count or the status words; the payload's thin status and note (asserted above) still serve the rep page's card. */
+  const r = renderComputed(html, '({text:document.body.innerText, note:(document.querySelector(".coaching-period-note")||{}).textContent||null, eyebrow:(document.querySelector(".coaching-period-priority .coaching-period-eyebrow")||{}).textContent||null, empty:(document.querySelector(".coaching-period-empty")||{}).textContent||null})');
+  assert.equal(r.empty, 'No coachable call found for these dates.');
+  assert.equal(r.note, null); assert.equal(r.eyebrow, null);
+  assert.doesNotMatch(r.text, /LOWEST-SCORING AREA|63\/ ?100|graded call|Not enough to judge/);
 });

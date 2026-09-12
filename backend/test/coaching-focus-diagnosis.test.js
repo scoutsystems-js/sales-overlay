@@ -163,18 +163,22 @@ function page(reps) {
   return '<html><head>' + source.slice(source.indexOf('<style>'), source.indexOf('</style>') + 8) + '</head><body data-view="team-coaching"><main class="page" id="content"></main><script>var COLORS={win:"#09e046",follow_up:"#fbbf24",loss:"#f87171"};var state={teamCoachable:{reps:' + JSON.stringify(reps) + '}};var MONTH_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];function escapeHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}function formatTimestampDisplay(s){return String(s);}function outcomeLabel(){return "Open";}function displayNameFromEmail(s){return s;}function openCallReview(c,u){window.opened=[c,u];}' + funcs + ';document.querySelector("#content").innerHTML=coachingRepWorkspaceHtml(state.teamCoachable.reps);</script></body></html>';
 }
 const probe = `(()=>{const ex=document.querySelector('.coaching-rep-detail > .coaching-period-example [data-call]');const notes=[...document.querySelectorAll('.coaching-period-priority .coaching-period-diagnosis')].map(n=>n.textContent);const advice=(document.querySelector('.coaching-period-priority .coaching-example-next p')||{}).textContent||null;const other=[...document.querySelectorAll('.coaching-other .coaching-period-example [data-call]')].map(b=>b.dataset.call);return {example:ex?ex.dataset.call:null,advice,other,notes,text:document.body.innerText,overflow:document.documentElement.scrollWidth>innerWidth};})()`;
-test('the page shows the period diagnosis and the strength beneath the lowest-scoring area, opens only the focus pattern, and says when evidence is insufficient', () => {
+/* Block 018 (the reset) re-pinned this rendered case: the diagnosis sentence, the strength sentence and the collapsed "other coaching" left the
+   view; the page shows the verified item (the lowest stage's pattern when it has one) and its most recent call, and when the lowest stage has
+   no example the verified item from another stage is shown AS ITS OWN stage. The payload's `focus` diagnosis (the tests above) is unchanged. */
+test('the page shows the lowest stage\'s pattern and its most recent call; with no example on the lowest stage the verified item is shown as its own stage', () => {
   const withPattern = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls(LOW_DISCOVERY, ['goals', 'current_situation']), [example(F.whyNow, 'c1'), example(F.whyNow, 'c2'), example(F.finance, 'c3')], window) }];
   for (const width of [1400, 390]) {
     const r = renderComputed(page(withPattern), probe, { width });
-    assert.equal(r.example, 'c2', 'the call example is the primary pattern\'s most recent call (c2 is dated after c1 in this fixture)'); assert.equal(r.advice, F.whyNow.recommendation, 'what to coach is the representative finding\'s recommendation'); assert.deepEqual(r.other, ['c3'], 'the secondary finding is the other coaching, collapsed'); assert.equal(r.overflow, false, 'width ' + width);
-    assert.equal(r.notes.length, 2, 'the diagnosis and the strength, nothing else');
-    assert.match(r.notes[0], /Discovery needs the most attention\. Establishing why now came up in 2 of 4 reviewed Discovery calls\. Qualifying financially in 1\./);
-    assert.match(r.notes[1], /Current situation and goals were established in 10 of 10 graded Discovery calls/);
+    assert.equal(r.example, 'c2', 'the call example is the primary pattern\'s most recent call (c2 is dated after c1 in this fixture)'); assert.equal(r.advice, F.whyNow.recommendation, 'what to coach is the representative finding\'s recommendation'); assert.deepEqual(r.other, [], 'Block 018: no other-coaching flow on this view'); assert.equal(r.overflow, false, 'width ' + width);
+    assert.equal(r.notes.length, 1, 'the stage line, nothing else');
+    assert.match(r.notes[0], /^Discovery · seen on 2 calls in this period$/);
+    assert.doesNotMatch(r.text, /needs the most attention|reviewed Discovery calls|graded Discovery calls|Stage scores this period/);
   }
-  const insufficient = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls(LOW_CLOSE), [example(F.finance, 'c1')], window) }];
-  const n = renderComputed(page(insufficient), probe);
-  assert.equal(n.example, null); assert.equal(n.advice, null); assert.equal(n.notes.length, 1); assert.match(n.text, /No reviewed call in Close to show for these dates/);
-  assert.match(n.notes[0], /Close is the lowest-scoring area, but there is not yet enough reviewed evidence/);
-  assert.deepEqual(n.other, ['c1'], 'the off-stage finding stays on the page, under the collapsed other coaching');
+  const offStage = [{ user_id: 'a', name: 'Ava', calls: 10, period_summary: R.summarize(calls(LOW_CLOSE), [example(F.finance, 'c1')], window) }];
+  const n = renderComputed(page(offStage), probe);
+  assert.equal(n.example, 'c1', 'one verified call is enough: the Discovery finding is the coaching item even though Close is the lowest stage'); assert.equal(n.advice, F.finance.recommendation); assert.equal(n.notes.length, 1);
+  assert.match(n.notes[0], /^Discovery$/, 'shown as its own stage, never as proof of Close');
+  assert.doesNotMatch(n.text, /Close is the lowest-scoring area|not yet enough reviewed evidence|No reviewed call in Close|Other coaching from these calls/);
+  assert.deepEqual(n.other, []);
 });

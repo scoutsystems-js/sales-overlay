@@ -144,23 +144,27 @@ function shell(body, funcs, stateJs) {
 }
 const WORKSPACE_FUNCS = ['scoreColor', 'ymd', 'dayLabel', 'rangeLabelInclusive', 'coachingRepName', 'coachingRepWorkspaceHtml', 'coachingPeriodWorkspaceHtml', 'coachingPeriodExampleHtml', 'selectCoachingRep'];
 
-test('RENDERED: Team → Coaching panel and rep list — the sentence beside the zero on a legacy window, gone on a ready window', function () {
+/* Block 018 (the reset) re-pinned this surface: Team → Coaching no longer shows a stage population or a zero, so H765's sentence has nothing
+   to sit beside there — the panel says its one plain sentence when no verified example exists, and never "Awaiting grades" or a zero count.
+   The payload still carries the label and the note (asserted above, both routes) for the surfaces that show a zero: the rep card and the
+   drilldown, rendered below. Was: the sentence beside the zero on the Team → Coaching panel and rep list. */
+test('RENDERED: Team → Coaching panel and rep list — no zero, no counting sentence, no "Awaiting grades" on a legacy window; nothing numerical on a ready one either', function () {
   const window = { from: '2026-08-10', to: '2026-09-08' };
   const legacyCalls = LEGACY.map(function (a, i) { return { id: a.fathom_call_id, call_date: '2026-09-0' + (i + 1) + 'T12:00:00Z', analysis_status: 'done', analysis: a }; });
   const legacyRep = { user_id: 'a', name: 'Ava', calls: 5, recent_calls: [], items: [], improvements: [], line: null, period_summary: P.summarize(legacyCalls, [], window) };
   const readyRep = { user_id: 'b', name: 'Bo', calls: 10, recent_calls: [], items: [], improvements: [], line: null,
     period_summary: P.summarize(NEW.map(function (a, i) { return { id: a.fathom_call_id, call_date: '2026-08-' + (20 + i) + 'T13:00:00Z', analysis_status: 'done', analysis: a }; }), [], window) };
+  assert.equal(legacyRep.period_summary.label, C.LABEL, 'the payload still carries the label for the surfaces that show a zero');
   const legacy = renderComputed(shell('coachingRepWorkspaceHtml(state.teamCoachable.reps)', WORKSPACE_FUNCS, JSON.stringify({ teamCoachable: { reps: [legacyRep] }, coachingSelectedRep: 'a' })),
-    '({text:document.body.innerText, note:(document.querySelector(".coaching-period-note")||{}).textContent||null, cells:[...document.querySelectorAll(".coaching-section-cell small")].map(e=>e.textContent)})');
-  assert.equal(legacy.note, C.newGradingNote(5), 'the note renders in its own element beside the zero');
-  assert.ok(legacy.text.includes(C.LABEL), 'the list and the panel carry the label');
-  assert.doesNotMatch(legacy.text, /Awaiting grades|0 graded call/);
-  legacy.cells.forEach(function (c) { assert.equal(c, 'none counted yet'); });
+    '({text:document.body.innerText, note:document.querySelector(".coaching-period-note"), cells:document.querySelectorAll(".coaching-section-cell").length, empty:(document.querySelector(".coaching-period-empty")||{}).textContent||null, list:[...document.querySelectorAll(".coaching-rep-choice")].map(b=>b.textContent.trim())})');
+  assert.equal(legacy.note, null, 'Block 018: no zero is shown on this view, so no sentence beside one');
+  assert.equal(legacy.cells, 0); assert.deepEqual(legacy.list, ['Ava'], 'the rep list is names only');
+  assert.equal(legacy.empty, 'No coachable call found for these dates.');
+  assert.doesNotMatch(legacy.text, /Awaiting grades|0 graded call|none counted yet|new calls come in/);
   const ready = renderComputed(shell('coachingRepWorkspaceHtml(state.teamCoachable.reps)', WORKSPACE_FUNCS, JSON.stringify({ teamCoachable: { reps: [readyRep] }, coachingSelectedRep: 'b' })),
-    '({text:document.body.innerText, note:document.querySelector(".coaching-period-note"), cells:[...document.querySelectorAll(".coaching-section-cell small")].map(e=>e.textContent)})');
-  assert.equal(ready.note, null, 'no note once the period has counted calls');
-  assert.doesNotMatch(ready.text, /new calls come in|none counted yet/);
-  ready.cells.forEach(function (c) { assert.equal(c, '10 graded calls'); });
+    '({text:document.body.innerText, note:document.querySelector(".coaching-period-note"), cells:document.querySelectorAll(".coaching-section-cell").length})');
+  assert.equal(ready.note, null); assert.equal(ready.cells, 0);
+  assert.doesNotMatch(ready.text, /new calls come in|none counted yet|graded call/);
 });
 
 test('RENDERED: the rep dashboard "What Needs Work" card — label and sentence on a legacy window, the thin state otherwise', function () {

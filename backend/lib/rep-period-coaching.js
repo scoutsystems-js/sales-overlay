@@ -88,7 +88,18 @@ function summarize(allCalls,examples,window={}) {
  }
  const isFocus=g=>!!(focus&&focus.move)&&g.section===focus.section&&g.move===focus.move;
  patterns.sort((a,b)=>(Number(isFocus(b))-Number(isFocus(a)))||(Number(b.section===weakest?.section)-Number(a.section===weakest?.section))||b.calls-a.calls||a.move.localeCompare(b.move));
- return {focus,status:!calls.length?'no_calls':weakest?'ready':thin?'thin':'ungraded',from:window.from,to:window.to,calls:calls.length,graded_calls:analyses.length,section:weakest?.section||null,label:weakest?LABELS[weakest.section]:thin?THIN_LABEL:awaiting?NG.LABEL:calls.length?'Awaiting grades':'No calls',awaiting_new_grading:awaiting&&!thin,note:thin?thinReason:awaiting?NG.newGradingNote(legacy):null,score:weakest?Math.round(weakest.score):null,/* Block 016 (SCOUT-SHARED-CONTEXT.md): ONE ranking for the overview AND the grid. `weakest` is the lowest section AT the floor (rankSections'
+ /* Block 018 (SCOUT-SHARED-CONTEXT.md; Justin's ruling): ONE VERIFIED CALL IS ENOUGH. The displayed coaching item's FIRST requirement is a
+    stored, verified example — `patterns` holds only findings that passed both reviews and locate in the stored transcript. The score-selected
+    stage only breaks ties: preferred when it has a supporting example (`candidates`, Blocks 002–006), never shown empty; otherwise the strongest
+    verified item from any stage, shown as ITS OWN stage (never as proof of the score-selected one). Recurrence is a count of distinct calls
+    (two or more), never a requirement; one call is never a pattern. With no verified example anywhere: one plain sentence, no numbers.
+    `focus`, the scores and the sections stay on the payload for their other readers; nothing about grading, eligibility or review changes.
+    Guard test/coaching-one-call.test.js. */
+ const strongest=[...patterns].sort((a,b)=>b.calls-a.calls||String(b.examples[0].call_date).localeCompare(String(a.examples[0].call_date))||a.move.localeCompare(b.move))[0]||null;
+ const chosen=candidates[0]?{section:candidates[0].section,move:candidates[0].move,calls:candidates[0].calls,recurring:candidates[0].recurring,example:candidates[0].example,from_lowest_stage:true}
+  :strongest?{section:strongest.section,move:strongest.move,calls:strongest.calls,recurring:strongest.calls>=2,example:strongest.examples[0],from_lowest_stage:false}:null;
+ const coaching=chosen?Object.assign({state:'item',label:LABELS[chosen.section]},chosen):{state:'none',copy:'No coachable call found for these dates.'};
+ return {coaching,focus,status:!calls.length?'no_calls':weakest?'ready':thin?'thin':'ungraded',from:window.from,to:window.to,calls:calls.length,graded_calls:analyses.length,section:weakest?.section||null,label:weakest?LABELS[weakest.section]:thin?THIN_LABEL:awaiting?NG.LABEL:calls.length?'Awaiting grades':'No calls',awaiting_new_grading:awaiting&&!thin,note:thin?thinReason:awaiting?NG.newGradingNote(legacy):null,score:weakest?Math.round(weakest.score):null,/* Block 016 (SCOUT-SHARED-CONTEXT.md): ONE ranking for the overview AND the grid. `weakest` is the lowest section AT the floor (rankSections'
     `enough`); the grid used to draw every section's mean with no sign of the floor, so a manager read "Discovery 73 is lowest" above a Close
     cell showing 61 over 8 calls. Every section now carries `enough` from the SAME rankSections call, and a tie is judged at the DISPLAYED
     precision — two sections that both render 78 are joint lowest, never one named above the other. Guard test/coaching-grid-agreement.test.js. */
