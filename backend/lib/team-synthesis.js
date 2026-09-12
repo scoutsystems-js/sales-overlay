@@ -142,7 +142,12 @@ const { evidenceSubjectMismatch, candidateEligible } = require('./evidence-subje
    period review's own strip regex runs on claim and data. Guard test/team-recs-copy-polarity.test.js. */
 const { momentReason } = require('./moment-bar');
 const TURN_REF = /\s+at turns? \d+(?:\s*[–-]\s*\d+)?/gi;
-function cleanInsightCopy(text) { return typeof text === 'string' ? text.replace(TURN_REF, '') : text; }
+/* BLOCK 015: the prompt labels its evidence candidates m1…mN (`c.id = 'm' + (i + 1)`, below) so the model can cite one by
+   evidence_id — and on 2026-09-12 a row quoted the labels IN THE PROSE ("Josh P's explicit pre-property sequencing at
+   [m10] shows…"). The label leaves, the words around it stay: parenthesised "([m3])", "at [m3]", or bare "[m3]" in any
+   position; a bracketed timestamp, "[inaudible]" or a "[word]" is not a label and is untouched. Same path, write and read. */
+const CANDIDATE_REF = /\s*\(\[m\d+\]\)|\s+at \[m\d+\]|\s*\[m\d+\]/g;
+function cleanInsightCopy(text) { return typeof text === 'string' ? text.replace(TURN_REF, '').replace(CANDIDATE_REF, '').replace(/^\s+/, '') : text; }
 function evidencePolarityMismatch(direction, moment) {
   var kind = (moment && moment.polarity) || ((momentReason(moment) || {}).kind) || null;
   if (!kind) return null;
