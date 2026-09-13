@@ -34,6 +34,10 @@ The personal Dashboard now presents its same four top values as SVG instruments:
 
 Justin revised personal `overview` only: its lower sections now use dark translucent green tint, modest backdrop blur, sage edges, and restrained emerald bloom so the existing fixed ground and HUD remain visible without weakening text contrast. The major surface is `rgba(7,23,14,.78)` with 4px blur; nested cards use `rgba(14,40,24,.42)` with 3px blur; the edge is `rgba(196,231,207,.30)` and bloom `rgba(21,161,71,.10)`. The four top gauges are free-floating in balanced desktop columns and a two-by-two phone grid; they retain their existing interactions and the dominant Closing hierarchy. Team Coaching and Team Performance retain opaque panels. Background-off, fixed HUD geometry/timing, pointer behavior, and reduced motion are unchanged. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/glass/release-status.md`. Focused rendered coverage and the full backend suite pass 2,858/2,858.
 
+### Three-gauge Overview refinement — September 13 implementation
+
+Personal `overview` now presents only three free-floating existing-data gauges, ordered Closing %, Objection handle rate, then Avg call score. Calls analyzed is removed; Closing is a native link to the regular, unfiltered Calls page. The focus grid now begins below the hero in the main column beside the rail, while Coach Summary is the final full-width section after both focus panels; the optional rep graph remains in its existing upper flow. No calculation, metric definition, load, permission, or lazy behavior changes. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/three-gauges/release-status.md`.
+
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
 `4269494` and preserves the four newer design commits in this worktree. The

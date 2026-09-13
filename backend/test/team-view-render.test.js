@@ -518,8 +518,12 @@ function renderOverviewAs(overrides) {
 test('personal Coaching Dashboard renderer keeps Closing % as the dominant number and preserves lazy lanes', () => {
   const out = renderOverviewAs();
   const closing = out.html.indexOf('Closing %');
+  const ohr = out.html.indexOf('Objection handle rate');
+  const avg = out.html.indexOf('Avg call score');
   assert.ok(closing > -1, 'personal dashboard must render the closing-rate lead');
-  assert.ok(closing < out.html.indexOf('Avg score'), 'Closing % must lead Avg score');
+  assert.ok(closing < ohr && ohr < avg, 'Closing %, OHR, then Avg call score retain the requested order');
+  assert.ok(!out.html.includes('Calls analyzed'), 'the removed Calls analyzed gauge must not render');
+  assert.match(out.html, /href="#call-library" onclick="goCallLibrary\(\); return false;"/, 'Closing keeps the regular Calls-page link');
   assert.ok(out.html.includes('Performance Summary'), 'performance entry point remains available');
   assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'lazy performance lane must not mount on first render');
 });
