@@ -75,6 +75,8 @@ test('⚠⚠ ONLY THE APPROVED OBSERVATORY VIEWS MAY OVERRIDE THE BASE PAINT', (
   assert.deepStrictEqual(perView.sort(), [
     'body[data-view="call-library"]::before',
     'body[data-view="call-library"]::before',
+    'body[data-view="eod"]::before',
+    'body[data-view="eod"]::before',
     'body[data-view="overview"]::before',
     'body[data-view="team-coaching"]::before',
     'body[data-view="team-performance"]::before',
@@ -87,11 +89,18 @@ test('⚠⚠ ONLY THE APPROVED OBSERVATORY VIEWS MAY OVERRIDE THE BASE PAINT', (
   const callsBefore = LIVE.match(/body\[data-view="call-library"\]::before\s*\{[^}]*\}/);
   assert.ok(callsBefore && /width:\s*62%/.test(callsBefore[0]) && /transform:\s*rotate\(-18deg\)/.test(callsBefore[0]),
     'Calls keeps the approved first contour geometry');
+  const eodContour = LIVE.match(/body\[data-view="eod"\]::before\s*,\s*body\[data-view="eod"\]::after\s*\{[^}]*\}/);
+  assert.ok(eodContour && /position:\s*fixed/.test(eodContour[0]) && /pointer-events:\s*none/.test(eodContour[0]),
+    'EOD keeps its reviewed fixed, non-interactive contour layer');
+  const eodBefore = LIVE.match(/body\[data-view="eod"\]::before\s*\{[^}]*\}/);
+  assert.ok(eodBefore && /width:\s*62%/.test(eodBefore[0]) && /transform:\s*rotate\(-18deg\)/.test(eodBefore[0]),
+    'EOD keeps the approved first contour geometry');
   const bgOffBase = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view\]::before\s*\{[^}]*\}/);
   const callsBgOff = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view="call-library"\]::after\s*\{[^}]*\}/);
-  assert.ok(bgOffBase && /display:\s*none/.test(bgOffBase[0]) && callsBgOff && /display:\s*none/.test(callsBgOff[0]),
-    'Calls background-off removes both reviewed contours');
-  assert.strictEqual((LIVE.match(/body\[data-view="(?!team-coaching|team-performance|overview|call-library)[a-z-]+"\]::before/g) || []).length, 0,
+  const eodBgOff = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view="eod"\]::after\s*\{[^}]*\}/);
+  assert.ok(bgOffBase && /display:\s*none/.test(bgOffBase[0]) && callsBgOff && /display:\s*none/.test(callsBgOff[0]) && eodBgOff && /display:\s*none/.test(eodBgOff[0]),
+    'Calls and EOD background-off remove both reviewed contours');
+  assert.strictEqual((LIVE.match(/body\[data-view="(?!team-coaching|team-performance|overview|call-library|eod)[a-z-]+"\]::before/g) || []).length, 0,
     'unapproved pages must not get a ground override');
   // ⚠ NON-VACUITY — the matcher must be able to find one. Assert it fires
   // against an injected rule, or this test passes on an empty string forever.

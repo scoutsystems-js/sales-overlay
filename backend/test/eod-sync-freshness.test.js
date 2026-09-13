@@ -99,7 +99,7 @@ test('⚠ THE PAGE RENDERS THE NOTE, and above the list rather than under it', (
   assert.ok(/\+ \(d \? eodSyncNoteHtml\(d\.sync\) : ''\)/.test(live),
     'and be CALLED, guarded on the lane — a builder nothing calls is the defect shape this codebase keeps hitting');
   const i = live.indexOf("+ (d ? eodSyncNoteHtml(d.sync) : '')");
-  const j = live.indexOf('+ toolbar + body', i);
+  const j = live.indexOf("+ toolbar + '</div>';", i);
   assert.ok(j > i, 'the note must render ABOVE the toolbar and list');
 });
 

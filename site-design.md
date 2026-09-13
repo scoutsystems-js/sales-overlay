@@ -22,6 +22,10 @@ Keep 24px desktop and 18px mobile outside gutters. Use available width and the r
 
 Calls now uses the exact forest gradient and two pale fixed contours, with translucent 14px panels, 1px mint borders, and the 42px × 1px mint light with a 14px inset on the header, verdict queue, list, loading and empty states. Rows remain transparent with hairlines; the list expands to the full width below the real sidebar. At 390px, controls and the verdict queue wrap without overflow, and the selected outcome filter retains its green border and fill. This is presentation only: the existing row list, filters, drills, evidence, badges, actions, metrics, permissions and data contracts remain unchanged. Final verification and deployment status are recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-calls/`.
 
+### EOD Report — implemented visual scope
+
+The EOD Report now places the first call directly below the header beside the measured rail, then places remaining calls full width below the actual rail. It uses the approved fixed forest gradient and two pale contours, translucent 14px panels with the mint top light and 14px inset, and a 100px minimum-height editable Summary field on each call. At 390px, controls and call content wrap without overflow; edited fields and focused controls retain green edges. Presentation only: preserve the ET single-day picker, Prev/Next/Today navigation, blank saves, prospect-name confirmation, Slack copy, read-only outcome, composed outcome labels and sync-freshness note. The previously removed payment input stays absent; no new metric or logic change. Verification and deployment status are recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-eod/`.
+
 ### Cards and selected states
 
 Cards use the exact Visor surface treatment: a 14px radius, 1px `rgba(118,255,171,.36)` edge, `linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42))` fill, inset highlight `0 1px 0 rgba(231,255,240,.12)` and outer bloom `0 0 28px rgba(18,222,96,.06)`. Major content panels include the mockup's short 42px × 1px mint top light with a 14px gap beneath it and `0 0 9px rgba(77,255,148,.7)` glow. The September 13 exact-match correction supersedes the prior flat glass tokens where this section differs. Preserve readable live content and existing controls; no fake summary text or telemetry.
@@ -32,7 +36,7 @@ Selected menu and selected member share the approved treatment: sage outline, 2p
 
 The gauge copies the approved artwork directly. It is an open 270-degree horseshoe, free-floating without a rectangular card, with these required layers:
 
-**Current size calibration (September 13, in progress):** the exact artwork is being returned to its compact pre-expansion dimensions: 216px standard gauges, 244px Overview Closing lead, 152px at widths up to 900px, and 216px for the stacked phone treatment (168px for the lead at the intermediate breakpoint). This changes size only; geometry, tokens, motion, layering and data behavior stay as specified below.
+**Current size calibration (September 13, verified in `2bc5e0b`):** the exact artwork uses compact dimensions: 216px standard gauges, 244px Overview Closing lead, 152px at widths up to 900px, and 216px for the stacked phone treatment (168px for the lead at the intermediate breakpoint). This changes size only; geometry, tokens, motion, layering and data behavior stay as specified below.
 
 - Main track: radius 125, stroke width 15, `rgba(171,224,194,.18)`.
 - Bloom: same path, width 23, `rgba(9,213,67,.42)`, blur 5px.

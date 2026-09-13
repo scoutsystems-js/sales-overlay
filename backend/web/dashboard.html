@@ -6630,6 +6630,182 @@
       body[data-view="call-library"] .vq { padding:26px 14px 14px; }
     }
 
+    /* EOD Observatory pass, 2026-09-13. The report remains the established
+       editable daily record; this scopes its visual shell without changing a
+       field, save handler, date action, copy path, or outcome meaning. */
+    body[data-view="eod"] {
+      --eod-observatory-panel:linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42));
+      --eod-observatory-edge:rgba(118,255,171,.36);
+      --eod-observatory-line:rgba(190,247,214,.18);
+      --eod-observatory-radius:var(--observatory-visor-card-radius);
+      --observatory-visor-card-radius:14px;
+      --eod-observatory-title-size:34px;
+      --eod-observatory-title-size-mobile:28px;
+      --sidebar-w:190px;
+      --accent:#09d543;
+      --accent-rgb:9,213,67;
+      background:
+        radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),
+        radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),
+        linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%);
+      background-attachment:fixed;
+    }
+    body[data-view="eod"]::before,
+    body[data-view="eod"]::after {
+      content:"";
+      position:fixed;
+      z-index:0;
+      pointer-events:none;
+      opacity:1;
+      background:none;
+      -webkit-mask:none;
+      mask:none;
+      border:1px solid rgba(125,255,179,.14);
+    }
+    body[data-view="eod"]::before {
+      inset:auto;
+      width:62%; height:78%; left:8%; top:2%;
+      border-radius:48% 52% 45% 55%; transform:rotate(-18deg);
+    }
+    body[data-view="eod"]::after {
+      width:78%; height:72%; right:-14%; bottom:-26%;
+      border-radius:50%;
+    }
+    html[data-bg="off"] body[data-view="eod"] { background:#090a0b; }
+    html[data-bg="off"] body[data-view="eod"]::after { display:none; }
+    body[data-view="eod"] .top-bar { background:#090a0b; border-bottom-color:rgba(219,239,226,.13); }
+    body[data-view="eod"] .page {
+      position:relative;
+      z-index:1;
+      width:auto;
+      max-width:calc(100vw - 48px);
+      margin:0 auto;
+      padding:24px 0 72px;
+      background:transparent;
+    }
+    body[data-view="eod"] .sidebar {
+      position:absolute;
+      top:67px;
+      left:24px;
+      width:var(--sidebar-w);
+      max-height:none;
+      overflow:visible;
+      border:1px solid var(--eod-observatory-line);
+      border-radius:var(--eod-observatory-radius);
+      background:rgba(5,20,11,.78);
+      box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.42);
+    }
+    body[data-view="eod"] .sidebar .nav-link.nav-active {
+      border:1px solid rgba(211,237,217,.52);
+      border-left:2px solid var(--accent);
+      border-radius:var(--eod-observatory-radius);
+      background:linear-gradient(100deg,#1b4527,#112617);
+      color:var(--text);
+      box-shadow:0 0 16px rgba(var(--accent-rgb),.24);
+    }
+    body[data-view="eod"] .eod-observatory {
+      position:relative;
+      display:grid;
+      grid-template-columns:var(--sidebar-w) minmax(0,1fr);
+      column-gap:22px;
+      row-gap:14px;
+      min-width:0;
+    }
+    body[data-view="eod"] .eod-upper { grid-column:2; min-width:0; }
+    body[data-view="eod"] .eod-call-list { grid-column:1 / -1; display:grid; gap:14px; min-width:0; }
+    body[data-view="eod"] .eod-header-panel,
+    body[data-view="eod"] .eod-call,
+    body[data-view="eod"] .empty {
+      position:relative;
+      border:1px solid var(--eod-observatory-edge);
+      border-radius:var(--eod-observatory-radius);
+      background:var(--eod-observatory-panel);
+      box-shadow:inset 0 1px 0 rgba(231,255,240,.12),0 0 28px rgba(18,222,96,.06);
+    }
+    body[data-view="eod"] .eod-header-panel { padding:30px 20px 18px; }
+    body[data-view="eod"] .eod-call { margin:14px 0 0; padding:30px 18px 18px; }
+    body[data-view="eod"] .eod-call-list .eod-call { margin:0; }
+    body[data-view="eod"] .eod-upper > .empty,
+    body[data-view="eod"] .eod-upper > .error,
+    body[data-view="eod"] .eod-upper > .lane-wait { margin-top:14px; }
+    body[data-view="eod"] .empty { padding:30px 18px 18px; }
+    body[data-view="eod"] .error {
+      position:relative;
+      border-color:var(--bad);
+      border-radius:var(--eod-observatory-radius);
+      background:rgba(38,8,12,.72);
+      box-shadow:inset 0 1px 0 rgba(255,231,234,.1),0 0 28px rgba(222,60,76,.06);
+    }
+    body[data-view="eod"] .eod-header-panel::before,
+    body[data-view="eod"] .eod-call::before,
+    body[data-view="eod"] .empty::before {
+      content:"";
+      position:absolute;
+      top:14px;
+      left:18px;
+      width:42px;
+      height:1px;
+      background:#71ffad;
+      box-shadow:0 0 9px rgba(77,255,148,.7);
+    }
+    body[data-view="eod"] .eod-header-panel .section-header { margin-bottom:12px; }
+    body[data-view="eod"] .eod-header-panel .section-header h2 { font-size:var(--eod-observatory-title-size); }
+    body[data-view="eod"] .eod-summary { color:#d9f2e1; margin-bottom:12px; }
+    body[data-view="eod"] .eod-toolbar { margin-bottom:0; gap:8px; flex-wrap:wrap; }
+    body[data-view="eod"] .eod-toolbar .btn-fathom-secondary,
+    body[data-view="eod"] .eod-toolbar .dp-btn,
+    body[data-view="eod"] .eod-input,
+    body[data-view="eod"] .eod-textarea {
+      background:rgba(2,16,8,.58);
+      border-color:rgba(174,241,199,.24);
+    }
+    /* The platform's text-input selector is deliberately very specific. Set
+       its own field variables here so EOD's scoped surface still resolves for
+       input[type=text], as well as for the simpler textarea selector. */
+    body[data-view="eod"] .eod-input,
+    body[data-view="eod"] .eod-textarea {
+      --bg-field:rgba(2,16,8,.58);
+      --border-strong:rgba(174,241,199,.24);
+    }
+    body[data-view="eod"] .eod-input:hover,
+    body[data-view="eod"] .eod-textarea:hover { border-color:rgba(118,255,171,.62); }
+    body[data-view="eod"] .eod-input.edited,
+    body[data-view="eod"] .eod-textarea.edited,
+    body[data-view="eod"] .eod-input:focus,
+    body[data-view="eod"] .eod-textarea:focus { --border-strong:var(--accent); border-color:var(--accent); outline:none; }
+    body[data-view="eod"] .eod-row { align-items:flex-start; gap:12px; margin:8px 0; }
+    body[data-view="eod"] .eod-label { flex-basis:102px; padding-top:7px; color:#cfe4d7; }
+    body[data-view="eod"] .eod-static { padding:6px 0; }
+    body[data-view="eod"] .eod-textarea { min-height:100px; }
+    body[data-view="eod"] .eod-attributed { margin:10px 0 12px; color:#cfe4d7; }
+    @media(max-width:900px) {
+      body[data-view="eod"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; }
+      body[data-view="eod"] .sidebar {
+        position:relative;
+        top:auto;
+        left:auto;
+        z-index:2;
+        width:auto;
+        max-height:none;
+        margin-bottom:14px;
+        overflow:visible;
+      }
+      body[data-view="eod"] .eod-observatory { grid-template-columns:1fr; }
+      body[data-view="eod"] .eod-upper,
+      body[data-view="eod"] .eod-call-list { grid-column:1; }
+    }
+    @media(max-width:620px) {
+      body[data-view="eod"] .eod-header-panel { padding:28px 16px 16px; }
+      body[data-view="eod"] .eod-header-panel .section-header h2 { font-size:var(--eod-observatory-title-size-mobile); }
+      body[data-view="eod"] .eod-call { padding:28px 14px 14px; }
+      body[data-view="eod"] .eod-row { flex-direction:column; gap:4px; }
+      body[data-view="eod"] .eod-label { flex-basis:auto; padding-top:0; }
+      body[data-view="eod"] .eod-input,
+      body[data-view="eod"] .eod-textarea,
+      body[data-view="eod"] .eod-static { width:100%; min-width:0; }
+      body[data-view="eod"] .eod-toolbar > * { min-width:0; max-width:100%; }
+    }
+
     @media(prefers-reduced-motion:reduce) {
       body[data-view="team-performance"] .observatory-hud-orbit,
       body[data-view="team-performance"] .observatory-hud-dot,
@@ -12049,7 +12225,7 @@
   var observatoryLayoutBound = false;
   var observatoryRailObserver = null;
   function syncObservatoryRailClearance() {
-    var upper = document.querySelector('.observatory-page > .observatory-upper, .call-library-upper');
+    var upper = document.querySelector('.observatory-page > .observatory-upper, .call-library-upper, .eod-observatory > .eod-upper');
     var rail = document.getElementById('sidebar');
     if (!upper || !rail) return;
     upper.style.minHeight = '';
@@ -18256,6 +18432,7 @@
      * establishing it, and the render probe caught it.
      */
     ensureEodPicker();
+    if (state.view === 'eod' && document.body) document.body.dataset.view = 'eod';
     var content = document.getElementById('content');
     if (state.eodData === null && !state.eodLoading) loadEod();
     var d = state.eodData;
@@ -18281,7 +18458,7 @@
       + '<span class="eod-copy-note" id="eodCopyNote"></span>'
       + '</div>';
 
-    var body;
+    var body, remainingCalls = '';
     if (!d) body = laneWaitHtml('eod', 'Building today\'s report\u2026', null, 120);
     else if (d._error) body = '<div class="error">' + laneFailureCopy('the EOD report') + '</div>';
     else if (!d.calls || d.calls.length === 0) {
@@ -18300,7 +18477,7 @@
       var attributedNote = (d.follow_up_closes > 0)
         ? '<div class="eod-attributed">' + d.follow_up_closes + ' follow up close' + (d.follow_up_closes === 1 ? '' : 's') + ' today — counted on the booked call' + (d.follow_up_closes === 1 ? '' : 's') + ' they follow</div>'
         : '';
-      body = attributedNote + d.calls.map(function (c) {
+      var calls = d.calls.map(function (c, index) {
         var f = c.fields, e = c.edited || {};
         function row(label, field, value, isArea) {
           var cls = (isArea ? 'eod-textarea' : 'eod-input') + (e[field] ? ' edited' : '');
@@ -18316,7 +18493,7 @@
           : '<span class="meta">no recording link</span>';
         var pendingNote = (c.analysis_status && c.analysis_status !== 'done')
           ? '<span class="meta"> · analysis ' + escapeHtml(c.analysis_status) + ' — prefills may update</span>' : '';
-        return '<div class="eod-call">'
+        return '<div class="eod-call' + (index === 0 ? ' eod-first-call' : '') + '">'
           // (u3) Read-only, so it gets the static treatment, not input chrome.
           + '<div class="eod-row"><div class="eod-label">Call</div><div class="eod-static">' + link + pendingNote + '</div></div>'
           + row('Prospect', 'prospect_name', f.prospect_name)
@@ -18343,10 +18520,12 @@
           + row('Cash ($)', 'cash_collected', f.cash_collected)
           + row('Summary', 'summary', f.summary, true)
           + '</div>';
-      }).join('');
+      });
+      body = attributedNote + calls[0];
+      remainingCalls = calls.slice(1).join('');
     }
 
-    content.innerHTML = '<div class="section fade-in">'
+    var header = '<div class="eod-header-panel fade-in">'
       + '<div class="section-header"><h2>EOD Report</h2>'
       + '<div class="meta">Your calls for the day</div></div>'
       // (u2) On the page as well as in the paste, from the one helper.
@@ -18354,7 +18533,12 @@
       // ⚠ ABOVE the toolbar and the list: a caveat under the calls is a caveat
       // nobody reads, and this one changes how the count should be read.
       + (d ? eodSyncNoteHtml(d.sync) : '')   /* ⚠ D-9 (2026-09-03): the toolbar is built BEFORE the null-lane branch below; `d.sync` on a still-loading lane threw on a direct entry to the view */
-      + toolbar + body + '</div>';
+      + toolbar + '</div>';
+    content.innerHTML = '<div class="eod-observatory">'
+      + '<div class="eod-upper">' + header + body + '</div>'
+      + (remainingCalls ? '<div class="eod-call-list">' + remainingCalls + '</div>' : '')
+      + '</div>';
+    if (d && d.calls && d.calls.length) observeObservatoryLayout();
   }
 
   // ═══ Knowledge Base view (relocated from admin.html — same ids, same JS) ═══
