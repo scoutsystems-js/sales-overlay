@@ -1,8 +1,8 @@
 # Google Calendar — private scheduled GHL appointments LIVE
 
-## Block 024 — account restriction removed; release pending
+## Block 024 — account restriction removed; LIVE
 
-The hard-coded Scout-team eligibility check is removed. An existing connection can share counts from its current Scout profile with no email match, account switch, reconnect or token transfer. Explicit opt-in and current manager/access checks remain. The SLR event-source filter and SalesKick exclusion are unchanged. Focused tests: 51 passing, including unchanged connection fields, other-team opt-in, wrong-manager denial, inactive/unmanaged denial, and consent/reassignment races. Both deliberate access-control bypasses fail the HTTP guard. Full-suite and release verification follow before deployment.
+Released `607252388755404b6316619c2cd4a2afa3b52fe8`, Railway `1fa7a405-eca4-47b0-890a-650adbc8257b` SUCCESS. The hard-coded Scout-team eligibility check is removed. An existing connection can share counts from its current Scout profile with no email match, account switch, reconnect or token transfer. Explicit opt-in and current manager/access checks remain. The SLR event-source filter and SalesKick exclusion are unchanged. Focused tests 51/51; full suite 2,880/2,880; both deliberate access-control bypasses fail the HTTP guard. Six served artifacts match the release, deploy markers pass. Actual signed-in page: existing 29 appointments for September 13–19, sharing control available and unchecked. Josh can enable sharing there; no live positive shared count is claimed before that consent. Evidence: `~/Desktop/scan-reports/block-024-calendar-account/`.
 
 ## Block 023 — manager counts LIVE
 
