@@ -8052,3 +8052,7 @@ Calls now uses the approved fixed forest gradient, two pale contours and translu
 
 ## [H781] EOD Report visual rollout is presentation-only — September 13, 2026
 The EOD Report visual implementation places the first call beside the measured rail below the header and remaining calls full width below it, with the approved forest ground, contours, glass panels, 100px summary and mobile wrapping. Existing ET single-day navigation, blank saves, name confirmation, Slack copy, read-only outcome and sync freshness remain unchanged; the previously removed payment input stays absent; no metric or logic change is included. Local verification and release status are tracked under `~/Desktop/scan-reports/observatory-2026-09-13/visor-eod/`.
+
+
+## [H782] Background controls removed from redesigned pages — September 13, 2026
+The header switch and Account Display checkbox are removed from redesigned Overview, Team Performance, Team Coaching, Calls and EOD; older pages retain the legacy control until redesigned. The stored `scout_bg_v1=off` preference, first-paint `data-bg="off"` application, background-off rendering and reduced motion remain unchanged. This is a controls-only implementation; final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`.

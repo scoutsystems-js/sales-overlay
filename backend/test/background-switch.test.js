@@ -18,7 +18,7 @@ const WEB = path.join(__dirname, '..', 'web');
 const HTML = fs.readFileSync(path.join(WEB, 'dashboard.html'), 'utf8');
 const LIVE = stripComments(HTML);
 
-test('the toggle sits to the RIGHT of My Account, carries no text, and names what it toggles', () => {
+test('legacy pages retain the switch to the RIGHT of My Account', () => {
   const admin = LIVE.indexOf('id="adminLink"'), acct = LIVE.indexOf('id="signedInEmail"'), sw = LIVE.indexOf('id="bgSwitch"');
   assert.ok(admin !== -1 && acct !== -1 && sw !== -1, 'all three present');
   assert.ok(admin < acct && acct < sw, 'order: Admin, My Account, the toggle — at the far edge');
@@ -31,17 +31,17 @@ test('the toggle sits to the RIGHT of My Account, carries no text, and names wha
   assert.ok(!/bg-switch-label|bg-switch-box/.test(LIVE), 'the square and its label are gone');
 });
 
-test('⚠⚠ EXECUTED: one setter drives both doors — the toggle and the Account checkbox never disagree', () => {
+test('⚠⚠ EXECUTED: the legacy switch still stores and applies its preference', () => {
   const src = ['backgroundIsOff', 'setBackgroundOff', 'syncBackgroundControls', 'toggleBackground'].map((n) => fnBody(LIVE, n)).join('\n');
   const store = {}; const attrs = {};
-  const sw = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } }; const cb = { checked: null };
+  const sw = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };
   const fn = new Function('localStorage', 'document', src + '\nreturn { toggle: toggleBackground, set: setBackgroundOff, isOff: backgroundIsOff };');
   const api = fn({ getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; } },
-    { documentElement: { setAttribute: (k, v) => { attrs[k] = v; }, removeAttribute: (k) => { delete attrs[k]; } }, getElementById: (id) => (id === 'bgSwitch' ? sw : id === 'acctBgOff' ? cb : null) });
+    { documentElement: { setAttribute: (k, v) => { attrs[k] = v; }, removeAttribute: (k) => { delete attrs[k]; } }, getElementById: (id) => (id === 'bgSwitch' ? sw : null) });
   api.toggle();
-  assert.strictEqual(api.isOff(), true); assert.strictEqual(sw.attrs['aria-checked'], 'false', 'the toggle says off'); assert.strictEqual(cb.checked, true, 'the checkbox says off too'); assert.strictEqual(attrs['data-bg'], 'off');
+  assert.strictEqual(api.isOff(), true); assert.strictEqual(sw.attrs['aria-checked'], 'false', 'the toggle says off'); assert.strictEqual(attrs['data-bg'], 'off');
   api.set(false);
-  assert.strictEqual(sw.attrs['aria-checked'], 'true', 'the toggle followed the checkbox'); assert.strictEqual(cb.checked, false); assert.ok(!('data-bg' in attrs));
+  assert.strictEqual(sw.attrs['aria-checked'], 'true', 'the toggle restores its visible state'); assert.ok(!('data-bg' in attrs));
 });
 
 const WM = fs.readFileSync(path.join(WEB, 'scout-wordmark.svg')); const GL = fs.readFileSync(path.join(WEB, 'scout-glyph.svg'));
@@ -55,14 +55,14 @@ const PROBE = `(() => { const s = document.getElementById('bgSwitch'); const t =
     barH: Math.round(bar.height), markRight: Math.round(mark.right), acctLeft: Math.round(acct.left), acctRight: Math.round(acct.right), text: s.textContent.trim() }; })()`;
 function page(on, view) { return '<!doctype html><html><head>' + STYLE + '</head><body data-view="' + (view || 'overview') + '">' + (on ? NAV : NAV.replace('aria-checked="true"', 'aria-checked="false"')) + '</body></html>'; }
 
-test('⚠⚠ RENDERED: white edge in BOTH states on a black track that never changes, the knob SLIDES, the glyph goes accent/dim, and nothing else in the bar moves', () => {
-  const on = renderComputed(page(true), PROBE), off = renderComputed(page(false), PROBE);
+test('⚠⚠ RENDERED: legacy pages retain the complete switch treatment', () => {
+  const on = renderComputed(page(true, 'call-review'), PROBE), off = renderComputed(page(false, 'call-review'), PROBE);
   for (const [name, st] of [['on', on], ['off', off]]) {
     assert.strictEqual(st.edge, '1px solid rgb(255, 255, 255)', name + ': the white edge is always there');
     assert.strictEqual(st.trackFill, 'rgb(0, 0, 0)', name + ': the track stays black'); assert.strictEqual(st.radius, '999px', name + ': a pill track');
     assert.ok(st.masked, name + ': the glyph is the vector, masked'); assert.ok(st.glyphH >= 15, name + ': the glyph is knob-sized (' + st.glyphH + 'px)'); assert.strictEqual(st.text, '', name + ': no text');
   }
-  assert.strictEqual(on.glyphFill, 'rgb(9, 213, 67)', 'on: the glyph is Observatory Scout green'); assert.strictEqual(on.glyphOpacity, '1');
+  assert.strictEqual(on.glyphFill, 'rgb(9, 224, 70)', 'on: the legacy glyph keeps its Scout green'); assert.strictEqual(on.glyphOpacity, '1');
   assert.strictEqual(off.glyphFill, 'rgb(237, 237, 237)', 'off: the glyph is the text white, dimmed'); assert.ok(+off.glyphOpacity >= 0.5 && +off.glyphOpacity <= 0.7, 'off: dimmed but readable (' + off.glyphOpacity + ')');
   assert.ok(on.knobX - off.knobX >= 16, 'the knob travels: on at ' + on.knobX + ', off at ' + off.knobX);
   assert.deepStrictEqual(on.box, off.box, 'the control\'s own box is identical in both states');
@@ -75,4 +75,11 @@ test('⚠⚠ RENDERED: white edge in BOTH states on a black track that never cha
 test('non-Observatory pages retain the original Scout green toggle glyph', () => {
   const on = renderComputed(page(true, 'call-review'), PROBE);
   assert.strictEqual(on.glyphFill, 'rgb(9, 224, 70)');
+});
+
+test('redesigned pages remove the switch and its top-bar layout slot', () => {
+  for (const view of ['overview', 'team-performance', 'team-coaching', 'call-library', 'eod']) {
+    const observed = renderComputed(page(true, view), `(() => { const switcher = document.getElementById('bgSwitch'); const rect = switcher.getBoundingClientRect(); return { display:getComputedStyle(switcher).display, width:rect.width, height:rect.height }; })()`, { width: 1400 });
+    assert.deepEqual(observed, { display: 'none', width: 0, height: 0 }, view + ' must expose no background switch or layout slot');
+  }
 });

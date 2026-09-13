@@ -26,6 +26,10 @@ Calls now uses the exact forest gradient and two pale fixed contours, with trans
 
 The EOD Report now places the first call directly below the header beside the measured rail, then places remaining calls full width below the actual rail. It uses the approved fixed forest gradient and two pale contours, translucent 14px panels with the mint top light and 14px inset, and a 100px minimum-height editable Summary field on each call. At 390px, controls and call content wrap without overflow; edited fields and focused controls retain green edges. Presentation only: preserve the ET single-day picker, Prev/Next/Today navigation, blank saves, prospect-name confirmation, Slack copy, read-only outcome, composed outcome labels and sync-freshness note. The previously removed payment input stays absent; no new metric or logic change. Verification and deployment status are recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-eod/`.
 
+### Background control scope
+
+The five redesigned views — Overview, Team Performance, Team Coaching, Calls and EOD Report — no longer show a header background switch or an Account Display checkbox. Older views keep the legacy header control until redesigned. The stored `scout_bg_v1=off` preference, first-paint `data-bg="off"` application, background-off styling and reduced-motion behavior remain unchanged; this is a controls-only change.
+
 ### Cards and selected states
 
 Cards use the exact Visor surface treatment: a 14px radius, 1px `rgba(118,255,171,.36)` edge, `linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42))` fill, inset highlight `0 1px 0 rgba(231,255,240,.12)` and outer bloom `0 0 28px rgba(18,222,96,.06)`. Major content panels include the mockup's short 42px × 1px mint top light with a 14px gap beneath it and `0 0 9px rgba(77,255,148,.7)` glow. The September 13 exact-match correction supersedes the prior flat glass tokens where this section differs. Preserve readable live content and existing controls; no fake summary text or telemetry.

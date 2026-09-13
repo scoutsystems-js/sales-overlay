@@ -6806,6 +6806,14 @@
       body[data-view="eod"] .eod-toolbar > * { min-width:0; max-width:100%; }
     }
 
+    /* Redesigned Observatory pages hide the header switch. The stored
+       preference and its header switch remain available on legacy pages. */
+    body[data-view="overview"] #bgSwitch,
+    body[data-view="team-performance"] #bgSwitch,
+    body[data-view="team-coaching"] #bgSwitch,
+    body[data-view="call-library"] #bgSwitch,
+    body[data-view="eod"] #bgSwitch { display:none; }
+
     @media(prefers-reduced-motion:reduce) {
       body[data-view="team-performance"] .observatory-hud-orbit,
       body[data-view="team-performance"] .observatory-hud-dot,
@@ -6922,9 +6930,8 @@
          Scout green when the artwork is ON, dimmed text-white when OFF. No text label: the
          glyph is what tells a user what it controls. One object, never two. The control's own
          box never changes between states — only the knob moves inside it. Still a real
-         switch button with role, aria-checked, an accessible name and the accent focus ring;
-         the Account page's Display checkbox is the same setting's second door, both synced by
-         setBackgroundOff. -->
+         switch button with role, aria-checked, an accessible name and the accent focus ring.
+         Redesigned pages hide this legacy control; Account no longer exposes a second door. -->
     <button type="button" id="bgSwitch" class="bg-switch" role="switch" aria-checked="true"
             aria-label="Background artwork" title="Turn the background artwork off" onclick="toggleBackground()">
       <span class="bg-switch-track" aria-hidden="true"><span class="bg-switch-knob"><span class="bg-switch-glyph"></span></span></span>
@@ -18047,9 +18054,8 @@
     } catch (e) {}
     syncBackgroundControls();
   }
-  /* ⚠⚠ ONE SETTING, TWO DOORS, NEVER OUT OF STEP (2026-09-03). The top-bar switch and the
-     Account page's Display checkbox both call setBackgroundOff, and the setter re-reads the
-     stored value into BOTH controls — so neither can show a state the other does not. */
+  /* The header switch remains on legacy pages only. Redesigned pages have no
+     background control, but retain the stored preference and its paint rules. */
   function syncBackgroundControls() {
     var off = backgroundIsOff();
     try {
@@ -18058,8 +18064,6 @@
         sw.setAttribute('aria-checked', off ? 'false' : 'true');
         sw.setAttribute('title', off ? 'Turn the background artwork on' : 'Turn the background artwork off');
       }
-      var cb = document.getElementById('acctBgOff');
-      if (cb) cb.checked = off;
     } catch (e) {}
   }
   function toggleBackground() { setBackgroundOff(!backgroundIsOff()); }
@@ -18141,15 +18145,6 @@
     var billingBody = acctRow('Status', '<div>' + badge + '</div>') + planRow
       + '<div class="eod-row"><div class="eod-label"></div><div>' + billingAction + '</div></div>';
 
-    /* ⚠ PURELY LOCAL — no server round-trip and nothing on the profile. It is a
-       per-user display preference (the 2026-08-20 ruling), so localStorage is
-       the right home and it needs no account entity. */
-    var bgOff = backgroundIsOff();
-    var displayBody = acctRow('Background',
-      '<div><label class="acct-toggle"><input type="checkbox" id="acctBgOff"' + (bgOff ? ' checked' : '')
-      + ' onchange="setBackgroundOff(this.checked)"> Turn the background artwork off</label>'
-      + '<div class="meta" style="margin-top:4px;">Plain black instead of the raster. Applies on this browser.</div></div>');
-
     content.innerHTML =
         '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
       + '<div class="section fade-in" id="connectionsSection"><div class="section-header"><h2>Connections</h2></div>' + renderConnectionsSectionHtml() + '<div id="calendarConnection">Loading Google Calendar…</div></div>'
@@ -18157,7 +18152,6 @@
       + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody
         + priceFieldHtml(a) + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Display</h2></div>' + displayBody + '</div>'
       /* Their own reports live here now, not in the modal. ⚠ STATUS ONLY — the
          server does not even SELECT the diagnostics, because those describe an
          ACCOUNT and on a shared company account that is not automatically

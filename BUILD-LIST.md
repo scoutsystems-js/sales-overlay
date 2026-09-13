@@ -67,6 +67,8 @@ motion stops it. Behavior and approved archives are unchanged; the prior
 
 **Calls visual rollout — implemented and verified live in `bb5e7aa`:** approved fixed forest ground and translucent glass panel treatment now covers Calls while preserving its row list, filters, drills, evidence, badges and actions. No gauges, metric or logic changes are included. Receipt: `~/Desktop/scan-reports/observatory-2026-09-13/visor-calls/release-status.md`.
 
+**Background control removal — implemented:** redesigned Overview, Team Performance, Team Coaching, Calls and EOD have no header switch or Account Display checkbox. Older pages retain the legacy control. Stored off preference and background-off rendering remain unchanged. Final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`.
+
 **EOD Report visual rollout — implemented locally:** first call directly below the header beside the measured rail; remaining calls full width below it. Approved forest ground, two contours, glass panels, 100px minimum-height editable Summary field on each call and mobile wrapping are presentation-only. Preserve ET single-day navigation, blank saves, name confirmation, Slack copy, read-only outcome and sync freshness; the previously removed payment input stays absent; no new metric or logic change. Final status: `docs/design/observatory-implementation.md` and `~/Desktop/scan-reports/observatory-2026-09-13/visor-eod/release-status.md`.
 
 ## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)

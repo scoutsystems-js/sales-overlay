@@ -104,9 +104,10 @@ test('the CSS rule exists and switches the layer off entirely', () => {
     'display:none, so the layer costs nothing when off');
 });
 
-test('the control is on the account page and calls the setter', () => {
-  assert.ok(/<h2>Display<\/h2>/.test(LIVE), 'a Display section must exist');
-  assert.ok(/id="acctBgOff"/.test(LIVE) && /onchange="setBackgroundOff\(this\.checked\)"/.test(LIVE),
-    'the checkbox must be wired to the setter');
-  assert.ok(/backgroundIsOff\(\)/.test(LIVE), 'and reflect the current value');
+test('Account removes the background checkbox while retaining its other settings sections', () => {
+  assert.ok(!/id="acctBgOff"/.test(LIVE) && !/onchange="setBackgroundOff\(this\.checked\)"/.test(LIVE),
+    'the Account background checkbox is gone');
+  for (const heading of ['Profile', 'Connections', 'Password', 'Offer', 'Billing', 'Your Reports']) {
+    assert.ok(new RegExp('<h2>' + heading + '<\\/h2>').test(LIVE), heading + ' remains in Account');
+  }
 });
