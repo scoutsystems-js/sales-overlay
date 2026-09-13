@@ -120,3 +120,41 @@ test('more than two event pages and upstream errors refuse partial or provider-s
   const failed = calendar.createGoogleClient(async () => ({ ok: false, status: 403, json: async () => ({ error: 'provider-secret' }) }));
   await assert.rejects(failed.events('secret', 'primary', range), { message: 'google_access_denied' });
 });
+
+test('calendar Zoom identity uses only the measured exact location URL shape', () => {
+  assert.equal(calendar.zoomMeetingIdFromEvent({ location: 'https://us06web.zoom.us/j/81234567890?pwd=private' }), '81234567890');
+  assert.equal(calendar.zoomMeetingIdFromEvent({ location: 'Join Zoom Meeting https://acme.zoom.us/j/9876543210' }), '9876543210');
+  assert.equal(calendar.zoomMeetingIdFromEvent({
+    description: 'https://us06web.zoom.us/j/81234567890',
+    conferenceData: { entryPoints: [{ uri: 'https://us06web.zoom.us/j/81234567890' }] },
+    summary: '81234567890',
+  }), null, 'unmeasured fields never become reconciliation identity');
+  assert.equal(calendar.zoomMeetingIdFromEvent({ location: 'https://meet.google.com/abc-defg-hij' }), null);
+  assert.equal(calendar.zoomMeetingIdFromEvent({ location: 'https://zoom.us/j/1234' }), null);
+});
+
+test('background appointment reads cover the durable sync window without the private inspection page cap', async () => {
+  let eventPages = 0;
+  const client = calendar.createGoogleClient(async url => {
+    eventPages += 1;
+    const page = Number(new URL(url).searchParams.get('pageToken') || 0);
+    return { ok: true, json: async () => ({
+      items: [event('event-' + page)],
+      ...(page < 2 ? { nextPageToken: String(page + 1) } : {}),
+    }) };
+  });
+  const rows = await client.appointmentEvents('token', 'primary', { from: '2026-08-30', to: '2026-12-12' });
+  assert.equal(eventPages, 3);
+  assert.equal(rows.length, 3);
+});
+
+test('background reads include explicit deleted rows while private inspection does not', async () => {
+  const seen = [];
+  const client = calendar.createGoogleClient(async url => {
+    seen.push(new URL(url).searchParams.get('showDeleted'));
+    return { ok: true, json: async () => ({ items: [] }) };
+  });
+  await client.events('token', 'primary', range);
+  await client.appointmentEvents('token', 'primary', range);
+  assert.deepEqual(seen, ['false', 'true']);
+});

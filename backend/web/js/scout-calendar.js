@@ -105,7 +105,7 @@
       return false;
     }
     host.innerHTML = '<p>' + (status.connected
-      ? 'Connected. Event details stay private to you and are not saved.'
+      ? 'Connected. Full event details stay private to you. Scout keeps only a minimal appointment history.'
       : 'Not connected. Review the private data-use note above before continuing.') + '</p>'
       + '<div class="calendar-actions"><button id="googleConnect" type="button">'
       + (status.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar') + '</button>'
@@ -125,7 +125,7 @@
     el('googleDisconnect').onclick = function () {
       action(this, async function () {
         if (!await window.scoutConfirm({ title: 'Disconnect Google Calendar?',
-          body: 'Scout will remove its saved Google connection. Your calendar events and recorded calls stay unchanged.', confirmText: 'Disconnect' })) return;
+          body: 'Scout will remove its saved Google connection. Your minimal appointment history stays with your Scout account.', confirmText: 'Disconnect' })) return;
         ++loadEpoch;
         el('calendarResults').textContent = 'Disconnecting Google Calendar…';
         var result = await request('/connection', 'DELETE');

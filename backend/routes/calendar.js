@@ -79,6 +79,21 @@ function createCalendarRouter(options = {}) {
     }
   };
 
+  router.post('/sync-all', run(async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+      const error = new Error('calendar_not_configured'); error.status = 503; throw error;
+    }
+    if ((req.get('X-Cron-Secret') || '') !== secret) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    const summary = await service().syncAll();
+    const allProviderReadsFailed = summary.total > 0 && summary.ok === 0 && summary.errors > 0;
+    const allReconciliationFailed = summary.reconciliation_total > 0
+      && summary.owners_reconciled === 0 && summary.reconciliation_errors > 0;
+    res.status(allProviderReadsFailed || allReconciliationFailed ? 502 : 200).json(summary);
+  }));
+
   router.post('/connect', authenticate, run(async (req, res) => {
     const origin = req.get('origin');
     if (origin && origin !== new URL(config().redirectUri).origin) throw new Error('calendar_origin_mismatch');

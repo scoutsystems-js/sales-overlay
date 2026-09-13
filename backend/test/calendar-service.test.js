@@ -147,3 +147,74 @@ test('disconnect also wins over an authorization exchange already in flight', as
   await Promise.all([connecting, disconnecting]);
   assert.equal(db.tables.google_calendar_connections.length, 0);
 });
+
+test('background sync keeps one occurrence and its minimal update history after disconnect', async () => {
+  const { service, google, db } = setup();
+  let providerEvent = (await google.events())[0];
+  let receivedRange;
+  google.appointmentEvents = async (_token, _calendarId, rangeArg) => {
+    receivedRange = rangeArg;
+    return [providerEvent];
+  };
+  await connect(service);
+  const first = await service.syncAll(new Date('2026-09-13T16:00:00Z'));
+  assert.deepEqual(receivedRange, { from: '2026-08-30', to: '2026-12-12' });
+  assert.equal(first.total, 1);
+  assert.equal(first.ok, 1);
+  assert.equal(first.appointments_recorded, 1);
+  assert.equal(db.tables.calendar_appointments.length, 1);
+  assert.equal(db.tables.calendar_appointment_history.length, 1);
+
+  providerEvent = {
+    ...providerEvent,
+    summary: 'Changed unverified title',
+    updated: '2026-09-13T17:00:00Z',
+    start: { dateTime: '2026-09-11T15:00:00Z' },
+    end: { dateTime: '2026-09-11T16:00:00Z' },
+  };
+  await service.syncAll(new Date('2026-09-13T18:00:00Z'));
+  assert.equal(db.tables.calendar_appointments.length, 1, 'a source update is still one occurrence');
+  assert.equal(db.tables.calendar_appointment_history.length, 2, 'both minimal source states remain');
+  assert.equal(db.tables.calendar_appointments[0].unverified_title, 'Changed unverified title');
+  await service.disconnect('rep');
+  assert.equal(db.tables.google_calendar_connections.length, 0);
+  assert.equal(db.tables.calendar_appointments.length, 1, 'disconnect keeps account history');
+  assert.equal(db.tables.calendar_appointment_history.length, 2);
+});
+
+test('retained appointments reconcile against late calls after calendar disconnect without another Google read', async () => {
+  const { service, db, google } = setup();
+  await connect(service);
+  db.tables.calendar_appointments = [{
+    id: 'appointment-late', user_id: 'rep', provider_calendar_id: 'primary@example.com', provider_event_id: 'event-late',
+    provider_occurrence_key: 'a'.repeat(64), scheduled_calendar_date: '2026-09-10', scheduled_time_zone: 'America/New_York',
+    zoom_meeting_id: '81234567890', matched_call_id: null,
+  }];
+  db.tables.calendar_appointment_history = [];
+  db.tables.fathom_calls = [{ id: 'call-late', user_id: 'rep', meeting_id: '81234567890', call_date: '2026-09-10T14:00:00Z' }];
+  await service.disconnect('rep');
+  let googleReads = 0;
+  google.calendars = async () => { googleReads += 1; return []; };
+  const result = await service.syncAll(new Date('2026-09-13T18:00:00Z'));
+  assert.equal(googleReads, 0);
+  assert.equal(result.disconnected_owners_reconciled, 1);
+  assert.equal(db.tables.calendar_appointments[0].matched_call_id, 'call-late');
+});
+
+test('stored reconciliation still runs when a connected owner Google read fails', async () => {
+  const { service, db, google } = setup();
+  await connect(service);
+  db.tables.calendar_appointments = [{
+    id: 'appointment-late', user_id: 'rep', provider_calendar_id: 'primary@example.com', provider_event_id: 'event-late',
+    provider_occurrence_key: 'a'.repeat(64), scheduled_calendar_date: '2026-09-10', scheduled_time_zone: 'America/New_York',
+    zoom_meeting_id: '81234567890', matched_call_id: null,
+  }];
+  db.tables.calendar_appointment_history = [];
+  db.tables.fathom_calls = [{ id: 'call-late', user_id: 'rep', meeting_id: '81234567890', call_date: '2026-09-10T14:00:00Z' }];
+  google.calendars = async () => { throw new Error('google_unavailable'); };
+  const result = await service.syncAll(new Date('2026-09-13T18:00:00Z'));
+  assert.equal(result.errors, 1);
+  assert.equal(result.owners_reconciled, 1);
+  assert.equal(result.reconciliation_errors, 0);
+  assert.equal(db.tables.calendar_appointments[0].matched_call_id, 'call-late');
+});

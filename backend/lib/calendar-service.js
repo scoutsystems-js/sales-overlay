@@ -1,7 +1,9 @@
 'use strict';
 const crypto = require('node:crypto');
-const { SCOPES, seal, unseal, inspectionEvents, scheduledGhlEvents, validateInspectionRange, authorizeUrl } = require('./google-calendar');
+const { SCOPES, seal, unseal, inspectionEvents, scheduledGhlEvents, validateInspectionRange, authorizeUrl,
+  dateInZone, isScheduledSlrGhlAppointment, zoomMeetingIdFromEvent } = require('./google-calendar');
 const { sharingEligibility, sharedCountStatus } = require('./calendar-sharing');
+const { recordObservedAppointments, reconcileStoredAppointments } = require('./calendar-appointments');
 const CONNECTIONS = 'google_calendar_connections';
 const STATES = 'google_calendar_oauth_states';
 const COLUMNS = 'user_id,generation,access_token_encrypted,refresh_token_encrypted,expires_at,connected_at,calendar_id,calendar_name,time_zone,title_contains,last_sync_at,last_sync_error,snapshot,share_scheduled_count,share_manager_id';
@@ -9,6 +11,11 @@ const PROFILE_COLUMNS = 'user_id,role,managed_by,active,team_name';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const refreshes = new Map();
 const authorizationWrites = new Map();
+const SYNC_CONCURRENCY = 4;
+const SYNC_PAST_DAYS = 14;
+const SYNC_FUTURE_DAYS = 90;
+const STORAGE_PAGE = 500;
+const ID_CHUNK = 200;
 
 // Scout currently serves one Railway process (same boundary as call-connections).
 // Serialize connect/disconnect so a late OAuth exchange cannot undo disconnect.
@@ -33,6 +40,32 @@ async function checked(query) {
   const result = await query;
   if (result.error) throw new Error('calendar_storage_error');
   return result.data;
+}
+
+async function pagedChecked(build) {
+  let rows = [];
+  for (let from = 0; ; from += STORAGE_PAGE) {
+    const page = await checked(build().range(from, from + STORAGE_PAGE - 1));
+    rows = [...rows, ...page];
+    if (page.length < STORAGE_PAGE) return rows;
+  }
+}
+
+function shiftCalendarDate(date, days) {
+  return new Date(Date.parse(date) + days * 86400000).toISOString().slice(0, 10);
+}
+
+function appointmentSyncRange(now, timeZone) {
+  const today = dateInZone(now.toISOString(), timeZone);
+  return { from: shiftCalendarDate(today, -SYNC_PAST_DAYS), to: shiftCalendarDate(today, SYNC_FUTURE_DAYS) };
+}
+
+async function mapBounded(items, read) {
+  let output = [];
+  for (let index = 0; index < items.length; index += SYNC_CONCURRENCY) {
+    output = [...output, ...await Promise.all(items.slice(index, index + SYNC_CONCURRENCY).map(read))];
+  }
+  return output;
 }
 
 function createCalendarService(admin, google, config) {
@@ -63,6 +96,29 @@ function createCalendarService(admin, google, config) {
     new Intl.DateTimeFormat('en', { timeZone: primary.time_zone });
     const appointments = inspectionEvents(scheduledGhlEvents(await google.events(token, primary.id, range)), range, primary.time_zone);
     return { primary, appointments };
+  }
+  async function syncConnection(conn, now) {
+    const token = await access(conn);
+    const calendars = await google.calendars(token);
+    const primary = calendars.find(calendar => calendar.primary === true);
+    if (!primary?.time_zone) throw new Error('calendar_not_available');
+    new Intl.DateTimeFormat('en', { timeZone: primary.time_zone });
+    const range = appointmentSyncRange(now, primary.time_zone);
+    const events = await google.appointmentEvents(token, primary.id, range);
+    const recorded = await recordObservedAppointments(admin, {
+      userId: conn.user_id,
+      generation: conn.generation,
+      calendarId: primary.id,
+      calendarTimeZone: primary.time_zone,
+      events,
+      observedAt: now.toISOString(),
+      isAppointment: isScheduledSlrGhlAppointment,
+      zoomMeetingIdFromEvent,
+    });
+    const current = await get(conn.user_id);
+    if (!current || current.generation !== conn.generation) throw new Error('connection_changed');
+    await update(conn, { last_sync_at: now.toISOString(), last_sync_error: null });
+    return { recorded };
   }
   return {
     async begin(userId) {
@@ -136,6 +192,57 @@ function createCalendarService(admin, google, config) {
         return { status: 'unavailable' };
       }
     },
+    async syncAll(now = new Date()) {
+      const connections = await pagedChecked(() => admin.from(CONNECTIONS).select(COLUMNS)
+        .order('user_id', { ascending: true }));
+      let profileRows = [];
+      for (let index = 0; index < connections.length; index += ID_CHUNK) {
+        profileRows = [...profileRows, ...await checked(admin.from('user_profiles').select('user_id,active')
+          .in('user_id', connections.slice(index, index + ID_CHUNK).map(conn => conn.user_id)))];
+      }
+      const activeById = new Map(profileRows.map(profile => [profile.user_id, profile.active !== false]));
+      const summary = { total: connections.length, ok: 0, appointments_recorded: 0, matched: 0,
+        reconciliation_total: 0, owners_reconciled: 0, disconnected_owners_reconciled: 0, reconciliation_errors: 0,
+        skipped_inactive: 0, errors: 0 };
+      const results = await mapBounded(connections, async conn => {
+        if (activeById.get(conn.user_id) === false) return { skipped: true };
+        try { return await syncConnection(conn, now); }
+        catch (error) {
+          try { await update(conn, { last_sync_error: error.message || 'calendar_unavailable' }); } catch (_) {}
+          return { error: true };
+        }
+      });
+      for (const result of results) {
+        if (result.skipped) summary.skipped_inactive += 1;
+        else if (result.error) summary.errors += 1;
+        else {
+          summary.ok += 1;
+          summary.appointments_recorded += result.recorded;
+        }
+      }
+
+      // Reconciliation reads only Scout's stored ledger and recording rows. Run
+      // it for every retained owner even when Google was unavailable or the
+      // owner disconnected, so a late recording can match historical evidence.
+      const ownerRows = await pagedChecked(() => admin.from('calendar_appointments').select('id,user_id')
+        .order('user_id', { ascending: true }).order('id', { ascending: true }));
+      const ownerIds = [...new Set(ownerRows.map(row => row.user_id).filter(Boolean))];
+      summary.reconciliation_total = ownerIds.length;
+      const connectedIds = new Set(connections.map(conn => conn.user_id));
+      const reconciliationResults = await mapBounded(ownerIds, async userId => {
+        try { return { userId, ...await reconcileStoredAppointments(admin, userId, now.toISOString()) }; }
+        catch (_) { return { userId, error: true }; }
+      });
+      for (const result of reconciliationResults) {
+        if (result.error) summary.reconciliation_errors += 1;
+        else {
+          summary.owners_reconciled += 1;
+          summary.matched += result.matched;
+          if (!connectedIds.has(result.userId)) summary.disconnected_owners_reconciled += 1;
+        }
+      }
+      return summary;
+    },
     async disconnect(userId) {
       return authorizeInOrder(userId, async () => {
         const conn = await get(userId);
@@ -149,4 +256,4 @@ function createCalendarService(admin, google, config) {
   };
 }
 
-module.exports = { readConfig, createCalendarService };
+module.exports = { readConfig, createCalendarService, appointmentSyncRange };

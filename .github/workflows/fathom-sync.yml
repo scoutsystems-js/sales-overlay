@@ -73,3 +73,21 @@ jobs:
             echo "zoom/sync-all did not return 200 or 503 (401 = secret mismatch; 5xx = server error)"
             exit 1
           fi
+      - name: Trigger /calendar/sync-all
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BACKEND_URL: https://sales-overlay-production.up.railway.app
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET repo secret is not set — aborting"; exit 1
+          fi
+          code=$(curl -sS -o /tmp/calendar-sync.json -w '%{http_code}' \
+            -X POST "$BACKEND_URL/calendar/sync-all" \
+            -H "X-Cron-Secret: $CRON_SECRET")
+          echo "HTTP $code"
+          cat /tmp/calendar-sync.json || true
+          echo
+          if [ "$code" != "200" ]; then
+            echo "calendar/sync-all did not return 200 (401 = secret mismatch; 5xx = sync failure)"
+            exit 1
+          fi

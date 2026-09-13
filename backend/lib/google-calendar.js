@@ -8,6 +8,7 @@ const SCOPES = Object.freeze([
 const DAY_MS = 86400000;
 const MAX_PAGES = 20;
 const MAX_INSPECTION_PAGES = 2;
+const EVENT_FIELDS = 'nextPageToken,items(id,status,summary,description,location,eventType,start,end,created,updated,visibility,transparency,recurringEventId,originalStartTime,organizer,creator,attendees,source,conferenceData(conferenceSolution),extendedProperties)';
 const SLR_GHL_PRIVATE_KEYS = Object.freeze(['calendarId', 'eventId', 'linkedCalendarId', 'userCalendarId', 'userId']);
 const SALESKICK_PROPERTY_KEYS = new Set(['skCreatedAt', 'skManagedBookingId', 'skSubmissionId', 'skVersion']);
 const SLR_BOOKING_HOST = 'links.soberlivingriches.com';
@@ -20,6 +21,19 @@ function urlHosts(value) {
     try { return [new URL(match[0]).hostname.toLowerCase()]; }
     catch (_) { return []; }
   });
+}
+
+function zoomMeetingIdFromEvent(event) {
+  if (typeof event?.location !== 'string') return null;
+  const ids = new Set([...event.location.matchAll(/https?:\/\/[^\s<>"']+/gi)].flatMap(match => {
+    try {
+      const url = new URL(match[0]);
+      if (url.hostname !== 'zoom.us' && !url.hostname.endsWith('.zoom.us')) return [];
+      const id = url.pathname.match(/^\/j\/(\d{9,11})(?:\/|$)/)?.[1];
+      return id ? [id] : [];
+    } catch (_) { return []; }
+  }));
+  return ids.size === 1 ? [...ids][0] : null;
 }
 
 function propertyNames(event) {
@@ -225,6 +239,12 @@ function createGoogleClient(fetchImpl = fetch) {
     }
     throw new Error('calendar_too_large');
   }
+  const eventParams = (range, showDeleted) => ({
+    singleEvents: 'true', showDeleted: showDeleted ? 'true' : 'false', orderBy: 'startTime',
+    timeMin: new Date(Date.parse(range.from) - DAY_MS).toISOString(),
+    timeMax: new Date(Date.parse(range.to) + 2 * DAY_MS).toISOString(),
+    fields: EVENT_FIELDS,
+  });
   return {
     exchange: (config, code) => token(config, { code, redirect_uri: config.redirectUri, grant_type: 'authorization_code' }),
     refresh: (config, refreshToken) => token(config, { refresh_token: refreshToken, grant_type: 'refresh_token' }),
@@ -237,13 +257,12 @@ function createGoogleClient(fetchImpl = fetch) {
       fields: 'nextPageToken,items(id,summary,summaryOverride,timeZone,accessRole,deleted,primary)',
     })).filter(readableCalendar).map(calendar => ({ id: calendar.id, name: calendar.summaryOverride || calendar.summary || calendar.id,
       time_zone: calendar.timeZone, primary: calendar.primary === true })),
-    events: (accessToken, calendarId, range) => pages('calendars/' + encodeURIComponent(calendarId) + '/events', accessToken, {
-      singleEvents: 'true', showDeleted: 'false', orderBy: 'startTime',
-      timeMin: new Date(Date.parse(range.from) - DAY_MS).toISOString(),
-      timeMax: new Date(Date.parse(range.to) + 2 * DAY_MS).toISOString(),
-      fields: 'nextPageToken,items(id,status,summary,description,location,eventType,start,end,created,updated,visibility,transparency,recurringEventId,organizer,creator,attendees,source,conferenceData(conferenceSolution),extendedProperties)',
-    }, MAX_INSPECTION_PAGES),
+    events: (accessToken, calendarId, range) => pages('calendars/' + encodeURIComponent(calendarId) + '/events', accessToken,
+      eventParams(range, false), MAX_INSPECTION_PAGES),
+    appointmentEvents: (accessToken, calendarId, range) => pages('calendars/' + encodeURIComponent(calendarId) + '/events', accessToken,
+      eventParams(range, true), MAX_PAGES),
   };
 }
 
-module.exports = { SCOPES, validateInspectionRange, dateInZone, inspectionEvents, scheduledGhlEvents, seal, unseal, authorizeUrl, createGoogleClient };
+module.exports = { SCOPES, validateInspectionRange, dateInZone, inspectionEvents, scheduledGhlEvents,
+  isScheduledSlrGhlAppointment, zoomMeetingIdFromEvent, seal, unseal, authorizeUrl, createGoogleClient };

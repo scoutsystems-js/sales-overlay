@@ -1,5 +1,7 @@
 # Google Calendar — private scheduled GHL appointments LIVE
 
+The current live behavior below predates the separate Calendar reconciliation foundation. That foundation is built locally and not live; it adds minimal retained appointment history without changing this page's current-count computation. See [calendar-reconciliation.md](calendar-reconciliation.md).
+
 ## Block 025 — automatic manager counts; LIVE
 
 Released `f97920d2b69a9cc7c5c48ea05d9849783e645945`, Railway `249f831e-a6cf-4321-b01b-e7183556fd96` SUCCESS. Connect Google Calendar now automatically makes the connected Scout profile's scheduled appointment count available to its current manager and authorized Scout admins. There is no sharing checkbox, second permission, account switch or reconnect. The connected Google account may differ from the Scout login. Event details remain private; the SLR event-source filter and SalesKick exclusion are unchanged. The existing connection backfill linked one connection to its manager scope. Full suite 2,884/2,884. Actual browser: private page shows 29 September 13–19 appointments; All users manager view shows Joshua Pinner 29, while unconnected members say Not connected. Onboarding now places Connect Google Calendar immediately after recording sources. Evidence: `~/Desktop/scan-reports/block-025-calendar-automatic/`.

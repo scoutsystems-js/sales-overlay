@@ -7,7 +7,7 @@ const { calendarStore } = require('./helpers/calendar-store');
 const { createCalendarService } = require('../lib/calendar-service');
 const { SCOPES } = require('../lib/google-calendar');
 
-async function server(t, full = false) {
+async function server(t, full = false, syncSummary = null) {
   const db = calendarStore({ user_profiles: [
     { user_id: 'manager', role: 'manager', first_name: 'Manager', active: true },
     { user_id: 'rep', managed_by: 'manager', role: 'user', first_name: 'Closer', active: true },
@@ -34,6 +34,7 @@ async function server(t, full = false) {
     complete: async () => { reads.push('completed'); },
     disconnect: async id => { reads.push(['disconnect', id]); },
     inspect: async (id, range) => { reads.push({ id, range }); return { ...range, calendar: { name: 'Primary', time_zone: 'America/New_York' }, event_count: 0, events: [] }; },
+    syncAll: async () => { reads.push('sync-all'); return syncSummary || { total: 1, ok: 1, appointments_recorded: 1, errors: 0 }; },
   };
   const app = express();
   app.use(express.json());
@@ -121,4 +122,42 @@ test('OAuth cannot start on a different host from its registered callback', asyn
   const response = await fetch(url + '/connect', { method: 'POST', headers: { Authorization: 'rep', Origin: 'https://other.example.com' } });
   assert.equal(response.status, 400);
   assert.equal((await response.json()).code, 'calendar_origin_mismatch');
+});
+
+test('background appointment sync requires the existing cron secret and executes the service', async t => {
+  const saved = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = 'calendar-cron-secret';
+  t.after(() => { if (saved === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = saved; });
+  const { url, reads } = await server(t);
+  assert.equal((await fetch(url + '/sync-all', { method: 'POST' })).status, 401);
+  const response = await fetch(url + '/sync-all', { method: 'POST', headers: { 'X-Cron-Secret': 'calendar-cron-secret' } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { total: 1, ok: 1, appointments_recorded: 1, errors: 0 });
+  assert.deepEqual(reads, ['sync-all']);
+});
+
+test('an all-failed background provider run is visible to the scheduler as non-success', async t => {
+  const saved = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = 'calendar-cron-secret';
+  t.after(() => { if (saved === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = saved; });
+  const summary = { total: 1, ok: 0, appointments_recorded: 0, errors: 1 };
+  const { url } = await server(t, false, summary);
+  const response = await fetch(url + '/sync-all', { method: 'POST', headers: { 'X-Cron-Secret': 'calendar-cron-secret' } });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), summary);
+});
+
+test('an all-failed reconciliation run is visible with or without active Google connections', async t => {
+  const saved = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = 'calendar-cron-secret';
+  t.after(() => { if (saved === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = saved; });
+  for (const summary of [
+    { total: 1, ok: 1, errors: 0, reconciliation_total: 1, owners_reconciled: 0, reconciliation_errors: 1 },
+    { total: 0, ok: 0, errors: 0, reconciliation_total: 1, owners_reconciled: 0, reconciliation_errors: 1 },
+  ]) {
+    const { url } = await server(t, false, summary);
+    const response = await fetch(url + '/sync-all', { method: 'POST', headers: { 'X-Cron-Secret': 'calendar-cron-secret' } });
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), summary);
+  }
 });
