@@ -7081,7 +7081,7 @@
        remain untouched; these rules only put the work areas in the approved
        fixed field and glass-panel system. */
     body[data-view="account"] { background:radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%); background-attachment:fixed; }
-    body[data-view="account"]::before, body[data-view="account"]::after { content:""; position:fixed; z-index:0; pointer-events:none; border:1px solid rgba(125,255,179,.14); opacity:.88; }
+    body[data-view="account"]::before, body[data-view="account"]::after { content:""; position:fixed; z-index:0; pointer-events:none; border:1px solid rgba(125,255,179,.14); opacity:.88; background-image:none!important; -webkit-mask:none; mask:none; }
     body[data-view="account"]::before { width:62%; height:78%; left:8%; top:2%; border-radius:48% 52% 45% 55%; transform:rotate(-18deg); animation:observatory-account-contour 30s ease-in-out infinite alternate; }
     body[data-view="account"]::after { width:78%; height:72%; right:-14%; bottom:-26%; border-radius:50%; animation:observatory-account-contour 38s ease-in-out -10s infinite alternate-reverse; }
     @keyframes observatory-account-contour { to { transform:rotate(-14deg) scale(1.04); } }
@@ -7107,7 +7107,7 @@
     /* Knowledge Base keeps its list and sharing controls, but now belongs to
        the same field and panel language as the rest of the redesigned app. */
     body[data-view="kb"] { background:radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%); background-attachment:fixed; }
-    body[data-view="kb"]::before, body[data-view="kb"]::after { content:""; position:fixed; z-index:0; pointer-events:none; border:1px solid rgba(125,255,179,.14); opacity:.88; }
+    body[data-view="kb"]::before, body[data-view="kb"]::after { content:""; position:fixed; z-index:0; pointer-events:none; border:1px solid rgba(125,255,179,.14); opacity:.88; background-image:none!important; -webkit-mask:none; mask:none; }
     body[data-view="kb"]::before { width:62%; height:78%; left:8%; top:2%; border-radius:48% 52% 45% 55%; transform:rotate(-18deg); animation:observatory-kb-contour 30s ease-in-out infinite alternate; }
     body[data-view="kb"]::after { width:78%; height:72%; right:-14%; bottom:-26%; border-radius:50%; animation:observatory-kb-contour 38s ease-in-out -10s infinite alternate-reverse; }
     @keyframes observatory-kb-contour { to { transform:rotate(-14deg) scale(1.04); } }
