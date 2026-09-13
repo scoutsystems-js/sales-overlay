@@ -1,6 +1,12 @@
 # Current build order — updated September 6, 2026
 
-The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Task 1 is active following Justin’s “you may begin.” Tasks 2–4 remain queued.
+The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Tasks 1–4 are closed; the Team → Coaching reset is live.
+
+## Active — Google Calendar connection and scheduled calls (Block 020, 2026-09-13)
+
+Justin authorized Codex to implement directly. Google Calendar only; GHL appointments arrive on mixed personal/internal/sales calendars. Local prototype is in `.codex/worktrees/google-calendar`, branch `codex/google-calendar`: encrypted read-only connection, calendar/title-filter preview, per-closer scheduled-call counts and appointment lists, manager-scoped access. Current Observatory main is merged locally. Calendar tests 29/29; combined suite 2,844/2,844. Nothing from this calendar work is pushed, migrated or live.
+
+**Next:** validate a real GHL appointment title before accepting the proposed filter; configure Google OAuth and complete a legitimate connect-to-count/reschedule/cancel/disconnect check. Title filtering is not yet proven on real appointments. The page is current scheduled appointments, including matching follow-ups—not a historical bookings ledger, calls-taken count, close-rate change or no-show inference. Details: [docs/google-calendar.md](docs/google-calendar.md). Canonical handoff: root `SCOUT-SHARED-CONTEXT.md`, Block 020. Preserve the separate design work and existing coaching/metrics.
 
 ## Current implementation — Observatory redesign (2026-09-13)
 

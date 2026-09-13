@@ -18,7 +18,7 @@ This is a **current scheduled-appointments view**, not a historical booking ledg
 1. Inspect one actual GHL appointment title/event with Justin. The title filter is a proposed deterministic setup control, not a proven GHL classifier. If sales calls lack a stable distinguishing title, or use multiple unrelated naming patterns, do not release this filter as accurate; resolve that from a real example first. Do not infer bookings from every event or from absent recordings.
 2. Configure the Google OAuth app and test one legitimate user's connect → preview → select → count → reschedule/cancel → refresh → disconnect flow. No live Google connection has been tested. Do not mint another user's Scout session.
 3. Apply the new schema to the intended environment before enabling the feature. The migration has only been executed in an isolated embedded PostgreSQL instance; local Supabase/Docker was unavailable. No live database change has occurred.
-4. Bring in the current design release, review the combined diff, run final tests and the normal drain/deploy/commit-marker checks before any production push. This document grants no deployment authority.
+4. Run the normal drain/deploy/commit-marker checks before any production push. The current design release (`origin/main` at `1a1cba2`) has been merged locally and the combined suite passed 2,844/2,844 with concurrency four. This document grants no deployment authority.
 
 ## Google setup
 
@@ -59,5 +59,7 @@ npm test
 ```
 
 The focused tests execute Google pagination/error handling, encryption, single-use OAuth, partial consent, deactivation, title filtering, preview/save agreement, cancellation/reschedule, timezone changes, disconnect races, the actual HTTP connect-to-count workflow, role/scope checks, and rendered desktop/mobile interactions. Access/scope guards were also tested with both removed gates and gates whose effects were ignored.
+
+Local results: 29/29 calendar tests; combined suite 2,844/2,844 after incorporating Observatory. Two earlier runs hit unchanged wall-clock timing assertions in `lane-parallel.test.js`; that file passed alone and in the final integrated run. No assertions were weakened. The schema executed in PGlite, rejecting incomplete selections and anon/authenticated access to both tables; service-role reads and auth-user deletion cascades passed. Rendered checks used 1400px and 390px layouts. All Google responses were fixtures: these results do not certify real GHL naming or a live Google connection.
 
 Reference documentation: [Google OAuth web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server), [Calendar scopes](https://developers.google.com/workspace/calendar/api/auth), [Event listing and recurrence](https://developers.google.com/workspace/calendar/api/v3/reference/events/list), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
