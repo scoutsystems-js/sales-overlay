@@ -6033,6 +6033,7 @@
     }
 </style>
   <script src="/js/scout-auth.js"></script>
+  <script src="/js/scout-calendar-account.js"></script>
   <script src="/js/scout-modal.js"></script>
 </head>
 <body>
@@ -17375,7 +17376,7 @@
 
     content.innerHTML =
         '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
-      + '<div class="section fade-in" id="connectionsSection"><div class="section-header"><h2>Connections</h2><div class="meta">your call recording sources</div></div>' + renderConnectionsSectionHtml() + '</div>'
+      + '<div class="section fade-in" id="connectionsSection"><div class="section-header"><h2>Connections</h2></div>' + renderConnectionsSectionHtml() + '<div id="calendarConnection">Loading Google Calendar…</div></div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
       + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody
         + priceFieldHtml(a) + '</div>'
@@ -17413,6 +17414,7 @@
     /* Their own support reports. ⚠ AFTER the markup exists — loadMyTickets
        writes into #supportMine, which this render just created. */
     loadMyTickets();
+    window.ScoutCalendarAccount.mount(document.getElementById('calendarConnection'));
   }
 
   // Scroll the #account Connections section into view and pulse the Zoom row, so

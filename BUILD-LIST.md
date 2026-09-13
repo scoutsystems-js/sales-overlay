@@ -1,10 +1,16 @@
 # Current build order — updated September 6, 2026
 
-Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
+The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Tasks 1–4 are closed; the Team → Coaching reset is live.
 
-The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Task 1 is active following Justin’s “you may begin.” Tasks 2–4 remain queued.
+## Active — Google Calendar connection and private inspection (Block 021, 2026-09-13)
+
+Justin authorized Codex to implement directly. Google Calendar only; GHL appointments arrive on mixed personal/internal/sales calendars and titles are normally only prospect names. The Block 020 title-filter/count prototype is replaced locally on `.codex/worktrees/google-calendar`: Account Connect starts Google directly after a short privacy disclosure; callback automatically reads the connected user's primary calendar; the user can privately inspect an allowlisted, escaped event-detail shape for at most 14 days. Raw event details are read on demand and never stored, logged, sent to AI or shared with a manager. Former team/schedule/preview/selection routes and the My Team calendar entry are removed. No sales-call classification or count is claimed. Focused tests: 27/27. Full backend suite: 2,842/2,842. Desktop and mobile fixture renders were inspected in `~/Desktop/scan-reports/block-021-calendar-connect/`.
+
+The existing additive migration was applied separately: both empty tables have RLS and no browser grants. A separate Scout Calendar Google project now has the API, read-only consent scopes and exact production callback configured; its credentials are saved in Railway without triggering deployment. The existing Scout login client is unchanged. Justin authorized releasing this private test flow so Josh can connect. **Next:** release after integrated checks and a fresh drain check, add Josh's actual Google email to Google's test list, then complete connect → automatic inspection → date change → disconnect and compare real GHL/non-GHL fields before proposing any sales-event rule. Nothing from this code is pushed or live at this checkpoint. Details: [docs/google-calendar.md](docs/google-calendar.md). Canonical handoff remains the root `SCOUT-SHARED-CONTEXT.md`; preserve the separate design work and existing coaching/metrics.
 
 ## Current implementation — Observatory redesign (2026-09-13)
+
+Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
 
 **LIVE — refinement verified 2026-09-13 on `9bdfa4e1cbb8322a8f36add576650bf3be6323c5`.** The source is in
 `.codex/worktrees/observatory-pages`, based on origin `4269494` and preserving

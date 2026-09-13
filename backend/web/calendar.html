@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Google Calendar — Scout Systems</title>
+  <link rel="icon" type="image/svg+xml" href="/scout-glyph.svg">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/calendar.css">
+  <script src="/js/scout-auth.js"></script>
+  <script src="/js/scout-modal.js"></script>
+  <script src="/js/scout-calendar.js" defer></script>
+</head>
+<body class="calendar-page">
+  <header class="calendar-topbar">
+    <a href="/dashboard"><img src="/scout-wordmark.svg" alt="Scout Systems" width="190" height="32"></a>
+    <a href="/dashboard#account">My Account</a>
+  </header>
+  <main class="calendar-main">
+    <a href="/dashboard#account">← Back to My Account</a>
+    <h1>Google Calendar</h1>
+    <p class="calendar-note">A private connection test to learn how GHL appointments appear on your calendar.</p>
+    <section id="calendarDataUse" class="calendar-panel" aria-labelledby="calendarDataUseTitle">
+      <h2 id="calendarDataUseTitle">Before you connect</h2>
+      <p>Scout will read your primary Google Calendar for the dates shown so you can inspect the event details Google provides. This private test is visible only to you.</p>
+      <p>Scout will not create or change events. It will not save event titles, descriptions, attendee details, or other event data, and this inspection is not sent to AI. Only your encrypted Google connection is saved.</p>
+    </section>
+    <p id="calendarNotice" role="status"></p>
+    <section class="calendar-panel" aria-labelledby="calendarConnectionTitle">
+      <h2 id="calendarConnectionTitle">Your connection</h2>
+      <div id="calendarConnection" aria-live="polite">Loading your connection…</div>
+    </section>
+    <form id="calendarRange" class="calendar-controls" hidden>
+      <label>From <input id="calendarFrom" type="date" required></label>
+      <label>Through <input id="calendarTo" type="date" required></label>
+      <button type="submit">Inspect Events</button>
+    </form>
+    <section id="calendarResults" aria-live="polite" aria-label="Private calendar inspection">Connect Google Calendar to inspect events.</section>
+  </main>
+</body>
+</html>
