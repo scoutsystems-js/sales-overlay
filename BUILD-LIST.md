@@ -2,7 +2,9 @@
 
 The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Tasks 1–4 are closed; the Team → Coaching reset is live.
 
-## Active — Scheduled GHL appointments (Block 022, local, 2026-09-13)
+## Active — Scheduled GHL appointments LIVE (Block 022, 2026-09-13)
+
+**Release verified:** `94bef3be7d6f5fc168df3b30e2c084dba9bcc2c6`, Railway `05a18e3e-26f6-4813-9bbb-331607ded02f` SUCCESS. Latest design `c472290` preserved. Combined tests 2,854/2,854. Real Josh browser counts 29 for September 13–19 and 33 for September 7–12; zero SalesKick rows, dates verified and current week restored. No manager sharing, event history or first-booking metrics. **Next proposed build:** manager per-closer scheduled counts with an appropriate sharing disclosure/authorization. The pre-release checkpoint below is historical.
 
 **LIVE connection test:** `22884b96e7289b0152e997d63b78414e86c5a54d`, Railway `b804381e-61a2-4bb4-b06b-421b5305969b` SUCCESS. Josh successfully connected `joshua@soberlivingriches.com`; the private page read 75 events in one real window. **Block 022 is local and not yet released:** it will show only current Scheduled GHL appointments, not every calendar event or a historical booked-call metric. The pre-release checkpoint below is historical.
 
