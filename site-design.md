@@ -43,7 +43,9 @@ uses the fixed ground and HUD, 24px desktop / 18px mobile gutters, selected rail
 transparent header, SVG Closing % instrument, compact existing support cards,
 and two-column lower focus panels. The existing rail observer sets clearance
 from the actual menu height. Inline-script parsing and diff checks pass. Focused rendered coverage for populated,
-loading, no-prospect, and first-load states passes; the full backend suite passes 2,853/2,853. The direct Overview loader now stamps `data-view="overview"` before it inserts the fixed HUD, so its scoped ground is present before analytics returns. Archives remain unchanged.
+loading, no-prospect, and first-load states passes; the full backend suite passes 2,856/2,856. The direct Overview loader now stamps `data-view="overview"` before it inserts the fixed HUD, so its scoped ground is present before analytics returns.
+
+September 13 compact Dashboard refinement: implemented in the Observatory worktree; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/compact/release-status.md`. Closing %, Calls analyzed, Avg score, and Objection handle rate are four existing-data SVG instruments. Closing remains dominant; Calls uses analyzed/in-range completion, Avg score retains its existing score color and trend, and OHR retains its existing rate and counts without a new band. Coach Summary fills the rail-height upper area; What Needs Work is the full lower left panel, with Objection Handling Focus and Performance Summary independently stacked at right. Desktop support rings are centered and compact; phones use a bounded two-by-two grid. Missing values are neutral without an arc or glow. Existing drills, loading, controls, metrics, and the approved archives remain unchanged.
 
 ## Approved visual standard
 

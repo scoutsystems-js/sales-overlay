@@ -33,7 +33,7 @@ metrics, controls, lazy graph, drilldowns, permissions, and Closing % definition
 remain unchanged; the proportional ring reads the existing close rate and counts
 without a target or band or any metric-computation change. The real rail observer sets lower-panel clearance.
 Inline parsing and diff checks pass; focused rendered populated/loading/no-prospect
-coverage passes; the full backend suite passes 2,853/2,853. The direct Overview first-load path stamps `data-view="overview"` before its fixed HUD is inserted, and the regression fixture begins without that hook. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`.
+coverage passes; the full backend suite passes 2,856/2,856. The direct Overview first-load path stamps `data-view="overview"` before its fixed HUD is inserted, and the regression fixture begins without that hook. September 13 compact refinement: the same Closing, Calls analyzed, Avg score, and OHR values render as four SVG instruments; Closing stays dominant, calls use the actual in-range total, score retains its existing trend/color, OHR adds no band, and missing values are neutral. Coach Summary fills the upper rail area; What Needs Work is the wide lower left panel while Objection Focus and Performance Summary stack at right; phones use a two-by-two grid. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/compact/release-status.md`.
 
 **September 13 visual refinement — LIVE, verified 2026-09-13.**
 The Observatory pages now have two localized emerald pools separated by a dark

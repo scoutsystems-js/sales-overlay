@@ -24,7 +24,11 @@ over the gradient, background-off hides HUD art, and reduced motion stops it.
 
 The extension is recorded in the Observatory worktree. Release verification:
 `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. Inline script parsing and the final diff check pass. Focused rendered coverage for populated,
-loading, no-prospect, and first-load states passes; the full backend suite passes 2,853/2,853. The direct Overview loader stamps `data-view="overview"` before it inserts the fixed HUD, preserving the scoped ground during its analytics wait.
+loading, no-prospect, and first-load states passes; the full backend suite passes 2,856/2,856. The direct Overview loader stamps `data-view="overview"` before it inserts the fixed HUD, preserving the scoped ground during its analytics wait.
+
+### Compact Dashboard refinement — September 13 implementation
+
+The personal Dashboard now presents its same four top values as SVG instruments: dominant Closing %, Calls analyzed against the actual in-range total, Avg score with its existing score color and trend, and Objection handle rate with its existing rate and counts. No target, band, metric calculation, load, or drill target changed. Missing values remain neutral with no arc or glow. Coach Summary now occupies the real rail-height upper area; below the rail, the long What Needs Work panel sits at left while Objection Handling Focus and the existing Performance Summary link stack independently at right. Desktop support gauges are centered and compact; phones use a bounded two-by-two gauge grid. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/compact/release-status.md`. Inline parsing and the final diff check pass; rendered focused coverage and the full backend suite pass 2,856/2,856.
 
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
