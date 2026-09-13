@@ -515,6 +515,24 @@ function renderOverviewAs(overrides) {
   return out;
 }
 
+test('personal Coaching Dashboard renderer keeps Closing % as the dominant number and preserves lazy lanes', () => {
+  const out = renderOverviewAs();
+  const closing = out.html.indexOf('Closing %');
+  assert.ok(closing > -1, 'personal dashboard must render the closing-rate lead');
+  assert.ok(closing < out.html.indexOf('Avg score'), 'Closing % must lead Avg score');
+  assert.ok(out.html.includes('Performance Summary'), 'performance entry point remains available');
+  assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'lazy performance lane must not mount on first render');
+});
+
+test('personal Coaching Dashboard loading and no-data states remain truthful', () => {
+  const loading = renderOverviewAs({ analytics2: null, analytics2Loading: true });
+  assert.ok(loading.html.length > 0, 'loading overview still renders a shell');
+  assert.ok(/loading|Loading|skeleton/i.test(loading.html), 'loading state is visible');
+  const empty = renderOverviewAs({ analytics2: { calls: { analyzed: 0, total_in_range: 0, processing: 0, error: 0 }, avg_score: { mean: null, graded_calls: 0 }, objections: { calls_with_objection: 0, total_highlights: 0 }, close_rate: null, close_wins: 0, close_decided: 0, sections: {}, weakest_section: null, strongest_section: null, latest_one_things: [] }, needsWork: { available: false } });
+  assert.ok(empty.html.length > 0, 'no-data overview still renders');
+  assert.ok(/No calls|No data|—/.test(empty.html), 'no-data state is explicit rather than a fabricated zero');
+});
+
 const REP_SERIES = {
   buckets: [{ label: 'Aug 3' }, { label: 'Aug 10' }],
   reps: [

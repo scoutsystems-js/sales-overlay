@@ -53,7 +53,7 @@ const PROBE = `(() => { const s = document.getElementById('bgSwitch'); const t =
   return { edge: ct.borderTopWidth + ' ' + ct.borderTopStyle + ' ' + ct.borderTopColor, trackFill: ct.backgroundColor, radius: ct.borderTopLeftRadius, box: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
     knobX: Math.round(kr.left - r.left), knobW: Math.round(kr.width), glyphFill: cg.backgroundColor, glyphOpacity: cg.opacity, glyphH: Math.round(gr.height), masked: /svg/.test(cg.webkitMaskImage || cg.maskImage || ''),
     barH: Math.round(bar.height), markRight: Math.round(mark.right), acctLeft: Math.round(acct.left), acctRight: Math.round(acct.right), text: s.textContent.trim() }; })()`;
-function page(on) { return '<!doctype html><html><head>' + STYLE + '</head><body data-view="overview">' + (on ? NAV : NAV.replace('aria-checked="true"', 'aria-checked="false"')) + '</body></html>'; }
+function page(on, view) { return '<!doctype html><html><head>' + STYLE + '</head><body data-view="' + (view || 'overview') + '">' + (on ? NAV : NAV.replace('aria-checked="true"', 'aria-checked="false"')) + '</body></html>'; }
 
 test('⚠⚠ RENDERED: white edge in BOTH states on a black track that never changes, the knob SLIDES, the glyph goes accent/dim, and nothing else in the bar moves', () => {
   const on = renderComputed(page(true), PROBE), off = renderComputed(page(false), PROBE);
@@ -62,7 +62,7 @@ test('⚠⚠ RENDERED: white edge in BOTH states on a black track that never cha
     assert.strictEqual(st.trackFill, 'rgb(0, 0, 0)', name + ': the track stays black'); assert.strictEqual(st.radius, '999px', name + ': a pill track');
     assert.ok(st.masked, name + ': the glyph is the vector, masked'); assert.ok(st.glyphH >= 15, name + ': the glyph is knob-sized (' + st.glyphH + 'px)'); assert.strictEqual(st.text, '', name + ': no text');
   }
-  assert.strictEqual(on.glyphFill, 'rgb(9, 224, 70)', 'on: the glyph is Scout green'); assert.strictEqual(on.glyphOpacity, '1');
+  assert.strictEqual(on.glyphFill, 'rgb(9, 213, 67)', 'on: the glyph is Observatory Scout green'); assert.strictEqual(on.glyphOpacity, '1');
   assert.strictEqual(off.glyphFill, 'rgb(237, 237, 237)', 'off: the glyph is the text white, dimmed'); assert.ok(+off.glyphOpacity >= 0.5 && +off.glyphOpacity <= 0.7, 'off: dimmed but readable (' + off.glyphOpacity + ')');
   assert.ok(on.knobX - off.knobX >= 16, 'the knob travels: on at ' + on.knobX + ', off at ' + off.knobX);
   assert.deepStrictEqual(on.box, off.box, 'the control\'s own box is identical in both states');
@@ -70,4 +70,9 @@ test('⚠⚠ RENDERED: white edge in BOTH states on a black track that never cha
   assert.ok(on.box[0] > on.acctRight, 'the toggle sits to the right of My Account');
   assert.strictEqual(on.barH, 51, 'the bar is 51px with the toggle in it (the vector wordmark had grown it to 55 — H697)');
   assert.ok(on.box[1] >= 2 && on.box[1] + on.box[3] <= 51 - 2, 'the track FITS inside the 51px bar with room on both sides (top ' + on.box[1] + ', height ' + on.box[3] + ') — an explicit bar height would otherwise hide a track that overflows it');
+});
+
+test('non-Observatory pages retain the original Scout green toggle glyph', () => {
+  const on = renderComputed(page(true, 'call-library'), PROBE);
+  assert.strictEqual(on.glyphFill, 'rgb(9, 224, 70)');
 });

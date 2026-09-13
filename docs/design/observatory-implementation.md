@@ -9,6 +9,23 @@ verified 2026-09-13. The later visibility calibration passes all 36 focused
 checks; production verification is recorded in
 `~/Desktop/scan-reports/observatory-2026-09-13/visibility/release-status.md`.
 
+### Coaching Dashboard extension — September 13 implementation
+
+The approved third Observatory page is the personal Coaching Dashboard
+(`body[data-view="overview"]`). It retains every existing data load, metric,
+date/user/pivot control, source/onboarding control, lazy optional rep graph,
+drill target, permission, and lower panel. Closing % remains the existing
+dominant prospect-close value and counts; its SVG ring reads the existing
+`prospect_close_rate` only and introduces no target or band and no metric calculation.
+The upper hero shares the fixed ground/HUD and real rail-clearance observer;
+compact existing support cards sit beside the instrument, while lower focus
+panels reclaim the full width below the actual menu. The header remains clear
+over the gradient, background-off hides HUD art, and reduced motion stops it.
+
+The extension is recorded in the Observatory worktree. Release verification:
+`~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. Inline script parsing and the final diff check pass. Focused rendered coverage for populated,
+loading, and no-prospect states passes; the full backend suite passes 2,852/2,852.
+
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
 `4269494` and preserves the four newer design commits in this worktree. The
@@ -37,14 +54,14 @@ above the artwork. Desktop and phone previews were reviewed. Only stylesheet
 and decorative HUD markup changed; all other page logic is byte-identical.
 Receipts: `~/Desktop/scan-reports/observatory-2026-09-13/animation/`.
 
-The approved redesign covers exactly two dashboard pages: Team → Coaching and
-Team → Performance. The server logic, intelligence, data contracts, routes,
-and existing functionality remain unchanged. Coaching keeps the current
-verified one focus item and one real supporting call; the retired stage grid is
-not restored. Performance keeps its three existing trend charts and their
-filters, even where those controls are absent from the static mockup.
+The live redesign covers Team → Coaching and Team → Performance; the approved
+third page, personal Coaching Dashboard, is recorded as a September 13
+implementation; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. Server logic, intelligence, data contracts, routes, and existing
+functionality remain unchanged. Coaching keeps the verified one-focus-item and
+one-real-supporting-call behavior; Performance keeps its trend charts and
+filters; Overview keeps its existing controls, loading paths, and drilldowns.
 
-Visual changes are scoped to the two approved views. Existing interactions,
+Visual changes are scoped to these three approved views. Existing interactions,
 filters, date ranges, rep selection, evidence links, chart drilldowns, and
 loading and empty states remain on their existing paths.
 
@@ -56,9 +73,11 @@ Page-scoped shape tokens use 20px panels on desktop, 16px on narrow screens,
 and 11px selected controls. The remaining pages retain their current tokens.
 
 The rail clearance follows the real menu height, including late navigation
-updates and viewport changes. Lower panels span the page below it. On phones,
-Coaching stacks the closer list above readable details; Performance stacks its
-instruments and rep cards.
+updates and viewport changes. Lower panels span the page below it. Overview uses
+the same observer so short rails do not leave a fixed gap; its lower focus panels
+are two columns when space permits and one column on phones. On phones, Coaching
+stacks the closer list above readable details; Performance stacks its instruments
+and rep cards.
 
 Review covered populated desktop and 390px phone layouts and expanded call
 exchanges. Existing guards retain metric bands, fixed seven-day instruments,
