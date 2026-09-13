@@ -12,6 +12,9 @@ The existing additive migration was applied separately: its tables have RLS and 
 
 ## Current implementation — Observatory redesign (2026-09-13)
 
+**Visor standard implemented; focused checks pass, not yet pushed.** Lock the fixed forest-gradient/HUD ground, translucent softly glowing cards and free-floating animated Visor gauges in `site-design.md`. Apply to personal Coaching Dashboard and Team Performance, with existing metric-dependent semantic bands. Team Performance keeps its three current metrics and fixed seven-day window; other page behavior stays intact. Verification/release record: `docs/design/observatory-implementation.md` and `~/Desktop/scan-reports/observatory-2026-09-13/visor-standard/`.
+
+
 Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
 
 **LIVE — refinement verified 2026-09-13 on `9bdfa4e1cbb8322a8f36add576650bf3be6323c5`.** The source is in

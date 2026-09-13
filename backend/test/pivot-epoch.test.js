@@ -24,7 +24,7 @@ const live = stripComments(source);
 function decl(re) { const m = live.match(re); if (!m) throw new Error('declaration not found: ' + re); return m[0]; }
 
 const REAL = ['setUser', 'setCallLibraryUser', 'resetRepScopedState', 'reloadAll', 'render', 'renderOverview', 'renderCoachingOverview', 'renderHeaderHtml',
-  'avgScoreSubstat', 'glanceTileHtml', 'leadNumberHtml', 'closeRateDisplay', 'overviewMetricInstrumentHtml', 'overviewCloseInstrumentHtml', 'objectionHandleRate', 'tileTrendHtml', 'scoreTrend', 'renderCoachSummary2',
+  'avgScoreSubstat', 'glanceTileHtml', 'leadNumberHtml', 'closeRateDisplay', 'visorTickMarks', 'visorPoint', 'visorGaugeHtml', 'overviewGaugePolicy', 'overviewMetricInstrumentHtml', 'overviewCloseInstrumentHtml', 'objectionHandleRate', 'tileTrendHtml', 'scoreTrend', 'renderCoachSummary2',
   'fetchAnalytics2', 'isSelf', 'pivoted', 'personLabel', 'laneWaitHtml', 'armLaneWait', 'clearLaneWait', 'loadNeedsWork', 'fetchNeedsWork', 'loadSectionRank',
   'loadCallLibrary', 'fetchCallLibrary', 'renderCallLibrary', 'loadObjectionsIntel', 'fetchObjectionsIntel'];
 const ASYNC = { reloadAll: 1, fetchAnalytics2: 1, loadNeedsWork: 1, fetchNeedsWork: 1, loadSectionRank: 1, loadCallLibrary: 1, fetchCallLibrary: 1, loadObjectionsIntel: 1, fetchObjectionsIntel: 1 };

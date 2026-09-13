@@ -206,6 +206,7 @@
 - **Deleted/dead views normalise at every ENTRY point** (`setView` AND the hash map), never in a renderer; redirect, do not delete (bookmarks). (H379)
 
 ### 4e · Design rulings (the 2026-08/09 design pass)
+- **Observatory + Visor is the approved site standard:** follow the current section of `site-design.md` for fixed gradient/HUD, translucent cards, free-floating gauges and slow outer-only rotation; reuse existing metric-specific color policies. Implementation scope and prior archives are distinguished there. (H777)
 - **Green carries three meanings at once — good, brand, and the association between them — by design. Never raise it as a collision again.** The only green issue worth raising is legibility (green on green), answered by contrast and FORM (border, fill, weight), never by hue. (H364)
 - **Scout green is `#09e046`** (a correction to the asset, not a preference); `--accent-rgb` exists because `rgba()` cannot read a hex token, and every tint derives from it. `--green-dark` is derived by ratio. (H321, H326)
 - **Palette has three jobs — semantic, interactive, categorical — and the categorical rep-line ramp borrows no hue from the other two.** Seven entries; a second cycle is DASHED, not more hues (the hue space is measured out). (H327, H052)

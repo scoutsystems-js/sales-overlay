@@ -101,3 +101,13 @@ test('empty range → zero decided, no rate', async () => {
   assert.strictEqual(out.close_decided, 0);
   assert.strictEqual(out.close_rate, undefined);
 });
+
+test('analytics2 carries personal gauge policy from canonical Team metrics without another fetch', async () => {
+  const A = require('../lib/team-averages');
+  const nonempty = await sa.computeCallAnalytics(fakeAdmin({ fathom_calls: CALLS, call_analyses: ANALYSES, call_highlights: [] }), 'U', FROM, TO);
+  const empty = await sa.computeCallAnalytics(fakeAdmin({ fathom_calls: [], call_analyses: [], call_highlights: [] }), 'U', FROM, TO);
+  for (const result of [nonempty, empty]) {
+    assert.deepStrictEqual(result.gauge_policy.closing, A.gaugePolicy('closing'));
+    assert.deepStrictEqual(result.gauge_policy.objections, A.gaugePolicy('objections'));
+  }
+});

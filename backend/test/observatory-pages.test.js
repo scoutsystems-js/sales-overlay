@@ -152,9 +152,13 @@ test('Performance remains an executed team surface: its date/team controls, sort
   }
   assert.deepEqual(out.charts.map((chart) => chart.canvas), ['repHandleChart', 'repCloseChart', 'repPriceChart'],
     'the existing three chart slots must mount before the new visual treatment is considered safe');
-  for (const ringPart of ['observatory-ring-track', 'observatory-ring-glow', 'observatory-ring-value']) {
+  for (const ringPart of ['observatory-visor-track', 'observatory-visor-arc-glow', 'observatory-visor-arc', 'observatory-visor-ticks', 'observatory-visor-contours', 'observatory-visor-bracket']) {
     assert.ok(out.markup.includes(ringPart), 'the instrument is incomplete: ' + ringPart);
   }
+  assert.match(out.markup, /observatory-visor-target[^]*>25<\/text>/, 'Closing retains its canonical 25% calibration mark');
+  assert.match(out.markup, /observatory-visor-target[^]*>35<\/text>/, 'Objection handling retains its canonical 35% calibration mark');
+  assert.match(out.markup, /observatory-visor-target[^]*>45<\/text>/, 'Call time uses its 35–45 minute good-band calibration');
+  assert.doesNotMatch(out.markup, /observatory-visor-target[^]*>60<\/text>/, 'Call-time must not redraw the old 60-minute ceiling as a target');
 });
 
 test('Coaching remains an executed team surface: one selected closer keeps the verified call, owner-aware review door, and cited evidence', () => {
@@ -358,4 +362,18 @@ test('the new motion has a reduce-motion override scoped to its own decorative p
     assert.ok(reduced.includes(selector), 'reduced motion must include ' + selector);
   }
   assert.match(reduced, /animation\s*:\s*(none|0s)/, 'new decorative movement must stop for reduced motion');
+});
+
+test('Team Performance stacks full-size Visor instruments on a narrow phone', () => {
+  const rendered = renderTeamSurface(PERFORMANCE);
+  const observed = renderComputed(visualShell('team-performance', rendered.markup), `(() => {
+    const gauges = [...document.querySelectorAll('.observatory-team-panel .observatory-visor-gauge')];
+    return { columns: getComputedStyle(document.querySelector('.avg-grid')).gridTemplateColumns.split(' ').length,
+      gauges: gauges.map((node) => { const r = node.getBoundingClientRect(); return { width: r.width, top: r.top, bottom: r.bottom }; }) };
+  })()`, { width: 390 });
+  assert.equal(observed.columns, 1, 'narrow Team Performance stacks its three instruments');
+  assert.equal(observed.gauges.length, 3);
+  observed.gauges.forEach((gauge) => assert.ok(gauge.width >= 210, 'a phone Visor retains readable scale text'));
+  assert.ok(observed.gauges[1].top >= observed.gauges[0].bottom, 'Team gauges do not share a cramped phone row');
+  assert.ok(observed.gauges[2].top >= observed.gauges[1].bottom, 'Team gauges remain vertically ordered');
 });

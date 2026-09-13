@@ -5733,7 +5733,9 @@
     body[data-view="team-performance"] .team-controls-row .page-header-side,
     body[data-view="team-coaching"] .team-controls-row .page-header-side { position:static; transform:none; justify-content:flex-end; width:100%; }
 
-    body[data-view="team-performance"] .observatory-team-panel,
+    body[data-view="team-performance"] .observatory-team-panel {
+      border-color:transparent!important; background:transparent!important; backdrop-filter:none; -webkit-backdrop-filter:none; box-shadow:none!important;
+    }
     body[data-view="team-performance"] .observatory-reps-panel,
     body[data-view="team-performance"] .observatory-detail-panel,
     body[data-view="team-coaching"] .observatory-focus-panel,
@@ -6068,6 +6070,84 @@
     body[data-view="overview"] .observatory-overview .perf-feature-points { gap:14px; }
     body[data-view="overview"] .observatory-overview .perf-feature-point { padding-left:0; }
 
+    /* Visor instruments: a fixed 270° horseshoe holds the reading still while
+       only its outer surveying marks move. These rules deliberately exclude
+       Team Coaching's existing score ring. */
+    body[data-view="overview"] .observatory-visor-gauge,
+    body[data-view="team-performance"] .observatory-visor-gauge {
+      --visor-tone:rgba(221,238,227,.40); position:relative; width:216px; max-width:100%; height:220px;
+      color:var(--visor-tone); filter:drop-shadow(0 0 8px color-mix(in srgb, var(--visor-tone) 42%, transparent));
+    }
+    body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge { width:244px; height:238px; }
+    body[data-view="overview"] .observatory-visor-gauge svg,
+    body[data-view="team-performance"] .observatory-visor-gauge svg { display:block; width:100%; height:100%; overflow:visible; }
+    body[data-view="overview"] .observatory-visor-gauge svg path,
+    body[data-view="team-performance"] .observatory-visor-gauge svg path { fill:none; }
+    body[data-view="overview"] .observatory-visor--good,
+    body[data-view="team-performance"] .observatory-visor--good { --visor-tone:var(--good); }
+    body[data-view="overview"] .observatory-visor--mid,
+    body[data-view="team-performance"] .observatory-visor--mid { --visor-tone:var(--mid); }
+    body[data-view="overview"] .observatory-visor--bad,
+    body[data-view="team-performance"] .observatory-visor--bad { --visor-tone:var(--bad); }
+    body[data-view="overview"] .observatory-visor--empty,
+    body[data-view="team-performance"] .observatory-visor--empty { --visor-tone:rgba(221,238,227,.40); filter:none; }
+    body[data-view="overview"] .observatory-visor-track,
+    body[data-view="team-performance"] .observatory-visor-track { stroke:rgba(221,238,227,.16); stroke-width:7; stroke-linecap:round; }
+    body[data-view="overview"] .observatory-visor-arc-glow,
+    body[data-view="team-performance"] .observatory-visor-arc-glow { stroke:var(--visor-tone); stroke-width:15; stroke-linecap:round; opacity:.34; filter:blur(6px); }
+    body[data-view="overview"] .observatory-visor-arc,
+    body[data-view="team-performance"] .observatory-visor-arc { stroke:var(--visor-tone); stroke-width:5; stroke-linecap:round; filter:drop-shadow(0 0 2px rgba(245,255,248,.85)); }
+    body[data-view="overview"] .observatory-visor-ticks,
+    body[data-view="team-performance"] .observatory-visor-ticks { stroke:rgba(226,246,233,.68); stroke-width:1.15; transform-box:view-box; transform-origin:170px 170px; animation:observatory-visor-tick-spin 80s linear infinite; animation-delay:var(--visor-phase); }
+    body[data-view="overview"] .observatory-visor-contours,
+    body[data-view="team-performance"] .observatory-visor-contours { stroke:rgba(190,234,205,.34); stroke-width:1; stroke-dasharray:8 11; transform-box:view-box; transform-origin:170px 170px; animation:observatory-visor-contour-spin 110s linear infinite; animation-delay:var(--visor-phase); }
+    body[data-view="overview"] .observatory-visor-static,
+    body[data-view="team-performance"] .observatory-visor-static { pointer-events:none; }
+    body[data-view="overview"] .observatory-visor-bracket,
+    body[data-view="team-performance"] .observatory-visor-bracket { fill:none; stroke:rgba(220,244,228,.72); stroke-width:1.15; }
+    body[data-view="overview"] .observatory-visor-chevron,
+    body[data-view="team-performance"] .observatory-visor-chevron { stroke:rgba(220,244,228,.52); stroke-width:1.2; }
+    body[data-view="overview"] .observatory-visor-underline,
+    body[data-view="team-performance"] .observatory-visor-underline { stroke:var(--visor-tone); stroke-width:2.2; filter:drop-shadow(0 0 3px var(--visor-tone)); }
+    body[data-view="overview"] .observatory-visor-value,
+    body[data-view="team-performance"] .observatory-visor-value { fill:var(--text); font-size:70px; font-weight:var(--fw-display); letter-spacing:-.06em; font-variant-numeric:tabular-nums; }
+    body[data-view="overview"] .observatory-visor-unit,
+    body[data-view="team-performance"] .observatory-visor-unit { font-size:28px; letter-spacing:-.02em; }
+    body[data-view="overview"] .observatory-visor-scale,
+    body[data-view="team-performance"] .observatory-visor-scale,
+    body[data-view="overview"] .observatory-visor-target text,
+    body[data-view="team-performance"] .observatory-visor-target text { fill:rgba(226,246,233,.68); font-size:18px; font-weight:var(--fw-emphasis); }
+    body[data-view="overview"] .observatory-visor-target line,
+    body[data-view="team-performance"] .observatory-visor-target line { stroke:rgba(226,246,233,.86); stroke-width:1.25; }
+    body[data-view="overview"] .observatory-overview .glance-tile { grid-template-rows:220px auto; min-height:266px; padding-top:0; }
+    body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { margin-top:9px; }
+    body[data-view="overview"] .observatory-close-instrument { min-height:266px; }
+    body[data-view="overview"] .observatory-metric-ring { width:auto; height:auto; }
+    body[data-view="team-performance"] { --observatory-performance-surface:rgba(7,23,14,.78); --observatory-performance-inset:rgba(14,40,24,.42); --observatory-performance-edge:rgba(196,231,207,.30); --observatory-performance-bloom:rgba(21,161,71,.10); }
+    body[data-view="team-performance"] .observatory-team-panel {
+      border-color:transparent!important; background:transparent!important; backdrop-filter:none; -webkit-backdrop-filter:none; box-shadow:none!important;
+    }
+    body[data-view="team-performance"] .observatory-reps-panel,
+    body[data-view="team-performance"] .observatory-detail-panel,
+    body[data-view="team-performance"] .observatory-graphs-panel {
+      border-color:var(--observatory-performance-edge)!important; background:var(--observatory-performance-surface)!important;
+      backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); box-shadow:inset 0 1px 0 rgba(245,255,248,.11),inset 0 0 0 1px rgba(103,205,135,.04),0 22px 48px rgba(0,0,0,.31),0 0 28px var(--observatory-performance-bloom)!important;
+    }
+    body[data-view="team-performance"] .observatory-instrument { min-height:282px; padding:4px 8px 12px; border-top-color:rgba(196,231,207,.16); }
+    body[data-view="team-performance"] .observatory-instrument-copy .avg-name { margin-top:-2px; }
+    body[data-view="team-performance"] .rep-card,
+    body[data-view="team-performance"] .rep-card-band,
+    body[data-view="team-performance"] .rep-card-none { background:var(--observatory-performance-inset)!important; border-color:rgba(196,231,207,.18)!important; }
+    body[data-view="team-performance"] .rep-card { box-shadow:inset 0 1px 0 rgba(245,255,248,.07),0 0 18px rgba(21,161,71,.045); }
+    @keyframes observatory-visor-tick-spin { to { transform:rotate(360deg); } }
+    @keyframes observatory-visor-contour-spin { to { transform:rotate(-360deg); } }
+    @media (prefers-reduced-motion:reduce) {
+      body[data-view="overview"] .observatory-visor-ticks,
+      body[data-view="overview"] .observatory-visor-contours,
+      body[data-view="team-performance"] .observatory-visor-ticks,
+      body[data-view="team-performance"] .observatory-visor-contours { animation:none; }
+    }
+
     @media(max-width:900px) {
       body[data-view="team-performance"] .sidebar,
       body[data-view="team-coaching"] .sidebar,
@@ -6096,8 +6176,15 @@
       body[data-view="overview"] .overview-close-ring { width:126px; height:126px; }
       body[data-view="overview"] .observatory-ring-number strong { font-size:32px; }
       body[data-view="overview"] .observatory-overview .glance-row { display:contents; }
-      body[data-view="overview"] .observatory-overview .glance-tile { grid-template-columns:1fr; grid-template-rows:104px auto; justify-items:center; min-height:154px; padding:11px 0 0; text-align:center; }
-      body[data-view="overview"] .observatory-metric-ring { width:104px; height:104px; }
+      body[data-view="overview"] .observatory-overview .glance-tile { grid-template-columns:1fr; grid-template-rows:152px auto; justify-items:center; min-height:204px; padding:0; text-align:center; }
+      body[data-view="overview"] .observatory-close-instrument { min-height:204px; }
+      body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge { width:168px; height:164px; }
+      body[data-view="overview"] .observatory-visor-gauge,
+      body[data-view="team-performance"] .observatory-visor-gauge { width:152px; height:156px; }
+      body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { margin-top:4px; }
+      body[data-view="overview"] .observatory-visor-value,
+      body[data-view="team-performance"] .observatory-visor-value { font-size:70px; }
+      body[data-view="overview"] .observatory-metric-ring { width:auto; height:auto; }
       body[data-view="overview"] .observatory-metric-instrument .glance-copy { text-align:center; }
       body[data-view="overview"] .observatory-metric-instrument .observatory-ring-number strong { display:flex; flex-direction:column; align-items:center; font-size:var(--fs-gauge-value); }
       body[data-view="overview"] .observatory-metric-instrument .glance-trend { margin:1px 0 0; font-size:10px; }
@@ -6150,6 +6237,17 @@
       }
       body[data-view="team-performance"] .observatory-instrument+.observatory-instrument:before { display:none; }
       body[data-view="team-performance"] .observatory-instrument-copy { text-align:left; }
+      /* Detailed Visor calibration needs a real instrument width on a phone;
+         stack rather than shrinking its text into decorative noise. */
+      body[data-view="overview"] .observatory-overview-hero { grid-template-columns:1fr; gap:12px; }
+      body[data-view="overview"] .observatory-close-instrument,
+      body[data-view="overview"] .observatory-overview .glance-tile { grid-column:auto; grid-template-rows:220px auto; min-height:266px; }
+      body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge,
+      body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge,
+      body[data-view="team-performance"] .observatory-visor-gauge { width:216px; height:220px; margin-top:0; }
+      body[data-view="team-performance"] .observatory-instrument { min-height:268px; display:flex; flex-direction:column; gap:0; padding:4px 0 12px; text-align:center; }
+      body[data-view="team-performance"] .observatory-instrument-copy { text-align:center; }
+      body[data-view="team-performance"] .observatory-instrument-copy .avg-name { margin-top:-2px; }
       body[data-view="team-performance"] .rep-card-left { grid-template-columns:1fr; gap:10px; }
       body[data-view="team-performance"] .rep-card-left>div { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:baseline; gap:8px; padding:9px 0 0; }
       body[data-view="team-performance"] .rep-card-left>div+div { border-left:0; border-top:1px solid rgba(215,236,222,.08); }
@@ -9312,6 +9410,7 @@
     var avgScore = a.avg_score.mean;
     var ohrValue = ohr ? ohr.rate + '%' : '—';
     var ohrSub = ohr ? (ohr.handled + ' of ' + ohr.total + ' handled') : 'true objections';
+    var ohrPolicy = overviewGaugePolicy(a, 'objections');
     var tiles = '<div class="observatory-overview-hero">' + overviewCloseInstrumentHtml(a, cr)
       + '<div class="glance-row fade-in">'
       /* ⚠⚠ CLOSING % IS THE LOUD NUMBER ON THIS PAGE (Justin's ruling,
@@ -9319,9 +9418,9 @@
          page remains one keyboard-accessible click away; neither path adds a target
          or computes a new metric. */
       + overviewMetricInstrumentHtml('Objection handle rate', ohrValue, ohrSub, ohr ? ohr.rate : null,
-          "goObjections()", 'Objection handle rate ' + ohrValue + '. ' + ohrSub, ohr ? 'var(--accent)' : null)
+          "goObjections()", 'Objection handle rate ' + ohrValue + '. ' + ohrSub, null, null, ohrPolicy, 17)
       + overviewMetricInstrumentHtml('Avg call score', avgValue, avgScoreSubstat(a.avg_score), avgScore,
-          "drillCalls('analyzed','score')", 'Average call score ' + (avgScore === null ? 'unavailable' : avgScore) + '. ' + avgScoreSubstat(a.avg_score), avgScore === null ? null : scoreColor(avgScore), avgTrend)
+          "drillCalls('analyzed','score')", 'Average call score ' + (avgScore === null ? 'unavailable' : avgScore) + '. ' + avgScoreSubstat(a.avg_score), avgScore === null ? null : scoreColor(avgScore), avgTrend, null, 31)
     + '</div></div>';
 
     // Compact Overview layout: header and three gauges lead the main column;
@@ -13367,31 +13466,22 @@
     var clickable = m.key === 'objections';
     var open = clickable ? ' onclick="openAvgObjections()" title="See the per-type breakdown for these 7 days"' : '';
     var labelTitle = m.key === 'closing'
-      ? ' title="By the booked call\u2019s date \u2014 a follow-up close counts on the call it follows"' : '';
-    if (m.value === null || m.value === undefined) {
-      return '<div class="avg-card avg-card-empty observatory-instrument' + (clickable ? ' avg-card-link' : '') + '"' + open + '>'
-        + '<div class="avg-name"' + labelTitle + '>' + escapeHtml(m.label) + '</div>'
-        + '<div class="avg-empty">Not enough to measure<span>' + escapeHtml(m.reason || '') + '</span></div></div>';
-    }
-    var scale = (typeof m.scale === 'number' && m.scale > 0) ? m.scale : 100;
-    var progress = avgFraction(m.value, scale) * 100;
-    var unit = m.unit === 'min' ? 'min' : '%';
+      ? ' title="By the booked call’s date — a follow-up close counts on the call it follows"' : '';
+    var unit = m.unit === 'min' ? ' min' : '%';
     var counts = m.unit === 'min'
       ? ('across ' + m.total + ' call' + (m.total === 1 ? '' : 's'))
       : (m.numerator + ' of ' + m.total + ' ' + m.unit_name + (m.total === 1 ? '' : 's') + ' ' + m.numerator_name);
+    if (m.value === null || m.value === undefined) {
+      return '<div class="avg-card avg-card-empty observatory-instrument' + (clickable ? ' avg-card-link' : '') + '"' + open + '>'
+        + visorGaugeHtml({ raw: null, measured: false, scale: m.scale, target: m.target, marks: m.sweet_spot && m.sweet_spot.good, band: null, phase: m.key === 'closing' ? 5 : (m.key === 'objections' ? 21 : 37), valueText: '—', aria: m.label + ' unavailable. ' + (m.reason || '') })
+        + '<div class="observatory-instrument-copy"><div class="avg-name"' + labelTitle + '>' + escapeHtml(m.label) + '</div>'
+        + '<div class="avg-empty">Not enough to measure<span>' + escapeHtml(m.reason || '') + '</span></div></div></div>';
+    }
     var aria = m.label + ': ' + m.value + unit + '. ' + counts;
     return '<div class="avg-card observatory-instrument' + (clickable ? ' avg-card-link' : '') + '"' + open + '>'
-      + '<div class="observatory-ring observatory-ring--' + band + '">'
-        + '<svg viewBox="0 0 120 120" role="img" aria-label="' + escapeHtml(aria) + '">'
-          + '<circle class="observatory-ring-ticks" cx="60" cy="60" r="56" pathLength="100"></circle>'
-          + '<circle class="observatory-ring-orbit" cx="60" cy="60" r="49"></circle>'
-          + '<circle class="observatory-ring-track" cx="60" cy="60" r="45" pathLength="100"></circle>'
-          + '<circle class="observatory-ring-glow" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
-          + '<circle class="observatory-ring-value" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
-          + '<circle class="observatory-ring-core" cx="60" cy="60" r="33"></circle>'
-        + '</svg><div class="observatory-ring-number"><strong>' + escapeHtml(String(m.value)) + '</strong><span>' + unit + '</span></div>'
-        + '<div class="observatory-ring-scale"><span>0</span><span>' + escapeHtml(String(scale)) + '</span></div>'
-      + '</div><div class="observatory-instrument-copy"><div class="avg-name"' + labelTitle + '>' + escapeHtml(m.label) + '</div>'
+      + visorGaugeHtml({ raw: m.value, scale: m.scale, target: m.target, marks: m.sweet_spot && m.sweet_spot.good, band: band, phase: m.key === 'closing' ? 5 : (m.key === 'objections' ? 21 : 37),
+        valueText: m.value, unitText: unit, aria: aria })
+      + '<div class="observatory-instrument-copy"><div class="avg-name"' + labelTitle + '>' + escapeHtml(m.label) + '</div>'
         + '<div class="avg-counts">' + escapeHtml(counts) + '</div></div></div>';
   }
 
@@ -18169,22 +18259,74 @@
     return { value: pct + '%', sub: won + ' of ' + tot + ' prospects' };
   }
 
-  function overviewMetricInstrumentHtml(label, valueHtml, sub, rawProgress, onclick, aria, color, trendHtml) {
-    var measured = typeof rawProgress === 'number' && isFinite(rawProgress);
-    var progress = measured ? Math.max(0, Math.min(100, rawProgress)) : null;
+  // The Visor instrument is shared by the personal Overview and Team Performance
+  // panels. Its policy arrives with each existing data carrier; this helper only
+  // turns that already-computed value into a fixed 270-degree visual readout.
+  function visorTickMarks() {
+    var lines = [];
+    for (var i = 0; i < 36; i++) {
+      var a = (i / 36) * Math.PI * 2;
+      var major = i % 3 === 0;
+      var r1 = major ? 142 : 146;
+      var r2 = 153;
+      lines.push('<line x1="' + (170 + Math.cos(a) * r1).toFixed(1) + '" y1="' + (170 + Math.sin(a) * r1).toFixed(1)
+        + '" x2="' + (170 + Math.cos(a) * r2).toFixed(1) + '" y2="' + (170 + Math.sin(a) * r2).toFixed(1) + '"/>');
+    }
+    return lines.join('');
+  }
+
+  function visorPoint(value, scale, radius) {
+    var ratio = Math.max(0, Math.min(1, value / scale));
+    var a = (135 + (270 * ratio)) * Math.PI / 180;
+    return { x: 170 + Math.cos(a) * radius, y: 170 + Math.sin(a) * radius };
+  }
+
+  function visorGaugeHtml(options) {
+    var raw = options.raw;
+    var measured = typeof raw === 'number' && isFinite(raw) && options.measured !== false;
+    var scale = (typeof options.scale === 'number' && options.scale > 0) ? options.scale : 100;
+    var progress = measured ? Math.max(0, Math.min(100, (raw / scale) * 100)) : null;
+    var band = options.band || null;
+    var toneStyle = options.color ? ' style="--visor-tone:' + escapeHtml(options.color) + '"' : '';
+    var emptyClass = measured ? '' : ' observatory-visor--empty';
+    var phase = typeof options.phase === 'number' ? options.phase : 0;
     var arc = measured && progress > 0
-      ? '<circle class="observatory-ring-glow" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
-        + '<circle class="observatory-ring-value" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
+      ? '<path class="observatory-visor-arc-glow" d="M81.6 258.4 A125 125 0 1 1 258.4 258.4" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' 100"/>'
+        + '<path class="observatory-visor-arc" d="M81.6 258.4 A125 125 0 1 1 258.4 258.4" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' 100"/>'
       : '';
-    var tone = color ? ' style="color:' + color + '"' : '';
+    var marks = Array.isArray(options.marks) ? options.marks : [options.target];
+    var targetMark = marks.filter(function (mark) { return typeof mark === 'number' && mark >= 0 && mark <= scale; }).map(function (mark) {
+      var point = visorPoint(mark, scale, 125);
+      var outer = visorPoint(mark, scale, 139);
+      var label = visorPoint(mark, scale, 151);
+      return '<g class="observatory-visor-target"><line x1="' + point.x.toFixed(1) + '" y1="' + point.y.toFixed(1)
+        + '" x2="' + outer.x.toFixed(1) + '" y2="' + outer.y.toFixed(1) + '"/><text text-anchor="middle" x="' + label.x.toFixed(1) + '" y="' + (label.y + 4).toFixed(1) + '">' + escapeHtml(String(mark)) + '</text></g>';
+    }).join('');
+    var numeral = options.valueText == null ? '—' : String(options.valueText);
+    var unitText = options.unitText ? '<tspan class="observatory-visor-unit">' + escapeHtml(String(options.unitText)) + '</tspan>' : '';
+    return '<div class="observatory-visor-gauge' + (band ? ' observatory-visor--' + band : '') + emptyClass + '"' + toneStyle + '>'
+      + '<svg viewBox="0 0 340 348" role="img" aria-label="' + escapeHtml(options.aria) + '">'
+      + '<g class="observatory-visor-contours" style="--visor-phase:' + (-phase) + 's"><path d="M37 237 A150 150 0 0 1 103 29"/><path d="M237 29 A150 150 0 0 1 303 237"/></g>'
+      + '<g class="observatory-visor-ticks" style="--visor-phase:' + phase + 's">' + visorTickMarks() + '</g>'
+      + '<path class="observatory-visor-track" d="M81.6 258.4 A125 125 0 1 1 258.4 258.4" pathLength="100"/>' + arc
+      + '<g class="observatory-visor-static"><path class="observatory-visor-bracket" d="M104 130 L92 144 V196 L104 210 M236 130 L248 144 V196 L236 210"/>'
+      + '<path class="observatory-visor-chevron" d="M162 110 L170 117 L178 110"/><path class="observatory-visor-underline" d="M145 222 H195"/>'
+      + '<text class="observatory-visor-value" x="170" y="191" text-anchor="middle">' + escapeHtml(numeral) + unitText + '</text>'
+      + '<text class="observatory-visor-scale" x="66" y="281" text-anchor="middle">0</text><text class="observatory-visor-scale" x="274" y="281" text-anchor="middle">' + escapeHtml(String(scale)) + '</text>'
+      + targetMark + '</g></svg></div>';
+  }
+
+  function overviewGaugePolicy(analytics, key) {
+    var policy = analytics && analytics.gauge_policy && analytics.gauge_policy[key];
+    return policy && typeof policy.scale === 'number' ? policy : null;
+  }
+
+  function overviewMetricInstrumentHtml(label, valueHtml, sub, rawProgress, onclick, aria, color, trendHtml, policy, phase) {
+    var measured = typeof rawProgress === 'number' && isFinite(rawProgress);
+    var band = (policy && measured) ? avgBand(rawProgress, policy.target, policy.direction, policy.band) : null;
     return '<div class="glance-tile observatory-metric-instrument" onclick="' + onclick + '" title="' + escapeHtml(label) + ' — click to drill in">'
-      + '<div class="observatory-ring observatory-metric-ring' + (measured ? '' : ' observatory-ring--empty') + '"' + tone + '>'
-      + '<svg viewBox="0 0 120 120" role="img" aria-label="' + escapeHtml(aria) + '">'
-      + '<circle class="observatory-ring-ticks" cx="60" cy="60" r="56" pathLength="100"></circle>'
-      + '<circle class="observatory-ring-orbit" cx="60" cy="60" r="49"></circle>'
-      + '<circle class="observatory-ring-track" cx="60" cy="60" r="45" pathLength="100"></circle>'
-      + arc + '<circle class="observatory-ring-core" cx="60" cy="60" r="33"></circle>'
-      + '</svg><div class="observatory-ring-number"><strong>' + valueHtml + '</strong></div></div>'
+      + visorGaugeHtml({ raw: rawProgress, measured: measured, scale: policy ? policy.scale : 100, target: policy ? policy.target : null,
+        band: band, color: color, phase: phase, valueText: valueHtml, aria: aria })
       + '<div class="glance-copy"><div class="glance-label">' + escapeHtml(label) + '</div>'
       + (trendHtml ? '<div class="observatory-metric-trend">' + trendHtml + '</div>' : '')
       + (sub ? '<div class="glance-sub">' + escapeHtml(sub) + '</div>' : '') + '</div></div>';
@@ -18194,25 +18336,16 @@
     var src = analytics || {};
     var raw = src.prospect_close_rate;
     var measured = typeof raw === 'number' && src.prospect_close_total > 0;
-    var progress = measured ? Math.max(0, Math.min(100, raw)) : null;
+    var policy = overviewGaugePolicy(src, 'closing');
+    var band = (policy && measured) ? avgBand(raw, policy.target, policy.direction, policy.band) : null;
     var aria = measured
       ? 'Closing percentage ' + display.value + '. ' + display.sub
       : 'Closing percentage unavailable. ' + display.sub;
-    var arc = measured && progress > 0
-      ? '<circle class="observatory-ring-glow" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
-        + '<circle class="observatory-ring-value" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
-      : '';
-    return '<a class="lead-number observatory-close-instrument overview-close-instrument-link" href="#call-library" onclick="goCallLibrary(); return false;" title="Open Calls">'
-      + '<div class="observatory-ring overview-close-ring' + (measured ? '' : ' observatory-ring--empty') + '">'
-      + '<svg viewBox="0 0 120 120" role="img" aria-label="' + escapeHtml(aria) + '">'
-      + '<circle class="observatory-ring-ticks" cx="60" cy="60" r="56" pathLength="100"></circle>'
-      + '<circle class="observatory-ring-orbit" cx="60" cy="60" r="49"></circle>'
-      + '<circle class="observatory-ring-track" cx="60" cy="60" r="45" pathLength="100"></circle>'
-      + arc + '<circle class="observatory-ring-core" cx="60" cy="60" r="33"></circle>'
-      + '</svg><div class="observatory-ring-number"><strong class="lead-number-val">' + escapeHtml(String(display.value)) + '</strong></div></div>'
+    return '<a class="lead-number observatory-close-instrument overview-close-instrument-link" href="#call-library" onclick="goCallLibrary(); return false;" title="By the booked call’s date — a follow-up close counts on the call it follows. Open Calls">'
+      + visorGaugeHtml({ raw: raw, measured: measured, scale: policy ? policy.scale : 100, target: policy ? policy.target : null,
+        band: band, phase: 0, valueText: display.value, aria: aria })
       + '<div class="lead-number-label">Closing %</div><div class="lead-number-sub">' + escapeHtml(display.sub) + '</div></a>';
   }
-
 
   // ── SECTION DRILLDOWN (stage 4a/4b) ─────────────────────────────────────
   // Clicking a Coach-summary bar shows the MOMENTS over the period that earned
