@@ -54,7 +54,7 @@ test('⚠⚠ EXECUTED: the review header renders from a seed and from a loaded r
 test('⚠⚠ RENDERED + CLICKED: the row opens the call; the NAME renames without opening; the TAG sets without opening; a marked row has no way in', () => {
   const { callLibraryCardHtml } = build();
   const rows = callLibraryCardHtml(SEED) + callLibraryCardHtml(Object.assign({}, SEED, { id: 'call-ns', not_a_sales_call: true, exclusion_reason: null }));
-  const page = '<!doctype html><html><head>' + STYLE + '</head><body data-view="calls"><main class="page"><div class="library-list">' + rows + '</div></main>'
+  const page = '<!doctype html><html><head>' + STYLE + '</head><body data-view="call-library"><main class="page"><div class="library-list">' + rows + '</div></main>'
     + '<script>window.calls=[];window.openCallReview=function(id){calls.push(["open",id]);};window.renameProspectFromRow=function(id,n){calls.push(["rename",id,n]);};'
     + 'window.setCallKind=function(id,v,f){calls.push(["kind",id,v,f]);};window.toggleNotSalesFromRow=function(id,v){calls.push(["ns",id,v]);};window.setCallOutcome=function(){calls.push(["outcome"]);};</script></body></html>';
   const probe = `(function(){

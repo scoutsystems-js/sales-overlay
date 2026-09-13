@@ -6420,6 +6420,216 @@
       body[data-view="team-performance"] .observatory-instrument { min-height:0; }
     }
 
+    /* Calls Observatory pass, 2026-09-13. This page deliberately keeps its
+       records as one hairline-separated list: the shell carries the glass
+       treatment while each interactive row stays a row, not a card. */
+    body[data-view="call-library"] {
+      --call-library-panel:linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42));
+      --call-library-edge:rgba(118,255,171,.36);
+      --call-library-line:rgba(190,247,214,.18);
+      --observatory-visor-card-radius:14px;
+      --call-library-radius:var(--observatory-visor-card-radius);
+      --call-library-page-title-size:34px;
+      --call-library-page-title-size-mobile:28px;
+      --call-library-bloom:inset 0 1px 0 rgba(231,255,240,.12),0 0 28px rgba(18,222,96,.06);
+      --sidebar-w:190px;
+      --accent:#09d543;
+      --accent-rgb:9,213,67;
+      background:
+        radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),
+        radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),
+        linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%);
+      background-attachment:fixed;
+    }
+    /* Replace the shared raster only on Calls with the quiet fixed Observatory
+       contours. Both remain decoration beneath controls and do not scroll. */
+    body[data-view="call-library"]::before,
+    body[data-view="call-library"]::after {
+      content:"";
+      position:fixed;
+      z-index:0;
+      pointer-events:none;
+      opacity:1;
+      background:none;
+      -webkit-mask:none;
+      mask:none;
+      border:1px solid rgba(125,255,179,.14);
+    }
+    body[data-view="call-library"]::before {
+      inset:auto;
+      width:62%; height:78%; left:8%; top:2%;
+      border-radius:48% 52% 45% 55%; transform:rotate(-18deg);
+    }
+    body[data-view="call-library"]::after {
+      width:78%; height:72%; right:-14%; bottom:-26%;
+      border-radius:50%;
+    }
+    html[data-bg="off"] body[data-view="call-library"] { background:#090a0b; }
+    html[data-bg="off"] body[data-view="call-library"]::after { display:none; }
+    body[data-view="call-library"] .top-bar {
+      background:#090a0b;
+      border-bottom-color:rgba(219,239,226,.13);
+    }
+    body[data-view="call-library"] .page {
+      position:relative;
+      z-index:1;
+      width:auto;
+      max-width:calc(100vw - 48px);
+      margin:0 auto;
+      padding:24px 0 72px;
+      background:transparent;
+    }
+    body[data-view="call-library"] #content {
+      display:grid;
+      grid-template-columns:var(--sidebar-w) minmax(0,1fr);
+      column-gap:22px;
+      min-width:0;
+    }
+    body[data-view="call-library"] .call-library-upper { grid-column:2; min-width:0; }
+    body[data-view="call-library"] .library-list,
+    body[data-view="call-library"] .error,
+    body[data-view="call-library"] .empty,
+    body[data-view="call-library"] .call-library-pagination { grid-column:1 / -1; }
+    body[data-view="call-library"] .sidebar {
+      position:absolute;
+      top:67px;
+      left:24px;
+      width:var(--sidebar-w);
+      max-height:none;
+      overflow:visible;
+      border:1px solid var(--call-library-line);
+      border-radius:var(--call-library-radius);
+      background:rgba(5,20,11,.78);
+      box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.42);
+    }
+    body[data-view="call-library"] .sidebar .nav-link.nav-active {
+      border:1px solid rgba(211,237,217,.52);
+      border-left:2px solid var(--accent);
+      border-radius:var(--call-library-radius);
+      background:linear-gradient(100deg,#1b4527,#112617);
+      color:var(--text);
+      box-shadow:0 0 16px rgba(var(--accent-rgb),.24);
+    }
+    body[data-view="call-library"] .page-header,
+    body[data-view="call-library"] .vq,
+    body[data-view="call-library"] .library-list,
+    body[data-view="call-library"] .library-list--loading,
+    body[data-view="call-library"] .empty,
+    body[data-view="call-library"] .call-library-pagination {
+      border:1px solid var(--call-library-edge);
+      border-radius:var(--call-library-radius);
+      background:var(--call-library-panel);
+      box-shadow:var(--call-library-bloom);
+    }
+    body[data-view="call-library"] .page-header {
+      margin-bottom:20px;
+      padding:30px 20px 18px;
+      align-items:flex-start;
+    }
+    body[data-view="call-library"] .page-header::before,
+    body[data-view="call-library"] .vq::before,
+    body[data-view="call-library"] .library-list::before,
+    body[data-view="call-library"] .empty::before {
+      content:"";
+      position:absolute;
+      top:14px;
+      left:18px;
+      width:42px;
+      height:1px;
+      background:#71ffad;
+      box-shadow:0 0 9px rgba(77,255,148,.7);
+    }
+    body[data-view="call-library"] .page-header,
+    body[data-view="call-library"] .vq,
+    body[data-view="call-library"] .library-list,
+    body[data-view="call-library"] .empty { position:relative; }
+    body[data-view="call-library"] .page-header h1 { font-size:var(--call-library-page-title-size); }
+    body[data-view="call-library"] .page-header .subtitle { color:#cfe4d7; }
+    body[data-view="call-library"] .calls-outcome-btn,
+    body[data-view="call-library"] .calls-outcome-clear,
+    body[data-view="call-library"] .user-select,
+    body[data-view="call-library"] .date-presets {
+      background:rgba(2,16,8,.58);
+      border-color:rgba(174,241,199,.24);
+    }
+    body[data-view="call-library"] .calls-outcome-btn:hover,
+    body[data-view="call-library"] .calls-outcome-clear:hover,
+    body[data-view="call-library"] .user-select:hover { border-color:rgba(118,255,171,.62); }
+    body[data-view="call-library"] .calls-outcome-btn.active {
+      border-color:var(--accent);
+      background:rgba(var(--accent-rgb),.12);
+      box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.10);
+    }
+    body[data-view="call-library"] .vq { margin:0 0 16px; padding:28px 18px 16px; }
+    body[data-view="call-library"] .vq-row { border-top-color:var(--call-library-line); }
+    body[data-view="call-library"] .library-list { gap:0; margin:0; padding:30px 16px 8px; }
+    body[data-view="call-library"] .library-card {
+      border-top-color:var(--call-library-line);
+      padding:14px 16px;
+      transition:background .15s var(--ease),box-shadow .15s var(--ease),border-color .15s var(--ease);
+    }
+    body[data-view="call-library"] .library-card:not(.not-clickable):hover,
+    body[data-view="call-library"] .library-card:not(.not-clickable):focus-within {
+      background:rgba(14,62,34,.36);
+      border-top-color:rgba(118,255,171,.46);
+      box-shadow:inset 2px 0 0 rgba(113,255,173,.72);
+    }
+    body[data-view="call-library"] .library-list--loading {
+      padding-bottom:8px;
+    }
+    body[data-view="call-library"] .library-skeleton-row {
+      height:68px;
+      background:linear-gradient(90deg,rgba(11,46,26,.36),rgba(20,83,45,.48),rgba(11,46,26,.36));
+      border:0;
+      border-radius:0;
+      border-top:1px solid var(--call-library-line);
+    }
+    body[data-view="call-library"] .library-skeleton-row:first-of-type { border-top:0; }
+    body[data-view="call-library"] .empty { padding:32px; }
+    body[data-view="call-library"] .error {
+      border-radius:var(--call-library-radius);
+      box-shadow:inset 0 1px 0 rgba(255,239,239,.10),0 0 28px rgba(248,113,113,.05);
+    }
+    body[data-view="call-library"] .call-library-pagination {
+      display:flex;
+      justify-content:center;
+      margin-top:14px;
+      padding:10px;
+    }
+    @media(max-width:900px) {
+      body[data-view="call-library"] .page {
+        max-width:calc(100vw - 36px);
+        padding:18px 0 64px;
+      }
+      body[data-view="call-library"] #content { display:block; }
+      body[data-view="call-library"] .sidebar {
+        position:relative;
+        top:auto;
+        left:auto;
+        z-index:2;
+        width:auto;
+        max-height:none;
+        margin-bottom:14px;
+        overflow:visible;
+      }
+    }
+    @media(max-width:620px) {
+      body[data-view="call-library"] .page-header { padding:28px 16px 16px; gap:14px; }
+      body[data-view="call-library"] .page-header h1 { font-size:var(--call-library-page-title-size-mobile); }
+      body[data-view="call-library"] .page-header .controls { width:100%; }
+      body[data-view="call-library"] .library-card { padding:13px 10px; align-items:flex-start; flex-direction:column; gap:10px; }
+      body[data-view="call-library"] .library-card-main,
+      body[data-view="call-library"] .library-card-side { width:100%; }
+      body[data-view="call-library"] .library-card-side { gap:6px; flex-wrap:wrap; justify-content:flex-start; }
+      body[data-view="call-library"] .library-card-side > * { min-width:0; max-width:100%; }
+      body[data-view="call-library"] .vq-row { flex-direction:column; gap:10px; }
+      body[data-view="call-library"] .vq-main,
+      body[data-view="call-library"] .vq-actions { width:100%; }
+      body[data-view="call-library"] .vq-actions { gap:6px; }
+      body[data-view="call-library"] .vq-actions > * { max-width:100%; }
+      body[data-view="call-library"] .vq { padding:26px 14px 14px; }
+    }
+
     @media(prefers-reduced-motion:reduce) {
       body[data-view="team-performance"] .observatory-hud-orbit,
       body[data-view="team-performance"] .observatory-hud-dot,
@@ -11839,7 +12049,7 @@
   var observatoryLayoutBound = false;
   var observatoryRailObserver = null;
   function syncObservatoryRailClearance() {
-    var upper = document.querySelector('.observatory-page > .observatory-upper');
+    var upper = document.querySelector('.observatory-page > .observatory-upper, .call-library-upper');
     var rail = document.getElementById('sidebar');
     if (!upper || !rail) return;
     upper.style.minHeight = '';
@@ -19979,6 +20189,10 @@
   }
 
   function renderCallLibrary() {
+    // The usual dispatcher stamps this hook. Keep the cold Calls paint covered
+    // too, so its fixed ground and non-interactive contours are scoped before
+    // the loading shell is inserted.
+    if (state.view === 'call-library') document.body.dataset.view = 'call-library';
     var content = document.getElementById('content');
 
     // First render after entering the view: kick off the fetch and show
@@ -19994,35 +20208,40 @@
     if (canSeeVerdictQueue() && state.verdictQueue === undefined) { state.verdictQueue = null; loadVerdictQueue(); }
     var queueHost = canSeeVerdictQueue() ? '<div id="verdictQueueHost">' + (state.verdictQueue ? verdictQueueHtml(state.verdictQueue) : '') + '</div>' : '';
     notice = notice + queueHost;
+    var upper = '<div class="call-library-upper">' + header + notice + '</div>';
 
     if (state.callLibraryError) {
-      content.innerHTML = header + notice
+      content.innerHTML = upper
         + '<div class="error fade-in">Could not load calls: ' + escapeHtml(state.callLibraryError) + '</div>';
+      observeObservatoryLayout();
       return;
     }
 
     if (state.callLibrary === null) {
       // Initial loading state — skeleton rows, no real data yet.
-      content.innerHTML = header + notice + renderCallLibrarySkeletonsHtml();
+      content.innerHTML = upper + renderCallLibrarySkeletonsHtml();
+      observeObservatoryLayout();
       return;
     }
 
     if (state.callLibrary.length === 0) {
-      content.innerHTML = header + notice + callLibraryEmptyHtml();
+      content.innerHTML = upper + callLibraryEmptyHtml();
+      observeObservatoryLayout();
       return;
     }
 
     var cards = state.callLibrary.map(callLibraryCardHtml).join('');
     var loadMore = '';
     if (state.callLibraryHasMore) {
-      loadMore = '<div style="display:flex;justify-content:center;margin-top:18px;">'
+      loadMore = '<div class="call-library-pagination">'
         + '<button class="btn-fathom-secondary" type="button" onclick="loadCallLibrary(' + state.callLibraryOffset + ')"'
         + (state.callLibraryLoading ? ' disabled>Loading…' : '>Load more')
         + '</button></div>';
     }
-    content.innerHTML = header + notice
+    content.innerHTML = upper
       + '<div class="library-list fade-in">' + cards + '</div>'
       + loadMore;
+    observeObservatoryLayout();
   }
 
   /* ⚠⚠ THE REVIEW QUEUE (Justin's ruling 2026-09-03, H712) — managers and above. Every "not a
@@ -20057,7 +20276,10 @@
       state.verdictQueue = res.ok ? await res.json() : { _error: 'HTTP ' + res.status };
     } catch (e) { state.verdictQueue = { _error: String((e && e.message) || e) }; }
     var host = document.getElementById('verdictQueueHost');
-    if (host) host.innerHTML = verdictQueueHtml(state.verdictQueue);
+    if (host) {
+      host.innerHTML = verdictQueueHtml(state.verdictQueue);
+      syncObservatoryRailClearance();
+    }
   }
   async function reviewVerdict(callId, decision) {
     var row = document.getElementById('vq-' + callId);
@@ -20205,7 +20427,7 @@
   function renderCallLibrarySkeletonsHtml() {
     var rows = '';
     for (var i = 0; i < 6; i++) rows += '<div class="library-skeleton-row"></div>';
-    return '<div class="library-list">' + rows + '</div>';
+    return '<div class="library-list library-list--loading">' + rows + '</div>';
   }
 
   // Thread 1: manual outcome tag. UX gate (server is authoritative): a

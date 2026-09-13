@@ -8046,3 +8046,6 @@ Justin showed the approved motion mockup beside production and said the glow bar
 
 ## [H779] Compact Visor sizing is visual-only — September 13, 2026
 The exact approved Visor artwork is being returned from the expanded 330/300px treatment to compact dimensions: 216px standard gauges, 244px Overview Closing lead, 152px through the intermediate breakpoint, and 216px for stacked phone gauges (168px lead at that breakpoint). This is a size correction only; geometry, tokens, motion, layering, metrics, loading, permissions and interactions remain unchanged. Local verification is pending in `~/Desktop/scan-reports/observatory-2026-09-13/visor-size/`.
+
+## [H780] Calls visual rollout is presentation-only — September 13, 2026
+Calls now uses the approved fixed forest gradient, two pale contours and translucent green panel treatment. Its rows, filters, drills, evidence, badges and actions remain the product behavior; no gauges, metric, permission, exclusion or data-contract change belongs to this visual scope. Local verification is complete; final test and deployment status are recorded separately under `~/Desktop/scan-reports/observatory-2026-09-13/visor-calls/.`

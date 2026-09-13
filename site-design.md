@@ -18,6 +18,10 @@ The two corrected pages use the mockup's two quiet pale-green ellipse contours i
 
 Keep 24px desktop and 18px mobile outside gutters. Use available width and the real sidebar height rather than fixed empty spacer bands. Personal Coaching has three free-floating gauges in this order: Closing %, Objection handle rate, Avg call score. Closing remains the lead and links to the regular Calls page. Focus panels begin directly below the hero; Coach Summary is last and spans the available page width. Retain all existing date/user controls, evidence, filters, optional charts and navigation.
 
+### Calls surface — implemented visual scope
+
+Calls now uses the exact forest gradient and two pale fixed contours, with translucent 14px panels, 1px mint borders, and the 42px × 1px mint light with a 14px inset on the header, verdict queue, list, loading and empty states. Rows remain transparent with hairlines; the list expands to the full width below the real sidebar. At 390px, controls and the verdict queue wrap without overflow, and the selected outcome filter retains its green border and fill. This is presentation only: the existing row list, filters, drills, evidence, badges, actions, metrics, permissions and data contracts remain unchanged. Final verification and deployment status are recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-calls/`.
+
 ### Cards and selected states
 
 Cards use the exact Visor surface treatment: a 14px radius, 1px `rgba(118,255,171,.36)` edge, `linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42))` fill, inset highlight `0 1px 0 rgba(231,255,240,.12)` and outer bloom `0 0 28px rgba(18,222,96,.06)`. Major content panels include the mockup's short 42px × 1px mint top light with a 14px gap beneath it and `0 0 9px rgba(77,255,148,.7)` glow. The September 13 exact-match correction supersedes the prior flat glass tokens where this section differs. Preserve readable live content and existing controls; no fake summary text or telemetry.

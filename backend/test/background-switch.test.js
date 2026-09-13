@@ -73,6 +73,6 @@ test('⚠⚠ RENDERED: white edge in BOTH states on a black track that never cha
 });
 
 test('non-Observatory pages retain the original Scout green toggle glyph', () => {
-  const on = renderComputed(page(true, 'call-library'), PROBE);
+  const on = renderComputed(page(true, 'call-review'), PROBE);
   assert.strictEqual(on.glyphFill, 'rgb(9, 224, 70)');
 });

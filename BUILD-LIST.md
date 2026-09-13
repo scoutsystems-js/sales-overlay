@@ -65,6 +65,8 @@ is 82s; point motion is 67s, 91s, and 74s. Background-off hides it and reduced
 motion stops it. Behavior and approved archives are unchanged; the prior
 `9bdfa4e1cbb8322a8f36add576650bf3be6323c5` refinement remains live.
 
+**Calls visual rollout — scoped presentation work:** approved fixed forest ground and translucent glass panel treatment may extend to Calls while preserving its row list, filters, drills, evidence, badges and actions. No gauges, metric or logic changes are included. Status and receipts: `docs/design/observatory-implementation.md` and `~/Desktop/scan-reports/observatory-2026-09-13/visor-calls/`.
+
 ## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)
 
 **Completion report:** [docs/build-plans/coaching-page-integrity-completion-report.md](docs/build-plans/coaching-page-integrity-completion-report.md). Two items carried, not closed: §9 the per-cell "N graded calls" labels (folded into the deferred stage-cell decision at the end of this file) and §16/§22 adding the Block 006 stage definitions to the doctrine file (a doctrine edit; Justin's call). The bullets below are the original brief and are kept as the record.

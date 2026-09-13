@@ -10,6 +10,10 @@
 
 Evidence and final release status: `~/Desktop/scan-reports/observatory-2026-09-13/visor-exact/release-status.md`.
 
+## Calls visual rollout — September 13, 2026
+
+**Status: implemented locally; not live in this record.** Calls uses the exact forest gradient and two pale fixed contours, translucent 14px panels with 1px mint borders, and the 42px × 1px mint light with a 14px inset on the header, verdict queue, list, loading and empty states. Rows remain transparent with hairlines and the list expands below the real sidebar; 390px controls and the verdict queue wrap without overflow, and the selected outcome filter retains its green border and fill. Existing rows, filters, drills, evidence, badges, actions, metrics, permissions, exclusions and data contracts are unchanged. Final test and deployment status belongs in `~/Desktop/scan-reports/observatory-2026-09-13/visor-calls/release-status.md`.
+
 
 ## Visor standard — approved September 13, 2026
 

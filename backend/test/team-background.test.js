@@ -4,9 +4,9 @@
  * ⚠⚠ WHAT CHANGED, AND WHY THIS FILE IS NO LONGER ABOUT "TEAM".
  * The raster used to be a per-view override on `team` alone, with the mesh as
  * the base everywhere else. Justin's rulings: mesh OFF on the dashboard, the
- * raster on the ordinary dashboard views, with Observatory's two approved
- * page-specific treatments allowed to suppress the mesh layer. So there is
- * one base painting rule and exactly two approved per-view exceptions.
+ * raster on the ordinary dashboard views, with the approved Observatory
+ * treatments allowed to suppress or replace the mesh layer. So there is one
+ * base painting rule and a short, explicit per-view exception list.
  *
  * ⚠⚠ THE LOAD-BEARING PROPERTY IS NOT A CONTRAST RATIO — IT IS THAT NO TEXT
  * TOUCHES THE IMAGE. Full brightness is safe BY CONSTRUCTION: every text leaf
@@ -70,16 +70,28 @@ test('⚠⚠ EXACTLY ONE background-position and ONE background-size in the rule
   assert.ok(/background-position:\s*50%\s+50%/.test(rule), 'centred');
 });
 
-test('⚠⚠ ONLY THE THREE APPROVED OBSERVATORY VIEWS MAY OVERRIDE THE BASE PAINT', () => {
+test('⚠⚠ ONLY THE APPROVED OBSERVATORY VIEWS MAY OVERRIDE THE BASE PAINT', () => {
   const perView = LIVE.match(/body\[data-view="[a-z-]+"\]::before/g) || [];
   assert.deepStrictEqual(perView.sort(), [
+    'body[data-view="call-library"]::before',
+    'body[data-view="call-library"]::before',
     'body[data-view="overview"]::before',
     'body[data-view="team-coaching"]::before',
     'body[data-view="team-performance"]::before',
-  ], 'only Observatory may have a page-specific ground rule; found ' + perView.join(', '));
+  ], 'only approved Observatory pages may have a page-specific ground rule; found ' + perView.join(', '));
   const approvedRule = LIVE.match(/body\[data-view="team-performance"\]::before\s*,\s*body\[data-view="team-coaching"\]::before\s*,\s*body\[data-view="overview"\]::before\s*\{[^}]*\}/);
   assert.ok(approvedRule && /display:\s*none/.test(approvedRule[0]), 'the three approved views must only suppress the mesh layer');
-  assert.strictEqual((LIVE.match(/body\[data-view="(?!team-coaching|team-performance|overview)[a-z-]+"\]::before/g) || []).length, 0,
+  const callsContour = LIVE.match(/body\[data-view="call-library"\]::before\s*,\s*body\[data-view="call-library"\]::after\s*\{[^}]*\}/);
+  assert.ok(callsContour && /position:\s*fixed/.test(callsContour[0]) && /pointer-events:\s*none/.test(callsContour[0]),
+    'Calls keeps its reviewed fixed, non-interactive contour layer');
+  const callsBefore = LIVE.match(/body\[data-view="call-library"\]::before\s*\{[^}]*\}/);
+  assert.ok(callsBefore && /width:\s*62%/.test(callsBefore[0]) && /transform:\s*rotate\(-18deg\)/.test(callsBefore[0]),
+    'Calls keeps the approved first contour geometry');
+  const bgOffBase = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view\]::before\s*\{[^}]*\}/);
+  const callsBgOff = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view="call-library"\]::after\s*\{[^}]*\}/);
+  assert.ok(bgOffBase && /display:\s*none/.test(bgOffBase[0]) && callsBgOff && /display:\s*none/.test(callsBgOff[0]),
+    'Calls background-off removes both reviewed contours');
+  assert.strictEqual((LIVE.match(/body\[data-view="(?!team-coaching|team-performance|overview|call-library)[a-z-]+"\]::before/g) || []).length, 0,
     'unapproved pages must not get a ground override');
   // ⚠ NON-VACUITY — the matcher must be able to find one. Assert it fires
   // against an injected rule, or this test passes on an empty string forever.
