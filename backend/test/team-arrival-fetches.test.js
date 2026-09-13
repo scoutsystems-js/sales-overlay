@@ -39,7 +39,8 @@ function decl(re) { const m = live.match(re); if (!m) throw new Error('declarati
 
 const REAL = ['loadTeam', 'fetchTeamJSON', 'armLaneWait', 'clearLaneWait', 'scheduleTeamRender', 'renderTeamSurface', 'resetTeamData', 'restoreTeamPick',
   'renderTeamCoaching', 'teamCoachableHtml', 'teamRecsHtml', 'laneWaitHtml', 'laneProblem', 'laneProblemHtml', 'noMaterialHtml', 'isTeamView', 'teamQP',
-  'coachingRepWorkspaceHtml', 'coachingPeriodWorkspaceHtml', 'coachingPeriodExampleHtml', 'coachingRepName', 'selectCoachingRep', 'scoreColor', 'ymd', 'dayLabel', 'rangeLabelInclusive'];
+  'coachingRepWorkspaceHtml', 'coachingPeriodWorkspaceHtml', 'coachingPeriodExampleHtml', 'coachingRepName', 'selectCoachingRep', 'scoreColor', 'ymd', 'dayLabel', 'rangeLabelInclusive',
+  'observatoryHudHtml', 'syncObservatoryRailClearance', 'observeObservatoryLayout', 'observatoryTitleHtml', 'observatoryScoreRingHtml'];
 
 function rep(id, name) {
   const calls = [1, 2, 3].map(function (i) { return { id: id + '-' + i, call_date: '2026-09-0' + i + 'T12:00:00Z', analysis_status: 'done', analysis: { intro_score: 70 } }; });
@@ -53,7 +54,8 @@ function page() {
   const ASYNC = { loadTeam: true, fetchTeamJSON: true };
   const funcs = REAL.map(function (n) { return (ASYNC[n] ? 'async ' : '') + fnBody(live, n); }).join('\n');
   const vars = [decl(/var TEAM_LANE_SCOPE = \{[\s\S]*?\n  \};/), decl(/var teamEpoch = 0;/), decl(/var laneWaitTimers = \{\};/), decl(/var teamRenderQueued = false;/),
-    decl(/var PERF_LONG_WAIT_MS = \d+;/), decl(/var TEAM_PICK_KEY = '[^']+';/), decl(/var TEAM_PAGES = \[[\s\S]*?\];/)].join('\n');
+    decl(/var PERF_LONG_WAIT_MS = \d+;/), decl(/var TEAM_PICK_KEY = '[^']+';/), decl(/var TEAM_PAGES = \[[\s\S]*?\];/),
+    decl(/var observatoryLayoutBound = false;/), decl(/var observatoryRailObserver = null;/)].join('\n');
   return '<html><head>' + source.slice(source.indexOf('<style>'), source.indexOf('</style>') + 8) + '</head><body data-view="team-coaching"><main class="page" id="content"></main><script>'
     + 'window.requestAnimationFrame = function (fn) { return setTimeout(fn, 0); };window.REJECTIONS=[];window.addEventListener("unhandledrejection",function(e){REJECTIONS.push(String(e.reason&&e.reason.stack||e.reason));});window.addEventListener("error",function(e){REJECTIONS.push(String(e.message));});'   /* the browser pauses rAF in a hidden window; the page\'s scheduling is what is under test */
     + 'var COLORS={win:"#09e046",follow_up:"#fbbf24",loss:"#f87171"};var MONTH_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];'
@@ -69,7 +71,7 @@ function page() {
     + 'var LOG=[];var PENDING={};window.fetch=function(url){var key=url.split("?")[0];LOG.push(key);return new Promise(function(resolve){(PENDING[key]=PENDING[key]||[]).push(function(body){resolve({ok:true,status:200,json:function(){return Promise.resolve(body);}});});});};'
     + 'function answer(key,body){var q=PENDING[key]||[];var fn=q.shift();if(!fn)throw new Error("nothing pending for "+key);fn(body);return new Promise(function(r){setTimeout(r,25);});}'
     + 'function count(key){return LOG.filter(function(k){return k===key;}).length;}'
-    + 'function panel(){var c=document.getElementById("content");var sec=[].slice.call(c.querySelectorAll(".section")).filter(function(x){return /Coachable Moments/.test(x.textContent);})[0];return {text:sec?sec.innerText:c.innerText,reps:[].slice.call(c.querySelectorAll(".coaching-rep-choice strong")).map(function(e){return e.textContent;})};}'
+    + 'function panel(){var c=document.getElementById("content");var sec=c.querySelector(".observatory-coaching-workspace-panel");return {text:sec?sec.innerText:c.innerText,reps:[].slice.call(c.querySelectorAll(".coaching-rep-choice strong")).map(function(e){return e.textContent;})};}'
     + 'try{localStorage.setItem(' + decl(/var TEAM_PICK_KEY = '[^']+';/).replace(/^var TEAM_PICK_KEY = /, '').replace(/;$/, '') + ',"sober");}catch(e){}'
     + '</script></body></html>';
 }

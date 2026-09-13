@@ -28,7 +28,7 @@ assert.ok(STYLE.length > 100000, 'floor: the stylesheet was found (' + STYLE.len
    placement is rendered under the view that hosts it, inside the ancestors the
    page actually builds (read from the live DOM 2026-09-02). */
 const HOSTS = [
-  { view: 'team-performance', open: '<main class="page"><div><div class="section fade-in"><div class="rep-card-list" id="grid">', close: '</div></div></div></main>', count: 8 },
+  { view: 'team-performance', open: '<main class="page"><div class="observatory-page observatory-performance"><section class="section fade-in observatory-reps-panel"><div class="rep-card-list" id="grid">', close: '</div></section></div></main>', count: 8, observatory: true },
   { view: 'team-dashboard',   open: '<main class="page"><div><div class="section fade-in"><div class="dash-grid"><div class="dash-card" id="slot" style="grid-column:span 2;">', close: '</div></div></div></div></main>', count: 1 },
 ];
 function page(host) {
@@ -45,16 +45,19 @@ const PROBE = `[...document.querySelectorAll('.rep-card')].map((el) => { const c
   radius: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '),
   clip: cs.overflow } })`;
 
-test('⚠⚠ RENDERED under each host view: every rep card has a 1px WHITE edge and 16px corners', () => {
+test('⚠⚠ RENDERED under each host view: Observatory Performance uses a sage edge and 20px cards; the dashboard keeps its white playing-card edge', () => {
   let seen = 0;
   for (const host of HOSTS) {
     const cards = renderComputed(page(host), PROBE);
     assert.strictEqual(cards.length, host.count, host.view + ': floor — ' + host.count + ' card(s) rendered');
     for (const c of cards) {
       seen++;
-      assert.strictEqual(c.edge, '1px solid rgb(255, 255, 255)', host.view + '/' + c.where + ': the edge must be 1px solid white as rendered, got ' + c.edge);
-      assert.strictEqual(c.edges, 'rgb(255, 255, 255)|rgb(255, 255, 255)|rgb(255, 255, 255)', host.view + ': all four sides white');
-      assert.strictEqual(c.radius, '16px 16px 16px 16px', host.view + ': playing-card corners (--radius-lg), got ' + c.radius);
+      const expectedEdge = host.observatory ? '1px solid rgba(215, 236, 222, 0.14)' : '1px solid rgb(255, 255, 255)';
+      const expectedEdges = host.observatory ? 'rgba(215, 236, 222, 0.14)|rgba(215, 236, 222, 0.14)|rgba(215, 236, 222, 0.14)' : 'rgb(255, 255, 255)|rgb(255, 255, 255)|rgb(255, 255, 255)';
+      const expectedRadius = host.observatory ? '20px 20px 20px 20px' : '16px 16px 16px 16px';
+      assert.strictEqual(c.edge, expectedEdge, host.view + '/' + c.where + ': unexpected rendered edge ' + c.edge);
+      assert.strictEqual(c.edges, expectedEdges, host.view + ': unexpected rendered edge colors');
+      assert.strictEqual(c.radius, expectedRadius, host.view + ': unexpected card radius ' + c.radius);
       assert.strictEqual(c.clip, 'hidden', host.view + ': the band must clip to the rounded corner');
     }
   }

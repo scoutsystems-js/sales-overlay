@@ -22,6 +22,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { stripComments, fnBody } = require('./helpers/strip-comments');
 
 const HTML = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
 
@@ -224,8 +225,8 @@ test('the plotted series is the real data, carried through the real render path'
 
 test('NO dead mount: the graph section is never emitted from inside a callback', () => {
   // The exact defect. teamScoreListHtml's callback must be a bare accessor.
-  const fn = HTML.slice(HTML.indexOf('function renderTeamPerformance'), HTML.indexOf('function drawRepSeriesCharts'));
-  assert.ok(fn.length > 800 && fn.length < 9000, 'slice must cover the render path: ' + fn.length);
+  const fn = fnBody(stripComments(HTML), 'renderTeamPerformance');
+  assert.ok(fn.length > 800, 'function body must cover the render path: ' + fn.length);
   /* The score-list callback that carried the dead mount is gone with its list
      (2026-09-02); the property that survives is the assertion below. */
   assert.ok(fn.indexOf('insertAdjacentHTML') === -1,

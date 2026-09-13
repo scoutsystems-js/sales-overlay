@@ -20,14 +20,14 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { fnBody, stripComments } = require('./helpers/strip-comments');
 
 const PAGE = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
 
 // ⚠ strip comments first — this codebase archives removed code in place, so a
 // raw scan reports the OLD position as still live. Line comments before block
 // comments: a `/*` inside a `//` line is a false opener.
-const LIVE = PAGE.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
-  .replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+const LIVE = stripComments(PAGE).replace(/<!--[\s\S]*?-->/g, '');
 
 function renderBody() {
   const at = LIVE.indexOf('content.innerHTML =\n      teamHeaderHtml()');
@@ -68,10 +68,8 @@ test('⚠⚠ the digest page has NO date picker — the rule, enforced structura
 });
 
 test('⚠ the picker-driven panels live WITH the picker, on Performance', () => {
-  const at = LIVE.indexOf('function renderTeamPerformance');
-  assert.ok(at !== -1, 'stale anchor — the performance page is gone');
-  const fn = LIVE.slice(at, LIVE.indexOf('allPanelsHiddenNoteHtml();', at));
-  assert.ok(fn.length > 300 && fn.length < 4000, 'slice must cover it: ' + fn.length);
+  const fn = fnBody(LIVE, 'renderTeamPerformance');
+  assert.ok(fn.length > 300, 'renderTeamPerformance must not be empty');
 
   /* ⚠⚠ NARROWED TO THE MAIN BODY ON PURPOSE, AND THE NARROWING IS ASSERTED.
      This function has an EARLY-RETURN branch for the glance-tile drilldown that

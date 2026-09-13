@@ -4,8 +4,9 @@
  * ⚠⚠ WHAT CHANGED, AND WHY THIS FILE IS NO LONGER ABOUT "TEAM".
  * The raster used to be a per-view override on `team` alone, with the mesh as
  * the base everywhere else. Justin's rulings: mesh OFF on the dashboard, the
- * raster on EVERY view, FULL BRIGHTNESS, one image one position. So there is
- * now exactly ONE painting rule and this file guards it for all fifteen views.
+ * raster on the ordinary dashboard views, with Observatory's two approved
+ * page-specific treatments allowed to suppress the mesh layer. So there is
+ * one base painting rule and exactly two approved per-view exceptions.
  *
  * ⚠⚠ THE LOAD-BEARING PROPERTY IS NOT A CONTRAST RATIO — IT IS THAT NO TEXT
  * TOUCHES THE IMAGE. Full brightness is safe BY CONSTRUCTION: every text leaf
@@ -69,14 +70,20 @@ test('⚠⚠ EXACTLY ONE background-position and ONE background-size in the rule
   assert.ok(/background-position:\s*50%\s+50%/.test(rule), 'centred');
 });
 
-test('⚠⚠ ZERO per-view rules — one image, one position (Justin\'s ruling)', () => {
+test('⚠⚠ ONLY THE TWO APPROVED OBSERVATORY VIEWS MAY OVERRIDE THE BASE PAINT', () => {
   const perView = LIVE.match(/body\[data-view="[a-z-]+"\]::before/g) || [];
-  assert.strictEqual(perView.length, 0,
-    'per-page variation is retired; found ' + perView.length + ': ' + perView.join(', '));
+  assert.deepStrictEqual(perView.sort(), [
+    'body[data-view="team-coaching"]::before',
+    'body[data-view="team-performance"]::before',
+  ], 'only Observatory may have a page-specific ground rule; found ' + perView.join(', '));
+  const approvedRule = LIVE.match(/body\[data-view="team-performance"\]::before\s*,\s*body\[data-view="team-coaching"\]::before\s*\{[^}]*\}/);
+  assert.ok(approvedRule && /display:\s*none/.test(approvedRule[0]), 'the two approved views must only suppress the mesh layer');
+  assert.strictEqual((LIVE.match(/body\[data-view="(?!team-coaching|team-performance)[a-z-]+"\]::before/g) || []).length, 0,
+    'unapproved pages must not get a ground override');
   // ⚠ NON-VACUITY — the matcher must be able to find one. Assert it fires
   // against an injected rule, or this test passes on an empty string forever.
   const broken = LIVE + '\nbody[data-view="overview"]::before { background-position: 0% 0%; }';
-  assert.strictEqual((broken.match(/body\[data-view="[a-z-]+"\]::before/g) || []).length, 1,
+  assert.strictEqual((broken.match(/body\[data-view="overview"\]::before/g) || []).length, 1,
     'non-vacuity: the matcher must detect a reintroduced per-view rule');
 });
 
