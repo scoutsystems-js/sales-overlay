@@ -31,8 +31,8 @@ test('⚠⚠ RENDERED: Observatory Performance card — sage edge, dark panel, c
   const cards = renderComputed(page([JOSH, DRE]), PROBE);
   assert.strictEqual(cards.length, 2, 'floor: two cards rendered');
   for (const c of cards) {
-    assert.strictEqual(c.edge, 'rgba(215, 236, 222, 0.14)', 'the Observatory edge is sage: ' + c.edge);
-    assert.ok(/rgba\(0, 0, 0, 0.24/.test(c.glow), 'the Observatory card keeps its dark shadow: ' + c.glow);
+    assert.strictEqual(c.edge, 'rgba(196, 231, 207, 0.18)', 'the Observatory glass edge is sage: ' + c.edge);
+    assert.ok(/rgba\(21, 161, 71, 0.043/.test(c.glow), 'the Observatory card keeps its subtle green glass bloom: ' + c.glow);
     assert.strictEqual(c.radius, '20px');
     assert.strictEqual(c.washDisplay, 'none', 'the Observatory card hides the old ring wash');
     assert.strictEqual(c.topLine.display, 'none', 'the Observatory card hides the old top line');

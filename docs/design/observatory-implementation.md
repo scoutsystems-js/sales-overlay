@@ -1,5 +1,16 @@
 # Observatory implementation record
 
+## Visor standard — approved September 13, 2026
+
+**Status: approved and implemented. Integrated validation passes 2,885/2,885 tests, zero skipped, after preserving the latest calendar release. Desktop, tablet and phone visual reviews pass. Live review caught decimal call-time text crowding its brackets; the final compact readout preserves all digits and units within the 132-unit aperture, tested with 49.3 and 120.5 minutes. Production deployment status is recorded in the release receipt below.** The current specification is the first section of `site-design.md`. Approved motion source is archived as `docs/design/scout-visor-motion-approved.html`; prior archives remain unchanged.
+
+Scope: personal Coaching Dashboard and Team Performance share free-floating Visor horseshoes, semantic color, slow independent outer rotation, and translucent green-tinted cards. Background/HUD remains the approved fixed viewport design. Team Coaching keeps its current cards/ring in this release. Personal Closing and OHR read a metadata-only `gauge_policy` projection from the already-loaded analytics response, sourced from canonical Team `METRICS`; no extra fetch is introduced. They use the existing Team metric policy, superseding the earlier unbanded appearance; average scores keep the existing 70/50 bands. Team Performance retains Closing/OHR/call time, real scales, band calibration, counts, seven-day window and existing drills. No metric definition, grading, intelligence or permissions change is authorized by this design request.
+
+Release evidence: `~/Desktop/scan-reports/observatory-2026-09-13/visor-standard/release-status.md`; clean full-suite receipt: `full-suite-final.txt` in that directory. The two original card-appearance failures are preserved separately as historical evidence; their expectations now match the approved glass treatment.
+
+## Earlier release records
+
+
 **Date:** September 13, 2026 (Eastern)
 
 Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.

@@ -504,6 +504,7 @@ function renderOverviewAs(overrides) {
       calls: { analyzed: 10, total_in_range: 10, processing: 0, error: 0 },
       avg_score: { mean: 60, graded_calls: 10, win_mean: null, win_n: 0, other_mean: null, other_n: 0 },
       objections: { calls_with_objection: 4, total_highlights: 9 },
+      gauge_policy: { closing: { scale: 50, target: 25, direction: 'higher_is_better', band: null }, objections: { scale: 100, target: 35, direction: 'higher_is_better', band: null } },
       cash_collected: 0, close_rate: null, close_wins: 0, close_decided: 0,
       sections: { intro: { mean: 57, n: 10 }, discovery: { mean: 47, n: 10 }, pitch: { mean: 65, n: 10 },
                   objection: { mean: 64, n: 10 }, close: { mean: 64, n: 10 } },

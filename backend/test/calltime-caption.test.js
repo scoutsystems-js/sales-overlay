@@ -25,7 +25,7 @@ test('no dial carries a caption (H704, H706); the call-time band stays', () => {
 });
 
 test('avgCardHtml (EXECUTED) renders no caption element for a null caption, and never invents a "Target N min" fallback', () => {
-  const src = [fnBody(LIVE, 'observatoryAverageCardHtml'), fnBody(LIVE, 'avgCardHtml')].join('\n');
+  const src = [fnBody(LIVE, 'visorTickMarks'), fnBody(LIVE, 'visorPoint'), fnBody(LIVE, 'visorGaugeHtml'), fnBody(LIVE, 'observatoryAverageCardHtml'), fnBody(LIVE, 'avgCardHtml')].join('\n');
   const card = { key: 'calltime', label: 'Avg Call Time', value: 41, target: 40, scale: 60, unit: 'min', total: 12, enough: true, target_caption: null, sweet_spot: { good: [35, 45], ok: [20, 60] } };
   const make = (state) => new Function('state', 'escapeHtml', 'avgBand', 'avgGaugeSvg', 'avgFraction', src + '\nreturn avgCardHtml;')(
     state, (s) => String(s), () => 'good', () => '<svg></svg>', (value, scale) => value / scale);

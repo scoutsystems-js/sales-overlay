@@ -1,5 +1,56 @@
 # Scout site design: Observatory HUD
 
+## Current standard — Visor, September 13, 2026
+
+Justin approved the animated Visor concept, then asked to lock the background, cards and gauges as Scout's standard and extend its gauge design to Team Performance. This section supersedes the earlier full-circle gauges, opaque Performance cards, and unbanded personal rate colors described below. Earlier releases and mockup CSS remain historical references, not competing standards. The implementation and verification state is recorded in [the implementation record](docs/design/observatory-implementation.md).
+
+### Background and layout
+
+One fixed viewport ground carries two visible forest-green light pools with a dark center. Page content scrolls over it; the gradient and background HUD do not scroll. No mesh on the redesigned pages. Keep the approved gradient exactly:
+
+```css
+radial-gradient(ellipse 58% 50% at -7% 8%, rgba(21,122,58,.46), transparent 74%),
+radial-gradient(ellipse 54% 46% at 104% 88%, rgba(13,91,43,.36), transparent 72%),
+radial-gradient(ellipse 46% 38% at 51% 42%, rgba(0,0,0,.48), transparent 78%),
+linear-gradient(136deg, #07100b 0%, #080a09 50%, #0a120d 100%)
+```
+
+Use the existing fixed 1200×860 HUD: two arcs, two rings, four traces, three points and one scan, in pale white/gray. Stroke alpha .14, dashed alpha .12, points .20; scan fill .17 at opacity .45. Orbit 82 seconds, points 67/91/74 seconds, scan 28 seconds. Artwork is decorative, behind content, hidden from accessibility and unable to intercept clicks. Background-off hides the artwork; reduced motion stops movement. Do not brighten it further or introduce fake telemetry.
+
+Keep 24px desktop and 18px mobile outside gutters. Use available width and the real sidebar height rather than fixed empty spacer bands. Personal Coaching has three free-floating gauges in this order: Closing %, Objection handle rate, Avg call score. Closing remains the lead and links to the regular Calls page. Focus panels begin directly below the hero; Coach Summary is last and spans the available page width. Retain all existing date/user controls, evidence, filters, optional charts and navigation.
+
+### Cards and selected states
+
+Cards float over the single gradient. Their fill is dark translucent green, with smooth 20px desktop / 16px narrow corners, a thin pale-sage edge, one subtle inset highlight, soft dark shadow and a restrained emerald border bloom. Major fill `rgba(7,23,14,.78)`, inset fill `rgba(14,40,24,.42)`, edge `rgba(196,231,207,.30)`, bloom `rgba(21,161,71,.10)`; blur 4px major / 3px inset. Keep body text pale and readable. Do not put separate gradient backgrounds or loud neon frames on each card.
+
+Selected menu and selected member share the approved treatment: sage outline, 2px bright Scout-green left edge, 11px radius, dark green selection fill `linear-gradient(100deg,#1b4527,#112617)`, pale text and restrained green glow. Preserve Scout's actual wordmark and white date picker.
+
+### Visor gauges and movement
+
+The gauge is an open 270-degree horseshoe, free-floating without a rectangular card. It has a quiet track, a smooth colored progress arc with a fine bright core and soft bloom, a pale central number, angular static brackets, a small upper chevron and a short lower underline. Thin calibration labels sit outside the ring. Metric name, counts, trend and existing context remain legible HTML below the graphic. On narrow phones, stack complete gauges with readable calibration rather than shrinking them into tiny side-by-side dials.
+
+Only the outer micro hash marks and broken contour lines rotate: ticks clockwise once every 80 seconds, contours counterclockwise once every 110 seconds. Stagger starting phases across gauges. The number, progress arc, brackets, labels, scale and target marks never rotate. Reduced motion freezes the decorative loops. The entire rotation must fit within the gauge bounds at every angle without touching the captions. Keep glow soft and movement slow; no pulsing numbers or sweeping progress animations.
+
+The approved motion [source](docs/design/scout-visor-motion-approved.html) is archived unchanged (SHA-256 `d23b1f8c740fd9a7d73d1e6cc5eabbec1525ce7cf38584e272cf86902033d518`). Its 340×348 viewBox encloses center 170,170 and the complete outer orbit; the main horseshoe uses radius 125, starting at 135° and ending at 405°. These are reference proportions, scaled responsively. For an open path with `pathLength="100"`, use a nonrepeating visible segment (`progress 100`), and omit the progress path at zero to prevent a stray luminous endpoint.
+
+### Color, scale and meaning
+
+Gauge color follows the metric's existing policy, never a universal percentage threshold. Red = below the middle band; yellow = middle; green = good. Keep the value readable in pale text. Missing measurements remain neutral with an explanation and no active arc; zero remains a real measured value. Clamp only the drawn arc to the scale; preserve the actual displayed value. Longer readouts (including decimal minutes and 100%) use a compact type treatment bounded to the 132-unit inner aperture, keeping every digit and unit clear of the brackets.
+
+| Metric | Red | Yellow | Green | Gauge scale |
+|---|---|---|---|---|
+| Closing | below 15% | 15% to below 25% | 25% and above | 0–50% |
+| Objection handling | below 21% | 21% to below 35% | 35% and above | 0–100% |
+| Average call score | below 50 | 50 to below 70 | 70 and above | 0–100 |
+| Average call time | below 20 or above 60 min | 20 to below 35, or above 45 to 60 min | 35–45 min | 0–90 min |
+
+These are documentation of the existing policies in `backend/lib/team-averages.js`, `backend/lib/metric-band.js` and the existing score renderer, not a second implementation. Reuse their policy and direction. Preserve target/band calibration marks without restoring removed target-caption sentences. Personal gauges use the selected personal period. Team Performance retains its existing Closing, Objections and Average call time metrics and clearly labeled fixed seven-day window; its page date picker continues to control the other report sections.
+
+Current implementation scope is personal Coaching Dashboard and Team Performance. Shared background/HUD already covers Team Coaching, which retains its previously approved cards and ring until its own update. Other pages adopt this standard when redesigned; approval of the standard does not silently change their behavior.
+
+## Historical approvals and release record
+
+
 Status: approved site standard, recorded 2026-09-12; Team Coaching and Team Performance are live as of 2026-09-13. The approved third page, personal Coaching Dashboard (`overview`), is recorded as a September 13 implementation; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. Justin’s approval: “yeah i like Observatory best. update the .md file”. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
 
 Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
@@ -103,7 +154,7 @@ in an Observatory panel. Metrics, permissions, and data remain unchanged.
 
 Preserve backend metrics, access rules, active-user filtering, real-call exclusions, and accessibility behavior. Use clean production markup and shared tokens rather than exploratory wrapper nesting. Do not treat historical Polished or Stark CSS as active authority.
 
-## Exact Observatory CSS appendix
+## Historical Observatory CSS appendix (superseded where noted above)
 
 All current Observatory source style blocks follow in source order. Font bytes are represented by the archive marker; use the approved archive for their exact payload.
 

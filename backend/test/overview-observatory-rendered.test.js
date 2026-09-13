@@ -64,15 +64,18 @@ test('overview uses three real glowing instruments in the requested order and ke
     const focusRect = focus.getBoundingClientRect();
     const railRect = document.querySelector('.sidebar').getBoundingClientRect();
     return {
-      tracks: hero.querySelectorAll('.observatory-ring-track').length,
-      values: hero.querySelectorAll('.observatory-ring-value').length,
-      glows: hero.querySelectorAll('.observatory-ring-glow').length,
-      arcs: [...hero.querySelectorAll('.observatory-ring-value')].map((arc) => arc.getAttribute('stroke-dasharray')),
+      tracks: hero.querySelectorAll('.observatory-visor-track').length,
+      values: hero.querySelectorAll('.observatory-visor-arc').length,
+      glows: hero.querySelectorAll('.observatory-visor-arc-glow').length,
+      arcs: [...hero.querySelectorAll('.observatory-visor-arc')].map((arc) => arc.getAttribute('stroke-dasharray')),
+      outerTicks: hero.querySelectorAll('.observatory-visor-ticks').length,
+      outerContours: hero.querySelectorAll('.observatory-visor-contours').length,
+      staticNumerals: [...hero.querySelectorAll('.observatory-visor-value')].map((node) => node.textContent),
       labels: [close.querySelector('.lead-number-label').textContent, ...metrics.map((node) => node.querySelector('.glance-label').textContent)],
-      metrics: metrics.map((node) => { const ring = node.querySelector('.observatory-metric-ring'); return { action: node.getAttribute('onclick'), ring: !!ring, ringWidth: ring && ring.getBoundingClientRect().width }; }),
+      metrics: metrics.map((node) => { const ring = node.querySelector('.observatory-visor-gauge'); return { action: node.getAttribute('onclick'), ring: !!ring, ringWidth: ring && ring.getBoundingClientRect().width }; }),
       closeLink: closingLink && { tag: closingLink.tagName, href: closingLink.getAttribute('href'), action: closingLink.getAttribute('onclick'), callsNavigationCount, callsNavigationPrevented },
-      closeRingWidth: close.querySelector('.overview-close-ring').getBoundingClientRect().width,
-      ringCenters: [close.querySelector('.overview-close-ring'), ...metrics.map((node) => node.querySelector('.observatory-metric-ring'))].map((ring) => { const rect = ring.getBoundingClientRect(); return rect.top + rect.height / 2; }),
+      closeRingWidth: close.querySelector('.observatory-visor-gauge').getBoundingClientRect().width,
+      ringCenters: [close.querySelector('.observatory-visor-gauge'), ...metrics.map((node) => node.querySelector('.observatory-visor-gauge'))].map((ring) => { const rect = ring.getBoundingClientRect(); return rect.top + rect.height / 2; }),
       trendBelowRing: !!document.querySelector('.observatory-metric-trend .glance-trend'),
       focusInUpper: focus.parentElement.classList.contains('observatory-upper'),
       focusStartsAfterHero: focusRect.top >= heroRect.bottom && focusRect.top - heroRect.bottom <= 32,
@@ -86,9 +89,12 @@ test('overview uses three real glowing instruments in the requested order and ke
     };
   })()`, { width: 1920 });
   assert.equal(desktop.tracks, 3, 'Closing, OHR, and score each need a real SVG track');
+  assert.equal(desktop.outerTicks, 3, 'each gauge keeps its rotating outer tick group');
+  assert.equal(desktop.outerContours, 3, 'each gauge keeps its counter-rotating contour group');
+  assert.deepEqual(desktop.staticNumerals, ['23%', '33%', '72'], 'the static Visor numerals retain existing metric values');
   assert.equal(desktop.values, 3, 'each measured top metric needs a proportional value arc');
   assert.equal(desktop.glows, 3, 'each measured top metric needs its glow arc');
-  assert.deepEqual(desktop.arcs, ['23.00 77.00', '33.00 67.00', '72.00 28.00'], 'each arc must reflect its existing fixture value, not a target');
+  assert.deepEqual(desktop.arcs, ['46.00 100', '33.00 100', '72.00 100'], 'each arc must reflect its existing fixture value, not a target');
   assert.deepEqual(desktop.labels, ['Closing %', 'Objection handle rate', 'Avg call score'], 'the three gauges follow the requested left-to-right order');
   assert.equal(desktop.metrics.length, 2, 'OHR and score remain the two supporting drill targets');
   assert.deepEqual(desktop.metrics.map((metric) => metric.action), ['goObjections()', "drillCalls('analyzed','score')"], 'OHR and score keep their existing drill actions');
@@ -113,7 +119,7 @@ test('overview uses three real glowing instruments in the requested order and ke
   })()`, { width: 390 });
   assert.equal(mobile.length, 3);
   assert.ok(mobile[1].top > mobile[0].bottom, 'mobile Closing gets a centered first row');
-  assert.ok(Math.abs(mobile[1].top - mobile[2].top) <= 1, 'mobile second row is OHR and Avg call score');
+  assert.ok(mobile[2].top > mobile[1].bottom, 'narrow mobile stacks OHR and Avg call score so Visor calibration stays readable');
   mobile.forEach((rect) => assert.ok(rect.left >= 0 && rect.right <= 390, 'mobile instruments stay in bounds'));
 });
 
@@ -190,11 +196,11 @@ test('overview loading and no-call exports remain truthful while background-off 
     assert.equal(observed.hud, true, file + ' must keep scoped decoration');
     assert.ok(/Counting your closed prospects|Reading your graded calls|No analyzed calls in this range/.test(html), file + ' must state its data state');
     if (file.includes('no-calls')) {
-      assert.ok(/lead-number-val">—/.test(html), 'no-call overview must show an unmeasured closing value');
-      assert.equal((html.match(/class="observatory-ring-value"/g) || []).length, 0, 'no-call overview must not draw a filled value arc');
-      assert.equal((html.match(/class="observatory-ring-glow"/g) || []).length, 0, 'no-call overview must not draw a glow arc');
-      assert.match(html, /class="observatory-ring overview-close-ring observatory-ring--empty"/, 'no-call overview keeps the neutral closing instrument');
-      const empty = renderComputed(html, `(() => { const rings = [...document.querySelectorAll('.observatory-overview-hero .observatory-ring--empty')]; return { count: rings.length, filters: rings.map((ring) => getComputedStyle(ring).filter) }; })()`);
+      assert.ok(/observatory-visor-value[^>]*>—/.test(html), 'no-call overview must show an unmeasured closing value');
+      assert.equal((html.match(/class="observatory-visor-arc"/g) || []).length, 0, 'no-call overview must not draw a filled value arc');
+      assert.equal((html.match(/class="observatory-visor-arc-glow"/g) || []).length, 0, 'no-call overview must not draw a glow arc');
+      assert.match(html, /observatory-visor-gauge observatory-visor--empty/, 'no-call overview keeps the neutral closing instrument');
+      const empty = renderComputed(html, `(() => { const rings = [...document.querySelectorAll('.observatory-overview-hero .observatory-visor--empty')]; return { count: rings.length, filters: rings.map((ring) => getComputedStyle(ring).filter) }; })()`);
       assert.equal(empty.count, 3, 'all three unavailable top metrics remain neutral instruments');
       empty.filters.forEach((filter) => assert.equal(filter, 'none', 'an unavailable metric must not keep a coloured glow'));
     }
@@ -207,4 +213,69 @@ test('overview HUD motion advances in normal mode and remains noninteractive', (
   const observed = renderComputed(documentFor('overview'), `(async () => { const hud = document.querySelector('.observatory-hud'); const orbit = document.querySelector('.observatory-hud-orbit'); const first = getComputedStyle(orbit).transform; await new Promise((resolve) => setTimeout(resolve, 140)); const second = getComputedStyle(orbit).transform; return { first, second, pointerEvents: getComputedStyle(hud).pointerEvents }; })()`);
   assert.notEqual(observed.first, observed.second, 'overview HUD orbit must advance in normal mode');
   assert.equal(observed.pointerEvents, 'none', 'overview HUD must not capture controls');
+});
+
+test('Visor moves only its outer surveying detail and respects reduced motion', () => {
+  const normal = renderComputed(documentFor('overview'), `(async () => {
+    const tick = document.querySelector('.observatory-visor-ticks');
+    const contour = document.querySelector('.observatory-visor-contours');
+    const value = document.querySelector('.observatory-visor-value');
+    const first = { tick: getComputedStyle(tick).transform, contour: getComputedStyle(contour).transform, value: getComputedStyle(value).transform };
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    const second = { tick: getComputedStyle(tick).transform, contour: getComputedStyle(contour).transform, value: getComputedStyle(value).transform };
+    return { first, second, tickAnimation: getComputedStyle(tick).animationName, contourAnimation: getComputedStyle(contour).animationName };
+  })()`);
+  assert.notEqual(normal.first.tick, normal.second.tick, 'outer tick marks must advance');
+  assert.notEqual(normal.first.contour, normal.second.contour, 'outer contours must advance');
+  assert.equal(normal.first.value, normal.second.value, 'the metric numeral must remain stationary');
+  assert.equal(normal.tickAnimation, 'observatory-visor-tick-spin');
+  assert.equal(normal.contourAnimation, 'observatory-visor-contour-spin');
+
+  const reduced = renderComputed(documentFor('overview'), `(() => ({
+    ticks: getComputedStyle(document.querySelector('.observatory-visor-ticks')).animationName,
+    contours: getComputedStyle(document.querySelector('.observatory-visor-contours')).animationName,
+    value: document.querySelector('.observatory-visor-value').textContent
+  }))()`, { reducedMotion: true });
+  assert.equal(reduced.ticks, 'none', 'reduced motion stops outer tick rotation');
+  assert.equal(reduced.contours, 'none', 'reduced motion stops contour rotation');
+  assert.equal(reduced.value, '23%', 'reduced motion must not change the reading');
+});
+
+function overviewAnalyticsForVisor(closeRate, avgScore) {
+  return {
+    calls: { analyzed: 3, total_in_range: 3, processing: 0, error: 0 },
+    avg_score: { mean: avgScore, prior_mean: null, graded_calls: 3, win_mean: null, win_n: 0, other_mean: null, other_n: 0 },
+    objections: { calls_with_objection: 1, total_highlights: 1 },
+    gauge_policy: {
+      closing: { scale: 50, target: 25, direction: 'higher_is_better', band: null },
+      objections: { scale: 100, target: 35, direction: 'higher_is_better', band: null }
+    },
+    prospect_close_rate: closeRate, prospect_close_wins: 0, prospect_close_total: 3,
+    close_wins: 0, close_decided: 0, sections: {}, weakest_section: null, strongest_section: null, latest_one_things: []
+  };
+}
+
+test('Visor uses the established semantic bands, and measured zero has no cap arc', () => {
+  const needsWork = (rate) => ({ available: true, bucket: { handled: rate, total: 100, rate_pct: rate }, detail: { buckets: [{ handled: rate, total: 100, rate_pct: rate }] } });
+  const classes = (html) => renderComputed(html, `(() => [...document.querySelectorAll('.observatory-overview-hero .observatory-visor-gauge')].map((node) => ({ className: node.className, style: node.getAttribute('style') || '' })))()`);
+  const good = classes(documentFor('overview', { analytics2: overviewAnalyticsForVisor(25, 70), needsWork: needsWork(35) }));
+  const mid = classes(documentFor('overview', { analytics2: overviewAnalyticsForVisor(15, 50), needsWork: needsWork(21) }));
+  const bad = classes(documentFor('overview', { analytics2: overviewAnalyticsForVisor(10, 40), needsWork: needsWork(10) }));
+  good.slice(0, 2).forEach((gauge) => assert.match(gauge.className, /observatory-visor--good/, 'Closing and OHR above their canonical bars use green'));
+  mid.slice(0, 2).forEach((gauge) => assert.match(gauge.className, /observatory-visor--mid/, 'Closing and OHR at their established yellow lower edge use amber'));
+  bad.slice(0, 2).forEach((gauge) => assert.match(gauge.className, /observatory-visor--bad/, 'Closing and OHR below their canonical bars use red'));
+  assert.match(good[2].style, /--visor-tone:\s*#09e046/, 'Avg score keeps its established 70+ green scoreColor tone');
+  assert.match(mid[2].style, /--visor-tone:\s*#fbbf24/, 'Avg score keeps its established 50-point amber edge');
+  assert.match(bad[2].style, /--visor-tone:\s*#f87171/, 'Avg score keeps its established below-50 red scoreColor tone');
+
+  const zeroHtml = documentFor('overview', { analytics2: overviewAnalyticsForVisor(0, 0), needsWork: needsWork(0) });
+  const zero = renderComputed(zeroHtml, `(() => {
+    const gauges = [...document.querySelectorAll('.observatory-overview-hero .observatory-visor-gauge')];
+    return { arcs: document.querySelectorAll('.observatory-overview-hero .observatory-visor-arc').length,
+      glows: document.querySelectorAll('.observatory-overview-hero .observatory-visor-arc-glow').length,
+      values: gauges.map((node) => node.querySelector('.observatory-visor-value').textContent) };
+  })()`);
+  assert.equal(zero.arcs, 0, 'a measured zero does not paint a rounded progress cap');
+  assert.equal(zero.glows, 0, 'a measured zero does not emit a glow arc');
+  assert.deepEqual(zero.values, ['0%', '0%', '0'], 'measured zeros remain visible values, not missing data');
 });

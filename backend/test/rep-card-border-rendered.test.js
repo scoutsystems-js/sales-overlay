@@ -1,7 +1,8 @@
 'use strict';
 /**
- * ⚠⚠ THE REP CARD'S WHITE EDGE, MEASURED AS RENDERED (Justin, 2026-09-02: "so it
- * looks like a playing card"; H686).
+ * ⚠⚠ THE REP CARD EDGE, MEASURED AS RENDERED (Justin, 2026-09-02: "so it looks
+ * like a playing card"; H686). Observatory Performance intentionally uses its
+ * approved translucent green-glass edge; the catalog host retains the white edge.
  *
  * This is a RULED EXCEPTION to the design pass, which removed borders everywhere
  * and replaced them with space: the rep card is the one surface where the
@@ -52,8 +53,8 @@ test('⚠⚠ RENDERED under each host view: Observatory Performance uses a sage 
     assert.strictEqual(cards.length, host.count, host.view + ': floor — ' + host.count + ' card(s) rendered');
     for (const c of cards) {
       seen++;
-      const expectedEdge = host.observatory ? '1px solid rgba(215, 236, 222, 0.14)' : '1px solid rgb(255, 255, 255)';
-      const expectedEdges = host.observatory ? 'rgba(215, 236, 222, 0.14)|rgba(215, 236, 222, 0.14)|rgba(215, 236, 222, 0.14)' : 'rgb(255, 255, 255)|rgb(255, 255, 255)|rgb(255, 255, 255)';
+      const expectedEdge = host.observatory ? '1px solid rgba(196, 231, 207, 0.18)' : '1px solid rgb(255, 255, 255)';
+      const expectedEdges = host.observatory ? 'rgba(196, 231, 207, 0.18)|rgba(196, 231, 207, 0.18)|rgba(196, 231, 207, 0.18)' : 'rgb(255, 255, 255)|rgb(255, 255, 255)|rgb(255, 255, 255)';
       const expectedRadius = host.observatory ? '20px 20px 20px 20px' : '16px 16px 16px 16px';
       assert.strictEqual(c.edge, expectedEdge, host.view + '/' + c.where + ': unexpected rendered edge ' + c.edge);
       assert.strictEqual(c.edges, expectedEdges, host.view + ': unexpected rendered edge colors');

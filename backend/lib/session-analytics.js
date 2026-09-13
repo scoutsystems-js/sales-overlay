@@ -15,6 +15,7 @@ var SR = require('./section-ranking');   // H774: the one floor under the Coach 
 const { isCredited } = require('./objection-handled');
 const { countsAsObjection } = require('./objection-strict');   // the ONE definition — see test/objection-counting-carrier.test.js
 var { fetchProspectCloseRates } = require('./prospect-entity');
+var { gaugePolicy } = require('./team-averages');
 
 const { clipHref } = require('./clip-link');
 const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
@@ -76,12 +77,19 @@ async function computeCallAnalytics(admin, userId, from, to) {
     callIds.push(calls[i].id);
   }
 
+  // Metadata only: personal gauges read the canonical Team metric policy from
+  // this already-loaded payload; no Team request or permission is involved.
+  var personalGaugePolicy = {
+    closing: gaugePolicy('closing'),
+    objections: gaugePolicy('objections'),
+  };
   var empty = {
     from: from, to: to,
     calls: { analyzed: 0, total_in_range: 0, processing: 0, error: 0 },
     avg_score: { mean: null, graded_calls: 0, win_mean: null, win_n: 0, other_mean: null, other_n: 0 },
     objections: { calls_with_objection: 0, total_highlights: 0 },
     close_wins: 0, close_decided: 0,
+    gauge_policy: personalGaugePolicy,
     sections: sectionsShape(),
     weakest_section: null, strongest_section: null, section_ranking_note: null,
     latest_one_things: [],
@@ -229,6 +237,7 @@ async function computeCallAnalytics(admin, userId, from, to) {
     prospect_close_rate:  prospectRate.pct,
     prospect_close_wins:  prospectRate.closed,
     prospect_close_total: prospectRate.total,
+    gauge_policy: personalGaugePolicy,
     sections: sections,
     weakest_section: weakest,
     strongest_section: strongest,

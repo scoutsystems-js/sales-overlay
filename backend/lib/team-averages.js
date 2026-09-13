@@ -119,6 +119,22 @@ const METRICS = {
   },
 };
 
+// Presentation clients that already carry personal analytics may need the same
+// semantic policy without fetching the fixed-window Team panel. Keep that
+// projection here, beside METRICS, so a visual surface cannot copy targets or
+// scales into a second mutable constant set.
+function gaugePolicy(metricKey) {
+  var metric = METRICS[metricKey];
+  if (!metric) return null;
+  return {
+    key: metric.key,
+    scale: metric.scale,
+    target: metric.target,
+    direction: metric.direction || null,
+    band: metric.band ? { good: metric.band.good, ok: metric.band.ok } : null,
+  };
+}
+
 function num(x) { return (typeof x === 'number' && isFinite(x)) ? x : null; }
 function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
 
@@ -341,6 +357,7 @@ module.exports = {
   CALLTIME_TARGET_MIN: CALLTIME_TARGET_MIN,
   CALLTIME_SCALE_MAX: CALLTIME_SCALE_MAX,
   METRICS: METRICS,
+  gaugePolicy: gaugePolicy,
   METRIC_ORDER: METRIC_ORDER,
   fixedWindow: fixedWindow,
   band: band,
