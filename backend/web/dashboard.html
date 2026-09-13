@@ -7133,6 +7133,28 @@
     @media(max-width:620px) { body[data-view="kb"] .page-header h1 { font-size:32px; } body[data-view="kb"] .observatory-kb-panel { padding:28px 16px 16px; } }
     @media(prefers-reduced-motion:reduce) { body[data-view="kb"]::before, body[data-view="kb"]::after { animation:none; } }
 
+    /* Full Call Review uses the same ground and panels while keeping the dense
+       evidence rows intentionally transparent inside their parent sections. */
+    body[data-view="call-review"] { background:radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%); background-attachment:fixed; }
+    body[data-view="call-review"]::before, body[data-view="call-review"]::after { content:""; position:fixed; z-index:0; pointer-events:none; border:1px solid rgba(125,255,179,.14); opacity:.88; background-image:none!important; -webkit-mask:none; mask:none; }
+    body[data-view="call-review"]::before { width:62%; height:78%; left:8%; top:2%; border-radius:48% 52% 45% 55%; transform:rotate(-18deg); animation:observatory-review-contour 30s ease-in-out infinite alternate; }
+    body[data-view="call-review"]::after { width:78%; height:72%; right:-14%; bottom:-26%; border-radius:50%; animation:observatory-review-contour 38s ease-in-out -10s infinite alternate-reverse; }
+    @keyframes observatory-review-contour { to { transform:rotate(-14deg) scale(1.04); } }
+    body[data-view="call-review"] #bgSwitch { display:none; }
+    body[data-view="call-review"] .page { position:relative; z-index:1; max-width:calc(100vw - 48px); width:auto; margin:0 auto; padding:24px 0 72px; background:transparent; }
+    body[data-view="call-review"] .sidebar { position:absolute; z-index:2; top:67px; left:24px; width:var(--sidebar-w); border:1px solid rgba(170,241,195,.28); border-radius:14px; background:rgba(5,20,11,.78); box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.42); }
+    body[data-view="call-review"] .sidebar .nav-link.nav-active { border:1px solid rgba(211,237,217,.52); border-left:2px solid var(--accent); border-radius:12px; background:linear-gradient(100deg,#1b4527,#112617); color:var(--text); box-shadow:0 0 16px rgba(var(--accent-rgb),.24); }
+    body[data-view="call-review"] #content { margin-left:calc(var(--sidebar-w) + 22px); min-width:0; }
+    body[data-view="call-review"] .review-page-header, body[data-view="call-review"] .section, body[data-view="call-review"] .review-excluded { position:relative; overflow:hidden; margin:0 0 18px; padding:30px 24px 22px; border:1px solid rgba(170,241,195,.30); border-radius:14px; background:linear-gradient(135deg,rgba(8,38,22,.78),rgba(1,12,7,.58)); box-shadow:inset 0 1px 0 rgba(245,255,248,.1),inset 0 0 0 1px rgba(103,205,135,.04),0 22px 48px rgba(0,0,0,.30),0 0 28px rgba(21,161,71,.07); backdrop-filter:blur(14px); }
+    body[data-view="call-review"] .review-page-header::before, body[data-view="call-review"] .section::before, body[data-view="call-review"] .review-excluded::before { content:""; position:absolute; top:14px; left:18px; width:42px; height:1px; background:#71ffad; box-shadow:0 0 9px rgba(77,255,148,.7); }
+    body[data-view="call-review"] .review-title { font-size:var(--fs-display); font-weight:var(--fw-normal); letter-spacing:-.045em; }
+    body[data-view="call-review"] .review-highlight, body[data-view="call-review"] .review-grade-card { border-color:rgba(215,236,222,.11); }
+    body[data-view="call-review"] .review-followup-box, body[data-view="call-review"] .review-why-quote { background:rgba(3,26,14,.30); border-color:rgba(170,241,195,.13); }
+    body[data-view="call-review"] .btn-fathom-secondary, body[data-view="call-review"] .review-back-link { border-color:rgba(170,241,195,.30); background:rgba(2,19,10,.52); border-radius:8px; }
+    @media(max-width:900px) { body[data-view="call-review"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; } body[data-view="call-review"] .sidebar { position:relative; top:auto; left:auto; width:auto; margin-bottom:14px; } body[data-view="call-review"] #content { margin-left:0; } }
+    @media(max-width:620px) { body[data-view="call-review"] .review-page-header, body[data-view="call-review"] .section, body[data-view="call-review"] .review-excluded { padding:28px 16px 16px; } body[data-view="call-review"] .review-title { font-size:32px; } }
+    @media(prefers-reduced-motion:reduce) { body[data-view="call-review"]::before, body[data-view="call-review"]::after { animation:none; } }
+
     /* Team Objections Observatory pass. The grid stays beside the navigation
        rail; its explanatory and evidence panels span the page below that rail. */
     body[data-view="team-objections"] {
