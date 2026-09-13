@@ -58,11 +58,11 @@
   // Treating the transient case as fatal is exactly what logged users out
   // overnight — the machine woke, the refresh fired before Wi-Fi was back, the
   // fetch threw, and the old code called clearSession() on that throw.
-  function _doRefresh(refreshToken) {
+  function _doRefresh(refreshToken, accessToken) {
     return _rawFetch(REFRESH_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      body: JSON.stringify({ refresh_token: refreshToken, access_token: accessToken || null }),
     }).then(function (res) {
       if (res.ok) {
         return res.json().then(function (data) {
@@ -251,13 +251,13 @@
         return { session: s, fatal: false };
       }
       _log('refresh start', s);
-      return _doRefresh(s.refresh_token).then(function (r) {
+      return _doRefresh(s.refresh_token, s.access_token).then(function (r) {
         if (r.session) { _log('refresh ok', r.session); return r; }
         if (!r.fatal) { diagBeacon('refresh-transient-kept', { had_stale: !!staleToken }); return r; }
         var latest = getSession();
         if (latest && latest.refresh_token && latest.refresh_token !== s.refresh_token) {
           _log('refresh fatal but token rotated elsewhere — retrying with newer token');
-          return _doRefresh(latest.refresh_token).then(function (r2) {
+          return _doRefresh(latest.refresh_token, latest.access_token).then(function (r2) {
             if (r2.session) { _log('refresh ok (2nd token)', r2.session); }
             else if (r2.fatal) { clearSession(); diagBeacon('refresh-fatal-cleared', { via: '2nd-token' }); }
             return r2;

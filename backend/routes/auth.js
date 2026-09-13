@@ -6,6 +6,7 @@ const welcomeEmail = require('../lib/welcome-email');
 const { CANONICAL_ORIGIN } = require('../config');
 const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const { createRateLimiter } = require('../lib/rate-limiter');
+const { requiresSessionReset } = require('../lib/session-reset');
 
 var router = express.Router();
 
@@ -335,12 +336,19 @@ router.post('/diag', function(req, res) {
 });
 
 router.post('/refresh', async function(req, res) {
-  var { refresh_token } = req.body;
+  var { refresh_token, access_token } = req.body;
   if (!refresh_token) {
     return res.status(400).json({ error: 'Refresh token required' });
   }
 
   try {
+    // After a deliberate global reset, old bundles submit only their refresh
+    // token. Refuse that refresh so they clear local storage and load the new
+    // dashboard at sign-in. Fresh bundles submit their current access token.
+    var admin = getAdminClient();
+    if (await requiresSessionReset(admin, access_token)) {
+      return res.status(401).json({ error: 'Please sign in again to continue.', code: 'session_reset' });
+    }
     var supabase = getSupabase();
     var { data, error } = await supabase.auth.refreshSession({ refresh_token });
     if (error) return res.status(400).json({ error: error.message });

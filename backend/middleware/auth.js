@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { requiresSessionReset } = require('../lib/session-reset');
 
 // Lazy Supabase client — only created on first auth check so a missing env
 // var returns 503 from the route instead of crashing `require()` at boot.
@@ -27,6 +28,18 @@ async function requireAuth(req, res, next) {
     var { data, error } = await supabase.auth.getUser(token);
     if (error || !data.user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // A deployment can deliberately require a fresh sign-in for every user.
+    // Do this after getUser() so the JWT itself has already been verified.
+    try {
+      if (await requiresSessionReset(supabase, token)) {
+        res.set('X-Scout-Session-Reset', '1');
+        return res.status(401).json({ error: 'Please sign in again to continue.', code: 'session_reset' });
+      }
+    } catch (resetError) {
+      // Keep normal sign-ins available if the small control table is unavailable.
+      console.warn('[auth] session-reset check skipped (fail-open):', resetError && resetError.message);
     }
     req.user = data.user;
 
