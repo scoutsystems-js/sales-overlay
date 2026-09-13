@@ -8,9 +8,11 @@
 
 **The design system is listed once in `SCOUT-DESIGN.md`** (rules as pointers to this file, the token blocks and the guards — never restated there; H693). **The queue is `BUILD-LIST.md`** (repo root): open work, rulings needed, filed items. Update it after every push, alongside this file (H533).
 
-- **The redesigned-view Observatory scope now includes Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest and Team Objections.** Daily Digest remains a fixed-day cached report with bounded navigation and existing team/count/evidence/focus behavior; its Observatory pass is presentation-only and adds no gauge or date-range picker. (H783, H784)
+- **The redesigned-view Observatory scope now includes Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest, Team Objections and My Team.** Daily Digest remains a fixed-day cached report with bounded navigation and existing team/count/evidence/focus behavior; its Observatory pass is presentation-only and adds no gauge or date-range picker. (H783, H784, H785)
 
 ---
+
+- **My Team (`team-members`) Observatory presentation is implemented; final deployment verification is recorded separately.** Preserve roster scope, permissions, active/inactive roles, add/move/deactivate/email/reset/delete handlers, team/date controls and the scoped Scheduled Appointments link; no auth, calendar or data changes. (H785)
 
 ## 1 · Who and what
 

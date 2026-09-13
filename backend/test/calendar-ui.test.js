@@ -63,10 +63,13 @@ test('My Team links to counts for the selected team without changing coaching', 
   assert.ok(start >= 0 && end > start);
   const source = dashboard.slice(start, end);
   let markup;
-  new Function('document', 'state', 'ensureTeamDefaultRange', 'teamHeaderHtml', 'teamControlsHtml', 'teamMembersBodyHtml', source.split('  function teamMembersScope')[0] + ';renderTeamMembersView();')(
+  const order = [];
+  new Function('document', 'state', 'ensureTeamDefaultRange', 'observatoryTitleHtml', 'teamControlsHtml', 'teamMembersBodyHtml', 'observeObservatoryLayout', source.split('  function teamMembersScope')[0] + ';renderTeamMembersView();')(
     {getElementById:()=>({set innerHTML(value){markup=value}})},
-    {teamContext:{},teamOverview:{},teamSelected:'selected-team'},()=>{},()=>'',()=>'',()=>''
+    {teamContext:{},teamOverview:{},teamSelected:'selected-team'},()=>{},
+    ()=>{order.push('header');return '';},()=>{order.push('controls');return '';},()=>'',()=>{}
   );
+  assert.deepEqual(order, ['header', 'controls'], 'the company header must register before the shared controls');
   assert.match(markup, /team-calendar\.html\?team=selected-team/);
   assert.match(markup, /Scheduled Appointments/);
 });

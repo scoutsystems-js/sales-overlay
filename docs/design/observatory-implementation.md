@@ -21,7 +21,11 @@ Evidence and final release status: `~/Desktop/scan-reports/observatory-2026-09-1
 
 ## Background control removal — September 13, 2026
 
-**Implemented; final deployment verification for the first five views is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`; Daily Digest verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`. Team Objections verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-objections/release-status.md`. Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest and Team Objections no longer show the header background switch or Account Display checkbox. Older views retain the legacy header control until redesigned. The stored off preference, first-paint `data-bg="off"` application, background-off rendering and reduced-motion behavior are unchanged; this is a controls-only change.
+**Implemented; final deployment verification for the first five views is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`; Daily Digest verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`. Team Objections verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-objections/release-status.md`. My Team verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-members/release-status.md`. Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest, Team Objections and My Team no longer show the header background switch or Account Display checkbox. Older views retain the legacy header control until redesigned. The stored off preference, first-paint `data-bg="off"` application, background-off rendering and reduced-motion behavior are unchanged; this is a controls-only change.
+
+## My Team visual rollout — September 13, 2026
+
+**Implemented; final deployment verification is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-members/release-status.md`. My Team (`team-members`) uses the approved Observatory ground, contours, glass panels and selected navigation. Preserve roster scope and permissions, active/inactive roles, add/move/deactivate/email/reset/delete handlers, team/date controls and the scoped Scheduled Appointments link. No auth, calendar or data change.
 
 ## Team Objections visual rollout — September 13, 2026
 

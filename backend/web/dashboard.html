@@ -6849,6 +6849,230 @@
     body[data-view="team"] .team-digest-panel .digest-notable:last-of-type { border-bottom:0; }
     body[data-view="team"] .team-digest-panel .digest-focus { background:transparent; border-color:rgba(190,247,214,.18); }
     body[data-view="team"] .team-digest-panel .empty { background:transparent; border:0; }
+    /* My Team Observatory pass. Membership remains a compact working roster;
+       the styling is confined to its existing controls, table, and actions. */
+    body[data-view="team-members"] {
+      --member-observatory-panel:linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42));
+      --member-observatory-edge:rgba(118,255,171,.36);
+      --member-observatory-line:rgba(190,247,214,.18);
+      --observatory-visor-card-radius:14px;
+      --member-observatory-radius:var(--observatory-visor-card-radius);
+      --member-observatory-title-size:34px;
+      --member-observatory-title-size-mobile:28px;
+      --sidebar-w:190px;
+      --accent:#09d543;
+      --accent-rgb:9,213,67;
+      background:
+        radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),
+        radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),
+        linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%);
+      background-attachment:fixed;
+    }
+    body[data-view="team-members"]::before,
+    body[data-view="team-members"]::after {
+      content:"";
+      position:fixed;
+      z-index:0;
+      pointer-events:none;
+      opacity:1;
+      background:none;
+      -webkit-mask:none;
+      mask:none;
+      border:1px solid var(--member-observatory-contour,rgba(125,255,179,.14));
+    }
+    body[data-view="team-members"]::before {
+      inset:auto;
+      width:62%;
+      height:78%;
+      left:8%;
+      top:2%;
+      border-radius:48% 52% 45% 55%;
+      transform:rotate(-18deg);
+    }
+    body[data-view="team-members"]::after {
+      width:78%;
+      height:72%;
+      right:-14%;
+      bottom:-26%;
+      border-radius:50%;
+    }
+    html[data-bg="off"] body[data-view="team-members"] {
+      --member-observatory-contour:transparent;
+      background:#090a0b;
+    }
+    html[data-bg="off"] body[data-view="team-members"]::after { display:none; }
+    body[data-view="team-members"] #bgSwitch { display:none; }
+    body[data-view="team-members"] .top-bar { background:#090a0b; border-bottom-color:rgba(219,239,226,.13); }
+    body[data-view="team-members"] .page {
+      position:relative;
+      z-index:1;
+      width:auto;
+      max-width:calc(100vw - 48px);
+      min-height:calc(100vh - 51px);
+      margin:0 auto;
+      padding:24px 0 72px;
+      background:transparent;
+    }
+    body[data-view="team-members"] .sidebar {
+      position:absolute;
+      top:67px;
+      left:24px;
+      width:var(--sidebar-w);
+      max-height:none;
+      overflow:visible;
+      border:1px solid var(--member-observatory-line);
+      border-radius:var(--member-observatory-radius);
+      background:rgba(5,20,11,.78);
+      box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.42);
+    }
+    body[data-view="team-members"] .sidebar .nav-link.nav-active,
+    body[data-view="team-members"] .workspace-team-link.is-current {
+      border:1px solid rgba(211,237,217,.52);
+      border-left:2px solid var(--accent);
+      border-radius:var(--member-observatory-radius);
+      background:linear-gradient(100deg,#1b4527,#112617);
+      color:var(--text);
+      box-shadow:0 0 16px rgba(var(--accent-rgb),.24);
+    }
+    body[data-view="team-members"] .workspace-team-link.is-current { padding-left:9px; }
+    body[data-view="team-members"] .team-members-observatory {
+      position:relative;
+      display:grid;
+      grid-template-columns:var(--sidebar-w) minmax(0,1fr);
+      column-gap:22px;
+      min-width:0;
+    }
+    body[data-view="team-members"] .team-members-main { grid-column:2; min-width:0; }
+    body[data-view="team-members"] .observatory-title-row {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:20px;
+      margin:0 0 18px;
+      padding:0 3px 15px;
+      border-bottom:1px solid rgba(215,236,222,.12);
+    }
+    body[data-view="team-members"] .observatory-title-row h2 {
+      margin:4px 0 0;
+      font-size:var(--member-observatory-title-size);
+      font-weight:var(--fw-normal);
+      line-height:1;
+      letter-spacing:-.045em;
+    }
+    body[data-view="team-members"] .observatory-eyebrow {
+      color:var(--accent);
+      font-size:var(--fs-eyebrow);
+      font-weight:var(--fw-emphasis);
+      letter-spacing:.17em;
+      text-transform:uppercase;
+    }
+    body[data-view="team-members"] .observatory-company .page-header {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin:0;
+      padding:0;
+      border:0;
+      background:transparent;
+    }
+    body[data-view="team-members"] .observatory-company .page-header-main { width:auto; padding:0; text-align:right; }
+    body[data-view="team-members"] .observatory-company .page-header-main h1 {
+      font-size:var(--fs-secondary);
+      font-weight:var(--fw-emphasis);
+      letter-spacing:.05em;
+    }
+    body[data-view="team-members"] .observatory-company .page-header-side { position:static; margin:0; transform:none; }
+    body[data-view="team-members"] .team-members-main > .team-controls-row {
+      position:relative;
+      z-index:70;
+      margin:0 0 14px;
+      padding:0 3px;
+      background:transparent;
+      border:0;
+    }
+    body[data-view="team-members"] .team-members-main > .team-controls-row .date-presets,
+    body[data-view="team-members"] .observatory-company .user-select,
+    body[data-view="team-members"] .members-move {
+      --bg-field:rgba(2,16,8,.58);
+      background:rgba(2,16,8,.58);
+      border-color:rgba(174,241,199,.24);
+    }
+    body[data-view="team-members"] .team-members-main > .team-controls-row .dp-panel { z-index:80; }
+    body[data-view="team-members"] .team-members-panel {
+      position:relative;
+      z-index:2;
+      overflow:visible;
+      margin:0!important;
+      padding:30px 20px 18px!important;
+      border:1px solid var(--member-observatory-edge)!important;
+      border-radius:var(--member-observatory-radius)!important;
+      background:var(--member-observatory-panel)!important;
+      box-shadow:inset 0 1px 0 rgba(231,255,240,.12),0 0 28px rgba(18,222,96,.06)!important;
+    }
+    body[data-view="team-members"] .team-members-panel::before {
+      content:"";
+      position:absolute;
+      top:14px;
+      left:18px;
+      width:42px;
+      height:1px;
+      box-sizing:content-box;
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:#71ffad;
+      box-shadow:0 0 9px rgba(77,255,148,.7);
+    }
+    body[data-view="team-members"] .team-members-panel .section-header { align-items:flex-start; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+    body[data-view="team-members"] .team-members-panel .empty { background:transparent; border:0; }
+    body[data-view="team-members"] .members-toolbar { padding-bottom:12px; border-bottom:1px solid var(--member-observatory-line); }
+    body[data-view="team-members"] .members-table { min-width:780px; }
+    body[data-view="team-members"] .members-table th,
+    body[data-view="team-members"] .members-table td { border-bottom-color:var(--member-observatory-line); }
+    body[data-view="team-members"] .members-table tbody tr:last-child td { border-bottom:0; }
+    body[data-view="team-members"] .members-email { max-width:260px; overflow-wrap:anywhere; }
+    body[data-view="team-members"] .members-act,
+    body[data-view="team-members"] .btn-fathom-secondary,
+    body[data-view="team-members"] .date-preset {
+      background:rgba(2,16,8,.58);
+      border-color:rgba(174,241,199,.24);
+    }
+    body[data-view="team-members"] .members-act:hover,
+    body[data-view="team-members"] .btn-fathom-secondary:hover,
+    body[data-view="team-members"] .date-preset:hover { border-color:rgba(118,255,171,.62); }
+    @media(max-width:900px) {
+      body[data-view="team-members"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; }
+      body[data-view="team-members"] .sidebar {
+        position:relative;
+        top:auto;
+        left:auto;
+        z-index:2;
+        width:auto;
+        max-height:none;
+        margin-bottom:14px;
+        overflow:visible;
+      }
+      body[data-view="team-members"] .team-members-observatory { grid-template-columns:1fr; }
+      body[data-view="team-members"] .team-members-main { grid-column:1; }
+    }
+    @media(max-width:620px) {
+      body[data-view="team-members"] .observatory-title-row { flex-direction:column; gap:12px; }
+      body[data-view="team-members"] .observatory-title-row h2 { font-size:var(--member-observatory-title-size-mobile); }
+      body[data-view="team-members"] .observatory-company,
+      body[data-view="team-members"] .observatory-company .page-header,
+      body[data-view="team-members"] .observatory-company .page-header-side,
+      body[data-view="team-members"] .observatory-company .user-select { width:100%; min-width:0; }
+      body[data-view="team-members"] .observatory-company .page-header { align-items:stretch; flex-direction:column; }
+      body[data-view="team-members"] .observatory-company .page-header-main { text-align:left; }
+      body[data-view="team-members"] .team-members-main > .team-controls-row,
+      body[data-view="team-members"] .team-members-main > .team-controls-row .page-header-side,
+      body[data-view="team-members"] .team-members-main > .team-controls-row .date-presets,
+      body[data-view="team-members"] .team-members-main > .team-controls-row .dp { width:100%; min-width:0; }
+      body[data-view="team-members"] .team-members-main > .team-controls-row .dp-panel { right:auto; left:0; }
+      body[data-view="team-members"] .team-members-panel { padding:28px 16px 16px!important; }
+      body[data-view="team-members"] .team-members-panel .section-header > div:first-child { flex:1 1 100%; }
+      body[data-view="team-members"] .members-toolbar { align-items:stretch; }
+    }
     @media(max-width:1100px) { body[data-view="team"] .team-digest-observatory .page-header--company { display:flex; align-items:center; gap:16px; } body[data-view="team"] .team-digest-observatory .page-header--company .page-header-main { flex:1; min-width:0; padding:0; text-align:left; } body[data-view="team"] .team-digest-observatory .page-header--company .page-header-side { position:static; flex:0 1 220px; margin:0; transform:none; } body[data-view="team"] .team-digest-observatory .page-header--company .user-select { width:100%; min-width:0; } }
     @media(max-width:900px) { body[data-view="team"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; } body[data-view="team"] .sidebar { position:relative; top:auto; left:auto; z-index:2; width:auto; margin-bottom:14px; } body[data-view="team"] .team-digest-observatory { grid-template-columns:1fr; } body[data-view="team"] .team-digest-main { grid-column:1; } }
     @media(max-width:620px) { body[data-view="team"] .team-digest-observatory .page-header, body[data-view="team"] .team-digest-panel { padding:28px 16px 16px; } body[data-view="team"] .team-digest-observatory .page-header--company { align-items:stretch; flex-direction:column; } body[data-view="team"] .team-digest-observatory .page-header--company .page-header-side { flex-basis:auto; width:100%; } }
@@ -12347,9 +12571,9 @@
       }
     }
   }
-  function observatoryTitleHtml(pageName) {
+  function observatoryTitleHtml(pageName, pageTitle) {
     return '<div class="observatory-title-row"><div><span class="observatory-eyebrow">Team / ' + escapeHtml(pageName) + '</span>'
-      + '<h2>Team ' + escapeHtml(pageName) + '</h2></div><div class="observatory-company">' + teamHeaderHtml() + '</div></div>';
+      + '<h2>' + escapeHtml(pageTitle || ('Team ' + pageName)) + '</h2></div><div class="observatory-company">' + teamHeaderHtml() + '</div></div>';
   }
   function renderTeamPerformance() {
     var content = document.getElementById('content');
@@ -16271,12 +16495,18 @@
     ensureTeamDefaultRange();
     if (state.teamContext === null) loadTeam('context');
     if (state.teamOverview === null && !state.teamOverviewLoading) loadTeam('overview');
-    content.innerHTML = teamHeaderHtml() + teamControlsHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>My Team</h2>'
+    /* Build the company header before the shared controls: teamHeaderHtml()
+       registers the owner picker that teamControlsHtml() expects to exist. */
+    var membersHeader = observatoryTitleHtml('My Team', 'My Team');
+    var membersControls = teamControlsHtml();
+    var membersPanel = '<div class="section fade-in team-members-panel"><div class="section-header"><div><h2>My Team</h2>'
         + '<div class="meta">add, deactivate, move, reset password, or update a rep\'s email</div></div>'
         + '<a class="date-preset" href="/team-calendar.html' + (state.teamSelected ? '?team=' + encodeURIComponent(state.teamSelected) : '') + '">Scheduled Appointments</a>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamMembersBodyHtml() + '</div>';
+    content.innerHTML = '<div class="observatory-page team-members-observatory"><div class="observatory-upper team-members-main">'
+      + membersHeader + membersControls + membersPanel + '</div></div>';
+    observeObservatoryLayout();
   }
   function teamMembersScope() {
     var o = state.teamOverview;

@@ -34,9 +34,13 @@ Daily Digest uses the approved fixed forest gradient, two pale contours and glas
 
 Team Objections uses the approved Observatory fixed ground, contours and glass outer panels. Preserve the handling grid and counts, existing date/team/rep/category filters, Why before moments, recording/call-review/Fine Tune actions, and grid-before-summary loading; inner evidence rows remain transparent. No metric, intelligence or data-contract change. Implemented; final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-objections/release-status.md`.
 
+### My Team — implemented visual scope
+
+My Team (`team-members`) uses the implemented Observatory ground, contours, glass panels and selected navigation. Preserve the roster scope and permissions, active/inactive roles, add/move/deactivate/email/reset/delete handlers, team/date controls and the scoped Scheduled Appointments link. No auth, calendar or data change. Implemented; final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-members/release-status.md`.
+
 ### Background control scope
 
-The seven redesigned views — Overview, Team Performance, Team Coaching, Calls, EOD Report, Daily Digest and Team Objections — no longer show a header background switch or an Account Display checkbox. Older views keep the legacy header control until redesigned. The stored `scout_bg_v1=off` preference, first-paint `data-bg="off"` application, background-off styling and reduced-motion behavior remain unchanged; removing the controls preserves saved background behavior.
+The eight redesigned views — Overview, Team Performance, Team Coaching, Calls, EOD Report, Daily Digest, Team Objections and My Team — no longer show a header background switch or an Account Display checkbox. Older views keep the legacy header control until redesigned. The stored `scout_bg_v1=off` preference, first-paint `data-bg="off"` application, background-off styling and reduced-motion behavior remain unchanged; removing the controls preserves saved background behavior.
 
 ### Cards and selected states
 
