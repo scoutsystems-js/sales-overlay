@@ -7156,6 +7156,18 @@
     @media(max-width:620px) { body[data-view="call-review"] .review-page-header, body[data-view="call-review"] .section, body[data-view="call-review"] .review-excluded { padding:28px 16px 16px; } body[data-view="call-review"] .review-title { font-size:32px; } }
     @media(prefers-reduced-motion:reduce) { body[data-view="call-review"]::before, body[data-view="call-review"]::after { animation:none; } }
 
+    /* Remaining personal drill-downs share one Observatory shell. Their data,
+       merge confirmation, filters and evidence rows remain unchanged. */
+    body[data-view="prospects"], body[data-view="performance"], body[data-view="needs-work"], body[data-view="objections-intel"], body[data-view="section"] { background:radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%); background-attachment:fixed; }
+    body[data-view="prospects"]::before, body[data-view="performance"]::before, body[data-view="needs-work"]::before, body[data-view="objections-intel"]::before, body[data-view="section"]::before, body[data-view="prospects"]::after, body[data-view="performance"]::after, body[data-view="needs-work"]::after, body[data-view="objections-intel"]::after, body[data-view="section"]::after { background-image:none!important; -webkit-mask:none; mask:none; border-color:rgba(125,255,179,.14); }
+    body[data-view="prospects"] #bgSwitch, body[data-view="performance"] #bgSwitch, body[data-view="needs-work"] #bgSwitch, body[data-view="objections-intel"] #bgSwitch, body[data-view="section"] #bgSwitch { display:none; }
+    body[data-view="prospects"] .page, body[data-view="performance"] .page, body[data-view="needs-work"] .page, body[data-view="objections-intel"] .page, body[data-view="section"] .page { background:transparent; max-width:calc(100vw - 48px); padding:24px 0 72px; }
+    body[data-view="prospects"] .section, body[data-view="performance"] .section, body[data-view="needs-work"] .section, body[data-view="objections-intel"] .section, body[data-view="section"] .section, body[data-view="prospects"] .merge-card { border-color:rgba(170,241,195,.30); background:linear-gradient(135deg,rgba(8,38,22,.78),rgba(1,12,7,.58)); box-shadow:inset 0 1px 0 rgba(245,255,248,.1),0 18px 42px rgba(0,0,0,.28); }
+    body[data-view="prospects"] .page-header, body[data-view="performance"] .page-header, body[data-view="needs-work"] .page-header, body[data-view="objections-intel"] .page-header, body[data-view="section"] .page-header { background:transparent; border-bottom-color:rgba(215,236,222,.13); }
+    body[data-view="prospects"] .page-header h1, body[data-view="performance"] .page-header h1, body[data-view="needs-work"] .page-header h1, body[data-view="objections-intel"] .page-header h1, body[data-view="section"] .page-header h1 { font-size:var(--fs-display); font-weight:var(--fw-normal); letter-spacing:-.045em; }
+    .support-modal { background:rgba(0,7,3,.72); backdrop-filter:blur(8px); }
+    .support-card { border-color:rgba(170,241,195,.30)!important; background:linear-gradient(135deg,rgba(9,40,23,.96),rgba(2,14,8,.96))!important; box-shadow:inset 0 1px 0 rgba(245,255,248,.1),0 28px 70px rgba(0,0,0,.52),0 0 36px rgba(26,231,104,.12); }
+
     /* Team Objections Observatory pass. The grid stays beside the navigation
        rail; its explanatory and evidence panels span the page below that rail. */
     body[data-view="team-objections"] {
