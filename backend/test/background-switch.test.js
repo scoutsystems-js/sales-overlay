@@ -78,7 +78,7 @@ test('non-Observatory pages retain the original Scout green toggle glyph', () =>
 });
 
 test('redesigned pages remove the switch and its top-bar layout slot', () => {
-  for (const view of ['overview', 'team-performance', 'team-coaching', 'call-library', 'eod']) {
+  for (const view of ['overview', 'team-performance', 'team-coaching', 'team', 'call-library', 'eod']) {
     const observed = renderComputed(page(true, view), `(() => { const switcher = document.getElementById('bgSwitch'); const rect = switcher.getBoundingClientRect(); return { display:getComputedStyle(switcher).display, width:rect.width, height:rect.height }; })()`, { width: 1400 });
     assert.deepEqual(observed, { display: 'none', width: 0, height: 0 }, view + ' must expose no background switch or layout slot');
   }

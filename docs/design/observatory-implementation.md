@@ -21,7 +21,11 @@ Evidence and final release status: `~/Desktop/scan-reports/observatory-2026-09-1
 
 ## Background control removal — September 13, 2026
 
-**Implemented; final deployment verification is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`. Overview, Team Performance, Team Coaching, Calls and EOD no longer show the header background switch or Account Display checkbox. Older views retain the legacy header control until redesigned. The stored off preference, first-paint `data-bg="off"` application, background-off rendering and reduced-motion behavior are unchanged; this is a controls-only change.
+**Implemented; final deployment verification for the first five views is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`; Daily Digest verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`. Overview, Team Performance, Team Coaching, Calls, EOD and Daily Digest no longer show the header background switch or Account Display checkbox. Older views retain the legacy header control until redesigned. The stored off preference, first-paint `data-bg="off"` application, background-off rendering and reduced-motion behavior are unchanged; this is a controls-only change.
+
+## Daily Digest visual rollout — September 13, 2026
+
+**Implemented; final deployment verification is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`. Daily Digest uses the approved fixed forest gradient, two pale contours and glass panels. Its fixed-day cached report, selected team, counts, notable evidence links, focus text and bounded Previous/Next navigation remain unchanged. No gauge or date-range picker is added.
 
 ## Visor standard — approved September 13, 2026
 

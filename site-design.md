@@ -26,9 +26,13 @@ Calls now uses the exact forest gradient and two pale fixed contours, with trans
 
 The EOD Report now places the first call directly below the header beside the measured rail, then places remaining calls full width below the actual rail. It uses the approved fixed forest gradient and two pale contours, translucent 14px panels with the mint top light and 14px inset, and a 100px minimum-height editable Summary field on each call. At 390px, controls and call content wrap without overflow; edited fields and focused controls retain green edges. Presentation only: preserve the ET single-day picker, Prev/Next/Today navigation, blank saves, prospect-name confirmation, Slack copy, read-only outcome, composed outcome labels and sync-freshness note. The previously removed payment input stays absent; no new metric or logic change. Verification and deployment status are recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-eod/`.
 
+### Daily Digest — implemented visual scope
+
+Daily Digest uses the approved fixed forest gradient, two pale contours and glass panels. Its fixed-day cached report, selected team, counts, notable evidence links, focus text and bounded Previous/Next navigation remain unchanged. Do not add a gauge or date-range picker. Implemented; final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`.
+
 ### Background control scope
 
-The five redesigned views — Overview, Team Performance, Team Coaching, Calls and EOD Report — no longer show a header background switch or an Account Display checkbox. Older views keep the legacy header control until redesigned. The stored `scout_bg_v1=off` preference, first-paint `data-bg="off"` application, background-off styling and reduced-motion behavior remain unchanged; this is a controls-only change.
+The six redesigned views — Overview, Team Performance, Team Coaching, Calls, EOD Report and Daily Digest — no longer show a header background switch or an Account Display checkbox. Older views keep the legacy header control until redesigned. The stored `scout_bg_v1=off` preference, first-paint `data-bg="off"` application, background-off styling and reduced-motion behavior remain unchanged; removing the controls preserves saved background behavior.
 
 ### Cards and selected states
 

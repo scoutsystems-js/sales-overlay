@@ -8056,3 +8056,6 @@ The EOD Report visual implementation places the first call beside the measured r
 
 ## [H782] Background controls removed from redesigned pages — September 13, 2026
 The header switch and Account Display checkbox are removed from redesigned Overview, Team Performance, Team Coaching, Calls and EOD; older pages retain the legacy control until redesigned. The stored `scout_bg_v1=off` preference, first-paint `data-bg="off"` application, background-off rendering and reduced motion remain unchanged. This is a controls-only implementation; final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`.
+
+## [H783] Daily Digest joins the Observatory presentation scope — September 13, 2026
+Daily Digest’s Observatory pass changes presentation only: its fixed-day cached report, bounded previous/next navigation, selected team, counts, notable evidence links and focus text remain unchanged. Use the approved fixed gradient, contours and glass panels; do not add a gauge or date-range picker. Final verification: `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`.
