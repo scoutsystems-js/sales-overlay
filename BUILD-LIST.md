@@ -4,23 +4,25 @@ The broader-coaching session is complete. The order below supersedes earlier nex
 
 ## Current implementation — Observatory redesign (2026-09-13)
 
-**LIVE — verified 2026-09-13 on `456ebf5`.** The source is in
+**LIVE — refinement verified 2026-09-13 on `9bdfa4e1cbb8322a8f36add576650bf3be6323c5`.** The source is in
 `.codex/worktrees/observatory-pages`, based on origin `4269494` and preserving
 the four newer approved design commits. It covers only Team → Coaching and
 Team → Performance. Existing server logic, intelligence, routes, data
 contracts, charts, filters and interactions remain in place. Coaching keeps
 Block 018's one verified focus item and one real supporting call; the retired
 stage grid is not restored. Performance keeps its three trend charts and
-filters, including controls absent from the static mockup. All 2,815 tests pass
+filters, including controls absent from the static mockup. All 2,816 tests pass
 with concurrency four. Railway SUCCESS, matching served-page markers, and live
 control checks confirm the release. Three static pending polls showed no
 active analysis drain before the code push.
 
-**September 13 visual refinement — IMPLEMENTED, RELEASE VERIFICATION PENDING.**
+**September 13 visual refinement — LIVE, verified 2026-09-13.**
 The Observatory pages now have two localized emerald pools separated by a dark
 center, a fixed viewport background and HUD, and 24px desktop / 18px mobile
-gutters. Behavior and the approved mockup archives are unchanged. `456ebf5`
-remains the live release until this refinement is verified.
+gutters. Behavior and the approved mockup archives are unchanged. Railway
+deployment `2a102b7e-d8e3-4004-a6fe-d4a3504710f3` succeeded; nine served-page
+markers matched in raw and comment-stripped output. Receipts are in
+`~/Desktop/scan-reports/observatory-2026-09-13/refinement/`.
 
 ## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)
 

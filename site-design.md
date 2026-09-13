@@ -15,18 +15,17 @@ dashboard pages keep their existing production appearance. Justin confirmed on
 2026-09-13 that the mesh must be removed from these redesigned pages: the
 forest gradient is their background, with quiet HUD artwork behind opaque panels.
 
-The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,815
+The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,816
 backend tests pass with test concurrency limited to four. Desktop and populated
 390px phone layouts were reviewed. Release `456ebf5` was verified on Railway
 and by raw/comment-stripped served-page markers; see
 [the implementation record](docs/design/observatory-implementation.md).
 
-September 13 refinement: implemented locally and pending release verification.
-The new fixed viewport ground uses two emerald pools separated by a dark center;
-the noninteractive HUD is fixed with it. Desktop gutters are 24px and mobile
-gutters remain 18px. This does not change any page behavior, and the approved
-mockup archives remain untouched. Release `456ebf5` remains live until the
-refinement is verified in production.
+September 13 refinement: implemented and verified live in commit
+`9bdfa4e1cbb8322a8f36add576650bf3be6323c5`. The fixed viewport ground uses two
+emerald pools separated by a dark center; the noninteractive HUD is fixed with
+it. Desktop gutters are 24px and mobile gutters remain 18px. This does not
+change page behavior, and the approved mockup archives remain untouched.
 
 ## Approved visual standard
 
@@ -44,7 +43,7 @@ Amber `#fbbf24` remains semantic for the 69/100 ring and stage bars 69/61. The r
 
 ## Layout, motion, and content
 
-Desktop retains a 190px nav column and flexible content, 16px grid gap, and 24px page gutters. Under 900px the page uses 18px gutters; under 700px it becomes a block page with nav two columns, workspace one column, members two, scores two, strengths one, then scores one under 380px. Preserve no horizontal overflow.
+Current production layout uses a 190px nav column, 22px rail gap, and 24px page gutters; under 900px it uses 18px gutters and stacks the page, and under 620px Coaching stacks the detail below the closer list. The earlier approved archive records a 16px grid gap and its historical phone breakpoints; those archive details remain reference-only. Preserve no horizontal overflow.
 
 The decorative HUD is fixed to the viewport, `aria-hidden`, noninteractive, below opaque content, and visible only in designed gaps/negative space. Orbit is 82s, scan 28s, markers 67–91s; reduced motion disables them. Motion must not cross readable content.
 

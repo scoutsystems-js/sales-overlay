@@ -2,9 +2,8 @@
 
 **Date:** September 13, 2026 (Eastern)
 
-**Status:** `456ebf5` is LIVE — implementation and production release verified
-2026-09-13. The September 13 visual refinement is implemented locally and
-awaits release verification.
+**Status:** `9bdfa4e1cbb8322a8f36add576650bf3be6323c5` is LIVE — implementation
+and production refinement verified 2026-09-13.
 
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
@@ -16,8 +15,8 @@ The refinement localizes the green field into two emerald pools with a dark
 center, fixes the viewport background and decorative HUD while page content
 scrolls, and widens desktop content to 24px gutters while retaining 18px
 gutters on mobile. It changes no behavior, data, metrics, permissions, or
-interactions. The approved mockup archives are unchanged. Release `456ebf5`
-remains live until this refinement is verified in production.
+interactions. The approved mockup archives are unchanged. The prior `456ebf5`
+release remains the historical Observatory release record.
 
 The approved redesign covers exactly two dashboard pages: Team → Coaching and
 Team → Performance. The server logic, intelligence, data contracts, routes,
@@ -62,13 +61,14 @@ The refinement passes all **2,816 tests**, zero skipped, with concurrency four
 backgrounds and HUDs remain fixed while actual cards scroll, and both lower
 panels reach the 1920px viewport gutters. Desktop and 390px phone previews
 were reviewed. All page scripts and markup outside the stylesheet are byte
-identical to the prior release. Release verification remains pending.
+identical to the prior release.
 
 Final suite and deployment receipts are saved in
-`~/Desktop/scan-reports/observatory-2026-09-13/`. Release `456ebf5109a37d5b196a7478563dbd6a80da58ca` was pushed after three
-standalone drain checks showed processing zero and pending static at 45.
-Railway deployment `1bb4ffa0-a782-42aa-bb23-95e911741f2d` reported SUCCESS at
-04:21 UTC on September 13. All six served-page markers matched in both raw and
+`~/Desktop/scan-reports/observatory-2026-09-13/refinement/`. Commit
+`9bdfa4e1cbb8322a8f36add576650bf3be6323c5` was pushed after processing drained
+from 2 to 1 to 0 while pending stayed static at 45; error count was 310.
+Railway deployment `2a102b7e-d8e3-4004-a6fe-d4a3504710f3` reported SUCCESS at
+04:36:57 UTC on September 13. All nine served-page markers matched in both raw and
 comment-stripped output. The live Performance and Coaching pages were reviewed;
 date-picker opening, Grade/Closing sorting, chart filters, closer selection,
 and real call-evidence expansion were exercised. The existing background
