@@ -15,11 +15,24 @@ dashboard pages keep their existing production appearance. Justin confirmed on
 2026-09-13 that the mesh must be removed from these redesigned pages: the
 forest gradient is their background, with quiet HUD artwork behind opaque panels.
 
-The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,815
+The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,816
 backend tests pass with test concurrency limited to four. Desktop and populated
 390px phone layouts were reviewed. Release `456ebf5` was verified on Railway
 and by raw/comment-stripped served-page markers; see
 [the implementation record](docs/design/observatory-implementation.md).
+
+September 13 refinement: implemented and verified live in commit
+`9bdfa4e1cbb8322a8f36add576650bf3be6323c5`. The fixed viewport ground uses two
+emerald pools separated by a dark center; the noninteractive HUD is fixed with
+it. Desktop gutters are 24px and mobile gutters remain 18px. This does not
+change page behavior, and the approved mockup archives remain untouched.
+
+September 13 HUD restoration: LIVE and verified in `3cbab93ffa9047103f3b0c66e96dfbf770053f89`.
+It restores the approved `1200×860` HUD: two arcs, two rings, four traces,
+three points, and a scan. The fixed layer uses opacity `1`, pale `.105` / `.095`
+strokes, and 82s orbit; points run at 67s, 91s, and 74s; the scan runs at 28s.
+Background-off hides it and reduced motion stops it. The prior refinement remains
+live and the approved mockup archives remain untouched.
 
 ## Approved visual standard
 
@@ -27,7 +40,7 @@ Team Coaching uses opaque, smooth near-black panels over one expansive forest-gr
 
 Root scope is `#scout-coaching-observatory`. The actual source uses `ScoutPolishedSaira, Saira, sans-serif`, base `14px/1.35`, text `#ededed`. The embedded Saira variable payload is 98,760 bytes, SHA-256 `e59235a42c248cf5f9ee37cd8ec84e3e9a3edca1e2935d844845a11f2c600904`, weight 100–900, stretch 50–125%, `font-display:swap`. The wordmark remains archive-authoritative at 104px with its original `#09E046` fill.
 
-The only broad green atmosphere is the page Aurora ground; panels remain opaque. Panel radii are 20px desktop and 16px narrow, with low-contrast sage edges, one quiet inset highlight, and smooth dark shadows. Focus uses `#0f1412`; members/detail/strengths use `#0c0f10`. The selected nav/member state is exact: sage border, 2px `#09d543` left rail, 11px radius, `linear-gradient(100deg,#1b4527,#112617)`, white text, and `0 0 16px rgba(9,213,67,.24)` glow. Member secondary is `rgba(237,237,237,.55)`.
+The fixed page ground uses two emerald pools separated by a dark center; panels remain opaque. Panel radii are 20px desktop and 16px narrow, with low-contrast sage edges, one quiet inset highlight, and smooth dark shadows. Focus uses `#0f1412`; members/detail/strengths use `#0c0f10`. The selected nav/member state is exact: sage border, 2px `#09d543` left rail, 11px radius, `linear-gradient(100deg,#1b4527,#112617)`, white text, and `0 0 16px rgba(9,213,67,.24)` glow. Member secondary is `rgba(237,237,237,.55)`.
 
 ## Observatory hero
 
@@ -37,9 +50,9 @@ Amber `#fbbf24` remains semantic for the 69/100 ring and stage bars 69/61. The r
 
 ## Layout, motion, and content
 
-Desktop retains a 190px nav column and flexible content, 16px grid gap, page padding `0 18px 26px`. Under 700px it becomes a block page; nav is two columns, workspace one column, members two, scores two, strengths one, then scores one under 380px. Preserve no horizontal overflow.
+Current production layout uses a 190px nav column, 22px rail gap, and 24px page gutters; under 900px it uses 18px gutters and stacks the page, and under 620px Coaching stacks the detail below the closer list. The earlier approved archive records a 16px grid gap and its historical phone breakpoints; those archive details remain reference-only. Preserve no horizontal overflow.
 
-The decorative HUD is `aria-hidden`, noninteractive, below opaque content, visible only in designed gaps/negative space. Orbit is 82s, scan 28s, markers 67–91s; reduced motion disables them. Motion must not cross readable content.
+The decorative HUD is fixed to the viewport, `aria-hidden`, noninteractive, below opaque content, and visible only in designed gaps/negative space. Orbit is 82s, scan 28s, markers 67–91s; reduced motion disables them. Motion must not cross readable content.
 
 The exact content inventory and semantics remain unchanged: Admin/My Account/toggle; Sober Living Riches and date controls; three Coaching Focus rows; all named closers and the no-calls disclosure; Gabriel Ocasio detail/evidence; five stage score values/counts; and two Team Strengths rows. Native `details` expands; every other control is visual until wired to existing approved behavior.
 

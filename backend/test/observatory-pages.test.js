@@ -246,6 +246,94 @@ test('the rendered desktop chrome aligns lower panels to the rail and clears an 
   assert.ok(mobileCoaching.selectedMember.height < 100, '390px Coaching selected member control is too tall to scan');
 });
 
+test('normal mode advances the HUD artwork, while the background switch removes it', () => {
+  const motionProbe = `(async () => {
+    const hud = document.querySelector('.observatory-hud');
+    const orbit = document.querySelector('.observatory-hud-orbit');
+    const first = getComputedStyle(orbit).transform;
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    const second = getComputedStyle(orbit).transform;
+    document.documentElement.setAttribute('data-bg', 'off');
+    const offDisplay = getComputedStyle(hud).display;
+    return { first, second, offDisplay };
+  })()`;
+  for (const [view, state] of [['team-performance', PERFORMANCE], ['team-coaching', populatedCoachingState()]]) {
+    const rendered = renderTeamSurface(state);
+    const observed = renderComputed(visualShell(view, rendered.markup), motionProbe, { width: 1400 });
+    assert.notEqual(observed.first, observed.second, view + ' HUD orbit must advance in normal mode');
+    assert.equal(observed.offDisplay, 'none', view + ' background-off switch must hide the HUD');
+  }
+});
+
+test('mobile navigation stays above the fixed HUD in both approved views', () => {
+  const layeringProbe = `(() => {
+    const sidebar = document.querySelector('.sidebar');
+    const hud = document.querySelector('.observatory-hud');
+    hud.style.pointerEvents = 'auto';
+    const sideStyle = getComputedStyle(sidebar);
+    const sideRect = sidebar.getBoundingClientRect();
+    const x = sideRect.left + Math.min(12, Math.max(2, sideRect.width / 2));
+    const y = sideRect.top + Math.min(12, Math.max(2, sideRect.height / 2));
+    const stack = document.elementsFromPoint(x, y);
+    const owner = (node) => node && (node === sidebar || node.closest('.sidebar') === sidebar ? 'sidebar' : node === hud || node.closest('.observatory-hud') === hud ? 'hud' : 'other');
+    return { position: sideStyle.position, top: sideStyle.top, left: sideStyle.left, rect: { left: sideRect.left, width: sideRect.width }, scrollWidth: document.documentElement.scrollWidth, stack: stack.map(owner).filter((value, index, values) => value !== 'other' && values.indexOf(value) === index) };
+  })()`;
+  for (const view of ['team-performance', 'team-coaching']) {
+    const state = view === 'team-performance' ? PERFORMANCE : populatedCoachingState();
+    const rendered = renderTeamSurface(state);
+    const observed = renderComputed(visualShell(view, rendered.markup), layeringProbe, { width: 390 });
+    assert.equal(observed.position, 'relative', view + ' mobile sidebar must remain in normal flow above the HUD');
+    assert.ok(observed.top === 'auto' || observed.top === '0px', view + ' mobile sidebar received a vertical offset');
+    assert.ok(observed.left === 'auto' || observed.left === '0px', view + ' mobile sidebar received a horizontal offset');
+    assert.ok(observed.rect.width > 300 && observed.rect.width <= 390, view + ' mobile sidebar width is outside the viewport');
+    assert.ok(observed.rect.left >= 0 && observed.scrollWidth <= 390, view + ' mobile sidebar introduces an offset or overflow');
+    assert.ok(observed.stack.indexOf('sidebar') > -1 && observed.stack.indexOf('hud') > -1 && observed.stack.indexOf('sidebar') < observed.stack.indexOf('hud'), view + ' sidebar must paint above the HUD: ' + observed.stack.join(' > '));
+  }
+});
+
+test('the HUD stays fixed while the Observatory content scrolls, and desktop lower panels reach the viewport gutters', () => {
+  const scrollProbe = `(() => {
+    const hud = document.querySelector('.observatory-hud');
+    const card = document.querySelector('.rep-card, .team-rep-card, .observatory-focus-panel');
+    const before = hud.getBoundingClientRect();
+    const cardBefore = card && card.getBoundingClientRect().top;
+    const contentHeight = document.documentElement.scrollHeight;
+    window.scrollTo(0, 600);
+    const after = hud.getBoundingClientRect();
+    const cardAfter = card && card.getBoundingClientRect().top;
+    return { contentHeight, scrollY, beforeTop: before.top, afterTop: after.top, beforeBottom: before.bottom, afterBottom: after.bottom, cardBefore, cardAfter, backgroundAttachment: getComputedStyle(document.body).backgroundAttachment, position: getComputedStyle(hud).position };
+  })()`;
+  for (const [view, state] of [['team-performance', PERFORMANCE], ['team-coaching', populatedCoachingState()]]) {
+    const rendered = renderTeamSurface(state);
+    const tall = rendered.markup + '<div style="height:1800px" aria-hidden="true"></div>';
+    const scrolled = renderComputed(visualShell(view, tall), scrollProbe, { width: 1400 });
+    assert.ok(scrolled.contentHeight > 1200, view + ' scroll fixture must contain content below the fold');
+    assert.ok(scrolled.scrollY >= 500, view + ' rendered page must actually scroll');
+    assert.equal(scrolled.position, 'fixed', view + ' HUD must be fixed to the viewport');
+    assert.ok(scrolled.backgroundAttachment.split(',').every((layer) => layer.trim() === 'fixed'), view + ' Observatory gradient layers must stay fixed: ' + scrolled.backgroundAttachment);
+    assert.equal(scrolled.beforeTop, scrolled.afterTop, view + ' HUD top must not move with document content');
+    assert.equal(scrolled.beforeBottom, scrolled.afterBottom, view + ' HUD bottom must not move with document content');
+    assert.ok(scrolled.cardBefore !== null && scrolled.cardAfter !== null, view + ' must render a content card');
+    assert.ok(Math.abs((scrolled.cardAfter - scrolled.cardBefore) + scrolled.scrollY) <= 2,
+      view + ' content card must move with the document by -scrollY');
+  }
+
+  const desktopBounds = `(() => {
+    const page = document.querySelector('#page').getBoundingClientRect();
+    const lower = document.querySelector('.observatory-reps-panel, .observatory-coaching-workspace-panel').getBoundingClientRect();
+    const rail = document.querySelector('.sidebar').getBoundingClientRect();
+    return { pageLeft: page.left, pageRight: page.right, lowerLeft: lower.left, lowerRight: lower.right, railRight: rail.right };
+  })()`;
+  for (const [view, state] of [['team-performance', PERFORMANCE], ['team-coaching', populatedCoachingState()]]) {
+    const bounds = renderComputed(visualShell(view, renderTeamSurface(state).markup), desktopBounds, { width: 1920 });
+    assert.ok(bounds.lowerLeft <= 32, view + ' lower panel left gutter is wider than 32px: ' + bounds.lowerLeft);
+    assert.ok(1920 - bounds.lowerRight <= 32, view + ' lower panel right gutter is wider than 32px: ' + (1920 - bounds.lowerRight));
+    assert.equal(bounds.lowerLeft, bounds.pageLeft, view + ' lower panel must share the page edge');
+    assert.ok(bounds.lowerRight <= 1920, view + ' lower panel must stay inside the viewport');
+    assert.ok(bounds.lowerLeft < bounds.railRight, view + ' lower panel must retain the established under-rail alignment');
+  }
+});
+
 function mediaBlocks(css, query) {
   const blocks = [];
   const opener = new RegExp('@media\\s*\\(' + query + '\\)\\s*\\{', 'g');

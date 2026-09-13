@@ -10,17 +10,32 @@ The existing additive migration was applied separately: both empty tables have R
 
 ## Current implementation — Observatory redesign (2026-09-13)
 
-**LIVE — verified 2026-09-13 on `456ebf5`.** The source is in
+**LIVE — refinement verified 2026-09-13 on `9bdfa4e1cbb8322a8f36add576650bf3be6323c5`.** The source is in
 `.codex/worktrees/observatory-pages`, based on origin `4269494` and preserving
 the four newer approved design commits. It covers only Team → Coaching and
 Team → Performance. Existing server logic, intelligence, routes, data
 contracts, charts, filters and interactions remain in place. Coaching keeps
 Block 018's one verified focus item and one real supporting call; the retired
 stage grid is not restored. Performance keeps its three trend charts and
-filters, including controls absent from the static mockup. All 2,815 tests pass
+filters, including controls absent from the static mockup. All 2,816 tests pass
 with concurrency four. Railway SUCCESS, matching served-page markers, and live
 control checks confirm the release. Three static pending polls showed no
 active analysis drain before the code push.
+
+**September 13 visual refinement — LIVE, verified 2026-09-13.**
+The Observatory pages now have two localized emerald pools separated by a dark
+center, a fixed viewport background and HUD, and 24px desktop / 18px mobile
+gutters. Behavior and the approved mockup archives are unchanged. Railway
+deployment `2a102b7e-d8e3-4004-a6fe-d4a3504710f3` succeeded; nine served-page
+markers matched in raw and comment-stripped output. Receipts are in
+`~/Desktop/scan-reports/observatory-2026-09-13/refinement/`.
+
+**September 13 HUD restoration — LIVE, verified on `3cbab93ffa9047103f3b0c66e96dfbf770053f89`.**
+The fixed `1200×860` HUD restores two arcs, two rings, four traces, three
+points, and a 28s scan at opacity `1` with pale `.105` / `.095` strokes. Orbit
+is 82s; point motion is 67s, 91s, and 74s. Background-off hides it and reduced
+motion stops it. Behavior and approved archives are unchanged; the prior
+`9bdfa4e1cbb8322a8f36add576650bf3be6323c5` refinement remains live.
 
 ## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)
 
@@ -39,7 +54,7 @@ Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Cl
 
 ### LIVE on origin `4269494` and Railway — Block 018 (2026-09-12): the Team → Coaching reset
 
-Justin's ruling: a manager sees only what this rep needs help with and one real call that shows it; one verified, useful call is enough. `period_summary.coaching` (lib/rep-period-coaching.js) picks the item — a stored, verified example first; the score-selected stage only breaks ties and is never shown empty; an item from another stage is shown as its own stage; one call is never a pattern; no example anywhere → "No coachable call found for these dates." The page shows WHAT TO WORK ON / WHAT TO COACH / THE CALL; the stage-score grid, the score, the diagnosis sentences, "More calls with this", "Other coaching from these calls" and the rep list's counts and labels left this view. Guard `test/coaching-one-call.test.js` (eight plants); six older guards re-pinned with their reasons; full suite 2,808/2,808. Real Sep 7–11 payload: Gabriel now shows Close · booking the follow-up with the Tracey call (was an empty priority); Godwin shows the one sentence. This historical record is now reflected in the live `4269494` base; the Observatory redesign above remains pending review and release verification. Record: SCOUT-SHARED-CONTEXT.md Block 018; evidence `~/Desktop/scan-reports/block-018-one-call/`.
+Justin's ruling: a manager sees only what this rep needs help with and one real call that shows it; one verified, useful call is enough. `period_summary.coaching` (lib/rep-period-coaching.js) picks the item — a stored, verified example first; the score-selected stage only breaks ties and is never shown empty; an item from another stage is shown as its own stage; one call is never a pattern; no example anywhere → "No coachable call found for these dates." The page shows WHAT TO WORK ON / WHAT TO COACH / THE CALL; the stage-score grid, the score, the diagnosis sentences, "More calls with this", "Other coaching from these calls" and the rep list's counts and labels left this view. Guard `test/coaching-one-call.test.js` (eight plants); six older guards re-pinned with their reasons; full suite 2,808/2,808. Real Sep 7–11 payload: Gabriel now shows Close · booking the follow-up with the Tracey call (was an empty priority); Godwin shows the one sentence. This historical record is now reflected in the live `4269494` base; the Observatory redesign is live on `456ebf5`, while its separate September 13 visual refinement awaits release verification. Record: SCOUT-SHARED-CONTEXT.md Block 018; evidence `~/Desktop/scan-reports/block-018-one-call/`.
 
 ### Current checkpoint — LIVE since September 12, 2026 (1397656, Blocks 001–017)
 
