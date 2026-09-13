@@ -45,6 +45,8 @@ test('clear private data-use copy appears before Connect and no classifier setup
   })()`, { width: 390 });
   assert.ok(source.indexOf('id="calendarDataUse"') < source.indexOf('id="calendarConnection"'));
   assert.match(result.text, /visible only to you/i);
+  assert.match(result.text, /manager and Scout admins can see how many appointments you have/i);
+  assert.doesNotMatch(result.text, /If you choose to share/i);
   assert.match(result.text, /will not save event titles, descriptions, attendee details/i);
   assert.match(result.connection, /Connect Google Calendar/);
   assert.equal(result.hasFilter, false);
@@ -68,37 +70,23 @@ test('My Team links to counts for the selected team without changing coaching', 
   assert.match(markup, /Scheduled Appointments/);
 });
 
-test('sharing is off until the owner explicitly enables it, and can be turned off', () => {
-  const page = html().replace('window.__inspectionCalls=0;', `window.__sharing=false;window.__posts=[];window.__inspectionCalls=0;`)
-    .replace('window.fetch=async function(url)', 'window.fetch=async function(url,options)')
-    .replace('let data=url.includes', `if(url.includes('/sharing')){window.__posts.push(JSON.parse(options.body));window.__sharing=JSON.parse(options.body).enabled;return {ok:true,json:async()=>({sharing_enabled:window.__sharing,sharing_eligible:true})}};let data=url.includes`)
-    .replace('configured:true,connected:true,', 'configured:true,connected:true,sharing_eligible:true,sharing_enabled:window.__sharing,');
-  const result = renderComputed(page, `(async()=>{
-    await new Promise(r=>setTimeout(r,50));
-    const control=document.getElementById('calendarShare');
-    if(!control)return {missing:true};
-    const initial=control.checked;control.click();await new Promise(r=>setTimeout(r,50));
-    const enabled=control.checked;control.click();await new Promise(r=>setTimeout(r,50));
-    return {initial,enabled,disabled:!control.checked,posts:window.__posts,text:document.body.textContent};
-  })()`, {width:390});
-  assert.equal(result.missing, undefined, 'owner sharing control must render');
-  assert.equal(result.initial, false);
-  assert.equal(result.enabled, true);
-  assert.equal(result.disabled, true);
-  assert.deepEqual(result.posts, [{enabled:true},{enabled:false}]);
-  assert.match(result.text, /manager and Scout admins/);
-  assert.match(result.text, /Event details stay private/);
+test('calendar connection automatically shares only the appointment count, with no second sharing control', () => {
+  const source = fs.readFileSync(path.join(web, 'js/scout-calendar.js'), 'utf8');
+  const result = renderComputed(html(), `(async()=>{await new Promise(r=>setTimeout(r,50));return document.getElementById('calendarConnection').textContent})()`, { width: 390 });
+  assert.doesNotMatch(source, /calendarShare|\/sharing|setSharing/);
+  assert.doesNotMatch(result, /Share scheduled appointment counts|turn(?:ed)? off/i);
+  assert.match(result, /Event details stay private/i);
 });
 
-test('eligible owners see the sharing control, while unmanaged users are told only that no manager is assigned', () => {
-  const eligible = html().replace('configured:true,connected:true,', 'configured:true,connected:true,sharing_eligible:true,sharing_enabled:false,');
-  const ineligible = html().replace('configured:true,connected:true,', 'configured:true,connected:true,sharing_eligible:false,sharing_enabled:false,');
-  const eligibleResult = renderComputed(eligible, `(async()=>{await new Promise(r=>setTimeout(r,50));return {control:!!document.getElementById('calendarShare'),text:document.getElementById('calendarConnection').textContent}})()`, { width: 390 });
-  const ineligibleResult = renderComputed(ineligible, `(async()=>{await new Promise(r=>setTimeout(r,50));return document.querySelector('.calendar-sharing').textContent})()`, { width: 390 });
-  assert.equal(eligibleResult.control, true);
-  assert.match(eligibleResult.text, /Share scheduled appointment counts/);
-  assert.match(ineligibleResult, /no assigned manager/i);
-  assert.doesNotMatch(ineligibleResult, /Sober Living Riches|signed into/i);
+test('Google Calendar is the onboarding step immediately after recording sources', () => {
+  const dashboard = fs.readFileSync(path.join(web, 'dashboard.html'), 'utf8');
+  const start = dashboard.indexOf('function getStartedCardHtml()');
+  const end = dashboard.indexOf('function renderCoachingOverview', start);
+  const card = dashboard.slice(start, end);
+  const recording = card.indexOf('Connect Zoom or Fathom');
+  const calendar = card.indexOf('Connect Google Calendar');
+  assert.ok(recording >= 0 && calendar > recording, 'calendar belongs immediately after the recording-source step');
+  assert.match(card, /\/calendar\.html/);
 });
 
 test('Account Connect click starts Google directly after showing private read-only use', () => {
