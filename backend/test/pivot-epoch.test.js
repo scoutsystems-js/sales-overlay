@@ -24,7 +24,7 @@ const live = stripComments(source);
 function decl(re) { const m = live.match(re); if (!m) throw new Error('declaration not found: ' + re); return m[0]; }
 
 const REAL = ['setUser', 'setCallLibraryUser', 'resetRepScopedState', 'reloadAll', 'render', 'renderOverview', 'renderCoachingOverview', 'renderHeaderHtml',
-  'avgScoreSubstat', 'glanceTileHtml', 'leadNumberHtml', 'closeRateDisplay', 'objectionHandleRate', 'tileTrendHtml', 'scoreTrend', 'renderCoachSummary2',
+  'avgScoreSubstat', 'glanceTileHtml', 'leadNumberHtml', 'closeRateDisplay', 'overviewCloseInstrumentHtml', 'objectionHandleRate', 'tileTrendHtml', 'scoreTrend', 'renderCoachSummary2',
   'fetchAnalytics2', 'isSelf', 'pivoted', 'personLabel', 'laneWaitHtml', 'armLaneWait', 'clearLaneWait', 'loadNeedsWork', 'fetchNeedsWork', 'loadSectionRank',
   'loadCallLibrary', 'fetchCallLibrary', 'renderCallLibrary', 'loadObjectionsIntel', 'fetchObjectionsIntel'];
 const ASYNC = { reloadAll: 1, fetchAnalytics2: 1, loadNeedsWork: 1, fetchNeedsWork: 1, loadSectionRank: 1, loadCallLibrary: 1, fetchCallLibrary: 1, loadObjectionsIntel: 1, fetchObjectionsIntel: 1 };
@@ -49,6 +49,8 @@ function page() {
     + 'function escapeHtml(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}'
     + 'function roleLabel(r){return r;}function trendArrow(){return "";}function scoreColor(){return "";}function authHeader(){return {};}function clearSession(){}function markDashboardReady(){}'
     + 'function renderFathomNoticeHtml(){return "";}function renderFathomSectionHtml(){return "";}function renderZoomSectionHtml(){return "";}function getStartedCardHtml(){return "";}'
+    + 'function observatoryHudHtml(){return "";}'
+    + 'function observeObservatoryLayout(){}'
     + 'function repOwnGraphHtml(){return "";}function sectionRankCardHtml(){return "";}function needsWorkCardHtml(){return "";}function perfFeatureCardHtml(){return "";}function drawRepOwnChart(){}function repOwnGraphVisible(){return false;}'
     + 'function ensureCoachingPicker(){}function datePickerHtml(){return "";}function summaryBtnHtml(){return "";}function updateNavActiveStates(){}function isTeamView(){return false;}'
     + 'function renderNeedsWorkView(){}function renderObjectionsIntel(){}function renderCallReview(){}function renderSectionView(){}function renderEodView(){}function renderAccountView(){}function renderKbView(){}function renderProspectsView(){}function renderTeamDigest(){}function renderTeamPerformance(){}function renderTeamCoaching(){}function renderTeamObjectionsView(){}function renderTeamMembersView(){}function renderTeamDashboard(){}function renderPerformanceView(){}'

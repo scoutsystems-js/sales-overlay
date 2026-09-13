@@ -1,19 +1,22 @@
 # Scout site design: Observatory HUD
 
-Status: approved site standard, recorded 2026-09-12; implemented and live on Team Coaching and Team Performance as of 2026-09-13. Justin’s approval: “yeah i like Observatory best. update the .md file”. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
+Status: approved site standard, recorded 2026-09-12; Team Coaching and Team Performance are live as of 2026-09-13. The approved third page, personal Coaching Dashboard (`overview`), is recorded as a September 13 implementation; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. Justin’s approval: “yeah i like Observatory best. update the .md file”. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
+
+Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
 
 ## Production implementation scope
 
-The saved implementation applies Observatory styling only to Team → Coaching
-and Team → Performance. It preserves the existing server logic, intelligence,
-routes, metrics, permissions, data contracts, interactions, and accessibility
-behavior. Block 018's current Coaching behavior remains: one verified focus
-item and one real supporting call, with no restoration of the retired stage
-grid. Performance keeps its three existing trend charts and filters, even
-where those controls are absent from the approved static mockup. All other
-dashboard pages keep their existing production appearance. Justin confirmed on
-2026-09-13 that the mesh must be removed from these redesigned pages: the
-forest gradient is their background, with quiet HUD artwork behind opaque panels.
+The saved implementation applies Observatory styling to the live Team → Coaching
+and Team → Performance pages, plus the implemented personal Coaching Dashboard
+(`overview`) September 13 implementation; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. It preserves existing
+server logic, intelligence, routes, metrics, permissions, data contracts,
+interactions, and accessibility behavior. The overview keeps its date/user/pivot
+controls, onboarding and source controls, lazy optional rep graph, lower
+drilldowns, and existing Closing % definition and counts; its proportional ring
+adds no target or band and changes no metric computation. Block 018's current Coaching behavior and
+Performance's trend charts and filters remain unchanged. Justin confirmed on
+2026-09-13 that mesh is removed from these redesigned pages: the forest gradient
+is their background, with quiet HUD artwork behind opaque panels.
 
 The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,816
 backend tests pass with test concurrency limited to four. Desktop and populated
@@ -33,6 +36,14 @@ three points, and a scan. The fixed layer uses opacity `1`, pale `.105` / `.095`
 strokes, and 82s orbit; points run at 67s, 91s, and 74s; the scan runs at 28s.
 Background-off hides it and reduced motion stops it. The prior refinement remains
 live and the approved mockup archives remain untouched.
+
+September 13 Coaching Dashboard extension: implemented in
+`.codex/worktrees/observatory-pages`; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. It
+uses the fixed ground and HUD, 24px desktop / 18px mobile gutters, selected rail,
+transparent header, SVG Closing % instrument, compact existing support cards,
+and two-column lower focus panels. The existing rail observer sets clearance
+from the actual menu height. Inline-script parsing and diff checks pass. Focused rendered coverage for populated,
+loading, and no-prospect states passes; the full backend suite passes 2,852/2,852. Archives remain unchanged.
 
 ## Approved visual standard
 

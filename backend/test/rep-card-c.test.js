@@ -46,7 +46,7 @@ test('⚠⚠ RENDERED: Observatory Performance card — sage edge, dark panel, c
 });
 
 test('⚠ the custom dashboard host keeps the prior Card C edge and top treatment', () => {
-  const c = renderComputed(page([JOSH], false, 'overview'), PROBE)[0];
+  const c = renderComputed(page([JOSH], false, 'call-library'), PROBE)[0];
   assert.strictEqual(c.edge, 'rgb(255, 255, 255)');
   assert.strictEqual(c.radius, '16px');
   assert.notStrictEqual(c.washDisplay, 'none');
