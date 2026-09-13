@@ -161,6 +161,7 @@ app.use('/fathom', fathomRoutes);
 app.use('/team', teamRoutes);
 app.use('/eod', eodRoutes);
 app.use('/zoom', zoomRoutes);
+app.use('/calendar', require('./routes/calendar'));
 
 // Global error handler
 app.use(function(err, req, res, next) {
