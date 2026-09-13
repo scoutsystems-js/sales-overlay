@@ -2,7 +2,7 @@
 
 **Date:** September 13, 2026 (Eastern)
 
-**Status:** Implementation complete and locally verified; deployment verification pending.
+**Status:** LIVE — implementation and production release verified 2026-09-13.
 
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
@@ -49,8 +49,18 @@ assumptions, which were updated without weakening their behavior assertions.
 Inline scripts parse, design archive hashes match, and the final diff check is clean.
 
 Final suite and deployment receipts are saved in
-`~/Desktop/scan-reports/observatory-2026-09-13/`. Deployment remains pending until
-the exact Railway commit and served page markers have been checked.
+`~/Desktop/scan-reports/observatory-2026-09-13/`. Release `456ebf5109a37d5b196a7478563dbd6a80da58ca` was pushed after three
+standalone drain checks showed processing zero and pending static at 45.
+Railway deployment `1bb4ffa0-a782-42aa-bb23-95e911741f2d` reported SUCCESS at
+04:21 UTC on September 13. All six served-page markers matched in both raw and
+comment-stripped output. The live Performance and Coaching pages were reviewed;
+date-picker opening, Grade/Closing sorting, chart filters, closer selection,
+and real call-evidence expansion were exercised. The existing background
+switch was turned on in the review tab to show the requested gradient.
+
+The verified page still uses its existing score bands, fixed seven-day gauge
+window, selected report range, and underlying live data. These are styling
+changes, not a metric reset or re-analysis.
 
 Related design records:
 

@@ -1,6 +1,6 @@
 # Scout site design: Observatory HUD
 
-Status: approved site standard, recorded 2026-09-12; implementation is complete and verified locally; deployment verification is pending. Justin’s approval: “yeah i like Observatory best. update the .md file”. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
+Status: approved site standard, recorded 2026-09-12; implemented and live on Team Coaching and Team Performance as of 2026-09-13. Justin’s approval: “yeah i like Observatory best. update the .md file”. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
 
 ## Production implementation scope
 
@@ -17,8 +17,9 @@ forest gradient is their background, with quiet HUD artwork behind opaque panels
 
 The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,815
 backend tests pass with test concurrency limited to four. Desktop and populated
-390px phone layouts were reviewed. Deployment verification remains pending;
-see [the implementation record](docs/design/observatory-implementation.md).
+390px phone layouts were reviewed. Release `456ebf5` was verified on Railway
+and by raw/comment-stripped served-page markers; see
+[the implementation record](docs/design/observatory-implementation.md).
 
 ## Approved visual standard
 
@@ -59,7 +60,7 @@ These are the snapshot values and words, not constants for production. “What t
 
 ## Approved Performance page — 2026-09-12
 
-Justin’s approval: “yo this is perfect save it”. This approves Performance within the Observatory standard; it is a saved snapshot, not live. The [byte-exact approved source](docs/design/scout-performance-observatory-approved.html) is authoritative for the exact CSS, SVG, JS, and font; SHA-256 `322a9ce6516731c2c6537e5bfa1ee96045e6591a0652af784f8db7f85481f5ad`. The [standalone preview](docs/design/scout-performance-observatory-preview.html) is the rendered archive.
+Justin’s approval: “yo this is perfect save it”. This approves Performance within the Observatory standard; the archive is a saved snapshot, while the production implementation is live. The [byte-exact approved source](docs/design/scout-performance-observatory-approved.html) is authoritative for the exact CSS, SVG, JS, and font; SHA-256 `322a9ce6516731c2c6537e5bfa1ee96045e6591a0652af784f8db7f85481f5ad`. The [standalone preview](docs/design/scout-performance-observatory-preview.html) is the rendered archive.
 
 Performance is active in the approved snapshot, with three glow rings fixed to the last 7 days against a report range of Aug 15–Sep 13. The page uses full-width two-column rep cards below a short nav, with 7 measured and 5 ungraded reps; actual grade, weakest objection, and stage bars; local Closing, Objections, and Grade sort with a direction toggle; responsive behavior from 320px up; and optional glow/HUD tweaks that respect reduced motion. The production implementation retains its existing three trend charts and filters below this approved snapshot composition; the static mockup does not depict those controls.
 

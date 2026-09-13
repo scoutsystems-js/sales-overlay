@@ -4,16 +4,17 @@ The broader-coaching session is complete. The order below supersedes earlier nex
 
 ## Current implementation — Observatory redesign (2026-09-13)
 
-**Implemented and verified locally; release verification pending.** The source is in
+**LIVE — verified 2026-09-13 on `456ebf5`.** The source is in
 `.codex/worktrees/observatory-pages`, based on origin `4269494` and preserving
 the four newer approved design commits. It covers only Team → Coaching and
 Team → Performance. Existing server logic, intelligence, routes, data
 contracts, charts, filters and interactions remain in place. Coaching keeps
 Block 018's one verified focus item and one real supporting call; the retired
 stage grid is not restored. Performance keeps its three trend charts and
-filters, including controls absent from the static mockup. Final tests and
-release verification are pending. This source is saved locally and has not
-been committed, pushed or deployed.
+filters, including controls absent from the static mockup. All 2,815 tests pass
+with concurrency four. Railway SUCCESS, matching served-page markers, and live
+control checks confirm the release. Three static pending polls showed no
+active analysis drain before the code push.
 
 ## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)
 
