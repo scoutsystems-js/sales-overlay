@@ -10,12 +10,12 @@ function html(connected = true) {
   const source = fs.readFileSync(path.join(web, 'calendar.html'), 'utf8');
   return source.replace(/<link[^>]+href="\/css\/[^>]+>/g, '')
     .replace('<script src="/js/scout-auth.js"></script>', `<script>window.__inspectionCalls=0;window.ScoutAuth={getSession:()=>({access_token:'test'}),authHeader:()=>({Authorization:'Bearer test'})};
-    window.fetch=async function(url){let data=url.includes('/inspection')?(window.__inspectionCalls++,{event_count:3,from:'2026-09-10',to:'2026-09-16',calendar:{name:'Primary',time_zone:'America/New_York'},events:[{title:'<img src=x onerror=alert(1)>',description:'Created from GHL',status:'confirmed',event_type:'default',start:'2026-09-10T14:00:00.000Z',end:'2026-09-10T15:00:00.000Z',all_day:false,organizer:{email:'owner@example.com',self:true},creator:{email:'owner@example.com',self:true},attendees:[{email:'prospect@example.com',response_status:'accepted'}],source:{title:'HighLevel appointment',host:'app.gohighlevel.com'},conference:{type:'hangoutsMeet',name:'Google Meet'},extended_property_keys:{private:['ghlAppointmentId'],shared:['source']},recurring:false},{title:'Dentist',status:'confirmed',event_type:'default',start:'2026-09-11',end:'2026-09-12',all_day:true,attendees:[],recurring:false},{title:'Internal team meeting',status:'confirmed',event_type:'default',start:'2026-09-12T14:00:00.000Z',end:'2026-09-12T15:00:00.000Z',all_day:false,attendees:[],recurring:false}]}):url.includes('/status')?{configured:true,connected:${connected},connect_origin:location.origin}:{ok:true,revoked:true};return {ok:true,json:async()=>data}};</script>`)
+    window.fetch=async function(url){let data=url.includes('/inspection')?(window.__inspectionCalls++,{scheduled_ghl_appointment_count:1,from:'2026-09-10',to:'2026-09-16',calendar:{name:'Primary',time_zone:'America/New_York'},appointments:[{title:'<img src=x onerror=alert(1)>',description:'Created from GHL',status:'confirmed',event_type:'default',start:'2026-09-10T14:00:00.000Z',end:'2026-09-10T15:00:00.000Z',all_day:false,organizer:{email:'owner@example.com',self:true},creator:{email:'owner@example.com',self:true},attendees:[{email:'prospect@example.com',response_status:'accepted'}],source:{title:'HighLevel appointment',host:'app.gohighlevel.com'},conference:{type:'hangoutsMeet',name:'Google Meet'},extended_property_keys:{private:['calendarId','eventId','linkedCalendarId','userCalendarId','userId'],shared:[]},recurring:false}]}):url.includes('/status')?{configured:true,connected:${connected},connect_origin:location.origin}:{ok:true,revoked:true};return {ok:true,json:async()=>data}};</script>`)
     .replace('<script src="/js/scout-calendar.js" defer></script>', '<script>' + fs.readFileSync(path.join(web, 'js/scout-calendar.js'), 'utf8') + '</script>')
     .replace('</head>', '<style>' + fs.readFileSync(path.join(web, 'css/style.css'), 'utf8') + fs.readFileSync(path.join(web, 'css/calendar.css'), 'utf8') + '</style></head>');
 }
 
-for (const width of [1400, 390]) test('private primary-calendar inspection renders safely at ' + width + 'px', () => {
+for (const width of [1400, 390]) test('scheduled GHL appointments render safely at ' + width + 'px', () => {
   const result = renderComputed(html(), `(async()=>{
     await new Promise(resolve=>setTimeout(resolve,100));
     const text=document.getElementById('calendarResults').textContent;
@@ -24,10 +24,9 @@ for (const width of [1400, 390]) test('private primary-calendar inspection rende
     return {text,overflow:document.documentElement.scrollWidth>innerWidth,open:disclosure.open,
       injected:!!document.querySelector('#calendarResults img'),inspectionCalls:window.__inspectionCalls};
   })()`, { width });
-  assert.match(result.text, /3 calendar events/);
-  assert.match(result.text, /not a sales-call count/i);
-  assert.match(result.text, /Dentist/);
-  assert.match(result.text, /Internal team meeting/);
+  assert.match(result.text, /1 scheduled GHL appointment/);
+  assert.match(result.text, /not calls taken or first bookings/i);
+  assert.doesNotMatch(result.text, /Dentist|Internal team meeting/);
   assert.match(result.text, /Created from GHL/);
   assert.match(result.text, /owner@example.com/);
   assert.match(result.text, /app\.gohighlevel\.com/);
@@ -127,6 +126,6 @@ test('a delayed inspection cannot redraw event details after Disconnect', () => 
     window.__release();await new Promise(resolve=>setTimeout(resolve,40));
     return document.getElementById('calendarResults').textContent;
   })()`, { width: 390 });
-  assert.match(result, /Connect Google Calendar to inspect events/);
+  assert.match(result, /Connect Google Calendar to view scheduled GHL appointments/);
   assert.doesNotMatch(result, /Private old event/);
 });

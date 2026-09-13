@@ -78,16 +78,16 @@
   async function loadInspection() {
     var epoch = ++loadEpoch;
     var query = new URLSearchParams({ from: el('calendarFrom').value, to: el('calendarTo').value });
-    el('calendarResults').textContent = 'Reading your primary Google Calendar…';
+    el('calendarResults').textContent = 'Reading scheduled GHL appointments…';
     try {
       var data = await request('/inspection?' + query);
       if (epoch !== loadEpoch) return;
       var heading = '<div class="calendar-result-head"><div><h2>' + escape(data.calendar.name) + '</h2><p class="calendar-note">'
         + escape(data.from) + ' through ' + escape(data.to) + ' · ' + escape(data.calendar.time_zone) + '</p></div><p>'
-        + escape(data.event_count) + ' calendar event' + (data.event_count === 1 ? '' : 's') + ' found</p></div>';
-      var boundary = '<p class="calendar-boundary">This is not a sales-call count. Mixed personal, internal, and appointment events are shown only so you can identify reliable GHL details.</p>';
-      var events = data.events.map(function (event) { return eventHtml(event, data.calendar.time_zone); }).join('');
-      el('calendarResults').innerHTML = heading + boundary + (events || '<p>No events are on your primary calendar for these dates.</p>');
+        + escape(data.scheduled_ghl_appointment_count) + ' scheduled GHL appointment' + (data.scheduled_ghl_appointment_count === 1 ? '' : 's') + '</p></div>';
+      var boundary = '<p class="calendar-boundary">Counts appointments currently on your calendar, not calls taken or first bookings. Personal, internal, and SalesKick events are excluded.</p>';
+      var appointments = data.appointments.map(function (event) { return eventHtml(event, data.calendar.time_zone); }).join('');
+      el('calendarResults').innerHTML = heading + boundary + (appointments || '<p>No scheduled GHL appointments are on your primary calendar for these dates.</p>');
     } catch (error) {
       if (epoch === loadEpoch) el('calendarResults').textContent = error.message;
     }
@@ -118,7 +118,7 @@
       action(this, connect);
     };
     if (!status.connected) {
-      el('calendarResults').textContent = 'Connect Google Calendar to inspect events.';
+      el('calendarResults').textContent = 'Connect Google Calendar to view scheduled GHL appointments.';
       return false;
     }
     el('calendarRange').hidden = false;
@@ -148,7 +148,7 @@
     el('calendarRange').onsubmit = function (event) { event.preventDefault(); action(this.querySelector('button'), loadInspection); };
     if (params.has('connection')) notice(params.get('connection') === 'denied'
       ? 'Google Calendar was not connected.' : 'Google connection did not finish. Try connecting again and allow both read-only permissions.');
-    if (params.has('connected')) notice('Google Calendar connected. Scout is reading your primary calendar below.');
+    if (params.has('connected')) notice('Google Calendar connected. Scout is reading your scheduled GHL appointments below.');
     try { if (await loadConnection()) await loadInspection(); }
     catch (error) { notice(error.message); el('calendarResults').textContent = 'Calendar is unavailable right now.'; }
   }

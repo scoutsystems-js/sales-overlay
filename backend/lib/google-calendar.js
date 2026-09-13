@@ -8,7 +8,50 @@ const SCOPES = Object.freeze([
 const DAY_MS = 86400000;
 const MAX_PAGES = 20;
 const MAX_INSPECTION_PAGES = 2;
+const SLR_GHL_PRIVATE_KEYS = Object.freeze(['calendarId', 'eventId', 'linkedCalendarId', 'userCalendarId', 'userId']);
+const SALESKICK_PROPERTY_KEYS = new Set(['skCreatedAt', 'skManagedBookingId', 'skSubmissionId', 'skVersion']);
+const SLR_BOOKING_HOST = 'links.soberlivingriches.com';
+const SALESKICK_HOST = 'app.saleskick.com';
 const readableCalendar = calendar => ['owner', 'writer', 'reader'].includes(calendar.accessRole) && !calendar.deleted;
+
+function urlHosts(value) {
+  if (typeof value !== 'string') return [];
+  return [...value.matchAll(/https?:\/\/[^\s<>"']+/gi)].flatMap(match => {
+    try { return [new URL(match[0]).hostname.toLowerCase()]; }
+    catch (_) { return []; }
+  });
+}
+
+function propertyNames(event) {
+  const properties = event.extendedProperties || {};
+  return ['private', 'shared'].flatMap(scope => properties[scope] && typeof properties[scope] === 'object'
+    ? Object.keys(properties[scope]) : []);
+}
+
+function hasSalesKickSource(event) {
+  const names = new Set(propertyNames(event));
+  if ([...SALESKICK_PROPERTY_KEYS].some(key => names.has(key))) return true;
+  const hosts = [event.description, event.location, event.source?.url].flatMap(urlHosts);
+  return hosts.includes(SALESKICK_HOST);
+}
+
+// This is intentionally a measured Sober Living Riches booking signature, not
+// a generic GHL detector. A title or one incidental property must never turn a
+// personal calendar event into a scheduled appointment.
+function isScheduledSlrGhlAppointment(event) {
+  if (!event || typeof event !== 'object' || hasSalesKickSource(event)) return false;
+  if (event.status === 'cancelled' || typeof event.start?.date === 'string') return false;
+  if (event.eventType && event.eventType !== 'default') return false;
+  if (Array.isArray(event.attendees) && event.attendees.some(attendee => attendee?.self === true && attendee.responseStatus === 'declined')) return false;
+  const privateProperties = event.extendedProperties?.private;
+  if (!privateProperties || typeof privateProperties !== 'object') return false;
+  const hasGhlSignature = SLR_GHL_PRIVATE_KEYS.every(key => typeof privateProperties[key] === 'string' && privateProperties[key].trim());
+  return hasGhlSignature && urlHosts(event.description).includes(SLR_BOOKING_HOST);
+}
+
+function scheduledGhlEvents(events) {
+  return Array.isArray(events) ? events.filter(isScheduledSlrGhlAppointment) : [];
+}
 
 function validateInspectionRange(from, to) {
   const valid = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -203,4 +246,4 @@ function createGoogleClient(fetchImpl = fetch) {
   };
 }
 
-module.exports = { SCOPES, validateInspectionRange, dateInZone, inspectionEvents, seal, unseal, authorizeUrl, createGoogleClient };
+module.exports = { SCOPES, validateInspectionRange, dateInZone, inspectionEvents, scheduledGhlEvents, seal, unseal, authorizeUrl, createGoogleClient };
