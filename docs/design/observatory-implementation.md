@@ -24,7 +24,7 @@ over the gradient, background-off hides HUD art, and reduced motion stops it.
 
 The extension is recorded in the Observatory worktree. Release verification:
 `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`. Inline script parsing and the final diff check pass. Focused rendered coverage for populated,
-loading, and no-prospect states passes; the full backend suite passes 2,852/2,852.
+loading, no-prospect, and first-load states passes; the full backend suite passes 2,853/2,853. The direct Overview loader stamps `data-view="overview"` before it inserts the fixed HUD, preserving the scoped ground during its analytics wait.
 
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit

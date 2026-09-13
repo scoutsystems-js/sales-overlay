@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { renderComputed } = require('./helpers/electron-render');
-const { documentFor } = require('./helpers/observatory-fixture');
+const { documentFor, overviewLoadingFirstPaint } = require('./helpers/observatory-fixture');
 
 function probePage() {
   return `(() => {
@@ -44,6 +44,16 @@ test('overview populated export uses the third-view Observatory structure and st
   assert.ok(desktop.focus.top >= desktop.rail.bottom, 'overview focus grid must clear the expanded rail');
   assert.equal(desktop.hudPosition, 'fixed', 'overview HUD must be viewport-fixed');
   assert.ok(desktop.backgroundAttachment.split(',').every((layer) => layer.trim() === 'fixed'), 'overview ground layers must stay fixed');
+});
+
+test('overview direct boot loader stamps its visual scope before it inserts the fixed HUD', () => {
+  const firstPaint = overviewLoadingFirstPaint();
+  assert.equal(firstPaint.startedWithoutView, true, 'boot fixture must start without a body data-view hook');
+  assert.equal(firstPaint.view, 'overview', 'direct overview loader must stamp its body view hook');
+  assert.match(firstPaint.markup, /class="observatory-hud/, 'direct loader must include the Observatory HUD');
+  const observed = renderComputed(firstPaint.document, `(() => { const hud = document.querySelector('.observatory-hud'); return { hudPosition: getComputedStyle(hud).position, backgroundAttachment: getComputedStyle(document.body).backgroundAttachment }; })()`);
+  assert.equal(observed.hudPosition, 'fixed', 'first-paint HUD must be viewport-fixed before analytics returns');
+  assert.ok(observed.backgroundAttachment.split(',').every((layer) => layer.trim() === 'fixed'), 'first-paint background must be fixed before analytics returns');
 });
 
 test('overview loading and no-call exports remain truthful while background-off scopes to the overview HUD', () => {

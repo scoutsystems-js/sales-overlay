@@ -43,7 +43,7 @@ uses the fixed ground and HUD, 24px desktop / 18px mobile gutters, selected rail
 transparent header, SVG Closing % instrument, compact existing support cards,
 and two-column lower focus panels. The existing rail observer sets clearance
 from the actual menu height. Inline-script parsing and diff checks pass. Focused rendered coverage for populated,
-loading, and no-prospect states passes; the full backend suite passes 2,852/2,852. Archives remain unchanged.
+loading, no-prospect, and first-load states passes; the full backend suite passes 2,853/2,853. The direct Overview loader now stamps `data-view="overview"` before it inserts the fixed HUD, so its scoped ground is present before analytics returns. Archives remain unchanged.
 
 ## Approved visual standard
 

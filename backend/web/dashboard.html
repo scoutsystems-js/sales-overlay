@@ -8873,9 +8873,9 @@
   })();
 
   function render() {
-    // (f) The single hook the background motifs key on. render() is the ONE
-    // dispatch point for every view, so this cannot fall out of step with what
-    // is on screen — which is why it lives here and not in each renderer.
+    // (f) The shared hook the background motifs key on. Most views enter through
+    // this dispatcher; the overview loader may paint directly during reloadAll,
+    // so renderOverview applies the same hook before it inserts that first paint.
     document.body.dataset.view = state.view;
     if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'call-library') renderCallLibrary();
@@ -8982,6 +8982,9 @@
   // Overview view — three donuts + coach summary + recent calls
   // ──────────────────────────────────────────────────────────────────
   function renderOverview(isLoading) {
+    // reloadAll may paint this loading shell before render() dispatches. Stamp
+    // the valid view hook first so its fixed Observatory background is scoped.
+    if (state.view === 'overview') document.body.dataset.view = 'overview';
     var content = document.getElementById('content');
     if (isLoading || !state.analytics2) {
       // A-1: skeleton TILES (not donuts) so the placeholder matches the collapsed
