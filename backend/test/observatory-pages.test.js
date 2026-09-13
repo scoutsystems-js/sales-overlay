@@ -246,6 +246,49 @@ test('the rendered desktop chrome aligns lower panels to the rail and clears an 
   assert.ok(mobileCoaching.selectedMember.height < 100, '390px Coaching selected member control is too tall to scan');
 });
 
+test('the HUD stays fixed while the Observatory content scrolls, and desktop lower panels reach the viewport gutters', () => {
+  const scrollProbe = `(() => {
+    const hud = document.querySelector('.observatory-hud');
+    const card = document.querySelector('.rep-card, .team-rep-card, .observatory-focus-panel');
+    const before = hud.getBoundingClientRect();
+    const cardBefore = card && card.getBoundingClientRect().top;
+    const contentHeight = document.documentElement.scrollHeight;
+    window.scrollTo(0, 600);
+    const after = hud.getBoundingClientRect();
+    const cardAfter = card && card.getBoundingClientRect().top;
+    return { contentHeight, scrollY, beforeTop: before.top, afterTop: after.top, beforeBottom: before.bottom, afterBottom: after.bottom, cardBefore, cardAfter, backgroundAttachment: getComputedStyle(document.body).backgroundAttachment, position: getComputedStyle(hud).position };
+  })()`;
+  for (const [view, state] of [['team-performance', PERFORMANCE], ['team-coaching', populatedCoachingState()]]) {
+    const rendered = renderTeamSurface(state);
+    const tall = rendered.markup + '<div style="height:1800px" aria-hidden="true"></div>';
+    const scrolled = renderComputed(visualShell(view, tall), scrollProbe, { width: 1400 });
+    assert.ok(scrolled.contentHeight > 1200, view + ' scroll fixture must contain content below the fold');
+    assert.ok(scrolled.scrollY >= 500, view + ' rendered page must actually scroll');
+    assert.equal(scrolled.position, 'fixed', view + ' HUD must be fixed to the viewport');
+    assert.ok(scrolled.backgroundAttachment.split(',').every((layer) => layer.trim() === 'fixed'), view + ' Observatory gradient layers must stay fixed: ' + scrolled.backgroundAttachment);
+    assert.equal(scrolled.beforeTop, scrolled.afterTop, view + ' HUD top must not move with document content');
+    assert.equal(scrolled.beforeBottom, scrolled.afterBottom, view + ' HUD bottom must not move with document content');
+    assert.ok(scrolled.cardBefore !== null && scrolled.cardAfter !== null, view + ' must render a content card');
+    assert.ok(Math.abs((scrolled.cardAfter - scrolled.cardBefore) + scrolled.scrollY) <= 2,
+      view + ' content card must move with the document by -scrollY');
+  }
+
+  const desktopBounds = `(() => {
+    const page = document.querySelector('#page').getBoundingClientRect();
+    const lower = document.querySelector('.observatory-reps-panel, .observatory-coaching-workspace-panel').getBoundingClientRect();
+    const rail = document.querySelector('.sidebar').getBoundingClientRect();
+    return { pageLeft: page.left, pageRight: page.right, lowerLeft: lower.left, lowerRight: lower.right, railRight: rail.right };
+  })()`;
+  for (const [view, state] of [['team-performance', PERFORMANCE], ['team-coaching', populatedCoachingState()]]) {
+    const bounds = renderComputed(visualShell(view, renderTeamSurface(state).markup), desktopBounds, { width: 1920 });
+    assert.ok(bounds.lowerLeft <= 32, view + ' lower panel left gutter is wider than 32px: ' + bounds.lowerLeft);
+    assert.ok(1920 - bounds.lowerRight <= 32, view + ' lower panel right gutter is wider than 32px: ' + (1920 - bounds.lowerRight));
+    assert.equal(bounds.lowerLeft, bounds.pageLeft, view + ' lower panel must share the page edge');
+    assert.ok(bounds.lowerRight <= 1920, view + ' lower panel must stay inside the viewport');
+    assert.ok(bounds.lowerLeft < bounds.railRight, view + ' lower panel must retain the established under-rail alignment');
+  }
+});
+
 function mediaBlocks(css, query) {
   const blocks = [];
   const opener = new RegExp('@media\\s*\\(' + query + '\\)\\s*\\{', 'g');

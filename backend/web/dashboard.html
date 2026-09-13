@@ -5573,10 +5573,12 @@
       --observatory-ring-value-compact:31px;
       --observatory-panel:#0d1011; --observatory-panel-deep:#0a0c0d;
       --observatory-line:rgba(215,236,222,.17); --observatory-soft:rgba(237,237,237,.56);
-      background:radial-gradient(ellipse 86% 48% at 7% 24%,rgba(20,109,52,.29),transparent 72%),
-        radial-gradient(ellipse 76% 54% at 94% 10%,rgba(13,82,41,.23),transparent 70%),
-        radial-gradient(ellipse 64% 30% at 48% 75%,rgba(24,83,45,.12),transparent 75%),
-        linear-gradient(136deg,#0b1210,#090a0b 56%,#0a120e);
+      background:
+        radial-gradient(ellipse 58% 50% at -7% 8%,rgba(21,122,58,.46),transparent 74%),
+        radial-gradient(ellipse 54% 46% at 104% 88%,rgba(13,91,43,.36),transparent 72%),
+        radial-gradient(ellipse 46% 38% at 51% 42%,rgba(0,0,0,.48),transparent 78%),
+        linear-gradient(136deg,#07100b 0%,#080a09 50%,#0a120d 100%);
+      background-attachment:fixed;
     }
     body[data-view="team-performance"]::before,
     body[data-view="team-coaching"]::before { display:none; }
@@ -5589,7 +5591,7 @@
     body[data-view="team-performance"] .page,
     body[data-view="team-coaching"] .page {
       position:relative; isolation:isolate; overflow:hidden;
-      width:auto; max-width:min(1200px,calc(100vw - 36px)); margin:0 auto;
+      width:auto; max-width:calc(100vw - 48px); margin:0 auto;
       padding:24px 0 90px;
       background:transparent;
     }
@@ -5613,11 +5615,11 @@
     body[data-view="team-coaching"] .observatory-page>.empty { grid-column:1/-1; }
     body[data-view="team-performance"] .observatory-hud,
     body[data-view="team-coaching"] .observatory-hud {
-      position:absolute; z-index:-1; inset:-24px 0 -90px; overflow:hidden;
-      pointer-events:none; opacity:.68;
+      position:fixed; z-index:-1; inset:0; overflow:hidden;
+      pointer-events:none; opacity:.46;
     }
     body[data-view="team-performance"] .observatory-hud svg,
-    body[data-view="team-coaching"] .observatory-hud svg { display:block; width:100%; height:100%; min-height:1100px; }
+    body[data-view="team-coaching"] .observatory-hud svg { display:block; width:100%; height:100%; min-height:0; }
     body[data-view="team-performance"] .observatory-hud path,
     body[data-view="team-performance"] .observatory-hud circle,
     body[data-view="team-performance"] .observatory-hud line,
@@ -5650,7 +5652,7 @@
 
     body[data-view="team-performance"] .sidebar,
     body[data-view="team-coaching"] .sidebar {
-      position:absolute; top:67px; left:max(18px,calc((100vw - 1200px) / 2));
+      position:absolute; top:67px; left:24px;
       width:var(--sidebar-w); max-height:none; overflow:visible;
       border:1px solid var(--observatory-line); border-radius:var(--radius-lg);
       background:var(--observatory-panel); box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.42);
@@ -5951,7 +5953,7 @@
       body[data-view="team-performance"] .observatory-page>.observatory-upper,
       body[data-view="team-coaching"] .observatory-page>.observatory-upper { min-height:0; }
       body[data-view="team-performance"] .observatory-hud,
-      body[data-view="team-coaching"] .observatory-hud { inset:-22px -18px -70px; }
+      body[data-view="team-coaching"] .observatory-hud { inset:0; }
     }
     @media(max-width:820px) {
       body[data-view="team-performance"] .observatory-ring { width:126px; height:126px; }

@@ -2,13 +2,22 @@
 
 **Date:** September 13, 2026 (Eastern)
 
-**Status:** LIVE — implementation and production release verified 2026-09-13.
+**Status:** `456ebf5` is LIVE — implementation and production release verified
+2026-09-13. The September 13 visual refinement is implemented locally and
+awaits release verification.
 
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
 `4269494` and preserves the four newer design commits in this worktree. The
 older canonical iCloud root is behind this work and must not be used as the
 implementation source for this block.
+
+The refinement localizes the green field into two emerald pools with a dark
+center, fixes the viewport background and decorative HUD while page content
+scrolls, and widens desktop content to 24px gutters while retaining 18px
+gutters on mobile. It changes no behavior, data, metrics, permissions, or
+interactions. The approved mockup archives are unchanged. Release `456ebf5`
+remains live until this refinement is verified in production.
 
 The approved redesign covers exactly two dashboard pages: Team → Coaching and
 Team → Performance. The server logic, intelligence, data contracts, routes,
@@ -47,6 +56,13 @@ passed unchanged both in isolation and in the complete bounded-concurrency run.
 The first run also exposed old visual expectations and extracted-fixture
 assumptions, which were updated without weakening their behavior assertions.
 Inline scripts parse, design archive hashes match, and the final diff check is clean.
+
+The refinement passes all **2,816 tests**, zero skipped, with concurrency four
+(36.1 seconds); its 78 focused checks also pass. Rendered checks prove both
+backgrounds and HUDs remain fixed while actual cards scroll, and both lower
+panels reach the 1920px viewport gutters. Desktop and 390px phone previews
+were reviewed. All page scripts and markup outside the stylesheet are byte
+identical to the prior release. Release verification remains pending.
 
 Final suite and deployment receipts are saved in
 `~/Desktop/scan-reports/observatory-2026-09-13/`. Release `456ebf5109a37d5b196a7478563dbd6a80da58ca` was pushed after three
