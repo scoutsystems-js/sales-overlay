@@ -358,6 +358,51 @@
     .offer-field textarea { width: 100%; max-width: 720px; font: inherit; color: inherit; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; resize: vertical; }
     .offer-editor-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .offer-editor-note { font-size: var(--fs-label); color: var(--text); opacity: 0.8; }
+
+    /* Observatory admin console. This is presentation only: the owner/admin
+       gates, user-management actions, and support-ticket routes stay exactly
+       where they are. */
+    body {
+      --admin-line: rgba(170, 241, 195, .28);
+      --admin-panel: linear-gradient(135deg, rgba(8, 38, 22, .78), rgba(1, 12, 7, .58));
+      position: relative; isolation: isolate; overflow-x: hidden;
+      background: radial-gradient(circle at 80% 4%, rgba(5, 130, 68, .32), transparent 30rem), radial-gradient(circle at 5% 72%, rgba(0, 112, 59, .18), transparent 34rem), linear-gradient(135deg, #06130d 0%, #010604 52%, #071c11 100%);
+      background-attachment: fixed;
+    }
+    body::before, body::after { content: ""; position: fixed; z-index: -1; pointer-events: none; border: 1px solid rgba(125, 255, 179, .14); opacity: .88; }
+    body::before { width: 62%; height: 78%; left: 8%; top: 2%; border-radius: 48% 52% 45% 55%; transform: rotate(-18deg); animation: admin-contour-drift 30s ease-in-out infinite alternate; }
+    body::after { width: 78%; height: 72%; right: -14%; bottom: -26%; border-radius: 50%; animation: admin-contour-drift 38s ease-in-out -10s infinite alternate-reverse; }
+    @keyframes admin-contour-drift { to { transform: rotate(-14deg) scale(1.04); } }
+    .admin-top { position: relative; z-index: 1; margin: 16px 24px 0; padding: 13px 18px; border: 1px solid var(--admin-line); border-radius: 14px; background: rgba(2, 15, 8, .64); box-shadow: inset 0 1px 0 rgba(245, 255, 248, .1), 0 18px 42px rgba(0, 0, 0, .28); backdrop-filter: blur(16px); }
+    .admin-top-left { letter-spacing: .035em; }
+    .admin-top-right a, .admin-top-right .signout { transition: color .18s ease; }
+    .admin-top-right a:hover, .admin-top-right .signout:hover { color: var(--green); }
+    .admin-page { position: relative; z-index: 1; width: min(1560px, calc(100% - 48px)); margin: 0 auto; padding: 24px 0 64px; }
+    .users-section { padding: 0; margin: 0 0 20px; }
+    .users-header { position: relative; margin: 0 0 12px; padding: 16px 18px; border-bottom: 1px solid rgba(215, 236, 222, .13); }
+    .users-header::before, .company-block::before, .users-table-wrap:not(.blocks)::before { content: ""; position: absolute; top: 14px; left: 18px; width: 42px; height: 1px; background: #71ffad; box-shadow: 0 0 9px rgba(77, 255, 148, .7); }
+    .users-header h2 { margin: 0; padding-top: 10px; color: rgba(225, 246, 231, .72); letter-spacing: .15em; }
+    .btn-add-user, .btn-resend, .role-save, .btn-modal-primary, .btn-modal-secondary { border-radius: 8px; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+    .btn-add-user, .btn-resend, .btn-modal-secondary { background: rgba(2, 19, 10, .52); border-color: rgba(170, 241, 195, .25); }
+    .btn-add-user:hover, .btn-resend:hover:not(:disabled), .btn-modal-secondary:hover { box-shadow: 0 0 16px rgba(57, 255, 126, .16); }
+    .role-save, .btn-modal-primary { background: linear-gradient(135deg, #57ef92, #17b95d); box-shadow: 0 0 16px rgba(53, 255, 125, .18); }
+    .users-table-wrap:not(.blocks), .company-block, .add-company-bar { position: relative; overflow: hidden; border-color: var(--admin-line); background: var(--admin-panel); box-shadow: inset 0 1px 0 rgba(245, 255, 248, .1), inset 0 0 0 1px rgba(103, 205, 135, .04), 0 22px 48px rgba(0, 0, 0, .26), 0 0 28px rgba(21, 161, 71, .07); backdrop-filter: blur(14px); }
+    .company-block { padding: 26px 18px 18px; }
+    .users-table-wrap.blocks { overflow: visible; }
+    .users-table th { background: rgba(1, 13, 7, .58); border-bottom-color: rgba(215, 236, 222, .13); }
+    .users-table td { border-bottom-color: rgba(215, 236, 222, .1); }
+    .users-table tr { transition: background .18s ease; }
+    .users-table tbody tr:hover { background: rgba(90, 255, 144, .045); }
+    .admin-tabs { gap: 9px; margin: 0 0 14px; }
+    .admin-tab { background: rgba(2, 19, 10, .52); border-color: rgba(170, 241, 195, .22); border-radius: 8px; }
+    .admin-tab.active { border-color: rgba(211, 237, 217, .52); border-left: 2px solid var(--green); color: var(--text); background: linear-gradient(100deg, #1b4527, #112617); box-shadow: 0 0 16px rgba(var(--green-rgb), .18); }
+    .company-name-input, .company-name-static { border-color: rgba(170, 241, 195, .12); background: rgba(1, 14, 7, .28); }
+    .role-select, .modal-input, .modal-select, .offer-field textarea { background: rgba(1, 14, 7, .58); border-color: rgba(170, 241, 195, .22); }
+    .modal-overlay { background: rgba(0, 7, 3, .72); backdrop-filter: blur(8px); }
+    .modal-box { border-color: var(--admin-line); background: linear-gradient(135deg, rgba(9, 40, 23, .96), rgba(2, 14, 8, .96)); box-shadow: inset 0 1px 0 rgba(245, 255, 248, .1), 0 28px 70px rgba(0, 0, 0, .52), 0 0 36px rgba(26, 231, 104, .12); }
+    .support-cat-admin, .support-ref-admin { background: rgba(3, 28, 15, .68); border-color: rgba(170, 241, 195, .24); }
+    @media (prefers-reduced-motion: reduce) { body::before, body::after { animation: none; } }
+    @media (max-width: 900px) { .admin-top { margin: 12px 18px 0; } .admin-page { width: min(100% - 36px, 1560px); padding-top: 18px; } .users-header { padding: 14px 16px; } }
   </style>
   <script src="/js/scout-auth.js"></script>
   <script src="/js/scout-modal.js"></script>
@@ -647,7 +692,7 @@
       ? '<div class="empty-msg">⚠ Diagnostics failed when this was raised: ' + escapeHtml(t.snapshot_error) + '</div>'
       : (s.verdict
           ? '<div><strong>' + escapeHtml(s.verdict) + '</strong></div>'
-            + '<div class="empty-msg">' + (s.what_they_see || []).map(esc).join('<br>') + '</div>'
+            + '<div class="empty-msg">' + (s.what_they_see || []).map(escapeHtml).join('<br>') + '</div>'
           : '<div class="empty-msg">No diagnostics attached.</div>');
     /* ⚠ THE ATTACHMENT IS OPENED THROUGH A SIGNED URL, never linked directly.
        The bucket is private, so there is no public URL to link to — which is

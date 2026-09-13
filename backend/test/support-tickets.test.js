@@ -179,6 +179,11 @@ test('⚠ THE SEARCH DISTINGUISHES "no matches" FROM "no tickets"', () => {
   assert.ok(/Nothing matches/.test(ADMIN) && /No tickets\./.test(ADMIN));
 });
 
+test('⚠ ADMIN TICKET SNAPSHOT LINES USE THE PAGE ESCAPER', () => {
+  assert.ok(/\(s\.what_they_see \|\| \[\]\)\.map\(escapeHtml\)/.test(ADMIN),
+    'ticket snapshot lines must use the defined escapeHtml helper');
+});
+
 test('⚠⚠ THEY ARE TOLD REPLIES COME BY EMAIL, BEFORE THEY SEND', () => {
   // There is no in-app messaging, so without this "no reply in Scout" reads as
   // "nobody looked" — the silence this whole flow exists to remove.

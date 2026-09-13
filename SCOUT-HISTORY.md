@@ -8067,3 +8067,6 @@ My Team (`team-members`) uses the implemented Observatory ground, contours, glas
 
 ## [H786] Customize is retired from Team navigation — September 13, 2026
 Justin decided the widget-builder surface should not be exposed while Scout has deliberately designed pages. Remove its Team-menu entry and send old `#team-dashboard` links to Daily Digest. Saved boards and the underlying editor stay untouched so a future, narrower personalization decision does not destroy existing work.
+
+## [H787] Admin and account areas join the Observatory presentation scope — September 13, 2026
+Justin directed the site redesign to proceed through Admin and My Account, including personal and manager calendar subpages, before the remaining reachable page and subpage inventory. Apply the approved fixed forest gradient, subtle contour animation and translucent glowing panels without changing existing controls, access rules, connection behavior, calendar data boundaries, filters, or actions. The Admin Support Tickets renderer had a separate live defect: its snapshot lines called an undefined `esc` identifier. Use the page's established `escapeHtml` helper and pin it with a regression check; it is a functional correction alongside the visual work.

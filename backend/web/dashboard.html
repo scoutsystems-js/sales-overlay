@@ -7077,6 +7077,33 @@
     @media(max-width:900px) { body[data-view="team"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; } body[data-view="team"] .sidebar { position:relative; top:auto; left:auto; z-index:2; width:auto; margin-bottom:14px; } body[data-view="team"] .team-digest-observatory { grid-template-columns:1fr; } body[data-view="team"] .team-digest-main { grid-column:1; } }
     @media(max-width:620px) { body[data-view="team"] .team-digest-observatory .page-header, body[data-view="team"] .team-digest-panel { padding:28px 16px 16px; } body[data-view="team"] .team-digest-observatory .page-header--company { align-items:stretch; flex-direction:column; } body[data-view="team"] .team-digest-observatory .page-header--company .page-header-side { flex-basis:auto; width:100%; } }
 
+    /* Account is an Observatory page. Existing account controls and handlers
+       remain untouched; these rules only put the work areas in the approved
+       fixed field and glass-panel system. */
+    body[data-view="account"] { background:radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%); background-attachment:fixed; }
+    body[data-view="account"]::before, body[data-view="account"]::after { content:""; position:fixed; z-index:0; pointer-events:none; border:1px solid rgba(125,255,179,.14); opacity:.88; }
+    body[data-view="account"]::before { width:62%; height:78%; left:8%; top:2%; border-radius:48% 52% 45% 55%; transform:rotate(-18deg); animation:observatory-account-contour 30s ease-in-out infinite alternate; }
+    body[data-view="account"]::after { width:78%; height:72%; right:-14%; bottom:-26%; border-radius:50%; animation:observatory-account-contour 38s ease-in-out -10s infinite alternate-reverse; }
+    @keyframes observatory-account-contour { to { transform:rotate(-14deg) scale(1.04); } }
+    body[data-view="account"] #bgSwitch { display:none; }
+    body[data-view="account"] .page { position:relative; z-index:1; width:auto; max-width:calc(100vw - 48px); margin:0 auto; padding:24px 0 72px; background:transparent; }
+    body[data-view="account"] .sidebar { position:absolute; z-index:2; top:67px; left:24px; width:var(--sidebar-w); border:1px solid rgba(170,241,195,.28); border-radius:14px; background:rgba(5,20,11,.78); box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.42); }
+    body[data-view="account"] .sidebar .nav-link.nav-active { border:1px solid rgba(211,237,217,.52); border-left:2px solid var(--accent); border-radius:12px; background:linear-gradient(100deg,#1b4527,#112617); color:var(--text); box-shadow:0 0 16px rgba(var(--accent-rgb),.24); }
+    body[data-view="account"] #content { margin-left:calc(var(--sidebar-w) + 22px); min-width:0; }
+    body[data-view="account"] .observatory-account-section { position:relative; overflow:hidden; margin:0 0 18px; padding:30px 24px 22px; border:1px solid rgba(170,241,195,.30); border-radius:14px; background:linear-gradient(135deg,rgba(8,38,22,.78),rgba(1,12,7,.58)); box-shadow:inset 0 1px 0 rgba(245,255,248,.1),inset 0 0 0 1px rgba(103,205,135,.04),0 22px 48px rgba(0,0,0,.30),0 0 28px rgba(21,161,71,.07); backdrop-filter:blur(14px); }
+    body[data-view="account"] .observatory-account-section::before { content:""; position:absolute; top:14px; left:18px; width:42px; height:1px; background:#71ffad; box-shadow:0 0 9px rgba(77,255,148,.7); }
+    body[data-view="account"] .observatory-account-section .section-header { margin:0 0 16px; padding:0 0 14px; border-bottom:1px solid rgba(215,236,222,.12); }
+    body[data-view="account"] .observatory-account-section .section-header h2 { font-size:var(--fs-eyebrow); letter-spacing:.16em; text-transform:uppercase; color:rgba(225,246,231,.76); }
+    body[data-view="account"] .observatory-account-section .eod-row, body[data-view="account"] .observatory-account-section .acct-row { border-bottom-color:rgba(215,236,222,.10); }
+    body[data-view="account"] .observatory-account-section .eod-input, body[data-view="account"] .observatory-account-section input, body[data-view="account"] .observatory-account-section textarea, body[data-view="account"] .observatory-account-section select { background:rgba(1,14,7,.54); border-color:rgba(170,241,195,.22); }
+    body[data-view="account"] .observatory-account-section .btn-fathom-secondary { border-color:rgba(170,241,195,.30); background:rgba(2,19,10,.52); }
+    body[data-view="account"] .observatory-account-section .btn-fathom-secondary:hover { border-color:rgba(118,255,171,.70); box-shadow:0 0 16px rgba(57,255,126,.14); }
+    body[data-view="account"] .observatory-account-section .acct-notice, body[data-view="account"] .observatory-account-section .conn-row { background:rgba(3,26,14,.32); border-color:rgba(170,241,195,.13); }
+    body[data-view="account"] .acct-signout-card { background:linear-gradient(135deg,rgba(48,11,15,.56),rgba(18,5,7,.50)); border-color:rgba(248,113,113,.28); }
+    @media(max-width:900px) { body[data-view="account"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; } body[data-view="account"] .sidebar { position:relative; top:auto; left:auto; width:auto; margin-bottom:14px; } body[data-view="account"] #content { margin-left:0; } }
+    @media(max-width:620px) { body[data-view="account"] .observatory-account-section { padding:28px 16px 16px; } }
+    @media(prefers-reduced-motion:reduce) { body[data-view="account"]::before, body[data-view="account"]::after { animation:none; } }
+
     /* Team Objections Observatory pass. The grid stays beside the navigation
        rail; its explanatory and evidence panels span the page below that rail. */
     body[data-view="team-objections"] {
@@ -18441,17 +18468,17 @@
       + '<div class="eod-row"><div class="eod-label"></div><div>' + billingAction + '</div></div>';
 
     content.innerHTML =
-        '<div class="section fade-in"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
-      + '<div class="section fade-in" id="connectionsSection"><div class="section-header"><h2>Connections</h2></div>' + renderConnectionsSectionHtml() + '<div id="calendarConnection">Loading Google Calendar…</div></div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Offer</h2></div>' + offerBody
+        '<div class="section fade-in observatory-account-section observatory-account-profile"><div class="section-header"><h2>Profile</h2></div>' + profileBody + '</div>'
+      + '<div class="section fade-in observatory-account-section" id="connectionsSection"><div class="section-header"><h2>Connections</h2></div>' + renderConnectionsSectionHtml() + '<div id="calendarConnection">Loading Google Calendar…</div></div>'
+      + '<div class="section fade-in observatory-account-section"><div class="section-header"><h2>Password</h2></div>' + passwordBody + '</div>'
+      + '<div class="section fade-in observatory-account-section"><div class="section-header"><h2>Offer</h2></div>' + offerBody
         + priceFieldHtml(a) + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>'
+      + '<div class="section fade-in observatory-account-section"><div class="section-header"><h2>Billing</h2></div>' + billingBody + '</div>'
       /* Their own reports live here now, not in the modal. ⚠ STATUS ONLY — the
          server does not even SELECT the diagnostics, because those describe an
          ACCOUNT and on a shared company account that is not automatically
          theirs to read. */
-      + '<div class="section fade-in"><div class="section-header"><h2>Your Reports</h2></div>'
+      + '<div class="section fade-in observatory-account-section"><div class="section-header"><h2>Your Reports</h2></div>'
         + '<div id="supportMine"></div></div>'
       /* ⚠⚠ SIGN OUT LIVES HERE NOW (Justin, 2026-09-01). It left the top bar
          when the page tabs became a sidebar: the top right is WHO YOU ARE, and
@@ -18468,7 +18495,7 @@
          BUTTON here, and every button on this site is Title Case. The guard
          caught the inconsistency the moment the element type changed; the label
          follows the convention rather than the old markup. */
-      + '<div class="section fade-in acct-signout-card">'
+      + '<div class="section fade-in observatory-account-section acct-signout-card">'
         + '<button class="acct-signout" type="button" onclick="signOut()">Sign Out</button>'
       + '</div>';
 

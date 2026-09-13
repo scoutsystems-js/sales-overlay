@@ -10,11 +10,12 @@
 
 - **Customize is retired from Team navigation for now.** Preserve saved boards and editor code; `#team-dashboard` must redirect to Daily Digest. Do not load dashboard data just to populate navigation. (H786)
 
-- **The redesigned-view Observatory scope now includes Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest, Team Objections and My Team.** Daily Digest remains a fixed-day cached report with bounded navigation and existing team/count/evidence/focus behavior; its Observatory pass is presentation-only and adds no gauge or date-range picker. (H783, H784, H785)
+- **The redesigned-view Observatory scope now includes Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest, Team Objections, My Team, Admin, My Account and both calendar views.** Daily Digest remains a fixed-day cached report with bounded navigation and existing team/count/evidence/focus behavior; its Observatory pass is presentation-only and adds no gauge or date-range picker. (H783, H784, H785, H787)
 
 ---
 
 - **My Team (`team-members`) Observatory presentation is implemented; final deployment verification is recorded separately.** Preserve roster scope, permissions, active/inactive roles, add/move/deactivate/email/reset/delete handlers, team/date controls and the scoped Scheduled Appointments link; no auth, calendar or data changes. (H785)
+- **Admin, My Account, and personal/team calendar Observatory passes are presentation-only; preserve their existing controls, permissions, connection actions, filters and data boundaries.** The Admin support-ticket snapshot lines must use `escapeHtml`; this is a real renderer fix, covered by a regression test. (H787)
 
 ## 1 · Who and what
 
@@ -207,7 +208,7 @@
 - **A page that renders nothing from a lane must not fetch it** (especially a model lane). (H651)
 - **Every lane waits IN WORDS where its content will be, through `laneWaitHtml(which, copy, longCopy, minHeight)`** — a spinner plus honest copy, the longer sentence only after `PERF_LONG_WAIT_MS` (armed by `armLaneWait`, cleared by `clearLaneWait`, one map `state.laneWaitLong` for team and personal lanes). A bare `skeleton` box on a loading lane is the recorded defect: loading and broken looked identical. A lane that FAILS renders words, never `''`. The view you deep-linked to paints BEFORE the personal lanes return (`reloadAll`). Guard: `test/lane-wait.test.js`. (H701)
 - **Controls inherit by CAPABILITY, never by enumeration:** `button, input, select, textarea { font: inherit; color: inherit }` plus one field rule for every field-like type; a per-type list (`input[type="text"]`) is how an email box became 22px of white Arial. Guarded as RENDERED with the inverse check (a control equal to its `all: revert` clone). The outside pages share `/css/style.css`, which mirrors the dashboard's tokens (executed) and ratchets literal size/weight/radius at zero; index inlines the same tokens by ruling. (H688)
-- **The background toggle is legacy on redesigned pages:** the five current redesigned views (`overview`, `team-performance`, `team-coaching`, `call-library`, `eod`) have no header switch and Account has no background checkbox; older views retain the H696 switch until redesigned. The stored `scout_bg_v1=off` preference and `data-bg="off"` rendering remain unchanged. (H782) **The top bar is 51px BY DECLARATION** — its contents cannot move it; both rendered guards pin the bar. (H697) The white date-range picker is Justin's own ruling (`.dp` tokens) — not a defect. (H688)
+- **The background toggle is legacy on redesigned pages:** the redesigned dashboard views have no header switch and Account has no background checkbox; older views retain the H696 switch until redesigned. The stored `scout_bg_v1=off` preference and `data-bg="off"` rendering remain unchanged. (H782, H787) **The top bar is 51px BY DECLARATION** — its contents cannot move it; both rendered guards pin the bar. (H697) The white date-range picker is Justin's own ruling (`.dp` tokens) — not a defect. (H688)
 - **Reveal a dialog before rendering into it;** a native `<select>` cannot stay open — use the custom control with full keyboard/aria. (H570, H344)
 - **Deleted/dead views normalise at every ENTRY point** (`setView` AND the hash map), never in a renderer; redirect, do not delete (bookmarks). (H379)
 
