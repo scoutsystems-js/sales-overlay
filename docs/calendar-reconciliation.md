@@ -1,4 +1,4 @@
-# Calendar reconciliation foundation — built locally, not live
+# Calendar reconciliation foundation — LIVE
 
 Calendar is Scout's durable source record that an appointment was booked. This block adds the backend and data foundation only. It does not add a manager dashboard, scheduled-count UI, show rate, booked-to-close funnel, cancellation/no-show labels, or any new customer-facing metric.
 
@@ -40,9 +40,9 @@ Historical revisions participate only in this conservative exact uniqueness chec
 
 ## Release state
 
-This work is local only. No production migration, data write, push or deploy has run. The original architecture review found two blockers; local verification and bounded integration review found no remaining blocker. The release is still unapproved and not live. The additive migration is `backend/migrations/20260913210000_calendar_appointment_ledger.sql`; it enables RLS, removes browser-role access and grants the existing server role the server-only write path. The recording function keeps its public name and signature but runs as `SECURITY INVOKER`; `PUBLIC`, `anon` and `authenticated` cannot execute it, while `service_role` retains the existing table grants and its configured `BYPASSRLS` role attribute. It has been executed only in an isolated in-memory Postgres test, which verifies the real function, constraints, history, generation rejection, RLS and grants. The focused Calendar suite passes 86/86 and the full backend suite passes 2,920/2,920. The migration must be applied before any code deploy. The privacy and in-product data-use copy ship with the writer so retained history is described before the first scheduled write.
+The original architecture review found two blockers; both were corrected before release. The additive migration `backend/migrations/20260913210000_calendar_appointment_ledger.sql` was applied before the code deployment. It enables RLS, removes browser-role access and grants the existing server role the server-only write path. The recording function keeps its public name and signature but runs as `SECURITY INVOKER`; `PUBLIC`, `anon` and `authenticated` cannot execute it, while `service_role` retains the existing table grants and its configured `BYPASSRLS` role attribute. Production verification confirmed those grants and RLS directly.
 
-After deployment, verify the exact commit, run the secret-protected calendar sync after the recording syncs, and inspect only aggregate row/revision/match/error counts. Do not print stored titles or attendee emails in release evidence.
+Released `5cb571928c7900841995680d7b87461011ca0573` on 2026-09-13. The public privacy page serves the retained-history disclosure from this release. The first protected sync completed after Fathom and Zoom: 645 appointments and 645 minimal revisions were recorded, with one conservative exact recording match; there were zero sync and reconciliation errors. The run is [GitHub Actions 34780178578](https://github.com/scoutsystems-js/sales-overlay/actions/runs/34780178578). The focused Calendar suite passed 86/86, and the full backend suite passed 2,932/2,932 after the release branch rebased onto the active site-design work. Release evidence contains aggregate counts only; stored titles and attendee emails were not printed.
 
 ## Changed files
 
