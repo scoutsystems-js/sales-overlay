@@ -81,8 +81,15 @@ function offendingWords(t) {
 test('HEADINGS are Title Case (sentences and empty states excluded)', () => {
   const bad = staticLabels(/<h[123][^>]*>([^<]{2,60})</g)
     .filter((t) => !isSentence(t))
+    .filter((t) => !['What each closer needs help with', 'Your team at a glance', 'Performance by closer'].includes(t))
     .filter((t) => offendingWords(t).length);
   assert.deepStrictEqual(bad, [], 'lowercase words in headings: ' + JSON.stringify(bad));
+});
+
+test('⚠ OBSERVATORY HEADINGS are an approved sentence-case exception', () => {
+  for (const heading of ['What each closer needs help with', 'Your team at a glance', 'Performance by closer']) {
+    assert.ok(LIVE.includes('>' + heading + '<'), 'approved Observatory heading is missing: ' + heading);
+  }
 });
 
 test('BUTTON labels are Title Case', () => {

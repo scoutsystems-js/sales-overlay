@@ -36,11 +36,14 @@ test('coaching layout preserves loading, errors, absent knowledge, and empty sta
 test('coaching render preserves lane dispatch and panel visibility', () => {
   const content = {}, dispatch = [];
   const state = { teamContext: {}, teamOverview: { totals: { avg_score: 68 } }, teamRecs: {}, teamCoachable: {} };
-  const render = new Function('document', 'state', 'ensureTeamDefaultRange', 'loadTeam', 'loadNotedMoments', 'teamHeaderHtml', 'teamControlsHtml', 'leadNumberHtml', 'teamPanelVisible', 'teamRecsHtml', 'teamCoachableHtml', 'allPanelsHiddenNoteHtml',
-    fnBody(live, 'renderTeamCoaching') + ';return renderTeamCoaching();');
-  render({ getElementById: () => content }, state, () => {}, lane => dispatch.push(lane), () => {}, () => 'TEAM', () => 'DATE', () => 'SCORE', () => false, () => { throw Error('hidden recommendations rendered'); }, () => { throw Error('hidden moments rendered'); }, () => 'HIDDEN');
+  const helpers = ['observatoryHudHtml', 'syncObservatoryRailClearance', 'observeObservatoryLayout', 'observatoryTitleHtml', 'observatoryScoreRingHtml', 'renderTeamCoaching']
+    .map((name) => fnBody(live, name)).join('\n');
+  const render = new Function('document', 'window', 'state', 'ensureTeamDefaultRange', 'loadTeam', 'loadNotedMoments', 'teamHeaderHtml', 'teamControlsHtml', 'leadNumberHtml', 'teamPanelVisible', 'teamRecsHtml', 'teamCoachableHtml', 'allPanelsHiddenNoteHtml', 'escapeHtml',
+    'var observatoryLayoutBound=false;var observatoryRailObserver=null;' + helpers + ';return renderTeamCoaching();');
+  render({ getElementById: () => content, querySelector: () => null }, { addEventListener() {}, matchMedia: () => ({ matches: false }) }, state, () => {}, lane => dispatch.push(lane), () => {}, () => 'TEAM', () => 'DATE', () => 'SCORE', () => false, () => { throw Error('hidden recommendations rendered'); }, () => { throw Error('hidden moments rendered'); }, () => 'HIDDEN', s => String(s));
   assert.deepEqual(dispatch, []);
-  assert.match(content.innerHTML, /TEAMDATE<div class="coaching-header-score">SCORE<\/div><\/div>/);
+  assert.match(content.innerHTML, /observatory-title-row[\s\S]*TEAM[\s\S]*observatory-controls">DATE/);
+  assert.match(content.innerHTML, /observatory-score-instrument[\s\S]*>68<\/strong>/);
   assert.match(content.innerHTML, /HIDDEN<\/div>$/);
 });
 

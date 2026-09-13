@@ -1,6 +1,24 @@
 # Scout site design: Observatory HUD
 
-Status: approved site standard, recorded 2026-09-12. Justin’s approval: “yeah i like Observatory best. update the .md file”. This is not deployed. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
+Status: approved site standard, recorded 2026-09-12; implementation is complete and verified locally; deployment verification is pending. Justin’s approval: “yeah i like Observatory best. update the .md file”. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
+
+## Production implementation scope
+
+The saved implementation applies Observatory styling only to Team → Coaching
+and Team → Performance. It preserves the existing server logic, intelligence,
+routes, metrics, permissions, data contracts, interactions, and accessibility
+behavior. Block 018's current Coaching behavior remains: one verified focus
+item and one real supporting call, with no restoration of the retired stage
+grid. Performance keeps its three existing trend charts and filters, even
+where those controls are absent from the approved static mockup. All other
+dashboard pages keep their existing production appearance. Justin confirmed on
+2026-09-13 that the mesh must be removed from these redesigned pages: the
+forest gradient is their background, with quiet HUD artwork behind opaque panels.
+
+The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,815
+backend tests pass with test concurrency limited to four. Desktop and populated
+390px phone layouts were reviewed. Deployment verification remains pending;
+see [the implementation record](docs/design/observatory-implementation.md).
 
 ## Approved visual standard
 
@@ -43,9 +61,11 @@ These are the snapshot values and words, not constants for production. “What t
 
 Justin’s approval: “yo this is perfect save it”. This approves Performance within the Observatory standard; it is a saved snapshot, not live. The [byte-exact approved source](docs/design/scout-performance-observatory-approved.html) is authoritative for the exact CSS, SVG, JS, and font; SHA-256 `322a9ce6516731c2c6537e5bfa1ee96045e6591a0652af784f8db7f85481f5ad`. The [standalone preview](docs/design/scout-performance-observatory-preview.html) is the rendered archive.
 
-Performance is active, with three glow rings fixed to the last 7 days against a report range of Aug 15–Sep 13. The page uses full-width two-column rep cards below a short nav, with 7 measured and 5 ungraded reps; actual grade, weakest objection, and stage bars; local Closing, Objections, and Grade sort with a direction toggle; responsive behavior from 320px up; and optional glow/HUD tweaks that respect reduced motion.
+Performance is active in the approved snapshot, with three glow rings fixed to the last 7 days against a report range of Aug 15–Sep 13. The page uses full-width two-column rep cards below a short nav, with 7 measured and 5 ungraded reps; actual grade, weakest objection, and stage bars; local Closing, Objections, and Grade sort with a direction toggle; responsive behavior from 320px up; and optional glow/HUD tweaks that respect reduced motion. The production implementation retains its existing three trend charts and filters below this approved snapshot composition; the static mockup does not depict those controls.
 
-No trend series are fabricated. Lower trend charts are not included and remain future design work. This save changes no production metrics, permissions, or data.
+No trend series are fabricated. The static archive excludes the lower charts;
+the implementation preserves the three existing live charts and their controls
+in an Observatory panel. Metrics, permissions, and data remain unchanged.
 
 
 ## Implementation boundary
@@ -246,4 +266,3 @@ The archive is authoritative for complete markup and embedded wordmark. These cu
 <!-- hero -->
 <div class="sc-hero"><div class="avg"><div class="ring-gauge" aria-label="Team average score 69 out of 100"><svg viewBox="0 0 100 100" role="img" aria-label="69 out of 100"><circle class="ring-ticks" cx="50" cy="50" r="48" pathLength="100"></circle><circle class="ring-track" cx="50" cy="50" r="43" pathLength="100"></circle><circle class="ring-inner" cx="50" cy="50" r="34"></circle><circle class="ring-bloom" cx="50" cy="50" r="43" pathLength="100" stroke-dasharray="69 31"></circle><circle class="ring-arc" cx="50" cy="50" r="43" pathLength="100" stroke-dasharray="69 31"></circle></svg><span>69<em>/100</em></span></div><small>TEAM AVERAGE SCORE</small></div><section class="panel focus"><header><div><label>COACHING FOCUS</label><h2>What to coach next</h2></div><small>3 focus areas</small></header><div><b>01</b><p>Partner objections are the team's most poorly handled category at 5% resolved, and the pattern…</p><i>+</i></div><div><b>02</b><p>Closing is the weakest section at 67 and the team consistently stops working the deal the moment…</p><i>+</i></div><div><b>03</b><p>The team's recurring one-thing gap is allowing calls to drift or end without locking a specific…</p><i>+</i></div></section></div>
 ```
-

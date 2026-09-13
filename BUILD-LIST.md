@@ -2,6 +2,19 @@
 
 The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Task 1 is active following Justin’s “you may begin.” Tasks 2–4 remain queued.
 
+## Current implementation — Observatory redesign (2026-09-13)
+
+**Implemented and verified locally; release verification pending.** The source is in
+`.codex/worktrees/observatory-pages`, based on origin `4269494` and preserving
+the four newer approved design commits. It covers only Team → Coaching and
+Team → Performance. Existing server logic, intelligence, routes, data
+contracts, charts, filters and interactions remain in place. Coaching keeps
+Block 018's one verified focus item and one real supporting call; the retired
+stage grid is not restored. Performance keeps its three trend charts and
+filters, including controls absent from the static mockup. Final tests and
+release verification are pending. This source is saved locally and has not
+been committed, pushed or deployed.
+
 ## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)
 
 **Completion report:** [docs/build-plans/coaching-page-integrity-completion-report.md](docs/build-plans/coaching-page-integrity-completion-report.md). Two items carried, not closed: §9 the per-cell "N graded calls" labels (folded into the deferred stage-cell decision at the end of this file) and §16/§22 adding the Block 006 stage definitions to the doctrine file (a doctrine edit; Justin's call). The bullets below are the original brief and are kept as the record.
@@ -17,9 +30,9 @@ Full user brief, preserved verbatim: [Coaching Page Integrity, Design & Stage Cl
 - Remove unnecessary explanatory copy and per-card graded-call labels only after validating the underlying logic; retain useful processing information only with a clear customer benefit. Do not relocate unnecessary copy into tooltips.
 - Validate real-call eligibility, design, coaching structure and existing approved examples. Update canonical documentation and deliver the brief's completion report. Preserve the completed broader-coaching work.
 
-### Built locally, NOT deployed — Block 018 (2026-09-12): the Team → Coaching reset
+### LIVE on origin `4269494` and Railway — Block 018 (2026-09-12): the Team → Coaching reset
 
-Justin's ruling: a manager sees only what this rep needs help with and one real call that shows it; one verified, useful call is enough. `period_summary.coaching` (lib/rep-period-coaching.js) picks the item — a stored, verified example first; the score-selected stage only breaks ties and is never shown empty; an item from another stage is shown as its own stage; one call is never a pattern; no example anywhere → "No coachable call found for these dates." The page shows WHAT TO WORK ON / WHAT TO COACH / THE CALL; the stage-score grid, the score, the diagnosis sentences, "More calls with this", "Other coaching from these calls" and the rep list's counts and labels left this view. Guard `test/coaching-one-call.test.js` (eight plants); six older guards re-pinned with their reasons; full suite 2,808/2,808. Real Sep 7–11 payload: Gabriel now shows Close · booking the follow-up with the Tracey call (was an empty priority); Godwin shows the one sentence. Awaiting architect review before any release. Record: SCOUT-SHARED-CONTEXT.md Block 018; evidence `~/Desktop/scan-reports/block-018-one-call/`.
+Justin's ruling: a manager sees only what this rep needs help with and one real call that shows it; one verified, useful call is enough. `period_summary.coaching` (lib/rep-period-coaching.js) picks the item — a stored, verified example first; the score-selected stage only breaks ties and is never shown empty; an item from another stage is shown as its own stage; one call is never a pattern; no example anywhere → "No coachable call found for these dates." The page shows WHAT TO WORK ON / WHAT TO COACH / THE CALL; the stage-score grid, the score, the diagnosis sentences, "More calls with this", "Other coaching from these calls" and the rep list's counts and labels left this view. Guard `test/coaching-one-call.test.js` (eight plants); six older guards re-pinned with their reasons; full suite 2,808/2,808. Real Sep 7–11 payload: Gabriel now shows Close · booking the follow-up with the Tracey call (was an empty priority); Godwin shows the one sentence. This historical record is now reflected in the live `4269494` base; the Observatory redesign above remains pending review and release verification. Record: SCOUT-SHARED-CONTEXT.md Block 018; evidence `~/Desktop/scan-reports/block-018-one-call/`.
 
 ### Current checkpoint — LIVE since September 12, 2026 (1397656, Blocks 001–017)
 

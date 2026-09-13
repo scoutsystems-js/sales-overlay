@@ -10,16 +10,18 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const { fnBody } = require('./helpers/strip-comments');
 
 const H = fs.readFileSync(path.join(__dirname, '..', 'web', 'dashboard.html'), 'utf8');
 
 function gauge() {
   const a = H.indexOf('  var AVG_SWEEP_DEG');
-  const b = H.indexOf('\n  function avgCardHtml');
+  const b = H.indexOf('\n  function avgPoint', a);
   assert.ok(a !== -1 && b > a, 'stale anchors');
-  const src = H.slice(a, b);                       // ⚠ raw source: comments are fine to run
-  assert.ok(src.length > 2000 && src.length < 9000, 'slice must cover it: ' + src.length);
-  return new Function(src + '; return avgGaugeSvg;')();
+  const constants = H.slice(a, b);                  // ⚠ raw source: comments are fine to run
+  const src = ['avgPoint', 'avgArc', 'avgFraction', 'avgAngle', 'avgLitCount', 'avgGaugeSvg']
+    .map((name) => fnBody(H, name)).join('\n');
+  return new Function(constants + '\n' + src + '; return avgGaugeSvg;')();
 }
 
 const CASES = [[24, 25, 50], [31, 35, 100], [41.7, 60, 90]];
@@ -34,8 +36,7 @@ test('every dial labels its target, with the target\'s own number', () => {
 });
 
 test('⚠ the label is drawn from the notch\'s OWN angle, never a second computation', () => {
-  const a = H.indexOf('  function avgGaugeSvg');
-  const fn = H.slice(a, H.indexOf('\n  }', H.indexOf('avg-notch-label', a)));
+  const fn = fnBody(H, 'avgGaugeSvg');
   assert.ok(fn.length > 400, 'slice: ' + fn.length);
   /* ⚠⚠ CONVERTED 2026-09-01: the notch became a LOOP when `avg_call_time` became a
      BAND — a metric with two edges gets two notches, because one mark on a metric
@@ -75,7 +76,7 @@ test('⚠ the notch still CROSSES the ring band — .avg-seg is stroke-width 12 
   const css = H.match(/\.avg-seg \{[^}]*stroke-width:\s*(\d+)/);
   assert.ok(css, 'stale anchor — .avg-seg stroke-width');
   const half = Number(css[1]) / 2;
-  const fn = H.slice(H.indexOf('  function avgGaugeSvg'), H.indexOf('\n  function avgCardHtml'));
+  const fn = fnBody(H, 'avgGaugeSvg');
   /* ⚠ CONVERTED with the loop — the endpoints are now computed per edge. The
      property is unchanged: the tip must clear the ring band's outer edge. */
   const tip = fn.match(/avgPoint\(cx, cy, rOuter - 10, a\), p1 = avgPoint\(cx, cy, rOuter \+ (\d+), a\)/);

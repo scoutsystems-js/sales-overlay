@@ -82,7 +82,7 @@ test('⚠ bandSideOf mirrors lib/metric-band sideOf on every edge — the edges 
 
 test('⚠⚠ PLACEMENT: gauges → cards → graphs, and the three score lists are gone', () => {
   const fn = fnBody(LIVE, 'renderTeamPerformance');
-  const body = fn.slice(fn.indexOf('content.innerHTML =\n      teamHeaderHtml()'));   // the main body, not the drill branch
+  const body = fn.slice(fn.lastIndexOf('content.innerHTML ='));   // main assembly, after the drill branch.
   const g = body.indexOf('avgPanelHtml()'), c = body.indexOf('teamControlsHtml()'), r = body.indexOf('repCardsHtml()'), s = body.indexOf('repSeriesSectionHtml()');
   assert.ok(g > 0 && c > g && r > c && s > r, 'order gauges < controls < cards < graphs: ' + [g, c, r, s]);
   assert.strictEqual((LIVE.match(/teamScoreListHtml\(/g) || []).length, 0, 'the three score lists are retired');
