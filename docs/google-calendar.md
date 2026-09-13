@@ -14,12 +14,14 @@ Justin authorized Codex to build this directly on September 13, 2026. Google Cal
 
 The former title filter, calendar picker, preview/save form, scheduled-sales-call count, manager team route and My Team calendar entry are removed. There is no background sync, calendar history, bulk harvest, GHL API connection, recording match, webhook or model call.
 
-## Current release gates
+## Test release and remaining live-user checks
+
+Justin authorized wiring and releasing this private inspection flow so Josh can connect. The dedicated Google project, read-only consent scopes, web client and exact production callback are configured. Production variables are saved, and the additive migration is applied with both tables empty and browser access denied. This is test-ready infrastructure, not a verified real Google connection or a sales-booking tracker.
 
 1. A legitimate user must be added to the Google app's test users and personally authorize the connection. Never mint another user's Scout session.
 2. Inspect real GHL and non-GHL events in that user's private view. Record which Google fields actually distinguish the source before designing any sales-appointment rule.
 3. Verify connect → automatic primary-calendar inspection → date change → disconnect with real events. No fixture is evidence that a GHL marker exists.
-4. Use the normal drain, integration, deployed-commit and served-marker checks for release. This document grants no deployment authority.
+4. Use the normal drain, integration, deployed-commit and served-marker checks to release the connection button. The real-user checks above follow that test release; they still gate any claim that real calendar reading or sales-appointment identification works.
 
 ## Google setup
 
