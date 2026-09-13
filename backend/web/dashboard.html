@@ -6853,6 +6853,59 @@
     @media(max-width:900px) { body[data-view="team"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; } body[data-view="team"] .sidebar { position:relative; top:auto; left:auto; z-index:2; width:auto; margin-bottom:14px; } body[data-view="team"] .team-digest-observatory { grid-template-columns:1fr; } body[data-view="team"] .team-digest-main { grid-column:1; } }
     @media(max-width:620px) { body[data-view="team"] .team-digest-observatory .page-header, body[data-view="team"] .team-digest-panel { padding:28px 16px 16px; } body[data-view="team"] .team-digest-observatory .page-header--company { align-items:stretch; flex-direction:column; } body[data-view="team"] .team-digest-observatory .page-header--company .page-header-side { flex-basis:auto; width:100%; } }
 
+    /* Team Objections Observatory pass. The grid stays beside the navigation
+       rail; its explanatory and evidence panels span the page below that rail. */
+    body[data-view="team-objections"] {
+      --observatory-objections-panel:linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42));
+      --observatory-objections-edge:rgba(118,255,171,.36);
+      --observatory-objections-line:rgba(190,247,214,.18);
+      --observatory-visor-card-radius:14px;
+      --observatory-objections-radius:var(--observatory-visor-card-radius);
+      --observatory-objections-title-size:34px;
+      --sidebar-w:190px;
+      --accent:#09d543;
+      --accent-rgb:9,213,67;
+      background:radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%);
+      background-attachment:fixed;
+    }
+    body[data-view="team-objections"]::before, body[data-view="team-objections"]::after { content:""; position:fixed; z-index:0; pointer-events:none; opacity:1; background:none; -webkit-mask:none; mask:none; border:1px solid var(--observatory-objections-contour,rgba(125,255,179,.14)); }
+    body[data-view="team-objections"]::before { inset:auto; width:62%; height:78%; left:8%; top:2%; border-radius:48% 52% 45% 55%; transform:rotate(-18deg); }
+    body[data-view="team-objections"]::after { width:78%; height:72%; right:-14%; bottom:-26%; border-radius:50%; }
+    html[data-bg="off"] body[data-view="team-objections"] { --observatory-objections-contour:transparent; background:#090a0b; }
+    html[data-bg="off"] body[data-view="team-objections"]::after { display:none; }
+    body[data-view="team-objections"] #bgSwitch { display:none; }
+    body[data-view="team-objections"] .top-bar { background:#090a0b; border-bottom-color:rgba(219,239,226,.13); }
+    body[data-view="team-objections"] .page { position:relative; z-index:1; width:auto; max-width:calc(100vw - 48px); margin:0 auto; padding:24px 0 72px; background:transparent; }
+    body[data-view="team-objections"] .sidebar { position:absolute; top:67px; left:24px; width:var(--sidebar-w); max-height:none; overflow:visible; border:1px solid var(--observatory-objections-line); border-radius:var(--observatory-objections-radius); background:rgba(5,20,11,.78); box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.42); }
+    body[data-view="team-objections"] .sidebar .nav-link.nav-active, body[data-view="team-objections"] .workspace-team-link.is-current { border:1px solid rgba(211,237,217,.52); border-left:2px solid var(--accent); border-radius:var(--observatory-objections-radius); background:linear-gradient(100deg,#1b4527,#112617); color:var(--text); box-shadow:0 0 16px rgba(var(--accent-rgb),.24); }
+    body[data-view="team-objections"] .workspace-team-link.is-current { padding-left:9px; }
+    body[data-view="team-objections"] .observatory-objections { position:relative; display:grid; grid-template-columns:var(--sidebar-w) minmax(0,1fr); column-gap:22px; row-gap:14px; min-width:0; }
+    body[data-view="team-objections"] .observatory-objections>.observatory-upper { grid-column:2; min-width:0; }
+    body[data-view="team-objections"] .observatory-objections>.observatory-objections-panel { grid-column:1/-1; min-width:0; }
+    body[data-view="team-objections"] .observatory-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin:0 0 18px; padding:0 3px 15px; border-bottom:1px solid rgba(215,236,222,.12); }
+    body[data-view="team-objections"] .observatory-title-row h2 { margin:4px 0 0; font-size:var(--observatory-objections-title-size); font-weight:var(--fw-normal); line-height:1; letter-spacing:-.045em; }
+    body[data-view="team-objections"] .observatory-eyebrow { color:var(--accent); font-size:var(--fs-eyebrow); font-weight:var(--fw-emphasis); letter-spacing:.17em; text-transform:uppercase; }
+    body[data-view="team-objections"] .observatory-company .page-header { display:flex; align-items:center; gap:12px; margin:0; padding:0; border:0; background:transparent; }
+    body[data-view="team-objections"] .observatory-company .page-header-main { width:auto; padding:0; text-align:right; }
+    body[data-view="team-objections"] .observatory-company .page-header-main h1 { font-size:var(--fs-secondary); font-weight:var(--fw-emphasis); letter-spacing:.05em; }
+    body[data-view="team-objections"] .observatory-company .page-header-side { position:static; margin:0; transform:none; }
+    body[data-view="team-objections"] .observatory-objections-panel { position:relative; overflow:visible; margin:0!important; padding:30px 20px 18px!important; border:1px solid var(--observatory-objections-edge)!important; border-radius:var(--observatory-objections-radius)!important; background:var(--observatory-objections-panel)!important; box-shadow:inset 0 1px 0 rgba(231,255,240,.12),0 0 28px rgba(18,222,96,.06)!important; }
+    body[data-view="team-objections"] .observatory-objections-panel::before { content:""; position:absolute; top:14px; left:18px; width:42px; height:1px; box-sizing:content-box; padding:0; border:0; border-radius:0; background:#71ffad; box-shadow:0 0 9px rgba(77,255,148,.7); }
+    body[data-view="team-objections"] .observatory-objections-grid-panel { z-index:20; }
+    body[data-view="team-objections"] .observatory-objections-why-panel, body[data-view="team-objections"] .observatory-objections-moments-panel { z-index:2; }
+    body[data-view="team-objections"] .observatory-objections-panel .section-header { margin-bottom:14px; }
+    body[data-view="team-objections"] .observatory-objections-panel .empty { background:transparent; border:0; }
+    body[data-view="team-objections"] .objdrill-controls { position:relative; z-index:70; margin-bottom:16px; padding-bottom:14px; border-bottom-color:var(--observatory-objections-line); }
+    body[data-view="team-objections"] .objdrill-controls .date-presets, body[data-view="team-objections"] .observatory-company .user-select { --bg-field:rgba(2,16,8,.58); background:rgba(2,16,8,.58); border-color:rgba(174,241,199,.24); }
+    body[data-view="team-objections"] .dp-panel { z-index:80; }
+    body[data-view="team-objections"] .obj-grid { max-width:100%; overflow-x:auto; overscroll-behavior-inline:contain; }
+    body[data-view="team-objections"] .obj-grid-row, body[data-view="team-objections"] .obj-grid-head { min-width:690px; }
+    body[data-view="team-objections"] .observatory-objections-why-panel .objsum-card { padding-top:18px; padding-bottom:20px; border-top-color:var(--observatory-objections-line); }
+    body[data-view="team-objections"] .observatory-objections-why-panel .objsum-card:first-of-type { padding-top:4px; }
+    body[data-view="team-objections"] .observatory-objections-moments-panel .pattern-card { padding:18px 0; border-bottom-color:var(--observatory-objections-line); }
+    @media(max-width:900px) { body[data-view="team-objections"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; } body[data-view="team-objections"] .sidebar { position:relative; top:auto; left:auto; z-index:2; width:auto; margin-bottom:14px; } body[data-view="team-objections"] .observatory-objections { grid-template-columns:1fr; } body[data-view="team-objections"] .observatory-objections>.observatory-upper, body[data-view="team-objections"] .observatory-objections>.observatory-objections-panel { grid-column:1; } }
+    @media(max-width:620px) { body[data-view="team-objections"] .observatory-title-row { flex-direction:column; gap:12px; } body[data-view="team-objections"] .observatory-company, body[data-view="team-objections"] .observatory-company .page-header, body[data-view="team-objections"] .observatory-company .page-header-side, body[data-view="team-objections"] .observatory-company .user-select { width:100%; min-width:0; } body[data-view="team-objections"] .observatory-company .page-header { align-items:stretch; flex-direction:column; } body[data-view="team-objections"] .observatory-company .page-header-main { text-align:left; } body[data-view="team-objections"] .observatory-objections-panel { padding:28px 16px 16px!important; } body[data-view="team-objections"] .observatory-objections-panel .section-header { align-items:flex-start; flex-wrap:wrap; gap:10px; } body[data-view="team-objections"] .observatory-objections-moments-panel .section-header { flex-direction:column; } body[data-view="team-objections"] .observatory-objections-moments-panel .date-presets { width:100%; flex-wrap:wrap; } body[data-view="team-objections"] .objdrill-controls { align-items:stretch; flex-direction:column; } body[data-view="team-objections"] .objdrill-controls>*, body[data-view="team-objections"] .objdrill-controls .date-presets { width:100%; max-width:100%; } body[data-view="team-objections"] .objdrill-controls .dp { width:100%; } body[data-view="team-objections"] .objdrill-controls .dp-panel { right:auto; left:0; } body[data-view="team-objections"] .obj-card-head { align-items:flex-start; } body[data-view="team-objections"] .obj-callmeta { width:100%; margin-left:0; } }
+
     @media(prefers-reduced-motion:reduce) {
       body[data-view="team-performance"] .observatory-hud-orbit,
       body[data-view="team-performance"] .observatory-hud-dot,
@@ -12674,8 +12727,8 @@
     /* ⚠ NO teamControlsHtml() HERE — the controls moved INTO the card below.
        That also removes Manage Members and Customize View from this page, which
        is deliberate: they act on the team, not on this breakdown. */
-    content.innerHTML = teamHeaderHtml()
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Per-Closer Objection Handling</h2>'
+    var objectionsHeader = observatoryTitleHtml('Objections');
+    var handlingPanel = '<div class="section fade-in observatory-objections-panel observatory-objections-grid-panel"><div class="section-header"><div><h2>Per-Closer Objection Handling</h2>'
         + '<div class="meta">how each closer is dealing with each objection</div></div>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + objDrillControlsHtml()
@@ -12693,18 +12746,22 @@
           var rate = (t && typeof t.rate === 'number') ? t.rate + '%' : null;
           return leadNumberHtml(rate, 'Objections handled');
         })()
-        + teamObjGridHtml() + '</div>'
+        + teamObjGridHtml() + '</div>';
       /* ⚠ THE SUMMARY SITS BETWEEN THE GRID AND THE MOMENTS DELIBERATELY. It
          explains the grid directly above it and is evidenced by the moments
          directly below it, so a manager can check the claim in both directions
          without leaving the screen. */
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Why</h2>'
+    var whyPanel = '<div class="section fade-in observatory-objections-panel observatory-objections-why-panel"><div class="section-header"><div><h2>Why</h2>'
         + '<div class="meta">what is behind those numbers, per closer</div></div></div>'
-        + teamObjSummaryHtml() + '</div>'
-      + '<div class="section fade-in"><div class="section-header"><div><h2>Objection Moments</h2>'
+        + teamObjSummaryHtml() + '</div>';
+    var momentsPanel = '<div class="section fade-in observatory-objections-panel observatory-objections-moments-panel"><div class="section-header"><div><h2>Objection Moments</h2>'
         + '<div class="meta">' + escapeHtml(teamObjFeedMeta()) + '</div></div>'
         + teamObjCategoryChipsHtml() + '</div>'
         + teamObjFeedHtml() + '</div>';
+    content.innerHTML = '<div class="observatory-page observatory-objections">'
+      + '<div class="observatory-upper">' + objectionsHeader + handlingPanel + '</div>'
+      + whyPanel + momentsPanel + '</div>';
+    observeObservatoryLayout();
   }
 
   /**

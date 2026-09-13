@@ -21,7 +21,11 @@ Evidence and final release status: `~/Desktop/scan-reports/observatory-2026-09-1
 
 ## Background control removal — September 13, 2026
 
-**Implemented; final deployment verification for the first five views is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`; Daily Digest verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`. Overview, Team Performance, Team Coaching, Calls, EOD and Daily Digest no longer show the header background switch or Account Display checkbox. Older views retain the legacy header control until redesigned. The stored off preference, first-paint `data-bg="off"` application, background-off rendering and reduced-motion behavior are unchanged; this is a controls-only change.
+**Implemented; final deployment verification for the first five views is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-controls/release-status.md`; Daily Digest verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`. Team Objections verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-objections/release-status.md`. Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest and Team Objections no longer show the header background switch or Account Display checkbox. Older views retain the legacy header control until redesigned. The stored off preference, first-paint `data-bg="off"` application, background-off rendering and reduced-motion behavior are unchanged; this is a controls-only change.
+
+## Team Objections visual rollout — September 13, 2026
+
+**Implemented; final deployment verification is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-objections/release-status.md`. Team Objections uses the approved Observatory fixed ground, contours and glass outer panels. Preserve the handling grid and counts, existing date/team/rep/category filters, Why before moments, recording/call-review/Fine Tune actions, grid-before-summary loading and transparent inner evidence rows. No metric, intelligence or data-contract change.
 
 ## Daily Digest visual rollout — September 13, 2026
 

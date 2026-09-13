@@ -25,7 +25,7 @@ test('⚠⚠ (e) a TIMESTAMP, not a percentage — and the payload carries one',
   assert.ok(/% through the call/.test(page), 'the fallback is still there for calls with no duration');
 });
 
-test('⚠⚠ (a) the objections page has NO cards — and the rules are SCOPED to it', () => {
+test('⚠⚠ (a) the objections page keeps its inner rows uncarded inside the outer Observatory panels', () => {
   const live = strip(HTML);
   const rules = ['.objsum-card', '.objsum-ev', '.nw-context'];
   rules.forEach((sel) => {

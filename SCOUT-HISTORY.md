@@ -8059,3 +8059,6 @@ The header switch and Account Display checkbox are removed from redesigned Overv
 
 ## [H783] Daily Digest joins the Observatory presentation scope — September 13, 2026
 Daily Digest’s Observatory pass changes presentation only: its fixed-day cached report, bounded previous/next navigation, selected team, counts, notable evidence links and focus text remain unchanged. Use the approved fixed gradient, contours and glass panels; do not add a gauge or date-range picker. Final verification: `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`.
+
+## [H784] Team Objections joins the Observatory presentation scope — September 13, 2026
+Team Objections uses approved Observatory fixed ground, contours and glass outer panels. Preserve handling grid/counts, existing date/team/rep/category filters, Why before moments, recording/call-review/Fine Tune actions, and grid-before-summary loading; inner evidence rows remain transparent. No metric, intelligence or data-contract change.

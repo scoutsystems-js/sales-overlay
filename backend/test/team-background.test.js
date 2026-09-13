@@ -81,6 +81,8 @@ test('⚠⚠ ONLY THE APPROVED OBSERVATORY VIEWS MAY OVERRIDE THE BASE PAINT', (
     'body[data-view="team"]::before',
     'body[data-view="team"]::before',
     'body[data-view="team-coaching"]::before',
+    'body[data-view="team-objections"]::before',
+    'body[data-view="team-objections"]::before',
     'body[data-view="team-performance"]::before',
   ], 'only approved Observatory pages may have a page-specific ground rule; found ' + perView.join(', '));
   const approvedRule = LIVE.match(/body\[data-view="team-performance"\]::before\s*,\s*body\[data-view="team-coaching"\]::before\s*,\s*body\[data-view="overview"\]::before\s*\{[^}]*\}/);
@@ -103,13 +105,20 @@ test('⚠⚠ ONLY THE APPROVED OBSERVATORY VIEWS MAY OVERRIDE THE BASE PAINT', (
   const teamBefore = LIVE.match(/body\[data-view="team"\]::before\s*\{[^}]*\}/);
   assert.ok(teamBefore && /width:\s*62%/.test(teamBefore[0]) && /transform:\s*rotate\(-18deg\)/.test(teamBefore[0]),
     'Daily Digest keeps the approved first contour geometry');
+  const objectionsContour = LIVE.match(/body\[data-view="team-objections"\]::before\s*,\s*body\[data-view="team-objections"\]::after\s*\{[^}]*\}/);
+  assert.ok(objectionsContour && /position:\s*fixed/.test(objectionsContour[0]) && /pointer-events:\s*none/.test(objectionsContour[0]),
+    'Team Objections keeps its reviewed fixed, non-interactive contour layer');
+  const objectionsBefore = LIVE.match(/body\[data-view="team-objections"\]::before\s*\{[^}]*\}/);
+  assert.ok(objectionsBefore && /width:\s*62%/.test(objectionsBefore[0]) && /transform:\s*rotate\(-18deg\)/.test(objectionsBefore[0]),
+    'Team Objections keeps the approved first contour geometry');
   const bgOffBase = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view\]::before\s*\{[^}]*\}/);
   const callsBgOff = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view="call-library"\]::after\s*\{[^}]*\}/);
   const eodBgOff = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view="eod"\]::after\s*\{[^}]*\}/);
   const teamBgOff = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view="team"\]::after\s*\{[^}]*\}/);
-  assert.ok(bgOffBase && /display:\s*none/.test(bgOffBase[0]) && callsBgOff && /display:\s*none/.test(callsBgOff[0]) && eodBgOff && /display:\s*none/.test(eodBgOff[0]) && teamBgOff && /display:\s*none/.test(teamBgOff[0]),
-    'Calls, EOD, and Daily Digest background-off remove both reviewed contours');
-  const unapproved = /body\[data-view="(?!(?:team-coaching|team-performance|overview|call-library|eod|team)"\])[a-z-]+"\]::before/g;
+  const objectionsBgOff = LIVE.match(/html\[data-bg="off"\]\s+body\[data-view="team-objections"\]::after\s*\{[^}]*\}/);
+  assert.ok(bgOffBase && /display:\s*none/.test(bgOffBase[0]) && callsBgOff && /display:\s*none/.test(callsBgOff[0]) && eodBgOff && /display:\s*none/.test(eodBgOff[0]) && teamBgOff && /display:\s*none/.test(teamBgOff[0]) && objectionsBgOff && /display:\s*none/.test(objectionsBgOff[0]),
+    'Calls, EOD, Daily Digest, and Team Objections background-off remove both reviewed contours');
+  const unapproved = /body\[data-view="(?!(?:team-coaching|team-performance|team-objections|overview|call-library|eod|team)"\])[a-z-]+"\]::before/g;
   assert.strictEqual((LIVE.match(unapproved) || []).length, 0,
     'unapproved pages must not get a ground override');
   // ⚠ NON-VACUITY — the matcher must be able to find one. Assert it fires

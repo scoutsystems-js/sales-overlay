@@ -121,7 +121,7 @@ test('⚠⚠ the drilldown renders its controls IN the card, and drops the team-
     'the strip above the card must be gone — that is what removes Manage Members and Customize View');
 
   // ⚠ CUT-TOO-DEEP CHECK: the card and its contents must survive the move.
-  ['teamObjGridHtml()', 'teamObjSummaryHtml()', 'teamObjFeedHtml()', 'teamHeaderHtml()'].forEach((m) => {
+  ['teamObjGridHtml()', 'teamObjSummaryHtml()', 'teamObjFeedHtml()', "observatoryTitleHtml('Objections')"].forEach((m) => {
     assert.ok(view.indexOf(m) !== -1, m + ' must survive the toolbar move');
   });
 
