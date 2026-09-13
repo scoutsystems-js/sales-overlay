@@ -24,6 +24,8 @@ The existing additive migration was applied separately: its tables have RLS and 
 
 **Visor standard implemented and verified: 2,885/2,885 integrated tests pass.** Lock the fixed forest-gradient/HUD ground, translucent softly glowing cards and free-floating animated Visor gauges in `site-design.md`. Apply to personal Coaching Dashboard and Team Performance, with existing metric-dependent semantic bands. Team Performance keeps its three current metrics and fixed seven-day window; other page behavior stays intact. Verification/release record: `docs/design/observatory-implementation.md` and `~/Desktop/scan-reports/observatory-2026-09-13/visor-standard/`.
 
+**Compact Visor size correction verified (September 13):** restored the exact artwork at 216px standard / 244px Overview Closing lead, with 152px through 900px and 216px stacked phone gauges (168px lead at the intermediate breakpoint). Size only; preserve geometry, tokens, motion, layering and logic. Full suite 2,885/2,885 passes, zero skipped; desktop and phone review passes. Exact deployment/live status: `~/Desktop/scan-reports/observatory-2026-09-13/visor-size/release-status.md`.
+
 
 Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
 

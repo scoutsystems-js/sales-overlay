@@ -75,7 +75,7 @@ test('overview uses three real glowing instruments in the requested order and ke
       metrics: metrics.map((node) => { const ring = node.querySelector('.observatory-visor-gauge'); return { action: node.getAttribute('onclick'), ring: !!ring, ringWidth: ring && ring.getBoundingClientRect().width }; }),
       closeLink: closingLink && { tag: closingLink.tagName, href: closingLink.getAttribute('href'), action: closingLink.getAttribute('onclick'), callsNavigationCount, callsNavigationPrevented },
       closeRingWidth: close.querySelector('.observatory-visor-gauge').getBoundingClientRect().width,
-      ringCenters: [close.querySelector('.observatory-visor-gauge'), ...metrics.map((node) => node.querySelector('.observatory-visor-gauge'))].map((ring) => { const rect = ring.getBoundingClientRect(); return rect.top + rect.height / 2; }),
+      ringTops: [close.querySelector('.observatory-visor-gauge'), ...metrics.map((node) => node.querySelector('.observatory-visor-gauge'))].map((ring) => ring.getBoundingClientRect().top),
       trendBelowRing: !!document.querySelector('.observatory-metric-trend .glance-trend'),
       focusInUpper: focus.parentElement.classList.contains('observatory-upper'),
       focusStartsAfterHero: focusRect.top >= heroRect.bottom && focusRect.top - heroRect.bottom <= 32,
@@ -99,8 +99,9 @@ test('overview uses three real glowing instruments in the requested order and ke
   assert.deepEqual(desktop.metrics.map((metric) => metric.action), ['goObjections()', "drillCalls('analyzed','score')"], 'OHR and score keep their existing drill actions');
   desktop.metrics.forEach((metric) => assert.ok(metric.ring, 'each supporting metric must render a ring, not text-only tile'));
   assert.deepEqual(desktop.closeLink, { tag: 'A', href: '#call-library', action: 'goCallLibrary(); return false;', callsNavigationCount: 1, callsNavigationPrevented: true }, 'Closing must use the regular Calls-page navigation');
-  assert.ok(Math.abs(desktop.closeRingWidth - desktop.metrics[0].ringWidth) <= 1, 'the faithful source uses equally sized Visor instruments');
-  desktop.ringCenters.forEach((center) => assert.ok(Math.abs(center - desktop.ringCenters[0]) <= 1, 'all three desktop rings share one visual centerline'));
+  assert.ok(Math.abs(desktop.closeRingWidth - 244) <= 1, 'Closing restores its earlier 244px desktop bounding width');
+  desktop.metrics.forEach((metric) => assert.ok(Math.abs(metric.ringWidth - 216) <= 1, 'support gauges restore their earlier 216px desktop bounding width'));
+  desktop.ringTops.forEach((top) => assert.ok(Math.abs(top - desktop.ringTops[0]) <= 1, 'the restored unequal bounds keep all three gauges aligned at their top edge'));
   assert.equal(desktop.trendBelowRing, true, 'the existing score trend remains present below its instrument');
   assert.equal(desktop.focusInUpper, true, 'focus panels sit directly below the gauges in the main column');
   assert.equal(desktop.focusStartsAfterHero, true, 'focus panels begin immediately after the hero');

@@ -28,6 +28,8 @@ Selected menu and selected member share the approved treatment: sage outline, 2p
 
 The gauge copies the approved artwork directly. It is an open 270-degree horseshoe, free-floating without a rectangular card, with these required layers:
 
+**Current size calibration (September 13, in progress):** the exact artwork is being returned to its compact pre-expansion dimensions: 216px standard gauges, 244px Overview Closing lead, 152px at widths up to 900px, and 216px for the stacked phone treatment (168px for the lead at the intermediate breakpoint). This changes size only; geometry, tokens, motion, layering and data behavior stay as specified below.
+
 - Main track: radius 125, stroke width 15, `rgba(171,224,194,.18)`.
 - Bloom: same path, width 23, `rgba(9,213,67,.42)`, blur 5px.
 - Main green progress: width 15, `#09d543`; shadows `0 0 5px rgba(70,255,131,.88)` and `0 0 14px rgba(9,213,67,.46)`.
@@ -36,7 +38,7 @@ The gauge copies the approved artwork directly. It is an open 270-degree horsesh
 - Exact angular brackets, stroke 1.25 in `rgba(198,255,220,.8)`; filled triangle `M163 108 H177 L170 120 Z` and filled underline `M150 222 H190 V225 H150 Z`, both mint with the approved glow. Never replace the triangle with an outline chevron.
 - Two rotating contour paths at radii 150 and 164 with dashed and fine dotted treatments, plus 34 open-arc ticks. Every fifth tick is major. Tick lengths, strokes, phase and paths come from the archive.
 
-Use the original pale `#f1fff7` numeric text, Saira weight 400 and 70-unit size (65 for the archive's compact percentage). Preserve the full-size percentage sign used by the reference where it fits; smaller units and bounded compression are reserved for genuinely long live readouts. Gauge width reaches 330px when space allows, with responsive scaling and a 300px phone maximum. Do not shrink it to a 216px desktop dial. Labels and counts follow the archive's weight, letter spacing and 12px copy gap, in readable HTML below the graphic. Narrow phones stack complete gauges. No whole-gauge blur/filter substitutes for the separately drawn glow layers.
+Use the original pale `#f1fff7` numeric text, Saira weight 400 and 70-unit size (65 for the archive's compact percentage). Preserve the full-size percentage sign used by the reference where it fits; smaller units and bounded compression are reserved for genuinely long live readouts. Current compact implementation sizes are 216px standard, 244px for the Overview Closing lead, 152px through the intermediate breakpoint, and 216px for the stacked phone treatment (168px for the lead at that breakpoint). Labels and counts follow the archive's weight, letter spacing and 12px copy gap, in readable HTML below the graphic. Narrow phones stack complete gauges. No whole-gauge blur/filter substitutes for the separately drawn glow layers.
 
 Only the outer micro hash marks and broken contour lines rotate: ticks clockwise once every 80 seconds, contours counterclockwise once every 110 seconds. Use the archive's starting phases: ticks 0/−21/−46 seconds; contours 0/−37/−12 seconds, with the archive's per-gauge tick angle offset. The number, progress arc, brackets, labels, scale and target marks never rotate. Reduced motion freezes the decorative loops. The entire rotation must fit within the gauge bounds at every angle without touching the captions. Keep glow soft and movement slow; no pulsing numbers or sweeping progress animations.
 

@@ -6336,9 +6336,11 @@
     }
     body[data-view="overview"] .observatory-visor-gauge,
     body[data-view="team-performance"] .observatory-visor-gauge {
-      width:min(330px,100%); max-width:330px; height:auto; aspect-ratio:340 / 348; color:var(--visor-tone); filter:none;
+      width:min(216px,100%); max-width:216px; height:auto; aspect-ratio:340 / 348; color:var(--visor-tone); filter:none;
     }
-    body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge { width:min(330px,100%); height:auto; }
+    body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge { width:min(244px,100%); max-width:244px; height:auto; }
+    body[data-view="overview"] .observatory-visor-gauge svg,
+    body[data-view="team-performance"] .observatory-visor-gauge svg { height:auto; aspect-ratio:340 / 348; }
     body[data-view="overview"] .observatory-overview .glance-tile { grid-template-rows:auto auto; min-height:0; }
     body[data-view="overview"] .observatory-close-instrument { min-height:0; }
     body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { margin-top:0; }
@@ -6403,11 +6405,16 @@
     body[data-view="overview"] .observatory-close-instrument .lead-number-label { margin-top:12px; }
     body[data-view="team-performance"] .observatory-instrument-copy .avg-name { margin-top:0; }
     body[data-view="team-performance"] .observatory-instrument-copy .avg-counts { letter-spacing:.28px; }
+    @media(max-width:900px) {
+      body[data-view="overview"] .observatory-visor-gauge,
+      body[data-view="team-performance"] .observatory-visor-gauge { width:min(152px,100%); max-width:152px; }
+      body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge { width:min(168px,100%); max-width:168px; }
+    }
     @media(max-width:620px) {
       body[data-view="overview"] .observatory-visor-gauge,
-      body[data-view="team-performance"] .observatory-visor-gauge { width:min(300px,100%); max-width:300px; }
+      body[data-view="team-performance"] .observatory-visor-gauge { width:min(216px,100%); max-width:216px; }
       body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge,
-      body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { width:min(300px,100%); height:auto; }
+      body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { width:min(216px,100%); max-width:216px; height:auto; }
       body[data-view="overview"] .observatory-overview .glance-tile,
       body[data-view="overview"] .observatory-close-instrument { grid-template-rows:auto auto; min-height:0; }
       body[data-view="team-performance"] .observatory-instrument { min-height:0; }
