@@ -1,30 +1,37 @@
-# Google Calendar — local implementation, not released
+# Google Calendar — private inspection, not released
 
-Justin authorized Codex to build this directly on September 13, 2026. Google Calendar only; appointments originate in GHL. He confirmed that calendars contain a mixture of sales, internal and personal events. Site design is owned by the separate Observatory workstream.
+Justin authorized Codex to build this directly on September 13, 2026. Google Calendar only; GHL appointments arrive on calendars that also contain personal and internal events. Their titles are normally prospect names, so this version deliberately does not classify or count sales calls.
 
 ## What this version does
 
-- My Account → Connections → Connect Google Calendar / Manage Calendar.
-- My Team → Scheduled Calls, with the selected team passed through and resolved again on the server.
-- A closer selects one readable Google calendar and enters a literal phrase used in sales appointment titles. Case is ignored; regex is not supported. A preview shows matches before the closer confirms sharing those matching titles and times with their manager. Editing the rule clears its preview.
-- The page reads Google when opened, when dates/scope change, and when Refresh Calls is pressed. One appointment is enough. Each manager sees only their team, including themselves; inactive reps are omitted. Owners retain the existing server-resolved team rules.
-- Dates refer to appointment start dates in each calendar's current time zone. Recurring instances are expanded; IDs deduplicate repeated instances. Cancelled, declined, all-day and non-appointment event types are excluded. Each complete read replaces one saved snapshot, so moved/cancelled events do not accumulate as duplicate rows.
-- A failed, disconnected or unfinished connection has no count, not zero. Zero means a complete Google read found no matching appointments. Incomplete pagination fails rather than publishing a partial number.
+- My Account shows a short read-only/private-use disclosure and starts Google sign-in directly from **Connect Google Calendar**. A connected user gets **Manage Calendar**.
+- After the callback, Scout automatically reads the connected user's primary calendar for today through six days ahead. The user may inspect any inclusive range up to 14 days.
+- The page calls every row a **calendar event** and explicitly says the total is not a sales-call count. Event details stay collapsed until the user opens one.
+- The inspection exposes an allowlisted set of details useful for finding a reliable GHL marker: title, description, location, status/type, start/end, organizer, creator, attendee identity/status, source title/host, conference provider, recurrence, timestamps, visibility, availability and extended-property key names.
+- Provider links, meeting entry points, event identifiers, extended-property values and token-like values do not reach the page. Every displayed value is escaped.
+- Event details are read on demand and returned only to the authenticated user whose encrypted Google connection is used. They are not saved to Scout's database, logged, sent to AI, shared with a manager, or used by coaching, grading or metrics.
+- Disconnect deletes Scout's encrypted connection and attempts Google revocation. A response that was already in flight cannot redraw event details after disconnect.
 
-This is a **current scheduled-appointments view**, not a historical booking ledger. It includes matching follow-ups; it does not claim they are first-booked prospects. No change to close rate, calls taken, grading, coaching, attendance or no-show logic. There is no background cron, webhook, GHL API connection, recording match, or new model call. A snapshot is the last successfully read date window, not a permanent appointment history. Past dates show Google's current surviving events, not how the calendar looked that day.
+The former title filter, calendar picker, preview/save form, scheduled-sales-call count, manager team route and My Team calendar entry are removed. There is no background sync, calendar history, bulk harvest, GHL API connection, recording match, webhook or model call.
 
-## Release gates — still open
+## Current release gates
 
-1. Inspect one actual GHL appointment title/event with Justin. The title filter is a proposed deterministic setup control, not a proven GHL classifier. If sales calls lack a stable distinguishing title, or use multiple unrelated naming patterns, do not release this filter as accurate; resolve that from a real example first. Do not infer bookings from every event or from absent recordings.
-2. Configure the Google OAuth app and test one legitimate user's connect → preview → select → count → reschedule/cancel → refresh → disconnect flow. No live Google connection has been tested. Do not mint another user's Scout session.
-3. Apply the new schema to the intended environment before enabling the feature. The migration has only been executed in an isolated embedded PostgreSQL instance; local Supabase/Docker was unavailable. No live database change has occurred.
-4. Run the normal drain/deploy/commit-marker checks before any production push. The current design release (`origin/main` at `1a1cba2`) has been merged locally and the combined suite passed 2,844/2,844 with concurrency four. This document grants no deployment authority.
+1. A legitimate user must be added to the Google app's test users and personally authorize the connection. Never mint another user's Scout session.
+2. Inspect real GHL and non-GHL events in that user's private view. Record which Google fields actually distinguish the source before designing any sales-appointment rule.
+3. Verify connect → automatic primary-calendar inspection → date change → disconnect with real events. No fixture is evidence that a GHL marker exists.
+4. Use the normal drain, integration, deployed-commit and served-marker checks for release. This document grants no deployment authority.
 
 ## Google setup
 
-Use a Scout-owned Google Cloud project dedicated to this integration, enable the Calendar API, and create an OAuth **Web application** client. Configure the consent screen and permitted test users before testing. Complete Google's publishing/verification requirements before general availability; test-mode authorization is not a production approval.
+Use the dedicated Scout Calendar Google Cloud project with the Calendar API and an OAuth **Web application** client. While the app remains in testing, each legitimate tester must be listed on the consent screen. Complete Google's publishing and verification requirements before general availability.
 
-Registered redirect URI and `GOOGLE_CALENDAR_REDIRECT_URI` must be identical, e.g. `https://scoutsystems.io/calendar/callback`. Use the same host on which users sign in. The browser binding is host-only: if Scout is opened on an alternate host, Connect navigates to the configured host first; the user may need to sign in there. Local testing may use `http://localhost:<port>/calendar/callback` with a separately registered redirect.
+The registered redirect URI and `GOOGLE_CALENDAR_REDIRECT_URI` must be exactly:
+
+```
+https://www.scoutsystems.io/calendar/callback
+```
+
+Local testing may use `http://localhost:<port>/calendar/callback` with a separately registered redirect.
 
 Server variables (never expose these in the browser or commit real values):
 
@@ -35,21 +42,19 @@ GOOGLE_CALENDAR_REDIRECT_URI
 GOOGLE_CALENDAR_TOKEN_KEY
 ```
 
-The token key is 32 cryptographically random bytes encoded as base64. Keep it stable and backed up in the approved secret store. Changing it without migrating encrypted tokens requires reconnecting. Record secrets only in the gitignored canonical `API Keys.md` and the deployment secret store, not in tracked files or chat.
+The token key is 32 cryptographically random bytes encoded as base64. Keep it stable in the approved secret store. Requested permissions are only `calendar.calendarlist.readonly` and `calendar.events.readonly`. OAuth state is random, browser-bound, hashed, expiring and one-use. Access and refresh tokens are encrypted with AES-256-GCM bound to the Scout user ID.
 
-Requested permissions are limited to `calendar.calendarlist.readonly` and `calendar.events.readonly`. Both must be granted. OAuth uses a random browser-bound, hashed, expiring, one-use state. Access and refresh tokens are encrypted with AES-256-GCM bound to the Scout user ID. The two tables have RLS enabled, no browser policies, and revoked anon/authenticated table privileges. Backend reads/writes also filter by user. Deleting the auth user cascades these rows.
-
-Disconnect deletes the local token and snapshot and attempts Google token revocation. If Google does not confirm revocation, the UI tells the user to remove access in Google Account permissions. Google revocation affects all grants in the Cloud project, which is why the integration should use a dedicated project.
+The existing additive migration remains unchanged. Both tables have RLS enabled, no browser policies, and no anon/authenticated table privileges. The inspection leaves `calendar_id`, `title_contains` and `snapshot` null; only the encrypted connection and OAuth state are stored. Backend reads also filter by the authenticated Scout user. Deleting the auth user cascades both rows.
 
 ## Operational boundaries
 
-- One selected calendar and one title phrase per closer. A shared team-wide calendar needs a real, reliable rep-assignment rule before being treated as an individual's calendar.
-- Date queries are capped at 93 days, Google pagination at 20 × 250 items, and manager scopes at 500 members. Caps refuse an incomplete measurement; they never quietly truncate a published count. Three Google reads run concurrently per team request.
-- OAuth connect/disconnect and token refresh serialization follow the existing single-Railway-process deployment model. Database generation comparisons prevent a late schedule/token update from recreating a disconnected connection. Multiple backend instances require a cross-instance authorization lock before scaling this feature.
-- Only matching appointment IDs, titles and start/end timestamps are saved. Descriptions and attendee lists are not persisted. Manager reads never receive OAuth tokens.
-- No production inference, analytics or recording source is touched. Google Calendar is independent of the one-active-recording-source rule.
+- The primary calendar is identified by Google's `CalendarListEntry.primary` marker on every inspection. No setup form or saved calendar selection exists.
+- A request covers at most 14 inclusive calendar days and at most two complete 250-item event pages. Exceeding either boundary refuses the inspection rather than returning a partial result.
+- Calendar-local dates decide whether an event is inside the window. Recurring instances remain separate. Cancelled events are omitted; mixed normal, all-day and nonstandard event types remain visible because this is an inspection, not a classifier.
+- OAuth connect/disconnect and token refresh serialization follow the existing single-process deployment model. Database generation checks prevent a disconnected request from serving late event data. Multiple backend instances would need a cross-instance authorization lock before scaling this feature.
+- Google Calendar remains independent of the one-active-recording-source rule.
 
-## Verification commands
+## Verification
 
 From `backend/`:
 
@@ -58,8 +63,8 @@ node --test test/google-calendar.test.js test/calendar-service.test.js test/cale
 npm test
 ```
 
-The focused tests execute Google pagination/error handling, encryption, single-use OAuth, partial consent, deactivation, title filtering, preview/save agreement, cancellation/reschedule, timezone changes, disconnect races, the actual HTTP connect-to-count workflow, role/scope checks, and rendered desktop/mobile interactions. Access/scope guards were also tested with both removed gates and gates whose effects were ignored.
+The focused tests execute the real HTTP and rendered UI paths: encrypted OAuth, single-use state, partial-consent and deactivated-user refusal, primary-calendar choice, short range/page caps, owner-only access, mixed-event metadata, redaction/escaping, no event persistence, missing former publishing routes, one-click Account connection, malicious redirect refusal, disconnect races, and desktop/mobile layout. All Google event responses remain fixtures until the legitimate real-user check.
 
-Local results: 29/29 calendar tests; combined suite 2,844/2,844 after incorporating Observatory. Two earlier runs hit unchanged wall-clock timing assertions in `lane-parallel.test.js`; that file passed alone and in the final integrated run. No assertions were weakened. The schema executed in PGlite, rejecting incomplete selections and anon/authenticated access to both tables; service-role reads and auth-user deletion cascades passed. Rendered checks used 1400px and 390px layouts. All Google responses were fixtures: these results do not certify real GHL naming or a live Google connection.
+Local verification on September 13, 2026: 27/27 focused tests and 2,842/2,842 full backend tests passed. Desktop and mobile fixture renders were inspected in `~/Desktop/scan-reports/block-021-calendar-connect/`; those labeled samples prove layout and mixed-event presentation only, not the presence of a real GHL marker.
 
-Reference documentation: [Google OAuth web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server), [Calendar scopes](https://developers.google.com/workspace/calendar/api/auth), [Event listing and recurrence](https://developers.google.com/workspace/calendar/api/v3/reference/events/list), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
+Reference documentation: [Google OAuth web-server flow](https://developers.google.com/identity/protocols/oauth2/web-server), [Calendar scopes](https://developers.google.com/workspace/calendar/api/auth), [Calendar-list primary marker](https://developers.google.com/workspace/calendar/api/v3/reference/calendarList), [Event resource](https://developers.google.com/workspace/calendar/api/v3/reference/events), [Event listing](https://developers.google.com/workspace/calendar/api/v3/reference/events/list), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).

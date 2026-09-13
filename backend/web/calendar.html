@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Scheduled Calls — Scout Systems</title>
+  <title>Google Calendar — Scout Systems</title>
   <link rel="icon" type="image/svg+xml" href="/scout-glyph.svg">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/calendar.css">
@@ -17,35 +17,25 @@
     <a href="/dashboard#account">My Account</a>
   </header>
   <main class="calendar-main">
-    <a id="calendarBack" href="/dashboard#team-members">← Back to Scout</a>
-    <h1>Scheduled Calls</h1>
-    <p class="calendar-note">Sales appointments on Google Calendar, including follow-ups. These are not calls taken.</p>
+    <a href="/dashboard#account">← Back to My Account</a>
+    <h1>Google Calendar</h1>
+    <p class="calendar-note">A private connection test to learn how GHL appointments appear on your calendar.</p>
+    <section id="calendarDataUse" class="calendar-panel" aria-labelledby="calendarDataUseTitle">
+      <h2 id="calendarDataUseTitle">Before you connect</h2>
+      <p>Scout will read your primary Google Calendar for the dates shown so you can inspect the event details Google provides. This private test is visible only to you.</p>
+      <p>Scout will not create or change events. It will not save event titles, descriptions, attendee details, or other event data, and this inspection is not sent to AI. Only your encrypted Google connection is saved.</p>
+    </section>
     <p id="calendarNotice" role="status"></p>
-    <details id="calendarSetup" class="calendar-panel">
-      <summary>Your Google Calendar</summary>
+    <section class="calendar-panel" aria-labelledby="calendarConnectionTitle">
+      <h2 id="calendarConnectionTitle">Your connection</h2>
       <div id="calendarConnection" aria-live="polite">Loading your connection…</div>
-      <form id="calendarSelection" hidden>
-        <fieldset id="calendarChoices"><legend>Choose the calendar GHL books into</legend></fieldset>
-        <label class="calendar-filter">Text in sales appointment titles
-          <input id="calendarTitleFilter" type="text" maxlength="120" required placeholder="e.g. Strategy Call">
-        </label>
-        <p class="calendar-note">Only matching titles count. Personal and internal meetings stay out.</p>
-        <button id="calendarPreviewButton" type="button">Preview Matches</button>
-        <div id="calendarPreview" aria-live="polite"></div>
-        <div id="calendarConfirmation" hidden>
-          <label class="calendar-confirm"><input id="calendarConfirmed" type="checkbox" required>
-            Count matching events as my sales appointments and share their titles and times with my manager.</label>
-        </div>
-        <button id="calendarSave" type="submit" disabled>Save Calendar</button>
-      </form>
-    </details>
-    <form id="calendarRange" class="calendar-controls">
-      <label>Show <select id="calendarScope"><option value="self">My calls</option></select></label>
+    </section>
+    <form id="calendarRange" class="calendar-controls" hidden>
       <label>From <input id="calendarFrom" type="date" required></label>
       <label>Through <input id="calendarTo" type="date" required></label>
-      <button type="submit">Refresh Calls</button>
+      <button type="submit">Inspect Events</button>
     </form>
-    <section id="calendarResults" aria-live="polite" aria-label="Scheduled sales calls">Loading calendar…</section>
+    <section id="calendarResults" aria-live="polite" aria-label="Private calendar inspection">Connect Google Calendar to inspect events.</section>
   </main>
 </body>
 </html>

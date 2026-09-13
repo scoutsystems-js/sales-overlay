@@ -7,12 +7,15 @@ const SCOPES = Object.freeze([
 ]);
 const DAY_MS = 86400000;
 const MAX_PAGES = 20;
-const readableCalendar = c => ['owner', 'writer', 'reader'].includes(c.accessRole) && !c.deleted;
+const MAX_INSPECTION_PAGES = 2;
+const readableCalendar = calendar => ['owner', 'writer', 'reader'].includes(calendar.accessRole) && !calendar.deleted;
 
-function validateRange(from, to) {
+function validateInspectionRange(from, to) {
   const valid = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
     && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
-  if (!valid(from) || !valid(to) || to < from || Date.parse(to) - Date.parse(from) >= 93 * DAY_MS) {
+  // Fourteen inclusive days is enough to inspect examples without creating a
+  // calendar-history export path.
+  if (!valid(from) || !valid(to) || to < from || Date.parse(to) - Date.parse(from) >= 14 * DAY_MS) {
     throw new Error('invalid_range');
   }
   return { from, to };
@@ -22,33 +25,100 @@ function dateInZone(iso, timeZone) {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
 }
 
-// Counts scheduled appointments, not first-booked prospects, attendance, or wins.
-// The caller applies the closer's saved title filter before publishing counts.
-function appointments(events, range, timeZone) {
-  const byId = new Map();
-  for (const event of events) {
-    if (event.status === 'cancelled' || (event.eventType && event.eventType !== 'default')) continue;
-    if (event.attendees?.some(a => a.self && a.responseStatus === 'declined')) continue;
-    if (event.start?.date) continue;
-    if (!event.id || !Number.isFinite(Date.parse(event.start?.dateTime)) || !Number.isFinite(Date.parse(event.end?.dateTime))) {
-      throw new Error('unreadable_event');
-    }
-    const date = dateInZone(event.start.dateTime, timeZone);
-    if (date < range.from || date > range.to) continue;
-    // No descriptions, invitees, emails or arbitrary URLs leave this layer.
-    byId.set(event.id, { id: event.id, title: event.summary || 'Sales call',
-      start: new Date(event.start.dateTime).toISOString(), end: new Date(event.end.dateTime).toISOString() });
-  }
-  return [...byId.values()].sort((a, b) => a.start.localeCompare(b.start) || a.id.localeCompare(b.id));
+function safeText(value, maxLength) {
+  if (typeof value !== 'string' || !value) return null;
+  return value.slice(0, maxLength)
+    .replace(/https?:\/\/[^\s<>"']+/gi, raw => {
+      try { return '[link hidden: ' + new URL(raw).hostname + ']'; }
+      catch (_) { return '[link hidden]'; }
+    })
+    .replace(/\b(access[_-]?token|refresh[_-]?token|api[_-]?key|authorization)\s*[:=]\s*\S+/gi, '$1=[hidden]');
 }
 
-function titleFilter(value) {
-  if (typeof value !== 'string' || !value.trim() || value.trim().length > 120) throw new Error('title_filter_required');
-  return value.trim();
+function safePerson(person, attendee = false) {
+  if (!person || typeof person !== 'object') return null;
+  const result = {
+    ...(safeText(person.displayName, 300) ? { display_name: safeText(person.displayName, 300) } : {}),
+    ...(safeText(person.email, 320) ? { email: safeText(person.email, 320) } : {}),
+    ...(person.self === true ? { self: true } : {}),
+  };
+  if (attendee) {
+    if (safeText(person.responseStatus, 40)) result.response_status = safeText(person.responseStatus, 40);
+    if (person.organizer === true) result.organizer = true;
+  }
+  return Object.keys(result).length ? result : null;
 }
-function matchingAppointments(events, range, timeZone, filter) {
-  const phrase = titleFilter(filter).toLowerCase();
-  return appointments(events.filter(event => typeof event.summary === 'string' && event.summary.toLowerCase().includes(phrase)), range, timeZone);
+
+function safeSource(source) {
+  if (!source || typeof source !== 'object') return null;
+  let host = null;
+  try { host = new URL(source.url).hostname; } catch (_) {}
+  const title = safeText(source.title, 500);
+  return title || host ? { ...(title ? { title } : {}), ...(host ? { host } : {}) } : null;
+}
+
+function safeConference(conferenceData) {
+  const solution = conferenceData?.conferenceSolution;
+  const type = safeText(solution?.key?.type, 100);
+  const name = safeText(solution?.name, 300);
+  return type || name ? { ...(type ? { type } : {}), ...(name ? { name } : {}) } : null;
+}
+
+function propertyKeys(extendedProperties) {
+  const keys = value => value && typeof value === 'object' ? Object.keys(value).sort().slice(0, 50) : [];
+  const result = { private: keys(extendedProperties?.private), shared: keys(extendedProperties?.shared) };
+  return result.private.length || result.shared.length ? result : null;
+}
+
+function eventStartDate(event, timeZone) {
+  if (typeof event.start?.date === 'string') return event.start.date;
+  if (!Number.isFinite(Date.parse(event.start?.dateTime))) throw new Error('unreadable_event');
+  return dateInZone(event.start.dateTime, timeZone);
+}
+
+// This is an owner-only inspection shape, not a sales-event classifier. It
+// keeps useful origin clues while dropping provider links, token-like values,
+// event ids and arbitrary nested Google payloads before they reach the page.
+function inspectionEvents(events, range, timeZone) {
+  const byId = new Map();
+  for (const event of events) {
+    if (event.status === 'cancelled') continue;
+    if (!event.id) throw new Error('unreadable_event');
+    const allDay = typeof event.start?.date === 'string';
+    const date = eventStartDate(event, timeZone);
+    if (date < range.from || date > range.to) continue;
+    const end = allDay ? event.end?.date : event.end?.dateTime;
+    if (typeof end !== 'string' || (!allDay && !Number.isFinite(Date.parse(end)))) throw new Error('unreadable_event');
+    const attendees = Array.isArray(event.attendees)
+      ? event.attendees.slice(0, 50).map(person => safePerson(person, true)).filter(Boolean) : [];
+    const source = safeSource(event.source);
+    const conference = safeConference(event.conferenceData);
+    const extendedPropertyKeys = propertyKeys(event.extendedProperties);
+    const normalized = {
+      title: safeText(event.summary, 500) || '(No title)',
+      status: safeText(event.status, 40) || 'unknown',
+      event_type: safeText(event.eventType, 100) || 'default',
+      start: allDay ? event.start.date : new Date(event.start.dateTime).toISOString(),
+      end: allDay ? end : new Date(end).toISOString(),
+      all_day: allDay,
+      recurring: Boolean(event.recurringEventId),
+      ...(safeText(event.description, 12000) ? { description: safeText(event.description, 12000) } : {}),
+      ...(safeText(event.location, 1000) ? { location: safeText(event.location, 1000) } : {}),
+      ...(safeText(event.visibility, 40) ? { visibility: safeText(event.visibility, 40) } : {}),
+      ...(safeText(event.transparency, 40) ? { transparency: safeText(event.transparency, 40) } : {}),
+      ...(Number.isFinite(Date.parse(event.created)) ? { created: new Date(event.created).toISOString() } : {}),
+      ...(Number.isFinite(Date.parse(event.updated)) ? { updated: new Date(event.updated).toISOString() } : {}),
+      ...(safePerson(event.organizer) ? { organizer: safePerson(event.organizer) } : {}),
+      ...(safePerson(event.creator) ? { creator: safePerson(event.creator) } : {}),
+      attendees,
+      attendee_count: Array.isArray(event.attendees) ? event.attendees.length : 0,
+      ...(source ? { source } : {}),
+      ...(conference ? { conference } : {}),
+      ...(extendedPropertyKeys ? { extended_property_keys: extendedPropertyKeys } : {}),
+    };
+    byId.set(event.id, normalized);
+  }
+  return [...byId.values()].sort((a, b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title));
 }
 
 function encryptionKey(encoded) {
@@ -61,10 +131,10 @@ function seal(value, userId, key) {
   const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey(key), iv);
   cipher.setAAD(Buffer.from(userId));
   const data = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-  return [iv, cipher.getAuthTag(), data].map(x => x.toString('base64url')).join('.');
+  return [iv, cipher.getAuthTag(), data].map(part => part.toString('base64url')).join('.');
 }
 function unseal(value, userId, key) {
-  const [iv, tag, data] = value.split('.').map(x => Buffer.from(x, 'base64url'));
+  const [iv, tag, data] = value.split('.').map(part => Buffer.from(part, 'base64url'));
   const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(key), iv);
   decipher.setAAD(Buffer.from(userId));
   decipher.setAuthTag(tag);
@@ -96,11 +166,11 @@ function createGoogleClient(fetchImpl = fetch) {
     if (!data.access_token || !Number.isFinite(data.expires_in) || data.expires_in <= 0) throw new Error('google_reconnect');
     return data;
   }
-  async function pages(path, accessToken, params) {
+  async function pages(path, accessToken, params, maxPages = MAX_PAGES) {
     const items = [];
     let pageToken;
     const started = Date.now();
-    for (let page = 0; page < MAX_PAGES; page++) {
+    for (let page = 0; page < maxPages; page++) {
       if (Date.now() - started > 45000) throw new Error('google_unavailable');
       const url = new URL('https://www.googleapis.com/calendar/v3/' + path);
       url.search = new URLSearchParams({ maxResults: '250', ...params, ...(pageToken ? { pageToken } : {}) }).toString();
@@ -120,16 +190,17 @@ function createGoogleClient(fetchImpl = fetch) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: refreshToken }).toString() });
       return response.ok;
     },
-    calendars: async accessToken => (await pages('users/me/calendarList', accessToken, {}))
-      .filter(readableCalendar).map(c => ({ id: c.id, name: c.summaryOverride || c.summary || c.id, time_zone: c.timeZone })),
-    // Widen the wire window to include every UTC offset, then select START dates
-    // in the calendar zone. Google's timeMin filters END times, not starts.
+    calendars: async accessToken => (await pages('users/me/calendarList', accessToken, {
+      fields: 'nextPageToken,items(id,summary,summaryOverride,timeZone,accessRole,deleted,primary)',
+    })).filter(readableCalendar).map(calendar => ({ id: calendar.id, name: calendar.summaryOverride || calendar.summary || calendar.id,
+      time_zone: calendar.timeZone, primary: calendar.primary === true })),
     events: (accessToken, calendarId, range) => pages('calendars/' + encodeURIComponent(calendarId) + '/events', accessToken, {
-      singleEvents: 'true', showDeleted: 'false',
+      singleEvents: 'true', showDeleted: 'false', orderBy: 'startTime',
       timeMin: new Date(Date.parse(range.from) - DAY_MS).toISOString(),
       timeMax: new Date(Date.parse(range.to) + 2 * DAY_MS).toISOString(),
-    }),
+      fields: 'nextPageToken,items(id,status,summary,description,location,eventType,start,end,created,updated,visibility,transparency,recurringEventId,organizer,creator,attendees,source,conferenceData(conferenceSolution),extendedProperties)',
+    }, MAX_INSPECTION_PAGES),
   };
 }
 
-module.exports = { SCOPES, validateRange, dateInZone, appointments, titleFilter, matchingAppointments, seal, unseal, authorizeUrl, createGoogleClient };
+module.exports = { SCOPES, validateInspectionRange, dateInZone, inspectionEvents, seal, unseal, authorizeUrl, createGoogleClient };
