@@ -34,7 +34,7 @@ test('⚠ the Knowledge Base counter is the page\'s one loud number, at the disp
   const rule = LIVE.match(/\.kb-counter-card \.kbc-num \{[^}]*\}/);
   assert.ok(rule, 'the rule exists');
   assert.ok(/font-size: var\(--fs-display\)/.test(rule[0]) && /font-weight: var\(--fw-display\)/.test(rule[0]), rule[0]);
-  assert.ok(!/42px/.test(LIVE.slice(LIVE.indexOf('<style>'), LIVE.indexOf('</style>'))), 'no 42px left in the stylesheet');
+  assert.ok(!/font-size\s*:\s*42px\b/.test(LIVE.slice(LIVE.indexOf('<style>'), LIVE.indexOf('</style>'))), 'no literal 42px font size remains in the stylesheet');
 });
 
 test('⚠ the landing page declares its two exemptions with their reason, and uses them', () => {

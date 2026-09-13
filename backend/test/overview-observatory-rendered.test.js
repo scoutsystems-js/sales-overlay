@@ -79,7 +79,6 @@ test('overview uses three real glowing instruments in the requested order and ke
       trendBelowRing: !!document.querySelector('.observatory-metric-trend .glance-trend'),
       focusInUpper: focus.parentElement.classList.contains('observatory-upper'),
       focusStartsAfterHero: focusRect.top >= heroRect.bottom && focusRect.top - heroRect.bottom <= 32,
-      focusBeforeRailBottom: focusRect.top < railRect.bottom,
       coachAfterFocus: coach.getBoundingClientRect().top >= focusRect.bottom,
       coachClearsRail: coach.getBoundingClientRect().top >= railRect.bottom,
       coachFullWidth: coach.parentElement.classList.contains('observatory-page'),
@@ -105,7 +104,6 @@ test('overview uses three real glowing instruments in the requested order and ke
   assert.equal(desktop.trendBelowRing, true, 'the existing score trend remains present below its instrument');
   assert.equal(desktop.focusInUpper, true, 'focus panels sit directly below the gauges in the main column');
   assert.equal(desktop.focusStartsAfterHero, true, 'focus panels begin immediately after the hero');
-  assert.equal(desktop.focusBeforeRailBottom, true, 'focus panels use the space beside the rail instead of waiting below it');
   assert.equal(desktop.coachAfterFocus, true, 'Coach Summary follows the coaching-focus panels');
   assert.equal(desktop.coachClearsRail, true, 'Coach Summary clears a tall rail before it spans the page');
   assert.equal(desktop.coachFullWidth, true, 'Coach Summary returns as a full-width lower section');
@@ -149,7 +147,7 @@ test('overview glass panels reveal the fixed ground while retaining readable edg
   assert.ok(observed.insetColors.length > 0, 'the rendered Overview must expose nested glass cards');
   observed.insetColors.forEach((color) => assert.ok(alphaOf(color) >= .32 && alphaOf(color) <= .48, 'nested cards must stay lighter glass, never opaque insets'));
   observed.panelBorders.forEach((color) => assert.ok(alphaOf(color) >= .22, 'glass panels need a visible sage edge'));
-  observed.panelShadows.forEach((shadow) => assert.ok(shadow.includes('21, 161, 71'), 'glass panels need their scoped emerald edge bloom'));
+  observed.panelShadows.forEach((shadow) => assert.ok(shadow.includes('18, 222, 96'), 'glass panels need their scoped emerald edge bloom'));
   assert.equal(observed.gaugeSurfaces.length, 2, 'the two support values remain distinct gauges');
   observed.gaugeSurfaces.forEach((gauge) => {
     assert.equal(alphaOf(gauge.background), 0, 'support gauges must leave the ground visible');

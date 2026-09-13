@@ -155,10 +155,11 @@ test('Performance remains an executed team surface: its date/team controls, sort
   for (const ringPart of ['observatory-visor-track', 'observatory-visor-arc-glow', 'observatory-visor-arc', 'observatory-visor-ticks', 'observatory-visor-contours', 'observatory-visor-bracket']) {
     assert.ok(out.markup.includes(ringPart), 'the instrument is incomplete: ' + ringPart);
   }
-  assert.match(out.markup, /observatory-visor-target[^]*>25<\/text>/, 'Closing retains its canonical 25% calibration mark');
-  assert.match(out.markup, /observatory-visor-target[^]*>35<\/text>/, 'Objection handling retains its canonical 35% calibration mark');
-  assert.match(out.markup, /observatory-visor-target[^]*>45<\/text>/, 'Call time uses its 35–45 minute good-band calibration');
-  assert.doesNotMatch(out.markup, /observatory-visor-target[^]*>60<\/text>/, 'Call-time must not redraw the old 60-minute ceiling as a target');
+  assert.match(out.markup, /<text class="observatory-visor-scale"[^>]*>25<\/text>/, 'Closing retains its canonical 25% calibration mark');
+  assert.match(out.markup, /<g class="observatory-visor-target">[^]*>35<\/text><\/g>/, 'Objection handling retains its canonical 35% calibration mark');
+  assert.match(out.markup, /<text class="observatory-visor-scale"[^>]*>45<\/text>/, 'Call time uses its 35–45 minute good-band calibration');
+  assert.match(out.markup, /<g class="observatory-visor-target"><line[^>]+><\/g>/, 'Closing retains its midpoint target line without duplicating the 25 label');
+  assert.doesNotMatch(out.markup, /<g class="observatory-visor-target">[^]*>60<\/text><\/g>/, 'Call-time must not redraw the old 60-minute ceiling as a target');
   assert.equal((out.markup.match(/observatory-visor-unit/g) || []).length, 1,
     'the two percentage readings remain full-size like the source Visor; only call time has a compact unit');
 });
