@@ -1,9 +1,11 @@
 'use strict';
 const crypto = require('node:crypto');
 const { SCOPES, seal, unseal, inspectionEvents, scheduledGhlEvents, validateInspectionRange, authorizeUrl } = require('./google-calendar');
+const { sharingEligibility, sharedCountStatus } = require('./calendar-sharing');
 const CONNECTIONS = 'google_calendar_connections';
 const STATES = 'google_calendar_oauth_states';
-const COLUMNS = 'user_id,generation,access_token_encrypted,refresh_token_encrypted,expires_at,connected_at,calendar_id,calendar_name,time_zone,title_contains,last_sync_at,last_sync_error,snapshot';
+const COLUMNS = 'user_id,generation,access_token_encrypted,refresh_token_encrypted,expires_at,connected_at,calendar_id,calendar_name,time_zone,title_contains,last_sync_at,last_sync_error,snapshot,share_scheduled_count,share_manager_id';
+const PROFILE_COLUMNS = 'user_id,role,managed_by,active,team_name';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const refreshes = new Map();
 const authorizationWrites = new Map();
@@ -35,6 +37,7 @@ async function checked(query) {
 
 function createCalendarService(admin, google, config) {
   const get = userId => checked(admin.from(CONNECTIONS).select(COLUMNS).eq('user_id', userId).maybeSingle());
+  const getProfile = userId => checked(admin.from('user_profiles').select(PROFILE_COLUMNS).eq('user_id', userId).maybeSingle());
   const update = async (conn, values) => {
     const result = await checked(admin.from(CONNECTIONS).update(values).eq('user_id', conn.user_id)
       .eq('generation', conn.generation).select('user_id').maybeSingle());
@@ -51,6 +54,15 @@ function createCalendarService(admin, google, config) {
       return data.access_token;
     })().finally(() => refreshes.delete(key)));
     return refreshes.get(key);
+  }
+  async function readScheduled(conn, range) {
+    const token = await access(conn);
+    const calendars = await google.calendars(token);
+    const primary = calendars.find(calendar => calendar.primary === true);
+    if (!primary?.time_zone) throw new Error('calendar_not_available');
+    new Intl.DateTimeFormat('en', { timeZone: primary.time_zone });
+    const appointments = inspectionEvents(scheduledGhlEvents(await google.events(token, primary.id, range)), range, primary.time_zone);
+    return { primary, appointments };
   }
   return {
     async begin(userId) {
@@ -79,26 +91,67 @@ function createCalendarService(admin, google, config) {
           refresh_token_encrypted: seal(data.refresh_token, pending.user_id, config.key),
           expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(), connected_at: new Date().toISOString(),
           calendar_id: null, calendar_name: null, time_zone: null, title_contains: null,
-          snapshot: null, last_sync_at: null, last_sync_error: null }, { onConflict: 'user_id' }));
+          snapshot: null, last_sync_at: null, last_sync_error: null,
+          share_scheduled_count: false, share_manager_id: null }, { onConflict: 'user_id' }));
       });
     },
-    async status(userId) { return { connected: Boolean(await get(userId)) }; },
+    async status(userId) {
+      const [conn, profile] = await Promise.all([get(userId), getProfile(userId)]);
+      const eligibility = sharingEligibility(profile);
+      let teamName = null;
+      if (eligibility.eligible) {
+        const manager = eligibility.managerId === userId ? profile : await getProfile(eligibility.managerId);
+        teamName = manager?.team_name || null;
+      }
+      return { connected: Boolean(conn), sharing_enabled: Boolean(conn && conn.share_scheduled_count === true && conn.share_manager_id === eligibility.managerId && eligibility.eligible),
+        sharing_eligible: eligibility.eligible, ...(teamName ? { sharing_team_name: teamName } : {}) };
+    },
+    async setSharing(userId, enabled) {
+      const [conn, profile] = await Promise.all([get(userId), getProfile(userId)]);
+      if (!conn) throw new Error('not_connected');
+      const eligibility = sharingEligibility(profile);
+      if (enabled && !eligibility.eligible) throw new Error('sharing_unavailable');
+      await update(conn, enabled
+        ? { share_scheduled_count: true, share_manager_id: eligibility.managerId }
+        : { share_scheduled_count: false, share_manager_id: null });
+      return this.status(userId);
+    },
     async inspect(userId, range) {
       validateInspectionRange(range.from, range.to);
       const conn = await get(userId);
       if (!conn) throw new Error('not_connected');
-      const token = await access(conn);
-      const calendars = await google.calendars(token);
-      const primary = calendars.find(calendar => calendar.primary === true);
-      if (!primary?.time_zone) throw new Error('calendar_not_available');
-      new Intl.DateTimeFormat('en', { timeZone: primary.time_zone });
-      const appointments = inspectionEvents(scheduledGhlEvents(await google.events(token, primary.id, range)), range, primary.time_zone);
+      const { primary, appointments } = await readScheduled(conn, range);
       // A disconnect that lands while Google is responding must prevent the old
       // request from serving event details after its connection is gone.
       const current = await get(userId);
       if (!current || current.generation !== conn.generation) throw new Error('connection_changed');
       return { ...range, calendar: { name: primary.name, time_zone: primary.time_zone },
         scheduled_ghl_appointment_count: appointments.length, appointments };
+    },
+    async sharedCount(viewer, userId, range) {
+      validateInspectionRange(range.from, range.to);
+      try {
+        const [conn, profile] = await Promise.all([get(userId), getProfile(userId)]);
+        const initialStatus = sharedCountStatus(profile, conn, viewer.role, viewer.id);
+        if (initialStatus !== 'ready') return { status: initialStatus };
+        const { appointments } = await readScheduled(conn, range);
+        const [current, currentProfile] = await Promise.all([get(userId), getProfile(userId)]);
+        if (!current || current.generation !== conn.generation) return { status: 'unavailable' };
+        const currentStatus = sharedCountStatus(currentProfile, current, viewer.role, viewer.id);
+        if (currentStatus !== 'ready') return { status: currentStatus };
+        return { status: 'ready', count: appointments.length, generation: conn.generation };
+      } catch (_) {
+        return { status: 'unavailable' };
+      }
+    },
+    async revalidateSharedCount(viewer, userId, generation) {
+      try {
+        const [conn, profile] = await Promise.all([get(userId), getProfile(userId)]);
+        if (!conn || conn.generation !== generation) return { status: 'unavailable' };
+        return { status: sharedCountStatus(profile, conn, viewer.role, viewer.id) };
+      } catch (_) {
+        return { status: 'unavailable' };
+      }
     },
     async disconnect(userId) {
       return authorizeInOrder(userId, async () => {

@@ -81,10 +81,9 @@ test('real HTTP workflow returns only scheduled GHL appointments without saving 
   assert.equal(connection.title_contains, null);
 });
 
-test('the former team, schedule, preview and selection publishing routes are absent', async t => {
+test('the former schedule, preview and selection publishing routes are absent', async t => {
   const { url, reads } = await server(t);
   for (const request of [
-    [url + '/team?from=2026-09-07&to=2026-09-11', { headers: { Authorization: 'manager' } }],
     [url + '/schedule?from=2026-09-07&to=2026-09-11', { headers: { Authorization: 'rep' } }],
     [url + '/calendars', { headers: { Authorization: 'rep' } }],
     [url + '/preview', { method: 'POST', headers: { Authorization: 'rep', 'Content-Type': 'application/json' }, body: '{}' }],

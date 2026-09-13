@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scheduled appointments — Scout Systems</title>
+  <link rel="icon" type="image/svg+xml" href="/scout-glyph.svg">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/calendar.css">
+  <script src="/js/scout-auth.js"></script>
+  <script src="/js/scout-team-calendar.js" defer></script>
+</head>
+<body class="calendar-page">
+  <header class="calendar-topbar">
+    <a href="/dashboard"><img src="/scout-wordmark.svg" alt="Scout Systems" width="190" height="32"></a>
+    <a href="/calendar.html">My calendar</a>
+  </header>
+  <main class="calendar-main">
+    <a id="teamCalendarBack" href="/dashboard#my-team">← Back to My Team</a>
+    <h1>Scheduled appointments</h1>
+    <p class="calendar-note">Current Sober Living Riches GHL appointments, shared by each closer. Event details stay private.</p>
+    <form id="teamCalendarRange" class="calendar-controls" hidden>
+      <label id="teamCalendarTeamLabel" hidden>Team <select id="teamCalendarTeam"></select></label>
+      <label>From <input id="teamCalendarFrom" type="date" required></label>
+      <label>Through <input id="teamCalendarTo" type="date" required></label>
+      <button type="submit">Refresh counts</button>
+    </form>
+    <p class="calendar-boundary">Up to 14 days. Scheduled appointments are not calls taken or first bookings.</p>
+    <section id="teamCalendarResults" aria-live="polite" aria-label="Appointments by closer">Loading your team…</section>
+  </main>
+</body>
+</html>

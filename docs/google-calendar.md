@@ -1,4 +1,22 @@
-# Google Calendar — private inspection test live; scheduled GHL view pending release
+# Google Calendar — private scheduled GHL appointments LIVE
+
+## Block 024 — account restriction removed; release pending
+
+The hard-coded Scout-team eligibility check is removed. An existing connection can share counts from its current Scout profile with no email match, account switch, reconnect or token transfer. Explicit opt-in and current manager/access checks remain. The SLR event-source filter and SalesKick exclusion are unchanged. Focused tests: 51 passing, including unchanged connection fields, other-team opt-in, wrong-manager denial, inactive/unmanaged denial, and consent/reassignment races. Both deliberate access-control bypasses fail the HTTP guard. Full-suite and release verification follow before deployment.
+
+## Block 023 — manager counts LIVE
+
+Released `0344cb95a1b818212ce60f41ca90d73b7be7db0a` (implementation `3fd6c43`), Railway `b16d7184-f1e0-43f8-bad6-3beec46f3e96` SUCCESS. Latest design `da7f2a2` merged and preserved. Full integrated suite 2,877/2,877; six served artifacts byte-identical and artifact-specific markers pass. Actual signed-in manager page: 12 active SLR members, all Not connected, dates verified and current week restored. Original private connection still shows 29 appointments. Live positive sharing awaits Josh's account/opt-in step below. Evidence: `~/Desktop/scan-reports/block-023-manager-calendar/`.
+
+My Team links to a separate Scheduled appointments view. It reads the same current GHL appointment computation as the private owner view, with a 14-day maximum and counts only. A missing connection, withheld sharing, unsupported team, or failed Google read never becomes zero. There is no attendance claim, first-booking ledger, title-derived follow-up flag, AI processing, or change to existing call metrics.
+
+Sharing is explicitly off for existing connections. An active closer with an assigned manager, or a manager/admin heading their own board, can enable it on their private calendar page. Only their current manager and authorized Scout admins can request the count; no event details reach that response. Consent is bound to the manager scope and reset on reconnect. Access and consent are checked again after the Google read. The connection table remains server-only with RLS and no browser grants. Block 024 removes the former hard-coded SLR Scout-team gate; it does not change the measured SLR booking-source filter.
+
+**Justin's correction, September 13 (Block 024):** the Google account chosen at Connect need not match the Scout email. The prior instruction to switch Scout accounts/reconnect is withdrawn. Josh keeps the existing connection on `josh@scoutsystems.io`; counts remain on that profile, not automatically transferred to another profile. He may opt into count sharing there. Other Google users still require test-user approval while the OAuth app is in Testing. This removes a Scout-team restriction, not Google's tester list or Scout's actual access controls.
+
+Historical receipts below describe the earlier private-only version.
+
+**Block 022 released:** `94bef3be7d6f5fc168df3b30e2c084dba9bcc2c6`, Railway `05a18e3e-26f6-4813-9bbb-331607ded02f` SUCCESS. Latest design `c472290` preserved; combined suite 2,854/2,854. Actual signed-in Josh view: 29 appointments September 13–19 and 33 September 7–12; zero SalesKick details in either. Date changes verified, current week restored, connection intact. Served dashboard/calendar HTML/calendar JS match the release byte-for-byte. Receipt: `~/Desktop/scan-reports/block-022-ghl-schedule/release-verification.md`. Pre-release notes below are historical; live manager sharing and first-booking metrics are not part of this release.
 
 Released September 13, 2026 as `22884b96e7289b0152e997d63b78414e86c5a54d`; Railway deployment `b804381e-61a2-4bb4-b06b-421b5305969b` SUCCESS. Latest Observatory main `172b591` is preserved. Final integrated suite: 2,845/2,845. Served page/scripts/styles/privacy match the release byte-for-byte, unauthenticated inspection returns 401, and the existing signed-in Scout browser shows the new Account button. That release receipt predates live consent. Follow-up completed: `joshua@soberlivingriches.com` is on Google's test list, Josh successfully connected, and real primary-calendar reads across two date ranges established the narrow Sober Living Riches signature below. The live connection remains intact. Release evidence: `~/Desktop/scan-reports/block-021-calendar-connect/release-verification.md`.
 
