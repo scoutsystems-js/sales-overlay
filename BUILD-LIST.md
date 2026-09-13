@@ -2,9 +2,15 @@
 
 The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Tasks 1–4 are closed; the Team → Coaching reset is live.
 
-## Active — Scheduled GHL appointments LIVE (Block 022, 2026-09-13)
+## Active — Manager calendar counts (Block 023, 2026-09-13)
 
-**Release verified:** `94bef3be7d6f5fc168df3b30e2c084dba9bcc2c6`, Railway `05a18e3e-26f6-4813-9bbb-331607ded02f` SUCCESS. Latest design `c472290` preserved. Combined tests 2,854/2,854. Real Josh browser counts 29 for September 13–19 and 33 for September 7–12; zero SalesKick rows, dates verified and current week restored. No manager sharing, event history or first-booking metrics. **Next proposed build:** manager per-closer scheduled counts with an appropriate sharing disclosure/authorization. The pre-release checkpoint below is historical.
+Block 023 is implemented locally; release verification is pending. My Team → Scheduled Appointments shows per-closer counts for an explicit window, using the same measured SLR GHL rule. Sharing is opt-in, off for existing connections, bound to the current manager, and reset on reconnect. Counts only; no event details, false zeros for missing data, new call metrics, or stored event history. The additive consent migration is applied; one existing connection remains, zero sharing enabled, zero event snapshots, RLS on, no browser grants. Latest design `7a7cb35` is preserved.
+
+**Next required live check:** Josh must sign into Scout as `joshua@soberlivingriches.com`, connect his Google calendar, and enable count sharing. The current test connection is on the different Scout owner account `josh@scoutsystems.io`; it remains untouched and must not be silently attributed to SLR. Other Google accounts still need tester access while OAuth is in Testing. No further source-classification question or broader booked-call ledger work is authorized by this block.
+
+### Previous checkpoints — Blocks 021–022 (historical)
+
+**Release verified:** `94bef3be7d6f5fc168df3b30e2c084dba9bcc2c6`, Railway `05a18e3e-26f6-4813-9bbb-331607ded02f` SUCCESS. Latest design `c472290` preserved. Combined tests 2,854/2,854. Real Josh browser counts 29 for September 13–19 and 33 for September 7–12; zero SalesKick rows, dates verified and current week restored. No manager sharing, event history or first-booking metrics in that release. Its proposed manager-count build is now Block 023 above.
 
 **LIVE connection test:** `22884b96e7289b0152e997d63b78414e86c5a54d`, Railway `b804381e-61a2-4bb4-b06b-421b5305969b` SUCCESS. Josh successfully connected `joshua@soberlivingriches.com`; the private page read 75 events in one real window. **Block 022 is local and not yet released:** it will show only current Scheduled GHL appointments, not every calendar event or a historical booked-call metric. The pre-release checkpoint below is historical.
 

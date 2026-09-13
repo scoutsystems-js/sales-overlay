@@ -53,12 +53,41 @@ test('clear private data-use copy appears before Connect and no classifier setup
   assert.doesNotMatch(source, /Scheduled Calls|Team calls|sales appointment title/i);
 });
 
-test('My Team no longer publishes a scheduled-calendar entry', () => {
+test('My Team links to counts for the selected team without changing coaching', () => {
   const dashboard = fs.readFileSync(path.join(web, 'dashboard.html'), 'utf8');
   const start = dashboard.indexOf('function renderTeamMembersView()');
   const end = dashboard.indexOf('function teamMembersScope()', start);
   assert.ok(start >= 0 && end > start);
-  assert.doesNotMatch(dashboard.slice(start, end), /calendar\.html|Scheduled Calls/);
+  const source = dashboard.slice(start, end);
+  let markup;
+  new Function('document', 'state', 'ensureTeamDefaultRange', 'teamHeaderHtml', 'teamControlsHtml', 'teamMembersBodyHtml', source.split('  function teamMembersScope')[0] + ';renderTeamMembersView();')(
+    {getElementById:()=>({set innerHTML(value){markup=value}})},
+    {teamContext:{},teamOverview:{},teamSelected:'selected-team'},()=>{},()=>'',()=>'',()=>''
+  );
+  assert.match(markup, /team-calendar\.html\?team=selected-team/);
+  assert.match(markup, /Scheduled Appointments/);
+});
+
+test('sharing is off until the owner explicitly enables it, and can be turned off', () => {
+  const page = html().replace('window.__inspectionCalls=0;', `window.__sharing=false;window.__posts=[];window.__inspectionCalls=0;`)
+    .replace('window.fetch=async function(url)', 'window.fetch=async function(url,options)')
+    .replace('let data=url.includes', `if(url.includes('/sharing')){window.__posts.push(JSON.parse(options.body));window.__sharing=JSON.parse(options.body).enabled;return {ok:true,json:async()=>({sharing_enabled:window.__sharing,sharing_eligible:true})}};let data=url.includes`)
+    .replace('configured:true,connected:true,', 'configured:true,connected:true,sharing_eligible:true,sharing_enabled:window.__sharing,');
+  const result = renderComputed(page, `(async()=>{
+    await new Promise(r=>setTimeout(r,50));
+    const control=document.getElementById('calendarShare');
+    if(!control)return {missing:true};
+    const initial=control.checked;control.click();await new Promise(r=>setTimeout(r,50));
+    const enabled=control.checked;control.click();await new Promise(r=>setTimeout(r,50));
+    return {initial,enabled,disabled:!control.checked,posts:window.__posts,text:document.body.textContent};
+  })()`, {width:390});
+  assert.equal(result.missing, undefined, 'owner sharing control must render');
+  assert.equal(result.initial, false);
+  assert.equal(result.enabled, true);
+  assert.equal(result.disabled, true);
+  assert.deepEqual(result.posts, [{enabled:true},{enabled:false}]);
+  assert.match(result.text, /manager and Scout admins/);
+  assert.match(result.text, /Event details stay private/);
 });
 
 test('Account Connect click starts Google directly after showing private read-only use', () => {

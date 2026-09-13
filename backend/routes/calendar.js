@@ -2,9 +2,13 @@
 const express = require('express');
 const crypto = require('node:crypto');
 const { createClient } = require('@supabase/supabase-js');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { CHUNK } = require('../lib/chunk');
+const { resolveDisplayName } = require('../lib/display-name');
 const { createGoogleClient, validateInspectionRange } = require('../lib/google-calendar');
 const { readConfig, createCalendarService } = require('../lib/calendar-service');
+const teamRouter = require('./team');
+const TEAM_READ_CONCURRENCY = 4;
 const COOKIE = 'scout_calendar_state';
 const MESSAGES = {
   calendar_not_configured: 'Google Calendar setup is not enabled yet.',
@@ -17,6 +21,8 @@ const MESSAGES = {
   not_connected: 'Connect Google Calendar first.',
   google_access_denied: 'Google did not allow access to this calendar. Check its permissions.',
   connection_changed: 'The calendar was disconnected while Scout was reading it.',
+  sharing_unavailable: 'Scheduled appointment sharing is not available for this team yet.',
+  invalid_sharing: 'Choose whether scheduled appointment counts are shared.',
 };
 
 function defaultAdmin() {
@@ -31,11 +37,37 @@ function browserStateMatches(req) {
   return saved.length === state.length && crypto.timingSafeEqual(Buffer.from(saved), Buffer.from(state));
 }
 
+async function activeProfiles(admin, memberIds) {
+  const batches = [];
+  for (let index = 0; index < memberIds.length; index += CHUNK) batches.push(memberIds.slice(index, index + CHUNK));
+  const results = await Promise.all(batches.map(ids => admin.from('user_profiles')
+    .select('user_id,first_name,last_name,active').in('user_id', ids)));
+  const failed = results.find(result => result.error);
+  if (failed) throw new Error('calendar_storage_error');
+  const byId = new Map(results.flatMap(result => result.data || []).filter(profile => profile.active !== false).map(profile => [profile.user_id, profile]));
+  return memberIds.map(id => byId.get(id)).filter(Boolean);
+}
+
+async function mapBounded(items, read) {
+  let output = [];
+  for (let index = 0; index < items.length; index += TEAM_READ_CONCURRENCY) {
+    output = [...output, ...await Promise.all(items.slice(index, index + TEAM_READ_CONCURRENCY).map(read))];
+  }
+  return output;
+}
+
+async function currentViewerProfile(admin, userId) {
+  const result = await admin.from('user_profiles').select('user_id,role,active').eq('user_id', userId).maybeSingle();
+  if (result.error) throw new Error('calendar_storage_error');
+  return result.data;
+}
+
 function createCalendarRouter(options = {}) {
   const router = express.Router();
   const admin = options.admin || defaultAdmin;
   const config = options.config || readConfig;
   const authenticate = options.authenticate || requireAuth;
+  const resolveTeam = options.resolveTeam || teamRouter._resolveTeam;
   const service = options.service || (() => createCalendarService(admin(), createGoogleClient(), config()));
   const cookieOptions = () => ({ httpOnly: true, sameSite: 'lax', secure: config().redirectUri.startsWith('https:'), path: '/calendar', maxAge: 600000 });
   const run = handler => async (req, res) => {
@@ -43,8 +75,8 @@ function createCalendarRouter(options = {}) {
     try { await handler(req, res); }
     catch (error) {
       const code = error.message;
-      const status = ['invalid_range', 'invalid_state', 'calendar_origin_mismatch'].includes(code) ? 400
-        : code === 'not_connected' ? 409 : code === 'calendar_not_configured' ? 503 : error.status || 502;
+      const status = ['invalid_range', 'invalid_state', 'calendar_origin_mismatch', 'invalid_sharing'].includes(code) ? 400
+        : ['not_connected', 'sharing_unavailable'].includes(code) ? 409 : code === 'calendar_not_configured' ? 503 : error.status || 502;
       res.status(status).json({ error: MESSAGES[code] || 'Calendar could not be loaded. Try again.', code: MESSAGES[code] ? code : 'calendar_unavailable' });
     }
   };
@@ -78,6 +110,48 @@ function createCalendarRouter(options = {}) {
     // No requested user id is accepted: this route can only inspect the
     // authenticated user's own encrypted Google connection.
     res.json(await service().inspect(req.user.id, range));
+  }));
+  router.post('/sharing', authenticate, run(async (req, res) => {
+    if (typeof req.body?.enabled !== 'boolean') throw new Error('invalid_sharing');
+    res.json(await service().setSharing(req.user.id, req.body.enabled));
+  }));
+  router.get('/team', authenticate, requireRole(['manager', 'owner']), run(async (req, res) => {
+    const range = validateInspectionRange(req.query.from, req.query.to);
+    const database = admin();
+    const team = await resolveTeam(database, req);
+    const profiles = await activeProfiles(database, team.memberIds || []);
+    const viewer = { id: req.user.id, role: req.userProfileRole || req.user.role };
+    const readMembers = await mapBounded(profiles, async profile => {
+      const result = await service().sharedCount(viewer, profile.user_id, range);
+      return { user_id: profile.user_id, name: resolveDisplayName(profile, null, profile.user_id), status: result.status,
+        ...(result.status === 'ready' ? { count: result.count, generation: result.generation } : {}) };
+    });
+
+    // External reads create a permission race. Resolve the actor, team and
+    // active member set again before any result crosses the response boundary.
+    const currentViewer = await currentViewerProfile(database, req.user.id);
+    if (!currentViewer || currentViewer.active === false || !['manager', 'owner'].includes(currentViewer.role)) {
+      const error = new Error('calendar_team_access_changed'); error.status = 403; throw error;
+    }
+    req.user.role = currentViewer.role;
+    req.userProfileRole = currentViewer.role;
+    const currentTeam = await resolveTeam(database, req);
+    const currentProfiles = await activeProfiles(database, currentTeam.memberIds || []);
+    const currentById = new Map(currentProfiles.map(profile => [profile.user_id, profile]));
+    const stillAuthorized = readMembers.filter(member => currentById.has(member.user_id));
+    const finalViewer = { id: req.user.id, role: currentViewer.role };
+    const revalidated = await mapBounded(stillAuthorized, async member => {
+      if (member.status !== 'ready') return member;
+      const current = await service().revalidateSharedCount(finalViewer, member.user_id, member.generation);
+      return current.status === 'ready' ? member : { ...member, status: current.status, count: undefined };
+    });
+    const members = revalidated.map(member => ({
+      user_id: member.user_id,
+      name: resolveDisplayName(currentById.get(member.user_id), null, member.user_id),
+      status: member.status,
+      ...(member.status === 'ready' ? { count: member.count } : {}),
+    }));
+    res.json({ ...range, team_label: currentTeam.label, members });
   }));
   router.delete('/connection', authenticate, run(async (req, res) => {
     const result = await service().disconnect(req.user.id);

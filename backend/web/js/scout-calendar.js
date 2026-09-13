@@ -105,7 +105,7 @@
       return false;
     }
     host.innerHTML = '<p>' + (status.connected
-      ? 'Connected. Event details are read only when you open this page and are not saved.'
+      ? 'Connected. Event details stay private to you and are not saved.'
       : 'Not connected. Review the private data-use note above before continuing.') + '</p>'
       + '<div class="calendar-actions"><button id="googleConnect" type="button">'
       + (status.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar') + '</button>'
@@ -122,6 +122,28 @@
       return false;
     }
     el('calendarRange').hidden = false;
+    var sharing = document.createElement('div');
+    sharing.className = 'calendar-sharing';
+    if (status.sharing_eligible) {
+      sharing.innerHTML = '<label><input id="calendarShare" type="checkbox"' + (status.sharing_enabled ? ' checked' : '')
+        + '> Share scheduled appointment counts with my manager and Scout admins</label>'
+        + '<p class="calendar-note">Event details stay private. Sharing can be turned off here at any time.</p>';
+      host.appendChild(sharing);
+      el('calendarShare').onchange = async function () {
+        var control = this;
+        var enabled = control.checked;
+        control.disabled = true;
+        try {
+          var result = await request('/sharing', 'POST', { enabled: enabled });
+          control.checked = result.sharing_enabled === true;
+          notice(control.checked ? 'Scheduled appointment counts are now shared.' : 'Scheduled appointment counts are no longer shared.');
+        } catch (error) { control.checked = !enabled; notice(error.message); }
+        finally { control.disabled = false; }
+      };
+    } else {
+      sharing.textContent = 'Team sharing is available for Sober Living Riches team accounts. To share there, connect Google Calendar while signed into your Sober Living Riches Scout account.';
+      host.appendChild(sharing);
+    }
     el('googleDisconnect').onclick = function () {
       action(this, async function () {
         if (!await window.scoutConfirm({ title: 'Disconnect Google Calendar?',

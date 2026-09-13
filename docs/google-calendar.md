@@ -1,5 +1,15 @@
 # Google Calendar — private scheduled GHL appointments LIVE
 
+## Block 023 — manager counts (local, not released yet)
+
+My Team links to a separate Scheduled appointments view. It reads the same current GHL appointment computation as the private owner view, with a 14-day maximum and counts only. A missing connection, withheld sharing, unsupported team, or failed Google read never becomes zero. There is no attendance claim, first-booking ledger, title-derived follow-up flag, AI processing, or change to existing call metrics.
+
+Sharing is explicitly off for existing connections. A closer on the verified Sober Living Riches team can enable it on their private calendar page. Only their current manager and authorized Scout admins can request the count; no event details reach that response. Consent is bound to the manager scope and reset on reconnect. Access and consent are checked again after the Google read. The connection table remains server-only with RLS and no browser grants.
+
+**Account distinction found September 13:** the existing test connection belongs to Scout account `josh@scoutsystems.io` (Scout Systems owner), not `joshua@soberlivingriches.com` (Sober Living Riches manager). It is not transferred or relabeled. Josh must sign into the SLR Scout account, connect his Google calendar there, and opt into count sharing before his count appears on that team. Other Google users still require test-user approval while the OAuth app is in Testing.
+
+Historical receipts below describe the earlier private-only version.
+
 **Block 022 released:** `94bef3be7d6f5fc168df3b30e2c084dba9bcc2c6`, Railway `05a18e3e-26f6-4813-9bbb-331607ded02f` SUCCESS. Latest design `c472290` preserved; combined suite 2,854/2,854. Actual signed-in Josh view: 29 appointments September 13–19 and 33 September 7–12; zero SalesKick details in either. Date changes verified, current week restored, connection intact. Served dashboard/calendar HTML/calendar JS match the release byte-for-byte. Receipt: `~/Desktop/scan-reports/block-022-ghl-schedule/release-verification.md`. Pre-release notes below are historical; live manager sharing and first-booking metrics are not part of this release.
 
 Released September 13, 2026 as `22884b96e7289b0152e997d63b78414e86c5a54d`; Railway deployment `b804381e-61a2-4bb4-b06b-421b5305969b` SUCCESS. Latest Observatory main `172b591` is preserved. Final integrated suite: 2,845/2,845. Served page/scripts/styles/privacy match the release byte-for-byte, unauthenticated inspection returns 401, and the existing signed-in Scout browser shows the new Account button. That release receipt predates live consent. Follow-up completed: `joshua@soberlivingriches.com` is on Google's test list, Josh successfully connected, and real primary-calendar reads across two date ranges established the narrow Sober Living Riches signature below. The live connection remains intact. Release evidence: `~/Desktop/scan-reports/block-021-calendar-connect/release-verification.md`.

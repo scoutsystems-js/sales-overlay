@@ -15545,6 +15545,7 @@
     content.innerHTML = teamHeaderHtml() + teamControlsHtml()
       + '<div class="section fade-in"><div class="section-header"><div><h2>My Team</h2>'
         + '<div class="meta">add, deactivate, move, reset password, or update a rep\'s email</div></div>'
+        + '<a class="date-preset" href="/team-calendar.html' + (state.teamSelected ? '?team=' + encodeURIComponent(state.teamSelected) : '') + '">Scheduled Appointments</a>'
         + '<button class="date-preset" onclick="goTeam()">← Back to Team</button></div>'
         + teamMembersBodyHtml() + '</div>';
   }

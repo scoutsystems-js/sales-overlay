@@ -32,7 +32,7 @@ test('OAuth state is expiring and single-use; tokens encrypted and never returne
   await service.complete(state, 'code');
   await assert.rejects(service.complete(state, 'code'), /invalid_state/);
   const status = await service.status('rep');
-  assert.deepEqual(status, { connected: true });
+  assert.deepEqual(status, { connected: true, sharing_enabled: false, sharing_eligible: false });
   assert.doesNotMatch(JSON.stringify(status), /access_token|refresh_token|refresh-secret|title_contains|snapshot/);
   assert.doesNotMatch(JSON.stringify(db.tables.google_calendar_connections), /"access"|"refresh"/);
   const pending = await service.begin('rep');
@@ -118,7 +118,7 @@ test('disconnect wins over an in-flight inspection and no event data is served a
   google.events = async () => { await service.disconnect('rep'); return []; };
   await assert.rejects(service.inspect('rep', range), /connection_changed/);
   assert.equal(db.tables.google_calendar_connections.length, 0);
-  assert.deepEqual(await service.status('rep'), { connected: false });
+  assert.deepEqual(await service.status('rep'), { connected: false, sharing_enabled: false, sharing_eligible: false });
 });
 
 test('disconnect also wins over an authorization exchange already in flight', async () => {
