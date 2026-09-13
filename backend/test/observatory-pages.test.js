@@ -159,6 +159,8 @@ test('Performance remains an executed team surface: its date/team controls, sort
   assert.match(out.markup, /observatory-visor-target[^]*>35<\/text>/, 'Objection handling retains its canonical 35% calibration mark');
   assert.match(out.markup, /observatory-visor-target[^]*>45<\/text>/, 'Call time uses its 35–45 minute good-band calibration');
   assert.doesNotMatch(out.markup, /observatory-visor-target[^]*>60<\/text>/, 'Call-time must not redraw the old 60-minute ceiling as a target');
+  assert.equal((out.markup.match(/observatory-visor-unit/g) || []).length, 1,
+    'the two percentage readings remain full-size like the source Visor; only call time has a compact unit');
 });
 
 test('Coaching remains an executed team surface: one selected closer keeps the verified call, owner-aware review door, and cited evidence', () => {
@@ -402,4 +404,44 @@ test('Team Visor preserves long decimal readouts inside the static brackets', ()
     assert.ok(observed.left >= 104 && observed.right <= 236, 'readout stays between the 104–236 bracket edges: ' + JSON.stringify(observed));
     assert.equal(observed.arc, dash, 'progress remains proportional and clamps over-scale values');
   }
+});
+
+test('production Visor gauge matches the approved source artwork at the reference value', () => {
+  const approvedPath = path.join(__dirname, '..', '..', 'docs', 'design', 'scout-visor-motion-approved.html');
+  const approved = fs.readFileSync(approvedPath, 'utf8');
+  const approvedStyle = /<style>([\s\S]*?)<\/style>/.exec(approved)[1].replace(/^\s*@import.*$/m, '');
+  const approvedGauge = /<article class="visor-gauge"[\s\S]*?<\/article>/.exec(approved)[0];
+  const helper = ['visorTickMarks', 'visorPoint', 'visorGaugeHtml'].map((name) => fnBody(SCRIPT, name)).join('\n');
+  const productionGauge = new Function('escapeHtml', helper + `\nreturn visorGaugeHtml({ raw:23, scale:100, valueText:'23%', aria:'Closing 23 percent', color:'#09d543', phase:0 });`)((value) => String(value));
+  const reference = '<!doctype html><html><head><style>' + STYLE + '</style><style>' + approvedStyle + '</style></head><body data-view="team-performance">'
+    + '<section id="scout-visor-motion" style="width:330px">' + approvedGauge + '</section>'
+    + '<div style="width:330px">' + productionGauge + '<div class="observatory-instrument-copy"><div class="avg-name">CLOSING %</div><div class="avg-counts">5 of 22 prospects</div></div></div></body></html>';
+  const observed = renderComputed(reference, `(() => {
+    const css = (node) => { const s = getComputedStyle(node); return { fill:s.fill, stroke:s.stroke, strokeWidth:s.strokeWidth, strokeLinecap:s.strokeLinecap, filter:s.filter, fontSize:s.fontSize, fontWeight:s.fontWeight, opacity:s.opacity }; };
+    const copyCss = (node) => { const s = getComputedStyle(node); return { color:s.color, fontSize:s.fontSize, fontWeight:s.fontWeight, letterSpacing:s.letterSpacing, lineHeight:s.lineHeight, marginTop:s.marginTop, opacity:s.opacity }; };
+    const source = document.querySelector('#scout-visor-motion');
+    const production = document.querySelector('.observatory-visor-gauge');
+    return {
+      source: { track:css(source.querySelector('.visor-track')), bloom:css(source.querySelector('.visor-value-bloom')), value:css(source.querySelector('.visor-value')), core:css(source.querySelector('.visor-value-core')), number:css(source.querySelector('.visor-number')), needle:css(source.querySelector('.visor-needle')), label:copyCss(source.querySelector('.visor-gauge-copy strong')), count:copyCss(source.querySelector('.visor-gauge-copy span')) },
+      production: { track:css(production.querySelector('.observatory-visor-track')), bloom:css(production.querySelector('.observatory-visor-arc-glow')), value:css(production.querySelector('.observatory-visor-arc')), core:css(production.querySelector('.observatory-visor-arc-core')), number:css(production.querySelector('.observatory-visor-value')), needle:css(production.querySelector('.observatory-visor-needle')), underline:css(production.querySelector('.observatory-visor-underline')), label:copyCss(document.querySelector('.observatory-instrument-copy .avg-name')), count:copyCss(document.querySelector('.observatory-instrument-copy .avg-counts')), ticks:production.querySelectorAll('.observatory-visor-tick').length, majors:production.querySelectorAll('.observatory-visor-tick--major').length, contours:production.querySelectorAll('.observatory-visor-contour').length, needlePath:production.querySelector('.observatory-visor-needle').getAttribute('d'), underlinePath:production.querySelector('.observatory-visor-underline').getAttribute('d'), firstTick:[...production.querySelectorAll('.observatory-visor-tick')].slice(0, 2).map((line) => [line.getAttribute('x1'), line.getAttribute('y1'), line.getAttribute('x2'), line.getAttribute('y2')]) },
+      paths: { sourceTrack:source.querySelector('.visor-track').getAttribute('d'), productionTrack:production.querySelector('.observatory-visor-track').getAttribute('d'), sourceInner:source.querySelectorAll('.visor-hair')[1].getAttribute('d'), productionInner:production.querySelectorAll('.observatory-visor-hair')[1].getAttribute('d') }
+    };
+  })()`);
+  assert.deepEqual(observed.production.track, observed.source.track, 'approved and production tracks share the source stroke treatment');
+  assert.deepEqual(observed.production.bloom, observed.source.bloom, 'approved and production blooms share the source thickness and blur');
+  assert.deepEqual(observed.production.value, observed.source.value, 'approved and production main arcs share the source glow hierarchy');
+  assert.deepEqual(observed.production.core, observed.source.core, 'approved and production white arc cores match');
+  assert.deepEqual(observed.production.number, observed.source.number, 'approved and production number typography matches');
+  assert.deepEqual(observed.production.label, observed.source.label, 'production captions retain the approved source typography');
+  assert.deepEqual(observed.production.count, observed.source.count, 'production gauge counts retain the approved source typography');
+  assert.equal(observed.paths.productionTrack, observed.paths.sourceTrack, 'production keeps the approved 270-degree horseshoe path');
+  assert.equal(observed.paths.productionInner, observed.paths.sourceInner, 'production keeps the approved inner hair ring');
+  assert.equal(observed.production.ticks, 34, 'production renders the approved dense 34-tick orbit');
+  assert.equal(observed.production.majors, 7, 'production preserves the approved major tick cadence');
+  assert.equal(observed.production.contours, 2, 'production preserves both approved contour arcs');
+  assert.deepEqual(observed.production.needle, observed.source.needle, 'filled needle retains the approved computed source treatment');
+  assert.equal(observed.production.underline.fill, observed.source.needle.fill, 'filled underline remains visible in the same mint source treatment');
+  assert.equal(observed.production.needlePath, 'M163 108 H177 L170 120 Z', 'production preserves the approved filled needle geometry');
+  assert.equal(observed.production.underlinePath, 'M150 222 H190 V225 H150 Z', 'production preserves the approved filled underline geometry');
+  assert.deepEqual(observed.production.firstTick, [['58.89', '83.19', '51.01', '77.04'], ['70.38', '64.64', '66.26', '60.28']], 'dense ticks use the approved source formula at phase zero');
 });

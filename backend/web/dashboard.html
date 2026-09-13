@@ -6117,6 +6117,21 @@
     body[data-view="team-performance"] .observatory-visor-value--compact { font-size:58px; letter-spacing:-.045em; }
     body[data-view="overview"] .observatory-visor-value--compact .observatory-visor-unit,
     body[data-view="team-performance"] .observatory-visor-value--compact .observatory-visor-unit { font-size:23px; }
+    body[data-view="overview"] .observatory-close-instrument .lead-number-label,
+    body[data-view="overview"] .observatory-metric-instrument .glance-label,
+    body[data-view="team-performance"] .observatory-instrument-copy .avg-name { display:block; margin-top:0; color:#e7f5ed; font-size:11px; font-weight:500; letter-spacing:.13em; line-height:1.35; text-transform:uppercase; opacity:1; }
+    body[data-view="overview"] .observatory-close-instrument .lead-number-sub,
+    body[data-view="overview"] .observatory-metric-instrument .glance-sub,
+    body[data-view="team-performance"] .observatory-instrument-copy .avg-counts { display:block; margin-top:4px; color:#aac3b6; font-size:12px; letter-spacing:.02em; line-height:1.35; opacity:1; }
+    body[data-view="overview"] .observatory-metric-instrument .glance-copy,
+    body[data-view="team-performance"] .observatory-instrument-copy { min-height:46px; margin-top:12px; }
+    /* Keep every Overview Visor caption on the source's single 12px cadence.
+       The legacy metric tile gap and label margin otherwise add seven pixels
+       after only the supporting gauges. */
+    body[data-view="overview"] .observatory-overview .glance-tile { row-gap:0; }
+    body[data-view="overview"] .observatory-metric-instrument .glance-copy { margin-top:12px; }
+    body[data-view="overview"] .observatory-metric-instrument .glance-label { margin-top:0; }
+    body[data-view="overview"] .observatory-close-instrument .lead-number-label { margin-top:12px; }
     body[data-view="overview"] .observatory-visor-scale,
     body[data-view="team-performance"] .observatory-visor-scale,
     body[data-view="overview"] .observatory-visor-target text,
@@ -6271,6 +6286,132 @@
       body[data-view="team-performance"] .rep-mono { width:32px; height:32px; }
       body[data-view="team-performance"] .rep-card-grade--head small { letter-spacing:0; text-transform:none; }
     }
+    /* H777 Visor source mapping: same gauge artwork and stroke hierarchy as the
+       approved concept; metric values and calibration still come from Scout. */
+    body[data-view="overview"], body[data-view="team-performance"] {
+      background:
+        radial-gradient(circle at 80% 4%, rgba(5,130,68,.32), transparent 30rem),
+        radial-gradient(circle at 5% 72%, rgba(0,112,59,.18), transparent 34rem),
+        linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%);
+      background-attachment:fixed;
+    }
+    /* Preserve the HUD container/accessibility and background-off hook, but use
+       the approved Visor's two quiet fixed contours for these two views. */
+    body[data-view="overview"] .observatory-hud svg,
+    body[data-view="team-performance"] .observatory-hud svg { opacity:0; }
+    body[data-view="overview"] .observatory-hud::before,
+    body[data-view="team-performance"] .observatory-hud::before,
+    body[data-view="overview"] .observatory-hud::after,
+    body[data-view="team-performance"] .observatory-hud::after {
+      content:""; position:fixed; pointer-events:none; border:1px solid rgba(125,255,179,.14);
+    }
+    body[data-view="overview"] .observatory-hud::before,
+    body[data-view="team-performance"] .observatory-hud::before {
+      width:62%; height:78%; left:8%; top:2%; border-radius:48% 52% 45% 55%; transform:rotate(-18deg);
+    }
+    body[data-view="overview"] .observatory-hud::after,
+    body[data-view="team-performance"] .observatory-hud::after {
+      width:78%; height:72%; right:-14%; bottom:-26%; border-radius:50%;
+    }
+    body[data-view="overview"] .observatory-upper>.section,
+    body[data-view="overview"] .observatory-overview>.section,
+    body[data-view="overview"] .observatory-overview-focus-grid>.section,
+    body[data-view="overview"] .observatory-overview-focus-side>.section,
+    body[data-view="team-performance"] .observatory-reps-panel,
+    body[data-view="team-performance"] .observatory-detail-panel,
+    body[data-view="team-performance"] .observatory-graphs-panel {
+      border-color:rgba(118,255,171,.36)!important; border-radius:14px!important;
+      background:linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42))!important;
+      box-shadow:inset 0 1px 0 rgba(231,255,240,.12),0 0 28px rgba(18,222,96,.06)!important;
+    }
+    body[data-view="overview"] .observatory-upper>.section::before,
+    body[data-view="overview"] .observatory-overview>.section::before,
+    body[data-view="overview"] .observatory-overview-focus-grid>.section::before,
+    body[data-view="overview"] .observatory-overview-focus-side>.section::before,
+    body[data-view="team-performance"] .observatory-reps-panel::before,
+    body[data-view="team-performance"] .observatory-detail-panel::before,
+    body[data-view="team-performance"] .observatory-graphs-panel::before {
+      content:""; display:block; width:42px; height:1px; margin-bottom:14px; background:#71ffad; box-shadow:0 0 9px rgba(77,255,148,.7);
+    }
+    body[data-view="overview"] .observatory-visor-gauge,
+    body[data-view="team-performance"] .observatory-visor-gauge {
+      width:min(330px,100%); max-width:330px; height:auto; aspect-ratio:340 / 348; color:var(--visor-tone); filter:none;
+    }
+    body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge { width:min(330px,100%); height:auto; }
+    body[data-view="overview"] .observatory-overview .glance-tile { grid-template-rows:auto auto; min-height:0; }
+    body[data-view="overview"] .observatory-close-instrument { min-height:0; }
+    body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { margin-top:0; }
+    body[data-view="team-performance"] .observatory-instrument { min-height:0; padding:4px 8px 12px; }
+    body[data-view="overview"] .observatory-visor--good,
+    body[data-view="team-performance"] .observatory-visor--good { --visor-tone:#09d543; }
+    body[data-view="overview"] .observatory-visor-track,
+    body[data-view="team-performance"] .observatory-visor-track { stroke:rgba(171,224,194,.18); stroke-width:15; stroke-linecap:butt; }
+    body[data-view="overview"] .observatory-visor-arc-glow,
+    body[data-view="team-performance"] .observatory-visor-arc-glow { stroke:color-mix(in srgb, var(--visor-tone) 42%, transparent); stroke-width:23; stroke-linecap:round; opacity:1; filter:blur(5px); }
+    body[data-view="overview"] .observatory-visor--good .observatory-visor-arc-glow,
+    body[data-view="team-performance"] .observatory-visor--good .observatory-visor-arc-glow,
+    body[data-view="overview"] .observatory-visor--reference-green .observatory-visor-arc-glow,
+    body[data-view="team-performance"] .observatory-visor--reference-green .observatory-visor-arc-glow { stroke:rgba(9,213,67,.42); }
+    body[data-view="overview"] .observatory-visor-arc,
+    body[data-view="team-performance"] .observatory-visor-arc { stroke:var(--visor-tone); stroke-width:15; stroke-linecap:round; filter:drop-shadow(0 0 5px color-mix(in srgb, var(--visor-tone) 72%, white)) drop-shadow(0 0 14px color-mix(in srgb, var(--visor-tone) 46%, transparent)); }
+    body[data-view="overview"] .observatory-visor--good .observatory-visor-arc,
+    body[data-view="team-performance"] .observatory-visor--good .observatory-visor-arc,
+    body[data-view="overview"] .observatory-visor--reference-green .observatory-visor-arc,
+    body[data-view="team-performance"] .observatory-visor--reference-green .observatory-visor-arc { filter:drop-shadow(0 0 5px rgba(70,255,131,.88)) drop-shadow(0 0 14px rgba(9,213,67,.46)); }
+    body[data-view="overview"] .observatory-visor-arc-core,
+    body[data-view="team-performance"] .observatory-visor-arc-core { fill:none; stroke:rgba(229,255,239,.88); stroke-width:1.5; stroke-linecap:round; }
+    body[data-view="overview"] .observatory-visor-hair,
+    body[data-view="team-performance"] .observatory-visor-hair { fill:none; stroke:rgba(120,248,171,.56); stroke-width:1.15; }
+    body[data-view="overview"] .observatory-visor-tick,
+    body[data-view="team-performance"] .observatory-visor-tick { stroke:rgba(220,255,234,.9); stroke-width:1.55; }
+    body[data-view="overview"] .observatory-visor-tick--major,
+    body[data-view="team-performance"] .observatory-visor-tick--major { stroke:#71ffad; stroke-width:2.1; }
+    body[data-view="overview"] .observatory-visor-contour,
+    body[data-view="team-performance"] .observatory-visor-contour { fill:none; stroke:rgba(142,255,189,.55); stroke-width:1.15; stroke-dasharray:4 8; }
+    body[data-view="overview"] .observatory-visor-contour--fine,
+    body[data-view="team-performance"] .observatory-visor-contour--fine { stroke:rgba(213,255,228,.34); stroke-dasharray:1 7; }
+    body[data-view="overview"] .observatory-visor-bracket,
+    body[data-view="team-performance"] .observatory-visor-bracket { stroke:rgba(198,255,220,.8); stroke-width:1.25; }
+    body[data-view="overview"] .observatory-visor-needle,
+    body[data-view="team-performance"] .observatory-visor-needle { fill:#71ffad!important; filter:drop-shadow(0 0 5px rgba(77,255,148,.9)); }
+    body[data-view="overview"] .observatory-visor-underline,
+    body[data-view="team-performance"] .observatory-visor-underline { fill:#71ffad!important; stroke:none; stroke-width:1px; filter:drop-shadow(0 0 5px rgba(77,255,148,.9)); }
+    body[data-view="overview"] .observatory-visor-value,
+    body[data-view="team-performance"] .observatory-visor-value { fill:#f1fff7; font-size:70px; font-weight:400; letter-spacing:-.06em; }
+    body[data-view="overview"] .observatory-visor-value--compact,
+    body[data-view="team-performance"] .observatory-visor-value--compact { font-size:65px; }
+    body[data-view="overview"] .observatory-visor-unit,
+    body[data-view="team-performance"] .observatory-visor-unit { font-size:28px; }
+    body[data-view="overview"] .observatory-close-instrument .lead-number-label,
+    body[data-view="overview"] .observatory-metric-instrument .glance-label,
+    body[data-view="team-performance"] .observatory-instrument-copy .avg-name { display:block; color:#e7f5ed; font-size:11px; font-weight:500; letter-spacing:.13em; line-height:1.35; text-transform:uppercase; opacity:1; }
+    body[data-view="overview"] .observatory-close-instrument .lead-number-sub,
+    body[data-view="overview"] .observatory-metric-instrument .glance-sub,
+    body[data-view="team-performance"] .observatory-instrument-copy .avg-counts { display:block; margin-top:4px; color:#aac3b6; font-size:12px; line-height:1.35; opacity:1; }
+    body[data-view="overview"] .observatory-metric-instrument .glance-copy,
+    body[data-view="team-performance"] .observatory-instrument-copy { min-height:46px; margin-top:12px; }
+    body[data-view="overview"] .observatory-visor-scale,
+    body[data-view="team-performance"] .observatory-visor-scale,
+    body[data-view="overview"] .observatory-visor-target text,
+    body[data-view="team-performance"] .observatory-visor-target text { fill:#aac3b6; font-size:18px; font-weight:500; }
+    /* The final Visor pass puts every gauge caption at the same source gap.
+       These reset older Overview and Team Performance spacing declarations. */
+    body[data-view="overview"] .observatory-overview .glance-tile { row-gap:0; }
+    body[data-view="overview"] .observatory-metric-instrument .glance-copy { margin-top:12px; }
+    body[data-view="overview"] .observatory-metric-instrument .glance-label { margin-top:0; }
+    body[data-view="overview"] .observatory-close-instrument .lead-number-label { margin-top:12px; }
+    body[data-view="team-performance"] .observatory-instrument-copy .avg-name { margin-top:0; }
+    body[data-view="team-performance"] .observatory-instrument-copy .avg-counts { letter-spacing:.28px; }
+    @media(max-width:620px) {
+      body[data-view="overview"] .observatory-visor-gauge,
+      body[data-view="team-performance"] .observatory-visor-gauge { width:min(300px,100%); max-width:300px; }
+      body[data-view="overview"] .observatory-close-instrument .observatory-visor-gauge,
+      body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { width:min(300px,100%); height:auto; }
+      body[data-view="overview"] .observatory-overview .glance-tile,
+      body[data-view="overview"] .observatory-close-instrument { grid-template-rows:auto auto; min-height:0; }
+      body[data-view="team-performance"] .observatory-instrument { min-height:0; }
+    }
+
     @media(prefers-reduced-motion:reduce) {
       body[data-view="team-performance"] .observatory-hud-orbit,
       body[data-view="team-performance"] .observatory-hud-dot,
@@ -18267,15 +18408,15 @@
   // The Visor instrument is shared by the personal Overview and Team Performance
   // panels. Its policy arrives with each existing data carrier; this helper only
   // turns that already-computed value into a fixed 270-degree visual readout.
-  function visorTickMarks() {
+  function visorTickMarks(offset) {
     var lines = [];
-    for (var i = 0; i < 36; i++) {
-      var a = (i / 36) * Math.PI * 2;
-      var major = i % 3 === 0;
-      var r1 = major ? 142 : 146;
-      var r2 = 153;
-      lines.push('<line x1="' + (170 + Math.cos(a) * r1).toFixed(1) + '" y1="' + (170 + Math.sin(a) * r1).toFixed(1)
-        + '" x2="' + (170 + Math.cos(a) * r2).toFixed(1) + '" y2="' + (170 + Math.sin(a) * r2).toFixed(1) + '"/>');
+    for (var i = 0; i < 34; i++) {
+      var a = (-142 + i * (284 / 33) + (offset || 0) * 2.7) * Math.PI / 180;
+      var major = i % 5 === 0;
+      var outer = 151;
+      var inner = outer - (major ? 10 : 6);
+      lines.push('<line class="observatory-visor-tick' + (major ? ' observatory-visor-tick--major' : '') + '" x1="' + (170 + Math.cos(a) * inner).toFixed(2) + '" y1="' + (170 + Math.sin(a) * inner).toFixed(2)
+        + '" x2="' + (170 + Math.cos(a) * outer).toFixed(2) + '" y2="' + (170 + Math.sin(a) * outer).toFixed(2) + '"/>');
     }
     return lines.join('');
   }
@@ -18292,39 +18433,47 @@
     var scale = (typeof options.scale === 'number' && options.scale > 0) ? options.scale : 100;
     var progress = measured ? Math.max(0, Math.min(100, (raw / scale) * 100)) : null;
     var band = options.band || null;
-    var toneStyle = options.color ? ' style="--visor-tone:' + escapeHtml(options.color) + '"' : '';
+    var tone = options.color === '#09e046' ? '#09d543' : options.color;
+    var greenClass = tone === '#09d543' ? ' observatory-visor--reference-green' : '';
+    var toneStyle = tone ? ' style="--visor-tone:' + escapeHtml(tone) + '"' : '';
     var emptyClass = measured ? '' : ' observatory-visor--empty';
     var phase = typeof options.phase === 'number' ? options.phase : 0;
+    var tickVariant = Math.round(phase / 16);
+    var arcPath = 'M81.6 258.4 A125 125 0 1 1 258.4 258.4';
     var arc = measured && progress > 0
-      ? '<path class="observatory-visor-arc-glow" d="M81.6 258.4 A125 125 0 1 1 258.4 258.4" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' 100"/>'
-        + '<path class="observatory-visor-arc" d="M81.6 258.4 A125 125 0 1 1 258.4 258.4" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' 100"/>'
+      ? '<path class="observatory-visor-arc-glow" d="' + arcPath + '" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' 100"/>'
+        + '<path class="observatory-visor-arc" d="' + arcPath + '" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' 100"/>'
+        + '<path class="observatory-visor-arc-core" d="' + arcPath + '" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' 100"/>'
       : '';
+    var midpoint = Math.round(scale / 2);
     var marks = Array.isArray(options.marks) ? options.marks : [options.target];
     var targetMark = marks.filter(function (mark) { return typeof mark === 'number' && mark >= 0 && mark <= scale; }).map(function (mark) {
       var point = visorPoint(mark, scale, 125);
       var outer = visorPoint(mark, scale, 139);
       var label = visorPoint(mark, scale, 151);
       return '<g class="observatory-visor-target"><line x1="' + point.x.toFixed(1) + '" y1="' + point.y.toFixed(1)
-        + '" x2="' + outer.x.toFixed(1) + '" y2="' + outer.y.toFixed(1) + '"/><text text-anchor="middle" x="' + label.x.toFixed(1) + '" y="' + (label.y + 4).toFixed(1) + '">' + escapeHtml(String(mark)) + '</text></g>';
+        + '" x2="' + outer.x.toFixed(1) + '" y2="' + outer.y.toFixed(1) + '"/>' + (mark === midpoint ? '' : '<text text-anchor="middle" x="' + label.x.toFixed(1) + '" y="' + (label.y + 4).toFixed(1) + '">' + escapeHtml(String(mark)) + '</text>') + '</g>';
     }).join('');
     var numeral = options.valueText == null ? '—' : String(options.valueText);
-    var readout = numeral + (options.unitText || '');
-    // Long, honest readings such as 49.3 min and 120.5 min stay inside the
-    // fixed bracket aperture. The actual characters remain untouched.
+    // The reference Visor keeps a percent with the main number. Minutes remain
+    // subordinate so long decimal call-time values can stay inside the brackets.
+    var fullUnit = options.unitText === '%' ? '%' : '';
+    var readout = numeral + fullUnit + (fullUnit ? '' : (options.unitText || ''));
     var compactReadout = readout.length >= 4;
     var valueClass = 'observatory-visor-value' + (compactReadout ? ' observatory-visor-value--compact' : '');
     var valueWidth = compactReadout ? ' textLength="132" lengthAdjust="spacingAndGlyphs"' : '';
-    var unitText = options.unitText ? '<tspan class="observatory-visor-unit">' + escapeHtml(String(options.unitText)) + '</tspan>' : '';
-    return '<div class="observatory-visor-gauge' + (band ? ' observatory-visor--' + band : '') + emptyClass + '"' + toneStyle + '>'
-      + '<svg viewBox="0 0 340 348" role="img" aria-label="' + escapeHtml(options.aria) + '">'
-      + '<g class="observatory-visor-contours" style="--visor-phase:' + (-phase) + 's"><path d="M37 237 A150 150 0 0 1 103 29"/><path d="M237 29 A150 150 0 0 1 303 237"/></g>'
-      + '<g class="observatory-visor-ticks" style="--visor-phase:' + phase + 's">' + visorTickMarks() + '</g>'
-      + '<path class="observatory-visor-track" d="M81.6 258.4 A125 125 0 1 1 258.4 258.4" pathLength="100"/>' + arc
-      + '<g class="observatory-visor-static"><path class="observatory-visor-bracket" d="M104 130 L92 144 V196 L104 210 M236 130 L248 144 V196 L236 210"/>'
-      + '<path class="observatory-visor-chevron" d="M162 110 L170 117 L178 110"/><path class="observatory-visor-underline" d="M145 222 H195"/>'
-      + '<text class="' + valueClass + '" x="170" y="191" text-anchor="middle"' + valueWidth + '>' + escapeHtml(numeral) + unitText + '</text>'
-      + '<text class="observatory-visor-scale" x="66" y="281" text-anchor="middle">0</text><text class="observatory-visor-scale" x="274" y="281" text-anchor="middle">' + escapeHtml(String(scale)) + '</text>'
-      + targetMark + '</g></svg></div>';
+    var unitText = options.unitText && !fullUnit ? '<tspan class="observatory-visor-unit">' + escapeHtml(String(options.unitText)) + '</tspan>' : '';
+    return '<div class="observatory-visor-gauge' + (band ? ' observatory-visor--' + band : '') + greenClass + emptyClass + '"' + toneStyle + '>'
+      + '<svg viewBox="0 0 340 348" role="img" aria-label="' + escapeHtml(options.aria) + '"><title>' + escapeHtml(options.aria) + '</title>'
+      + '<g class="observatory-visor-contours" style="--visor-phase:' + (-phase) + 's"><path class="observatory-visor-contour" d="M63.9 276.1 A150 150 0 1 1 276.1 276.1"/><path class="observatory-visor-contour observatory-visor-contour--fine" d="M54 280 A164 164 0 1 1 286 280"/></g>'
+      + '<g class="observatory-visor-ticks" style="--visor-phase:' + phase + 's">' + visorTickMarks(tickVariant) + '</g>'
+      + '<path class="observatory-visor-hair" d="M73.1 266.9 A137 137 0 1 1 266.9 266.9"/><path class="observatory-visor-track" d="' + arcPath + '" pathLength="100"/>' + arc
+      + '<g class="observatory-visor-static"><path class="observatory-visor-hair" d="M97.9 242.1 A102 102 0 1 1 242.1 242.1"/><path class="observatory-visor-bracket" d="M104 130 L92 144 V196 L104 210 M236 130 L248 144 V196 L236 210"/>'
+      + '<path class="observatory-visor-hair" d="M170 48 V84 M154 100 H186"/><path class="observatory-visor-hair" d="M91 258 L68 281 M249 258 L272 281"/>'
+      + '<text class="observatory-visor-scale" x="65" y="275">0</text><text class="observatory-visor-scale" x="170" y="19" text-anchor="middle">' + midpoint + '</text><text class="observatory-visor-scale" x="252" y="275">' + escapeHtml(String(scale)) + '</text>'
+      + targetMark + '<path class="observatory-visor-needle" d="M163 108 H177 L170 120 Z"/><path class="observatory-visor-underline" d="M150 222 H190 V225 H150 Z"/>'
+      + '<text class="' + valueClass + '" x="170" y="190" text-anchor="middle"' + valueWidth + '>' + escapeHtml(numeral + fullUnit) + unitText + '</text>'
+      + '</g></svg></div>';
   }
 
   function overviewGaugePolicy(analytics, key) {

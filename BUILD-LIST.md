@@ -20,6 +20,8 @@ The existing additive migration was applied separately: its tables have RLS and 
 
 ## Current implementation — Observatory redesign (2026-09-13)
 
+**Exact Visor correction in progress, not yet released.** The first live approximation was rejected against the approved motion mockup. Restore its complete artwork, original stroke/glow values, size, typography and surface treatment; compare directly to the unchanged source. Preserve metric semantics and site functions. See H778 and `~/Desktop/scan-reports/observatory-2026-09-13/visor-exact/release-status.md`.
+
 **Visor standard implemented and verified: 2,885/2,885 integrated tests pass.** Lock the fixed forest-gradient/HUD ground, translucent softly glowing cards and free-floating animated Visor gauges in `site-design.md`. Apply to personal Coaching Dashboard and Team Performance, with existing metric-dependent semantic bands. Team Performance keeps its three current metrics and fixed seven-day window; other page behavior stays intact. Verification/release record: `docs/design/observatory-implementation.md` and `~/Desktop/scan-reports/observatory-2026-09-13/visor-standard/`.
 
 

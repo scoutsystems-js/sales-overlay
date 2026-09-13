@@ -2,36 +2,45 @@
 
 ## Current standard — Visor, September 13, 2026
 
-Justin approved the animated Visor concept, then asked to lock the background, cards and gauges as Scout's standard and extend its gauge design to Team Performance. This section supersedes the earlier full-circle gauges, opaque Performance cards, and unbanded personal rate colors described below. Earlier releases and mockup CSS remain historical references, not competing standards. The implementation and verification state is recorded in [the implementation record](docs/design/observatory-implementation.md).
+Justin approved the animated Visor concept, then asked to lock the background, cards and gauges as Scout's standard and extend its gauge design to Team Performance. On September 13 at 2:30 PM he rejected the first live approximation and required it to be IDENTICAL to that mockup. The archived SVG/CSS is the appearance authority; implementation shortcuts are not a new approved standard. This section supersedes the earlier full-circle gauges, opaque Performance cards, and unbanded personal rate colors described below. Earlier releases and mockup CSS remain historical references, not competing standards. The implementation and verification state is recorded in [the implementation record](docs/design/observatory-implementation.md).
 
 ### Background and layout
 
 One fixed viewport ground carries two visible forest-green light pools with a dark center. Page content scrolls over it; the gradient and background HUD do not scroll. No mesh on the redesigned pages. Keep the approved gradient exactly:
 
 ```css
-radial-gradient(ellipse 58% 50% at -7% 8%, rgba(21,122,58,.46), transparent 74%),
-radial-gradient(ellipse 54% 46% at 104% 88%, rgba(13,91,43,.36), transparent 72%),
-radial-gradient(ellipse 46% 38% at 51% 42%, rgba(0,0,0,.48), transparent 78%),
-linear-gradient(136deg, #07100b 0%, #080a09 50%, #0a120d 100%)
+radial-gradient(circle at 80% 4%, rgba(5,130,68,.32), transparent 30rem),
+radial-gradient(circle at 5% 72%, rgba(0,112,59,.18), transparent 34rem),
+linear-gradient(135deg, #06130d 0%, #010604 52%, #071c11 100%)
 ```
 
-Use the existing fixed 1200×860 HUD: two arcs, two rings, four traces, three points and one scan, in pale white/gray. Stroke alpha .14, dashed alpha .12, points .20; scan fill .17 at opacity .45. Orbit 82 seconds, points 67/91/74 seconds, scan 28 seconds. Artwork is decorative, behind content, hidden from accessibility and unable to intercept clicks. Background-off hides the artwork; reduced motion stops movement. Do not brighten it further or introduce fake telemetry.
+The two corrected pages use the mockup's two quiet pale-green ellipse contours instead of the earlier white multi-ring/trace/scan artwork. Match `rgba(125,255,179,.14)` 1px contours: the first is 62% × 78%, left 8%, top 2%, with 48%/52%/45%/55% corner curvature and −18° rotation; the second is 78% × 72%, right −14%, bottom −26%, fully rounded. Their layer remains fixed, decorative, hidden from accessibility and unable to intercept clicks. The background-off setting hides it. The gauge's outer artwork retains its approved rotation. Team Coaching keeps its prior HUD in this scoped correction. Do not reintroduce the old visible white traces behind these two pages.
 
 Keep 24px desktop and 18px mobile outside gutters. Use available width and the real sidebar height rather than fixed empty spacer bands. Personal Coaching has three free-floating gauges in this order: Closing %, Objection handle rate, Avg call score. Closing remains the lead and links to the regular Calls page. Focus panels begin directly below the hero; Coach Summary is last and spans the available page width. Retain all existing date/user controls, evidence, filters, optional charts and navigation.
 
 ### Cards and selected states
 
-Cards float over the single gradient. Their fill is dark translucent green, with smooth 20px desktop / 16px narrow corners, a thin pale-sage edge, one subtle inset highlight, soft dark shadow and a restrained emerald border bloom. Major fill `rgba(7,23,14,.78)`, inset fill `rgba(14,40,24,.42)`, edge `rgba(196,231,207,.30)`, bloom `rgba(21,161,71,.10)`; blur 4px major / 3px inset. Keep body text pale and readable. Do not put separate gradient backgrounds or loud neon frames on each card.
+Cards use the exact Visor surface treatment: a 14px radius, 1px `rgba(118,255,171,.36)` edge, `linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42))` fill, inset highlight `0 1px 0 rgba(231,255,240,.12)` and outer bloom `0 0 28px rgba(18,222,96,.06)`. Major content panels include the mockup's short 42px × 1px mint top light with a 14px gap beneath it and `0 0 9px rgba(77,255,148,.7)` glow. The September 13 exact-match correction supersedes the prior flat glass tokens where this section differs. Preserve readable live content and existing controls; no fake summary text or telemetry.
 
 Selected menu and selected member share the approved treatment: sage outline, 2px bright Scout-green left edge, 11px radius, dark green selection fill `linear-gradient(100deg,#1b4527,#112617)`, pale text and restrained green glow. Preserve Scout's actual wordmark and white date picker.
 
 ### Visor gauges and movement
 
-The gauge is an open 270-degree horseshoe, free-floating without a rectangular card. It has a quiet track, a smooth colored progress arc with a fine bright core and soft bloom, a pale central number, angular static brackets, a small upper chevron and a short lower underline. Thin calibration labels sit outside the ring. Metric name, counts, trend and existing context remain legible HTML below the graphic. On narrow phones, stack complete gauges with readable calibration rather than shrinking them into tiny side-by-side dials.
+The gauge copies the approved artwork directly. It is an open 270-degree horseshoe, free-floating without a rectangular card, with these required layers:
 
-Only the outer micro hash marks and broken contour lines rotate: ticks clockwise once every 80 seconds, contours counterclockwise once every 110 seconds. Stagger starting phases across gauges. The number, progress arc, brackets, labels, scale and target marks never rotate. Reduced motion freezes the decorative loops. The entire rotation must fit within the gauge bounds at every angle without touching the captions. Keep glow soft and movement slow; no pulsing numbers or sweeping progress animations.
+- Main track: radius 125, stroke width 15, `rgba(171,224,194,.18)`.
+- Bloom: same path, width 23, `rgba(9,213,67,.42)`, blur 5px.
+- Main green progress: width 15, `#09d543`; shadows `0 0 5px rgba(70,255,131,.88)` and `0 0 14px rgba(9,213,67,.46)`.
+- Bright progress core: width 1.5, `rgba(229,255,239,.88)`; round ends on every progress layer.
+- Outer radius-137 hair arc, inner radius-102 hair arc, upper crosshair and endpoint calibration hairs; stroke 1.15 in `rgba(120,248,171,.56)`.
+- Exact angular brackets, stroke 1.25 in `rgba(198,255,220,.8)`; filled triangle `M163 108 H177 L170 120 Z` and filled underline `M150 222 H190 V225 H150 Z`, both mint with the approved glow. Never replace the triangle with an outline chevron.
+- Two rotating contour paths at radii 150 and 164 with dashed and fine dotted treatments, plus 34 open-arc ticks. Every fifth tick is major. Tick lengths, strokes, phase and paths come from the archive.
 
-The approved motion [source](docs/design/scout-visor-motion-approved.html) is archived unchanged (SHA-256 `d23b1f8c740fd9a7d73d1e6cc5eabbec1525ce7cf38584e272cf86902033d518`). Its 340×348 viewBox encloses center 170,170 and the complete outer orbit; the main horseshoe uses radius 125, starting at 135° and ending at 405°. These are reference proportions, scaled responsively. For an open path with `pathLength="100"`, use a nonrepeating visible segment (`progress 100`), and omit the progress path at zero to prevent a stray luminous endpoint.
+Use the original pale `#f1fff7` numeric text, Saira weight 400 and 70-unit size (65 for the archive's compact percentage). Preserve the full-size percentage sign used by the reference where it fits; smaller units and bounded compression are reserved for genuinely long live readouts. Gauge width reaches 330px when space allows, with responsive scaling and a 300px phone maximum. Do not shrink it to a 216px desktop dial. Labels and counts follow the archive's weight, letter spacing and 12px copy gap, in readable HTML below the graphic. Narrow phones stack complete gauges. No whole-gauge blur/filter substitutes for the separately drawn glow layers.
+
+Only the outer micro hash marks and broken contour lines rotate: ticks clockwise once every 80 seconds, contours counterclockwise once every 110 seconds. Use the archive's starting phases: ticks 0/−21/−46 seconds; contours 0/−37/−12 seconds, with the archive's per-gauge tick angle offset. The number, progress arc, brackets, labels, scale and target marks never rotate. Reduced motion freezes the decorative loops. The entire rotation must fit within the gauge bounds at every angle without touching the captions. Keep glow soft and movement slow; no pulsing numbers or sweeping progress animations.
+
+The approved motion [source](docs/design/scout-visor-motion-approved.html) is archived unchanged (SHA-256 `d23b1f8c740fd9a7d73d1e6cc5eabbec1525ce7cf38584e272cf86902033d518`). Its 340×348 viewBox encloses center 170,170 and the complete outer orbit; the main horseshoe uses radius 125, starting at 135° and ending at 405°. These are required proportions, scaled responsively. Compare rendered production geometry, stroke widths, colors, glow and typography against the unchanged archive under the same sample value/scale/color; generic tests that merely prove a ring exists do not prove fidelity. For an open path with `pathLength="100"`, use a nonrepeating visible segment (`progress 100`), and omit the progress path at zero to prevent a stray luminous endpoint.
 
 ### Color, scale and meaning
 

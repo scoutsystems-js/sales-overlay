@@ -100,7 +100,7 @@ test('overview uses three real glowing instruments in the requested order and ke
   assert.deepEqual(desktop.metrics.map((metric) => metric.action), ['goObjections()', "drillCalls('analyzed','score')"], 'OHR and score keep their existing drill actions');
   desktop.metrics.forEach((metric) => assert.ok(metric.ring, 'each supporting metric must render a ring, not text-only tile'));
   assert.deepEqual(desktop.closeLink, { tag: 'A', href: '#call-library', action: 'goCallLibrary(); return false;', callsNavigationCount: 1, callsNavigationPrevented: true }, 'Closing must use the regular Calls-page navigation');
-  assert.ok(desktop.closeRingWidth > desktop.metrics[0].ringWidth, 'Closing remains visibly more prominent than a support instrument');
+  assert.ok(Math.abs(desktop.closeRingWidth - desktop.metrics[0].ringWidth) <= 1, 'the faithful source uses equally sized Visor instruments');
   desktop.ringCenters.forEach((center) => assert.ok(Math.abs(center - desktop.ringCenters[0]) <= 1, 'all three desktop rings share one visual centerline'));
   assert.equal(desktop.trendBelowRing, true, 'the existing score trend remains present below its instrument');
   assert.equal(desktop.focusInUpper, true, 'focus panels sit directly below the gauges in the main column');
@@ -135,6 +135,7 @@ test('overview glass panels reveal the fixed ground while retaining readable edg
     const insets = [...document.querySelectorAll('.observatory-overview .team-recs-card, .observatory-overview .pattern-card')];
     return {
       panelColors: panels.map((panel) => getComputedStyle(panel).backgroundColor),
+      panelImages: panels.map((panel) => getComputedStyle(panel).backgroundImage),
       panelBorders: panels.map((panel) => getComputedStyle(panel).borderTopColor),
       panelShadows: panels.map((panel) => getComputedStyle(panel).boxShadow),
       gaugeSurfaces: gauges.map((gauge) => { const style = getComputedStyle(gauge); return { background: style.backgroundColor, border: style.borderTopWidth, shadow: style.boxShadow, blur: style.backdropFilter }; }),
@@ -143,7 +144,8 @@ test('overview glass panels reveal the fixed ground while retaining readable edg
     };
   })()`);
   assert.ok(observed.panelColors.length >= 4, 'the rendered Overview must expose its major glass surfaces');
-  observed.panelColors.forEach((color) => assert.ok(alphaOf(color) >= .72 && alphaOf(color) <= .82, 'major panels must remain dark but translucent'));
+  observed.panelColors.forEach((color) => assert.equal(alphaOf(color), 0, 'approved Visor panels use a translucent gradient rather than a solid fill'));
+  observed.panelImages.forEach((image) => assert.match(image, /linear-gradient/, 'major panels retain the approved Visor glass gradient'));
   assert.ok(observed.insetColors.length > 0, 'the rendered Overview must expose nested glass cards');
   observed.insetColors.forEach((color) => assert.ok(alphaOf(color) >= .32 && alphaOf(color) <= .48, 'nested cards must stay lighter glass, never opaque insets'));
   observed.panelBorders.forEach((color) => assert.ok(alphaOf(color) >= .22, 'glass panels need a visible sage edge'));
@@ -264,7 +266,7 @@ test('Visor uses the established semantic bands, and measured zero has no cap ar
   good.slice(0, 2).forEach((gauge) => assert.match(gauge.className, /observatory-visor--good/, 'Closing and OHR above their canonical bars use green'));
   mid.slice(0, 2).forEach((gauge) => assert.match(gauge.className, /observatory-visor--mid/, 'Closing and OHR at their established yellow lower edge use amber'));
   bad.slice(0, 2).forEach((gauge) => assert.match(gauge.className, /observatory-visor--bad/, 'Closing and OHR below their canonical bars use red'));
-  assert.match(good[2].style, /--visor-tone:\s*#09e046/, 'Avg score keeps its established 70+ green scoreColor tone');
+  assert.match(good[2].style, /--visor-tone:\s*#09d543/, 'Avg score keeps its established 70+ green scoreColor tone');
   assert.match(mid[2].style, /--visor-tone:\s*#fbbf24/, 'Avg score keeps its established 50-point amber edge');
   assert.match(bad[2].style, /--visor-tone:\s*#f87171/, 'Avg score keeps its established below-50 red scoreColor tone');
 

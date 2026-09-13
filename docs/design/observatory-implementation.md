@@ -1,5 +1,12 @@
 # Observatory implementation record
 
+## Exact Visor correction — September 13, 2026
+
+**Approved correction; implementation in progress, not yet released.** Justin rejected the first simplified live gauges beside the approved mockup. The source lost the 15-unit arc, white core, inner/outer hair rings, filled triangle, crosshairs, fine contour and exact glow. This correction copies those archived layers and proportions, restores the reference ground/card styling on personal Overview and Team Performance, and adds a direct reference comparison. Metric policies, real values, actions, content and fixed background behavior remain intact. Current authority is the first section of site-design.md (H778); the original Visor archive remains byte-identical.
+
+Evidence and final release status: `~/Desktop/scan-reports/observatory-2026-09-13/visor-exact/release-status.md`.
+
+
 ## Visor standard — approved September 13, 2026
 
 **Status: approved and implemented. Integrated validation passes 2,885/2,885 tests, zero skipped, after preserving the latest calendar release. Desktop, tablet and phone visual reviews pass. Live review caught decimal call-time text crowding its brackets; the final compact readout preserves all digits and units within the 132-unit aperture, tested with 49.3 and 120.5 minutes. Production deployment status is recorded in the release receipt below.** The current specification is the first section of `site-design.md`. Approved motion source is archived as `docs/design/scout-visor-motion-approved.html`; prior archives remain unchanged.
