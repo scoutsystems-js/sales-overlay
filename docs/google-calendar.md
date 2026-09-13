@@ -1,6 +1,8 @@
 # Google Calendar — private scheduled GHL appointments LIVE
 
-## Block 023 — manager counts (local, not released yet)
+## Block 023 — manager counts LIVE
+
+Released `0344cb95a1b818212ce60f41ca90d73b7be7db0a` (implementation `3fd6c43`), Railway `b16d7184-f1e0-43f8-bad6-3beec46f3e96` SUCCESS. Latest design `da7f2a2` merged and preserved. Full integrated suite 2,877/2,877; six served artifacts byte-identical and artifact-specific markers pass. Actual signed-in manager page: 12 active SLR members, all Not connected, dates verified and current week restored. Original private connection still shows 29 appointments. Live positive sharing awaits Josh's account/opt-in step below. Evidence: `~/Desktop/scan-reports/block-023-manager-calendar/`.
 
 My Team links to a separate Scheduled appointments view. It reads the same current GHL appointment computation as the private owner view, with a 14-day maximum and counts only. A missing connection, withheld sharing, unsupported team, or failed Google read never becomes zero. There is no attendance claim, first-booking ledger, title-derived follow-up flag, AI processing, or change to existing call metrics.
 
