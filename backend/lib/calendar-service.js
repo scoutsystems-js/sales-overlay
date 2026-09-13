@@ -1,7 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const { SCOPES, seal, unseal, inspectionEvents, scheduledGhlEvents, validateInspectionRange, authorizeUrl } = require('./google-calendar');
-const { SUPPORTED_CALENDAR_TEAM_ID, sharingEligibility, sharedCountStatus } = require('./calendar-sharing');
+const { sharingEligibility, sharedCountStatus } = require('./calendar-sharing');
 const CONNECTIONS = 'google_calendar_connections';
 const STATES = 'google_calendar_oauth_states';
 const COLUMNS = 'user_id,generation,access_token_encrypted,refresh_token_encrypted,expires_at,connected_at,calendar_id,calendar_name,time_zone,title_contains,last_sync_at,last_sync_error,snapshot,share_scheduled_count,share_manager_id';
@@ -166,4 +166,4 @@ function createCalendarService(admin, google, config) {
   };
 }
 
-module.exports = { readConfig, createCalendarService, SUPPORTED_CALENDAR_TEAM_ID };
+module.exports = { readConfig, createCalendarService };

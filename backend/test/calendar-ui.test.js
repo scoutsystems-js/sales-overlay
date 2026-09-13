@@ -90,6 +90,17 @@ test('sharing is off until the owner explicitly enables it, and can be turned of
   assert.match(result.text, /Event details stay private/);
 });
 
+test('eligible owners see the sharing control, while unmanaged users are told only that no manager is assigned', () => {
+  const eligible = html().replace('configured:true,connected:true,', 'configured:true,connected:true,sharing_eligible:true,sharing_enabled:false,');
+  const ineligible = html().replace('configured:true,connected:true,', 'configured:true,connected:true,sharing_eligible:false,sharing_enabled:false,');
+  const eligibleResult = renderComputed(eligible, `(async()=>{await new Promise(r=>setTimeout(r,50));return {control:!!document.getElementById('calendarShare'),text:document.getElementById('calendarConnection').textContent}})()`, { width: 390 });
+  const ineligibleResult = renderComputed(ineligible, `(async()=>{await new Promise(r=>setTimeout(r,50));return document.querySelector('.calendar-sharing').textContent})()`, { width: 390 });
+  assert.equal(eligibleResult.control, true);
+  assert.match(eligibleResult.text, /Share scheduled appointment counts/);
+  assert.match(ineligibleResult, /no assigned manager/i);
+  assert.doesNotMatch(ineligibleResult, /Sober Living Riches|signed into/i);
+});
+
 test('Account Connect click starts Google directly after showing private read-only use', () => {
   const accountScript = fs.readFileSync(path.join(web, 'js/scout-calendar-account.js'), 'utf8');
   const page = `<!doctype html><html><body><div id="host"></div><script>

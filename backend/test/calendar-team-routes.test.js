@@ -5,7 +5,7 @@ const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createCalendarRouter } = require('../routes/calendar');
-const { createCalendarService, SUPPORTED_CALENDAR_TEAM_ID } = require('../lib/calendar-service');
+const { createCalendarService } = require('../lib/calendar-service');
 const { seal } = require('../lib/google-calendar');
 const { calendarStore } = require('./helpers/calendar-store');
 
@@ -116,15 +116,15 @@ test('manager response contains counts and states but no calendar or event detai
   assert.deepEqual(Object.keys(body.members.find(row => row.status === 'ready')).sort(), ['count', 'name', 'status', 'user_id']);
 });
 
-test('all-team owner view evaluates each current manager and never calls unsupported calendars a zero', async t => {
+test('all-team owner view evaluates each current manager and never calls unavailable calendars a zero', async t => {
   const { url } = await server(t, { resolveTeam: async () => ({ keyId: PRIVATE_OWNER, memberIds: [REP, OTHER_REP, PRIVATE_OWNER], label: 'All users', mode: 'all' }) });
   const body = await (await fetch(url + '/team' + range + '&team=all', { headers: { Authorization: PRIVATE_OWNER } })).json();
   assert.deepEqual(body.members.map(row => [row.user_id, row.status, row.count]), [
-    [REP, 'ready', 1], [OTHER_REP, 'unsupported', undefined], [PRIVATE_OWNER, 'unsupported', undefined],
+    [REP, 'ready', 1], [OTHER_REP, 'ready', 1], [PRIVATE_OWNER, 'not_sharing', undefined],
   ]);
 });
 
-test('sharing is opt-in for the authenticated owner, bound to the current supported manager, and reassignment disables it', async t => {
+test('sharing is opt-in for the authenticated owner, bound to the current manager, and reassignment disables it', async t => {
   const initial = seed();
   initial.google_calendar_connections.find(row => row.user_id === REP).share_scheduled_count = false;
   initial.google_calendar_connections.find(row => row.user_id === REP).share_manager_id = null;
@@ -151,16 +151,60 @@ test('sharing is opt-in for the authenticated owner, bound to the current suppor
   db.tables.user_profiles.find(row => row.user_id === REP).managed_by = OTHER_MANAGER;
   const moved = await (await fetch(url + '/status', { headers })).json();
   assert.equal(moved.sharing_enabled, false);
-  assert.equal(moved.sharing_eligible, false);
+  assert.equal(moved.sharing_eligible, true);
 });
 
-test('sharing rejects missing consent and unsupported teams without changing the connection', async t => {
+test('sharing rejects missing consent but allows every active managed rep to opt in', async t => {
   const { url, db } = await server(t);
   const headers = { Authorization: OTHER_REP, 'Content-Type': 'application/json' };
   assert.equal((await fetch(url + '/sharing', { method: 'POST', headers, body: '{}' })).status, 400);
-  assert.equal((await fetch(url + '/sharing', { method: 'POST', headers, body: JSON.stringify({ enabled: true }) })).status, 409);
+  assert.equal((await fetch(url + '/sharing', { method: 'POST', headers, body: JSON.stringify({ enabled: true }) })).status, 200);
   const conn = db.tables.google_calendar_connections.find(row => row.user_id === OTHER_REP);
   assert.equal(conn.share_manager_id, OTHER_MANAGER);
+});
+
+test('a connected Scout owner can opt into count sharing without reconnecting or changing its Google connection', async t => {
+  const { url, db } = await server(t, { resolveTeam: async () => ({ keyId: PRIVATE_OWNER, memberIds: [PRIVATE_OWNER], label: 'Scout Systems', mode: 'own' }) });
+  const headers = { Authorization: PRIVATE_OWNER, 'Content-Type': 'application/json' };
+  const connectionBefore = structuredClone(db.tables.google_calendar_connections.find(row => row.user_id === PRIVATE_OWNER));
+  const status = await (await fetch(url + '/status', { headers })).json();
+  assert.equal(status.sharing_eligible, true);
+
+  const response = await fetch(url + '/sharing', { method: 'POST', headers, body: JSON.stringify({ enabled: true }) });
+  assert.equal(response.status, 200);
+  const connectionAfter = db.tables.google_calendar_connections.find(row => row.user_id === PRIVATE_OWNER);
+  assert.equal(connectionAfter.share_scheduled_count, true);
+  assert.equal(connectionAfter.share_manager_id, PRIVATE_OWNER);
+  assert.equal(connectionAfter.generation, connectionBefore.generation);
+  assert.equal(connectionAfter.access_token_encrypted, connectionBefore.access_token_encrypted);
+  assert.equal(connectionAfter.refresh_token_encrypted, connectionBefore.refresh_token_encrypted);
+  assert.equal(connectionAfter.connected_at, connectionBefore.connected_at);
+
+  const teamResponse = await fetch(url + '/team' + range, { headers });
+  assert.equal(teamResponse.status, 200);
+  const body = await teamResponse.json();
+  assert.deepEqual(body.members.map(member => [member.user_id, member.status, member.count]), [[PRIVATE_OWNER, 'ready', 1]]);
+});
+
+test('a manager outside the connection owner’s current team cannot read its shared count', async t => {
+  const { url } = await server(t, { resolveTeam: async () => ({ keyId: OTHER_MANAGER, memberIds: [REP], label: 'Other Team', mode: 'own' }) });
+  const response = await fetch(url + '/team' + range, { headers: { Authorization: OTHER_MANAGER } });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.members.map(member => [member.user_id, member.status, member.count]), [[REP, 'unavailable', undefined]]);
+});
+
+test('deactivated and unmanaged owners cannot share scheduled counts', async t => {
+  const initial = seed();
+  initial.user_profiles.find(profile => profile.user_id === OTHER_REP).managed_by = null;
+  initial.user_profiles.find(profile => profile.user_id === INACTIVE).role = 'manager';
+  initial.google_calendar_connections.push(connection(INACTIVE));
+  const { url } = await server(t, { seed: initial });
+  const headers = id => ({ Authorization: id, 'Content-Type': 'application/json' });
+  const unmanaged = await fetch(url + '/sharing', { method: 'POST', headers: headers(OTHER_REP), body: JSON.stringify({ enabled: true }) });
+  const deactivated = await fetch(url + '/sharing', { method: 'POST', headers: headers(INACTIVE), body: JSON.stringify({ enabled: true }) });
+  assert.equal(unmanaged.status, 409);
+  assert.equal(deactivated.status, 409);
 });
 
 test('disconnect/reconnect resets consent instead of transferring old sharing', async () => {
@@ -294,8 +338,4 @@ test('migration defaults existing connections off and requires a bound manager w
   assert.match(sql, /share_scheduled_count boolean not null default false/i);
   assert.match(sql, /share_scheduled_count = false and share_manager_id is null/i);
   assert.match(sql, /share_scheduled_count = true and share_manager_id is not null/i);
-});
-
-test('the supported team identifier is explicit and stable', () => {
-  assert.equal(SUPPORTED_CALENDAR_TEAM_ID, MANAGER);
 });

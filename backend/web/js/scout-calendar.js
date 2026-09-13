@@ -141,7 +141,7 @@
         finally { control.disabled = false; }
       };
     } else {
-      sharing.textContent = 'Team sharing is available for Sober Living Riches team accounts. To share there, connect Google Calendar while signed into your Sober Living Riches Scout account.';
+      sharing.textContent = 'Team sharing is unavailable because you have no assigned manager.';
       host.appendChild(sharing);
     }
     el('googleDisconnect').onclick = function () {

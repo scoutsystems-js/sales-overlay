@@ -1,9 +1,5 @@
 'use strict';
 
-// The GHL signature used by Scout was measured only for Sober Living Riches.
-// Another team must be measured before its calendar can produce a count.
-const SUPPORTED_CALENDAR_TEAM_ID = '40616e16-a92b-45c4-99b8-b3d12e508bf6';
-
 function currentManagerId(profile) {
   if (!profile || profile.active === false) return null;
   if (profile.managed_by) return profile.managed_by;
@@ -13,7 +9,7 @@ function currentManagerId(profile) {
 
 function sharingEligibility(profile) {
   const managerId = currentManagerId(profile);
-  return { managerId, eligible: managerId === SUPPORTED_CALENDAR_TEAM_ID };
+  return { managerId, eligible: managerId !== null };
 }
 
 function sharedCountStatus(profile, connection, viewerRole, viewerId) {
@@ -25,4 +21,4 @@ function sharedCountStatus(profile, connection, viewerRole, viewerId) {
   return 'ready';
 }
 
-module.exports = { SUPPORTED_CALENDAR_TEAM_ID, currentManagerId, sharingEligibility, sharedCountStatus };
+module.exports = { currentManagerId, sharingEligibility, sharedCountStatus };

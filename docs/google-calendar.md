@@ -1,14 +1,18 @@
 # Google Calendar — private scheduled GHL appointments LIVE
 
+## Block 024 — account restriction removed; release pending
+
+The hard-coded Scout-team eligibility check is removed. An existing connection can share counts from its current Scout profile with no email match, account switch, reconnect or token transfer. Explicit opt-in and current manager/access checks remain. The SLR event-source filter and SalesKick exclusion are unchanged. Focused tests: 51 passing, including unchanged connection fields, other-team opt-in, wrong-manager denial, inactive/unmanaged denial, and consent/reassignment races. Both deliberate access-control bypasses fail the HTTP guard. Full-suite and release verification follow before deployment.
+
 ## Block 023 — manager counts LIVE
 
 Released `0344cb95a1b818212ce60f41ca90d73b7be7db0a` (implementation `3fd6c43`), Railway `b16d7184-f1e0-43f8-bad6-3beec46f3e96` SUCCESS. Latest design `da7f2a2` merged and preserved. Full integrated suite 2,877/2,877; six served artifacts byte-identical and artifact-specific markers pass. Actual signed-in manager page: 12 active SLR members, all Not connected, dates verified and current week restored. Original private connection still shows 29 appointments. Live positive sharing awaits Josh's account/opt-in step below. Evidence: `~/Desktop/scan-reports/block-023-manager-calendar/`.
 
 My Team links to a separate Scheduled appointments view. It reads the same current GHL appointment computation as the private owner view, with a 14-day maximum and counts only. A missing connection, withheld sharing, unsupported team, or failed Google read never becomes zero. There is no attendance claim, first-booking ledger, title-derived follow-up flag, AI processing, or change to existing call metrics.
 
-Sharing is explicitly off for existing connections. A closer on the verified Sober Living Riches team can enable it on their private calendar page. Only their current manager and authorized Scout admins can request the count; no event details reach that response. Consent is bound to the manager scope and reset on reconnect. Access and consent are checked again after the Google read. The connection table remains server-only with RLS and no browser grants.
+Sharing is explicitly off for existing connections. An active closer with an assigned manager, or a manager/admin heading their own board, can enable it on their private calendar page. Only their current manager and authorized Scout admins can request the count; no event details reach that response. Consent is bound to the manager scope and reset on reconnect. Access and consent are checked again after the Google read. The connection table remains server-only with RLS and no browser grants. Block 024 removes the former hard-coded SLR Scout-team gate; it does not change the measured SLR booking-source filter.
 
-**Account distinction found September 13:** the existing test connection belongs to Scout account `josh@scoutsystems.io` (Scout Systems owner), not `joshua@soberlivingriches.com` (Sober Living Riches manager). It is not transferred or relabeled. Josh must sign into the SLR Scout account, connect his Google calendar there, and opt into count sharing before his count appears on that team. Other Google users still require test-user approval while the OAuth app is in Testing.
+**Justin's correction, September 13 (Block 024):** the Google account chosen at Connect need not match the Scout email. The prior instruction to switch Scout accounts/reconnect is withdrawn. Josh keeps the existing connection on `josh@scoutsystems.io`; counts remain on that profile, not automatically transferred to another profile. He may opt into count sharing there. Other Google users still require test-user approval while the OAuth app is in Testing. This removes a Scout-team restriction, not Google's tester list or Scout's actual access controls.
 
 Historical receipts below describe the earlier private-only version.
 
