@@ -2,11 +2,11 @@
 
 ## Visor standard — approved September 13, 2026
 
-**Status: implemented and visually reviewed; focused checks pass 95/95 plus 9/9 final boundary checks. Not yet pushed; integrated release verification is pending.** The current specification is the first section of `site-design.md`. Approved motion source is archived as `docs/design/scout-visor-motion-approved.html`; prior archives remain unchanged.
+**Status: approved and implemented. Integrated validation passes 2,884/2,884 tests, zero skipped, after preserving the latest calendar release. Desktop, tablet and phone visual reviews pass. Production deployment status is recorded in the release receipt below.** The current specification is the first section of `site-design.md`. Approved motion source is archived as `docs/design/scout-visor-motion-approved.html`; prior archives remain unchanged.
 
 Scope: personal Coaching Dashboard and Team Performance share free-floating Visor horseshoes, semantic color, slow independent outer rotation, and translucent green-tinted cards. Background/HUD remains the approved fixed viewport design. Team Coaching keeps its current cards/ring in this release. Personal Closing and OHR read a metadata-only `gauge_policy` projection from the already-loaded analytics response, sourced from canonical Team `METRICS`; no extra fetch is introduced. They use the existing Team metric policy, superseding the earlier unbanded appearance; average scores keep the existing 70/50 bands. Team Performance retains Closing/OHR/call time, real scales, band calibration, counts, seven-day window and existing drills. No metric definition, grading, intelligence or permissions change is authorized by this design request.
 
-Release evidence will be recorded under `~/Desktop/scan-reports/observatory-2026-09-13/visor-standard/` after checks and deployment.
+Release evidence: `~/Desktop/scan-reports/observatory-2026-09-13/visor-standard/release-status.md`; clean full-suite receipt: `full-suite-final.txt` in that directory. The two original card-appearance failures are preserved separately as historical evidence; their expectations now match the approved glass treatment.
 
 ## Earlier release records
 
