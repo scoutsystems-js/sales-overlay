@@ -30,12 +30,12 @@ active analysis drain before the code push.
 
 **Coaching Dashboard Observatory extension — September 13 implementation.**
 Personal `overview` now shares the scoped fixed ground/HUD, responsive gutters,
-selected rail, transparent header, and opaque panels. Its existing data loads,
+selected rail, transparent header, and personal Overview glass panels. Its existing data loads,
 metrics, controls, lazy graph, drilldowns, permissions, and Closing % definition
 remain unchanged; the proportional ring reads the existing close rate and counts
 without a target or band or any metric-computation change. The real rail observer sets lower-panel clearance.
 Inline parsing and diff checks pass; focused rendered populated/loading/no-prospect
-coverage passes; the full backend suite passes 2,852/2,852. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/overview/release-status.md`.
+coverage passes; the full backend suite passes 2,856/2,856. The direct Overview first-load path stamps `data-view="overview"` before its fixed HUD is inserted, and the regression fixture begins without that hook. September 13 compact refinement: the same Closing, Calls analyzed, Avg score, and OHR values render as four SVG instruments; Closing stays dominant, calls use the actual in-range total, score retains its existing trend/color, OHR adds no band, and missing values are neutral. Coach Summary fills the upper rail area; What Needs Work is the wide lower left panel while Objection Focus and Performance Summary stack at right; phones use a two-by-two grid. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/compact/release-status.md`. September 13 Overview glass refinement is scoped only to personal `overview`: dark translucent green-tinted lower panels with modest blur, sage edges, and restrained emerald bloom reveal the existing fixed ground/HUD; the four gauges float free of cards in balanced desktop columns and the existing phone grid. Background-off and reduced-motion behavior remain pinned. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/glass/release-status.md`. Focused rendered coverage and the full backend suite pass 2,858/2,858.
 
 **September 13 visual refinement — LIVE, verified 2026-09-13.**
 The Observatory pages now have two localized emerald pools separated by a dark

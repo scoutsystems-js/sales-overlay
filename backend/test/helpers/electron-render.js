@@ -22,7 +22,10 @@ function renderComputed(html, probeJs, opts) {
   const file = path.join(dir, 'page.html');
   fs.writeFileSync(file, html);
   const r = spawnSync(ELECTRON, [RUNNER, file, probeJs, String((opts && opts.width) || 1400)], {
-    encoding: 'utf8', timeout: 30000, env: Object.assign({}, process.env, { ELECTRON_ENABLE_LOGGING: '0' }),
+    encoding: 'utf8', timeout: 30000, env: Object.assign({}, process.env, {
+      ELECTRON_ENABLE_LOGGING: '0',
+      SCOUT_REDUCED_MOTION: opts && opts.reducedMotion ? '1' : '0',
+    }),
   });
   fs.rmSync(dir, { recursive: true, force: true });
   const line = String(r.stdout || '').split('\n').filter((l) => l.startsWith('@@RESULT@@')).pop();
