@@ -5994,24 +5994,34 @@
       font-size:var(--observatory-page-title-size); font-weight:var(--fw-normal); line-height:1; letter-spacing:-.045em;
     }
     body[data-view="overview"] .observatory-overview .page-header .subtitle { opacity:.66; }
+    /* Justin's September 13 Overview revision: these surface layers are glass so
+       the already-fixed ground and HUD remain visible, while the dark tint keeps
+       body text readable. Team pages retain their opaque Observatory panels. */
+    body[data-view="overview"] {
+      --observatory-overview-surface:rgba(7,23,14,.78);
+      --observatory-overview-inset:rgba(14,40,24,.42);
+      --observatory-overview-edge:rgba(196,231,207,.30);
+      --observatory-overview-bloom:rgba(21,161,71,.10);
+    }
     body[data-view="overview"] .observatory-upper>.section,
     body[data-view="overview"] .observatory-overview>.section,
     body[data-view="overview"] .observatory-overview-focus-grid>.section,
     body[data-view="overview"] .observatory-overview-focus-side>.section {
-      position:relative; z-index:2; padding:22px 24px; border:1px solid var(--observatory-line)!important;
-      border-radius:var(--radius-lg)!important; background:var(--observatory-panel)!important;
-      box-shadow:inset 0 1px 0 rgba(245,255,248,.09),0 28px 58px rgba(0,0,0,.32)!important;
+      position:relative; z-index:2; padding:22px 24px; border:1px solid var(--observatory-overview-edge)!important;
+      border-radius:var(--radius-lg)!important; background:var(--observatory-overview-surface)!important;
+      backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+      box-shadow:inset 0 1px 0 rgba(245,255,248,.11),inset 0 0 0 1px rgba(103,205,135,.04),0 22px 48px rgba(0,0,0,.31),0 0 28px var(--observatory-overview-bloom)!important;
     }
     body[data-view="overview"] .observatory-upper>.section { margin:0 0 16px; }
     body[data-view="overview"] .observatory-overview>.section { margin:20px 0 0; }
     body[data-view="overview"] .observatory-overview-focus-grid>.section,
     body[data-view="overview"] .observatory-overview-focus-side>.section { margin:0; min-width:0; }
     body[data-view="overview"] .observatory-overview-hero {
-      position:relative; z-index:2; display:grid; grid-template-columns:190px minmax(0,1fr);
-      align-items:center; gap:18px; margin:0 0 16px;
+      position:relative; z-index:2; display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+      align-items:start; gap:12px; margin:0 0 16px;
     }
     body[data-view="overview"] .observatory-close-instrument {
-      display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:166px; margin:0;
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:196px; margin:0;
     }
     body[data-view="overview"] .overview-close-ring { width:166px; height:166px; color:var(--accent); }
     body[data-view="overview"] .observatory-close-instrument .lead-number-label {
@@ -6022,20 +6032,20 @@
       margin:4px 0 0; color:var(--text); font-size:var(--fs-secondary); opacity:.68;
     }
     body[data-view="overview"] .observatory-close-instrument--loading { align-items:flex-start; padding:22px 0; }
-    body[data-view="overview"] .observatory-overview .glance-row {
-      grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:0;
-    }
+    body[data-view="overview"] .observatory-overview .glance-row { display:contents; }
+    /* The support gauges are instruments, not cards: their open space lets the
+       same fixed ground show through as the dominant Closing gauge. */
     body[data-view="overview"] .observatory-overview .glance-tile {
-      display:grid; grid-template-columns:1fr; justify-items:center; align-content:center; row-gap:2px;
-      min-height:196px; padding:14px; text-align:center; border:1px solid var(--observatory-line); border-radius:var(--radius-lg);
-      background:#101315; box-shadow:inset 0 1px 0 rgba(245,255,248,.06),0 15px 34px rgba(0,0,0,.24);
+      display:grid; grid-template-columns:1fr; grid-template-rows:140px auto; justify-items:center; align-content:start; row-gap:2px;
+      min-height:196px; padding:13px 0 0; text-align:center; border:0; border-radius:0;
+      background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; box-shadow:none;
     }
-    body[data-view="overview"] .observatory-overview .glance-tile:first-child { padding-left:14px; border-left:1px solid var(--observatory-line); }
-    body[data-view="overview"] .observatory-overview .glance-tile:hover { border-color:rgba(211,237,217,.42); background:#111617; }
+    body[data-view="overview"] .observatory-metric-instrument { cursor:pointer; }
     body[data-view="overview"] .observatory-metric-ring { width:140px; height:140px; }
+    body[data-view="overview"] .observatory-metric-instrument:hover .glance-label { color:var(--accent); }
     body[data-view="overview"] .observatory-ring--empty { color:rgba(221,238,227,.36)!important; filter:none; }
     body[data-view="overview"] .observatory-metric-instrument .glance-copy { min-width:0; text-align:center; }
-    body[data-view="overview"] .observatory-metric-instrument .glance-label { margin-top:5px; }
+    body[data-view="overview"] .observatory-metric-instrument .glance-label { margin-top:5px; font-size:var(--fs-eyebrow); letter-spacing:.12em; }
     body[data-view="overview"] .observatory-metric-instrument .glance-sub { margin-top:4px; line-height:1.35; }
     body[data-view="overview"] .observatory-metric-trend .glance-trend { margin:3px 0 0; vertical-align:0; font-size:11px; }
     body[data-view="overview"] .observatory-metric-instrument .observatory-ring-number strong { font-size:var(--observatory-ring-value-compact); }
@@ -6044,9 +6054,10 @@
     body[data-view="overview"] .observatory-overview-focus-grid .section { min-height:0; }
     body[data-view="overview"] .observatory-overview .team-recs-card,
     body[data-view="overview"] .observatory-overview .pattern-card {
-      border:1px solid rgba(215,236,222,.10); border-radius:var(--radius); background:#101315; padding:18px 20px;
+      border:1px solid rgba(196,231,207,.18); border-radius:var(--radius); background:var(--observatory-overview-inset); padding:18px 20px;
+      backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); box-shadow:inset 0 1px 0 rgba(245,255,248,.07),0 0 18px rgba(21,161,71,.045);
     }
-    body[data-view="overview"] .observatory-overview .pattern-card + .pattern-card { border-top:1px solid rgba(215,236,222,.10); }
+    body[data-view="overview"] .observatory-overview .pattern-card + .pattern-card { border-top:1px solid rgba(196,231,207,.18); }
     body[data-view="overview"] .observatory-overview .patterns-list,
     body[data-view="overview"] .observatory-overview .team-recs-card,
     body[data-view="overview"] .observatory-overview .srk-card { max-width:980px; }
@@ -6078,11 +6089,11 @@
       body[data-view="overview"] .observatory-overview-focus-grid { grid-template-columns:1fr; }
       body[data-view="overview"] .observatory-overview .page-header { padding:0 0 14px; }
       body[data-view="overview"] .observatory-overview-hero { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:10px; }
-      body[data-view="overview"] .observatory-close-instrument { min-height:154px; margin:0; }
+      body[data-view="overview"] .observatory-close-instrument { min-height:154px; margin:0; justify-content:flex-start; }
       body[data-view="overview"] .overview-close-ring { width:126px; height:126px; }
       body[data-view="overview"] .observatory-ring-number strong { font-size:32px; }
       body[data-view="overview"] .observatory-overview .glance-row { display:contents; }
-      body[data-view="overview"] .observatory-overview .glance-tile { grid-template-columns:1fr; justify-items:center; min-height:154px; padding:10px; text-align:center; }
+      body[data-view="overview"] .observatory-overview .glance-tile { grid-template-columns:1fr; grid-template-rows:104px auto; justify-items:center; min-height:154px; padding:11px 0 0; text-align:center; }
       body[data-view="overview"] .observatory-metric-ring { width:104px; height:104px; }
       body[data-view="overview"] .observatory-metric-instrument .glance-copy { text-align:center; }
       body[data-view="overview"] .observatory-metric-instrument .observatory-ring-number strong { display:flex; flex-direction:column; align-items:center; font-size:var(--fs-gauge-value); }

@@ -1,5 +1,6 @@
 // Runs INSIDE electron (see electron-render.js). argv: [html file, probe expression, width]
 const { app, BrowserWindow } = require('electron');
+if (process.env.SCOUT_REDUCED_MOTION === '1') app.commandLine.appendSwitch('force-prefers-reduced-motion', 'reduce');
 app.whenReady().then(async () => {
   const file = process.argv[2], probe = process.argv[3], width = parseInt(process.argv[4], 10) || 1400;
   const win = new BrowserWindow({ show: false, width: width, height: 900, webPreferences: { offscreen: true, sandbox: false } });

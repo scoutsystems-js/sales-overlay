@@ -64,6 +64,7 @@ test('overview uses four real glowing instruments and keeps content compact at e
       arcs: [...hero.querySelectorAll('.observatory-ring-value')].map((arc) => arc.getAttribute('stroke-dasharray')),
       metrics: metrics.map((node) => { const ring = node.querySelector('.observatory-metric-ring'); return { action: node.getAttribute('onclick'), ring: !!ring, ringWidth: ring && ring.getBoundingClientRect().width }; }),
       closeRingWidth: close.querySelector('.overview-close-ring').getBoundingClientRect().width,
+      ringCenters: [close.querySelector('.overview-close-ring'), ...metrics.map((node) => node.querySelector('.observatory-metric-ring'))].map((ring) => { const rect = ring.getBoundingClientRect(); return rect.top + rect.height / 2; }),
       trendBelowRing: !!document.querySelector('.observatory-metric-trend .glance-trend'),
       coachInUpper: coach.parentElement.classList.contains('observatory-upper'),
       focusColumns: getComputedStyle(focus).gridTemplateColumns.split(' ').length,
@@ -83,6 +84,7 @@ test('overview uses four real glowing instruments and keeps content compact at e
   });
   assert.deepEqual(desktop.metrics.map((metric) => metric.action), ["drillCalls('analyzed',null)", "drillCalls('analyzed','score')", 'goObjections()'], 'the existing Calls, score, and OHR drills remain intact');
   assert.ok(desktop.closeRingWidth > desktop.metrics[0].ringWidth, 'Closing remains visibly more prominent than a support instrument');
+  desktop.ringCenters.forEach((center) => assert.ok(Math.abs(center - desktop.ringCenters[0]) <= 1, 'all four desktop rings share one visual centerline'));
   assert.equal(desktop.trendBelowRing, true, 'the existing score trend remains present below its instrument');
   assert.equal(desktop.coachInUpper, true, 'Coach Summary fills the upper rail-height area');
   assert.equal(desktop.focusColumns, 2, 'the full-width lower content retains its two-column desktop layout');
@@ -99,6 +101,59 @@ test('overview uses four real glowing instruments and keeps content compact at e
   assert.ok(mobile[2].top > mobile[0].bottom, 'mobile score moves to the second row');
   assert.ok(Math.abs(mobile[2].top - mobile[3].top) <= 1, 'mobile second row is score and OHR');
   mobile.forEach((rect) => assert.ok(rect.left >= 0 && rect.right <= 390, 'mobile instruments stay in bounds'));
+});
+
+function alphaOf(color) {
+  const match = /^rgba\([^,]+,[^,]+,[^,]+,\s*([0-9.]+)\)$/.exec(color);
+  return match ? Number(match[1]) : 1;
+}
+
+test('overview glass panels reveal the fixed ground while retaining readable edges', () => {
+  const observed = renderComputed(documentFor('overview'), `(() => {
+    const panels = [...document.querySelectorAll('.observatory-overview-upper-coach, .observatory-overview-focus-grid > .section, .observatory-overview-focus-side > .section')];
+    const gauges = [...document.querySelectorAll('.observatory-metric-instrument')];
+    const insets = [...document.querySelectorAll('.observatory-overview .team-recs-card, .observatory-overview .pattern-card')];
+    return {
+      panelColors: panels.map((panel) => getComputedStyle(panel).backgroundColor),
+      panelBorders: panels.map((panel) => getComputedStyle(panel).borderTopColor),
+      panelShadows: panels.map((panel) => getComputedStyle(panel).boxShadow),
+      gaugeSurfaces: gauges.map((gauge) => { const style = getComputedStyle(gauge); return { background: style.backgroundColor, border: style.borderTopWidth, shadow: style.boxShadow, blur: style.backdropFilter }; }),
+      insetColors: insets.map((panel) => getComputedStyle(panel).backgroundColor),
+      hud: (() => { const node = document.querySelector('.observatory-hud'); const style = getComputedStyle(node); return { position: style.position, pointerEvents: style.pointerEvents }; })()
+    };
+  })()`);
+  assert.ok(observed.panelColors.length >= 4, 'the rendered Overview must expose its major glass surfaces');
+  observed.panelColors.forEach((color) => assert.ok(alphaOf(color) >= .72 && alphaOf(color) <= .82, 'major panels must remain dark but translucent'));
+  assert.ok(observed.insetColors.length > 0, 'the rendered Overview must expose nested glass cards');
+  observed.insetColors.forEach((color) => assert.ok(alphaOf(color) >= .32 && alphaOf(color) <= .48, 'nested cards must stay lighter glass, never opaque insets'));
+  observed.panelBorders.forEach((color) => assert.ok(alphaOf(color) >= .22, 'glass panels need a visible sage edge'));
+  observed.panelShadows.forEach((shadow) => assert.ok(shadow.includes('21, 161, 71'), 'glass panels need their scoped emerald edge bloom'));
+  assert.equal(observed.gaugeSurfaces.length, 3, 'the three support values remain distinct gauges');
+  observed.gaugeSurfaces.forEach((gauge) => {
+    assert.equal(alphaOf(gauge.background), 0, 'support gauges must leave the ground visible');
+    assert.equal(gauge.border, '0px', 'support gauges must not regain a card edge');
+    assert.equal(gauge.shadow, 'none', 'support gauges must not regain a card shadow');
+    assert.equal(gauge.blur, 'none', 'support gauges must not blur the ground');
+  });
+  assert.deepEqual(observed.hud, { position: 'fixed', pointerEvents: 'none' }, 'the existing fixed noninteractive HUD remains behind content');
+});
+
+test('overview HUD honors reduced-motion while preserving its fixed noninteractive layer', () => {
+  const observed = renderComputed(documentFor('overview'), `(() => {
+    const hud = document.querySelector('.observatory-hud');
+    return {
+      reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      orbit: getComputedStyle(document.querySelector('.observatory-hud-orbit')).animationName,
+      scan: getComputedStyle(document.querySelector('.observatory-hud-scan')).animationName,
+      position: getComputedStyle(hud).position,
+      pointerEvents: getComputedStyle(hud).pointerEvents
+    };
+  })()`, { reducedMotion: true });
+  assert.equal(observed.reduced, true, 'the probe must render in reduced-motion mode');
+  assert.equal(observed.orbit, 'none', 'reduced-motion stops the existing orbit');
+  assert.equal(observed.scan, 'none', 'reduced-motion stops the existing scan');
+  assert.equal(observed.position, 'fixed');
+  assert.equal(observed.pointerEvents, 'none');
 });
 
 test('overview direct boot loader stamps its visual scope before it inserts the fixed HUD', () => {

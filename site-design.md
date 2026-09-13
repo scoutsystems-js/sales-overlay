@@ -16,7 +16,7 @@ drilldowns, and existing Closing % definition and counts; its proportional ring
 adds no target or band and changes no metric computation. Block 018's current Coaching behavior and
 Performance's trend charts and filters remain unchanged. Justin confirmed on
 2026-09-13 that mesh is removed from these redesigned pages: the forest gradient
-is their background, with quiet HUD artwork behind opaque panels.
+is their background. Team pages keep quiet HUD artwork behind opaque panels; the personal Overview uses dark translucent green-tinted panels with modest blur and restrained sage/emerald edges so the fixed ground and HUD remain visible.
 
 The implementation is saved in `.codex/worktrees/observatory-pages`. All 2,816
 backend tests pass with test concurrency limited to four. Desktop and populated
@@ -47,13 +47,15 @@ loading, no-prospect, and first-load states passes; the full backend suite passe
 
 September 13 compact Dashboard refinement: implemented in the Observatory worktree; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/compact/release-status.md`. Closing %, Calls analyzed, Avg score, and Objection handle rate are four existing-data SVG instruments. Closing remains dominant; Calls uses analyzed/in-range completion, Avg score retains its existing score color and trend, and OHR retains its existing rate and counts without a new band. Coach Summary fills the rail-height upper area; What Needs Work is the full lower left panel, with Objection Handling Focus and Performance Summary independently stacked at right. Desktop support rings are centered and compact; phones use a bounded two-by-two grid. Missing values are neutral without an arc or glow. Existing drills, loading, controls, metrics, and the approved archives remain unchanged.
 
+September 13 Overview glass refinement: implemented only for personal `overview`; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/glass/release-status.md`. Its lower panels use dark translucent green tint, modest backdrop blur, sage edges, and restrained emerald bloom. The four top gauges float without card surfaces in balanced desktop columns and a two-by-two phone grid. The fixed HUD, background switch, and reduced-motion behavior remain unchanged. Focused rendered coverage and the full backend suite pass 2,858/2,858.
+
 ## Approved visual standard
 
 Team Coaching uses opaque, smooth near-black panels over one expansive forest-green Aurora ground, with pale-sage edges, smooth dark shadows, precise instrument detail, and slow white/gray HUD motion. Do not add fake telemetry, extra metrics, controls, or character/IP imagery. Product rules, metrics, permissions, data, and content remain unchanged.
 
 Root scope is `#scout-coaching-observatory`. The actual source uses `ScoutPolishedSaira, Saira, sans-serif`, base `14px/1.35`, text `#ededed`. The embedded Saira variable payload is 98,760 bytes, SHA-256 `e59235a42c248cf5f9ee37cd8ec84e3e9a3edca1e2935d844845a11f2c600904`, weight 100–900, stretch 50–125%, `font-display:swap`. The wordmark remains archive-authoritative at 104px with its original `#09E046` fill.
 
-The fixed page ground uses two emerald pools separated by a dark center; panels remain opaque. Panel radii are 20px desktop and 16px narrow, with low-contrast sage edges, one quiet inset highlight, and smooth dark shadows. Focus uses `#0f1412`; members/detail/strengths use `#0c0f10`. The selected nav/member state is exact: sage border, 2px `#09d543` left rail, 11px radius, `linear-gradient(100deg,#1b4527,#112617)`, white text, and `0 0 16px rgba(9,213,67,.24)` glow. Member secondary is `rgba(237,237,237,.55)`.
+The fixed page ground uses two emerald pools separated by a dark center; Team panels remain opaque. The personal Overview is the approved scoped exception: dark translucent green-tinted panels with modest blur and restrained sage/emerald edges keep text readable while revealing the fixed ground and HUD. Panel radii are 20px desktop and 16px narrow, with low-contrast sage edges, one quiet inset highlight, and smooth dark shadows. Focus uses `#0f1412`; members/detail/strengths use `#0c0f10`. The selected nav/member state is exact: sage border, 2px `#09d543` left rail, 11px radius, `linear-gradient(100deg,#1b4527,#112617)`, white text, and `0 0 16px rgba(9,213,67,.24)` glow. Member secondary is `rgba(237,237,237,.55)`.
 
 ## Observatory hero
 
@@ -65,7 +67,7 @@ Amber `#fbbf24` remains semantic for the 69/100 ring and stage bars 69/61. The r
 
 Current production layout uses a 190px nav column, 22px rail gap, and 24px page gutters; under 900px it uses 18px gutters and stacks the page, and under 620px Coaching stacks the detail below the closer list. The earlier approved archive records a 16px grid gap and its historical phone breakpoints; those archive details remain reference-only. Preserve no horizontal overflow.
 
-The decorative HUD is fixed to the viewport, `aria-hidden`, noninteractive, below opaque content, and visible only in designed gaps/negative space. Orbit is 82s, scan 28s, markers 67–91s; reduced motion disables them. Motion must not cross readable content.
+For the approved Team archive standard, the decorative HUD is fixed to the viewport, `aria-hidden`, noninteractive, below opaque content, and visible only in designed gaps/negative space. Personal Overview is the later scoped exception: its dark translucent tint reveals the same fixed HUD and ground behind readable text. Orbit is 82s, scan 28s, markers 67–91s; reduced motion disables them. Motion must not cross readable content.
 
 The exact content inventory and semantics remain unchanged: Admin/My Account/toggle; Sober Living Riches and date controls; three Coaching Focus rows; all named closers and the no-calls disclosure; Gabriel Ocasio detail/evidence; five stage score values/counts; and two Team Strengths rows. Native `details` expands; every other control is visual until wired to existing approved behavior.
 

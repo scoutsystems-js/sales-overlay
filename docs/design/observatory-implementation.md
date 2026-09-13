@@ -30,6 +30,10 @@ loading, no-prospect, and first-load states passes; the full backend suite passe
 
 The personal Dashboard now presents its same four top values as SVG instruments: dominant Closing %, Calls analyzed against the actual in-range total, Avg score with its existing score color and trend, and Objection handle rate with its existing rate and counts. No target, band, metric calculation, load, or drill target changed. Missing values remain neutral with no arc or glow. Coach Summary now occupies the real rail-height upper area; below the rail, the long What Needs Work panel sits at left while Objection Handling Focus and the existing Performance Summary link stack independently at right. Desktop support gauges are centered and compact; phones use a bounded two-by-two gauge grid. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/compact/release-status.md`. Inline parsing and the final diff check pass; rendered focused coverage and the full backend suite pass 2,856/2,856.
 
+### Overview glass refinement — September 13 implementation
+
+Justin revised personal `overview` only: its lower sections now use dark translucent green tint, modest backdrop blur, sage edges, and restrained emerald bloom so the existing fixed ground and HUD remain visible without weakening text contrast. The major surface is `rgba(7,23,14,.78)` with 4px blur; nested cards use `rgba(14,40,24,.42)` with 3px blur; the edge is `rgba(196,231,207,.30)` and bloom `rgba(21,161,71,.10)`. The four top gauges are free-floating in balanced desktop columns and a two-by-two phone grid; they retain their existing interactions and the dominant Closing hierarchy. Team Coaching and Team Performance retain opaque panels. Background-off, fixed HUD geometry/timing, pointer behavior, and reduced motion are unchanged. Release verification: `~/Desktop/scan-reports/observatory-2026-09-13/glass/release-status.md`. Focused rendered coverage and the full backend suite pass 2,858/2,858.
+
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
 `4269494` and preserves the four newer design commits in this worktree. The
@@ -70,9 +74,11 @@ filters, date ranges, rep selection, evidence links, chart drilldowns, and
 loading and empty states remain on their existing paths.
 
 The mesh is removed on both approved views. The forest gradient fills the
-viewport; decorative HUD motion stays behind opaque panels and cannot receive
-clicks. The existing background switch and reduced-motion preference remain
-supported. The selected menu item and closer share the approved green treatment.
+viewport; decorative HUD motion stays behind opaque Team panels and cannot receive
+clicks. Personal Overview is the approved exception: its dark translucent green-tinted
+panels use modest blur and restrained sage/emerald edges so the fixed ground and HUD
+remain visible behind readable text. The existing background switch and reduced-motion
+preference remain supported. The selected menu item and closer share the approved green treatment.
 Page-scoped shape tokens use 20px panels on desktop, 16px on narrow screens,
 and 11px selected controls. The remaining pages retain their current tokens.
 
