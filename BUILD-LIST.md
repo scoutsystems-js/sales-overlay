@@ -30,6 +30,8 @@ The existing additive migration was applied separately: its tables have RLS and 
 
 ## Current implementation — Observatory redesign (2026-09-13)
 
+**Global session reset — LIVE (September 13):** every Scout session issued before `2026-09-13 23:29:21 UTC` is refused on its next request and sent back to sign-in, so a fresh login loads the current Observatory dashboard. This touches no account, call, calendar or integration data. The server-only control is migration `079_global_session_reset.sql`; future resets advance its cutoff rather than changing individual users.
+
 **Knowledge Base Observatory pass (local, pending release):** The Knowledge Base fixed field, selected rail, glass list panel, add-resource modal and pattern/note viewer use the approved visual system. Upload, scope promotion, delete, resource types, loading/error states and permissions are unchanged.
 
 **Admin + Account Observatory pass LIVE:** `eadebec6dd66c03639cd63b5b1040215a4ee57dc` is deployed successfully. Admin, My Account, personal Calendar and Team Calendar use the fixed forest field, quiet contour motion and translucent green panels. Existing controls, access rules, calendar boundaries, filters and actions remain unchanged. The Admin support-ticket snapshot renderer fixes its live `esc is not defined` failure by using the established `escapeHtml` helper; focused and full checks passed, and signed-in browser review covered Admin company/single-user/support-ticket states plus both calendar views. The remaining redesign work is a complete reachable-page/subpage inventory before the next page is styled.
