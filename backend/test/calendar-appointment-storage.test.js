@@ -29,6 +29,10 @@ test('appointment ledger schema owns stable occurrences, minimal history and ser
 test('transactional recorder requires a live matching connection and retains first-seen history', () => {
   const sql = fs.readFileSync(MIGRATION, 'utf8');
   assert.match(sql, /create or replace function public\.record_calendar_appointment/i);
+  assert.match(sql, /security invoker/i);
+  assert.doesNotMatch(sql, /security definer/i);
+  assert.match(sql, /revoke all on function public\.record_calendar_appointment[\s\S]*from public, anon, authenticated/i);
+  assert.match(sql, /grant execute on function public\.record_calendar_appointment[\s\S]*to service_role/i);
   assert.match(sql, /google_calendar_connections[\s\S]*p_generation/i);
   assert.match(sql, /raise exception 'connection_changed'/i);
   assert.match(sql, /for update/i);

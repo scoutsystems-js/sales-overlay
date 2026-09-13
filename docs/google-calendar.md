@@ -1,6 +1,6 @@
 # Google Calendar — private scheduled GHL appointments LIVE
 
-The current live behavior below predates the separate Calendar reconciliation foundation. That foundation is built locally and not live; it adds minimal retained appointment history without changing this page's current-count computation. See [calendar-reconciliation.md](calendar-reconciliation.md).
+The current live behavior below predates the separate Calendar reconciliation foundation. That foundation is built locally and not live; it adds minimal retained appointment history without changing this page's current-count computation. Its background source read covers a rolling 90 calendar days back and 90 forward. Private on-demand inspection remains capped at 14 inclusive calendar days. The first source read captures only that bounded window; it does not invent older history, while captured history remains durable after it leaves the window. See [calendar-reconciliation.md](calendar-reconciliation.md).
 
 ## Block 025 — automatic manager counts; LIVE
 
@@ -10,7 +10,7 @@ Released `f97920d2b69a9cc7c5c48ea05d9849783e645945`, Railway `249f831e-a6cf-4321
 
 Released `0344cb95a1b818212ce60f41ca90d73b7be7db0a` (implementation `3fd6c43`), Railway `b16d7184-f1e0-43f8-bad6-3beec46f3e96` SUCCESS. Latest design `da7f2a2` merged and preserved. Full integrated suite 2,877/2,877; six served artifacts byte-identical and artifact-specific markers pass. Actual signed-in manager page: 12 active SLR members, all Not connected, dates verified and current week restored. Original private connection still shows 29 appointments. Live positive sharing awaits Josh's account/opt-in step below. Evidence: `~/Desktop/scan-reports/block-023-manager-calendar/`.
 
-My Team links to a separate Scheduled appointments view. It reads the same current GHL appointment computation as the private owner view, with a 14-day maximum and counts only. A missing connection, withheld sharing, unsupported team, or failed Google read never becomes zero. There is no attendance claim, first-booking ledger, title-derived follow-up flag, AI processing, or change to existing call metrics.
+My Team links to a separate Scheduled appointments view. It reads the same current GHL appointment computation as the private owner view, with a 14-day maximum and counts only. A missing connection, withheld sharing, unsupported team, or failed Google read never becomes zero. There is no attendance claim, title-derived follow-up flag, AI processing, or change to existing call metrics.
 
 Connecting is the count-sharing authorization. An active closer's count is bound to their current manager; a manager/admin can see their own board. Only that manager and authorized Scout admins can request the count; no event details reach that response. Reconnecting refreshes the same automatic manager scope. Access is checked again after the Google read. The connection table remains server-only with RLS and no browser grants. Block 025 replaces the former optional sharing control; it does not change the measured SLR booking-source filter.
 
@@ -81,7 +81,7 @@ The existing additive migration remains unchanged. Both tables have RLS enabled,
 ## Operational boundaries
 
 - The primary calendar is identified by Google's `CalendarListEntry.primary` marker on every inspection. No setup form or saved calendar selection exists.
-- A request covers at most 14 inclusive calendar days and at most two complete 250-item event pages. Exceeding either boundary refuses the inspection rather than returning a partial result.
+- An on-demand inspection request covers at most 14 inclusive calendar days and at most two complete 250-item event pages. Exceeding either boundary refuses the inspection rather than returning a partial result. Background reconciliation uses a separate rolling 90-day-back/90-day-forward source window and its own provider safety cap.
 - Calendar-local dates decide whether an event is inside the window. Recurring instances remain separate. The scheduled view excludes cancelled, all-day, non-default event types, and self-declined events before its count is formed.
 - OAuth connect/disconnect and token refresh serialization follow the existing single-process deployment model. Database generation checks prevent a disconnected request from serving late event data. Multiple backend instances would need a cross-instance authorization lock before scaling this feature.
 - Google Calendar remains independent of the one-active-recording-source rule.

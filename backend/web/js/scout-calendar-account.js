@@ -35,7 +35,7 @@
           return;
         }
         host.innerHTML = '<div class="conn-row"><div class="conn-left"><div>Google Calendar</div>'
-          + '<p class="meta">Read-only. Full event details stay private to you. Scout keeps only a minimal appointment history. <a href="/privacy.html">Privacy</a></p>'
+          + '<p class="meta">Read-only. Scout captures qualifying appointments from 90 days before today through 90 days after today in your primary calendar time zone. Full event details stay private to you; Scout keeps only a minimal appointment history. <a href="/privacy.html">Privacy</a></p>'
           + '<p class="meta" role="status" data-calendar-notice></p></div><div class="conn-right">'
           + '<button class="btn-fathom-secondary" type="button" data-calendar-connect>Connect Google Calendar</button></div></div>';
         var button = host.querySelector('[data-calendar-connect]');

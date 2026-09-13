@@ -2,7 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { calendarStore } = require('./helpers/calendar-store');
-const { createCalendarService } = require('../lib/calendar-service');
+const { createCalendarService, appointmentSyncRange } = require('../lib/calendar-service');
 const { SCOPES } = require('../lib/google-calendar');
 const config = { clientId: 'client', clientSecret: 'secret', redirectUri: 'https://example.com/calendar/callback', key: Buffer.alloc(32, 7).toString('base64') };
 const range = { from: '2026-09-07', to: '2026-09-11' };
@@ -148,6 +148,57 @@ test('disconnect also wins over an authorization exchange already in flight', as
   assert.equal(db.tables.google_calendar_connections.length, 0);
 });
 
+test('background appointment capture uses exact 90-day primary-calendar date bounds', () => {
+  assert.deepEqual(appointmentSyncRange(new Date('2026-09-13T16:00:00Z'), 'America/New_York'), {
+    from: '2026-06-15', to: '2026-12-12',
+  });
+  assert.deepEqual(appointmentSyncRange(new Date('2026-01-01T00:15:00Z'), 'America/Los_Angeles'), {
+    from: '2025-10-02', to: '2026-03-31',
+  });
+});
+
+test('background capture records both 90-day bounds but not provider-padding events outside them', async () => {
+  const { service, google, db } = setup();
+  const base = (await google.events())[0];
+  google.appointmentEvents = async () => [
+    { ...base, id: 'provider-padding', start: { dateTime: '2026-06-14T04:00:00Z' }, end: { dateTime: '2026-06-14T05:00:00Z' } },
+    { ...base, id: 'ninety-days-back', start: { dateTime: '2026-06-15T04:00:00Z' }, end: { dateTime: '2026-06-15T05:00:00Z' } },
+    { ...base, id: 'ninety-days-forward', start: { dateTime: '2026-12-12T05:00:00Z' }, end: { dateTime: '2026-12-12T06:00:00Z' } },
+    { ...base, id: 'provider-padding-after', start: { dateTime: '2026-12-13T05:00:00Z' }, end: { dateTime: '2026-12-13T06:00:00Z' } },
+  ];
+  await connect(service);
+  await service.syncAll(new Date('2026-09-13T16:00:00Z'));
+  assert.deepEqual(db.tables.calendar_appointments.map(row => row.provider_event_id), ['ninety-days-back', 'ninety-days-forward']);
+  assert.deepEqual(db.tables.calendar_appointments.map(row => row.scheduled_calendar_date), ['2026-06-15', '2026-12-12']);
+});
+
+test('background capture uses the primary calendar date when an included instant is on the preceding UTC day', async () => {
+  const { service, google, db } = setup();
+  const base = (await google.events())[0];
+  google.calendars = async () => [{ id: 'primary@example.com', name: 'Primary', time_zone: 'Pacific/Auckland', primary: true }];
+  google.appointmentEvents = async () => [{ ...base, id: 'auckland-first-day',
+    start: { dateTime: '2026-06-15T12:30:00Z' }, end: { dateTime: '2026-06-15T13:30:00Z' } }];
+  await connect(service);
+  await service.syncAll(new Date('2026-09-13T16:00:00Z'));
+  assert.equal(db.tables.calendar_appointments.length, 1);
+  assert.equal(db.tables.calendar_appointments[0].scheduled_calendar_date, '2026-06-16');
+});
+
+test('a captured appointment stays durable when a later out-of-window deleted observation has no timed start', async () => {
+  const { service, google, db } = setup();
+  const base = (await google.events())[0];
+  google.appointmentEvents = async () => [{ ...base, id: 'ninety-days-back', start: { dateTime: '2026-06-15T04:00:00Z' }, end: { dateTime: '2026-06-15T05:00:00Z' } }];
+  await connect(service);
+  await service.syncAll(new Date('2026-09-13T16:00:00Z'));
+  google.appointmentEvents = async () => [{ id: 'ninety-days-back', status: 'cancelled', updated: '2026-12-14T16:00:00Z',
+    start: { date: '2026-06-15' }, end: { date: '2026-06-16' } }];
+  await service.syncAll(new Date('2026-12-14T16:00:00Z'));
+  assert.equal(db.tables.calendar_appointments.length, 1);
+  assert.equal(db.tables.calendar_appointments[0].scheduled_calendar_date, '2026-06-15');
+  assert.equal(db.tables.calendar_appointment_history.length, 2);
+  assert.equal(db.tables.calendar_appointment_history[1].source_observation, 'not_qualifying');
+});
+
 test('background sync keeps one occurrence and its minimal update history after disconnect', async () => {
   const { service, google, db } = setup();
   let providerEvent = (await google.events())[0];
@@ -158,7 +209,7 @@ test('background sync keeps one occurrence and its minimal update history after 
   };
   await connect(service);
   const first = await service.syncAll(new Date('2026-09-13T16:00:00Z'));
-  assert.deepEqual(receivedRange, { from: '2026-08-30', to: '2026-12-12' });
+  assert.deepEqual(receivedRange, { from: '2026-06-15', to: '2026-12-12' });
   assert.equal(first.total, 1);
   assert.equal(first.ok, 1);
   assert.equal(first.appointments_recorded, 1);

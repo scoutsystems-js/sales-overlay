@@ -85,7 +85,7 @@ create or replace function public.record_calendar_appointment(
   p_state_hash text
 ) returns uuid
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare

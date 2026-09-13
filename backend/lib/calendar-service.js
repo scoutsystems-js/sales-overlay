@@ -12,7 +12,7 @@ const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const refreshes = new Map();
 const authorizationWrites = new Map();
 const SYNC_CONCURRENCY = 4;
-const SYNC_PAST_DAYS = 14;
+const SYNC_PAST_DAYS = 90;
 const SYNC_FUTURE_DAYS = 90;
 const STORAGE_PAGE = 500;
 const ID_CHUNK = 200;
@@ -60,6 +60,16 @@ function appointmentSyncRange(now, timeZone) {
   return { from: shiftCalendarDate(today, -SYNC_PAST_DAYS), to: shiftCalendarDate(today, SYNC_FUTURE_DAYS) };
 }
 
+// Google receives a small UTC query cushion so calendar-time-zone boundary
+// events are not missed. Retention stays strictly within the declared primary
+// calendar-date window. Untimed rows still reach the recorder: it can retain a
+// known deleted or all-day occurrence without inventing a new appointment.
+function withinAppointmentCaptureRange(event, range, timeZone) {
+  if (!Number.isFinite(Date.parse(event?.start?.dateTime))) return true;
+  const eventDate = dateInZone(event.start.dateTime, timeZone);
+  return eventDate >= range.from && eventDate <= range.to;
+}
+
 async function mapBounded(items, read) {
   let output = [];
   for (let index = 0; index < items.length; index += SYNC_CONCURRENCY) {
@@ -104,7 +114,8 @@ function createCalendarService(admin, google, config) {
     if (!primary?.time_zone) throw new Error('calendar_not_available');
     new Intl.DateTimeFormat('en', { timeZone: primary.time_zone });
     const range = appointmentSyncRange(now, primary.time_zone);
-    const events = await google.appointmentEvents(token, primary.id, range);
+    const events = (await google.appointmentEvents(token, primary.id, range))
+      .filter(event => withinAppointmentCaptureRange(event, range, primary.time_zone));
     const recorded = await recordObservedAppointments(admin, {
       userId: conn.user_id,
       generation: conn.generation,

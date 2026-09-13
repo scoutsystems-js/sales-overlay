@@ -20,9 +20,9 @@ Disconnecting removes the connection and stops new reads. It does not delete the
 
 ## Source coverage
 
-The read-only source audit found a stable event ID on every event in two live windows. Every recurring event had `recurringEventId` and `originalStartTime`. All 61 measured SLR appointments carried a numeric Zoom join ID in `location`; none carried it in a conference entry point. Every candidate had at least one valid non-self attendee email. This is why the implementation reads the event ID before the private inspection response removes it and derives the Zoom ID from `location` only. See [calendar-reconciliation-source-audit.md](calendar-reconciliation-source-audit.md).
+The read-only source audit found a stable event ID on every event in two live windows. Every recurring event had `recurringEventId` and `originalStartTime`. All 61 measured SLR appointments carried a numeric Zoom join ID in `location`; none carried it in a conference entry point. Every candidate had at least one valid non-self attendee email. This is why the implementation reads the event ID before the private inspection response removes it and derives the Zoom ID from `location` only. See [calendar-reconciliation-source-audit.md](calendar-reconciliation-source-audit.md). The audit describes provider shape; it does not invent older appointment history.
 
-The background read runs after Fathom and Zoom in the existing two-hour workflow. It covers 14 calendar days before today through 90 days after today in the primary calendar's time zone, with complete pagination up to the provider safety cap. A provider response that exceeds the cap fails before any event state is written. Once an appointment is seen, it remains after it falls outside the window. A booking more than 90 days ahead is first captured when it enters the window. An edit made after an event leaves the 14-day lookback is not observed unless the event later re-enters the window. An explicit deleted, cancelled or all-day form returned for a known occurrence appends a `not_qualifying` source observation while retaining the prior minimal schedule. It is not an outcome or attendance claim. Mere absence from the bounded response is never converted into a state or result.
+The background read runs after Fathom and Zoom in the existing two-hour workflow. Durable capture covers a rolling 90 calendar days before today through 90 days after today in the primary calendar's time zone; the separate on-demand inspection remains unchanged at no more than 14 inclusive calendar days. The provider request keeps its UTC boundary cushion, while timed events are stored only when their date in the primary calendar's time zone is within that 90-day range. Pagination is complete up to the provider safety cap, and a response that exceeds the cap fails before any event state is written. The initial run captures only events in that bounded window, so it does not invent older history. Once an appointment is seen, its durable record and every distinct captured minimal revision remain after it falls outside the window. Edits outside the 90-day lookback are not observed unless the event later re-enters the window, except that an explicit deleted, cancelled or all-day form returned for a known occurrence can append a `not_qualifying` source observation while retaining the prior minimal schedule. That observation is not an outcome or attendance claim. Mere absence from the bounded response is never converted into a state or result.
 
 ## Reconciliation
 
@@ -40,7 +40,7 @@ Historical revisions participate only in this conservative exact uniqueness chec
 
 ## Release state
 
-This work is not live. No production migration or data write has run. The additive migration is `backend/migrations/20260913210000_calendar_appointment_ledger.sql`; it enables RLS, removes browser-role access and grants only the existing server role. It has been executed only in an isolated in-memory Postgres test, which verifies the real function, constraints, history, generation rejection, RLS and grants. The focused Calendar suite passes 53/53, the full backend suite passes 2,914/2,914, and independent review found no blocking issue. The migration must be applied before the code deploy. The privacy and in-product data-use copy ship with the writer so retained history is described before the first scheduled write.
+This work is local only. No production migration, data write, push or deploy has run. The original architecture review found two blockers; local verification and bounded integration review found no remaining blocker. The release is still unapproved and not live. The additive migration is `backend/migrations/20260913210000_calendar_appointment_ledger.sql`; it enables RLS, removes browser-role access and grants the existing server role the server-only write path. The recording function keeps its public name and signature but runs as `SECURITY INVOKER`; `PUBLIC`, `anon` and `authenticated` cannot execute it, while `service_role` retains the existing table grants and its configured `BYPASSRLS` role attribute. It has been executed only in an isolated in-memory Postgres test, which verifies the real function, constraints, history, generation rejection, RLS and grants. The focused Calendar suite passes 86/86 and the full backend suite passes 2,920/2,920. The migration must be applied before any code deploy. The privacy and in-product data-use copy ship with the writer so retained history is described before the first scheduled write.
 
 After deployment, verify the exact commit, run the secret-protected calendar sync after the recording syncs, and inspect only aggregate row/revision/match/error counts. Do not print stored titles or attendee emails in release evidence.
 
@@ -64,6 +64,8 @@ Tests:
 - [`backend/test/calendar-appointments.test.js`](../backend/test/calendar-appointments.test.js)
 - [`backend/test/calendar-routes.test.js`](../backend/test/calendar-routes.test.js)
 - [`backend/test/calendar-service.test.js`](../backend/test/calendar-service.test.js)
+- [`backend/test/calendar-history-window-disclosure.test.js`](../backend/test/calendar-history-window-disclosure.test.js)
+- [`backend/test/calendar-ui.test.js`](../backend/test/calendar-ui.test.js)
 - [`backend/test/google-calendar.test.js`](../backend/test/google-calendar.test.js)
 - [`backend/test/helpers/calendar-store.js`](../backend/test/helpers/calendar-store.js)
 
@@ -71,6 +73,7 @@ Customer copy:
 
 - [`backend/web/js/scout-calendar-account.js`](../backend/web/js/scout-calendar-account.js)
 - [`backend/web/js/scout-calendar.js`](../backend/web/js/scout-calendar.js)
+- [`backend/web/calendar.html`](../backend/web/calendar.html)
 - [`backend/web/privacy.html`](../backend/web/privacy.html)
 
 Build and technical records:

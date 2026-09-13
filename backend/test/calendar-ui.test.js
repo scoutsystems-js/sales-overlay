@@ -47,7 +47,8 @@ test('clear private data-use copy appears before Connect and no classifier setup
   assert.match(result.text, /visible only to you/i);
   assert.match(result.text, /manager and Scout admins can see how many appointments you have/i);
   assert.doesNotMatch(result.text, /If you choose to share/i);
-  assert.match(result.text, /will not save event titles, descriptions, attendee details/i);
+  assert.match(result.text, /keeps only a minimal appointment history/i);
+  assert.match(result.text, /does not save descriptions, meeting links, attendee names or arrays/i);
   assert.match(result.connection, /Connect Google Calendar/);
   assert.equal(result.hasFilter, false);
   assert.equal(result.hasScope, false);

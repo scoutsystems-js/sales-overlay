@@ -105,7 +105,7 @@
       return false;
     }
     host.innerHTML = '<p>' + (status.connected
-      ? 'Connected. Full event details stay private to you. Scout keeps only a minimal appointment history.'
+      ? 'Connected. Scout captures qualifying appointments from 90 days before today through 90 days after today in your primary calendar time zone. Full event details stay private to you; Scout keeps only a minimal appointment history.'
       : 'Not connected. Review the private data-use note above before continuing.') + '</p>'
       + '<div class="calendar-actions"><button id="googleConnect" type="button">'
       + (status.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar') + '</button>'
