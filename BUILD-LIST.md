@@ -24,7 +24,7 @@ deployment `2a102b7e-d8e3-4004-a6fe-d4a3504710f3` succeeded; nine served-page
 markers matched in raw and comment-stripped output. Receipts are in
 `~/Desktop/scan-reports/observatory-2026-09-13/refinement/`.
 
-**September 13 HUD restoration — IMPLEMENTED, PRODUCTION VERIFICATION PENDING.**
+**September 13 HUD restoration — LIVE, verified on `3cbab93ffa9047103f3b0c66e96dfbf770053f89`.**
 The fixed `1200×860` HUD restores two arcs, two rings, four traces, three
 points, and a 28s scan at opacity `1` with pale `.105` / `.095` strokes. Orbit
 is 82s; point motion is 67s, 91s, and 74s. Background-off hides it and reduced

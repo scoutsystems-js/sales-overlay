@@ -2,8 +2,8 @@
 
 **Date:** September 13, 2026 (Eastern)
 
-**Status:** `9bdfa4e1cbb8322a8f36add576650bf3be6323c5` is LIVE — implementation
-and production refinement verified 2026-09-13.
+**Status:** `3cbab93ffa9047103f3b0c66e96dfbf770053f89` is LIVE — HUD restoration
+verified 2026-09-13.
 
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
@@ -18,14 +18,13 @@ gutters on mobile. It changes no behavior, data, metrics, permissions, or
 interactions. The approved mockup archives are unchanged. The prior `456ebf5`
 release remains the historical Observatory release record.
 
-The September 13 HUD restoration is implemented and awaits production
-verification. It restores the approved `1200×860` geometry: two arcs, two
+The September 13 HUD restoration is LIVE and verified. It restores the approved `1200×860` geometry: two arcs, two
 rings, four traces, three points, and a scan. Its fixed layer is opacity `1`
 with pale `.105` / `.095` strokes; the orbit is 82s, the points are 67s, 91s,
 and 74s, and the scan is 28s. Background-off hides the layer and reduced motion
 stops it. The mobile navigation stays above the artwork without changing its
 normal position or width. The prior `9bdfa4e1cbb8322a8f36add576650bf3be6323c5` refinement
-remains live; the approved archives remain unchanged.
+is the prior release; the approved archives remain unchanged.
 
 HUD restoration validation: all **2,818 tests passed**, zero skipped, with
 concurrency four (39.5 seconds). Rendered checks cover real orbit movement,
@@ -93,6 +92,13 @@ switch was turned on in the review tab to show the requested gradient.
 The verified page still uses its existing score bands, fixed seven-day gauge
 window, selected report range, and underlying live data. These are styling
 changes, not a metric reset or re-analysis.
+
+HUD release receipt: Railway deployment `1a96adb0-b066-4a5a-a668-dad171ee4a5b`
+reported SUCCESS for `3cbab93ffa9047103f3b0c66e96dfbf770053f89` at
+04:53:16 UTC. All 13 served-page markers match in raw and comment-stripped
+output. The push followed separate drain checks: processing zero, pending
+static at 45, errors 310. Evidence is saved in
+`~/Desktop/scan-reports/observatory-2026-09-13/animation/`.
 
 Related design records:
 

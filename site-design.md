@@ -27,7 +27,7 @@ emerald pools separated by a dark center; the noninteractive HUD is fixed with
 it. Desktop gutters are 24px and mobile gutters remain 18px. This does not
 change page behavior, and the approved mockup archives remain untouched.
 
-September 13 HUD restoration: implemented, with production verification pending.
+September 13 HUD restoration: LIVE and verified in `3cbab93ffa9047103f3b0c66e96dfbf770053f89`.
 It restores the approved `1200×860` HUD: two arcs, two rings, four traces,
 three points, and a scan. The fixed layer uses opacity `1`, pale `.105` / `.095`
 strokes, and 82s orbit; points run at 67s, 91s, and 74s; the scan runs at 28s.
