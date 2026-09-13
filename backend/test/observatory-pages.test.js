@@ -377,3 +377,29 @@ test('Team Performance stacks full-size Visor instruments on a narrow phone', ()
   assert.ok(observed.gauges[1].top >= observed.gauges[0].bottom, 'Team gauges do not share a cramped phone row');
   assert.ok(observed.gauges[2].top >= observed.gauges[1].bottom, 'Team gauges remain vertically ordered');
 });
+
+test('Team Visor preserves long decimal readouts inside the static brackets', () => {
+  function withCallTime(value) {
+    const metrics = Object.assign({}, AVERAGES.metrics, {
+      calltime: Object.assign({}, AVERAGES.metrics.calltime, { value, total: 12, enough: true, reason: null })
+    });
+    return Object.assign({}, PERFORMANCE, { teamAverages: { metrics } });
+  }
+  for (const [value, dash] of [[49.3, '54.78 100'], [120.5, '100.00 100']]) {
+    const rendered = renderTeamSurface(withCallTime(value));
+    const observed = renderComputed(visualShell('team-performance', rendered.markup), `(() => {
+      const gauge = document.querySelectorAll('.observatory-team-panel .observatory-visor-gauge')[2];
+      const svg = gauge.querySelector('svg').getBoundingClientRect();
+      const valueNode = gauge.querySelector('.observatory-visor-value');
+      const box = valueNode.getBoundingClientRect();
+      return { text: valueNode.textContent, compact: valueNode.classList.contains('observatory-visor-value--compact'), textLength: valueNode.getAttribute('textLength'),
+        left: (box.left - svg.left) * 340 / svg.width, right: (box.right - svg.left) * 340 / svg.width,
+        arc: gauge.querySelector('.observatory-visor-arc').getAttribute('stroke-dasharray') };
+    })()`, { width: 1400 });
+    assert.equal(observed.text, value + ' min', 'decimal readout keeps every digit and unit');
+    assert.equal(observed.compact, true, 'long readout receives the bounded compact treatment');
+    assert.equal(observed.textLength, '132', 'compact readout has a fixed safe glyph aperture');
+    assert.ok(observed.left >= 104 && observed.right <= 236, 'readout stays between the 104–236 bracket edges: ' + JSON.stringify(observed));
+    assert.equal(observed.arc, dash, 'progress remains proportional and clamps over-scale values');
+  }
+});

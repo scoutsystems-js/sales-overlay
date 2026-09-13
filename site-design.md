@@ -35,7 +35,7 @@ The approved motion [source](docs/design/scout-visor-motion-approved.html) is ar
 
 ### Color, scale and meaning
 
-Gauge color follows the metric's existing policy, never a universal percentage threshold. Red = below the middle band; yellow = middle; green = good. Keep the value readable in pale text. Missing measurements remain neutral with an explanation and no active arc; zero remains a real measured value. Clamp only the drawn arc to the scale; preserve the actual displayed value.
+Gauge color follows the metric's existing policy, never a universal percentage threshold. Red = below the middle band; yellow = middle; green = good. Keep the value readable in pale text. Missing measurements remain neutral with an explanation and no active arc; zero remains a real measured value. Clamp only the drawn arc to the scale; preserve the actual displayed value. Longer readouts (including decimal minutes and 100%) use a compact type treatment bounded to the 132-unit inner aperture, keeping every digit and unit clear of the brackets.
 
 | Metric | Red | Yellow | Green | Gauge scale |
 |---|---|---|---|---|

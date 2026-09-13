@@ -6113,6 +6113,10 @@
     body[data-view="team-performance"] .observatory-visor-value { fill:var(--text); font-size:70px; font-weight:var(--fw-display); letter-spacing:-.06em; font-variant-numeric:tabular-nums; }
     body[data-view="overview"] .observatory-visor-unit,
     body[data-view="team-performance"] .observatory-visor-unit { font-size:28px; letter-spacing:-.02em; }
+    body[data-view="overview"] .observatory-visor-value--compact,
+    body[data-view="team-performance"] .observatory-visor-value--compact { font-size:58px; letter-spacing:-.045em; }
+    body[data-view="overview"] .observatory-visor-value--compact .observatory-visor-unit,
+    body[data-view="team-performance"] .observatory-visor-value--compact .observatory-visor-unit { font-size:23px; }
     body[data-view="overview"] .observatory-visor-scale,
     body[data-view="team-performance"] .observatory-visor-scale,
     body[data-view="overview"] .observatory-visor-target text,
@@ -18304,6 +18308,12 @@
         + '" x2="' + outer.x.toFixed(1) + '" y2="' + outer.y.toFixed(1) + '"/><text text-anchor="middle" x="' + label.x.toFixed(1) + '" y="' + (label.y + 4).toFixed(1) + '">' + escapeHtml(String(mark)) + '</text></g>';
     }).join('');
     var numeral = options.valueText == null ? '—' : String(options.valueText);
+    var readout = numeral + (options.unitText || '');
+    // Long, honest readings such as 49.3 min and 120.5 min stay inside the
+    // fixed bracket aperture. The actual characters remain untouched.
+    var compactReadout = readout.length >= 4;
+    var valueClass = 'observatory-visor-value' + (compactReadout ? ' observatory-visor-value--compact' : '');
+    var valueWidth = compactReadout ? ' textLength="132" lengthAdjust="spacingAndGlyphs"' : '';
     var unitText = options.unitText ? '<tspan class="observatory-visor-unit">' + escapeHtml(String(options.unitText)) + '</tspan>' : '';
     return '<div class="observatory-visor-gauge' + (band ? ' observatory-visor--' + band : '') + emptyClass + '"' + toneStyle + '>'
       + '<svg viewBox="0 0 340 348" role="img" aria-label="' + escapeHtml(options.aria) + '">'
@@ -18312,7 +18322,7 @@
       + '<path class="observatory-visor-track" d="M81.6 258.4 A125 125 0 1 1 258.4 258.4" pathLength="100"/>' + arc
       + '<g class="observatory-visor-static"><path class="observatory-visor-bracket" d="M104 130 L92 144 V196 L104 210 M236 130 L248 144 V196 L236 210"/>'
       + '<path class="observatory-visor-chevron" d="M162 110 L170 117 L178 110"/><path class="observatory-visor-underline" d="M145 222 H195"/>'
-      + '<text class="observatory-visor-value" x="170" y="191" text-anchor="middle">' + escapeHtml(numeral) + unitText + '</text>'
+      + '<text class="' + valueClass + '" x="170" y="191" text-anchor="middle"' + valueWidth + '>' + escapeHtml(numeral) + unitText + '</text>'
       + '<text class="observatory-visor-scale" x="66" y="281" text-anchor="middle">0</text><text class="observatory-visor-scale" x="274" y="281" text-anchor="middle">' + escapeHtml(String(scale)) + '</text>'
       + targetMark + '</g></svg></div>';
   }
