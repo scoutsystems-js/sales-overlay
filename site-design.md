@@ -164,7 +164,7 @@ The exact content inventory and semantics remain unchanged: Admin/My Account/tog
 These are the snapshot values and words, not constants for production. “What to coach next” and “What is already working” are hidden in the approved view; all other listed content remains in its original role.
 
 - Header actions: `Admin`, `My Account`, toggle.
-- Nav label: `YOUR WORKSPACE`; items `Coaching Dashboard`, `Calls`, `EOD Report`, `Team⌄`, nested `Daily Digest`, `Performance`, selected `Coaching`, `Objections`, `My Team`, `Customize`; footer `Knowledge Base`.
+- Nav label: `YOUR WORKSPACE`; items `Coaching Dashboard`, `Calls`, `EOD Report`, `Team⌄`, nested `Daily Digest`, `Performance`, selected `Coaching`, `Objections`, `My Team`; footer `Knowledge Base`. Customize is retired from navigation for now; saved boards remain intact and its old route returns to Daily Digest.
 - Breadcrumb/title: `TEAM / COACHING`, `Team Coaching`.
 - Gauge: `TEAM AVERAGE SCORE`, `69`, `/100`, accessible labels `Team average score 69 out of 100` and `69 out of 100`.
 - Filters: `Sober Living Riches`; `Sober Living Riches (11)⌄`; white date control `Sep 7 – Sep 11`.

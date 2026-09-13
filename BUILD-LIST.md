@@ -81,6 +81,8 @@ motion stops it. Behavior and approved archives are unchanged; the prior
 
 **My Team Observatory — implemented:** My Team (`team-members`) uses the approved ground, contours, glass panels and selected navigation while preserving roster scope and permissions, active/inactive roles, add/move/deactivate/email/reset/delete handlers, team/date controls and the scoped Scheduled Appointments link. No auth, calendar or data change. Final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-members/release-status.md`.
 
+**Customize — retired from navigation:** The Team menu no longer exposes the widget-builder page. Saved board records and editor code remain intact; `#team-dashboard` redirects to Daily Digest. Revisit only if we choose a smaller personalization feature. (H786)
+
 **Team Objections Observatory — implemented:** Team Objections uses the approved fixed ground, contours and glass outer panels while preserving the handling grid/counts, date/team/rep/category filters, Why-before-moments order, recording/call-review/Fine Tune actions, grid-before-summary loading and transparent inner evidence rows. No metric, intelligence or data-contract change. Final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-objections/release-status.md`.
 
 **Daily Digest Observatory — implemented:** the approved forest gradient, contours and glass panels are presentation-only. The fixed-day cached report, selected team, counts, notable evidence links, focus text and bounded Previous/Next navigation remain unchanged; no gauge or date-range picker is added. Final deployment verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-digest/release-status.md`.

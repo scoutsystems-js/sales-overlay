@@ -143,50 +143,20 @@ test('⚠ the picker sits BELOW the confirm modal, so a confirm from it is never
 
 // ───────────────────────────────────────────────── the dropdown entry (e)+(f)
 
-test('⚠⚠ the pinned board is TOP of the Team menu, and Customize otherwise', () => {
+test('Customize is retired from the Team menu while board code remains dormant', () => {
   const src = HTML.slice(HTML.indexOf('var TEAM_PAGES'), HTML.indexOf('function teamPageSelectHtml'));
-  /* ⚠ CEILING RAISED with its cause: the helper gained the comment explaining
-     why the label names the board it OPENS rather than requiring a pin. */
-  assert.ok(src.length > 200 && src.length < 5400, 'slice: ' + src.length);
+  assert.ok(src.length > 200 && src.length < 2600, 'slice: ' + src.length);
   const make = new Function('state', src + '; return teamPagesWithBoard;');
-
-  const noLane = make({ teamDashboard: null })().map((p) => p.label);
-  assert.strictEqual(noLane[noLane.length - 1], 'Customize',
-    'with no board the entry is last, and is a way IN rather than a name');
-
-  const pinned = make({ teamDashboard: { board: { name: 'Morning board', pinned: true } } })();
-  assert.strictEqual(pinned[0].label, 'Morning board', 'a pinned board goes to the TOP');
-  assert.strictEqual(pinned[0].view, 'team-dashboard');
-  assert.strictEqual(pinned.length, noLane.length, 'it REPLACES the entry, never adds one');
-
-  /* ⚠⚠ CONVERTED 2026-09-01 — JUSTIN HIT THIS AS A BUG. He saved and renamed a
-     board and the dropdown still read "Customize", so he concluded the save had
-     not worked. IT HAD: the row was in the database, named, with its cards. The
-     entry required `pinned` for its LABEL while the server returns boards[0]
-     ordered pinned-first then most-recent — so the entry ALWAYS opened that
-     board and refused to say its name.
-     ⚠ THE POSITION STILL FOLLOWS THE PIN, which is what was specified, and there
-     is still exactly ONE entry. Only the label stopped requiring a pin. */
-  const unpinned = make({ teamDashboard: { board: { name: 'Morning board', pinned: false } } })();
-  assert.strictEqual(unpinned[unpinned.length - 1].label, 'Morning board',
-    'an unpinned board still LENDS ITS NAME — the entry opens it, so it names it');
-  assert.strictEqual(unpinned[0].label, 'Daily Digest',
-    'but it does NOT take the top slot — position follows the pin, as specified');
-  assert.strictEqual(unpinned.length, noLane.length, 'and it still REPLACES, never adds');
-
-  /* ⚠ NEVER A GUESS AT A NAME. The nav renders on every page in the product,
-     including ones with no business asking the server about dashboards. */
-  const erred = make({ teamDashboard: { _error: 'boom' } })().map((p) => p.label);
-  assert.ok(erred.includes('Customize'), 'an errored lane falls back to the plain entry');
+  const pages = make({ teamDashboard: { board: { name: 'Morning board', pinned: true } } })();
+  assert.deepStrictEqual(pages.map((p) => p.label), ['Daily Digest', 'Performance', 'Coaching', 'Objections', 'My Team']);
+  assert.ok(!pages.some((p) => p.view === 'team-dashboard'));
 });
 
-test('⚠⚠ team-dashboard is a TEAM VIEW — or its data arrives and nothing repaints', () => {
+test('retired Customize is no longer a Team view and its old links redirect', () => {
   const src = HTML.slice(HTML.indexOf('var TEAM_PAGES'), HTML.indexOf('function teamPageSelectHtml'));
   const is = new Function(src + '; return isTeamView;')();
-  assert.ok(is('team-dashboard'),
-    'my first attempt had the MENU synthesise this entry and dropped the view from '
-    + 'every list — which makes this false, and a false here means the coalescer '
-    + 'returns early and the page renders shells forever');
+  assert.ok(!is('team-dashboard'));
+  assert.match(HTML, /'team-dashboard': 'team'/);
 });
 
 // ─────────────────────────────────────────── nothing internal reaches the wire

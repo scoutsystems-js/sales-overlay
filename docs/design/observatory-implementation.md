@@ -27,6 +27,10 @@ Evidence and final release status: `~/Desktop/scan-reports/observatory-2026-09-1
 
 **Implemented; final deployment verification is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-members/release-status.md`. My Team (`team-members`) uses the approved Observatory ground, contours, glass panels and selected navigation. Preserve roster scope and permissions, active/inactive roles, add/move/deactivate/email/reset/delete handlers, team/date controls and the scoped Scheduled Appointments link. No auth, calendar or data change.
 
+## Customize retirement — September 13, 2026
+
+The Team navigation no longer exposes Customize. Its widget-builder code and saved board records remain intact behind an explicit retirement comment, while old `#team-dashboard` links now open Daily Digest. This is a navigation decision only; no stored layout, metric, intelligence or data behavior changed.
+
 ## Team Objections visual rollout — September 13, 2026
 
 **Implemented; final deployment verification is recorded in** `~/Desktop/scan-reports/observatory-2026-09-13/visor-objections/release-status.md`. Team Objections uses the approved Observatory fixed ground, contours and glass outer panels. Preserve the handling grid and counts, existing date/team/rep/category filters, Why before moments, recording/call-review/Fine Tune actions, grid-before-summary loading and transparent inner evidence rows. No metric, intelligence or data-contract change.

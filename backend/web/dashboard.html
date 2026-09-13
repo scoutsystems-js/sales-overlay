@@ -14480,6 +14480,11 @@
      together, because the three have to agree and a ternary chain is how they
      came apart. The old code inferred the team line from the label and drew the
      CLOSING average on the objection-handling card. */
+  /* ── CUSTOMIZE WIDGET BUILDER — RETIRED FROM NAVIGATION (2026-09-13) ─────
+     Kept intact on purpose. Justin may bring back a smaller personalization
+     feature later, so do not delete or refactor this block casually. It has no
+     public navigation entry and `#team-dashboard` now redirects to Daily Digest.
+     Saved layouts remain stored and untouched. */
   var DASH_CANVAS = {
     closing_rate:          { key: 'close',     label: 'Closing %',         unit: '%' },
     objection_handle_rate: { key: 'handle',    label: 'Objection handling %', unit: '%' },
@@ -15839,49 +15844,13 @@
     { view: 'team-coaching',    label: 'Coaching' },
     { view: 'team-objections',  label: 'Objections' },
     { view: 'team-members',     label: 'My Team' },
-    /* ⚠⚠ IN THE ONE LIST, NOT APPENDED BY THE MENU BUILDER. My first attempt
-       had the menu synthesise this entry and dropped the view from every list —
-       which silently makes `isTeamView('team-dashboard')` FALSE, and a false
-       there means `scheduleTeamRender` returns early and a lane's data ARRIVES
-       AND NOTHING REPAINTS. That is the exact dead-dispatcher defect this list
-       exists to prevent, reintroduced by the change that made the page
-       reachable. One list; the menu REORDERS and RELABELS, it never adds. */
-    { view: 'team-dashboard',   label: 'Customize' },
   ];
 
-  /* ⚠⚠ (e)+(f) IN ONE ENTRY, NOT TWO. A pinned board goes to the TOP of the
-     dropdown and a way in to build one must exist at all — and the honest way
-     to satisfy both is ONE entry whose LABEL and POSITION follow the pin,
-     rather than two entries pointing at the same view. Two would make the
-     "you are here" mark ambiguous, and this nav marks the current page.
-
-     ⚠ IT READS THE BOARD NAME FROM AN ALREADY-LOADED LANE AND NEVER FETCHES.
-     The nav is rendered on every page in the product, including ones that have
-     no business asking the server about dashboards; before the lane has landed
-     the entry is simply "Customize", which is what it says for a manager with
-     no pinned board anyway. Absent, never a guess at a name. */
+  /* Customize is retired from navigation for now (Justin, 2026-09-13).
+     The board renderer and saved layouts stay in place, but no dashboard data
+     is fetched simply to make a menu entry. */
   function teamPagesWithBoard() {
-    var d = state.teamDashboard;
-    var b = (d && !d._error && d.board) ? d.board : null;
-    var rest = TEAM_PAGES.filter(function (p) { return p.view !== 'team-dashboard'; });
-    var base = TEAM_PAGES.filter(function (p) { return p.view === 'team-dashboard'; })[0];
-    /* ⚠ THE ENTRY IS THE LIST'S OWN OBJECT WITH ONE FIELD OVERRIDDEN, never a
-       fresh literal. A literal repeats the view id — a second copy of a name
-       the one list already owns — and it is what made the page COUNT read 7. */
-    /* ⚠⚠ THE LABEL NAMES THE BOARD THE ENTRY ACTUALLY OPENS — it used to require
-       `b.pinned`, so a manager who saved and named a board saw "Customize" and
-       reasonably concluded the save had not worked. IT HAD: the row was in the
-       database, named, with its cards. The server returns `boards[0]` ordered
-       pinned-first then most-recent, and `d.board` IS that board, so naming it
-       is naming the destination rather than guessing.
-       ⚠ THE POSITION STILL FOLLOWS THE PIN, which is what was specified — only
-       the LABEL stopped requiring it. Still ONE entry: two pointing at the same
-       view would make the "you are here" mark ambiguous, which is why the one
-       entry was ruled in the first place.
-       ⚠ With no boards at all `b` is null and it reads "Customize" — absent,
-       never a guess at a name. */
-    var entry = { view: base.view, label: (b && b.name) ? b.name : base.label };
-    return (b && b.pinned) ? [entry].concat(rest) : rest.concat([entry]);
+    return TEAM_PAGES.slice();
   }
   /* ⚠ The expanded recommendations page is a CHILD of Coaching, not a sixth
      page — the dropdown must still show where you are when you drill into it. */
@@ -17862,7 +17831,7 @@
     if (state.view === 'team-needs-work')  return 'team-needs-work' + teamRangeHashSuffix();
     if (state.view === 'team-objections')  return 'team-objections' + teamRangeHashSuffix();
     if (state.view === 'team-members')     return 'my-team' + teamRangeHashSuffix();
-    if (state.view === 'team-dashboard')   return 'team-dashboard' + teamRangeHashSuffix();
+    // team-dashboard is retired; stale state falls back to the default Team page.
     if (state.view === 'call-review')      return state.selectedCallId ? 'call/' + encodeURIComponent(state.selectedCallId) : 'calls';
     // Overview has no path of its own, but still carries its range so a
     // refresh or a shared link lands on the same window.
@@ -17906,7 +17875,7 @@
                          says so too. `#team-members` STILL ROUTES IN because a
                          bookmark is a link — it normalises on the next nav. */
                       'my-team': 'team-members', 'team-members': 'team-members',
-                      'team-dashboard': 'team-dashboard',
+                      'team-dashboard': 'team',
                       'team-objections': 'team-objections',
                       // the split — every page must be reachable by refresh and
                       // by a pasted URL, not only by clicking the dropdown
@@ -19987,7 +19956,8 @@
      worse than no route. It lands on Coaching, which is the page that used to
      link to it. ⚠ REDIRECT RATHER THAN DELETE — a bookmark is a link too. */
   var ARCHIVED_VIEWS = { 'team-needs-work': 'team-objections',
-                         'team-expanded': 'team-coaching' };
+                         'team-expanded': 'team-coaching',
+                         'team-dashboard': 'team' };
 
   function setView(view) {
     view = ARCHIVED_VIEWS[view] || view;

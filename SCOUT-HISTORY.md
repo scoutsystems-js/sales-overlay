@@ -8064,3 +8064,6 @@ Daily Digest’s Observatory pass changes presentation only: its fixed-day cache
 Team Objections uses approved Observatory fixed ground, contours and glass outer panels. Preserve handling grid/counts, existing date/team/rep/category filters, Why before moments, recording/call-review/Fine Tune actions, and grid-before-summary loading; inner evidence rows remain transparent. No metric, intelligence or data-contract change.
 ## [H785] My Team joins the approved Observatory scope — September 13, 2026
 My Team (`team-members`) uses the implemented Observatory ground, contours, glass panels and selected navigation. Preserve roster scope and permissions, active/inactive roles, add/move/deactivate/email/reset/delete handlers, team/date controls and the scoped Scheduled Appointments link. No auth, calendar or data change. Final verification is recorded in `~/Desktop/scan-reports/observatory-2026-09-13/visor-members/release-status.md`.
+
+## [H786] Customize is retired from Team navigation — September 13, 2026
+Justin decided the widget-builder surface should not be exposed while Scout has deliberately designed pages. Remove its Team-menu entry and send old `#team-dashboard` links to Daily Digest. Saved boards and the underlying editor stay untouched so a future, narrower personalization decision does not destroy existing work.

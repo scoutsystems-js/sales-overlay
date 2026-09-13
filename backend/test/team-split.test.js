@@ -107,12 +107,7 @@ test('⚠⚠ isTeamView covers every page in the dropdown, and says no to others
   const is = new Function(src + '; return isTeamView;')();
 
   const pages = [...H.matchAll(/\{ view: '([a-z-]+)',\s+label:/g)].map(m => m[1]);
-  /* ⚠ SIX SINCE 2026-09-01: `team-dashboard` joined the ONE list rather than
-     being synthesised by the menu builder. My first attempt did synthesise it
-     and dropped the view from every list — which makes isTeamView FALSE for it,
-     and a false there means a lane's data arrives and NOTHING REPAINTS. That is
-     the dead-dispatcher defect this very test exists to catch, and it caught it. */
-  assert.strictEqual(pages.length, 6, 'expected six pages, found ' + pages.length);
+  assert.strictEqual(pages.length, 5, 'expected five visible Team pages, found ' + pages.length);
   pages.forEach(v => assert.ok(is(v), v + ' is in the dropdown but isTeamView says no'));
   /* ⚠ `team-expanded` left this list 2026-09-01 — RETIRED with Call Highlights
      of the Week, normalised away at BOTH entry points, so it can never be the
@@ -372,22 +367,15 @@ test('⚠⚠ the page dropdown is the NAV TAB, and there is exactly one of it', 
   const mAt = LIVE.indexOf('function navTeamMenuHtml');
   const menu = LIVE.slice(mAt, LIVE.indexOf('\n  }', mAt));
   assert.ok(menu.length > 200 && menu.length < 1800, 'menu slice: ' + menu.length);
-  /* ⚠⚠ CONVERTED, NOT WEAKENED (2026-09-01). The menu now maps over
-     `teamPagesWithBoard()` rather than TEAM_PAGES directly, because a PINNED
-     board goes to the TOP of the dropdown and its entry carries the board's
-     name. The SUBJECT survives exactly — "never a second copy of the page
-     names" — and is now asserted one step further back: the helper REORDERS and
-     RELABELS the one list and may not contain a page name of its own. */
+  /* The retired Customize surface no longer changes the order or labels of the
+     Team menu. The helper remains so navigation has one source of truth. */
   assert.ok(/teamPagesWithBoard\(\)\.map/.test(menu),
     'the menu must render from the one list — never a second copy of the page names');
 
   const wAt = LIVE.indexOf('function teamPagesWithBoard');
   const helper = LIVE.slice(wAt, LIVE.indexOf('\n  }', wAt));
-  /* ⚠ CEILING RAISED, cause named: `teamPagesWithBoard` gained the comment
-     explaining why the nav entry names the board it OPENS rather than requiring
-     a pin. Raising a bound is the mirror of lowering a floor. */
-  assert.ok(helper.length > 150 && helper.length < 2200, 'helper slice: ' + helper.length);
-  assert.ok(/TEAM_PAGES\.filter/.test(helper), 'the helper must derive from TEAM_PAGES');
+  assert.ok(helper.length > 40 && helper.length < 300, 'helper slice: ' + helper.length);
+  assert.ok(/TEAM_PAGES\.slice/.test(helper), 'the helper must derive from TEAM_PAGES');
   ['Daily Digest', 'Performance', 'Coaching', 'Objections', 'My Team'].forEach((n) =>
     assert.ok(!helper.includes(n),
       'the helper must not name a page itself — that is the second copy: ' + n));

@@ -106,7 +106,7 @@ test('⚠⚠ the DIAL draws one notch per edge — one mark on a band marks a ba
   assert.deepStrictEqual(labels(legacy), ['25']);
 });
 
-test('⚠⚠ the nav entry NAMES THE BOARD IT OPENS, pinned or not', () => {
+test('Customize is absent from Team navigation while saved boards remain untouched', () => {
   /* ⚠ Justin saved and renamed a board and the dropdown still read "Customize",
      so he concluded the save had failed. IT HAD NOT — the row was in the
      database, named, with its cards. The label required `pinned` while the
@@ -114,11 +114,7 @@ test('⚠⚠ the nav entry NAMES THE BOARD IT OPENS, pinned or not', () => {
      ALWAYS opened that board and refused to say its name. */
   const src = HTML.slice(HTML.indexOf('var TEAM_PAGES'), HTML.indexOf('function teamPageSelectHtml'));
   const make = new Function('state', src + '; return teamPagesWithBoard;');
-  const un = make({ teamDashboard: { board: { name: 'Morning board', pinned: false } } })();
-  assert.strictEqual(un[un.length - 1].label, 'Morning board', 'an unpinned board lends its name');
-  assert.notStrictEqual(un[0].label, 'Morning board', 'but does not take the top slot');
-  const pin = make({ teamDashboard: { board: { name: 'Morning board', pinned: true } } })();
-  assert.strictEqual(pin[0].label, 'Morning board', 'a pinned board still goes to the top');
-  // and with nothing loaded it is a way IN, never a guess at a name
-  assert.ok(make({ teamDashboard: null })().map((p) => p.label).includes('Customize'));
+  const pages = make({ teamDashboard: { board: { name: 'Morning board', pinned: true } } })();
+  assert.ok(!pages.some((p) => p.label === 'Morning board' || p.label === 'Customize'));
+  assert.deepStrictEqual(pages.map((p) => p.view), ['team', 'team-performance', 'team-coaching', 'team-objections', 'team-members']);
 });
