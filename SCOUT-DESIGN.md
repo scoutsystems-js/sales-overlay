@@ -1,5 +1,7 @@
 # Scout — the design system (rules and pointers, not history)
 
+**Approved replacement design — 2026-09-12:** Justin selected the floating-panel Stark/HUD mockup as the new site design. [site-design.md](site-design.md) records that approved visual direction and links the exact archived mockup. Its explicitly approved visual changes supersede the older appearance below for the redesign; this file's existing tokens and guards still describe production until implementation. This approval does not change product behavior, metric definitions, or permissions. The redesign is saved, not deployed.
+
 **Companion file:** `SCOUT-BRAND.md` is the brand guide — the actual hex values, the wordmark and glyph rules, and the usage rules for anyone making something that carries the Scout name (a page, a post, a deck, a landing page), human or model. It states values and reasoning; **this file states the law.** If the two disagree, this file and CLAUDE.md §4e win and the brand guide is stale.
 
 **This file is the one place the design system is listed.** Every rule below is *stated* once, where it was ruled, and this file *points* at it — CLAUDE.md §4e for the rulings, the token blocks for the values, `SCOUT-HISTORY.md` (`H###`) for the reasoning, and `backend/test/` for what pins it. **Do not restate a rule here that is written there; add a pointer.** Two documents describing one system is the defect this codebase keeps paying for. Keep this file under 12,000 characters (`wc -c SCOUT-DESIGN.md`).
