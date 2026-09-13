@@ -10,7 +10,7 @@
 
 - **Customize is retired from Team navigation for now.** Preserve saved boards and editor code; `#team-dashboard` must redirect to Daily Digest. Do not load dashboard data just to populate navigation. (H786)
 
-- **The redesigned-view Observatory scope now includes Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest, Team Objections, My Team, Admin, My Account and both calendar views.** Daily Digest remains a fixed-day cached report with bounded navigation and existing team/count/evidence/focus behavior; its Observatory pass is presentation-only and adds no gauge or date-range picker. (H783, H784, H785, H787)
+- **The redesigned-view Observatory scope now includes Overview, Team Performance, Team Coaching, Calls, EOD, Daily Digest, Team Objections, My Team, Admin, My Account, both calendar views and Knowledge Base.** Daily Digest remains a fixed-day cached report with bounded navigation and existing team/count/evidence/focus behavior; its Observatory pass is presentation-only and adds no gauge or date-range picker. (H783, H784, H785, H787, H788)
 
 ---
 
