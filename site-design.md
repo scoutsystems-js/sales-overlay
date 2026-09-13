@@ -49,6 +49,8 @@ September 13 compact Dashboard refinement: implemented in the Observatory worktr
 
 September 13 Overview glass refinement: implemented only for personal `overview`; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/glass/release-status.md`. Its lower panels use dark translucent green tint, modest backdrop blur, sage edges, and restrained emerald bloom. The four top gauges float without card surfaces in balanced desktop columns and a two-by-two phone grid. The fixed HUD, background switch, and reduced-motion behavior remain unchanged. Focused rendered coverage and the full backend suite pass 2,858/2,858.
 
+September 13 three-gauge Overview refinement: implemented only for personal `overview`; release verification: `~/Desktop/scan-reports/observatory-2026-09-13/three-gauges/release-status.md`. Calls analyzed is removed. The free-floating gauges run Closing %, Objection handle rate, and Avg call score; Closing is a native link to the regular Calls page. Focus panels begin below the hero beside the rail; Coach Summary is the final full-width section. The fixed HUD, background switch, and reduced-motion behavior remain unchanged.
+
 ## Approved visual standard
 
 Team Coaching uses opaque, smooth near-black panels over one expansive forest-green Aurora ground, with pale-sage edges, smooth dark shadows, precise instrument detail, and slow white/gray HUD motion. Do not add fake telemetry, extra metrics, controls, or character/IP imagery. Product rules, metrics, permissions, data, and content remain unchanged.

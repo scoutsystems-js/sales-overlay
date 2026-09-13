@@ -5621,7 +5621,7 @@
     body[data-view="team-coaching"] .observatory-page>.observatory-strengths-panel,
     body[data-view="team-coaching"] .observatory-page>.empty,
     body[data-view="overview"] .observatory-page>.section,
-    body[data-view="overview"] .observatory-overview-focus-grid { grid-column:1/-1; }
+    body[data-view="overview"] .observatory-page>.observatory-overview-focus-grid { grid-column:1/-1; }
     body[data-view="team-performance"] .observatory-hud,
     body[data-view="team-coaching"] .observatory-hud,
     body[data-view="overview"] .observatory-hud {
@@ -6017,12 +6017,16 @@
     body[data-view="overview"] .observatory-overview-focus-grid>.section,
     body[data-view="overview"] .observatory-overview-focus-side>.section { margin:0; min-width:0; }
     body[data-view="overview"] .observatory-overview-hero {
-      position:relative; z-index:2; display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+      position:relative; z-index:2; display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
       align-items:start; gap:12px; margin:0 0 16px;
     }
     body[data-view="overview"] .observatory-close-instrument {
       display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:196px; margin:0;
     }
+    body[data-view="overview"] .overview-close-instrument-link { color:inherit; text-decoration:none; }
+    body[data-view="overview"] .overview-close-instrument-link:hover .lead-number-label,
+    body[data-view="overview"] .overview-close-instrument-link:focus-visible .lead-number-label { color:var(--accent); }
+    body[data-view="overview"] .overview-close-instrument-link:focus-visible { outline:1px solid var(--accent); outline-offset:4px; border-radius:var(--radius); }
     body[data-view="overview"] .overview-close-ring { width:166px; height:166px; color:var(--accent); }
     body[data-view="overview"] .observatory-close-instrument .lead-number-label {
       margin:10px 0 0; color:var(--text); font-size:var(--fs-eyebrow); font-weight:var(--fw-emphasis);
@@ -6049,8 +6053,7 @@
     body[data-view="overview"] .observatory-metric-instrument .glance-sub { margin-top:4px; line-height:1.35; }
     body[data-view="overview"] .observatory-metric-trend .glance-trend { margin:3px 0 0; vertical-align:0; font-size:11px; }
     body[data-view="overview"] .observatory-metric-instrument .observatory-ring-number strong { font-size:var(--observatory-ring-value-compact); }
-    body[data-view="overview"] .observatory-overview-upper-coach { margin-top:0!important; }
-    body[data-view="overview"] .observatory-overview-upper-coach .section-header { margin-bottom:10px; }
+    body[data-view="overview"] .observatory-overview-bottom-coach .section-header { margin-bottom:10px; }
     body[data-view="overview"] .observatory-overview-focus-grid .section { min-height:0; }
     body[data-view="overview"] .observatory-overview .team-recs-card,
     body[data-view="overview"] .observatory-overview .pattern-card {
@@ -6089,7 +6092,7 @@
       body[data-view="overview"] .observatory-overview-focus-grid { grid-template-columns:1fr; }
       body[data-view="overview"] .observatory-overview .page-header { padding:0 0 14px; }
       body[data-view="overview"] .observatory-overview-hero { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:10px; }
-      body[data-view="overview"] .observatory-close-instrument { min-height:154px; margin:0; justify-content:flex-start; }
+      body[data-view="overview"] .observatory-close-instrument { grid-column:1/-1; min-height:154px; margin:0; justify-content:flex-start; }
       body[data-view="overview"] .overview-close-ring { width:126px; height:126px; }
       body[data-view="overview"] .observatory-ring-number strong { font-size:32px; }
       body[data-view="overview"] .observatory-overview .glance-row { display:contents; }
@@ -9303,38 +9306,27 @@
     // falls back to counting all moments).
     var ohr = objectionHandleRate(state.needsWork);
     /* ⚠ ONE LOUD NUMBER PER PAGE, FIXED — never weakest-against-target. On the
-       personal Coaching Dashboard that is CLOSING %: the only one of the four
-       a closer is actually paid on, and a count ratio rather than a judgement. */
+       personal Coaching Dashboard that is CLOSING %: the only one of the three
+       shown values a closer is actually paid on, and a count ratio rather than a judgement. */
     var cr = closeRateDisplay(a);
-    var callsTotal = a.calls.total_in_range;
-    var callsSub = (analyzed < callsTotal)
-      ? ('of ' + callsTotal + ' in range · ' + (callsTotal - analyzed) + ' not graded yet')
-      : ('of ' + callsTotal + ' in range');
-    var callsProgress = callsTotal > 0 ? (analyzed / callsTotal) * 100 : null;
     var avgScore = a.avg_score.mean;
     var ohrValue = ohr ? ohr.rate + '%' : '—';
     var ohrSub = ohr ? (ohr.handled + ' of ' + ohr.total + ' handled') : 'true objections';
     var tiles = '<div class="observatory-overview-hero">' + overviewCloseInstrumentHtml(a, cr)
       + '<div class="glance-row fade-in">'
-      /* ⚠ "19 of 149" with no explanation reads as broken to a trial customer.
-         It is not: grading is capped when calls first arrive. Say so, and say
-         where to fix it, rather than leaving a number that looks like a fault. */
-      + overviewMetricInstrumentHtml('Calls analyzed', String(analyzed), callsSub, callsProgress,
-          "drillCalls('analyzed',null)", 'Calls analyzed ' + analyzed + '. ' + callsSub, callsProgress === null ? null : 'var(--accent)')
-      + overviewMetricInstrumentHtml('Avg score', avgValue, avgScoreSubstat(a.avg_score), avgScore,
-          "drillCalls('analyzed','score')", 'Average score ' + (avgScore === null ? 'unavailable' : avgScore) + '. ' + avgScoreSubstat(a.avg_score), avgScore === null ? null : scoreColor(avgScore), avgTrend)
       /* ⚠⚠ CLOSING % IS THE LOUD NUMBER ON THIS PAGE (Justin's ruling,
-         2026-09-01) and it now leads above these instruments rather than sitting
-         as the fourth of four at equal weight. AVG SCORE keeps its existing
-         score colour and its trend helper, but Closing % stays the loud number:
-         it is a count ratio with no model drift. The counts ride with each rate. */
+         2026-09-01). Its counts ride with the existing rate and the regular Calls
+         page remains one keyboard-accessible click away; neither path adds a target
+         or computes a new metric. */
       + overviewMetricInstrumentHtml('Objection handle rate', ohrValue, ohrSub, ohr ? ohr.rate : null,
           "goObjections()", 'Objection handle rate ' + ohrValue + '. ' + ohrSub, ohr ? 'var(--accent)' : null)
+      + overviewMetricInstrumentHtml('Avg call score', avgValue, avgScoreSubstat(a.avg_score), avgScore,
+          "drillCalls('analyzed','score')", 'Average call score ' + (avgScore === null ? 'unavailable' : avgScore) + '. ' + avgScoreSubstat(a.avg_score), avgScore === null ? null : scoreColor(avgScore), avgTrend)
     + '</div></div>';
 
-    // A-2.2 layout: tiles → What-needs-work card → Coach summary (OPEN inline) →
-    // Performance summary (card → #performance page, LLM on open) → Recent calls
-    // (card → the Call Library). No accordions.
+    // Compact Overview layout: header and three gauges lead the main column;
+    // optional rep graph, then coaching focus panels, stay beside the rail;
+    // Coach Summary follows as the final full-width section. No accordions.
     // While the Get-started card is showing, it owns the connect prompt — suppress
     // the standalone Fathom/Zoom connect cards so there's no duplicate "Connect".
     var gsCard = getStartedCardHtml();
@@ -9345,10 +9337,7 @@
       + gsCard
       + connectSections
       + tiles
-      + '<div class="section fade-in observatory-overview-upper-coach"><div class="section-header"><h2>Coach Summary</h2>'
-        + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
-        + renderCoachSummary2(a) + '</div>'
-      + repOwnGraphHtml() + '</div>'
+      + repOwnGraphHtml()
       + '<div class="observatory-overview-focus-grid">'
       + '<div class="section fade-in">' + sectionRankCardHtml() + '</div>'
       + '<div class="observatory-overview-focus-side">'
@@ -9363,7 +9352,11 @@
       // for. Bigger here means more visual weight, not more work.
       + '<div class="section fade-in perf-feature"><div class="section-header"><h2>Performance Summary</h2>'
         + '<div class="meta">Your Wins and What to Improve</div></div>'
-        + perfFeatureCardHtml() + '</div></div></div>';
+        + perfFeatureCardHtml() + '</div></div></div>'
+      + '</div>'
+      + '<div class="section fade-in observatory-overview-bottom-coach"><div class="section-header"><h2>Coach Summary</h2>'
+        + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
+        + renderCoachSummary2(a) + '</div></div>';
       observeObservatoryLayout();
       /* REMOVED 2026-08-17 (Justin's item n) — Recent Calls. The Call Library is
          one click away in the top nav, and the card was a link to it with no
@@ -18210,7 +18203,7 @@
       ? '<circle class="observatory-ring-glow" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
         + '<circle class="observatory-ring-value" cx="60" cy="60" r="45" pathLength="100" stroke-dasharray="' + progress.toFixed(2) + ' ' + (100 - progress).toFixed(2) + '"></circle>'
       : '';
-    return '<div class="lead-number observatory-close-instrument">'
+    return '<a class="lead-number observatory-close-instrument overview-close-instrument-link" href="#call-library" onclick="goCallLibrary(); return false;" title="Open Calls">'
       + '<div class="observatory-ring overview-close-ring' + (measured ? '' : ' observatory-ring--empty') + '">'
       + '<svg viewBox="0 0 120 120" role="img" aria-label="' + escapeHtml(aria) + '">'
       + '<circle class="observatory-ring-ticks" cx="60" cy="60" r="56" pathLength="100"></circle>'
@@ -18218,7 +18211,7 @@
       + '<circle class="observatory-ring-track" cx="60" cy="60" r="45" pathLength="100"></circle>'
       + arc + '<circle class="observatory-ring-core" cx="60" cy="60" r="33"></circle>'
       + '</svg><div class="observatory-ring-number"><strong class="lead-number-val">' + escapeHtml(String(display.value)) + '</strong></div></div>'
-      + '<div class="lead-number-label">Closing %</div><div class="lead-number-sub">' + escapeHtml(display.sub) + '</div></div>';
+      + '<div class="lead-number-label">Closing %</div><div class="lead-number-sub">' + escapeHtml(display.sub) + '</div></a>';
   }
 
 
