@@ -39,6 +39,14 @@ These are the snapshot values and words, not constants for production. “What t
 - Scores: `STAGE SCORES THIS PERIOD`; Intro `77` / `17 graded calls`; Discovery `73` / `16 graded calls`; Pitch `80` / `12 graded calls`; Objection Handling `69` / `7 graded calls · not enough to judge`; Close `61` / `8 graded calls · not enough to judge`.
 - Strengths: `TEAM STRENGTHS`, `What is already working`, `2 strengths`; Josh P: “The team’s pitch mechanics are the strongest section on the board, with closers framing the…” / `Closed` / `View exchange →`; Yazan Younis: “Decision-maker awareness is showing up early in the call on winning conversations, with reps…” / `Closed` / `View exchange →`.
 
+## Approved Performance page — 2026-09-12
+
+Justin’s approval: “yo this is perfect save it”. This approves Performance within the Observatory standard; it is a saved snapshot, not live. The [byte-exact approved source](docs/design/scout-performance-observatory-approved.html) is authoritative for the exact CSS, SVG, JS, and font; SHA-256 `322a9ce6516731c2c6537e5bfa1ee96045e6591a0652af784f8db7f85481f5ad`. The [standalone preview](docs/design/scout-performance-observatory-preview.html) is the rendered archive.
+
+Performance is active, with three glow rings fixed to the last 7 days against a report range of Aug 15–Sep 13. The page uses full-width two-column rep cards below a short nav, with 7 measured and 5 ungraded reps; actual grade, weakest objection, and stage bars; local Closing, Objections, and Grade sort with a direction toggle; responsive behavior from 320px up; and optional glow/HUD tweaks that respect reduced motion.
+
+No trend series are fabricated. Lower trend charts are not included and remain future design work. This save changes no production metrics, permissions, or data.
+
 
 ## Implementation boundary
 
@@ -223,6 +231,7 @@ All current Observatory source style blocks follow in source order. Font bytes a
 @media(max-width:850px){#scout-coaching-observatory .sc-hero{grid-template-columns:1fr}#scout-coaching-observatory .sc-hero .avg{min-height:0;flex-direction:row;justify-content:start}#scout-coaching-observatory .sc-hero .focus{min-height:0}}@media(max-width:700px){#scout-coaching-observatory .sc-hero{display:block;margin-top:16px}#scout-coaching-observatory .sc-hero .avg{margin-bottom:16px;justify-content:center;flex-direction:column}#scout-coaching-observatory .sc-hero .ring-gauge{width:140px;height:140px;flex-basis:140px}}
 
 ```
+
 
 ## Exact structural markup
 
