@@ -18,6 +18,22 @@ gutters on mobile. It changes no behavior, data, metrics, permissions, or
 interactions. The approved mockup archives are unchanged. The prior `456ebf5`
 release remains the historical Observatory release record.
 
+The September 13 HUD restoration is implemented and awaits production
+verification. It restores the approved `1200×860` geometry: two arcs, two
+rings, four traces, three points, and a scan. Its fixed layer is opacity `1`
+with pale `.105` / `.095` strokes; the orbit is 82s, the points are 67s, 91s,
+and 74s, and the scan is 28s. Background-off hides the layer and reduced motion
+stops it. The mobile navigation stays above the artwork without changing its
+normal position or width. The prior `9bdfa4e1cbb8322a8f36add576650bf3be6323c5` refinement
+remains live; the approved archives remain unchanged.
+
+HUD restoration validation: all **2,818 tests passed**, zero skipped, with
+concurrency four (39.5 seconds). Rendered checks cover real orbit movement,
+background-off, fixed scrolling, wide gutters, and mobile navigation painting
+above the artwork. Desktop and phone previews were reviewed. Only stylesheet
+and decorative HUD markup changed; all other page logic is byte-identical.
+Receipts: `~/Desktop/scan-reports/observatory-2026-09-13/animation/`.
+
 The approved redesign covers exactly two dashboard pages: Team → Coaching and
 Team → Performance. The server logic, intelligence, data contracts, routes,
 and existing functionality remain unchanged. Coaching keeps the current

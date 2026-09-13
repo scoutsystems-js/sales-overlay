@@ -24,6 +24,13 @@ deployment `2a102b7e-d8e3-4004-a6fe-d4a3504710f3` succeeded; nine served-page
 markers matched in raw and comment-stripped output. Receipts are in
 `~/Desktop/scan-reports/observatory-2026-09-13/refinement/`.
 
+**September 13 HUD restoration — IMPLEMENTED, PRODUCTION VERIFICATION PENDING.**
+The fixed `1200×860` HUD restores two arcs, two rings, four traces, three
+points, and a 28s scan at opacity `1` with pale `.105` / `.095` strokes. Orbit
+is 82s; point motion is 67s, 91s, and 74s. Background-off hides it and reduced
+motion stops it. Behavior and approved archives are unchanged; the prior
+`9bdfa4e1cbb8322a8f36add576650bf3be6323c5` refinement remains live.
+
 ## 1. Coaching Page Integrity, Design & Stage Classification — CLOSED 2026-09-11 (Block 008)
 
 **Completion report:** [docs/build-plans/coaching-page-integrity-completion-report.md](docs/build-plans/coaching-page-integrity-completion-report.md). Two items carried, not closed: §9 the per-cell "N graded calls" labels (folded into the deferred stage-cell decision at the end of this file) and §16/§22 adding the Block 006 stage definitions to the doctrine file (a doctrine edit; Justin's call). The bullets below are the original brief and are kept as the record.

@@ -5616,7 +5616,7 @@
     body[data-view="team-performance"] .observatory-hud,
     body[data-view="team-coaching"] .observatory-hud {
       position:fixed; z-index:-1; inset:0; overflow:hidden;
-      pointer-events:none; opacity:.46;
+      pointer-events:none; opacity:1;
     }
     body[data-view="team-performance"] .observatory-hud svg,
     body[data-view="team-coaching"] .observatory-hud svg { display:block; width:100%; height:100%; min-height:0; }
@@ -5626,29 +5626,34 @@
     body[data-view="team-coaching"] .observatory-hud path,
     body[data-view="team-coaching"] .observatory-hud circle,
     body[data-view="team-coaching"] .observatory-hud line {
-      fill:none; stroke:rgba(227,238,233,.10); stroke-width:1;
+      fill:none; stroke:rgba(227,238,233,.105); stroke-width:1;
     }
     body[data-view="team-performance"] .observatory-hud-dash,
-    body[data-view="team-coaching"] .observatory-hud-dash { stroke-dasharray:3 14; }
+    body[data-view="team-coaching"] .observatory-hud-dash { stroke:rgba(227,238,233,.095); stroke-dasharray:3 13; }
     body[data-view="team-performance"] .observatory-hud-orbit,
     body[data-view="team-coaching"] .observatory-hud-orbit {
-      transform-origin:600px 800px; animation:observatory-orbit 82s linear infinite;
+      transform-origin:600px 420px; animation:observatory-orbit 82s linear infinite;
     }
     body[data-view="team-performance"] .observatory-hud-dot,
     body[data-view="team-coaching"] .observatory-hud-dot {
-      fill:rgba(237,237,237,.19)!important; stroke:none!important;
-      filter:drop-shadow(0 0 4px rgba(237,237,237,.25));
+      fill:rgba(237,237,237,.15)!important; stroke:none!important;
+      filter:drop-shadow(0 0 3px rgba(237,237,237,.25));
       animation:observatory-drift 67s ease-in-out infinite alternate;
     }
     body[data-view="team-performance"] .observatory-hud-dot:nth-of-type(2),
     body[data-view="team-coaching"] .observatory-hud-dot:nth-of-type(2) { animation-duration:91s; animation-delay:-19s; }
+    body[data-view="team-performance"] .observatory-hud-dot:nth-of-type(3),
+    body[data-view="team-coaching"] .observatory-hud-dot:nth-of-type(3) { animation-duration:74s; animation-delay:-37s; }
     body[data-view="team-performance"] .observatory-hud-scan,
-    body[data-view="team-coaching"] .observatory-hud-scan { animation:observatory-scan 28s linear infinite; }
+    body[data-view="team-coaching"] .observatory-hud-scan {
+      fill:rgba(237,237,237,.14); filter:blur(.35px); opacity:.45;
+      animation:observatory-scan 28s linear infinite;
+    }
     html[data-bg="off"] body[data-view="team-performance"] .observatory-hud,
     html[data-bg="off"] body[data-view="team-coaching"] .observatory-hud { display:none; }
     @keyframes observatory-orbit { to { transform:rotate(360deg); } }
     @keyframes observatory-drift { to { transform:translate(16px,-10px); } }
-    @keyframes observatory-scan { from { transform:translateY(-20px); } to { transform:translateY(1980px); } }
+    @keyframes observatory-scan { from { transform:translateY(-10px); } to { transform:translateY(880px); } }
 
     body[data-view="team-performance"] .sidebar,
     body[data-view="team-coaching"] .sidebar {
@@ -5942,7 +5947,8 @@
     @media(max-width:900px) {
       body[data-view="team-performance"] .sidebar,
       body[data-view="team-coaching"] .sidebar {
-        position:static; width:auto; max-height:none; overflow:visible;
+        position:relative; top:auto; left:auto; z-index:2;
+        width:auto; max-height:none; overflow:visible;
       }
       body[data-view="team-performance"] .page,
       body[data-view="team-coaching"] .page {
@@ -11425,11 +11431,11 @@
     return '<div class="msg-error">The closing rate below is computed on ' + escapeHtml(String(pr.calls)) + ' calls \u2014 the read was cut at the server\'s limit, so it is not the whole team.</div>';
   }
   function observatoryHudHtml() {
-    return '<div class="observatory-hud" aria-hidden="true"><svg viewBox="0 0 1200 1980" preserveAspectRatio="xMidYMid slice">'
-      + '<g class="observatory-hud-orbit"><path d="M-220 1180 A830 830 0 0 1 910 -180"></path><path class="observatory-hud-dash" d="M-30 1490 A930 930 0 0 1 1210 30"></path><circle cx="600" cy="800" r="440"></circle><circle class="observatory-hud-dash" cx="600" cy="800" r="386"></circle></g>'
-      + '<path d="M32 310 H244 L292 262 H496"></path><path d="M755 1350 H1012 L1060 1302 H1170"></path><path d="M870 490 H1134"></path><path d="M80 1680 H302"></path>'
-      + '<circle class="observatory-hud-dot" cx="246" cy="309" r="3"></circle><circle class="observatory-hud-dot" cx="1024" cy="1350" r="3"></circle>'
-      + '<line class="observatory-hud-scan" x1="0" x2="1200" y1="0" y2="0"></line></svg></div>';
+    return '<div class="observatory-hud" aria-hidden="true"><svg viewBox="0 0 1200 860" preserveAspectRatio="xMidYMid slice">'
+      + '<g class="observatory-hud-orbit"><path d="M-80 700 A650 650 0 0 1 800 -70"></path><path class="observatory-hud-dash" d="M168 820 A690 690 0 0 1 1040 35"></path><circle cx="600" cy="420" r="318"></circle><circle class="observatory-hud-dash" cx="600" cy="420" r="280"></circle></g>'
+      + '<g><path d="M38 196 H300 L342 154 H502"></path><path d="M774 735 H1030 L1072 693 H1160"></path><path d="M896 222 H1120"></path><path d="M77 612 H202"></path></g>'
+      + '<g><circle class="observatory-hud-dot" cx="214" cy="195" r="3"></circle><circle class="observatory-hud-dot" cx="903" cy="735" r="3"></circle><circle class="observatory-hud-dot" cx="1020" cy="222" r="2.5"></circle></g>'
+      + '<rect class="observatory-hud-scan" x="0" y="-5" width="1200" height="1"></rect></svg></div>';
   }
   var observatoryLayoutBound = false;
   var observatoryRailObserver = null;

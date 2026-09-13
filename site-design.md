@@ -27,6 +27,13 @@ emerald pools separated by a dark center; the noninteractive HUD is fixed with
 it. Desktop gutters are 24px and mobile gutters remain 18px. This does not
 change page behavior, and the approved mockup archives remain untouched.
 
+September 13 HUD restoration: implemented, with production verification pending.
+It restores the approved `1200×860` HUD: two arcs, two rings, four traces,
+three points, and a scan. The fixed layer uses opacity `1`, pale `.105` / `.095`
+strokes, and 82s orbit; points run at 67s, 91s, and 74s; the scan runs at 28s.
+Background-off hides it and reduced motion stops it. The prior refinement remains
+live and the approved mockup archives remain untouched.
+
 ## Approved visual standard
 
 Team Coaching uses opaque, smooth near-black panels over one expansive forest-green Aurora ground, with pale-sage edges, smooth dark shadows, precise instrument detail, and slow white/gray HUD motion. Do not add fake telemetry, extra metrics, controls, or character/IP imagery. Product rules, metrics, permissions, data, and content remain unchanged.
