@@ -32,12 +32,25 @@ test('OAuth state is expiring and single-use; tokens encrypted and never returne
   await service.complete(state, 'code');
   await assert.rejects(service.complete(state, 'code'), /invalid_state/);
   const status = await service.status('rep');
-  assert.deepEqual(status, { connected: true, sharing_enabled: false, sharing_eligible: false });
+  assert.deepEqual(status, { connected: true });
   assert.doesNotMatch(JSON.stringify(status), /access_token|refresh_token|refresh-secret|title_contains|snapshot/);
   assert.doesNotMatch(JSON.stringify(db.tables.google_calendar_connections), /"access"|"refresh"/);
   const pending = await service.begin('rep');
   db.tables.google_calendar_oauth_states[0].expires_at = '2020-01-01T00:00:00.000Z';
   await assert.rejects(service.complete(pending.state, 'code'), /invalid_state/);
+});
+
+test('connecting a calendar automatically shares its appointment count with the rep’s current manager', async () => {
+  const { service, db } = setup();
+  db.tables.user_profiles[0].managed_by = 'manager';
+  db.tables.user_profiles.push({ user_id: 'manager', role: 'manager', active: true });
+  await connect(service);
+  const connection = db.tables.google_calendar_connections[0];
+  assert.equal(connection.share_scheduled_count, true);
+  assert.equal(connection.share_manager_id, 'manager');
+  const shared = await service.sharedCount({ id: 'manager', role: 'manager' }, 'rep', range);
+  assert.equal(shared.status, 'ready');
+  assert.equal(shared.count, 1);
 });
 
 test('partial Google consent and deactivated users cannot finish connecting', async () => {
@@ -118,7 +131,7 @@ test('disconnect wins over an in-flight inspection and no event data is served a
   google.events = async () => { await service.disconnect('rep'); return []; };
   await assert.rejects(service.inspect('rep', range), /connection_changed/);
   assert.equal(db.tables.google_calendar_connections.length, 0);
-  assert.deepEqual(await service.status('rep'), { connected: false, sharing_enabled: false, sharing_eligible: false });
+  assert.deepEqual(await service.status('rep'), { connected: false });
 });
 
 test('disconnect also wins over an authorization exchange already in flight', async () => {

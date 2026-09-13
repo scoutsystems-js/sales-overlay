@@ -80,41 +80,24 @@ function createCalendarService(admin, google, config) {
         const pending = await checked(admin.from(STATES).delete().eq('state_hash', hash(state))
           .gt('expires_at', new Date().toISOString()).select('user_id').maybeSingle());
         if (!pending) throw new Error('invalid_state');
-        const profile = await checked(admin.from('user_profiles').select('active').eq('user_id', pending.user_id).maybeSingle());
+        const profile = await checked(admin.from('user_profiles').select('user_id,active,role,managed_by').eq('user_id', pending.user_id).maybeSingle());
         if (!profile || profile.active === false) throw new Error('account_unavailable');
         const data = await google.exchange(config, code);
         const granted = new Set((data.scope || '').split(' '));
         if (!SCOPES.every(scope => granted.has(scope))) throw new Error('google_scope_missing');
         if (!data.refresh_token) throw new Error('google_reconnect');
+        const sharing = sharingEligibility(profile);
         await checked(admin.from(CONNECTIONS).upsert({ user_id: pending.user_id, generation: crypto.randomUUID(),
           access_token_encrypted: seal(data.access_token, pending.user_id, config.key),
           refresh_token_encrypted: seal(data.refresh_token, pending.user_id, config.key),
           expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(), connected_at: new Date().toISOString(),
           calendar_id: null, calendar_name: null, time_zone: null, title_contains: null,
           snapshot: null, last_sync_at: null, last_sync_error: null,
-          share_scheduled_count: false, share_manager_id: null }, { onConflict: 'user_id' }));
+          share_scheduled_count: sharing.eligible, share_manager_id: sharing.managerId }, { onConflict: 'user_id' }));
       });
     },
     async status(userId) {
-      const [conn, profile] = await Promise.all([get(userId), getProfile(userId)]);
-      const eligibility = sharingEligibility(profile);
-      let teamName = null;
-      if (eligibility.eligible) {
-        const manager = eligibility.managerId === userId ? profile : await getProfile(eligibility.managerId);
-        teamName = manager?.team_name || null;
-      }
-      return { connected: Boolean(conn), sharing_enabled: Boolean(conn && conn.share_scheduled_count === true && conn.share_manager_id === eligibility.managerId && eligibility.eligible),
-        sharing_eligible: eligibility.eligible, ...(teamName ? { sharing_team_name: teamName } : {}) };
-    },
-    async setSharing(userId, enabled) {
-      const [conn, profile] = await Promise.all([get(userId), getProfile(userId)]);
-      if (!conn) throw new Error('not_connected');
-      const eligibility = sharingEligibility(profile);
-      if (enabled && !eligibility.eligible) throw new Error('sharing_unavailable');
-      await update(conn, enabled
-        ? { share_scheduled_count: true, share_manager_id: eligibility.managerId }
-        : { share_scheduled_count: false, share_manager_id: null });
-      return this.status(userId);
+      return { connected: Boolean(await get(userId)) };
     },
     async inspect(userId, range) {
       validateInspectionRange(range.from, range.to);

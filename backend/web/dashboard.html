@@ -9470,7 +9470,11 @@
         + '<button class="btn-fathom-primary" type="button" onclick="connectFathom()">Connect Fathom</button></div>');
     }
 
-    // Step 2 — get calls graded. Connecting does NOT auto-sync, so this step carries
+    var calendar = stepHtml(false, 'Connect Google Calendar',
+      'Let your manager see how many appointments you have scheduled. Calendar details stay private.',
+      '<button class="btn-fathom-primary" type="button" onclick="location.assign(\'/calendar.html\')">Connect Google Calendar</button>');
+
+    // Step 3 — get calls graded. Connecting does NOT auto-sync, so this step carries
     // the action itself. Both Fathom and Zoom now have a real one-click sync.
     var s2;
     if (analyzed && blWaiting === 0) {
@@ -9529,7 +9533,7 @@
     return '<div class="section fade-in gs-card">'
       + '<button class="gs-dismiss" type="button" title="Dismiss" onclick="dismissGetStarted()">×</button>'
       + '<div class="gs-head"><h2>Get Started With Scout</h2><div class="meta">A couple of quick steps to make your grading sharp.</div></div>'
-      + s1 + s2 + s3
+      + s1 + calendar + s2 + s3
       + '</div>';
   }
 

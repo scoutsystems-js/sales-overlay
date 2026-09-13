@@ -2,11 +2,11 @@
 
 The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Tasks 1–4 are closed; the Team → Coaching reset is live.
 
-## Active — Manager calendar counts (Block 023, 2026-09-13)
+## Active — Manager calendar counts LIVE (Block 024, 2026-09-13)
 
 Block 023 is LIVE on `0344cb9`, implementation `3fd6c43`, Railway `b16d7184-f1e0-43f8-bad6-3beec46f3e96` SUCCESS. My Team → Scheduled Appointments shows per-closer counts for an explicit window, using the same measured SLR GHL rule. Sharing is opt-in, off for existing connections, bound to the current manager, and reset on reconnect. Counts only; no event details, false zeros for missing data, new call metrics, or stored event history. The additive consent migration is applied; one existing connection remains, zero sharing enabled, zero event snapshots, RLS on, no browser grants. Latest design `da7f2a2` is preserved. Final integrated tests 2,877/2,877. Actual manager browser: 12 active SLR members with truthful Not connected states; date changes verified. Existing owner-account private calendar still reads 29 appointments. A live positive shared-count check awaits Josh's real opt-in below.
 
-**Block 024 authorized, in progress:** remove the unnecessary hard-coded Scout-team restriction. Google account selection is independent of the Scout login email. Keep Josh's existing connection and its Scout-profile ownership, with no login switch or reconnect. Consent and actual manager/team permissions stay; the measured SLR event filter is unchanged. The previous reconnect instruction is withdrawn.
+**Block 024 LIVE:** `6072523`, Railway `1fa7a405-eca4-47b0-890a-650adbc8257b` SUCCESS. Removed the unnecessary hard-coded Scout-team restriction. Selected Google account need not match Scout login; no login switch or reconnect. Counts stay on the existing Scout profile; consent and real team permissions remain, SLR source filter unchanged. Full suite 2,880/2,880. Actual page: existing 29 appointments, sharing checkbox available and unchecked. **Next user step:** Josh enables count sharing on his current calendar page; then verify a live shared count. No booking ledger or connection transfer.
 
 ### Previous checkpoints — Blocks 021–022 (historical)
 
