@@ -2,6 +2,8 @@
 
 Status: approved site standard, recorded 2026-09-12; implemented and live on Team Coaching and Team Performance as of 2026-09-13. Justin’s approval: “yeah i like Observatory best. update the .md file”. The byte-exact approved source is [docs/design/scout-coaching-observatory-approved.html](docs/design/scout-coaching-observatory-approved.html), SHA-256 `238f4c3800a190bfa624c191a0a2b5bca85229475440fe32c414cacd909b3c71`; wrapper: [docs/design/scout-coaching-observatory-preview.html](docs/design/scout-coaching-observatory-preview.html). Polished and Stark are historical; Atelier remains unapproved.
 
+Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
+
 ## Production implementation scope
 
 The saved implementation applies Observatory styling only to Team → Coaching

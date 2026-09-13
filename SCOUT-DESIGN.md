@@ -4,6 +4,8 @@
 
 **Companion file:** `SCOUT-BRAND.md` is the brand guide — the actual hex values, the wordmark and glyph rules, and the usage rules for anyone making something that carries the Scout name (a page, a post, a deck, a landing page), human or model. It states values and reasoning; **this file states the law.** If the two disagree, this file and CLAUDE.md §4e win and the brand guide is stale.
 
+Current HUD visibility calibration: stroke `.14`, dashed `.12`, points `.20`, scan fill `.17` at opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
+
 **This file is the one place the design system is listed.** Every rule below is *stated* once, where it was ruled, and this file *points* at it — CLAUDE.md §4e for the rulings, the token blocks for the values, `SCOUT-HISTORY.md` (`H###`) for the reasoning, and `backend/test/` for what pins it. **Do not restate a rule here that is written there; add a pointer.** Two documents describing one system is the defect this codebase keeps paying for. Keep this file under 12,000 characters (`wc -c SCOUT-DESIGN.md`).
 
 **Where the values live:** the dashboard's token block `backend/web/dashboard.html` `:root` (lines ~78–240: sizes 85–91, the two named exceptions 102 and 114, `--edge-white` 128, weights 162–164, colours 175–211, radii 237–239); the shared file the outside pages load, `backend/web/css/style.css` `:root` (line 4); the landing page's own block, `backend/web/index.html` (self-contained by ruling). **They must agree, and a guard says so** — `style-tokens-mirror.test.js` executes the shared and index blocks against the dashboard's.

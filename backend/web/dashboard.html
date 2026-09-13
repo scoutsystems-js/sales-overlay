@@ -5626,17 +5626,17 @@
     body[data-view="team-coaching"] .observatory-hud path,
     body[data-view="team-coaching"] .observatory-hud circle,
     body[data-view="team-coaching"] .observatory-hud line {
-      fill:none; stroke:rgba(227,238,233,.105); stroke-width:1;
+      fill:none; stroke:rgba(227,238,233,.14); stroke-width:1;
     }
     body[data-view="team-performance"] .observatory-hud-dash,
-    body[data-view="team-coaching"] .observatory-hud-dash { stroke:rgba(227,238,233,.095); stroke-dasharray:3 13; }
+    body[data-view="team-coaching"] .observatory-hud-dash { stroke:rgba(227,238,233,.12); stroke-dasharray:3 13; }
     body[data-view="team-performance"] .observatory-hud-orbit,
     body[data-view="team-coaching"] .observatory-hud-orbit {
       transform-origin:600px 420px; animation:observatory-orbit 82s linear infinite;
     }
     body[data-view="team-performance"] .observatory-hud-dot,
     body[data-view="team-coaching"] .observatory-hud-dot {
-      fill:rgba(237,237,237,.15)!important; stroke:none!important;
+      fill:rgba(237,237,237,.20)!important; stroke:none!important;
       filter:drop-shadow(0 0 3px rgba(237,237,237,.25));
       animation:observatory-drift 67s ease-in-out infinite alternate;
     }
@@ -5646,7 +5646,7 @@
     body[data-view="team-coaching"] .observatory-hud-dot:nth-of-type(3) { animation-duration:74s; animation-delay:-37s; }
     body[data-view="team-performance"] .observatory-hud-scan,
     body[data-view="team-coaching"] .observatory-hud-scan {
-      fill:rgba(237,237,237,.14); filter:blur(.35px); opacity:.45;
+      fill:rgba(237,237,237,.17); filter:blur(.35px); opacity:.45;
       animation:observatory-scan 28s linear infinite;
     }
     html[data-bg="off"] body[data-view="team-performance"] .observatory-hud,

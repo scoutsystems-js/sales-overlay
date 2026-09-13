@@ -1,5 +1,7 @@
 # Current build order — updated September 6, 2026
 
+Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
+
 The broader-coaching session is complete. The order below supersedes earlier next-task suggestions and historical checkpoints in this file. Task 1 is active following Justin’s “you may begin.” Tasks 2–4 remain queued.
 
 ## Current implementation — Observatory redesign (2026-09-13)

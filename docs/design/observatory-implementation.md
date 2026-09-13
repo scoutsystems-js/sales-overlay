@@ -2,8 +2,12 @@
 
 **Date:** September 13, 2026 (Eastern)
 
-**Status:** `3cbab93ffa9047103f3b0c66e96dfbf770053f89` is LIVE — HUD restoration
-verified 2026-09-13.
+Current HUD visibility calibration: stroke alpha `.14`, dashed alpha `.12`, points alpha `.20`, and scan fill alpha `.17` at scan opacity `.45`—more noticeable, still quiet. Speeds, geometry, gradient, layering, and logic are unchanged; archive `.105`/`.095` values are historical.
+
+**Previous verified release:** `3cbab93ffa9047103f3b0c66e96dfbf770053f89` — HUD restoration
+verified 2026-09-13. The later visibility calibration passes all 36 focused
+checks; production verification is recorded in
+`~/Desktop/scan-reports/observatory-2026-09-13/visibility/release-status.md`.
 
 The implementation is saved in the Observatory worktree at
 `.codex/worktrees/observatory-pages`. It is based on origin commit
