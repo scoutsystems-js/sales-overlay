@@ -14,7 +14,8 @@ function setup() {
     revoke: async () => true,
     calendars: async () => [{ id: 'primary@example.com', name: 'Primary', time_zone: 'America/New_York', primary: true },
       { id: 'shared@example.com', name: 'Shared', time_zone: 'America/New_York', primary: false }],
-    events: async () => [{ id: 'one', status: 'confirmed', summary: 'Jordan Prospect', description: 'Booked by GHL',
+    events: async () => [{ id: 'one', status: 'confirmed', summary: 'Jordan Prospect', description: 'Booked by GHL https://links.soberlivingriches.com/booking/123',
+      extendedProperties: { private: { calendarId: 'calendar', eventId: 'event', linkedCalendarId: 'linked', userCalendarId: 'user-calendar', userId: 'user' } },
       start: { dateTime: '2026-09-10T14:00:00Z' }, end: { dateTime: '2026-09-10T15:00:00Z' } }],
   };
   return { db, google, service: createCalendarService(db, google, config) };
@@ -55,14 +56,34 @@ test('connected owner inspects the primary calendar without setup or event persi
   db.calls.length = 0;
   const result = await service.inspect('rep', range);
   assert.equal(result.calendar.name, 'Primary');
-  assert.equal(result.event_count, 1);
-  assert.equal(result.events[0].description, 'Booked by GHL');
+  assert.equal(result.scheduled_ghl_appointment_count, 1);
+  assert.match(result.appointments[0].description, /^Booked by GHL/);
   assert.ok(db.calls.every(call => call.action === 'select'), 'inspection only reads connection state');
   assert.equal(db.tables.google_calendar_connections[0].snapshot, null);
   assert.equal(db.tables.google_calendar_connections[0].calendar_id, null);
   assert.equal(db.tables.google_calendar_connections[0].title_contains, null);
   google.calendars = async () => [{ id: 'shared', name: 'Shared', time_zone: 'America/New_York', primary: false }];
   await assert.rejects(service.inspect('rep', range), /calendar_not_available/);
+});
+
+test('inspection reports only current scheduled GHL appointments, never every calendar event', async () => {
+  const { service, google } = setup();
+  google.events = async () => [
+    { id: 'ghl', status: 'confirmed', summary: 'Prospect', description: 'https://links.soberlivingriches.com/booking/123',
+      extendedProperties: { private: { calendarId: 'calendar', eventId: 'event', linkedCalendarId: 'linked', userCalendarId: 'user-calendar', userId: 'user' } },
+      start: { dateTime: '2026-09-10T14:00:00Z' }, end: { dateTime: '2026-09-10T15:00:00Z' } },
+    { id: 'saleskick', status: 'confirmed', summary: 'Not a Scout booking', description: 'https://app.saleskick.com/booking/456',
+      extendedProperties: { private: { calendarId: 'calendar', eventId: 'event', linkedCalendarId: 'linked', userCalendarId: 'user-calendar', userId: 'user' } },
+      start: { dateTime: '2026-09-10T16:00:00Z' }, end: { dateTime: '2026-09-10T17:00:00Z' } },
+    { id: 'internal', status: 'confirmed', summary: 'Internal team meeting',
+      start: { dateTime: '2026-09-10T18:00:00Z' }, end: { dateTime: '2026-09-10T19:00:00Z' } },
+  ];
+  await connect(service);
+  const result = await service.inspect('rep', range);
+  assert.equal(result.scheduled_ghl_appointment_count, 1);
+  assert.deepEqual(result.appointments.map(event => event.title), ['Prospect']);
+  assert.equal(result.event_count, undefined);
+  assert.equal(result.events, undefined);
 });
 
 test('refresh preserves a Google refresh token when the response does not rotate it', async () => {
@@ -73,7 +94,7 @@ test('refresh preserves a Google refresh token when the response does not rotate
   conn.expires_at = '2020-01-01T00:00:00.000Z';
   let received;
   google.refresh = async (_config, token) => { received = token; return { access_token: 'new', expires_in: 3600 }; };
-  assert.equal((await service.inspect('rep', range)).event_count, 1);
+  assert.equal((await service.inspect('rep', range)).scheduled_ghl_appointment_count, 1);
   assert.equal(received, 'refresh');
   assert.equal(conn.refresh_token_encrypted, saved);
 });

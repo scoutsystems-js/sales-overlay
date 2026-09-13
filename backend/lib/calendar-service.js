@@ -1,6 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
-const { SCOPES, seal, unseal, inspectionEvents, validateInspectionRange, authorizeUrl } = require('./google-calendar');
+const { SCOPES, seal, unseal, inspectionEvents, scheduledGhlEvents, validateInspectionRange, authorizeUrl } = require('./google-calendar');
 const CONNECTIONS = 'google_calendar_connections';
 const STATES = 'google_calendar_oauth_states';
 const COLUMNS = 'user_id,generation,access_token_encrypted,refresh_token_encrypted,expires_at,connected_at,calendar_id,calendar_name,time_zone,title_contains,last_sync_at,last_sync_error,snapshot';
@@ -92,12 +92,13 @@ function createCalendarService(admin, google, config) {
       const primary = calendars.find(calendar => calendar.primary === true);
       if (!primary?.time_zone) throw new Error('calendar_not_available');
       new Intl.DateTimeFormat('en', { timeZone: primary.time_zone });
-      const events = inspectionEvents(await google.events(token, primary.id, range), range, primary.time_zone);
+      const appointments = inspectionEvents(scheduledGhlEvents(await google.events(token, primary.id, range)), range, primary.time_zone);
       // A disconnect that lands while Google is responding must prevent the old
       // request from serving event details after its connection is gone.
       const current = await get(userId);
       if (!current || current.generation !== conn.generation) throw new Error('connection_changed');
-      return { ...range, calendar: { name: primary.name, time_zone: primary.time_zone }, event_count: events.length, events };
+      return { ...range, calendar: { name: primary.name, time_zone: primary.time_zone },
+        scheduled_ghl_appointment_count: appointments.length, appointments };
     },
     async disconnect(userId) {
       return authorizeInOrder(userId, async () => {

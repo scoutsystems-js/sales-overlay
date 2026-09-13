@@ -18,9 +18,15 @@ async function server(t, full = false) {
   const google = {
     exchange: async () => ({ access_token: 'access', refresh_token: 'refresh', expires_in: 3600, scope: SCOPES.join(' ') }),
     calendars: async () => [{ id: 'primary@example.com', name: 'Primary', time_zone: 'America/New_York', primary: true }],
-    events: async () => ['Jordan Prospect', 'Internal team meeting', 'Dentist'].map((summary, index) => ({ id: String(index), summary,
-      description: index === 0 ? 'Created from GHL' : '', organizer: { email: 'owner@example.com', self: true },
-      start: { dateTime: '2026-09-10T14:00:00Z' }, end: { dateTime: '2026-09-10T15:00:00Z' } })),
+    events: async () => [
+      { id: 'ghl', summary: 'Jordan Prospect', description: 'https://links.soberlivingriches.com/booking/123', organizer: { email: 'owner@example.com', self: true },
+        extendedProperties: { private: { calendarId: 'calendar', eventId: 'event', linkedCalendarId: 'linked', userCalendarId: 'user-calendar', userId: 'user' } },
+        start: { dateTime: '2026-09-10T14:00:00Z' }, end: { dateTime: '2026-09-10T15:00:00Z' } },
+      { id: 'saleskick', summary: 'SalesKick appointment', description: 'https://app.saleskick.com/booking/456',
+        extendedProperties: { private: { calendarId: 'calendar', eventId: 'event', linkedCalendarId: 'linked', userCalendarId: 'user-calendar', userId: 'user' } },
+        start: { dateTime: '2026-09-10T16:00:00Z' }, end: { dateTime: '2026-09-10T17:00:00Z' } },
+      { id: 'internal', summary: 'Internal team meeting', start: { dateTime: '2026-09-10T18:00:00Z' }, end: { dateTime: '2026-09-10T19:00:00Z' } },
+    ],
   };
   const service = full ? createCalendarService(db, google, config) : {
     status: async id => ({ connected: false, user_id: id }),
@@ -54,7 +60,7 @@ test('inspection requires auth and always reads only the connected Scout user', 
   assert.deepEqual(reads, [{ id: 'rep', range: { from: '2026-09-07', to: '2026-09-11' } }]);
 });
 
-test('real HTTP workflow connects and privately inspects mixed primary-calendar metadata without saving it', async t => {
+test('real HTTP workflow returns only scheduled GHL appointments without saving event data', async t => {
   const { url, db } = await server(t, true);
   const headers = { Authorization: 'rep', 'Content-Type': 'application/json' };
   const connecting = await fetch(url + '/connect', { method: 'POST', headers, body: '{}' });
@@ -63,12 +69,12 @@ test('real HTTP workflow connects and privately inspects mixed primary-calendar 
   assert.equal(callback.status, 302);
   assert.equal(callback.headers.get('location'), '/calendar.html?connected=1');
   const result = await (await fetch(url + '/inspection?from=2026-09-07&to=2026-09-11&user_id=outsider', { headers })).json();
-  assert.equal(result.event_count, 3);
-  assert.deepEqual(new Set(result.events.map(event => event.title)), new Set(['Jordan Prospect', 'Internal team meeting', 'Dentist']));
-  const prospect = result.events.find(event => event.title === 'Jordan Prospect');
-  assert.equal(prospect.description, 'Created from GHL');
+  assert.equal(result.scheduled_ghl_appointment_count, 1);
+  assert.deepEqual(result.appointments.map(event => event.title), ['Jordan Prospect']);
+  const prospect = result.appointments[0];
+  assert.match(prospect.description, /links\.soberlivingriches\.com/);
   assert.equal(prospect.organizer.email, 'owner@example.com');
-  assert.doesNotMatch(JSON.stringify(result), /sales_call|is_sales|access_token|refresh_token/);
+  assert.doesNotMatch(JSON.stringify(result), /SalesKick|Internal team meeting|sales_call|is_sales|access_token|refresh_token/);
   const connection = db.tables.google_calendar_connections[0];
   assert.equal(connection.snapshot, null);
   assert.equal(connection.calendar_id, null);

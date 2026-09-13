@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Google Calendar — Scout Systems</title>
+  <title>Scheduled GHL Appointments — Scout Systems</title>
   <link rel="icon" type="image/svg+xml" href="/scout-glyph.svg">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/calendar.css">
@@ -18,11 +18,11 @@
   </header>
   <main class="calendar-main">
     <a href="/dashboard#account">← Back to My Account</a>
-    <h1>Google Calendar</h1>
-    <p class="calendar-note">A private connection test to learn how GHL appointments appear on your calendar.</p>
+    <h1>Scheduled GHL Appointments</h1>
+    <p class="calendar-note">Your current Sober Living Riches appointments from GHL, visible only to you.</p>
     <section id="calendarDataUse" class="calendar-panel" aria-labelledby="calendarDataUseTitle">
       <h2 id="calendarDataUseTitle">Before you connect</h2>
-      <p>Scout will read your primary Google Calendar for the dates shown so you can inspect the event details Google provides. This private test is visible only to you.</p>
+      <p>Scout reads your primary Google Calendar for the dates shown and shows only appointments with the verified Sober Living Riches GHL booking details. This private schedule is visible only to you.</p>
       <p>Scout will not create or change events. It will not save event titles, descriptions, attendee details, or other event data, and this inspection is not sent to AI. Only your encrypted Google connection is saved.</p>
     </section>
     <p id="calendarNotice" role="status"></p>
@@ -33,9 +33,9 @@
     <form id="calendarRange" class="calendar-controls" hidden>
       <label>From <input id="calendarFrom" type="date" required></label>
       <label>Through <input id="calendarTo" type="date" required></label>
-      <button type="submit">Inspect Events</button>
+      <button type="submit">Refresh appointments</button>
     </form>
-    <section id="calendarResults" aria-live="polite" aria-label="Private calendar inspection">Connect Google Calendar to inspect events.</section>
+    <section id="calendarResults" aria-live="polite" aria-label="Scheduled GHL appointments">Connect Google Calendar to view scheduled GHL appointments.</section>
   </main>
 </body>
 </html>

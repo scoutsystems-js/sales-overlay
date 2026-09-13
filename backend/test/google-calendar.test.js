@@ -7,6 +7,31 @@ const range = { from: '2026-09-07', to: '2026-09-11' };
 const event = (id, extra = {}) => ({ id, summary: 'Jordan Prospect', status: 'confirmed',
   start: { dateTime: '2026-09-10T10:00:00-04:00' }, end: { dateTime: '2026-09-10T11:00:00-04:00' }, ...extra });
 
+function slrBookingProperties(extra = {}) {
+  return { private: {
+    calendarId: 'calendar', eventId: 'event', linkedCalendarId: 'linked-calendar', userCalendarId: 'user-calendar', userId: 'user', ...extra,
+  } };
+}
+
+test('scheduled GHL appointments use the measured Sober Living Riches signature and exclude SalesKick first', () => {
+  const rows = [
+    event('ghl', { description: 'Manage it at https://links.soberlivingriches.com/booking/123', extendedProperties: slrBookingProperties() }),
+    event('title-code', { summary: 'FU AF Prospect', description: 'https://links.soberlivingriches.com/booking/124', extendedProperties: slrBookingProperties() }),
+    event('missing-key', { description: 'https://links.soberlivingriches.com/booking/456', extendedProperties: slrBookingProperties({ userId: '' }) }),
+    event('missing-host', { description: 'Reschedule or cancel your appointment', extendedProperties: slrBookingProperties() }),
+    event('personal', { description: 'https://links.soberlivingriches.com/booking/789' }),
+    event('saleskick-key', { description: 'https://links.soberlivingriches.com/booking/101', extendedProperties: slrBookingProperties({ skManagedBookingId: 'sk-1' }) }),
+    event('saleskick-host', { description: 'https://app.saleskick.com/booking/202', extendedProperties: slrBookingProperties() }),
+    event('hybrid', { description: 'https://links.soberlivingriches.com/booking/303 then https://app.saleskick.com/booking/404', extendedProperties: slrBookingProperties() }),
+    event('cancelled', { status: 'cancelled', description: 'https://links.soberlivingriches.com/booking/505', extendedProperties: slrBookingProperties() }),
+    event('all-day', { description: 'https://links.soberlivingriches.com/booking/606', extendedProperties: slrBookingProperties(), start: { date: '2026-09-10' }, end: { date: '2026-09-11' } }),
+    event('focus-time', { description: 'https://links.soberlivingriches.com/booking/707', extendedProperties: slrBookingProperties(), eventType: 'focusTime' }),
+    event('self-declined', { description: 'https://links.soberlivingriches.com/booking/808', extendedProperties: slrBookingProperties(),
+      attendees: [{ email: 'owner@example.com', self: true, responseStatus: 'declined' }] }),
+  ];
+  assert.deepEqual(calendar.scheduledGhlEvents(rows).map(item => item.id), ['ghl', 'title-code']);
+});
+
 test('private inspection keeps mixed event kinds and useful source clues without calling them sales', () => {
   const rows = [
     event('prospect', { description: 'Contact source: GHL', organizer: { email: 'calendar@example.com', self: true },
