@@ -199,6 +199,13 @@ in an Observatory panel. Metrics, permissions, and data remain unchanged.
 
 Preserve backend metrics, access rules, active-user filtering, real-call exclusions, and accessibility behavior. Use clean production markup and shared tokens rather than exploratory wrapper nesting. Do not treat historical Polished or Stark CSS as active authority.
 
+
+## Landing page — Reps and Managers (September 14, 2026)
+
+The public front door uses the approved Observatory fixed forest field, rotating contours, translucent glass panels and the vector Scout wordmark. Its job is to explain one shared source of truth — the recorded sales conversation — through two clearly separated sections: **For reps** (call review, what is working, what to work on, history) and **For managers** (team performance, coaching review, meaningful-call review queue and daily digest). Navigation and audience chips link directly to those sections.
+
+Primary landing CTAs use the approved **physical Visor control**: a raised dark panel with a fine light edge and one small glowing green status lamp. Secondary actions are dark outlined controls. The bright flat green marketing button is retired from the landing page. This is a landing-only treatment; product dashboard action controls keep their established rule. Public product panels are anonymized examples until a scrubbed screenshot set replaces them; never publish a prospect name, call wording, or customer data as marketing art.
+
 ## Historical Observatory CSS appendix (superseded where noted above)
 
 All current Observatory source style blocks follow in source order. Font bytes are represented by the archive marker; use the approved archive for their exact payload.

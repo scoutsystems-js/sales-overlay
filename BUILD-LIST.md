@@ -28,6 +28,10 @@ Justin authorized Codex to implement directly. Google Calendar only; GHL appoint
 
 The existing additive migration was applied separately: its tables have RLS and no browser grants. A separate Scout Calendar Google project has the API, read-only consent scopes and exact production callback configured; the existing Scout login client is unchanged. **Next:** run integrated checks, merge current design work, fresh drain check and release Block 022. Live date change is verified; do not disconnect Josh's current test connection merely as a release check. The narrower source rule is measured only for Sober Living Riches and must not be silently reused for another team. Canonical handoff remains the root `SCOUT-SHARED-CONTEXT.md`; preserve the separate design work and existing coaching/metrics.
 
+## Landing page — Reps and Managers (September 14, 2026)
+
+**Implemented, pending deployment verification:** the public landing page now uses the approved Observatory field and glass treatment, with distinct Rep and Manager sections, anonymized product examples, Fathom/Zoom connection copy, retained pricing and existing access/login routes. Landing CTAs use the approved dark physical Visor control; existing dashboard controls are unchanged. Replace the anonymized product panels only with scrubbed public-safe screenshots.
+
 ## Current implementation — Observatory redesign (2026-09-13)
 
 **Global session reset — LIVE (September 13):** every Scout session issued before `2026-09-13 23:29:21 UTC` is refused on its next request and sent back to sign-in, so a fresh login loads the current Observatory dashboard. This touches no account, call, calendar or integration data. The server-only control is migration `079_global_session_reset.sql`; future resets advance its cutoff rather than changing individual users.
