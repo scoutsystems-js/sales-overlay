@@ -68,6 +68,7 @@ coverage passes; the full backend suite passes 2,856/2,856. The direct Overview 
 
 **September 13 Coaching Review simplification — implemented, pending release verification.**
 The personal overview keeps the three approved Visor gauges but replaces its graph, stacked lower cards, and separate Coach Summary with one glass coaching brief: Your Edge, Your Focus, and one real call moment. Existing section, objection, Calls, and detailed Performance routes remain the drill-downs; the landing page adds no model work. Focused rendered coverage passes before release verification.
+The concise overview now continues with one responsive five-section Coaching Summary: Intro, Discovery, Pitch, Objection, and Close retain their existing scores and each opens its existing section drill-down. Strongest and weakest sections are labelled as the closer’s edge and focus; no calculation or model request was added.
 
 **September 13 visual refinement — LIVE, verified 2026-09-13.**
 The Observatory pages now have two localized emerald pools separated by a dark

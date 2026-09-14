@@ -139,6 +139,8 @@ September 13 three-gauge Overview refinement: implemented only for personal `ove
 
 September 13 concise Coaching Review direction: the personal `overview` keeps the three approved Visor gauges unchanged. Beneath them, it shows one shared glass panel only: **Your Edge** names the strongest scored sales section, **Your Focus** names the current evidence-backed objection category, and **A real moment** shows one checkable quote from the current section ranking. The action links retain access to the existing section, objection, Calls, and detailed Performance pages; no extra model call runs on dashboard load. The old rep graph, stacked focus cards, and separate Coach Summary do not appear on the landing board.
 
+The concise Coaching Review continues with a compact **Coaching Summary** beneath the brief. It keeps the five established sales sections in a single responsive row: Intro, Discovery, Pitch, Objection, and Close. Each tile carries its existing earned score, marks the strongest section as the closer’s edge and the weakest section as the current focus, and opens the existing call-level section drill-down. It adds no new calculation or model request.
+
 ## Approved visual standard
 
 Team Coaching uses opaque, smooth near-black panels over one expansive forest-green Aurora ground, with pale-sage edges, smooth dark shadows, precise instrument detail, and slow white/gray HUD motion. Do not add fake telemetry, extra metrics, controls, or character/IP imagery. Product rules, metrics, permissions, data, and content remain unchanged.

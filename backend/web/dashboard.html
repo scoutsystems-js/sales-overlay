@@ -6111,6 +6111,31 @@
     body[data-view="overview"] .coaching-brief-footer { display:flex; justify-content:space-between; gap:16px; padding:14px 34px; color:#aac3b6; font-size:12px; border-top:1px solid rgba(196,231,207,.12); }
     body[data-view="overview"] .coaching-brief-footer a { color:#baffd4; text-decoration:none; }
     body[data-view="overview"] .coaching-brief-footer a:hover, body[data-view="overview"] .coaching-brief-footer a:focus-visible { text-decoration:underline; }
+    body[data-view="overview"] .coaching-section-summary {
+      position:relative; z-index:2; margin-top:16px; padding:26px 30px;
+      border:1px solid var(--observatory-overview-edge); border-radius:var(--radius-lg);
+      background:linear-gradient(135deg,rgba(7,23,14,.72),rgba(3,16,9,.52));
+      backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+      box-shadow:inset 0 1px 0 rgba(245,255,248,.10),0 16px 38px rgba(0,0,0,.25),0 0 24px rgba(21,161,71,.07);
+    }
+    body[data-view="overview"] .coaching-section-summary-head { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:20px; }
+    body[data-view="overview"] .coaching-section-summary-kicker { color:#a9c9b3; font-size:10px; font-weight:var(--fw-emphasis); letter-spacing:.18em; text-transform:uppercase; }
+    body[data-view="overview"] .coaching-section-summary h2 { margin:6px 0 0; color:#f2fff6; font-size:23px; font-weight:var(--fw-normal); letter-spacing:-.03em; }
+    body[data-view="overview"] .coaching-section-summary-note { max-width:260px; color:#aac3b6; font-size:12px; line-height:1.45; text-align:right; }
+    body[data-view="overview"] .coaching-section-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+    body[data-view="overview"] .coaching-section-tile {
+      min-width:0; padding:15px 14px; color:inherit; text-align:left; font:inherit; cursor:pointer;
+      border:1px solid rgba(196,231,207,.16); border-radius:12px; background:rgba(8,30,17,.44);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.045); transition:border-color .16s ease,transform .16s ease,background .16s ease;
+    }
+    body[data-view="overview"] .coaching-section-tile:hover, body[data-view="overview"] .coaching-section-tile:focus-visible { border-color:rgba(113,255,173,.68); background:rgba(10,44,23,.62); outline:0; transform:translateY(-2px); }
+    body[data-view="overview"] .coaching-section-name { display:block; color:#cfe5d6; font-size:11px; font-weight:var(--fw-emphasis); letter-spacing:.10em; text-transform:uppercase; }
+    body[data-view="overview"] .coaching-section-score { display:block; margin:9px 0 8px; color:#f4fff7; font-size:31px; font-weight:var(--fw-display); letter-spacing:-.05em; line-height:1; font-variant-numeric:tabular-nums; }
+    body[data-view="overview"] .coaching-section-bar { display:block; height:3px; overflow:hidden; border-radius:99px; background:rgba(218,245,226,.12); }
+    body[data-view="overview"] .coaching-section-bar > i { display:block; height:100%; border-radius:inherit; box-shadow:0 0 8px currentColor; }
+    body[data-view="overview"] .coaching-section-status { display:block; min-height:16px; margin-top:9px; color:#a9c9b3; font-size:11px; line-height:1.3; }
+    body[data-view="overview"] .coaching-section-status.is-strong { color:#8dffba; }
+    body[data-view="overview"] .coaching-section-status.is-focus { color:#ffd26d; }
 
     /* Visor instruments: a fixed 270° horseshoe holds the reading still while
        only its outer surveying marks move. These rules deliberately exclude
@@ -6252,6 +6277,7 @@
       body[data-view="overview"] .observatory-overview-focus-side { grid-template-columns:1fr; }
       body[data-view="overview"] .coaching-brief-main { grid-template-columns:1fr; }
       body[data-view="overview"] .coaching-brief-story + .coaching-brief-story { border-left:0; border-top:1px solid rgba(196,231,207,.20); }
+      body[data-view="overview"] .coaching-section-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
       body[data-view="overview"] .observatory-upper>.section,
       body[data-view="overview"] .observatory-overview>.section,
       body[data-view="overview"] .observatory-overview-focus-grid>.section,
@@ -6466,6 +6492,10 @@
       body[data-view="overview"] .coaching-brief-proof { grid-template-columns:1fr; gap:10px; padding:18px 20px; }
       body[data-view="overview"] .coaching-brief-proof-meta { text-align:left; }
       body[data-view="overview"] .coaching-brief-footer { padding:14px 20px; flex-direction:column; }
+      body[data-view="overview"] .coaching-section-summary { padding:22px 20px; }
+      body[data-view="overview"] .coaching-section-summary-head { display:block; }
+      body[data-view="overview"] .coaching-section-summary-note { max-width:none; margin-top:8px; text-align:left; }
+      body[data-view="overview"] .coaching-section-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
       body[data-view="team-performance"] .observatory-instrument { min-height:0; }
     }
 
@@ -10443,7 +10473,8 @@
       + gsCard
       + connectSections
       + tiles
-      + coachingBriefHtml(a) + '</div></div>';
+      + coachingBriefHtml(a)
+      + coachingSectionSummaryHtml(a) + '</div></div>';
       observeObservatoryLayout();
 
     // These two existing, cheap lanes supply the concise cards and proof. The
@@ -10504,6 +10535,37 @@
       + '<div class="coaching-brief-proof"' + proofClick + '><div class="coaching-brief-proof-label">' + proofLabel + '</div><div class="coaching-brief-proof-quote">' + proofQuote + '</div><div class="coaching-brief-proof-meta">' + proofMeta + '</div></div>'
       + '<div class="coaching-brief-footer"><span>One edge to keep. One focus to work on.</span><a href="#performance" onclick="openPerformance(); return false;">Open detailed coaching →</a></div>'
       + '</section>';
+  }
+
+  function coachingSectionSummaryHtml(analytics) {
+    var sections = [['intro', 'Intro'], ['discovery', 'Discovery'], ['pitch', 'Pitch'], ['objection', 'Objection'], ['close', 'Close']];
+    if (!analytics || !analytics.calls || !analytics.calls.analyzed) {
+      return '<section class="coaching-section-summary fade-in" aria-label="Coaching Summary">'
+        + '<div class="coaching-section-summary-head"><div><div class="coaching-section-summary-kicker">Coaching Summary</div><h2>Your sales sections</h2></div>'
+        + '<div class="coaching-section-summary-note">Scores will appear after Scout grades calls in this date range.</div></div></section>';
+    }
+    var tiles = sections.map(function (pair) {
+      var key = pair[0];
+      var section = (analytics.sections && analytics.sections[key]) || {};
+      var raw = typeof section.avg === 'number' ? section.avg : null;
+      var score = raw === null ? '—' : String(raw);
+      var width = raw === null ? 0 : Math.max(0, Math.min(100, raw));
+      var tone = raw === null ? '#789083' : scoreColor(raw);
+      var status = analytics.strongest_section === key
+        ? '<span class="coaching-section-status is-strong">Your edge</span>'
+        : (analytics.weakest_section === key
+            ? '<span class="coaching-section-status is-focus">Focus here</span>'
+            : '<span class="coaching-section-status">View details</span>');
+      return '<button class="coaching-section-tile" type="button" onclick="goSection(\'' + key + '\')" title="Open ' + escapeHtml(pair[1]) + ' coaching">'
+        + '<span class="coaching-section-name">' + escapeHtml(pair[1]) + '</span>'
+        + '<strong class="coaching-section-score">' + score + '</strong>'
+        + '<span class="coaching-section-bar"><i style="width:' + width + '%;background:' + tone + ';color:' + tone + ';"></i></span>'
+        + status + '</button>';
+    }).join('');
+    return '<section class="coaching-section-summary fade-in" aria-label="Coaching Summary">'
+      + '<div class="coaching-section-summary-head"><div><div class="coaching-section-summary-kicker">Coaching Summary</div><h2>Your sales sections</h2></div>'
+      + '<div class="coaching-section-summary-note">Choose a section to see the scored calls and coaching behind it.</div></div>'
+      + '<div class="coaching-section-grid">' + tiles + '</div></section>';
   }
 
   // (n) The promoted Performance Summary card. Still a LINK — see the note at

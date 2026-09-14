@@ -528,6 +528,11 @@ test('personal Coaching Dashboard keeps the standard gauges and one concise coac
   assert.ok(out.html.includes('Your edge'), 'the current strength is named on the home board');
   assert.ok(out.html.includes('Your focus'), 'the current improvement focus is named on the home board');
   assert.ok(out.html.includes('Open detailed coaching'), 'the detail entry point remains available');
+  assert.ok(out.html.includes('Coaching Summary'), 'the section summary follows the concise coaching brief');
+  ['Intro', 'Discovery', 'Pitch', 'Objection', 'Close'].forEach((label) =>
+    assert.ok(out.html.includes('>' + label + '</span>'), label + ' remains a direct section drill-down'));
+  assert.ok((out.html.match(/class="coaching-section-tile"/g) || []).length === 5,
+    'the summary exposes exactly the five established sales sections');
   assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'the concise home board must not mount a chart');
 });
 
