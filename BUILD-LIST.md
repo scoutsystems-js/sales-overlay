@@ -2442,6 +2442,8 @@ Filed after final page check: clicking Review Full Call formed the correct call/
 
 Team Call Review now uses the fixed Scout gradient and restrained animated visor lines, with transparent green-edged queue cards. The legacy mesh/raster layer is suppressed on this page, and the background toggle is hidden to match the redesigned surfaces. No call data, filters, queue ordering, or review navigation changed.
 
+Follow-up: the queue header no longer reserves space for the sidebar, the Manager View explainer panel is removed, and Call Review opens on its own latest 7-day window. A manager-selected date range still remains in place.
+
 ---
 
 ## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented

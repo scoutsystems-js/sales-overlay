@@ -7353,7 +7353,7 @@
     .team-review-filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px 16px; border:1px solid rgba(118,255,171,.30); border-radius:14px; background:linear-gradient(135deg,rgba(8,38,22,.58),rgba(1,12,7,.38)); box-shadow:inset 0 1px 0 rgba(231,255,240,.10),0 0 24px rgba(18,222,96,.045); margin:0 0 16px; }
     .team-review-filter select { appearance:none; border:1px solid rgba(var(--accent-rgb),.28); border-radius:9px; background:rgba(0,0,0,.2); color:var(--text); padding:9px 30px 9px 11px; font:inherit; font-size:var(--fs-label); }
     .team-review-count { margin-left:auto; font-size:var(--fs-label); color:var(--text-muted); }
-    .team-review-grid { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,.65fr); gap:16px; align-items:start; }
+    .team-review-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; align-items:start; }
     .team-review-queue,.team-review-priorities { margin:0; background:linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42)); border:1px solid rgba(118,255,171,.36); border-radius:14px; box-shadow:inset 0 1px 0 rgba(231,255,240,.12),0 0 28px rgba(18,222,96,.06); }
     .team-review-queue { overflow:hidden; }
     .team-review-queue .section-header { padding:20px 22px 16px; margin:0; border-bottom:1px solid var(--border); }
@@ -11649,8 +11649,11 @@
        WINDOW IS PART OF THE DEFINITION.
        ⚠ THE FIXED 7-DAY GAUGE IS DELIBERATE AND STAYS: it is a separate,
        explicitly-labelled window and does not follow this picker. */
-    var monthAgo = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
-    state.teamRanges[pg] = rangeToIso(monthAgo, today);   // last 30 days INCLUSIVE
+    /* Call Review is a manager's daily queue, not a rate comparison. It opens
+       on the last seven days, then keeps any range the manager chooses. */
+    var daysBack = pg === 'call-review' ? 6 : 29;
+    var rangeStart = new Date(Date.now() - daysBack * 86400000).toISOString().slice(0, 10);
+    state.teamRanges[pg] = rangeToIso(rangeStart, today);
   }
   function teamRange() { ensureTeamDefaultRange(); return state.teamRanges[teamRangePage()]; }
 
@@ -13007,7 +13010,7 @@
       var topic = call.focus_section ? call.focus_section + (typeof call.focus_score === 'number' ? ' · ' + Math.round(call.focus_score) : '') : 'Analysis pending';
       return '<article class="team-review-row"><div class="team-review-person"><strong>' + escapeHtml(call.prospect_name || call.title || 'Unnamed prospect') + '</strong><span>' + escapeHtml(call.rep || 'Closer') + ' · ' + escapeHtml(formatNaturalDate(call.call_date)) + ' · ' + escapeHtml(formatNaturalDuration(call.duration_seconds)) + '</span></div><span class="team-review-outcome ' + escapeHtml(String(call.outcome || 'waiting')) + '">' + outcome + '</span><span class="team-review-topic">' + escapeHtml(topic) + '</span><strong class="team-review-score">' + score + '</strong><button type="button" class="team-review-open" onclick="openCallReview(\'' + escapeHtml(call.call_id) + '\',\'' + escapeHtml(call.user_id) + '\')">Review call →</button></article>';
     }).join('');
-    return controls + '<div class="team-review-grid"><section class="section team-review-queue"><div class="section-header"><div><span class="observatory-eyebrow">Review queue</span><h2>Start with the calls that need attention</h2></div></div>' + rows + '</section><aside class="section team-review-priorities"><span class="observatory-eyebrow">Manager view</span><h2>What to review first</h2><div><strong>Lowest-scoring calls</strong><p>Use the queue to find the conversations most worth coaching this week.</p></div><div><strong>One topic at a time</strong><p>Filter by section to coach a clear skill instead of reviewing every problem at once.</p></div><div><strong>Open the full breakdown</strong><p>Each row keeps the complete call review, moments, scores, and follow-up email one click away.</p></div></aside></div>';
+    return controls + '<div class="team-review-grid"><section class="section team-review-queue"><div class="section-header"><div><span class="observatory-eyebrow">Review queue</span><h2>Start with the calls that need attention</h2></div></div>' + rows + '</section></div>';
   }
   function renderTeamCallReview() {
     var content = document.getElementById('content');
@@ -13015,7 +13018,8 @@
     if (state.teamContext === null) loadTeam('context');
     if (state.teamCallReview === null && !state.teamCallReviewLoading) loadTeam('callReview');
     content.innerHTML = '<div class="observatory-page team-call-review-page">' + observatoryHudHtml() + '<div class="observatory-upper">' + observatoryTitleHtml('Call Review', 'Call Review') + '<p class="team-review-subtitle">Review the calls your team needs help with, then open the full breakdown.</p>' + teamControlsHtml() + '</div>' + teamCallReviewHtml() + '</div>';
-    observeObservatoryLayout();
+    /* Call Review has no gauge bank to clear the sidebar. Keeping its header at
+       the sidebar height left a large blank band before the queue. */
   }
 
   function renderTeamCoaching() {
