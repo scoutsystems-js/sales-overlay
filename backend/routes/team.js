@@ -1080,6 +1080,63 @@ router.get('/objections/summary', teamGate, async function (req, res) {
   }
 });
 
+/* GET /team/call-review — the manager's entry point into the same individual
+   reviews closers use. Scope comes only from resolveTeam: a browser can filter
+   the returned queue, but can never nominate a user outside the team. This is
+   stored data only; it does not create a new coaching or analysis lane. */
+router.get('/call-review', teamGate, async function (req, res) {
+  var range = rangeFrom(req); if (!range) return res.status(400).json({ error: 'from/to must be ISO 8601' });
+  try {
+    var admin = getAdmin();
+    var team = await resolveTeam(admin, req);
+    var ids = team.memberIds || [];
+    if (!ids.length) return res.json({ team: { label: team.label }, calls: [], from: range.from, to: range.to });
+    var calls = [];
+    for (var i = 0; i < ids.length; i += CHUNK) {
+      var cq = await admin.from('fathom_calls')
+        .select('id, user_id, title, call_date, duration_seconds, recording_url, call_kind, not_a_sales_call, duplicate_of')
+        .in('user_id', ids.slice(i, i + CHUNK)).gte('call_date', range.from).lte('call_date', range.to)
+        .not('not_a_sales_call', 'is', true).is('duplicate_of', null)
+        .order('call_date', { ascending: false }).limit(1000);
+      if (cq.error) throw new Error('fathom_calls: ' + cq.error.message);
+      calls = calls.concat(cq.data || []);
+    }
+    calls = realCallsOnly(calls);
+    var callIds = calls.map(function (c) { return c.id; });
+    var analyses = [];
+    for (var j = 0; j < callIds.length; j += CHUNK) {
+      var aq = await admin.from('call_analyses')
+        .select('fathom_call_id, status, prospect_name, overall_score, outcome, intro_score, discovery_score, pitch_score, objection_score, close_score')
+        .in('fathom_call_id', callIds.slice(j, j + CHUNK));
+      if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
+      analyses = analyses.concat(aq.data || []);
+    }
+    var analysisById = {}; analyses.forEach(function (a) { analysisById[a.fathom_call_id] = a; });
+    var names = await nameMapFor(admin, ids);
+    var sectionKeys = ['intro', 'discovery', 'pitch', 'objection', 'close'];
+    var sectionLabel = { intro: 'Intro', discovery: 'Discovery', pitch: 'Pitch', objection: 'Objection', close: 'Close' };
+    var rows = calls.map(function (c) {
+      var a = analysisById[c.id] || null;
+      var lowest = null;
+      if (a && a.status === 'done') sectionKeys.forEach(function (key) {
+        var value = a[key + '_score'];
+        if (typeof value === 'number' && (!lowest || value < lowest.value)) lowest = { key: key, value: value };
+      });
+      return {
+        call_id: c.id, user_id: c.user_id, rep: names[c.user_id] || 'Closer', title: c.title || null,
+        prospect_name: a && a.prospect_name ? a.prospect_name : null, call_date: c.call_date,
+        duration_seconds: c.duration_seconds, recording_url: c.recording_url || null, call_kind: c.call_kind || null,
+        status: a ? a.status : null, outcome: a ? a.outcome : null, score: a && typeof a.overall_score === 'number' ? a.overall_score : null,
+        focus_section: lowest ? sectionLabel[lowest.key] : null, focus_score: lowest ? lowest.value : null
+      };
+    }).sort(function (a, b) {
+      var as = typeof a.score === 'number' ? a.score : Infinity, bs = typeof b.score === 'number' ? b.score : Infinity;
+      return (as - bs) || String(b.call_date || '').localeCompare(String(a.call_date || ''));
+    });
+    res.json({ team: { label: team.label, key: team.keyId, mode: team.mode }, calls: rows, from: range.from, to: range.to });
+  } catch (err) { if (handleConfigError(err, res)) return; if (err.status) return res.status(err.status).json({ error: err.message }); logTeamError('call-review', err); res.status(500).json({ error: 'Failed to load the call review queue' }); }
+});
+
 // ⚠ Pure-ish helpers exported for test, per the log.js `_validateLogBatch`
 // pattern. resolveTeam is the ONE place that decides who is on a board, so it
 // is the one place worth pinning — see team-membership.test.js.

@@ -107,7 +107,7 @@ test('⚠⚠ isTeamView covers every page in the dropdown, and says no to others
   const is = new Function(src + '; return isTeamView;')();
 
   const pages = [...H.matchAll(/\{ view: '([a-z-]+)',\s+label:/g)].map(m => m[1]);
-  assert.strictEqual(pages.length, 5, 'expected five visible Team pages, found ' + pages.length);
+  assert.strictEqual(pages.length, 6, 'expected six visible Team pages, found ' + pages.length);
   pages.forEach(v => assert.ok(is(v), v + ' is in the dropdown but isTeamView says no'));
   /* ⚠ `team-expanded` left this list 2026-09-01 — RETIRED with Call Highlights
      of the Week, normalised away at BOTH entry points, so it can never be the
@@ -157,7 +157,7 @@ test('⚠⚠ BOTH dispatchers carry all five pages', () => {
     assert.ok(body.length > 200 && body.length < 6000, sig + ' slice: ' + body.length);
     return [sig, body];
   });
-  ['team', 'team-performance', 'team-coaching', 'team-objections', 'team-members'].forEach((v) => {
+  ['team', 'team-performance', 'team-coaching', 'team-call-review', 'team-objections', 'team-members'].forEach((v) => {
     bodies.forEach(([sig, body]) => {
       assert.ok(body.indexOf("state.view === '" + v + "'") !== -1,
         v + ' is not dispatched in ' + sig + ' — the multiple-dispatch trap');
@@ -178,7 +178,7 @@ test('every page round-trips through the hash — written, then read back', () =
   const write = LIVE.slice(at, LIVE.indexOf('\n  }', at));
   assert.ok(write.length > 500 && write.length < 4000, 'write-side slice: ' + write.length);
 
-  ['team', 'team-performance', 'team-coaching', 'team-objections', 'team-members'].forEach((v) => {
+  ['team', 'team-performance', 'team-coaching', 'team-call-review', 'team-objections', 'team-members'].forEach((v) => {
     const m = new RegExp("state\\.view === '" + v + "'\\)\\s*return '([a-z-]+)'").exec(write);
     assert.ok(m, v + ' has no WRITE case — it would emit an empty hash and a refresh would lose it');
     const slug = m[1];
