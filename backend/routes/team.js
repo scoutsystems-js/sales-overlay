@@ -76,8 +76,9 @@ function rangeFrom(req) {
    recordings, no-shows, and grader-identified non-sales recordings out of the
    manager's coaching queue. The existing verdict queue remains where a manager
    confirms or corrects the last group. */
-function isCoachingReviewEligible(analysis) {
-  return !!analysis && analysis.status === 'done'
+function isCoachingReviewEligible(call, analysis) {
+  return !!call && Number(call.duration_seconds) >= 10 * 60
+    && !!analysis && analysis.status === 'done'
     && analysis.outcome !== 'no_show'
     && analysis.sales_call_verdict !== 'not_sales';
 }
@@ -1129,7 +1130,7 @@ router.get('/call-review', teamGate, async function (req, res) {
     var sectionLabel = { intro: 'Intro', discovery: 'Discovery', pitch: 'Pitch', objection: 'Objection', close: 'Close' };
     var rows = calls.map(function (c) {
       var a = analysisById[c.id] || null;
-      if (!isCoachingReviewEligible(a)) return null;
+      if (!isCoachingReviewEligible(c, a)) return null;
       var lowest = null;
       if (a && a.status === 'done') sectionKeys.forEach(function (key) {
         var value = a[key + '_score'];

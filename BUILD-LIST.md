@@ -2446,6 +2446,8 @@ Follow-up: the queue header no longer reserves space for the sidebar, the Manage
 
 Call Review now defaults to coaching-ready conversations only: completed analyses that are not no-shows and are not grader-identified as non-sales. This is a display filter only; it changes no call mark, metric, or review decision. The manager verdict queue remains the confirmation path for recordings identified as non-sales.
 
+The coaching queue excludes recordings shorter than 10 minutes. Its row headings now state that the middle score is the lowest section score and the far-right score is the overall score out of 100. This remains a queue-only filter and does not alter analytics or stored call records.
+
 ---
 
 ## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented
