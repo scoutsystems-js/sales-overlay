@@ -7,15 +7,22 @@
   <link rel="icon" type="image/svg+xml" href="/scout-glyph.svg">
   <link rel="stylesheet" href="/css/style.css"/>
   <style>
-    body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px 20px; text-align: center; }
-    .cx { max-width: 420px; }
-    .cx-icon { width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--fs-company); background: var(--bg2, #131313); border: 1px solid var(--border, #2a2a2a); }
-    .cx h1 { font-size: var(--fs-number); font-weight: var(--fw-emphasis); color: var(--text, #ededed); margin-bottom: 8px; }
-    .cx p { font-size: var(--fs-body); color: var(--muted, #9a9a9a); line-height: 1.5; }
-    .cx a { display: inline-block; margin-top: 18px; font-size: var(--fs-body); color: var(--text, #ededed); }
+    body.cx-observatory { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 20px; text-align:center; overflow:hidden; background:radial-gradient(ellipse at 84% 8%,rgba(0,104,50,.36),transparent 39rem),radial-gradient(ellipse at 10% 88%,rgba(3,76,39,.25),transparent 34rem),linear-gradient(135deg,#041109 0%,#071d10 48%,#020805 100%); }
+    body.cx-observatory::before,body.cx-observatory::after { content:""; position:fixed; pointer-events:none; border:1px solid rgba(137,255,188,.15); border-radius:50%; }
+    body.cx-observatory::before { width:72vmax; height:72vmax; top:-40vmax; right:-25vmax; }
+    body.cx-observatory::after { width:52vmax; height:52vmax; bottom:-34vmax; left:-23vmax; border-style:dashed; opacity:.5; }
+    .cx { position:relative; z-index:1; width:min(560px,100%); overflow:hidden; padding:42px; border:1px solid rgba(148,250,181,.30); border-radius:var(--radius-lg); background:linear-gradient(140deg,rgba(10,47,26,.78),rgba(1,12,6,.68)); box-shadow:inset 0 1px 0 rgba(255,255,255,.11),inset 0 0 0 1px rgba(100,225,140,.04),0 24px 58px rgba(0,0,0,.35),0 0 34px rgba(20,220,92,.09); backdrop-filter:blur(19px); }
+    .cx::before { content:""; position:absolute; top:18px; left:23px; width:45px; height:1px; background:#71ffad; box-shadow:0 0 11px rgba(80,255,145,.72); }
+    .cx-icon { width:88px; height:88px; margin:0 auto 25px; border:1px solid #6dffa5; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:32px; color:#bdffda; background:radial-gradient(circle,rgba(18,186,75,.25),rgba(3,26,12,.2) 62%); box-shadow:0 0 16px rgba(68,255,133,.46),0 0 44px rgba(22,210,85,.18),inset 0 0 24px rgba(23,214,86,.18); }
+    .cx h1 { font-size:32px; font-weight:var(--fw-normal); letter-spacing:-.035em; color:var(--text); margin:0 0 10px; }
+    .cx p { max-width:390px; margin:auto; font-size:var(--fs-body); color:#b5c6ba; line-height:1.55; }
+    .cx a { display:inline-flex; align-items:center; justify-content:center; margin-top:24px; padding:11px 18px; border:1px solid #67ff9f; border-radius:var(--radius-sm); background:rgba(5,54,26,.84); box-shadow:0 0 18px rgba(24,230,94,.14); color:#c5ffda; font-size:var(--fs-body); font-weight:var(--fw-emphasis); text-decoration:none; }
+    .cx a:hover { background:#0ca746; color:#031207; }
+    body.cx-observatory[data-connection-status="denied"] .cx-icon,body.cx-observatory[data-connection-status="already_linked"] .cx-icon,body.cx-observatory[data-connection-status="error"] .cx-icon { color:#ffe0a9; border-color:#ffc35c; box-shadow:0 0 16px rgba(255,178,50,.36),0 0 44px rgba(255,178,50,.14),inset 0 0 24px rgba(255,178,50,.12); background:radial-gradient(circle,rgba(163,106,13,.22),rgba(26,17,3,.2) 62%); }
+    @media (max-width:520px) { .cx { padding:34px 22px; } .cx h1 { font-size:var(--fs-company); } }
   </style>
 </head>
-<body>
+<body class="cx-observatory">
   <div class="cx">
     <div class="cx-icon" id="cxIcon">✓</div>
     <h1 id="cxTitle">You're connected</h1>
@@ -45,6 +52,7 @@
       error:          { icon: '⚠',  title: 'Something went wrong',        msg: 'We couldn’t finish connecting ' + providerLabel + '. Close this window and try again.' },
     };
     var c = copy[status] || copy.error;
+    document.body.dataset.connectionStatus = status;
     document.getElementById('cxIcon').textContent = c.icon;
     document.getElementById('cxTitle').textContent = c.title;
     document.getElementById('cxMsg').textContent = c.msg;

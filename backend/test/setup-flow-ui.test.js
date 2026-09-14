@@ -22,3 +22,14 @@ test('calendar setup preserves its private-use disclosure before the connection 
   assert.match(page, /90 days before today through 90 days after today/i);
   assert.match(page, /does not save descriptions, meeting links, attendee names or arrays/i);
 });
+
+test('password and OAuth completion screens use the shared Observatory access treatment without replacing their flows', () => {
+  const password = fs.readFileSync(path.join(web, 'set-password.html'), 'utf8');
+  const connected = fs.readFileSync(path.join(web, 'connected.html'), 'utf8');
+  assert.match(password, /<body class="password-observatory">/);
+  assert.match(password, /function parseFragment\(\)/);
+  assert.match(password, /fetch\('\/auth\/set-password'/);
+  assert.match(connected, /<body class="cx-observatory">/);
+  assert.match(connected, /BroadcastChannel\('scout-oauth'\)/);
+  assert.match(connected, /document\.body\.dataset\.connectionStatus = status/);
+});

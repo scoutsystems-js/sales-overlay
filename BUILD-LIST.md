@@ -32,7 +32,7 @@ The existing additive migration was applied separately: its tables have RLS and 
 
 **Global session reset — LIVE (September 13):** every Scout session issued before `2026-09-13 23:29:21 UTC` is refused on its next request and sent back to sign-in, so a fresh login loads the current Observatory dashboard. This touches no account, call, calendar or integration data. The server-only control is migration `079_global_session_reset.sql`; future resets advance its cutoff rather than changing individual users.
 
-**Setup flow Observatory pass:** Sign-in, recording-source setup and Calendar setup share the approved fixed forest field, contour motion, Saira and glass-panel treatment. `/connect/fathom` and `/connect/zoom` are separate entry routes that invoke the existing secure OAuth actions; the Calendar privacy disclosure, existing account connection, appointment and auth behavior remain intact.
+**Setup flow Observatory pass:** Sign-in, password setup, recording-source setup, OAuth completion and Calendar setup share the approved fixed forest field, contour motion, Saira and glass-panel treatment. `/connect/fathom` and `/connect/zoom` are separate entry routes that invoke the existing secure OAuth actions; the Calendar privacy disclosure, existing account connection, appointment and auth behavior remain intact.
 
 **Knowledge Base Observatory pass (local, pending release):** The Knowledge Base fixed field, selected rail, glass list panel, add-resource modal and pattern/note viewer use the approved visual system. Upload, scope promotion, delete, resource types, loading/error states and permissions are unchanged.
 

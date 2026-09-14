@@ -72,7 +72,7 @@ The green button treatment · a new view's ground · at-most-one-48 per view · 
 
 ## Setup flow — September 14, 2026
 
-Sign-in, recording-source connection and Calendar setup use the Observatory field: fixed forest gradient, quiet contour motion, Saira, and translucent panels with restrained green edge glow. Fathom and Zoom are distinct routes and buttons; their existing OAuth actions, sign-in return path, Calendar privacy disclosure and appointment behavior remain unchanged.
+Sign-in, password setup, recording-source connection, OAuth completion and Calendar setup use the Observatory field: fixed forest gradient, quiet contour motion, Saira, and translucent panels with restrained green edge glow. Fathom and Zoom are distinct routes and buttons; their existing OAuth actions, sign-in return path, Calendar privacy disclosure and appointment behavior remain unchanged.
 
 ## Knowledge Base source library — September 14, 2026
 
