@@ -2448,6 +2448,8 @@ Call Review now defaults to coaching-ready conversations only: completed analyse
 
 The coaching queue excludes recordings shorter than 10 minutes. Its row headings now state that the middle score is the lowest section score and the far-right score is the overall score out of 100. This remains a queue-only filter and does not alter analytics or stored call records.
 
+The Call Review header and queue rows use the same action-column width so Outcome, Lowest Section, and Overall Score labels align exactly with their values.
+
 ---
 
 ## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented
