@@ -8075,3 +8075,8 @@ Implemented and live in `eadebec6dd66c03639cd63b5b1040215a4ee57dc`, Railway depl
 
 ## [H788] Knowledge Base joins the Observatory presentation scope — September 13, 2026
 Knowledge Base receives the approved fixed field, selected navigation, glass list panel, add-resource dialog and pattern/note viewer. Its upload paths, resource types, scope promotion, deletion, loading/error states and permissions remain unchanged; this is presentation-only.
+
+
+## [H789] Knowledge Base is a source library, not a coaching dashboard — September 14, 2026
+
+Justin clarified that Knowledge Base is the stored material Scout pulls from to ground feedback: scripts, offer details, winning calls, stored moments and team notes. The approved redesign treats it as a searchable source library with scope/type filters, compact inventory context, sorting and the existing resource controls. It must not become a separate coaching dashboard or surface coaching recommendations. The previous daily counter is removed from the page; Knowledge Base has no loud page-level metric. Existing upload, delete, promotion, access, source viewer and retrieval behavior remain intact.

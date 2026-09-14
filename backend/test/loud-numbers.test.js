@@ -2,8 +2,8 @@
 /**
  * ⚠⚠ ONE LOUD NUMBER PER PAGE, AT 48 (Justin's rulings, 2026-09-03, H690).
  * Objections: the handle rate is the page's number; its two counts are supporting
- * stats. Knowledge Base: the counter is the page's number. Both EXECUTED against
- * the real render, not read from the source.
+ * stats. Knowledge Base is a source library and has no loud page metric. Both
+ * rules are executed against the real render, not read from the source.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -30,11 +30,14 @@ test('⚠⚠ EXECUTED: the Objections tiles — the handle rate renders at the d
   assert.ok(/'Handle Rate'/.test(loudCalls[0]), 'and it is the handle rate');
 });
 
-test('⚠ the Knowledge Base counter is the page\'s one loud number, at the display step', () => {
-  const rule = LIVE.match(/\.kb-counter-card \.kbc-num \{[^}]*\}/);
-  assert.ok(rule, 'the rule exists');
-  assert.ok(/font-size: var\(--fs-display\)/.test(rule[0]) && /font-weight: var\(--fw-display\)/.test(rule[0]), rule[0]);
-  assert.ok(!/font-size\s*:\s*42px\b/.test(LIVE.slice(LIVE.indexOf('<style>'), LIVE.indexOf('</style>'))), 'no literal 42px font size remains in the stylesheet');
+test('⚠ Knowledge Base is a source library with compact inventory context, not a loud metric', () => {
+  const render = fnBody(LIVE, 'renderKbList');
+  assert.match(render, /kb-library-stats/);
+  assert.match(render, /Resources Scout can use/);
+  assert.match(render, /Stored moments from calls/);
+  const css = LIVE.slice(LIVE.indexOf('<style>'), LIVE.indexOf('</style>'));
+  assert.match(css, /\.kb-library-stats strong \{[^}]*font-size:29px/);
+  assert.doesNotMatch(render, /kbCounterCardHtml\(\)/);
 });
 
 test('⚠ the landing page declares its two exemptions with their reason, and uses them', () => {

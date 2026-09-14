@@ -7209,6 +7209,49 @@
     body[data-view="kb"] .kb-modal-overlay { background:rgba(0,7,3,.72); backdrop-filter:blur(8px); }
     body[data-view="kb"] .kb-modal-dialog { border-color:rgba(170,241,195,.30); background:linear-gradient(135deg,rgba(9,40,23,.96),rgba(2,14,8,.96)); box-shadow:inset 0 1px 0 rgba(245,255,248,.1),0 28px 70px rgba(0,0,0,.52),0 0 36px rgba(26,231,104,.12); }
     body[data-view="kb"] .kb-modal-dialog input, body[data-view="kb"] .kb-modal-dialog textarea, body[data-view="kb"] .kb-modal-dialog select { background:rgba(1,14,7,.58); border-color:rgba(170,241,195,.24); }
+    /* Source library layout: preserves the existing KB records and controls,
+       but makes the material Scout reads easy to search and organize. */
+    body[data-view="kb"] .kb-library-page { min-width:0; }
+    body[data-view="kb"] .kb-library-page .page-header { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; }
+    body[data-view="kb"] .kb-library-page .page-header h1 { margin:7px 0 6px; }
+    body[data-view="kb"] .kb-library-shell { display:grid; grid-template-columns:220px minmax(0,1fr); gap:18px; }
+    body[data-view="kb"] .kb-library-rail { align-self:start; padding:14px 10px; border-color:rgba(170,241,195,.26); background:linear-gradient(135deg,rgba(8,38,22,.68),rgba(1,12,7,.54)); box-shadow:inset 0 1px 0 rgba(245,255,248,.08),0 18px 40px rgba(0,0,0,.22); }
+    body[data-view="kb"] .kb-library-rail-title { display:block; margin:8px 10px 6px; color:rgba(209,236,217,.72); font-size:10px; font-weight:var(--fw-emphasis); letter-spacing:.15em; text-transform:uppercase; }
+    body[data-view="kb"] .kb-library-rail-title--type { margin-top:22px; }
+    body[data-view="kb"] .kb-library-filter { display:flex; width:100%; align-items:center; justify-content:space-between; gap:8px; padding:10px; border:0; border-left:2px solid transparent; border-radius:7px; background:transparent; color:var(--text-muted); font:inherit; font-size:var(--fs-secondary); text-align:left; cursor:pointer; }
+    body[data-view="kb"] .kb-library-filter span { color:rgba(185,219,197,.64); font-size:var(--fs-label); }
+    body[data-view="kb"] .kb-library-filter:hover { background:rgba(var(--accent-rgb),.06); color:var(--text); }
+    body[data-view="kb"] .kb-library-filter.active { border-left-color:var(--accent); background:linear-gradient(90deg,rgba(var(--accent-rgb),.20),transparent); color:var(--text); }
+    body[data-view="kb"] .kb-library-toolbar { display:flex; gap:10px; margin:0 0 14px; }
+    body[data-view="kb"] .kb-library-search, body[data-view="kb"] .kb-library-sort { height:44px; border:1px solid rgba(170,241,195,.28); border-radius:8px; background:rgba(2,19,10,.56); color:var(--text); font:inherit; font-size:var(--fs-secondary); }
+    body[data-view="kb"] .kb-library-search { flex:1; min-width:0; padding:0 14px; }
+    body[data-view="kb"] .kb-library-sort { width:145px; padding:0 10px; cursor:pointer; }
+    body[data-view="kb"] .kb-library-search:focus, body[data-view="kb"] .kb-library-sort:focus { outline:0; border-color:rgba(118,255,171,.74); box-shadow:0 0 16px rgba(57,255,126,.12); }
+    body[data-view="kb"] .kb-library-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+    body[data-view="kb"] .kb-library-stats .section { position:relative; overflow:hidden; margin:0; padding:18px; border-color:rgba(170,241,195,.22); background:linear-gradient(135deg,rgba(8,38,22,.66),rgba(1,12,7,.48)); }
+    body[data-view="kb"] .kb-library-stats .section::before { content:""; display:block; width:34px; height:1px; margin-bottom:12px; background:#71ffad; box-shadow:0 0 8px rgba(77,255,148,.65); }
+    body[data-view="kb"] .kb-library-stats strong { display:block; font-size:29px; font-weight:var(--fw-normal); line-height:1; letter-spacing:-.04em; }
+    body[data-view="kb"] .kb-library-stats span { display:block; margin-top:6px; color:var(--text-muted); font-size:var(--fs-secondary); }
+    body[data-view="kb"] .kb-library-stats em { display:block; margin-top:9px; color:var(--accent); font-size:10px; font-style:normal; font-weight:var(--fw-emphasis); letter-spacing:.12em; text-transform:uppercase; }
+    body[data-view="kb"] .kb-library-panel { padding:20px 24px 14px; }
+    body[data-view="kb"] .kb-library-list-head { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:7px 0 14px; border-bottom:1px solid rgba(215,236,222,.12); }
+    body[data-view="kb"] .kb-library-list-head h2 { margin:0; font-size:18px; font-weight:var(--fw-normal); }
+    body[data-view="kb"] .kb-library-list-head>div>span { display:block; margin-top:4px; color:var(--text-muted); font-size:var(--fs-secondary); }
+    body[data-view="kb"] .kb-library-legend { color:var(--text-muted); font-size:var(--fs-label); white-space:nowrap; }
+    body[data-view="kb"] .kb-library-legend .team { color:var(--accent); }.kb-library-legend .moment { margin-left:8px; color:#8bbfff; }
+    body[data-view="kb"] .kb-library-item { display:grid; grid-template-columns:34px minmax(0,1fr) 118px 92px auto; align-items:center; gap:14px; padding:14px 0; }
+    body[data-view="kb"] .kb-library-glyph { display:grid; place-items:center; width:32px; height:32px; border:1px solid rgba(170,241,195,.22); border-radius:7px; color:var(--accent); font-size:15px; }
+    body[data-view="kb"] .kb-library-item .kb-item-title { display:block; font-size:var(--fs-body); }.kb-library-item .kb-item-title b { font-weight:var(--fw-emphasis); }
+    body[data-view="kb"] .kb-library-item .kb-item-sub { color:var(--text-muted); }
+    body[data-view="kb"] .kb-library-kind { width:max-content; max-width:118px; overflow:hidden; text-overflow:ellipsis; border:1px solid rgba(170,241,195,.22); border-radius:99px; padding:4px 7px; color:rgba(210,242,219,.84); font-size:10px; white-space:nowrap; }
+    body[data-view="kb"] .kb-library-kind.moment { border-color:rgba(139,191,255,.34); color:#a9d0ff; }
+    body[data-view="kb"] .kb-library-date { color:var(--text-muted); font-size:var(--fs-label); white-space:nowrap; }
+    body[data-view="kb"] .kb-library-actions { display:flex; justify-content:flex-end; align-items:center; gap:6px; }
+    body[data-view="kb"] .kb-library-actions .kb-view-btn, body[data-view="kb"] .kb-library-actions .kb-promote-btn, body[data-view="kb"] .kb-library-actions .kb-delete-btn { white-space:nowrap; }
+    body[data-view="kb"] .kb-library-note { margin:14px 0 0; padding:12px 15px; border-left:2px solid var(--accent); background:rgba(var(--accent-rgb),.08); color:var(--text-muted); font-size:var(--fs-secondary); line-height:1.5; }
+    body[data-view="kb"] .kb-library-note strong { color:var(--text); }
+    @media(max-width:1100px) { body[data-view="kb"] .kb-library-shell { grid-template-columns:1fr; } body[data-view="kb"] .kb-library-rail { display:flex; flex-wrap:wrap; gap:4px; padding:12px; } body[data-view="kb"] .kb-library-rail-title { width:100%; } body[data-view="kb"] .kb-library-filter { width:auto; } body[data-view="kb"] .kb-library-rail-title--type { margin-top:8px; } }
+    @media(max-width:760px) { body[data-view="kb"] .kb-library-stats { grid-template-columns:1fr; } body[data-view="kb"] .kb-library-item { grid-template-columns:32px minmax(0,1fr) auto; } body[data-view="kb"] .kb-library-kind, body[data-view="kb"] .kb-library-date { display:none; } body[data-view="kb"] .kb-library-actions { grid-column:2 / -1; justify-content:flex-start; flex-wrap:wrap; } }
     @media(max-width:900px) { body[data-view="kb"] .page { max-width:calc(100vw - 36px); padding:18px 0 64px; } body[data-view="kb"] .sidebar { position:relative; top:auto; left:auto; width:auto; margin-bottom:14px; } body[data-view="kb"] #content { margin-left:0; } }
     @media(max-width:620px) { body[data-view="kb"] .page-header h1 { font-size:32px; } body[data-view="kb"] .observatory-kb-panel { padding:28px 16px 16px; } }
     @media(prefers-reduced-motion:reduce) { body[data-view="kb"]::before, body[data-view="kb"]::after { animation:none; } }
@@ -19390,22 +19433,76 @@
       needsAttention: true };
   }
 
+  function kbCategoryLabel(category) {
+    return {
+      script: 'Script', offer_document: 'Offer details', doctrine: 'Scout method',
+      objection_framework: 'Objection framework', winning_call: 'Winning call',
+      case_study: 'Case study', training_material: 'Training material',
+      call_moment: 'Stored moment', learned_pattern: 'Stored moment',
+      coaching_correction: 'Coaching note'
+    }[category] || 'Resource';
+  }
+  function kbResourceKind(item) {
+    if (item && (item.category === 'call_moment' || item.category === 'learned_pattern')) return 'moment';
+    if (item && item.category === 'coaching_correction') return 'note';
+    return item && item.category ? item.category : 'other';
+  }
+  function kbFilterItems(items) {
+    var filters = state.kbLibraryFilters || {};
+    var query = String(filters.query || '').trim().toLowerCase();
+    var filtered = (items || []).filter(function (item) {
+      var kind = kbResourceKind(item);
+      if (filters.scope === 'team' && item.scope !== 'team') return false;
+      if (filters.scope === 'personal' && item.scope !== 'personal') return false;
+      if (filters.kind && kind !== filters.kind) return false;
+      if (query && (String(item.source_label || '') + ' ' + String(item.category || '')).toLowerCase().indexOf(query) === -1) return false;
+      return true;
+    });
+    if (filters.sort === 'name') filtered.sort(function(a,b){ return String(a.source_label || '').localeCompare(String(b.source_label || '')); });
+    else if (filters.sort === 'oldest') filtered.sort(function(a,b){ return String(a.created_at || '').localeCompare(String(b.created_at || '')); });
+    else filtered.sort(function(a,b){ return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
+    return filtered;
+  }
+  function kbLibrarySetFilter(key, value) {
+    if (!state.kbLibraryFilters) state.kbLibraryFilters = {};
+    state.kbLibraryFilters[key] = value || '';
+    renderKbList(state.kbLibraryItems || []);
+  }
+  function kbLibraryFilterHtml(items) {
+    var filters = state.kbLibraryFilters || {};
+    var count = function (match) { return (items || []).filter(match).length; };
+    var row = function (label, key, value, n) {
+      var active = (filters[key] || '') === value ? ' active' : '';
+      return '<button class="kb-library-filter' + active + '" onclick="kbLibrarySetFilter(\'' + key + '\',\'' + value + '\')">' + escapeHtml(label) + '<span>' + n + '</span></button>';
+    };
+    return '<aside class="kb-library-rail section"><span class="kb-library-rail-title">Show</span>'
+      + row('All resources', 'scope', '', items.length)
+      + row('Team library', 'scope', 'team', count(function(x){ return x.scope === 'team'; }))
+      + row('My resources', 'scope', 'personal', count(function(x){ return x.scope === 'personal'; }))
+      + '<span class="kb-library-rail-title kb-library-rail-title--type">Type</span>'
+      + row('Scripts', 'kind', 'script', count(function(x){ return kbResourceKind(x) === 'script'; }))
+      + row('Offer details', 'kind', 'offer_document', count(function(x){ return kbResourceKind(x) === 'offer_document'; }))
+      + row('Winning calls', 'kind', 'winning_call', count(function(x){ return kbResourceKind(x) === 'winning_call'; }))
+      + row('Stored moments', 'kind', 'moment', count(function(x){ return kbResourceKind(x) === 'moment'; }))
+      + row('Coaching notes', 'kind', 'note', count(function(x){ return kbResourceKind(x) === 'note'; })) + '</aside>';
+  }
   function renderKbView() {
     var content = document.getElementById('content');
     var canManage = kbCanManage();
     var sub = canManage
-      ? 'Offer docs &amp; scripts that ground coaching'
-      : 'Your team’s offer docs &amp; scripts — what Scout grades your calls against (view only)';
-    var addBtn = canManage ? '<div class="page-header-side"><button class="kb-add-btn" onclick="openKbModal()">+ Add resource</button></div>' : '';
+      ? 'The material Scout uses to ground call feedback and coaching.'
+      : 'Your team’s source library — the material Scout uses to ground call feedback and coaching.';
+    var addBtn = canManage ? '<button class="kb-add-btn" onclick="openKbModal()">+ Add resource</button>' : '';
     if (state.kbCounter === null && !state.kbCounterLoading) loadKbCounter();
-    content.innerHTML =
-      kbCounterCardHtml() +
-      '<div class="page-header fade-in"><div class="page-header-main"><h1>Knowledge Base</h1>'
-        + '<div class="review-meta-row"><span>' + sub + '</span></div></div>'
-        + addBtn
-      + '</div>'
-      + '<div class="section fade-in observatory-kb-panel"><div id="kbContainer"><div class="load-spinner"><div class="spinner"></div></div></div></div>';
-    loadKbList(); // lazy — only on view entry, never on page init
+    if (!state.kbLibraryFilters) state.kbLibraryFilters = { scope: '', kind: '', query: '', sort: 'newest' };
+    content.innerHTML = '<div class="kb-library-page">'
+      + '<div class="page-header fade-in"><div class="page-header-main"><span class="observatory-eyebrow">Scout source library</span><h1>Knowledge Base</h1><div class="review-meta-row"><span>' + sub + '</span></div></div>' + addBtn + '</div>'
+      + '<div class="kb-library-shell"><div id="kbRailMount" class="kb-library-rail-mount"></div><main class="kb-library-main">'
+      + '<div class="kb-library-toolbar"><input id="kbLibrarySearch" class="kb-library-search" type="search" placeholder="Search the library" value="' + escapeHtml(state.kbLibraryFilters.query || '') + '" oninput="kbLibrarySetFilter(\'query\',this.value)"><select class="kb-library-sort" aria-label="Sort resources" onchange="kbLibrarySetFilter(\'sort\',this.value)"><option value="newest"' + (state.kbLibraryFilters.sort === 'newest' ? ' selected' : '') + '>Recently added</option><option value="oldest"' + (state.kbLibraryFilters.sort === 'oldest' ? ' selected' : '') + '>Oldest first</option><option value="name"' + (state.kbLibraryFilters.sort === 'name' ? ' selected' : '') + '>Name</option></select></div>'
+      + '<div id="kbStatsMount"></div><section class="section observatory-kb-panel kb-library-panel"><div id="kbContainer"><div class="load-spinner"><div class="spinner"></div></div></div></section>'
+      + '<p class="kb-library-note"><strong>How Scout uses this:</strong> these sources give Scout the team’s language, offer details, and proven call moments. They help ground feedback; they do not replace the actual call evidence.</p>'
+      + '</main></div></div>';
+    loadKbList();
   }
   async function loadKbList() {
     var container = document.getElementById('kbContainer');
@@ -19425,7 +19522,8 @@
       return;
     }
     var data = await res.json();
-    renderKbList((data && data.uploads) || []);
+    state.kbLibraryItems = (data && data.uploads) || [];
+    renderKbList(state.kbLibraryItems);
     /* ⚠ A cut list must say so (H062). The server pages the whole list before answering,
        so this only fires at its hard cap — but the count on this page must never read as
        complete when it is not. */
@@ -19944,95 +20042,33 @@
 
   function renderKbList(items) {
     var container = document.getElementById('kbContainer');
+    var rail = document.getElementById('kbRailMount');
+    var stats = document.getElementById('kbStatsMount');
     if (!container) return;
-    var canManage = kbCanManage();
-
-    if (!items || items.length === 0) {
-      container.innerHTML = canManage
-        ? '<div class="empty-card">'
-            + '<h2>No knowledge base resources yet</h2>'
-            + '<p>Upload your offer docs, scripts, and winning calls. Scout grounds its post-call grading and coaching in these — the more it has, the sharper your feedback.</p>'
-            + '<button class="kb-add-btn" onclick="openKbModal()">+ Add your first resource</button>'
-          + '</div>'
-        : '<div class="empty-card">'
-            + '<h2>No team resources yet</h2>'
-            + '<p>Your team’s offer docs, scripts, and winning calls will appear here once your manager adds them — they’re what Scout grades your calls against.</p>'
-          + '</div>';
+    var all = items || [];
+    if (rail) rail.innerHTML = kbLibraryFilterHtml(all);
+    var moments = all.filter(function(x){ return kbResourceKind(x) === 'moment'; }).length;
+    var team = all.filter(function(x){ return x.scope === 'team'; }).length;
+    if (stats) stats.innerHTML = '<div class="kb-library-stats"><div class="section"><strong>' + all.length + '</strong><span>Resources Scout can use</span><em>All sources</em></div><div class="section"><strong>' + moments + '</strong><span>Stored moments from calls</span><em>Captured evidence</em></div><div class="section"><strong>' + team + '</strong><span>Shared with your team</span><em>Team library</em></div></div>';
+    var shown = kbFilterItems(all);
+    if (!shown.length) {
+      container.innerHTML = '<div class="empty-card"><h2>No resources match these filters</h2><p>Try another search or choose a different source type.</p></div>';
       return;
     }
-
-    var parts = ['<div class="kb-list">'];
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      var typeBadge = it.source_type
-        ? '<span class="kb-badge kb-type-' + escapeHtml(it.source_type) + '">' + escapeHtml(it.source_type) + '</span>'
-        : '';
-      // Category badge — only when category is set (pre-feature uploads
-      // don't have it). Friendly labels rather than the raw enum value.
-      var catLabels = {
-        script: 'Script',
-        offer_document: 'Offer info',
-        doctrine: 'Scout\'s method',   // H732
-        objection_framework: 'Objection handling framework',
-        winning_call: 'Winning call transcript',
-        case_study: 'Case study / social proof',
-        training_material: 'Training material',
-        // Part 2b: moments harvested from call reviews. Deliberately NOT a
-        // grader/synthesis category (ruling 1) — see lib/kb-entry.js.
-        call_moment: 'Call moment',
-        coaching_correction: 'Team coaching notes',
-      };
-      var catBadge = (it.category && catLabels[it.category])
-        ? '<span class="kb-badge kb-cat-' + escapeHtml(it.category) + '">' + escapeHtml(catLabels[it.category]) + '</span>'
-        : '';
-      // Scope badge stays on admin: admins see uploads with mixed scopes
-      // (own personal/team plus their team members') so the badge tells
-      // them which is which. Dashboard hides it because users only ever
-      // see their own personal uploads.
-      var scopeBadge = it.scope
-        ? '<span class="kb-badge kb-scope-' + escapeHtml(it.scope) + '">' + escapeHtml(it.scope) + '</span>'
-        : '';
-      /* ⚠⚠ THE CHUNK COUNT IS GONE (Justin's ruling, 2026-09-01). "1000 chunks"
-         is INTERNAL VOCABULARY on a customer surface: a chunk is an artefact of
-         how the text was split for retrieval, and there is nothing a reader can
-         do with the number.
-         ⚠ REMOVED, NOT TRANSLATED. "1000 moments" would be a guess at what a
-         chunk maps to, and a chunk is not a moment — a smaller, more confident
-         lie than the number it replaced. What survives is the fact a reader can
-         use: when it was added. */
-      var rel = relativeTime(it.created_at);
-      // Only learned_pattern uploads get the expand affordance — other
-      // categories are bulk text whose chunks aren't independently useful
-      // to surface in a side panel.
-      var viewBtn = '';
-      var expandPanel = '';
-      if (it.category === 'learned_pattern' || it.category === 'call_moment' || it.category === 'coaching_correction') {
-        viewBtn = '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">' + (it.category === 'coaching_correction' ? 'View notes' : 'View Patterns') + '</button>';
-        expandPanel = '<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>';
-      }
-      // Promotion affordance (KB Part 2, sub-stage 2a). Manager/owner only — a
-      // plain unmanaged user has no team to promote INTO, so showing them the
-      // button would only produce a 400. Global (owner-wide) resources are not
-      // re-scopable through this route, so they get no button either.
+    var parts = ['<div class="kb-library-list"><div class="kb-library-list-head"><div><h2>All resources</h2><span>' + shown.length + ' source' + (shown.length === 1 ? '' : 's') + ' available to Scout</span></div><div class="kb-library-legend"><span class="team">•</span> team <span class="moment">•</span> stored moment</div></div>'];
+    shown.forEach(function (it, i) {
+      var kind = kbResourceKind(it);
+      var icon = kind === 'moment' ? '◎' : kind === 'script' ? '⌘' : kind === 'offer_document' ? '◇' : kind === 'note' ? '✦' : '○';
+      var viewBtn = (it.category === 'learned_pattern' || it.category === 'call_moment' || it.category === 'coaching_correction')
+        ? '<button class="kb-view-btn" data-label="' + escapeHtml(it.source_label) + '" data-slot="' + i + '" onclick="viewKbEntries(this.getAttribute(\'data-label\'), this.getAttribute(\'data-slot\'), this)">' + (it.category === 'coaching_correction' ? 'View notes' : 'View patterns') + '</button>' : '';
       var promoteBtn = '';
-      if (kbCanPromote() && it.scope !== 'global') {
-        promoteBtn = (it.scope === 'team')
-          ? '<button class="kb-promote-btn is-team" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'personal\')" title="Remove from the team knowledge base">Team ✓</button>'
-          : '<button class="kb-promote-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'team\')" title="Share with your whole team">Promote to Team</button>';
-      }
-      parts.push(
-        '<div class="kb-item">'
-          + '<div class="kb-item-main">'
-            + '<div class="kb-item-title">' + typeBadge + catBadge + scopeBadge + escapeHtml(it.source_label || '(unlabeled)') + '</div>'
-            + '<div class="kb-item-sub">added ' + rel + '</div>'
-          + '</div>'
-          + viewBtn
-          + promoteBtn
-          + (canManage ? '<button class="kb-delete-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="deleteKbItem(this.getAttribute(\'data-label\'))">Delete</button>' : '')
-        + '</div>'
-        + expandPanel
-      );
-    }
+      if (kbCanPromote() && it.scope !== 'global') promoteBtn = it.scope === 'team'
+        ? '<button class="kb-promote-btn is-team" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'personal\')">Team ✓</button>'
+        : '<button class="kb-promote-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="setKbScope(this.getAttribute(\'data-label\'), \'team\')">Share with team</button>';
+      var deleteBtn = kbCanManage() ? '<button class="kb-delete-btn" data-label="' + escapeHtml(it.source_label) + '" onclick="deleteKbItem(this.getAttribute(\'data-label\'))">Delete</button>' : '';
+      parts.push('<div class="kb-item kb-library-item"><span class="kb-library-glyph">' + icon + '</span><div class="kb-item-main"><div class="kb-item-title"><b>' + escapeHtml(it.source_label || '(unlabeled)') + '</b></div><div class="kb-item-sub">' + escapeHtml(kbCategoryLabel(it.category)) + ' · added ' + escapeHtml(relativeTime(it.created_at)) + '</div></div><span class="kb-library-kind ' + escapeHtml(kind) + '">' + escapeHtml(kbCategoryLabel(it.category)) + '</span><span class="kb-library-date">' + escapeHtml(relativeTime(it.created_at)) + '</span><div class="kb-library-actions">' + viewBtn + promoteBtn + deleteBtn + '</div></div>');
+      if (viewBtn) parts.push('<div class="kb-expand-panel hidden" id="kbExpand-' + i + '"></div>');
+    });
     parts.push('</div>');
     container.innerHTML = parts.join('');
   }

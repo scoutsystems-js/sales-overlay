@@ -2454,6 +2454,8 @@ Opening a call from Team Call Review now changes the review header action to “
 
 Every Call Review queue row now opens that full review directly. The small “Open review” label remains as a visual cue, and Enter or Space opens the same review for keyboard users.
 
+Knowledge Base is now ruled as Scout’s source library rather than a coaching dashboard: preserve its stored moments, scripts, offer details, winning calls, team notes, search, scope promotion and permissions. Its daily collection counter is retired from the page; compact library inventory counts are context only.
+
 ---
 
 ## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented

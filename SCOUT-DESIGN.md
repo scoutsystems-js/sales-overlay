@@ -51,7 +51,7 @@
 
 | rule | stated in | pinned by |
 |---|---|---|
-| **One loud number per page, fixed per page, at 48/300; some pages honestly have none** — Objections: the handle rate; Knowledge Base: the counter | CLAUDE.md §4e (H653, H690) | `loud-numbers.test.js` (those two pages, executed); **no page-wide guard** that a view renders at most one 48 (finding) |
+| **One loud number per page, fixed per page, at 48/300; some pages honestly have none** — Objections: the handle rate; Knowledge Base is a source library and has no loud metric | CLAUDE.md §4e (H653, H690, H789) | `loud-numbers.test.js` (executed); **no page-wide guard** that a view renders at most one 48 (finding) |
 | **Banded metrics state which side they are on; direction is a declared property, never a call-site comparison** | CLAUDE.md §4a (H518, H521, H125) | `metric-band-mirror.test.js`, `call-time-ranking-band.test.js` |
 | **Unmeasured is a sentence, never a zero or a dash** | CLAUDE.md §4a (H189, H247); §4e rep cards (H705) | `rep-card.test.js`, `team-averages.test.js`, `widget-render-mirror.test.js` |
 | **Anything a customer can see is written for them** — no internal words, ever | CLAUDE.md §4d (H064, H591) | `customer-language.test.js` |
@@ -70,3 +70,8 @@
 ## 6 · Findings — rules with no guard
 
 The green button treatment · a new view's ground · at-most-one-48 per view · the badge words · the picker's whiteness. Each is a rule a sweep could break with the suite green. Filed in `BUILD-LIST.md`.
+
+
+## Knowledge Base source library — September 14, 2026
+
+Knowledge Base is Scout’s source library, not a coaching dashboard. It uses the approved fixed forest ground, subtle contours, glass cards and the site’s existing Saira type system. The page provides search, source-type and scope filters, compact resource/moment/team inventory counts, sorting, and an openable resource list. Preserve upload, delete, scope promotion, permissions, pattern/note viewers and existing API data. The inventory counts are supporting context, not a headline metric. (H789)
