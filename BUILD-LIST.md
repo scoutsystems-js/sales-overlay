@@ -2450,6 +2450,8 @@ The coaching queue excludes recordings shorter than 10 minutes. Its row headings
 
 The Call Review header and queue rows use the same action-column width so Outcome, Lowest Section, and Overall Score labels align exactly with their values.
 
+Opening a call from Team Call Review now changes the review header action to “Back to Call Reviews” and restores that manager queue. Calls opened from the regular Calls page continue to return there.
+
 ---
 
 ## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented

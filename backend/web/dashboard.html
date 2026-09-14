@@ -7853,6 +7853,7 @@
     callLibraryShowAllUsers: false, // owner-only: picker revealed the full user set (default = assigned reps + self)
     // Call Review (Scout v2.0 Phase 2 Step 4)
     selectedCallId:     null,  // public.fathom_calls(id) UUID of the call being reviewed
+    callReviewOrigin:   null,  // 'team-call-review' when the queue opened this call
     callReview:         null,  // null pre-load, then the GET /fathom/calls/:id response
     callReviewLoading:  false, // gates retry click while a fetch is in flight
     callReviewError:    null,  // last fetch error message; cleared on successful re-fetch
@@ -21565,7 +21566,7 @@
   function renderCallReview() {
     var content = document.getElementById('content');
     var callId = state.selectedCallId;
-    if (!callId) { backToCallLibrary(); return; }
+    if (!callId) { backFromCallReview(); return; }
 
     // Pull the partial card from the library cache to render the header
     // instantly while the full fetch is in flight. Avoids a blank flash.
@@ -21932,7 +21933,7 @@
     }
 
     return '<div class="review-page-header fade-in">'
-      + '<button class="review-back-link" type="button" onclick="backToCallLibrary()">← Back to Calls</button>'
+      + '<button class="review-back-link" type="button" onclick="backFromCallReview()">← ' + (state.callReviewOrigin === 'team-call-review' ? 'Back to Call Reviews' : 'Back to Calls') + '</button>'
       + '<div class="review-title-row">'
         + '<div class="review-title-main">'
           + titleHtml
@@ -22749,9 +22750,11 @@
     });
   }
 
-  function backToCallLibrary() {
-    state.view = 'call-library';
+  function backFromCallReview() {
+    var returnToQueue = state.callReviewOrigin === 'team-call-review';
+    state.view = returnToQueue ? 'team-call-review' : 'call-library';
     state.selectedCallId = null;
+    state.callReviewOrigin = null;
     // Intentionally keep state.callReview around in case the user re-opens
     // the same call — but null it so a subsequent open kicks a fresh fetch
     // and reflects any analysis-status changes that happened in the meantime.
@@ -22841,6 +22844,8 @@
      the caller knows the owner, it says so, and the pivot door (setUser — the ONE door, with
      its scope reset) is walked first. A call site that cannot name the owner behaves as before. */
   function openCallReview(callId, ownerUserId) {
+    if (state.view === 'team-call-review') state.callReviewOrigin = 'team-call-review';
+    else if (state.view !== 'call-review') state.callReviewOrigin = null;
     if (ownerUserId && state.me && ownerUserId !== state.viewingUserId) setUser(ownerUserId);
     state.selectedCallId = callId;
     state.callReview = null;
