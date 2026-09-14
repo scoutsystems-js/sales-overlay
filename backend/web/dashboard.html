@@ -12973,7 +12973,7 @@
     });
     var reps = {}; (payload.calls || []).forEach(function (call) { if (call.user_id) reps[call.user_id] = call.rep || 'Closer'; });
     var repOptions = Object.keys(reps).sort(function(a,b){ return reps[a].localeCompare(reps[b]); }).map(function(id){ return '<option value="' + escapeHtml(id) + '"' + (filters.rep === id ? ' selected' : '') + '>' + escapeHtml(reps[id]) + '</option>'; }).join('');
-    var select = function (key, label, options) { return '<label class="team-review-filter"><span class="sr-only">' + label + '</span><select onchange="teamCallReviewFilter(\'' + key + '\',this.value)"><option value="">' + label + '</option>' + options + '</select></label>'; };
+    var select = function (key, label, options) { return '<label class="team-review-filter"><select aria-label="' + escapeHtml(label) + '" onchange="teamCallReviewFilter(\'' + key + '\',this.value)"><option value="">' + label + '</option>' + options + '</select></label>'; };
     var outcomeOptions = [['follow_up','Open'],['closed','Won'],['lost','Lost']].map(function(x){return '<option value="' + x[0] + '"' + (filters.outcome === x[0] ? ' selected' : '') + '>' + x[1] + '</option>';}).join('');
     var sectionOptions = ['Intro','Discovery','Pitch','Objection','Close'].map(function(x){return '<option value="' + x + '"' + (filters.section === x ? ' selected' : '') + '>' + x + '</option>';}).join('');
     var sortOptions = '<option value="score"' + (filters.sort !== 'newest' ? ' selected' : '') + '>Lowest score first</option><option value="newest"' + (filters.sort === 'newest' ? ' selected' : '') + '>Newest first</option>';
