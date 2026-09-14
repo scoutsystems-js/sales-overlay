@@ -70,6 +70,18 @@ function rangeFrom(req) {
   return { from: from, to: to };
 }
 
+/* The Call Review queue is for coaching a real sales conversation. This is a
+   display filter only: it never marks or removes a call. A human-confirmed
+   not-sales call is already excluded at the query; this also keeps ungraded
+   recordings, no-shows, and grader-identified non-sales recordings out of the
+   manager's coaching queue. The existing verdict queue remains where a manager
+   confirms or corrects the last group. */
+function isCoachingReviewEligible(analysis) {
+  return !!analysis && analysis.status === 'done'
+    && analysis.outcome !== 'no_show'
+    && analysis.sales_call_verdict !== 'not_sales';
+}
+
 /* ⚠ ONE SHARED MAP, READ AT MOST ONCE PER MINUTE PER PROCESS — lib/email-map.js.
    This used to call auth.admin.listUsers on EVERY team request (~1s each). */
 async function emailMap(admin) { return emailMapFor(admin); }
@@ -1106,7 +1118,7 @@ router.get('/call-review', teamGate, async function (req, res) {
     var analyses = [];
     for (var j = 0; j < callIds.length; j += CHUNK) {
       var aq = await admin.from('call_analyses')
-        .select('fathom_call_id, status, prospect_name, overall_score, outcome, intro_score, discovery_score, pitch_score, objection_score, close_score')
+        .select('fathom_call_id, status, prospect_name, overall_score, outcome, sales_call_verdict, intro_score, discovery_score, pitch_score, objection_score, close_score')
         .in('fathom_call_id', callIds.slice(j, j + CHUNK));
       if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
       analyses = analyses.concat(aq.data || []);
@@ -1117,6 +1129,7 @@ router.get('/call-review', teamGate, async function (req, res) {
     var sectionLabel = { intro: 'Intro', discovery: 'Discovery', pitch: 'Pitch', objection: 'Objection', close: 'Close' };
     var rows = calls.map(function (c) {
       var a = analysisById[c.id] || null;
+      if (!isCoachingReviewEligible(a)) return null;
       var lowest = null;
       if (a && a.status === 'done') sectionKeys.forEach(function (key) {
         var value = a[key + '_score'];
@@ -1129,7 +1142,7 @@ router.get('/call-review', teamGate, async function (req, res) {
         status: a ? a.status : null, outcome: a ? a.outcome : null, score: a && typeof a.overall_score === 'number' ? a.overall_score : null,
         focus_section: lowest ? sectionLabel[lowest.key] : null, focus_score: lowest ? lowest.value : null
       };
-    }).sort(function (a, b) {
+    }).filter(Boolean).sort(function (a, b) {
       var as = typeof a.score === 'number' ? a.score : Infinity, bs = typeof b.score === 'number' ? b.score : Infinity;
       return (as - bs) || String(b.call_date || '').localeCompare(String(a.call_date || ''));
     });
@@ -1142,6 +1155,7 @@ router.get('/call-review', teamGate, async function (req, res) {
 // is the one place worth pinning — see team-membership.test.js.
 router._resolveTeam = resolveTeam;
 router._repIdsFor = repIdsFor;
+router._isCoachingReviewEligible = isCoachingReviewEligible;
 
 
 /* ⚠⚠ THE REVIEW QUEUE (Justin's ruling 2026-09-03, H712). Every "not a sales call" verdict the

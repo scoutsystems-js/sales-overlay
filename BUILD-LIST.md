@@ -2444,6 +2444,8 @@ Team Call Review now uses the fixed Scout gradient and restrained animated visor
 
 Follow-up: the queue header no longer reserves space for the sidebar, the Manager View explainer panel is removed, and Call Review opens on its own latest 7-day window. A manager-selected date range still remains in place.
 
+Call Review now defaults to coaching-ready conversations only: completed analyses that are not no-shows and are not grader-identified as non-sales. This is a display filter only; it changes no call mark, metric, or review decision. The manager verdict queue remains the confirmation path for recordings identified as non-sales.
+
 ---
 
 ## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented
