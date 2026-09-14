@@ -6070,6 +6070,48 @@
     body[data-view="overview"] .observatory-overview .perf-feature-points { gap:14px; }
     body[data-view="overview"] .observatory-overview .perf-feature-point { padding-left:0; }
 
+    /* The personal board deliberately tells one short story. The gauges remain
+       the established Visor instruments; beneath them is only the closer's
+       current edge, the current focus, and one checkable moment from a call. */
+    body[data-view="overview"] .observatory-coaching-brief {
+      position:relative; z-index:2; overflow:hidden; margin-top:6px;
+      border:1px solid var(--observatory-overview-edge); border-radius:var(--radius-lg);
+      background:linear-gradient(135deg,rgba(7,29,16,.76),rgba(4,18,10,.58));
+      backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+      box-shadow:inset 0 1px 0 rgba(245,255,248,.11),inset 0 0 0 1px rgba(103,205,135,.04),0 22px 48px rgba(0,0,0,.31),0 0 28px var(--observatory-overview-bloom);
+    }
+    body[data-view="overview"] .observatory-coaching-brief::before {
+      content:""; position:absolute; top:28px; left:32px; width:50px; height:1px; background:#71ffad;
+      box-shadow:0 0 10px rgba(77,255,148,.7);
+    }
+    body[data-view="overview"] .coaching-brief-main {
+      display:grid; grid-template-columns:1fr 1fr; min-height:248px;
+    }
+    body[data-view="overview"] .coaching-brief-story { padding:54px 34px 30px; min-width:0; }
+    body[data-view="overview"] .coaching-brief-story + .coaching-brief-story { border-left:1px solid rgba(196,231,207,.20); }
+    body[data-view="overview"] .coaching-brief-kicker {
+      color:#a9c9b3; font-size:10px; font-weight:var(--fw-emphasis); letter-spacing:.18em; text-transform:uppercase;
+    }
+    body[data-view="overview"] .coaching-brief-topic {
+      margin:12px 0 8px; color:#72ffad; font-size:30px; font-weight:var(--fw-display); letter-spacing:.08em; line-height:1; text-transform:uppercase;
+    }
+    body[data-view="overview"] .coaching-brief-story h2 { margin:12px 0 12px; max-width:530px; color:#f2fff6; font-size:26px; font-weight:var(--fw-normal); letter-spacing:-.035em; line-height:1.13; }
+    body[data-view="overview"] .coaching-brief-story p { max-width:500px; margin:0; color:#c2d8ca; font-size:15px; line-height:1.55; }
+    body[data-view="overview"] .coaching-brief-action {
+      display:inline-block; margin-top:20px; color:#74ffaf; font-size:13px; font-weight:var(--fw-emphasis); text-decoration:none; cursor:pointer;
+    }
+    body[data-view="overview"] .coaching-brief-action:hover, body[data-view="overview"] .coaching-brief-action:focus-visible { color:#d6ffe4; text-decoration:underline; }
+    body[data-view="overview"] .coaching-brief-proof {
+      display:grid; grid-template-columns:136px minmax(0,1fr) auto; gap:18px; align-items:center;
+      padding:22px 34px; border-top:1px solid rgba(196,231,207,.20); background:rgba(3,18,9,.32);
+    }
+    body[data-view="overview"] .coaching-brief-proof-label { color:#a9c9b3; font-size:10px; font-weight:var(--fw-emphasis); letter-spacing:.16em; text-transform:uppercase; }
+    body[data-view="overview"] .coaching-brief-proof-quote { padding-left:18px; border-left:2px solid #71ffad; color:#effff5; font-size:16px; font-weight:var(--fw-emphasis); line-height:1.42; }
+    body[data-view="overview"] .coaching-brief-proof-meta { color:#a9c9b3; font-size:11px; letter-spacing:.08em; text-align:right; text-transform:uppercase; white-space:nowrap; }
+    body[data-view="overview"] .coaching-brief-footer { display:flex; justify-content:space-between; gap:16px; padding:14px 34px; color:#aac3b6; font-size:12px; border-top:1px solid rgba(196,231,207,.12); }
+    body[data-view="overview"] .coaching-brief-footer a { color:#baffd4; text-decoration:none; }
+    body[data-view="overview"] .coaching-brief-footer a:hover, body[data-view="overview"] .coaching-brief-footer a:focus-visible { text-decoration:underline; }
+
     /* Visor instruments: a fixed 270° horseshoe holds the reading still while
        only its outer surveying marks move. These rules deliberately exclude
        Team Coaching's existing score ring. */
@@ -6208,6 +6250,8 @@
       body[data-view="overview"] .observatory-metric-instrument .observatory-ring-number strong { display:flex; flex-direction:column; align-items:center; font-size:var(--fs-gauge-value); }
       body[data-view="overview"] .observatory-metric-instrument .glance-trend { margin:1px 0 0; font-size:10px; }
       body[data-view="overview"] .observatory-overview-focus-side { grid-template-columns:1fr; }
+      body[data-view="overview"] .coaching-brief-main { grid-template-columns:1fr; }
+      body[data-view="overview"] .coaching-brief-story + .coaching-brief-story { border-left:0; border-top:1px solid rgba(196,231,207,.20); }
       body[data-view="overview"] .observatory-upper>.section,
       body[data-view="overview"] .observatory-overview>.section,
       body[data-view="overview"] .observatory-overview-focus-grid>.section,
@@ -6417,6 +6461,11 @@
       body[data-view="overview"] .observatory-metric-instrument .observatory-visor-gauge { width:min(216px,100%); max-width:216px; height:auto; }
       body[data-view="overview"] .observatory-overview .glance-tile,
       body[data-view="overview"] .observatory-close-instrument { grid-template-rows:auto auto; min-height:0; }
+      body[data-view="overview"] .coaching-brief-story { padding:48px 20px 24px; }
+      body[data-view="overview"] .coaching-brief-story h2 { font-size:23px; }
+      body[data-view="overview"] .coaching-brief-proof { grid-template-columns:1fr; gap:10px; padding:18px 20px; }
+      body[data-view="overview"] .coaching-brief-proof-meta { text-align:left; }
+      body[data-view="overview"] .coaching-brief-footer { padding:14px 20px; flex-direction:column; }
       body[data-view="team-performance"] .observatory-instrument { min-height:0; }
     }
 
@@ -10380,9 +10429,10 @@
           "drillCalls('analyzed','score')", 'Average call score ' + (avgScore === null ? 'unavailable' : avgScore) + '. ' + avgScoreSubstat(a.avg_score), avgScore === null ? null : scoreColor(avgScore), avgTrend, null, 31)
     + '</div></div>';
 
-    // Compact Overview layout: header and three gauges lead the main column;
-    // optional rep graph, then coaching focus panels, stay beside the rail;
-    // Coach Summary follows as the final full-width section. No accordions.
+    // The home board is intentionally short: the approved gauges, one thing the
+    // closer does well, one current focus, and one moment they can inspect.
+    // Detailed analysis stays on the existing drill-down pages instead of
+    // forcing every result onto this first screen.
     // While the Get-started card is showing, it owns the connect prompt — suppress
     // the standalone Fathom/Zoom connect cards so there's no duplicate "Connect".
     var gsCard = getStartedCardHtml();
@@ -10393,43 +10443,67 @@
       + gsCard
       + connectSections
       + tiles
-      + repOwnGraphHtml()
-      + '<div class="observatory-overview-focus-grid">'
-      + '<div class="section fade-in">' + sectionRankCardHtml() + '</div>'
-      + '<div class="observatory-overview-focus-side">'
-      + '<div class="section fade-in">' + needsWorkCardHtml() + '</div>'
-      // (n) 2026-08-17 — Performance Summary PROMOTED, Recent Calls REMOVED.
-      //
-      // ⚠ THIS STAYS A LINK CARD, and that is what keeps it fast. The overview
-      // card does NOT render the panel; the synthesis LLM fires when the
-      // #performance page opens (see the A-1 boot-trim note above). Inlining the
-      // panel here to "make it bigger" would drag a lane whose cache MISS costs
-      // ~35s onto every dashboard boot — the opposite of what the boot trim was
-      // for. Bigger here means more visual weight, not more work.
-      + '<div class="section fade-in perf-feature"><div class="section-header"><h2>Performance Summary</h2>'
-        + '<div class="meta">Your Wins and What to Improve</div></div>'
-        + perfFeatureCardHtml() + '</div></div></div>'
-      + '</div>'
-      + '<div class="section fade-in observatory-overview-bottom-coach"><div class="section-header"><h2>Coach Summary</h2>'
-        + '<div class="meta">' + (analyzed ? 'based on ' + analyzed + (analyzed === 1 ? ' analyzed call' : ' analyzed calls') : '') + '</div></div>'
-        + renderCoachSummary2(a) + '</div></div>';
+      + coachingBriefHtml(a) + '</div></div>';
       observeObservatoryLayout();
-      /* REMOVED 2026-08-17 (Justin's item n) — Recent Calls. The Call Library is
-         one click away in the top nav, and the card was a link to it with no
-         content of its own, so it cost a full section band to duplicate a nav
-         item. Restoring it is re-adding this one line.
-      + '<div class="section fade-in"><div class="section-header"><h2>Recent Calls</h2></div>' + overviewLinkCardHtml('Open your Call Library to review recent calls.', 'goCallLibrary()') + '</div>';
-      */
 
-    // 10e: the canvas exists only after the assignment above.
-    drawRepOwnChart();
-
-    // Personal What-needs-work loads once (cheap: cache hit = no Claude).
+    // These two existing, cheap lanes supply the concise cards and proof. The
+    // more expensive Performance Summary remains on its dedicated page.
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
     if (state.sectionRank === null && !state.sectionRankLoading) loadSectionRank();
-    // 10e is lazy and only for a manager viewing someone else's report.
-    if (repOwnGraphVisible() && state.repGraph === null && !state.repGraphLoading) loadRepGraph();
-    // NOTE: Performance's LLM call fires on the #performance page open, not here.
+  }
+
+  function coachingBriefHtml(analytics) {
+    var strongest = analytics && analytics.strongest_section;
+    var strongestLabel = strongest && SECTION_LABEL[strongest] ? SECTION_LABEL[strongest] : null;
+    var edgeHeading = strongestLabel
+      ? strongestLabel + ' is your strongest section right now.'
+      : 'Your strongest patterns will show here as more calls are graded.';
+    var edgeBody = strongestLabel
+      ? 'This is where your recent calls are earning their best scores. Review the calls that worked and keep that pattern visible.'
+      : 'Scout needs a few more graded calls before it can name a reliable strength.';
+    var edgeAction = strongestLabel
+      ? '<a class="coaching-brief-action" href="#section/' + escapeHtml(strongest) + '" onclick="goSection(\'' + escapeHtml(strongest) + '\'); return false;">Study what is working →</a>'
+      : '<a class="coaching-brief-action" href="#call-library" onclick="goCallLibrary(); return false;">Open your calls →</a>';
+
+    var focus = state.needsWork;
+    var bucket = focus && focus.bucket;
+    var focusLabel = bucket && bucket.label
+      ? String(bucket.label)
+      : (focus && focus.detail && Array.isArray(focus.detail.buckets) && focus.detail.buckets[0] && focus.detail.buckets[0].label
+          ? String(focus.detail.buckets[0].label) : 'CURRENT FOCUS');
+    var focusHeading = bucket
+      ? 'Find the real concern before you answer it.'
+      : 'Your coaching focus will appear when Scout has enough evidence.';
+    var focusBody = bucket
+      ? String(focus.card_text || 'Review the calls behind this pattern, then practice one better response.')
+      : String((focus && focus.reason) || 'Scout will name a focus after it sees enough true objection moments in this range.');
+    var focusAction = bucket
+      ? '<a class="coaching-brief-action" href="#needs-work" onclick="openNeedsWork(); return false;">Open your practice moments →</a>'
+      : '<a class="coaching-brief-action" href="#call-library" onclick="goCallLibrary(); return false;">Review your calls →</a>';
+
+    var rank = state.sectionRank;
+    var section = rank && Array.isArray(rank.sections) ? rank.sections[0] : null;
+    var moment = section && Array.isArray(section.moments) ? section.moments[0] : null;
+    var speaker = moment && moment.speaker === 'CLOSER' ? 'You said' : 'They said';
+    var proofLabel = moment ? 'A real moment' : 'Your next review';
+    var proofQuote = moment && moment.quote
+      ? '“' + escapeHtml(moment.quote) + '”'
+      : 'Open your detailed coaching to review the real call moments behind these results.';
+    var proofMeta = moment
+      ? escapeHtml([speaker, moment.prospect_name, moment.call_date ? dayLabel(String(moment.call_date).slice(0, 10)) : ''].filter(Boolean).join(' · '))
+      : '';
+    var proofClick = section && section.section
+      ? ' onclick="goSection(\'' + escapeHtml(section.section) + '\')" role="link" tabindex="0" title="Open this call section"'
+      : '';
+
+    return '<section class="observatory-coaching-brief fade-in" aria-label="Your coaching summary">'
+      + '<div class="coaching-brief-main">'
+      + '<article class="coaching-brief-story"><div class="coaching-brief-kicker">Your edge</div><h2>' + escapeHtml(edgeHeading) + '</h2><p>' + escapeHtml(edgeBody) + '</p>' + edgeAction + '</article>'
+      + '<article class="coaching-brief-story"><div class="coaching-brief-kicker">Your focus</div><div class="coaching-brief-topic">' + escapeHtml(focusLabel) + '</div><h2>' + escapeHtml(focusHeading) + '</h2><p>' + escapeHtml(focusBody) + '</p>' + focusAction + '</article>'
+      + '</div>'
+      + '<div class="coaching-brief-proof"' + proofClick + '><div class="coaching-brief-proof-label">' + proofLabel + '</div><div class="coaching-brief-proof-quote">' + proofQuote + '</div><div class="coaching-brief-proof-meta">' + proofMeta + '</div></div>'
+      + '<div class="coaching-brief-footer"><span>One edge to keep. One focus to work on.</span><a href="#performance" onclick="openPerformance(); return false;">Open detailed coaching →</a></div>'
+      + '</section>';
   }
 
   // (n) The promoted Performance Summary card. Still a LINK — see the note at

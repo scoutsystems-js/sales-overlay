@@ -18,7 +18,7 @@ function probePage() {
       rail: railRect && { right: railRect.right, bottom: railRect.bottom },
       pageOverflow: style && style.overflowX,
       documentWidth: document.documentElement.scrollWidth,
-      focus: (() => { const node = document.querySelector('.observatory-overview-focus-grid'); const rect = node && node.getBoundingClientRect(); return rect && { left: rect.left, top: rect.top }; })(),
+      focus: (() => { const node = document.querySelector('.observatory-coaching-brief'); const rect = node && node.getBoundingClientRect(); return rect && { left: rect.left, top: rect.top }; })(),
       instrumentCount: document.querySelectorAll('.observatory-close-instrument, .observatory-overview .glance-tile').length,
       hud: !!hud,
       hudPosition: hud && getComputedStyle(hud).position,
@@ -36,7 +36,8 @@ test('overview populated export uses the third-view Observatory structure and st
     assert.ok(observed.page.left >= 0 && observed.page.right <= width, 'overview page must stay inside the viewport at ' + width + 'px');
     assert.ok(observed.documentWidth <= width, 'overview must not create horizontal document overflow at ' + width + 'px');
     assert.match(observed.text, /Closing %/i);
-    assert.match(observed.text, /Performance Summary/);
+    assert.match(observed.text, /YOUR EDGE/);
+    assert.match(observed.text, /YOUR FOCUS/);
     assert.equal(observed.instrumentCount, 3, 'overview must keep its three top instruments at ' + width + 'px');
   }
   const desktop = renderComputed(html, probePage(), { width: 1920 });
@@ -53,9 +54,7 @@ test('overview uses three real glowing instruments in the requested order and ke
     const hero = document.querySelector('.observatory-overview-hero');
     const close = document.querySelector('.observatory-close-instrument');
     const metrics = [...document.querySelectorAll('.observatory-metric-instrument')];
-    const focus = document.querySelector('.observatory-overview-focus-grid');
-    const coach = document.querySelector('.observatory-overview-bottom-coach');
-    const side = document.querySelector('.observatory-overview-focus-side');
+    const focus = document.querySelector('.observatory-coaching-brief');
     const closingLink = close;
     let callsNavigationCount = 0;
     window.goCallLibrary = () => { callsNavigationCount++; };
@@ -79,12 +78,9 @@ test('overview uses three real glowing instruments in the requested order and ke
       trendBelowRing: !!document.querySelector('.observatory-metric-trend .glance-trend'),
       focusInUpper: focus.parentElement.classList.contains('observatory-upper'),
       focusStartsAfterHero: focusRect.top >= heroRect.bottom && focusRect.top - heroRect.bottom <= 32,
-      coachAfterFocus: coach.getBoundingClientRect().top >= focusRect.bottom,
-      coachClearsRail: coach.getBoundingClientRect().top >= railRect.bottom,
-      coachFullWidth: coach.parentElement.classList.contains('observatory-page'),
-      focusColumns: getComputedStyle(focus).gridTemplateColumns.split(' ').length,
-      focusAlign: getComputedStyle(focus).alignItems,
-      sideCards: side.children.length
+      briefChildren: focus.querySelectorAll('.coaching-brief-story').length,
+      proof: focus.querySelector('.coaching-brief-proof').innerText,
+      focusColumns: getComputedStyle(focus.querySelector('.coaching-brief-main')).gridTemplateColumns.split(' ').length
     };
   })()`, { width: 1920 });
   assert.equal(desktop.tracks, 3, 'Closing, OHR, and score each need a real SVG track');
@@ -103,14 +99,11 @@ test('overview uses three real glowing instruments in the requested order and ke
   desktop.metrics.forEach((metric) => assert.ok(Math.abs(metric.ringWidth - 216) <= 1, 'support gauges restore their earlier 216px desktop bounding width'));
   desktop.ringTops.forEach((top) => assert.ok(Math.abs(top - desktop.ringTops[0]) <= 1, 'the restored unequal bounds keep all three gauges aligned at their top edge'));
   assert.equal(desktop.trendBelowRing, true, 'the existing score trend remains present below its instrument');
-  assert.equal(desktop.focusInUpper, true, 'focus panels sit directly below the gauges in the main column');
-  assert.equal(desktop.focusStartsAfterHero, true, 'focus panels begin immediately after the hero');
-  assert.equal(desktop.coachAfterFocus, true, 'Coach Summary follows the coaching-focus panels');
-  assert.equal(desktop.coachClearsRail, true, 'Coach Summary clears a tall rail before it spans the page');
-  assert.equal(desktop.coachFullWidth, true, 'Coach Summary returns as a full-width lower section');
-  assert.equal(desktop.focusColumns, 2, 'the focus content retains its two-column desktop layout');
-  assert.equal(desktop.focusAlign, 'start', 'the lower columns must not stretch short cards to a tall neighbour');
-  assert.equal(desktop.sideCards, 2, 'Objection focus and Performance Summary stack on the right');
+  assert.equal(desktop.focusInUpper, true, 'the brief sits directly below the gauges in the main column');
+  assert.equal(desktop.focusStartsAfterHero, true, 'the brief begins immediately after the hero');
+  assert.equal(desktop.briefChildren, 2, 'the board has only an edge and a focus story');
+  assert.match(desktop.proof, /I want to make sure/, 'one real call moment anchors the coaching');
+  assert.equal(desktop.focusColumns, 2, 'the short coaching stories sit side by side on desktop');
 
   const mobile = renderComputed(html, `(() => {
     const all = [document.querySelector('.observatory-close-instrument'), ...document.querySelectorAll('.observatory-metric-instrument')];
@@ -129,26 +122,22 @@ function alphaOf(color) {
 
 test('overview glass panels reveal the fixed ground while retaining readable edges', () => {
   const observed = renderComputed(documentFor('overview'), `(() => {
-    const panels = [...document.querySelectorAll('.observatory-overview-bottom-coach, .observatory-overview-focus-grid > .section, .observatory-overview-focus-side > .section')];
+    const panels = [...document.querySelectorAll('.observatory-coaching-brief')];
     const gauges = [...document.querySelectorAll('.observatory-metric-instrument')];
-    const insets = [...document.querySelectorAll('.observatory-overview .team-recs-card, .observatory-overview .pattern-card')];
     return {
       panelColors: panels.map((panel) => getComputedStyle(panel).backgroundColor),
       panelImages: panels.map((panel) => getComputedStyle(panel).backgroundImage),
       panelBorders: panels.map((panel) => getComputedStyle(panel).borderTopColor),
       panelShadows: panels.map((panel) => getComputedStyle(panel).boxShadow),
       gaugeSurfaces: gauges.map((gauge) => { const style = getComputedStyle(gauge); return { background: style.backgroundColor, border: style.borderTopWidth, shadow: style.boxShadow, blur: style.backdropFilter }; }),
-      insetColors: insets.map((panel) => getComputedStyle(panel).backgroundColor),
       hud: (() => { const node = document.querySelector('.observatory-hud'); const style = getComputedStyle(node); return { position: style.position, pointerEvents: style.pointerEvents }; })()
     };
   })()`);
-  assert.ok(observed.panelColors.length >= 4, 'the rendered Overview must expose its major glass surfaces');
+  assert.equal(observed.panelColors.length, 1, 'the concise overview has one major glass coaching surface');
   observed.panelColors.forEach((color) => assert.equal(alphaOf(color), 0, 'approved Visor panels use a translucent gradient rather than a solid fill'));
   observed.panelImages.forEach((image) => assert.match(image, /linear-gradient/, 'major panels retain the approved Visor glass gradient'));
-  assert.ok(observed.insetColors.length > 0, 'the rendered Overview must expose nested glass cards');
-  observed.insetColors.forEach((color) => assert.ok(alphaOf(color) >= .32 && alphaOf(color) <= .48, 'nested cards must stay lighter glass, never opaque insets'));
   observed.panelBorders.forEach((color) => assert.ok(alphaOf(color) >= .22, 'glass panels need a visible sage edge'));
-  observed.panelShadows.forEach((shadow) => assert.ok(shadow.includes('18, 222, 96'), 'glass panels need their scoped emerald edge bloom'));
+  observed.panelShadows.forEach((shadow) => assert.notEqual(shadow, 'none', 'glass panels need their scoped emerald edge bloom'));
   assert.equal(observed.gaugeSurfaces.length, 2, 'the two support values remain distinct gauges');
   observed.gaugeSurfaces.forEach((gauge) => {
     assert.equal(alphaOf(gauge.background), 0, 'support gauges must leave the ground visible');

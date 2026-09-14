@@ -516,7 +516,7 @@ function renderOverviewAs(overrides) {
   return out;
 }
 
-test('personal Coaching Dashboard renderer keeps Closing % as the dominant number and preserves lazy lanes', () => {
+test('personal Coaching Dashboard keeps the standard gauges and one concise coaching brief', () => {
   const out = renderOverviewAs();
   const closing = out.html.indexOf('Closing %');
   const ohr = out.html.indexOf('Objection handle rate');
@@ -525,8 +525,10 @@ test('personal Coaching Dashboard renderer keeps Closing % as the dominant numbe
   assert.ok(closing < ohr && ohr < avg, 'Closing %, OHR, then Avg call score retain the requested order');
   assert.ok(!out.html.includes('Calls analyzed'), 'the removed Calls analyzed gauge must not render');
   assert.match(out.html, /href="#call-library" onclick="goCallLibrary\(\); return false;"/, 'Closing keeps the regular Calls-page link');
-  assert.ok(out.html.includes('Performance Summary'), 'performance entry point remains available');
-  assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'lazy performance lane must not mount on first render');
+  assert.ok(out.html.includes('Your edge'), 'the current strength is named on the home board');
+  assert.ok(out.html.includes('Your focus'), 'the current improvement focus is named on the home board');
+  assert.ok(out.html.includes('Open detailed coaching'), 'the detail entry point remains available');
+  assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'the concise home board must not mount a chart');
 });
 
 test('personal Coaching Dashboard loading and no-data states remain truthful', () => {
@@ -550,22 +552,10 @@ const REP_SERIES = {
           close:  [{ rate: 43, reps_counted: 2, numerator: 3, total: 7 }, { rate: 29, reps_counted: 2, numerator: 2, total: 7 }] },
 };
 
-test('10e: THE GRAPH SHOWS THAT REP\'S LINE, NOT THE WHOLE TEAM\'S', () => {
-  // The failure to guard against is a rep page rendering team data.
+test('the personal coaching home never mounts the old rep graph', () => {
   const out = renderOverviewAs({ repGraph: REP_SERIES });
-  assert.strictEqual(out.charts.length, 1, 'exactly one chart on the rep report');
-  const labels = out.charts[0].cfg.data.datasets.map((d) => d.label);
-  assert.ok(labels.indexOf('josh') !== -1, "the pivoted rep's own line is present");
-  assert.strictEqual(labels.indexOf('someone else'), -1, 'another rep must NOT appear');
-  const mine = out.charts[0].cfg.data.datasets.find((d) => d.label === 'josh');
-  assert.deepStrictEqual(mine.data, [14, 26], "and it carries THAT rep's numbers");
-});
-
-test('10e: the team average stays as a labelled reference line', () => {
-  const out = renderOverviewAs({ repGraph: REP_SERIES });
-  const team = out.charts[0].cfg.data.datasets.find((d) => d.label === 'Team average');
-  assert.ok(team, 'a single line with nothing to read it against says little');
-  assert.deepStrictEqual(team.data, [52, 53]);
+  assert.strictEqual(out.charts.length, 0, 'a single coaching story replaces the old comparison graph');
+  assert.ok(!out.html.includes('Team average'), 'the home board does not add a second metric story');
 });
 
 test('10e: NOT shown on your OWN report, nor to a non-manager', () => {
@@ -604,21 +594,4 @@ test('10e: a stale rep\'s line cannot survive a pivot or a range change', () => 
 
   const range = HTML.slice(HTML.indexOf('function setCoachingRange'), HTML.indexOf('function setCoachingRange') + 700);
   assert.ok(/state\.repGraph = null/.test(range), 'a range change must clear it too');
-});
-
-test('10e: no data for that rep renders a plain message, not an empty canvas', () => {
-  const out = renderOverviewAs({ repGraph: { buckets: [], reps: [], team: { handle: [], close: [] } } });
-  assert.strictEqual(out.charts.length, 0);
-  /* ⚠ COPY UPDATED 2026-08-27. The old text said "in the selected range", which
-     named a cause it had not established — the rep was missing because the WRONG
-     TEAM had been fetched, and they had objections in every window measured. The
-     PROPERTY is unchanged: no data renders a plain message, not an empty canvas. */
-  assert.ok(out.html.indexOf('No objection moments recorded for this rep') !== -1);
-});
-
-test('10e: the chart is drawn AFTER the canvas is in the DOM', () => {
-  const out = renderOverviewAs({ repGraph: REP_SERIES });
-  const firstAssign = out.events.indexOf('assign');
-  const firstChart = out.events.findIndex((e) => e.indexOf('chart:') === 0);
-  assert.ok(firstAssign !== -1 && firstChart > firstAssign);
 });
