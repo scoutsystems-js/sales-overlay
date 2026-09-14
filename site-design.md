@@ -141,6 +141,8 @@ September 13 concise Coaching Review direction: the personal `overview` keeps th
 
 The concise Coaching Review continues with a compact **Coaching Summary** beneath the brief. It keeps the five established sales sections in a single responsive row: Intro, Discovery, Pitch, Objection, and Close. Each tile carries its existing earned score, marks the strongest section as the closer’s edge and the weakest section as the current focus, and opens the existing call-level section drill-down. It adds no new calculation or model request.
 
+Released September 14, 2026 in `5ecf29a`; Railway deployment `8222fd20-12dc-45b7-b26c-094ec20cc40c` succeeded. The served dashboard contains the executable coaching brief and five-section summary markers.
+
 ## Approved visual standard
 
 Team Coaching uses opaque, smooth near-black panels over one expansive forest-green Aurora ground, with pale-sage edges, smooth dark shadows, precise instrument detail, and slow white/gray HUD motion. Do not add fake telemetry, extra metrics, controls, or character/IP imagery. Product rules, metrics, permissions, data, and content remain unchanged.
