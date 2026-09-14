@@ -120,12 +120,10 @@ app.get('/dashboard', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'dashboard.html'));
 });
 
-// Zoom app-submission "Direct Landing URL" (install method = "From Your Site").
-// Zoom requires this to be a page where a LOGGED-IN user can connect Zoom and a
-// LOGGED-OUT user is sent to log in first. connect.html does the client-side
-// session gate: signed-in → /dashboard#connect (the #account Connections section
-// where Connect Zoom lives); signed-out → /login?return=... back to that surface.
-app.get('/connect', function(req, res) {
+// Recording-source setup routes. /connect is the source chooser; the provider
+// routes are stable direct links for Fathom and Zoom. connect.html keeps the user
+// signed in, then starts the provider's existing OAuth action without changing it.
+app.get(['/connect', '/connect/fathom', '/connect/zoom'], function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'connect.html'));
 });
 

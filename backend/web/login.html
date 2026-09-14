@@ -1058,6 +1058,24 @@
        ⚠ AND IT MUST NEVER JOIN THE 450 LIST. Its 700 pairs with a MEASURED k
        that keeps it on one line; changing the weight changes k and reintroduces
        the wrap this page has already had three times. */
+    /* Observatory setup screen — presentation only; auth and return-path logic below is unchanged. */
+    body.login-observatory { background:radial-gradient(ellipse at 83% 8%,rgba(0,104,50,.35),transparent 38rem),radial-gradient(ellipse at 10% 88%,rgba(3,76,39,.24),transparent 34rem),linear-gradient(135deg,#041109 0%,#071d10 48%,#020805 100%); }
+    body.login-observatory::before { opacity:.42; filter:drop-shadow(0 0 24px rgba(9,224,70,.14)); }
+    body.login-observatory::after { content:""; position:fixed; pointer-events:none; z-index:0; width:70vmax; height:70vmax; border:1px solid rgba(137,255,188,.14); border-radius:50%; top:-39vmax; right:-27vmax; }
+    .login-observatory .login-nav { min-height:70px; padding:0 clamp(22px,5vw,72px); border-color:rgba(163,250,193,.16); background:rgba(2,11,6,.52); backdrop-filter:blur(18px); }
+    .login-observatory .login-nav .nav-logo { color:#d8ffe5; }
+    .login-observatory .login-main { padding:56px 20px 78px; }
+    .login-observatory .card { max-width:460px; padding:34px; border:1px solid rgba(148,250,181,.30); border-radius:var(--radius-lg); background:linear-gradient(140deg,rgba(10,47,26,.77),rgba(1,12,6,.68)); box-shadow:inset 0 1px 0 rgba(255,255,255,.11),inset 0 0 0 1px rgba(100,225,140,.04),0 24px 58px rgba(0,0,0,.35),0 0 34px rgba(20,220,92,.09); backdrop-filter:blur(19px); }
+    .login-observatory .brand-lockup { width:230px; margin:0 auto 30px; }
+    .login-observatory .brand-img { width:100%; height:auto; filter:var(--wordmark-glow); }
+    .login-observatory .card-header { text-align:left; margin-bottom:27px; }
+    .login-observatory .card-header h1 { font-size:var(--fs-title); font-weight:var(--fw-emphasis); }
+    .login-observatory .card-header p { color:#b3c6b8; }
+    .login-observatory .field input { background:rgba(1,14,7,.66); border-color:rgba(165,245,193,.21); }
+    .login-observatory .submit-btn { background:rgba(5,54,26,.84); color:#c5ffda; border-color:#66ff9f; box-shadow:0 0 18px rgba(24,230,94,.14); }
+    .login-observatory .submit-btn:hover:not(:disabled) { background:#0ca746; color:#031207; }
+    .login-observatory .login-footer { color:#91a79a; }
+    @media (max-width:520px) { .login-observatory .card { padding:28px 22px; } .login-observatory .brand-lockup { width:205px; } }
   </style>
   <script src="/js/scout-auth.js"></script>
   <script>
@@ -1127,7 +1145,7 @@
     })();
   </script>
 </head>
-<body>
+<body class="login-observatory">
 
 <nav class="login-nav">
   <a href="/" class="nav-logo">
@@ -1543,11 +1561,12 @@
   // Kick off session check on page load
   checkExistingSession();
 
-  // Reviewer/user arriving from /connect while signed out: name the next step so
-  // the login page reads as "log in first, then connect Zoom" (Zoom's requirement).
-  if (RETURN_PATH === '/dashboard#connect') {
+  // A setup route can return here after sign-in. Name the next step without
+  // changing the guarded return path or the normal dashboard destination.
+  if (RETURN_PATH === '/dashboard#connect' || RETURN_PATH === '/connect/fathom' || RETURN_PATH === '/connect/zoom') {
     var connSub = document.getElementById('cardSub');
-    if (connSub) connSub.textContent = 'Sign in to connect your Zoom account';
+    var provider = RETURN_PATH === '/connect/fathom' ? 'Fathom' : RETURN_PATH === '/connect/zoom' ? 'Zoom or Fathom' : 'Zoom';
+    if (connSub) connSub.textContent = 'Sign in to connect ' + provider;
   }
 </script>
 </body>

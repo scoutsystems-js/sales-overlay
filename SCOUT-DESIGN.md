@@ -1,12 +1,10 @@
 # Scout — the design system (rules and pointers, not history)
 
-**Observatory + Visor — approved September 13, 2026:** [site-design.md](site-design.md#current-standard--visor-september-13-2026) owns the current background, glass-card, gauge and motion specification; older mockups are historical where they differ. [Implementation record](docs/design/observatory-implementation.md) distinguishes saved work from verified releases and records the compact size correction verified at `2bc5e0b`; Calls visual scope is implemented and verified live in `bb5e7aa`; EOD Report visual scope is implemented and verified live in `50e1c0e`; the concise personal Coaching Dashboard is verified live in `5ecf29a`. Current implementation scope: personal Coaching Dashboard and Team Performance; Team Coaching retains its prior gauge/cards until separately updated. Fixed forest pools/HUD and selected navigation remain shared across all three. The direct Overview loader must stamp its view before inserting HUD. Overview keeps Closing → objection handling → Avg call score and Calls navigation, then reduces its coaching surface to Your Edge, Your Focus, one real call moment, and an existing-score section drill-down; detailed analysis remains behind its links. The September 14 Call Breakdown compacts the identity header and keeps the follow-up email before detailed evidence; Team → Call Review is the manager queue beneath Coaching and only opens the existing scoped reviews. Metric bands come from existing policies; Visor changes presentation only. See H777–H785. The unchanged Visor archive is authoritative for exact artwork; the first simplified live version is superseded.
+**Observatory + Visor — approved September 13, 2026:** [site-design.md](site-design.md#current-standard--visor-september-13-2026) owns the current ground, glass cards, gauges and motion. [Implementation record](docs/design/observatory-implementation.md) separates saved work from verified releases. The authoritative Visor archive controls exact artwork; metric bands and product behavior remain unchanged. See H777–H785.
 
 **Daily Digest:** uses the approved ground and panels while preserving its fixed-day cached report, bounded navigation, team/count/evidence/focus behavior, and no gauge/date-range picker (H783).
 
-**Companion file:** `SCOUT-BRAND.md` is the brand guide — the actual hex values, the wordmark and glyph rules, and the usage rules for anyone making something that carries the Scout name (a page, a post, a deck, a landing page), human or model. It states values and reasoning; **this file states the law.** If the two disagree, this file and CLAUDE.md §4e win and the brand guide is stale.
-
-**This file is the one place the design system is listed.** Every rule below is *stated* once, where it was ruled, and this file *points* at it — CLAUDE.md §4e for the rulings, the token blocks for the values, `SCOUT-HISTORY.md` (`H###`) for the reasoning, and `backend/test/` for what pins it. **Do not restate a rule here that is written there; add a pointer.** Two documents describing one system is the defect this codebase keeps paying for. Keep this file under 12,000 characters (`wc -c SCOUT-DESIGN.md`).
+`SCOUT-BRAND.md` is the companion brand guide. If it differs from this file or CLAUDE.md §4e, it is stale. This file points to each ruling, token and guard; do not duplicate rules here. Keep it under 12,000 characters.
 
 **Where the values live:** the dashboard's token block `backend/web/dashboard.html` `:root` (lines ~78–240: sizes 85–91, the two named exceptions 102 and 114, `--edge-white` 128, weights 162–164, colours 175–211, radii 237–239); the shared file the outside pages load, `backend/web/css/style.css` `:root` (line 4); the landing page's own block, `backend/web/index.html` (self-contained by ruling). **They must agree, and a guard says so** — `style-tokens-mirror.test.js` executes the shared and index blocks against the dashboard's.
 
@@ -71,6 +69,10 @@
 
 The green button treatment · a new view's ground · at-most-one-48 per view · the badge words · the picker's whiteness. Each is a rule a sweep could break with the suite green. Filed in `BUILD-LIST.md`.
 
+
+## Setup flow — September 14, 2026
+
+Sign-in, recording-source connection and Calendar setup use the Observatory field: fixed forest gradient, quiet contour motion, Saira, and translucent panels with restrained green edge glow. Fathom and Zoom are distinct routes and buttons; their existing OAuth actions, sign-in return path, Calendar privacy disclosure and appointment behavior remain unchanged.
 
 ## Knowledge Base source library — September 14, 2026
 

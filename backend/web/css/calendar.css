@@ -53,3 +53,25 @@
   .calendar-event summary, .calendar-detail { grid-template-columns: 1fr; display: grid; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { .calendar-page::before, .calendar-page::after { animation:none; } }
+
+
+/* Observatory setup treatment — layout only; the calendar API and disclosures remain unchanged. */
+.calendar-setup-main { max-width:980px; padding-top:46px; }
+.calendar-back { display:inline-flex; color:#9bd8b1; font-size:var(--fs-secondary); }
+.calendar-back:hover { color:var(--text); }
+.calendar-setup-hero { max-width:650px; margin:48px 0 34px; }
+.calendar-kicker { color:#9ae7b9; font-size:var(--fs-eyebrow); font-weight:var(--fw-emphasis); letter-spacing:.18em; text-transform:uppercase; margin:0 0 10px; }
+.calendar-setup-main h1 { font-size:clamp(38px,5vw,var(--fs-display)); line-height:1.04; margin:0 0 12px; }
+.calendar-setup-hero .calendar-note { max-width:570px; color:#b8cbbd; font-size:var(--fs-title); line-height:1.5; }
+.calendar-disclosure { max-width:760px; padding:28px 28px 22px; background:linear-gradient(135deg,rgba(4,31,16,.74),rgba(1,11,6,.56)); }
+.calendar-disclosure h2 { font-size:var(--fs-body); color:#c9ecd3; margin-bottom:10px; }
+.calendar-disclosure p { color:#a9bcad; font-size:var(--fs-secondary); line-height:1.55; }
+.calendar-connection-panel { max-width:760px; min-height:226px; padding:34px 30px 30px; background:linear-gradient(140deg,rgba(9,54,27,.78),rgba(1,14,7,.63)); box-shadow:inset 0 1px 0 rgba(245,255,248,.12),inset 0 0 0 1px rgba(103,205,135,.05),0 22px 52px rgba(0,0,0,.32),0 0 34px rgba(21,190,78,.11); }
+.calendar-connection-panel h2 { font-size:var(--fs-title); margin-bottom:8px; }
+.calendar-connection-panel #calendarConnection p { max-width:610px; color:#b7cabd; }
+.calendar-connection-panel .calendar-actions { margin:22px 0 0; }
+.calendar-connection-panel button, .calendar-controls button { border-color:#64f59c; background:rgba(5,42,20,.76); color:#ccffe0; box-shadow:0 0 18px rgba(18,224,85,.15); }
+.calendar-connection-panel button:hover, .calendar-controls button:hover { background:rgba(22,100,48,.72); border-color:#80ffb2; }
+.calendar-setup-main #calendarResults { max-width:100%; }
+.calendar-setup-main .calendar-controls { max-width:760px; }
+@media (max-width:600px) { .calendar-setup-main { padding-top:30px; } .calendar-setup-hero { margin:36px 0 26px; } .calendar-disclosure,.calendar-connection-panel { padding-left:20px; padding-right:20px; } }
