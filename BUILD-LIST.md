@@ -2452,6 +2452,8 @@ The Call Review header and queue rows use the same action-column width so Outcom
 
 Opening a call from Team Call Review now changes the review header action to “Back to Call Reviews” and restores that manager queue. Calls opened from the regular Calls page continue to return there.
 
+Every Call Review queue row now opens that full review directly. The small “Open review” label remains as a visual cue, and Enter or Space opens the same review for keyboard users.
+
 ---
 
 ## Filed 2026-09-11 (Block 005, SCOUT-BUILD-SESSION.md) — deferred, not implemented
