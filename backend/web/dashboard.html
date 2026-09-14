@@ -6890,6 +6890,7 @@
     body[data-view="overview"] #bgSwitch,
     body[data-view="team-performance"] #bgSwitch,
     body[data-view="team-coaching"] #bgSwitch,
+    body[data-view="team-call-review"] #bgSwitch,
     body[data-view="call-library"] #bgSwitch,
     body[data-view="eod"] #bgSwitch { display:none; }
 
@@ -7307,13 +7308,28 @@
       body[data-view="team-coaching"] .observatory-hud-orbit,
       body[data-view="team-coaching"] .observatory-hud-dot,
       body[data-view="team-coaching"] .observatory-hud-scan,
+      body[data-view="team-call-review"] .observatory-hud-orbit,
+      body[data-view="team-call-review"] .observatory-hud-dot,
+      body[data-view="team-call-review"] .observatory-hud-scan,
       body[data-view="overview"] .observatory-hud-orbit,
       body[data-view="overview"] .observatory-hud-dot,
       body[data-view="overview"] .observatory-hud-scan { animation:none!important; }
     }
     /* Team Call Review — a compact decision queue; individual reviews remain the source of detail. */
-    body[data-view="team-call-review"] { --sidebar-w: 170px; }
-    body[data-view="team-call-review"] .page { padding: 24px 24px 80px; }
+    /* This is an Observatory surface: it deliberately replaces the retired raster/mesh
+       layer with the fixed Scout gradient and quiet visor instrumentation used by the
+       dashboard and Team Performance. */
+    body[data-view="team-call-review"] {
+      --sidebar-w:170px;
+      background:
+        radial-gradient(circle at 80% 4%,rgba(5,130,68,.32),transparent 30rem),
+        radial-gradient(circle at 5% 72%,rgba(0,112,59,.18),transparent 34rem),
+        linear-gradient(135deg,#06130d 0%,#010604 52%,#071c11 100%);
+      background-attachment:fixed;
+    }
+    body[data-view="team-call-review"]::before { display:none; }
+    body[data-view="team-call-review"] .top-bar { background:#090a0b; border-bottom-color:rgba(219,239,226,.13); }
+    body[data-view="team-call-review"] .page { position:relative; isolation:isolate; overflow:hidden; width:auto; max-width:calc(100vw - 48px); margin:0 auto; padding:24px 0 80px; background:transparent; }
     body[data-view="team-call-review"] #content { position:relative; z-index:1; }
     .team-call-review-page { position:relative; }
     body[data-view="team-call-review"] .team-call-review-page { display:grid; grid-template-columns:var(--sidebar-w) minmax(0,1fr); column-gap:22px; min-width:0; }
@@ -7327,12 +7343,18 @@
     body[data-view="team-call-review"] .observatory-hud circle,
     body[data-view="team-call-review"] .observatory-hud line { fill:none; stroke:rgba(227,238,233,.14); stroke-width:1; }
     body[data-view="team-call-review"] .observatory-hud-dash { stroke:rgba(227,238,233,.12); stroke-dasharray:3 13; }
+    body[data-view="team-call-review"] .observatory-hud-orbit { transform-origin:600px 420px; animation:observatory-orbit 82s linear infinite; }
+    body[data-view="team-call-review"] .observatory-hud-dot { fill:rgba(237,237,237,.20)!important; stroke:none!important; filter:drop-shadow(0 0 3px rgba(237,237,237,.25)); animation:observatory-drift 67s ease-in-out infinite alternate; }
+    body[data-view="team-call-review"] .observatory-hud-dot:nth-of-type(2) { animation-duration:91s; animation-delay:-19s; }
+    body[data-view="team-call-review"] .observatory-hud-dot:nth-of-type(3) { animation-duration:74s; animation-delay:-37s; }
+    body[data-view="team-call-review"] .observatory-hud-scan { fill:rgba(237,237,237,.17); filter:blur(.35px); opacity:.45; animation:observatory-scan 28s linear infinite; }
+    html[data-bg="off"] body[data-view="team-call-review"] .observatory-hud { display:none; }
     .team-review-subtitle { margin:4px 0 20px; color:var(--text-muted); font-size:var(--fs-secondary); }
-    .team-review-filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px 16px; border:1px solid var(--border); border-radius:var(--radius); background:rgba(3,26,14,.42); margin:0 0 16px; }
+    .team-review-filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:14px 16px; border:1px solid rgba(118,255,171,.30); border-radius:14px; background:linear-gradient(135deg,rgba(8,38,22,.58),rgba(1,12,7,.38)); box-shadow:inset 0 1px 0 rgba(231,255,240,.10),0 0 24px rgba(18,222,96,.045); margin:0 0 16px; }
     .team-review-filter select { appearance:none; border:1px solid rgba(var(--accent-rgb),.28); border-radius:9px; background:rgba(0,0,0,.2); color:var(--text); padding:9px 30px 9px 11px; font:inherit; font-size:var(--fs-label); }
     .team-review-count { margin-left:auto; font-size:var(--fs-label); color:var(--text-muted); }
     .team-review-grid { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(280px,.65fr); gap:16px; align-items:start; }
-    .team-review-queue,.team-review-priorities { margin:0; background:rgba(3,26,14,.53); border:1px solid var(--border); border-radius:var(--radius); box-shadow:inset 0 1px rgba(255,255,255,.06),0 0 28px rgba(var(--accent-rgb),.05); }
+    .team-review-queue,.team-review-priorities { margin:0; background:linear-gradient(135deg,rgba(8,38,22,.63),rgba(1,12,7,.42)); border:1px solid rgba(118,255,171,.36); border-radius:14px; box-shadow:inset 0 1px 0 rgba(231,255,240,.12),0 0 28px rgba(18,222,96,.06); }
     .team-review-queue { overflow:hidden; }
     .team-review-queue .section-header { padding:20px 22px 16px; margin:0; border-bottom:1px solid var(--border); }
     .team-review-queue .section-header h2,.team-review-priorities h2 { margin:5px 0 0; font-size:var(--fs-title); }
