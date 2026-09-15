@@ -536,6 +536,24 @@ test('personal Coaching Dashboard keeps the standard gauges and one concise coac
   assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'the concise home board must not mount a chart');
 });
 
+test('personal Coaching Dashboard ties its proof to the focus and shows a verified closer response', () => {
+  const focus = {
+    available: true,
+    state: 'rate_gap',
+    bucket: { label: 'Partner', handled: 2, total: 24, rate_pct: 8, baseline_pct: 19 },
+    detail: {
+      subject: 'personal',
+      buckets: [],
+      mapping: [{ bucket: 'Partner', surface: 'I need to talk to my partner' }],
+    },
+    card_text: 'You handled “Partner” objections 2 of 24 times (8%) — your weakest area, vs 19% on your other objections this period.',
+  };
+  const out = renderOverviewAs({ needsWork: focus, focusEvidence: [{ closer_response: 'Before you decide together, what does your partner need to understand?', call_id: 'partner-call', date: '2026-09-13T12:00:00.000Z' }] });
+  assert.ok(out.html.includes('Before you decide together, what does your partner need to understand?'), 'the brief shows the closer response from the focus bucket');
+  assert.ok(out.html.includes('Focus example'), 'the proof labels what it supports');
+  assert.ok(!out.html.includes('I want to make sure this will work for my team before I commit to the next step.'), 'the brief must not borrow an unrelated section-ranking quote as focus proof');
+});
+
 test('personal Coaching Dashboard loading and no-data states remain truthful', () => {
   const loading = renderOverviewAs({ analytics2: null, analytics2Loading: true });
   assert.ok(loading.html.length > 0, 'loading overview still renders a shell');

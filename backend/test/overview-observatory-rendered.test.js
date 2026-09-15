@@ -102,7 +102,8 @@ test('overview uses three real glowing instruments in the requested order and ke
   assert.equal(desktop.focusInUpper, true, 'the brief sits directly below the gauges in the main column');
   assert.equal(desktop.focusStartsAfterHero, true, 'the brief begins immediately after the hero');
   assert.equal(desktop.briefChildren, 2, 'the board has only an edge and a focus story');
-  assert.match(desktop.proof, /I want to make sure/, 'one real call moment anchors the coaching');
+  assert.match(desktop.proof, /Let me slow down and understand/, 'a verified closer response from the focus anchors the coaching');
+  assert.match(desktop.proof, /FOCUS EXAMPLE/, 'the proof says that it supports the focus');
   assert.equal(desktop.focusColumns, 2, 'the short coaching stories sit side by side on desktop');
 
   const mobile = renderComputed(html, `(() => {

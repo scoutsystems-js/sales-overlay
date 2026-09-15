@@ -7776,6 +7776,7 @@
     overviewExpanded: { coach: false, perf: false, recent: false },
     overviewRecent: null, overviewRecentLoading: false, // lazy 5 recent calls on expand
     needsWork: null, needsWorkLoading: false, // A-2.1 personal "What needs work"
+    focusEvidence: null, focusEvidenceLoading: false, focusEvidenceKey: null,
     // ── Team (manager) view ──
     teamContext:    null,   // /team/context: {role, is_owner, has_reps, teams}
     teamSelected:   null,   // owner picker: team key ('all' | managerId) or null=default
@@ -9970,6 +9971,7 @@
   function setCoachingRange(from, to) {
     state.dateRange = { from: from, to: to };
     state.needsWork = null;                 // range-responsive — refetch for the new window
+    state.focusEvidence = null; state.focusEvidenceKey = null;
     state.repGraph = null;                  // 10e windows by this range too
     syncHashFromState(true);                // the range lives in the URL
     if (state.view === 'needs-work') { renderNeedsWorkView(); return; }
@@ -9984,6 +9986,7 @@
   // it for a range restored from the hash WITHOUT overwriting that range first.
   function applyCoachingRangeChange(preserveView) {
     state.needsWork = null; // range-responsive (2026-07-27) — refetch for the new window
+    state.focusEvidence = null; state.focusEvidenceKey = null;
     // Range-responsive sub-views update IN PLACE — never bounce back to the
     // coaching overview when the range changes while inside them.
     if (state.view === 'needs-work') { renderNeedsWorkView(); return; }
@@ -10629,19 +10632,24 @@
       ? '<a class="coaching-brief-action" href="#needs-work" onclick="openNeedsWork(); return false;">Open your practice moments →</a>'
       : '<a class="coaching-brief-action" href="#call-library" onclick="goCallLibrary(); return false;">Review your calls →</a>';
 
-    var rank = state.sectionRank;
-    var section = rank && Array.isArray(rank.sections) ? rank.sections[0] : null;
-    var moment = section && Array.isArray(section.moments) ? section.moments[0] : null;
-    var speaker = moment && moment.speaker === 'CLOSER' ? 'You said' : 'They said';
-    var proofLabel = moment ? 'A real moment' : 'Your next review';
-    var proofQuote = moment && moment.quote
-      ? '“' + escapeHtml(moment.quote) + '”'
-      : 'Open your detailed coaching to review the real call moments behind these results.';
-    var proofMeta = moment
-      ? escapeHtml([speaker, moment.prospect_name, moment.call_date ? dayLabel(String(moment.call_date).slice(0, 10)) : ''].filter(Boolean).join(' · '))
+    /* The proof belongs to the Focus, not the Edge. The old board selected the
+       first quote from the strongest section and placed it directly beneath a
+       different objection focus. That made an unrelated prospect concern look
+       like proof of the recommended practice. Only a verified closer response
+       from this focus bucket is useful here; when none exists, say less rather
+       than borrowing a quote from another topic. */
+    var focusCall = (state.focusEvidence || []).filter(function (c) { return c && c.closer_response; })[0] || null;
+    var proofLabel = focusCall ? 'Focus example' : 'Your next review';
+    var proofQuote = focusCall
+      ? '“' + escapeHtml(focusCall.closer_response) + '”'
+      : (bucket
+          ? 'Open your practice moments to review the calls behind this focus.'
+          : 'Open your detailed coaching to review the real call moments behind these results.');
+    var proofMeta = focusCall
+      ? escapeHtml(['You said', focusCall.date ? dayLabel(String(focusCall.date).slice(0, 10)) : ''].filter(Boolean).join(' · '))
       : '';
-    var proofClick = section && section.section
-      ? ' onclick="goSection(\'' + escapeHtml(section.section) + '\')" role="link" tabindex="0" title="Open this call section"'
+    var proofClick = bucket
+      ? ' onclick="openNeedsWork()" role="link" tabindex="0" title="Open practice moments"'
       : '';
 
     return '<section class="observatory-coaching-brief fade-in" aria-label="Your coaching summary">'
@@ -10750,12 +10758,42 @@
     state.needsWorkLoading = true;
     var epoch = viewEpoch;   // H775
     armLaneWait('needsWork', function () { return state.needsWorkLoading; }, function () { if (state.view === 'overview') renderOverview(false); });
-    try { var nw = await fetchNeedsWork(); if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.needsWork = nw; }
+    try { var nw = await fetchNeedsWork(); if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.needsWork = nw; loadFocusEvidence(nw); }
     catch (err) { if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ if (err.message === 'unauth') return; state.needsWork = { _error: err.message || 'unknown' }; }
     state.needsWorkLoading = false;
     clearLaneWait('needsWork');
     if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'needs-work') renderNeedsWorkView();
+  }
+  function focusEvidenceKey(d) {
+    var label = d && d.bucket && d.bucket.label;
+    return [state.viewingUserId || '', state.dateRange.from || '', state.dateRange.to || '', label || ''].join('|');
+  }
+  async function loadFocusEvidence(d) {
+    var detail = d && d.detail;
+    var label = d && d.bucket && d.bucket.label;
+    var surfaces = detail && Array.isArray(detail.mapping)
+      ? detail.mapping.filter(function (m) { return m.bucket === label; }).map(function (m) { return m.surface; }) : [];
+    var key = focusEvidenceKey(d);
+    if (!label || !surfaces.length || state.focusEvidenceKey === key || state.focusEvidenceLoading) return;
+    state.focusEvidenceKey = key;
+    state.focusEvidence = null;
+    state.focusEvidenceLoading = true;
+    var url = isSelf() ? '/me/needs-work/bucket' : '/admin/needs-work/' + encodeURIComponent(state.viewingUserId) + '/bucket';
+    try {
+      var res = await fetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ surfaces: surfaces, from: state.dateRange.from, to: state.dateRange.to }) });
+      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+      if (!res.ok) return;
+      var calls = ((await res.json()) || {}).calls || [];
+      if (state.focusEvidenceKey === key) state.focusEvidence = calls;
+    } catch (_) {
+      // The focus itself remains useful; the proof simply stays absent.
+    } finally {
+      if (state.focusEvidenceKey === key) {
+        state.focusEvidenceLoading = false;
+        if (state.view === 'overview') renderOverview(false);
+      }
+    }
   }
   // Compact card under the glance tiles. Mirrors the team needs-work card.
   // Personal needs-work degrades honestly when a short window is too thin.
@@ -21353,7 +21391,7 @@
       // Refresh whatever surface is showing so close rate / tiles reflect the change.
       if (state.view === 'call-library') { state.callLibrary = null; renderCallLibrary(); }
       else if (state.view === 'call-review') { state.callReview = null; loadCallReview(state.selectedCallId); }
-      state.analytics2 = null; state.needsWork = null; // stale after an outcome change
+      state.analytics2 = null; state.needsWork = null; state.focusEvidence = null; state.focusEvidenceKey = null; // stale after an outcome change
       if (state.view === 'overview') reloadAll();
     } catch (err) { alert(networkFailureCopy('the outcome')); }
   }
