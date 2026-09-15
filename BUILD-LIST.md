@@ -30,7 +30,7 @@ The existing additive migration was applied separately: its tables have RLS and 
 
 ## Landing page — Reps and Managers (September 14, 2026)
 
-**Live and verified September 14 (`0ed0b59`):** the public landing page uses the approved Observatory field and glass treatment, with distinct Rep and Manager sections, three scrubbed real-product proof views (Rep Coaching Review, Manager Coaching, Call Review), Fathom/Zoom connection copy, retained pricing and existing access/login routes. Landing CTAs use the approved dark physical Visor control; existing dashboard controls are unchanged. The scrubbed-product-proof follow-up is ready to release; its images are scrubbed at the file level before publication.
+**Live and verified September 14 (`14f1e4b`):** the public landing page uses the approved Observatory field and glass treatment, with distinct Rep and Manager sections, three scrubbed real-product proof views (Rep Coaching Review, Manager Coaching, Call Review), Fathom/Zoom connection copy, retained pricing and existing access/login routes. Landing CTAs use the approved dark physical Visor control; existing dashboard controls are unchanged. The proof images were scrubbed at the file level before publication, and the live page and all three image URLs returned 200.
 
 ## Current implementation — Observatory redesign (2026-09-13)
 
