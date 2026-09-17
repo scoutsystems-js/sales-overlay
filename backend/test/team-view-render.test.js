@@ -536,7 +536,7 @@ test('personal Coaching Dashboard keeps the standard gauges and one concise coac
   assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'the concise home board must not mount a chart');
 });
 
-test('personal Coaching Dashboard ties its proof to the focus and shows a verified closer response', () => {
+test('personal Coaching Dashboard turns the focus into the saved coaching framework, not a stray transcript line', () => {
   const focus = {
     available: true,
     state: 'rate_gap',
@@ -548,10 +548,23 @@ test('personal Coaching Dashboard ties its proof to the focus and shows a verifi
     },
     card_text: 'You handled “Partner” objections 2 of 24 times (8%) — your weakest area, vs 19% on your other objections this period.',
   };
-  const out = renderOverviewAs({ needsWork: focus, focusEvidence: [{ closer_response: 'Before you decide together, what does your partner need to understand?', call_id: 'partner-call', date: '2026-09-13T12:00:00.000Z' }] });
-  assert.ok(out.html.includes('Before you decide together, what does your partner need to understand?'), 'the brief shows the closer response from the focus bucket');
-  assert.ok(out.html.includes('Focus example'), 'the proof labels what it supports');
-  assert.ok(!out.html.includes('I want to make sure this will work for my team before I commit to the next step.'), 'the brief must not borrow an unrelated section-ranking quote as focus proof');
+  const objectionCoaching = {
+    available: true,
+    categories: [{
+      category: 'partner',
+      isolate: 'Clarify what the partner needs to understand before answering the first concern.',
+      reframe: 'Bring the conversation back to the outcome both decision-makers need to agree on.',
+      overcome: 'Test whether that conversation is the only thing standing between them and a decision.',
+      what_worked: 'You clarified what the partner needed to understand, then tested whether that was the only remaining concern.',
+      grounded: true,
+    }],
+  };
+  const out = renderOverviewAs({ needsWork: focus, objectionsSynthesis: objectionCoaching });
+  assert.ok(out.html.includes('Your coaching playbook'), 'the overview names the existing coaching source');
+  assert.ok(out.html.includes('Clarify what the partner needs to understand'), 'the overview reuses the saved isolate guidance');
+  assert.ok(out.html.includes('You clarified what the partner needed to understand'), 'the overview captures the evidence-backed move that worked');
+  assert.ok(!out.html.includes('Before you decide together, what does your partner need to understand?'), 'a raw closer fragment is not presented as the lesson');
+  assert.ok(!out.html.includes('Focus example'), 'the overview no longer overstates a transcript fragment as proof');
 });
 
 test('personal Coaching Dashboard loading and no-data states remain truthful', () => {

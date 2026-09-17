@@ -3,8 +3,8 @@
 // For each objection category present in the window, produces ISOLATE → REFRAME
 // → OVERCOME coaching. GROUNDED-FIRST: where the closer has handled examples of
 // that category, the advice references their own real handling (with the quote +
-// clip surfaced as evidence); otherwise it's general best practice, clearly
-// labeled. One Claude call per (user, range, analysis-set), cached in
+// clip surfaced as evidence); otherwise it uses only saved team material or
+// returns no guidance. One Claude call per (user, range, analysis-set), cached in
 // objection_synthesis_cache and invalidated by the analysis_set_hash.
 
 const Anthropic = require('@anthropic-ai/sdk');
@@ -58,15 +58,16 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v4-2026-09-05-layered';   /* v4 (H733): notes under their entries; the loss rule in code. Was v3-2026-09-05-doctrine */ //   /* v3 (H732): Scout's doctrine in the prompt as a constraint. Was v2-2026-09-05-kb-material */ //   // H731: the knowledge base before the advice; no generic fallback. v1 was the unversioned original.
+var SYNTH_PROMPT_VERSION = 'v5-2026-09-17-worked-move';
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
     '  - Isolate: confirm it is the real/only objection before addressing it.',
     '  - Reframe: shift the frame the objection lives in.',
     '  - Overcome: resolve it and advance to the close.',
-    'Where HANDLED examples (the closer\'s own words) are provided, GROUND your advice in what THEY actually did — build on their real approach, do not invent. Where none are provided, give general best practice.',
+    'Where HANDLED examples (the closer\'s own words) are provided, GROUND your advice in what THEY actually did — build on their real approach, do not invent. Where none are provided, use only the saved team material; if it does not speak to the category, return null rather than generic advice.',
     'Each of isolate/reframe/overcome must be 1-2 concrete sentences. No fluff, no cheerleading.',
+    'For a category with handled examples, also write what_worked: one short sentence describing the repeatable move the closer used successfully. Ground it only in those handled examples and the team material, not a transcript fragment or generic advice. If there are no handled examples, return null for what_worked.',
     '',
     'Note: money-phrased objections ("too expensive", "can\'t afford it") are categorized as "fear" in this domain.',
     '',
@@ -91,8 +92,26 @@ function buildSynthPrompt(present, byCat, material) {
   if (material && material.contextText) { lines.push('TEAM MATERIAL (this closer\'s offer, qualifications and approach — ground every sentence in it):'); lines.push(material.contextText.trim()); lines.push(''); }
   if (material && material.notes && material.notes.text) { lines.push(require('./coaching-corrections').promptLane(material.notes.text)); lines.push(''); }
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
-  lines.push('{"categories":[{"category":"fear","isolate":"...","reframe":"...","overcome":"..."}]}');
+  lines.push('{"categories":[{"category":"fear","isolate":"...","reframe":"...","overcome":"...","what_worked":"... or null"}]}');
   return lines.join('\n');
+}
+
+function mergeGuidance(present, byCat, guide, lossScope) {
+  return present.map(function(c) {
+    var bucket = byCat[c], guidance = guide[c] || {};
+    var hasHandledExample = bucket.examples.length > 0;
+    return {
+      category: c, count: bucket.count, handled: bucket.handled, grounded: hasHandledExample,
+      isolate: require('./doctrine').enforceLossRule(str(guidance.isolate, 500), lossScope, null, 'objection-synthesis'),
+      reframe: require('./doctrine').enforceLossRule(str(guidance.reframe, 500), lossScope, null, 'objection-synthesis'),
+      overcome: require('./doctrine').enforceLossRule(str(guidance.overcome, 500), lossScope, null, 'objection-synthesis'),
+      // A closed call can credit a rate, but it never manufactures a worked example.
+      what_worked: hasHandledExample
+        ? require('./doctrine').enforceLossRule(str(guidance.what_worked, 500), lossScope, null, 'objection-synthesis')
+        : null,
+      evidence: bucket.examples.slice(0, 2),
+    };
+  });
 }
 
 async function computeObjectionSynthesis(admin, userId, from, to) {
@@ -199,18 +218,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   //    never LLM-generated — it's the actual handled example from the DB).
   var guide = {};
   parsed.categories.forEach(function(g) { if (g && g.category) guide[String(g.category).toLowerCase()] = g; });
-  var categories = present.map(function(c) {
-    var b = byCat[c], g = guide[c] || {};
-    return {
-      category: c, count: b.count, handled: b.handled, grounded: b.examples.length > 0,
-      /* H733: the loss rule in code — the guidance is unattributed prose, so it is dropped only when every loss
-         in this closer's window is a disqualification (then loss framing can only be about a DQ). */
-      isolate: require('./doctrine').enforceLossRule(str(g.isolate, 500), lossScope, null, 'objection-synthesis'),
-      reframe: require('./doctrine').enforceLossRule(str(g.reframe, 500), lossScope, null, 'objection-synthesis'),
-      overcome: require('./doctrine').enforceLossRule(str(g.overcome, 500), lossScope, null, 'objection-synthesis'),
-      evidence: b.examples.slice(0, 2),
-    };
-  });
+  var categories = mergeGuidance(present, byCat, guide, lossScope);
   var synthesis = { categories: categories, generated_at: new Date().toISOString() };
 
   // 7) cache (best-effort — a cache write failure shouldn't fail the response).
@@ -222,4 +230,4 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-module.exports = { computeObjectionSynthesis: computeObjectionSynthesis, _buildSynthPrompt: buildSynthPrompt, _SYNTH_PROMPT_VERSION: SYNTH_PROMPT_VERSION };
+module.exports = { computeObjectionSynthesis: computeObjectionSynthesis, _buildSynthPrompt: buildSynthPrompt, _mergeGuidance: mergeGuidance, _SYNTH_PROMPT_VERSION: SYNTH_PROMPT_VERSION };

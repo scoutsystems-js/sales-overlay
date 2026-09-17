@@ -6000,6 +6000,11 @@
     }
     body[data-view="overview"] .coaching-brief-proof-label { color:#a9c9b3; font-size:10px; font-weight:var(--fw-emphasis); letter-spacing:.16em; text-transform:uppercase; }
     body[data-view="overview"] .coaching-brief-proof-quote { padding-left:18px; border-left:2px solid #71ffad; color:#effff5; font-size:16px; font-weight:var(--fw-emphasis); line-height:1.42; }
+    body[data-view="overview"] .coaching-brief-playbook { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    body[data-view="overview"] .coaching-brief-playbook-step { min-width:0; color:#c2d8ca; font-size:13px; line-height:1.45; }
+    body[data-view="overview"] .coaching-brief-playbook-step strong { display:block; margin-bottom:4px; color:#72ffad; font-size:10px; letter-spacing:.13em; text-transform:uppercase; }
+    body[data-view="overview"] .coaching-brief-worked { margin-top:12px; color:#effff5; font-size:14px; font-weight:var(--fw-emphasis); line-height:1.45; }
+    body[data-view="overview"] .coaching-brief-worked strong { color:#72ffad; font-size:10px; letter-spacing:.13em; text-transform:uppercase; }
     body[data-view="overview"] .coaching-brief-proof-meta { color:#a9c9b3; font-size:11px; letter-spacing:.08em; text-align:right; text-transform:uppercase; white-space:nowrap; }
     body[data-view="overview"] .coaching-brief-footer { display:flex; justify-content:space-between; gap:16px; padding:14px 34px; color:#aac3b6; font-size:12px; border-top:1px solid rgba(196,231,207,.12); }
     body[data-view="overview"] .coaching-brief-footer a { color:#baffd4; text-decoration:none; }
@@ -6383,6 +6388,7 @@
       body[data-view="overview"] .coaching-brief-story { padding:48px 20px 24px; }
       body[data-view="overview"] .coaching-brief-story h2 { font-size:23px; }
       body[data-view="overview"] .coaching-brief-proof { grid-template-columns:1fr; gap:10px; padding:18px 20px; }
+      body[data-view="overview"] .coaching-brief-playbook { grid-template-columns:1fr; gap:10px; }
       body[data-view="overview"] .coaching-brief-proof-meta { text-align:left; }
       body[data-view="overview"] .coaching-brief-footer { padding:14px 20px; flex-direction:column; }
       body[data-view="overview"] .coaching-section-summary { padding:22px 20px; }
@@ -7669,7 +7675,6 @@
     overviewExpanded: { coach: false, perf: false, recent: false },
     overviewRecent: null, overviewRecentLoading: false, // lazy 5 recent calls on expand
     needsWork: null, needsWorkLoading: false, // A-2.1 personal "What needs work"
-    focusEvidence: null, focusEvidenceLoading: false, focusEvidenceKey: null,
     // ── Team (manager) view ──
     teamContext:    null,   // /team/context: {role, is_owner, has_reps, teams}
     teamSelected:   null,   // owner picker: team key ('all' | managerId) or null=default
@@ -9728,7 +9733,7 @@
   function setCoachingRange(from, to) {
     state.dateRange = { from: from, to: to };
     state.needsWork = null;                 // range-responsive — refetch for the new window
-    state.focusEvidence = null; state.focusEvidenceKey = null;
+    state.objectionsSynthesis = null;       // playbook is scoped to this same window
     state.repGraph = null;                  // 10e windows by this range too
     syncHashFromState(true);                // the range lives in the URL
     if (state.view === 'needs-work') { renderNeedsWorkView(); return; }
@@ -9743,7 +9748,7 @@
   // it for a range restored from the hash WITHOUT overwriting that range first.
   function applyCoachingRangeChange(preserveView) {
     state.needsWork = null; // range-responsive (2026-07-27) — refetch for the new window
-    state.focusEvidence = null; state.focusEvidenceKey = null;
+    state.objectionsSynthesis = null;
     // Range-responsive sub-views update IN PLACE — never bounce back to the
     // coaching overview when the range changes while inside them.
     if (state.view === 'needs-work') { renderNeedsWorkView(); return; }
@@ -10354,9 +10359,10 @@
       + coachingSectionSummaryHtml(a) + '</div></div>';
       observeObservatoryLayout();
 
-    // These two existing, cheap lanes supply the concise cards and proof. The
-    // more expensive Performance Summary remains on its dedicated page.
+    // These lanes supply the concise cards and the already-established
+    // objection coaching playbook. Performance remains on its dedicated page.
     if (state.needsWork === null && !state.needsWorkLoading) loadNeedsWork();
+    if (state.needsWork && state.needsWork.bucket && state.objectionsSynthesis === null && !state.objectionsSynthesisLoading) loadObjectionsSynthesis();
     if (state.sectionRank === null && !state.sectionRankLoading) loadSectionRank();
   }
 
@@ -10389,32 +10395,39 @@
       ? '<a class="coaching-brief-action" href="#needs-work" onclick="openNeedsWork(); return false;">Open your practice moments →</a>'
       : '<a class="coaching-brief-action" href="#call-library" onclick="goCallLibrary(); return false;">Review your calls →</a>';
 
-    /* The proof belongs to the Focus, not the Edge. The old board selected the
-       first quote from the strongest section and placed it directly beneath a
-       different objection focus. That made an unrelated prospect concern look
-       like proof of the recommended practice. Only a verified closer response
-       from this focus bucket is useful here; when none exists, say less rather
-       than borrowing a quote from another topic. */
-    var focusCall = (state.focusEvidence || []).filter(function (c) { return c && c.closer_response; })[0] || null;
-    var proofLabel = focusCall ? 'Focus example' : 'Your next review';
-    var proofQuote = focusCall
-      ? '“' + escapeHtml(focusCall.closer_response) + '”'
-      : (bucket
-          ? 'Open your practice moments to review the calls behind this focus.'
-          : 'Open your detailed coaching to review the real call moments behind these results.');
-    var proofMeta = focusCall
-      ? escapeHtml(['You said', focusCall.date ? dayLabel(String(focusCall.date).slice(0, 10)) : ''].filter(Boolean).join(' · '))
-      : '';
-    var proofClick = bucket
-      ? ' onclick="openNeedsWork()" role="link" tabindex="0" title="Open practice moments"'
-      : '';
+    /* Teach from the existing objection-coaching lane. A matching transcript
+       line alone is not the lesson: the lane grounds the playbook in Scout's
+       method, saved team material, and explicitly handled moments. */
+    var synthesis = state.objectionsSynthesis;
+    var focusCoaching = synthesis && synthesis.available && Array.isArray(synthesis.categories)
+      ? synthesis.categories.filter(function (c) { return c && String(c.category || '').toLowerCase() === String(focusLabel || '').toLowerCase(); })[0]
+      : null;
+    var proofLabel = 'Your coaching playbook';
+    var proofQuote;
+    if (focusCoaching && (focusCoaching.isolate || focusCoaching.reframe || focusCoaching.overcome)) {
+      var steps = [
+        ['Isolate', focusCoaching.isolate],
+        ['Reframe', focusCoaching.reframe],
+        ['Overcome', focusCoaching.overcome],
+      ].filter(function (step) { return step[1]; }).map(function (step) {
+        return '<div class="coaching-brief-playbook-step"><strong>' + escapeHtml(step[0]) + '</strong>' + escapeHtml(step[1]) + '</div>';
+      }).join('');
+      proofQuote = '<div class="coaching-brief-playbook">' + steps + '</div>'
+        + (focusCoaching.what_worked
+          ? '<div class="coaching-brief-worked"><strong>What worked</strong><br>' + escapeHtml(focusCoaching.what_worked) + '</div>'
+          : '');
+    } else if (synthesis === null || state.objectionsSynthesisLoading) {
+      proofQuote = 'Preparing your coaching playbook from Scout’s saved team guidance and real handled calls.';
+    } else {
+      proofQuote = 'Scout has not found approved coaching guidance for this focus in the saved team material yet.';
+    }
 
     return '<section class="observatory-coaching-brief fade-in" aria-label="Your coaching summary">'
       + '<div class="coaching-brief-main">'
       + '<article class="coaching-brief-story"><div class="coaching-brief-kicker">Your edge</div><h2>' + escapeHtml(edgeHeading) + '</h2><p>' + escapeHtml(edgeBody) + '</p>' + edgeAction + '</article>'
       + '<article class="coaching-brief-story"><div class="coaching-brief-kicker">Your focus</div><div class="coaching-brief-topic">' + escapeHtml(focusLabel) + '</div><h2>' + escapeHtml(focusHeading) + '</h2><p>' + escapeHtml(focusBody) + '</p>' + focusAction + '</article>'
       + '</div>'
-      + '<div class="coaching-brief-proof"' + proofClick + '><div class="coaching-brief-proof-label">' + proofLabel + '</div><div class="coaching-brief-proof-quote">' + proofQuote + '</div><div class="coaching-brief-proof-meta">' + proofMeta + '</div></div>'
+      + '<div class="coaching-brief-proof"><div class="coaching-brief-proof-label">' + proofLabel + '</div><div class="coaching-brief-proof-quote">' + proofQuote + '</div><div class="coaching-brief-proof-meta"></div></div>'
       + '<div class="coaching-brief-footer"><span>One edge to keep. One focus to work on.</span><a href="#performance" onclick="openPerformance(); return false;">Open detailed coaching →</a></div>'
       + '</section>';
   }
@@ -10515,42 +10528,12 @@
     state.needsWorkLoading = true;
     var epoch = viewEpoch;   // H775
     armLaneWait('needsWork', function () { return state.needsWorkLoading; }, function () { if (state.view === 'overview') renderOverview(false); });
-    try { var nw = await fetchNeedsWork(); if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.needsWork = nw; loadFocusEvidence(nw); }
+    try { var nw = await fetchNeedsWork(); if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ state.needsWork = nw; }
     catch (err) { if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */ if (err.message === 'unauth') return; state.needsWork = { _error: err.message || 'unknown' }; }
     state.needsWorkLoading = false;
     clearLaneWait('needsWork');
     if (state.view === 'overview') renderOverview(false);
     else if (state.view === 'needs-work') renderNeedsWorkView();
-  }
-  function focusEvidenceKey(d) {
-    var label = d && d.bucket && d.bucket.label;
-    return [state.viewingUserId || '', state.dateRange.from || '', state.dateRange.to || '', label || ''].join('|');
-  }
-  async function loadFocusEvidence(d) {
-    var detail = d && d.detail;
-    var label = d && d.bucket && d.bucket.label;
-    var surfaces = detail && Array.isArray(detail.mapping)
-      ? detail.mapping.filter(function (m) { return m.bucket === label; }).map(function (m) { return m.surface; }) : [];
-    var key = focusEvidenceKey(d);
-    if (!label || !surfaces.length || state.focusEvidenceKey === key || state.focusEvidenceLoading) return;
-    state.focusEvidenceKey = key;
-    state.focusEvidence = null;
-    state.focusEvidenceLoading = true;
-    var url = isSelf() ? '/me/needs-work/bucket' : '/admin/needs-work/' + encodeURIComponent(state.viewingUserId) + '/bucket';
-    try {
-      var res = await fetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ surfaces: surfaces, from: state.dateRange.from, to: state.dateRange.to }) });
-      if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
-      if (!res.ok) return;
-      var calls = ((await res.json()) || {}).calls || [];
-      if (state.focusEvidenceKey === key) state.focusEvidence = calls;
-    } catch (_) {
-      // The focus itself remains useful; the proof simply stays absent.
-    } finally {
-      if (state.focusEvidenceKey === key) {
-        state.focusEvidenceLoading = false;
-        if (state.view === 'overview') renderOverview(false);
-      }
-    }
   }
   // Compact card under the glance tiles. Mirrors the team needs-work card.
   // Personal needs-work degrades honestly when a short window is too thin.
@@ -20478,6 +20461,7 @@
     }
     state.objectionsSynthesisLoading = false;
     if (state.view === 'objections-intel') renderObjectionsIntel();
+    else if (state.view === 'overview') renderOverview(false);
   }
 
   async function fetchObjectionsIntel() {
@@ -21148,7 +21132,7 @@
       // Refresh whatever surface is showing so close rate / tiles reflect the change.
       if (state.view === 'call-library') { state.callLibrary = null; renderCallLibrary(); }
       else if (state.view === 'call-review') { state.callReview = null; loadCallReview(state.selectedCallId); }
-      state.analytics2 = null; state.needsWork = null; state.focusEvidence = null; state.focusEvidenceKey = null; // stale after an outcome change
+      state.analytics2 = null; state.needsWork = null; state.objectionsSynthesis = null; // stale after an outcome change
       if (state.view === 'overview') reloadAll();
     } catch (err) { alert(networkFailureCopy('the outcome')); }
   }
