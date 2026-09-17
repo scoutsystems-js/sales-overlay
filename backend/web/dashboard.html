@@ -3806,184 +3806,45 @@
     }
 
     .wel {
-      position: fixed; inset: 0; z-index: 9999;
-      background: #050505;
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden; cursor: pointer;
-      will-change: transform, opacity;
+      --wel-ink: rgba(235, 255, 241, 0.94);
+      position: fixed; inset: 0; z-index: 9999; background: #050505;
+      display: grid; place-items: center; overflow: hidden; cursor: pointer;
+      isolation: isolate; color: var(--wel-ink); font-family: 'Saira', system-ui, sans-serif;
     }
-    .wel-out { animation: welSwipe var(--wel-swipe) cubic-bezier(0.7, 0, 0.84, 0) forwards; }
-    @keyframes welSwipe {
-      to { transform: translateX(115%) rotate(4deg); opacity: 0.85; }
-    }
-    .wel-stage { position: relative; width: min(92vw, 92vh); height: min(92vw, 92vh); }
-    .wel-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .wel-out { animation: welExit var(--wel-swipe) cubic-bezier(.7,0,.84,0) forwards; }
+    @keyframes welExit { to { opacity: 0; transform: scale(1.03); } }
+    .wel-field { position: absolute; inset: 0; overflow: hidden; }
+    .wel-field::before { content: ''; position: absolute; inset: -35%; background: repeating-radial-gradient(ellipse at 50% 50%, transparent 0 128px, rgba(var(--accent-rgb),.16) 129px 130px, transparent 131px 215px); opacity: .45; animation: welDrift var(--wel-drift) linear infinite; }
+    .wel-field::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 49.95%, rgba(var(--accent-rgb),.14) 50%, transparent 50.05%), linear-gradient(transparent 49.95%, rgba(var(--accent-rgb),.1) 50%, transparent 50.05%); background-size: 120px 120px; mask-image: radial-gradient(circle at center, #000 0 24%, transparent 71%); opacity: .32; }
+    @keyframes welDrift { to { transform: rotate(360deg); } }
+    .wel-hud { position: absolute; inset: 0; opacity: 0; animation: welHudIn var(--wel-hud-in) ease-out forwards, welHudFade var(--wel-hud-out) var(--wel-hud-fade) ease-in forwards; }
+    @keyframes welHudIn { to { opacity: 1; } }
+    @keyframes welHudFade { to { opacity: 0; filter: blur(3px); visibility: hidden; } }
+    .wel-line { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--accent-rgb),.76) 19%, rgba(var(--accent-rgb),.76) 81%, transparent); transform: scaleX(0); animation: welLine var(--wel-line-in) cubic-bezier(.2,.9,.2,1) forwards; }
+    @keyframes welLine { to { transform: scaleX(1); } }
+    .wel-orbit { position: absolute; left: 50%; top: 50%; border: 1px solid rgba(var(--accent-rgb),.28); border-radius: 50%; transform: translate(-50%,-50%) scale(.72); opacity: 0; }
+    .wel-orbit-a { width: min(112vw,1440px); height: min(112vw,1440px); animation: welOrbitIn var(--wel-orbit-in) var(--wel-orbit-a) cubic-bezier(.15,.9,.2,1) forwards; }
+    .wel-orbit-b { width: min(80vw,1020px); height: min(80vw,1020px); border-style: dashed; animation: welOrbitIn var(--wel-orbit-in) var(--wel-orbit-b) cubic-bezier(.15,.9,.2,1) forwards, welSpin var(--wel-slow-spin) var(--wel-orbit-b) linear infinite; }
+    .wel-orbit-c { width: min(56vw,710px); height: min(56vw,710px); animation: welOrbitIn var(--wel-orbit-in) var(--wel-orbit-c) cubic-bezier(.15,.9,.2,1) forwards; }
+    @keyframes welOrbitIn { to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+    @keyframes welSpin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+    .wel-bracket { position: absolute; left: 50%; top: 50%; width: min(44vw,560px); height: min(25vw,320px); transform: translate(-50%,-50%); opacity: 0; animation: welHudIn var(--wel-bracket-in) var(--wel-bracket-at) ease-out forwards; }
+    .wel-bracket::before, .wel-bracket::after, .wel-bracket i::before, .wel-bracket i::after { content: ''; position: absolute; width: 72px; height: 72px; border-color: rgba(var(--accent-rgb),.9); border-style: solid; filter: drop-shadow(0 0 8px rgba(var(--accent-rgb),.32)); }
+    .wel-bracket::before { left: 0; top: 0; border-width: 2px 0 0 2px; }.wel-bracket::after { right: 0; bottom: 0; border-width: 0 2px 2px 0; }.wel-bracket i::before { right: 0; top: 0; border-width: 2px 2px 0 0; }.wel-bracket i::after { left: 0; bottom: 0; border-width: 0 0 2px 2px; }
+    .wel-reactor { position: absolute; z-index: 2; left: 50%; top: 50%; width: min(36vw,460px); height: min(36vw,460px); border-radius: 50%; opacity: 0; transform: translate(-50%,-50%) scale(.3); animation: welReactorIn var(--wel-reactor-in) var(--wel-reactor-at) cubic-bezier(.08,1.2,.32,1) forwards, welReactorOut var(--wel-reactor-out) var(--wel-takeover-at) ease-in forwards; }
+    @keyframes welReactorIn { to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+    @keyframes welReactorOut { to { opacity: 0; transform: translate(-50%,-50%) scale(.72); } }
+    .wel-reactor::before { content: ''; position: absolute; inset: 9%; border-radius: 50%; background: conic-gradient(from 220deg, transparent 0 21%, var(--accent) 22% 51%, transparent 52%); mask: radial-gradient(transparent 0 67%, #000 68% 77%, transparent 78%); filter: drop-shadow(0 0 15px var(--accent)); animation: welRotor var(--wel-rotor) var(--wel-rotor-at) linear 2 forwards; }
+    .wel-reactor::after { content: ''; position: absolute; inset: 29%; border-radius: 50%; border: 1px solid rgba(225,255,232,.76); background: radial-gradient(circle, rgba(235,255,241,1) 0 5%, var(--accent) 6% 16%, rgba(var(--accent-rgb),.24) 28%, rgba(5,20,10,.92) 69%); box-shadow: 0 0 22px rgba(var(--accent-rgb),.88), 0 0 92px rgba(var(--accent-rgb),.42), inset 0 0 32px rgba(var(--accent-rgb),.42); }
+    .wel-reactor i { position: absolute; inset: 0; display: block; border-radius: 50%; background: repeating-conic-gradient(from 12deg, rgba(218,255,229,.92) 0 1deg, transparent 1.2deg 6deg); mask: radial-gradient(transparent 0 66%, #000 67% 69%, transparent 70%); animation: welRotor var(--wel-rotor) var(--wel-rotor-at) linear 2 forwards; }
+    @keyframes welRotor { to { transform: rotate(720deg); } }
+    .wel-loaded { position: absolute; z-index: 3; left: 50%; top: calc(50% + min(24vw,300px)); transform: translate(-50%,8px); color: var(--wel-ink); white-space: nowrap; opacity: 0; font-size: clamp(10px,1vw,13px); letter-spacing: .28em; animation: welLoadedIn var(--wel-loaded-in) var(--wel-loaded-at) ease-out forwards, welLoadedOut var(--wel-loaded-out) var(--wel-takeover-at) ease-in forwards; }
+    .wel-loaded::before, .wel-loaded::after { content: ''; display: inline-block; vertical-align: middle; width: 42px; height: 1px; margin: 0 14px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+    @keyframes welLoadedIn { to { opacity: 1; transform: translate(-50%,0); } } @keyframes welLoadedOut { to { opacity: 0; transform: translate(-50%,-5px); } }
+    .wel-takeover { position: absolute; z-index: 4; left: 50%; top: 50%; width: min(36vw,460px); height: min(36vw,460px); border-radius: 50%; border: 2px solid rgba(var(--accent-rgb),.9); box-shadow: 0 0 18px var(--accent), 0 0 96px rgba(var(--accent-rgb),.55), inset 0 0 48px rgba(var(--accent-rgb),.38); transform: translate(-50%,-50%) scale(.6); opacity: 0; animation: welTakeover var(--wel-takeover-in) var(--wel-takeover-at) cubic-bezier(.16,.74,.17,1) forwards; }
+    @keyframes welTakeover { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.6); } 11% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-50%) scale(9); } }
+    @media (prefers-reduced-motion: reduce) { .wel *, .wel *::before, .wel *::after { animation: none !important; } .wel-hud { opacity: 0; } .wel-reactor, .wel-takeover, .wel-loaded { display: none; } .sidebar .nav-team-menu { transition: none; } }
 
-    .wel-ink   { stroke: var(--accent); fill: none; }
-    .wel-fill  { fill: var(--accent); }
-
-    /* the two rings turn in OPPOSITE directions — the counter-rotation is what
-       makes it read as an instrument rather than a spinner */
-    .wel-ticks { animation: welSpin var(--wel-spin-slow) linear infinite; transform-origin: 500px 500px; }
-    .wel-segs  { animation: welSpin var(--wel-spin-back) linear infinite reverse; transform-origin: 500px 500px; }
-    @keyframes welSpin { to { transform: rotate(360deg); } }
-
-    .wel-sweep { animation: welSpin var(--wel-sweep) linear infinite; transform-origin: 500px 500px; }
-
-    .wel-seg { opacity: 0; animation: welSegOn var(--wel-seg-on) ease-out forwards; }
-    @keyframes welSegOn { to { opacity: 1; } }
-
-    .wel-core { opacity: 0; animation: welFadeIn var(--wel-core-in) ease-out forwards; }
-    @keyframes welFadeIn { to { opacity: 1; } }
-
-    /* satellites pop in with a slight OVERSHOOT, staggered */
-    .wel-sat { opacity: 0; transform: scale(0.4); transform-box: fill-box; transform-origin: center;
-               animation: welPop var(--wel-sat-in) cubic-bezier(0.34, 1.8, 0.64, 1) forwards; }
-    @keyframes welPop { to { opacity: 1; transform: scale(1); } }
-
-    /* ⚠ THE WELCOME LOCKUP MUST BE THE SAME FACE AS THE LOGIN LOCKUP, so the
-       overlay carries the same @font-face as login.html. Same self-hosted file
-       (5.6KB), and the user ALWAYS arrives here THROUGH /login — so it is
-       already warm in cache and costs no request in practice.
-       ⚠ ONLY WEIGHT 700 EXISTS IN THIS FILE. Asking for 800 (which this overlay
-       did) makes the browser SYNTHESISE a heavier face, and a synthesised
-       weight measures differently from the real one — the faux-bold trap that
-       has produced wrong metrics twice on this project. */
-    /* ⚠⚠ THE ARCHIVO @font-face AND ITS FILE ARE DELETED (2026-08-21). The
-       file mapped only SPACE and "A", so this overlay's title had never drawn a
-       single letter in it — every glyph fell back to the system face. With the
-       title now an image there is nothing left for it to draw. */
-    /**
-     * ⚠⚠ SAIRA — SELF-HOSTED, AND SELF-HOSTING IS REQUIRED RATHER THAN PREFERRED.
-     * index.js sets `style-src 'self' 'unsafe-inline'` and `font-src 'self' data:`,
-     * so fonts.googleapis.com and fonts.gstatic.com are BOTH blocked. A CDN link
-     * here would fail silently and the page would render a fallback — which is
-     * exactly what login.html did with Montserrat for months.
-     *
-     * ⚠ ONE VARIABLE FILE, NOT STATIC CUTS. The site asks for weight 650 in five
-     * places, and 650 exists in no static cut set — it would be SYNTHESISED or
-     * snapped, which looks nearly right and is not. The variable file renders it
-     * for real. Both axes ship in the same 96.4 KB: wght 100-900, wdth 50-125.
-     *
-     * ⚠ format('woff2-variations') and the RANGE syntax on font-weight are what
-     * make the axes available; a single `font-weight: 400` here would collapse
-     * the file to one instance.
-     */
-    @font-face {
-      font-family: 'Saira';
-      font-style: normal;
-      font-weight: 100 900;
-      font-stretch: 50% 125%;
-      font-display: swap;
-      src: url('/fonts/saira-variable-latin.woff2') format('woff2-variations');
-    }
-    .wel-text { position: absolute; inset: 0; display: flex; flex-direction: column;
-                align-items: center; justify-content: center; text-align: center; pointer-events: none; }
-    /**
-     * ⚠⚠ nowrap + SIZED FROM THE WIDEST TRACKING IN THE ANIMATION, NOT THE
-     * RESTING ONE. Josh: the words start stacked and snap to one line.
-     *
-     * welSettle animates FROM letter-spacing: 0.7em down to --wel-track, so the
-     * WIDEST state is the FIRST frame. letter-spacing adds exactly
-     * tracking x charCount to the advance width, so for "SCOUT SYSTEMS" (13):
-     *
-     *     k(0.06em resting) =  8.98      k(0.7em start) = 17.30
-     *     at 68px:  611px wide resting,  1177px wide at the start
-     *     stage = min(92vw, 92vh) = 828px at 1440x900
-     *
-     * It therefore wrapped to two lines for the first part of the animation and
-     * reflowed to one the instant tracking fell below ~0.31em. That
-     * single-frame reflow IS the "glitch" — nothing was glitching, the text
-     * simply stopped needing two lines.
-     *
-     * ⚠ THE GENERAL RULE: WHEN A PROPERTY IS ANIMATED, THE CONSTRAINT MUST HOLD
-     * AT EVERY VALUE IT PASSES THROUGH, NOT JUST THE ENDPOINTS. Fitting at the
-     * destination is not fitting, and sizing from the resting tracking measures
-     * the one end of the range that cannot fail.
-     *
-     * 92vmin / 17.30 = 5.32vmin is the largest size that fits at the START, so
-     * 5.2vmin ships. The 68px cap only engages above a ~1308px vmin, where
-     * 92vmin already exceeds 68 x 17.30 = 1177px.
-     *
-     * ⚠ Only welSettle animates a layout property — every other keyframe here
-     * animates opacity and/or transform, which are composited and cannot
-     * reflow. Audited, not assumed.
-     */
-    .wel-kicker, .wel-title {
-      white-space: nowrap;
-      color: var(--accent); opacity: 0;
-      text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.55), 0 0 44px rgba(var(--accent-rgb), 0.25);
-      animation: welSettle var(--wel-text-in) cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .wel-kicker { font-size: clamp(11px, 1.5vw, 15px); font-weight: var(--fw-emphasis); text-transform: uppercase; }
-    /**
-     * ⚠⚠ SIZED FROM k AT THE WIDEST TRACKING, NOT THE RESTING ONE — the rule
-     * this page has broken four times. welSettle starts at letter-spacing 0.7em,
-     * so the FIRST frame is the widest, and the lockup makes the run MIXED:
-     * twelve glyphs plus one SVG occupying the O's advance.
-     *
-     *     k at 0.7em   Montserrat 700  17.829      Archivo Expanded  20.286
-     *     stage = min(92vw, 92vh) = 92vmin
-     *     92 / 20.286 = 4.53vmin  <- the WIDER face governs, so 4.5vmin ships
-     *
-     * The wider of the two candidate faces sets the coefficient, for the same
-     * reason the fallback face does on the login page: whichever renders, it
-     * must fit. Verified with scrollWidth vs clientWidth, because
-     * getBoundingClientRect on a block returns the clamped box and cannot see
-     * overflow at all.
-     */
-    /* ══ THE TITLE IS JUSTIN'S LOGO IMAGE (ruling, 2026-08-21) ═════════════
-       ⚠⚠ SIZED TO REPRODUCE THE OLD RESTING WIDTH, NOT PICKED. The text title
-       rendered `min(4.5vmin,68px)` at 0.06em tracking, which measured k=9.372
-       wide on the face that actually drew — 328px at a 779px vmin. So:
-
-           9.372 x min(4.5vmin, 68px)  =  min(42vmin, 637px)
-
-       The overlay therefore looks the same size as the one Justin approved; the
-       coefficient is the measured k, not a number chosen to taste.
-
-       ⚠⚠ AND THE OLD TIGHT-FIT RISK IS STRUCTURALLY GONE, not merely improved.
-       The text was 620px at its WIDEST animation frame against a 92vmin stage —
-       a 13.5% margin, and only 1.2% had the declared font ever drawn. An image
-       does not track, so its width is a constant 42vmin against a 92vmin stage:
-       it cannot overflow at any viewport, by construction rather than by
-       measurement. (Measured anyway — see the findings.) */
-    /* ⚠ the glow the retired PNG carried baked-in is now the shared filter — one line to drop (H695) */
-    .wel-title  { margin-top: 8px; width: min(42vmin, 637px); height: auto; filter: var(--wordmark-glow);
-                  display: block; }
-    /* ⚠⚠ THE SAME DERIVED CHAIN AS THE LOGIN LOCKUP, COPIED VERBATIM — not
-       re-derived by eye. The old values here (0.844 / 0.700 / 0.0873) were
-       MONTSERRAT's, kept from before the face changed, so the glyph was sized
-       for a font this overlay no longer renders.
-
-       ⚠ THE STROKE IS IN viewBox UNITS, SO IT IS A FUNCTION OF THE BOX — which
-       is exactly why the same 1.3285 is correct at BOTH sizes. Login: 6px at a
-       104px title. Here: min(4.5vmin, 68px), so ~2.3px at 1440x900 and 3.9px at
-       the 68px cap. Same 5.8% of the title either way. Matching the SPEC means
-       matching the ratio, not copying the pixel count into a smaller box. */
-    /* ⚠ .wel-o AND ITS WHOLE DERIVED CHAIN ARE GONE (2026-08-21) — --cap-em,
-       --o-adv-em, --mark-stroke(-px), --ring-path-span, --ring-ink-span,
-       --vb-height, --vb-drop, --o-box-em, --o-drop-em, --dot-1/2/3. They sized
-       an inline SVG "O" inside a TEXT title; the title is now one image with
-       the mark already in it. Deleted rather than left pointing at nothing —
-       and --cap-em in particular held a value measured on the WRONG FACE. */
-    /* both settle IN from wide tracking as they fade up */
-    @keyframes welSettle {
-      from { opacity: 0; letter-spacing: 0.7em; }
-      to   { opacity: 1; letter-spacing: var(--wel-track); }
-    }
-
-    /* ⚠ REDUCED MOTION GETS A PLAIN FADE, NOT A FASTER SEQUENCE. Nothing spins,
-       nothing pops, nothing sweeps — the ring is simply drawn and the whole
-       thing fades away. */
-    @media (prefers-reduced-motion: reduce) {
-      .wel-ticks, .wel-segs, .wel-sweep { animation: none; }
-      .wel-seg, .wel-core, .wel-sat { opacity: 1; animation: none; transform: none; }
-      .wel-kicker, .wel-title { opacity: 1; animation: none; letter-spacing: var(--wel-track); }
-      .wel-out { animation: welFadeOut var(--wel-swipe) ease-out forwards; }
-      @keyframes welFadeOut { to { opacity: 0; } }
-      .sidebar .nav-team-menu { transition: none; }
-    }
 
     /* ── the objection drilldown grid ────────────────────────────────────── */
     /* The drilldown's controls, inside the card rather than in a strip above it. */
@@ -8052,46 +7913,34 @@
    * stylesheet holds no timing numbers of its own.
    */
   var WELCOME_TIMING = {
-    coreIn:      420,   // the central dial fades up
-    segStep:      26,   // gap between one arc block lighting and the next
-    segOn:       200,   // how long a single block takes to light
-    satFirst:    340,   // first satellite starts
-    satStagger:  110,   // and each one after it
-    satIn:       520,   // satellite pop, with overshoot
-    textAt:      900,   // "WELCOME TO" begins settling in
-    titleAt:    1120,   // "SCOUT SYSTEMS" follows
-    textIn:      760,   // how long the letter-spacing settles
-    hold:        500,   // beat after everything has arrived
-    swipe:       620,   // the overlay leaves
-    spinSlow:  38000,   // tick ring, one direction
-    spinBack:  26000,   // segmented ring, the other
-    sweep:      2600,   // radar line
-    /**
-     * ⚠⚠ THE CEILING ON WAITING FOR THE DASHBOARD — THIS IS HOW THE "NEVER
-     * WAIT" PROHIBITION STANDS, NOT AN EXCEPTION TO IT.
-     *
-     * Justin's ruling (2026-08-18): hold until the dashboard is ready OR until
-     * a ceiling, whichever comes FIRST, then swipe regardless. That absorbs a
-     * normal load without ever becoming a dependency — a slow day makes the
-     * animation longer, never infinite.
-     *
-     * DERIVED FROM MEASUREMENT, not chosen. Measured against production:
-     * network+container floor 150-410ms per request; the /dashboard document
-     * 210-690ms; and the coaching boot fires its three lanes through ONE
-     * Promise.all, so boot is the SLOWEST lane, not their sum. Against a base
-     * sequence of 2380ms the data almost always lands before the swipe, so
-     * this cap should rarely engage at all — it exists for the slow day.
-     * 1200ms keeps the worst case at ~3.6s, which is still an intro rather
-     * than a wait.
-     *
-     * ⚠ THE CAP IS NOT A TARGET. Reaching it means the hold EXPIRED and we
-     * swiped onto an unfinished page — which is the correct outcome, not a
-     * failure. The watchdog (6000) still outlasts base + cap by a clear
-     * margin, so the ultimate backstop is untouched.
-     */
-    holdCap:    1200,
-    holdPoll:    100,   // how often the hold re-checks readiness
-    watchdog:   6000,   // ⚠ hard removal, whatever else happens
+    // One timing source for the complete visor sequence.
+    hudIn:        900,
+    lineIn:       900,
+    orbitIn:     1050,
+    orbitA:       300,
+    orbitB:       700,
+    orbitC:      1100,
+    bracketIn:    600,
+    bracketAt:   1650,
+    hudFade:     4300,
+    hudOut:       650,
+    reactorAt:   4100,
+    reactorIn:    800,
+    rotorAt:     4900,
+    rotor:       1250,
+    loadedAt:    6100,
+    loadedIn:     360,
+    loadedOut:    240,
+    takeoverAt:  6750,
+    takeoverIn:   820,
+    reactorOut:   320,
+    hold:         200,
+    swipe:        620,
+    drift:      42000,
+    slowSpin:   28000,
+    holdCap:     1000,
+    holdPoll:     100,
+    watchdog:    9800
   };
 
   /**
@@ -8127,76 +7976,14 @@
   }
 
   function welcomeOverlayHtml() {
-    var T = WELCOME_TIMING;
-    var C = 500;
-
-    // fine tick ring — 96 ticks, every 6th longer
-    var ticks = '';
-    for (var i = 0; i < 96; i++) {
-      var deg = i * (360 / 96);
-      var long = (i % 6 === 0);
-      var p0 = welPoint(C, C, long ? 392 : 400, deg);
-      var p1 = welPoint(C, C, 412, deg);
-      ticks += '<line x1="' + p0.x.toFixed(1) + '" y1="' + p0.y.toFixed(1)
-        + '" x2="' + p1.x.toFixed(1) + '" y2="' + p1.y.toFixed(1)
-        + '" stroke-width="' + (long ? 3 : 1.4) + '" opacity="' + (long ? 0.85 : 0.4) + '"/>';
-    }
-
-    // radial spokes
-    var spokes = '';
-    for (var s = 0; s < 12; s++) {
-      var sd = s * 30;
-      var a0 = welPoint(C, C, 150, sd), a1 = welPoint(C, C, 300, sd);
-      spokes += '<line x1="' + a0.x.toFixed(1) + '" y1="' + a0.y.toFixed(1)
-        + '" x2="' + a1.x.toFixed(1) + '" y2="' + a1.y.toFixed(1)
-        + '" stroke-width="1.2" opacity="0.28"/>';
-    }
-
-    // the radar sweep: a wedge that fades along its length
-    var sweepEnd = welPoint(C, C, 360, 0);
-    var sweep = '<g class="wel-sweep">'
-      + '<line x1="' + C + '" y1="' + C + '" x2="' + sweepEnd.x.toFixed(1) + '" y2="' + sweepEnd.y.toFixed(1)
-      + '" stroke="url(#welSweepGrad)" stroke-width="3"/>'
-      + '<path d="' + welArc(C, C, 360, -26, 0) + ' L ' + C + ' ' + C + ' Z" fill="url(#welSweepFan)" stroke="none"/>'
-      + '</g>';
-
-    var svg = '<svg class="wel-svg" viewBox="0 0 1000 1000" aria-hidden="true">'
-      + '<defs>'
-      + '<linearGradient id="welSweepGrad" x1="0" y1="1" x2="0" y2="0">'
-        + '<stop offset="0" stop-color="var(--accent)" stop-opacity="0"/>'
-        + '<stop offset="1" stop-color="var(--accent)" stop-opacity="0.95"/></linearGradient>'
-      + '<radialGradient id="welSweepFan">'
-        + '<stop offset="0" stop-color="var(--accent)" stop-opacity="0.22"/>'
-        + '<stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></radialGradient>'
-      + '</defs>'
-      + '<g class="wel-core wel-ink" style="animation-delay:0ms">'
-        + '<g class="wel-ticks">' + ticks + '</g>'
-        + '<g>' + spokes + '</g>'
-        + '<circle cx="' + C + '" cy="' + C + '" r="300" stroke-width="1.5" opacity="0.5"/>'
-        + '<circle cx="' + C + '" cy="' + C + '" r="150" stroke-width="1.5" opacity="0.7"/>'
-        + sweep
-      + '</g>'
-      // the segmented arc, lighting block by block, turning the other way
-      + '<g class="wel-segs wel-ink" stroke-width="14" stroke-linecap="butt">'
-        + welSegments(C, C, 348, 40, 360, 0, 'wel-seg', T.coreIn, T.segStep)
-      + '</g>'
-      // four satellites, partial arcs, staggered pops
-      + [[170, 170], [830, 170], [170, 830], [830, 830]].map(function (p, i) {
-          return '<g class="wel-sat wel-ink" stroke-width="7" style="animation-delay:'
-            + (T.satFirst + i * T.satStagger) + 'ms">'
-            + welSegments(p[0], p[1], 84, 11, 260, 40 + i * 25, 'wel-satseg', 0, 0)
-            + '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="26" stroke-width="2" opacity="0.65"/>'
-            + '<circle class="wel-fill" cx="' + p[0] + '" cy="' + p[1] + '" r="5" stroke="none"/>'
-            + '</g>';
-        }).join('')
-      + '</svg>';
-
     return '<div class="wel" id="welcomeOverlay" role="presentation">'
-      + '<div class="wel-stage">' + svg
-        + '<div class="wel-text">'
-          + '<div class="wel-kicker" style="--wel-track:0.42em;animation-delay:' + T.textAt + 'ms">Welcome to</div>'
-          + '<img class="wel-title" src="/scout-wordmark.svg" alt="Scout Systems" width="1090" height="170" style="animation-delay:' + T.titleAt + 'ms">'
-        + '</div>'
+      + '<div class="wel-field">'
+      + '<div class="wel-hud"><div class="wel-line"></div>'
+      + '<i class="wel-orbit wel-orbit-a"></i><i class="wel-orbit wel-orbit-b"></i><i class="wel-orbit wel-orbit-c"></i>'
+      + '<div class="wel-bracket"><i></i></div></div>'
+      + '<div class="wel-reactor"><i></i></div>'
+      + '<div class="wel-loaded">SCOUT SYSTEMS LOADED</div>'
+      + '<div class="wel-takeover"></div>'
       + '</div></div>';
   }
 
@@ -8245,15 +8032,13 @@
       host.innerHTML = welcomeOverlayHtml();
       node = host.firstChild;
 
-      // Every timing value reaches CSS from the one object above.
-      node.style.setProperty('--wel-core-in', T.coreIn + 'ms');
-      node.style.setProperty('--wel-seg-on', T.segOn + 'ms');
-      node.style.setProperty('--wel-sat-in', T.satIn + 'ms');
-      node.style.setProperty('--wel-text-in', T.textIn + 'ms');
+      // Every timing value reaches CSS from this one object.
+      Object.keys(T).forEach(function (key) {
+        if (key === 'hold' || key === 'holdCap' || key === 'holdPoll' || key === 'watchdog') return;
+        var cssKey = '--wel-' + key.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); });
+        node.style.setProperty(cssKey, T[key] + 'ms');
+      });
       node.style.setProperty('--wel-swipe', T.swipe + 'ms');
-      node.style.setProperty('--wel-spin-slow', T.spinSlow + 'ms');
-      node.style.setProperty('--wel-spin-back', T.spinBack + 'ms');
-      node.style.setProperty('--wel-sweep', T.sweep + 'ms');
 
       document.body.appendChild(node);
       // ⚠ HANDOFF, NOT REMOVAL-THEN-MOUNT. The overlay is in the DOM and sits
@@ -8278,7 +8063,7 @@
 
       var runFor = reduced
         ? T.hold
-        : (T.titleAt + T.textIn + T.hold);
+        : (T.takeoverAt + T.takeoverIn + T.hold);
 
       /**
        * ⚠⚠ THE HOLD — AND IT IS A CAP, NOT AN EXCEPTION TO THE NO-WAIT RULE.

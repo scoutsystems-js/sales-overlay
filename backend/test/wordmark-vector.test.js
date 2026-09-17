@@ -29,18 +29,16 @@ test('⚠ the repo carries the METADATA-STRIPPED outlines — one path, the toke
   }
 });
 
-test('⚠⚠ all four surfaces load the ONE vector with its intrinsic size, and nothing loads the retired PNG', () => {
+test('⚠⚠ the three persistent brand surfaces load the ONE vector, and nothing loads the retired PNG', () => {
   const dash = read('dashboard.html');
-  const four = [['nav', dash, /<img class="brand-wordmark" src="\/scout-wordmark\.svg" alt="Scout Systems" width="1090" height="170">/],
-    ['welcome overlay', dash, /<img class="wel-title" src="\/scout-wordmark\.svg" alt="Scout Systems" width="1090" height="170"/],
+  const surfaces = [['nav', dash, /<img class="brand-wordmark" src="\/scout-wordmark\.svg" alt="Scout Systems" width="1090" height="170">/],
     ['login', read('login.html'), /<img class="brand-img" src="\/scout-wordmark\.svg"\s+alt="Scout Systems" width="1090" height="170"/],
     ['set-password', read('set-password.html'), /<img class="brand-img" src="\/scout-wordmark\.svg"\s+alt="Scout Systems" width="1090" height="170"/]];
-  for (const [name, src, re] of four) assert.ok(re.test(src), name + ' must load the vector at its intrinsic size');
+  for (const [name, src, re] of surfaces) assert.ok(re.test(src), name + ' must load the vector at its intrinsic size');
   for (const f of fs.readdirSync(WEB).filter((x) => x.endsWith('.html') && !/archived/.test(x))) assert.ok(!/scout-wordmark\.png/.test(read(f)), f + ' still names the retired PNG');
   assert.ok(!fs.existsSync(path.join(WEB, 'scout-wordmark.png')), 'the PNG is gone');
-  // the glow rides on the three surfaces that had it baked in, never the nav
+  // The full-screen HUD intentionally uses its own loaded lockup. Persistent auth surfaces retain the wordmark glow; nav stays clean.
   const css = stripComments(dash);
-  assert.ok(/\.wel-title\s*\{[^}]*filter: var\(--wordmark-glow\)/.test(css), 'the overlay carries the glow filter');
   assert.ok(!/\.brand-wordmark\s*\{[^}]*filter/.test(css), 'the nav carries NO glow');
   assert.ok(/filter: var\(--wordmark-glow\)/.test(stripComments(read('login.html'))) && /filter: var\(--wordmark-glow\)/.test(stripComments(read('set-password.html'))), 'login and set-password carry the glow filter');
 });
