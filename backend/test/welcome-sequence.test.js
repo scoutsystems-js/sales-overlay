@@ -32,25 +32,35 @@ test('Core Takeover has the approved HUD, reactor, loaded status, and expanding 
 });
 
 test('all motion timing comes from one configuration object', () => {
-  ['hudIn','lineIn','orbitIn','orbitA','orbitB','orbitC','bracketIn','bracketAt','hudFade','hudOut','reactorAt','reactorIn','rotorAt','rotor','loadedAt','loadedIn','loadedOut','takeoverAt','takeoverIn','reactorOut','hold','swipe','drift','slowSpin','holdCap','holdPoll','watchdog'].forEach((key) => assert.ok(new RegExp(key + ':\\s*\\d+').test(CONFIG), key));
+  ['hudIn','lineIn','lineAt','orbitIn','orbitA','orbitB','orbitC','bracketIn','bracketAt','readoutIn','readoutLeftAt','readoutRightAt','scanIn','scanAt','targetIn','targetA','targetB','targetC','targetOut','targetOutAt','threadIn','threadAt','apertureIn','apertureAt','apertureOut','apertureOutAt','apertureShutter','apertureShutterAt','hudFade','hudOut','reactorAt','reactorIn','rotorAt','rotor','loadedAt','loadedIn','loadedOut','takeoverAt','takeoverIn','reactorOut','flashIn','flashAt','hold','swipe','drift','slowSpin','watchdog'].forEach((key) => assert.ok(new RegExp(key + ':\\s*\\d+').test(CONFIG), key));
   const cssStart = LIVE.indexOf('.wel {');
   const css = LIVE.slice(cssStart, LIVE.indexOf('.objdrill-controls', cssStart));
   assert.deepStrictEqual(css.match(/animation:[^;]*?\b\d+m?s\b/g) || [], [], 'CSS may only use timing variables');
   assert.ok(/Object\.keys\(T\)/.test(LIVE), 'configuration must be pushed to CSS programmatically');
 });
 
-test('the watchdog outlasts the visual sequence and bounded readiness hold', () => {
-  const maximum = timing('takeoverAt') + timing('takeoverIn') + timing('hold') + timing('holdCap') + timing('swipe');
+test('the watchdog outlasts the visual sequence', () => {
+  const maximum = timing('takeoverAt') + timing('takeoverIn') + timing('swipe');
   assert.ok(timing('watchdog') > maximum, 'watchdog must outlast all normal paths');
   assert.ok(timing('watchdog') < 12000, 'watchdog must still be short');
 });
 
-test('readiness wait stays bounded and cannot await data', () => {
-  const at = LIVE.indexOf('var waitedFrom = null;');
-  const body = LIVE.slice(at, LIVE.indexOf('setTimeout(tick, runFor);', at));
-  assert.match(body, /welcomeDashboardReady \|\| expired/);
-  assert.match(body, /holdCap/);
-  assert.doesNotMatch(body, /await/);
+test('the visual reveal never waits for dashboard data', () => {
+  const at = LIVE.indexOf('var runFor = reduced');
+  const end = LIVE.indexOf('setTimeout(function () { welcomeDismiss(node, true); cleanup(); }, T.watchdog);', at);
+  const body = LIVE.slice(at, end);
+  assert.match(body, /takeoverAt \+ T\.takeoverIn/);
+  assert.match(body, /welcomeDismiss\(node\)/);
+  assert.doesNotMatch(body, /welcomeDashboardReady|await|holdCap|holdPoll/);
+});
+
+test('Core Takeover restores the scan, target locks, aperture, and reactor scale from the approved mock', () => {
+  const at = LIVE.indexOf('function welcomeOverlayHtml');
+  const renderer = LIVE.slice(at, LIVE.indexOf('function welcomeDismiss', at));
+  ['wel-readout', 'wel-scan', 'wel-target-a', 'wel-thread', 'wel-aperture', 'wel-flash'].forEach((part) => assert.ok(renderer.includes(part), part));
+  const css = LIVE.slice(LIVE.indexOf('.wel {'), LIVE.indexOf('.objdrill-controls'));
+  assert.match(css, /width: min\(27vw,330px\)/);
+  assert.match(css, /welBackdropReveal/);
 });
 
 test('skip is immediate and dismissal is idempotent', () => {
