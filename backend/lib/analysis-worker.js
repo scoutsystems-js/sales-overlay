@@ -86,6 +86,8 @@ const { labelForQuote, locateQuoteSpeaker } = require('./quote-locate');
 // H719: the capture of causes — the closer's arc behind a buying signal and the
 // disclosure tier. The vocabulary, the guard and the prompt block live THERE.
 const arcCause = require('./arc-cause');
+const objectionSequence = require('./objection-coaching-sequence');
+const stageCoachingEvidence = require('./stage-coaching-evidence');
 // H721: the selectivity bar — a moment needs a reason to exist. Forward only; never a delete.
 const momentBar = require('./moment-bar');
 // 7c: the rep's own discovery areas (cached on their material hash).
@@ -161,7 +163,7 @@ const VALID_PAYMENT_STRUCTURES = require('./sales-constants').PAYMENT_STRUCTURES
 //      per-structure cash rules; (b) payment_structure field (closed-only);
 //      (c) eod_summary — first-person closer-voice EOD report summary
 //      (coaching's overall_summary untouched). Never-fabricate unchanged.
-const ANALYSIS_PROMPT_VERSION = 'v62-2026-09-11'; // v62 (Block 006): Justin's authoritative stage definitions — price and the FIRST ask are Pitch; re-asks inside the objection loop are Objection Handling; Close is the commitment and the transaction, never the end of the call or the follow-up booking; stages interleave. Definitions printed from stage-eligibility.STAGE_DEFINITIONS. // v61 (H768): a genuine financial DQ makes Objection Handling and Close not_applicable whenever discovered — one miss, coached once, in Discovery; enforced in the validator (stage-eligibility-v18), stated here so the reasons agree with the states.
+const ANALYSIS_PROMPT_VERSION = 'v64-2026-09-18'; // v64: Discovery, Pitch and Close now preserve their own verified evidence exchanges; objection handling keeps its separate isolation sequence. Evidence only; no score, rate or outcome changes, and no re-analysis.
 // v60 (2026-09-08) was: // v60: the partner objection is positional, never tonal (a post-price deferral to a person whose agreement is needed is an objection however agreeable it sounds); a pre-price concern answered well is credited to the stage where it happened. v59: the doctrine'''s stage entries read from the file at build time (the v58 hand copy deleted where the file supplies it; the record carries the doctrine hash); a prospect asking the price makes a decision due unless a located blocker; evidence strongest first with the count in the schema. v58: the stage rules the offline candidate and reviewer prompts carried, ported into the grader as prompt text (work not due is not_applicable, a score never means absent; the opening judged when the conversation starts, H762; logistics and inability are not objections). v57: the evidence bounds stated once for stage records (1-4) and context facts (unbounded), from the validator's own constants; a bad context field withholds only the stages that read it. v56: the normal grader is the sole source for validated five-stage eligibility and canonical A+–F scores. v55: unambiguous call-ending wording. v54: exact action/answer records instead of prior interpretations. v53: sentence-by-sentence evidence review. v52: one compact coaching brief, 45–65 word target. v51: scope/length preflight and original review IDs. v50: observed continuation without invented causation.
 // THE DOCTRINE PIN (cutover Stage B, 2026-09-08): the grader prompt embeds backend/doctrine/scout-doctrine.md at build
 // time, so a doctrine edit is a prompt change. test/doctrine-version-pin.test.js fails when the file no longer matches
@@ -939,6 +941,10 @@ function buildHighlightExtractorPrompt(normalized) {
     '',
     arcCause.disclosurePromptBlock(),
     '',
+    objectionSequence.promptBlock(),
+    '',
+    stageCoachingEvidence.promptBlock(),
+    '',
     'Order moments chronologically (earliest first).',
     '',
     momentBar.barPromptRule(),   // H721 — replaces the old "quality gate" sentence, which the model read as a quota (6.1 per call in both eras)
@@ -1221,6 +1227,8 @@ function sanitizeHighlights(arr, durationSeconds) {
          not offered, which is a different fact from `none`). */
       cause:              (type === 'buying_signal') ? arcCause.sanitizeCause(h.cause) : null,
       disclosure_handling: (speaker === 'PROSPECT') ? arcCause.sanitizeDisclosure(h.disclosure_handling) : null,
+      coaching_sequence:  (type === 'objection') ? objectionSequence.sanitize(h.coaching_sequence) : null,
+      coaching_evidence:  (type !== 'objection') ? stageCoachingEvidence.sanitize(h.coaching_evidence, sanitizeSectionValue(h.section)) : null,
       sequence_order:     out.length + 1,
     });
   }
@@ -1237,6 +1245,8 @@ function attachArcFields(highlights, turns, speakerConfidence) {
   var matched = speakerConfidence === 'matched';
   var locate = matched ? labelForQuote : function () { return null; };
   var stats = { moves: 0, none: 0, refused: 0, tiers: 0, tiers_refused: 0 };
+  var capturedSequence = false;
+  var capturedStage = {};
   var out = (Array.isArray(highlights) ? highlights : []).map(function (h) {
     var c = Object.assign({}, h);
     if (c.cause) {
@@ -1246,6 +1256,31 @@ function attachArcFields(highlights, turns, speakerConfidence) {
     if (c.disclosure_handling) {
       c.disclosure_handling = arcCause.verifyDisclosure(c.disclosure_handling, turns, c.timestamp_seconds, locate);
       if (c.disclosure_handling && c.disclosure_handling.refused) stats.tiers_refused++; else if (c.disclosure_handling) stats.tiers++;
+    }
+    if (c.coaching_sequence) {
+      // One verified sequence is enough for a call. A second one adds output
+      // weight but not a new evidence shape, so it is deliberately withheld.
+      var locateSequence = matched ? function (allTurns, quote) {
+        var exact = String(quote || '').trim();
+        var hits = (Array.isArray(allTurns) ? allTurns : []).map(function (turn, index) {
+          return turn && turn.text && String(turn.text).includes(exact) ? { index: index + 1, speaker: turn.speaker } : null;
+        }).filter(Boolean);
+        return hits.length === 1 ? hits[0] : null;
+      } : function () { return null; };
+      c.coaching_sequence = capturedSequence ? null : objectionSequence.verify(c.coaching_sequence, turns, locateSequence);
+      if (c.coaching_sequence) capturedSequence = true;
+    }
+    if (c.coaching_evidence) {
+      var stage = c.section;
+      var locateStage = matched ? function (allTurns, quote) {
+        var exact = String(quote || '').trim();
+        var hits = (Array.isArray(allTurns) ? allTurns : []).map(function (turn, index) {
+          return turn && turn.text && String(turn.text).includes(exact) ? { index: index + 1, speaker: turn.speaker } : null;
+        }).filter(Boolean);
+        return hits.length === 1 ? hits[0] : null;
+      } : function () { return null; };
+      c.coaching_evidence = capturedStage[stage] ? null : stageCoachingEvidence.verify(c.coaching_evidence, stage, turns, locateStage);
+      if (c.coaching_evidence) capturedStage[stage] = true;
     }
     return c;
   });

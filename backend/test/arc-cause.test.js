@@ -191,9 +191,9 @@ test('persistHighlights writes the two columns (executed against a fake wire)', 
   assert.ok('disclosure_handling' in written[0]);
 });
 
-test('v41: the prompt lists the sixteen moves (derived, not typed twice), the version is bumped, the cap is 4500', () => {
+test('the extractor preserves its arc fields and adds the verified coaching-evidence contracts', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'analysis-worker.js'), 'utf8');
-  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v62-2026-09-11'/);
+  assert.match(src, /ANALYSIS_PROMPT_VERSION = 'v64-2026-09-18'/);
   assert.match(src, /HIGHLIGHT_MAX_TOK\s*=\s*4500/);
   const prompt = W._buildHighlightExtractorPrompt({ turns: TURNS, speaker_confidence: 'matched' });
   arc.ALL_MOVES.forEach((m) => assert.ok(prompt.indexOf(m) !== -1, 'prompt lacks ' + m));
@@ -201,6 +201,8 @@ test('v41: the prompt lists the sixteen moves (derived, not typed twice), the ve
   assert.ok(/banked_and_used/.test(prompt));
   assert.ok(prompt.indexOf(arc.causePromptBlock()) !== -1, 'the prompt block is the lib\'s, not a copy');
   assert.ok(prompt.indexOf(arc.disclosurePromptBlock()) !== -1, 'the disclosure block is the lib\'s, not a copy');
+  assert.match(prompt, /coaching_sequence/);
+  assert.match(prompt, /coaching_evidence/);
 });
 
 // ── the harvest and the KB row ─────────────────────────────────────────────
