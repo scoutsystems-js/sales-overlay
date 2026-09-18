@@ -2,6 +2,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const synthesis = require('../lib/objection-synthesis');
 
+test('fear practice makes the closer isolate before offering a payment solution', () => {
+  const prompt = synthesis._buildSynthPrompt(
+    ['fear'],
+    { fear: { count: 1, handled: 1, examples: [], closedExamples: [{ surface: 'I cannot afford it.', closer_response: 'We can work with that.' }] } },
+    {},
+  );
+
+  assert.match(prompt, /Fear practice: first isolate whether the stated concern is the real blocker/i);
+  assert.match(prompt, /Do not recommend a payment plan, BNPL, price change, or other solution before that isolation/i);
+});
+
 test('worked coaching summary is retained only when an explicitly handled example supports it', () => {
   const result = synthesis._mergeGuidance(
     ['fear'],

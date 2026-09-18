@@ -58,7 +58,7 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v6-2026-09-18-closed-review-example';
+var SYNTH_PROMPT_VERSION = 'v7-2026-09-18-fear-isolate-first';
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
@@ -69,6 +69,7 @@ function buildSynthPrompt(present, byCat, material) {
     'Each of isolate/reframe/overcome must be 1-2 concrete sentences. No fluff, no cheerleading.',
     'For a category with handled examples, also write what_worked: one short sentence describing the repeatable move the closer used successfully. Ground it only in those handled examples and the team material, not a transcript fragment or generic advice. If there are no handled examples, return null for what_worked.',
     'For a category with a CLOSED HANDLED REVIEW EXAMPLE, also write practice: one direct sentence telling the closer what to practice. Ground it only in that closed handled example and the team material. If there is no closed handled review example, return null for practice.',
+    'Fear practice: first isolate whether the stated concern is the real blocker. Do not recommend a payment plan, BNPL, price change, or other solution before that isolation. Only after it is the real blocker may the sentence name the response that worked in the review call.',
     '',
     'Note: money-phrased objections ("too expensive", "can\'t afford it") are categorized as "fear" in this domain.',
     '',
