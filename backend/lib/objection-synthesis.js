@@ -58,7 +58,7 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v5-2026-09-17-worked-move';
+var SYNTH_PROMPT_VERSION = 'v6-2026-09-18-closed-review-example';
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
@@ -68,6 +68,7 @@ function buildSynthPrompt(present, byCat, material) {
     'Where HANDLED examples (the closer\'s own words) are provided, GROUND your advice in what THEY actually did — build on their real approach, do not invent. Where none are provided, use only the saved team material; if it does not speak to the category, return null rather than generic advice.',
     'Each of isolate/reframe/overcome must be 1-2 concrete sentences. No fluff, no cheerleading.',
     'For a category with handled examples, also write what_worked: one short sentence describing the repeatable move the closer used successfully. Ground it only in those handled examples and the team material, not a transcript fragment or generic advice. If there are no handled examples, return null for what_worked.',
+    'For a category with a CLOSED HANDLED REVIEW EXAMPLE, also write practice: one direct sentence telling the closer what to practice. Ground it only in that closed handled example and the team material. If there is no closed handled review example, return null for practice.',
     '',
     'Note: money-phrased objections ("too expensive", "can\'t afford it") are categorized as "fear" in this domain.',
     '',
@@ -86,13 +87,18 @@ function buildSynthPrompt(present, byCat, material) {
          speaks to it gets NO advice — the fields come back null and the surface says so. */
       lines.push('  (no handled examples in this window — if the TEAM MATERIAL below speaks to this category, coach from it and say so; if it does not, return null for isolate, reframe and overcome — never general best practice)');
     }
+    if (b.closedExamples && b.closedExamples.length) {
+      var review = b.closedExamples[0];
+      lines.push('  CLOSED HANDLED REVIEW EXAMPLE (the objection was explicitly handled and this same call closed):');
+      lines.push('    - prospect said "' + (review.surface || review.quote || '').slice(0, 80) + '" → closer responded: "' + (review.closer_response || '').slice(0, 320) + '"');
+    }
   });
   lines.push('');
   if (material && material.doctrineBlock) { var dblock = material.doctrineBlock('objection-synthesis'); if (dblock) { lines.push(dblock); lines.push(''); } }   // H732
   if (material && material.contextText) { lines.push('TEAM MATERIAL (this closer\'s offer, qualifications and approach — ground every sentence in it):'); lines.push(material.contextText.trim()); lines.push(''); }
   if (material && material.notes && material.notes.text) { lines.push(require('./coaching-corrections').promptLane(material.notes.text)); lines.push(''); }
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
-  lines.push('{"categories":[{"category":"fear","isolate":"...","reframe":"...","overcome":"...","what_worked":"... or null"}]}');
+  lines.push('{"categories":[{"category":"fear","isolate":"...","reframe":"...","overcome":"...","what_worked":"... or null","practice":"... or null"}]}');
   return lines.join('\n');
 }
 
@@ -100,6 +106,7 @@ function mergeGuidance(present, byCat, guide, lossScope) {
   return present.map(function(c) {
     var bucket = byCat[c], guidance = guide[c] || {};
     var hasHandledExample = bucket.examples.length > 0;
+    var reviewExample = bucket.closedExamples && bucket.closedExamples.length ? bucket.closedExamples[0] : null;
     return {
       category: c, count: bucket.count, handled: bucket.handled, grounded: hasHandledExample,
       isolate: require('./doctrine').enforceLossRule(str(guidance.isolate, 500), lossScope, null, 'objection-synthesis'),
@@ -109,6 +116,10 @@ function mergeGuidance(present, byCat, guide, lossScope) {
       what_worked: hasHandledExample
         ? require('./doctrine').enforceLossRule(str(guidance.what_worked, 500), lossScope, null, 'objection-synthesis')
         : null,
+      practice: reviewExample
+        ? require('./doctrine').enforceLossRule(str(guidance.practice, 220), lossScope, null, 'objection-synthesis')
+        : null,
+      review_example: reviewExample,
       evidence: bucket.examples.slice(0, 2),
     };
   });
@@ -119,7 +130,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
     var cq = await admin.from('fathom_calls')
-      .select('id, recording_url, call_date, source')
+      .select('id, title, recording_url, call_date, source')
       .eq('user_id', userId).gte('call_date', from).lte('call_date', to)
       .not('not_a_sales_call', 'is', true)
       .is('duplicate_of', null)
@@ -150,8 +161,10 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   // 2) done analyses → analysis_set_hash (cache invalidation).
   // `outcome` added 2026-08-17: an objection on a closed call counts as handled.
   // Same select, one more column — no extra query.
-  var done = await inChunks('call_analyses', 'fathom_call_id, analyzed_at, outcome', function(q) { return q.eq('status', 'done'); });
+  var done = await inChunks('call_analyses', 'fathom_call_id, analyzed_at, outcome, prospect_name', function(q) { return q.eq('status', 'done'); });
   var outcomeByCall = outcomeMap(done);
+  var analysisByCall = {};
+  done.forEach(function(d) { analysisByCall[d.fathom_call_id] = d; });
   var hashInput = done.map(function(d) { return d.fathom_call_id + ':' + d.analyzed_at; }).sort().join('|');
   /* H731: the material rides the hash — a profile edit or a new note regenerates; the version too. */
   var material = await require('./kb-material').loadKbMaterial(admin, { userId: userId, lane: 'objection-synthesis', maxChars: 2500 });
@@ -176,7 +189,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   var lossScope = require('./doctrine').lossScope(done, rows);   // H733: which of this closer's calls carry a disqualification
   rows = rows.filter(function (r) { return r.type === 'objection'; });
   var byCat = {};
-  OBJECTION_CATEGORIES.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [] }; });
+  OBJECTION_CATEGORIES.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [], closedExamples: [] }; });
   rows.forEach(function(r) {
     var b = byCat[r.objection_category];
     if (!b) return; // null / uncategorized — excluded
@@ -191,11 +204,27 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     if (r.resolution === 'handled') {
       /* ⚠ SENTINEL-GATED: an example is EVIDENCE OF GOOD HANDLING shown to a
          closer — a sentinel is not something he said. */
-      if (provenCloserResponse(r) && b.examples.length < 3) {
-        b.examples.push({ quote: str(r.quote, 300), closer_response: str(provenCloserResponse(r), 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
-          source: (meta[r.fathom_call_id] || {}).source || null });
+      if (provenCloserResponse(r)) {
+        var example = { quote: str(r.quote, 300), closer_response: str(provenCloserResponse(r), 400), surface: str(r.objection_surface, 80), clip_url: clipUrl(meta[r.fathom_call_id], r.timestamp_seconds),
+          source: (meta[r.fathom_call_id] || {}).source || null };
+        if (b.examples.length < 3) b.examples.push(example);
+        if (outcomeByCall[r.fathom_call_id] === 'closed') {
+          var analysis = analysisByCall[r.fathom_call_id] || {};
+          b.closedExamples.push(Object.assign({}, example, {
+            call_id: r.fathom_call_id,
+            prospect_name: str(analysis.prospect_name, 160) || str((meta[r.fathom_call_id] || {}).title, 160),
+            call_date: (meta[r.fathom_call_id] || {}).call_date || null,
+            outcome: 'closed',
+            timestamp_seconds: typeof r.timestamp_seconds === 'number' ? r.timestamp_seconds : null,
+          }));
+        }
       }
     }
+  });
+  Object.keys(byCat).forEach(function(c) {
+    byCat[c].closedExamples.sort(function(a, b) {
+      return String(b.call_date || '').localeCompare(String(a.call_date || '')) || (b.timestamp_seconds || 0) - (a.timestamp_seconds || 0);
+    });
   });
   var present = OBJECTION_CATEGORIES.filter(function(c) { return byCat[c].count > 0; })
     .sort(function(a, b) { return byCat[b].count - byCat[a].count; });

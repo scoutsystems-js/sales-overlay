@@ -6000,11 +6000,13 @@
     }
     body[data-view="overview"] .coaching-brief-proof-label { color:#a9c9b3; font-size:10px; font-weight:var(--fw-emphasis); letter-spacing:.16em; text-transform:uppercase; }
     body[data-view="overview"] .coaching-brief-proof-quote { padding-left:18px; border-left:2px solid #71ffad; color:#effff5; font-size:16px; font-weight:var(--fw-emphasis); line-height:1.42; }
-    body[data-view="overview"] .coaching-brief-playbook { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-    body[data-view="overview"] .coaching-brief-playbook-step { min-width:0; color:#c2d8ca; font-size:13px; line-height:1.45; }
-    body[data-view="overview"] .coaching-brief-playbook-step strong { display:block; margin-bottom:4px; color:#72ffad; font-size:10px; letter-spacing:.13em; text-transform:uppercase; }
-    body[data-view="overview"] .coaching-brief-worked { margin-top:12px; color:#effff5; font-size:14px; font-weight:var(--fw-emphasis); line-height:1.45; }
-    body[data-view="overview"] .coaching-brief-worked strong { color:#72ffad; font-size:10px; letter-spacing:.13em; text-transform:uppercase; }
+    body[data-view="overview"] .coaching-brief-quick { display:grid; gap:18px; }
+    body[data-view="overview"] .coaching-brief-quick-block + .coaching-brief-quick-block { padding-top:16px; border-top:1px solid rgba(196,231,207,.14); }
+    body[data-view="overview"] .coaching-brief-quick-label { display:block; margin-bottom:6px; color:#72ffad; font-size:10px; letter-spacing:.13em; text-transform:uppercase; }
+    body[data-view="overview"] .coaching-brief-practice { color:#effff5; font-size:16px; font-weight:var(--fw-emphasis); line-height:1.45; }
+    body[data-view="overview"] .coaching-brief-review-name { color:#effff5; font-size:16px; font-weight:var(--fw-emphasis); line-height:1.35; }
+    body[data-view="overview"] .coaching-brief-review-meta { margin-top:4px; color:#b8d5c2; font-size:13px; }
+    body[data-view="overview"] .coaching-brief-review-link { display:inline-block; margin-top:10px; color:#72ffad; font-size:13px; font-weight:var(--fw-emphasis); text-decoration:none; }
     body[data-view="overview"] .coaching-brief-proof-meta { color:#a9c9b3; font-size:11px; letter-spacing:.08em; text-align:right; text-transform:uppercase; white-space:nowrap; }
     body[data-view="overview"] .coaching-brief-footer { display:flex; justify-content:space-between; gap:16px; padding:14px 34px; color:#aac3b6; font-size:12px; border-top:1px solid rgba(196,231,207,.12); }
     body[data-view="overview"] .coaching-brief-footer a { color:#baffd4; text-decoration:none; }
@@ -6388,7 +6390,6 @@
       body[data-view="overview"] .coaching-brief-story { padding:48px 20px 24px; }
       body[data-view="overview"] .coaching-brief-story h2 { font-size:23px; }
       body[data-view="overview"] .coaching-brief-proof { grid-template-columns:1fr; gap:10px; padding:18px 20px; }
-      body[data-view="overview"] .coaching-brief-playbook { grid-template-columns:1fr; gap:10px; }
       body[data-view="overview"] .coaching-brief-proof-meta { text-align:left; }
       body[data-view="overview"] .coaching-brief-footer { padding:14px 20px; flex-direction:column; }
       body[data-view="overview"] .coaching-section-summary { padding:22px 20px; }
@@ -10395,31 +10396,30 @@
       ? '<a class="coaching-brief-action" href="#needs-work" onclick="openNeedsWork(); return false;">Open your practice moments →</a>'
       : '<a class="coaching-brief-action" href="#call-library" onclick="goCallLibrary(); return false;">Review your calls →</a>';
 
-    /* Teach from the existing objection-coaching lane. A matching transcript
-       line alone is not the lesson: the lane grounds the playbook in Scout's
-       method, saved team material, and explicitly handled moments. */
+    /* The quick review has one practice instruction and one real model call.
+       A merely credited rate never creates a success example: the selected
+       call must have an explicitly handled objection and a closed outcome. */
     var synthesis = state.objectionsSynthesis;
     var focusCoaching = synthesis && synthesis.available && Array.isArray(synthesis.categories)
       ? synthesis.categories.filter(function (c) { return c && String(c.category || '').toLowerCase() === String(focusLabel || '').toLowerCase(); })[0]
       : null;
-    var proofLabel = 'Your coaching playbook';
+    var proofLabel = 'Coaching focus';
     var proofQuote;
-    if (focusCoaching && (focusCoaching.isolate || focusCoaching.reframe || focusCoaching.overcome)) {
-      var steps = [
-        ['Isolate', focusCoaching.isolate],
-        ['Reframe', focusCoaching.reframe],
-        ['Overcome', focusCoaching.overcome],
-      ].filter(function (step) { return step[1]; }).map(function (step) {
-        return '<div class="coaching-brief-playbook-step"><strong>' + escapeHtml(step[0]) + '</strong>' + escapeHtml(step[1]) + '</div>';
-      }).join('');
-      proofQuote = '<div class="coaching-brief-playbook">' + steps + '</div>'
-        + (focusCoaching.what_worked
-          ? '<div class="coaching-brief-worked"><strong>What worked</strong><br>' + escapeHtml(focusCoaching.what_worked) + '</div>'
-          : '');
+    if (focusCoaching && focusCoaching.review_example) {
+      var reviewExample = focusCoaching.review_example;
+      var reviewDate = reviewExample.call_date ? dayLabel(String(reviewExample.call_date).slice(0, 10)) : 'This call';
+      var reviewName = reviewExample.prospect_name || reviewDate;
+      proofQuote = '<div class="coaching-brief-quick">'
+        + (focusCoaching.practice
+          ? '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">What to practice</strong><div class="coaching-brief-practice">' + escapeHtml(focusCoaching.practice) + '</div></div>'
+          : '')
+        + '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">A call to review</strong><div class="coaching-brief-review-name">' + escapeHtml(reviewName) + '</div><div class="coaching-brief-review-meta">' + escapeHtml(reviewDate + ' · ' + focusLabel + ' handled · Closed') + '</div>'
+        + '<a class="coaching-brief-review-link" href="#call/' + encodeURIComponent(reviewExample.call_id) + '" onclick="openCallReview(\'' + escapeHtml(reviewExample.call_id) + '\'); return false;">Open this call →</a></div>'
+        + '</div>';
     } else if (synthesis === null || state.objectionsSynthesisLoading) {
-      proofQuote = 'Preparing your coaching playbook from Scout’s saved team guidance and real handled calls.';
+      proofQuote = 'Preparing your coaching focus from Scout’s saved team guidance and real closed calls.';
     } else {
-      proofQuote = 'Scout has not found approved coaching guidance for this focus in the saved team material yet.';
+      proofQuote = 'No handled-and-closed ' + escapeHtml(focusLabel) + ' call found for these dates.';
     }
 
     return '<section class="observatory-coaching-brief fade-in" aria-label="Your coaching summary">'

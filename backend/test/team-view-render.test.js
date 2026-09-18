@@ -536,7 +536,7 @@ test('personal Coaching Dashboard keeps the standard gauges and one concise coac
   assert.ok(!out.events.some((event) => event.indexOf('chart:') === 0), 'the concise home board must not mount a chart');
 });
 
-test('personal Coaching Dashboard turns the focus into the saved coaching framework, not a stray transcript line', () => {
+test('personal Coaching Dashboard gives one practice instruction and one handled-and-closed call to review', () => {
   const focus = {
     available: true,
     state: 'rate_gap',
@@ -552,19 +552,30 @@ test('personal Coaching Dashboard turns the focus into the saved coaching framew
     available: true,
     categories: [{
       category: 'partner',
-      isolate: 'Clarify what the partner needs to understand before answering the first concern.',
-      reframe: 'Bring the conversation back to the outcome both decision-makers need to agree on.',
-      overcome: 'Test whether that conversation is the only thing standing between them and a decision.',
-      what_worked: 'You clarified what the partner needed to understand, then tested whether that was the only remaining concern.',
+      practice: 'Clarify what the partner needs to understand before answering the first concern.',
+      review_example: { call_id: 'partner-closed', prospect_name: 'Jordan Smith', call_date: '2026-09-16T15:00:00.000Z', outcome: 'closed', closer_response: 'What does your partner need to understand before you decide together?' },
       grounded: true,
     }],
   };
   const out = renderOverviewAs({ needsWork: focus, objectionsSynthesis: objectionCoaching });
-  assert.ok(out.html.includes('Your coaching playbook'), 'the overview names the existing coaching source');
-  assert.ok(out.html.includes('Clarify what the partner needs to understand'), 'the overview reuses the saved isolate guidance');
-  assert.ok(out.html.includes('You clarified what the partner needed to understand'), 'the overview captures the evidence-backed move that worked');
-  assert.ok(!out.html.includes('Before you decide together, what does your partner need to understand?'), 'a raw closer fragment is not presented as the lesson');
-  assert.ok(!out.html.includes('Focus example'), 'the overview no longer overstates a transcript fragment as proof');
+  assert.ok(out.html.includes('What to practice'), 'the overview gives the closer one actionable instruction');
+  assert.ok(out.html.includes('Clarify what the partner needs to understand'), 'the overview uses the short saved instruction');
+  assert.ok(out.html.includes('A call to review'), 'the overview names the evidence as one reviewable call');
+  assert.ok(out.html.includes('Jordan Smith'), 'the authorized rep/manager sees the stored prospect name');
+  assert.ok(out.html.includes('Sep 16'), 'the call date stays visible');
+  assert.ok(out.html.includes('Partner handled · Closed'), 'the objection result and call outcome are stated together');
+  assert.ok(out.html.includes("openCallReview('partner-closed')"), 'the card reuses the protected existing call review route');
+  assert.ok(!out.html.includes('Your coaching playbook'), 'the long multi-step playbook is not on the overview');
+  assert.ok(!out.html.includes('Isolate'), 'the internal framework headings remain off the quick coaching page');
+});
+
+test('personal Coaching Dashboard refuses to invent a successful call when none handled-and-closed exists', () => {
+  const out = renderOverviewAs({
+    needsWork: { available: true, bucket: { label: 'Fear' }, card_text: 'Fear is your current focus.' },
+    objectionsSynthesis: { available: true, categories: [{ category: 'fear', practice: null, review_example: null }] },
+  });
+  assert.ok(out.html.includes('No handled-and-closed Fear call found for these dates.'), 'the absence of a successful model call is explicit');
+  assert.ok(!out.html.includes('A call to review'), 'an open or lost call is not dressed up as proof');
 });
 
 test('personal Coaching Dashboard loading and no-data states remain truthful', () => {
