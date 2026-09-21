@@ -20441,8 +20441,21 @@
     setView('objections-intel');
   }
 
+  function coachingFocusRequest() {
+    if (state.view !== 'overview') return null;
+    var focus = state.needsWork;
+    var bucket = focus && focus.bucket;
+    var label = bucket && bucket.label ? String(bucket.label) : '';
+    var mapping = focus && focus.detail && Array.isArray(focus.detail.mapping) ? focus.detail.mapping : [];
+    var surfaces = mapping.filter(function(row) { return row && String(row.bucket || '').toLowerCase() === label.toLowerCase() && row.surface; })
+      .map(function(row) { return String(row.surface); });
+    return label && surfaces.length ? { label: label, surfaces: surfaces } : null;
+  }
+
   async function fetchObjectionsSynthesis() {
     var qp = 'from=' + encodeURIComponent(state.dateRange.from) + '&to=' + encodeURIComponent(state.dateRange.to);
+    var focus = coachingFocusRequest();
+    if (focus) qp += '&focus=' + encodeURIComponent(JSON.stringify(focus));
     var base = isSelf() ? '/me/objections-synthesis' : '/admin/objections-synthesis/' + encodeURIComponent(state.viewingUserId);
     var res = await fetch(base + '?' + qp, { headers: authHeader() });
     if (res.status === 401) { clearSession(); window.location.replace('/login'); throw new Error('unauth'); }

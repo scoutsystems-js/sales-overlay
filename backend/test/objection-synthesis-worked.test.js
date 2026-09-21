@@ -2,6 +2,38 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const synthesis = require('../lib/objection-synthesis');
 
+test('personal coaching excludes a logistical barrier from the focus population and review-call candidates', () => {
+  const eligible = synthesis._eligibleObjectionRows([
+    { objection_class: 'true_objection', resolution: 'unhandled' },
+    { objection_class: 'logistical_barrier', resolution: 'handled' },
+    { objection_class: 'disqualification', resolution: 'handled' },
+    { objection_class: null, resolution: 'unhandled' },
+  ]);
+
+  assert.deepEqual(eligible, [
+    { objection_class: 'true_objection', resolution: 'unhandled' },
+    { objection_class: null, resolution: 'unhandled' },
+  ]);
+});
+
+test('personal coaching focus uses the exact surfaces behind the focus metric, not a second category grouping', () => {
+  const focused = synthesis._focusRows([
+    { objection_surface: 'I need more time', objection_category: 'fear', objection_class: 'true_objection' },
+    { objection_surface: 'My partner wants to wait', objection_category: 'timing', objection_class: 'true_objection' },
+  ], { label: 'Timing', surfaces: ['I need more time'] });
+
+  assert.deepEqual(focused, [{ objection_surface: 'I need more time', objection_category: 'fear', objection_class: 'true_objection' }]);
+});
+
+test('focus request accepts only a bounded label plus its actual bucket surfaces', () => {
+  assert.deepEqual(
+    synthesis._focusFromQuery(JSON.stringify({ label: 'Timing', surfaces: ['I need more time', 'Call me next month'] })),
+    { label: 'Timing', surfaces: ['I need more time', 'Call me next month'] },
+  );
+  assert.equal(synthesis._focusFromQuery('{not json'), null);
+  assert.equal(synthesis._focusFromQuery(JSON.stringify({ label: 'Timing', surfaces: [] })), null);
+});
+
 test('fear practice makes the closer isolate before offering a payment solution', () => {
   const prompt = synthesis._buildSynthPrompt(
     ['fear'],
@@ -94,6 +126,27 @@ test('personal coaching withholds an either-or list even when both sides have en
   );
 
   assert.equal(result[0].when_not_handled, null);
+});
+
+test('personal coaching withholds a missed-pattern sentence that invents a prospect outcome', () => {
+  const result = synthesis._mergeGuidance(
+    ['timing'],
+    { timing: { count: 6, handled: 0, examples: [], missedExamples: [{ closer_response: 'Tell me what has to change.' }, { closer_response: 'What would make now work?' }], closedExamples: [] } },
+    { timing: { when_not_handled: 'The closer reframed the concern early, which allowed the prospect to stay in deferral.' } },
+    { allLossesAreDisqualifications: false },
+  );
+
+  assert.equal(result[0].when_not_handled, null);
+});
+
+test('coaching prompt forbids borrowing a financial or other-category call as timing advice', () => {
+  const prompt = synthesis._buildSynthPrompt(
+    ['timing'],
+    { timing: { count: 2, handled: 0, examples: [], missedExamples: [], closedExamples: [] } },
+    {},
+  );
+
+  assert.match(prompt, /Do not borrow a specific call, phrase, or technique from a different objection category/i);
 });
 
 test('a review call is surfaced only when the objection was explicitly handled and that same call closed', () => {

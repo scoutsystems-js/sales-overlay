@@ -11,6 +11,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { CHUNK } = require('./chunk');   // ⚠ the one `.in()` chunk size (③-6) — never a literal here
 const createWithUsage = require('./model-usage').usageFor('objection-synthesis');
 const { isHandled, outcomeMap } = require('./objection-handled');
+const { strictObjections } = require('./objection-strict');
 const { snapCacheWindow } = require('./cache-window');
 const crypto = require('crypto');
 const { CLAUDE_MODEL } = require('../config');
@@ -57,6 +58,38 @@ function sharedPattern(x, cap) {
   return value && !/\beither\b/i.test(value) ? value : null;
 }
 
+function observedMissedPattern(x, cap) {
+  var value = sharedPattern(x, cap);
+  // The saved moment proves the closer's action, not what it caused the prospect
+  // to do later. Withhold causal storytelling rather than present it as evidence.
+  return value && !/\b(?:allowed|caused|resulted|led|kept)\b[^.]{0,140}\b(?:prospect|deferral|decision|close|outcome|loss)\b/i.test(value) ? value : null;
+}
+
+function eligibleObjectionRows(rows) {
+  return strictObjections(rows || []);
+}
+
+function normSurface(value) { return String(value == null ? '' : value).trim().toLowerCase(); }
+
+function focusRows(rows, focus) {
+  if (!focus || !Array.isArray(focus.surfaces) || !focus.surfaces.length) return rows || [];
+  var wanted = {};
+  focus.surfaces.forEach(function(surface) { var key = normSurface(surface); if (key) wanted[key] = true; });
+  return (rows || []).filter(function(row) { return !!wanted[normSurface(row.objection_surface)]; });
+}
+
+function focusFromQuery(value) {
+  if (typeof value !== 'string' || value.length > 20000) return null;
+  try {
+    var parsed = JSON.parse(value);
+    var label = typeof parsed.label === 'string' ? parsed.label.trim().slice(0, 80) : '';
+    var surfaces = Array.isArray(parsed.surfaces) ? parsed.surfaces
+      .filter(function(surface) { return typeof surface === 'string' && surface.trim(); })
+      .slice(0, 200).map(function(surface) { return surface.trim().slice(0, 300); }) : [];
+    return label && surfaces.length ? { label: label, surfaces: surfaces } : null;
+  } catch (_) { return null; }
+}
+
 // ⚠ delegates to lib/clip-link.js — the ONE place a deep link is built.
 // Building it here would mean labelling it here, and this module does not
 // know the provider. Pinned by test/clip-link-single-source.test.js.
@@ -65,7 +98,7 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v8-2026-09-21-handled-and-missed-patterns';
+var SYNTH_PROMPT_VERSION = 'v9-2026-09-21-focus-population-alignment';
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
@@ -74,6 +107,7 @@ function buildSynthPrompt(present, byCat, material) {
     '  - Overcome: resolve it and advance to the close.',
     'Where HANDLED examples (the closer\'s own words) are provided, GROUND your advice in what THEY actually did — build on their real approach, do not invent. Where none are provided, use only the saved team material; if it does not speak to the category, return null rather than generic advice.',
     'Each of isolate/reframe/overcome must be 1-2 concrete sentences. No fluff, no cheerleading.',
+    'Do not borrow a specific call, phrase, or technique from a different objection category. Each category must be coached from its own eligible examples and applicable team material.',
     'For a category with handled examples, also write what_worked: one short sentence describing the repeatable move the closer used successfully. Ground it only in those handled examples and the team material, not a transcript fragment or generic advice. If there are no handled examples, return null for what_worked.',
     'For a category with at least TWO handled examples, also write when_handled: one short, plain-language summary of the repeated behavior that made those objections move forward. State only what the examples show; do not claim a call closed unless the example says it did. Do not list separate calls. If the examples do not show one shared behavior, return null; also return null with fewer than two handled examples.',
     'For a category with at least TWO NOT-HANDLED examples, also write when_not_handled: one short, plain-language summary of what the closer did or failed to do in those examples. These are explicitly partial or unhandled moments, not inferred failures. State only what the examples show; do not infer intent or claim a loss unless the example says it did. Do not list the separate calls with “either/or” wording. If the examples do not show one shared behavior, return null; also return null with fewer than two not-handled examples.',
@@ -138,7 +172,7 @@ function mergeGuidance(present, byCat, guide, lossScope) {
         ? require('./doctrine').enforceLossRule(sharedPattern(guidance.when_handled, 500), lossScope, null, 'objection-synthesis')
         : null,
       when_not_handled: missedExamples.length >= 2
-        ? require('./doctrine').enforceLossRule(sharedPattern(guidance.when_not_handled, 500), lossScope, null, 'objection-synthesis')
+        ? require('./doctrine').enforceLossRule(observedMissedPattern(guidance.when_not_handled, 500), lossScope, null, 'objection-synthesis')
         : null,
       practice: reviewExample
         ? require('./doctrine').enforceLossRule(str(guidance.practice, 220), lossScope, null, 'objection-synthesis')
@@ -149,7 +183,7 @@ function mergeGuidance(present, byCat, guide, lossScope) {
   });
 }
 
-async function computeObjectionSynthesis(admin, userId, from, to) {
+async function computeObjectionSynthesis(admin, userId, from, to, focus) {
   // 1) calls in window (recording_url powers clip links).
   var calls = [], PAGE = 1000, start = 0;
   while (true) {
@@ -192,7 +226,9 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   var hashInput = done.map(function(d) { return d.fathom_call_id + ':' + d.analyzed_at; }).sort().join('|');
   /* H731: the material rides the hash — a profile edit or a new note regenerates; the version too. */
   var material = await require('./kb-material').loadKbMaterial(admin, { userId: userId, lane: 'objection-synthesis', maxChars: 2500 });
-  var hash = crypto.createHash('md5').update((hashInput || 'empty') + '|' + SYNTH_PROMPT_VERSION + '|kb:' + material.kbHash).digest('hex');
+  var focusKey = focus && typeof focus.label === 'string' ? normSurface(focus.label) : '';
+  var focusHash = focusKey + ':' + ((focus && Array.isArray(focus.surfaces)) ? focus.surfaces.map(normSurface).filter(Boolean).sort().join('|') : '');
+  var hash = crypto.createHash('md5').update((hashInput || 'empty') + '|' + SYNTH_PROMPT_VERSION + '|focus:' + focusHash + '|kb:' + material.kbHash).digest('hex');
 
   // 3) cache check.
   // Key snapped to UTC day boundaries — see lib/cache-window.js. The hash above
@@ -211,11 +247,13 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
     'fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, resolution, closer_response, closer_response_verified, type, objection_class',
     function(q) { return q.in('type', ['objection', 'disqualify_signal']); });
   var lossScope = require('./doctrine').lossScope(done, rows);   // H733: which of this closer's calls carry a disqualification
-  rows = rows.filter(function (r) { return r.type === 'objection'; });
+  rows = eligibleObjectionRows(rows.filter(function (r) { return r.type === 'objection'; }));
+  rows = focusRows(rows, focus);
   var byCat = {};
-  OBJECTION_CATEGORIES.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [], missedExamples: [], closedExamples: [] }; });
+  var categories = focusKey ? [focusKey] : OBJECTION_CATEGORIES;
+  categories.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [], missedExamples: [], closedExamples: [] }; });
   rows.forEach(function(r) {
-    var b = byCat[r.objection_category];
+    var b = byCat[focusKey || r.objection_category];
     if (!b) return; // null / uncategorized — excluded
     b.count += 1;
     // ⚠ TWO DIFFERENT QUESTIONS ON ONE ROW, and they get two different answers.
@@ -263,7 +301,7 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
       return String(b.call_date || '').localeCompare(String(a.call_date || '')) || (b.timestamp_seconds || 0) - (a.timestamp_seconds || 0);
     });
   });
-  var present = OBJECTION_CATEGORIES.filter(function(c) { return byCat[c].count > 0; })
+  var present = categories.filter(function(c) { return byCat[c].count > 0; })
     .sort(function(a, b) { return byCat[b].count - byCat[a].count; });
   if (present.length === 0) return { available: true, categories: [], generated_at: new Date().toISOString() };
 
@@ -296,4 +334,4 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-module.exports = { computeObjectionSynthesis: computeObjectionSynthesis, _buildSynthPrompt: buildSynthPrompt, _mergeGuidance: mergeGuidance, _SYNTH_PROMPT_VERSION: SYNTH_PROMPT_VERSION };
+module.exports = { computeObjectionSynthesis: computeObjectionSynthesis, focusFromQuery: focusFromQuery, _buildSynthPrompt: buildSynthPrompt, _mergeGuidance: mergeGuidance, _eligibleObjectionRows: eligibleObjectionRows, _focusRows: focusRows, _focusFromQuery: focusFromQuery, _SYNTH_PROMPT_VERSION: SYNTH_PROMPT_VERSION };

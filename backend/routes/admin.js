@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { computeCallAnalytics, computeObjectionIntel } = require('../lib/session-analytics');
-const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
+const { computeObjectionSynthesis, focusFromQuery } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 const { computePersonalNeedsWork, loadBucketEvidence } = require('../lib/team-needs-work');
 const { fetchSellingContext } = require('../lib/selling-context');
@@ -1642,7 +1642,7 @@ router.get('/objections-synthesis/:user_id', requireAuth, requireRole(['manager'
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
     }
-    var result = await computeObjectionSynthesis(admin, targetUserId, from, to);
+    var result = await computeObjectionSynthesis(admin, targetUserId, from, to, focusFromQuery(req.query.focus));
     res.json(result);
   } catch (err) {
     if (handleConfigError(err, res)) return;

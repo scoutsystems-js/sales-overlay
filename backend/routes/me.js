@@ -32,7 +32,7 @@ const { VALID_OUTCOMES, TAGGABLE_OUTCOMES, effectiveCloseScore, canTagOutcome,
         canMarkNotSalesCall, markRoleFor } = require('../lib/outcome-tag');
 const { setCallKindHuman, earlierCallsFor } = require('../lib/call-kind');   // H706
 const { renameOnCall } = require('../lib/prospect-rename');   // H707
-const { computeObjectionSynthesis } = require('../lib/objection-synthesis');
+const { computeObjectionSynthesis, focusFromQuery } = require('../lib/objection-synthesis');
 const { computePerformanceSynthesis } = require('../lib/performance-synthesis');
 
 var router = express.Router();
@@ -684,7 +684,7 @@ router.get('/objections-synthesis', requireAuth, async function(req, res) {
     return res.status(400).json({ error: 'from/to must be ISO 8601 dates' });
   }
   try {
-    var result = await computeObjectionSynthesis(getAdminClient(), req.user.id, from, to);
+    var result = await computeObjectionSynthesis(getAdminClient(), req.user.id, from, to, focusFromQuery(req.query.focus));
     res.json(result);
   } catch (err) {
     if (handleConfigError(err, res)) return;
