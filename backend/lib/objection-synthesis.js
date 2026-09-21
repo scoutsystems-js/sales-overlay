@@ -50,6 +50,13 @@ function extractJson(text) {
 
 function str(x, cap) { return (typeof x === 'string' && x.trim()) ? x.trim().slice(0, cap || 600) : null; }
 
+// A combined "either/or" answer is a list of unrelated calls, not the useful
+// repeated behavior this surface promises. In that case silence is truer.
+function sharedPattern(x, cap) {
+  var value = str(x, cap);
+  return value && !/\beither\b/i.test(value) ? value : null;
+}
+
 // ⚠ delegates to lib/clip-link.js — the ONE place a deep link is built.
 // Building it here would mean labelling it here, and this module does not
 // know the provider. Pinned by test/clip-link-single-source.test.js.
@@ -58,7 +65,7 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v7-2026-09-18-fear-isolate-first';
+var SYNTH_PROMPT_VERSION = 'v8-2026-09-21-handled-and-missed-patterns';
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
@@ -68,6 +75,8 @@ function buildSynthPrompt(present, byCat, material) {
     'Where HANDLED examples (the closer\'s own words) are provided, GROUND your advice in what THEY actually did — build on their real approach, do not invent. Where none are provided, use only the saved team material; if it does not speak to the category, return null rather than generic advice.',
     'Each of isolate/reframe/overcome must be 1-2 concrete sentences. No fluff, no cheerleading.',
     'For a category with handled examples, also write what_worked: one short sentence describing the repeatable move the closer used successfully. Ground it only in those handled examples and the team material, not a transcript fragment or generic advice. If there are no handled examples, return null for what_worked.',
+    'For a category with at least TWO handled examples, also write when_handled: one short, plain-language summary of the repeated behavior that made those objections move forward. State only what the examples show; do not claim a call closed unless the example says it did. Do not list separate calls. If the examples do not show one shared behavior, return null; also return null with fewer than two handled examples.',
+    'For a category with at least TWO NOT-HANDLED examples, also write when_not_handled: one short, plain-language summary of what the closer did or failed to do in those examples. These are explicitly partial or unhandled moments, not inferred failures. State only what the examples show; do not infer intent or claim a loss unless the example says it did. Do not list the separate calls with “either/or” wording. If the examples do not show one shared behavior, return null; also return null with fewer than two not-handled examples.',
     'For a category with a CLOSED HANDLED REVIEW EXAMPLE, also write practice: one direct sentence telling the closer what to practice. Ground it only in that closed handled example and the team material. If there is no closed handled review example, return null for practice.',
     'Fear practice: first isolate whether the stated concern is the real blocker. Do not recommend a payment plan, BNPL, price change, or other solution before that isolation. Only after it is the real blocker may the sentence name the response that worked in the review call.',
     '',
@@ -77,6 +86,7 @@ function buildSynthPrompt(present, byCat, material) {
   ];
   present.forEach(function(c) {
     var b = byCat[c];
+    var missedExamples = b.missedExamples || [];
     lines.push('### ' + c.toUpperCase() + ' — ' + b.count + ' objections, ' + b.handled + ' handled');
     if (b.examples.length) {
       lines.push('  Handled examples (the closer\'s own words):');
@@ -87,6 +97,12 @@ function buildSynthPrompt(present, byCat, material) {
         /* H731: NO GENERIC FALLBACK. A category with no handled example and nothing in the knowledge base that
          speaks to it gets NO advice — the fields come back null and the surface says so. */
       lines.push('  (no handled examples in this window — if the TEAM MATERIAL below speaks to this category, coach from it and say so; if it does not, return null for isolate, reframe and overcome — never general best practice)');
+    }
+    if (missedExamples.length) {
+      lines.push('  Not-handled examples (explicit partial or unhandled moments):');
+      missedExamples.forEach(function(e) {
+        lines.push('    - prospect said "' + (e.surface || e.quote || '').slice(0, 80) + '" → closer responded: "' + (e.closer_response || '__no_reply__').slice(0, 320) + '"' + (e.observation ? ' · observed: "' + e.observation.slice(0, 240) + '"' : ''));
+      });
     }
     if (b.closedExamples && b.closedExamples.length) {
       var review = b.closedExamples[0];
@@ -99,7 +115,7 @@ function buildSynthPrompt(present, byCat, material) {
   if (material && material.contextText) { lines.push('TEAM MATERIAL (this closer\'s offer, qualifications and approach — ground every sentence in it):'); lines.push(material.contextText.trim()); lines.push(''); }
   if (material && material.notes && material.notes.text) { lines.push(require('./coaching-corrections').promptLane(material.notes.text)); lines.push(''); }
   lines.push('Respond with ONLY this JSON — no markdown, no code fences:');
-  lines.push('{"categories":[{"category":"fear","isolate":"...","reframe":"...","overcome":"...","what_worked":"... or null","practice":"... or null"}]}');
+  lines.push('{"categories":[{"category":"fear","isolate":"...","reframe":"...","overcome":"...","what_worked":"... or null","when_handled":"... or null","when_not_handled":"... or null","practice":"... or null"}]}');
   return lines.join('\n');
 }
 
@@ -107,6 +123,7 @@ function mergeGuidance(present, byCat, guide, lossScope) {
   return present.map(function(c) {
     var bucket = byCat[c], guidance = guide[c] || {};
     var hasHandledExample = bucket.examples.length > 0;
+    var missedExamples = bucket.missedExamples || [];
     var reviewExample = bucket.closedExamples && bucket.closedExamples.length ? bucket.closedExamples[0] : null;
     return {
       category: c, count: bucket.count, handled: bucket.handled, grounded: hasHandledExample,
@@ -116,6 +133,12 @@ function mergeGuidance(present, byCat, guide, lossScope) {
       // A closed call can credit a rate, but it never manufactures a worked example.
       what_worked: hasHandledExample
         ? require('./doctrine').enforceLossRule(str(guidance.what_worked, 500), lossScope, null, 'objection-synthesis')
+        : null,
+      when_handled: bucket.examples.length >= 2
+        ? require('./doctrine').enforceLossRule(sharedPattern(guidance.when_handled, 500), lossScope, null, 'objection-synthesis')
+        : null,
+      when_not_handled: missedExamples.length >= 2
+        ? require('./doctrine').enforceLossRule(sharedPattern(guidance.when_not_handled, 500), lossScope, null, 'objection-synthesis')
         : null,
       practice: reviewExample
         ? require('./doctrine').enforceLossRule(str(guidance.practice, 220), lossScope, null, 'objection-synthesis')
@@ -185,12 +208,12 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
 
   // 4) categorized objection highlights → per-category counts + handled examples.
   var rows = await inChunks('call_highlights',
-    'fathom_call_id, timestamp_seconds, quote, objection_surface, objection_category, resolution, closer_response, closer_response_verified, type, objection_class',
+    'fathom_call_id, timestamp_seconds, quote, observation, objection_surface, objection_category, resolution, closer_response, closer_response_verified, type, objection_class',
     function(q) { return q.in('type', ['objection', 'disqualify_signal']); });
   var lossScope = require('./doctrine').lossScope(done, rows);   // H733: which of this closer's calls carry a disqualification
   rows = rows.filter(function (r) { return r.type === 'objection'; });
   var byCat = {};
-  OBJECTION_CATEGORIES.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [], closedExamples: [] }; });
+  OBJECTION_CATEGORIES.forEach(function(c) { byCat[c] = { count: 0, handled: 0, examples: [], missedExamples: [], closedExamples: [] }; });
   rows.forEach(function(r) {
     var b = byCat[r.objection_category];
     if (!b) return; // null / uncategorized — excluded
@@ -219,6 +242,19 @@ async function computeObjectionSynthesis(admin, userId, from, to) {
             timestamp_seconds: typeof r.timestamp_seconds === 'number' ? r.timestamp_seconds : null,
           }));
         }
+      }
+    }
+    if ((r.resolution === 'partial' || r.resolution === 'unhandled') && b.missedExamples.length < 3) {
+      var missedResponse = provenCloserResponse(r);
+      var missedObservation = str(r.observation, 300);
+      if (missedResponse || missedObservation) {
+        b.missedExamples.push({
+          quote: str(r.quote, 300),
+          closer_response: str(missedResponse, 400),
+          surface: str(r.objection_surface, 80),
+          observation: missedObservation,
+          resolution: r.resolution,
+        });
       }
     }
   });

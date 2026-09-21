@@ -553,6 +553,8 @@ test('personal Coaching Dashboard gives one practice instruction and one handled
     categories: [{
       category: 'partner',
       practice: 'Clarify what the partner needs to understand before answering the first concern.',
+      when_handled: 'When you handle Partner well, you find out what the partner needs before answering the first concern.',
+      when_not_handled: 'When Partner is not handled, you answer the first concern without finding out what the partner needs.',
       review_example: { call_id: 'partner-closed', prospect_name: 'Jordan Smith', call_date: '2026-09-16T15:00:00.000Z', outcome: 'closed', closer_response: 'What does your partner need to understand before you decide together?' },
       grounded: true,
     }],
@@ -560,6 +562,10 @@ test('personal Coaching Dashboard gives one practice instruction and one handled
   const out = renderOverviewAs({ needsWork: focus, objectionsSynthesis: objectionCoaching });
   assert.ok(out.html.includes('What to practice'), 'the overview gives the closer one actionable instruction');
   assert.ok(out.html.includes('Clarify what the partner needs to understand'), 'the overview uses the short saved instruction');
+  assert.ok(out.html.includes('When it works'), 'the overview shows the repeatable handling pattern when the evidence supports it');
+  assert.ok(out.html.includes('When this objection is not handled'), 'the overview shows the distinct missed pattern when the evidence supports it');
+  assert.ok(out.html.includes('find out what the partner needs before answering'), 'the handled summary stays visible');
+  assert.ok(out.html.includes('answer the first concern without finding out'), 'the missed summary stays visible');
   assert.ok(out.html.includes('A call to review'), 'the overview names the evidence as one reviewable call');
   assert.ok(out.html.includes('Jordan Smith'), 'the authorized rep/manager sees the stored prospect name');
   assert.ok(out.html.includes('Sep 16'), 'the call date stays visible');

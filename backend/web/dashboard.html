@@ -10405,21 +10405,25 @@
       : null;
     var proofLabel = 'Coaching focus';
     var proofQuote;
-    if (focusCoaching && focusCoaching.review_example) {
-      var reviewExample = focusCoaching.review_example;
-      var reviewDate = reviewExample.call_date ? dayLabel(String(reviewExample.call_date).slice(0, 10)) : 'This call';
-      var reviewName = reviewExample.prospect_name || reviewDate;
-      proofQuote = '<div class="coaching-brief-quick">'
-        + (focusCoaching.practice
-          ? '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">What to practice</strong><div class="coaching-brief-practice">' + escapeHtml(focusCoaching.practice) + '</div></div>'
-          : '')
-        + '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">A call to review</strong><div class="coaching-brief-review-name">' + escapeHtml(reviewName) + '</div><div class="coaching-brief-review-meta">' + escapeHtml(reviewDate + ' · ' + focusLabel + ' handled · Closed') + '</div>'
-        + '<a class="coaching-brief-review-link" href="#call/' + encodeURIComponent(reviewExample.call_id) + '" onclick="openCallReview(\'' + escapeHtml(reviewExample.call_id) + '\'); return false;">Open this call →</a></div>'
-        + '</div>';
+    if (focusCoaching) {
+      var quickBlocks = '';
+      if (focusCoaching.practice) quickBlocks += '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">What to practice</strong><div class="coaching-brief-practice">' + escapeHtml(focusCoaching.practice) + '</div></div>';
+      if (focusCoaching.when_handled) quickBlocks += '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">When it works</strong><div class="coaching-brief-practice">' + escapeHtml(focusCoaching.when_handled) + '</div></div>';
+      if (focusCoaching.when_not_handled) quickBlocks += '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">When this objection is not handled</strong><div class="coaching-brief-practice">' + escapeHtml(focusCoaching.when_not_handled) + '</div></div>';
+      if (focusCoaching.review_example) {
+        var reviewExample = focusCoaching.review_example;
+        var reviewDate = reviewExample.call_date ? dayLabel(String(reviewExample.call_date).slice(0, 10)) : 'This call';
+        var reviewName = reviewExample.prospect_name || reviewDate;
+        quickBlocks += '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">A call to review</strong><div class="coaching-brief-review-name">' + escapeHtml(reviewName) + '</div><div class="coaching-brief-review-meta">' + escapeHtml(reviewDate + ' · ' + focusLabel + ' handled · Closed') + '</div>'
+          + '<a class="coaching-brief-review-link" href="#call/' + encodeURIComponent(reviewExample.call_id) + '" onclick="openCallReview(\'' + escapeHtml(reviewExample.call_id) + '\'); return false;">Open this call →</a></div>';
+      } else {
+        quickBlocks += '<div class="coaching-brief-quick-block">No handled-and-closed ' + escapeHtml(focusLabel) + ' call found for these dates.</div>';
+      }
+      proofQuote = '<div class="coaching-brief-quick">' + quickBlocks + '</div>';
     } else if (synthesis === null || state.objectionsSynthesisLoading) {
       proofQuote = 'Preparing your coaching focus from Scout’s saved team guidance and real closed calls.';
     } else {
-      proofQuote = 'No handled-and-closed ' + escapeHtml(focusLabel) + ' call found for these dates.';
+      proofQuote = 'No coaching detail found for ' + escapeHtml(focusLabel) + ' in these dates.';
     }
 
     return '<section class="observatory-coaching-brief fade-in" aria-label="Your coaching summary">'
