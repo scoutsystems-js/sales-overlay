@@ -68,7 +68,15 @@ var protect = [requireAuth, requireRole(['manager', 'owner'])];
 async function loadTargetProfile(admin, targetId) {
   var r = await admin.from('user_profiles').select('role, managed_by, active').eq('user_id', targetId).maybeSingle();
   if (r.error) throw new Error('target lookup: ' + r.error.message);
-  return r.data || null;
+  if (!r.data) return null;
+  var shared = await admin.from('manager_rep_assignments').select('manager_user_id').eq('rep_user_id', targetId);
+  if (shared.error) throw new Error('shared manager lookup: ' + shared.error.message);
+  var managerIds = r.data.managed_by ? [r.data.managed_by] : [];
+  (shared.data || []).forEach(function (row) {
+    if (row && row.manager_user_id && managerIds.indexOf(row.manager_user_id) === -1) managerIds.push(row.manager_user_id);
+  });
+  r.data.manager_ids = managerIds;
+  return r.data;
 }
 // Manager rep-scope guard. Sends a 404/403 and returns true when the actor may
 // NOT manage the target (owner: anyone; manager: only own reps). false = proceed.
@@ -80,10 +88,22 @@ function denyIfCannotManage(req, res, target) {
   }
   return false;
 }
+async function managerCanAccessTarget(admin, managerId, targetId) {
+  var target = await loadTargetProfile(admin, targetId);
+  return canManageTarget('manager', managerId, target);
+}
 // Count of reps a user manages (for the deactivate "move reps first" guard).
 async function countManagedReps(admin, userId) {
-  var r = await admin.from('user_profiles').select('user_id', { count: 'exact', head: true }).eq('managed_by', userId);
-  return r.error ? 0 : (r.count || 0);
+  var results = await Promise.all([
+    admin.from('user_profiles').select('user_id').eq('managed_by', userId),
+    admin.from('manager_rep_assignments').select('rep_user_id').eq('manager_user_id', userId),
+  ]);
+  if (results[0].error || results[1].error) return 0;
+  var ids = (results[0].data || []).map(function (row) { return row.user_id; });
+  (results[1].data || []).forEach(function (row) {
+    if (row && row.rep_user_id && ids.indexOf(row.rep_user_id) === -1) ids.push(row.rep_user_id);
+  });
+  return ids.length;
 }
 // Total recorded calls for the delete plan (fathom + sessions).
 /* ⚠⚠ STILL DELIBERATELY NOT FILTERED FOR not_a_sales_call — AND THE REASON
@@ -110,13 +130,14 @@ async function countUserHistory(admin, userId) {
 // the result into a query via .in('user_id', ids) when non-null.
 async function getAllowedUserIds(admin, user) {
   if (user.role === 'owner') return null;
-  var managedResult = await admin
-    .from('user_profiles')
-    .select('user_id')
-    .eq('managed_by', user.id);
-  if (managedResult.error) throw new Error('managed lookup failed: ' + managedResult.error.message);
+  var results = await Promise.all([
+    admin.from('user_profiles').select('user_id').eq('managed_by', user.id),
+    admin.from('manager_rep_assignments').select('rep_user_id').eq('manager_user_id', user.id),
+  ]);
+  if (results[0].error || results[1].error) throw new Error('managed lookup failed: ' + ((results[0].error || results[1].error).message));
   var ids = [user.id];
-  (managedResult.data || []).forEach(function(p) { if (p && p.user_id) ids.push(p.user_id); });
+  (results[0].data || []).forEach(function(p) { if (p && p.user_id && ids.indexOf(p.user_id) === -1) ids.push(p.user_id); });
+  (results[1].data || []).forEach(function(p) { if (p && p.rep_user_id && ids.indexOf(p.rep_user_id) === -1) ids.push(p.rep_user_id); });
   return ids;
 }
 
@@ -184,7 +205,7 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
     } else {
       // admin scope: managed users + self
       visible = allUsers.filter(function(u) {
-        return u.managed_by === req.user.id || u.user_id === req.user.id;
+        return (u.manager_ids || []).indexOf(req.user.id) !== -1 || u.user_id === req.user.id;
       });
     }
 
@@ -211,6 +232,7 @@ router.get('/users', requireAuth, requireRole(['manager', 'owner']), async funct
         email: u.email,
         role: u.role,
         managed_by: u.managed_by,
+        manager_ids: u.manager_ids,
         billing_status: u.billing_status,
         billing_plan: u.billing_plan,
         /* ⚠ RE-PICKED EXPLICITLY. fetchUsersWithProfiles selects it, but this
@@ -416,6 +438,55 @@ router.patch('/users/:user_id/managed_by', requireAuth, requireRole(['manager', 
     if (handleConfigError(err, res)) return;
     console.error('[admin] managed_by patch error:', err.message);
     res.status(500).json({ error: 'Failed to update manager assignment' });
+  }
+});
+
+// ── PUT /admin/users/:user_id/managers ─────────────────────────────────────
+// Owner-only: preserve a closer's existing home manager and grant/remove
+// additional manager access. The home manager remains the source for team
+// setup and inherited selling context; this route changes access only.
+router.put('/users/:user_id/managers', requireAuth, requireRole('owner'), async function(req, res) {
+  var targetId = req.params.user_id;
+  var requested = req.body && req.body.manager_ids;
+  if (!Array.isArray(requested) || requested.some(function (id) { return typeof id !== 'string' || !id; })) {
+    return res.status(400).json({ error: 'manager_ids must be an array of manager IDs' });
+  }
+  try {
+    var admin = getAdminClient();
+    var target = await admin.from('user_profiles').select('user_id, managed_by').eq('user_id', targetId).maybeSingle();
+    if (target.error) throw new Error('target lookup: ' + target.error.message);
+    if (!target.data) return res.status(404).json({ error: 'User not found' });
+    if (!target.data.managed_by) return res.status(400).json({ error: 'Assign this closer to a home manager before sharing them with another manager' });
+    if (requested.indexOf(target.data.managed_by) === -1) {
+      return res.status(400).json({ error: 'The home manager must remain assigned' });
+    }
+    var unique = requested.filter(function (id, index) { return requested.indexOf(id) === index; });
+    if (unique.indexOf(targetId) !== -1) return res.status(400).json({ error: 'A user cannot manage themselves' });
+    var additional = unique.filter(function (id) { return id !== target.data.managed_by; });
+    if (additional.length) {
+      var managers = await admin.from('user_profiles').select('user_id, role, active').in('user_id', additional);
+      if (managers.error) throw new Error('manager lookup: ' + managers.error.message);
+      var valid = (managers.data || []).every(function (manager) {
+        return manager.active !== false && (manager.role === 'manager' || manager.role === 'owner') && additional.indexOf(manager.user_id) !== -1;
+      });
+      if (!valid || (managers.data || []).length !== additional.length) {
+        return res.status(400).json({ error: 'Every assigned manager must be an active manager or owner' });
+      }
+    }
+    var removed = await admin.from('manager_rep_assignments').delete().eq('rep_user_id', targetId);
+    if (removed.error) throw new Error('shared manager removal: ' + removed.error.message);
+    if (additional.length) {
+      var added = await admin.from('manager_rep_assignments').upsert(additional.map(function (managerId) {
+        return { manager_user_id: managerId, rep_user_id: targetId };
+      }), { onConflict: 'manager_user_id,rep_user_id' });
+      if (added.error) throw new Error('shared manager save: ' + added.error.message);
+    }
+    console.log('[admin] shared managers changed: actor=%s target=%s managers=%s', req.user.id, targetId, unique.join(','));
+    res.json({ user_id: targetId, managed_by: target.data.managed_by, manager_ids: [target.data.managed_by].concat(additional) });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] shared managers error:', err.message);
+    res.status(500).json({ error: 'Could not update manager assignments' });
   }
 });
 
@@ -1252,8 +1323,7 @@ router.get('/needs-work/:user_id', requireAuth, requireRole(['manager', 'owner']
   try {
     var admin = getAdminClient();
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var t = await loadTargetProfile(admin, targetUserId);
-      if (!t || t.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on needs-work: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1291,8 +1361,7 @@ router.get('/needs-work-sections/:user_id', requireAuth, requireRole(['manager',
     var admin = getAdminClient();
     // the same scope predicate every other pivot route uses — never a second one
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var t = await loadTargetProfile(admin, targetUserId);
-      if (!t || t.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on needs-work-sections: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1317,8 +1386,7 @@ router.post('/needs-work/:user_id/bucket', requireAuth, requireRole(['manager', 
   try {
     var admin = getAdminClient();
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var t = await loadTargetProfile(admin, targetUserId);
-      if (!t || t.managed_by !== req.user.id) return res.status(403).json({ error: 'Not authorized for that user' });
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) return res.status(403).json({ error: 'Not authorized for that user' });
     }
     var rows = await loadBucketEvidence(admin, [targetUserId], surfaces, from, to);
     res.json({ calls: rows });
@@ -1363,21 +1431,34 @@ async function fetchUsersWithProfiles(admin) {
     .from('user_profiles')
     .select('user_id, role, managed_by, billing_status, billing_plan, active, first_name, last_name, team_name, deactivated_with_company, price_pif');
   if (profilesResult.error) throw new Error('user_profiles query failed: ' + profilesResult.error.message);
+  var assignmentsResult = await admin.from('manager_rep_assignments').select('manager_user_id, rep_user_id');
+  if (assignmentsResult.error) throw new Error('shared managers query failed: ' + assignmentsResult.error.message);
 
   var profilesByUserId = {};
   var profiles = profilesResult.data || [];
   for (var i = 0; i < profiles.length; i++) {
     profilesByUserId[profiles[i].user_id] = profiles[i];
   }
+  var managersByRep = {};
+  (assignmentsResult.data || []).forEach(function (row) {
+    if (!row || !row.rep_user_id || !row.manager_user_id) return;
+    var ids = managersByRep[row.rep_user_id] = managersByRep[row.rep_user_id] || [];
+    if (ids.indexOf(row.manager_user_id) === -1) ids.push(row.manager_user_id);
+  });
 
   var authUsers = (authResult.data && authResult.data.users) || [];
   return authUsers.map(function(u) {
     var p = profilesByUserId[u.id] || {};
+    var managerIds = p.managed_by ? [p.managed_by] : [];
+    (managersByRep[u.id] || []).forEach(function (managerId) {
+      if (managerIds.indexOf(managerId) === -1) managerIds.push(managerId);
+    });
     return {
       user_id: u.id,
       email: u.email || null,
       role: p.role || 'user',
       managed_by: p.managed_by || null,
+      manager_ids: managerIds,
       billing_status: p.billing_status || 'trial',
       billing_plan: p.billing_plan || null,
       /* Managers set this for their reps (ruling 2026-08-26); it rides here so
@@ -1432,16 +1513,7 @@ router.get('/analytics2/:user_id', requireAuth, requireRole(['manager', 'owner']
     var admin = getAdminClient();
 
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] analytics2 scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on analytics2: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1476,16 +1548,7 @@ router.get('/sections/:user_id/:section', requireAuth, requireRole(['manager', '
     var admin = getAdminClient();
 
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] sections scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on sections: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1512,16 +1575,7 @@ router.get('/fathom-calls/:user_id', requireAuth, requireRole(['manager', 'owner
     var admin = getAdminClient();
 
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] fathom-calls scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on fathom-calls: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1561,16 +1615,7 @@ router.get('/fathom-calls/:user_id/:call_id', requireAuth, requireRole(['manager
     var admin = getAdminClient();
 
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] fathom-call review scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on fathom-call review: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1597,16 +1642,7 @@ router.get('/objections-intel/:user_id', requireAuth, requireRole(['manager', 'o
   try {
     var admin = getAdminClient();
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin
-        .from('user_profiles')
-        .select('user_id, managed_by')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] objections-intel scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on objections-intel: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1632,12 +1668,7 @@ router.get('/objections-synthesis/:user_id', requireAuth, requireRole(['manager'
   try {
     var admin = getAdminClient();
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin.from('user_profiles').select('user_id, managed_by').eq('user_id', targetUserId).maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] objections-synthesis scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on objections-synthesis: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }
@@ -1662,12 +1693,7 @@ router.get('/performance-synthesis/:user_id', requireAuth, requireRole(['manager
   try {
     var admin = getAdminClient();
     if (req.user.role !== 'owner' && targetUserId !== req.user.id) {
-      var scopeCheck = await admin.from('user_profiles').select('user_id, managed_by').eq('user_id', targetUserId).maybeSingle();
-      if (scopeCheck.error) {
-        console.error('[admin] performance-synthesis scope check failed:', scopeCheck.error.message);
-        return res.status(500).json({ error: 'Could not verify access' });
-      }
-      if (!scopeCheck.data || scopeCheck.data.managed_by !== req.user.id) {
+      if (!(await managerCanAccessTarget(admin, req.user.id, targetUserId))) {
         console.warn('[admin] Scope violation on performance-synthesis: actor=%s target=%s', req.user.id, targetUserId);
         return res.status(403).json({ error: 'Not authorized for that user' });
       }

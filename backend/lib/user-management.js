@@ -3,10 +3,13 @@
 // handlers in routes/admin.js do the DB work and call these to decide.
 
 // Can `actor` (role + id) manage `target`? Owner = anyone. Manager = only their
-// own reps (target.managed_by === actor id). Anyone else = no.
+// own reps plus explicitly shared closers. Anyone else = no.
 function canManageTarget(actorRole, actorId, target) {
   if (actorRole === 'owner') return true;
-  if (actorRole === 'manager') return !!(target && target.managed_by === actorId);
+  if (actorRole === 'manager') {
+    return !!(target && (target.managed_by === actorId
+      || (Array.isArray(target.manager_ids) && target.manager_ids.indexOf(actorId) !== -1)));
+  }
   return false;
 }
 

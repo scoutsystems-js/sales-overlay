@@ -35,6 +35,10 @@ const PROFILES = [
   { user_id: 'joshua',    managed_by: null },
 ];
 
+const SHARED_MANAGER_ASSIGNMENTS = [
+  { rep_user_id: 'demo-ava', manager_user_id: 'joshua' },
+];
+
 /** The old, defective construction — kept so the test proves it was the cause. */
 function handRolledRepsByManager(rows) {
   const out = {};
@@ -82,4 +86,11 @@ test('it does not mutate its input', () => {
   const reps = ['a'];
   TM.withBoardOwner('m', reps);
   assert.deepStrictEqual(reps, ['a']);
+});
+
+test('an additional manager sees the shared closer on their team without moving the closer from their home manager', () => {
+  const members = TM.membersByManager(PROFILES, SHARED_MANAGER_ASSIGNMENTS);
+  assert.ok(members[JOSH].includes('demo-ava'), 'the home manager still has the closer');
+  assert.ok(members.joshua.includes('demo-ava'), 'the additional manager also has the closer');
+  assert.ok(members.joshua.includes('joshua'), 'the additional manager remains on their own board');
 });

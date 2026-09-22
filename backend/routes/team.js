@@ -87,9 +87,18 @@ function isCoachingReviewEligible(call, analysis) {
    This used to call auth.admin.listUsers on EVERY team request (~1s each). */
 async function emailMap(admin) { return emailMapFor(admin); }
 async function repIdsFor(admin, keyId) {
-  var r = await admin.from('user_profiles').select('user_id').eq('managed_by', keyId);
-  if (r.error) throw new Error('reps lookup: ' + r.error.message);
-  return (r.data || []).map(function (x) { return x.user_id; });
+  var results = await Promise.all([
+    admin.from('user_profiles').select('user_id').eq('managed_by', keyId),
+    admin.from('manager_rep_assignments').select('rep_user_id').eq('manager_user_id', keyId),
+  ]);
+  if (results[0].error || results[1].error) {
+    throw new Error('reps lookup: ' + ((results[0].error || results[1].error).message));
+  }
+  var ids = (results[0].data || []).map(function (x) { return x.user_id; });
+  (results[1].data || []).forEach(function (x) {
+    if (x && x.rep_user_id && ids.indexOf(x.rep_user_id) === -1) ids.push(x.rep_user_id);
+  });
+  return ids;
 }
 /* ⚠⚠ THE COMPANY NAME COMES FROM lib/company.js, NOT FROM A LOCAL STRING.
    Before this, TWO places here built a team label and BOTH produced an email

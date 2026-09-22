@@ -24,17 +24,17 @@ const resolveTeam = require('../routes/team')._resolveTeam;
 
 // A supabase double carrying one small org: an owner with 1 rep, and a manager
 // with 1 rep on a DIFFERENT board — the shape that produced the bug.
-function fakeAdmin(profiles) {
+function fakeAdmin(profiles, assignments) {
   return {
-    from() {
+    from(table) {
       const q = {
-        _rows: profiles, _eqCol: null, _eqVal: null,
+        _rows: table === 'manager_rep_assignments' ? (assignments || []) : profiles, _eqCol: null, _eqVal: null,
         select() { return q; },
         eq(c, v) { q._eqCol = c; q._eqVal = v; return q; },
         async maybeSingle() {
-          return { data: profiles.filter((p) => p[q._eqCol] === q._eqVal)[0] || null, error: null };
+          return { data: q._rows.filter((p) => p[q._eqCol] === q._eqVal)[0] || null, error: null };
         },
-        then(res) { res({ data: profiles.filter((p) => q._eqCol ? p[q._eqCol] === q._eqVal : true), error: null }); },
+        then(res) { res({ data: q._rows.filter((p) => q._eqCol ? p[q._eqCol] === q._eqVal : true), error: null }); },
       };
       return q;
     },
@@ -80,6 +80,13 @@ test('⚠ rep= IS IGNORED FOR A NON-OWNER — a manager only ever sees their own
   const t = await resolveTeam(fakeAdmin(PROFILES), { user: { id: 'mgr', role: 'manager' }, query: { rep: 'own-rep' } });
   assert.strictEqual(t.mode, 'own');
   assert.strictEqual(t.keyId, 'mgr', 'a rep hint must not let a manager resolve another board');
+});
+
+test('an additional manager resolves a board with the closer shared to them', async () => {
+  const t = await resolveTeam(fakeAdmin(PROFILES, [{ manager_user_id: 'mgr', rep_user_id: 'own-rep' }]),
+    { user: { id: 'mgr', role: 'manager' }, query: {} });
+  assert.ok(t.memberIds.includes('own-rep'), 'shared closer must be on the additional manager’s board');
+  assert.ok(t.memberIds.includes('mgr'), 'the manager remains part of their own board');
 });
 
 test('⚠⚠ THE CLIENT ACTUALLY SENDS IT — a server that accepts rep= changes nothing alone', () => {

@@ -34,7 +34,8 @@ function canTagOutcome(actor, ownerProfile) {
   if (!actor || !ownerProfile) return false;
   var ownerId = ownerProfile.user_id;
   if (actor.role === 'owner') return true;
-  if (actor.role === 'manager') return ownerId === actor.id || ownerProfile.managed_by === actor.id;
+  if (actor.role === 'manager') return ownerId === actor.id || ownerProfile.managed_by === actor.id
+    || (Array.isArray(ownerProfile.manager_ids) && ownerProfile.manager_ids.indexOf(actor.id) !== -1);
   // plain user: only their OWN call, and only if they are unmanaged.
   return ownerId === actor.id && !ownerProfile.managed_by;
 }
@@ -63,7 +64,8 @@ function canMarkNotSalesCall(actor, ownerProfile) {
   if (!actor || !ownerProfile) return false;
   var ownerId = ownerProfile.user_id;
   if (actor.role === 'owner') return true;
-  if (actor.role === 'manager') return ownerId === actor.id || ownerProfile.managed_by === actor.id;
+  if (actor.role === 'manager') return ownerId === actor.id || ownerProfile.managed_by === actor.id
+    || (Array.isArray(ownerProfile.manager_ids) && ownerProfile.manager_ids.indexOf(actor.id) !== -1);
   return ownerId === actor.id;          // a closer may always mark their OWN call
 }
 

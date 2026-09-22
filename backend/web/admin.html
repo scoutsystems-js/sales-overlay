@@ -979,6 +979,7 @@
       var roleCell = editable ? roleControlHtml(u)
         : '<span class="role-badge ' + roleBadgeClass(u.role) + '">' + escapeHtml(roleLabel(u.role)) + (isSelf ? '<span class="self-tag">(you)</span>' : '') + '</span>';
       var mbCell = editable ? managedByControlHtml(u, mgrs) : managedByLabel(u);
+      var sharedManagersCell = editable ? sharedManagersControlHtml(u, mgrs) : sharedManagersLabel(u, mgrs);
       var billCell = editable ? billingControlHtml(u) : '<span class="role-badge user">' + escapeHtml(u.billing_status || 'trial') + '</span>';
       var created = u.created_at ? shortDate(u.created_at) : '—';
       var emailDisplay = u.email || (u.user_id.slice(0, 8) + '…');
@@ -1006,12 +1007,13 @@
         + '<td>' + escapeHtml(emailDisplay) + '</td>'
         + '<td>' + roleCell + '</td>'
         + '<td>' + mbCell + '</td>'
+        + '<td>' + sharedManagersCell + '</td>'
         + '<td>' + billCell + '</td>'
         + '<td>' + statusCell + '</td>'
         + '<td style="color:var(--muted);font-size:12px;">' + escapeHtml(created) + '</td>'
         + '<td>' + (actions || (offerBtn ? '<div class="admin-actions">' + offerBtn + '</div>' : '')) + '</td>'
       + '</tr>'
-      + '<tr class="offer-editor-row" id="offer-row-' + u.user_id + '" hidden><td colspan="8"><div id="offer-editor-' + u.user_id + '"></div></td></tr>';
+      + '<tr class="offer-editor-row" id="offer-row-' + u.user_id + '" hidden><td colspan="9"><div id="offer-editor-' + u.user_id + '"></div></td></tr>';
 
   }
 
@@ -1043,7 +1045,7 @@
     if (status) { status.textContent = '✓ saved'; status.className = 'field-status ok'; }
   }
 
-  var USERS_TABLE_HEADER = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Company</th><th>Billing</th><th>Status</th><th>Created</th><th></th></tr>';
+  var USERS_TABLE_HEADER = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Company</th><th>Also managed by</th><th>Billing</th><th>Status</th><th>Created</th><th></th></tr>';
 
   function usersTableHtml(list, isOwnerViewer, mgrs, emptyMsg) {
     if (!list.length) return '<div class="empty-msg">' + escapeHtml(emptyMsg) + '</div>';
@@ -1322,6 +1324,47 @@
     if (!u.managed_by) return '<span style="font-size:12px;opacity:0.6;">— none</span>';
     var m = usersArray.filter(function(x) { return x.user_id === u.managed_by; })[0];
     return '<span style="font-size:12px;">' + escapeHtml(m ? (m.email || u.managed_by.slice(0, 8)) : u.managed_by.slice(0, 8)) + '</span>';
+  }
+
+  function sharedManagersLabel(u, mgrs) {
+    var ids = (u.manager_ids || []).filter(function(id) { return id !== u.managed_by; });
+    if (!ids.length) return '<span style="font-size:12px;opacity:0.6;">—</span>';
+    return '<span style="font-size:12px;">' + ids.map(function(id) {
+      var manager = mgrs.filter(function(row) { return row.user_id === id; })[0];
+      return escapeHtml(manager ? (manager.email || id.slice(0, 8)) : id.slice(0, 8));
+    }).join(', ') + '</span>';
+  }
+  function sharedManagersControlHtml(u, mgrs) {
+    if (!u.managed_by) return '<span style="font-size:12px;opacity:0.6;">Choose a home manager first</span>';
+    var ids = u.manager_ids || [u.managed_by];
+    var choices = mgrs.filter(function(manager) { return manager.user_id !== u.user_id && manager.user_id !== u.managed_by; });
+    if (!choices.length) return '<span style="font-size:12px;opacity:0.6;">—</span>';
+    return '<div class="shared-manager-control" data-user-id="' + escapeHtml(u.user_id) + '">'
+      + choices.map(function(manager) {
+        var label = manager.email || manager.user_id.slice(0, 8);
+        return '<label style="display:block;font-size:12px;white-space:nowrap;"><input type="checkbox" value="' + escapeHtml(manager.user_id) + '"'
+          + (ids.indexOf(manager.user_id) !== -1 ? ' checked' : '') + '> ' + escapeHtml(label) + '</label>';
+      }).join('')
+      + '<button class="btn-resend" type="button" onclick="saveSharedManagers(\'' + u.user_id + '\')">Save</button></div>';
+  }
+  async function saveSharedManagers(userId) {
+    var host = document.querySelector('.shared-manager-control[data-user-id="' + CSS.escape(userId) + '"]');
+    if (!host) return;
+    var user = usersArray.filter(function(row) { return row.user_id === userId; })[0];
+    if (!user || !user.managed_by) return;
+    var selected = Array.prototype.slice.call(host.querySelectorAll('input:checked')).map(function(input) { return input.value; });
+    var res;
+    try {
+      res = await fetch('/admin/users/' + encodeURIComponent(userId) + '/managers', {
+        method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+        body: JSON.stringify({ manager_ids: [user.managed_by].concat(selected) }),
+      });
+    } catch (e) { alert('Could not reach the server.'); return; }
+    if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
+    var data = null; try { data = await res.json(); } catch (e) {}
+    if (!res.ok) { alert((data && data.error) || 'Could not save manager access.'); return; }
+    user.manager_ids = data.manager_ids || [user.managed_by];
+    renderUsersTable();
   }
 
   // Save-on-change for role / managed_by / billing_status. Inline ✓ / ✗ feedback;

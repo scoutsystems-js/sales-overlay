@@ -16675,7 +16675,9 @@
        render NOTHING rather than the viewer's own context. */
     var key = (o && o.team && o.team.key) || (state.teamSelected ? null : state.me.user_id);
     if (!key) return { key: null, members: [] };
-    return { key: key, members: (state.users || []).filter(function (u) { return u.managed_by === key; }) };
+    return { key: key, members: (state.users || []).filter(function (u) {
+      return (u.manager_ids || [u.managed_by]).indexOf(key) !== -1;
+    }) };
   }
   function teamMembersBodyHtml() {
     if (!state.users) return laneWaitHtml('users', 'Listing the team\u2026', null, 120);

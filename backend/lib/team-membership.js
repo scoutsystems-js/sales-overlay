@@ -31,11 +31,18 @@ function withBoardOwner(keyId, repIds) {
  * their own list. Only users who actually have reps become keys — having a
  * manager does not make you one.
  * @param {Array<{user_id:string, managed_by:string|null}>} rows
+ * @param {Array<{rep_user_id:string, manager_user_id:string}>} sharedAssignments
  */
-function membersByManager(rows) {
+function membersByManager(rows, sharedAssignments) {
   var reps = {};
   (rows || []).forEach(function (p) {
     if (p && p.managed_by) (reps[p.managed_by] = reps[p.managed_by] || []).push(p.user_id);
+  });
+  (sharedAssignments || []).forEach(function (assignment) {
+    if (!assignment || !assignment.rep_user_id || !assignment.manager_user_id) return;
+    var managerId = assignment.manager_user_id;
+    var repIds = reps[managerId] = reps[managerId] || [];
+    if (repIds.indexOf(assignment.rep_user_id) === -1) repIds.push(assignment.rep_user_id);
   });
   var out = {};
   Object.keys(reps).forEach(function (keyId) { out[keyId] = withBoardOwner(keyId, reps[keyId]); });

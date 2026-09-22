@@ -59,6 +59,18 @@ function handleConfigError(err, res) {
   return false;
 }
 
+async function attachManagerIds(admin, profile) {
+  if (!profile || !profile.user_id) return profile;
+  var shared = await admin.from('manager_rep_assignments').select('manager_user_id').eq('rep_user_id', profile.user_id);
+  if (shared.error) throw new Error('shared manager lookup: ' + shared.error.message);
+  var ids = profile.managed_by ? [profile.managed_by] : [];
+  (shared.data || []).forEach(function (row) {
+    if (row && row.manager_user_id && ids.indexOf(row.manager_user_id) === -1) ids.push(row.manager_user_id);
+  });
+  profile.manager_ids = ids;
+  return profile;
+}
+
 var DEFAULT_LIMIT = 50;
 var MAX_LIMIT = 100;
 var LOG_HARD_CAP = 10000;
@@ -612,6 +624,7 @@ router.patch('/calls/:call_id/outcome', requireAuth, async function(req, res) {
     var profs = await admin.from('user_profiles').select('user_id, role, managed_by').in('user_id', [ownerId, req.user.id]);
     var rows = (profs.data || []);
     var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0] || { user_id: ownerId, managed_by: null };
+    await attachManagerIds(admin, ownerProfile);
     var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
     var actorRole = (actorRow && actorRow.role) || req.userProfileRole || 'user';
     if (!canTagOutcome({ id: req.user.id, role: actorRole }, ownerProfile)) {
@@ -1046,6 +1059,7 @@ router.post('/calls/:id/prospect-name', requireAuth, async function (req, res) {
     var profs = await admin.from('user_profiles').select('user_id, role, managed_by').in('user_id', [ownerId, req.user.id]);
     var rows = (profs.data || []);
     var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0] || { user_id: ownerId, managed_by: null };
+    await attachManagerIds(admin, ownerProfile);
     var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
     var actor = { id: req.user.id, role: (actorRow && actorRow.role) || req.userProfileRole || 'user' };
     if (!canMarkNotSalesCall(actor, ownerProfile)) {
@@ -1076,6 +1090,7 @@ router.post('/calls/:id/call-kind', requireAuth, async function (req, res) {
     var profs = await admin.from('user_profiles').select('user_id, role, managed_by').in('user_id', [ownerId, req.user.id]);
     var rows = (profs.data || []);
     var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0] || { user_id: ownerId, managed_by: null };
+    await attachManagerIds(admin, ownerProfile);
     var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
     var actor = { id: req.user.id, role: (actorRow && actorRow.role) || req.userProfileRole || 'user' };
     if (!canMarkNotSalesCall(actor, ownerProfile)) {
@@ -1117,6 +1132,7 @@ router.post('/calls/:id/not-a-sales-call', requireAuth, async function (req, res
     var rows = (profs.data || []);
     var ownerProfile = rows.filter(function (p) { return p.user_id === ownerId; })[0]
       || { user_id: ownerId, managed_by: null };
+    await attachManagerIds(admin, ownerProfile);
     var actorRow = rows.filter(function (p) { return p.user_id === req.user.id; })[0];
     var actorRole = (actorRow && actorRow.role) || req.userProfileRole || 'user';
     var actor = { id: req.user.id, role: actorRole };

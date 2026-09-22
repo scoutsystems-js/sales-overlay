@@ -21,6 +21,17 @@ test('canManageTarget: manager only their own reps', () => {
   assert.strictEqual(um.canManageTarget('manager', 'm1', null), false);
 });
 
+test('canManageTarget: manager may manage a closer explicitly shared with them', () => {
+  assert.strictEqual(um.canManageTarget('manager', 'm2', {
+    managed_by: 'm1',
+    manager_ids: ['m1', 'm2'],
+  }), true);
+  assert.strictEqual(um.canManageTarget('manager', 'm3', {
+    managed_by: 'm1',
+    manager_ids: ['m1', 'm2'],
+  }), false);
+});
+
 test('canManageTarget: plain user can manage nobody', () => {
   assert.strictEqual(um.canManageTarget('user', 'u1', { managed_by: 'u1' }), false);
 });

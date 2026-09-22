@@ -22,6 +22,13 @@ test('canTagOutcome: manager may tag own + managed reps, not others', () => {
   assert.strictEqual(ot.canTagOutcome(mgr, { user_id: 'rep2', managed_by: 'otherMgr' }), false); // not theirs
 });
 
+test('canTagOutcome: an additional manager may tag the closer they share', () => {
+  const manager = { id: 'm2', role: 'manager' };
+  const closer = { user_id: 'rep', managed_by: 'm1', manager_ids: ['m1', 'm2'] };
+  assert.strictEqual(ot.canTagOutcome(manager, closer), true);
+  assert.strictEqual(ot.canMarkNotSalesCall(manager, closer), true);
+});
+
 test('canTagOutcome: an UNMANAGED user may tag their own calls', () => {
   assert.strictEqual(ot.canTagOutcome({ id: 'u', role: 'user' }, { user_id: 'u', managed_by: null }), true);
 });
