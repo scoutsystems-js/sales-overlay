@@ -1345,7 +1345,8 @@
         return '<label style="display:block;font-size:12px;white-space:nowrap;"><input type="checkbox" value="' + escapeHtml(manager.user_id) + '"'
           + (ids.indexOf(manager.user_id) !== -1 ? ' checked' : '') + '> ' + escapeHtml(label) + '</label>';
       }).join('')
-      + '<button class="btn-resend" type="button" onclick="saveSharedManagers(\'' + u.user_id + '\')">Save</button></div>';
+      + '<button class="btn-resend" type="button" onclick="saveSharedManagers(\'' + u.user_id + '\')">Save</button>'
+      + '<span class="field-status" id="shared-managers-status-' + escapeHtml(u.user_id) + '"></span></div>';
   }
   async function saveSharedManagers(userId) {
     var host = document.querySelector('.shared-manager-control[data-user-id="' + CSS.escape(userId) + '"]');
@@ -1353,18 +1354,31 @@
     var user = usersArray.filter(function(row) { return row.user_id === userId; })[0];
     if (!user || !user.managed_by) return;
     var selected = Array.prototype.slice.call(host.querySelectorAll('input:checked')).map(function(input) { return input.value; });
+    var button = host.querySelector('button');
+    var status = document.getElementById('shared-managers-status-' + userId);
+    if (button) { button.disabled = true; button.textContent = 'Saving…'; }
+    if (status) { status.textContent = ''; status.className = 'field-status'; }
     var res;
     try {
       res = await fetch('/admin/users/' + encodeURIComponent(userId) + '/managers', {
         method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
         body: JSON.stringify({ manager_ids: [user.managed_by].concat(selected) }),
       });
-    } catch (e) { alert('Could not reach the server.'); return; }
+    } catch (e) {
+      if (button) { button.disabled = false; button.textContent = 'Save'; }
+      if (status) { status.textContent = '✗ network'; status.className = 'field-status err'; }
+      return;
+    }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
     var data = null; try { data = await res.json(); } catch (e) {}
-    if (!res.ok) { alert((data && data.error) || 'Could not save manager access.'); return; }
+    if (!res.ok) {
+      if (button) { button.disabled = false; button.textContent = 'Save'; }
+      if (status) { status.textContent = '✗ ' + ((data && data.error) || 'failed'); status.className = 'field-status err'; }
+      return;
+    }
     user.manager_ids = data.manager_ids || [user.managed_by];
-    renderUsersTable();
+    if (button) { button.disabled = false; button.textContent = 'Save'; }
+    if (status) { status.textContent = '✓ Saved'; status.className = 'field-status ok'; }
   }
 
   // Save-on-change for role / managed_by / billing_status. Inline ✓ / ✗ feedback;
