@@ -21,7 +21,13 @@ const ROOT = path.resolve(__dirname, '../../../../..');
 const KEY_FILE = path.join(ROOT, 'API Keys.md');
 const REPORT_FILE = path.join(process.env.HOME, 'Desktop/scan-reports/block-039-focus-evidence-reader/receipt.json');
 const RUN = process.argv.includes('--run');
-const TARGET_FEAR = process.argv.includes('--target-fear');
+function option(name) {
+  const inline = process.argv.find((arg) => arg.startsWith(name + '='));
+  if (inline) return inline.slice(name.length + 1).trim().toLowerCase() || null;
+  const index = process.argv.indexOf(name);
+  return index >= 0 && process.argv[index + 1] ? String(process.argv[index + 1]).trim().toLowerCase() : null;
+}
+const TARGET_CATEGORY = option('--target-category') || (process.argv.includes('--target-fear') ? 'fear' : null);
 const MAX_OUTPUT_TOKENS = 350;
 const SPECIMENS = [
   '93562168-253c-4fbe-8e46-df452dfdd165',
@@ -50,6 +56,14 @@ function focusFor(rows) {
   if (objection) return { stage: 'objection', category: objection.objection_category };
   const stage = (rows || []).find((row) => reader.normalizeFocus({ stage: row.section }));
   return stage ? { stage: stage.section } : null;
+}
+
+function uniqueProspectAnchor(turns, rows, category) {
+  const objection = (rows || []).find((row) => row.type === 'objection' && countsAsObjection(row) && row.objection_category === category && typeof row.quote === 'string');
+  if (!objection) return null;
+  const hits = (turns || []).map((turn, index) => ({ turn, index: index + 1 }))
+    .filter(({ turn }) => turn && turn.speaker === 'PROSPECT' && String(turn.text || '').includes(objection.quote));
+  return hits.length === 1 ? hits[0].index : null;
 }
 
 async function countTokens(apiKey, prompt) {
@@ -82,17 +96,17 @@ async function main() {
   const apiKey = key('ANTHROPIC_API_KEY');
   const supabase = createClient(key('SUPABASE_URL'), key('SUPABASE_SERVICE_ROLE_KEY'));
   let highlights;
-  if (TARGET_FEAR) {
+  if (TARGET_CATEGORY) {
     highlights = await supabase.from('call_highlights')
-      .select('fathom_call_id,type,section,objection_category,objection_class,resolution')
-      .eq('type', 'objection').eq('objection_category', 'fear').eq('resolution', 'handled').limit(80);
+      .select('fathom_call_id,type,section,objection_category,objection_class,resolution,quote')
+      .eq('type', 'objection').eq('objection_category', TARGET_CATEGORY).eq('resolution', 'handled').limit(80);
   } else {
     highlights = await supabase.from('call_highlights')
-      .select('fathom_call_id,type,section,objection_category,objection_class,resolution')
+      .select('fathom_call_id,type,section,objection_category,objection_class,resolution,quote')
       .in('fathom_call_id', SPECIMENS);
   }
   if (highlights.error) throw new Error('Read-only highlight query failed: ' + highlights.error.message);
-  const ids = TARGET_FEAR
+  const ids = TARGET_CATEGORY
     ? [...new Set((highlights.data || []).filter(countsAsObjection).map((row) => row.fathom_call_id))].slice(0, 20)
     : SPECIMENS;
   const analyses = await supabase.from('call_analyses').select('fathom_call_id,transcript_stored').in('fathom_call_id', ids);
@@ -101,12 +115,15 @@ async function main() {
   (highlights.data || []).forEach((row) => { (highlightByCall[row.fathom_call_id] ||= []).push(row); });
   const items = (analyses.data || []).map((row) => {
     const turns = row.transcript_stored && row.transcript_stored.turns;
-    const focus = TARGET_FEAR ? { stage: 'objection', category: 'fear' } : focusFor(highlightByCall[row.fathom_call_id]);
-    return { id: row.fathom_call_id, turns, focus };
-  }).filter((item) => item.focus && matchedTurns(item.turns)).slice(0, 5);
+    const focus = TARGET_CATEGORY ? { stage: 'objection', category: TARGET_CATEGORY } : focusFor(highlightByCall[row.fathom_call_id]);
+    const concernTurn = TARGET_CATEGORY ? uniqueProspectAnchor(turns, highlightByCall[row.fathom_call_id], TARGET_CATEGORY) : null;
+    return { id: row.fathom_call_id, turns, focus, concernTurn };
+  }).filter((item) => item.focus && matchedTurns(item.turns) && (!TARGET_CATEGORY || item.concernTurn)).slice(0, 5);
   if (!items.length) throw new Error('The fixed sandbox contains no usable focus/transcript pair.');
   for (const item of items) {
-    item.prompt = reader.buildPrompt(item.focus, item.turns);
+    item.prompt = TARGET_CATEGORY
+      ? reader.buildObjectionResponseArcPrompt(item.turns, item.concernTurn)
+      : reader.buildPrompt(item.focus, item.turns);
     item.input_tokens = await countTokens(apiKey, item.prompt);
   }
   const inputTokens = items.reduce((sum, item) => sum + item.input_tokens, 0);
@@ -116,7 +133,7 @@ async function main() {
   const base = {
     purpose: 'Read-only proof of dedicated focus-specific turn-number evidence reader',
     model: CLAUDE_MODEL,
-    sample: TARGET_FEAR ? 'five explicit handled Fear candidates' : 'the original mixed five-call capture set',
+    sample: TARGET_CATEGORY ? 'five explicit handled ' + TARGET_CATEGORY + ' candidates' : 'the original mixed five-call capture set',
     specimens: items.length,
     input_tokens: inputTokens,
     max_output_tokens_per_call: MAX_OUTPUT_TOKENS,
@@ -133,7 +150,9 @@ async function main() {
     const response = await anthropic.messages.create({ model: CLAUDE_MODEL, max_tokens: MAX_OUTPUT_TOKENS, messages: [{ role: 'user', content: item.prompt }] });
     const text = (response.content || []).map((part) => part.text || '').join('');
     const candidate = reader.parseResponse(text);
-    const verified = reader.verifyCandidate(candidate, item.focus, item.turns);
+    const verified = TARGET_CATEGORY
+      ? reader.verifyObjectionResponseArc(candidate, item.concernTurn, item.turns)
+      : reader.verifyCandidate(candidate, item.focus, item.turns);
     responses.push(receiptRow(item, {
       shape: candidate ? 'object' : (String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim() === 'null' ? 'null' : 'invalid'),
       verified,

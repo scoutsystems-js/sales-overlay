@@ -63,3 +63,25 @@ test('the response parser treats a fenced null as an honest absence, not malform
   assert.equal(reader.parseResponse('```json\nnull\n```'), null);
   assert.deepEqual(reader.parseResponse('```json\n{"concern_turn": 1}\n```'), { concern_turn: 1 });
 });
+
+test('the broader objection arc anchors on the known concern and keeps only the factual next exchange', () => {
+  const result = reader.verifyObjectionResponseArc({
+    action_turns: [2, 4],
+    prospect_next_turn: 5,
+  }, 1, objectionTurns.concat({ speaker: 'PROSPECT', text: 'That makes sense. What would the first step be?' }));
+  assert.deepEqual(result, {
+    concern: { quote: objectionTurns[0].text, turn: 1 },
+    actions: [
+      { quote: objectionTurns[1].text, turn: 2 },
+      { quote: objectionTurns[3].text, turn: 4 },
+    ],
+    prospect_next: { quote: 'That makes sense. What would the first step be?', turn: 5 },
+  });
+});
+
+test('the broader objection arc withholds a missing next prospect response, closer anchor, or unordered actions', () => {
+  const turns = objectionTurns.concat({ speaker: 'PROSPECT', text: 'That makes sense.' });
+  assert.equal(reader.verifyObjectionResponseArc({ action_turns: [2], prospect_next_turn: 4 }, 1, turns), null);
+  assert.equal(reader.verifyObjectionResponseArc({ action_turns: [2], prospect_next_turn: 5 }, 2, turns), null);
+  assert.equal(reader.verifyObjectionResponseArc({ action_turns: [4, 2], prospect_next_turn: 5 }, 1, turns), null);
+});

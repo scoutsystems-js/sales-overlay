@@ -90,6 +90,28 @@ function verifyCandidate(candidate, rawFocus, turns) {
   return stageEvidence.verify(built.raw, focus.stage, turns, locate);
 }
 
+// Broader objection evidence: the concern is already a saved, exact focus
+// moment. The reader only locates the reply that followed and the prospect's
+// next recorded line. It makes no claim that the reply caused an outcome.
+function verifyObjectionResponseArc(candidate, concernTurn, turns) {
+  if (!candidate || typeof candidate !== 'object') return null;
+  const concern = turnAt(turns, concernTurn);
+  const actionNumbers = Array.isArray(candidate.action_turns) ? candidate.action_turns : [];
+  const prospectNext = turnAt(turns, candidate.prospect_next_turn);
+  if (!concern || concern.speaker !== 'PROSPECT' || !prospectNext || prospectNext.speaker !== 'PROSPECT') return null;
+  if (actionNumbers.length < 1 || actionNumbers.length > 3) return null;
+  const actions = actionNumbers.map((number) => turnAt(turns, number));
+  if (actions.some((action) => !action || action.speaker !== 'CLOSER')) return null;
+  if (new Set(actions.map((action) => action.index)).size !== actions.length) return null;
+  if (actions.some((action, index) => action.index <= concern.index || (index && actions[index - 1].index >= action.index))) return null;
+  if (prospectNext.index <= actions[actions.length - 1].index) return null;
+  return {
+    concern: { quote: concern.text, turn: concern.index },
+    actions: actions.map((action) => ({ quote: action.text, turn: action.index })),
+    prospect_next: { quote: prospectNext.text, turn: prospectNext.index },
+  };
+}
+
 function schemaFor(focus) {
   if (focus.stage === 'objection') {
     return '{"concern_turn":number,"check_turn":number,"confirmation_turn":number,"response_turn":number,"response_kind":"reframed|offered_path|addressed|continued_isolation|did_not_address"}';
@@ -129,6 +151,27 @@ function buildPrompt(rawFocus, turns) {
   ].join('\n\n');
 }
 
+function buildObjectionResponseArcPrompt(turns, concernTurn) {
+  const concern = turnAt(turns, concernTurn);
+  if (!concern || concern.speaker !== 'PROSPECT') throw new Error('A prospect-spoken objection turn is required.');
+  const start = Math.max(0, concern.index - 3);
+  const end = Math.min(turns.length, concern.index + 60);
+  const transcript = turns.slice(start, end).map((turn, offset) => {
+    const index = start + offset + 1;
+    return '[' + index + '] ' + turn.speaker + ': ' + String(turn.text || '').trim();
+  }).join('\n');
+  return [
+    'You are a factual evidence locator. You do not coach, grade, summarize, explain, or infer outcomes.',
+    'The known objection is the PROSPECT line at turn [' + concern.index + ']. Do not choose another concern.',
+    'Return the one to three CLOSER turns that directly respond to that objection, followed by the next PROSPECT turn after those selected actions.',
+    'Return JSON only, using turn numbers only. Never copy, shorten, paraphrase, combine wording, infer intent, or claim the response worked.',
+    'If there is no direct response followed by a prospect line, return null. Do not choose a later unrelated topic.',
+    'Required JSON shape: {"action_turns":[number],"prospect_next_turn":number}',
+    'Transcript window:',
+    transcript,
+  ].join('\n\n');
+}
+
 function extractFirstJsonObject(text) {
   const source = String(text || '').trim();
   const start = source.indexOf('{');
@@ -161,4 +204,4 @@ function parseResponse(text) {
   return cleaned === 'null' ? null : extractFirstJsonObject(cleaned);
 }
 
-module.exports = { normalizeFocus, verifyCandidate, buildPrompt, extractFirstJsonObject, parseResponse };
+module.exports = { normalizeFocus, verifyCandidate, verifyObjectionResponseArc, buildPrompt, buildObjectionResponseArcPrompt, extractFirstJsonObject, parseResponse };
