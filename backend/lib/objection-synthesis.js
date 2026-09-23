@@ -18,6 +18,7 @@ const { CLAUDE_MODEL } = require('../config');
 
 const { clipHref } = require('./clip-link');
 const { displayCloserResponse, provenCloserResponse } = require('./closer-side');
+const focusEvidenceReader = require('./focus-evidence-reader');
 const OBJECTION_CATEGORIES = require('./objection-categories').STORED_OBJECTION_CATEGORIES;   /* ⚠ ONE SOURCE (fix #7, H680): the ruled set in its stored order — never a literal copy here (sweep ③-3) */
 const SYNTH_MAX_TOKENS = 2500;
 
@@ -98,7 +99,7 @@ function clipUrl(meta, ts) {
   return clipHref(meta.recording_url, ts);
 }
 
-var SYNTH_PROMPT_VERSION = 'v9-2026-09-21-focus-population-alignment';
+var SYNTH_PROMPT_VERSION = 'v10-2026-09-23-review-response-arc';
 function buildSynthPrompt(present, byCat, material) {
   var lines = [
     'You are a high-ticket sales coach. For each objection category below, give the closer concise, actionable coaching structured as ISOLATE → REFRAME → OVERCOME:',
@@ -181,6 +182,56 @@ function mergeGuidance(present, byCat, guide, lossScope) {
       evidence: bucket.examples.slice(0, 2),
     };
   });
+}
+
+function transcriptTurns(stored) {
+  var raw = Array.isArray(stored) ? stored : (stored && Array.isArray(stored.turns) ? stored.turns : []);
+  return raw.filter(function(turn) {
+    return turn && (turn.speaker === 'CLOSER' || turn.speaker === 'PROSPECT') && typeof turn.text === 'string' && turn.text.trim();
+  }).map(function(turn) { return { speaker: turn.speaker, text: turn.text.trim() }; });
+}
+
+// The page has one current coaching focus. Read only its existing review call;
+// a general multi-category request must never fan out into model calls.
+async function attachFocusReviewArc(categories, focus, readArc) {
+  if (!focus || typeof focus.label !== 'string' || typeof readArc !== 'function') return categories;
+  var wanted = normSurface(focus.label);
+  var index = (categories || []).findIndex(function(category) {
+    return category && normSurface(category.category) === wanted && category.review_example;
+  });
+  if (index < 0) return categories;
+  var arc = await readArc(categories[index].review_example);
+  if (!arc) return categories;
+  return categories.map(function(category, current) {
+    if (current !== index) return category;
+    return Object.assign({}, category, {
+      review_example: Object.assign({}, category.review_example, { response_arc: arc }),
+    });
+  });
+}
+
+async function readReviewResponseArc(admin, userId, review) {
+  if (!review || !review.call_id || !review.quote) return null;
+  try {
+    var source = await admin.from('call_analyses')
+      .select('transcript_stored').eq('fathom_call_id', review.call_id).eq('status', 'done').maybeSingle();
+    if (source.error || !source.data) return null;
+    var turns = transcriptTurns(source.data.transcript_stored);
+    var concernTurn = focusEvidenceReader.findUniqueProspectConcern(turns, review.quote);
+    if (!concernTurn) return null;
+    var response = await createWithUsage({
+      model: CLAUDE_MODEL,
+      max_tokens: 180,
+      messages: [{ role: 'user', content: focusEvidenceReader.buildObjectionResponseArcPrompt(turns, concernTurn) }],
+    }, { userId: userId, callId: review.call_id });
+    var candidate = focusEvidenceReader.parseResponse(response.content && response.content[0] ? response.content[0].text : '');
+    return focusEvidenceReader.verifyObjectionResponseArc(candidate, concernTurn, turns);
+  } catch (err) {
+    // This is optional proof attached to an already-valid coaching result. Its
+    // absence must not hide the advice or re-label a call as a successful arc.
+    console.warn('[synthesis] review response arc unavailable for call %s: %s', review.call_id, err && err.message);
+    return null;
+  }
 }
 
 async function computeObjectionSynthesis(admin, userId, from, to, focus) {
@@ -323,6 +374,9 @@ async function computeObjectionSynthesis(admin, userId, from, to, focus) {
   var guide = {};
   parsed.categories.forEach(function(g) { if (g && g.category) guide[String(g.category).toLowerCase()] = g; });
   var categories = mergeGuidance(present, byCat, guide, lossScope);
+  categories = await attachFocusReviewArc(categories, focus, function(review) {
+    return readReviewResponseArc(admin, userId, review);
+  });
   var synthesis = { categories: categories, generated_at: new Date().toISOString() };
 
   // 7) cache (best-effort — a cache write failure shouldn't fail the response).
@@ -334,4 +388,4 @@ async function computeObjectionSynthesis(admin, userId, from, to, focus) {
   return Object.assign({ available: true, cached: false }, synthesis);
 }
 
-module.exports = { computeObjectionSynthesis: computeObjectionSynthesis, focusFromQuery: focusFromQuery, _buildSynthPrompt: buildSynthPrompt, _mergeGuidance: mergeGuidance, _eligibleObjectionRows: eligibleObjectionRows, _focusRows: focusRows, _focusFromQuery: focusFromQuery, _SYNTH_PROMPT_VERSION: SYNTH_PROMPT_VERSION };
+module.exports = { computeObjectionSynthesis: computeObjectionSynthesis, focusFromQuery: focusFromQuery, _buildSynthPrompt: buildSynthPrompt, _mergeGuidance: mergeGuidance, _attachFocusReviewArc: attachFocusReviewArc, _eligibleObjectionRows: eligibleObjectionRows, _focusRows: focusRows, _focusFromQuery: focusFromQuery, _SYNTH_PROMPT_VERSION: SYNTH_PROMPT_VERSION };

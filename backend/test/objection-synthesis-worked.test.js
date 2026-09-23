@@ -179,3 +179,30 @@ test('a handled objection on an open or lost call is never presented as a model 
   assert.equal(result[0].review_example, null);
   assert.equal(result[0].practice, null);
 });
+
+test('a response arc attaches only to the currently selected focus review call, regardless of objection category', async () => {
+  const categories = [
+    { category: 'fear', review_example: { call_id: 'fear-call' } },
+    { category: 'timing', review_example: { call_id: 'timing-call' } },
+  ];
+  const reads = [];
+  const result = await synthesis._attachFocusReviewArc(categories, { label: 'Timing', surfaces: ['Need to wait'] }, async (review) => {
+    reads.push(review.call_id);
+    return { concern: { quote: 'I need to wait.', turn: 4 }, actions: [{ quote: 'What needs to change?', turn: 5 }], prospect_next: { quote: 'I need next month.', turn: 6 } };
+  });
+
+  assert.deepEqual(reads, ['timing-call']);
+  assert.equal(result[0].review_example.response_arc, undefined);
+  assert.deepEqual(result[1].review_example.response_arc.actions, [{ quote: 'What needs to change?', turn: 5 }]);
+});
+
+test('a response arc is not read without an active focus or a verified result', async () => {
+  const categories = [{ category: 'partner', review_example: { call_id: 'partner-call' } }];
+  let reads = 0;
+  const withoutFocus = await synthesis._attachFocusReviewArc(categories, null, async () => { reads += 1; return {}; });
+  const withoutEvidence = await synthesis._attachFocusReviewArc(categories, { label: 'Partner', surfaces: ['My partner'] }, async () => { reads += 1; return null; });
+
+  assert.equal(reads, 1);
+  assert.equal(withoutFocus[0].review_example.response_arc, undefined);
+  assert.equal(withoutEvidence[0].review_example.response_arc, undefined);
+});

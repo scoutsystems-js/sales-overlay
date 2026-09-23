@@ -28,6 +28,24 @@ function turnAt(turns, number) {
   return { index, speaker: turn.speaker, text: turn.text.trim() };
 }
 
+function comparableText(value) {
+  return String(value || '')
+    .replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/(?:…|\.\.\.)\s*$/, '')
+    .replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+// A saved objection surface may be a verbatim excerpt of a longer prospect
+// turn. It is useful only when it locates exactly one prospect-spoken line;
+// choosing a convenient duplicate would turn evidence into a guess.
+function findUniqueProspectConcern(turns, savedQuote) {
+  const needle = comparableText(savedQuote);
+  if (needle.length < 12 || !Array.isArray(turns)) return null;
+  const matches = turns.map((turn, index) => ({ turn, index: index + 1 }))
+    .filter(({ turn }) => turn && turn.speaker === 'PROSPECT' && comparableText(turn.text).includes(needle));
+  return matches.length === 1 ? matches[0].index : null;
+}
+
 function locateAtCandidateIndex(candidateIndex) {
   return function (turns, quote) {
     const hit = turnAt(turns, candidateIndex);
@@ -204,4 +222,4 @@ function parseResponse(text) {
   return cleaned === 'null' ? null : extractFirstJsonObject(cleaned);
 }
 
-module.exports = { normalizeFocus, verifyCandidate, verifyObjectionResponseArc, buildPrompt, buildObjectionResponseArcPrompt, extractFirstJsonObject, parseResponse };
+module.exports = { normalizeFocus, verifyCandidate, verifyObjectionResponseArc, findUniqueProspectConcern, buildPrompt, buildObjectionResponseArcPrompt, extractFirstJsonObject, parseResponse };

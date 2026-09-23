@@ -6006,6 +6006,8 @@
     body[data-view="overview"] .coaching-brief-practice { color:#effff5; font-size:16px; font-weight:var(--fw-emphasis); line-height:1.45; }
     body[data-view="overview"] .coaching-brief-review-name { color:#effff5; font-size:16px; font-weight:var(--fw-emphasis); line-height:1.35; }
     body[data-view="overview"] .coaching-brief-review-meta { margin-top:4px; color:#b8d5c2; font-size:13px; }
+    body[data-view="overview"] .coaching-brief-review-arc { display:grid; gap:7px; margin-top:12px; color:#d8eadd; font-size:14px; font-weight:var(--fw-normal); line-height:1.45; }
+    body[data-view="overview"] .coaching-brief-review-arc b { color:#94b9a1; font-size:10px; font-weight:var(--fw-emphasis); letter-spacing:.1em; text-transform:uppercase; }
     body[data-view="overview"] .coaching-brief-review-link { display:inline-block; margin-top:10px; color:#72ffad; font-size:13px; font-weight:var(--fw-emphasis); text-decoration:none; }
     body[data-view="overview"] .coaching-brief-proof-meta { color:#a9c9b3; font-size:11px; letter-spacing:.08em; text-align:right; text-transform:uppercase; white-space:nowrap; }
     body[data-view="overview"] .coaching-brief-footer { display:flex; justify-content:space-between; gap:16px; padding:14px 34px; color:#aac3b6; font-size:12px; border-top:1px solid rgba(196,231,207,.12); }
@@ -10414,8 +10416,15 @@
         var reviewExample = focusCoaching.review_example;
         var reviewDate = reviewExample.call_date ? dayLabel(String(reviewExample.call_date).slice(0, 10)) : 'This call';
         var reviewName = reviewExample.prospect_name || reviewDate;
+        var arc = reviewExample.response_arc;
+        var reviewArc = '';
+        if (arc && arc.concern && Array.isArray(arc.actions) && arc.actions.length && arc.prospect_next) {
+          var shortQuote = function (value) { var text = String(value || '').trim(); return text.length > 280 ? text.slice(0, 277).trim() + '…' : text; };
+          var actions = arc.actions.map(function (action) { return shortQuote(action && action.quote); }).filter(Boolean).join(' ');
+          if (actions) reviewArc = '<div class="coaching-brief-review-arc"><div><b>They said</b> “' + escapeHtml(shortQuote(arc.concern.quote)) + '”</div><div><b>You said</b> “' + escapeHtml(actions) + '”</div><div><b>Then they said</b> “' + escapeHtml(shortQuote(arc.prospect_next.quote)) + '”</div></div>';
+        }
         quickBlocks += '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">A call to review</strong><div class="coaching-brief-review-name">' + escapeHtml(reviewName) + '</div><div class="coaching-brief-review-meta">' + escapeHtml(reviewDate + ' · ' + focusLabel + ' handled · Closed') + '</div>'
-          + '<a class="coaching-brief-review-link" href="#call/' + encodeURIComponent(reviewExample.call_id) + '" onclick="openCallReview(\'' + escapeHtml(reviewExample.call_id) + '\'); return false;">Open this call →</a></div>';
+          + reviewArc + '<a class="coaching-brief-review-link" href="#call/' + encodeURIComponent(reviewExample.call_id) + '" onclick="openCallReview(\'' + escapeHtml(reviewExample.call_id) + '\'); return false;">Open this call →</a></div>';
       } else {
         quickBlocks += '<div class="coaching-brief-quick-block">No handled-and-closed ' + escapeHtml(focusLabel) + ' call found for these dates.</div>';
       }

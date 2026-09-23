@@ -85,3 +85,14 @@ test('the broader objection arc withholds a missing next prospect response, clos
   assert.equal(reader.verifyObjectionResponseArc({ action_turns: [2], prospect_next_turn: 5 }, 2, turns), null);
   assert.equal(reader.verifyObjectionResponseArc({ action_turns: [4, 2], prospect_next_turn: 5 }, 1, turns), null);
 });
+
+test('the response reader finds one exact prospect concern and refuses an ambiguous or wrong-speaker saved moment', () => {
+  const turns = [
+    { speaker: 'PROSPECT', text: 'I need to think about the timing before I decide.' },
+    { speaker: 'CLOSER', text: 'What part of the timing concerns you?' },
+    { speaker: 'PROSPECT', text: 'I need to think about the timing before I decide.' },
+  ];
+  assert.equal(reader.findUniqueProspectConcern(turns, 'I need to think about the timing'), null);
+  assert.equal(reader.findUniqueProspectConcern(turns.slice(0, 2), 'What part of the timing concerns you?'), null);
+  assert.equal(reader.findUniqueProspectConcern(turns.slice(0, 2), 'I need to think about the timing'), 1);
+});
