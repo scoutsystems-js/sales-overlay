@@ -92,3 +92,21 @@ test('⚠⚠ A DEEP-LINKED TEAM / EOD / ACCOUNT VIEW PAINTS BEFORE THE PERSONAL 
   const boot = HTML.match(/<div id="content">([\s\S]*?)<\/div><\/div>/);
   assert.ok(boot && /Loading your dashboard/.test(boot[1]), 'the boot state says what it is doing: ' + (boot && boot[1]));
 });
+
+/* The overview has one request that owns its first meaningful paint:
+   /me/analytics2. Provider status is deliberately slower because Fathom status
+   also checks whether older analyses need an update. That housekeeping must
+   never hold the coaching page on its loading screen. */
+test('⚠⚠ OVERVIEW PAINTS ON CORE ANALYTICS, NOT THE SLOW SOURCE-STATUS LANES', () => {
+  const body = stripComments(fnBody(LIVE, 'reloadAll'));
+  const support = body.indexOf('var supportingLanes = Promise.all([');
+  const core = body.indexOf('var analytics = await fetchAnalytics2();');
+  const paint = body.indexOf('state.analytics2     = analytics;');
+  const settle = body.indexOf('supportingLanes.then(function(results) {');
+  assert.ok(support >= 0, 'supporting status lanes must start alongside the core request');
+  assert.ok(core > support, 'core analytics must begin after the supporting lanes start');
+  assert.ok(paint > core, 'core analytics must paint the overview when it lands');
+  assert.ok(settle > paint, 'source status must update after the initial overview paint');
+  assert.equal(/await\s+supportingLanes/.test(body), false,
+    'the overview is still waiting for source-status housekeeping before painting');
+});

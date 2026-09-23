@@ -9880,24 +9880,38 @@
             .then(function (r) { return r.ok ? r.json() : null; })
             .catch(function () { return null; })
         : Promise.resolve(null);
-      var results = await Promise.all([
+      /*
+       * The source-status lane is useful, but it is not the dashboard itself.
+       * In particular Fathom status also scans for old analyses so it can offer
+       * an "Update analyses" action. That scan used to hold the whole overview
+       * behind the loading screen even after the core coaching numbers were
+       * ready. Start it at the same time, but let the overview paint on the one
+       * request it actually needs. The source strips and onboarding card render
+       * only once these facts arrive, so an unknown connection never flashes as
+       * disconnected.
+       */
+      var supportingLanes = Promise.all([
         fathomPromise,
-        fetchAnalytics2(),
         zoomPromise,
         backlogPromise,
       ]);
+      var analytics = await fetchAnalytics2();
       if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
-      state.fathomStatus   = results[0];
-      state.analytics2     = results[1];
+      state.analytics2     = analytics;
       clearLaneWait('analytics2');
-      state.zoomStatus     = results[2];
-      state.gradingBacklog = results[3];
       render();
       // ⚠ THE READINESS SIGNAL THE WELCOME HOLD POLLS. Set AFTER render(), so
       // "ready" means the board is actually painted, not merely fetched. It is
       // only ever read by a capped poll that gives up on its own — nothing
       // awaits it, so forgetting to set it can only shorten the ceremony.
       markDashboardReady();
+      supportingLanes.then(function(results) {
+        if (epoch !== viewEpoch) return;
+        state.fathomStatus   = results[0];
+        state.zoomStatus     = results[1];
+        state.gradingBacklog = results[2];
+        rerenderConnectionViews();
+      });
     } catch (err) {
       if (epoch !== viewEpoch) return;   /* H775: a pivot happened while this was in flight — the answer belongs to the previous viewer */
       if (err.message === 'unauth') return;
@@ -10197,6 +10211,11 @@
        null and the card would reappear reading like a fresh account. It was
        never right to show a manager onboarding steps for someone else. */
     if (!isSelf()) return '';
+    // Connection status is deliberately a background lane at boot. Until both
+    // answers arrive, showing an onboarding card would guess that a connected
+    // closer is disconnected. Wait silently, then render the established card
+    // from the real status values.
+    if (state.fathomStatus === null || state.zoomStatus === null) return '';
     var connected = anySourceConnected();
     /* ⚠⚠ THIS CARD USED TO DELETE ITSELF THE MOMENT ONE CALL WAS GRADED, having
        just said "Your recent calls are graded." A live customer synced 121,
