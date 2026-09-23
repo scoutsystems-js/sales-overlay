@@ -13,6 +13,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const ta = require('../lib/team-analytics');
 const sa = require('../lib/session-analytics');
+const teamRouter = require('../routes/team');
 
 function slowAdmin(tables, delayMs, stats) {
   return {
@@ -100,4 +101,19 @@ test('⚠⚠ computeTeamObjections fetches each family\'s chunks at once', async
   assert.strictEqual(out.totals.total, N, 'every objection counted once across the chunks');
   const seq = await to.computeTeamObjections(slowAdmin(TABLES, 0, { total: 0, inflight: 0, max: 0 }), ['A'], FROM, TO, { strict: false, keyId: 'A' });
   assert.deepStrictEqual(out, seq, 'ordering must not change the answer');
+});
+
+test('⚠⚠ Team Performance keeps call-ID URLs bounded while reading several chunks at once', async () => {
+  let inFlight = 0, maxInFlight = 0;
+  const ids = Array.from({ length: 250 }, function (_, i) { return 'call-' + i; });
+  const rows = await teamRouter._readCallChunks(ids, async function (slice) {
+    inFlight++; maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise(function (resolve) { setTimeout(resolve, 10); });
+    inFlight--;
+    return { data: slice, error: null };
+  });
+  assert.strictEqual(rows.length, 3, '250 ids remain three URL-safe chunks');
+  assert.deepStrictEqual(rows.flatMap(function (row) { return row.data; }), ids,
+    'responses preserve chunk order, so the graph data cannot reorder');
+  assert.strictEqual(maxInFlight, 3, 'the three requests start together instead of waiting one after another');
 });

@@ -70,6 +70,25 @@ function rangeFrom(req) {
   return { from: from, to: to };
 }
 
+/* Performance graphs keep the 100-id ceiling that protects PostgREST URLs,
+   but must not make a reader wait for every safe request one at a time. Three
+   requests at once is the established evidence-reader limit: it lowers normal
+   round-trip time without turning one dashboard visit into an unbounded burst. */
+async function readCallChunks(ids, read) {
+  var chunks = [];
+  for (var i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+  var results = new Array(chunks.length);
+  var next = 0;
+  async function worker() {
+    while (next < chunks.length) {
+      var index = next++;
+      results[index] = await read(chunks[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(3, chunks.length) }, worker));
+  return results;
+}
+
 /* The Call Review queue is for coaching a real sales conversation. This is a
    display filter only: it never marks or removes a call. A human-confirmed
    not-sales call is already excluded at the query; this also keeps ungraded
@@ -766,22 +785,29 @@ router.get('/rep-series', teamGate, async function (req, res) {
     calls = realCallsOnly(calls);
 
     var ids = calls.map(function (c) { return c.id; });
-    var analyses = [], objections = [];
-    for (var i = 0; i < ids.length; i += CHUNK) {
-      var slice = ids.slice(i, i + CHUNK);
+    var windowRows = await Promise.all([
+      readCallChunks(ids, function (slice) {
       // price_stated_at_seconds drives the third graph (item j). Selecting it
       // here is the same class of omission that made the Part-1b section tags
       // invisible — the component was fine, the SELECT did not fetch the column.
       /* ⚠ `overall_score` ADDED FOR THE SCORE SERIES — populated on 1,555 of
-         1,589 done analyses. Same shape: one field on an existing query. */
-      var aq = await admin.from('call_analyses').select('fathom_call_id, outcome, price_stated_at_seconds, overall_score').in('fathom_call_id', slice).eq('status', 'done');
+       1,589 done analyses. Same shape: one field on an existing query. */
+        return admin.from('call_analyses').select('fathom_call_id, outcome, price_stated_at_seconds, overall_score').in('fathom_call_id', slice).eq('status', 'done');
+      }),
+      readCallChunks(ids, function (slice) {
+        return admin.from('call_highlights').select('fathom_call_id, resolution, objection_category, objection_class')   /* ⚠ buildRepSeries calls countsAsObjection on these rows — the column must travel (H674) */
+        .in('fathom_call_id', slice).eq('type', 'objection');
+      })
+    ]);
+    var analyses = [], objections = [];
+    windowRows[0].forEach(function (aq) {
       if (aq.error) throw new Error('call_analyses: ' + aq.error.message);
       analyses = analyses.concat(aq.data || []);
-      var oq = await admin.from('call_highlights').select('fathom_call_id, resolution, objection_category, objection_class')   /* ⚠ buildRepSeries calls countsAsObjection on these rows — the column must travel (H674) */
-        .in('fathom_call_id', slice).eq('type', 'objection');
+    });
+    windowRows[1].forEach(function (oq) {
       if (oq.error) throw new Error('call_highlights: ' + oq.error.message);
       objections = objections.concat(oq.data || []);
-    }
+    });
 
     // A rep with NO calls in the window is absent from the chart entirely —
     // not drawn as a flat zero, and not an empty legend entry implying a line.
@@ -803,11 +829,13 @@ router.get('/rep-series', teamGate, async function (req, res) {
     var known = {}; ids.forEach(function (id) { known[id] = true; });
     var extraIds = prospectCalls.map(function (c) { return c.id; }).filter(function (id) { return !known[id]; });
     var prospectAnalyses = [];
-    for (var xi = 0; xi < extraIds.length; xi += CHUNK) {
-      var xq = await admin.from('call_analyses').select('fathom_call_id, outcome').in('fathom_call_id', extraIds.slice(xi, xi + CHUNK)).eq('status', 'done');
+    var prospectAnalysisRows = await readCallChunks(extraIds, function (slice) {
+      return admin.from('call_analyses').select('fathom_call_id, outcome').in('fathom_call_id', slice).eq('status', 'done');
+    });
+    prospectAnalysisRows.forEach(function (xq) {
       if (xq.error) throw new Error('call_analyses (prospect history): ' + xq.error.message);
       prospectAnalyses = prospectAnalyses.concat(xq.data || []);
-    }
+    });
     var withCalls = {}; calls.forEach(function (c) { withCalls[c.user_id] = true; });
     var em = await emailMap(admin);
     /* ⚠⚠ price_pif IS NO LONGER SELECTED HERE, AND THAT IS THE POINT (2026-08-31).
@@ -1166,6 +1194,7 @@ router.get('/call-review', teamGate, async function (req, res) {
 router._resolveTeam = resolveTeam;
 router._repIdsFor = repIdsFor;
 router._isCoachingReviewEligible = isCoachingReviewEligible;
+router._readCallChunks = readCallChunks;
 
 
 /* ⚠⚠ THE REVIEW QUEUE (Justin's ruling 2026-09-03, H712). Every "not a sales call" verdict the
