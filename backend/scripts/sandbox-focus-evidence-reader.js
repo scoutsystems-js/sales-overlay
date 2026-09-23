@@ -21,6 +21,7 @@ const ROOT = path.resolve(__dirname, '../../../../..');
 const KEY_FILE = path.join(ROOT, 'API Keys.md');
 const REPORT_FILE = path.join(process.env.HOME, 'Desktop/scan-reports/block-039-focus-evidence-reader/receipt.json');
 const RUN = process.argv.includes('--run');
+const TARGET_FEAR = process.argv.includes('--target-fear');
 const MAX_OUTPUT_TOKENS = 350;
 const SPECIMENS = [
   '93562168-253c-4fbe-8e46-df452dfdd165',
@@ -80,19 +81,29 @@ function receiptRow(item, result) {
 async function main() {
   const apiKey = key('ANTHROPIC_API_KEY');
   const supabase = createClient(key('SUPABASE_URL'), key('SUPABASE_SERVICE_ROLE_KEY'));
-  const [analyses, highlights] = await Promise.all([
-    supabase.from('call_analyses').select('fathom_call_id,transcript_stored').in('fathom_call_id', SPECIMENS),
-    supabase.from('call_highlights').select('fathom_call_id,type,section,objection_category,objection_class').in('fathom_call_id', SPECIMENS),
-  ]);
-  if (analyses.error) throw new Error('Read-only transcript query failed: ' + analyses.error.message);
+  let highlights;
+  if (TARGET_FEAR) {
+    highlights = await supabase.from('call_highlights')
+      .select('fathom_call_id,type,section,objection_category,objection_class,resolution')
+      .eq('type', 'objection').eq('objection_category', 'fear').eq('resolution', 'handled').limit(80);
+  } else {
+    highlights = await supabase.from('call_highlights')
+      .select('fathom_call_id,type,section,objection_category,objection_class,resolution')
+      .in('fathom_call_id', SPECIMENS);
+  }
   if (highlights.error) throw new Error('Read-only highlight query failed: ' + highlights.error.message);
+  const ids = TARGET_FEAR
+    ? [...new Set((highlights.data || []).filter(countsAsObjection).map((row) => row.fathom_call_id))].slice(0, 20)
+    : SPECIMENS;
+  const analyses = await supabase.from('call_analyses').select('fathom_call_id,transcript_stored').in('fathom_call_id', ids);
+  if (analyses.error) throw new Error('Read-only transcript query failed: ' + analyses.error.message);
   const highlightByCall = {};
   (highlights.data || []).forEach((row) => { (highlightByCall[row.fathom_call_id] ||= []).push(row); });
   const items = (analyses.data || []).map((row) => {
     const turns = row.transcript_stored && row.transcript_stored.turns;
-    const focus = focusFor(highlightByCall[row.fathom_call_id]);
+    const focus = TARGET_FEAR ? { stage: 'objection', category: 'fear' } : focusFor(highlightByCall[row.fathom_call_id]);
     return { id: row.fathom_call_id, turns, focus };
-  }).filter((item) => item.focus && matchedTurns(item.turns));
+  }).filter((item) => item.focus && matchedTurns(item.turns)).slice(0, 5);
   if (!items.length) throw new Error('The fixed sandbox contains no usable focus/transcript pair.');
   for (const item of items) {
     item.prompt = reader.buildPrompt(item.focus, item.turns);
@@ -105,6 +116,7 @@ async function main() {
   const base = {
     purpose: 'Read-only proof of dedicated focus-specific turn-number evidence reader',
     model: CLAUDE_MODEL,
+    sample: TARGET_FEAR ? 'five explicit handled Fear candidates' : 'the original mixed five-call capture set',
     specimens: items.length,
     input_tokens: inputTokens,
     max_output_tokens_per_call: MAX_OUTPUT_TOKENS,
