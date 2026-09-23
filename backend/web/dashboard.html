@@ -10421,7 +10421,7 @@
         if (arc && arc.concern && Array.isArray(arc.actions) && arc.actions.length && arc.prospect_next) {
           var shortQuote = function (value) { var text = String(value || '').trim(); return text.length > 280 ? text.slice(0, 277).trim() + '…' : text; };
           var actions = arc.actions.map(function (action) { return shortQuote(action && action.quote); }).filter(Boolean).join(' ');
-          if (actions) reviewArc = '<div class="coaching-brief-review-arc"><div><b>They said</b> “' + escapeHtml(shortQuote(arc.concern.quote)) + '”</div><div><b>You said</b> “' + escapeHtml(actions) + '”</div><div><b>Then they said</b> “' + escapeHtml(shortQuote(arc.prospect_next.quote)) + '”</div></div>';
+          if (actions) reviewArc = '<div class="coaching-brief-review-arc"><b>What happened</b><div>The prospect raised a ' + escapeHtml(String(focusLabel || '').toLowerCase()) + ' concern: “' + escapeHtml(shortQuote(arc.concern.quote)) + '”</div><div>You said: “' + escapeHtml(actions) + '”</div><div>Then the prospect said: “' + escapeHtml(shortQuote(arc.prospect_next.quote)) + '”</div></div>';
         }
         quickBlocks += '<div class="coaching-brief-quick-block"><strong class="coaching-brief-quick-label">A call to review</strong><div class="coaching-brief-review-name">' + escapeHtml(reviewName) + '</div><div class="coaching-brief-review-meta">' + escapeHtml(reviewDate + ' · ' + focusLabel + ' handled · Closed') + '</div>'
           + reviewArc + '<a class="coaching-brief-review-link" href="#call/' + encodeURIComponent(reviewExample.call_id) + '" onclick="openCallReview(\'' + escapeHtml(reviewExample.call_id) + '\'); return false;">Open this call →</a></div>';
