@@ -124,10 +124,23 @@ router.get('/', requireAuth, async function (req, res) {
        day looked identical to a finished one.
        ⚠ The NEWEST sync across his sources: if any source has run since the day
        ended, everything that source had a chance to deliver is here. */
+    // These reads have no dependency on one another. Start them together so an
+    // EOD report does not make a closer wait through three separate round trips
+    // before it can even decide whether there are calls on the selected day.
+    var fq = admin.from('fathom_connections').select('last_sync_at').eq('user_id', userId).maybeSingle();
+    var zq = admin.from('call_connections').select('last_sync_at').eq('user_id', userId);
+    var callsQ = admin.from('fathom_calls')
+      .select('id, title, call_date, recording_url, call_kind, follows_call_id')
+      .eq('user_id', userId)
+      .gte('call_date', bounds.fromIso).lt('call_date', bounds.toIso)
+      .not('not_a_sales_call', 'is', true)
+      .is('duplicate_of', null)
+      .order('call_date', { ascending: true });
+    var initialReads = await Promise.all([fq, zq, callsQ]);
+    fq = initialReads[0]; zq = initialReads[1]; callsQ = initialReads[2];
+
     var syncTimes = [];
-    var fq = await admin.from('fathom_connections').select('last_sync_at').eq('user_id', userId).maybeSingle();
     if (!fq.error && fq.data) syncTimes.push(fq.data.last_sync_at || null);
-    var zq = await admin.from('call_connections').select('last_sync_at').eq('user_id', userId);
     if (!zq.error) (zq.data || []).forEach(function (c) { syncTimes.push(c.last_sync_at || null); });
     var connected = syncTimes.length > 0;
     var newest = syncTimes.filter(Boolean).sort().pop() || null;
@@ -135,28 +148,23 @@ router.get('/', requireAuth, async function (req, res) {
       date: date, lastSyncAt: newest, dayEndsIso: bounds.toIso, connected: connected, now: new Date(),
     });
 
-    var callsQ = await admin.from('fathom_calls')
-      .select('id, title, call_date, recording_url, call_kind, follows_call_id')
-      .eq('user_id', userId)
-      .gte('call_date', bounds.fromIso).lt('call_date', bounds.toIso)
-      .not('not_a_sales_call', 'is', true)
-      .is('duplicate_of', null)
-      .order('call_date', { ascending: true });
     if (callsQ.error) throw new Error('fathom_calls: ' + callsQ.error.message);
     var calls = callsQ.data || [];
     if (calls.length === 0) return res.json({ date: date, calls: [], sync: freshness });
 
     var callIds = calls.map(function (c) { return c.id; });
-    var anQ = await admin.from('call_analyses')
+    var anQ = admin.from('call_analyses')
       .select('fathom_call_id, status, outcome, overall_summary, eod_summary, cash_collected, payment_structure, prospect_name')
       .in('fathom_call_id', callIds);
+    var edQ = admin.from('eod_edits')
+      .select('fathom_call_id, field, value')
+      .eq('user_id', userId).in('fathom_call_id', callIds);
+    var detailReads = await Promise.all([anQ, edQ]);
+    anQ = detailReads[0]; edQ = detailReads[1];
     if (anQ.error) throw new Error('call_analyses: ' + anQ.error.message);
     var anByCall = {};
     (anQ.data || []).forEach(function (a) { anByCall[a.fathom_call_id] = a; });
 
-    var edQ = await admin.from('eod_edits')
-      .select('fathom_call_id, field, value')
-      .eq('user_id', userId).in('fathom_call_id', callIds);
     if (edQ.error) throw new Error('eod_edits: ' + edQ.error.message);
     var edByCall = {};
     (edQ.data || []).forEach(function (e) {
