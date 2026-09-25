@@ -29,6 +29,7 @@ const { linkTargetsSetPassword } = require('../lib/recovery-link');
 const provisionUser = require('../lib/provision-user');
 const { applyPriceFields } = require('../lib/price-fields');
 const { applyOfferFields } = require('../lib/offer-fields');   // H730
+const { normalizeCompanyBillingDraft } = require('../lib/company-billing');
 const fathomRoutes = require('./fathom'); // for _loadCallsList / _parseCallListOpts (admin-pivot call list)
 
 var router = express.Router();
@@ -616,6 +617,85 @@ async function companyMembers(admin, headId) {
   if (r.error) throw new Error('member lookup failed: ' + r.error.message);
   return r.data || [];
 }
+
+// A company is still Scout's existing team shape: a named team head or a head
+// with at least one directly managed rep. Billing must not turn every manager
+// row into a billable company merely because the owner knows their id.
+async function assertCompanyHead(admin, headId) {
+  var head = await admin.from('user_profiles')
+    .select('user_id, role, team_name').eq('user_id', headId).maybeSingle();
+  if (head.error) throw new Error('company head lookup failed: ' + head.error.message);
+  if (!head.data || (head.data.role !== 'manager' && head.data.role !== 'owner')) return null;
+  if (head.data.team_name && head.data.team_name.trim()) return head.data;
+  var reps = await admin.from('user_profiles').select('user_id').eq('managed_by', headId).limit(1);
+  if (reps.error) throw new Error('company member lookup failed: ' + reps.error.message);
+  return (reps.data || []).length ? head.data : null;
+}
+
+// ── Company billing draft ──────────────────────────────────────────────────
+// Owner-only and intentionally API-first: a public checkout or a generic promo
+// field would expand the commercial surface before the account has been set up.
+// The owner chooses the closer count and the approved $197/$97 rate here; the
+// checkout route can only read this saved draft.
+router.get('/companies/:head_id/billing', requireAuth, requireRole('owner'), async function(req, res) {
+  try {
+    var admin = getAdminClient();
+    var head = await assertCompanyHead(admin, req.params.head_id);
+    if (!head) return res.status(404).json({ error: 'No company found for that team head.' });
+    var found = await admin.from('company_billing').select('*')
+      .eq('company_head_id', req.params.head_id).maybeSingle();
+    if (found.error) throw new Error('company billing lookup failed: ' + found.error.message);
+    res.json({ company_head_id: req.params.head_id, billing: found.data || null });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company billing lookup:', err.message);
+    res.status(500).json({ error: 'Could not load company billing' });
+  }
+});
+
+router.put('/companies/:head_id/billing', requireAuth, requireRole('owner'), async function(req, res) {
+  var draft;
+  try {
+    draft = normalizeCompanyBillingDraft(req.body);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  try {
+    var admin = getAdminClient();
+    var head = await assertCompanyHead(admin, req.params.head_id);
+    if (!head) return res.status(404).json({ error: 'No company found for that team head.' });
+
+    var current = await admin.from('company_billing').select('status')
+      .eq('company_head_id', req.params.head_id).maybeSingle();
+    if (current.error) throw new Error('company billing lookup failed: ' + current.error.message);
+    if (current.data && ['active', 'trialing', 'past_due'].indexOf(current.data.status) !== -1) {
+      return res.status(409).json({ error: 'This company already has a Stripe subscription. Change it in Stripe, not by replacing the Scout billing draft.' });
+    }
+
+    var now = new Date().toISOString();
+    var saved = await admin.from('company_billing').upsert(Object.assign({}, draft, {
+      company_head_id: req.params.head_id,
+      provider: 'stripe',
+      status: 'draft',
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      stripe_checkout_session_id: null,
+      stripe_price_id: null,
+      current_period_end: null,
+      created_by: req.user.id,
+      updated_at: now,
+    }), { onConflict: 'company_head_id' }).select('*').single();
+    if (saved.error) throw new Error('company billing save failed: ' + saved.error.message);
+    console.log('[admin] company billing draft saved: actor=%s head=%s closer_seats=%d rate=%s',
+      req.user.id, req.params.head_id, draft.closer_seats, draft.rate_code);
+    res.json({ ok: true, billing: saved.data });
+  } catch (err) {
+    if (handleConfigError(err, res)) return;
+    console.error('[admin] company billing save:', err.message);
+    res.status(500).json({ error: 'Could not save company billing' });
+  }
+});
 
 // ── POST /admin/companies/:head_id/deactivate ───────────────────────────────
 // Nobody in the company can log in. EVERY NUMBER THEY PRODUCED STAYS (Justin's
