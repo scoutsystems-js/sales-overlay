@@ -67,10 +67,10 @@ router.post('/checkout', requireAuth, async function(req, res) {
   }
 });
 
-// Owner-created company checkout for the launch offer. The browser cannot send
-// a price, coupon, seat count, or customer email here: all four come from the
-// owner-saved company_billing draft. That keeps the $97 launch rate an admin
-// decision and prevents a future pricing-card edit from becoming a charge.
+// Owner-created company checkout for the current per-seat offer. The browser cannot send
+// a price, coupon, seat count, or customer email here: all of it comes from the
+// owner-saved company_billing draft. That keeps both current seat prices under
+// owner control and prevents a future pricing-card edit from becoming a charge.
 router.post('/admin/companies/:head_id/checkout', requireAuth, requireRole('owner'), async function(req, res) {
   try {
     var supabase = getSupabase();
@@ -89,15 +89,17 @@ router.post('/admin/companies/:head_id/checkout', requireAuth, requireRole('owne
     var saved = await supabase.from('company_billing').update({
       status: 'checkout_started',
       stripe_checkout_session_id: session.id,
-      stripe_price_id: params.line_items[0].price,
+      stripe_closer_price_id: params.line_items.filter(function (item) { return item.price === process.env.STRIPE_CLOSER_197_PRICE_ID; })[0] ? process.env.STRIPE_CLOSER_197_PRICE_ID : null,
+      stripe_manager_price_id: params.line_items.filter(function (item) { return item.price === process.env.STRIPE_MANAGER_297_PRICE_ID; })[0] ? process.env.STRIPE_MANAGER_297_PRICE_ID : null,
       updated_at: new Date().toISOString(),
     }).eq('company_head_id', req.params.head_id).eq('status', 'draft')
       .select('company_head_id').maybeSingle();
     if (saved.error) throw new Error('company checkout state save failed: ' + saved.error.message);
     if (!saved.data) throw new Error('company billing draft changed before checkout state could be saved');
 
-    console.log('[billing] company checkout created: actor=%s head=%s seats=%d rate=%s',
-      req.user.id, req.params.head_id, params.line_items[0].quantity, params.metadata.rate_code);
+    console.log('[billing] company checkout created: actor=%s head=%s closer_seats=%d manager_seats=%d',
+      req.user.id, req.params.head_id,
+      draftResult.data.closer_seats, draftResult.data.manager_seats);
     res.json({ url: session.url });
   } catch (err) {
     if (handleConfigError(err, res)) return;

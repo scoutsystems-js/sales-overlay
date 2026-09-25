@@ -39,10 +39,10 @@ function post(port) {
 
 test('only an owner can create checkout, and its line item comes from the saved draft', async () => {
   const priorStandard = process.env.STRIPE_CLOSER_197_PRICE_ID;
-  const priorLaunch = process.env.STRIPE_CLOSER_LAUNCH_97_PRICE_ID;
+  const priorManager = process.env.STRIPE_MANAGER_297_PRICE_ID;
   process.env.STRIPE_CLOSER_197_PRICE_ID = 'price_standard';
-  process.env.STRIPE_CLOSER_LAUNCH_97_PRICE_ID = 'price_launch';
-  const draft = { company_head_id: HEAD, billing_email: 'billing@example.com', closer_seats: 9, rate_code: 'closer_launch_97', status: 'draft' };
+  process.env.STRIPE_MANAGER_297_PRICE_ID = 'price_manager';
+  const draft = { company_head_id: HEAD, billing_email: 'billing@example.com', closer_seats: 9, manager_seats: 2, status: 'draft' };
   const calls = [];
   const supabase = { from(table) {
     const state = { table, payload: null, filters: {} };
@@ -67,12 +67,13 @@ test('only an owner can create checkout, and its line item comes from the saved 
     assert.strictEqual(result.status, 200, result.body);
     assert.strictEqual(calls.length, 1);
     assert.strictEqual(calls[0].line_items[0].quantity, 9);
-    assert.strictEqual(calls[0].line_items[0].price, 'price_launch');
+    assert.strictEqual(calls[0].line_items[0].price, 'price_standard');
+    assert.strictEqual(calls[0].line_items[1].price, 'price_manager');
   } finally {
     server.close(); h.restore();
     if (priorStandard === undefined) delete process.env.STRIPE_CLOSER_197_PRICE_ID;
     else process.env.STRIPE_CLOSER_197_PRICE_ID = priorStandard;
-    if (priorLaunch === undefined) delete process.env.STRIPE_CLOSER_LAUNCH_97_PRICE_ID;
-    else process.env.STRIPE_CLOSER_LAUNCH_97_PRICE_ID = priorLaunch;
+    if (priorManager === undefined) delete process.env.STRIPE_MANAGER_297_PRICE_ID;
+    else process.env.STRIPE_MANAGER_297_PRICE_ID = priorManager;
   }
 });

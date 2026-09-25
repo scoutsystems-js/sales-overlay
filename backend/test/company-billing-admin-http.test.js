@@ -79,24 +79,24 @@ async function serve(actor, writes, status) {
   return { h, server, port: server.address().port };
 }
 
-test('company billing draft is owner-only and saves only closer seats plus an approved rate', async () => {
+test('company billing draft is owner-only and saves closer and manager access seats', async () => {
   const actor = { current: { id: 'manager', role: 'manager' } };
   const writes = [];
   const { h, server, port } = await serve(actor, writes);
   try {
-    const body = { billing_email: 'billing@example.com', closer_seats: 9, rate_code: 'closer_launch_97' };
-    assert.strictEqual((await put(port, actor, body)).status, 403, 'a manager cannot assign discounted billing');
+    const body = { billing_email: 'billing@example.com', closer_seats: 9, manager_seats: 2 };
+    assert.strictEqual((await put(port, actor, body)).status, 403, 'a manager cannot create a charge path');
 
     actor.current = { id: 'owner', role: 'owner' };
     const good = await put(port, actor, body);
     assert.strictEqual(good.status, 200, good.body);
     const saved = JSON.parse(good.body).billing;
     assert.strictEqual(saved.closer_seats, 9);
-    assert.strictEqual(saved.rate_code, 'closer_launch_97');
+    assert.strictEqual(saved.manager_seats, 2);
     assert.strictEqual(saved.status, 'draft');
 
-    const invalid = await put(port, actor, Object.assign({}, body, { closer_seats: 0 }));
-    assert.strictEqual(invalid.status, 400, 'a zero-seat company subscription must be refused');
+    const invalid = await put(port, actor, Object.assign({}, body, { closer_seats: 0, manager_seats: 0 }));
+    assert.strictEqual(invalid.status, 400, 'an empty company subscription must be refused');
   } finally {
     server.close();
     h.restore();

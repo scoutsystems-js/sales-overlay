@@ -635,8 +635,8 @@ async function assertCompanyHead(admin, headId) {
 // ── Company billing draft ──────────────────────────────────────────────────
 // Owner-only and intentionally API-first: a public checkout or a generic promo
 // field would expand the commercial surface before the account has been set up.
-// The owner chooses the closer count and the approved $197/$97 rate here; the
-// checkout route can only read this saved draft.
+// The owner chooses the closer and manager seat counts here; the checkout route
+// can only read this saved draft.
 router.get('/companies/:head_id/billing', requireAuth, requireRole('owner'), async function(req, res) {
   try {
     var admin = getAdminClient();
@@ -681,14 +681,15 @@ router.put('/companies/:head_id/billing', requireAuth, requireRole('owner'), asy
       stripe_customer_id: null,
       stripe_subscription_id: null,
       stripe_checkout_session_id: null,
-      stripe_price_id: null,
+      stripe_closer_price_id: null,
+      stripe_manager_price_id: null,
       current_period_end: null,
       created_by: req.user.id,
       updated_at: now,
     }), { onConflict: 'company_head_id' }).select('*').single();
     if (saved.error) throw new Error('company billing save failed: ' + saved.error.message);
-    console.log('[admin] company billing draft saved: actor=%s head=%s closer_seats=%d rate=%s',
-      req.user.id, req.params.head_id, draft.closer_seats, draft.rate_code);
+    console.log('[admin] company billing draft saved: actor=%s head=%s closer_seats=%d manager_seats=%d',
+      req.user.id, req.params.head_id, draft.closer_seats, draft.manager_seats);
     res.json({ ok: true, billing: saved.data });
   } catch (err) {
     if (handleConfigError(err, res)) return;

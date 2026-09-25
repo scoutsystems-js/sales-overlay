@@ -1083,9 +1083,9 @@
     + '</div>';
   }
 
-  /* Billing stays inside the owner console while launch pricing is controlled.
-     There is no public price or promo input: the owner records closer seats and
-     one approved rate, then may create a hosted Stripe link. */
+  /* Billing stays inside the owner console while per-seat pricing is controlled.
+     There is no public price or promo input: the owner records closer and
+     manager-access seats, then may create a hosted Stripe link. */
   async function toggleCompanyBilling(headId) {
     var row = document.getElementById('company-billing-row-' + headId);
     var host = document.getElementById('company-billing-editor-' + headId);
@@ -1104,15 +1104,13 @@
     var host = document.getElementById('company-billing-editor-' + headId); if (!host) return;
     var b = billing || {}; var status = b.status || 'not configured';
     var locked = ['active', 'trialing', 'past_due'].indexOf(b.status) !== -1;
-    var standard = b.rate_code === 'closer_197' ? ' selected' : '';
-    var launch = b.rate_code === 'closer_launch_97' ? ' selected' : '';
     var note = locked
       ? 'This company has a Stripe subscription. Change it in Stripe; Scout will not silently replace it.'
-      : 'Closer seats only. Managers are included for access and are not billed in this launch offer.';
+      : 'Each closer is $197/month. Each manager-access seat is $297/month. Scout never changes these seat counts automatically.';
     host.innerHTML = '<div class="offer-editor">'
       + '<label class="offer-field"><span>Billing Email</span><input class="modal-input" id="company-billing-email-' + headId + '" value="' + escapeHtml(b.billing_email || '') + '" ' + (locked ? 'disabled' : '') + '></label>'
-      + '<label class="offer-field"><span>Closer Seats</span><input class="modal-input" id="company-billing-seats-' + headId + '" type="number" min="1" max="500" value="' + escapeHtml(String(b.closer_seats || 1)) + '" ' + (locked ? 'disabled' : '') + '></label>'
-      + '<label class="offer-field"><span>Approved Rate</span><select class="role-select" id="company-billing-rate-' + headId + '" ' + (locked ? 'disabled' : '') + '><option value="closer_197"' + standard + '>$197 per closer / month</option><option value="closer_launch_97"' + launch + '>$97 launch rate per closer / month</option></select></label>'
+      + '<label class="offer-field"><span>Closer Seats</span><input class="modal-input" id="company-billing-seats-' + headId + '" type="number" min="0" max="500" value="' + escapeHtml(String(b.closer_seats || 1)) + '" ' + (locked ? 'disabled' : '') + '></label>'
+      + '<label class="offer-field"><span>Manager Access Seats</span><input class="modal-input" id="company-billing-managers-' + headId + '" type="number" min="0" max="100" value="' + escapeHtml(String(b.manager_seats || 0)) + '" ' + (locked ? 'disabled' : '') + '></label>'
       + '<div class="offer-editor-foot">'
       + (locked ? '' : '<button class="btn-resend" onclick="saveCompanyBilling(\'' + headId + '\')">Save Billing Draft</button>')
       + (b.status === 'draft' ? '<button class="btn-resend" onclick="createCompanyCheckout(\'' + headId + '\')">Create Checkout Link</button>' : '')
@@ -1123,11 +1121,11 @@
     var status = document.getElementById('company-billing-status-' + headId);
     var email = document.getElementById('company-billing-email-' + headId);
     var seats = document.getElementById('company-billing-seats-' + headId);
-    var rate = document.getElementById('company-billing-rate-' + headId);
-    if (!email || !seats || !rate) return;
+    var managers = document.getElementById('company-billing-managers-' + headId);
+    if (!email || !seats || !managers) return;
     if (status) { status.textContent = 'Saving…'; status.className = 'field-status'; }
     var res;
-    try { res = await fetch('/admin/companies/' + encodeURIComponent(headId) + '/billing', { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ billing_email: email.value, closer_seats: Number(seats.value), rate_code: rate.value }) }); }
+    try { res = await fetch('/admin/companies/' + encodeURIComponent(headId) + '/billing', { method: 'PUT', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeader()), body: JSON.stringify({ billing_email: email.value, closer_seats: Number(seats.value), manager_seats: Number(managers.value) }) }); }
     catch (e) { if (status) { status.textContent = '✗ network'; status.className = 'field-status err'; } return; }
     if (res.status === 401) { clearSession(); window.location.replace('/login'); return; }
     var data; try { data = await res.json(); } catch (e) { data = {}; }

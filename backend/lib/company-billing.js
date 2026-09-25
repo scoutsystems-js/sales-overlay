@@ -1,22 +1,16 @@
 'use strict';
 
 /*
- * Company billing deliberately models only the launch offer:
- *   - one recurring price per closer seat;
- *   - an owner-selected standard or launch rate;
- *   - managers are included operationally but are never line items here.
+ * Company billing deliberately models only the current offer:
+ *   - $197 recurring price per closer seat;
+ *   - $297 recurring price per manager-access seat.
  *
  * Team and Agency packages are future commercial offers, not aliases for this
  * one. Keeping their names out of this module prevents a future price card from
  * accidentally becoming a charge path before its entitlements are built.
  */
-const RATE_CODES = Object.freeze({
-  CLOSER_197: 'closer_197',
-  CLOSER_LAUNCH_97: 'closer_launch_97',
-});
-
-const VALID_RATE_CODES = new Set(Object.values(RATE_CODES));
 const MAX_CLOSER_SEATS = 500;
+const MAX_MANAGER_SEATS = 100;
 
 function normalizeEmail(value) {
   if (typeof value !== 'string') return null;
@@ -32,31 +26,32 @@ function normalizeCompanyBillingDraft(input) {
   if (!billingEmail) throw new Error('billing_email must be a valid email address');
 
   const seats = value.closer_seats;
-  if (!Number.isInteger(seats) || seats < 1 || seats > MAX_CLOSER_SEATS) {
-    throw new Error('closer_seats must be a whole number from 1 to ' + MAX_CLOSER_SEATS);
+  if (!Number.isInteger(seats) || seats < 0 || seats > MAX_CLOSER_SEATS) {
+    throw new Error('closer_seats must be a whole number from 0 to ' + MAX_CLOSER_SEATS);
   }
-
-  if (!VALID_RATE_CODES.has(value.rate_code)) {
-    throw new Error('rate_code must be one of the approved closer rates');
+  const managerSeats = value.manager_seats;
+  if (!Number.isInteger(managerSeats) || managerSeats < 0 || managerSeats > MAX_MANAGER_SEATS) {
+    throw new Error('manager_seats must be a whole number from 0 to ' + MAX_MANAGER_SEATS);
+  }
+  if (seats + managerSeats < 1) {
+    throw new Error('At least one closer or manager seat is required');
   }
 
   return {
     billing_email: billingEmail,
     closer_seats: seats,
-    rate_code: value.rate_code,
+    manager_seats: managerSeats,
   };
 }
 
-function stripePriceIdFor(rateCode, env) {
-  const key = rateCode === RATE_CODES.CLOSER_197
-    ? 'STRIPE_CLOSER_197_PRICE_ID'
-    : rateCode === RATE_CODES.CLOSER_LAUNCH_97
-      ? 'STRIPE_CLOSER_LAUNCH_97_PRICE_ID'
-      : null;
-  if (!key || !env || !env[key]) {
-    throw new Error('Stripe price for this approved rate is not configured');
+function stripePriceIds(env) {
+  if (!env || !env.STRIPE_CLOSER_197_PRICE_ID || !env.STRIPE_MANAGER_297_PRICE_ID) {
+    throw new Error('Stripe closer and manager prices are not configured');
   }
-  return env[key];
+  return {
+    closer: env.STRIPE_CLOSER_197_PRICE_ID,
+    manager: env.STRIPE_MANAGER_297_PRICE_ID,
+  };
 }
 
 function buildCompanyCheckoutParams(draft, env, origin) {
@@ -67,26 +62,25 @@ function buildCompanyCheckoutParams(draft, env, origin) {
   if (!origin || !/^https:\/\//.test(origin)) {
     throw new Error('A secure canonical origin is required for checkout');
   }
+  const prices = stripePriceIds(env);
+  const lineItems = [];
+  if (normalized.closer_seats) lineItems.push({ price: prices.closer, quantity: normalized.closer_seats });
+  if (normalized.manager_seats) lineItems.push({ price: prices.manager, quantity: normalized.manager_seats });
 
   return {
     mode: 'subscription',
     payment_method_types: ['card'],
     allow_promotion_codes: false,
-    line_items: [{
-      price: stripePriceIdFor(normalized.rate_code, env),
-      quantity: normalized.closer_seats,
-    }],
+    line_items: lineItems,
     customer_email: normalized.billing_email,
     metadata: {
       billing_scope: 'company',
       company_head_id: draft.company_head_id,
-      rate_code: normalized.rate_code,
     },
     subscription_data: {
       metadata: {
         billing_scope: 'company',
         company_head_id: draft.company_head_id,
-        rate_code: normalized.rate_code,
       },
     },
     success_url: origin + '/dashboard?billing=success#admin',
@@ -101,10 +95,10 @@ function isStripeManagedCompanyBilling(row) {
 }
 
 module.exports = {
-  RATE_CODES,
   MAX_CLOSER_SEATS,
+  MAX_MANAGER_SEATS,
   normalizeCompanyBillingDraft,
-  stripePriceIdFor,
+  stripePriceIds,
   buildCompanyCheckoutParams,
   isStripeManagedCompanyBilling,
 };
