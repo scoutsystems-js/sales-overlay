@@ -3,7 +3,7 @@
 /*
  * Company billing deliberately models only the current offer:
  *   - $197 recurring price per closer seat;
- *   - $297 recurring price per manager-access seat.
+ *   - $497 recurring price per manager-access seat.
  *
  * Team and Agency packages are future commercial offers, not aliases for this
  * one. Keeping their names out of this module prevents a future price card from
@@ -45,12 +45,12 @@ function normalizeCompanyBillingDraft(input) {
 }
 
 function stripePriceIds(env) {
-  if (!env || !env.STRIPE_CLOSER_197_PRICE_ID || !env.STRIPE_MANAGER_297_PRICE_ID) {
+  if (!env || !env.STRIPE_CLOSER_197_PRICE_ID || !env.STRIPE_MANAGER_497_PRICE_ID) {
     throw new Error('Stripe closer and manager prices are not configured');
   }
   return {
     closer: env.STRIPE_CLOSER_197_PRICE_ID,
-    manager: env.STRIPE_MANAGER_297_PRICE_ID,
+    manager: env.STRIPE_MANAGER_497_PRICE_ID,
   };
 }
 

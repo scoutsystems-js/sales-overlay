@@ -90,7 +90,7 @@ router.post('/admin/companies/:head_id/checkout', requireAuth, requireRole('owne
       status: 'checkout_started',
       stripe_checkout_session_id: session.id,
       stripe_closer_price_id: params.line_items.filter(function (item) { return item.price === process.env.STRIPE_CLOSER_197_PRICE_ID; })[0] ? process.env.STRIPE_CLOSER_197_PRICE_ID : null,
-      stripe_manager_price_id: params.line_items.filter(function (item) { return item.price === process.env.STRIPE_MANAGER_297_PRICE_ID; })[0] ? process.env.STRIPE_MANAGER_297_PRICE_ID : null,
+      stripe_manager_price_id: params.line_items.filter(function (item) { return item.price === process.env.STRIPE_MANAGER_497_PRICE_ID; })[0] ? process.env.STRIPE_MANAGER_497_PRICE_ID : null,
       updated_at: new Date().toISOString(),
     }).eq('company_head_id', req.params.head_id).eq('status', 'draft')
       .select('company_head_id').maybeSingle();

@@ -54,7 +54,7 @@ test('company checkout reads both saved seat counts and never accepts price or q
     manager_seats: 2,
   }, {
     STRIPE_CLOSER_197_PRICE_ID: 'price_closer',
-    STRIPE_MANAGER_297_PRICE_ID: 'price_manager',
+    STRIPE_MANAGER_497_PRICE_ID: 'price_manager',
   }, 'https://www.scoutsystems.io');
 
   assert.strictEqual(params.line_items[0].price, 'price_closer');

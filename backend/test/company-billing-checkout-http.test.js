@@ -39,9 +39,9 @@ function post(port) {
 
 test('only an owner can create checkout, and its line item comes from the saved draft', async () => {
   const priorStandard = process.env.STRIPE_CLOSER_197_PRICE_ID;
-  const priorManager = process.env.STRIPE_MANAGER_297_PRICE_ID;
+  const priorManager = process.env.STRIPE_MANAGER_497_PRICE_ID;
   process.env.STRIPE_CLOSER_197_PRICE_ID = 'price_standard';
-  process.env.STRIPE_MANAGER_297_PRICE_ID = 'price_manager';
+  process.env.STRIPE_MANAGER_497_PRICE_ID = 'price_manager';
   const draft = { company_head_id: HEAD, billing_email: 'billing@example.com', closer_seats: 9, manager_seats: 2, status: 'draft' };
   const calls = [];
   const supabase = { from(table) {
@@ -73,7 +73,7 @@ test('only an owner can create checkout, and its line item comes from the saved 
     server.close(); h.restore();
     if (priorStandard === undefined) delete process.env.STRIPE_CLOSER_197_PRICE_ID;
     else process.env.STRIPE_CLOSER_197_PRICE_ID = priorStandard;
-    if (priorManager === undefined) delete process.env.STRIPE_MANAGER_297_PRICE_ID;
-    else process.env.STRIPE_MANAGER_297_PRICE_ID = priorManager;
+    if (priorManager === undefined) delete process.env.STRIPE_MANAGER_497_PRICE_ID;
+    else process.env.STRIPE_MANAGER_497_PRICE_ID = priorManager;
   }
 });

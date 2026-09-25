@@ -1106,7 +1106,7 @@
     var locked = ['active', 'trialing', 'past_due'].indexOf(b.status) !== -1;
     var note = locked
       ? 'This company has a Stripe subscription. Change it in Stripe; Scout will not silently replace it.'
-      : 'Each closer is $197/month. Each manager-access seat is $297/month. Scout never changes these seat counts automatically.';
+      : 'Each closer is $197/month. Each manager-access seat is $497/month. Scout never changes these seat counts automatically.';
     host.innerHTML = '<div class="offer-editor">'
       + '<label class="offer-field"><span>Billing Email</span><input class="modal-input" id="company-billing-email-' + headId + '" value="' + escapeHtml(b.billing_email || '') + '" ' + (locked ? 'disabled' : '') + '></label>'
       + '<label class="offer-field"><span>Closer Seats</span><input class="modal-input" id="company-billing-seats-' + headId + '" type="number" min="0" max="500" value="' + escapeHtml(String(b.closer_seats || 1)) + '" ' + (locked ? 'disabled' : '') + '></label>'
