@@ -178,7 +178,7 @@ function reportEnv() {
     'DEEPGRAM_API_KEY',
     'DEEPGRAM_PROJECT_ID',
   ];
-  var optional = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_ID', 'GITHUB_TOKEN'];
+  var optional = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_CLOSER_197_PRICE_ID', 'STRIPE_MANAGER_497_PRICE_ID', 'GITHUB_TOKEN'];
   console.log('[server] Env check:');
   required.forEach(function(k) {
     console.log('  ' + k + ': ' + (process.env[k] ? 'set' : 'MISSING (required)'));

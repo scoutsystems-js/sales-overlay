@@ -26,10 +26,10 @@ function withActor(actorRef, clients) {
   return { app, restore() { require.cache[authPath].exports = saved; delete require.cache[require.resolve('../routes/billing')]; } };
 }
 
-function post(port) {
+function post(port, path) {
   return new Promise((resolve, reject) => {
     const request = http.request({ port, method: 'POST', agent: false,
-      path: '/billing/admin/companies/' + HEAD + '/checkout' }, (response) => {
+      path: path || '/billing/admin/companies/' + HEAD + '/checkout' }, (response) => {
       let body = ''; response.on('data', (chunk) => { body += chunk; });
       response.on('end', () => resolve({ status: response.statusCode, body }));
     });
@@ -75,5 +75,20 @@ test('only an owner can create checkout, and its line item comes from the saved 
     else process.env.STRIPE_CLOSER_197_PRICE_ID = priorStandard;
     if (priorManager === undefined) delete process.env.STRIPE_MANAGER_497_PRICE_ID;
     else process.env.STRIPE_MANAGER_497_PRICE_ID = priorManager;
+  }
+});
+
+test('the retired personal checkout route cannot create a Stripe session', async () => {
+  const calls = [];
+  const stripe = { checkout: { sessions: { create(params) { calls.push(params); return Promise.resolve({ id: 'cs_test', url: 'https://checkout.stripe.test/session' }); } } } };
+  const actor = { current: { id: 'owner', role: 'owner' } };
+  const h = withActor(actor, { stripe, supabase: {} });
+  const server = await new Promise((resolve) => { const value = http.createServer(h.app); value.listen(0, () => resolve(value)); });
+  try {
+    const result = await post(server.address().port, '/billing/checkout');
+    assert.strictEqual(result.status, 410, result.body);
+    assert.strictEqual(calls.length, 0, 'a retired route must never reach Stripe');
+  } finally {
+    server.close(); h.restore();
   }
 });

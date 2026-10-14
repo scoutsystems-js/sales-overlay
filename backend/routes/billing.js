@@ -38,33 +38,11 @@ function handleConfigError(err, res) {
   return false;
 }
 
-// Create a Stripe Checkout session — user pays $197/month
-// Electron app opens the returned URL in a browser window
-router.post('/checkout', requireAuth, async function(req, res) {
-  try {
-    var session = await getStripe().checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      customer_email: req.user.email,
-      metadata: {
-        user_id: req.user.id,
-      },
-      success_url: 'scout://billing/success',   // Electron intercepts this
-      cancel_url: 'scout://billing/cancel',
-    });
-
-    res.json({ url: session.url });
-  } catch (err) {
-    if (handleConfigError(err, res)) return;
-    console.error('[billing] Checkout error:', err.message);
-    res.status(500).json({ error: 'Failed to create checkout session' });
-  }
+// Retired personal checkout path. The current offer is company-admin controlled,
+// so this legacy route must fail closed instead of becoming an accidental charge
+// path if an obsolete STRIPE_PRICE_ID is ever configured.
+router.post('/checkout', requireAuth, function(_req, res) {
+  res.status(410).json({ error: 'Personal checkout is retired. Ask a Scout owner to set up company billing.' });
 });
 
 // Owner-created company checkout for the current per-seat offer. The browser cannot send
