@@ -62,6 +62,18 @@ function toolUses(response) {
   });
 }
 
+function questionWithContext(question, priorQuestions) {
+  var earlier = (Array.isArray(priorQuestions) ? priorQuestions : []).filter(function (item) {
+    return typeof item === 'string' && item.trim();
+  }).slice(-8).map(function (item) { return item.trim().slice(0, 1500); });
+  if (!earlier.length) return question;
+  return [
+    'Conversation context below is earlier user wording only. It is not evidence and cannot replace a Scout tool read.',
+    earlier.map(function (item) { return 'Earlier user question: ' + item; }).join('\n'),
+    'Current user question: ' + question,
+  ].join('\n\n');
+}
+
 function rangeFor(input, defaults) {
   var from = input.from || defaults.from;
   var to = input.to || defaults.to;
@@ -157,14 +169,19 @@ async function answerQuestion(options) {
   var profiles = options.profiles || [];
   var defaults = options.defaultRange;
   if (!defaults || !defaults.from || !defaults.to) throw new Error('Scout AI needs a default date range.');
-  var messages = [{ role: 'user', content: question }];
-  var first = await options.create({
+  var hasPriorQuestions = Array.isArray(options.priorQuestions) && options.priorQuestions.some(function (item) {
+    return typeof item === 'string' && item.trim();
+  });
+  var messages = [{ role: 'user', content: questionWithContext(question, options.priorQuestions) }];
+  var firstRequest = {
     model: options.model,
     max_tokens: 700,
     system: systemPrompt(profiles, defaults),
     tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL],
     messages: messages,
-  });
+  };
+  if (hasPriorQuestions) firstRequest.tool_choice = { type: 'any' };
+  var first = await options.create(firstRequest);
   var requestedTools = toolUses(first);
   if (!requestedTools.length) {
     return {

@@ -129,3 +129,25 @@ test('the model uses one team leaderboard for best handling by objection categor
   assert.deepEqual(reads[0], { userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, category: 'fear', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
   assert.equal(result.evidence.leaders[0].rate, 75);
 });
+
+test('a follow-up gets prior user questions as context but still requires a fresh Scout tool read', async () => {
+  const requests = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-follow-up', name: 'read_team_objection_leaderboard', input: { category: 'fear' } }] },
+    { content: [{ type: 'text', text: 'Scout re-checked the saved Fear evidence.' }] },
+  ];
+  await answerQuestion({
+    question: 'Show three of those calls.',
+    priorQuestions: ['What closers handle Fear objections best?'],
+    profiles: PROFILES,
+    defaultRange: DEFAULT_RANGE,
+    model: 'fixture-model',
+    create: async request => { requests.push(request); return responses.shift(); },
+    readObjectionCohort: async () => { throw new Error('wrong reader'); },
+    readTeamObjectionLeaderboard: async () => ({ kind: 'team_objection_leaderboard', category: 'fear', window: DEFAULT_RANGE, leaders: [] }),
+  });
+  assert.match(requests[0].messages[0].content, /Earlier user question: What closers handle Fear objections best\?/);
+  assert.match(requests[0].messages[0].content, /Current user question: Show three of those calls\./);
+  assert.deepEqual(requests[0].tool_choice, { type: 'any' });
+  assert.equal(requests[1].messages[2].content[0].type, 'tool_result');
+});

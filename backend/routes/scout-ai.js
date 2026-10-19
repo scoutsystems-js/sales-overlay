@@ -5,6 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validateRequest, readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard } = require('../lib/scout-ai-reader');
 const { answerQuestion } = require('../lib/scout-ai-engine');
+const { visibleUserIds } = require('../lib/scout-ai-scope');
 const { resolveDisplayName } = require('../lib/display-name');
 const createWithUsage = require('../lib/model-usage').usageFor('scout-ai');
 const { CLAUDE_MODEL } = require('../config');
@@ -29,11 +30,23 @@ function defaultRange(body) {
   return { from, to };
 }
 
-async function availableClosers(admin) {
+function priorQuestions(body) {
+  var values = body && body.prior_questions;
+  if (values == null) return [];
+  if (!Array.isArray(values) || values.length > 8 || values.some(function (item) { return typeof item !== 'string' || item.length > 1500; })) {
+    throw new Error('Scout AI could not read this conversation.');
+  }
+  return values.map(function (item) { return item.trim(); }).filter(Boolean);
+}
+
+async function availableClosers(admin, actor) {
   const authResult = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
   if (authResult.error) throw new Error('Scout AI could not load closers.');
-  const profilesResult = await admin.from('user_profiles').select('user_id, role, active, first_name, last_name');
+  const profilesResult = await admin.from('user_profiles').select('user_id, role, active, managed_by, first_name, last_name');
   if (profilesResult.error) throw new Error('Scout AI could not load closer profiles.');
+  const assignmentsResult = await admin.from('manager_rep_assignments').select('manager_user_id, rep_user_id');
+  if (assignmentsResult.error) throw new Error('Scout AI could not load team assignments.');
+  const visible = new Set(visibleUserIds(actor, profilesResult.data || [], assignmentsResult.data || []));
   const profilesById = {};
   (profilesResult.data || []).forEach(function (profile) { profilesById[profile.user_id] = profile; });
   return ((authResult.data && authResult.data.users) || []).map(function (user) {
@@ -44,7 +57,7 @@ async function availableClosers(admin) {
       role: profile.role || 'user',
       active: profile.active !== false,
     };
-  }).filter(function (profile) { return profile.active && profile.role !== 'owner'; });
+  }).filter(function (profile) { return profile.active && visible.has(profile.user_id); });
 }
 
 // This is a deliberately narrow first tool endpoint, not a general query API.
@@ -67,7 +80,7 @@ router.post('/facts/objection-cohort', requireAuth, requireRole('owner'), async 
   }
 });
 
-router.post('/ask', requireAuth, requireRole('owner'), async function (req, res) {
+router.post('/ask', requireAuth, requireRole(['user', 'manager', 'owner']), async function (req, res) {
   try {
     const question = String((req.body && req.body.question) || '').trim();
     if (!question) return res.status(400).json({ error: 'Ask Scout a question first.' });
@@ -75,8 +88,9 @@ router.post('/ask', requireAuth, requireRole('owner'), async function (req, res)
     const admin = adminClient();
     const result = await answerQuestion({
       question: question,
-      profiles: await availableClosers(admin),
+      profiles: await availableClosers(admin, { id: req.user.id, role: req.user.role }),
       defaultRange: range,
+      priorQuestions: priorQuestions(req.body),
       model: CLAUDE_MODEL,
       create: function (params) { return createWithUsage(params, { userId: req.user.id }); },
       readObjectionCohort: function (input) { return readObjectionCohort(admin, input); },
@@ -94,5 +108,6 @@ router.post('/ask', requireAuth, requireRole('owner'), async function (req, res)
 router._setAdminClientForTests = function (client) { adminOverride = client; };
 router._defaultRangeForTests = defaultRange;
 router._availableClosersForTests = availableClosers;
+router._priorQuestionsForTests = priorQuestions;
 
 module.exports = router;

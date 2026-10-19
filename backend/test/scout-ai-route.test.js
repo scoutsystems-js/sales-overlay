@@ -65,10 +65,17 @@ test('an owner reaches the fact tool before request validation', async () => {
   assert.notEqual(result.status, 403);
 });
 
-test('the owner-only question route rejects an empty question before a model call', async () => {
-  const blocked = await post(appFor('user'), {}, '/scout-ai/ask');
-  assert.equal(blocked.status, 403);
+test('the conversation route rejects an empty question before a model call', async () => {
   const owner = await post(appFor('owner'), {}, '/scout-ai/ask');
   assert.equal(owner.status, 400);
   assert.match(owner.body.error, /Ask Scout a question/);
+});
+
+test('a closer and manager can reach the conversation route before question validation', async () => {
+  const closer = await post(appFor('user'), {}, '/scout-ai/ask');
+  const manager = await post(appFor('manager'), {}, '/scout-ai/ask');
+  assert.equal(closer.status, 400);
+  assert.equal(manager.status, 400);
+  assert.match(closer.body.error, /Ask Scout a question/);
+  assert.match(manager.body.error, /Ask Scout a question/);
 });
