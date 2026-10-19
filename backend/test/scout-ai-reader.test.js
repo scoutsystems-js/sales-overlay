@@ -14,7 +14,7 @@ test('Scout AI has a bounded database reader before a question route can exist',
   );
 });
 
-const { readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance } = require('../lib/scout-ai-reader');
+const { readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples } = require('../lib/scout-ai-reader');
 
 const CALLS = [
   { id: 'call-spouse', user_id: 'josh', fathom_call_id: 'real-spouse', prospect_id: 'prospect-spouse', title: 'Avery', call_date: '2026-10-02T12:00:00Z', recording_url: 'https://recording.example/spouse', not_a_sales_call: false, duplicate_of: null },
@@ -25,6 +25,8 @@ const CALLS = [
 const HIGHLIGHTS = [
   { id: 'm-spouse', fathom_call_id: 'call-spouse', type: 'objection', quote: 'My spouse needs to be part of this.', speaker: 'prospect', timestamp_seconds: 90, objection_surface: 'I need to speak with my spouse', objection_category: 'partner', objection_class: 'true_objection', resolution: 'handled' },
   { id: 'm-partner', fathom_call_id: 'call-partner', type: 'objection', quote: 'I need to speak with my business partner.', speaker: 'prospect', timestamp_seconds: 110, objection_surface: 'I need my partner', objection_category: 'partner', objection_class: 'true_objection', resolution: 'unhandled' },
+  { id: 'm-discovery', fathom_call_id: 'call-spouse', type: 'strong_moment', section: 'discovery', quote: 'We are trying to find a better option.', speaker: 'prospect', timestamp_seconds: 60, coaching_evidence: { stage: 'discovery', prospect_context: { quote: 'We are trying to find a better option.' }, closer_probe: { quote: 'What has made the current option difficult?' }, prospect_detail: { quote: 'The lack of support has been the hardest part.' } } },
+  { id: 'm-pitch', fathom_call_id: 'call-spouse', type: 'strong_moment', section: 'pitch', quote: 'How would this work?', speaker: 'prospect', timestamp_seconds: 130, coaching_evidence: { stage: 'pitch', prospect_question: { quote: 'How would this work?' }, closer_explanation: { quote: 'Here is how the support plan works.' }, prospect_confirmation: { quote: 'That makes sense.' } } },
 ];
 const ANALYSES = [
   { fathom_call_id: 'call-spouse', outcome: 'lost', status: 'done' },
@@ -159,4 +161,21 @@ test('the bounded reader ranks only sufficiently measured Discovery scores in th
   assert.equal(result.kind, 'stage_performance');
   assert.equal(result.stage, 'discovery');
   assert.deepEqual(result.closers.map(function (closer) { return [closer.name, closer.score, closer.graded_calls]; }), [['Ava', 60, 10], ['Ben', 80, 10]]);
+});
+
+test('the bounded reader returns only a saved, verified exchange for the requested stage', async () => {
+  const result = await readStageExamples(fakeAdmin(), {
+    userIds: ['josh'], namesByUserId: { josh: 'Josh P' }, stage: 'discovery',
+    from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z',
+  });
+  assert.equal(result.kind, 'stage_examples');
+  assert.equal(result.stage, 'discovery');
+  assert.equal(result.examples.length, 1);
+  assert.deepEqual(result.examples[0].exchange, [
+    { label: 'Prospect context', speaker: 'PROSPECT', quote: 'We are trying to find a better option.' },
+    { label: 'Closer digs deeper', speaker: 'CLOSER', quote: 'What has made the current option difficult?' },
+    { label: 'Prospect detail', speaker: 'PROSPECT', quote: 'The lack of support has been the hardest part.' },
+  ]);
+  assert.equal(result.examples[0].prospect_name, 'Avery');
+  assert.equal(result.examples[0].recording_url, 'https://recording.example/spouse');
 });

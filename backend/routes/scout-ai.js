@@ -3,7 +3,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { validateRequest, readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance } = require('../lib/scout-ai-reader');
+const { validateRequest, readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples } = require('../lib/scout-ai-reader');
 const { answerQuestion } = require('../lib/scout-ai-engine');
 const { visibleUserIds } = require('../lib/scout-ai-scope');
 const { resolveDisplayName } = require('../lib/display-name');
@@ -98,6 +98,7 @@ router.post('/ask', requireAuth, requireRole(['user', 'manager', 'owner']), asyn
       readTeamObjectionLeaderboard: function (input) { return readTeamObjectionLeaderboard(admin, input); },
       readCloserCloseRate: function (input) { return readCloserCloseRate(admin, input); },
       readStagePerformance: function (input) { return readStagePerformance(admin, input); },
+      readStageExamples: function (input) { return readStageExamples(admin, input); },
     });
     res.json(result);
   } catch (error) {

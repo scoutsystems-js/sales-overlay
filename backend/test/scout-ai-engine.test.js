@@ -89,7 +89,7 @@ test('the model can read the team objection overview without inventing a closer 
   assert.equal(result.status, 'answered');
   assert.equal(reads.length, 1);
   assert.deepEqual(reads[0], { userIds: ['josh-id'], from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
-  assert.equal(requests[0].tools.length, 5);
+  assert.equal(requests[0].tools.length, 6);
   assert.equal(result.evidence.most_raised.category, 'timing');
 });
 
@@ -158,6 +158,21 @@ test('the model can rank the authorized group’s earned Discovery scores', asyn
   });
   assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: null, stage: 'discovery', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
   assert.equal(result.evidence.stage, 'discovery');
+});
+
+test('the model can return a closer’s saved Discovery exchange without inventing coaching', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-discovery-example', name: 'read_stage_examples', input: { user_id: 'josh-id', stage: 'discovery' } }] },
+    { content: [{ type: 'text', text: 'Scout found one saved Discovery exchange for Josh in this date range.' }] },
+  ];
+  const result = await answerQuestion({
+    question: 'Show me a Discovery call for Josh.', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readStageExamples: async request => { reads.push(request); return { kind: 'stage_examples', stage: 'discovery', window: DEFAULT_RANGE, examples: [{ call_id: 'call-1', exchange: [] }] }; },
+  });
+  assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: 'josh-id', stage: 'discovery', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.equal(result.evidence.kind, 'stage_examples');
 });
 
 test('a follow-up gets prior user questions as context but still requires a fresh Scout tool read', async () => {

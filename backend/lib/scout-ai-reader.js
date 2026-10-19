@@ -8,10 +8,17 @@ var { CHUNK } = require('./chunk');
 var { realCallsOnly } = require('./real-calls');
 var { fetchProspectCloseRates } = require('./prospect-entity');
 var { SECTION_ORDER, LABELS, sectionStatsFromAnalyses, rankSections } = require('./section-ranking');
+var stageCoachingEvidence = require('./stage-coaching-evidence');
 var facts = require('./scout-ai-facts');
 
 var PAGE_SIZE = 1000;
 var MAX_PAGES = 25;
+var EVIDENCE_STAGES = ['discovery', 'pitch', 'close'];
+var EVIDENCE_LABELS = {
+  discovery: ['Prospect context', 'Closer digs deeper', 'Prospect detail'],
+  pitch: ['Prospect question', 'Closer explains', 'Prospect confirmation'],
+  close: ['Closer asks', 'Prospect response', 'Closer next move'],
+};
 
 function validIso(value) {
   return typeof value === 'string' && !isNaN(Date.parse(value));
@@ -116,6 +123,15 @@ async function stageAnalysesForCalls(admin, callIds) {
       .select('fathom_call_id, status, intro_score, discovery_score, pitch_score, objection_score, close_score_earned, stage_eligibility')
       .in('fathom_call_id', ids)
       .eq('status', 'done');
+  });
+}
+
+async function stageHighlightsForCalls(admin, callIds) {
+  if (!callIds.length) return [];
+  return chunked(callIds, function (ids) {
+    return admin.from('call_highlights')
+      .select('fathom_call_id, section, timestamp_seconds, coaching_evidence')
+      .in('fathom_call_id', ids);
   });
 }
 
@@ -306,6 +322,58 @@ async function readStagePerformance(admin, request) {
   };
 }
 
+// These exchanges were verified against the stored transcript when the call
+// was analyzed. The reader exposes that small saved record only; it never asks
+// the model to read a transcript or infer why a score or outcome happened.
+function savedStageExchange(value, stage) {
+  var evidence = stageCoachingEvidence.sanitize(value, stage);
+  var shape = stageCoachingEvidence.SHAPES[stage];
+  if (!evidence || !shape) return null;
+  return shape.map(function (part, index) {
+    return { label: EVIDENCE_LABELS[stage][index], speaker: part[1], quote: evidence[part[0]].quote };
+  });
+}
+
+async function readStageExamples(admin, request) {
+  var input = validateStageRequest(request);
+  if (EVIDENCE_STAGES.indexOf(input.stage) === -1) throw new Error('Saved call examples are currently available for Discovery, Pitch, or Close.');
+  var calls = await paged(function (from, to) {
+    return baseTeamCalls(admin, input.userIds)
+      .gte('call_date', input.from)
+      .lte('call_date', input.to)
+      .order('call_date', { ascending: false })
+      .range(from, to);
+  });
+  calls = realCallsOnly(calls);
+  var callById = {};
+  calls.forEach(function (call) { callById[call.id] = call; });
+  var highlights = await stageHighlightsForCalls(admin, calls.map(function (call) { return call.id; }));
+  var examples = highlights.map(function (highlight) {
+    var call = callById[highlight.fathom_call_id];
+    if (!call || highlight.section !== input.stage) return null;
+    var exchange = savedStageExchange(highlight.coaching_evidence, input.stage);
+    if (!exchange) return null;
+    return {
+      call_id: call.id,
+      closer_name: (input.namesByUserId && input.namesByUserId[call.user_id]) || 'Closer name not recorded',
+      prospect_name: call.title || null,
+      call_date: call.call_date || null,
+      recording_url: call.recording_url || null,
+      timestamp_seconds: highlight.timestamp_seconds == null ? null : highlight.timestamp_seconds,
+      exchange: exchange,
+    };
+  }).filter(Boolean).sort(function (left, right) {
+    return String(right.call_date || '').localeCompare(String(left.call_date || '')) || left.call_id.localeCompare(right.call_id);
+  }).slice(0, 3);
+  return {
+    kind: 'stage_examples',
+    window: { from: input.from, to: input.to },
+    stage: input.stage,
+    calls_in_window: calls.length,
+    examples: examples,
+  };
+}
+
 module.exports = {
   validateRequest: validateRequest,
   validateTeamRequest: validateTeamRequest,
@@ -315,4 +383,5 @@ module.exports = {
   readTeamObjectionLeaderboard: readTeamObjectionLeaderboard,
   readCloserCloseRate: readCloserCloseRate,
   readStagePerformance: readStagePerformance,
+  readStageExamples: readStageExamples,
 };

@@ -6,6 +6,7 @@
 
 const CATEGORIES = ['fear', 'timing', 'partner', 'logistical', 'other'];
 const STAGES = ['intro', 'discovery', 'pitch', 'objection', 'close'];
+const EVIDENCE_STAGES = ['discovery', 'pitch', 'close'];
 
 const COHORT_TOOL = {
   name: 'read_objection_cohort',
@@ -77,7 +78,22 @@ const STAGE_PERFORMANCE_TOOL = {
   },
 };
 
-const SCOUT_TOOLS = [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL, CLOSER_CLOSE_RATE_TOOL, STAGE_PERFORMANCE_TOOL];
+const STAGE_EXAMPLES_TOOL = {
+  name: 'read_stage_examples',
+  description: 'Read up to three saved, verified call exchanges for Discovery, Pitch, or Close. Use when asked to show a closer’s calls or exact examples for one of those stages. The exchange is evidence only; do not claim it caused a score or outcome.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      user_id: { type: 'string', description: 'One id from the available closer list. Omit to show examples from the authorized group.' },
+      stage: { type: 'string', enum: EVIDENCE_STAGES, description: 'Discovery, Pitch, or Close.' },
+      from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+      to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+    },
+    required: ['stage'],
+  },
+};
+
+const SCOUT_TOOLS = [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL, CLOSER_CLOSE_RATE_TOOL, STAGE_PERFORMANCE_TOOL, STAGE_EXAMPLES_TOOL];
 
 function textFrom(response) {
   return ((response && response.content) || [])
@@ -171,6 +187,23 @@ function validStagePerformanceToolInput(input, profiles, defaults) {
   };
 }
 
+function validStageExamplesToolInput(input, profiles, defaults) {
+  input = input || {};
+  var stage = typeof input.stage === 'string' ? input.stage.trim().toLowerCase() : '';
+  if (EVIDENCE_STAGES.indexOf(stage) === -1) throw new Error('Scout has saved call examples only for Discovery, Pitch, or Close.');
+  var userId = input.user_id || null;
+  if (userId && !(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
+  var namesByUserId = {};
+  (profiles || []).forEach(function (profile) { namesByUserId[profile.user_id] = profile.name; });
+  return {
+    userIds: userId ? [userId] : Object.keys(namesByUserId),
+    namesByUserId: namesByUserId,
+    userId: userId,
+    stage: stage,
+    range: rangeFor(input, defaults),
+  };
+}
+
 function systemPrompt(profiles, defaults) {
   var people = (profiles || []).map(function (profile) {
     return profile.user_id + ' — ' + profile.name;
@@ -186,12 +219,16 @@ function systemPrompt(profiles, defaults) {
     'For a team-wide objection question, distinguish the objection raised most often from the objection handled least often. They can be different.',
     'For “who handles a category best,” use the team leaderboard tool once. Do not call one closer tool per person.',
     'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked.',
+    'For a request to show saved calls or examples for Discovery, Pitch, or Close, use the stage-examples tool. Describe only the saved exchange; never say it caused a grade, handling result, or call outcome.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
 }
 
 function evidenceFrom(facts) {
+  if (facts && facts.kind === 'stage_examples') {
+    return { kind: facts.kind, window: facts.window, stage: facts.stage, examples: facts.examples };
+  }
   if (facts && facts.kind === 'closer_close_rate') {
     return { kind: facts.kind, window: facts.window, close_rate: facts.close_rate };
   }
@@ -276,6 +313,10 @@ async function answerQuestion(options) {
       if (typeof options.readStagePerformance !== 'function') throw new Error('Scout AI is not configured.');
       return { kind: 'stage-performance', tool: tool, request: validStagePerformanceToolInput(tool.input, profiles, defaults) };
     }
+    if (tool.name === STAGE_EXAMPLES_TOOL.name) {
+      if (typeof options.readStageExamples !== 'function') throw new Error('Scout AI is not configured.');
+      return { kind: 'stage-examples', tool: tool, request: validStageExamplesToolInput(tool.input, profiles, defaults) };
+    }
     throw new Error('Scout AI requested an unavailable tool.');
   });
   var facts = [];
@@ -316,7 +357,7 @@ async function answerQuestion(options) {
           from: closeRateRequest.range.from,
           to: closeRateRequest.range.to,
         });
-      } else {
+      } else if (plan.kind === 'stage-performance') {
         var stageRequest = plan.request;
         fact = await options.readStagePerformance({
           userIds: stageRequest.userIds,
@@ -325,6 +366,16 @@ async function answerQuestion(options) {
           stage: stageRequest.stage,
           from: stageRequest.range.from,
           to: stageRequest.range.to,
+        });
+      } else {
+        var exampleRequest = plan.request;
+        fact = await options.readStageExamples({
+          userIds: exampleRequest.userIds,
+          namesByUserId: exampleRequest.namesByUserId,
+          userId: exampleRequest.userId,
+          stage: exampleRequest.stage,
+          from: exampleRequest.range.from,
+          to: exampleRequest.range.to,
         });
       }
       facts.push(fact);
@@ -351,10 +402,12 @@ module.exports = {
   TEAM_OBJECTION_LEADERBOARD_TOOL: TEAM_OBJECTION_LEADERBOARD_TOOL,
   CLOSER_CLOSE_RATE_TOOL: CLOSER_CLOSE_RATE_TOOL,
   STAGE_PERFORMANCE_TOOL: STAGE_PERFORMANCE_TOOL,
+  STAGE_EXAMPLES_TOOL: STAGE_EXAMPLES_TOOL,
   validToolInput: validToolInput,
   validTeamToolInput: validTeamToolInput,
   validLeaderboardToolInput: validLeaderboardToolInput,
   validCloseRateToolInput: validCloseRateToolInput,
   validStagePerformanceToolInput: validStagePerformanceToolInput,
+  validStageExamplesToolInput: validStageExamplesToolInput,
   answerQuestion: answerQuestion,
 };
