@@ -6,6 +6,8 @@
 // database client, SQL, or arbitrary transcript access.
 var { CHUNK } = require('./chunk');
 var { realCallsOnly } = require('./real-calls');
+var { fetchProspectCloseRates } = require('./prospect-entity');
+var { SECTION_ORDER, LABELS, sectionStatsFromAnalyses, rankSections } = require('./section-ranking');
 var facts = require('./scout-ai-facts');
 
 var PAGE_SIZE = 1000;
@@ -29,6 +31,12 @@ function validateTeamRequest(input) {
     throw new Error('At least one closer is required.');
   }
   if (!validIso(input.from) || !validIso(input.to) || input.from > input.to) throw new Error('A valid date range is required.');
+  return input;
+}
+
+function validateStageRequest(input) {
+  input = validateTeamRequest(input);
+  if (input.stage != null && SECTION_ORDER.indexOf(input.stage) === -1) throw new Error('A valid sales stage is required.');
   return input;
 }
 
@@ -96,6 +104,16 @@ async function analysesForCalls(admin, callIds) {
   return chunked(callIds, function (ids) {
     return admin.from('call_analyses')
       .select('fathom_call_id, outcome, status')
+      .in('fathom_call_id', ids)
+      .eq('status', 'done');
+  });
+}
+
+async function stageAnalysesForCalls(admin, callIds) {
+  if (!callIds.length) return [];
+  return chunked(callIds, function (ids) {
+    return admin.from('call_analyses')
+      .select('fathom_call_id, status, intro_score, discovery_score, pitch_score, objection_score, close_score_earned, stage_eligibility')
       .in('fathom_call_id', ids)
       .eq('status', 'done');
   });
@@ -217,10 +235,84 @@ async function readTeamObjectionLeaderboard(admin, request) {
   return leaderboard;
 }
 
+// This deliberately calls the one close-rate computation used by Scout's
+// existing performance views. The rate's window is the prospect's first booked
+// call, not whichever later follow-up happened to close it.
+async function readCloserCloseRate(admin, request) {
+  var input = validateTeamRequest({ userIds: [request && request.userId], from: request && request.from, to: request && request.to });
+  var rates = await fetchProspectCloseRates(admin, input.userIds, input.from, input.to);
+  return {
+    kind: 'closer_close_rate',
+    window: { from: input.from, to: input.to },
+    close_rate: rates[input.userIds[0]] || { closed: 0, total: 0, pct: null },
+  };
+}
+
+// Stage scores come from the same eligibility-aware score calculation as the
+// coaching and performance views. A sparse stage remains unranked rather than
+// becoming a made-up weakness.
+async function readStagePerformance(admin, request) {
+  var input = validateStageRequest(request);
+  var calls = await paged(function (from, to) {
+    return baseTeamCalls(admin, input.userIds)
+      .gte('call_date', input.from)
+      .lte('call_date', input.to)
+      .order('call_date', { ascending: false })
+      .range(from, to);
+  });
+  calls = realCallsOnly(calls);
+  var analyses = await stageAnalysesForCalls(admin, calls.map(function (call) { return call.id; }));
+  var byUser = {};
+  input.userIds.forEach(function (userId) { byUser[userId] = []; });
+  var callById = {};
+  calls.forEach(function (call) { callById[call.id] = call; });
+  analyses.forEach(function (analysis) {
+    var call = callById[analysis.fathom_call_id];
+    if (call && byUser[call.user_id]) byUser[call.user_id].push(analysis);
+  });
+  var stages = input.stage ? [input.stage] : SECTION_ORDER;
+  var closers = input.userIds.map(function (userId) {
+    var ranked = rankSections(sectionStatsFromAnalyses(byUser[userId] || []));
+    var stageRows = stages.map(function (stage) {
+      var row = ranked.find(function (item) { return item.section === stage; });
+      return {
+        stage: stage,
+        label: LABELS[stage],
+        score: row && row.score != null ? row.score : null,
+        graded_calls: row ? row.n : 0,
+        enough: !!(row && row.enough),
+        reason: row ? row.reason : 'no graded calls in this period',
+      };
+    });
+    return {
+      user_id: userId,
+      name: (input.namesByUserId && input.namesByUserId[userId]) || 'Closer name not recorded',
+      stages: stageRows,
+    };
+  });
+  if (input.stage) {
+    closers = closers.map(function (closer) {
+      var stage = closer.stages[0];
+      return { user_id: closer.user_id, name: closer.name, score: stage.score, graded_calls: stage.graded_calls, enough: stage.enough, reason: stage.reason };
+    }).filter(function (closer) { return closer.enough; }).sort(function (left, right) {
+      return left.score - right.score || left.name.localeCompare(right.name);
+    });
+  }
+  return {
+    kind: 'stage_performance',
+    window: { from: input.from, to: input.to },
+    stage: input.stage || null,
+    closers: closers,
+  };
+}
+
 module.exports = {
   validateRequest: validateRequest,
   validateTeamRequest: validateTeamRequest,
+  validateStageRequest: validateStageRequest,
   readObjectionCohort: readObjectionCohort,
   readTeamObjections: readTeamObjections,
   readTeamObjectionLeaderboard: readTeamObjectionLeaderboard,
+  readCloserCloseRate: readCloserCloseRate,
+  readStagePerformance: readStagePerformance,
 };

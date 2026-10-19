@@ -5,6 +5,7 @@
 // transcript.  The model chooses what to ask for; Scout computes the facts.
 
 const CATEGORIES = ['fear', 'timing', 'partner', 'logistical', 'other'];
+const STAGES = ['intro', 'discovery', 'pitch', 'objection', 'close'];
 
 const COHORT_TOOL = {
   name: 'read_objection_cohort',
@@ -47,6 +48,36 @@ const TEAM_OBJECTION_LEADERBOARD_TOOL = {
     required: ['category'],
   },
 };
+
+const CLOSER_CLOSE_RATE_TOOL = {
+  name: 'read_closer_close_rate',
+  description: 'Read Scout’s canonical prospect close rate for one closer. Use for questions about a closer’s overall closing rate in a date range.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      user_id: { type: 'string', description: 'One id from the available closer list.' },
+      from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+      to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+    },
+    required: ['user_id'],
+  },
+};
+
+const STAGE_PERFORMANCE_TOOL = {
+  name: 'read_stage_performance',
+  description: 'Read earned sales-stage scores for one closer or the authorized closer group. Use for questions about Discovery, Intro, Pitch, Objection Handling, or Close performance. When comparing who needs help with one stage, provide that stage and omit user_id.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      user_id: { type: 'string', description: 'One id from the available closer list. Omit to compare the authorized group.' },
+      stage: { type: 'string', enum: STAGES, description: 'One sales stage. Omit only when asking for one closer’s full stage breakdown.' },
+      from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+      to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+    },
+  },
+};
+
+const SCOUT_TOOLS = [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL, CLOSER_CLOSE_RATE_TOOL, STAGE_PERFORMANCE_TOOL];
 
 function textFrom(response) {
   return ((response && response.content) || [])
@@ -115,6 +146,31 @@ function validLeaderboardToolInput(input, profiles, defaults) {
   return { userIds: Object.keys(namesByUserId), namesByUserId: namesByUserId, category: category, range: rangeFor(input || {}, defaults) };
 }
 
+function validCloseRateToolInput(input, profiles, defaults) {
+  input = input || {};
+  var userId = input.user_id;
+  if (!(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
+  return { userId: userId, range: rangeFor(input, defaults) };
+}
+
+function validStagePerformanceToolInput(input, profiles, defaults) {
+  input = input || {};
+  var userId = input.user_id || null;
+  if (userId && !(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
+  var stage = typeof input.stage === 'string' ? input.stage.trim().toLowerCase() : null;
+  if (stage && STAGES.indexOf(stage) === -1) throw new Error('Scout AI needs a valid sales stage for that question.');
+  if (!stage && !userId) throw new Error('Scout AI needs a closer or sales stage for that question.');
+  var namesByUserId = {};
+  (profiles || []).forEach(function (profile) { namesByUserId[profile.user_id] = profile.name; });
+  return {
+    userIds: userId ? [userId] : Object.keys(namesByUserId),
+    namesByUserId: namesByUserId,
+    userId: userId,
+    stage: stage,
+    range: rangeFor(input, defaults),
+  };
+}
+
 function systemPrompt(profiles, defaults) {
   var people = (profiles || []).map(function (profile) {
     return profile.user_id + ' — ' + profile.name;
@@ -124,17 +180,24 @@ function systemPrompt(profiles, defaults) {
     'You never invent a number, call, quote, outcome, or reason. If the available tool cannot answer the request, say that plainly and do not use a tool.',
     'A phrase such as “spouse” is not the same thing as the whole Partner category. Say which one you used.',
     'Question-specific cohort rates are answer-only. They do not change Scout’s normal dashboard metrics.',
-    'When you use a tool, write a short plain-language answer that names the date range, numerator and denominator, and distinguishes objection handling from closing.',
+    'When you use a tool, write a short plain-language answer that names the date range and the supporting counts. Distinguish objection handling, close rate, and earned stage scores; they answer different questions.',
     'Do not use Markdown, tables, headings, bullets, asterisks, or invented links. Write short plain sentences for Scout’s conversation view.',
     'The user can open the evidence cards Scout returns separately, so do not make up clips or quotes.',
     'For a team-wide objection question, distinguish the objection raised most often from the objection handled least often. They can be different.',
     'For “who handles a category best,” use the team leaderboard tool once. Do not call one closer tool per person.',
+    'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
 }
 
 function evidenceFrom(facts) {
+  if (facts && facts.kind === 'closer_close_rate') {
+    return { kind: facts.kind, window: facts.window, close_rate: facts.close_rate };
+  }
+  if (facts && facts.kind === 'stage_performance') {
+    return { kind: facts.kind, window: facts.window, stage: facts.stage, closers: facts.closers };
+  }
   if (facts && facts.kind === 'team_objection_overview') {
     return {
       kind: facts.kind,
@@ -177,7 +240,7 @@ async function answerQuestion(options) {
     model: options.model,
     max_tokens: 700,
     system: systemPrompt(profiles, defaults),
-    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL],
+    tools: SCOUT_TOOLS,
     messages: messages,
   };
   if (hasPriorQuestions) firstRequest.tool_choice = { type: 'any' };
@@ -205,6 +268,14 @@ async function answerQuestion(options) {
       if (typeof options.readTeamObjectionLeaderboard !== 'function') throw new Error('Scout AI is not configured.');
       return { kind: 'leaderboard', tool: tool, request: validLeaderboardToolInput(tool.input, profiles, defaults) };
     }
+    if (tool.name === CLOSER_CLOSE_RATE_TOOL.name) {
+      if (typeof options.readCloserCloseRate !== 'function') throw new Error('Scout AI is not configured.');
+      return { kind: 'close-rate', tool: tool, request: validCloseRateToolInput(tool.input, profiles, defaults) };
+    }
+    if (tool.name === STAGE_PERFORMANCE_TOOL.name) {
+      if (typeof options.readStagePerformance !== 'function') throw new Error('Scout AI is not configured.');
+      return { kind: 'stage-performance', tool: tool, request: validStagePerformanceToolInput(tool.input, profiles, defaults) };
+    }
     throw new Error('Scout AI requested an unavailable tool.');
   });
   var facts = [];
@@ -229,7 +300,7 @@ async function answerQuestion(options) {
           from: teamRequest.range.from,
           to: teamRequest.range.to,
         });
-      } else {
+      } else if (plan.kind === 'leaderboard') {
         var leaderboardRequest = plan.request;
         fact = await options.readTeamObjectionLeaderboard({
           userIds: leaderboardRequest.userIds,
@@ -237,6 +308,23 @@ async function answerQuestion(options) {
           category: leaderboardRequest.category,
           from: leaderboardRequest.range.from,
           to: leaderboardRequest.range.to,
+        });
+      } else if (plan.kind === 'close-rate') {
+        var closeRateRequest = plan.request;
+        fact = await options.readCloserCloseRate({
+          userId: closeRateRequest.userId,
+          from: closeRateRequest.range.from,
+          to: closeRateRequest.range.to,
+        });
+      } else {
+        var stageRequest = plan.request;
+        fact = await options.readStagePerformance({
+          userIds: stageRequest.userIds,
+          namesByUserId: stageRequest.namesByUserId,
+          userId: stageRequest.userId,
+          stage: stageRequest.stage,
+          from: stageRequest.range.from,
+          to: stageRequest.range.to,
         });
       }
       facts.push(fact);
@@ -251,7 +339,7 @@ async function answerQuestion(options) {
     model: options.model,
     max_tokens: 700,
     system: systemPrompt(profiles, defaults),
-    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL],
+    tools: SCOUT_TOOLS,
     messages: messages,
   });
   return { status: 'answered', answer: textFrom(final), evidence: facts.length ? evidenceFrom(facts[0]) : null };
@@ -261,8 +349,12 @@ module.exports = {
   COHORT_TOOL: COHORT_TOOL,
   TEAM_OBJECTIONS_TOOL: TEAM_OBJECTIONS_TOOL,
   TEAM_OBJECTION_LEADERBOARD_TOOL: TEAM_OBJECTION_LEADERBOARD_TOOL,
+  CLOSER_CLOSE_RATE_TOOL: CLOSER_CLOSE_RATE_TOOL,
+  STAGE_PERFORMANCE_TOOL: STAGE_PERFORMANCE_TOOL,
   validToolInput: validToolInput,
   validTeamToolInput: validTeamToolInput,
   validLeaderboardToolInput: validLeaderboardToolInput,
+  validCloseRateToolInput: validCloseRateToolInput,
+  validStagePerformanceToolInput: validStagePerformanceToolInput,
   answerQuestion: answerQuestion,
 };

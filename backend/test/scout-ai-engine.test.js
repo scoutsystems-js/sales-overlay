@@ -89,7 +89,7 @@ test('the model can read the team objection overview without inventing a closer 
   assert.equal(result.status, 'answered');
   assert.equal(reads.length, 1);
   assert.deepEqual(reads[0], { userIds: ['josh-id'], from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
-  assert.equal(requests[0].tools.length, 3);
+  assert.equal(requests[0].tools.length, 5);
   assert.equal(result.evidence.most_raised.category, 'timing');
 });
 
@@ -128,6 +128,36 @@ test('the model uses one team leaderboard for best handling by objection categor
   });
   assert.deepEqual(reads[0], { userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, category: 'fear', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
   assert.equal(result.evidence.leaders[0].rate, 75);
+});
+
+test('the model reads Scout’s canonical close rate for a known closer', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-close-rate', name: 'read_closer_close_rate', input: { user_id: 'josh-id' } }] },
+    { content: [{ type: 'text', text: 'Josh closed 4 of 10 prospects (40%) in this date range.' }] },
+  ];
+  const result = await answerQuestion({
+    question: 'What is Josh’s closing rate?', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readCloserCloseRate: async request => { reads.push(request); return { kind: 'closer_close_rate', window: DEFAULT_RANGE, close_rate: { closed: 4, total: 10, pct: 40 } }; },
+  });
+  assert.deepEqual(reads, [{ userId: 'josh-id', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.equal(result.evidence.close_rate.pct, 40);
+});
+
+test('the model can rank the authorized group’s earned Discovery scores', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-discovery', name: 'read_stage_performance', input: { stage: 'discovery' } }] },
+    { content: [{ type: 'text', text: 'Josh has the lowest measured Discovery score in this group.' }] },
+  ];
+  const result = await answerQuestion({
+    question: 'What closers need help with Discovery?', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readStagePerformance: async request => { reads.push(request); return { kind: 'stage_performance', stage: 'discovery', window: DEFAULT_RANGE, closers: [{ user_id: 'josh-id', name: 'Josh P', score: 62, graded_calls: 10 }] }; },
+  });
+  assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: null, stage: 'discovery', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.equal(result.evidence.stage, 'discovery');
 });
 
 test('a follow-up gets prior user questions as context but still requires a fresh Scout tool read', async () => {
