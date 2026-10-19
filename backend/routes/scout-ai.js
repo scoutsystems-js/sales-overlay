@@ -80,7 +80,7 @@ router.post('/facts/objection-cohort', requireAuth, requireRole('owner'), async 
   }
 });
 
-router.post('/ask', requireAuth, requireRole(['user', 'manager', 'owner']), async function (req, res) {
+router.post('/ask', requireAuth, requireRole('owner'), async function (req, res) {
   try {
     const question = String((req.body && req.body.question) || '').trim();
     if (!question) return res.status(400).json({ error: 'Ask Scout a question first.' });

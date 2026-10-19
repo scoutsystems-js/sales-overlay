@@ -71,11 +71,9 @@ test('the conversation route rejects an empty question before a model call', asy
   assert.match(owner.body.error, /Ask Scout a question/);
 });
 
-test('a closer and manager can reach the conversation route before question validation', async () => {
+test('only the owner can reach the Scout AI conversation during the admin pilot', async () => {
   const closer = await post(appFor('user'), {}, '/scout-ai/ask');
   const manager = await post(appFor('manager'), {}, '/scout-ai/ask');
-  assert.equal(closer.status, 400);
-  assert.equal(manager.status, 400);
-  assert.match(closer.body.error, /Ask Scout a question/);
-  assert.match(manager.body.error, /Ask Scout a question/);
+  assert.equal(closer.status, 403);
+  assert.equal(manager.status, 403);
 });
