@@ -24,3 +24,12 @@ test('Scout AI has a private question page, not a new dashboard metric', () => {
   assert.match(source, /me\.role !== 'owner'/);
   assert.doesNotMatch(source, /spouse-objection cohort close rate/i);
 });
+
+test('the admin dashboard gives the owner a visible path to the private Scout AI pilot', () => {
+  const file = path.join(__dirname, '..', 'web', 'dashboard.html');
+  const source = fs.readFileSync(file, 'utf8');
+
+  assert.match(source, /id="navScoutAi"[^>]*>Scout AI/);
+  assert.match(source, /window\.location\.href\s*=\s*'\/scout-ai'/);
+  assert.match(source, /state\.me\.role\s*===\s*'owner'[\s\S]{0,300}navScoutAi/);
+});
