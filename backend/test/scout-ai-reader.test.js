@@ -14,7 +14,7 @@ test('Scout AI has a bounded database reader before a question route can exist',
   );
 });
 
-const { readObjectionCohort } = require('../lib/scout-ai-reader');
+const { readObjectionCohort, readTeamObjections } = require('../lib/scout-ai-reader');
 
 const CALLS = [
   { id: 'call-spouse', user_id: 'josh', fathom_call_id: 'real-spouse', prospect_id: 'prospect-spouse', title: 'Avery', call_date: '2026-10-02T12:00:00Z', recording_url: 'https://recording.example/spouse', not_a_sales_call: false, duplicate_of: null },
@@ -74,4 +74,16 @@ test('the bounded reader returns only exact spouse evidence and its linked close
   assert.equal(result.handled_examples[0].prospect_name, 'Avery');
   assert.equal(result.handled_examples[0].timestamp_seconds, 90);
   assert.equal(result.handled_examples[0].recording_url, 'https://recording.example/spouse');
+});
+
+test('the bounded reader returns a team objection overview from saved strict moments', async () => {
+  const result = await readTeamObjections(fakeAdmin(), {
+    userIds: ['josh'],
+    from: '2026-10-01T00:00:00Z',
+    to: '2026-10-05T00:00:00Z',
+  });
+  assert.equal(result.kind, 'team_objection_overview');
+  assert.equal(result.most_raised.category, 'partner');
+  assert.equal(result.most_raised.total, 2);
+  assert.equal(result.least_handled.rate, 50);
 });

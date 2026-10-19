@@ -71,3 +71,18 @@ test('a spouse-objection cohort close rate is shown only for matching prospects'
   assert.equal(result.rate, 100);
   assert.equal(result.phrase, 'spouse');
 });
+
+test('a team objection overview separates the most raised objection from the weakest-handled one', () => {
+  const result = facts.summarizeTeamObjections([
+    { type: 'objection', fathom_call_id: 'fear-1', objection_category: 'fear', objection_class: 'true_objection', resolution: 'handled' },
+    { type: 'objection', fathom_call_id: 'fear-2', objection_category: 'fear', objection_class: 'true_objection', resolution: 'unhandled' },
+    { type: 'objection', fathom_call_id: 'timing-1', objection_category: 'timing', objection_class: 'true_objection', resolution: 'unhandled' },
+    { type: 'objection', fathom_call_id: 'timing-2', objection_category: 'timing', objection_class: 'true_objection', resolution: 'unhandled' },
+    { type: 'objection', fathom_call_id: 'timing-3', objection_category: 'timing', objection_class: 'true_objection', resolution: 'unhandled' },
+    { type: 'objection', fathom_call_id: 'dq', objection_category: 'timing', objection_class: 'disqualification', resolution: 'handled' },
+  ], {});
+  assert.deepEqual(result.most_raised, { category: 'timing', total: 3, handled: 0, rate: 0 });
+  assert.deepEqual(result.least_handled, { category: 'timing', total: 3, handled: 0, rate: 0 });
+  assert.equal(result.categories.fear.total, 2);
+  assert.equal(result.categories.timing.total, 3);
+});

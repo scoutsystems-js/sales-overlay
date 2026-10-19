@@ -5,6 +5,7 @@
 var { strictObjections } = require('./objection-strict');
 var { countObjections } = require('./objection-handled');
 var { closeRateForCalls } = require('./prospect-entity');
+var { OBJECTION_CATEGORIES } = require('./objection-categories');
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -119,6 +120,48 @@ function selectObjectionExamples(rows, callsById, filter, state, limit) {
   });
 }
 
+// This is a factual team overview, not an AI interpretation of what “biggest”
+// means.  It returns both the category raised most often and the category with
+// the lowest documented handle rate so the writer can distinguish volume from
+// difficulty in plain language.
+function summarizeTeamObjections(rows, outcomeByCall) {
+  var categories = {};
+  OBJECTION_CATEGORIES.forEach(function (category) {
+    categories[category.key] = { category: category.key, total: 0, handled: 0, rate: null };
+  });
+  var grouped = {};
+  strictObjections(rows).forEach(function (row) {
+    var key = Object.prototype.hasOwnProperty.call(categories, row.objection_category) ? row.objection_category : 'other';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(row);
+  });
+  Object.keys(grouped).forEach(function (key) {
+    var counts = countObjections(grouped[key], outcomeByCall);
+    categories[key] = {
+      category: key,
+      total: counts.total,
+      handled: counts.handled,
+      rate: counts.rate,
+    };
+  });
+  var populated = Object.keys(categories).map(function (key) { return categories[key]; })
+    .filter(function (category) { return category.total > 0; });
+  var mostRaised = populated.slice().sort(function (a, b) {
+    return b.total - a.total || OBJECTION_CATEGORIES.map(function (c) { return c.key; }).indexOf(a.category) - OBJECTION_CATEGORIES.map(function (c) { return c.key; }).indexOf(b.category);
+  })[0] || null;
+  var leastHandled = populated.slice().sort(function (a, b) {
+    return a.rate - b.rate || b.total - a.total || OBJECTION_CATEGORIES.map(function (c) { return c.key; }).indexOf(a.category) - OBJECTION_CATEGORIES.map(function (c) { return c.key; }).indexOf(b.category);
+  })[0] || null;
+  return {
+    kind: 'team_objection_overview',
+    total: populated.reduce(function (sum, category) { return sum + category.total; }, 0),
+    categories: categories,
+    most_raised: mostRaised,
+    least_handled: leastHandled,
+    definition: 'documented true objections in the requested date range; handled means the saved moment was handled or its call closed',
+  };
+}
+
 module.exports = {
   matchesPhrase: matchesPhrase,
   matchesCohort: matchesCohort,
@@ -126,4 +169,5 @@ module.exports = {
   summarizeObjectionCohort: summarizeObjectionCohort,
   summarizeCohortCloseRate: summarizeCohortCloseRate,
   selectObjectionExamples: selectObjectionExamples,
+  summarizeTeamObjections: summarizeTeamObjections,
 };

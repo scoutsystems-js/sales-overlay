@@ -22,6 +22,18 @@ const COHORT_TOOL = {
   },
 };
 
+const TEAM_OBJECTIONS_TOOL = {
+  name: 'read_team_objections',
+  description: 'Read verified Scout totals for the active closer group. Use for questions about which documented objection is raised most often or handled least often across the group.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+      to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+    },
+  },
+};
+
 function textFrom(response) {
   return ((response && response.content) || [])
     .filter(function (block) { return block && block.type === 'text' && typeof block.text === 'string'; })
@@ -62,6 +74,13 @@ function validToolInput(input, profiles, defaults) {
   };
 }
 
+function validTeamToolInput(input, profiles, defaults) {
+  return {
+    userIds: (profiles || []).map(function (profile) { return profile.user_id; }),
+    range: rangeFor(input || {}, defaults),
+  };
+}
+
 function systemPrompt(profiles, defaults) {
   var people = (profiles || []).map(function (profile) {
     return profile.user_id + ' — ' + profile.name;
@@ -74,13 +93,25 @@ function systemPrompt(profiles, defaults) {
     'When you use a tool, write a short plain-language answer that names the date range, numerator and denominator, and distinguishes objection handling from closing.',
     'Do not use Markdown, tables, headings, bullets, asterisks, or invented links. Write short plain sentences for Scout’s conversation view.',
     'The user can open the evidence cards Scout returns separately, so do not make up clips or quotes.',
+    'For a team-wide objection question, distinguish the objection raised most often from the objection handled least often. They can be different.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
 }
 
 function evidenceFrom(facts) {
+  if (facts && facts.kind === 'team_objection_overview') {
+    return {
+      kind: facts.kind,
+      window: facts.window,
+      closer_count: facts.closer_count,
+      most_raised: facts.most_raised,
+      least_handled: facts.least_handled,
+      categories: facts.categories,
+    };
+  }
   return {
+    kind: facts && facts.kind,
     window: facts.window,
     filter: facts.filter,
     objection_handle_rate: facts.objection_handle_rate,
@@ -105,7 +136,7 @@ async function answerQuestion(options) {
     model: options.model,
     max_tokens: 700,
     system: systemPrompt(profiles, defaults),
-    tools: [COHORT_TOOL],
+    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL],
     messages: messages,
   });
   var tool = firstToolUse(first);
@@ -116,21 +147,33 @@ async function answerQuestion(options) {
       evidence: null,
     };
   }
-  if (tool.name !== COHORT_TOOL.name) throw new Error('Scout AI requested an unavailable tool.');
-  var request = validToolInput(tool.input, profiles, defaults);
-  var facts = await options.readObjectionCohort({
-    userId: request.userId,
-    from: request.range.from,
-    to: request.range.to,
-    filter: request.filter,
-  });
+  var facts;
+  if (tool.name === COHORT_TOOL.name) {
+    var request = validToolInput(tool.input, profiles, defaults);
+    facts = await options.readObjectionCohort({
+      userId: request.userId,
+      from: request.range.from,
+      to: request.range.to,
+      filter: request.filter,
+    });
+  } else if (tool.name === TEAM_OBJECTIONS_TOOL.name) {
+    if (typeof options.readTeamObjections !== 'function') throw new Error('Scout AI is not configured.');
+    var teamRequest = validTeamToolInput(tool.input, profiles, defaults);
+    facts = await options.readTeamObjections({
+      userIds: teamRequest.userIds,
+      from: teamRequest.range.from,
+      to: teamRequest.range.to,
+    });
+  } else {
+    throw new Error('Scout AI requested an unavailable tool.');
+  }
   messages.push({ role: 'assistant', content: first.content });
   messages.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: tool.id, content: JSON.stringify(facts) }] });
   var final = await options.create({
     model: options.model,
     max_tokens: 700,
     system: systemPrompt(profiles, defaults),
-    tools: [COHORT_TOOL],
+    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL],
     messages: messages,
   });
   return { status: 'answered', answer: textFrom(final), evidence: evidenceFrom(facts) };
@@ -138,6 +181,8 @@ async function answerQuestion(options) {
 
 module.exports = {
   COHORT_TOOL: COHORT_TOOL,
+  TEAM_OBJECTIONS_TOOL: TEAM_OBJECTIONS_TOOL,
   validToolInput: validToolInput,
+  validTeamToolInput: validTeamToolInput,
   answerQuestion: answerQuestion,
 };

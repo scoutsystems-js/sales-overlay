@@ -23,6 +23,15 @@ function validateRequest(input) {
   return input;
 }
 
+function validateTeamRequest(input) {
+  input = input || {};
+  if (!Array.isArray(input.userIds) || input.userIds.length === 0 || input.userIds.some(function (id) { return typeof id !== 'string' || !id; })) {
+    throw new Error('At least one closer is required.');
+  }
+  if (!validIso(input.from) || !validIso(input.to) || input.from > input.to) throw new Error('A valid date range is required.');
+  return input;
+}
+
 async function paged(read) {
   var out = [];
   for (var page = 0; page < MAX_PAGES; page++) {
@@ -49,6 +58,14 @@ function baseCalls(admin, userId) {
   return admin.from('fathom_calls')
     .select('id, user_id, fathom_call_id, prospect_id, title, call_date, recording_url, not_a_sales_call, duplicate_of')
     .eq('user_id', userId)
+    .not('not_a_sales_call', 'is', true)
+    .is('duplicate_of', null);
+}
+
+function baseTeamCalls(admin, userIds) {
+  return admin.from('fathom_calls')
+    .select('id, user_id, fathom_call_id, prospect_id, title, call_date, recording_url, not_a_sales_call, duplicate_of')
+    .in('user_id', userIds)
     .not('not_a_sales_call', 'is', true)
     .is('duplicate_of', null);
 }
@@ -148,4 +165,29 @@ async function readObjectionCohort(admin, request) {
   };
 }
 
-module.exports = { validateRequest: validateRequest, readObjectionCohort: readObjectionCohort };
+async function readTeamObjections(admin, request) {
+  var input = validateTeamRequest(request);
+  var calls = await paged(function (from, to) {
+    return baseTeamCalls(admin, input.userIds)
+      .gte('call_date', input.from)
+      .lte('call_date', input.to)
+      .order('call_date', { ascending: false })
+      .range(from, to);
+  });
+  calls = realCallsOnly(calls);
+  var callIds = calls.map(function (call) { return call.id; });
+  var moments = await highlightsForCalls(admin, callIds);
+  var analyses = await analysesForCalls(admin, callIds);
+  var overview = facts.summarizeTeamObjections(moments, outcomesByCall(analyses));
+  overview.window = { from: input.from, to: input.to };
+  overview.calls_in_window = calls.length;
+  overview.closer_count = input.userIds.length;
+  return overview;
+}
+
+module.exports = {
+  validateRequest: validateRequest,
+  validateTeamRequest: validateTeamRequest,
+  readObjectionCohort: readObjectionCohort,
+  readTeamObjections: readTeamObjections,
+};

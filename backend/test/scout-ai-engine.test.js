@@ -63,3 +63,32 @@ test('a hallucinated closer id is rejected before any fact read', async () => {
   }, /could not match that closer/);
   assert.equal(read, false);
 });
+
+test('the model can read the team objection overview without inventing a closer cohort', async () => {
+  const requests = [];
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-team', name: 'read_team_objections', input: {} }] },
+    { content: [{ type: 'text', text: 'In this date range, Timing was raised most often: 12 documented objections, with 3 handled. It was also the weakest-handled category at 25%.' }] },
+  ];
+  const facts = {
+    kind: 'team_objection_overview', window: DEFAULT_RANGE, closer_count: 1,
+    most_raised: { category: 'timing', total: 12, handled: 3, rate: 25 },
+    least_handled: { category: 'timing', total: 12, handled: 3, rate: 25 },
+    categories: {},
+  };
+  const result = await answerQuestion({
+    question: 'What is the biggest objection our closers are facing?',
+    profiles: PROFILES,
+    defaultRange: DEFAULT_RANGE,
+    model: 'fixture-model',
+    create: async request => { requests.push(request); return responses.shift(); },
+    readObjectionCohort: async () => { throw new Error('wrong reader'); },
+    readTeamObjections: async request => { reads.push(request); return facts; },
+  });
+  assert.equal(result.status, 'answered');
+  assert.equal(reads.length, 1);
+  assert.deepEqual(reads[0], { userIds: ['josh-id'], from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
+  assert.equal(requests[0].tools.length, 2);
+  assert.equal(result.evidence.most_raised.category, 'timing');
+});
