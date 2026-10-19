@@ -10,6 +10,8 @@ var { fetchProspectCloseRates } = require('./prospect-entity');
 var { SECTION_ORDER, LABELS, sectionStatsFromAnalyses, rankSections } = require('./section-ranking');
 var stageCoachingEvidence = require('./stage-coaching-evidence');
 var facts = require('./scout-ai-facts');
+var { computeObjectionSynthesis } = require('./objection-synthesis');
+var { comparisonFromSavedCoaching } = require('./scout-ai-coaching-comparison');
 
 var PAGE_SIZE = 1000;
 var MAX_PAGES = 25;
@@ -197,6 +199,27 @@ async function readObjectionCohort(admin, request) {
     handled_examples: facts.selectObjectionExamples(moments, callsById(windowCalls), input.filter, 'handled'),
     not_handled_examples: facts.selectObjectionExamples(moments, callsById(windowCalls), input.filter, 'not_handled'),
   };
+}
+
+// The comparison language is already generated and guarded by the personal
+// Objections coaching lane. Reuse it here rather than asking a second model to
+// summarize the same calls. The accompanying examples remain direct facts.
+async function readObjectionCoachingComparison(admin, request) {
+  var input = validateRequest({
+    userId: request && request.userId,
+    from: request && request.from,
+    to: request && request.to,
+    filter: { category: request && request.category },
+  });
+  var cohort = await readObjectionCohort(admin, input);
+  var synthesis = await computeObjectionSynthesis(admin, input.userId, input.from, input.to);
+  return comparisonFromSavedCoaching({
+    cohort: cohort,
+    synthesis: synthesis,
+    userId: input.userId,
+    name: request && request.name,
+    category: input.filter.category,
+  });
 }
 
 async function readTeamObjections(admin, request) {
@@ -399,6 +422,7 @@ module.exports = {
   validateTeamRequest: validateTeamRequest,
   validateStageRequest: validateStageRequest,
   readObjectionCohort: readObjectionCohort,
+  readObjectionCoachingComparison: readObjectionCoachingComparison,
   readTeamObjections: readTeamObjections,
   readTeamObjectionLeaderboard: readTeamObjectionLeaderboard,
   readCloserCloseRate: readCloserCloseRate,

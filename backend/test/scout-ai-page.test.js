@@ -44,3 +44,10 @@ test('an overall coaching priority has its own evidence card', () => {
   assert.match(source, /evidence\.priority/);
   assert.match(source, /Coaching priority/);
 });
+
+test('a saved objection comparison shows both grounded patterns and the supporting calls', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /evidence\.kind === 'objection_coaching_comparison'/);
+  assert.match(source, /When it works/);
+  assert.match(source, /When it is not handled/);
+});

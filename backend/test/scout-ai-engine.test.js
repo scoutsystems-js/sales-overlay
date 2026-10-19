@@ -89,7 +89,7 @@ test('the model can read the team objection overview without inventing a closer 
   assert.equal(result.status, 'answered');
   assert.equal(reads.length, 1);
   assert.deepEqual(reads[0], { userIds: ['josh-id'], from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
-  assert.equal(requests[0].tools.length, 6);
+  assert.equal(requests[0].tools.length, 7);
   assert.equal(result.evidence.most_raised.category, 'timing');
 });
 
@@ -191,6 +191,30 @@ test('the model can return a closer’s saved Discovery exchange without inventi
   });
   assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: 'josh-id', stage: 'discovery', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
   assert.equal(result.evidence.kind, 'stage_examples');
+});
+
+test('the model can compare one closer’s saved handled and not-handled objection patterns', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-comparison', name: 'read_objection_coaching_comparison', input: { user_id: 'josh-id', category: 'fear' } }] },
+    { content: [{ type: 'text', text: 'When Fear worked for Josh, he isolated the concern before offering a path forward. When it did not, he answered before confirming the real blocker.' }] },
+  ];
+  const facts = {
+    kind: 'objection_coaching_comparison', window: DEFAULT_RANGE, closer: { user_id: 'josh-id', name: 'Josh P' }, category: 'fear',
+    handle_rate: { handled: 2, total: 5, rate: 40 },
+    when_handled: 'He confirmed the concern was the only blocker before offering a path forward.',
+    when_not_handled: 'He answered the concern before confirming whether it was the real blocker.',
+    handled_examples: [{ call_id: 'handled-1', quote: 'I cannot afford it.' }],
+    not_handled_examples: [{ call_id: 'missed-1', quote: 'It is too expensive.' }],
+  };
+  const result = await answerQuestion({
+    question: 'How does Josh handle Fear when it works, and what happens when he does not?', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readObjectionCoachingComparison: async request => { reads.push(request); return facts; },
+  });
+  assert.deepEqual(reads, [{ userId: 'josh-id', name: 'Josh P', category: 'fear', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.equal(result.evidence.when_handled, facts.when_handled);
+  assert.equal(result.evidence.not_handled_examples[0].call_id, 'missed-1');
 });
 
 test('a follow-up gets prior user questions as context but still requires a fresh Scout tool read', async () => {

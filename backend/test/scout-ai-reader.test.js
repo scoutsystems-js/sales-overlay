@@ -15,6 +15,7 @@ test('Scout AI has a bounded database reader before a question route can exist',
 });
 
 const { readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples } = require('../lib/scout-ai-reader');
+const { comparisonFromSavedCoaching } = require('../lib/scout-ai-coaching-comparison');
 
 const CALLS = [
   { id: 'call-spouse', user_id: 'josh', fathom_call_id: 'real-spouse', prospect_id: 'prospect-spouse', title: 'Avery', call_date: '2026-10-02T12:00:00Z', recording_url: 'https://recording.example/spouse', not_a_sales_call: false, duplicate_of: null },
@@ -76,6 +77,25 @@ test('the bounded reader returns only exact spouse evidence and its linked close
   assert.equal(result.handled_examples[0].prospect_name, 'Avery');
   assert.equal(result.handled_examples[0].timestamp_seconds, 90);
   assert.equal(result.handled_examples[0].recording_url, 'https://recording.example/spouse');
+});
+
+test('a coaching comparison withholds a claimed repeated pattern without two matching saved examples', () => {
+  const comparison = comparisonFromSavedCoaching({
+    userId: 'josh', name: 'Josh P', category: 'fear', window: { from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z' },
+    cohort: {
+      window: { from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z' },
+      objection_handle_rate: { handled: 1, total: 3, rate: 33 },
+      handled_examples: [{ call_id: 'handled-1' }],
+      not_handled_examples: [{ call_id: 'missed-1' }, { call_id: 'missed-2' }],
+    },
+    synthesis: { categories: [{
+      category: 'fear',
+      when_handled: 'The closer isolated the concern first.',
+      when_not_handled: 'The closer answered before isolating.',
+    }] },
+  });
+  assert.equal(comparison.when_handled, null);
+  assert.equal(comparison.when_not_handled, 'The closer answered before isolating.');
 });
 
 test('the bounded reader returns a team objection overview from saved strict moments', async () => {

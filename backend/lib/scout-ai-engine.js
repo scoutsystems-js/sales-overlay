@@ -24,6 +24,21 @@ const COHORT_TOOL = {
   },
 };
 
+const OBJECTION_COACHING_COMPARISON_TOOL = {
+  name: 'read_objection_coaching_comparison',
+  description: 'Compare one closer’s saved coaching patterns for one canonical objection category. Use for questions about what they do when that objection is handled versus what happens when it is not handled. The comparison is available only when Scout has saved repeated evidence; otherwise say so plainly.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      user_id: { type: 'string', description: 'One id from the available closer list.' },
+      category: { type: 'string', enum: CATEGORIES, description: 'Canonical Scout objection category.' },
+      from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+      to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+    },
+    required: ['user_id', 'category'],
+  },
+};
+
 const TEAM_OBJECTIONS_TOOL = {
   name: 'read_team_objections',
   description: 'Read verified Scout totals for the active closer group. Use for questions about which documented objection is raised most often or handled least often across the group.',
@@ -93,7 +108,7 @@ const STAGE_EXAMPLES_TOOL = {
   },
 };
 
-const SCOUT_TOOLS = [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL, CLOSER_CLOSE_RATE_TOOL, STAGE_PERFORMANCE_TOOL, STAGE_EXAMPLES_TOOL];
+const SCOUT_TOOLS = [COHORT_TOOL, OBJECTION_COACHING_COMPARISON_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL, CLOSER_CLOSE_RATE_TOOL, STAGE_PERFORMANCE_TOOL, STAGE_EXAMPLES_TOOL];
 
 function textFrom(response) {
   return ((response && response.content) || [])
@@ -145,6 +160,16 @@ function validToolInput(input, profiles, defaults) {
     filter: { phrase: phrase || null, category: category || null },
     range: rangeFor(input, defaults),
   };
+}
+
+function validCoachingComparisonToolInput(input, profiles, defaults) {
+  input = input || {};
+  var userId = input.user_id;
+  var profile = (profiles || []).find(function (item) { return item.user_id === userId; });
+  if (!profile) throw new Error('Scout AI could not match that closer.');
+  var category = typeof input.category === 'string' ? input.category.trim().toLowerCase() : '';
+  if (CATEGORIES.indexOf(category) === -1) throw new Error('Scout AI needs a canonical objection category for that comparison.');
+  return { userId: userId, name: profile.name, category: category, range: rangeFor(input, defaults) };
 }
 
 function validTeamToolInput(input, profiles, defaults) {
@@ -217,6 +242,7 @@ function systemPrompt(profiles, defaults) {
     'The user can open the evidence cards Scout returns separately, so do not make up clips or quotes.',
     'For a team-wide objection question, distinguish the objection raised most often from the objection handled least often. They can be different.',
     'For “who handles a category best,” use the team leaderboard tool once. Do not call one closer tool per person.',
+    'For “what does a closer do when an objection works versus when it does not,” use the objection-coaching-comparison tool once for that closer and category. State only the saved repeated patterns it returns; never add a cause, outcome, or pattern that is not present.',
     'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer.',
     'For a request to show saved calls or examples for Discovery, Pitch, or Close, use the stage-examples tool. Describe only the saved exchange; never say it caused a grade, handling result, or call outcome.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
@@ -225,6 +251,13 @@ function systemPrompt(profiles, defaults) {
 }
 
 function evidenceFrom(facts) {
+  if (facts && facts.kind === 'objection_coaching_comparison') {
+    return {
+      kind: facts.kind, window: facts.window, closer: facts.closer, category: facts.category, handle_rate: facts.handle_rate,
+      when_handled: facts.when_handled, when_not_handled: facts.when_not_handled,
+      handled_examples: facts.handled_examples, not_handled_examples: facts.not_handled_examples,
+    };
+  }
   if (facts && facts.kind === 'stage_examples') {
     return { kind: facts.kind, window: facts.window, stage: facts.stage, examples: facts.examples };
   }
@@ -296,6 +329,10 @@ async function answerQuestion(options) {
     if (tool.name === COHORT_TOOL.name) {
       return { kind: 'cohort', tool: tool, request: validToolInput(tool.input, profiles, defaults) };
     }
+    if (tool.name === OBJECTION_COACHING_COMPARISON_TOOL.name) {
+      if (typeof options.readObjectionCoachingComparison !== 'function') throw new Error('Scout AI is not configured.');
+      return { kind: 'coaching-comparison', tool: tool, request: validCoachingComparisonToolInput(tool.input, profiles, defaults) };
+    }
     if (tool.name === TEAM_OBJECTIONS_TOOL.name) {
       if (typeof options.readTeamObjections !== 'function') throw new Error('Scout AI is not configured.');
       return { kind: 'team', tool: tool, request: validTeamToolInput(tool.input, profiles, defaults) };
@@ -332,6 +369,15 @@ async function answerQuestion(options) {
           from: request.range.from,
           to: request.range.to,
           filter: request.filter,
+        });
+      } else if (plan.kind === 'coaching-comparison') {
+        var comparisonRequest = plan.request;
+        fact = await options.readObjectionCoachingComparison({
+          userId: comparisonRequest.userId,
+          name: comparisonRequest.name,
+          category: comparisonRequest.category,
+          from: comparisonRequest.range.from,
+          to: comparisonRequest.range.to,
         });
       } else if (plan.kind === 'team') {
         var teamRequest = plan.request;
@@ -397,12 +443,14 @@ async function answerQuestion(options) {
 
 module.exports = {
   COHORT_TOOL: COHORT_TOOL,
+  OBJECTION_COACHING_COMPARISON_TOOL: OBJECTION_COACHING_COMPARISON_TOOL,
   TEAM_OBJECTIONS_TOOL: TEAM_OBJECTIONS_TOOL,
   TEAM_OBJECTION_LEADERBOARD_TOOL: TEAM_OBJECTION_LEADERBOARD_TOOL,
   CLOSER_CLOSE_RATE_TOOL: CLOSER_CLOSE_RATE_TOOL,
   STAGE_PERFORMANCE_TOOL: STAGE_PERFORMANCE_TOOL,
   STAGE_EXAMPLES_TOOL: STAGE_EXAMPLES_TOOL,
   validToolInput: validToolInput,
+  validCoachingComparisonToolInput: validCoachingComparisonToolInput,
   validTeamToolInput: validTeamToolInput,
   validLeaderboardToolInput: validLeaderboardToolInput,
   validCloseRateToolInput: validCloseRateToolInput,
