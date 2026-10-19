@@ -141,6 +141,12 @@ app.get('/coaching', function(req, res) {
   res.sendFile(path.join(__dirname, 'web', 'coaching.html'));
 });
 
+// Owner-only Scout AI page. The browser verifies the role, and every data route
+// repeats the owner gate server-side.
+app.get('/scout-ai', function(req, res) {
+  res.sendFile(path.join(__dirname, 'web', 'scout-ai.html'));
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/billing', billingRoutes);
