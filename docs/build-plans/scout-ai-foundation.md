@@ -13,7 +13,8 @@ Development access is owner-only.  The first release handles the high-value
 question families already supported by stored Scout facts:
 
 1. measured close and objection-handle rates for a closer, team or stated date
-   range;
+   range, including a clearly labelled cohort rate only when the person asks
+   for that cohort;
 2. the largest or weakest objection category, with the count and rate used;
 3. up to three handled and three not-handled examples for a closer and
    objection category; and
@@ -22,6 +23,10 @@ question families already supported by stored Scout facts:
 The default window is the preceding 90 calendar days.  Every answer names the
 actual window and the set of calls included.  A requested date range replaces
 that default.
+
+Question-specific cohort calculations are answer-only.  They do not add a
+dashboard card, alter Scout's normal closing-rate definition, or become a
+permanent metric simply because somebody asked for one.
 
 ## Evidence contract
 
