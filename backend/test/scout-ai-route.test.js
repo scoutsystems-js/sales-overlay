@@ -36,11 +36,11 @@ function appFor(role) {
   return app;
 }
 
-function post(app, body) {
+function post(app, body, pathName) {
   return new Promise(function (resolve, reject) {
     const server = http.createServer(app).listen(0, function () {
       const payload = JSON.stringify(body);
-      const req = http.request({ port: server.address().port, path: '/scout-ai/facts/objection-cohort', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, function (res) {
+      const req = http.request({ port: server.address().port, path: pathName || '/scout-ai/facts/objection-cohort', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, function (res) {
         let text = '';
         res.on('data', chunk => { text += chunk; });
         res.on('end', function () {
@@ -63,4 +63,12 @@ test('an owner reaches the fact tool before request validation', async () => {
   const result = await post(appFor('owner'), {});
   assert.equal(result.status, 400);
   assert.notEqual(result.status, 403);
+});
+
+test('the owner-only question route rejects an empty question before a model call', async () => {
+  const blocked = await post(appFor('user'), {}, '/scout-ai/ask');
+  assert.equal(blocked.status, 403);
+  const owner = await post(appFor('owner'), {}, '/scout-ai/ask');
+  assert.equal(owner.status, 400);
+  assert.match(owner.body.error, /Ask Scout a question/);
 });

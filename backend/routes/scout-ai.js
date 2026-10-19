@@ -4,6 +4,10 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validateRequest, readObjectionCohort } = require('../lib/scout-ai-reader');
+const { answerQuestion } = require('../lib/scout-ai-engine');
+const { resolveDisplayName } = require('../lib/display-name');
+const createWithUsage = require('../lib/model-usage').usageFor('scout-ai');
+const { CLAUDE_MODEL } = require('../config');
 
 const router = express.Router();
 let adminOverride = null;
@@ -23,6 +27,24 @@ function defaultRange(body) {
   if (isNaN(Date.parse(from)) || isNaN(Date.parse(to)) || from > to) throw new Error('Choose a valid date range.');
   if (Date.parse(to) - Date.parse(from) > 366 * 24 * 60 * 60 * 1000) throw new Error('Choose a date range of one year or less.');
   return { from, to };
+}
+
+async function availableClosers(admin) {
+  const authResult = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (authResult.error) throw new Error('Scout AI could not load closers.');
+  const profilesResult = await admin.from('user_profiles').select('user_id, role, active, first_name, last_name');
+  if (profilesResult.error) throw new Error('Scout AI could not load closer profiles.');
+  const profilesById = {};
+  (profilesResult.data || []).forEach(function (profile) { profilesById[profile.user_id] = profile; });
+  return ((authResult.data && authResult.data.users) || []).map(function (user) {
+    const profile = profilesById[user.id] || {};
+    return {
+      user_id: user.id,
+      name: resolveDisplayName(profile, user.email, user.id),
+      role: profile.role || 'user',
+      active: profile.active !== false,
+    };
+  }).filter(function (profile) { return profile.active && profile.role !== 'owner'; });
 }
 
 // This is a deliberately narrow first tool endpoint, not a general query API.
@@ -45,7 +67,30 @@ router.post('/facts/objection-cohort', requireAuth, requireRole('owner'), async 
   }
 });
 
+router.post('/ask', requireAuth, requireRole('owner'), async function (req, res) {
+  try {
+    const question = String((req.body && req.body.question) || '').trim();
+    if (!question) return res.status(400).json({ error: 'Ask Scout a question first.' });
+    const range = defaultRange(req.body);
+    const admin = adminClient();
+    const result = await answerQuestion({
+      question: question,
+      profiles: await availableClosers(admin),
+      defaultRange: range,
+      model: CLAUDE_MODEL,
+      create: function (params) { return createWithUsage(params, { userId: req.user.id }); },
+      readObjectionCohort: function (input) { return readObjectionCohort(admin, input); },
+    });
+    res.json(result);
+  } catch (error) {
+    const message = (error && error.message) || 'Scout AI could not answer that question.';
+    const config = message.indexOf('not configured') !== -1;
+    res.status(config ? 503 : 400).json({ error: message });
+  }
+});
+
 router._setAdminClientForTests = function (client) { adminOverride = client; };
 router._defaultRangeForTests = defaultRange;
+router._availableClosersForTests = availableClosers;
 
 module.exports = router;
