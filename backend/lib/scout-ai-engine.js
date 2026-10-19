@@ -72,6 +72,7 @@ function systemPrompt(profiles, defaults) {
     'A phrase such as “spouse” is not the same thing as the whole Partner category. Say which one you used.',
     'Question-specific cohort rates are answer-only. They do not change Scout’s normal dashboard metrics.',
     'When you use a tool, write a short plain-language answer that names the date range, numerator and denominator, and distinguishes objection handling from closing.',
+    'Do not use Markdown, tables, headings, bullets, asterisks, or invented links. Write short plain sentences for Scout’s conversation view.',
     'The user can open the evidence cards Scout returns separately, so do not make up clips or quotes.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,

@@ -44,6 +44,7 @@ test('the model can request only a known closer and receives Scout facts before 
   assert.equal(toolReads.length, 1);
   assert.deepEqual(toolReads[0], { userId: 'josh-id', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to, filter: { phrase: 'spouse', category: null } });
   assert.equal(requests.length, 2);
+  assert.match(requests[0].system, /Do not use Markdown/);
   assert.equal(requests[1].messages[2].content[0].type, 'tool_result');
   assert.equal(result.evidence.close_rate.rate, 33);
 });
