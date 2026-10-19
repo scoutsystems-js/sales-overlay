@@ -1,0 +1,51 @@
+'use strict';
+
+const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { validateRequest, readObjectionCohort } = require('../lib/scout-ai-reader');
+
+const router = express.Router();
+let adminOverride = null;
+
+function adminClient() {
+  if (adminOverride) return adminOverride;
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Supabase admin not configured — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
+  }
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+}
+
+function defaultRange(body) {
+  body = body || {};
+  const to = body.to || new Date().toISOString();
+  const from = body.from || new Date(Date.parse(to) - (90 * 24 * 60 * 60 * 1000)).toISOString();
+  if (isNaN(Date.parse(from)) || isNaN(Date.parse(to)) || from > to) throw new Error('Choose a valid date range.');
+  if (Date.parse(to) - Date.parse(from) > 366 * 24 * 60 * 60 * 1000) throw new Error('Choose a date range of one year or less.');
+  return { from, to };
+}
+
+// This is a deliberately narrow first tool endpoint, not a general query API.
+// It remains owner-only until the chat writer and scope rules are complete.
+router.post('/facts/objection-cohort', requireAuth, requireRole('owner'), async function (req, res) {
+  try {
+    const range = defaultRange(req.body);
+    const request = validateRequest({
+      userId: req.body && req.body.user_id,
+      from: range.from,
+      to: range.to,
+      filter: (req.body && req.body.filter) || {},
+    });
+    const result = await readObjectionCohort(adminClient(), request);
+    res.json(result);
+  } catch (error) {
+    const message = (error && error.message) || 'Scout AI could not read that evidence.';
+    const config = message.indexOf('not configured') !== -1;
+    res.status(config ? 503 : 400).json({ error: message });
+  }
+});
+
+router._setAdminClientForTests = function (client) { adminOverride = client; };
+router._defaultRangeForTests = defaultRange;
+
+module.exports = router;

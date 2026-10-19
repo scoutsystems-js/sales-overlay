@@ -160,6 +160,7 @@ app.use('/team', teamRoutes);
 app.use('/eod', eodRoutes);
 app.use('/zoom', zoomRoutes);
 app.use('/calendar', require('./routes/calendar'));
+app.use('/scout-ai', require('./routes/scout-ai'));
 
 // Global error handler
 app.use(function(err, req, res, next) {

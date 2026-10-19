@@ -148,4 +148,4 @@ async function readObjectionCohort(admin, request) {
   };
 }
 
-module.exports = { readObjectionCohort: readObjectionCohort };
+module.exports = { validateRequest: validateRequest, readObjectionCohort: readObjectionCohort };
