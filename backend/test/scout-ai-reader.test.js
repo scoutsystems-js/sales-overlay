@@ -163,6 +163,17 @@ test('the bounded reader ranks only sufficiently measured Discovery scores in th
   assert.deepEqual(result.closers.map(function (closer) { return [closer.name, closer.score, closer.graded_calls]; }), [['Ava', 60, 10], ['Ben', 80, 10]]);
 });
 
+test('the bounded reader returns one complete, tied-safe coaching priority across all earned stages', async () => {
+  const result = await readStagePerformance(stageAdmin(), {
+    userIds: ['ava', 'ben'], namesByUserId: { ava: 'Ava', ben: 'Ben' },
+    from: '2026-10-01T00:00:00Z', to: '2026-10-31T23:59:59Z',
+  });
+  assert.equal(result.stage, null);
+  assert.deepEqual(result.priority, {
+    ties: [{ user_id: 'ava', name: 'Ava', stage: 'discovery', label: 'Discovery', score: 60, graded_calls: 10 }],
+  });
+});
+
 test('the bounded reader returns only a saved, verified exchange for the requested stage', async () => {
   const result = await readStageExamples(fakeAdmin(), {
     userIds: ['josh'], namesByUserId: { josh: 'Josh P' }, stage: 'discovery',

@@ -314,10 +314,30 @@ async function readStagePerformance(admin, request) {
       return left.score - right.score || left.name.localeCompare(right.name);
     });
   }
+  var priority = null;
+  if (!input.stage) {
+    var candidates = closers.flatMap(function (closer) {
+      return closer.stages.filter(function (stage) { return stage.enough && stage.score != null; }).map(function (stage) {
+        return {
+          user_id: closer.user_id,
+          name: closer.name,
+          stage: stage.stage,
+          label: stage.label,
+          score: stage.score,
+          graded_calls: stage.graded_calls,
+        };
+      });
+    });
+    if (candidates.length) {
+      var lowestScore = Math.min.apply(null, candidates.map(function (candidate) { return candidate.score; }));
+      priority = { ties: candidates.filter(function (candidate) { return candidate.score === lowestScore; }) };
+    }
+  }
   return {
     kind: 'stage_performance',
     window: { from: input.from, to: input.to },
     stage: input.stage || null,
+    priority: priority,
     closers: closers,
   };
 }

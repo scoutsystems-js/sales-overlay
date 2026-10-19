@@ -160,6 +160,24 @@ test('the model can rank the authorized group’s earned Discovery scores', asyn
   assert.equal(result.evidence.stage, 'discovery');
 });
 
+test('the model uses one complete stage read for who needs the most coaching overall', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-priority', name: 'read_stage_performance', input: {} }] },
+    { content: [{ type: 'text', text: 'Ava needs the most help with Discovery.' }] },
+  ];
+  const result = await answerQuestion({
+    question: 'What closer needs the most coaching and in which area?', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readStagePerformance: async request => {
+      reads.push(request);
+      return { kind: 'stage_performance', stage: null, window: DEFAULT_RANGE, priority: { ties: [{ user_id: 'josh-id', name: 'Josh P', stage: 'discovery', label: 'Discovery', score: 62, graded_calls: 10 }] }, closers: [] };
+    },
+  });
+  assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: null, stage: null, from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.equal(result.evidence.priority.ties[0].stage, 'discovery');
+});
+
 test('the model can return a closer’s saved Discovery exchange without inventing coaching', async () => {
   const reads = [];
   const responses = [

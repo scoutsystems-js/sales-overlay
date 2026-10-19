@@ -66,7 +66,7 @@ const CLOSER_CLOSE_RATE_TOOL = {
 
 const STAGE_PERFORMANCE_TOOL = {
   name: 'read_stage_performance',
-  description: 'Read earned sales-stage scores for one closer or the authorized closer group. Use for questions about Discovery, Intro, Pitch, Objection Handling, or Close performance. When comparing who needs help with one stage, provide that stage and omit user_id.',
+  description: 'Read earned sales-stage scores for one closer or the authorized closer group. Use for questions about Discovery, Intro, Pitch, Objection Handling, or Close performance. For who needs the most coaching overall, omit both user_id and stage: Scout returns one complete, tied-safe priority from all eligible stages. When comparing who needs help with one stage, provide that stage and omit user_id.',
   input_schema: {
     type: 'object',
     properties: {
@@ -175,7 +175,6 @@ function validStagePerformanceToolInput(input, profiles, defaults) {
   if (userId && !(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
   var stage = typeof input.stage === 'string' ? input.stage.trim().toLowerCase() : null;
   if (stage && STAGES.indexOf(stage) === -1) throw new Error('Scout AI needs a valid sales stage for that question.');
-  if (!stage && !userId) throw new Error('Scout AI needs a closer or sales stage for that question.');
   var namesByUserId = {};
   (profiles || []).forEach(function (profile) { namesByUserId[profile.user_id] = profile.name; });
   return {
@@ -218,7 +217,7 @@ function systemPrompt(profiles, defaults) {
     'The user can open the evidence cards Scout returns separately, so do not make up clips or quotes.',
     'For a team-wide objection question, distinguish the objection raised most often from the objection handled least often. They can be different.',
     'For “who handles a category best,” use the team leaderboard tool once. Do not call one closer tool per person.',
-    'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked.',
+    'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer.',
     'For a request to show saved calls or examples for Discovery, Pitch, or Close, use the stage-examples tool. Describe only the saved exchange; never say it caused a grade, handling result, or call outcome.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
@@ -233,7 +232,7 @@ function evidenceFrom(facts) {
     return { kind: facts.kind, window: facts.window, close_rate: facts.close_rate };
   }
   if (facts && facts.kind === 'stage_performance') {
-    return { kind: facts.kind, window: facts.window, stage: facts.stage, closers: facts.closers };
+    return { kind: facts.kind, window: facts.window, stage: facts.stage, priority: facts.priority || null, closers: facts.closers };
   }
   if (facts && facts.kind === 'team_objection_overview') {
     return {

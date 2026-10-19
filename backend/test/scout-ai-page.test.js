@@ -33,3 +33,14 @@ test('the admin dashboard gives the owner a visible path to the private Scout AI
   assert.match(source, /window\.location\.href\s*=\s*'\/scout-ai'/);
   assert.match(source, /state\.me\.role\s*===\s*'owner'[\s\S]{0,300}navScoutAi/);
 });
+
+test('the active composer follows the conversation instead of covering the answer', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.doesNotMatch(source, /#askForm\s*\{\s*position:sticky/);
+});
+
+test('an overall coaching priority has its own evidence card', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /evidence\.priority/);
+  assert.match(source, /Coaching priority/);
+});
